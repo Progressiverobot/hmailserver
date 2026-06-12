@@ -303,3 +303,17 @@ Test-environment recipe (dev tree, no installer):
 8. Tests authenticate COM as Administrator with password `testar` → blank
    fallback; they bind live ports and wipe data — never run against a
    production install.
+
+Optional integrations (turn inconclusive tests into real runs):
+- `AddXOriginalRcptTo=1` under `[Settings]` in BOTH INI copies (exe dir and
+  `Bin\`) enables the 6 XOriginalRcptHeaderTests.
+- ClamAV (5 tests): install ClamAV (winget `Cisco.ClamAV`), copy the install
+  to `C:\clamav` (CustomAsserts hardcodes `C:\clamav\clamd.exe`), minimal
+  `clamd.conf` (`TCPSocket 3310`, `TCPAddr 127.0.0.1`, `DatabaseDirectory
+  C:\clamav\database`), run freshclam, start clamd. **Warm-up gotcha:** clamd
+  accepts TCP before signatures finish loading and hMailServer fails open —
+  send one EICAR message and confirm "Virus detected" in the log before
+  trusting AntiVirus fixture results.
+- SpamAssassin (22 tests): requires a local process literally named `spamd`
+  (or the legacy `SpamAssassinJAM` service). No maintained Windows build;
+  left inconclusive.
