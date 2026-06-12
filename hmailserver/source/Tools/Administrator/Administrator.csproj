@@ -520,6 +520,10 @@
     <Compile Include="Controls\DashboardControls.cs">
       <SubType>Component</SubType>
     </Compile>
+    <Compile Include="Utilities\Theme.cs" />
+    <Compile Include="Dialogs\formCommandPalette.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="Utilities\TwoFactorAuth.cs" />
     <Compile Include="Dialogs\formTotpPrompt.cs">
       <SubType>Form</SubType>

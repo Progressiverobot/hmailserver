@@ -8,6 +8,7 @@
 #include "ServerStatus.h"
 #include "Crypt.h"
 #include "AcmeClient.h"
+#include "FileUtilities.h"
 #include "Encoding/Base64.h"
 
 #include "../BO/Domains.h"
@@ -377,6 +378,12 @@ namespace HM
       if (queryPosition >= 0)
          path = path.Mid(0, queryPosition);
 
+      // The web admin SPA shell is served without authentication (it is a
+      // static login page). Every data endpoint below still requires
+      // HTTP Basic authentication.
+      if (method == "GET" && (path == "/" || path == "/index.html"))
+         return HandleWebAdminPage_();
+
       if (!Authenticate_(request))
       {
          AnsiString response;
@@ -477,6 +484,33 @@ namespace HM
       AnsiString response;
       response.Format("HTTP/1.0 %d %hs\r\nContent-Type: application/json\r\nContent-Length: %d\r\nConnection: close\r\n\r\n",
          statusCode, statusText.c_str(), body.GetLength());
+      response += body;
+
+      return response;
+   }
+
+   AnsiString
+   RestApiServer::HandleWebAdminPage_()
+   {
+      String pagePath = FileUtilities::Combine(
+         IniFileSettings::Instance()->GetProgramDirectory(), _T("WebAdmin\\index.html"));
+
+      AnsiString body;
+      if (FileUtilities::Exists(pagePath))
+      {
+         String content = FileUtilities::ReadCompleteTextFile(pagePath);
+         body = content;
+      }
+      else
+      {
+         body = "<!doctype html><html><body style=\"font-family:sans-serif\">"
+                "<h1>hMailServer</h1><p>Web administration page not installed. "
+                "The REST API is available under /api/v1/.</p></body></html>";
+      }
+
+      AnsiString response;
+      response.Format("HTTP/1.0 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: %d\r\nConnection: close\r\n\r\n",
+         body.GetLength());
       response += body;
 
       return response;

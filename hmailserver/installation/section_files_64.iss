@@ -8,6 +8,9 @@ Source: "..\source\server\hMailServer\x64\Release\hMailServer.Minidump.exe"; Des
 ; the service on startup (e.g. constexpr std::mutex changes).
 Source: "Microsoft.VC145.CRT\*"; DestDir: "{app}\Bin"; Flags: ignoreversion; Components: server admintools;
 
+; Web administration SPA (served by the REST API listener at GET /)
+Source: "WebAdmin\index.html"; DestDir: "{app}\WebAdmin"; Flags: ignoreversion; Components: server;
+
 Source: "SQLCE\SSCERuntime_x64-ENU.msi"; Flags: deleteafterinstall ; Excludes: ".svn"; DestDir: "{tmp}"; Components: server;
 
 ; Common tools

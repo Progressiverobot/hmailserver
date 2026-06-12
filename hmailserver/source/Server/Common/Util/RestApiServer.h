@@ -34,6 +34,7 @@ namespace HM
       static bool Authenticate_(const AnsiString &request);
 
       static AnsiString BuildResponse_(int statusCode, const AnsiString &body);
+      static AnsiString HandleWebAdminPage_();
       static AnsiString HandleStatus_();
       static AnsiString HandleListDomains_();
       static AnsiString HandleListAccounts_(const String &domainName);

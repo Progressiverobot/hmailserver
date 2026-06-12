@@ -42,14 +42,14 @@ namespace hMailServer.Administrator
       {
          SuspendLayout();
 
-         BackColor = Color.FromArgb(246, 248, 250);
+         BackColor = Theme.C.Background;
          AutoScroll = true;
 
          _labelHeader = new Label
          {
             Text = "Server Dashboard",
             Font = new Font("Segoe UI", 15F, FontStyle.Bold),
-            ForeColor = Color.FromArgb(36, 41, 47),
+            ForeColor = Theme.C.Text,
             AutoSize = true,
             Location = new Point(16, 12)
          };
@@ -59,18 +59,18 @@ namespace hMailServer.Administrator
          {
             Text = "",
             Font = new Font("Segoe UI", 8.5F),
-            ForeColor = Color.FromArgb(130, 140, 152),
+            ForeColor = Theme.C.TextMuted,
             AutoSize = true,
             Location = new Point(18, 44)
          };
          Controls.Add(_labelUpdated);
 
          // Row 1: stat cards
-         _cardUptime = MakeCard("Server started", Color.FromArgb(9, 105, 218));
-         _cardProcessed = MakeCard("Messages processed", Color.FromArgb(46, 160, 67));
-         _cardQueue = MakeCard("Messages in queue", Color.FromArgb(227, 160, 8));
-         _cardSpam = MakeCard("Spam blocked", Color.FromArgb(130, 80, 223));
-         _cardViruses = MakeCard("Viruses removed", Color.FromArgb(207, 34, 46));
+         _cardUptime = MakeCard("Server started", Theme.C.Accent);
+         _cardProcessed = MakeCard("Messages processed", Theme.C.Success);
+         _cardQueue = MakeCard("Messages in queue", Theme.C.Warning);
+         _cardSpam = MakeCard("Spam blocked", Theme.C.Purple);
+         _cardViruses = MakeCard("Viruses removed", Theme.C.Danger);
 
          // Row 2: session gauges
          _gaugeSmtp = MakeGauge("SMTP sessions");
@@ -91,7 +91,24 @@ namespace hMailServer.Administrator
          Resize += (s, e) => LayoutDashboard();
          LayoutDashboard();
 
+         // Keep palette-driven colors in sync when the theme changes.
+         Theme.Changed += OnThemeChanged;
+         Disposed += delegate { Theme.Changed -= OnThemeChanged; };
+
          ResumeLayout();
+      }
+
+      private void OnThemeChanged(object sender, EventArgs e)
+      {
+         BackColor = Theme.C.Background;
+         _labelHeader.ForeColor = Theme.C.Text;
+         _labelUpdated.ForeColor = Theme.C.TextMuted;
+         _cardUptime.AccentColor = Theme.C.Accent;
+         _cardProcessed.AccentColor = Theme.C.Success;
+         _cardQueue.AccentColor = Theme.C.Warning;
+         _cardSpam.AccentColor = Theme.C.Purple;
+         _cardViruses.AccentColor = Theme.C.Danger;
+         Invalidate(true);
       }
 
       private StatCard MakeCard(string caption, Color accent)

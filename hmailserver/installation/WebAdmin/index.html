@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>hMailServer — Control Deck</title>
+<style>
+:root{
+  --bg:#070b12; --bg2:#0b1018; --surface:rgba(255,255,255,.045); --surface2:rgba(255,255,255,.08);
+  --border:rgba(255,255,255,.09); --text:#e6edf3; --muted:#8b949e;
+  --accent:#36c2ff; --accent2:#7c5cff; --good:#3fb950; --warn:#d29922; --bad:#f85149;
+  --glow:0 0 24px rgba(54,194,255,.25);
+  --radius:14px; --font:'Segoe UI Variable','Segoe UI',system-ui,sans-serif;
+}
+[data-theme="light"]{
+  --bg:#eef2f7; --bg2:#f7fafc; --surface:rgba(255,255,255,.75); --surface2:rgba(255,255,255,.95);
+  --border:rgba(15,30,50,.12); --text:#1c2530; --muted:#5a6877;
+  --accent:#0969da; --accent2:#6f42c1; --glow:0 4px 18px rgba(9,105,218,.18);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{font-family:var(--font);background:var(--bg);color:var(--text);overflow:hidden}
+
+/* Animated aurora backdrop */
+.aurora{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.5;filter:blur(90px)}
+.aurora::before,.aurora::after{content:"";position:absolute;width:55vw;height:55vw;border-radius:50%;
+  background:radial-gradient(circle,var(--accent) 0%,transparent 60%);animation:drift 26s ease-in-out infinite}
+.aurora::after{background:radial-gradient(circle,var(--accent2) 0%,transparent 60%);
+  right:-10vw;bottom:-18vw;animation-delay:-13s}
+.aurora::before{left:-12vw;top:-18vw}
+@keyframes drift{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(7vw,5vh) scale(1.15)}}
+
+.app{position:relative;z-index:1;display:flex;height:100%}
+
+/* ---------- Sidebar ---------- */
+.side{width:232px;display:flex;flex-direction:column;padding:20px 14px;gap:4px;
+  background:linear-gradient(180deg,var(--surface),transparent);border-right:1px solid var(--border);backdrop-filter:blur(18px)}
+.brand{display:flex;align-items:center;gap:10px;padding:6px 10px 22px}
+.brand .logo{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-weight:700;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;box-shadow:var(--glow)}
+.brand b{font-size:15px;letter-spacing:.4px}
+.brand small{display:block;color:var(--muted);font-size:10.5px;letter-spacing:1.6px;text-transform:uppercase}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav button{all:unset;display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;
+  color:var(--muted);font-size:13.5px;cursor:pointer;transition:all .18s}
+.nav button:hover{background:var(--surface2);color:var(--text)}
+.nav button.on{background:linear-gradient(90deg,rgba(54,194,255,.16),transparent);color:var(--text);
+  box-shadow:inset 2.5px 0 0 var(--accent)}
+.nav .ico{width:17px;text-align:center;opacity:.9}
+.side .foot{margin-top:auto;display:flex;flex-direction:column;gap:8px;padding:10px}
+.pill{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:7px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--good);box-shadow:0 0 8px var(--good);animation:pulse 2s infinite}
+@keyframes pulse{50%{opacity:.45}}
+
+/* ---------- Main ---------- */
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.topbar{display:flex;align-items:center;gap:14px;padding:18px 28px;border-bottom:1px solid var(--border)}
+.topbar h1{font-size:18px;font-weight:600;letter-spacing:.3px}
+.topbar .sp{flex:1}
+.iconbtn{all:unset;cursor:pointer;width:36px;height:36px;display:grid;place-items:center;border-radius:10px;
+  border:1px solid var(--border);background:var(--surface);transition:all .18s;font-size:15px}
+.iconbtn:hover{border-color:var(--accent);box-shadow:var(--glow)}
+.content{flex:1;overflow:auto;padding:26px 28px}
+
+/* ---------- Cards / grids ---------- */
+.grid{display:grid;gap:16px}
+.g4{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:20px;backdrop-filter:blur(14px);transition:transform .2s,box-shadow .2s,border-color .2s}
+.card:hover{transform:translateY(-2px);border-color:rgba(54,194,255,.4);box-shadow:var(--glow)}
+.kpi .v{font-size:30px;font-weight:700;font-variant-numeric:tabular-nums;
+  background:linear-gradient(90deg,var(--text),var(--accent));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.kpi .l{color:var(--muted);font-size:12px;margin-top:6px;letter-spacing:.6px;text-transform:uppercase}
+.kpi .bar{height:3px;border-radius:2px;margin-top:14px;background:linear-gradient(90deg,var(--accent),var(--accent2));opacity:.7}
+
+.sect{margin-top:26px}
+.sect h2{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:1.4px;margin-bottom:12px}
+
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{color:var(--muted);text-align:left;font-weight:500;font-size:11.5px;text-transform:uppercase;
+  letter-spacing:1px;padding:10px 14px;border-bottom:1px solid var(--border)}
+td{padding:11px 14px;border-bottom:1px solid var(--border)}
+tr{transition:background .15s}
+tbody tr:hover{background:var(--surface2)}
+
+.btn{all:unset;cursor:pointer;padding:8px 16px;border-radius:9px;font-size:13px;font-weight:600;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;transition:all .18s;letter-spacing:.3px}
+.btn:hover{box-shadow:var(--glow);transform:translateY(-1px)}
+.btn.ghost{background:var(--surface);border:1px solid var(--border);color:var(--text)}
+.btn.ghost:hover{border-color:var(--accent)}
+.btn.danger{background:linear-gradient(135deg,#f85149,#c93c54)}
+.btn.sm{padding:5px 11px;font-size:12px}
+
+input,select{background:var(--surface);border:1px solid var(--border);border-radius:9px;color:var(--text);
+  padding:9px 13px;font-size:13.5px;font-family:var(--font);outline:none;transition:all .18s}
+input:focus{border-color:var(--accent);box-shadow:var(--glow)}
+
+.badge{display:inline-block;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:600;letter-spacing:.4px}
+.badge.good{background:rgba(63,185,80,.15);color:var(--good)}
+.badge.warn{background:rgba(210,153,34,.15);color:var(--warn)}
+
+.empty{color:var(--muted);padding:34px;text-align:center;font-size:13.5px}
+pre{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:16px;font-size:12px;
+  overflow:auto;line-height:1.7;color:var(--text)}
+.toast{position:fixed;bottom:26px;right:26px;background:var(--surface2);border:1px solid var(--accent);
+  border-radius:12px;padding:13px 20px;font-size:13.5px;backdrop-filter:blur(16px);box-shadow:var(--glow);
+  opacity:0;transform:translateY(12px);transition:all .3s;z-index:60;pointer-events:none}
+.toast.show{opacity:1;transform:none}
+
+/* ---------- Login ---------- */
+.gate{position:fixed;inset:0;z-index:50;display:grid;place-items:center;background:var(--bg)}
+.gate .aurora{opacity:.6}
+.login{position:relative;width:380px;background:var(--surface);border:1px solid var(--border);
+  border-radius:18px;padding:38px;backdrop-filter:blur(20px);box-shadow:0 24px 80px rgba(0,0,0,.45)}
+.login .logo{width:52px;height:52px;border-radius:14px;display:grid;place-items:center;font-weight:700;font-size:21px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;box-shadow:var(--glow);margin-bottom:18px}
+.login h1{font-size:20px;margin-bottom:4px}
+.login p{color:var(--muted);font-size:13px;margin-bottom:24px}
+.login input{width:100%;margin-bottom:12px}
+.login .btn{width:100%;text-align:center;padding:11px;margin-top:6px;box-sizing:border-box}
+.login .err{color:var(--bad);font-size:12.5px;min-height:18px;margin-top:10px}
+.view{animation:fadein .25s ease}
+@keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+</style>
+</head>
+<body data-theme="dark">
+<div class="aurora"></div>
+
+<!-- Login gate -->
+<div class="gate" id="gate">
+  <div class="aurora"></div>
+  <form class="login" id="loginForm">
+    <div class="logo">hM</div>
+    <h1>Control Deck</h1>
+    <p>Sign in with the hMailServer administrator credential.</p>
+    <input id="user" placeholder="Username" value="Administrator" autocomplete="username">
+    <input id="pass" type="password" placeholder="Password" autocomplete="current-password" autofocus>
+    <button class="btn" type="submit">Connect</button>
+    <div class="err" id="loginErr"></div>
+  </form>
+</div>
+
+<!-- App shell -->
+<div class="app" id="app" style="display:none">
+  <aside class="side">
+    <div class="brand">
+      <div class="logo">hM</div>
+      <div><b>hMailServer</b><small>Control Deck</small></div>
+    </div>
+    <nav class="nav" id="nav">
+      <button data-view="dash" class="on"><span class="ico">◈</span>Dashboard</button>
+      <button data-view="domains"><span class="ico">⌂</span>Domains</button>
+      <button data-view="queue"><span class="ico">⇶</span>Delivery queue</button>
+      <button data-view="tlsa"><span class="ico">⛨</span>DANE / TLSA</button>
+    </nav>
+    <div class="foot">
+      <div class="pill"><span class="dot"></span><span id="connState">Connected</span></div>
+      <div class="pill" style="opacity:.7">v<span id="ver">—</span></div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <h1 id="viewTitle">Dashboard</h1>
+      <div class="sp"></div>
+      <button class="iconbtn" id="themeBtn" title="Toggle theme">◐</button>
+      <button class="iconbtn" id="logoutBtn" title="Sign out">⏻</button>
+    </div>
+    <div class="content" id="content"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+const $=s=>document.querySelector(s);
+let auth=sessionStorage.getItem("hmsAuth")||null;
+let view="dash", pollTimer=null;
+
+/* ---------- API ---------- */
+async function api(path,opts={}){
+  const res=await fetch(path,{...opts,headers:{...(opts.headers||{}),"Authorization":"Basic "+auth}});
+  if(res.status===401) throw new Error("auth");
+  if(!res.ok){let t=await res.text();throw new Error(t||res.status)}
+  const text=await res.text();
+  return text?JSON.parse(text):{};
+}
+function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");
+  clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),2600)}
+
+/* ---------- Theme ---------- */
+const savedTheme=localStorage.getItem("hmsTheme")||"dark";
+document.body.dataset.theme=savedTheme;
+$("#themeBtn").onclick=()=>{
+  const next=document.body.dataset.theme==="dark"?"light":"dark";
+  document.body.dataset.theme=next;localStorage.setItem("hmsTheme",next);
+};
+
+/* ---------- Login ---------- */
+$("#loginForm").onsubmit=async e=>{
+  e.preventDefault();
+  const candidate=btoa($("#user").value+":"+$("#pass").value);
+  auth=candidate;
+  try{
+    const s=await api("/api/v1/status");
+    sessionStorage.setItem("hmsAuth",candidate);
+    enter(s);
+  }catch(_){auth=null;$("#loginErr").textContent="Authentication failed. Check the password.";}
+};
+$("#logoutBtn").onclick=()=>{sessionStorage.removeItem("hmsAuth");location.reload()};
+
+function enter(status){
+  $("#gate").style.display="none";$("#app").style.display="flex";
+  $("#ver").textContent=status.version||"?";
+  render();
+  pollTimer=setInterval(()=>{if(view==="dash")render(true)},3000);
+}
+
+/* ---------- Navigation ---------- */
+$("#nav").addEventListener("click",e=>{
+  const b=e.target.closest("button");if(!b)return;
+  document.querySelectorAll("#nav button").forEach(x=>x.classList.toggle("on",x===b));
+  view=b.dataset.view;render();
+});
+const titles={dash:"Dashboard",domains:"Domains",queue:"Delivery queue",tlsa:"DANE / TLSA"};
+
+async function render(silent){
+  $("#viewTitle").textContent=titles[view];
+  try{
+    if(view==="dash")await renderDash(silent);
+    else if(view==="domains")await renderDomains();
+    else if(view==="queue")await renderQueue();
+    else if(view==="tlsa")await renderTlsa();
+    $("#connState").textContent="Connected";
+  }catch(err){
+    if(err.message==="auth"){sessionStorage.removeItem("hmsAuth");location.reload();return}
+    $("#connState").textContent="Connection problem";
+    if(!silent)$("#content").innerHTML='<div class="empty">Could not reach the server: '+err.message+'</div>';
+  }
+}
+
+/* ---------- Views ---------- */
+function animateNum(el,target){
+  const start=parseInt(el.dataset.v||"0",10),diff=target-start;if(!diff){el.textContent=target.toLocaleString();return}
+  const t0=performance.now();
+  (function step(t){const k=Math.min(1,(t-t0)/600),e=1-Math.pow(1-k,3);
+    el.textContent=Math.round(start+diff*e).toLocaleString();
+    if(k<1)requestAnimationFrame(step);else el.dataset.v=target})(t0);
+}
+
+async function renderDash(update){
+  const s=await api("/api/v1/status");
+  if(!update||!$("#kpiProcessed")){
+    $("#content").innerHTML=`
+    <div class="grid g4 view">
+      <div class="card kpi"><div class="v" id="kpiProcessed" data-v="0">0</div><div class="l">Messages processed</div><div class="bar"></div></div>
+      <div class="card kpi"><div class="v" id="kpiSpam" data-v="0">0</div><div class="l">Spam blocked</div><div class="bar"></div></div>
+      <div class="card kpi"><div class="v" id="kpiVirus" data-v="0">0</div><div class="l">Viruses removed</div><div class="bar"></div></div>
+      <div class="card kpi"><div class="v" id="kpiState">—</div><div class="l">Server state</div><div class="bar"></div></div>
+    </div>
+    <div class="sect view"><h2>Live sessions</h2>
+      <div class="grid g4">
+        <div class="card kpi"><div class="v" id="sesSmtp" data-v="0">0</div><div class="l">SMTP sessions</div></div>
+        <div class="card kpi"><div class="v" id="sesImap" data-v="0">0</div><div class="l">IMAP sessions</div></div>
+        <div class="card kpi"><div class="v" id="sesPop3" data-v="0">0</div><div class="l">POP3 sessions</div></div>
+      </div>
+    </div>`;
+  }
+  animateNum($("#kpiProcessed"),s.processedMessages);
+  animateNum($("#kpiSpam"),s.spamMessages);
+  animateNum($("#kpiVirus"),s.virusesRemoved);
+  animateNum($("#sesSmtp"),s.sessions.smtp);
+  animateNum($("#sesImap"),s.sessions.imap);
+  animateNum($("#sesPop3"),s.sessions.pop3);
+  const states={0:"Unknown",1:"Stopped",2:"Starting",3:"Running",4:"Stopping"};
+  $("#kpiState").innerHTML=s.state===3?'<span class="badge good">Running</span>':'<span class="badge warn">'+(states[s.state]||("State "+s.state))+'</span>';
+}
+
+async function renderDomains(){
+  const d=await api("/api/v1/domains");
+  const list=Array.isArray(d)?d:(d.domains||[]);
+  const rows=list.map(x=>`
+    <tr><td><b>${x.name}</b></td>
+        <td>${x.active?'<span class="badge good">Active</span>':'<span class="badge warn">Disabled</span>'}</td>
+        <td style="text-align:right"><button class="btn ghost sm" onclick="showAccounts('${x.name}')">Accounts ›</button></td></tr>`).join("");
+  $("#content").innerHTML=`<div class="card view">
+    <table><thead><tr><th>Domain</th><th>Status</th><th></th></tr></thead>
+    <tbody>${rows||'<tr><td colspan="3" class="empty">No domains configured.</td></tr>'}</tbody></table></div>`;
+}
+
+window.showAccounts=async function(domain){
+  const a=await api("/api/v1/domains/"+encodeURIComponent(domain)+"/accounts");
+  const list=Array.isArray(a)?a:(a.accounts||[]);
+  const rows=list.map(x=>`
+    <tr><td><b>${x.address}</b></td>
+        <td>${x.active?'<span class="badge good">Active</span>':'<span class="badge warn">Disabled</span>'}</td>
+        <td style="text-align:right"><button class="btn danger sm" onclick="delAccount('${x.address}','${domain}')">Delete</button></td></tr>`).join("");
+  $("#content").innerHTML=`
+  <div class="view">
+    <button class="btn ghost sm" onclick="render()">‹ All domains</button>
+    <div class="sect"><h2>${domain} — accounts</h2>
+      <div class="card"><table><thead><tr><th>Address</th><th>Status</th><th></th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="3" class="empty">No accounts.</td></tr>'}</tbody></table></div>
+    </div>
+    <div class="sect"><h2>New account</h2>
+      <div class="card" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+        <input id="newAddr" placeholder="user@${domain}" style="flex:1;min-width:220px">
+        <input id="newPass" type="password" placeholder="Password" style="flex:1;min-width:160px">
+        <button class="btn" onclick="addAccount('${domain}')">Create account</button>
+      </div>
+    </div>
+  </div>`;
+};
+
+window.addAccount=async function(domain){
+  const address=$("#newAddr").value.trim(),password=$("#newPass").value;
+  if(!address||!password){toast("Address and password are required");return}
+  try{
+    await api("/api/v1/domains/"+encodeURIComponent(domain)+"/accounts",
+      {method:"POST",body:JSON.stringify({address:address,password:password})});
+    toast("Account created: "+address);showAccounts(domain);
+  }catch(e){toast("Create failed: "+e.message)}
+};
+
+window.delAccount=async function(address,domain){
+  if(!confirm("Delete "+address+"?"))return;
+  try{await api("/api/v1/accounts/"+encodeURIComponent(address),{method:"DELETE"});
+    toast("Deleted "+address);showAccounts(domain);
+  }catch(e){toast("Delete failed: "+e.message)}
+};
+
+async function renderQueue(){
+  const q=await api("/api/v1/queue");
+  const rows=(q.messages||[]).map(x=>`
+    <tr><td>${x.id}</td><td>${x.from||"—"}</td><td>${x.recipients||"—"}</td><td>${x.next_try||"—"}</td>
+        <td style="text-align:right;white-space:nowrap">
+          <button class="btn ghost sm" onclick="retryMsg(${x.id})">Retry now</button>
+          <button class="btn danger sm" onclick="delMsg(${x.id})">Delete</button></td></tr>`).join("");
+  $("#content").innerHTML=`<div class="card view">
+    <table><thead><tr><th>ID</th><th>From</th><th>To</th><th>Next try</th><th></th></tr></thead>
+    <tbody>${rows||'<tr><td colspan="5" class="empty">The delivery queue is empty. ✦</td></tr>'}</tbody></table></div>`;
+}
+window.retryMsg=async function(id){try{await api("/api/v1/queue/"+id+"/retry",{method:"POST"});toast("Delivery retriggered");renderQueue()}catch(e){toast("Failed: "+e.message)}};
+window.delMsg=async function(id){if(!confirm("Remove message "+id+" from the queue?"))return;
+  try{await api("/api/v1/queue/"+id,{method:"DELETE"});toast("Message removed");renderQueue()}catch(e){toast("Failed: "+e.message)}};
+
+async function renderTlsa(){
+  const t=await api("/api/v1/tlsa");
+  const recs=(t.records||[]).map(r=>r.record||JSON.stringify(r)).join("\n");
+  $("#content").innerHTML=`<div class="view">
+    <div class="card"><p style="color:var(--muted);font-size:13px;margin-bottom:14px">
+      Publish-ready DANE TLSA records for your certificates. Add these to DNS (with DNSSEC) to enable DANE validation by sending servers.</p>
+      <pre id="tlsaPre">${recs||"No TLSA records available — assign an SSL certificate first."}</pre>
+      <div style="margin-top:12px"><button class="btn ghost sm" onclick="navigator.clipboard.writeText($('#tlsaPre').textContent).then(()=>toast('Copied to clipboard'))">Copy all</button></div>
+    </div></div>`;
+}
+
+/* ---------- Boot ---------- */
+if(auth){api("/api/v1/status").then(enter).catch(()=>{sessionStorage.removeItem("hmsAuth")});}
+</script>
+</body>
+</html>

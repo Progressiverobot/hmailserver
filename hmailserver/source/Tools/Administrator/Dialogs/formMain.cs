@@ -50,6 +50,61 @@ namespace hMailServer.Administrator
                 insertIndex = menuItemFile.DropDownItems.Count;
 
             menuItemFile.DropDownItems.Insert(insertIndex, menuItemServerFeatures);
+
+            // View menu with light/dark theme switching.
+            var menuItemView = new ToolStripMenuItem("&View");
+            var menuItemThemeLight = new ToolStripMenuItem("&Light theme");
+            var menuItemThemeDark = new ToolStripMenuItem("&Dark theme");
+
+            EventHandler updateThemeChecks = delegate
+            {
+                menuItemThemeLight.Checked = !Theme.IsDark;
+                menuItemThemeDark.Checked = Theme.IsDark;
+            };
+
+            menuItemThemeLight.Click += delegate { Theme.SetMode(ThemeMode.Light); };
+            menuItemThemeDark.Click += delegate { Theme.SetMode(ThemeMode.Dark); };
+            Theme.Changed += updateThemeChecks;
+            updateThemeChecks(null, EventArgs.Empty);
+
+            menuItemView.DropDownItems.Add(menuItemThemeLight);
+            menuItemView.DropDownItems.Add(menuItemThemeDark);
+
+            int viewIndex = menuStrip.Items.IndexOf(menuItemHelp);
+            if (viewIndex < 0)
+                viewIndex = menuStrip.Items.Count;
+            menuStrip.Items.Insert(viewIndex, menuItemView);
+
+            // Ctrl+K command palette: fuzzy-jump to any page.
+            var menuItemPalette = new ToolStripMenuItem("&Go to page...")
+            {
+                ShortcutKeys = Keys.Control | Keys.K,
+                ShowShortcutKeys = true
+            };
+            menuItemPalette.Click += delegate { ShowCommandPalette(); };
+            menuItemView.DropDownItems.Insert(0, menuItemPalette);
+            menuItemView.DropDownItems.Insert(1, new ToolStripSeparator());
+
+            KeyPreview = true;
+            KeyDown += (s, e) =>
+            {
+                if (e.Control && e.KeyCode == Keys.K)
+                {
+                    ShowCommandPalette();
+                    e.Handled = true;
+                    e.SuppressKeyPress = true;
+                }
+            };
+        }
+
+        private void ShowCommandPalette()
+        {
+            TreeNode target = Dialogs.formCommandPalette.Prompt(this, treeNodes);
+            if (target != null)
+            {
+                treeNodes.SelectedNode = target;
+                target.EnsureVisible();
+            }
         }
 
         public void ShowItem(INode node)
@@ -294,6 +349,9 @@ namespace hMailServer.Administrator
             panelMain.Controls.Add(control);
 
             control.Dock = DockStyle.Fill;
+
+            // Style the freshly created pane with the active theme.
+            Theme.Apply(control);
 
             ISettingsControl settingsControl = (ISettingsControl)control;
             labelTopCaption.Text = node.Title;

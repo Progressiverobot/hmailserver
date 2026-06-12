@@ -31,6 +31,11 @@ namespace hMailServer.Administrator
          System.Windows.Forms.Application.EnableVisualStyles();
          System.Windows.Forms.Application.SetCompatibleTextRenderingDefault(false);
 
+         // Modern theming: load the saved (or system) light/dark preference and
+         // auto-theme every form the application opens.
+         Theme.LoadPreference();
+         Theme.InstallAutoThemer();
+
          formConnect connectDlg = new formConnect();
          if (!connectDlg.AutoConnect())
          {
