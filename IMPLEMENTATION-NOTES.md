@@ -314,6 +314,13 @@ Optional integrations (turn inconclusive tests into real runs):
   accepts TCP before signatures finish loading and hMailServer fails open —
   send one EICAR message and confirm "Virus detected" in the log before
   trusting AntiVirus fixture results.
-- SpamAssassin (22 tests): requires a local process literally named `spamd`
-  (or the legacy `SpamAssassinJAM` service). No maintained Windows build;
-  left inconclusive.
+- SpamAssassin (22 tests): **works on Windows** via the JAM Software x64 build —
+  direct download `https://downloads.jam-software.de/spamassassin/
+  SpamAssassinForWindows-x64.zip` (v4.0.1, rules bundled in `share\`). Extract
+  to `C:\SpamAssassin`, run `spamd.exe -i 127.0.0.1 -A 127.0.0.1 -p 783`;
+  a process literally named `spamd` satisfies the test gate. 21/22 then run
+  for real. `TestSANotRunning` stays inconclusive (it stops/starts the
+  `SpamAssassinJAM` service, i.e. JAM's "SpamAssassin in a Box" variant).
+  The two `AntiSpam.Combinations` SURBL/MX tests additionally require a DNS
+  resolver that answers `surbl-org-permanent-test-point.com` queries — many
+  public resolvers filter these.
