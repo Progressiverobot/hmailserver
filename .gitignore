@@ -50,3 +50,7 @@ hmailserver/source/Server/hMailServer.Minidump/x64/*
 /hmailserver/.claude/*
 
 /logs/
+
+/hmailserver/source/Tools/ControlPanel/bin/
+/hmailserver/source/Tools/ControlPanel/obj/
+/hmailserver/source/Tools/ControlPanel/publish/

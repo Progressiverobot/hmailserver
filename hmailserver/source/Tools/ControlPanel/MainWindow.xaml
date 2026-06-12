@@ -1,0 +1,123 @@
+<ui:FluentWindow
+    x:Class="hMailServer.ControlPanel.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    Title="hMailServer Control Panel"
+    Width="1280" Height="800"
+    MinWidth="980" MinHeight="640"
+    WindowBackdropType="Mica"
+    ExtendsContentIntoTitleBar="True"
+    WindowCornerPreference="Round"
+    WindowStartupLocation="CenterScreen">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar Grid.Row="0" Title="hMailServer Control Panel" ShowMaximize="True" ShowMinimize="True">
+            <ui:TitleBar.Icon>
+                <ui:SymbolIcon Symbol="Mail24" Foreground="{StaticResource BrandBrush}" />
+            </ui:TitleBar.Icon>
+        </ui:TitleBar>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="228" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Sidebar -->
+            <Grid Grid.Column="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <!-- Brand -->
+                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="18,10,0,16">
+                    <Border Width="34" Height="34" CornerRadius="9" Background="{StaticResource BrandGradient}">
+                        <TextBlock Text="hM" FontWeight="Bold" FontSize="14" Foreground="White"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="hMailServer" FontWeight="SemiBold" FontSize="14"
+                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                        <TextBlock Text="CONTROL PANEL" FontSize="9" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Navigation -->
+                <StackPanel x:Name="NavPanel" Grid.Row="1">
+                    <RadioButton x:Name="NavDashboard" Style="{StaticResource NavItem}" Content="Dashboard" GroupName="Nav" Checked="Nav_Checked">
+                        <RadioButton.Tag><ui:SymbolIcon Symbol="Home24" /></RadioButton.Tag>
+                    </RadioButton>
+                    <RadioButton x:Name="NavDomains" Style="{StaticResource NavItem}" Content="Domains &amp; accounts" GroupName="Nav" Checked="Nav_Checked">
+                        <RadioButton.Tag><ui:SymbolIcon Symbol="Globe24" /></RadioButton.Tag>
+                    </RadioButton>
+                    <RadioButton x:Name="NavQueue" Style="{StaticResource NavItem}" Content="Delivery queue" GroupName="Nav" Checked="Nav_Checked">
+                        <RadioButton.Tag><ui:SymbolIcon Symbol="MailArrowUp24" /></RadioButton.Tag>
+                    </RadioButton>
+                    <RadioButton x:Name="NavLogs" Style="{StaticResource NavItem}" Content="Live logs" GroupName="Nav" Checked="Nav_Checked">
+                        <RadioButton.Tag><ui:SymbolIcon Symbol="DocumentText24" /></RadioButton.Tag>
+                    </RadioButton>
+
+                    <TextBlock Text="SERVER SETTINGS" FontSize="10" Margin="20,16,0,6"
+                               Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+
+                    <RadioButton x:Name="NavProtocols" Style="{StaticResource NavItem}" Content="Protocols" GroupName="Nav" Checked="Nav_Checked">
+                        <RadioButton.Tag><ui:SymbolIcon Symbol="Server24" /></RadioButton.Tag>
+                    </RadioButton>
+                    <RadioButton x:Name="NavDelivery" Style="{StaticResource NavItem}" Content="Delivery" GroupName="Nav" Checked="Nav_Checked">
+                        <RadioButton.Tag><ui:SymbolIcon Symbol="Send24" /></RadioButton.Tag>
+                    </RadioButton>
+                    <RadioButton x:Name="NavAntiSpam" Style="{StaticResource NavItem}" Content="Anti-spam" GroupName="Nav" Checked="Nav_Checked">
+                        <RadioButton.Tag><ui:SymbolIcon Symbol="Filter24" /></RadioButton.Tag>
+                    </RadioButton>
+                    <RadioButton x:Name="NavAntiVirus" Style="{StaticResource NavItem}" Content="Anti-virus" GroupName="Nav" Checked="Nav_Checked">
+                        <RadioButton.Tag><ui:SymbolIcon Symbol="Bug24" /></RadioButton.Tag>
+                    </RadioButton>
+                    <RadioButton x:Name="NavTls" Style="{StaticResource NavItem}" Content="SSL/TLS &amp; auto-ban" GroupName="Nav" Checked="Nav_Checked">
+                        <RadioButton.Tag><ui:SymbolIcon Symbol="LockClosed24" /></RadioButton.Tag>
+                    </RadioButton>
+                    <RadioButton x:Name="NavLogging" Style="{StaticResource NavItem}" Content="Logging" GroupName="Nav" Checked="Nav_Checked">
+                        <RadioButton.Tag><ui:SymbolIcon Symbol="Notebook24" /></RadioButton.Tag>
+                    </RadioButton>
+
+                    <TextBlock Text="SERVER FEATURES" FontSize="10" Margin="20,16,0,6"
+                               Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+
+                    <RadioButton x:Name="NavSecurity" Style="{StaticResource NavItem}" Content="Transport security" GroupName="Nav" Checked="Nav_Checked">
+                        <RadioButton.Tag><ui:SymbolIcon Symbol="ShieldCheckmark24" /></RadioButton.Tag>
+                    </RadioButton>
+                    <RadioButton x:Name="NavAutomation" Style="{StaticResource NavItem}" Content="Certificates (ACME)" GroupName="Nav" Checked="Nav_Checked">
+                        <RadioButton.Tag><ui:SymbolIcon Symbol="Certificate24" /></RadioButton.Tag>
+                    </RadioButton>
+                    <RadioButton x:Name="NavIntegration" Style="{StaticResource NavItem}" Content="API &amp; monitoring" GroupName="Nav" Checked="Nav_Checked">
+                        <RadioButton.Tag><ui:SymbolIcon Symbol="PlugConnected24" /></RadioButton.Tag>
+                    </RadioButton>
+                </StackPanel>
+
+                <!-- Footer -->
+                <StackPanel Grid.Row="2" Margin="18,0,18,14">
+                    <StackPanel x:Name="ConnBadge" Orientation="Horizontal" Visibility="Collapsed">
+                        <Ellipse Width="8" Height="8" Fill="#3FB950" VerticalAlignment="Center" />
+                        <TextBlock x:Name="ConnText" Margin="7,0,0,0" FontSize="11.5"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                    <TextBlock x:Name="VersionText" FontSize="10.5" Margin="15,4,0,0"
+                               Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                </StackPanel>
+            </Grid>
+
+            <!-- Content -->
+            <Border Grid.Column="1" Background="{DynamicResource ApplicationBackgroundBrush}"
+                    CornerRadius="8,0,0,0" Margin="0,4,0,0">
+                <ContentControl x:Name="ContentHost" />
+            </Border>
+        </Grid>
+    </Grid>
+</ui:FluentWindow>

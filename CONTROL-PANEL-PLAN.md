@@ -88,15 +88,20 @@ INI changes to take effect).
 ## Phases
 
 - [x] Phase 0 — environment: .NET 8 SDK 8.0.422 installed (2026-06-12)
-- [ ] Phase 1 — scaffold: csproj + NuGet restore proof (`dotnet build`), FluentWindow shell w/ NavigationView, dark/light + Mica, Connect page with working COM auth
-- [ ] Phase 2 — Dashboard: KPI cards, LiveCharts animated session + throughput charts (2s poll), uptime/state badges
-- [ ] Phase 3 — feature settings pages (Security / Automation / Integration) reading+writing INI, with restart prompt — closes the "missing settings" gap
-- [ ] Phase 4 — Domains & accounts CRUD
-- [ ] Phase 5 — Delivery queue (list/retry/delete) + Logs live tail with severity colors
-- [ ] Phase 6 — polish: transitions, empty states, error toasts (Snackbar), Ctrl+K palette parity, app icon, About
-- [ ] Phase 7 — packaging: `dotnet publish` self-contained? No — framework-dependent (runtime 8.0.28 already on dev box; installer adds .NET 8 Desktop Runtime check) → add to InnoSetup as `hMailCP.exe` + new Start-menu shortcut
-- [ ] Phase 8 — validation: launch + PrintWindow screenshots (script exists: `build/capture-admin.ps1` pattern), both themes
-- [ ] Phase 9 — release: commit, tag, push, update GitHub release (STANDING RULE: always update GitHub + release after changes)
+- [x] Phase 1 — scaffold: FluentWindow shell, Mica, custom Fluent sidebar, Connect page with COM auth (+ `/connect host user pass` CLI auto-connect)
+- [x] Phase 2 — Dashboard: KPI cards, LiveCharts animated throughput + session charts (2s poll), uptime/state
+- [x] Phase 3 — feature settings pages (Security / Automation / Integration) reading+writing INI, with restart prompt
+- [x] Phase 3.5 — **COM server settings pages**: Protocols, Delivery, Anti-spam (SPF/DKIM/DMARC/greylisting/SpamAssassin), Anti-virus (ClamAV/ClamWin), SSL/TLS + auto-ban, Logging — data-driven via dotted property paths over IDispatch (`ServerSettingsView`)
+- [x] Phase 4 — Domains & accounts CRUD (note: COM path is `app.Domains`, NOT `app.Settings.Domains`)
+- [x] Phase 5 — Delivery queue + Logs live tail with severity colors
+- [x] Phase 6 (partial) — contrast guarantee (global TextBlock style), validated by screenshots in dark mode
+- [x] Phase 7 — packaging: framework-dependent publish (7 MB) shipped in installer as component `controlpanel` → `{app}\ControlPanel\hMailCP.exe` + Start-menu icon (requires .NET 8 Desktop Runtime)
+- [x] Phase 8 — validation: UIA-driven screenshots (`build/capture-cp.ps1 -Launch -Nav 'Anti-spam'`)
+- [x] Phase 9 — release: v6.2.0 (server 6.2.0 build 6, gate 898/898)
+
+Remaining backlog: rules editor, IP ranges editor, SSL certificate manager,
+backup/restore page, distribution lists/aliases UI, theme toggle in titlebar,
+Ctrl+K palette, app icon.
 
 ## Environment facts (do not rediscover)
 

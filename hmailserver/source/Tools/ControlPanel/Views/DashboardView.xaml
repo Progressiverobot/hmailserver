@@ -1,0 +1,100 @@
+<UserControl
+    x:Class="hMailServer.ControlPanel.Views.DashboardView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="26,20">
+        <StackPanel>
+            <TextBlock Text="Dashboard" Style="{StaticResource PageTitle}" />
+            <TextBlock x:Name="SubtitleText" Text="Live server statistics, refreshed every 2 seconds."
+                       Style="{StaticResource PageSubtitle}" />
+
+            <!-- KPI row: fixed-height cards, value top-aligned, label bottom-anchored -->
+            <UniformGrid Columns="5" Margin="0,0,0,12">
+                <Border Style="{StaticResource Card}" MinHeight="96" Margin="0,0,12,0">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock x:Name="KpiUptime" Text="—" Style="{StaticResource KpiValue}" FontSize="22" />
+                        <TextBlock Grid.Row="1" Text="UPTIME" Style="{StaticResource KpiLabel}" />
+                    </Grid>
+                </Border>
+                <Border Style="{StaticResource Card}" MinHeight="96" Margin="0,0,12,0">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock x:Name="KpiProcessed" Text="0" Style="{StaticResource KpiValue}" />
+                        <TextBlock Grid.Row="1" Text="MESSAGES PROCESSED" Style="{StaticResource KpiLabel}" />
+                    </Grid>
+                </Border>
+                <Border Style="{StaticResource Card}" MinHeight="96" Margin="0,0,12,0">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock x:Name="KpiQueue" Text="0" Style="{StaticResource KpiValue}" />
+                        <TextBlock Grid.Row="1" Text="IN QUEUE" Style="{StaticResource KpiLabel}" />
+                    </Grid>
+                </Border>
+                <Border Style="{StaticResource Card}" MinHeight="96" Margin="0,0,12,0">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock x:Name="KpiSpam" Text="0" Style="{StaticResource KpiValue}" Foreground="#A371F7" />
+                        <TextBlock Grid.Row="1" Text="SPAM BLOCKED" Style="{StaticResource KpiLabel}" />
+                    </Grid>
+                </Border>
+                <Border Style="{StaticResource Card}" MinHeight="96">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock x:Name="KpiViruses" Text="0" Style="{StaticResource KpiValue}" Foreground="#F85149" />
+                        <TextBlock Grid.Row="1" Text="VIRUSES REMOVED" Style="{StaticResource KpiLabel}" />
+                    </Grid>
+                </Border>
+            </UniformGrid>
+
+            <!-- Charts -->
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="3*" />
+                    <ColumnDefinition Width="2*" />
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,12,0" Height="300">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Text="Delivery throughput (messages / minute)" FontWeight="SemiBold" FontSize="13"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,8" />
+                        <lvc:CartesianChart x:Name="ThroughputChart" Grid.Row="1" />
+                    </Grid>
+                </Border>
+
+                <Border Grid.Column="1" Style="{StaticResource Card}" Height="300">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Text="Active sessions" FontWeight="SemiBold" FontSize="13"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,8" />
+                        <lvc:CartesianChart x:Name="SessionsChart" Grid.Row="1" />
+                    </Grid>
+                </Border>
+            </Grid>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
