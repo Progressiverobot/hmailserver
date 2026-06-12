@@ -270,3 +270,18 @@ Without finding any serious issues:
 3. Enable Gflags (gflags /p /enable hmailserver.exe) and run all integration tests to check for memory issues
 4. Run for at least 1 week in production for hMailServer.com
 5. Wait for at least 500 downloads of the beta version
+
+License
+=======
+
+hMailServer is free and open source software, licensed under the GNU Affero General Public License v3.0 (AGPLv3). See [LICENSE](LICENSE) for the full text. Third-party component licenses are listed in [hmailserver/docs/Licenses](hmailserver/docs/Licenses).
+
+Security
+========
+
+Please report security vulnerabilities privately — see [SECURITY.md](.github/SECURITY.md).
+
+Contributing
+============
+
+See [CONTRIBUTING.md](.github/CONTRIBUTING.md) and the codebase guide in [AGENTS.md](AGENTS.md).

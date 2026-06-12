@@ -48,3 +48,5 @@ hmailserver/source/Server/hMailServer.Minidump/x64/*
 /.claude/*
 **/.vs/*
 /hmailserver/.claude/*
+
+/logs/

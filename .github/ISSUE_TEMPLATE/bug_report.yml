@@ -1,0 +1,47 @@
+name: Bug report
+description: Report a defect in hMailServer
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: hMailServer version
+      placeholder: "6.0.0 build 4"
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Windows version
+      placeholder: "Windows Server 2025"
+    validations:
+      required: true
+  - type: input
+    id: database
+    attributes:
+      label: Database backend
+      placeholder: "MySQL 8 / MariaDB 11 / MS SQL / PostgreSQL / SQL CE"
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe the problem and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: hMailServer log excerpts (Logs folder), Windows Event Log entries, or error dialogs. Redact passwords and real email addresses.
+      render: text
