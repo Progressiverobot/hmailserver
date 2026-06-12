@@ -5,6 +5,8 @@ hMailServer is an open source email server for Microsoft Windows, implementing S
 
 This repository is a modernized fork of the original project (which is no longer maintained upstream). It has been brought up to date with a current toolchain, current cryptography, and the transport-security standards expected of a mail server in 2026.
 
+**Production status:** version **6.0.0** is released — [download the installer](https://github.com/Progressiverobot/hmailserver/releases/latest) (`hMailServer-6.0.0-B2-x64.exe`). The release is validated by the full regression suite: **898 of 898 tests passing, zero failures, zero inconclusive**, including live SpamAssassin, ClamAV (real EICAR detection), DMARC evaluation against live DNS, and TLS 1.2/1.3 handshakes end to end.
+
 What's new in 6.0
 =================
 
@@ -238,7 +240,7 @@ If you want to run hMailServer in debug mode in Visual Studio, add the command a
 Running tests
 -------------
 
-hMailServer source code contains a number of automated tests which excercises the basic functionality. When adding new features or fixing bugs, corresponding tests should be added. hMailServer tests are implemented using NUnit. To run them in Visual Studio, follow these steps:
+hMailServer ships with a full regression suite (898 NUnit tests) which exercises the server end to end over SMTP, IMAP and POP3 — including anti-spam, anti-virus, TLS, DKIM/DMARC, rules, backup and the COM API. Release 6.0.0 passes the complete suite with zero failures and zero inconclusive results.
 
 NOTE: When running tests, your local hMailServer installation will be updated with test accounts. Existing domains and accounts are deleted. Each tests prepares the server configuration in different ways. In other words, do not run the automated tests in an environment where you need to preserve hMailServer data.
 
@@ -248,7 +250,15 @@ NOTE: When running tests, your local hMailServer installation will be updated wi
 4. Locate a test to run under "RegressionTests"
 5. Right-click on a test or test category and select "Run".
 
-You can also navigate to the source code for a test, right-click anywhere and select "Run Test(s)" to run it.
+You can also navigate to the source code for a test, right-click anywhere and select "Run Test(s)" to run it, or run the whole suite from the command line with the NUnit console runner (`hmailserver\test\packages\NUnit.ConsoleRunner.*\tools\nunit3-console.exe`).
+
+For 100% coverage the suite expects three optional integrations (tests degrade to *inconclusive* without them):
+
+   * **SpamAssassin** — the JAM Software Windows build (`https://downloads.jam-software.de/spamassassin/SpamAssassinForWindows-x64.zip`), extracted to `C:\SpamAssassin`, with `spamd.exe -i 127.0.0.1 -A 127.0.0.1 -p 783` running — ideally wrapped as a Windows service named `SpamAssassinJAM` so outage-handling tests can stop and start it.
+   * **ClamAV** — installed to `C:\clamav` with `clamd` listening on TCP 3310 and current freshclam definitions. Let the daemon finish loading signatures before the first run.
+   * **`AddXOriginalRcptTo=1`** in `hMailServer.INI` for the X-Original-Rcpt-To header tests.
+
+The complete dev-tree provisioning recipe (directories, certificates, DB scripts, runtime files) is documented in [IMPLEMENTATION-NOTES.md](IMPLEMENTATION-NOTES.md).
 
 Releasing hMailServer
 =====================

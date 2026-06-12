@@ -245,10 +245,10 @@ and configuration instructions live in [README.md](README.md).
 - Both solutions build clean: Release|x64 server + Release tools, MSBuild EXIT 0,
   `/WX`, zero warnings.
 - dumpbin-confirmed linkage: libcrypto-4-x64.dll, libssl-4-x64.dll, libpq.dll.
-- **Regression suite GREEN (2026-06-12): 898 tests — 865 passed, 0 failed,
-  33 inconclusive (environment-conditional), nunit exit 0.** First full
-  validation of the 6.0 modernization; two real fixes came out of it
-  (FormatV — see conventions above; test-infra TLS defaults — see below).
+- **Released as 6.0.0 (build 2): full regression suite 898/898 — zero failures,
+  zero inconclusive** — with live SpamAssassin, ClamAV, DMARC-against-live-DNS
+  and TLS 1.2/1.3 all exercised. GitHub release v6.0.0 on
+  Progressiverobot/hmailserver with the InnoSetup installer attached.
 
 ### Test-validation round (first machine able to run the suite)
 
@@ -304,7 +304,7 @@ Test-environment recipe (dev tree, no installer):
    fallback; they bind live ports and wipe data — never run against a
    production install.
 
-Optional integrations (turn inconclusive tests into real runs):
+Optional integrations (required for the full 898/898 run):
 - `AddXOriginalRcptTo=1` under `[Settings]` in BOTH INI copies (exe dir and
   `Bin\`) enables the 6 XOriginalRcptHeaderTests.
 - ClamAV (5 tests): install ClamAV (winget `Cisco.ClamAV`), copy the install
@@ -314,13 +314,24 @@ Optional integrations (turn inconclusive tests into real runs):
   accepts TCP before signatures finish loading and hMailServer fails open —
   send one EICAR message and confirm "Virus detected" in the log before
   trusting AntiVirus fixture results.
-- SpamAssassin (22 tests): **works on Windows** via the JAM Software x64 build —
-  direct download `https://downloads.jam-software.de/spamassassin/
-  SpamAssassinForWindows-x64.zip` (v4.0.1, rules bundled in `share\`). Extract
-  to `C:\SpamAssassin`, run `spamd.exe -i 127.0.0.1 -A 127.0.0.1 -p 783`;
-  a process literally named `spamd` satisfies the test gate. 21/22 then run
-  for real. `TestSANotRunning` stays inconclusive (it stops/starts the
-  `SpamAssassinJAM` service, i.e. JAM's "SpamAssassin in a Box" variant).
-  The two `AntiSpam.Combinations` SURBL/MX tests additionally require a DNS
-  resolver that answers `surbl-org-permanent-test-point.com` queries — many
-  public resolvers filter these.
+- SpamAssassin (22 tests): the JAM Software x64 build works — direct URL
+  `https://downloads.jam-software.de/spamassassin/SpamAssassinForWindows-x64.zip`
+  (v4.0.1, bundled rules in `share\`). Extract to `C:\SpamAssassin` and wrap
+  `spamd.exe -i 127.0.0.1 -A 127.0.0.1 -p 783` as a Windows service named
+  **SpamAssassinJAM** (WinSW works; child process keeps the name `spamd`,
+  satisfying both the process gate and `TestSANotRunning`'s stop/start).
+  Grant Authenticated Users start/stop on the service (`sc sdset`) so the
+  non-elevated test runner can control it — do the same for the hMailServer
+  service to make rebuild cycles UAC-free on a dev box.
+
+Test-harness modernizations discovered during full validation (all
+harness-side; server behavior matches upstream):
+- `AntiSpam.Combinations` tests now connect via `TestSetup.GetLocalIpAddress()`
+  — `SpamTestHeloHost` skips the HELO check for loopback connections by
+  design, so the expected score can never occur from 127.0.0.1.
+- `TestSetup.DisableSpamProtection` also resets `DMARCEnabled`: the 6.0 DMARC
+  feature is on by default, and **example.com publishes a real `p=reject`
+  DMARC record nowadays** — correctly applied to test subdomains via the
+  RFC 7489 organizational-domain fallback, which surprised pre-DMARC tests.
+- `CustomAsserts.AssertSpamAssassinIsRunning` waits for spamd to actually
+  accept connections after a service (re)start (rule loading takes seconds).

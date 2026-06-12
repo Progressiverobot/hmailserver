@@ -1,6 +1,6 @@
 # hMailServer — Codebase Guide for Agents
 
-hMailServer is a free, open-source email server for Microsoft Windows, licensed under AGPLv3. It implements SMTP, IMAP, and POP3, and runs as a Windows service. The codebase is written primarily in C++ (server core) and C# (admin tools), targeting Visual Studio 2026 (platform toolset v145) with 64-bit Windows builds. Current version: 6.0 (database version 6001). External libraries: OpenSSL 4.0.x, Boost 1.91, PostgreSQL 18 libpq; the C# tools target .NET Framework 4.8.1.
+hMailServer is a free, open-source email server for Microsoft Windows, licensed under AGPLv3. It implements SMTP, IMAP, and POP3, and runs as a Windows service. The codebase is written primarily in C++ (server core) and C# (admin tools), targeting Visual Studio 2026 (platform toolset v145) with 64-bit Windows builds. Current version: **6.0.0, released** (build 2, database version 6001), validated by the full regression suite (898/898 passing). External libraries: OpenSSL 4.0.x, Boost 1.91, PostgreSQL 18 libpq; the C# tools target .NET Framework 4.8.1.
 
 ## Repository Layout
 
@@ -156,7 +156,7 @@ test/
   StressTest/         # Stress/load testing tools
 ```
 
-`RegressionTests/` is the primary test suite — it executes against a real hMailServer instance and exercises it end-to-end over SMTP, IMAP, and POP3. The full suite covers 500+ scenarios.
+`RegressionTests/` is the primary test suite — it executes against a real hMailServer instance and exercises it end-to-end over SMTP, IMAP, and POP3. The full suite is 898 tests; release 6.0.0 passes all of them (with SpamAssassin, ClamAV and `AddXOriginalRcptTo` integrations active — see IMPLEMENTATION-NOTES.md for the test-environment recipe).
 
 ---
 
