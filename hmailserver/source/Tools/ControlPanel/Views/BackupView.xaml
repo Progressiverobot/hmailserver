@@ -1,0 +1,44 @@
+<UserControl
+    x:Class="hMailServer.ControlPanel.Views.BackupView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="26,20">
+        <StackPanel>
+            <TextBlock Text="Backup &amp; restore" Style="{StaticResource PageTitle}" />
+            <TextBlock x:Name="SubtitleText" Text="Back up domains, messages and settings to a folder; restore from a previous backup."
+                       Style="{StaticResource PageSubtitle}" />
+
+            <Border Style="{StaticResource Card}" Margin="0,0,12,12">
+                <StackPanel>
+                    <TextBlock Text="Backup" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,14" />
+                    <TextBlock Text="Destination folder (on the server)" FontSize="13" Margin="0,0,0,4" />
+                    <ui:TextBox x:Name="DestinationBox" MaxWidth="520" MinWidth="320" HorizontalAlignment="Left" Margin="0,0,0,12" />
+                    <CheckBox x:Name="CheckDomains" Content="Back up domains (accounts, aliases, lists)" FontSize="13.5" Margin="0,0,0,12" />
+                    <CheckBox x:Name="CheckMessages" Content="Back up messages" FontSize="13.5" Margin="0,0,0,12" />
+                    <CheckBox x:Name="CheckSettings" Content="Back up settings" FontSize="13.5" Margin="0,0,0,12" />
+                    <CheckBox x:Name="CheckCompress" Content="Compress destination files (zip)" FontSize="13.5" Margin="0,0,0,14" />
+                    <StackPanel Orientation="Horizontal">
+                        <ui:Button Content="Save settings" Click="SaveSettings_Click" Margin="0,0,8,0" />
+                        <ui:Button Content="Start backup now" Appearance="Primary" Click="StartBackup_Click" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Card}" Margin="0,0,12,0">
+                <StackPanel>
+                    <TextBlock Text="Restore" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,4" />
+                    <TextBlock Text="Select the backup XML file created by a previous backup (in the destination folder). The contents replace the current data for the selected categories."
+                               FontSize="12" Opacity="0.65" TextWrapping="Wrap" Margin="0,0,0,14" />
+                    <TextBlock Text="Backup file (HMBackup*.xml on the server)" FontSize="13" Margin="0,0,0,4" />
+                    <ui:TextBox x:Name="BackupFileBox" MaxWidth="520" MinWidth="320" HorizontalAlignment="Left" Margin="0,0,0,12" />
+                    <CheckBox x:Name="RestoreDomains" Content="Restore domains" FontSize="13.5" Margin="0,0,0,12" />
+                    <CheckBox x:Name="RestoreMessages" Content="Restore messages" FontSize="13.5" Margin="0,0,0,12" />
+                    <CheckBox x:Name="RestoreSettings" Content="Restore settings" FontSize="13.5" Margin="0,0,0,14" />
+                    <ui:Button Content="Start restore" Appearance="Danger" Click="StartRestore_Click" HorizontalAlignment="Left" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

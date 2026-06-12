@@ -46,6 +46,230 @@ namespace hMailServer.ControlPanel.Views
       private void DomainList_SelectionChanged(object sender, SelectionChangedEventArgs e)
       {
          ReloadAccounts();
+         ReloadAliases();
+         ReloadDistLists();
+      }
+
+      public class AliasRow
+      {
+         public string Name { get; set; }
+         public string Display { get; set; }
+      }
+
+      private dynamic OpenSelectedDomain(dynamic domains)
+      {
+         string domainName = DomainList.SelectedItem as string;
+         return domainName == null ? null : domains.ItemByName[domainName];
+      }
+
+      private void ReloadAliases()
+      {
+         var rows = new List<AliasRow>();
+         if (DomainList.SelectedItem != null)
+         {
+            dynamic domains = ServerSession.Current.Application.Domains;
+            try
+            {
+               dynamic domain = OpenSelectedDomain(domains);
+               dynamic aliases = domain.Aliases;
+               int count = (int) aliases.Count;
+               for (int i = 0; i < count; i++)
+               {
+                  dynamic alias = aliases.Item[i];
+                  rows.Add(new AliasRow
+                  {
+                     Name = (string) alias.Name,
+                     Display = (string) alias.Name + "  →  " + (string) alias.Value
+                  });
+                  ServerSession.Release(alias);
+               }
+               ServerSession.Release(aliases);
+               ServerSession.Release(domain);
+            }
+            catch (Exception)
+            {
+            }
+            finally
+            {
+               ServerSession.Release(domains);
+            }
+         }
+         AliasList.ItemsSource = rows;
+      }
+
+      private void ReloadDistLists()
+      {
+         var rows = new List<string>();
+         if (DomainList.SelectedItem != null)
+         {
+            dynamic domains = ServerSession.Current.Application.Domains;
+            try
+            {
+               dynamic domain = OpenSelectedDomain(domains);
+               dynamic lists = domain.DistributionLists;
+               int count = (int) lists.Count;
+               for (int i = 0; i < count; i++)
+               {
+                  dynamic list = lists.Item[i];
+                  rows.Add((string) list.Address);
+                  ServerSession.Release(list);
+               }
+               ServerSession.Release(lists);
+               ServerSession.Release(domain);
+            }
+            catch (Exception)
+            {
+            }
+            finally
+            {
+               ServerSession.Release(domains);
+            }
+         }
+         DistList.ItemsSource = rows;
+      }
+
+      private void AddAlias_Click(object sender, RoutedEventArgs e)
+      {
+         string name = NewAliasName.Text.Trim();
+         string value = NewAliasValue.Text.Trim();
+         if (DomainList.SelectedItem == null || name.Length == 0 || value.Length == 0)
+            return;
+
+         dynamic domains = ServerSession.Current.Application.Domains;
+         try
+         {
+            dynamic domain = OpenSelectedDomain(domains);
+            dynamic aliases = domain.Aliases;
+            dynamic alias = aliases.Add();
+            alias.Name = name;
+            alias.Value = value;
+            alias.Active = true;
+            alias.Save();
+            ServerSession.Release(alias);
+            ServerSession.Release(aliases);
+            ServerSession.Release(domain);
+         }
+         catch (Exception ex)
+         {
+            MessageBox.Show("Could not create the alias: " + ex.Message, "Control Panel");
+            return;
+         }
+         finally
+         {
+            ServerSession.Release(domains);
+         }
+
+         NewAliasName.Text = NewAliasValue.Text = "";
+         ReloadAliases();
+      }
+
+      private void DeleteAlias_Click(object sender, RoutedEventArgs e)
+      {
+         string name = (sender as FrameworkElement)?.Tag as string;
+         if (name == null || DomainList.SelectedItem == null)
+            return;
+
+         dynamic domains = ServerSession.Current.Application.Domains;
+         try
+         {
+            dynamic domain = OpenSelectedDomain(domains);
+            dynamic aliases = domain.Aliases;
+            int count = (int) aliases.Count;
+            for (int i = 0; i < count; i++)
+            {
+               dynamic alias = aliases.Item[i];
+               if ((string) alias.Name == name)
+               {
+                  alias.Delete();
+                  ServerSession.Release(alias);
+                  break;
+               }
+               ServerSession.Release(alias);
+            }
+            ServerSession.Release(aliases);
+            ServerSession.Release(domain);
+         }
+         catch (Exception ex)
+         {
+            MessageBox.Show("Could not delete the alias: " + ex.Message, "Control Panel");
+         }
+         finally
+         {
+            ServerSession.Release(domains);
+         }
+
+         ReloadAliases();
+      }
+
+      private void AddDistList_Click(object sender, RoutedEventArgs e)
+      {
+         string address = NewDistAddress.Text.Trim();
+         if (DomainList.SelectedItem == null || address.Length == 0)
+            return;
+
+         dynamic domains = ServerSession.Current.Application.Domains;
+         try
+         {
+            dynamic domain = OpenSelectedDomain(domains);
+            dynamic lists = domain.DistributionLists;
+            dynamic list = lists.Add();
+            list.Address = address;
+            list.Active = true;
+            list.Save();
+            ServerSession.Release(list);
+            ServerSession.Release(lists);
+            ServerSession.Release(domain);
+         }
+         catch (Exception ex)
+         {
+            MessageBox.Show("Could not create the list: " + ex.Message, "Control Panel");
+            return;
+         }
+         finally
+         {
+            ServerSession.Release(domains);
+         }
+
+         NewDistAddress.Text = "";
+         ReloadDistLists();
+      }
+
+      private void DeleteDistList_Click(object sender, RoutedEventArgs e)
+      {
+         string address = (sender as FrameworkElement)?.Tag as string;
+         if (address == null || DomainList.SelectedItem == null)
+            return;
+
+         dynamic domains = ServerSession.Current.Application.Domains;
+         try
+         {
+            dynamic domain = OpenSelectedDomain(domains);
+            dynamic lists = domain.DistributionLists;
+            int count = (int) lists.Count;
+            for (int i = 0; i < count; i++)
+            {
+               dynamic list = lists.Item[i];
+               if ((string) list.Address == address)
+               {
+                  list.Delete();
+                  ServerSession.Release(list);
+                  break;
+               }
+               ServerSession.Release(list);
+            }
+            ServerSession.Release(lists);
+            ServerSession.Release(domain);
+         }
+         catch (Exception ex)
+         {
+            MessageBox.Show("Could not delete the list: " + ex.Message, "Control Panel");
+         }
+         finally
+         {
+            ServerSession.Release(domains);
+         }
+
+         ReloadDistLists();
       }
 
       private void ReloadAccounts()

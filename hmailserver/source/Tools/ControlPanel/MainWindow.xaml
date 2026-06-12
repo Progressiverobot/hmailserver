@@ -61,6 +61,9 @@
                     <RadioButton x:Name="NavQueue" Style="{StaticResource NavItem}" Content="Delivery queue" GroupName="Nav" Checked="Nav_Checked">
                         <RadioButton.Tag><ui:SymbolIcon Symbol="MailArrowUp24" /></RadioButton.Tag>
                     </RadioButton>
+                    <RadioButton x:Name="NavRules" Style="{StaticResource NavItem}" Content="Rules" GroupName="Nav" Checked="Nav_Checked">
+                        <RadioButton.Tag><ui:SymbolIcon Symbol="TaskListLtr24" /></RadioButton.Tag>
+                    </RadioButton>
                     <RadioButton x:Name="NavLogs" Style="{StaticResource NavItem}" Content="Live logs" GroupName="Nav" Checked="Nav_Checked">
                         <RadioButton.Tag><ui:SymbolIcon Symbol="DocumentText24" /></RadioButton.Tag>
                     </RadioButton>
@@ -91,6 +94,9 @@
                     </RadioButton>
                     <RadioButton x:Name="NavLogging" Style="{StaticResource NavItem}" Content="Logging" GroupName="Nav" Checked="Nav_Checked">
                         <RadioButton.Tag><ui:SymbolIcon Symbol="Notebook24" /></RadioButton.Tag>
+                    </RadioButton>
+                    <RadioButton x:Name="NavBackup" Style="{StaticResource NavItem}" Content="Backup &amp; restore" GroupName="Nav" Checked="Nav_Checked">
+                        <RadioButton.Tag><ui:SymbolIcon Symbol="ArrowDownload24" /></RadioButton.Tag>
                     </RadioButton>
 
                     <TextBlock Text="SERVER FEATURES" FontSize="10" Margin="20,16,0,6"

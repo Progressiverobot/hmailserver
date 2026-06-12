@@ -16,10 +16,17 @@
                 <TextBlock x:Name="SubtitleText" Text="Messages waiting for delivery."
                            Style="{StaticResource PageSubtitle}" />
             </StackPanel>
-            <ui:Button Content="Refresh" HorizontalAlignment="Right" VerticalAlignment="Top"
-                       Click="Refresh_Click">
-                <ui:Button.Icon><ui:SymbolIcon Symbol="ArrowClockwise24" /></ui:Button.Icon>
-            </ui:Button>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+                <ui:Button Content="Deliver now" Appearance="Primary" Click="Retry_Click" Margin="0,0,8,0">
+                    <ui:Button.Icon><ui:SymbolIcon Symbol="Send24" /></ui:Button.Icon>
+                </ui:Button>
+                <ui:Button Content="Remove" Appearance="Danger" Click="Remove_Click" Margin="0,0,8,0">
+                    <ui:Button.Icon><ui:SymbolIcon Symbol="Delete24" /></ui:Button.Icon>
+                </ui:Button>
+                <ui:Button Content="Refresh" Click="Refresh_Click">
+                    <ui:Button.Icon><ui:SymbolIcon Symbol="ArrowClockwise24" /></ui:Button.Icon>
+                </ui:Button>
+            </StackPanel>
         </Grid>
 
         <Border Grid.Row="1" Style="{StaticResource Card}" Padding="6">

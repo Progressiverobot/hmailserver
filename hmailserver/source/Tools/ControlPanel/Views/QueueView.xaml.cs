@@ -31,6 +31,55 @@ namespace hMailServer.ControlPanel.Views
 
       private void Refresh_Click(object sender, RoutedEventArgs e) => Reload();
 
+      private void Retry_Click(object sender, RoutedEventArgs e)
+      {
+         if (QueueGrid.SelectedItem is not QueueRow row)
+         {
+            SubtitleText.Text = "Select a message first.";
+            return;
+         }
+
+         try
+         {
+            dynamic queue = ServerSession.Current.Application.GlobalObjects.DeliveryQueue;
+            queue.ResetDeliveryTime(Convert.ToInt32(row.Id));
+            queue.StartDelivery();
+            ServerSession.Release(queue);
+            SubtitleText.Text = "Delivery retriggered for message " + row.Id + ".";
+            Reload();
+         }
+         catch (Exception ex)
+         {
+            SubtitleText.Text = "Could not retrigger delivery: " + ex.Message;
+         }
+      }
+
+      private void Remove_Click(object sender, RoutedEventArgs e)
+      {
+         if (QueueGrid.SelectedItem is not QueueRow row)
+         {
+            SubtitleText.Text = "Select a message first.";
+            return;
+         }
+
+         if (MessageBox.Show("Remove message " + row.Id + " from the queue?", "Control Panel",
+             MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            return;
+
+         try
+         {
+            dynamic queue = ServerSession.Current.Application.GlobalObjects.DeliveryQueue;
+            queue.Remove(Convert.ToInt64(row.Id));
+            ServerSession.Release(queue);
+            SubtitleText.Text = "Message " + row.Id + " removed.";
+            Reload();
+         }
+         catch (Exception ex)
+         {
+            SubtitleText.Text = "Could not remove the message: " + ex.Message;
+         }
+      }
+
       private void Reload()
       {
          try

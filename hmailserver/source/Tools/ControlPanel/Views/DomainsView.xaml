@@ -21,9 +21,13 @@
                 <ColumnDefinition Width="2*" />
                 <ColumnDefinition Width="3*" />
             </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="3*" />
+                <RowDefinition Height="2*" />
+            </Grid.RowDefinitions>
 
             <!-- Domain list -->
-            <Border Style="{StaticResource Card}" Margin="0,0,12,0" Padding="10">
+            <Border Style="{StaticResource Card}" Margin="0,0,12,0" Padding="10" Grid.RowSpan="2">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="*" />
@@ -91,6 +95,84 @@
                     </Grid>
                 </Grid>
             </Border>
+
+            <!-- Aliases + distribution lists -->
+            <Grid Grid.Column="1" Grid.Row="1" Margin="0,12,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Border Style="{StaticResource Card}" Padding="10" Margin="0,0,12,0">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Text="Aliases" FontWeight="SemiBold" FontSize="13.5" Margin="6,2,0,6" />
+                        <ListView x:Name="AliasList" Grid.Row="1" BorderThickness="0" Background="Transparent">
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="4,3">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding Display}" FontSize="12.5" VerticalAlignment="Center" />
+                                        <ui:Button Grid.Column="1" Content="✕" FontSize="10" Padding="6,2"
+                                                   Tag="{Binding Name}" Click="DeleteAlias_Click" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                        <Grid Grid.Row="2" Margin="4,8,0,2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ui:TextBox x:Name="NewAliasName" PlaceholderText="alias@domain" FontSize="12" Margin="0,0,6,0" />
+                            <ui:TextBox x:Name="NewAliasValue" Grid.Column="1" PlaceholderText="target@anywhere" FontSize="12" Margin="0,0,6,0" />
+                            <ui:Button Grid.Column="2" Content="Add" FontSize="12" Click="AddAlias_Click" />
+                        </Grid>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Column="1" Style="{StaticResource Card}" Padding="10">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Text="Distribution lists" FontWeight="SemiBold" FontSize="13.5" Margin="6,2,0,6" />
+                        <ListView x:Name="DistList" Grid.Row="1" BorderThickness="0" Background="Transparent">
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="4,3">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding}" FontSize="12.5" VerticalAlignment="Center" />
+                                        <ui:Button Grid.Column="1" Content="✕" FontSize="10" Padding="6,2"
+                                                   Tag="{Binding}" Click="DeleteDistList_Click" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                        <Grid Grid.Row="2" Margin="4,8,0,2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ui:TextBox x:Name="NewDistAddress" PlaceholderText="list@domain" FontSize="12" Margin="0,0,6,0" />
+                            <ui:Button Grid.Column="1" Content="Add" FontSize="12" Click="AddDistList_Click" />
+                        </Grid>
+                    </Grid>
+                </Border>
+            </Grid>
         </Grid>
     </Grid>
 </UserControl>

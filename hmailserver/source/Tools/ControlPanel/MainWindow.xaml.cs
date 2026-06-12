@@ -56,8 +56,8 @@ namespace hMailServer.ControlPanel
 
       private IEnumerable<RadioButton> AllNavItems() => new[]
       {
-         NavDashboard, NavDomains, NavQueue, NavLogs,
-         NavProtocols, NavDelivery, NavAntiSpam, NavAntiVirus, NavTls, NavCerts, NavIpRanges, NavLogging,
+         NavDashboard, NavDomains, NavQueue, NavRules, NavLogs,
+         NavProtocols, NavDelivery, NavAntiSpam, NavAntiVirus, NavTls, NavCerts, NavIpRanges, NavLogging, NavBackup,
          NavSecurity, NavAutomation, NavIntegration
       };
 
@@ -132,6 +132,7 @@ namespace hMailServer.ControlPanel
                nameof(NavDashboard) => new DashboardView(),
                nameof(NavDomains) => new DomainsView(),
                nameof(NavQueue) => new QueueView(),
+               nameof(NavRules) => new RulesView(),
                nameof(NavLogs) => new LogsView(),
                nameof(NavProtocols) => new ServerSettingsView(ServerSettingsView.Section.Protocols),
                nameof(NavDelivery) => new ServerSettingsView(ServerSettingsView.Section.Delivery),
@@ -141,6 +142,7 @@ namespace hMailServer.ControlPanel
                nameof(NavCerts) => new SslCertificatesView(),
                nameof(NavIpRanges) => new IPRangesView(),
                nameof(NavLogging) => new ServerSettingsView(ServerSettingsView.Section.Logging),
+               nameof(NavBackup) => new BackupView(),
                nameof(NavSecurity) => new FeatureSettingsView(FeatureSettingsView.Section.Security),
                nameof(NavAutomation) => new FeatureSettingsView(FeatureSettingsView.Section.Automation),
                nameof(NavIntegration) => new FeatureSettingsView(FeatureSettingsView.Section.Integration),
