@@ -1,7 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
+using Microsoft.Win32;
+using Wpf.Ui.Appearance;
 using hMailServer.ControlPanel.Services;
 using hMailServer.ControlPanel.Views;
 
@@ -9,6 +13,8 @@ namespace hMailServer.ControlPanel
 {
    public partial class MainWindow
    {
+      private const string RegistryPath = @"Software\hMailServer\ControlPanel";
+
       private readonly Dictionary<string, UserControl> pageCache_ = new();
       private bool connected_;
 
@@ -16,8 +22,20 @@ namespace hMailServer.ControlPanel
       {
          InitializeComponent();
 
+         ApplySavedTheme();
+
          SetNavEnabled(false);
          ContentHost.Content = new ConnectView(OnConnected);
+
+         // Ctrl+K command palette.
+         PreviewKeyDown += (s, e) =>
+         {
+            if (connected_ && e.Key == Key.K && Keyboard.Modifiers == ModifierKeys.Control)
+            {
+               new CommandPalette(this, AllNavItems()).ShowDialog();
+               e.Handled = true;
+            }
+         };
 
          // Optional auto-connect: hMailCP.exe /connect <host> <user> <password>
          string[] args = Environment.GetCommandLineArgs();
@@ -36,12 +54,48 @@ namespace hMailServer.ControlPanel
          }
       }
 
+      private IEnumerable<RadioButton> AllNavItems() => new[]
+      {
+         NavDashboard, NavDomains, NavQueue, NavLogs,
+         NavProtocols, NavDelivery, NavAntiSpam, NavAntiVirus, NavTls, NavCerts, NavIpRanges, NavLogging,
+         NavSecurity, NavAutomation, NavIntegration
+      };
+
       private void SetNavEnabled(bool enabled)
       {
-         foreach (var item in new Control[] { NavDashboard, NavDomains, NavQueue, NavLogs,
-                  NavProtocols, NavDelivery, NavAntiSpam, NavAntiVirus, NavTls, NavLogging,
-                  NavSecurity, NavAutomation, NavIntegration })
+         foreach (var item in AllNavItems())
             item.IsEnabled = enabled;
+      }
+
+      private void ApplySavedTheme()
+      {
+         string saved = null;
+         try
+         {
+            using RegistryKey key = Registry.CurrentUser.OpenSubKey(RegistryPath);
+            saved = key?.GetValue("Theme") as string;
+         }
+         catch (Exception)
+         {
+         }
+
+         if (saved == "Light")
+            ApplicationThemeManager.Apply(ApplicationTheme.Light);
+      }
+
+      private void Theme_Click(object sender, RoutedEventArgs e)
+      {
+         bool toLight = ApplicationThemeManager.GetAppTheme() == ApplicationTheme.Dark;
+         ApplicationThemeManager.Apply(toLight ? ApplicationTheme.Light : ApplicationTheme.Dark);
+
+         try
+         {
+            using RegistryKey key = Registry.CurrentUser.CreateSubKey(RegistryPath);
+            key?.SetValue("Theme", toLight ? "Light" : "Dark");
+         }
+         catch (Exception)
+         {
+         }
       }
 
       private void OnConnected()
@@ -84,6 +138,8 @@ namespace hMailServer.ControlPanel
                nameof(NavAntiSpam) => new ServerSettingsView(ServerSettingsView.Section.AntiSpam),
                nameof(NavAntiVirus) => new ServerSettingsView(ServerSettingsView.Section.AntiVirus),
                nameof(NavTls) => new ServerSettingsView(ServerSettingsView.Section.Tls),
+               nameof(NavCerts) => new SslCertificatesView(),
+               nameof(NavIpRanges) => new IPRangesView(),
                nameof(NavLogging) => new ServerSettingsView(ServerSettingsView.Section.Logging),
                nameof(NavSecurity) => new FeatureSettingsView(FeatureSettingsView.Section.Security),
                nameof(NavAutomation) => new FeatureSettingsView(FeatureSettingsView.Section.Automation),

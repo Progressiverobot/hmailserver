@@ -83,6 +83,12 @@
                     <RadioButton x:Name="NavTls" Style="{StaticResource NavItem}" Content="SSL/TLS &amp; auto-ban" GroupName="Nav" Checked="Nav_Checked">
                         <RadioButton.Tag><ui:SymbolIcon Symbol="LockClosed24" /></RadioButton.Tag>
                     </RadioButton>
+                    <RadioButton x:Name="NavCerts" Style="{StaticResource NavItem}" Content="SSL certificates" GroupName="Nav" Checked="Nav_Checked">
+                        <RadioButton.Tag><ui:SymbolIcon Symbol="Certificate24" /></RadioButton.Tag>
+                    </RadioButton>
+                    <RadioButton x:Name="NavIpRanges" Style="{StaticResource NavItem}" Content="IP ranges" GroupName="Nav" Checked="Nav_Checked">
+                        <RadioButton.Tag><ui:SymbolIcon Symbol="Filter24" /></RadioButton.Tag>
+                    </RadioButton>
                     <RadioButton x:Name="NavLogging" Style="{StaticResource NavItem}" Content="Logging" GroupName="Nav" Checked="Nav_Checked">
                         <RadioButton.Tag><ui:SymbolIcon Symbol="Notebook24" /></RadioButton.Tag>
                     </RadioButton>
@@ -108,8 +114,13 @@
                         <TextBlock x:Name="ConnText" Margin="7,0,0,0" FontSize="11.5"
                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                     </StackPanel>
-                    <TextBlock x:Name="VersionText" FontSize="10.5" Margin="15,4,0,0"
-                               Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                    <Grid Margin="0,6,0,0">
+                        <TextBlock x:Name="VersionText" FontSize="10.5" Margin="15,4,0,0" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                        <ui:Button x:Name="ThemeButton" Content="◐" FontSize="13" Padding="7,3"
+                                   HorizontalAlignment="Right" ToolTip="Toggle light/dark theme"
+                                   Click="Theme_Click" />
+                    </Grid>
                 </StackPanel>
             </Grid>
 

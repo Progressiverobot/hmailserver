@@ -11,6 +11,7 @@
     <AssemblyName>hMailCP</AssemblyName>
     <RootNamespace>hMailServer.ControlPanel</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>app.ico</ApplicationIcon>
     <Version>6.2.0</Version>
     <Product>hMailServer Control Panel</Product>
     <Company>hMailServer</Company>
