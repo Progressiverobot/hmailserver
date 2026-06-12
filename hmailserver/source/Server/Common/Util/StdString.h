@@ -647,6 +647,7 @@ inline const Type& SSMAX(const Type& arg1, const Type& arg2)
 // Standard headers needed
 
 #include <string>			// basic_string
+#include <vector>			// AppendFormatV buffer
 #include <algorithm>		// for_each, etc.
 #include <functional>		// for StdStringLessNoCase, et al
 #include <locale>			// for various facets
@@ -2959,16 +2960,19 @@ public:
 	#define BUFSIZE_2ND 512
 	#define STD_BUF_SIZE		1024
 
-	// an efficient way to add formatted characters to the string.  You may only
-	// add up to STD_BUF_SIZE characters at a time, though
+	// an efficient way to add formatted characters to the string.
+	// (Used to write into a fixed 1024-char stack buffer via vsprintf_s,
+	// which fail-fasts the process when the output exceeds the buffer.
+	// Now counts first, like FormatV.)
 	void AppendFormatV(const CT* szFmt, va_list argList)
 	{
-		CT szBuf[STD_BUF_SIZE];
+		int nLen = ssvscprintf(szFmt, argList);
+		if (nLen <= 0)
+			return;
 
-		int nLen = ssvsprintf(szBuf, STD_BUF_SIZE, szFmt, argList);
-
-      if ( 0 < nLen )
-			this->append(szBuf, nLen);
+		std::vector<CT> buf(nLen + 1);
+		ssvsprintf(&buf[0], nLen + 1, szFmt, argList);
+		this->append(&buf[0], nLen);
 	}
 
 	// -------------------------------------------------------------------------

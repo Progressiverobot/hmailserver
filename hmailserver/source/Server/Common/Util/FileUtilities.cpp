@@ -432,11 +432,14 @@ namespace HM
    bool
    FileUtilities::DeleteFilesInDirectory(const String &sDirName)
    {
-      for (boost::filesystem::directory_iterator file(sDirName); file != boost::filesystem::directory_iterator(); ++file)
+      // Iterate with an error_code so a missing/inaccessible directory does
+      // not throw (nothing to delete in that case).
+      boost::system::error_code ec;
+      for (boost::filesystem::directory_iterator file(std::wstring(sDirName), ec); !ec && file != boost::filesystem::directory_iterator(); ++file)
       {
          boost::filesystem::path current(file->path());
          if (!boost::filesystem::is_directory(current))
-            boost::filesystem::remove(current);
+            boost::filesystem::remove(current, ec);
       }
 
       return true;
@@ -448,7 +451,12 @@ namespace HM
    {
       std::vector<FileInfo> result;
 
-      for (boost::filesystem::directory_iterator file(sDirectoryName); file != boost::filesystem::directory_iterator(); ++file)
+      // Iterate with an error_code: a missing directory yields an empty result
+      // instead of an unhandled boost::filesystem exception. (An absent
+      // Languages directory used to crash the service on startup via
+      // Languages::Load.)
+      boost::system::error_code ec;
+      for (boost::filesystem::directory_iterator file(std::wstring(sDirectoryName), ec); !ec && file != boost::filesystem::directory_iterator(); ++file)
       {
          boost::filesystem::path current(file->path());
 
@@ -499,7 +507,8 @@ namespace HM
    bool
    FileUtilities::DeleteDirectoriesInDirectory(const String &sDirName)
    {
-      for (boost::filesystem::directory_iterator file(sDirName); file != boost::filesystem::directory_iterator(); ++file)
+      boost::system::error_code iterate_error;
+      for (boost::filesystem::directory_iterator file(std::wstring(sDirName), iterate_error); !iterate_error && file != boost::filesystem::directory_iterator(); ++file)
       {
          boost::filesystem::path current(file->path());
          if (boost::filesystem::is_directory(current))
@@ -510,7 +519,7 @@ namespace HM
             if (error_code)
             {
                String sErrorMessage;
-               sErrorMessage.Format(_T("Could not delete the directory %s."), file->path().string());
+               sErrorMessage.Format(_T("Could not delete the directory %s."), String(current.wstring()).c_str());
                ErrorManager::Instance()->ReportError(ErrorManager::High, 5700, "FileUtilities::DeleteDirectoriesInDirectory", sErrorMessage, error_code);
                return false;
             }

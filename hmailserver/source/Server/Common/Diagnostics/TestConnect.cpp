@@ -62,7 +62,7 @@ namespace HM
       for (auto ipaddress : ipaddresses)
       {
          String formattedString;
-         formattedString.Format(_T("Trying to connect to TCP/IP address %s on port %d.\r\n"), ipaddress, port);
+         formattedString.Format(_T("Trying to connect to TCP/IP address %s on port %d.\r\n"), ipaddress.c_str(), port);
          result.append(formattedString);
 
          std::shared_ptr<Event> disconnectEvent = std::shared_ptr<Event>(new Event());

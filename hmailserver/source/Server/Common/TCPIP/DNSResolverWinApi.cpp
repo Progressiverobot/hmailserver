@@ -84,7 +84,7 @@ namespace HM
          if (!pSrvList) {
 
             String sMessage;
-            sMessage.Format(_T("Unable to allocate memory for DNS server list. Query: %s, Type: %d."), query, resourceType);
+            sMessage.Format(_T("Unable to allocate memory for DNS server list. Query: %s, Type: %d."), query.c_str(), resourceType);
             ErrorManager::Instance()->ReportError(ErrorManager::Low, 4401, "DNSResolver::_Resolve", sMessage);
 
             return false;

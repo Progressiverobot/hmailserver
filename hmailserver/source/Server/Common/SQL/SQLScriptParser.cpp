@@ -38,18 +38,24 @@ namespace HM
          return false;
       }
    
+      // Normalize line endings so scripts parse correctly regardless of
+      // whether the file was stored with CRLF or LF endings. (LF-normalized
+      // scripts used to be treated as one giant command, which the database
+      // server then rejected.)
+      sContents.Replace(_T("\r\n"), _T("\n"));
+
       String sCommandSeparator;
       switch (settings_->GetType())
       {
       case HM::DatabaseSettings::TypeMSSQLCompactEdition:
       case HM::DatabaseSettings::TypeMSSQLServer:
-         sCommandSeparator = "\r\n\r\n";
+         sCommandSeparator = "\n\n";
          break;
       case HM::DatabaseSettings::TypeMYSQLServer:
-         sCommandSeparator = "\r\n\r\n";
+         sCommandSeparator = "\n\n";
          break;
       case HM::DatabaseSettings::TypePGServer:
-         sCommandSeparator = ";\r\n\r\n";
+         sCommandSeparator = ";\n\n";
          break;
       }
 
@@ -77,6 +83,9 @@ namespace HM
       // Do some basic preprocessing...
       while (sLine.Left(2).Compare(_T("\r\n")) == 0)
          sLine = sLine.Mid(2);
+
+      while (sLine.Left(1).Compare(_T("\n")) == 0)
+         sLine = sLine.Mid(1);
       
       while (sLine.Left(1).Compare(_T(" ")) == 0)
          sLine = sLine.Mid(1);

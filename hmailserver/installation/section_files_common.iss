@@ -19,3 +19,6 @@ Source: "..\source\Translations\*"; Excludes: "CVS,.cvsignore,.#*"; DestDir: "{a
 Source: ISC.dll; Flags: dontcopy
 Source: ".\Extras\tlds.txt"; DestDir: "{app}\Bin";  Flags: ignoreversion; Components: server;
 Source: ".\Extras\dh2048.pem"; DestDir: "{app}\Bin";  Flags: ignoreversion; Components: server;
+
+; MySQL client library (x64) - loaded at runtime when the database type is MySQL/MariaDB
+Source: ".\Extras\libmysql.dll"; DestDir: "{app}\Bin"; Flags: ignoreversion; Components: server;
