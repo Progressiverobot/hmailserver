@@ -32,6 +32,7 @@ namespace hMailServer.Administrator.Utilities
       public Color Text;           // primary text
       public Color TextMuted;      // secondary text
       public Color Accent;         // brand / focus color
+      public Color Accent2;        // gradient end for brand surfaces
       public Color AccentText;     // text on accent
       public Color Success;
       public Color Warning;
@@ -55,6 +56,7 @@ namespace hMailServer.Administrator.Utilities
          Text = Color.FromArgb(36, 41, 47),
          TextMuted = Color.FromArgb(87, 96, 106),
          Accent = Color.FromArgb(9, 105, 218),
+         Accent2 = Color.FromArgb(111, 66, 193),
          AccentText = Color.White,
          Success = Color.FromArgb(46, 160, 67),
          Warning = Color.FromArgb(227, 160, 8),
@@ -73,6 +75,7 @@ namespace hMailServer.Administrator.Utilities
          Text = Color.FromArgb(230, 237, 243),
          TextMuted = Color.FromArgb(139, 148, 158),
          Accent = Color.FromArgb(47, 129, 247),
+         Accent2 = Color.FromArgb(163, 113, 247),
          AccentText = Color.White,
          Success = Color.FromArgb(63, 185, 80),
          Warning = Color.FromArgb(210, 153, 34),
@@ -166,6 +169,40 @@ namespace hMailServer.Administrator.Utilities
             handler(null, EventArgs.Empty);
       }
 
+      /// <summary>
+      /// Translates a legacy stored foreground color into the active palette.
+      /// Legacy code carries hard-coded SystemColors.WindowText (black) and
+      /// semantic colors (red = disabled item); rendering them verbatim makes
+      /// text invisible in dark mode.
+      /// </summary>
+      public static Color TranslateForeColor(Color stored)
+      {
+         ThemePalette p = C;
+
+         // Colors written by the opposite palette translate to their token.
+         if (stored == Light.Text || stored == Dark.Text)
+            return p.Text;
+         if (stored == Light.TextMuted || stored == Dark.TextMuted)
+            return p.TextMuted;
+         if (stored == Light.Danger || stored == Dark.Danger)
+            return p.Danger;
+
+         // Near-black (legacy SystemColors.WindowText defaults) and
+         // near-white both become readable primary text.
+         if (stored.IsEmpty || stored == SystemColors.WindowText || stored == SystemColors.ControlText ||
+             (stored.R < 40 && stored.G < 40 && stored.B < 40) ||
+             (stored.R > 215 && stored.G > 215 && stored.B > 215))
+            return p.Text;
+
+         if (stored == Color.Red || (stored.R > 150 && stored.G < 80 && stored.B < 80))
+            return p.Danger;
+
+         if (stored == SystemColors.GrayText || stored == Color.Gray || stored == Color.DarkGray)
+            return p.TextMuted;
+
+         return stored;
+      }
+
       /// <summary>Recursively themes a control tree (including the form chrome).</summary>
       public static void Apply(Control root)
       {
@@ -183,6 +220,10 @@ namespace hMailServer.Administrator.Utilities
 
       private static void ApplyRecursive(Control control)
       {
+         // Brand surfaces (gradient header bar etc.) keep their explicit colors.
+         if ("theme-skip".Equals(control.Tag as string))
+            return;
+
          ApplyToControl(control);
 
          foreach (Control child in control.Controls)
@@ -237,6 +278,11 @@ namespace hMailServer.Administrator.Utilities
             list.ForeColor = p.Text;
             if (list.BorderStyle == BorderStyle.Fixed3D)
                list.BorderStyle = BorderStyle.FixedSingle;
+            foreach (ListViewItem item in list.Items)
+            {
+               item.ForeColor = TranslateForeColor(item.ForeColor);
+               item.BackColor = p.Input;
+            }
             SetNativeScrollbarTheme(list);
          }
          else if (control is TreeView)
@@ -244,9 +290,16 @@ namespace hMailServer.Administrator.Utilities
             TreeView tree = (TreeView) control;
             tree.BackColor = p.Input;
             tree.ForeColor = p.Text;
-            if (tree.BorderStyle == BorderStyle.Fixed3D)
-               tree.BorderStyle = BorderStyle.FixedSingle;
+            tree.BorderStyle = BorderStyle.None;
             tree.LineColor = p.Border;
+            tree.FullRowSelect = true;
+            tree.ShowLines = false;
+            tree.HotTracking = false;
+            tree.HideSelection = false;
+            tree.ItemHeight = Math.Max(tree.ItemHeight, 26);
+            if (tree.Font.Name != "Segoe UI")
+               tree.Font = new Font("Segoe UI", 9.75f);
+            ApplyTreeNodeColors(tree.Nodes);
             SetNativeScrollbarTheme(tree);
          }
          else if (control is ListBox)
@@ -326,6 +379,17 @@ namespace hMailServer.Administrator.Utilities
          {
             control.BackColor = p.Background;
             control.ForeColor = p.Text;
+         }
+      }
+
+      /// <summary>Translates the foreground color of every node in a tree.</summary>
+      public static void ApplyTreeNodeColors(TreeNodeCollection nodes)
+      {
+         foreach (TreeNode node in nodes)
+         {
+            node.ForeColor = TranslateForeColor(node.ForeColor);
+            node.BackColor = Color.Empty;
+            ApplyTreeNodeColors(node.Nodes);
          }
       }
 

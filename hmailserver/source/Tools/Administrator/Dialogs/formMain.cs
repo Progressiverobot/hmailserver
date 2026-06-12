@@ -95,6 +95,50 @@ namespace hMailServer.Administrator
                     e.SuppressKeyPress = true;
                 }
             };
+
+            ApplyModernChrome();
+        }
+
+        /// <summary>
+        /// Restyles the main window chrome: gradient brand header with white
+        /// caption, primary accent Save button. Reapplied on theme changes.
+        /// </summary>
+        private void ApplyModernChrome()
+        {
+            // Brand header: gradient surface, exempt from recursive theming.
+            panelTopBar.Tag = "theme-skip";
+            panelTopBar.BorderStyle = BorderStyle.None;
+            panelTopBar.Height = 40;
+            panelTopBar.Paint += (s, e) =>
+            {
+                Rectangle r = panelTopBar.ClientRectangle;
+                if (r.Width <= 0 || r.Height <= 0) return;
+                using (var brush = new System.Drawing.Drawing2D.LinearGradientBrush(
+                    r, Theme.C.Accent, Theme.C.Accent2, 0f))
+                    e.Graphics.FillRectangle(brush, r);
+            };
+            panelTopBar.Resize += (s, e) => panelTopBar.Invalidate();
+
+            labelTopCaption.Tag = "theme-skip";
+            labelTopCaption.Font = new Font("Segoe UI Semibold", 12F);
+            labelTopCaption.ForeColor = Color.White;
+            labelTopCaption.BackColor = Color.Transparent;
+            labelTopCaption.Location = new Point(10, 9);
+
+            // Primary Save button.
+            buttonSave.Tag = "theme-skip";
+            EventHandler styleSave = delegate
+            {
+                buttonSave.FlatStyle = FlatStyle.Flat;
+                buttonSave.FlatAppearance.BorderSize = 0;
+                buttonSave.BackColor = Theme.C.Accent;
+                buttonSave.ForeColor = Theme.C.AccentText;
+                buttonSave.FlatAppearance.MouseOverBackColor = Theme.C.Accent2;
+                buttonSave.Font = new Font("Segoe UI Semibold", 9F);
+                panelTopBar.Invalidate();
+            };
+            styleSave(null, EventArgs.Empty);
+            Theme.Changed += styleSave;
         }
 
         private void ShowCommandPalette()
@@ -210,7 +254,7 @@ namespace hMailServer.Administrator
                }
             }
 
-            node.ForeColor = internalNode.ForeColor;
+            node.ForeColor = Theme.TranslateForeColor(internalNode.ForeColor);
             node.Tag = internalNode;
 
             return node;
@@ -471,8 +515,9 @@ namespace hMailServer.Administrator
 
            internalNode.ForeColor = color;
 
-           if (internalNode.ForeColor != currentlySelectedNode.ForeColor)
-              currentlySelectedNode.ForeColor = internalNode.ForeColor;
+           Color rendered = Theme.TranslateForeColor(internalNode.ForeColor);
+           if (rendered != currentlySelectedNode.ForeColor)
+              currentlySelectedNode.ForeColor = rendered;
 
            RefreshCurrentNode(newName);
         }
