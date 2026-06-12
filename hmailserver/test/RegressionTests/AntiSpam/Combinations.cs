@@ -46,7 +46,10 @@ namespace RegressionTests.AntiSpam
 
          // Send a messages to this account, containing both incorrect MX records an SURBL-hits.
          // We should only detect one of these two:
-         var smtpClientSimulator = new SmtpClientSimulator();
+         // Connect via the machine's LAN address: the HELO host check is by design
+         // skipped for loopback connections (SpamTestHeloHost), so a 127.0.0.1
+         // client would never produce the expected score.
+         var smtpClientSimulator = new SmtpClientSimulator(false, 25, TestSetup.GetLocalIpAddress());
 
          // Should not be possible to send this email since it's results in a spam
          // score over the delete threshold.
@@ -84,7 +87,9 @@ namespace RegressionTests.AntiSpam
 
          // Send a messages to this account, containing both incorrect MX records an SURBL-hits.
          // We should only detect one of these two:
-         var smtpClientSimulator = new SmtpClientSimulator();
+         // Connect via the machine's LAN address: the HELO host check is by design
+         // skipped for loopback connections (SpamTestHeloHost).
+         var smtpClientSimulator = new SmtpClientSimulator(false, 25, TestSetup.GetLocalIpAddress());
 
          // Should not be possible to send this email since it's results in a spam
          // score over the delete threshold.

@@ -71,20 +71,48 @@ namespace RegressionTests.Infrastructure
       {
          var processlist = Process.GetProcesses();
 
+         var spamdRunning = false;
          foreach (var theprocess in processlist)
             if (theprocess.ProcessName == "spamd")
-               return;
+               spamdRunning = true;
 
-         // Check if we can launch it...
-         try
+         if (!spamdRunning)
          {
-            var serviceController = new ServiceController("SpamAssassinJAM");
-            serviceController.Start();
+            // Check if we can launch it...
+            try
+            {
+               var serviceController = new ServiceController("SpamAssassinJAM");
+               if (serviceController.Status != ServiceControllerStatus.Running)
+                  serviceController.Start();
+            }
+            catch (Exception)
+            {
+               Assert.Inconclusive("Unable to start SpamAssassin process. Is SpamAssassin installed?");
+            }
          }
-         catch (Exception)
+
+         // Wait until spamd actually accepts connections - a freshly (re)started
+         // service needs a few seconds to load its rule set.
+         for (var i = 0; i < 40; i++)
          {
-            Assert.Inconclusive("Unable to start SpamAssassin process. Is SpamAssassin installed?");
+            try
+            {
+               using (var client = new System.Net.Sockets.TcpClient())
+               {
+                  var result = client.BeginConnect("127.0.0.1", 783, null, null);
+                  if (result.AsyncWaitHandle.WaitOne(500) && client.Connected)
+                     return;
+               }
+            }
+            catch
+            {
+               // not ready yet
+            }
+
+            Thread.Sleep(250);
          }
+
+         Assert.Inconclusive("SpamAssassin is not accepting connections on port 783.");
       }
 
       public static void AssertDeleteFile(string file)

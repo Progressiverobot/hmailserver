@@ -454,6 +454,12 @@ namespace RegressionTests.Shared
          if (antiSpam.DKIMVerificationEnabled)
             antiSpam.DKIMVerificationEnabled = false;
 
+         // 6.0: DMARC verification is on by default. Tests that score spam from
+         // non-loopback connections would otherwise pick up real-world DMARC
+         // policies (example.com publishes p=reject these days).
+         if (antiSpam.DMARCEnabled)
+            antiSpam.DMARCEnabled = false;
+
          antiSpam.WhiteListAddresses.Clear();
 
          for (var i = 0; i < antiSpam.DNSBlackLists.Count; i++)
