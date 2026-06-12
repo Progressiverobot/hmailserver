@@ -5,7 +5,7 @@ hMailServer is an open source email server for Microsoft Windows, implementing S
 
 This repository is a modernized fork of the original project (which is no longer maintained upstream). It has been brought up to date with a current toolchain, current cryptography, and the transport-security standards expected of a mail server in 2026.
 
-**Production status:** version **6.0.0** is released — [download the installer](https://github.com/Progressiverobot/hmailserver/releases/latest) (`hMailServer-6.0.0-B2-x64.exe`). The release is validated by the full regression suite: **898 of 898 tests passing, zero failures, zero inconclusive**, including live SpamAssassin, ClamAV (real EICAR detection), DMARC evaluation against live DNS, and TLS 1.2/1.3 handshakes end to end.
+**Production status:** version **6.0.0** is released  -  [download the installer](https://github.com/Progressiverobot/hmailserver/releases/latest) (`hMailServer-6.0.0-B2-x64.exe`). The release is validated by the full regression suite: **898 of 898 tests passing, zero failures, zero inconclusive**, including live SpamAssassin, ClamAV (real EICAR detection), DMARC evaluation against live DNS, and TLS 1.2/1.3 handshakes end to end.
 
 What's new in 6.0
 =================
@@ -20,7 +20,7 @@ What's new in 6.0
 **Outbound transport security**
 
    * MTA-STS (RFC 8461) policy discovery and enforcement
-   * DANE (RFC 7672) with full in-process DNSSEC validation (RFC 4033-4035) — bogus chains block delivery to that host
+   * DANE (RFC 7672) with full in-process DNSSEC validation (RFC 4033-4035)  -  bogus chains block delivery to that host
    * DNSSEC validation also protects SPF/DKIM/DMARC TXT lookups
    * TLS-RPT (RFC 8460): daily aggregate reports sent to recipient domains
 
@@ -60,9 +60,9 @@ Environment set up
 
    * An installed version of hMailServer 5.7 or later (configured with a database)
    * Visual Studio 2026 (Community edition or Build Tools)
-   * InnoSetup 5.5.4a (non-unicode version) — only needed to build the installer
-   * Perl 5 (https://strawberryperl.com/) — only needed to build OpenSSL
-   * Python 3 (https://www.python.org/) — only needed to build libpq
+   * InnoSetup 5.5.4a (non-unicode version)  -  only needed to build the installer
+   * Perl 5 (https://strawberryperl.com/)  -  only needed to build OpenSSL
+   * Python 3 (https://www.python.org/)  -  only needed to build libpq
    
 **NOTE**
 
@@ -240,7 +240,7 @@ If you want to run hMailServer in debug mode in Visual Studio, add the command a
 Running tests
 -------------
 
-hMailServer ships with a full regression suite (898 NUnit tests) which exercises the server end to end over SMTP, IMAP and POP3 — including anti-spam, anti-virus, TLS, DKIM/DMARC, rules, backup and the COM API. Release 6.0.0 passes the complete suite with zero failures and zero inconclusive results.
+hMailServer ships with a full regression suite (898 NUnit tests) which exercises the server end to end over SMTP, IMAP and POP3  -  including anti-spam, anti-virus, TLS, DKIM/DMARC, rules, backup and the COM API. Release 6.0.0 passes the complete suite with zero failures and zero inconclusive results.
 
 NOTE: When running tests, your local hMailServer installation will be updated with test accounts. Existing domains and accounts are deleted. Each tests prepares the server configuration in different ways. In other words, do not run the automated tests in an environment where you need to preserve hMailServer data.
 
@@ -254,8 +254,8 @@ You can also navigate to the source code for a test, right-click anywhere and se
 
 For 100% coverage the suite expects three optional integrations (tests degrade to *inconclusive* without them):
 
-   * **SpamAssassin** — the JAM Software Windows build (`https://downloads.jam-software.de/spamassassin/SpamAssassinForWindows-x64.zip`), extracted to `C:\SpamAssassin`, with `spamd.exe -i 127.0.0.1 -A 127.0.0.1 -p 783` running — ideally wrapped as a Windows service named `SpamAssassinJAM` so outage-handling tests can stop and start it.
-   * **ClamAV** — installed to `C:\clamav` with `clamd` listening on TCP 3310 and current freshclam definitions. Let the daemon finish loading signatures before the first run.
+   * **SpamAssassin**  -  the JAM Software Windows build (`https://downloads.jam-software.de/spamassassin/SpamAssassinForWindows-x64.zip`), extracted to `C:\SpamAssassin`, with `spamd.exe -i 127.0.0.1 -A 127.0.0.1 -p 783` running  -  ideally wrapped as a Windows service named `SpamAssassinJAM` so outage-handling tests can stop and start it.
+   * **ClamAV**  -  installed to `C:\clamav` with `clamd` listening on TCP 3310 and current freshclam definitions. Let the daemon finish loading signatures before the first run.
    * **`AddXOriginalRcptTo=1`** in `hMailServer.INI` for the X-Original-Rcpt-To header tests.
 
 The complete dev-tree provisioning recipe (directories, certificates, DB scripts, runtime files) is documented in [IMPLEMENTATION-NOTES.md](IMPLEMENTATION-NOTES.md).
@@ -279,7 +279,7 @@ hMailServer is free and open source software, licensed under the GNU Affero Gene
 Security
 ========
 
-Please report security vulnerabilities privately � see [SECURITY.md](.github/SECURITY.md).
+Please report security vulnerabilities privately - see [SECURITY.md](.github/SECURITY.md).
 
 Contributing
 ============
