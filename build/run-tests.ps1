@@ -28,49 +28,15 @@ $nunitArgs = @(
     '--labels=All',
     '/stoponerror'
 )
-$nunitArgString = [string]::Join(' ', $nunitArgs)
 
 Write-Host "Starting NUnit runner (streaming output)..." -ForegroundColor Cyan
 
-$psi = New-Object System.Diagnostics.ProcessStartInfo
-$psi.FileName = $nunitExe
-$psi.Arguments = $nunitArgString
-$psi.RedirectStandardOutput = $true
-$psi.RedirectStandardError = $true
-$psi.UseShellExecute = $false
-$psi.CreateNoWindow = $true
+# Invoke the runner directly. PowerShell streams stdout/stderr natively;
+# manual pipe reading with StreamReader.Peek() deadlocks when one stream
+# has no data while the other pipe buffer fills.
+& $nunitExe @nunitArgs 2>&1 | ForEach-Object { $_.ToString() }
 
-$proc = New-Object System.Diagnostics.Process
-$proc.StartInfo = $psi
-$proc.EnableRaisingEvents = $true
-
-
-$proc.Start() | Out-Null
-
-# Read redirected streams on the main thread to avoid PowerShell runspace errors
-$stdout = $proc.StandardOutput
-$stderr = $proc.StandardError
-
-while (-not $proc.HasExited -or -not $stdout.EndOfStream -or -not $stderr.EndOfStream) {
-    while ($stdout.Peek() -ne -1) {
-        $line = $stdout.ReadLine()
-        if ($line) { [System.Console]::WriteLine($line) }
-    }
-    while ($stderr.Peek() -ne -1) {
-        $line = $stderr.ReadLine()
-        if ($line) {
-            $old = [System.Console]::ForegroundColor
-            [System.Console]::ForegroundColor = 'Red'
-            [System.Console]::WriteLine($line)
-            [System.Console]::ForegroundColor = $old
-        }
-    }
-    Start-Sleep -Milliseconds 50
-}
-
-$proc.WaitForExit()
-
-$lastExit = $proc.ExitCode
+$lastExit = $LASTEXITCODE
 if ($lastExit -ne 0) {
     Write-Error "Tests failed with exit code $lastExit"
 }

@@ -3,8 +3,10 @@
 Source: "..\source\server\hMailServer\x64\Release\hMailServer.exe"; DestDir: "{app}\Bin"; Flags: ignoreversion; Components: server admintools;
 Source: "..\source\server\hMailServer\x64\Release\hMailServer.tlb"; DestDir: "{app}\Bin"; Flags: ignoreversion; Components: server admintools;
 Source: "..\source\server\hMailServer\x64\Release\hMailServer.Minidump.exe"; DestDir: "{app}\Bin"; Flags: ignoreversion; Components: server;
-Source: "Microsoft.VC142.CRT\*"; DestDir: "{app}\Bin"; Flags: ignoreversion; Components: server admintools;
-Source: "Microsoft.UCRT.WindowsSDK10240\*"; DestDir: "{app}\Bin"; Flags: ignoreversion; Components: server admintools;
+; Visual C++ runtime matching the build toolset (v145). Shipping an older
+; app-local msvcp140 than the toolset the binaries were built with crashes
+; the service on startup (e.g. constexpr std::mutex changes).
+Source: "Microsoft.VC145.CRT\*"; DestDir: "{app}\Bin"; Flags: ignoreversion; Components: server admintools;
 
 Source: "SQLCE\SSCERuntime_x64-ENU.msi"; Flags: deleteafterinstall ; Excludes: ".svn"; DestDir: "{tmp}"; Components: server;
 
