@@ -99,9 +99,13 @@ INI changes to take effect).
 - [x] Phase 8 — validation: UIA-driven screenshots (`build/capture-cp.ps1 -Launch -Nav 'Anti-spam'`)
 - [x] Phase 9 — release: v6.2.0 (server 6.2.0 build 6, gate 898/898)
 
-Remaining backlog: rules editor, IP ranges editor, SSL certificate manager,
-backup/restore page, distribution lists/aliases UI, theme toggle in titlebar,
-Ctrl+K palette, app icon.
+Remaining backlog: rules editor, backup/restore page, distribution
+lists/aliases UI, per-range permission editing in IP ranges, queue
+retry/delete actions, About page.
+
+Done post-6.2.0-initial: IP ranges page, SSL certificates manager,
+light/dark theme toggle (sidebar footer, HKCU persisted), Ctrl+K command
+palette, branded app icon (build/make-app-icon.ps1).
 
 ## Environment facts (do not rediscover)
 
