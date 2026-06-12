@@ -1,0 +1,580 @@
+// Copyright (c) 2010 Martin Knafve / hMailServer.com.  
+// http://www.hmailserver.com
+// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Threading;
+using hMailServer;
+using Microsoft.VisualBasic;
+using NUnit.Framework;
+using RegressionTests.Infrastructure;
+using RegressionTests.Shared;
+
+namespace RegressionTests.API
+{
+   [TestFixture]
+   public class Basics : TestFixtureBase
+   {
+      private static void SendMessageToTest()
+      {
+         var smtp = new SmtpClientSimulator();
+         var recipients = new List<string>();
+         recipients.Add("test@example.test");
+         smtp.Send("test@example.test", recipients, "Test", "Test message");
+      }
+
+      [Test]
+      public void BlowfishEncryptShouldNotRequireAdminPrivileges()
+      {
+         var app = SingletonProvider<TestSetup>.Instance.GetApp();
+
+         var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "test@example.test", "test");
+
+         var newApp = new Application();
+         Assert.IsNotNull(newApp.Authenticate(account.Address, "test"));
+
+         var utilities = newApp.Utilities;
+
+         var encryptedResult = utilities.BlowfishEncrypt("Test");
+         Assert.AreNotEqual("Test", encryptedResult, encryptedResult);
+
+         var decrypted = utilities.BlowfishDecrypt(encryptedResult);
+         Assert.AreEqual("Test", decrypted, decrypted);
+      }
+
+      [Test]
+      [Description("Issue 210, Duplicate UIDS when COM Messages.Add is used")]
+      public void TestAddMessage()
+      {
+         var app = SingletonProvider<TestSetup>.Instance.GetApp();
+         var utilities = app.Utilities;
+
+         var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "test@example.test", "test");
+
+         // Create a new folder.
+         var folder = account.IMAPFolders.get_ItemByName("INBOX");
+         folder.Save();
+
+         for (var i = 0; i < 3; i++)
+         {
+            var message = folder.Messages.Add();
+            message.set_Flag(eMessageFlag.eMFSeen, true);
+            message.Save();
+
+            Pop3ClientSimulator.AssertMessageCount(account.Address, "test", (i + 1) * 2 - 1);
+
+            SmtpClientSimulator.StaticSend("test@example.com", account.Address, "Test", "Test");
+            Pop3ClientSimulator.AssertMessageCount(account.Address, "test", (i + 1) * 2);
+         }
+
+         Pop3ClientSimulator.AssertMessageCount(account.Address, "test", 6);
+
+         var sim = new ImapClientSimulator();
+         sim.ConnectAndLogon(account.Address, "test");
+         sim.SelectFolder("Inbox");
+
+         var response = sim.Fetch("1:6 UID");
+
+         var lines = Strings.Split(response, Environment.NewLine, -1, CompareMethod.Text);
+
+         var uids = new List<string>();
+
+         foreach (var line in lines)
+         {
+            var paraPos = line.IndexOf("(");
+            var paraEndPos = line.IndexOf(")");
+
+            if (paraPos < 0 || paraEndPos < 0)
+               continue;
+
+            var paraContent = line.Substring(paraPos + 1, paraEndPos - paraPos - 1);
+
+            if (!uids.Contains(paraContent))
+               uids.Add(paraContent);
+         }
+
+         Assert.AreEqual(6, uids.Count);
+
+         // Make sure the UIDS are sorted properly by creating a copy, sort the copy
+         // and then compare to original.
+         var copy = new List<string>();
+         copy.InsertRange(0, uids);
+         copy.Sort();
+
+         Assert.AreEqual(copy, uids);
+      }
+
+
+      [Test]
+      [Description("Add text to an empty body during sending of attachments")]
+      public void TestAddTextToEmptyBody()
+      {
+         var account1 = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "test@example.test", "test");
+
+         // Send a message to the account.
+         var messageText = @"Date: Thu, 03 Jul 2008 22:01:53 +0200\r\n" +
+                           "From: Test <test@example.test>\r\n" +
+                           "MIME-Version: 1.0\r\n" +
+                           "To: test@example.test\r\n" +
+                           "Subject: test\r\n" +
+                           "Content-Type: multipart/mixed;\r\n" +
+                           "  boundary=\"------------050908050500020808050006\"\r\n" +
+                           "\r\n" +
+                           "This is a multi-part message in MIME format.\r\n" +
+                           "--------------050908050500020808050006\r\n" +
+                           "Content-Type: text/plain; charset=ISO-8859-1; format=flowed\r\n" +
+                           "Content-Transfer-Encoding: 7bit\r\n" +
+                           "\r\n" +
+                           "Test\r\n" +
+                           "\r\n" +
+                           "--------------050908050500020808050006\r\n" +
+                           "Content-Type: text/plain;\r\n" +
+                           " name=\"AUTOEXEC.BAT\"\r\n" +
+                           "Content-Transfer-Encoding: base64\r\n" +
+                           "Content-Disposition: inline;\r\n" +
+                           " filename=\"AUTOEXEC.BAT\"\r\n" +
+                           "\r\n" +
+                           "\r\n" +
+                           "--------------050908050500020808050006--\r\n";
+
+         SmtpClientSimulator.StaticSendRaw("test@example.test", "test@example.test", messageText);
+
+         var message =
+            CustomAsserts.AssertRetrieveFirstMessage(account1.IMAPFolders.get_ItemByName("INBOX"));
+         Assert.AreEqual(1, message.Attachments.Count);
+         Assert.AreEqual("AUTOEXEC.BAT", message.Attachments[0].Filename);
+      }
+
+      [Test]
+      [Description("Issue 210, Duplicate UIDS when COM Messages.Add is used")]
+      public void TestCopyMessage()
+      {
+         var app = SingletonProvider<TestSetup>.Instance.GetApp();
+         var utilities = app.Utilities;
+
+         var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "test@example.test", "test");
+
+         // Create a new folder.
+         var folder = account.IMAPFolders.get_ItemByName("INBOX");
+         folder.Save();
+
+         var someOtherFolder = account.IMAPFolders.Add("SomeOtherFolder");
+
+         for (var i = 0; i < 3; i++)
+         {
+            var message = folder.Messages.Add();
+            message.set_Flag(eMessageFlag.eMFSeen, true);
+            message.Save();
+
+            message.Copy(someOtherFolder.ID);
+         }
+
+         SmtpClientSimulator.StaticSend("test@example.com", account.Address, "Test", "Test");
+
+         // Copy back to inbox.
+         for (var i = 0; i < 3; i++)
+         {
+            var message = someOtherFolder.Messages[i];
+            message.Copy(folder.ID);
+         }
+
+         Pop3ClientSimulator.AssertMessageCount(account.Address, "test", 7);
+
+         var sim = new ImapClientSimulator();
+         sim.ConnectAndLogon(account.Address, "test");
+         sim.SelectFolder("Inbox");
+         var response = sim.Fetch("1:7 UID");
+
+         var lines = Strings.Split(response, Environment.NewLine, -1, CompareMethod.Text);
+
+         var uids = new List<string>();
+
+         foreach (var line in lines)
+         {
+            var paraPos = line.IndexOf("(");
+            var paraEndPos = line.IndexOf(")");
+
+            if (paraPos < 0 || paraEndPos < 0)
+               continue;
+
+            var paraContent = line.Substring(paraPos + 1, paraEndPos - paraPos - 1);
+
+            if (!uids.Contains(paraContent))
+               uids.Add(paraContent);
+         }
+
+         Assert.AreEqual(7, uids.Count);
+
+         // Make sure the UIDS are sorted properly by creating a copy, sort the copy
+         // and then compare to original.
+         var copy = new List<string>();
+         copy.InsertRange(0, uids);
+         copy.Sort();
+
+         Assert.AreEqual(copy, uids);
+      }
+
+      [Test]
+      public void TestCriteriaMatching()
+      {
+         var app = SingletonProvider<TestSetup>.Instance.GetApp();
+         var utilities = app.Utilities;
+
+         Assert.IsTrue(utilities.CriteriaMatch("Test", eRuleMatchType.eMTEquals, "Test"));
+         Assert.IsFalse(utilities.CriteriaMatch("Testa", eRuleMatchType.eMTEquals, "Test"));
+
+         Assert.IsTrue(utilities.CriteriaMatch("Test*", eRuleMatchType.eMTWildcard, "Testar!"));
+         Assert.IsFalse(utilities.CriteriaMatch("Test*", eRuleMatchType.eMTWildcard, "Tesb"));
+      }
+
+      [Test]
+      public void TestDomainDeletion()
+      {
+         var app = SingletonProvider<TestSetup>.Instance.GetApp();
+
+         Assert.IsNotNull(app.Links.get_Domain(_domain.ID));
+
+         app.Domains.DeleteByDBID(_domain.ID);
+
+         try
+         {
+            app.Links.get_Domain(_domain.ID);
+
+            Assert.Fail("Didn't throw");
+         }
+         catch (Exception)
+         {
+            // should throw => ok
+         }
+      }
+
+      [Test]
+      public void TestEventLog()
+      {
+         var application = SingletonProvider<TestSetup>.Instance.GetApp();
+
+         // First set up a script
+         var script =
+            @"Sub OnAcceptMessage(oClient, message)
+                               EventLog.Write(""HOWDY"")
+                              End Sub";
+
+         var scripting = _settings.Scripting;
+         var file = scripting.CurrentScriptFile;
+         File.WriteAllText(file, script);
+         scripting.Enabled = true;
+         scripting.Reload();
+
+         // Drop the current event log
+         var eventLogFile = _settings.Logging.CurrentEventLog;
+
+         LogHandler.DeleteEventLog();
+
+         // Add an account and send a message to it.
+         var account1 = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "test@example.test", "test");
+
+         SendMessageToTest();
+
+         Pop3ClientSimulator.AssertGetFirstMessageText(account1.Address, "test");
+
+         CustomAsserts.AssertFileExists(eventLogFile, false);
+
+         // Check that it starts with Unicode markers.
+         for (var i = 0; i <= 400; i++)
+         {
+            try
+            {
+               var fs = new FileStream(eventLogFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+               var br = new BinaryReader(fs);
+               int i1 = br.ReadByte();
+               int i2 = br.ReadByte();
+               br.Close();
+               fs.Close();
+
+               Assert.AreEqual(255, i1);
+               Assert.AreEqual(254, i2);
+
+               break;
+            }
+            catch (Exception e)
+            {
+               if (i == 40)
+                  throw e;
+            }
+
+            Thread.Sleep(25);
+         }
+      }
+
+      [Test]
+      [Category("COM API")]
+      [Description("Test deletion of IMAP folders using COM API.")]
+      public void TestFolderDeletion()
+      {
+         // Create a test account
+         // Fetch the default domain
+         var account1 = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "folder@example.test", "test");
+         var folder = account1.IMAPFolders.Add("TestFolder1");
+         folder.Save();
+
+         var simulator1 = new ImapClientSimulator();
+         simulator1.ConnectAndLogon(account1.Address, "test");
+         var result = simulator1.List();
+         Assert.IsTrue(result.Contains(folder.Name));
+         simulator1.Disconnect();
+
+         // Delete the folder and confirm it's no longer listed.
+         folder.Delete();
+
+         simulator1.ConnectAndLogon(account1.Address, "test");
+         result = simulator1.List();
+         Assert.IsFalse(result.Contains(folder.Name));
+         simulator1.Disconnect();
+      }
+
+      [Test]
+      public void TestIMAPFolderPermissionAccessGroup()
+      {
+         var application = SingletonProvider<TestSetup>.Instance.GetApp();
+
+
+         var account1 = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "account1@example.test", "test");
+         var group = SingletonProvider<TestSetup>.Instance.AddGroup("TestGroup");
+
+         var publicFolders = _settings.PublicFolders;
+         var folder = publicFolders.Add("Share1");
+         folder.Save();
+
+         var permission = folder.Permissions.Add();
+         permission.PermissionGroupID = group.ID;
+         permission.PermissionType = eACLPermissionType.ePermissionTypeGroup;
+         permission.Save();
+
+         Assert.AreEqual(permission.Group.Name, group.Name);
+
+         permission = folder.Permissions.Add();
+         permission.PermissionAccountID = account1.ID;
+         permission.PermissionType = eACLPermissionType.ePermissionTypeUser;
+         permission.Save();
+
+         Assert.AreEqual(permission.Account.Address, account1.Address);
+      }
+
+      [Test]
+      public void TestInternalDateCombinedWithOnDeliverMessage()
+      {
+         var application = SingletonProvider<TestSetup>.Instance.GetApp();
+         var scripting = _settings.Scripting;
+         scripting.Language = "JScript";
+         // First set up a script
+         var script =
+            @"function OnDeliverMessage(message)
+                           {
+                               EventLog.Write(message.InternalDate);
+                           }";
+
+
+         var file = scripting.CurrentScriptFile;
+         File.WriteAllText(file, script);
+         scripting.Enabled = true;
+         scripting.Reload();
+
+         // Add an account and send a message to it.
+         var account1 = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "test@example.test", "test");
+
+         SmtpClientSimulator.StaticSend(account1.Address, account1.Address, "Test", "SampleBody");
+
+         Pop3ClientSimulator.AssertMessageCount(account1.Address, "test", 1);
+         var text = TestSetup.ReadExistingTextFile(_settings.Logging.CurrentEventLog);
+
+         var columns = text.Split('\t');
+
+         if (columns.Length != 3)
+            Assert.Fail("Wrong number of cols: " + text);
+
+         var lastColumn = columns[columns.Length - 1];
+
+         Assert.IsFalse(lastColumn.Contains("00:00:00"), lastColumn);
+         Assert.IsTrue(lastColumn.Contains(DateTime.Now.Year.ToString()), lastColumn);
+         Assert.IsTrue(lastColumn.Contains(DateTime.Now.Month.ToString()), lastColumn);
+         Assert.IsTrue(lastColumn.Contains(DateTime.Now.Day.ToString()), lastColumn);
+      }
+
+
+      [Test]
+      [Description("Test that live log works and that it's reset when enabled.")]
+      public void TestLiveLog()
+      {
+         var app = SingletonProvider<TestSetup>.Instance.GetApp();
+         var utilities = app.Utilities;
+
+         var logging = app.Settings.Logging;
+
+         logging.EnableLiveLogging(true);
+
+         // Add an account and send a message to it.
+         var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "test@example.test", "test");
+
+         SmtpClientSimulator.StaticSend(account.Address, account.Address, "Test", "SampleBody");
+         Pop3ClientSimulator.AssertMessageCount(account.Address, "test", 1);
+
+         var liveLog = logging.LiveLog;
+         Assert.IsTrue(liveLog.Length > 0, liveLog);
+
+         SmtpClientSimulator.StaticSend(account.Address, account.Address, "Test", "SampleBody");
+         Pop3ClientSimulator.AssertMessageCount(account.Address, "test", 2);
+
+         logging.EnableLiveLogging(true);
+
+         liveLog = logging.LiveLog;
+         Assert.IsFalse(liveLog.Contains("SMTPDeliverer - Message"));
+      }
+
+      [Test]
+      public void TestReinitialize()
+      {
+         var messageText =
+            "From: test@example.test\r\n" +
+            "\r\n" +
+            "WhatTest\r\n";
+
+         var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "test@example.test", "test");
+         SmtpClientSimulator.StaticSend(account.Address, account.Address, "First message",
+            "Test message");
+         Pop3ClientSimulator.AssertMessageCount(account.Address, "test", 1);
+
+         // Create another message on disk and import it.
+         var domainPath = Path.Combine(_application.Settings.Directories.DataDirectory, "example.test");
+         var accountPath = Path.Combine(domainPath, "test");
+         Directory.CreateDirectory(accountPath);
+         var fileName = Path.Combine(accountPath, "something.eml");
+         File.WriteAllText(fileName, messageText);
+         Assert.IsTrue(_application.Utilities.ImportMessageFromFile(fileName, account.ID));
+
+         // Since the cache isn't refreshed, the message has not yet appeared.
+         Pop3ClientSimulator.AssertMessageCount(account.Address, "test", 1);
+
+         // Reinitialize the server. Should, among other things, clear the cache.
+         _application.Reinitialize();
+
+         // Now the message should have appeared.
+         Pop3ClientSimulator.AssertMessageCount(account.Address, "test", 2);
+
+         var sim = new Pop3ClientSimulator();
+         sim.ConnectAndLogon(account.Address, "test");
+         messageText = sim.RETR(2);
+         sim.QUIT();
+
+         Assert.IsTrue(messageText.Contains("WhatTest"), messageText);
+      }
+
+      [Test]
+      public void TestRetrieveMessageID()
+      {
+         var app = SingletonProvider<TestSetup>.Instance.GetApp();
+         var utilities = app.Utilities;
+
+         // Add an account and send a message to it.
+         var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "test@example.test", "test");
+
+         SmtpClientSimulator.StaticSend(account.Address, account.Address, "Test", "SampleBody");
+         Pop3ClientSimulator.AssertMessageCount(account.Address, "test", 1);
+
+         var message = account.IMAPFolders.get_ItemByName("INBOX").Messages[0];
+
+         Assert.AreEqual(message.ID, utilities.RetrieveMessageID(message.Filename));
+         Assert.AreEqual(0, utilities.RetrieveMessageID(@"C:\some\nonexistant\file"));
+      }
+
+      [Test]
+      [Description("Issue 368, Routes.ItemByName returns invalid object")]
+      public void TestRetrieveNonexistantRoute()
+      {
+         var settings = SingletonProvider<TestSetup>.Instance.GetApp().Settings;
+         var ex = Assert.Throws<COMException>(() => settings.Routes.get_ItemByName("whatever.com"));
+         StringAssert.Contains("Invalid index.", ex.Message);
+      }
+
+      [Test]
+      public void TestSaveMessageInExistingIMAPFolder()
+      {
+         var settings = SingletonProvider<TestSetup>.Instance.GetApp().Settings;
+
+         var account1 = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "test@example.test", "test");
+
+         // Check that the message does not exist
+         Pop3ClientSimulator.AssertMessageCount(account1.Address, "test", 0);
+
+         // Send a message to the account.
+         var folder = account1.IMAPFolders.get_ItemByName("INBOX");
+
+         var message = folder.Messages.Add();
+
+         Assert.AreEqual(0, message.State);
+
+         message.Body = "V�lkommen till verkligheten";
+         message.Subject = "Hej";
+         message.Save();
+
+         Assert.AreEqual(2, message.State);
+         Assert.IsFalse(message.Filename.Contains(settings.PublicFolderDiskName));
+         Assert.IsTrue(message.Filename.Contains(_domain.Name));
+
+         // Check that the message exists
+         var firstMessageText = Pop3ClientSimulator.AssertGetFirstMessageText(account1.Address, "test");
+
+         Assert.IsNotEmpty(firstMessageText);
+         Assert.Less(0, firstMessageText.IndexOf("Hej"));
+      }
+
+      [Test]
+      public void TestSaveMessageInPublicIMAPFolder()
+      {
+         var settings = SingletonProvider<TestSetup>.Instance.GetApp().Settings;
+         var publicFolders = settings.PublicFolders;
+
+         var testFolder = publicFolders.Add("TestFolder");
+         testFolder.Save();
+
+         // Send a message to the account.
+         var message = testFolder.Messages.Add();
+
+         Assert.AreEqual(0, message.State);
+
+         message.Body = "V�lkommen till verkligheten";
+         message.Subject = "Hej";
+         message.Save();
+
+         Assert.AreEqual(2, message.State);
+         Assert.IsTrue(message.Filename.Contains(settings.PublicFolderDiskName));
+         Assert.IsFalse(message.Filename.Contains(_domain.Name));
+      }
+
+      [Test]
+      public void TestSendMessage()
+      {
+         var account1 = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "test@example.test", "test");
+
+         // Send a message to the account.
+         var message = new hMailServer.Message();
+
+         Assert.AreEqual(0, message.State);
+
+         message.AddRecipient("Martin", account1.Address);
+         message.Body = "V�lkommen till verkligheten";
+         message.Subject = "Hej";
+         message.Save();
+
+         Assert.AreEqual(1, message.State);
+
+         // Check that the message exists
+         var firstMessageText = Pop3ClientSimulator.AssertGetFirstMessageText(account1.Address, "test");
+
+         Assert.IsNotEmpty(firstMessageText);
+         Assert.Less(0, firstMessageText.IndexOf("Hej"));
+      }
+   }
+}

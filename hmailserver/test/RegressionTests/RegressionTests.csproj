@@ -1,0 +1,277 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="12.0">
+  <Import Project="..\packages\NUnit3TestAdapter.4.4.2\build\net462\NUnit3TestAdapter.props" Condition="Exists('..\packages\NUnit3TestAdapter.4.4.2\build\net462\NUnit3TestAdapter.props')" />
+  <Import Project="..\packages\NUnit.3.13.3\build\NUnit.props" Condition="Exists('..\packages\NUnit.3.13.3\build\NUnit.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>9.0.30729</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{8F691179-0851-4A25-AC78-3548DD0514FA}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>RegressionTests</RootNamespace>
+    <AssemblyName>RegressionTests</AssemblyName>
+    <IsWebBootstrapper>true</IsWebBootstrapper>
+    <FileUpgradeFlags>
+    </FileUpgradeFlags>
+    <OldToolsVersion>3.5</OldToolsVersion>
+    <UpgradeBackupLocation>
+    </UpgradeBackupLocation>
+    <PublishUrl>http://localhost/UnitTest/</PublishUrl>
+    <Install>true</Install>
+    <InstallFrom>Web</InstallFrom>
+    <UpdateEnabled>true</UpdateEnabled>
+    <UpdateMode>Foreground</UpdateMode>
+    <UpdateInterval>7</UpdateInterval>
+    <UpdateIntervalUnits>Days</UpdateIntervalUnits>
+    <UpdatePeriodically>false</UpdatePeriodically>
+    <UpdateRequired>false</UpdateRequired>
+    <MapFileExtensions>true</MapFileExtensions>
+    <ApplicationRevision>0</ApplicationRevision>
+    <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
+    <UseApplicationTrust>false</UseApplicationTrust>
+    <BootstrapperEnabled>true</BootstrapperEnabled>
+    <TargetFrameworkVersion>v4.8.1</TargetFrameworkVersion>
+    <TargetFrameworkProfile />
+    <NuGetPackageImportStamp>
+    </NuGetPackageImportStamp>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\x64\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DebugType>full</DebugType>
+    <PlatformTarget>x64</PlatformTarget>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+    <Prefer32Bit>false</Prefer32Bit>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
+    <OutputPath>bin\x64\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <Optimize>true</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>x64</PlatformTarget>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+    <Prefer32Bit>false</Prefer32Bit>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Microsoft.VisualBasic" />
+    <Reference Include="nunit.framework, Version=3.13.3.0, Culture=neutral, PublicKeyToken=2638cd05610744eb, processorArchitecture=MSIL">
+      <HintPath>..\packages\NUnit.3.13.3\lib\net45\nunit.framework.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.ServiceProcess" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="API\StatusTests.cs" />
+    <Compile Include="API\Messages.cs" />
+    <Compile Include="IMAP\ConcurrentConnections.cs" />
+    <Compile Include="Infrastructure\AccountProperties.cs" />
+    <Compile Include="Infrastructure\AccountServices.cs" />
+    <Compile Include="AntiSpam\Combinations.cs" />
+    <Compile Include="AntiSpam\Basics.cs" />
+    <Compile Include="AntiSpam\SpamAssassin.cs" />
+    <Compile Include="API\Basics.cs" />
+    <Compile Include="Infrastructure\Cache.cs" />
+    <Compile Include="Infrastructure\CustomAsserts.cs" />
+    <Compile Include="Infrastructure\DnsResolution.cs" />
+    <Compile Include="Infrastructure\LogHandler.cs" />
+    <Compile Include="Infrastructure\Persistence\AccountNameValidation.cs" />
+    <Compile Include="Infrastructure\Persistence\AliasNameValidation.cs" />
+    <Compile Include="Infrastructure\Persistence\DomainNameValidation.cs" />
+    <None Include="Resources\MessageWithInvalidDkim.eml" />
+    <None Include="Resources\MessageWithValidDkim.eml" />
+    <Compile Include="Shared\DeliveryFailedException.cs" />
+    <Compile Include="Shared\RetryableAssert.cs" />
+    <Compile Include="Shared\ServiceRestartDetector.cs" />
+    <Compile Include="Shared\SslVersions.cs" />
+    <Compile Include="Shared\StringExtensions.cs" />
+    <Compile Include="Shared\TcpConnection.cs" />
+    <Compile Include="Infrastructure\Delivery.cs" />
+    <Compile Include="Infrastructure\DomainServices.cs" />
+    <Compile Include="IMAP\Basics.cs" />
+    <Compile Include="Shared\ImapClientSimulator.cs" />
+    <Compile Include="Infrastructure\IPRanges.cs" />
+    <Compile Include="Infrastructure\MainOperations.cs" />
+    <Compile Include="Infrastructure\Persistence\Basics.cs" />
+    <Compile Include="POP3\Basics.cs" />
+    <Compile Include="Shared\Pop3ClientSimulator.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Rules\Rules.cs" />
+    <Compile Include="Shared\SingletonProvider.cs" />
+    <Compile Include="SMTP\AWStatsLoggingTests.cs" />
+    <Compile Include="SMTP\Basics.cs" />
+    <Compile Include="SMTP\ESmtpTests.cs" />
+    <Compile Include="SMTP\RcptToParsing.cs" />
+    <Compile Include="SMTP\MailFromParsing.cs" />
+    <Compile Include="SMTP\XOriginalRcptHeaderTests.cs" />
+    <Compile Include="SSL\SslTlsVersionTests.cs" />
+    <Compile Include="SSL\SslServerTests.cs" />
+    <Compile Include="Infrastructure\TCPIP.cs" />
+    <Compile Include="Infrastructure\Timeouts.cs" />
+    <Compile Include="Shared\TestSetup.cs" />
+    <Compile Include="Shared\UtilityServices.cs" />
+    <Compile Include="TestResources.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>TestResources.resx</DependentUpon>
+    </Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <COMReference Include="hMailServer">
+      <Guid>{DB241B59-A1B1-4C59-98FC-8D101A2995F2}</Guid>
+      <VersionMajor>1</VersionMajor>
+      <VersionMinor>0</VersionMinor>
+      <Lcid>0</Lcid>
+      <WrapperTool>tlbimp</WrapperTool>
+      <Isolated>False</Isolated>
+    </COMReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="API\Unicode.cs" />
+    <Compile Include="Infrastructure\BackupRestore.cs" />
+    <Compile Include="Shared\TcpServer.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <BootstrapperPackage Include="Microsoft.Net.Framework.2.0">
+      <Visible>False</Visible>
+      <ProductName>.NET Framework 2.0 %28x86%29</ProductName>
+      <Install>true</Install>
+    </BootstrapperPackage>
+    <BootstrapperPackage Include="Microsoft.Net.Framework.3.0">
+      <Visible>False</Visible>
+      <ProductName>.NET Framework 3.0 %28x86%29</ProductName>
+      <Install>false</Install>
+    </BootstrapperPackage>
+    <BootstrapperPackage Include="Microsoft.Net.Framework.3.5">
+      <Visible>False</Visible>
+      <ProductName>.NET Framework 3.5</ProductName>
+      <Install>false</Install>
+    </BootstrapperPackage>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="API\Message.cs" />
+    <Compile Include="IMAP\ACL.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="IMAP\CommandSequences.cs" />
+    <Compile Include="IMAP\Folders.cs" />
+    <Compile Include="IMAP\Search.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="AntiSpam\DKIM\Signing.cs" />
+    <Compile Include="AntiSpam\DKIM\Verification.cs" />
+    <Compile Include="API\Events.cs" />
+    <Compile Include="API\Links.cs" />
+    <Compile Include="Stress\ContentStressTest.cs" />
+    <Compile Include="IMAP\Sort.cs" />
+    <Compile Include="POP3\Fetching\Basics.cs" />
+    <Compile Include="Shared\Pop3ServerSimulator.cs" />
+    <Compile Include="Security\AutoBan.cs" />
+    <Compile Include="Security\SMTPAuthentication.cs" />
+    <Compile Include="SMTP\Signatures.cs" />
+    <Compile Include="Infrastructure\Persistence\Limitations.cs" />
+    <Compile Include="SSL\CertificateTypes.cs" />
+    <Compile Include="Stress\StabilitySanityTests.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="IMAP\HierarchyDelimiter.cs" />
+    <Compile Include="Security\PasswordMasking.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="AntiSpam\GreyListing.cs" />
+    <Compile Include="AntiSpam\Whitelisting.cs" />
+    <Compile Include="IMAP\MessageIndexing.cs" />
+    <Compile Include="IMAP\MessageUids.cs" />
+    <Compile Include="MIME\Parameters.cs" />
+    <Compile Include="Security\Basics.cs" />
+    <Compile Include="Shared\TestFixtureBase.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Messages\MessageContainingGreekAndJapanese.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Messages\MessageContainingGreekSubject.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="AntiVirus\ClamAV.cs" />
+    <Compile Include="API\Security.cs" />
+    <Compile Include="API\Utilities.cs" />
+    <Compile Include="API\Permissions.cs" />
+    <Compile Include="IMAP\Append.cs" />
+    <Compile Include="IMAP\Examine.cs" />
+    <Compile Include="IMAP\Fetch.cs" />
+    <Compile Include="Infrastructure\ExceptionHandlerTests.cs" />
+    <Compile Include="Infrastructure\Persistence\TCPIPPortTests.cs" />
+    <Compile Include="Infrastructure\RetryHelper.cs" />
+    <Compile Include="Infrastructure\SessionLimitingTests.cs" />
+    <Compile Include="MIME\MessageParsing.cs" />
+    <Compile Include="MIME\RoundTrip.cs" />
+    <Compile Include="Infrastructure\Persistence\Maintenance.cs" />
+    <Compile Include="POP3\Fetching\ExternalAccountSslTests.cs" />
+    <Compile Include="POP3\Fetching\LockHelper.cs" />
+    <Compile Include="POP3\Fetching\ServerBehaviors.cs" />
+    <Compile Include="Shared\SmtpClientSimulator.cs" />
+    <Compile Include="Shared\TestTracer.cs" />
+    <Compile Include="SMTP\BlockedAttachmentTests.cs" />
+    <Compile Include="SMTP\ReceivedHeaders.cs" />
+    <Compile Include="SMTP\DistributionLists.cs" />
+    <Compile Include="SMTP\Routes.cs" />
+    <Compile Include="SMTP\SMTPClientStartTLSTests.cs" />
+    <Compile Include="SMTP\SMTPClientTests.cs" />
+    <Compile Include="Shared\SmtpServerSimulator.cs" />
+    <Compile Include="SSL\SmtpDeliverySslTests.cs" />
+    <Compile Include="SSL\SslSetup.cs" />
+    <Compile Include="SSL\StartTls\ImapServerTests.cs" />
+    <Compile Include="SSL\StartTls\Pop3ServerTests.cs" />
+    <Compile Include="SSL\StartTls\SmtpServerTests.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Messages\MultipartMessageWithNoMainBodyText.txt" />
+    <EmbeddedResource Include="TestResources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>TestResources.Designer.cs</LastGenOutput>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+    <None Include="Resources\EmailWith-TextPlainBody-TextPlainContentType.txt" />
+    <None Include="Resources\SecuniaBody1.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\EmailWith-TextPlainBody+TextHtmlBody+TextPlainAttachment.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\EmailWith-TextPlainBody-NoContentType.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\EmailWith-TextHtmlBody-TextHtmlContentType.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\EmailWith-TextPlainBody+TextHtmlBody.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\EmailWith-TextPlainBody+TextHtmlBody+TextHtmlAttachment.txt" />
+  </ItemGroup>
+  <ItemGroup />
+  <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('..\packages\NUnit.3.13.3\build\NUnit.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\NUnit.3.13.3\build\NUnit.props'))" />
+    <Error Condition="!Exists('..\packages\NUnit3TestAdapter.4.4.2\build\net462\NUnit3TestAdapter.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\NUnit3TestAdapter.4.4.2\build\net462\NUnit3TestAdapter.props'))" />
+  </Target>
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets...
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>
