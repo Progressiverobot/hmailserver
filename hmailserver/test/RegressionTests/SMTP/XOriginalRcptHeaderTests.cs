@@ -75,9 +75,17 @@ namespace RegressionTests.SMTP
          SmtpClientSimulator.StaticSend(account1.Address, recipients, "Test", "Test");
 
          var text = Pop3ClientSimulator.AssertGetFirstMessageText(account1.Address, Password);
+
+         // The header value is exactly at the RFC 5322 fold limit, so the server
+         // folds it. Compare the unfolded header value instead of raw text.
+         var headerStart = text.IndexOf("X-Original-Rcpt-To:");
+         Assert.GreaterOrEqual(headerStart, 0, "X-Original-Rcpt-To header missing. Message: " + text);
+         var headerEnd = text.IndexOf("From: ", headerStart);
+         var unfolded = text.Substring(headerStart, headerEnd - headerStart)
+            .Replace("\r\n\t", "").Replace("\r\n ", "");
          StringAssert.Contains(
-            "X-Original-Rcpt-To: my-alias@example.test,test1@example.test,test2@example.test" + Environment.NewLine,
-            text);
+            "X-Original-Rcpt-To: my-alias@example.test,test1@example.test,test2@example.test",
+            unfolded);
       }
 
       [Test]
