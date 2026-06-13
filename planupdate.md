@@ -1,9 +1,39 @@
-# hMailServer Control Panel — Migration & Modernization Roadmap
+# hMailServer Modernization — Master Plan & Roadmap
 
-*Generated 2026-06-13. Goal: make the WPF Control Panel (`hMailCP.exe`) the
-single administration GUI, retire the classic WinForms Administrator from the
-installer, add third-party AV/security extensibility, and complete a full
-UX/UI pass.*
+*Generated 2026-06-13. This is the single authoritative plan. It covers two
+tracks run as one ordered program:*
+
+- **Track A — Control Panel becomes the sole admin GUI** (parity with the classic
+  WinForms Administrator, drop the classic from the installer, AV/security
+  extensibility, full UX/UI pass).
+- **Track B — Server world-class hardening** (security defects, auth/secrets
+  modernization, standards & deliverability, operability, CI/fuzzing).
+
+*Scope: Tier 1 defects + Tier 2 harden-in-place now; Tier 3 platform expansion
+(Linux/JMAP/HA) is a documented future track only. Every new server capability is
+surfaced in the Control Panel.*
+
+---
+
+## Master execution sequence (the chosen order)
+
+Risk/value-ordered. Security defects first, locked by tests/CI, then finish the
+Control Panel as the sole GUI, then deepen hardening. Each step ends with: clean
+build, run the regression suite, (CP steps) screenshot-validate, then commit/push
++ move tag `v6.2.0` + clobber the release asset.
+
+1. **B1 — security & correctness defects + secure defaults.** ✅ **Done** (see Progress).
+2. **B8 (core) — CI + fuzzing.** GitHub Actions matrix running the suite; ASAN/UBSAN; SMTP/IMAP/MIME fuzz harnesses.
+3. **Track A Ph 0–1 — drop classic from installer + Control-Panel functional parity.** CP becomes the sole shipped GUI.
+4. **B3 — secrets & least-privilege** (DPAPI for INI/DB secrets; non-LocalSystem service).
+5. **B2 — auth modernization** (OAuth2 XOAUTH2/OAUTHBEARER, SCRAM-SHA-256, Argon2id + hash policy).
+6. **Track A Ph 2 — Control-Panel UX/UI polish.**
+7. **B4 — deliverability & SMTP standards** (SMTPUTF8/EAI, SRS, PIPELINING/DSN, rate shaping).
+8. **B5 — IMAP modern sync profile** (CONDSTORE/QRESYNC/UIDPLUS/ENABLE/ESEARCH/STATUS=SIZE).
+9. **Track A Ph 3 — AV/security extensibility + INI hardening knobs.**
+10. **B7 — operability & observability** (OpenTelemetry, health probes, DB pool/executor, durability, HA runbook).
+11. **B6 — Sieve + ManageSieve.**
+12. **Track A Ph 4 / ongoing** — finalize gap doc, release cadence. Then the future track (Tier 3).
 
 ---
 
@@ -16,8 +46,8 @@ as work lands.
 ### ✅ Done — Server security & correctness defects (Track B, phase B1)
 
 Validated end-to-end: **IMAP 215/215** and **SMTP 175/175** regression tests pass
-(the SMTP suite was re-run a second time with strict line-endings active, also
-175/175). Committed as `6f7e019`.
+(SMTP re-run under strict line-endings and again with the AUTH cap — both 175/175).
+Commits: `6f7e019` (defects), `53ec538` (line-ending default), `9f3a51e` (AUTH cap).
 
 | Fix | File | What changed |
 |---|---|---|
@@ -26,20 +56,23 @@ Validated end-to-end: **IMAP 215/215** and **SMTP 175/175** regression tests pas
 | ✅ MIME header over-read | `Common/Mime/Mime.cpp` | `MimeHeader::Load` bounds every read by `nDataSize`; no read past the caller's buffer on an unterminated header. |
 | ✅ AV scanner path hijack | `Common/AntiVirus/ClamWinVirusScanner.cpp`, `CustomVirusScanner.cpp` | Quotes the executable path so a spaced path can't be hijacked by `CreateProcess` (unquoted-path resolution). |
 | ✅ Listener slow-loris | (REST/Web/Metrics) | Verified already mitigated — 64 KB / fixed-buffer request caps + 5–10 s read deadlines already present. |
+| ✅ Secure default: strict SMTP line endings | `DBScripts/CreateTables{MYSQL,MSSQL,PGSQL}.sql` | `smtpallowincorrectlineendings` default 1→0 on fresh installs (SMTP-smuggling hardening). Validated: SMTP suite 175/175 under strict mode. Commit `53ec538`. |
+| ✅ Per-connection SMTP AUTH cap | `SMTP/SMTPConnection.cpp/.h` | 10 failed AUTH attempts per connection → 535 + disconnect (defense-in-depth over per-IP auto-ban). Validated: SMTP 175/175. Commit `9f3a51e`. |
 
-### ⏳ In progress / next
+### ⏳ Next
 
-- ⏳ Secure-by-default: flip `smtpallowincorrectlineendings` to 0 in the install
-  scripts (strict line-endings; SMTP-smuggling hardening). Validated: SMTP suite
-  passes 175/175 under strict mode.
-- ⬜ Per-connection AUTH attempt cap (complements per-IP auto-ban).
+- ⬜ Modern default TLS cipher list (drop RC4/legacy CBC) + MD5-hash-accept deprecation —
+  deferred to run with the TLS/auth-modernization work (higher regression risk).
+- ⬜ CI + fuzzing (GitHub Actions matrix, ASAN/UBSAN, SMTP/IMAP/MIME fuzz harnesses).
 - ⬜ Then: Control-Panel parity track (Phases 0–4 below), then deeper hardening
-  (OAuth2/SCRAM, DPAPI secrets, SMTPUTF8, IMAP sync profile, CI + fuzzing).
+  (OAuth2/SCRAM, DPAPI secrets, SMTPUTF8, IMAP sync profile).
 
-The full two-track roadmap (server world-class hardening + Control Panel) lives in
-the session plan; the Control-Panel phases follow.
+The full two-track roadmap is below: **Track A** (Control Panel) then **Track B**
+(server hardening B2–B8) then the future track.
 
 ---
+
+# TRACK A — Control Panel becomes the sole admin GUI
 
 ## Guiding decisions
 
@@ -192,3 +225,86 @@ are larger.
    *disconnecting* sessions likely needs server support. Recommend view-only.
 3. **Removing Administrator from the Tools `.sln`** — defer until CP parity is
    proven in production.
+
+---
+
+# TRACK B — Server world-class hardening (Tiers 1–2; harden-in-place)
+
+*Evidence from four code deep-dives (auth/crypto, protocol standards,
+architecture/operability, correctness bug-hunt). Already verified strong (do not
+redo): PBKDF2-HMAC-SHA256 (210k iters, transparent rehash-on-login), TLS 1.2/1.3
+defaults, DANE+DNSSEC outbound, ARC, Ed25519 DKIM, MTA-STS, TLS-RPT, auto-ban,
+correct dot-stuffing, parameterized SQL.*
+
+## B1 — Protocol correctness & DoS hardening ✅ DONE
+Delivered and validated — see **Implementation progress** above (commits `6f7e019`,
+`53ec538`, `9f3a51e`; IMAP 215/215 + SMTP 175/175).
+Deferred from B1 (do with the TLS/auth work, higher regression risk): modern default
+TLS cipher list (drop RC4/legacy CBC) and MD5-hash-accept deprecation; per-connection
+AUTH cap for IMAP/POP3 (they already inherit the per-IP auto-ban).
+
+## B2 — Authentication modernization
+- OAuth2 SASL **XOAUTH2 + OAUTHBEARER** (IMAP / SMTP submission / POP3); token validation
+  via JWKS/introspection. Today only AUTH LOGIN/PLAIN (`SMTPConnection`, `IMAPCommandAuthenticate`,
+  outbound `SMTPClientConnection`).
+- **SCRAM-SHA-256** (+ `-PLUS` channel binding).
+- **Argon2id** KDF option (keep PBKDF2); hash-policy engine (min accepted type, rehash stale,
+  phase out MD5/SHA256); optional pepper. `HashCreator`.
+- POP3 SASL + UTF8 (RFC 6856).
+- Verify: O365/Gmail XOAUTH2 + Thunderbird SCRAM interop.
+
+## B3 — Secrets & least-privilege
+- **DPAPI** envelope encryption (machine/service-SID) for the DB password in `hMailServer.INI`
+  (`IniFileSettings`) and the DB-stored reversible Blowfish secrets — route (`PersistentRoute`),
+  fetch (`PersistentFetchAccount`), relayer (`Property`). External-secret-provider abstraction.
+- Run the service as a **least-privileged virtual account** (not LocalSystem; `ServiceManager`),
+  with explicit ACLs + privilege drop.
+- Verify: secrets not reversible off-box; service runs non-SYSTEM.
+
+## B4 — Deliverability & SMTP standards
+- **SMTPUTF8 / EAI** (RFC 6531/6532) end-to-end (parser, validator currently ASCII-only, storage, delivery).
+- **SRS** for forwarding (SPF alignment) replacing the naive envelope rewrite (`SMTPForwarding`); optional BATV.
+- PIPELINING, ENHANCEDSTATUSCODES, DSN (RFC 3461; RCPT rejects ext params today); optional CHUNKING/BDAT.
+  Per-IP / per-destination submission + outbound rate shaping.
+- Verify: EAI roundtrip; SPF passes on forwarded mail; DSN interop.
+
+## B5 — IMAP modern sync profile
+- CONDSTORE/QRESYNC (7162), UIDPLUS (4315), ENABLE (5161), LIST-EXTENDED/ESEARCH/SEARCHRES,
+  STATUS=SIZE; consider IMAP4rev2. (`IMAPCommandCapability` + command map.)
+- Verify: fast resync in Thunderbird/Apple Mail.
+
+## B6 — Standards-based filtering
+- **Sieve** (RFC 5228) interpreter + **ManageSieve** (RFC 5804) service alongside the
+  proprietary rules engine (`RuleApplier`). Verify with Sieve test vectors + a ManageSieve client.
+
+## B7 — Operability & observability
+- **OpenTelemetry** tracing (SMTP/IMAP/POP/DB spans + correlation IDs); unauthenticated local
+  health/readiness/liveness probes; richer metrics (queue depth, per-command latency, DB pool
+  saturation, TLS handshake failures); log retention/rotation.
+- Async/DB isolation: dedicated DB executor; replace the connection-pool `Sleep` polling with
+  condition variables (`DatabaseConnectionManager`); prepared-statement caches (MySQL/PG).
+- Message-store durability: configurable fsync + consistency checker + recovery tooling.
+  Graceful shutdown: readiness/drain + connection draining.
+- HA: a documented, tested active/passive (shared DB + storage + VIP) runbook + readiness gating
+  (no clustering code in this track).
+
+## B8 — Quality gates & supply chain (no CI exists today)
+- **GitHub Actions**: build+test matrix Windows × MySQL/MSSQL/PostgreSQL running the full suite.
+- SAST (CodeQL + clang-tidy); ASAN/UBSAN build; **fuzz harnesses for SMTP/IMAP/MIME parsers**
+  (the B1 defects prove the need). SBOM + dependency/CVE scanning + signed release artifacts.
+- Verify: green-gates-required-to-merge; nightly fuzz.
+
+## Cross-cutting — surface new server capabilities in the Control Panel
+OAuth2 provider config, SCRAM/Argon2 policy, SMTPUTF8/SRS/rate-limit toggles, IMAP profile,
+Sieve/ManageSieve editor, secrets/least-priv status, health/trace endpoints, AV scanner
+presets + tests (Track A Phase 3), a security-diagnostics report.
+
+## Future track (Tier 3 — documented, not scheduled)
+Linux/container port (OS-abstraction layer first; today hard-wired to Win32/ATL/registry/service),
+JMAP (RFC 8620/8621), CalDAV/CardDAV, native webmail, true clustering/HA, rspamd integration,
+BIMI + VMC, OCSP stapling, ARF feedback-loop processing.
+
+## Track B verification
+Each phase: clean build; run the regression suite (`build/run-tests.ps1`) plus new
+negative/fuzz tests; no `/WX` warnings. Security phases: a reproducer test proves the defect
+is closed. Interop phases: test against real clients.
