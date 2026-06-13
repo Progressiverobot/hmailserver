@@ -99,7 +99,11 @@ INI changes to take effect).
 - [x] Phase 8 — validation: UIA-driven screenshots (`build/capture-cp.ps1 -Launch -Nav 'Anti-spam'`)
 - [x] Phase 9 — release: v6.2.0 (server 6.2.0 build 6, gate 898/898)
 
-**ALL FEATURES COMPLETE** (2026-06-13). 19 navigation sections.
+**ALL FEATURES COMPLETE** (2026-06-13). Tree navigation mirrors the
+classic Administrator (Welcome, Dashboard, Status, Domains, Rules,
+Settings > Advanced, Utilities, About) - 27 pages total. Installer
+bundles the .NET 8 Desktop Runtime (silent install when missing;
+build/get-dotnet-runtime.ps1 downloads it pre-build; gitignored).
 
 Done post-6.2.0-initial: IP ranges page (+ full per-range permission
 editor), SSL certificates manager, light/dark theme toggle (sidebar
