@@ -172,6 +172,7 @@
     <Compile Include="POP3\Fetching\Basics.cs" />
     <Compile Include="Shared\Pop3ServerSimulator.cs" />
     <Compile Include="Security\AutoBan.cs" />
+    <Compile Include="Security\ProtocolFuzz.cs" />
     <Compile Include="Security\SMTPAuthentication.cs" />
     <Compile Include="SMTP\Signatures.cs" />
     <Compile Include="Infrastructure\Persistence\Limitations.cs" />
