@@ -16,9 +16,7 @@
             <TextBlock x:Name="SubtitleText" Style="{StaticResource PageSubtitle}" />
         </StackPanel>
 
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-            <StackPanel x:Name="CardsPanel" Margin="0,0,12,0" />
-        </ScrollViewer>
+        <TabControl x:Name="SettingsTabs" Grid.Row="1" Background="Transparent" BorderThickness="0" Padding="0,8,0,0" />
 
         <Grid Grid.Row="2" Margin="0,14,12,0">
             <TextBlock x:Name="StatusText" VerticalAlignment="Center"

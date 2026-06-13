@@ -1,16 +1,18 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
+using TextBox = Wpf.Ui.Controls.TextBox;
 
 namespace hMailServer.ControlPanel.Views
 {
    /// <summary>
-   /// Data-driven settings pages backed by the COM Settings object.
-   /// Property paths are dotted ("AntiSpam.SpamMarkThreshold") and resolved
-   /// against app.Settings via late binding, covering protocols, delivery,
-   /// anti-spam, anti-virus, TLS, auto-ban and logging.
+   /// Tabbed, data-driven settings pages backed by the COM Settings object.
+   /// Mirrors the classic Administrator layout: each section is a TabControl
+   /// whose tabs group related cards. Property paths are dotted
+   /// ("AntiSpam.SpamMarkThreshold") and resolved against app.Settings.
    /// </summary>
    public partial class ServerSettingsView : UserControl, IPageLifecycle
    {
@@ -22,15 +24,28 @@ namespace hMailServer.ControlPanel.Views
          AntiVirus,
          Tls,
          Logging,
+         Performance,
          Advanced
       }
+
+      // ---- editor model ------------------------------------------------------
 
       private abstract class ComSetting
       {
          public string Path;   // dotted path under app.Settings
          public string Label;
+         public virtual bool WantsInitialValue => true;
          public abstract FrameworkElement CreateEditor(object value);
          public abstract object ReadEditor();
+
+         public virtual void Write(object owner, string property)
+         {
+            object value = ReadEditor();
+            if (value is long n)
+               SetProperty(owner, property, (int) n);
+            else
+               SetProperty(owner, property, value);
+         }
       }
 
       private class ComBool : ComSetting
@@ -49,15 +64,21 @@ namespace hMailServer.ControlPanel.Views
       private class ComText : ComSetting
       {
          public bool Numeric;
-         private Wpf.Ui.Controls.TextBox box_;
+         public int Divisor = 1;   // numeric display scaling (e.g. hours stored, days shown)
+         private TextBox box_;
 
          public override FrameworkElement CreateEditor(object value)
          {
             var panel = new StackPanel();
             panel.Children.Add(new TextBlock { Text = Label, FontSize = 13, Margin = new Thickness(0, 0, 0, 4) });
-            box_ = new Wpf.Ui.Controls.TextBox
+            object shown = value;
+            if (Numeric && Divisor > 1 && value != null)
             {
-               Text = Convert.ToString(value) ?? "",
+               try { shown = Convert.ToInt64(value) / Divisor; } catch (Exception) { shown = value; }
+            }
+            box_ = new TextBox
+            {
+               Text = Convert.ToString(shown) ?? "",
                FontSize = 13,
                MaxWidth = 520,
                HorizontalAlignment = HorizontalAlignment.Left,
@@ -72,7 +93,70 @@ namespace hMailServer.ControlPanel.Views
             string text = box_.Text.Trim();
             if (!Numeric)
                return text;
-            return long.TryParse(text, out long number) ? number : 0L;
+            long number = long.TryParse(text, out long v) ? v : 0L;
+            return number * Divisor;
+         }
+      }
+
+      private class ComCombo : ComSetting
+      {
+         public (int Value, string Label)[] Options;
+         private ComboBox combo_;
+
+         public override FrameworkElement CreateEditor(object value)
+         {
+            var panel = new StackPanel();
+            panel.Children.Add(new TextBlock { Text = Label, FontSize = 13, Margin = new Thickness(0, 0, 0, 4) });
+            combo_ = new ComboBox { MinWidth = 320, HorizontalAlignment = HorizontalAlignment.Left, FontSize = 13 };
+            int sel;
+            try { sel = Convert.ToInt32(value); } catch (Exception) { sel = 0; }
+            foreach ((int v, string l) in Options)
+            {
+               var item = new ComboBoxItem { Content = l, Tag = v };
+               combo_.Items.Add(item);
+               if (v == sel)
+                  combo_.SelectedItem = item;
+            }
+            if (combo_.SelectedItem == null && combo_.Items.Count > 0)
+               combo_.SelectedIndex = 0;
+            panel.Children.Add(combo_);
+            return panel;
+         }
+
+         public override object ReadEditor()
+            => combo_.SelectedItem is ComboBoxItem cbi ? (int) cbi.Tag : 0;
+      }
+
+      private class ComPassword : ComSetting
+      {
+         public string MethodName;   // e.g. SetSMTPRelayerPassword
+         private PasswordBox box_;
+         public override bool WantsInitialValue => false;
+
+         public override FrameworkElement CreateEditor(object value)
+         {
+            var panel = new StackPanel();
+            panel.Children.Add(new TextBlock { Text = Label, FontSize = 13, Margin = new Thickness(0, 0, 0, 4) });
+            box_ = new PasswordBox
+            {
+               FontSize = 13,
+               MinWidth = 320,
+               MaxWidth = 520,
+               Padding = new Thickness(6),
+               HorizontalAlignment = HorizontalAlignment.Left
+            };
+            panel.Children.Add(box_);
+            return panel;
+         }
+
+         public override object ReadEditor() => box_.Password;
+
+         public override void Write(object owner, string property)
+         {
+            string pw = box_.Password;
+            if (string.IsNullOrEmpty(pw))
+               return;   // leave the current password unchanged
+            owner.GetType().InvokeMember(MethodName, BindingFlags.InvokeMethod, null, owner, new object[] { pw });
          }
       }
 
@@ -83,9 +167,28 @@ namespace hMailServer.ControlPanel.Views
          public List<ComSetting> Settings = new();
       }
 
-      private readonly Section section_;
-      private List<CardDef> cards_;
+      private class TabDef
+      {
+         public string Header;
+         public List<CardDef> Cards = new();
+      }
 
+      // ---- enum option tables ------------------------------------------------
+
+      private static readonly (int, string)[] ConnSecurity =
+      {
+         (0, "None"), (1, "SSL/TLS"), (2, "STARTTLS (optional)"), (3, "STARTTLS (required)")
+      };
+
+      private static readonly (int, string)[] AntivirusAction =
+      {
+         (0, "Delete entire e-mail"), (1, "Delete infected attachments only")
+      };
+
+      private readonly Section section_;
+      private List<TabDef> tabs_;
+      private string diag_;
+      private int failedReads_;
       public ServerSettingsView(Section section)
       {
          InitializeComponent();
@@ -99,298 +202,281 @@ namespace hMailServer.ControlPanel.Views
       {
       }
 
+      // ---- definitions -------------------------------------------------------
+
+      private TabDef Tab(string header)
+      {
+         var t = new TabDef { Header = header };
+         tabs_.Add(t);
+         return t;
+      }
+
+      private static CardDef Card(string title, string blurb = null)
+         => new() { Title = title, Blurb = blurb };
+
       private void BuildDefinition()
       {
-         cards_ = new List<CardDef>();
+         tabs_ = new List<TabDef>();
 
          switch (section_)
          {
-            case Section.Protocols:
-               TitleText.Text = "Protocols";
-               SubtitleText.Text = "Which services this server runs, connection limits and greetings.";
-               cards_.Add(new CardDef
-               {
-                  Title = "Services",
-                  Blurb = "Enable or disable the protocol servers. Changes apply after pressing Save.",
-                  Settings =
-                  {
-                     new ComBool { Path = "ServiceSMTP", Label = "SMTP server" },
-                     new ComBool { Path = "ServiceIMAP", Label = "IMAP server" },
-                     new ComBool { Path = "ServicePOP3", Label = "POP3 server" }
-                  }
-               });
-               cards_.Add(new CardDef
-               {
-                  Title = "SMTP",
-                  Settings =
-                  {
-                     new ComText { Path = "HostName", Label = "Host name (HELO/EHLO greeting)" },
-                     new ComText { Path = "MaxSMTPConnections", Label = "Max simultaneous connections (0 = unlimited)", Numeric = true },
-                     new ComText { Path = "MaxMessageSize", Label = "Max message size (KB, 0 = unlimited)", Numeric = true },
-                     new ComText { Path = "MaxSMTPRecipientsInBatch", Label = "Max recipients per message", Numeric = true },
-                     new ComText { Path = "WelcomeSMTP", Label = "Welcome banner (empty = default)" },
-                     new ComBool { Path = "AllowSMTPAuthPlain", Label = "Allow plain-text authentication (AUTH PLAIN/LOGIN)" },
-                     new ComBool { Path = "DenyMailFromNull", Label = "Reject empty sender addresses (MAIL FROM:<>)" },
-                     new ComBool { Path = "AllowIncorrectLineEndings", Label = "Allow incorrect line endings" },
-                     new ComBool { Path = "DisconnectInvalidClients", Label = "Disconnect clients sending too many invalid commands" },
-                     new ComText { Path = "MaxNumberOfInvalidCommands", Label = "Invalid command limit", Numeric = true }
-                  }
-               });
-               cards_.Add(new CardDef
-               {
-                  Title = "IMAP",
-                  Settings =
-                  {
-                     new ComText { Path = "MaxIMAPConnections", Label = "Max simultaneous connections (0 = unlimited)", Numeric = true },
-                     new ComText { Path = "WelcomeIMAP", Label = "Welcome banner (empty = default)" },
-                     new ComBool { Path = "IMAPIdleEnabled", Label = "IDLE (push mail)" },
-                     new ComBool { Path = "IMAPQuotaEnabled", Label = "QUOTA" },
-                     new ComBool { Path = "IMAPSortEnabled", Label = "SORT" },
-                     new ComBool { Path = "IMAPACLEnabled", Label = "ACL (shared folder permissions)" },
-                     new ComText { Path = "IMAPPublicFolderName", Label = "Public folder name" },
-                     new ComText { Path = "IMAPMasterUser", Label = "Master user (empty = disabled)" }
-                  }
-               });
-               cards_.Add(new CardDef
-               {
-                  Title = "POP3",
-                  Settings =
-                  {
-                     new ComText { Path = "MaxPOP3Connections", Label = "Max simultaneous connections (0 = unlimited)", Numeric = true },
-                     new ComText { Path = "WelcomePOP3", Label = "Welcome banner (empty = default)" }
-                  }
-               });
-               break;
-
-            case Section.Delivery:
-               TitleText.Text = "Delivery";
-               SubtitleText.Text = "Outbound delivery behavior, retries and smart-host relaying.";
-               cards_.Add(new CardDef
-               {
-                  Title = "Delivery of e-mail",
-                  Settings =
-                  {
-                     new ComText { Path = "SMTPNoOfTries", Label = "Number of delivery retries", Numeric = true },
-                     new ComText { Path = "SMTPMinutesBetweenTry", Label = "Minutes between retries", Numeric = true },
-                     new ComText { Path = "MaxNumberOfMXHosts", Label = "Max MX hosts to try (0 = all)", Numeric = true },
-                     new ComText { Path = "SMTPDeliveryBindToIP", Label = "Bind outbound connections to IP (empty = any)" },
-                     new ComBool { Path = "AddDeliveredToHeader", Label = "Add Delivered-To header" }
-                  }
-               });
-               cards_.Add(new CardDef
-               {
-                  Title = "SMTP relayer (smart host)",
-                  Blurb = "Route all outbound mail through another SMTP server instead of delivering directly.",
-                  Settings =
-                  {
-                     new ComText { Path = "SMTPRelayer", Label = "Relay host name (empty = direct delivery)" },
-                     new ComText { Path = "SMTPRelayerPort", Label = "Port", Numeric = true },
-                     new ComBool { Path = "SMTPRelayerRequiresAuthentication", Label = "Relay requires authentication" },
-                     new ComText { Path = "SMTPRelayerUsername", Label = "User name" },
-                     new ComText { Path = "SMTPRelayerConnectionSecurity", Label = "Connection security (0=None 1=SSL/TLS 2=STARTTLS-optional 3=STARTTLS-required)", Numeric = true }
-                  }
-               });
-               cards_.Add(new CardDef
-               {
-                  Title = "Rules",
-                  Settings =
-                  {
-                     new ComText { Path = "RuleLoopLimit", Label = "Rule loop limit", Numeric = true }
-                  }
-               });
-               break;
-
-            case Section.AntiSpam:
-               TitleText.Text = "Anti-spam";
-               SubtitleText.Text = "Score-based spam filtering: SPF, DKIM, DMARC, host checks, greylisting and SpamAssassin.";
-               cards_.Add(new CardDef
-               {
-                  Title = "Thresholds & actions",
-                  Settings =
-                  {
-                     new ComText { Path = "AntiSpam.SpamMarkThreshold", Label = "Spam mark threshold (score)", Numeric = true },
-                     new ComText { Path = "AntiSpam.SpamDeleteThreshold", Label = "Spam delete threshold (score)", Numeric = true },
-                     new ComBool { Path = "AntiSpam.AddHeaderSpam", Label = "Add X-hMailServer-Spam header" },
-                     new ComBool { Path = "AntiSpam.AddHeaderReason", Label = "Add X-hMailServer-Reason header" },
-                     new ComBool { Path = "AntiSpam.PrependSubject", Label = "Prepend text to subject" },
-                     new ComText { Path = "AntiSpam.PrependSubjectText", Label = "Subject prefix" }
-                  }
-               });
-               cards_.Add(new CardDef
-               {
-                  Title = "Sender authentication",
-                  Settings =
-                  {
-                     new ComBool { Path = "AntiSpam.UseSPF", Label = "Check SPF" },
-                     new ComText { Path = "AntiSpam.UseSPFScore", Label = "SPF failure score", Numeric = true },
-                     new ComBool { Path = "AntiSpam.DKIMVerificationEnabled", Label = "Verify DKIM signatures" },
-                     new ComText { Path = "AntiSpam.DKIMVerificationFailureScore", Label = "DKIM failure score", Numeric = true },
-                     new ComBool { Path = "AntiSpam.DMARCEnabled", Label = "Evaluate DMARC policies" }
-                  }
-               });
-               cards_.Add(new CardDef
-               {
-                  Title = "Connecting host checks",
-                  Settings =
-                  {
-                     new ComBool { Path = "AntiSpam.CheckHostInHelo", Label = "Check host in HELO" },
-                     new ComText { Path = "AntiSpam.CheckHostInHeloScore", Label = "HELO check score", Numeric = true },
-                     new ComBool { Path = "AntiSpam.CheckPTR", Label = "Check PTR record" },
-                     new ComText { Path = "AntiSpam.CheckPTRScore", Label = "PTR check score", Numeric = true },
-                     new ComBool { Path = "AntiSpam.UseMXChecks", Label = "Check sender MX records" },
-                     new ComText { Path = "AntiSpam.UseMXChecksScore", Label = "MX check score", Numeric = true }
-                  }
-               });
-               cards_.Add(new CardDef
-               {
-                  Title = "Greylisting",
-                  Settings =
-                  {
-                     new ComBool { Path = "AntiSpam.GreyListingEnabled", Label = "Enable greylisting" },
-                     new ComText { Path = "AntiSpam.GreyListingInitialDelay", Label = "Initial delay (minutes)", Numeric = true },
-                     new ComText { Path = "AntiSpam.GreyListingInitialDelete", Label = "Delete unconfirmed after (hours)", Numeric = true },
-                     new ComText { Path = "AntiSpam.GreyListingFinalDelete", Label = "Delete confirmed after (days)", Numeric = true },
-                     new ComBool { Path = "AntiSpam.GreyListingOnMailFromMX", Label = "Bypass when sender matches MX" },
-                     new ComBool { Path = "AntiSpam.GreylistingOnSPFSuccess", Label = "Bypass on SPF success" }
-                  }
-               });
-               cards_.Add(new CardDef
-               {
-                  Title = "SpamAssassin",
-                  Settings =
-                  {
-                     new ComBool { Path = "AntiSpam.SpamAssassinEnabled", Label = "Use SpamAssassin" },
-                     new ComText { Path = "AntiSpam.SpamAssassinHost", Label = "Host" },
-                     new ComText { Path = "AntiSpam.SpamAssassinPort", Label = "Port", Numeric = true },
-                     new ComBool { Path = "AntiSpam.SpamAssassinMergeScore", Label = "Merge SpamAssassin score into hMailServer score" },
-                     new ComText { Path = "AntiSpam.SpamAssassinScore", Label = "Score when not merging", Numeric = true }
-                  }
-               });
-               break;
-
-            case Section.AntiVirus:
-               TitleText.Text = "Anti-virus";
-               SubtitleText.Text = "Virus scanning of received messages.";
-               cards_.Add(new CardDef
-               {
-                  Title = "ClamAV (network daemon)",
-                  Settings =
-                  {
-                     new ComBool { Path = "AntiVirus.ClamAVEnabled", Label = "Scan with clamd" },
-                     new ComText { Path = "AntiVirus.ClamAVHost", Label = "Host" },
-                     new ComText { Path = "AntiVirus.ClamAVPort", Label = "Port", Numeric = true }
-                  }
-               });
-               cards_.Add(new CardDef
-               {
-                  Title = "ClamWin (local executable)",
-                  Settings =
-                  {
-                     new ComBool { Path = "AntiVirus.ClamWinEnabled", Label = "Scan with ClamWin" },
-                     new ComText { Path = "AntiVirus.ClamWinExecutable", Label = "clamscan.exe path" },
-                     new ComText { Path = "AntiVirus.ClamWinDBFolder", Label = "Database folder" }
-                  }
-               });
-               break;
-
-            case Section.Tls:
-               TitleText.Text = "SSL / TLS";
-               SubtitleText.Text = "Protocol versions and cipher configuration for encrypted connections.";
-               cards_.Add(new CardDef
-               {
-                  Title = "Protocol versions",
-                  Blurb = "TLS 1.2 and 1.3 are the recommended baseline; older versions exist only for legacy clients.",
-                  Settings =
-                  {
-                     new ComBool { Path = "TlsVersion10Enabled", Label = "TLS 1.0 (legacy)" },
-                     new ComBool { Path = "TlsVersion11Enabled", Label = "TLS 1.1 (legacy)" },
-                     new ComBool { Path = "TlsVersion12Enabled", Label = "TLS 1.2" },
-                     new ComBool { Path = "TlsVersion13Enabled", Label = "TLS 1.3" }
-                  }
-               });
-               cards_.Add(new CardDef
-               {
-                  Title = "Ciphers & verification",
-                  Settings =
-                  {
-                     new ComText { Path = "SslCipherList", Label = "Cipher list (OpenSSL format)" },
-                     new ComBool { Path = "TlsOptionPreferServerCiphersEnabled", Label = "Prefer server cipher order" },
-                     new ComBool { Path = "TlsOptionPrioritizeChaChaEnabled", Label = "Prioritize ChaCha20 on mobile clients" },
-                     new ComBool { Path = "VerifyRemoteSslCertificate", Label = "Verify remote certificates when delivering" }
-                  }
-               });
-               cards_.Add(new CardDef
-               {
-                  Title = "Auto-ban",
-                  Blurb = "Temporarily blocks IP addresses after repeated failed logons.",
-                  Settings =
-                  {
-                     new ComBool { Path = "AutoBanOnLogonFailure", Label = "Enable auto-ban" },
-                     new ComText { Path = "MaxInvalidLogonAttempts", Label = "Max invalid logon attempts", Numeric = true },
-                     new ComText { Path = "MaxInvalidLogonAttemptsWithin", Label = "...within (minutes)", Numeric = true },
-                     new ComText { Path = "AutoBanMinutes", Label = "Ban duration (minutes)", Numeric = true }
-                  }
-               });
-               break;
-
-            case Section.Logging:
-               TitleText.Text = "Logging";
-               SubtitleText.Text = "What the server writes to its log files (viewable on the Live logs page).";
-               cards_.Add(new CardDef
-               {
-                  Title = "Log categories",
-                  Settings =
-                  {
-                     new ComBool { Path = "Logging.Enabled", Label = "Logging enabled" },
-                     new ComBool { Path = "Logging.LogApplication", Label = "Application events" },
-                     new ComBool { Path = "Logging.LogSMTP", Label = "SMTP conversations" },
-                     new ComBool { Path = "Logging.LogIMAP", Label = "IMAP conversations" },
-                     new ComBool { Path = "Logging.LogPOP3", Label = "POP3 conversations" },
-                     new ComBool { Path = "Logging.LogTCPIP", Label = "TCP/IP activity" },
-                     new ComBool { Path = "Logging.LogDebug", Label = "Debug messages" },
-                     new ComBool { Path = "Logging.AWStatsEnabled", Label = "AWStats-compatible log" },
-                     new ComBool { Path = "Logging.KeepFilesOpen", Label = "Keep log files open (performance)" }
-                  }
-               });
-               break;
-
-            case Section.Advanced:
-               TitleText.Text = "Performance & scripting";
-               SubtitleText.Text = "Thread pools, mirroring and the server-side scripting engine.";
-               cards_.Add(new CardDef
-               {
-                  Title = "Performance",
-                  Blurb = "Thread pool sizing. Defaults suit most installations; raise for very busy servers.",
-                  Settings =
-                  {
-                     new ComText { Path = "MaxDeliveryThreads", Label = "Max delivery threads", Numeric = true },
-                     new ComText { Path = "MaxAsynchronousThreads", Label = "Max asynchronous task threads", Numeric = true },
-                     new ComText { Path = "TCPIPThreads", Label = "TCP/IP threads", Numeric = true },
-                     new ComText { Path = "WorkerThreadPriority", Label = "Worker thread priority", Numeric = true }
-                  }
-               });
-               cards_.Add(new CardDef
-               {
-                  Title = "Mirroring",
-                  Blurb = "Sends a copy of every message passing through the server to one address (compliance archiving).",
-                  Settings =
-                  {
-                     new ComText { Path = "MirrorEMailAddress", Label = "Mirror address (empty = disabled)" }
-                  }
-               });
-               cards_.Add(new CardDef
-               {
-                  Title = "Scripting",
-                  Blurb = "Runs event scripts (OnAcceptMessage, OnDeliveryStart...) from the Events folder. The script engine reloads when you save.",
-                  Settings =
-                  {
-                     new ComBool { Path = "Scripting.Enabled", Label = "Enable server-side event scripts" },
-                     new ComText { Path = "Scripting.Language", Label = "Language (VBScript or JScript)" }
-                  }
-               });
-               break;
+            case Section.Protocols: BuildProtocols(); break;
+            case Section.Delivery: BuildDelivery(); break;
+            case Section.AntiSpam: BuildAntiSpam(); break;
+            case Section.AntiVirus: BuildAntiVirus(); break;
+            case Section.Tls: BuildTls(); break;
+            case Section.Logging: BuildLogging(); break;
+            case Section.Performance: BuildPerformance(); break;
+            case Section.Advanced: BuildAdvanced(); break;
          }
       }
+
+      private void BuildProtocols()
+      {
+         TitleText.Text = "Protocols";
+         SubtitleText.Text = "Which services this server runs, connection limits and greetings.";
+
+         var services = Card("Services", "Enable or disable the protocol servers. Changes apply after pressing Save.");
+         services.Settings.Add(new ComBool { Path = "ServiceSMTP", Label = "SMTP server" });
+         services.Settings.Add(new ComBool { Path = "ServiceIMAP", Label = "IMAP server" });
+         services.Settings.Add(new ComBool { Path = "ServicePOP3", Label = "POP3 server" });
+         Tab("Services").Cards.Add(services);
+
+         var smtp = Card("SMTP");
+         smtp.Settings.Add(new ComText { Path = "HostName", Label = "Host name (HELO/EHLO greeting)" });
+         smtp.Settings.Add(new ComText { Path = "MaxSMTPConnections", Label = "Max simultaneous connections (0 = unlimited)", Numeric = true });
+         smtp.Settings.Add(new ComText { Path = "MaxMessageSize", Label = "Max message size (KB, 0 = unlimited)", Numeric = true });
+         smtp.Settings.Add(new ComText { Path = "MaxSMTPRecipientsInBatch", Label = "Max recipients per message", Numeric = true });
+         smtp.Settings.Add(new ComText { Path = "WelcomeSMTP", Label = "Welcome banner (empty = default)" });
+         smtp.Settings.Add(new ComBool { Path = "AllowSMTPAuthPlain", Label = "Allow plain-text authentication (AUTH PLAIN/LOGIN)" });
+         smtp.Settings.Add(new ComBool { Path = "DenyMailFromNull", Label = "Reject empty sender addresses (MAIL FROM:<>)" });
+         smtp.Settings.Add(new ComBool { Path = "AllowIncorrectLineEndings", Label = "Allow incorrect line endings" });
+         smtp.Settings.Add(new ComBool { Path = "DisconnectInvalidClients", Label = "Disconnect clients sending too many invalid commands" });
+         smtp.Settings.Add(new ComText { Path = "MaxNumberOfInvalidCommands", Label = "Invalid command limit", Numeric = true });
+         Tab("SMTP").Cards.Add(smtp);
+
+         var imap = Card("IMAP");
+         imap.Settings.Add(new ComText { Path = "MaxIMAPConnections", Label = "Max simultaneous connections (0 = unlimited)", Numeric = true });
+         imap.Settings.Add(new ComText { Path = "WelcomeIMAP", Label = "Welcome banner (empty = default)" });
+         imap.Settings.Add(new ComBool { Path = "IMAPIdleEnabled", Label = "IDLE (push mail)" });
+         imap.Settings.Add(new ComBool { Path = "IMAPQuotaEnabled", Label = "QUOTA" });
+         imap.Settings.Add(new ComBool { Path = "IMAPSortEnabled", Label = "SORT" });
+         imap.Settings.Add(new ComBool { Path = "IMAPACLEnabled", Label = "ACL (shared folder permissions)" });
+         imap.Settings.Add(new ComBool { Path = "IMAPSASLPlainEnabled", Label = "Allow SASL PLAIN authentication" });
+         imap.Settings.Add(new ComBool { Path = "IMAPSASLInitialResponseEnabled", Label = "Allow SASL initial client response" });
+         imap.Settings.Add(new ComText { Path = "IMAPPublicFolderName", Label = "Public folder name" });
+         imap.Settings.Add(new ComText { Path = "IMAPMasterUser", Label = "Master user (empty = disabled)" });
+         imap.Settings.Add(new ComText { Path = "IMAPHierarchyDelimiter", Label = "Folder hierarchy delimiter" });
+         Tab("IMAP").Cards.Add(imap);
+
+         var pop3 = Card("POP3");
+         pop3.Settings.Add(new ComText { Path = "MaxPOP3Connections", Label = "Max simultaneous connections (0 = unlimited)", Numeric = true });
+         pop3.Settings.Add(new ComText { Path = "WelcomePOP3", Label = "Welcome banner (empty = default)" });
+         Tab("POP3").Cards.Add(pop3);
+      }
+
+      private void BuildDelivery()
+      {
+         TitleText.Text = "Delivery of e-mail";
+         SubtitleText.Text = "Outbound delivery behavior, retries and smart-host relaying.";
+
+         var del = Card("Delivery of e-mail");
+         del.Settings.Add(new ComText { Path = "SMTPNoOfTries", Label = "Number of delivery retries", Numeric = true });
+         del.Settings.Add(new ComText { Path = "SMTPMinutesBetweenTry", Label = "Minutes between retries", Numeric = true });
+         del.Settings.Add(new ComText { Path = "MaxNumberOfMXHosts", Label = "Max MX hosts to try (0 = all)", Numeric = true });
+         del.Settings.Add(new ComText { Path = "SMTPDeliveryBindToIP", Label = "Bind outbound connections to IP (empty = any)" });
+         del.Settings.Add(new ComCombo { Path = "SMTPConnectionSecurity", Label = "Outbound delivery security (after MX lookup)", Options = ConnSecurity });
+         del.Settings.Add(new ComBool { Path = "AddDeliveredToHeader", Label = "Add Delivered-To header" });
+         Tab("Delivery").Cards.Add(del);
+
+         var relay = Card("SMTP relayer (smart host)", "Route all outbound mail through another SMTP server instead of delivering directly.");
+         relay.Settings.Add(new ComText { Path = "SMTPRelayer", Label = "Relay host name (empty = direct delivery)" });
+         relay.Settings.Add(new ComText { Path = "SMTPRelayerPort", Label = "Port", Numeric = true });
+         relay.Settings.Add(new ComCombo { Path = "SMTPRelayerConnectionSecurity", Label = "Connection security", Options = ConnSecurity });
+         relay.Settings.Add(new ComBool { Path = "SMTPRelayerRequiresAuthentication", Label = "Relay requires authentication" });
+         relay.Settings.Add(new ComText { Path = "SMTPRelayerUsername", Label = "User name" });
+         relay.Settings.Add(new ComPassword { Path = "SetSMTPRelayerPassword", MethodName = "SetSMTPRelayerPassword", Label = "Password (leave empty to keep current)" });
+         Tab("Relayer").Cards.Add(relay);
+
+         var rules = Card("Rules");
+         rules.Settings.Add(new ComText { Path = "RuleLoopLimit", Label = "Rule loop limit", Numeric = true });
+         Tab("Rules").Cards.Add(rules);
+      }
+
+      private void BuildAntiSpam()
+      {
+         TitleText.Text = "Anti-spam";
+         SubtitleText.Text = "Score-based spam filtering: SPF, DKIM, DMARC, host checks, greylisting and SpamAssassin.";
+
+         var general = Card("Thresholds & actions");
+         general.Settings.Add(new ComText { Path = "AntiSpam.SpamMarkThreshold", Label = "Spam mark threshold (score)", Numeric = true });
+         general.Settings.Add(new ComText { Path = "AntiSpam.SpamDeleteThreshold", Label = "Spam delete threshold (score)", Numeric = true });
+         general.Settings.Add(new ComBool { Path = "AntiSpam.AddHeaderSpam", Label = "Add X-hMailServer-Spam header" });
+         general.Settings.Add(new ComBool { Path = "AntiSpam.AddHeaderReason", Label = "Add X-hMailServer-Reason header" });
+         general.Settings.Add(new ComBool { Path = "AntiSpam.PrependSubject", Label = "Prepend text to subject" });
+         general.Settings.Add(new ComText { Path = "AntiSpam.PrependSubjectText", Label = "Subject prefix" });
+         general.Settings.Add(new ComText { Path = "AntiSpam.MaximumMessageSize", Label = "Max message size to spam-scan (KB, 0 = unlimited)", Numeric = true });
+         Tab("General").Cards.Add(general);
+
+         var auth = Card("Sender authentication");
+         auth.Settings.Add(new ComBool { Path = "AntiSpam.UseSPF", Label = "Check SPF" });
+         auth.Settings.Add(new ComText { Path = "AntiSpam.UseSPFScore", Label = "SPF failure score", Numeric = true });
+         auth.Settings.Add(new ComBool { Path = "AntiSpam.DKIMVerificationEnabled", Label = "Verify DKIM signatures" });
+         auth.Settings.Add(new ComText { Path = "AntiSpam.DKIMVerificationFailureScore", Label = "DKIM failure score", Numeric = true });
+         auth.Settings.Add(new ComBool { Path = "AntiSpam.DMARCEnabled", Label = "Evaluate DMARC policies" });
+         Tab("Sender auth").Cards.Add(auth);
+
+         var host = Card("Connecting host checks");
+         host.Settings.Add(new ComBool { Path = "AntiSpam.CheckHostInHelo", Label = "Check host in HELO" });
+         host.Settings.Add(new ComText { Path = "AntiSpam.CheckHostInHeloScore", Label = "HELO check score", Numeric = true });
+         host.Settings.Add(new ComBool { Path = "AntiSpam.CheckPTR", Label = "Check PTR record" });
+         host.Settings.Add(new ComText { Path = "AntiSpam.CheckPTRScore", Label = "PTR check score", Numeric = true });
+         host.Settings.Add(new ComBool { Path = "AntiSpam.UseMXChecks", Label = "Check sender MX records" });
+         host.Settings.Add(new ComText { Path = "AntiSpam.UseMXChecksScore", Label = "MX check score", Numeric = true });
+         Tab("Host checks").Cards.Add(host);
+
+         var grey = Card("Greylisting", "Temporarily rejects mail from unknown senders; legitimate servers retry and pass.");
+         grey.Settings.Add(new ComBool { Path = "AntiSpam.GreyListingEnabled", Label = "Enable greylisting" });
+         grey.Settings.Add(new ComText { Path = "AntiSpam.GreyListingInitialDelay", Label = "Initial delay (minutes)", Numeric = true });
+         grey.Settings.Add(new ComText { Path = "AntiSpam.GreyListingInitialDelete", Label = "Delete unconfirmed after (days)", Numeric = true, Divisor = 24 });
+         grey.Settings.Add(new ComText { Path = "AntiSpam.GreyListingFinalDelete", Label = "Delete confirmed after (days)", Numeric = true, Divisor = 24 });
+         grey.Settings.Add(new ComBool { Path = "AntiSpam.BypassGreylistingOnMailFromMX", Label = "Bypass when sender matches MX" });
+         grey.Settings.Add(new ComBool { Path = "AntiSpam.BypassGreylistingOnSPFSuccess", Label = "Bypass on SPF success" });
+         Tab("Greylisting").Cards.Add(grey);
+
+         var sa = Card("SpamAssassin");
+         sa.Settings.Add(new ComBool { Path = "AntiSpam.SpamAssassinEnabled", Label = "Use SpamAssassin" });
+         sa.Settings.Add(new ComText { Path = "AntiSpam.SpamAssassinHost", Label = "Host" });
+         sa.Settings.Add(new ComText { Path = "AntiSpam.SpamAssassinPort", Label = "Port", Numeric = true });
+         sa.Settings.Add(new ComBool { Path = "AntiSpam.SpamAssassinMergeScore", Label = "Merge SpamAssassin score into hMailServer score" });
+         sa.Settings.Add(new ComText { Path = "AntiSpam.SpamAssassinScore", Label = "Score when not merging", Numeric = true });
+         Tab("SpamAssassin").Cards.Add(sa);
+      }
+
+      private void BuildAntiVirus()
+      {
+         TitleText.Text = "Anti-virus";
+         SubtitleText.Text = "Virus scanning and attachment blocking of received messages.";
+
+         var general = Card("Action & notifications");
+         general.Settings.Add(new ComCombo { Path = "AntiVirus.Action", Label = "When a virus is found", Options = AntivirusAction });
+         general.Settings.Add(new ComBool { Path = "AntiVirus.NotifySender", Label = "Notify sender" });
+         general.Settings.Add(new ComBool { Path = "AntiVirus.NotifyReceiver", Label = "Notify receiver" });
+         general.Settings.Add(new ComText { Path = "AntiVirus.MaximumMessageSize", Label = "Max message size to virus-scan (KB, 0 = unlimited)", Numeric = true });
+         general.Settings.Add(new ComBool { Path = "AntiVirus.EnableAttachmentBlocking", Label = "Enable attachment blocking (manage list on the Blocked attachments page)" });
+         Tab("General").Cards.Add(general);
+
+         var clamav = Card("ClamAV (network daemon)");
+         clamav.Settings.Add(new ComBool { Path = "AntiVirus.ClamAVEnabled", Label = "Scan with clamd" });
+         clamav.Settings.Add(new ComText { Path = "AntiVirus.ClamAVHost", Label = "Host" });
+         clamav.Settings.Add(new ComText { Path = "AntiVirus.ClamAVPort", Label = "Port", Numeric = true });
+         Tab("ClamAV").Cards.Add(clamav);
+
+         var clamwin = Card("ClamWin (local executable)");
+         clamwin.Settings.Add(new ComBool { Path = "AntiVirus.ClamWinEnabled", Label = "Scan with ClamWin" });
+         clamwin.Settings.Add(new ComText { Path = "AntiVirus.ClamWinExecutable", Label = "clamscan.exe path" });
+         clamwin.Settings.Add(new ComText { Path = "AntiVirus.ClamWinDBFolder", Label = "Database folder" });
+         Tab("ClamWin").Cards.Add(clamwin);
+
+         var custom = Card("Custom scanner", "Run an external command; a configured return value indicates an infected message.");
+         custom.Settings.Add(new ComBool { Path = "AntiVirus.CustomScannerEnabled", Label = "Use a custom virus scanner" });
+         custom.Settings.Add(new ComText { Path = "AntiVirus.CustomScannerExecutable", Label = "Executable" });
+         custom.Settings.Add(new ComText { Path = "AntiVirus.CustomScannerReturnValue", Label = "Return value for infected", Numeric = true });
+         Tab("Custom").Cards.Add(custom);
+      }
+
+      private void BuildTls()
+      {
+         TitleText.Text = "SSL / TLS";
+         SubtitleText.Text = "Protocol versions, cipher configuration and brute-force protection.";
+
+         var ver = Card("Protocol versions", "TLS 1.2 and 1.3 are the recommended baseline; older versions exist only for legacy clients.");
+         ver.Settings.Add(new ComBool { Path = "TlsVersion10Enabled", Label = "TLS 1.0 (legacy)" });
+         ver.Settings.Add(new ComBool { Path = "TlsVersion11Enabled", Label = "TLS 1.1 (legacy)" });
+         ver.Settings.Add(new ComBool { Path = "TlsVersion12Enabled", Label = "TLS 1.2" });
+         ver.Settings.Add(new ComBool { Path = "TlsVersion13Enabled", Label = "TLS 1.3" });
+         Tab("Protocol versions").Cards.Add(ver);
+
+         var ciph = Card("Ciphers & verification");
+         ciph.Settings.Add(new ComText { Path = "SslCipherList", Label = "Cipher list (OpenSSL format)" });
+         ciph.Settings.Add(new ComBool { Path = "TlsOptionPreferServerCiphersEnabled", Label = "Prefer server cipher order" });
+         ciph.Settings.Add(new ComBool { Path = "TlsOptionPrioritizeChaChaEnabled", Label = "Prioritize ChaCha20 on mobile clients" });
+         ciph.Settings.Add(new ComBool { Path = "VerifyRemoteSslCertificate", Label = "Verify remote certificates when delivering" });
+         Tab("Ciphers").Cards.Add(ciph);
+
+         var ban = Card("Auto-ban", "Temporarily blocks IP addresses after repeated failed logons.");
+         ban.Settings.Add(new ComBool { Path = "AutoBanOnLogonFailure", Label = "Enable auto-ban" });
+         ban.Settings.Add(new ComText { Path = "MaxInvalidLogonAttempts", Label = "Max invalid logon attempts", Numeric = true });
+         ban.Settings.Add(new ComText { Path = "MaxInvalidLogonAttemptsWithin", Label = "...within (minutes)", Numeric = true });
+         ban.Settings.Add(new ComText { Path = "AutoBanMinutes", Label = "Ban duration (minutes)", Numeric = true });
+         Tab("Auto-ban").Cards.Add(ban);
+      }
+
+      private void BuildLogging()
+      {
+         TitleText.Text = "Logging";
+         SubtitleText.Text = "What the server writes to its log files (viewable on the Live logs page).";
+
+         var log = Card("Log categories");
+         log.Settings.Add(new ComBool { Path = "Logging.Enabled", Label = "Logging enabled" });
+         log.Settings.Add(new ComBool { Path = "Logging.LogApplication", Label = "Application events" });
+         log.Settings.Add(new ComBool { Path = "Logging.LogSMTP", Label = "SMTP conversations" });
+         log.Settings.Add(new ComBool { Path = "Logging.LogIMAP", Label = "IMAP conversations" });
+         log.Settings.Add(new ComBool { Path = "Logging.LogPOP3", Label = "POP3 conversations" });
+         log.Settings.Add(new ComBool { Path = "Logging.LogTCPIP", Label = "TCP/IP activity" });
+         log.Settings.Add(new ComBool { Path = "Logging.LogDebug", Label = "Debug messages" });
+         log.Settings.Add(new ComBool { Path = "Logging.AWStatsEnabled", Label = "AWStats-compatible log" });
+         log.Settings.Add(new ComBool { Path = "Logging.KeepFilesOpen", Label = "Keep log files open (performance)" });
+         Tab("Logging").Cards.Add(log);
+      }
+
+      private void BuildPerformance()
+      {
+         TitleText.Text = "Performance";
+         SubtitleText.Text = "Thread pools, in-memory caches and message indexing.";
+
+         var threads = Card("Threads", "Thread pool sizing. Defaults suit most installations; raise for very busy servers.");
+         threads.Settings.Add(new ComText { Path = "MaxDeliveryThreads", Label = "Max delivery threads", Numeric = true });
+         threads.Settings.Add(new ComText { Path = "MaxAsynchronousThreads", Label = "Max asynchronous task threads", Numeric = true });
+         threads.Settings.Add(new ComText { Path = "TCPIPThreads", Label = "TCP/IP threads", Numeric = true });
+         threads.Settings.Add(new ComText { Path = "WorkerThreadPriority", Label = "Worker thread priority", Numeric = true });
+         Tab("Threads").Cards.Add(threads);
+
+         var cache = Card("Cache", "Caches domain/account/alias lookups in memory to reduce database round-trips. TTL in seconds.");
+         cache.Settings.Add(new ComBool { Path = "Cache.Enabled", Label = "Enable caching" });
+         cache.Settings.Add(new ComText { Path = "Cache.DomainCacheTTL", Label = "Domain cache TTL (seconds)", Numeric = true });
+         cache.Settings.Add(new ComText { Path = "Cache.AccountCacheTTL", Label = "Account cache TTL (seconds)", Numeric = true });
+         cache.Settings.Add(new ComText { Path = "Cache.AliasCacheTTL", Label = "Alias cache TTL (seconds)", Numeric = true });
+         cache.Settings.Add(new ComText { Path = "Cache.DistributionListCacheTTL", Label = "Distribution-list cache TTL (seconds)", Numeric = true });
+         Tab("Cache").Cards.Add(cache);
+
+         var index = Card("Message indexing", "Builds a search index so IMAP SEARCH and the web client are faster.");
+         index.Settings.Add(new ComBool { Path = "MessageIndexing.Enabled", Label = "Enable message indexing" });
+         Tab("Indexing").Cards.Add(index);
+      }
+
+      private void BuildAdvanced()
+      {
+         TitleText.Text = "Advanced";
+         SubtitleText.Text = "Server-wide defaults, archiving mirror and the scripting engine.";
+
+         var general = Card("General");
+         general.Settings.Add(new ComText { Path = "DefaultDomain", Label = "Default domain (for unqualified logons)" });
+         general.Settings.Add(new ComBool { Path = "IPv6PreferredEnabled", Label = "Prefer IPv6 when delivering" });
+         general.Settings.Add(new ComPassword { Path = "SetAdministratorPassword", MethodName = "SetAdministratorPassword", Label = "New main administration password (leave empty to keep current)" });
+         Tab("General").Cards.Add(general);
+
+         var mirror = Card("Mirroring", "Sends a copy of every message passing through the server to one address (compliance archiving).");
+         mirror.Settings.Add(new ComText { Path = "MirrorEMailAddress", Label = "Mirror address (empty = disabled)" });
+         Tab("Mirroring").Cards.Add(mirror);
+
+         var script = Card("Scripting", "Runs event scripts (OnAcceptMessage, OnDeliveryStart...) from the Events folder. The script engine reloads when you save.");
+         script.Settings.Add(new ComBool { Path = "Scripting.Enabled", Label = "Enable server-side event scripts" });
+         script.Settings.Add(new ComText { Path = "Scripting.Language", Label = "Language (VBScript or JScript)" });
+         Tab("Scripting").Cards.Add(script);
+      }
+
+      // ---- COM resolution ----------------------------------------------------
 
       private static object ResolveOwner(string path, out string property)
       {
@@ -403,70 +489,94 @@ namespace hMailServer.ControlPanel.Views
       }
 
       private static object GetProperty(object owner, string name)
-         => owner.GetType().InvokeMember(name,
-            System.Reflection.BindingFlags.GetProperty, null, owner, null);
+         => owner.GetType().InvokeMember(name, BindingFlags.GetProperty, null, owner, null);
 
       private static void SetProperty(object owner, string name, object value)
-         => owner.GetType().InvokeMember(name,
-            System.Reflection.BindingFlags.SetProperty, null, owner, new[] { value });
+         => owner.GetType().InvokeMember(name, BindingFlags.SetProperty, null, owner, new[] { value });
+
+      // ---- UI ----------------------------------------------------------------
 
       private void BuildUi()
       {
-         CardsPanel.Children.Clear();
+         SettingsTabs.Items.Clear();
+         diag_ = null;
+         failedReads_ = 0;
 
-         foreach (CardDef card in cards_)
+         foreach (TabDef tab in tabs_)
          {
-            var border = new Border { Margin = new Thickness(0, 0, 0, 12) };
-            border.SetResourceReference(StyleProperty, "Card");
+            var panel = new StackPanel { Margin = new Thickness(2, 4, 14, 4) };
 
-            var panel = new StackPanel();
-            panel.Children.Add(new TextBlock
+            foreach (CardDef card in tab.Cards)
             {
-               Text = card.Title,
-               FontSize = 15,
-               FontWeight = FontWeights.SemiBold,
-               Margin = new Thickness(0, 0, 0, string.IsNullOrEmpty(card.Blurb) ? 12 : 4)
-            });
-            if (!string.IsNullOrEmpty(card.Blurb))
-            {
-               panel.Children.Add(new TextBlock
+               var border = new Border { Margin = new Thickness(0, 0, 0, 12) };
+               border.SetResourceReference(StyleProperty, "Card");
+
+               var inner = new StackPanel();
+               inner.Children.Add(new TextBlock
                {
-                  Text = card.Blurb,
-                  FontSize = 12,
-                  TextWrapping = TextWrapping.Wrap,
-                  Opacity = 0.65,
-                  Margin = new Thickness(0, 0, 0, 14)
+                  Text = card.Title,
+                  FontSize = 15,
+                  FontWeight = FontWeights.SemiBold,
+                  Margin = new Thickness(0, 0, 0, string.IsNullOrEmpty(card.Blurb) ? 12 : 4)
                });
+               if (!string.IsNullOrEmpty(card.Blurb))
+               {
+                  inner.Children.Add(new TextBlock
+                  {
+                     Text = card.Blurb,
+                     FontSize = 12,
+                     TextWrapping = TextWrapping.Wrap,
+                     Opacity = 0.65,
+                     Margin = new Thickness(0, 0, 0, 14)
+                  });
+               }
+
+               FrameworkElement lastEditor = null;
+               foreach (ComSetting setting in card.Settings)
+               {
+                  object value = null;
+                  if (setting.WantsInitialValue)
+                  {
+                     try
+                     {
+                        object owner = ResolveOwner(setting.Path, out string property);
+                        value = GetProperty(owner, property);
+                     }
+                     catch (Exception ex)
+                     {
+                        failedReads_++;
+                        diag_ ??= ex.Message;
+                        continue;   // value could not be read; skip this editor
+                     }
+                  }
+
+                  FrameworkElement editor = setting.CreateEditor(value);
+                  editor.Margin = new Thickness(0, 0, 0, 12);
+                  inner.Children.Add(editor);
+                  lastEditor = editor;
+               }
+
+               if (lastEditor != null)
+                  lastEditor.Margin = new Thickness(0, 0, 0, 2);
+
+               border.Child = inner;
+               panel.Children.Add(border);
             }
 
-            FrameworkElement lastEditor = null;
-            foreach (ComSetting setting in card.Settings)
+            var scroll = new ScrollViewer
             {
-               object value;
-               try
-               {
-                  object owner = ResolveOwner(setting.Path, out string property);
-                  value = GetProperty(owner, property);
-               }
-               catch (Exception)
-               {
-                  continue; // property unavailable on this server version
-               }
-
-               FrameworkElement editor = setting.CreateEditor(value);
-               editor.Margin = new Thickness(0, 0, 0, 12);
-               panel.Children.Add(editor);
-               lastEditor = editor;
-            }
-
-            if (lastEditor != null)
-               lastEditor.Margin = new Thickness(0, 0, 0, 2);
-
-            border.Child = panel;
-            CardsPanel.Children.Add(border);
+               VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+               Content = panel
+            };
+            SettingsTabs.Items.Add(new TabItem { Header = tab.Header, Content = scroll });
          }
 
-         StatusText.Text = "Values read from the server.";
+         if (SettingsTabs.Items.Count > 0)
+            SettingsTabs.SelectedIndex = 0;
+
+         StatusText.Text = failedReads_ == 0
+            ? "Values read from the server."
+            : failedReads_ + " setting(s) could not be read: " + diag_;
       }
 
       private void Reload_Click(object sender, RoutedEventArgs e) => BuildUi();
@@ -475,24 +585,19 @@ namespace hMailServer.ControlPanel.Views
       {
          int saved = 0, failed = 0;
 
-         foreach (CardDef card in cards_)
+         foreach (TabDef tab in tabs_)
+         foreach (CardDef card in tab.Cards)
+         foreach (ComSetting setting in card.Settings)
          {
-            foreach (ComSetting setting in card.Settings)
+            try
             {
-               try
-               {
-                  object owner = ResolveOwner(setting.Path, out string property);
-                  object newValue = setting.ReadEditor();
-                  if (newValue is long number)
-                     SetProperty(owner, property, (int) number);
-                  else
-                     SetProperty(owner, property, newValue);
-                  saved++;
-               }
-               catch (Exception)
-               {
-                  failed++;
-               }
+               object owner = ResolveOwner(setting.Path, out string property);
+               setting.Write(owner, property);
+               saved++;
+            }
+            catch (Exception)
+            {
+               failed++;
             }
          }
 

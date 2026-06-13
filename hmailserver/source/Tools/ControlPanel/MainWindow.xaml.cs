@@ -69,10 +69,18 @@ namespace hMailServer.ControlPanel
          pageFactories_["delivery"] = () => new ServerSettingsView(ServerSettingsView.Section.Delivery);
          pageFactories_["routes"] = () => new RoutesView();
          pageFactories_["antispam"] = () => new ServerSettingsView(ServerSettingsView.Section.AntiSpam);
+         pageFactories_["surbl"] = () => CollectionSpecs.SurblServers();
+         pageFactories_["dnsbl"] = () => CollectionSpecs.DnsBlackLists();
+         pageFactories_["spamwhitelist"] = () => CollectionSpecs.SpamWhiteList();
+         pageFactories_["greylistwhitelist"] = () => CollectionSpecs.GreyListWhiteList();
          pageFactories_["antivirus"] = () => new ServerSettingsView(ServerSettingsView.Section.AntiVirus);
+         pageFactories_["blockedattachments"] = () => CollectionSpecs.BlockedAttachments();
          pageFactories_["logging"] = () => new ServerSettingsView(ServerSettingsView.Section.Logging);
          pageFactories_["tls"] = () => new ServerSettingsView(ServerSettingsView.Section.Tls);
+         pageFactories_["performance"] = () => new ServerSettingsView(ServerSettingsView.Section.Performance);
          pageFactories_["advanced"] = () => new ServerSettingsView(ServerSettingsView.Section.Advanced);
+         pageFactories_["groups"] = () => CollectionSpecs.Groups();
+         pageFactories_["servermessages"] = () => CollectionSpecs.ServerMessages();
          pageFactories_["certs"] = () => new SslCertificatesView();
          pageFactories_["ports"] = () => new TcpIpPortsView();
          pageFactories_["ipranges"] = () => new IPRangesView();
@@ -126,12 +134,22 @@ namespace hMailServer.ControlPanel
             Item("Protocols", "protocols"),
             Item("Delivery of e-mail", "delivery"),
             Item("Routes", "routes"),
-            Item("Anti-spam", "antispam"),
-            Item("Anti-virus", "antivirus"),
+            Group("Anti-spam",
+               Item("Anti-spam settings", "antispam"),
+               Item("SURBL servers", "surbl"),
+               Item("DNS blacklists", "dnsbl"),
+               Item("White list", "spamwhitelist"),
+               Item("Greylisting white list", "greylistwhitelist")),
+            Group("Anti-virus",
+               Item("Anti-virus settings", "antivirus"),
+               Item("Blocked attachments", "blockedattachments")),
             Item("Logging", "logging"),
             Group("Advanced",
                Item("Auto-ban & SSL/TLS", "tls"),
-               Item("Performance & scripting", "advanced"),
+               Item("Performance", "performance"),
+               Item("Advanced & scripting", "advanced"),
+               Item("Server messages", "servermessages"),
+               Item("Groups", "groups"),
                Item("SSL certificates", "certs"),
                Item("TCP/IP ports", "ports"),
                Item("IP ranges", "ipranges"),

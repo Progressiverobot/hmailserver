@@ -319,6 +319,16 @@ namespace hMailServer.ControlPanel.Views
          AccountList.ItemsSource = addresses;
       }
 
+      private void EditDomain_Click(object sender, RoutedEventArgs e)
+      {
+         string name = (sender as FrameworkElement)?.Tag as string;
+         if (name == null)
+            return;
+
+         new DomainDialog(Window.GetWindow(this), name).ShowDialog();
+         ReloadDomains();
+      }
+
       private void AddDomain_Click(object sender, RoutedEventArgs e)
       {
          string name = NewDomainBox.Text.Trim();

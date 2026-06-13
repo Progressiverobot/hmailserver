@@ -37,10 +37,18 @@
                               BorderThickness="0" Background="Transparent">
                         <ListView.ItemTemplate>
                             <DataTemplate>
-                                <StackPanel Orientation="Horizontal" Margin="4,6">
-                                    <ui:SymbolIcon Symbol="Globe24" Foreground="{StaticResource BrandBrush}" />
-                                    <TextBlock Text="{Binding}" Margin="10,0,0,0" FontSize="14" VerticalAlignment="Center" />
-                                </StackPanel>
+                                <Grid Margin="4,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Orientation="Horizontal">
+                                        <ui:SymbolIcon Symbol="Globe24" Foreground="{StaticResource BrandBrush}" />
+                                        <TextBlock Text="{Binding}" Margin="10,0,0,0" FontSize="14" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                    <ui:Button Grid.Column="1" Content="Properties" FontSize="11" Padding="8,3"
+                                               Tag="{Binding}" Click="EditDomain_Click" />
+                                </Grid>
                             </DataTemplate>
                         </ListView.ItemTemplate>
                     </ListView>
