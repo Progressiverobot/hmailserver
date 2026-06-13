@@ -111,16 +111,16 @@ The full two-track roadmap is below: **Track A** (Control Panel) then **Track B*
 
 | # | Item | COM / source | Notes |
 |---|---|---|---|
-| 1 | **IP-range full policy editor** | `IInterfaceSecurityRange` | Add RequireSMTPAuth per direction (Local→Local/Local→External/External→Local/External→External), EnableSpamProtection, EnableAntiVirus, Expires+ExpiresTime, Priority. Move inline form → tabbed `IPRangeDialog`. *Parallel.* |
-| 2 | **TCP/IP port → SSL certificate binding** | `IInterfaceTCPIPPort.SSLCertificateID` | Pick from `Settings.SSLCertificates`. **Security-critical**, currently missing. *Parallel.* |
+| 1 | ✅ **IP-range full policy editor** (done, commit 9743096) | `IInterfaceSecurityRange` | Tabbed `IPRangeDialog` (General/Connections/Relaying/Require auth/Protection): RequireSMTPAuth per direction, EnableSpamProtection, EnableAntiVirus, Expires+ExpiresTime, Priority. Wired via Properties button + double-click. Live-validated. |
+| 2 | ✅ **TCP/IP port → SSL certificate binding** (done, commit 9743096) | `IInterfaceTCPIPPort.SSLCertificateID` | `TcpIpPortDialog` picks from `Settings.SSLCertificates`; Certificate column added to grid. Live-validated. |
 | 3 | **Rules editor parity** | `IInterfaceRule/RuleCriteria/RuleActions` | Per-row criterion/action **edit** + **move up/down** + Test-matcher + AND/OR; all criteria fields and action types (delete, forward, move-to-folder, reply, run-script, set-header, stop, create-copy, bind-to-IP, send-using-route). Applies to global `RulesView` and the account Rules tab. *Largest item.* |
 | 4 | **Route Addresses tab** | `Route.Addresses` | AllAddresses toggle + per-address list editor in `RouteDialog`. *Parallel.* |
 | 5 | **Status page** | `Application.Status`, `Application.Version` | New `StatusView`: Server / Status / Delivery-queue tabs (version, DB, uptime, session + spam/virus counters) — full `ucStatus` parity. |
 | 6 | **TOTP 2FA login** | port `TwoFactorAuth.cs`, `formTotpSetup`, `formTotpPrompt` | Setup dialog (generate secret, show secret/QR, verify) + prompt in `ConnectView`; reuse classic's registry key so existing 2FA carries over. |
 | 7 | **Active Directory pickers + Import members** | port `formActiveDirectoryAccounts`, `formSelectUsers`, `formUserAccounts`, `formImportMembers` | Browse/import AD accounts into the Account Directory tab; import members for groups/dist-lists. |
 | 8 | **Message viewer** | `formMessageViewer` parity | "Show message" → raw source/headers from queue/mailbox. |
-| 9 | **DMARC failure score** | `AntiSpam.DMARCFailureScore` | Add field to the AntiSpam section. |
-| 10 | **Admin actions** | `ClearGreyListingTriplets`, `ClearLogonFailureList`, IP-range `SetDefault` | Surface as buttons. |
+| 9 | ✅ **DMARC failure score** (done, commit 9743096) | `AntiSpam.DMARCFailureScore` | Field added to the AntiSpam section. |
+| 10 | ◑ **Admin actions** (greylisting + logon-failure clear done, commit 9743096; IP-range bulk SetDefault deferred — destructive) | `ClearGreyListingTriplets`, `ClearLogonFailureList`, IP-range `SetDefault` | Surface as buttons. |
 
 *Parallelizable:* items 1, 2, 4, 9 are small and independent. Items 3, 5, 6, 7
 are larger.
