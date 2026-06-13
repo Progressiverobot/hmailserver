@@ -414,9 +414,39 @@ namespace HM
       int iParEnd = sCommand.Find(_T("}"), iParStart);
       int iParLength = iParEnd - iParStart;
 
-      int iSize = _ttoi(sCommand.Mid(iParStart, iParLength));
-      
-      return iSize;
+      if (iParStart <= 0 || iParEnd < 0 || iParLength <= 0)
+         return 0;
+
+      String sSize = sCommand.Mid(iParStart, iParLength);
+
+      // IMAP permits a trailing '+' for non-synchronizing literals ({n+}).
+      if (sSize.Right(1) == _T("+"))
+         sSize = sSize.Mid(0, sSize.GetLength() - 1);
+
+      // The literal length must be a plain, non-negative integer. Reject anything
+      // else: an unvalidated value fed to _ttoi can overflow, and an unbounded
+      // size lets a (possibly unauthenticated) client pin large amounts of memory
+      // in literal_buffer_ before the command is even parsed.
+      if (sSize.IsEmpty())
+         return 0;
+
+      for (int i = 0; i < sSize.GetLength(); i++)
+      {
+         TCHAR ch = sSize.GetAt(i);
+         if (ch < _T('0') || ch > _T('9'))
+            return 0;
+      }
+
+      __int64 iSize = _ttoi64(sSize);
+
+      // Command-level literals (folder names, LOGIN arguments, SEARCH strings)
+      // are always small. Cap them well below any message size so a malformed or
+      // hostile literal cannot exhaust memory.
+      const __int64 iMaxCommandLiteral = 10 * 1024 * 1024; // 10 MB
+      if (iSize <= 0 || iSize > iMaxCommandLiteral)
+         return 0;
+
+      return (int) iSize;
    }
 
 

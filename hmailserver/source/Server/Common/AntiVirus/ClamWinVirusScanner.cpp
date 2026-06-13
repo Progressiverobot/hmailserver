@@ -43,7 +43,14 @@ namespace HM
       String sTempDir = IniFileSettings::Instance()->GetTempDirectory();
 
       String sCommandLine;
-      sCommandLine.Format(_T("%s --database=\"%s\" \"%s\" --tempdir=\"%s\""), scannerExecutable.c_str(), databasePath.c_str(), sFileToScan.c_str(), sTempDir.c_str());
+      // Quote the executable path so a path containing spaces cannot be
+      // misinterpreted by CreateProcess (which searches NULL lpApplicationName
+      // by splitting on whitespace, e.g. C:\Program.exe before C:\Program Files\...).
+      String sExecutable = scannerExecutable;
+      if (sExecutable.GetLength() > 0 && sExecutable.GetAt(0) != _T('"'))
+         sExecutable = _T("\"") + sExecutable + _T("\"");
+
+      sCommandLine.Format(_T("%s --database=\"%s\" \"%s\" --tempdir=\"%s\""), sExecutable.c_str(), databasePath.c_str(), sFileToScan.c_str(), sTempDir.c_str());
 
       unsigned int exitCode = 0;
       ProcessLauncher launcher(sCommandLine, sPath);

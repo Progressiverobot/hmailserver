@@ -49,7 +49,15 @@ namespace HM
          sCommandLine.Replace(_T("%FILE%"), sFilename);
       }
       else
-         sCommandLine.Format(_T("%s %s"), executablePath.c_str(), sFilename.c_str());
+      {
+         // Quote both the executable and the file path so that spaces in either
+         // cannot be misinterpreted by CreateProcess (unquoted-path hijack).
+         String sExe = executablePath;
+         if (sExe.GetLength() > 0 && sExe.GetAt(0) != _T('"'))
+            sExe = _T("\"") + sExe + _T("\"");
+
+         sCommandLine.Format(_T("%s \"%s\""), sExe.c_str(), sFilename.c_str());
+      }
 
       unsigned int exitCode = 0;
       ProcessLauncher launcher(sCommandLine, sPath);

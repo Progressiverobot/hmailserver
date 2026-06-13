@@ -865,7 +865,10 @@ namespace HM
       ASSERT(pszData != NULL);
 
       size_t nInput = 0;
-      while (pszData[nInput] != 0 && pszData[nInput] != '\r')
+      // Bound every read by nDataSize: the input is not guaranteed to be
+      // null-terminated or to contain a terminating CR, so an unbounded
+      // pszData[nInput] read can run past the end of the caller's buffer.
+      while (nInput < nDataSize && pszData[nInput] != 0 && pszData[nInput] != '\r')
       {
          MimeField fd;
          size_t nSize = fd.Load(pszData + nInput, nDataSize - nInput, unfold);
@@ -877,7 +880,13 @@ namespace HM
       }
 
       headers_modified_ = false;
-      return nInput + 2;				// skip the ending CRLF
+
+      // Skip the ending CRLF, but only when the buffer actually has room for
+      // it; otherwise the header was truncated and we must not over-advance.
+      if (nInput + 2 <= nDataSize)
+         return nInput + 2;				// skip the ending CRLF
+
+      return nInput;
    }
 
    // returns the encoded version of the header.

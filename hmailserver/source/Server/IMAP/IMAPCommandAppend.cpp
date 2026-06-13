@@ -92,13 +92,35 @@ namespace HM
          return IMAPResult(IMAPResult::ResultBad, "Missing literal");
 
       AnsiString literalSize = pWord->Value();
-       
-      bytes_left_to_receive_ = atoi(literalSize);
-      if (bytes_left_to_receive_ == 0)
+
+      // Strip a trailing '+' (non-synchronizing literal) before validating.
+      if (literalSize.GetLength() > 0 && literalSize.GetAt(literalSize.GetLength() - 1) == '+')
+         literalSize = literalSize.Mid(0, literalSize.GetLength() - 1);
+
+      // The octet count must be a plain non-negative integer; reject anything else
+      // so atoi cannot overflow into a bogus (possibly enormous) size_t value.
+      if (literalSize.IsEmpty())
+         return IMAPResult(IMAPResult::ResultBad, "Invalid literal size.");
+
+      for (int i = 0; i < literalSize.GetLength(); i++)
+      {
+         char ch = literalSize.GetAt(i);
+         if (ch < '0' || ch > '9')
+            return IMAPResult(IMAPResult::ResultBad, "Invalid literal size.");
+      }
+
+      __int64 declaredSize = _atoi64(literalSize);
+      if (declaredSize <= 0)
          return IMAPResult(IMAPResult::ResultBad, "Empty message not permitted.");
-      
+
+      // Absolute ceiling independent of the configured maximum, so an "unlimited"
+      // (0) max message size cannot translate into an unbounded APPEND.
+      const __int64 absoluteMaxMessageBytes = (__int64) 2 * 1024 * 1024 * 1024; // 2 GB
+      if (declaredSize > absoluteMaxMessageBytes)
+         return IMAPResult(IMAPResult::ResultNo, "Message size exceeds the maximum permitted size.");
+
       // Add an extra two bytes since we expect a <newline> in the end.
-      bytes_left_to_receive_ += 2;
+      bytes_left_to_receive_ = (size_t) declaredSize + 2;
 
       std::shared_ptr<const Domain> domain = CacheContainer::Instance()->GetDomain(pConnection->GetAccount()->GetDomainID());
       size_t maxMessageSizeKB = GetMaxMessageSize_(domain);
@@ -182,7 +204,14 @@ namespace HM
    
       if (append_buffer_.GetSize() >= bytes_left_to_receive_)
       {
-         WriteData_(pConnection, append_buffer_.GetBuffer(), append_buffer_.GetSize());
+         // Write only the number of bytes still expected for this literal; never
+         // spill trailing bytes that belong to a following command into the
+         // stored message (which would corrupt it and desync the parser).
+         size_t writeLen = bytes_left_to_receive_;
+         if (writeLen > append_buffer_.GetSize())
+            writeLen = append_buffer_.GetSize();
+
+         WriteData_(pConnection, append_buffer_.GetBuffer(), writeLen);
 
          pConnection->SetReceiveBinary(false);
    
