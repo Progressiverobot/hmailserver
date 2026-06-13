@@ -329,6 +329,17 @@ upgrading the management/admin INI password from MD5.
   `* ESEARCH` response. Advertised in CAPABILITY. Covered by `TestEsearchReturnsExtendedResponse`.
 - ⏳ Remaining: CONDSTORE/QRESYNC (7162) [needs persistent per-message MODSEQ — DB schema change],
   LIST-EXTENDED/SEARCHRES; consider IMAP4rev2. (`IMAPCommandCapability` + command map.)
+- 🅿️ **CONDSTORE/QRESYNC (RFC 7162) — DEFERRED to a dedicated, supervised cycle.** Rationale: it is
+  the only remaining B5 item that requires a **database schema migration** (a persistent per-message
+  `MODSEQ` + per-folder `HIGHESTMODSEQ`). That means bumping `REQUIRED_DB_VERSION` 6001→6002
+  (`Common/Application/Constants.h`), adding the `modseq` column to all four `CreateTables*` scripts
+  **and** writing `Upgrade6001to6002{MSSQL,MSSQLCE,MySQL,PGSQL}.sql`. Only the MySQL/MariaDB backend
+  is exercised by the regression suite in this environment, so the MSSQL/PGSQL/SQLCE migrations would
+  ship unvalidated, and a partial/incorrect MODSEQ actively corrupts client sync state (worse than
+  not advertising it). Command surface also touches SELECT/EXAMINE (`HIGHESTMODSEQ`), FETCH
+  (`MODSEQ`, `CHANGEDSINCE`), STORE (`UNCHANGEDSINCE` + `MODIFIED`), SEARCH (`MODSEQ`), STATUS
+  (`HIGHESTMODSEQ`), ENABLE wiring, and QRESYNC `VANISHED`/SELECT params. Do this as its own release
+  with real cross-backend upgrade testing.
 - Verify: fast resync in Thunderbird/Apple Mail.
 
 ## B6 — Standards-based filtering
