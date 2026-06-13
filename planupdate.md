@@ -118,7 +118,7 @@ The full two-track roadmap is below: **Track A** (Control Panel) then **Track B*
 | 5 | **Status page** | `Application.Status`, `Application.Version` | New `StatusView`: Server / Status / Delivery-queue tabs (version, DB, uptime, session + spam/virus counters) — full `ucStatus` parity. |
 | 6 | ✅ **TOTP 2FA login** (done, commit e9e5051) | `Services/Totp.cs`, `TotpSetupDialog`, `TotpPromptDialog` | RFC 6238 setup (secret + otpauth URI) + login prompt gate in `OnConnected`. Reads the same HKLM `AdminTotpSecret` (machine-scope DPAPI via crypt32) as Administrator, so existing 2FA carries over. Live-validated end-to-end (DPAPI round-trip, prompt, code acceptance → dashboard). |
 | 7 | **Active Directory pickers + Import members** | port `formActiveDirectoryAccounts`, `formSelectUsers`, `formUserAccounts`, `formImportMembers` | Browse/import AD accounts into the Account Directory tab; import members for groups/dist-lists. |
-| 8 | **Message viewer** | `formMessageViewer` parity | "Show message" → raw source/headers from queue/mailbox. |
+| 8 | ✅ **Message viewer** (done, commit 4cf4bac) | `MessageViewerDialog` | "View source" / double-click on a queued message shows the raw `.eml` (headers + body) read from disk (`Status.UndeliveredMessages` file column), with Copy. Friendly message if the file is gone/inaccessible. Live-validated. |
 | 9 | ✅ **DMARC failure score** (done, commit 9743096) | `AntiSpam.DMARCFailureScore` | Field added to the AntiSpam section. |
 | 10 | ◑ **Admin actions** (greylisting + logon-failure clear done, commit 9743096; IP-range bulk SetDefault deferred — destructive) | `ClearGreyListingTriplets`, `ClearLogonFailureList`, IP-range `SetDefault` | Surface as buttons. |
 
