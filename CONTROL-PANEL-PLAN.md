@@ -99,16 +99,17 @@ INI changes to take effect).
 - [x] Phase 8 — validation: UIA-driven screenshots (`build/capture-cp.ps1 -Launch -Nav 'Anti-spam'`)
 - [x] Phase 9 — release: v6.2.0 (server 6.2.0 build 6, gate 898/898)
 
-Remaining backlog: rule criteria/actions editor (currently list/toggle/
-reorder/delete only), per-range permission editing in IP ranges,
-distribution list recipients editor, About page.
+Backlog complete (2026-06-13). Remaining nice-to-haves only: graphical
+rule criteria/actions *editor* (details are rendered read-only today),
+account-level settings (quota, forwarding, vacation), routes editor.
 
-Done post-6.2.0-initial: IP ranges page, SSL certificates manager,
-light/dark theme toggle (sidebar footer, HKCU persisted), Ctrl+K command
-palette, branded app icon (build/make-app-icon.ps1), Rules page (list/
-toggle/reorder/delete), Backup & restore page (BackupManager COM),
-aliases + distribution lists panels in Domains, queue Deliver now/Remove
-actions. 17 nav sections total.
+Done post-6.2.0-initial: IP ranges page (+ full per-range permission
+editor), SSL certificates manager, light/dark theme toggle (sidebar
+footer, HKCU persisted), Ctrl+K command palette, branded app icon
+(build/make-app-icon.ps1), Rules page (list/toggle/reorder/delete + IF/
+THEN detail rendering), Backup & restore page (BackupManager COM),
+aliases + distribution lists panels (with Members recipients dialog),
+queue Deliver now/Remove actions, About page. 18 nav sections total.
 
 ## Environment facts (do not rediscover)
 
