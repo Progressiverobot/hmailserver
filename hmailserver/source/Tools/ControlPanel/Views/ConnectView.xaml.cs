@@ -51,5 +51,10 @@ namespace hMailServer.ControlPanel.Views
             ConnectButton.IsEnabled = true;
          }
       }
+
+      private void Totp_Click(object sender, RoutedEventArgs e)
+      {
+         new TotpSetupDialog(Window.GetWindow(this)).ShowDialog();
+      }
    }
 }

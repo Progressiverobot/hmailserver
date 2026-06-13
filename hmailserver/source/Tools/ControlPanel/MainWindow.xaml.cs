@@ -205,6 +205,17 @@ namespace hMailServer.ControlPanel
 
       private void OnConnected()
       {
+         if (!VerifyTwoFactor())
+         {
+            // Two-factor verification failed or was cancelled: drop the session
+            // and return to the connect screen instead of revealing the UI.
+            connected_ = false;
+            NavTree.IsEnabled = false;
+            ConnBadge.Visibility = Visibility.Collapsed;
+            ContentHost.Content = new ConnectView(OnConnected);
+            return;
+         }
+
          connected_ = true;
          NavTree.IsEnabled = true;
 
@@ -221,6 +232,26 @@ namespace hMailServer.ControlPanel
          }
 
          ((TreeViewItem) NavTree.Items[1]).IsSelected = true; // Dashboard
+      }
+
+      private bool VerifyTwoFactor()
+      {
+         if (!TotpManager.IsConfigured())
+            return true;
+
+         for (int attempt = 0; attempt < 3; attempt++)
+         {
+            var prompt = new Views.TotpPromptDialog(this);
+            if (prompt.ShowDialog() != true)
+               return false;
+
+            if (Totp.VerifyCode(TotpManager.ReadSecret(), prompt.Code))
+               return true;
+
+            MessageBox.Show("The verification code is incorrect.", "Two-factor authentication");
+         }
+
+         return false;
       }
 
       private void NavTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)

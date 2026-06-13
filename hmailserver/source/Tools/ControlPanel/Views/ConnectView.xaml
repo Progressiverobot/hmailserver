@@ -35,6 +35,9 @@
 
                 <TextBlock x:Name="ErrorText" Foreground="#F85149" FontSize="12" Margin="0,12,0,0"
                            TextWrapping="Wrap" Visibility="Collapsed" />
+
+                <ui:HyperlinkButton Content="Set up two-factor authentication…" Click="Totp_Click"
+                                    HorizontalAlignment="Left" Margin="0,12,0,0" FontSize="12" />
             </StackPanel>
         </Border>
     </Grid>
