@@ -86,6 +86,7 @@ namespace HM
       type_(SPNone),
       pending_disconnect_(false),
       isAuthenticated_(false),
+      authentication_failure_count_(0),
       start_tls_used_(false)
    {
 
@@ -2167,6 +2168,18 @@ namespace HM
       }
       else
       {
+         authentication_failure_count_++;
+
+         // Defense-in-depth on top of the per-IP auto-ban: never let a single
+         // connection make an unbounded number of authentication attempts.
+         if (authentication_failure_count_ >= 10)
+         {
+            SendErrorResponse_(535, "Authentication failed. Too many invalid logon attempts.");
+            pending_disconnect_ = true;
+            EnqueueDisconnect();
+            return;
+         }
+
          RestartAuthentication_();
       }
    }

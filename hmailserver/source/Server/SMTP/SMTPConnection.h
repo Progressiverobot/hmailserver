@@ -221,6 +221,7 @@ namespace HM
       bool re_authenticate_user_;
       bool pending_disconnect_;
       bool isAuthenticated_;
+      int authentication_failure_count_;
       SpamProtectionType type_;
 
       RecipientParser recipientParser_;
