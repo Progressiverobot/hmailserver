@@ -20,6 +20,7 @@
 #include "../Common/BO/IMAPFolder.h"
 #include "../Common/BO/Message.h"
 #include "../Common/BO/Messages.h"
+#include "../Common/Persistence/PersistentIMAPFolder.h"
 #include "../Common/Tracking/ChangeNotification.h"
 #include "../Common/Tracking/NotificationServer.h"
 
@@ -296,6 +297,25 @@ namespace HM
       if (!StringParser::ValidateString(sMailNo, "01234567890,.:*"))
          return IMAPResult(IMAPResult::ResultBad, "Incorrect mail number");
 
+      // RFC 7162 (QRESYNC): "UID FETCH <set> (… CHANGEDSINCE n VANISHED)" asks the server to also
+      // report, via "* VANISHED (EARLIER)", the UIDs in <set> expunged since mod-sequence n.
+      bool fetchVanished = false;
+      __int64 fetchVanishedSince = 0;
+      if (sTypeOfUID.CompareNoCase(_T("FETCH")) == 0)
+      {
+         String sShowUpper = sShowPart;
+         sShowUpper.MakeUpper();
+         int vanishedPos = sShowUpper.Find(_T("VANISHED"));
+         int changedSincePos = sShowUpper.Find(_T("CHANGEDSINCE"));
+         if (vanishedPos >= 0 && changedSincePos >= 0)
+         {
+            String sRest = sShowUpper.Mid(changedSincePos + (int)_tcslen(_T("CHANGEDSINCE")));
+            sRest.TrimLeft();
+            fetchVanishedSince = _ttoi64(sRest);
+            fetchVanished = true;
+         }
+      }
+
       // Set the command to execute as argument
       pArgument->Command(sShowPart);
 
@@ -304,7 +324,42 @@ namespace HM
       IMAPResult result = command_->DoForMails(pConnection, sMailNo, pArgument);
 
       if (result.GetResult() == IMAPResult::ResultOK)
+      {
+         // RFC 7162 (QRESYNC): emit "* VANISHED (EARLIER)" for the requested UIDs expunged since n.
+         if (fetchVanished)
+         {
+            std::shared_ptr<IMAPFolder> pCurFolder = pConnection->GetCurrentFolder();
+            if (pCurFolder)
+            {
+               std::vector<__int64> expunged = PersistentIMAPFolder::GetExpungedUIDsSince(pCurFolder->GetID(), fetchVanishedSince);
+               if (!expunged.empty())
+               {
+                  std::vector<std::pair<unsigned int, unsigned int>> vanishedRanges = ParseUidSet_(sMailNo);
+                  std::vector<__int64> reported;
+                  for (__int64 uid : expunged)
+                  {
+                     for (const std::pair<unsigned int, unsigned int> &range : vanishedRanges)
+                     {
+                        if ((unsigned int) uid >= range.first && (unsigned int) uid <= range.second)
+                        {
+                           reported.push_back(uid);
+                           break;
+                        }
+                     }
+                  }
+
+                  if (!reported.empty())
+                  {
+                     String sVanished;
+                     sVanished.Format(_T("* VANISHED (EARLIER) %s\r\n"), IMAPConnection::CompactUidSet(reported).c_str());
+                     pConnection->SendAsciiData(sVanished);
+                  }
+               }
+            }
+         }
+
          pConnection->SendAsciiData(pArgument->Tag() + " OK " + command_->GetUIDPlusResponseCode() + command_->GetConditionalStoreResponseCode() + "UID completed\r\n");
+      }
 
       return result;
    }

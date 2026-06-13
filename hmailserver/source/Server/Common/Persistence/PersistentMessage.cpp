@@ -60,6 +60,20 @@ namespace HM
          if (!Application::Instance()->GetDBManager()->Execute(command))
             return false;
 
+         // RFC 7162 (QRESYNC): when a message belonging to an IMAP folder is expunged, record a
+         // tombstone (folder + UID + a freshly bumped mod-sequence) so the server can report the
+         // removal via "* VANISHED (EARLIER)" to clients resyncing after a disconnect.
+         {
+            __int64 expungeAccountID = pMessage->GetAccountID();
+            __int64 expungeFolderID = pMessage->GetFolderID();
+
+            if (expungeAccountID > 0 && expungeFolderID > 0)
+            {
+               __int64 expungeModSeq = PersistentIMAPFolder::GetNextModSeq(expungeAccountID, expungeFolderID);
+               PersistentIMAPFolder::AddExpunged(expungeAccountID, expungeFolderID, pMessage->GetUID(), expungeModSeq);
+            }
+         }
+
          // If the message is placed into an account, there won't be any recipients
          // connected to it. If the message is still in the queue, we must delete the
          // recipients as well.

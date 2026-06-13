@@ -91,6 +91,10 @@ namespace HM
 
          bool result = Application::Instance()->GetDBManager()->Execute(command);
 
+         // RFC 7162 (QRESYNC): the folder is gone, so its expunge tombstones are no longer
+         // meaningful (a recreated folder gets a new UIDVALIDITY). Discard them.
+         DeleteExpungedForFolder(pFolder->GetID());
+
          return result;
       }
       else
@@ -288,5 +292,59 @@ namespace HM
       IMAPFolderContainer::Instance()->UpdateCurrentModSeq(accountID, folderID, newModSeq);
 
       return newModSeq;
+   }
+
+   bool
+   PersistentIMAPFolder::AddExpunged(__int64 accountID, __int64 folderID, __int64 uid, __int64 modSeq)
+   {
+      if (folderID == 0)
+         return false;
+
+      SQLCommand command("INSERT INTO hm_imapexpunged (expungedaccountid, expungedfolderid, expungeduid, expungedmodseq) "
+                         "VALUES (@ACCOUNTID, @FOLDERID, @UID, @MODSEQ)");
+      command.AddParameter("@ACCOUNTID", accountID);
+      command.AddParameter("@FOLDERID", folderID);
+      command.AddParameter("@UID", uid);
+      command.AddParameter("@MODSEQ", modSeq);
+
+      return Application::Instance()->GetDBManager()->Execute(command);
+   }
+
+   std::vector<__int64>
+   PersistentIMAPFolder::GetExpungedUIDsSince(__int64 folderID, __int64 sinceModSeq)
+   {
+      std::vector<__int64> result;
+
+      if (folderID == 0)
+         return result;
+
+      SQLCommand command("SELECT expungeduid FROM hm_imapexpunged WHERE expungedfolderid = @FOLDERID "
+                         "AND expungedmodseq > @MODSEQ ORDER BY expungeduid");
+      command.AddParameter("@FOLDERID", folderID);
+      command.AddParameter("@MODSEQ", sinceModSeq);
+
+      std::shared_ptr<DALRecordset> pRS = Application::Instance()->GetDBManager()->OpenRecordset(command);
+      if (!pRS)
+         return result;
+
+      while (!pRS->IsEOF())
+      {
+         result.push_back(pRS->GetInt64Value("expungeduid"));
+         pRS->MoveNext();
+      }
+
+      return result;
+   }
+
+   bool
+   PersistentIMAPFolder::DeleteExpungedForFolder(__int64 folderID)
+   {
+      if (folderID == 0)
+         return false;
+
+      SQLCommand command("DELETE FROM hm_imapexpunged WHERE expungedfolderid = @FOLDERID");
+      command.AddParameter("@FOLDERID", folderID);
+
+      return Application::Instance()->GetDBManager()->Execute(command);
    }
 }

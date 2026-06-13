@@ -360,11 +360,19 @@ upgrading the management/admin INI password from MD5.
     `EXPUNGE` and `UID EXPUNGE` emit a single `* VANISHED <uid-set>` (compressed sequence-set) when
     QRESYNC is enabled instead of per-message `* n EXPUNGE` lines. Covered by
     `TestExpungeWithQResyncReturnsVanished` and `TestSelectQResyncReplaysChanges`.
-  - **Stage 3b (next, QRESYNC offline tracking):** persistent expunged-UID tombstones (DB 6002→6003)
-    to back `* VANISHED (EARLIER)` on `SELECT (QRESYNC (… known-uids))` and
-    `UID FETCH … (CHANGEDSINCE n VANISHED)` for messages expunged while the client was disconnected.
-- ⏳ Remaining: CONDSTORE/QRESYNC Stage 3b (QRESYNC offline tombstones, above); LIST-EXTENDED/SEARCHRES;
-  consider IMAP4rev2. (`IMAPCommandCapability` + command map.)
+  - **Stage 3b (done in v6.2.0, QRESYNC offline tracking):** persistent expunged-UID tombstones
+    (new `hm_imapexpunged` table, DB 6002→6003) recorded at the universal
+    `PersistentMessage::DeleteObject` chokepoint (covers IMAP `EXPUNGE`/`UID EXPUNGE`, `CLOSE`,
+    `MOVE` source-delete and POP3 delete; guarded to account/folder-scoped messages), each bumping
+    the folder mod-sequence. `SELECT`/`EXAMINE (QRESYNC (uidvalidity modseq …))` now emits
+    `* VANISHED (EARLIER) <uid-set>` for UIDs expunged since the supplied mod-sequence, and
+    `UID FETCH <set> (CHANGEDSINCE n VANISHED)` emits `* VANISHED (EARLIER)` for the requested UIDs
+    expunged since `n`. Tombstones are pruned when a folder is deleted. Covered by
+    `TestSelectQResyncReportsVanishedEarlier` and `TestUidFetchVanishedReportsEarlier`. Migration
+    scripts shipped for MySQL/MSSQL/PGSQL/SQLCE; only the MySQL path is validated in CI here.
+    Follow-up: tombstone pruning/retention beyond folder deletion is not yet implemented (RFC 7162
+    permits the server to fall back to a full resync, which the client handles).
+- ⏳ Remaining: LIST-EXTENDED/SEARCHRES; consider IMAP4rev2. (`IMAPCommandCapability` + command map.)
 - Verify: fast resync in Thunderbird/Apple Mail.
 
 ## B6 — Standards-based filtering

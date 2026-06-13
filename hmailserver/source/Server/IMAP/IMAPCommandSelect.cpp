@@ -11,6 +11,7 @@
 
 #include "../Common/BO/IMAPFolders.h"
 #include "../Common/BO/IMAPFolder.h"
+#include "../Common/Persistence/PersistentIMAPFolder.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -132,7 +133,17 @@ namespace HM
 
       // RFC 7162 (QRESYNC): replay flag/MODSEQ changes since the client's mod-sequence.
       if (qresyncRequested)
+      {
+         std::vector<__int64> vanished = PersistentIMAPFolder::GetExpungedUIDsSince(pSelectedFolder->GetID(), qresyncModSeq);
+         if (!vanished.empty())
+         {
+            String sVanished;
+            sVanished.Format(_T("* VANISHED (EARLIER) %s\r\n"), IMAPConnection::CompactUidSet(vanished).c_str());
+            sResponse += sVanished;
+         }
+
          sResponse += pConnection->GetQResyncChangedFetch(qresyncModSeq);
+      }
 
       if (writeAccess)
          sResponse += pArgument->Tag() + _T(" OK [READ-WRITE] SELECT completed\r\n");

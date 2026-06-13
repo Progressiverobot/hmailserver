@@ -574,6 +574,67 @@ namespace RegressionTests.IMAP
       }
 
       [Test]
+      [Description("RFC 7162 (QRESYNC): SELECT (QRESYNC (uidvalidity modseq)) reports messages " +
+                   "expunged since the supplied mod-sequence via * VANISHED (EARLIER), using the " +
+                   "persisted expunge tombstones.")]
+      public void TestSelectQResyncReportsVanishedEarlier()
+      {
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "vanishedearlier@example.test", "test");
+
+         var simulator = new ImapClientSimulator();
+         simulator.Connect();
+         simulator.LogonWithLiteral("vanishedearlier@example.test", "test");
+
+         simulator.SendSingleCommandWithLiteral("A01 APPEND INBOX {4}", "ABCD");
+         simulator.SendSingleCommandWithLiteral("A02 APPEND INBOX {4}", "EFGH");
+         simulator.SendSingleCommand("A03 ENABLE QRESYNC");
+         simulator.SelectFolder("INBOX");
+
+         long modseq = ParseModSeq(simulator.SendSingleCommand("A04 FETCH 1 (MODSEQ)"));
+
+         // Expunge the first message; this records a persistent tombstone.
+         simulator.SetDeletedFlag(1);
+         simulator.SendSingleCommand("A05 EXPUNGE");
+
+         // Re-select with QRESYNC referencing the earlier mod-sequence; the expunge must be reported.
+         string result = simulator.SendSingleCommand("A06 SELECT INBOX (QRESYNC (1 " + modseq + "))");
+         Assert.IsTrue(result.Contains("* VANISHED (EARLIER) 1"),
+            "QRESYNC SELECT should report the expunged UID via * VANISHED (EARLIER). " + result);
+
+         simulator.Disconnect();
+      }
+
+      [Test]
+      [Description("RFC 7162 (QRESYNC): UID FETCH <set> (CHANGEDSINCE n VANISHED) reports UIDs in " +
+                   "the requested set that were expunged since mod-sequence n via * VANISHED (EARLIER).")]
+      public void TestUidFetchVanishedReportsEarlier()
+      {
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "uidfetchvanished@example.test", "test");
+
+         var simulator = new ImapClientSimulator();
+         simulator.Connect();
+         simulator.LogonWithLiteral("uidfetchvanished@example.test", "test");
+
+         simulator.SendSingleCommandWithLiteral("A01 APPEND INBOX {4}", "ABCD");
+         simulator.SendSingleCommandWithLiteral("A02 APPEND INBOX {4}", "EFGH");
+         simulator.SendSingleCommand("A03 ENABLE QRESYNC");
+         simulator.SelectFolder("INBOX");
+
+         long modseq = ParseModSeq(simulator.SendSingleCommand("A04 FETCH 1 (MODSEQ)"));
+
+         // Expunge the first message; this records a persistent tombstone.
+         simulator.SetDeletedFlag(1);
+         simulator.SendSingleCommand("A05 EXPUNGE");
+
+         string result = simulator.SendSingleCommand(
+            "A06 UID FETCH 1:* (FLAGS) (CHANGEDSINCE " + modseq + " VANISHED)");
+         Assert.IsTrue(result.Contains("* VANISHED (EARLIER) 1"),
+            "UID FETCH VANISHED should report the expunged UID via * VANISHED (EARLIER). " + result);
+
+         simulator.Disconnect();
+      }
+
+      [Test]
       public void TestAppendDeletedMessage()
 
       {

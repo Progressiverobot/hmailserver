@@ -261,6 +261,16 @@ CREATE INDEX idx_hm_imapfolders ON hm_imapfolders (folderaccountid);
 
 CREATE UNIQUE INDEX idx_hm_imapfolders_unique ON hm_imapfolders (folderaccountid, folderparentid, foldername);
 
+create table hm_imapexpunged
+(
+  expungedaccountid int not null,
+  expungedfolderid int not null,
+  expungeduid bigint not null,
+  expungedmodseq bigint not null
+);
+
+CREATE INDEX idx_hm_imapexpunged ON hm_imapexpunged (expungedfolderid, expungedmodseq);
+
 create table hm_routes
 (
   routeid bigserial not null primary key,
@@ -809,4 +819,4 @@ insert into hm_tcpipports (portprotocol, portnumber, portaddress1, portaddress2,
 
 insert into hm_tcpipports (portprotocol, portnumber, portaddress1, portaddress2, portconnectionsecurity, portsslcertificateid) values (5, 143, 0, NULL, 0, 0);
 
-insert into hm_dbversion values (6002);
+insert into hm_dbversion values (6003);
