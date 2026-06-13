@@ -316,7 +316,11 @@ upgrading the management/admin INI password from MD5.
 - ✅ **UNSELECT (RFC 3691)** — delivered in v6.2.0. Closes the selected mailbox without the
   implicit EXPUNGE that CLOSE performs (\Deleted retained). Advertised in CAPABILITY. Covered by
   `RegressionTests.IMAP.Basics.TestUnselectKeepsDeletedMessages`.
-- ⏳ Remaining: CONDSTORE/QRESYNC (7162), UIDPLUS (4315), ENABLE (5161), LIST-EXTENDED/ESEARCH/SEARCHRES,
+- ✅ **UIDPLUS (RFC 4315)** — delivered in v6.2.0. APPEND/COPY/MOVE return `[APPENDUID]`/`[COPYUID]`
+  response codes (destination UIDVALIDITY + assigned UIDs) and `UID EXPUNGE` removes only \Deleted
+  messages whose UID is in the supplied set. Advertised in CAPABILITY. Covered by
+  `TestAppendReturnsAppendUid`, `TestCopyReturnsCopyUid`, `TestUidExpungeOnlyRemovesMatchingUids`.
+- ⏳ Remaining: CONDSTORE/QRESYNC (7162), ENABLE (5161), LIST-EXTENDED/ESEARCH/SEARCHRES,
   STATUS=SIZE; consider IMAP4rev2. (`IMAPCommandCapability` + command map.)
 - Verify: fast resync in Thunderbird/Apple Mail.
 
