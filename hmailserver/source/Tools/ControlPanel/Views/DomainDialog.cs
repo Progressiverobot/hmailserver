@@ -48,14 +48,17 @@ namespace hMailServer.ControlPanel.Views
       private readonly ComboBox dkimBodyCanon_ = new();
       private readonly ComboBox dkimAlgorithm_ = new();
 
+      // Names (domain aliases) — embedded list editor
+      private CollectionEditorView aliasEditor_;
+
       public DomainDialog(Window owner, string domainName)
       {
          domainName_ = domainName;
 
          Owner = owner;
          Title = "Domain - " + domainName;
-         Width = 560;
-         Height = 640;
+         Width = 640;
+         Height = 680;
          WindowStartupLocation = WindowStartupLocation.CenterOwner;
          SetResourceReference(BackgroundProperty, "ApplicationBackgroundBrush");
 
@@ -77,6 +80,7 @@ namespace hMailServer.ControlPanel.Views
 
          var tabs = new TabControl { Background = System.Windows.Media.Brushes.Transparent, BorderThickness = new Thickness(0) };
          tabs.Items.Add(new TabItem { Header = "General", Content = BuildGeneral() });
+         tabs.Items.Add(new TabItem { Header = "Names", Content = BuildNames() });
          tabs.Items.Add(new TabItem { Header = "Limits", Content = BuildLimits() });
          tabs.Items.Add(new TabItem { Header = "Signature", Content = BuildSignature() });
          tabs.Items.Add(new TabItem { Header = "DKIM", Content = BuildDkim() });
@@ -94,7 +98,7 @@ namespace hMailServer.ControlPanel.Views
          root.Children.Add(buttons);
 
          Content = root;
-         Loaded += (s, e) => Load();
+         Loaded += (s, e) => { Load(); aliasEditor_?.OnEnter(); };
       }
 
       private ScrollViewer BuildGeneral()
@@ -104,6 +108,13 @@ namespace hMailServer.ControlPanel.Views
          panel.Children.Add(Label("Postmaster address (mail to unknown recipients is redirected here)"));
          panel.Children.Add(Input(postmaster_));
          return Scroll(panel);
+      }
+
+      private FrameworkElement BuildNames()
+      {
+         aliasEditor_ = CollectionSpecs.DomainAliases(domainName_);
+         aliasEditor_.Margin = new Thickness(4, 8, 4, 4);
+         return aliasEditor_;
       }
 
       private ScrollViewer BuildLimits()

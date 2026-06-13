@@ -60,35 +60,67 @@ namespace hMailServer.ControlPanel.Views
       }
 
       private readonly CollectionSpec spec_;
+      private readonly bool embedded_;
       private readonly DataGrid grid_ = new();
       private readonly ObservableCollection<Row> rows_ = new();
       private readonly TextBlock countBadge_ = new();
       private readonly TextBlock status_ = new();
 
-      public CollectionEditorView(CollectionSpec spec)
+      public CollectionEditorView(CollectionSpec spec) : this(spec, false)
+      {
+      }
+
+      /// <param name="embedded">
+      /// When true the page chrome (large title/subtitle and outer page margins)
+      /// is dropped so the editor can be hosted inside a dialog tab. Only a
+      /// compact one-line hint is shown above the grid.
+      /// </param>
+      public CollectionEditorView(CollectionSpec spec, bool embedded)
       {
          spec_ = spec;
+         embedded_ = embedded;
          Build();
       }
 
       public void OnEnter() => Reload();
       public void OnLeave() { }
 
+      /// <summary>Loads (or reloads) the collection. Used when embedded in a dialog.</summary>
+      public void Refresh() => Reload();
+
       // ---- UI scaffolding ----------------------------------------------------
 
       private void Build()
       {
-         var root = new Grid { Margin = new Thickness(26, 20, 26, 20) };
+         var root = new Grid { Margin = embedded_ ? new Thickness(0, 8, 0, 0) : new Thickness(26, 20, 26, 20) };
          root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
          root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
          root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
          root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-         // Title + subtitle
-         var head = new StackPanel();
-         head.Children.Add(new TextBlock { Text = spec_.Title, Style = (Style) FindResource("PageTitle") });
-         head.Children.Add(new TextBlock { Text = spec_.Subtitle, Style = (Style) FindResource("PageSubtitle") });
-         root.Children.Add(head);
+         // Title + subtitle (page mode) or a compact hint (embedded mode).
+         if (embedded_)
+         {
+            if (!string.IsNullOrEmpty(spec_.Subtitle))
+            {
+               var hint = new TextBlock
+               {
+                  Text = spec_.Subtitle,
+                  FontSize = 12,
+                  TextWrapping = TextWrapping.Wrap,
+                  Margin = new Thickness(0, 0, 0, 10)
+               };
+               hint.SetResourceReference(ForegroundProperty, "TextFillColorSecondaryBrush");
+               root.Children.Add(hint);
+            }
+         }
+         else
+         {
+            var head = new StackPanel();
+            head.Children.Add(new TextBlock { Text = spec_.Title, Style = (Style) FindResource("PageTitle") });
+            head.Children.Add(new TextBlock { Text = spec_.Subtitle, Style = (Style) FindResource("PageSubtitle") });
+            root.Children.Add(head);
+         }
 
          // Toolbar: count badge + actions
          var toolbar = new Grid { Margin = new Thickness(0, 0, 0, 12) };
@@ -214,7 +246,19 @@ namespace hMailServer.ControlPanel.Views
 
          countBadge_.Text = rows_.Count == 1
             ? "1 " + spec_.ItemNoun
-            : rows_.Count + " " + spec_.ItemNoun + "s";
+            : rows_.Count + " " + Pluralize(spec_.ItemNoun);
+      }
+
+      private static string Pluralize(string noun)
+      {
+         if (string.IsNullOrEmpty(noun))
+            return noun;
+         if (noun.EndsWith("s") || noun.EndsWith("x") || noun.EndsWith("z") ||
+             noun.EndsWith("ch") || noun.EndsWith("sh"))
+            return noun + "es";
+         if (noun.EndsWith("y") && noun.Length > 1 && !"aeiou".Contains(noun[^2]))
+            return noun.Substring(0, noun.Length - 1) + "ies";
+         return noun + "s";
       }
 
       private void EditSelected()

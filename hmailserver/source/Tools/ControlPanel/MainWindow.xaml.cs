@@ -68,6 +68,7 @@ namespace hMailServer.ControlPanel
          pageFactories_["protocols"] = () => new ServerSettingsView(ServerSettingsView.Section.Protocols);
          pageFactories_["delivery"] = () => new ServerSettingsView(ServerSettingsView.Section.Delivery);
          pageFactories_["routes"] = () => new RoutesView();
+         pageFactories_["publicfolders"] = () => new PublicFoldersView();
          pageFactories_["antispam"] = () => new ServerSettingsView(ServerSettingsView.Section.AntiSpam);
          pageFactories_["surbl"] = () => CollectionSpecs.SurblServers();
          pageFactories_["dnsbl"] = () => CollectionSpecs.DnsBlackLists();
@@ -81,6 +82,7 @@ namespace hMailServer.ControlPanel
          pageFactories_["advanced"] = () => new ServerSettingsView(ServerSettingsView.Section.Advanced);
          pageFactories_["groups"] = () => CollectionSpecs.Groups();
          pageFactories_["servermessages"] = () => CollectionSpecs.ServerMessages();
+         pageFactories_["scripts"] = () => new ScriptsView();
          pageFactories_["certs"] = () => new SslCertificatesView();
          pageFactories_["ports"] = () => new TcpIpPortsView();
          pageFactories_["ipranges"] = () => new IPRangesView();
@@ -134,6 +136,7 @@ namespace hMailServer.ControlPanel
             Item("Protocols", "protocols"),
             Item("Delivery of e-mail", "delivery"),
             Item("Routes", "routes"),
+            Item("Public folders", "publicfolders"),
             Group("Anti-spam",
                Item("Anti-spam settings", "antispam"),
                Item("SURBL servers", "surbl"),
@@ -148,6 +151,7 @@ namespace hMailServer.ControlPanel
                Item("Auto-ban & SSL/TLS", "tls"),
                Item("Performance", "performance"),
                Item("Advanced & scripting", "advanced"),
+               Item("Event scripts", "scripts"),
                Item("Server messages", "servermessages"),
                Item("Groups", "groups"),
                Item("SSL certificates", "certs"),

@@ -110,5 +110,93 @@ namespace hMailServer.ControlPanel.Views
             new FieldSpec { Prop = "Text", Label = "Text", Kind = FieldKind.Multiline }
          }
       });
+
+      // ---- per-object collections (embedded in dialogs) ----------------------
+
+      private static dynamic OpenDomain(string domainName)
+      {
+         dynamic domains = ServerSession.Current.Application.Domains;
+         dynamic domain = domains.ItemByName[domainName];
+         ServerSession.Release(domains);
+         return domain;
+      }
+
+      private static dynamic OpenAccount(string domainName, string address)
+      {
+         dynamic domain = OpenDomain(domainName);
+         dynamic accounts = domain.Accounts;
+         dynamic account = accounts.ItemByAddress[address];
+         ServerSession.Release(accounts);
+         ServerSession.Release(domain);
+         return account;
+      }
+
+      /// <summary>Domain-name aliases for one domain (embedded in the Domain editor).</summary>
+      public static CollectionEditorView DomainAliases(string domainName) => new(new CollectionSpec
+      {
+         Title = "Domain aliases",
+         Subtitle = "Alternative domain names treated as this domain. Mail sent to user@alias is delivered to user@" + domainName + ".",
+         ItemNoun = "alias",
+         GetCollection = () =>
+         {
+            dynamic domain = OpenDomain(domainName);
+            dynamic aliases = domain.DomainAliases;
+            ServerSession.Release(domain);
+            return aliases;
+         },
+         Fields =
+         {
+            new FieldSpec { Prop = "AliasName", Label = "Alias domain name (e.g. example.net)", Default = "" }
+         }
+      }, embedded: true);
+
+      /// <summary>External POP3 download (fetch) accounts for one account.</summary>
+      public static CollectionEditorView FetchAccounts(string domainName, string address) => new(new CollectionSpec
+      {
+         Title = "External accounts",
+         Subtitle = "POP3 mailboxes hMailServer downloads mail from on behalf of this account.",
+         ItemNoun = "external account",
+         GetCollection = () =>
+         {
+            dynamic account = OpenAccount(domainName, address);
+            dynamic fetch = account.FetchAccounts;
+            ServerSession.Release(account);
+            return fetch;
+         },
+         Fields =
+         {
+            new FieldSpec { Prop = "Enabled", Label = "Enabled", Kind = FieldKind.Bool, GridWidth = 70, Default = true },
+            new FieldSpec { Prop = "Name", Label = "Name", GridWidth = 150, Default = "" },
+            new FieldSpec { Prop = "ServerAddress", Label = "POP3 server", Default = "" },
+            new FieldSpec { Prop = "Port", Label = "Port", Kind = FieldKind.Number, GridWidth = 70, Default = 110 },
+            new FieldSpec { Prop = "Username", Label = "User name", ShowInGrid = false, Default = "" },
+            new FieldSpec { Prop = "Password", Label = "Password", ShowInGrid = false, Default = "" },
+            new FieldSpec { Prop = "MinutesBetweenFetch", Label = "Minutes between downloads", Kind = FieldKind.Number, ShowInGrid = false, Default = 15 },
+            new FieldSpec { Prop = "DaysToKeepMessages", Label = "Days to keep on server (0 = delete after download)", Kind = FieldKind.Number, ShowInGrid = false, Default = 0 },
+            new FieldSpec { Prop = "UseSSL", Label = "Use SSL/TLS", Kind = FieldKind.Bool, ShowInGrid = false, Default = false },
+            new FieldSpec { Prop = "UseAntiSpam", Label = "Run anti-spam on downloaded mail", Kind = FieldKind.Bool, ShowInGrid = false, Default = true },
+            new FieldSpec { Prop = "UseAntiVirus", Label = "Run anti-virus on downloaded mail", Kind = FieldKind.Bool, ShowInGrid = false, Default = true }
+         }
+      }, embedded: true);
+
+      /// <summary>Account-level rules (enable/disable and delete; criteria/actions are not edited here).</summary>
+      public static CollectionEditorView AccountRules(string domainName, string address) => new(new CollectionSpec
+      {
+         Title = "Rules",
+         Subtitle = "Per-account rules. You can add, rename, enable/disable and delete rules here; matching criteria and actions are managed on the server.",
+         ItemNoun = "rule",
+         GetCollection = () =>
+         {
+            dynamic account = OpenAccount(domainName, address);
+            dynamic rules = account.Rules;
+            ServerSession.Release(account);
+            return rules;
+         },
+         Fields =
+         {
+            new FieldSpec { Prop = "Active", Label = "Active", Kind = FieldKind.Bool, GridWidth = 70, Default = true },
+            new FieldSpec { Prop = "Name", Label = "Rule name", Default = "" }
+         }
+      }, embedded: true);
    }
 }

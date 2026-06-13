@@ -2,7 +2,8 @@
 param(
     [string]$Out = 'C:\Dev\cp-domain-dialog.png',
     [string]$ButtonName = 'Properties',
-    [string]$DialogTitlePart = 'Domain -'
+    [string]$DialogTitlePart = 'Domain -',
+    [string]$SelectTab = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -37,12 +38,22 @@ $desktop = $auto::RootElement
 $wins = $desktop.FindAll($scope,
     (New-Object System.Windows.Automation.PropertyCondition($auto::ControlTypeProperty,
         [System.Windows.Automation.ControlType]::Window)))
-$handle = [IntPtr]::Zero
+$dlg = $null
 foreach ($w in $wins) {
-    if ($w.Current.Name -like "*$DialogTitlePart*") { $handle = [IntPtr]$w.Current.NativeWindowHandle; break }
+    if ($w.Current.Name -like "*$DialogTitlePart*") { $dlg = $w; break }
 }
-if ($handle -eq [IntPtr]::Zero) { throw "Dialog '$DialogTitlePart' not found." }
+if (-not $dlg) { throw "Dialog '$DialogTitlePart' not found." }
 
+if ($SelectTab) {
+    $tab = $dlg.FindFirst($scope,
+        (New-Object System.Windows.Automation.PropertyCondition($auto::NameProperty, $SelectTab)))
+    if ($tab) {
+        $tab.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
+        Start-Sleep -Milliseconds 700
+    }
+}
+
+$handle = [IntPtr]$dlg.Current.NativeWindowHandle
 $b = [CpShot]::Shoot($handle)
 $b.Save($Out, [System.Drawing.Imaging.ImageFormat]::Png)
 $b.Dispose()

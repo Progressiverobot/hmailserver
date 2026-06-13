@@ -166,11 +166,14 @@
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Text="{Binding}" FontSize="12.5" VerticalAlignment="Center" />
-                                        <ui:Button Grid.Column="1" Content="Members" FontSize="10" Padding="6,2" Margin="0,0,4,0"
+                                        <ui:Button Grid.Column="1" Content="Properties" FontSize="10" Padding="6,2" Margin="0,0,4,0"
+                                                   Tag="{Binding}" Click="EditDistList_Click" />
+                                        <ui:Button Grid.Column="2" Content="Members" FontSize="10" Padding="6,2" Margin="0,0,4,0"
                                                    Tag="{Binding}" Click="EditRecipients_Click" />
-                                        <ui:Button Grid.Column="2" Content="✕" FontSize="10" Padding="6,2"
+                                        <ui:Button Grid.Column="3" Content="✕" FontSize="10" Padding="6,2"
                                                    Tag="{Binding}" Click="DeleteDistList_Click" />
                                     </Grid>
                                 </DataTemplate>

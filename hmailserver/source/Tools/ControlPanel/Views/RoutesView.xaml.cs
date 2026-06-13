@@ -97,6 +97,18 @@ namespace hMailServer.ControlPanel.Views
          Reload();
       }
 
+      private void Edit_Click(object sender, RoutedEventArgs e)
+      {
+         if (RouteGrid.SelectedItem is not RouteRow row)
+         {
+            MessageBox.Show("Select a route first.", "Control Panel");
+            return;
+         }
+
+         new RouteDialog(Window.GetWindow(this), row.DomainName).ShowDialog();
+         Reload();
+      }
+
       private void Delete_Click(object sender, RoutedEventArgs e)
       {
          if (RouteGrid.SelectedItem is not RouteRow row)

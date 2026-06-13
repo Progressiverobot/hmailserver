@@ -21,7 +21,7 @@
             <DataGrid x:Name="RouteGrid" AutoGenerateColumns="False" IsReadOnly="True"
                       HeadersVisibility="Column" GridLinesVisibility="None"
                       Background="Transparent" BorderThickness="0" RowHeight="34"
-                      SelectionMode="Single">
+                      SelectionMode="Single" MouseDoubleClick="Edit_Click">
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="Domain" Binding="{Binding DomainName}" Width="*" />
                     <DataGridTextColumn Header="Target host" Binding="{Binding TargetHost}" Width="*" />
@@ -42,12 +42,14 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <ui:TextBox x:Name="NewDomain" PlaceholderText="Domain (e.g. partner.com)" Margin="0,0,8,0" />
                     <ui:TextBox x:Name="NewHost" Grid.Column="1" PlaceholderText="Target SMTP host" Margin="0,0,8,0" />
                     <ui:TextBox x:Name="NewPort" Grid.Column="2" PlaceholderText="Port" Text="25" Margin="0,0,8,0" />
                     <ui:Button Grid.Column="3" Content="Add" Appearance="Primary" Click="Add_Click" Margin="0,0,8,0" />
-                    <ui:Button Grid.Column="4" Content="Delete selected" Appearance="Danger" Click="Delete_Click" />
+                    <ui:Button Grid.Column="4" Content="Properties" Click="Edit_Click" Margin="0,0,8,0" />
+                    <ui:Button Grid.Column="5" Content="Delete selected" Appearance="Danger" Click="Delete_Click" />
                 </Grid>
             </StackPanel>
         </Border>

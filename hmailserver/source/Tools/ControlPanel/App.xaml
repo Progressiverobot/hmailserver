@@ -105,6 +105,84 @@
                 <Setter Property="VerticalAlignment" Value="Bottom" />
                 <Setter Property="Margin" Value="0,10,0,0" />
             </Style>
+
+            <!-- ============================================================
+                 Modern tab strip. The stock WPF TabControl wraps its tab
+                 headers onto multiple rows and renders them as low-contrast
+                 raised buttons. We replace it with a single-row, horizontally
+                 scrolling strip of flat "pivot" tabs: a clear accent underline
+                 marks the selected tab, hover gives a subtle fill, and the
+                 header sits on a 1px divider so the underline reads cleanly.
+                 Implicit styles so every TabControl/TabItem picks them up. -->
+            <Style TargetType="TabItem">
+                <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                <Setter Property="FontSize" Value="13.5" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="Padding" Value="15,9" />
+                <Setter Property="Margin" Value="0,0,4,0" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="TabItem">
+                            <Border x:Name="Bd" Background="Transparent" CornerRadius="7,7,0,0"
+                                    Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
+                                <Grid>
+                                    <ContentPresenter x:Name="Content" ContentSource="Header"
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                      TextElement.Foreground="{TemplateBinding Foreground}" />
+                                    <Border x:Name="Underline" Height="2.5" CornerRadius="2" Margin="2,0,2,-1"
+                                            VerticalAlignment="Bottom" Background="{StaticResource BrandBrush}"
+                                            Opacity="0" />
+                                </Grid>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                                    <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                                </Trigger>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                    <Setter TargetName="Underline" Property="Opacity" Value="1" />
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter Property="Opacity" Value="0.4" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style TargetType="TabControl">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="TabControl">
+                            <Grid KeyboardNavigation.TabNavigation="Local">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <Border Grid.Row="0" BorderThickness="0,0,0,1"
+                                        BorderBrush="{DynamicResource ControlElevationBorderBrush}">
+                                    <ScrollViewer HorizontalScrollBarVisibility="Hidden"
+                                                  VerticalScrollBarVisibility="Disabled" Focusable="False">
+                                        <StackPanel x:Name="HeaderPanel" IsItemsHost="True"
+                                                    Orientation="Horizontal" KeyboardNavigation.TabIndex="1" />
+                                    </ScrollViewer>
+                                </Border>
+                                <Border Grid.Row="1" Background="Transparent"
+                                        Padding="{TemplateBinding Padding}" KeyboardNavigation.TabIndex="2">
+                                    <ContentPresenter x:Name="PART_SelectedContentHost"
+                                                      ContentSource="SelectedContent" />
+                                </Border>
+                            </Grid>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

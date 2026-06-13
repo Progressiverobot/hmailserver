@@ -47,6 +47,12 @@ namespace hMailServer.ControlPanel.Views
       private readonly TextBox adDomain_ = new();
       private readonly TextBox adUser_ = new();
 
+      // External (fetch) accounts, account rules, IMAP folders — embedded editors
+      private CollectionEditorView fetchEditor_;
+      private CollectionEditorView rulesEditor_;
+      private readonly ListBox folderList_ = new() { Height = 220, FontSize = 13, Margin = new Thickness(0, 0, 0, 10) };
+      private readonly TextBlock folderStatus_ = new() { FontSize = 12, Margin = new Thickness(0, 4, 0, 0) };
+
       public AccountDialog(Window owner, string domainName, string address)
       {
          domainName_ = domainName;
@@ -54,8 +60,8 @@ namespace hMailServer.ControlPanel.Views
 
          Owner = owner;
          Title = "Account - " + address;
-         Width = 560;
-         Height = 640;
+         Width = 640;
+         Height = 680;
          WindowStartupLocation = WindowStartupLocation.CenterOwner;
          SetResourceReference(BackgroundProperty, "ApplicationBackgroundBrush");
 
@@ -80,6 +86,9 @@ namespace hMailServer.ControlPanel.Views
          tabs.Items.Add(new TabItem { Header = "Forwarding", Content = BuildForwarding() });
          tabs.Items.Add(new TabItem { Header = "Auto-reply", Content = BuildAutoReply() });
          tabs.Items.Add(new TabItem { Header = "Signature", Content = BuildSignature() });
+         tabs.Items.Add(new TabItem { Header = "External", Content = BuildExternal() });
+         tabs.Items.Add(new TabItem { Header = "Rules", Content = BuildRules() });
+         tabs.Items.Add(new TabItem { Header = "Folders", Content = BuildFolders() });
          tabs.Items.Add(new TabItem { Header = "Directory", Content = BuildDirectory() });
          Grid.SetRow(tabs, 1);
          root.Children.Add(tabs);
@@ -95,7 +104,13 @@ namespace hMailServer.ControlPanel.Views
          root.Children.Add(buttons);
 
          Content = root;
-         Loaded += (s, e) => Load();
+         Loaded += (s, e) =>
+         {
+            Load();
+            fetchEditor_?.OnEnter();
+            rulesEditor_?.OnEnter();
+            LoadFolders();
+         };
       }
 
       private ScrollViewer BuildGeneral()
@@ -173,6 +188,221 @@ namespace hMailServer.ControlPanel.Views
          panel.Children.Add(Label("Active Directory user name"));
          panel.Children.Add(Input(adUser_));
          return Scroll(panel);
+      }
+
+      private FrameworkElement BuildExternal()
+      {
+         fetchEditor_ = CollectionSpecs.FetchAccounts(domainName_, address_);
+         fetchEditor_.Margin = new Thickness(4, 8, 4, 4);
+         return fetchEditor_;
+      }
+
+      private FrameworkElement BuildRules()
+      {
+         rulesEditor_ = CollectionSpecs.AccountRules(domainName_, address_);
+         rulesEditor_.Margin = new Thickness(4, 8, 4, 4);
+         return rulesEditor_;
+      }
+
+      private FrameworkElement BuildFolders()
+      {
+         var panel = TabPanel();
+         panel.Children.Add(Label("IMAP folders in this mailbox"));
+         panel.Children.Add(folderList_);
+
+         var actions = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 4) };
+         var add = new Wpf.Ui.Controls.Button { Content = "Add folder", Margin = new Thickness(0, 0, 8, 0) };
+         add.Click += (s, e) => AddFolder();
+         var del = new Wpf.Ui.Controls.Button { Content = "Delete folder", Appearance = Wpf.Ui.Controls.ControlAppearance.Danger, Margin = new Thickness(0, 0, 8, 0) };
+         del.Click += (s, e) => DeleteFolder();
+         var refresh = new Wpf.Ui.Controls.Button { Content = "Refresh" };
+         refresh.Click += (s, e) => LoadFolders();
+         actions.Children.Add(add);
+         actions.Children.Add(del);
+         actions.Children.Add(refresh);
+         panel.Children.Add(actions);
+
+         panel.Children.Add(Separator());
+         panel.Children.Add(Label("Maintenance"));
+         var maint = new StackPanel { Orientation = Orientation.Horizontal };
+         var empty = new Wpf.Ui.Controls.Button { Content = "Empty mailbox", Appearance = Wpf.Ui.Controls.ControlAppearance.Danger, Margin = new Thickness(0, 0, 8, 0) };
+         empty.Click += (s, e) => EmptyMailbox();
+         var unlock = new Wpf.Ui.Controls.Button { Content = "Unlock mailbox" };
+         unlock.Click += (s, e) => UnlockMailbox();
+         maint.Children.Add(empty);
+         maint.Children.Add(unlock);
+         panel.Children.Add(maint);
+
+         folderStatus_.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
+         panel.Children.Add(folderStatus_);
+         return Scroll(panel);
+      }
+
+      private void LoadFolders()
+      {
+         folderList_.Items.Clear();
+         dynamic domains = ServerSession.Current.Application.Domains;
+         try
+         {
+            dynamic a = OpenAccount(domains);
+            dynamic folders = a.IMAPFolders;
+            int count = (int) folders.Count;
+            for (int i = 0; i < count; i++)
+            {
+               dynamic f = folders.Item[i];
+               string name = (string) f.Name;
+               bool sub = (bool) f.Subscribed;
+               folderList_.Items.Add(sub ? name : name + "  (not subscribed)");
+               ServerSession.Release(f);
+            }
+            ServerSession.Release(folders);
+            ServerSession.Release(a);
+            folderStatus_.Text = count + (count == 1 ? " folder." : " folders.");
+         }
+         catch (Exception ex)
+         {
+            folderStatus_.Text = "Could not load folders: " + ex.Message;
+         }
+         finally
+         {
+            ServerSession.Release(domains);
+         }
+      }
+
+      private void AddFolder()
+      {
+         string name = PromptText("New IMAP folder", "Folder name (use the hierarchy delimiter for sub-folders):");
+         if (string.IsNullOrWhiteSpace(name))
+            return;
+
+         dynamic domains = ServerSession.Current.Application.Domains;
+         try
+         {
+            dynamic a = OpenAccount(domains);
+            dynamic folders = a.IMAPFolders;
+            dynamic created = folders.Add(name.Trim());
+            ServerSession.Release(created);
+            ServerSession.Release(folders);
+            ServerSession.Release(a);
+         }
+         catch (Exception ex)
+         {
+            MessageBox.Show("Could not create the folder: " + ex.Message, "Control Panel");
+         }
+         finally
+         {
+            ServerSession.Release(domains);
+         }
+         LoadFolders();
+      }
+
+      private void DeleteFolder()
+      {
+         if (folderList_.SelectedItem is not string display)
+         {
+            folderStatus_.Text = "Select a folder first.";
+            return;
+         }
+         string name = display.Replace("  (not subscribed)", "");
+         if (MessageBox.Show("Delete the folder '" + name + "' and all messages in it?", "Control Panel",
+             MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            return;
+
+         dynamic domains = ServerSession.Current.Application.Domains;
+         try
+         {
+            dynamic a = OpenAccount(domains);
+            dynamic folders = a.IMAPFolders;
+            dynamic folder = folders.ItemByName[name];
+            folder.Delete();
+            ServerSession.Release(folder);
+            ServerSession.Release(folders);
+            ServerSession.Release(a);
+         }
+         catch (Exception ex)
+         {
+            MessageBox.Show("Could not delete the folder: " + ex.Message, "Control Panel");
+         }
+         finally
+         {
+            ServerSession.Release(domains);
+         }
+         LoadFolders();
+      }
+
+      private void EmptyMailbox()
+      {
+         if (MessageBox.Show("Permanently delete ALL folders and messages in this mailbox?", "Control Panel",
+             MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            return;
+
+         dynamic domains = ServerSession.Current.Application.Domains;
+         try
+         {
+            dynamic a = OpenAccount(domains);
+            a.DeleteMessages();
+            ServerSession.Release(a);
+            folderStatus_.Text = "Mailbox emptied.";
+         }
+         catch (Exception ex)
+         {
+            MessageBox.Show("Could not empty the mailbox: " + ex.Message, "Control Panel");
+         }
+         finally
+         {
+            ServerSession.Release(domains);
+         }
+         LoadFolders();
+      }
+
+      private void UnlockMailbox()
+      {
+         dynamic domains = ServerSession.Current.Application.Domains;
+         try
+         {
+            dynamic a = OpenAccount(domains);
+            a.UnlockMailbox();
+            ServerSession.Release(a);
+            folderStatus_.Text = "Mailbox unlocked.";
+         }
+         catch (Exception ex)
+         {
+            MessageBox.Show("Could not unlock the mailbox: " + ex.Message, "Control Panel");
+         }
+         finally
+         {
+            ServerSession.Release(domains);
+         }
+      }
+
+      private string PromptText(string title, string prompt)
+      {
+         var dlg = new Window
+         {
+            Owner = this,
+            Title = title,
+            Width = 420,
+            SizeToContent = SizeToContent.Height,
+            ResizeMode = ResizeMode.NoResize,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner
+         };
+         dlg.SetResourceReference(BackgroundProperty, "ApplicationBackgroundBrush");
+         var panel = new StackPanel { Margin = new Thickness(20) };
+         panel.Children.Add(Label(prompt));
+         var box = new TextBox { FontSize = 13, Padding = new Thickness(6), Margin = new Thickness(0, 0, 0, 12) };
+         panel.Children.Add(box);
+         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+         string result = null;
+         var ok = new Wpf.Ui.Controls.Button { Content = "OK", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80 };
+         ok.Click += (s, e) => { result = box.Text; dlg.DialogResult = true; dlg.Close(); };
+         var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel", MinWidth = 80 };
+         cancel.Click += (s, e) => dlg.Close();
+         buttons.Children.Add(ok);
+         buttons.Children.Add(cancel);
+         panel.Children.Add(buttons);
+         dlg.Content = panel;
+         box.Loaded += (s, e) => box.Focus();
+         return dlg.ShowDialog() == true ? result : null;
       }
 
       private dynamic OpenAccount(dynamic domains)

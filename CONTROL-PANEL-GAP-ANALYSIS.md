@@ -45,7 +45,7 @@ a tabbed `DomainDialog`; the account editor is a tabbed `AccountDialog`.
 | **IMAPSASLPlainEnabled** | ✅ |
 | **IMAPSASLInitialResponseEnabled** | ✅ |
 | **IMAPHierarchyDelimiter** | ✅ |
-| **Public folders editor** (Settings.PublicFolders – add/rename/permissions) | ❌ |
+| **Public folders editor** (Settings.PublicFolders – add/delete/permissions) | ✅ Public folders page + ACL editor |
 
 ### 1c. POP3
 | Setting (COM) | CP status |
@@ -65,7 +65,7 @@ a tabbed `DomainDialog`; the account editor is a tabbed `AccountDialog`.
 | CheckHostInHelo(+Score), CheckPTR(+Score), UseMXChecks(+Score) | ✅ |
 | **MaximumMessageSize** (max bytes to spam-scan) | ✅ |
 | SpamAssassinEnabled/Host/Port/MergeScore/Score | ✅ |
-| **TestSpamAssassinConnection** button | ❌ |
+| **TestSpamAssassinConnection** button | ✅ (on SpamAssassin tab) |
 
 ### 2b. List-backed sub-panes (each is a managed collection — add/edit/delete)
 | Pane (COM collection) | CP status |
@@ -107,7 +107,7 @@ a tabbed `DomainDialog`; the account editor is a tabbed `AccountDialog`.
 | TlsVersion10/11/12/13, SslCipherList | ✅ |
 | TlsOptionPreferServerCiphersEnabled, TlsOptionPrioritizeChaChaEnabled | ✅ |
 | VerifyRemoteSslCertificate | ✅ |
-| (ChaCha enable/disable interlock with cipher-order + TLS1.2/1.3) | ⚠️ no dependency logic |
+| (ChaCha enable/disable interlock with cipher-order + TLS1.2/1.3) | ✅ live UI interlock |
 
 ---
 
@@ -142,15 +142,15 @@ a tabbed `DomainDialog`; the account editor is a tabbed `AccountDialog`.
 | **DefaultDomain** | ✅ |
 | **IPv6PreferredEnabled** | ✅ |
 | **SetAdministratorPassword** (change main admin password) | ✅ |
-| Scripts pane: edit/reload event script **files** on disk | ❌ (only enable + language) |
+| Scripts pane: edit/reload event script **files** on disk | ✅ Event scripts page (load/edit/save + CheckSyntax + Reload) |
 
 ---
 
 ## 8. Domains — per-domain editor (classic tabs: *General*, *Names*, *Limits*, *Signature*, *Advanced*, *DKIM*)
 
 **Current CP:** lists domains + shows aliases/distribution lists, **plus a
-tabbed `DomainDialog`** (Properties button) with General / Limits / Signature /
-DKIM tabs.
+tabbed `DomainDialog`** (Properties button) with General / Names (domain aliases) /
+Limits / Signature / DKIM tabs.
 
 | Setting (`Domain`) | CP status |
 |---|---|
@@ -168,14 +168,14 @@ DKIM tabs.
 | DKIMHeaderCanonicalizationMethod (relaxed/simple) | ✅ |
 | DKIMBodyCanonicalizationMethod (relaxed/simple) | ✅ |
 | DKIMSigningAlgorithm (SHA1/SHA256) | ✅ |
-| Domain aliases (`DomainAliases`) list | ⚠️ address-alias list exists; domain-alias list ❌ |
+| Domain aliases (`DomainAliases`) list | ✅ Names tab in DomainDialog |
 
 ---
 
 ## 9. Accounts — per-account editor (classic tabs: *General*, *Auto-reply*, *Forwarding*, *External accounts*, *Active Directory*, *Rules*)
 
 **Current CP `AccountDialog`:** tabbed (General / Forwarding / Auto-reply /
-Signature / Directory).
+Signature / External / Rules / Folders / Directory).
 
 | Setting (`Account`) | CP status |
 |---|---|
@@ -189,10 +189,10 @@ Signature / Directory).
 | **IsAD / ADDomain / ADUsername** (Active Directory account) | ✅ |
 | **AdminLevel** (user / domain admin / server admin) | ✅ |
 | **LastLogonTime** (read-only display) | ✅ |
-| **External (download) accounts** (`Account.FetchAccounts`) | ❌ entire tab |
-| **Account-level rules** | ❌ (only global rules exist) |
-| **IMAP folders editor** (per account) | ❌ |
-| Empty account / Unlock buttons | ❌ |
+| **External (download) accounts** (`Account.FetchAccounts`) | ✅ External tab |
+| **Account-level rules** | ✅ Rules tab (add/rename/enable/delete) |
+| **IMAP folders editor** (per account) | ✅ Folders tab |
+| Empty account / Unlock buttons | ✅ Folders tab (Empty mailbox / Unlock mailbox) |
 
 ---
 
@@ -202,11 +202,11 @@ Signature / Directory).
 |---|---|---|
 | **Groups / Group** (security groups & members) | `Application.Groups` | ✅ list editor |
 | **Server messages** (system message templates / bounce text) | `Settings.ServerMessages` | ✅ list editor |
-| **Scripts** (event-script file editor) | event scripts on disk | ❌ |
+| **Scripts** (event-script file editor) | event scripts on disk | ✅ Event scripts page |
 | **Status** (uptime, version, session counts, processes) | `Application.Status` | ⚠️ Dashboard covers some |
-| **Distribution list** property editor (Address, Active, Mode, RequireSenderAddress, AnnounceOnly) | `DistributionList` | ⚠️ members only (RecipientsDialog) |
-| **Incoming relay** full options (beyond Name/LowerIP/UpperIP) | `IncomingRelay` | ⚠️ basic fields only |
-| **Route** advanced options (RouteAddress, ConnectionSecurity, RelayMode, GreyListing, etc.) | `Route` | ⚠️ host/port/tries only |
+| **Distribution list** property editor (Address, Active, Mode, RequireSenderAddress, AnnounceOnly) | `DistributionList` | ✅ Properties dialog + members (RecipientsDialog) |
+| **Incoming relay** full options (beyond Name/LowerIP/UpperIP) | `IncomingRelay` | ✅ (COM exposes only Name/IP range) |
+| **Route** advanced options (RouteAddress, ConnectionSecurity, RelayMode, GreyListing, etc.) | `Route` | ✅ Properties dialog (security, auth, local-domain, retries) |
 
 ---
 
@@ -214,29 +214,35 @@ Signature / Directory).
 
 ### ✅ Closed
 1. **Tab-based layout** across all settings pages and both editors (Section 0).
-2. **Domain editor** — tabbed General/Limits/Signature/DKIM (Section 8).
-3. **Account editor** — tabbed General/Forwarding/Auto-reply/Signature/Directory;
-   admin level, AD, expiry/abort-spam flags, last-logon (Section 9).
+2. **Domain editor** — tabbed General/Names/Limits/Signature/DKIM incl. domain-alias
+   list (Sections 8).
+3. **Account editor** — tabbed General/Forwarding/Auto-reply/Signature/External/
+   Rules/Folders/Directory; admin level, AD, expiry/abort-spam flags, last-logon,
+   external fetch accounts, account rules, IMAP folders, Empty/Unlock (Section 9).
 4. **Anti-virus** completion + blocked-attachments list (Section 3).
-5. **Anti-spam list panes** — SURBL, DNSBL, whitelist, greylist whitelist (Section 2b).
+5. **Anti-spam list panes** — SURBL, DNSBL, whitelist, greylist whitelist (Section 2b)
+   plus the **Test SpamAssassin connection** button (Section 2a).
 6. **Performance** cache + message indexing (Section 6); **Advanced** default
    domain / IPv6 / admin password (Section 7).
 7. **IMAP** SASL + hierarchy delimiter; **SMTP** delivery STARTTLS + relay
-   password (Sections 1a/1b).
+   password (Sections 1a/1b); **public folders** editor with ACL permissions (1b).
 8. **Groups**, **Server messages** list editors (Section 10).
+9. **Event scripts** page — load/edit/save the event-handler file, check syntax,
+   reload the engine (Sections 7 & 10).
+10. **Routes** advanced properties (connection security, auth, local-domain treatment)
+    and **distribution-list** properties dialog (mode, auth, sender) (Section 10).
+11. **SSL/TLS ChaCha ↔ cipher-order/TLS-version** live dependency interlock (Section 4).
 
-### ⬜ Remaining (lower priority)
-- IMAP **public folders** editor (Section 1b).
-- **TestSpamAssassinConnection** button (Section 2a).
-- Account **external (fetch) accounts**, **account-level rules**, **IMAP folders**,
-  Empty/Unlock buttons (Section 9).
-- Event-**script file editor** on disk (Sections 7 & 10).
-- **Domain-alias** list (Section 8).
-- Advanced options for **distribution lists / incoming relays / routes** (Section 10).
-- SSL/TLS ChaCha ↔ cipher-order dependency interlock (Section 4).
+### ⬜ Remaining
+- **Status** pane parity (uptime / session counts / process list) — partly covered by
+  the Dashboard.
+- Full account **rule criteria/action** editing (CP lists and toggles rules; the
+  detailed criteria/action builder is not ported).
 
 ---
 
 *Generated 2026-06-13 from `source/Tools/Administrator/Main panes/*.cs` vs
 `source/Tools/ControlPanel/Views/*`. Status updated 2026-06-13 after the
-parity + tabbed-editor work.*
+full gap-closure pass (tab-strip redesign, domain/account sub-editors, public
+folders, event scripts, route/distribution-list properties, SpamAssassin test,
+ChaCha interlock).*

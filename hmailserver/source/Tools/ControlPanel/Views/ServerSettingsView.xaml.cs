@@ -52,6 +52,9 @@ namespace hMailServer.ControlPanel.Views
       {
          private CheckBox box_;
 
+         /// <summary>The created checkbox (for cross-field dependency wiring).</summary>
+         public CheckBox Box => box_;
+
          public override FrameworkElement CreateEditor(object value)
          {
             box_ = new CheckBox { Content = Label, IsChecked = value is bool b && b, FontSize = 13.5 };
@@ -67,6 +70,8 @@ namespace hMailServer.ControlPanel.Views
          public int Divisor = 1;   // numeric display scaling (e.g. hours stored, days shown)
          private TextBox box_;
 
+         /// <summary>Current text in the editor (for live test buttons).</summary>
+         public string CurrentText => box_?.Text?.Trim() ?? "";
          public override FrameworkElement CreateEditor(object value)
          {
             var panel = new StackPanel();
@@ -160,6 +165,54 @@ namespace hMailServer.ControlPanel.Views
          }
       }
 
+      /// <summary>A non-persistent action button (e.g. "Test connection") with a result line.</summary>
+      private class ComAction : ComSetting
+      {
+         public string ButtonText;
+         public Func<(bool ok, string text)> Action;
+         private System.Windows.Controls.TextBlock result_;
+         public override bool WantsInitialValue => false;
+
+         public override FrameworkElement CreateEditor(object value)
+         {
+            var panel = new StackPanel();
+            var btn = new Wpf.Ui.Controls.Button
+            {
+               Content = ButtonText,
+               Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
+               HorizontalAlignment = HorizontalAlignment.Left
+            };
+            result_ = new System.Windows.Controls.TextBlock
+            {
+               FontSize = 12,
+               Margin = new Thickness(0, 8, 0, 0),
+               TextWrapping = TextWrapping.Wrap
+            };
+            btn.Click += (s, e) =>
+            {
+               try
+               {
+                  (bool ok, string text) r = Action();
+                  result_.Text = r.text;
+                  result_.Foreground = r.ok
+                     ? System.Windows.Media.Brushes.MediumSeaGreen
+                     : System.Windows.Media.Brushes.IndianRed;
+               }
+               catch (Exception ex)
+               {
+                  result_.Text = "Test failed: " + ex.Message;
+                  result_.Foreground = System.Windows.Media.Brushes.IndianRed;
+               }
+            };
+            panel.Children.Add(btn);
+            panel.Children.Add(result_);
+            return panel;
+         }
+
+         public override object ReadEditor() => null;
+         public override void Write(object owner, string property) { }
+      }
+
       private class CardDef
       {
          public string Title;
@@ -189,6 +242,7 @@ namespace hMailServer.ControlPanel.Views
       private List<TabDef> tabs_;
       private string diag_;
       private int failedReads_;
+      private Action afterBuildUi_;
       public ServerSettingsView(Section section)
       {
          InitializeComponent();
@@ -346,10 +400,23 @@ namespace hMailServer.ControlPanel.Views
 
          var sa = Card("SpamAssassin");
          sa.Settings.Add(new ComBool { Path = "AntiSpam.SpamAssassinEnabled", Label = "Use SpamAssassin" });
-         sa.Settings.Add(new ComText { Path = "AntiSpam.SpamAssassinHost", Label = "Host" });
-         sa.Settings.Add(new ComText { Path = "AntiSpam.SpamAssassinPort", Label = "Port", Numeric = true });
+         var saHost = new ComText { Path = "AntiSpam.SpamAssassinHost", Label = "Host" };
+         var saPort = new ComText { Path = "AntiSpam.SpamAssassinPort", Label = "Port", Numeric = true };
+         sa.Settings.Add(saHost);
+         sa.Settings.Add(saPort);
          sa.Settings.Add(new ComBool { Path = "AntiSpam.SpamAssassinMergeScore", Label = "Merge SpamAssassin score into hMailServer score" });
          sa.Settings.Add(new ComText { Path = "AntiSpam.SpamAssassinScore", Label = "Score when not merging", Numeric = true });
+         sa.Settings.Add(new ComAction
+         {
+            Path = "AntiSpam.SpamAssassinEnabled",
+            ButtonText = "Test SpamAssassin connection",
+            Action = () =>
+            {
+               string host = saHost.CurrentText;
+               int.TryParse(saPort.CurrentText, out int port);
+               return TestSpamAssassin(host, port);
+            }
+         });
          Tab("SpamAssassin").Cards.Add(sa);
       }
 
@@ -391,18 +458,29 @@ namespace hMailServer.ControlPanel.Views
          SubtitleText.Text = "Protocol versions, cipher configuration and brute-force protection.";
 
          var ver = Card("Protocol versions", "TLS 1.2 and 1.3 are the recommended baseline; older versions exist only for legacy clients.");
-         ver.Settings.Add(new ComBool { Path = "TlsVersion10Enabled", Label = "TLS 1.0 (legacy)" });
-         ver.Settings.Add(new ComBool { Path = "TlsVersion11Enabled", Label = "TLS 1.1 (legacy)" });
-         ver.Settings.Add(new ComBool { Path = "TlsVersion12Enabled", Label = "TLS 1.2" });
-         ver.Settings.Add(new ComBool { Path = "TlsVersion13Enabled", Label = "TLS 1.3" });
+         var tls10 = new ComBool { Path = "TlsVersion10Enabled", Label = "TLS 1.0 (legacy)" };
+         var tls11 = new ComBool { Path = "TlsVersion11Enabled", Label = "TLS 1.1 (legacy)" };
+         var tls12 = new ComBool { Path = "TlsVersion12Enabled", Label = "TLS 1.2" };
+         var tls13 = new ComBool { Path = "TlsVersion13Enabled", Label = "TLS 1.3" };
+         ver.Settings.Add(tls10);
+         ver.Settings.Add(tls11);
+         ver.Settings.Add(tls12);
+         ver.Settings.Add(tls13);
          Tab("Protocol versions").Cards.Add(ver);
 
          var ciph = Card("Ciphers & verification");
+         var preferServer = new ComBool { Path = "TlsOptionPreferServerCiphersEnabled", Label = "Prefer server cipher order" };
+         var chacha = new ComBool { Path = "TlsOptionPrioritizeChaChaEnabled", Label = "Prioritize ChaCha20 on mobile clients" };
          ciph.Settings.Add(new ComText { Path = "SslCipherList", Label = "Cipher list (OpenSSL format)" });
-         ciph.Settings.Add(new ComBool { Path = "TlsOptionPreferServerCiphersEnabled", Label = "Prefer server cipher order" });
-         ciph.Settings.Add(new ComBool { Path = "TlsOptionPrioritizeChaChaEnabled", Label = "Prioritize ChaCha20 on mobile clients" });
+         ciph.Settings.Add(preferServer);
+         ciph.Settings.Add(chacha);
          ciph.Settings.Add(new ComBool { Path = "VerifyRemoteSslCertificate", Label = "Verify remote certificates when delivering" });
          Tab("Ciphers").Cards.Add(ciph);
+
+         // ChaCha prioritization only takes effect when the server chooses the
+         // cipher order and a modern TLS version is enabled. Reflect that
+         // dependency live in the UI instead of letting it silently no-op.
+         afterBuildUi_ = () => WireChaChaDependency(preferServer, chacha, tls12, tls13);
 
          var ban = Card("Auto-ban", "Temporarily blocks IP addresses after repeated failed logons.");
          ban.Settings.Add(new ComBool { Path = "AutoBanOnLogonFailure", Label = "Enable auto-ban" });
@@ -577,6 +655,58 @@ namespace hMailServer.ControlPanel.Views
          StatusText.Text = failedReads_ == 0
             ? "Values read from the server."
             : failedReads_ + " setting(s) could not be read: " + diag_;
+
+         afterBuildUi_?.Invoke();
+      }
+
+      // ---- live test / dependency helpers ------------------------------------
+
+      private static (bool ok, string text) TestSpamAssassin(string host, int port)
+      {
+         if (string.IsNullOrWhiteSpace(host) || port <= 0)
+            return (false, "Enter a host name and port first.");
+
+         dynamic antispam = ServerSession.Current.Application.Settings.AntiSpam;
+         try
+         {
+            object[] args = { host, port, "" };
+            object ret = ((object) antispam).GetType().InvokeMember(
+               "TestSpamAssassinConnection", BindingFlags.InvokeMethod, null, (object) antispam, args);
+            bool ok = ret is bool b && b;
+            string msg = args.Length > 2 ? args[2] as string : null;
+            if (string.IsNullOrEmpty(msg))
+               msg = ok ? "Connection succeeded." : "Connection failed.";
+            return (ok, msg);
+         }
+         finally
+         {
+            ServerSession.Release((object) antispam);
+         }
+      }
+
+      private static void WireChaChaDependency(ComBool preferServer, ComBool chacha, ComBool tls12, ComBool tls13)
+      {
+         if (preferServer?.Box == null || chacha?.Box == null || tls12?.Box == null || tls13?.Box == null)
+            return;
+
+         void Update()
+         {
+            bool eligible = preferServer.Box.IsChecked == true
+               && (tls12.Box.IsChecked == true || tls13.Box.IsChecked == true);
+            chacha.Box.IsEnabled = eligible;
+            chacha.Box.ToolTip = eligible
+               ? null
+               : "Requires 'Prefer server cipher order' and TLS 1.2 or 1.3 to be enabled.";
+         }
+
+         void Handler(object s, RoutedEventArgs e) => Update();
+         preferServer.Box.Checked += Handler;
+         preferServer.Box.Unchecked += Handler;
+         tls12.Box.Checked += Handler;
+         tls12.Box.Unchecked += Handler;
+         tls13.Box.Checked += Handler;
+         tls13.Box.Unchecked += Handler;
+         Update();
       }
 
       private void Reload_Click(object sender, RoutedEventArgs e) => BuildUi();
