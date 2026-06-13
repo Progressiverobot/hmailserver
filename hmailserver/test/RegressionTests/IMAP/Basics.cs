@@ -72,6 +72,55 @@ namespace RegressionTests.IMAP
       }
 
       [Test]
+      [Description("Security: with the per-IP auto-ban disabled, a single IMAP connection must still be disconnected after the per-connection authentication-failure cap (defense-in-depth brute-force protection).")]
+      public void TestPerConnectionLoginFailureCapDisconnects()
+      {
+         var settings = SingletonProvider<TestSetup>.Instance.GetApp().Settings;
+         bool originalAutoBan = settings.AutoBanOnLogonFailure;
+         settings.AutoBanOnLogonFailure = false;
+         settings.ClearLogonFailureList();
+
+         try
+         {
+            SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "capimap@example.test", "secret");
+
+            var simulator = new ImapClientSimulator();
+            simulator.Connect();
+
+            string last = "";
+            bool disconnected = false;
+            for (int i = 1; i <= 12; i++)
+            {
+               try
+               {
+                  last = simulator.Send("A" + i + " LOGIN capimap@example.test wrongpassword");
+               }
+               catch (Exception)
+               {
+                  disconnected = true;
+                  break;
+               }
+
+               if (last.Contains("Too many invalid logon attempts") || last.Contains("Goodbye"))
+               {
+                  disconnected = true;
+                  break;
+               }
+            }
+
+            Assert.IsTrue(disconnected,
+               "The IMAP connection should have been disconnected after the per-connection authentication-failure cap. Last response: " + last);
+
+            simulator.Disconnect();
+         }
+         finally
+         {
+            settings.AutoBanOnLogonFailure = originalAutoBan;
+            settings.ClearLogonFailureList();
+         }
+      }
+
+      [Test]
       public void TestAppendDeletedMessage()
       {
          var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "check@example.test", "test");

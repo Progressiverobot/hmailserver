@@ -38,6 +38,59 @@ namespace RegressionTests.POP3
       }
 
       [Test]
+      [Description("Security: with the per-IP auto-ban disabled, a single POP3 connection must still be disconnected after the per-connection authentication-failure cap (defense-in-depth brute-force protection).")]
+      public void TestPerConnectionLoginFailureCapDisconnects()
+      {
+         var settings = SingletonProvider<TestSetup>.Instance.GetApp().Settings;
+         bool originalAutoBan = settings.AutoBanOnLogonFailure;
+         settings.AutoBanOnLogonFailure = false;
+         settings.ClearLogonFailureList();
+
+         try
+         {
+            SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "cappop3@example.test", "secret");
+
+            var tc = new TcpConnection();
+            Assert.IsTrue(tc.Connect(110));
+            tc.ReadUntil("+OK"); // banner
+
+            string last = "";
+            bool disconnected = false;
+            for (int i = 1; i <= 12; i++)
+            {
+               try
+               {
+                  tc.Send("USER cappop3@example.test\r\n");
+                  tc.ReadUntil("+OK");
+                  tc.Send("PASS wrongpassword\r\n");
+                  last = tc.Receive();
+               }
+               catch (Exception)
+               {
+                  disconnected = true;
+                  break;
+               }
+
+               if (last.Contains("Too many invalid logon attempts"))
+               {
+                  disconnected = true;
+                  break;
+               }
+            }
+
+            Assert.IsTrue(disconnected,
+               "The POP3 connection should have been disconnected after the per-connection authentication-failure cap. Last response: " + last);
+
+            tc.Disconnect();
+         }
+         finally
+         {
+            settings.AutoBanOnLogonFailure = originalAutoBan;
+            settings.ClearLogonFailureList();
+         }
+      }
+
+      [Test]
       [Description("Test to send a number of attachments...")]
       public void TestAttachmentEncoding()
       {
