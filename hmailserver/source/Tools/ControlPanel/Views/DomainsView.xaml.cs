@@ -234,6 +234,16 @@ namespace hMailServer.ControlPanel.Views
          ReloadDistLists();
       }
 
+      private void EditRecipients_Click(object sender, RoutedEventArgs e)
+      {
+         string address = (sender as FrameworkElement)?.Tag as string;
+         string domainName = DomainList.SelectedItem as string;
+         if (address == null || domainName == null)
+            return;
+
+         new RecipientsDialog(Window.GetWindow(this), domainName, address).ShowDialog();
+      }
+
       private void DeleteDistList_Click(object sender, RoutedEventArgs e)
       {
          string address = (sender as FrameworkElement)?.Tag as string;

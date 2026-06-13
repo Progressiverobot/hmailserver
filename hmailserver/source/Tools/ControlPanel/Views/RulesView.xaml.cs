@@ -56,6 +56,93 @@ namespace hMailServer.ControlPanel.Views
             : rows.Count + " rule(s), evaluated top to bottom.";
       }
 
+      private static readonly string[] FieldNames =
+         { "?", "From", "To", "CC", "Subject", "Body", "Message size", "Recipient list", "Delivery attempts" };
+
+      private static readonly string[] MatchNames =
+         { "?", "equals", "contains", "is less than", "is greater than", "matches regex", "does not contain", "does not equal", "matches wildcard" };
+
+      private static readonly string[] ActionNames =
+         { "?", "Delete e-mail", "Forward e-mail", "Reply", "Move to IMAP folder", "Run script function",
+           "Stop rule processing", "Set header value", "Send using route", "Create copy", "Bind to address" };
+
+      private static string Pick(string[] names, int index)
+         => index >= 0 && index < names.Length ? names[index] : "#" + index;
+
+      private void RuleGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+      {
+         if (RuleGrid.SelectedItem is not RuleRow row)
+         {
+            DetailText.Text = "Select a rule to see its criteria and actions.";
+            return;
+         }
+
+         try
+         {
+            dynamic rules = ServerSession.Current.Application.Rules;
+            dynamic rule = rules.Item[row.Position - 1];
+
+            var text = new System.Text.StringBuilder();
+
+            text.Append("IF  ");
+            dynamic criterias = rule.Criterias;
+            int criteriaCount = (int) criterias.Count;
+            for (int i = 0; i < criteriaCount; i++)
+            {
+               dynamic criteria = criterias.Item[i];
+               if (i > 0)
+                  text.Append("  AND  ");
+               string field = (bool) criteria.UsePredefined
+                  ? Pick(FieldNames, (int) criteria.PredefinedField)
+                  : "header '" + (string) criteria.HeaderField + "'";
+               text.Append(field + " " + Pick(MatchNames, (int) criteria.MatchType) + " '" + (string) criteria.MatchValue + "'");
+               ServerSession.Release(criteria);
+            }
+            if (criteriaCount == 0)
+               text.Append("(no criteria - matches everything)");
+            ServerSession.Release(criterias);
+
+            text.AppendLine();
+            text.Append("THEN  ");
+            dynamic actions = rule.Actions;
+            int actionCount = (int) actions.Count;
+            for (int i = 0; i < actionCount; i++)
+            {
+               dynamic action = actions.Item[i];
+               if (i > 0)
+                  text.Append("  ;  ");
+               int type = (int) action.Type;
+               text.Append(Pick(ActionNames, type));
+               try
+               {
+                  switch (type)
+                  {
+                     case 2: text.Append(" -> " + (string) action.To); break;
+                     case 4: text.Append(" '" + (string) action.IMAPFolder + "'"); break;
+                     case 5: text.Append(" " + (string) action.ScriptFunction); break;
+                     case 7: text.Append(" " + (string) action.HeaderName + "=" + (string) action.Value); break;
+                  }
+               }
+               catch (Exception)
+               {
+               }
+               ServerSession.Release(action);
+            }
+            if (actionCount == 0)
+               text.Append("(no actions)");
+            ServerSession.Release(actions);
+
+            ServerSession.Release(rule);
+            ServerSession.Release(rules);
+
+            DetailText.Text = text.ToString();
+         }
+         catch (Exception ex)
+         {
+            DetailText.Text = "Could not read the rule details: " + ex.Message;
+         }
+      }
+
       private void WithSelectedRule(Action<dynamic> action)
       {
          if (RuleGrid.SelectedItem is not RuleRow row)

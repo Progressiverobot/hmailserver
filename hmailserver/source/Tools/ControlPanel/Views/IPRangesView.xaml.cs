@@ -61,6 +61,93 @@ namespace hMailServer.ControlPanel.Views
          RangeGrid.ItemsSource = rows;
       }
 
+      private void RangeGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+      {
+         if (RangeGrid.SelectedItem is not RangeRow row)
+         {
+            PermHeader.Text = "Permissions (select a range)";
+            SavePermsButton.IsEnabled = false;
+            return;
+         }
+
+         dynamic ranges = ServerSession.Current.Application.Settings.SecurityRanges;
+         try
+         {
+            dynamic range = FindRange(ranges, row);
+            if (range == null)
+               return;
+
+            PermHeader.Text = "Permissions - " + row.Name;
+            PermSmtp.IsChecked = (bool) range.AllowSMTPConnections;
+            PermImap.IsChecked = (bool) range.AllowIMAPConnections;
+            PermPop3.IsChecked = (bool) range.AllowPOP3Connections;
+            PermTlsAuth.IsChecked = (bool) range.RequireSSLTLSForAuth;
+            PermLL.IsChecked = (bool) range.AllowDeliveryFromLocalToLocal;
+            PermLR.IsChecked = (bool) range.AllowDeliveryFromLocalToRemote;
+            PermRL.IsChecked = (bool) range.AllowDeliveryFromRemoteToLocal;
+            PermRR.IsChecked = (bool) range.AllowDeliveryFromRemoteToRemote;
+            SavePermsButton.IsEnabled = true;
+            ServerSession.Release(range);
+         }
+         catch (Exception)
+         {
+            SavePermsButton.IsEnabled = false;
+         }
+         finally
+         {
+            ServerSession.Release(ranges);
+         }
+      }
+
+      private static dynamic FindRange(dynamic ranges, RangeRow row)
+      {
+         int count = (int) ranges.Count;
+         for (int i = 0; i < count; i++)
+         {
+            dynamic range = ranges.Item[i];
+            if ((string) range.Name == row.Name && (string) range.LowerIP == row.LowerIP)
+               return range;
+            ServerSession.Release(range);
+         }
+         return null;
+      }
+
+      private void SavePerms_Click(object sender, RoutedEventArgs e)
+      {
+         if (RangeGrid.SelectedItem is not RangeRow row)
+            return;
+
+         dynamic ranges = ServerSession.Current.Application.Settings.SecurityRanges;
+         try
+         {
+            dynamic range = FindRange(ranges, row);
+            if (range == null)
+               return;
+
+            range.AllowSMTPConnections = PermSmtp.IsChecked == true;
+            range.AllowIMAPConnections = PermImap.IsChecked == true;
+            range.AllowPOP3Connections = PermPop3.IsChecked == true;
+            range.RequireSSLTLSForAuth = PermTlsAuth.IsChecked == true;
+            range.AllowDeliveryFromLocalToLocal = PermLL.IsChecked == true;
+            range.AllowDeliveryFromLocalToRemote = PermLR.IsChecked == true;
+            range.AllowDeliveryFromRemoteToLocal = PermRL.IsChecked == true;
+            range.AllowDeliveryFromRemoteToRemote = PermRR.IsChecked == true;
+            range.Save();
+            ServerSession.Release(range);
+            PermHeader.Text = "Permissions - " + row.Name + " (saved)";
+         }
+         catch (Exception ex)
+         {
+            MessageBox.Show("Could not save the permissions: " + ex.Message, "Control Panel");
+         }
+         finally
+         {
+            ServerSession.Release(ranges);
+         }
+
+         Reload();
+      }
+
       private void Add_Click(object sender, RoutedEventArgs e)
       {
          string name = NewName.Text.Trim();

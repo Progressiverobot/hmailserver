@@ -58,7 +58,7 @@ namespace hMailServer.ControlPanel
       {
          NavDashboard, NavDomains, NavQueue, NavRules, NavLogs,
          NavProtocols, NavDelivery, NavAntiSpam, NavAntiVirus, NavTls, NavCerts, NavIpRanges, NavLogging, NavBackup,
-         NavSecurity, NavAutomation, NavIntegration
+         NavSecurity, NavAutomation, NavIntegration, NavAbout
       };
 
       private void SetNavEnabled(bool enabled)
@@ -146,6 +146,7 @@ namespace hMailServer.ControlPanel
                nameof(NavSecurity) => new FeatureSettingsView(FeatureSettingsView.Section.Security),
                nameof(NavAutomation) => new FeatureSettingsView(FeatureSettingsView.Section.Automation),
                nameof(NavIntegration) => new FeatureSettingsView(FeatureSettingsView.Section.Integration),
+               nameof(NavAbout) => new AboutView(),
                _ => null
             };
             if (page != null)

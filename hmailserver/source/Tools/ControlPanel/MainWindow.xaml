@@ -111,6 +111,9 @@
                     <RadioButton x:Name="NavIntegration" Style="{StaticResource NavItem}" Content="API &amp; monitoring" GroupName="Nav" Checked="Nav_Checked">
                         <RadioButton.Tag><ui:SymbolIcon Symbol="PlugConnected24" /></RadioButton.Tag>
                     </RadioButton>
+                    <RadioButton x:Name="NavAbout" Style="{StaticResource NavItem}" Content="About" GroupName="Nav" Checked="Nav_Checked">
+                        <RadioButton.Tag><ui:SymbolIcon Symbol="Info24" /></RadioButton.Tag>
+                    </RadioButton>
                 </StackPanel>
 
                 <!-- Footer -->
