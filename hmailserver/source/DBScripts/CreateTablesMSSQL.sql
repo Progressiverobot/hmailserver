@@ -839,7 +839,8 @@ insert into hm_settings (settingname, settingstring, settinginteger) values ('as
 
 insert into hm_settings (settingname, settingstring, settinginteger) values ('tcpipthreads', '', 15) 
 
-insert into hm_settings (settingname, settingstring, settinginteger) values ('smtpallowincorrectlineendings', '', 1) 
+-- Secure default: reject messages with incorrect (bare LF) line endings to harden against SMTP smuggling.
+insert into hm_settings (settingname, settingstring, settinginteger) values ('smtpallowincorrectlineendings', '', 0) 
 
 insert into hm_settings (settingname, settingstring, settinginteger) values ('usegreylisting', '', 0) 
 
