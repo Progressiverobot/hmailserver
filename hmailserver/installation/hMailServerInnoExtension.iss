@@ -17,7 +17,7 @@ var
   findRec: TFindRec;
 begin
   Result := True;
-  if FindFirst(ExpandConstant('{commonpf64}\dotnet\shared\Microsoft.WindowsDesktop.App\8.*'), findRec) then
+  if FindFirst(ExpandConstant('{pf64}\dotnet\shared\Microsoft.WindowsDesktop.App\8.*'), findRec) then
   begin
     Result := False;
     FindClose(findRec);
