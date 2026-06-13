@@ -77,6 +77,9 @@
                     <RadioButton x:Name="NavDelivery" Style="{StaticResource NavItem}" Content="Delivery" GroupName="Nav" Checked="Nav_Checked">
                         <RadioButton.Tag><ui:SymbolIcon Symbol="Send24" /></RadioButton.Tag>
                     </RadioButton>
+                    <RadioButton x:Name="NavRoutes" Style="{StaticResource NavItem}" Content="Routes" GroupName="Nav" Checked="Nav_Checked">
+                        <RadioButton.Tag><ui:SymbolIcon Symbol="ArrowRoutingRectangleMultiple24" /></RadioButton.Tag>
+                    </RadioButton>
                     <RadioButton x:Name="NavAntiSpam" Style="{StaticResource NavItem}" Content="Anti-spam" GroupName="Nav" Checked="Nav_Checked">
                         <RadioButton.Tag><ui:SymbolIcon Symbol="Filter24" /></RadioButton.Tag>
                     </RadioButton>

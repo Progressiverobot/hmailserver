@@ -14,7 +14,7 @@
         <StackPanel>
             <TextBlock Text="Global rules" Style="{StaticResource PageTitle}" />
             <TextBlock x:Name="SubtitleText"
-                       Text="Server-wide message rules, evaluated top to bottom. Criteria and actions are edited in the classic Administrator for now."
+                       Text="Server-wide message rules, evaluated top to bottom."
                        Style="{StaticResource PageSubtitle}" />
         </StackPanel>
 
@@ -47,11 +47,51 @@
             </Grid>
         </Border>
 
-        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,12,0,0">
-            <ui:Button Content="Move up" Click="MoveUp_Click" Margin="0,0,8,0" />
-            <ui:Button Content="Move down" Click="MoveDown_Click" Margin="0,0,8,0" />
-            <ui:Button Content="Enable / disable" Click="Toggle_Click" Margin="0,0,8,0" />
-            <ui:Button Content="Delete" Appearance="Danger" Click="Delete_Click" />
+        <StackPanel Grid.Row="2" Margin="0,12,0,0">
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                <ui:Button Content="Move up" Click="MoveUp_Click" Margin="0,0,8,0" />
+                <ui:Button Content="Move down" Click="MoveDown_Click" Margin="0,0,8,0" />
+                <ui:Button Content="Enable / disable" Click="Toggle_Click" Margin="0,0,8,0" />
+                <ui:Button Content="Delete rule" Appearance="Danger" Click="Delete_Click" Margin="0,0,24,0" />
+                <ui:TextBox x:Name="NewRuleName" PlaceholderText="New rule name" AutomationProperties.Name="New rule name" Width="200" Margin="0,0,8,0" />
+                <ui:Button Content="Add rule" Appearance="Primary" Click="AddRule_Click" />
+            </StackPanel>
+
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <TextBlock Text="Edit selected rule" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,12" />
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="2*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="IF" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,10,0" />
+                        <ComboBox x:Name="CritField" Grid.Column="1" Margin="0,0,8,0" SelectedIndex="0" />
+                        <ComboBox x:Name="CritMatch" Grid.Column="2" Margin="0,0,8,0" SelectedIndex="1" />
+                        <ui:TextBox x:Name="CritValue" Grid.Column="3" PlaceholderText="Value" AutomationProperties.Name="Criterion value" Margin="0,0,8,0" />
+                        <ui:Button Grid.Column="4" Content="Add criterion" Click="AddCriterion_Click" Margin="0,0,8,0" />
+                        <ui:Button Grid.Column="5" Content="Remove last" Click="RemoveCriterion_Click" />
+                    </Grid>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="2*" />
+                            <ColumnDefinition Width="2*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="THEN" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,10,0" />
+                        <ComboBox x:Name="ActionType" Grid.Column="1" Margin="0,0,8,0" SelectedIndex="0" />
+                        <ui:TextBox x:Name="ActionParam" Grid.Column="2" PlaceholderText="Parameter (address, folder, Header=Value...)" AutomationProperties.Name="Action parameter" Margin="0,0,8,0" />
+                        <ui:Button Grid.Column="3" Content="Add action" Click="AddAction_Click" Margin="0,0,8,0" />
+                        <ui:Button Grid.Column="4" Content="Remove last" Click="RemoveAction_Click" />
+                    </Grid>
+                </StackPanel>
+            </Border>
         </StackPanel>
     </Grid>
 </UserControl>

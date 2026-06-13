@@ -71,12 +71,15 @@
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Orientation="Horizontal">
                                         <ui:SymbolIcon Symbol="Person24" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                                         <TextBlock Text="{Binding}" Margin="10,0,0,0" FontSize="13.5" VerticalAlignment="Center" />
                                     </StackPanel>
-                                    <ui:Button Grid.Column="1" Content="Delete" Appearance="Danger" FontSize="11"
+                                    <ui:Button Grid.Column="1" Content="Edit" FontSize="11" Padding="8,3" Margin="0,0,6,0"
+                                               Tag="{Binding}" Click="EditAccount_Click" />
+                                    <ui:Button Grid.Column="2" Content="Delete" Appearance="Danger" FontSize="11"
                                                Padding="8,3" Tag="{Binding}" Click="DeleteAccount_Click" />
                                 </Grid>
                             </DataTemplate>

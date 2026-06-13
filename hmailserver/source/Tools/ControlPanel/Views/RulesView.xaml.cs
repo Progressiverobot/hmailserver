@@ -18,6 +18,18 @@ namespace hMailServer.ControlPanel.Views
       public RulesView()
       {
          InitializeComponent();
+
+         for (int i = 1; i < FieldNames.Length; i++)
+            CritField.Items.Add(FieldNames[i]);
+         CritField.SelectedIndex = 0;
+
+         for (int i = 1; i < MatchNames.Length; i++)
+            CritMatch.Items.Add(MatchNames[i]);
+         CritMatch.SelectedIndex = 1;
+
+         for (int i = 1; i < ActionNames.Length; i++)
+            ActionType.Items.Add(ActionNames[i]);
+         ActionType.SelectedIndex = 0;
       }
 
       public void OnEnter() => Reload();
@@ -52,7 +64,7 @@ namespace hMailServer.ControlPanel.Views
 
          RuleGrid.ItemsSource = rows;
          SubtitleText.Text = rows.Count == 0
-            ? "No global rules defined. Criteria and actions are edited in the classic Administrator for now."
+            ? "No global rules defined yet - create one below."
             : rows.Count + " rule(s), evaluated top to bottom.";
       }
 
@@ -148,6 +160,8 @@ namespace hMailServer.ControlPanel.Views
          if (RuleGrid.SelectedItem is not RuleRow row)
             return;
 
+         int selectedIndex = RuleGrid.SelectedIndex;
+
          dynamic rules = ServerSession.Current.Application.Rules;
          try
          {
@@ -165,6 +179,10 @@ namespace hMailServer.ControlPanel.Views
          }
 
          Reload();
+
+         // Keep the rule selected so consecutive edits chain naturally.
+         if (selectedIndex >= 0 && selectedIndex < RuleGrid.Items.Count)
+            RuleGrid.SelectedIndex = selectedIndex;
       }
 
       private void MoveUp_Click(object sender, RoutedEventArgs e) => WithSelectedRule(rule => rule.MoveUp());
@@ -188,5 +206,105 @@ namespace hMailServer.ControlPanel.Views
 
          WithSelectedRule(rule => rule.Delete());
       }
+
+      private void AddRule_Click(object sender, RoutedEventArgs e)
+      {
+         string name = NewRuleName.Text.Trim();
+         if (name.Length == 0)
+         {
+            MessageBox.Show("Enter a name for the new rule.", "Control Panel");
+            return;
+         }
+
+         dynamic rules = ServerSession.Current.Application.Rules;
+         try
+         {
+            dynamic rule = rules.Add();
+            rule.Name = name;
+            rule.Active = true;
+            rule.Save();
+            ServerSession.Release(rule);
+         }
+         catch (Exception ex)
+         {
+            MessageBox.Show("Could not create the rule: " + ex.Message, "Control Panel");
+            return;
+         }
+         finally
+         {
+            ServerSession.Release(rules);
+         }
+
+         NewRuleName.Text = "";
+         Reload();
+      }
+
+      private void AddCriterion_Click(object sender, RoutedEventArgs e) => WithSelectedRule(rule =>
+      {
+         dynamic criterias = rule.Criterias;
+         dynamic criteria = criterias.Add();
+         criteria.UsePredefined = true;
+         criteria.PredefinedField = CritField.SelectedIndex + 1;   // eFT* starts at 1
+         criteria.MatchType = CritMatch.SelectedIndex + 1;         // eMT* starts at 1
+         criteria.MatchValue = CritValue.Text;
+         criteria.Save();
+         ServerSession.Release(criteria);
+         ServerSession.Release(criterias);
+         rule.Save();
+      });
+
+      private void RemoveCriterion_Click(object sender, RoutedEventArgs e) => WithSelectedRule(rule =>
+      {
+         dynamic criterias = rule.Criterias;
+         int count = (int) criterias.Count;
+         if (count > 0)
+         {
+            dynamic last = criterias.Item[count - 1];
+            last.Delete();
+            ServerSession.Release(last);
+            rule.Save();
+         }
+         ServerSession.Release(criterias);
+      });
+
+      private void AddAction_Click(object sender, RoutedEventArgs e) => WithSelectedRule(rule =>
+      {
+         int type = ActionType.SelectedIndex + 1; // eRA* starts at 1
+         string param = ActionParam.Text.Trim();
+
+         dynamic actions = rule.Actions;
+         dynamic action = actions.Add();
+         action.Type = type;
+         switch (type)
+         {
+            case 2: action.To = param; break;                       // forward
+            case 3: action.Subject = "Re:"; action.Body = param; break; // reply
+            case 4: action.IMAPFolder = param; break;               // move to folder
+            case 5: action.ScriptFunction = param; break;           // run script
+            case 7:                                                  // set header
+               string[] parts = param.Split(new[] { '=' }, 2);
+               action.HeaderName = parts[0];
+               action.Value = parts.Length > 1 ? parts[1] : "";
+               break;
+         }
+         action.Save();
+         ServerSession.Release(action);
+         ServerSession.Release(actions);
+         rule.Save();
+      });
+
+      private void RemoveAction_Click(object sender, RoutedEventArgs e) => WithSelectedRule(rule =>
+      {
+         dynamic actions = rule.Actions;
+         int count = (int) actions.Count;
+         if (count > 0)
+         {
+            dynamic last = actions.Item[count - 1];
+            last.Delete();
+            ServerSession.Release(last);
+            rule.Save();
+         }
+         ServerSession.Release(actions);
+      });
    }
 }
