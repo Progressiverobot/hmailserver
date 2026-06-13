@@ -75,7 +75,7 @@ function New-Banner {
 
         $verFont = New-Object System.Drawing.Font('Segoe UI', 10)
         $accentBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(54, 194, 255))
-        $g.DrawString('6.1', $verFont, $accentBrush, 17, 112)
+        $g.DrawString('6', $verFont, $accentBrush, 17, 112)
 
         $tagFont = New-Object System.Drawing.Font('Segoe UI', 8)
         $mutedBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(139, 148, 158))

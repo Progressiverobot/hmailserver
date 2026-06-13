@@ -54,3 +54,4 @@ hmailserver/source/Server/hMailServer.Minidump/x64/*
 /hmailserver/source/Tools/ControlPanel/bin/
 /hmailserver/source/Tools/ControlPanel/obj/
 /hmailserver/source/Tools/ControlPanel/publish/
+/hmailserver/installation/DotNet/

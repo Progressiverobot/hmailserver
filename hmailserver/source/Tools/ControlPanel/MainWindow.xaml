@@ -25,7 +25,7 @@
 
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="228" />
+                <ColumnDefinition Width="248" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
@@ -38,7 +38,7 @@
                 </Grid.RowDefinitions>
 
                 <!-- Brand -->
-                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="18,10,0,16">
+                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="18,10,0,12">
                     <Border Width="34" Height="34" CornerRadius="9" Background="{StaticResource BrandGradient}">
                         <TextBlock Text="hM" FontWeight="Bold" FontSize="14" Foreground="White"
                                    HorizontalAlignment="Center" VerticalAlignment="Center" />
@@ -50,74 +50,24 @@
                     </StackPanel>
                 </StackPanel>
 
-                <!-- Navigation -->
-                <StackPanel x:Name="NavPanel" Grid.Row="1">
-                    <RadioButton x:Name="NavDashboard" Style="{StaticResource NavItem}" Content="Dashboard" GroupName="Nav" Checked="Nav_Checked">
-                        <RadioButton.Tag><ui:SymbolIcon Symbol="Home24" /></RadioButton.Tag>
-                    </RadioButton>
-                    <RadioButton x:Name="NavDomains" Style="{StaticResource NavItem}" Content="Domains &amp; accounts" GroupName="Nav" Checked="Nav_Checked">
-                        <RadioButton.Tag><ui:SymbolIcon Symbol="Globe24" /></RadioButton.Tag>
-                    </RadioButton>
-                    <RadioButton x:Name="NavQueue" Style="{StaticResource NavItem}" Content="Delivery queue" GroupName="Nav" Checked="Nav_Checked">
-                        <RadioButton.Tag><ui:SymbolIcon Symbol="MailArrowUp24" /></RadioButton.Tag>
-                    </RadioButton>
-                    <RadioButton x:Name="NavRules" Style="{StaticResource NavItem}" Content="Rules" GroupName="Nav" Checked="Nav_Checked">
-                        <RadioButton.Tag><ui:SymbolIcon Symbol="TaskListLtr24" /></RadioButton.Tag>
-                    </RadioButton>
-                    <RadioButton x:Name="NavLogs" Style="{StaticResource NavItem}" Content="Live logs" GroupName="Nav" Checked="Nav_Checked">
-                        <RadioButton.Tag><ui:SymbolIcon Symbol="DocumentText24" /></RadioButton.Tag>
-                    </RadioButton>
-
-                    <TextBlock Text="SERVER SETTINGS" FontSize="10" Margin="20,16,0,6"
-                               Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
-
-                    <RadioButton x:Name="NavProtocols" Style="{StaticResource NavItem}" Content="Protocols" GroupName="Nav" Checked="Nav_Checked">
-                        <RadioButton.Tag><ui:SymbolIcon Symbol="Server24" /></RadioButton.Tag>
-                    </RadioButton>
-                    <RadioButton x:Name="NavDelivery" Style="{StaticResource NavItem}" Content="Delivery" GroupName="Nav" Checked="Nav_Checked">
-                        <RadioButton.Tag><ui:SymbolIcon Symbol="Send24" /></RadioButton.Tag>
-                    </RadioButton>
-                    <RadioButton x:Name="NavRoutes" Style="{StaticResource NavItem}" Content="Routes" GroupName="Nav" Checked="Nav_Checked">
-                        <RadioButton.Tag><ui:SymbolIcon Symbol="ArrowRoutingRectangleMultiple24" /></RadioButton.Tag>
-                    </RadioButton>
-                    <RadioButton x:Name="NavAntiSpam" Style="{StaticResource NavItem}" Content="Anti-spam" GroupName="Nav" Checked="Nav_Checked">
-                        <RadioButton.Tag><ui:SymbolIcon Symbol="Filter24" /></RadioButton.Tag>
-                    </RadioButton>
-                    <RadioButton x:Name="NavAntiVirus" Style="{StaticResource NavItem}" Content="Anti-virus" GroupName="Nav" Checked="Nav_Checked">
-                        <RadioButton.Tag><ui:SymbolIcon Symbol="Bug24" /></RadioButton.Tag>
-                    </RadioButton>
-                    <RadioButton x:Name="NavTls" Style="{StaticResource NavItem}" Content="SSL/TLS &amp; auto-ban" GroupName="Nav" Checked="Nav_Checked">
-                        <RadioButton.Tag><ui:SymbolIcon Symbol="LockClosed24" /></RadioButton.Tag>
-                    </RadioButton>
-                    <RadioButton x:Name="NavCerts" Style="{StaticResource NavItem}" Content="SSL certificates" GroupName="Nav" Checked="Nav_Checked">
-                        <RadioButton.Tag><ui:SymbolIcon Symbol="Certificate24" /></RadioButton.Tag>
-                    </RadioButton>
-                    <RadioButton x:Name="NavIpRanges" Style="{StaticResource NavItem}" Content="IP ranges" GroupName="Nav" Checked="Nav_Checked">
-                        <RadioButton.Tag><ui:SymbolIcon Symbol="Filter24" /></RadioButton.Tag>
-                    </RadioButton>
-                    <RadioButton x:Name="NavLogging" Style="{StaticResource NavItem}" Content="Logging" GroupName="Nav" Checked="Nav_Checked">
-                        <RadioButton.Tag><ui:SymbolIcon Symbol="Notebook24" /></RadioButton.Tag>
-                    </RadioButton>
-                    <RadioButton x:Name="NavBackup" Style="{StaticResource NavItem}" Content="Backup &amp; restore" GroupName="Nav" Checked="Nav_Checked">
-                        <RadioButton.Tag><ui:SymbolIcon Symbol="ArrowDownload24" /></RadioButton.Tag>
-                    </RadioButton>
-
-                    <TextBlock Text="SERVER FEATURES" FontSize="10" Margin="20,16,0,6"
-                               Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
-
-                    <RadioButton x:Name="NavSecurity" Style="{StaticResource NavItem}" Content="Transport security" GroupName="Nav" Checked="Nav_Checked">
-                        <RadioButton.Tag><ui:SymbolIcon Symbol="ShieldCheckmark24" /></RadioButton.Tag>
-                    </RadioButton>
-                    <RadioButton x:Name="NavAutomation" Style="{StaticResource NavItem}" Content="Certificates (ACME)" GroupName="Nav" Checked="Nav_Checked">
-                        <RadioButton.Tag><ui:SymbolIcon Symbol="Certificate24" /></RadioButton.Tag>
-                    </RadioButton>
-                    <RadioButton x:Name="NavIntegration" Style="{StaticResource NavItem}" Content="API &amp; monitoring" GroupName="Nav" Checked="Nav_Checked">
-                        <RadioButton.Tag><ui:SymbolIcon Symbol="PlugConnected24" /></RadioButton.Tag>
-                    </RadioButton>
-                    <RadioButton x:Name="NavAbout" Style="{StaticResource NavItem}" Content="About" GroupName="Nav" Checked="Nav_Checked">
-                        <RadioButton.Tag><ui:SymbolIcon Symbol="Info24" /></RadioButton.Tag>
-                    </RadioButton>
-                </StackPanel>
+                <!-- Navigation tree (structure mirrors the classic Administrator) -->
+                <TreeView x:Name="NavTree" Grid.Row="1" Background="Transparent" BorderThickness="0"
+                          Margin="8,0" SelectedItemChanged="NavTree_SelectedItemChanged"
+                          ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <TreeView.ItemContainerStyle>
+                        <Style TargetType="TreeViewItem">
+                            <Setter Property="Padding" Value="4,5" />
+                            <Setter Property="Margin" Value="0,1" />
+                            <Setter Property="FontSize" Value="13" />
+                            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                            <Style.Triggers>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TreeView.ItemContainerStyle>
+                </TreeView>
 
                 <!-- Footer -->
                 <StackPanel Grid.Row="2" Margin="18,0,18,14">

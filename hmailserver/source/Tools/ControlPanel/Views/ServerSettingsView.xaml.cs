@@ -21,7 +21,8 @@ namespace hMailServer.ControlPanel.Views
          AntiSpam,
          AntiVirus,
          Tls,
-         Logging
+         Logging,
+         Advanced
       }
 
       private abstract class ComSetting
@@ -352,6 +353,42 @@ namespace hMailServer.ControlPanel.Views
                   }
                });
                break;
+
+            case Section.Advanced:
+               TitleText.Text = "Performance & scripting";
+               SubtitleText.Text = "Thread pools, mirroring and the server-side scripting engine.";
+               cards_.Add(new CardDef
+               {
+                  Title = "Performance",
+                  Blurb = "Thread pool sizing. Defaults suit most installations; raise for very busy servers.",
+                  Settings =
+                  {
+                     new ComText { Path = "MaxDeliveryThreads", Label = "Max delivery threads", Numeric = true },
+                     new ComText { Path = "MaxAsynchronousThreads", Label = "Max asynchronous task threads", Numeric = true },
+                     new ComText { Path = "TCPIPThreads", Label = "TCP/IP threads", Numeric = true },
+                     new ComText { Path = "WorkerThreadPriority", Label = "Worker thread priority", Numeric = true }
+                  }
+               });
+               cards_.Add(new CardDef
+               {
+                  Title = "Mirroring",
+                  Blurb = "Sends a copy of every message passing through the server to one address (compliance archiving).",
+                  Settings =
+                  {
+                     new ComText { Path = "MirrorEMailAddress", Label = "Mirror address (empty = disabled)" }
+                  }
+               });
+               cards_.Add(new CardDef
+               {
+                  Title = "Scripting",
+                  Blurb = "Runs event scripts (OnAcceptMessage, OnDeliveryStart...) from the Events folder. The script engine reloads when you save.",
+                  Settings =
+                  {
+                     new ComBool { Path = "Scripting.Enabled", Label = "Enable server-side event scripts" },
+                     new ComText { Path = "Scripting.Language", Label = "Language (VBScript or JScript)" }
+                  }
+               });
+               break;
          }
       }
 
@@ -462,6 +499,20 @@ namespace hMailServer.ControlPanel.Views
          StatusText.Text = failed == 0
             ? "Saved " + saved + " settings at " + DateTime.Now.ToLongTimeString() + " - applied immediately."
             : "Saved " + saved + " settings, " + failed + " could not be written.";
+
+         // Reload the script engine after scripting changes.
+         if (section_ == Section.Advanced)
+         {
+            try
+            {
+               dynamic scripting = ServerSession.Current.Application.Settings.Scripting;
+               scripting.Reload();
+               ServerSession.Release(scripting);
+            }
+            catch (Exception)
+            {
+            }
+         }
       }
    }
 }

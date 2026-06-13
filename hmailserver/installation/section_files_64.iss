@@ -13,6 +13,9 @@ Source: "WebAdmin\index.html"; DestDir: "{app}\WebAdmin"; Flags: ignoreversion; 
 
 ; hMailServer Control Panel (modern .NET 8 WPF admin app)
 Source: "..\source\Tools\ControlPanel\publish\*"; DestDir: "{app}\ControlPanel"; Flags: ignoreversion recursesubdirs; Components: controlpanel;
+; .NET 8 Desktop Runtime, installed silently when missing
+; (file is downloaded by build\get-dotnet-runtime.ps1; not in the repository)
+Source: "DotNet\windowsdesktop-runtime-8.0-win-x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall; Components: controlpanel;
 
 Source: "SQLCE\SSCERuntime_x64-ENU.msi"; Flags: deleteafterinstall ; Excludes: ".svn"; DestDir: "{tmp}"; Components: server;
 

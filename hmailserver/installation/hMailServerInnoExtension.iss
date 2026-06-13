@@ -10,6 +10,20 @@ var
   rdoUseInternal : TRadioButton;
   rdoUseExternal : TRadioButton;
 
+// Returns true when the .NET 8 Desktop Runtime is not installed, in
+// which case the bundled runtime installer is executed.
+function DotNetDesktopMissing(): Boolean;
+var
+  findRec: TFindRec;
+begin
+  Result := True;
+  if FindFirst(ExpandConstant('{commonpf64}\dotnet\shared\Microsoft.WindowsDesktop.App\8.*'), findRec) then
+  begin
+    Result := False;
+    FindClose(findRec);
+  end;
+end;
+
 // The NT-service specific parts of the scrit below is taken
 // from the innosetup extension knowledgebase.
 // Author: Silvio Iaccarino silvio.iaccarino(at)de.adp.com

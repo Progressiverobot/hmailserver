@@ -9,16 +9,21 @@ using System.Windows.Media;
 namespace hMailServer.ControlPanel.Views
 {
    /// <summary>
-   /// Ctrl+K command palette: fuzzy-search every page and jump to it.
+   /// Ctrl+K command palette: fuzzy-search every page name; the chosen name
+   /// is exposed through <see cref="Selected"/>.
    /// </summary>
-   public class CommandPalette : Window
+   public class NavigationPalette : Window
    {
       private readonly TextBox searchBox_;
       private readonly ListBox resultsList_;
-      private readonly List<KeyValuePair<string, RadioButton>> items_;
+      private readonly List<string> names_;
 
-      public CommandPalette(Window owner, IEnumerable<RadioButton> navItems)
+      public string Selected { get; private set; }
+
+      public NavigationPalette(Window owner, IEnumerable<string> pageNames)
       {
+         names_ = pageNames.ToList();
+
          Owner = owner;
          WindowStyle = WindowStyle.None;
          AllowsTransparency = true;
@@ -29,11 +34,6 @@ namespace hMailServer.ControlPanel.Views
          WindowStartupLocation = WindowStartupLocation.Manual;
          Left = owner.Left + (owner.Width - Width) / 2;
          Top = owner.Top + 90;
-
-         items_ = navItems
-            .Select(item => new KeyValuePair<string, RadioButton>(item.Content?.ToString() ?? "", item))
-            .Where(pair => pair.Key.Length > 0)
-            .ToList();
 
          var root = new Border
          {
@@ -85,10 +85,10 @@ namespace hMailServer.ControlPanel.Views
          string query = searchBox_.Text.Trim();
          resultsList_.Items.Clear();
 
-         foreach (var pair in items_)
+         foreach (string name in names_)
          {
-            if (query.Length == 0 || IsSubsequence(query, pair.Key))
-               resultsList_.Items.Add(pair.Key);
+            if (query.Length == 0 || IsSubsequence(query, name))
+               resultsList_.Items.Add(name);
          }
 
          if (resultsList_.Items.Count > 0)
@@ -136,13 +136,7 @@ namespace hMailServer.ControlPanel.Views
 
       private void Accept()
       {
-         string selected = resultsList_.SelectedItem as string;
-         if (selected != null)
-         {
-            var target = items_.FirstOrDefault(pair => pair.Key == selected).Value;
-            if (target != null && target.IsEnabled)
-               target.IsChecked = true;
-         }
+         Selected = resultsList_.SelectedItem as string;
          Close();
       }
    }
