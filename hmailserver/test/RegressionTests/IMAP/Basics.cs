@@ -29,6 +29,49 @@ namespace RegressionTests.IMAP
       }
 
       [Test]
+      [Description("Reproducer: an APPEND with an absurd octet count must be rejected before the server enters literal mode (no unbounded buffering / integer overflow), and the connection must remain usable.")]
+      public void TestAppendOversizedLiteralRejected()
+      {
+         var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "huge@example.test", "test");
+
+         var simulator = new ImapClientSimulator();
+         simulator.Connect();
+         simulator.Logon("huge@example.test", "test");
+
+         // ~100 GB declared literal. Must be rejected, never buffered.
+         string response = simulator.Send("A01 APPEND INBOX {99999999999}");
+         Assert.IsFalse(response.StartsWith("+"), "Server must not enter literal mode for an oversized APPEND. Got: " + response);
+         Assert.IsTrue(response.Contains("A01 NO") || response.Contains("A01 BAD"), "Expected a rejection. Got: " + response);
+
+         Assert.AreEqual(0, simulator.GetMessageCount("INBOX"));
+
+         // The connection must still be usable after the rejection.
+         string noop = simulator.Send("A02 NOOP");
+         Assert.IsTrue(noop.Contains("A02 OK"), "Connection should remain usable after rejection. Got: " + noop);
+
+         simulator.Disconnect();
+      }
+
+      [Test]
+      [Description("Reproducer: an oversized command-level literal (here on LOGIN, pre-auth) must not be requested/buffered; the server rejects it and stays responsive.")]
+      public void TestOversizedCommandLiteralRejected()
+      {
+         var simulator = new ImapClientSimulator();
+         simulator.Connect();
+
+         // Pre-auth: an absurd literal length must not cause the server to buffer
+         // unbounded data (it must not answer with a "+" continuation).
+         string response = simulator.Send("A01 LOGIN {99999999999}");
+         Assert.IsFalse(response.StartsWith("+"), "Server must not request an oversized literal. Got: " + response);
+
+         // The connection must still respond to a normal command.
+         string caps = simulator.Send("A02 CAPABILITY");
+         Assert.IsTrue(caps.Contains("A02 OK") || caps.Contains("CAPABILITY"), "Connection should remain usable. Got: " + caps);
+
+         simulator.Disconnect();
+      }
+
+      [Test]
       public void TestAppendDeletedMessage()
       {
          var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "check@example.test", "test");
