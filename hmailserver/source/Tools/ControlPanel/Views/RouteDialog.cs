@@ -9,6 +9,7 @@ namespace hMailServer.ControlPanel.Views
    public class RouteDialog : Window
    {
       private readonly string domainName_;
+      private int routeId_;
 
       private readonly TextBox host_ = new();
       private readonly TextBox port_ = new();
@@ -16,6 +17,9 @@ namespace hMailServer.ControlPanel.Views
       private readonly TextBox tries_ = new();
       private readonly TextBox minutes_ = new();
       private readonly CheckBox allAddresses_ = new() { Content = "Deliver to all addresses (not only known accounts)", FontSize = 13 };
+
+      private readonly ListBox addressList_ = new() { Height = 200, FontSize = 13 };
+      private readonly TextBox newAddress_ = new();
 
       private readonly ComboBox connSecurity_ = new();
       private readonly CheckBox treatSenderLocal_ = new() { Content = "Treat sender domain as local", FontSize = 13 };
@@ -48,6 +52,7 @@ namespace hMailServer.ControlPanel.Views
          var tabs = new TabControl { Background = System.Windows.Media.Brushes.Transparent, BorderThickness = new Thickness(0) };
          tabs.Items.Add(new TabItem { Header = "General", Content = BuildGeneral() });
          tabs.Items.Add(new TabItem { Header = "Delivery", Content = BuildDelivery() });
+         tabs.Items.Add(new TabItem { Header = "Addresses", Content = BuildAddresses() });
          tabs.Items.Add(new TabItem { Header = "Security", Content = BuildSecurity() });
          tabs.Items.Add(new TabItem { Header = "Authentication", Content = BuildAuth() });
          Grid.SetRow(tabs, 1);
@@ -87,6 +92,28 @@ namespace hMailServer.ControlPanel.Views
          p.Children.Add(Label("Minutes between retries"));
          p.Children.Add(Input(minutes_));
          p.Children.Add(allAddresses_);
+         return Scroll(p);
+      }
+
+      private ScrollViewer BuildAddresses()
+      {
+         var p = TabPanel();
+         p.Children.Add(Label("Specific addresses to route (used when \u201cDeliver to all addresses\u201d is off)"));
+         addressList_.DisplayMemberPath = "Address";
+         p.Children.Add(addressList_);
+
+         var addRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0) };
+         newAddress_.Width = 320;
+         Input(newAddress_);
+         newAddress_.Margin = new Thickness(0, 0, 8, 0);
+         var addBtn = new Wpf.Ui.Controls.Button { Content = "Add", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0) };
+         addBtn.Click += (s, e) => AddAddress();
+         var removeBtn = new Wpf.Ui.Controls.Button { Content = "Remove" };
+         removeBtn.Click += (s, e) => RemoveAddress();
+         addRow.Children.Add(newAddress_);
+         addRow.Children.Add(addBtn);
+         addRow.Children.Add(removeBtn);
+         p.Children.Add(addRow);
          return Scroll(p);
       }
 
@@ -141,6 +168,7 @@ namespace hMailServer.ControlPanel.Views
          {
             dynamic r = FindRoute(routes);
             if (r == null) { Close(); return; }
+            routeId_ = (int) r.ID;
             host_.Text = (string) r.TargetSMTPHost ?? "";
             port_.Text = ((int) r.TargetSMTPPort).ToString();
             description_.Text = (string) r.Description ?? "";
@@ -152,6 +180,7 @@ namespace hMailServer.ControlPanel.Views
             treatRecipientLocal_.IsChecked = (bool) r.TreatRecipientAsLocalDomain;
             requiresAuth_.IsChecked = (bool) r.RelayerRequiresAuth;
             authUser_.Text = (string) r.RelayerAuthUsername ?? "";
+            LoadAddresses(r);
             ServerSession.Release(r);
          }
          catch (Exception ex)
@@ -201,6 +230,123 @@ namespace hMailServer.ControlPanel.Views
       }
 
       // ---- UI helpers ----
+
+      private sealed class AddrItem
+      {
+         public int Id { get; init; }
+         public string Address { get; init; } = "";
+         public override string ToString() => Address;
+      }
+
+      private void LoadAddresses(dynamic route)
+      {
+         addressList_.Items.Clear();
+         dynamic addresses = route.Addresses;
+         try
+         {
+            int count = (int) addresses.Count;
+            for (int i = 0; i < count; i++)
+            {
+               dynamic a = addresses.Item[i];
+               addressList_.Items.Add(new AddrItem { Id = (int) a.ID, Address = (string) a.Address });
+               ServerSession.Release(a);
+            }
+         }
+         finally
+         {
+            ServerSession.Release(addresses);
+         }
+      }
+
+      private void ReloadAddresses()
+      {
+         dynamic routes = ServerSession.Current.Application.Settings.Routes;
+         try
+         {
+            dynamic r = FindRoute(routes);
+            if (r == null) return;
+            LoadAddresses(r);
+            ServerSession.Release(r);
+         }
+         finally
+         {
+            ServerSession.Release(routes);
+         }
+      }
+
+      private void AddAddress()
+      {
+         string addr = newAddress_.Text.Trim();
+         if (addr.Length == 0)
+            return;
+
+         dynamic routes = ServerSession.Current.Application.Settings.Routes;
+         try
+         {
+            dynamic r = FindRoute(routes);
+            if (r == null) return;
+            dynamic addresses = r.Addresses;
+            try
+            {
+               dynamic a = addresses.Add();
+               a.Address = addr;
+               a.RouteID = routeId_;
+               a.Save();
+               ServerSession.Release(a);
+            }
+            finally
+            {
+               ServerSession.Release(addresses);
+            }
+            ServerSession.Release(r);
+         }
+         catch (Exception ex)
+         {
+            MessageBox.Show("Could not add the address: " + ex.Message, "Control Panel");
+            return;
+         }
+         finally
+         {
+            ServerSession.Release(routes);
+         }
+
+         newAddress_.Text = "";
+         ReloadAddresses();
+      }
+
+      private void RemoveAddress()
+      {
+         if (addressList_.SelectedItem is not AddrItem item)
+            return;
+
+         dynamic routes = ServerSession.Current.Application.Settings.Routes;
+         try
+         {
+            dynamic r = FindRoute(routes);
+            if (r == null) return;
+            dynamic addresses = r.Addresses;
+            try
+            {
+               addresses.DeleteByDBID(item.Id);
+            }
+            finally
+            {
+               ServerSession.Release(addresses);
+            }
+            ServerSession.Release(r);
+         }
+         catch (Exception ex)
+         {
+            MessageBox.Show("Could not remove the address: " + ex.Message, "Control Panel");
+            return;
+         }
+         finally
+         {
+            ServerSession.Release(routes);
+         }
+
+         ReloadAddresses();
+      }
 
       private static StackPanel TabPanel() => new() { Margin = new Thickness(4, 12, 4, 4) };
       private static ScrollViewer Scroll(StackPanel panel) => new() { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
