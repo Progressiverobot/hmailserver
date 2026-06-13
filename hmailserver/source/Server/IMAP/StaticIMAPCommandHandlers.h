@@ -36,6 +36,12 @@ namespace HM
       virtual IMAPResult ExecuteCommand(std::shared_ptr<HM::IMAPConnection> pConnection, std::shared_ptr<IMAPCommandArgument> pArgument);
    };
 
+   // RFC 3691: closes the selected mailbox WITHOUT the implicit EXPUNGE that CLOSE performs.
+   class IMAPCommandUNSELECT : public IMAPCommand
+   {
+      virtual IMAPResult ExecuteCommand(std::shared_ptr<HM::IMAPConnection> pConnection, std::shared_ptr<IMAPCommandArgument> pArgument);
+   };
+
 
 
 }

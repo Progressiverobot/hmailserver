@@ -83,6 +83,7 @@ namespace HM
       mapCommandHandlers[IMAPConnection::IMAP_SETACL] = std::shared_ptr<IMAPCommandSetAcl>(new IMAPCommandSetAcl());
       mapCommandHandlers[IMAPConnection::IMAP_LISTRIGHTS] = std::shared_ptr<IMAPCommandListRights>(new IMAPCommandListRights());
       mapCommandHandlers[IMAPConnection::IMAP_STARTTLS] = std::shared_ptr<IMAPCommandStartTls>(new IMAPCommandStartTls());
+      mapCommandHandlers[IMAPConnection::IMAP_UNSELECT] = std::shared_ptr<IMAPCommandUNSELECT>(new IMAPCommandUNSELECT());
    }
 
 
@@ -104,6 +105,25 @@ namespace HM
 
       return IMAPResult();
    
+   }
+
+   IMAPResult
+   IMAPCommandUNSELECT::ExecuteCommand(std::shared_ptr<IMAPConnection> pConnection, std::shared_ptr<IMAPCommandArgument> pArgument)
+   {
+      if (!pConnection->IsAuthenticated())
+         return IMAPResult(IMAPResult::ResultNo, "Authenticate first");
+
+      auto pCurFolder = pConnection->GetCurrentFolder();
+      if (!pCurFolder)
+         return IMAPResult(IMAPResult::ResultBad, "No mailbox is selected.");
+
+      // RFC 3691: free the selected mailbox WITHOUT the implicit EXPUNGE that
+      // CLOSE performs, so \\Deleted messages are retained.
+      pConnection->CloseCurrentFolder();
+
+      pConnection->SendAsciiData(pArgument->Tag() + " OK UNSELECT completed\r\n");
+
+      return IMAPResult();
    }
 
 }

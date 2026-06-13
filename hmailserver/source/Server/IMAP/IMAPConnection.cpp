@@ -598,6 +598,8 @@ namespace HM
          return IMAP_MOVE;
       else if (sCommand == _T("ID"))
          return IMAP_ID;
+      else if (sCommand == _T("UNSELECT"))
+         return IMAP_UNSELECT;
 
       return IMAP_UNKNOWN;
    }

@@ -121,6 +121,36 @@ namespace RegressionTests.IMAP
       }
 
       [Test]
+      [Description("RFC 3691 UNSELECT: closes the selected mailbox WITHOUT the implicit EXPUNGE that CLOSE performs, " +
+                   "so messages marked \\Deleted are retained. Also asserts UNSELECT is advertised in CAPABILITY.")]
+      public void TestUnselectKeepsDeletedMessages()
+      {
+         var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "unselect@example.test", "test");
+
+         var smtp = new SmtpClientSimulator();
+         smtp.Send(account.Address, account.Address, "UNSELECT test", "Body");
+         ImapClientSimulator.AssertMessageCount(account.Address, "test", "INBOX", 1);
+
+         var simulator = new ImapClientSimulator();
+         Assert.IsTrue(simulator.ConnectAndLogon(account.Address, "test"));
+
+         Assert.IsTrue(simulator.GetCapabilities().Contains("UNSELECT"),
+            "The CAPABILITY response should advertise the UNSELECT extension.");
+
+         Assert.IsTrue(simulator.SelectFolder("INBOX"));
+         Assert.IsTrue(simulator.SetDeletedFlag(1), "The message should have been marked \\Deleted.");
+
+         string response = simulator.SendSingleCommand("A50 UNSELECT");
+         Assert.IsTrue(response.Contains("A50 OK"), "UNSELECT should succeed. Response: " + response);
+
+         // RFC 3691: UNSELECT must not expunge the \Deleted message (unlike CLOSE).
+         Assert.AreEqual(1, simulator.GetMessageCount("INBOX"),
+            "UNSELECT must not expunge messages marked \\Deleted.");
+
+         simulator.Disconnect();
+      }
+
+      [Test]
       public void TestAppendDeletedMessage()
       {
          var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "check@example.test", "test");
