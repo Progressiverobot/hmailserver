@@ -17,6 +17,9 @@
                            Style="{StaticResource PageSubtitle}" />
             </StackPanel>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+                <ui:Button Content="View source" Click="View_Click" Margin="0,0,8,0">
+                    <ui:Button.Icon><ui:SymbolIcon Symbol="DocumentText24" /></ui:Button.Icon>
+                </ui:Button>
                 <ui:Button Content="Deliver now" Appearance="Primary" Click="Retry_Click" Margin="0,0,8,0">
                     <ui:Button.Icon><ui:SymbolIcon Symbol="Send24" /></ui:Button.Icon>
                 </ui:Button>
@@ -32,7 +35,8 @@
         <Border Grid.Row="1" Style="{StaticResource Card}" Padding="6">
             <DataGrid x:Name="QueueGrid" AutoGenerateColumns="False" IsReadOnly="True"
                       HeadersVisibility="Column" GridLinesVisibility="None"
-                      Background="Transparent" BorderThickness="0" RowHeight="34">
+                      Background="Transparent" BorderThickness="0" RowHeight="34"
+                      MouseDoubleClick="View_Click">
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="90" />
                     <DataGridTextColumn Header="Created" Binding="{Binding Created}" Width="150" />

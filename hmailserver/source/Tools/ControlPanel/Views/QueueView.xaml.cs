@@ -16,6 +16,7 @@ namespace hMailServer.ControlPanel.Views
          public string Recipients { get; set; }
          public string NextTry { get; set; }
          public string Tries { get; set; }
+         public string File { get; set; }
       }
 
       public QueueView()
@@ -30,6 +31,17 @@ namespace hMailServer.ControlPanel.Views
       }
 
       private void Refresh_Click(object sender, RoutedEventArgs e) => Reload();
+
+      private void View_Click(object sender, RoutedEventArgs e)
+      {
+         if (QueueGrid.SelectedItem is not QueueRow row)
+         {
+            SubtitleText.Text = "Select a message first.";
+            return;
+         }
+
+         new MessageViewerDialog(Window.GetWindow(this), row.File).ShowDialog();
+      }
 
       private void Retry_Click(object sender, RoutedEventArgs e)
       {
@@ -101,6 +113,7 @@ namespace hMailServer.ControlPanel.Views
                   From = string.IsNullOrWhiteSpace(columns[2]) ? "<>" : columns[2],
                   Recipients = columns[3],
                   NextTry = columns[4],
+                  File = columns[5],
                   Tries = columns[7]
                });
             }
