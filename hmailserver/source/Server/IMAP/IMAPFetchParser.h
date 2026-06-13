@@ -125,6 +125,11 @@ namespace HM
       // RFC 7162 (CONDSTORE/QRESYNC): the MODSEQ FETCH data item.
       bool GetShowModSeq() { return show_modseq_; }
 
+      // RFC 7162 (CONDSTORE): the "(CHANGEDSINCE <modseq>)" FETCH modifier. When present,
+      // only messages whose mod-sequence is greater than this value are returned.
+      bool GetHasChangedSince() { return has_changedsince_; }
+      __int64 GetChangedSince() { return changedsince_; }
+
       bool GetSetSeenFlag() { return set_seen_; }
 
       std::vector<BodyPart> GetPartsToLookAt() { return parts_to_look_at_; }
@@ -151,6 +156,9 @@ namespace HM
       bool show_body_structure_;
       bool show_body_structure_NonExtensible;
       bool show_modseq_;
+
+      bool has_changedsince_;
+      __int64 changedsince_;
 
       bool set_seen_;
       

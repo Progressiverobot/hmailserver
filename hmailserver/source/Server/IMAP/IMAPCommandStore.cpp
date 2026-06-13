@@ -54,7 +54,7 @@ namespace HM
       IMAPResult result = pStore->DoForMails(pConnection, sMailNo, pArgument);
 
       if (result.GetResult() == IMAPResult::ResultOK)
-         pConnection->SendAsciiData(pArgument->Tag() + " OK STORE completed\r\n");
+         pConnection->SendAsciiData(pArgument->Tag() + " OK " + pStore->GetConditionalStoreResponseCode() + "STORE completed\r\n");
 
       return result;
    }

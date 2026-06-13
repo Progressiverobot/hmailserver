@@ -60,5 +60,10 @@ namespace HM
       bool esearch_max_;
       bool esearch_all_;
       bool esearch_count_;
+
+      // RFC 7162 (CONDSTORE): set when a MODSEQ search key is present, so the SEARCH/ESEARCH
+      // response can report the highest mod-sequence among the matched messages.
+      bool modseq_search_;
+      __int64 highest_modseq_;
    };
 }

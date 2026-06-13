@@ -44,6 +44,22 @@ namespace HM
          return IMAPResult(IMAPResult::ResultNo, "Store command on read-only folder.");
       }
 
+      // RFC 7162 (CONDSTORE): parse the optional "(UNCHANGEDSINCE <modseq>)" modifier once.
+      if (!modifier_parsed_)
+         ParseModifier_(pArgument->Command());
+
+      // MODSEQ is reported in STORE responses when CONDSTORE is enabled or a conditional
+      // STORE is in progress.
+      bool includeModSeq = pConnection->GetCondstoreEnabled() || has_unchangedsince_;
+
+      // Conditional STORE: a message changed since the client's mod-sequence is left
+      // untouched and added to the MODIFIED set returned in the tagged response.
+      if (has_unchangedsince_ && pMessage->GetModSeq() > unchangedsince_)
+      {
+         modified_.push_back(GetIsUID() ? pMessage->GetUID() : (unsigned int) messageIndex);
+         return IMAPResult();
+      }
+
       bool bSilent = false;
 
       String sCommand = pArgument->Command();
@@ -133,7 +149,14 @@ namespace HM
 
       if (!bSilent)
       {
-         pConnection->SendAsciiData(GetMessageFlags(pMessage, messageIndex));
+         pConnection->SendAsciiData(GetMessageFlags(pMessage, messageIndex, includeModSeq));
+      }
+      else if (includeModSeq)
+      {
+         // RFC 7162: even a silent conditional/CONDSTORE STORE must report the new MODSEQ.
+         String sModSeqOnly;
+         sModSeqOnly.Format(_T("* %d FETCH (UID %u MODSEQ (%I64d))\r\n"), messageIndex, pMessage->GetUID(), pMessage->GetModSeq());
+         pConnection->SendAsciiData(sModSeqOnly);
       }
 
       // BEGIN IMAP IDLE
@@ -152,7 +175,7 @@ namespace HM
    }
 
    String 
-   IMAPStore::GetMessageFlags(std::shared_ptr<Message> pMessage, int messageIndex)
+   IMAPStore::GetMessageFlags(std::shared_ptr<Message> pMessage, int messageIndex, bool includeModSeq)
    {
       // Build a flags string.
       String sFlags;
@@ -200,8 +223,46 @@ namespace HM
 
       // It really should be FETCH below...
       String sRet;
-      sRet.Format(_T("* %d FETCH (FLAGS (%s) UID %u)\r\n"), messageIndex, sFlags.c_str(), pMessage->GetUID());
+      if (includeModSeq)
+         sRet.Format(_T("* %d FETCH (FLAGS (%s) UID %u MODSEQ (%I64d))\r\n"), messageIndex, sFlags.c_str(), pMessage->GetUID(), pMessage->GetModSeq());
+      else
+         sRet.Format(_T("* %d FETCH (FLAGS (%s) UID %u)\r\n"), messageIndex, sFlags.c_str(), pMessage->GetUID());
       return sRet;
+   }
+
+   void
+   IMAPStore::ParseModifier_(const String &sCommand)
+   {
+      modifier_parsed_ = true;
+
+      long lPos = sCommand.FindNoCase(_T("UNCHANGEDSINCE"));
+      if (lPos < 0)
+         return;
+
+      String sRest = sCommand.Mid(lPos + 14); // length of "UNCHANGEDSINCE"
+      sRest.TrimLeft();
+      unchangedsince_ = _ttoi64(sRest);
+      has_unchangedsince_ = true;
+   }
+
+   String
+   IMAPStore::GetConditionalStoreResponseCode()
+   {
+      if (modified_.empty())
+         return _T("");
+
+      String sSet;
+      for (size_t i = 0; i < modified_.size(); i++)
+      {
+         if (i > 0)
+            sSet += _T(",");
+
+         String sTemp;
+         sTemp.Format(_T("%u"), modified_[i]);
+         sSet += sTemp;
+      }
+
+      return _T("[MODIFIED ") + sSet + _T("] ");
    }
       
 

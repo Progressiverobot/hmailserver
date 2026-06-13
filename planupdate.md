@@ -345,14 +345,20 @@ upgrading the management/admin INI password from MD5.
     `TestFetchModSeqIncrementsOnFlagChange`. MySQL/MariaDB migration validated end-to-end against the
     live regression DB (316/316 IMAP+persistence tests green); MSSQL/PGSQL/SQLCE scripts authored to
     match but await cross-backend upgrade testing.
-  - **Stage 2 (next):** `FETCH`/`STORE (CHANGEDSINCE n)` / `(UNCHANGEDSINCE n)` modifiers, the
-    `STORE … [MODIFIED …]` response code, `STORE` returning `MODSEQ` in its `FETCH` when CONDSTORE is
-    on, and the `SEARCH MODSEQ` criterion (+ `(MODSEQ n)` in the SEARCH reply).
-  - **Stage 3 (QRESYNC):** `SELECT`/`EXAMINE (QRESYNC (uidvalidity modseq …))` params, `* VANISHED
+  - **Stage 2 (done in v6.2.0):** conditional-store semantics. `FETCH … (CHANGEDSINCE n)` returns
+    only messages whose mod-sequence exceeds `n` and implicitly includes `MODSEQ`; `STORE …
+    (UNCHANGEDSINCE n) …` leaves any message changed since `n` untouched and lists it in a tagged
+    `[MODIFIED <set>]` response code; a satisfied/CONDSTORE `STORE` returns the new `MODSEQ` in its
+    untagged `FETCH` (even when `.SILENT`); and `SEARCH MODSEQ n` matches messages with
+    mod-sequence ≥ `n`, appending the highest matched value as `(MODSEQ n)` (and `MODSEQ n` in an
+    `ESEARCH` reply). Covered by `TestFetchChangedSinceFiltersByModSeq`,
+    `TestStoreUnchangedSinceRejectsModified`, `TestStoreUnchangedSinceSucceedsAndReturnsModSeq` and
+    `TestSearchModSeqReportsHighest`.
+  - **Stage 3 (next, QRESYNC):** `SELECT`/`EXAMINE (QRESYNC (uidvalidity modseq …))` params, `* VANISHED
     (EARLIER)` responses, `EXPUNGE` emitting `* VANISHED` when QRESYNC is enabled, and
     `UID FETCH … (CHANGEDSINCE n VANISHED)`.
-- ⏳ Remaining: CONDSTORE/QRESYNC Stages 2–3 (above); LIST-EXTENDED/SEARCHRES; consider IMAP4rev2.
-  (`IMAPCommandCapability` + command map.)
+- ⏳ Remaining: CONDSTORE/QRESYNC Stage 3 (QRESYNC, above); LIST-EXTENDED/SEARCHRES; consider
+  IMAP4rev2. (`IMAPCommandCapability` + command map.)
 - Verify: fast resync in Thunderbird/Apple Mail.
 
 ## B6 — Standards-based filtering

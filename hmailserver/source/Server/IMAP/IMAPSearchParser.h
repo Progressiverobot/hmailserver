@@ -53,6 +53,10 @@ namespace HM
 
          CTSequenceSet = 36,
 
+         // RFC 7162 (CONDSTORE): MODSEQ search key (matches messages whose mod-sequence
+         // is greater than or equal to the supplied value).
+         CTModSeq = 37,
+
          CTCharset = 40,
 
          CTSubCriteria = 100

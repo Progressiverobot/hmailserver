@@ -401,6 +401,122 @@ namespace RegressionTests.IMAP
       }
 
       [Test]
+      [Description("RFC 7162: FETCH (CHANGEDSINCE n) returns only messages whose mod-sequence is " +
+                   "greater than n, and implicitly includes MODSEQ in the response.")]
+      public void TestFetchChangedSinceFiltersByModSeq()
+      {
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "changedsince@example.test", "test");
+
+         var simulator = new ImapClientSimulator();
+         simulator.Connect();
+         simulator.LogonWithLiteral("changedsince@example.test", "test");
+
+         simulator.SendSingleCommandWithLiteral("A01 APPEND INBOX {4}", "ABCD");
+         simulator.SendSingleCommand("A02 ENABLE CONDSTORE");
+         simulator.SelectFolder("INBOX");
+
+         long modseq = ParseModSeq(simulator.SendSingleCommand("A03 FETCH 1 (MODSEQ)"));
+
+         // CHANGEDSINCE equal to the current mod-sequence excludes the message.
+         string notChanged = simulator.SendSingleCommand("A04 FETCH 1 (FLAGS) (CHANGEDSINCE " + modseq + ")");
+         Assert.IsFalse(notChanged.Contains("* 1 FETCH"),
+            "CHANGEDSINCE == current modseq should not return the message. " + notChanged);
+
+         // CHANGEDSINCE below the current mod-sequence includes it, with MODSEQ.
+         string changed = simulator.SendSingleCommand("A05 FETCH 1 (FLAGS) (CHANGEDSINCE " + (modseq - 1) + ")");
+         Assert.IsTrue(changed.Contains("* 1 FETCH"),
+            "CHANGEDSINCE below current modseq should return the message. " + changed);
+         Assert.IsTrue(changed.Contains("MODSEQ ("),
+            "CHANGEDSINCE implicitly enables MODSEQ in the FETCH response. " + changed);
+
+         simulator.Disconnect();
+      }
+
+      [Test]
+      [Description("RFC 7162: a conditional STORE (UNCHANGEDSINCE n) leaves messages changed since n " +
+                   "untouched and reports them in a [MODIFIED set] response code.")]
+      public void TestStoreUnchangedSinceRejectsModified()
+      {
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "unchangedsince@example.test", "test");
+
+         var simulator = new ImapClientSimulator();
+         simulator.Connect();
+         simulator.LogonWithLiteral("unchangedsince@example.test", "test");
+
+         simulator.SendSingleCommandWithLiteral("A01 APPEND INBOX {4}", "ABCD");
+         simulator.SendSingleCommand("A02 ENABLE CONDSTORE");
+         simulator.SelectFolder("INBOX");
+
+         long modseq = ParseModSeq(simulator.SendSingleCommand("A03 FETCH 1 (MODSEQ)"));
+
+         // Bump the message mod-sequence past the value we will use for UNCHANGEDSINCE.
+         simulator.SendSingleCommand("A04 STORE 1 +FLAGS (\\Seen)");
+
+         string conditional = simulator.SendSingleCommand("A05 STORE 1 (UNCHANGEDSINCE " + modseq + ") +FLAGS (\\Flagged)");
+         Assert.IsTrue(conditional.Contains("[MODIFIED 1]"),
+            "A stale conditional STORE should report the message in [MODIFIED]. " + conditional);
+
+         // The rejected store must not have applied the flag.
+         string flags = simulator.SendSingleCommand("A06 FETCH 1 (FLAGS)");
+         Assert.IsFalse(flags.Contains("\\Flagged"),
+            "Rejected conditional STORE must not change the flag. " + flags);
+
+         simulator.Disconnect();
+      }
+
+      [Test]
+      [Description("RFC 7162: a satisfied conditional STORE (UNCHANGEDSINCE n) applies the change and " +
+                   "returns the new MODSEQ without a MODIFIED code.")]
+      public void TestStoreUnchangedSinceSucceedsAndReturnsModSeq()
+      {
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "unchangedok@example.test", "test");
+
+         var simulator = new ImapClientSimulator();
+         simulator.Connect();
+         simulator.LogonWithLiteral("unchangedok@example.test", "test");
+
+         simulator.SendSingleCommandWithLiteral("A01 APPEND INBOX {4}", "ABCD");
+         simulator.SendSingleCommand("A02 ENABLE CONDSTORE");
+         simulator.SelectFolder("INBOX");
+
+         long modseq = ParseModSeq(simulator.SendSingleCommand("A03 FETCH 1 (MODSEQ)"));
+
+         string conditional = simulator.SendSingleCommand("A04 STORE 1 (UNCHANGEDSINCE " + modseq + ") +FLAGS (\\Seen)");
+         Assert.IsFalse(conditional.Contains("MODIFIED"),
+            "A satisfied conditional STORE should not report MODIFIED. " + conditional);
+         Assert.IsTrue(conditional.Contains("MODSEQ ("),
+            "A CONDSTORE STORE must return the new MODSEQ. " + conditional);
+         Assert.Greater(ParseModSeq(conditional), modseq,
+            "The successful store must bump the mod-sequence. " + conditional);
+
+         simulator.Disconnect();
+      }
+
+      [Test]
+      [Description("RFC 7162: SEARCH MODSEQ n matches messages with mod-sequence >= n and appends the " +
+                   "highest matched mod-sequence as (MODSEQ n).")]
+      public void TestSearchModSeqReportsHighest()
+      {
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "searchmodseq@example.test", "test");
+
+         var simulator = new ImapClientSimulator();
+         simulator.Connect();
+         simulator.LogonWithLiteral("searchmodseq@example.test", "test");
+
+         simulator.SendSingleCommandWithLiteral("A01 APPEND INBOX {4}", "ABCD");
+         simulator.SendSingleCommandWithLiteral("A02 APPEND INBOX {4}", "EFGH");
+         simulator.SendSingleCommand("A03 ENABLE CONDSTORE");
+         simulator.SelectFolder("INBOX");
+
+         string result = simulator.SendSingleCommand("A04 SEARCH MODSEQ 1");
+         Assert.IsTrue(result.Contains("* SEARCH"), "Expected a SEARCH response. " + result);
+         Assert.IsTrue(result.Contains("(MODSEQ "),
+            "A MODSEQ search should append the highest mod-sequence. " + result);
+
+         simulator.Disconnect();
+      }
+
+      [Test]
       public void TestAppendDeletedMessage()
 
       {

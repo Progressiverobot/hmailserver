@@ -55,6 +55,11 @@ namespace HM
          parser_->ParseCommand(sTemp);
       }
 
+      // RFC 7162 (CONDSTORE): with a CHANGEDSINCE modifier, only return messages whose
+      // mod-sequence is greater than the supplied value; silently skip the rest.
+      if (parser_->GetHasChangedSince() && pMessage->GetModSeq() <= parser_->GetChangedSince())
+         return IMAPResult();
+
       // If we're going to touch the file, make sure it's there.
       bool willReadMessageFile =
          parser_->GetShowEnvelope() ||

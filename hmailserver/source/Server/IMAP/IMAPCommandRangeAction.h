@@ -23,6 +23,10 @@ namespace HM
       // prefix accumulated during COPY/MOVE, or an empty string when not applicable.
       String GetUIDPlusResponseCode();
 
+      // RFC 7162 (CONDSTORE): the "[MODIFIED <set>] " response-code prefix produced by a
+      // conditional STORE (UNCHANGEDSINCE), or an empty string when not applicable.
+      virtual String GetConditionalStoreResponseCode() { return _T(""); }
+
    protected:
 
       bool GetIsUID();

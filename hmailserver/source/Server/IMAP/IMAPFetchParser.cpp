@@ -37,6 +37,8 @@ namespace HM
       set_seen_ = false;
       show_body_structure_NonExtensible = false;
       show_modseq_ = false;
+      has_changedsince_ = false;
+      changedsince_ = 0;
    }
 
    IMAPFetchParser::~IMAPFetchParser()
@@ -144,7 +146,32 @@ namespace HM
    IMAPFetchParser::ParseCommand(const String &sCommand)
    {
       String sStringToParse = sCommand;
-      
+
+      // RFC 7162 (CONDSTORE): an optional "(CHANGEDSINCE <modseq> [VANISHED])" FETCH modifier
+      // may accompany the data items. Consume it before normal item parsing and switch on
+      // MODSEQ output (CHANGEDSINCE implicitly enables CONDSTORE responses for this command).
+      long lChangedSince = sStringToParse.FindNoCase(_T("CHANGEDSINCE"));
+      if (lChangedSince >= 0)
+      {
+         String sRest = sStringToParse.Mid(lChangedSince + 12); // length of "CHANGEDSINCE"
+         sRest.TrimLeft();
+         changedsince_ = _ttoi64(sRest);
+         has_changedsince_ = true;
+         show_modseq_ = true;
+
+         // Remove the enclosing "(CHANGEDSINCE ... )" group so it isn't parsed as a data item.
+         long lOpen = lChangedSince;
+         while (lOpen > 0 && sStringToParse.SafeGetAt(lOpen) != _T('('))
+            lOpen--;
+         long lClose = sStringToParse.Find(_T(")"), lChangedSince);
+         if (lClose > lOpen && sStringToParse.SafeGetAt(lOpen) == _T('('))
+         {
+            String sBefore = sStringToParse.Mid(0, lOpen);
+            String sAfter = sStringToParse.Mid(lClose + 1);
+            sStringToParse = sBefore + sAfter;
+         }
+      }
+
       IMAPResult result = ValidateSyntax_(sStringToParse);
       if (result.GetResult() != IMAPResult::ResultOK)
          return result;

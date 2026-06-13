@@ -295,7 +295,7 @@ namespace HM
          if (!pMessage)
             return;
 
-         connection->SendAsciiData(IMAPStore::GetMessageFlags(pMessage, foundIndex));
+         connection->SendAsciiData(IMAPStore::GetMessageFlags(pMessage, foundIndex, connection->GetCondstoreEnabled()));
       }
 
 

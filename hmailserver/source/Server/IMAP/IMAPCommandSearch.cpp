@@ -34,7 +34,8 @@ namespace HM
       esearch_all_(false),
       esearch_count_(false)
    {
-
+      modseq_search_ = false;
+      highest_modseq_ = 0;
    }
 
    IMAPCommandSEARCH::~IMAPCommandSEARCH()
@@ -142,6 +143,10 @@ namespace HM
             {
                // Yup we got a match.
                vecMatchingMessages.push_back(make_pair(index, pMessage));
+
+               // RFC 7162: track the highest mod-sequence so a MODSEQ search can report it.
+               if (pMessage->GetModSeq() > highest_modseq_)
+                  highest_modseq_ = pMessage->GetModSeq();
             }
          }
 
@@ -208,12 +213,32 @@ namespace HM
             sResponse += sCount;
          }
 
+         // RFC 7162: report the highest mod-sequence of the matched messages.
+         if (modseq_search_ && !sMatchingVec.empty())
+         {
+            String sModSeq;
+            sModSeq.Format(_T(" MODSEQ %I64d"), highest_modseq_);
+            sResponse += sModSeq;
+         }
+
          sResponse += "\r\n";
       }
       else if (is_sort_)
          sResponse = "* SORT" + sMatching + "\r\n";
       else
-         sResponse = "* SEARCH" + sMatching + "\r\n";
+      {
+         sResponse = "* SEARCH" + sMatching;
+
+         // RFC 7162: a SEARCH using the MODSEQ key appends "(MODSEQ <highest>)".
+         if (modseq_search_ && !sMatchingVec.empty())
+         {
+            String sModSeq;
+            sModSeq.Format(_T(" (MODSEQ %I64d)"), highest_modseq_);
+            sResponse += sModSeq;
+         }
+
+         sResponse += "\r\n";
+      }
 
       if (!is_uid_) 
          // if this is a UID command, IMAPCommandUID takes care of the below line.
@@ -490,6 +515,19 @@ namespace HM
             {
                if (!MatchesSMALLERCriteria_(pMessage, pCriteria))
                   bMessageIsMatchingCriteria = false;
+               break;
+            }
+         case IMAPSearchCriteria::CTModSeq:
+            {
+               // RFC 7162 (CONDSTORE): match messages whose mod-sequence is >= the value.
+               modseq_search_ = true;
+               __int64 wantedModSeq = _ttoi64(pCriteria->GetText());
+               bool bMatches = pMessage->GetModSeq() >= wantedModSeq;
+               if (pCriteria->GetPositive() && !bMatches ||
+                  !pCriteria->GetPositive() && bMatches)
+               {
+                  bMessageIsMatchingCriteria = false;
+               }
                break;
             }
 

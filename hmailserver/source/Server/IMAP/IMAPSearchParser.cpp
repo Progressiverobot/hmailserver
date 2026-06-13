@@ -80,6 +80,8 @@ namespace HM
          return CTOld;
       else if (sTmp == _T("smaller"))
          return CTSmaller;
+      else if (sTmp == _T("modseq"))
+         return CTModSeq;
       else if (sTmp == _T("unanswered"))
          return CTUnanswered;
       else if (sTmp == _T("undraft"))
@@ -328,6 +330,7 @@ namespace HM
          ct == IMAPSearchCriteria::CTBefore ||
          ct == IMAPSearchCriteria::CTLarger ||
          ct == IMAPSearchCriteria::CTSmaller ||
+         ct == IMAPSearchCriteria::CTModSeq ||
          ct == IMAPSearchCriteria::CTOn)
       {
          iCurrentWord++;
