@@ -61,6 +61,7 @@ namespace hMailServer.ControlPanel
       {
          pageFactories_["welcome"] = () => new WelcomeView();
          pageFactories_["dashboard"] = () => new DashboardView();
+         pageFactories_["status"] = () => new StatusView();
          pageFactories_["queue"] = () => new QueueView();
          pageFactories_["logs"] = () => new LogsView();
          pageFactories_["domains"] = () => new DomainsView();
@@ -127,6 +128,7 @@ namespace hMailServer.ControlPanel
          NavTree.Items.Add(Item("Welcome", "welcome"));
          NavTree.Items.Add(Item("Dashboard", "dashboard"));
          NavTree.Items.Add(Group("Status",
+            Item("Server status", "status"),
             Item("Delivery queue", "queue"),
             Item("Live logs", "logs")));
          NavTree.Items.Add(Item("Domains", "domains"));
