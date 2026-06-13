@@ -10,6 +10,7 @@ namespace hMailServer.ControlPanel.Views
    {
       public class RangeRow
       {
+         public int Id { get; set; }
          public string Name { get; set; }
          public string LowerIP { get; set; }
          public string UpperIP { get; set; }
@@ -42,6 +43,7 @@ namespace hMailServer.ControlPanel.Views
                dynamic range = ranges.Item[i];
                rows.Add(new RangeRow
                {
+                  Id = (int) range.ID,
                   Name = (string) range.Name,
                   LowerIP = (string) range.LowerIP,
                   UpperIP = (string) range.UpperIP,
@@ -145,6 +147,18 @@ namespace hMailServer.ControlPanel.Views
             ServerSession.Release(ranges);
          }
 
+         Reload();
+      }
+
+      private void Edit_Click(object sender, RoutedEventArgs e)
+      {
+         if (RangeGrid.SelectedItem is not RangeRow row)
+         {
+            MessageBox.Show("Select a range first.", "Control Panel");
+            return;
+         }
+
+         new IPRangeDialog(Window.GetWindow(this), row.Id).ShowDialog();
          Reload();
       }
 

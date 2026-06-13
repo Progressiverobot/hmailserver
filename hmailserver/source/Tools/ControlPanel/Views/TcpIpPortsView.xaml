@@ -21,12 +21,13 @@
             <DataGrid x:Name="PortGrid" AutoGenerateColumns="False" IsReadOnly="True"
                       HeadersVisibility="Column" GridLinesVisibility="None"
                       Background="Transparent" BorderThickness="0" RowHeight="34"
-                      SelectionMode="Single">
+                      SelectionMode="Single" MouseDoubleClick="Edit_Click">
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="Protocol" Binding="{Binding Protocol}" Width="120" />
+                    <DataGridTextColumn Header="Protocol" Binding="{Binding Protocol}" Width="110" />
                     <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="*" />
-                    <DataGridTextColumn Header="Port" Binding="{Binding Port}" Width="90" />
-                    <DataGridTextColumn Header="Security" Binding="{Binding Security}" Width="160" />
+                    <DataGridTextColumn Header="Port" Binding="{Binding Port}" Width="80" />
+                    <DataGridTextColumn Header="Security" Binding="{Binding Security}" Width="150" />
+                    <DataGridTextColumn Header="Certificate" Binding="{Binding Certificate}" Width="160" />
                 </DataGrid.Columns>
             </DataGrid>
         </Border>
@@ -40,6 +41,7 @@
                         <ColumnDefinition Width="2*" />
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="2*" />
+                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
@@ -57,7 +59,8 @@
                         <ComboBoxItem Content="STARTTLS (required)" />
                     </ComboBox>
                     <ui:Button Grid.Column="4" Content="Add" Appearance="Primary" Click="Add_Click" Margin="0,0,8,0" />
-                    <ui:Button Grid.Column="5" Content="Delete selected" Appearance="Danger" Click="Delete_Click" />
+                    <ui:Button Grid.Column="5" Content="Properties" Click="Edit_Click" Margin="0,0,8,0" />
+                    <ui:Button Grid.Column="6" Content="Delete selected" Appearance="Danger" Click="Delete_Click" />
                 </Grid>
             </StackPanel>
         </Border>

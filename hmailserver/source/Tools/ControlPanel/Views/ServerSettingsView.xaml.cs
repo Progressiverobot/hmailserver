@@ -378,6 +378,7 @@ namespace hMailServer.ControlPanel.Views
          auth.Settings.Add(new ComBool { Path = "AntiSpam.DKIMVerificationEnabled", Label = "Verify DKIM signatures" });
          auth.Settings.Add(new ComText { Path = "AntiSpam.DKIMVerificationFailureScore", Label = "DKIM failure score", Numeric = true });
          auth.Settings.Add(new ComBool { Path = "AntiSpam.DMARCEnabled", Label = "Evaluate DMARC policies" });
+         auth.Settings.Add(new ComText { Path = "AntiSpam.DMARCFailureScore", Label = "DMARC failure score", Numeric = true });
          Tab("Sender auth").Cards.Add(auth);
 
          var host = Card("Connecting host checks");
@@ -396,6 +397,17 @@ namespace hMailServer.ControlPanel.Views
          grey.Settings.Add(new ComText { Path = "AntiSpam.GreyListingFinalDelete", Label = "Delete confirmed after (days)", Numeric = true, Divisor = 24 });
          grey.Settings.Add(new ComBool { Path = "AntiSpam.BypassGreylistingOnMailFromMX", Label = "Bypass when sender matches MX" });
          grey.Settings.Add(new ComBool { Path = "AntiSpam.BypassGreylistingOnSPFSuccess", Label = "Bypass on SPF success" });
+         grey.Settings.Add(new ComAction
+         {
+            Path = "AntiSpam.GreyListingEnabled",
+            ButtonText = "Clear greylisting triplets",
+            Action = () =>
+            {
+               dynamic a = ServerSession.Current.Application.Settings.AntiSpam;
+               try { a.ClearGreyListingTriplets(); return (true, "Greylisting triplets cleared."); }
+               finally { ServerSession.Release((object) a); }
+            }
+         });
          Tab("Greylisting").Cards.Add(grey);
 
          var sa = Card("SpamAssassin");
@@ -487,6 +499,17 @@ namespace hMailServer.ControlPanel.Views
          ban.Settings.Add(new ComText { Path = "MaxInvalidLogonAttempts", Label = "Max invalid logon attempts", Numeric = true });
          ban.Settings.Add(new ComText { Path = "MaxInvalidLogonAttemptsWithin", Label = "...within (minutes)", Numeric = true });
          ban.Settings.Add(new ComText { Path = "AutoBanMinutes", Label = "Ban duration (minutes)", Numeric = true });
+         ban.Settings.Add(new ComAction
+         {
+            Path = "AutoBanOnLogonFailure",
+            ButtonText = "Clear logon-failure list",
+            Action = () =>
+            {
+               dynamic s = ServerSession.Current.Application.Settings;
+               try { s.ClearLogonFailureList(); return (true, "Logon-failure list cleared."); }
+               finally { ServerSession.Release((object) s); }
+            }
+         });
          Tab("Auto-ban").Cards.Add(ban);
       }
 

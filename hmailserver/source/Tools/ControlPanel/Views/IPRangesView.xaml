@@ -22,7 +22,8 @@
             <DataGrid x:Name="RangeGrid" AutoGenerateColumns="False" IsReadOnly="True"
                       HeadersVisibility="Column" GridLinesVisibility="None"
                       Background="Transparent" BorderThickness="0" RowHeight="34"
-                      SelectionMode="Single" SelectionChanged="RangeGrid_SelectionChanged">
+                      SelectionMode="Single" SelectionChanged="RangeGrid_SelectionChanged"
+                      MouseDoubleClick="Edit_Click">
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" />
                     <DataGridTextColumn Header="Lower IP" Binding="{Binding LowerIP}" Width="150" />
@@ -50,6 +51,7 @@
                 </UniformGrid>
                 <StackPanel Orientation="Horizontal">
                     <ui:Button x:Name="SavePermsButton" Content="Save permissions" Appearance="Primary" Click="SavePerms_Click" IsEnabled="False" Margin="0,0,8,0" />
+                    <ui:Button Content="Properties…" Click="Edit_Click" Margin="0,0,8,0" />
                     <ui:Button Content="Delete selected range" Appearance="Danger" Click="Delete_Click" />
                 </StackPanel>
             </StackPanel>
