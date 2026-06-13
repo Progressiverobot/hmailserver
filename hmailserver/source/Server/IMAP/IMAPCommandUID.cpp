@@ -14,7 +14,14 @@
 #include "IMAPStore.h"
 #include "IMAPCommandSearch.h"
 
+#include "MessagesContainer.h"
+
 #include "../Common/BO/ACLPermission.h"
+#include "../Common/BO/IMAPFolder.h"
+#include "../Common/BO/Message.h"
+#include "../Common/BO/Messages.h"
+#include "../Common/Tracking/ChangeNotification.h"
+#include "../Common/Tracking/NotificationServer.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -23,6 +30,53 @@
 
 namespace HM
 {
+   namespace
+   {
+      // Parses an IMAP UID sequence-set (e.g. "1,3:5,8:*") into inclusive [first,last]
+      // ranges. "*" is represented as the maximum UID value.
+      std::vector<std::pair<unsigned int, unsigned int>> ParseUidSet_(const String &sUidSet)
+      {
+         std::vector<std::pair<unsigned int, unsigned int>> ranges;
+
+         std::vector<String> parts = StringParser::SplitString(sUidSet, ",");
+         for (const String &part : parts)
+         {
+            if (part.IsEmpty())
+               continue;
+
+            int colonPos = part.Find(_T(":"));
+            if (colonPos >= 0)
+            {
+               String first = part.Mid(0, colonPos);
+               String second = part.Mid(colonPos + 1);
+
+               unsigned int start = (unsigned int) _ttoi(first);
+               unsigned int end = (second == _T("*")) ? (unsigned int) 0xFFFFFFFF : (unsigned int) _ttoi(second);
+
+               if (end < start)
+               {
+                  unsigned int swap = start;
+                  start = end;
+                  end = swap;
+               }
+
+               ranges.push_back(std::pair<unsigned int, unsigned int>(start, end));
+            }
+            else if (part == _T("*"))
+            {
+               ranges.push_back(std::pair<unsigned int, unsigned int>((unsigned int) 0, (unsigned int) 0xFFFFFFFF));
+            }
+            else
+            {
+               unsigned int uid = (unsigned int) _ttoi(part);
+               ranges.push_back(std::pair<unsigned int, unsigned int>(uid, uid));
+            }
+         }
+
+         return ranges;
+      }
+   }
+
    IMAPCommandUID::IMAPCommandUID()
    {
 
@@ -104,8 +158,9 @@ namespace HM
 
          if (result.GetResult() == IMAPResult::ResultOK)
          {
+            String sUidPlus = pMove->GetUIDPlusResponseCode();
             pMove->ExpungeMovedMessages(pConnection);
-            pConnection->SendAsciiData(sTag + " OK UID MOVE completed\r\n");
+            pConnection->SendAsciiData(sTag + " OK " + sUidPlus + "UID MOVE completed\r\n");
          }
 
          return result;
@@ -139,6 +194,76 @@ namespace HM
 
          return result;
       }
+      else if (sTypeOfUID.CompareNoCase(_T("EXPUNGE")) == 0)
+      {
+         // RFC 4315 (UIDPLUS): UID EXPUNGE permanently removes only the messages
+         // that are both flagged \Deleted and contained in the supplied UID set.
+         if (pParser->WordCount() < 3)
+            return IMAPResult(IMAPResult::ResultBad, "Command requires a UID set.");
+
+         if (pConnection->GetCurrentFolderReadOnly())
+            return IMAPResult(IMAPResult::ResultNo, "Expunge command on read-only folder.");
+
+         std::shared_ptr<IMAPFolder> pCurFolder = pConnection->GetCurrentFolder();
+         if (!pCurFolder)
+            return IMAPResult(IMAPResult::ResultNo, "No folder selected.");
+
+         if (!pConnection->CheckPermission(pCurFolder, ACLPermission::PermissionExpunge))
+            return IMAPResult(IMAPResult::ResultBad, "ACL: Expunge permission denied (Required for UID EXPUNGE command).");
+
+         String sUidSet = pParser->Word(2)->Value();
+         if (sUidSet.IsEmpty() || !StringParser::ValidateString(sUidSet, "01234567890,.:*"))
+            return IMAPResult(IMAPResult::ResultBad, "Incorrect mail number");
+
+         std::vector<std::pair<unsigned int, unsigned int>> ranges = ParseUidSet_(sUidSet);
+
+         std::vector<__int64> expunged_messages_index;
+         std::vector<__int64> expunged_messages_uid;
+
+         std::function<bool(int, std::shared_ptr<Message>)> filter = [&expunged_messages_index, &expunged_messages_uid, &ranges](int index, std::shared_ptr<Message> message)
+         {
+            if (!message->GetFlagDeleted())
+               return false;
+
+            unsigned int uid = message->GetUID();
+            for (const std::pair<unsigned int, unsigned int> &range : ranges)
+            {
+               if (uid >= range.first && uid <= range.second)
+               {
+                  expunged_messages_index.push_back(index);
+                  expunged_messages_uid.push_back(message->GetID());
+                  return true;
+               }
+            }
+
+            return false;
+         };
+
+         auto messages = MessagesContainer::Instance()->GetMessages(pCurFolder->GetAccountID(), pCurFolder->GetID());
+         messages->DeleteMessages(filter);
+
+         String sResponse;
+         for (__int64 expungedIndex : expunged_messages_index)
+         {
+            String sTemp;
+            sTemp.Format(_T("* %d EXPUNGE\r\n"), (int) expungedIndex);
+            sResponse += sTemp;
+         }
+
+         pConnection->SendAsciiData(sResponse);
+
+         if (!expunged_messages_uid.empty())
+         {
+            std::shared_ptr<ChangeNotification> pNotification =
+               std::shared_ptr<ChangeNotification>(new ChangeNotification(pCurFolder->GetAccountID(), pCurFolder->GetID(), ChangeNotification::NotificationMessageDeleted, expunged_messages_index));
+
+            Application::Instance()->GetNotificationServer()->SendNotification(pConnection->GetNotificationClient(), pNotification);
+         }
+
+         pConnection->SendAsciiData(sTag + " OK UID EXPUNGE completed\r\n");
+
+         return IMAPResult();
+      }
 
 
       if (!command_)
@@ -169,7 +294,7 @@ namespace HM
       IMAPResult result = command_->DoForMails(pConnection, sMailNo, pArgument);
 
       if (result.GetResult() == IMAPResult::ResultOK)
-         pConnection->SendAsciiData(pArgument->Tag() + " OK UID completed\r\n");
+         pConnection->SendAsciiData(pArgument->Tag() + " OK " + command_->GetUIDPlusResponseCode() + "UID completed\r\n");
 
       return result;
    }

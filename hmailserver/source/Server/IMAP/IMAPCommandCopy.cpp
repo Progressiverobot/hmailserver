@@ -65,7 +65,7 @@ namespace HM
       IMAPResult result = pCopy->DoForMails(pConnection, sMailNo, pArgument);
 
       if (result.GetResult() == IMAPResult::ResultOK)
-          pConnection->SendAsciiData(pArgument->Tag() + " OK COPY completed\r\n");
+          pConnection->SendAsciiData(pArgument->Tag() + " OK " + pCopy->GetUIDPlusResponseCode() + "COPY completed\r\n");
 
       return result;
    }

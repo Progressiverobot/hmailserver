@@ -18,7 +18,8 @@
 namespace HM
 {
    IMAPCommandRangeAction::IMAPCommandRangeAction() :
-      is_uid_(false)
+      is_uid_(false),
+      uidplus_dest_uidvalidity_(0)
    {
     
    }
@@ -163,6 +164,47 @@ namespace HM
 
       return IMAPResult();
 
+   }
+
+   void
+   IMAPCommandRangeAction::RecordCopyUid(unsigned int sourceUid, unsigned int destUid, unsigned int destUidValidity)
+   {
+      uidplus_source_uids_.push_back(sourceUid);
+      uidplus_dest_uids_.push_back(destUid);
+      uidplus_dest_uidvalidity_ = destUidValidity;
+   }
+
+   String
+   IMAPCommandRangeAction::JoinUids_(const std::vector<unsigned int> &uids)
+   {
+      String result;
+
+      for (size_t i = 0; i < uids.size(); i++)
+      {
+         if (i > 0)
+            result += _T(",");
+
+         String temp;
+         temp.Format(_T("%u"), uids[i]);
+         result += temp;
+      }
+
+      return result;
+   }
+
+   String
+   IMAPCommandRangeAction::GetUIDPlusResponseCode()
+   {
+      if (uidplus_source_uids_.empty() || uidplus_dest_uids_.empty())
+         return _T("");
+
+      String validity;
+      validity.Format(_T("%u"), uidplus_dest_uidvalidity_);
+
+      String result = _T("[COPYUID ") + validity + _T(" ") + JoinUids_(uidplus_source_uids_) +
+                      _T(" ") + JoinUids_(uidplus_dest_uids_) + _T("] ");
+
+      return result;
    }
 
 }

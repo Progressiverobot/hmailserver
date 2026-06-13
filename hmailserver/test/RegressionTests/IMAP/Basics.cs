@@ -151,6 +151,82 @@ namespace RegressionTests.IMAP
       }
 
       [Test]
+      [Description("RFC 4315 (UIDPLUS): APPEND returns an [APPENDUID validity uid] response code and " +
+                   "UIDPLUS is advertised in CAPABILITY.")]
+      public void TestAppendReturnsAppendUid()
+      {
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "uidplus@example.test", "test");
+
+         var simulator = new ImapClientSimulator();
+         simulator.Connect();
+         simulator.LogonWithLiteral("uidplus@example.test", "test");
+
+         Assert.IsTrue(simulator.GetCapabilities().Contains("UIDPLUS"),
+            "The CAPABILITY response should advertise the UIDPLUS extension.");
+
+         string result = simulator.SendSingleCommandWithLiteral("A01 APPEND INBOX {4}", "ABCD");
+         Assert.IsTrue(result.Contains("[APPENDUID"),
+            "APPEND should return an APPENDUID response code. Response: " + result);
+
+         simulator.Disconnect();
+      }
+
+      [Test]
+      [Description("RFC 4315 (UIDPLUS): COPY returns a [COPYUID ...] response code.")]
+      public void TestCopyReturnsCopyUid()
+      {
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "uidpluscopy@example.test", "test");
+
+         var simulator = new ImapClientSimulator();
+         simulator.Connect();
+         simulator.LogonWithLiteral("uidpluscopy@example.test", "test");
+
+         Assert.IsTrue(simulator.CreateFolder("Target"));
+         simulator.SendSingleCommandWithLiteral("A01 APPEND INBOX {4}", "ABCD");
+         simulator.SelectFolder("INBOX");
+
+         string result = simulator.SendSingleCommand("A02 COPY 1 Target");
+         Assert.IsTrue(result.Contains("[COPYUID"),
+            "COPY should return a COPYUID response code. Response: " + result);
+
+         simulator.Disconnect();
+      }
+
+      [Test]
+      [Description("RFC 4315 (UIDPLUS): UID EXPUNGE removes only the \\Deleted messages whose UID is in the " +
+                   "supplied set, leaving other \\Deleted messages intact.")]
+      public void TestUidExpungeOnlyRemovesMatchingUids()
+      {
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "uidexpunge@example.test", "test");
+
+         var simulator = new ImapClientSimulator();
+         simulator.Connect();
+         simulator.LogonWithLiteral("uidexpunge@example.test", "test");
+
+         // Append two messages; they receive UIDs 1 and 2.
+         simulator.SendSingleCommandWithLiteral("A01 APPEND INBOX {4}", "ABCD");
+         simulator.SendSingleCommandWithLiteral("A02 APPEND INBOX {4}", "EFGH");
+
+         // GetMessageCount selects INBOX and leaves it selected.
+         Assert.AreEqual(2, simulator.GetMessageCount("INBOX"));
+
+         // Mark both messages \Deleted (by sequence number).
+         simulator.SetDeletedFlag(1);
+         simulator.SetDeletedFlag(2);
+
+         // Expunge only the message with UID 1.
+         string result = simulator.SendSingleCommand("A03 UID EXPUNGE 1");
+         Assert.IsTrue(result.Contains("A03 OK"),
+            "UID EXPUNGE should succeed. Response: " + result);
+
+         // The message with UID 2 must remain.
+         Assert.AreEqual(1, simulator.GetMessageCount("INBOX"),
+            "UID EXPUNGE must remove only the message with the matching UID.");
+
+         simulator.Disconnect();
+      }
+
+      [Test]
       public void TestAppendDeletedMessage()
       {
          var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "check@example.test", "test");
@@ -190,7 +266,8 @@ namespace RegressionTests.IMAP
          simulator.SendRaw("WOOOT\r\n");
          result = simulator.Receive();
 
-         Assert.AreEqual("A01 OK APPEND completed\r\n", result);
+         StringAssert.StartsWith("A01 OK [APPENDUID ", result);
+         StringAssert.EndsWith("APPEND completed\r\n", result);
       }
 
       [Test]
@@ -218,7 +295,8 @@ namespace RegressionTests.IMAP
          simulator.SendRaw("WOOOT\r\n");
          result = simulator.Receive();
 
-         Assert.AreEqual("A01 OK APPEND completed\r\n", result);
+         StringAssert.StartsWith("A01 OK [APPENDUID ", result);
+         StringAssert.EndsWith("APPEND completed\r\n", result);
 
          var date = Convert.ToDateTime(account.IMAPFolders.get_ItemByName("MONK").Messages[0].InternalDate);
 
@@ -252,7 +330,8 @@ namespace RegressionTests.IMAP
          simulator.SendRaw("WOOOT\r\n");
          result = simulator.Receive();
 
-         Assert.AreEqual("A01 OK APPEND completed\r\n", result);
+         StringAssert.StartsWith("A01 OK [APPENDUID ", result);
+         StringAssert.EndsWith("APPEND completed\r\n", result);
       }
 
       [Test]
@@ -280,7 +359,8 @@ namespace RegressionTests.IMAP
          simulator.SendRaw("WOOOT\r\n");
          result = simulator.Receive();
 
-         Assert.AreEqual("A01 OK APPEND completed\r\n", result);
+         StringAssert.StartsWith("A01 OK [APPENDUID ", result);
+         StringAssert.EndsWith("APPEND completed\r\n", result);
       }
 
       [Test]

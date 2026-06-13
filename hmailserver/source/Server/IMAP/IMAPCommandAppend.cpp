@@ -330,8 +330,14 @@ namespace HM
          sResponse += IMAPNotificationClient::GenerateRecentString((int) pConnection->GetRecentMessages().size());
       }
 
+      // RFC 4315 (UIDPLUS): report the destination folder's UIDVALIDITY and the
+      // UID assigned to the appended message so the client can reference it
+      // without performing a search.
+      String sAppendUid;
+      sAppendUid.Format(_T("[APPENDUID %d %u] "), destination_folder_->GetCreationTime().ToInt(), current_message_->GetUID());
+
       // Send the OK response to the client.
-      sResponse += current_tag_ + " OK APPEND completed\r\n";
+      sResponse += current_tag_ + " OK " + sAppendUid + "APPEND completed\r\n";
       pConnection->SendAsciiData(sResponse);
 
       // Notify the mailbox notifier that the mailbox contents have changed. 

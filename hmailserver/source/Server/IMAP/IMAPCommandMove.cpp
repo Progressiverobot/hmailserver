@@ -67,8 +67,9 @@ namespace HM
 
       if (result.GetResult() == IMAPResult::ResultOK)
       {
+         String sUidPlus = pMove->GetUIDPlusResponseCode();
          pMove->ExpungeMovedMessages(pConnection);
-         pConnection->SendAsciiData(pArgument->Tag() + " OK MOVE completed\r\n");
+         pConnection->SendAsciiData(pArgument->Tag() + " OK " + sUidPlus + "MOVE completed\r\n");
       }
 
       return result;

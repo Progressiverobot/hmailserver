@@ -79,6 +79,9 @@ namespace HM
       if (!PersistentMessage::SaveObject(pNewMessage))
          return IMAPResult(IMAPResult::ResultBad, "Failed to save moved message.");
 
+      // RFC 4315/6851 (UIDPLUS): remember the source/destination UIDs for the COPYUID response.
+      RecordCopyUid(pOldMessage->GetUID(), pNewMessage->GetUID(), (unsigned int) pFolder->GetCreationTime().ToInt());
+
       MessagesContainer::Instance()->SetFolderNeedsRefresh(pFolder->GetID());
 
       // Notify any IMAP idle client watching the target folder.
