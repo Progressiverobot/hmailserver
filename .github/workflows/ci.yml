@@ -1,0 +1,39 @@
+name: CI
+
+# Builds the .NET 8 Control Panel (hMailCP) on every push / PR. This catches C#
+# regressions cheaply. The C++ server build + the 898-test regression suite need
+# the prebuilt native libraries (OpenSSL 4.0.x, Boost 1.91, PostgreSQL 18 libpq —
+# see libraries/build-dependencies.ps1) and a database service, so they run in the
+# separate, manually-triggered server-build workflow.
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  control-panel:
+    name: Build Control Panel (.NET 8)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore hmailserver/source/Tools/ControlPanel/ControlPanel.csproj
+
+      - name: Build (Release, warnings as errors)
+        run: dotnet build hmailserver/source/Tools/ControlPanel/ControlPanel.csproj -c Release --no-restore -warnaserror
+
+      - name: Publish (smoke check)
+        run: dotnet publish hmailserver/source/Tools/ControlPanel/ControlPanel.csproj -c Release -o publish --no-build

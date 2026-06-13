@@ -1,0 +1,48 @@
+name: CodeQL
+
+# Static security analysis for the C# code (Control Panel). C++ CodeQL needs the
+# native server build (OpenSSL/Boost/libpq) and is deferred to the server-build
+# pipeline; this workflow scopes the build to the .NET 8 Control Panel.
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  schedule:
+    - cron: '32 4 * * 1'   # weekly, Monday 04:32 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze (csharp)
+    runs-on: windows-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: csharp
+          build-mode: manual
+
+      - name: Build Control Panel
+        run: dotnet build hmailserver/source/Tools/ControlPanel/ControlPanel.csproj -c Release
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:csharp"
