@@ -18,6 +18,7 @@
 #include "../Common/BO/IMAPFolders.h"
 #include "../Common/BO/IMAPFolder.h"
 #include "../Common/BO/ACLPermission.h"
+#include "../Common/BO/Message.h"
 
 // IMAP Utilities
 #include "IMAPFolderUtilities.h"
@@ -880,6 +881,90 @@ namespace HM
    IMAPConnection::SetCommandBuffer(const String &sval)
    {
       command_buffer_ = sval;
+   }
+
+   String
+   IMAPConnection::CompactUidSet(std::vector<__int64> uids)
+   {
+      // RFC 7162: build a sequence-set string ("1:3,5,7:9") from a list of UIDs.
+      if (uids.empty())
+         return _T("");
+
+      std::sort(uids.begin(), uids.end());
+      uids.erase(std::unique(uids.begin(), uids.end()), uids.end());
+
+      String result;
+      size_t i = 0;
+      while (i < uids.size())
+      {
+         __int64 rangeStart = uids[i];
+         __int64 rangeEnd = rangeStart;
+
+         while (i + 1 < uids.size() && uids[i + 1] == rangeEnd + 1)
+         {
+            rangeEnd = uids[i + 1];
+            i++;
+         }
+
+         if (!result.IsEmpty())
+            result += _T(",");
+
+         String temp;
+         if (rangeStart == rangeEnd)
+            temp.Format(_T("%I64d"), rangeStart);
+         else
+            temp.Format(_T("%I64d:%I64d"), rangeStart, rangeEnd);
+
+         result += temp;
+         i++;
+      }
+
+      return result;
+   }
+
+   String
+   IMAPConnection::GetQResyncChangedFetch(__int64 sinceModSeq)
+   {
+      // RFC 7162 (QRESYNC): after a SELECT/EXAMINE with the QRESYNC parameter, the
+      // server replays flag/MODSEQ changes that have happened since the client's
+      // last known mod-sequence as untagged FETCH responses.
+      String sResult;
+
+      if (!current_folder_)
+         return sResult;
+
+      std::vector<std::shared_ptr<Message>> messages = current_folder_->GetMessages()->GetCopy();
+
+      int index = 0;
+      for (std::shared_ptr<Message> pMessage : messages)
+      {
+         index++;
+
+         if (!pMessage)
+            continue;
+
+         if (pMessage->GetModSeq() <= sinceModSeq)
+            continue;
+
+         String sFlags;
+         if (pMessage->GetFlagDeleted())
+            sFlags += sFlags.IsEmpty() ? _T("\\Deleted") : _T(" \\Deleted");
+         if (pMessage->GetFlagAnswered())
+            sFlags += sFlags.IsEmpty() ? _T("\\Answered") : _T(" \\Answered");
+         if (pMessage->GetFlagFlagged())
+            sFlags += sFlags.IsEmpty() ? _T("\\Flagged") : _T(" \\Flagged");
+         if (pMessage->GetFlagDraft())
+            sFlags += sFlags.IsEmpty() ? _T("\\Draft") : _T(" \\Draft");
+         if (pMessage->GetFlagSeen())
+            sFlags += sFlags.IsEmpty() ? _T("\\Seen") : _T(" \\Seen");
+
+         String sLine;
+         sLine.Format(_T("* %d FETCH (UID %u FLAGS (%s) MODSEQ (%I64d))\r\n"),
+                      index, pMessage->GetUID(), sFlags.c_str(), pMessage->GetModSeq());
+         sResult += sLine;
+      }
+
+      return sResult;
    }
 
    void 

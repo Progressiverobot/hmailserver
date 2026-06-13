@@ -121,6 +121,14 @@ namespace HM
       bool GetQResyncEnabled() const { return qresync_enabled_; }
       void SetQResyncEnabled(bool bNewVal) { qresync_enabled_ = bNewVal; }
 
+      // RFC 7162 (QRESYNC): compress a list of UIDs into a sequence-set string
+      // (e.g. "1:3,5,7:9") for use in "* VANISHED" responses. Sorts and de-dupes.
+      static String CompactUidSet(std::vector<__int64> uids);
+
+      // RFC 7162 (QRESYNC): build untagged FETCH lines (FLAGS/UID/MODSEQ) for every
+      // message in the current folder whose MODSEQ is greater than sinceModSeq.
+      String GetQResyncChangedFetch(__int64 sinceModSeq);
+
       void SetDelayedChangeNotification(std::shared_ptr<ChangeNotification> pNotification);
 
       void Login(std::shared_ptr<const Account> account);

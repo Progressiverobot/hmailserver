@@ -27,11 +27,41 @@ namespace HM
          return IMAPResult(IMAPResult::ResultNo, "Authenticate first");
 
       // RFC 7162: an "EXAMINE mailbox (CONDSTORE)" parameter enables CONDSTORE for the session.
+      // A "EXAMINE mailbox (QRESYNC (uidvalidity modseq ...))" parameter additionally enables
+      // QRESYNC and asks the server to replay changes since the supplied mod-sequence.
+      bool qresyncRequested = false;
+      __int64 qresyncModSeq = 0;
       {
          String sCmdUpper = pArgument->Command();
          sCmdUpper.MakeUpper();
          if (sCmdUpper.Find(_T("CONDSTORE")) >= 0)
             pConnection->SetCondstoreEnabled(true);
+
+         int qresyncPos = sCmdUpper.Find(_T("QRESYNC"));
+         if (qresyncPos >= 0)
+         {
+            qresyncRequested = true;
+            pConnection->SetCondstoreEnabled(true);
+            pConnection->SetQResyncEnabled(true);
+
+            int openParen = sCmdUpper.Find(_T("("), qresyncPos);
+            if (openParen >= 0)
+            {
+               int closeParen = sCmdUpper.Find(_T(")"), openParen);
+               if (closeParen > openParen)
+               {
+                  String sInner = sCmdUpper.Mid(openParen + 1, closeParen - openParen - 1);
+                  sInner.TrimLeft();
+                  int sp = sInner.Find(_T(" "));
+                  if (sp > 0)
+                  {
+                     String sRest = sInner.Mid(sp + 1);
+                     sRest.TrimLeft();
+                     qresyncModSeq = _ttoi64(sRest);
+                  }
+               }
+            }
+         }
       }
 
       std::shared_ptr<IMAPSimpleCommandParser> pParser = std::shared_ptr<IMAPSimpleCommandParser>(new IMAPSimpleCommandParser());
@@ -92,6 +122,10 @@ namespace HM
       }
 
       sResponse += _T("* OK [PERMANENTFLAGS ()] limited\r\n");
+
+      // RFC 7162 (QRESYNC): replay flag/MODSEQ changes since the client's mod-sequence.
+      if (qresyncRequested)
+         sResponse += pConnection->GetQResyncChangedFetch(qresyncModSeq);
 
       sResponse += pArgument->Tag() + _T(" OK [READ-ONLY] EXAMINE completed\r\n");
 

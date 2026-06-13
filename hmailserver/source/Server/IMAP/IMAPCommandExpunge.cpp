@@ -43,13 +43,15 @@ namespace HM
 
       std::vector<__int64> expunged_messages_uid;
       std::vector<__int64> expunged_messages_index;
+      std::vector<__int64> vanished_uids;
 
-      std::function<bool(int, std::shared_ptr<Message>)> filter = [&expunged_messages_index, &expunged_messages_uid](int index, std::shared_ptr<Message> message)
+      std::function<bool(int, std::shared_ptr<Message>)> filter = [&expunged_messages_index, &expunged_messages_uid, &vanished_uids](int index, std::shared_ptr<Message> message)
       {
          if (message->GetFlagDeleted())
          {
             expunged_messages_index.push_back(index);
             expunged_messages_uid.push_back(message->GetID());
+            vanished_uids.push_back(message->GetUID());
             return true;
          }
 
@@ -59,15 +61,24 @@ namespace HM
       auto messages = MessagesContainer::Instance()->GetMessages(pCurFolder->GetAccountID(), pCurFolder->GetID());
       messages->DeleteMessages(filter);
 
-      auto iterExpunged = expunged_messages_index.begin();
-
       String sResponse;
-      while (iterExpunged != expunged_messages_index.end())
+
+      if (pConnection->GetQResyncEnabled() && !vanished_uids.empty())
       {
-         String sTemp;
-         sTemp.Format(_T("* %d EXPUNGE\r\n"), (*iterExpunged));
-         sResponse += sTemp;
-         iterExpunged++;
+         // RFC 7162 (QRESYNC): report expunges as a single "* VANISHED" with a UID set
+         // instead of one "* n EXPUNGE" line per message.
+         sResponse.Format(_T("* VANISHED %s\r\n"), IMAPConnection::CompactUidSet(vanished_uids).c_str());
+      }
+      else
+      {
+         auto iterExpunged = expunged_messages_index.begin();
+         while (iterExpunged != expunged_messages_index.end())
+         {
+            String sTemp;
+            sTemp.Format(_T("* %d EXPUNGE\r\n"), (*iterExpunged));
+            sResponse += sTemp;
+            iterExpunged++;
+         }
       }
 
       pConnection->SendAsciiData(sResponse);

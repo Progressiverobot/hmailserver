@@ -354,11 +354,17 @@ upgrading the management/admin INI password from MD5.
     `ESEARCH` reply). Covered by `TestFetchChangedSinceFiltersByModSeq`,
     `TestStoreUnchangedSinceRejectsModified`, `TestStoreUnchangedSinceSucceedsAndReturnsModSeq` and
     `TestSearchModSeqReportsHighest`.
-  - **Stage 3 (next, QRESYNC):** `SELECT`/`EXAMINE (QRESYNC (uidvalidity modseq …))` params, `* VANISHED
-    (EARLIER)` responses, `EXPUNGE` emitting `* VANISHED` when QRESYNC is enabled, and
-    `UID FETCH … (CHANGEDSINCE n VANISHED)`.
-- ⏳ Remaining: CONDSTORE/QRESYNC Stage 3 (QRESYNC, above); LIST-EXTENDED/SEARCHRES; consider
-  IMAP4rev2. (`IMAPCommandCapability` + command map.)
+  - **Stage 3a (done in v6.2.0, QRESYNC in-session):** `SELECT`/`EXAMINE (QRESYNC (uidvalidity
+    modseq …))` is parsed, enabling QRESYNC+CONDSTORE for the session and replaying flag/`MODSEQ`
+    changes since the supplied mod-sequence as untagged `FETCH (UID … FLAGS … MODSEQ …)` responses;
+    `EXPUNGE` and `UID EXPUNGE` emit a single `* VANISHED <uid-set>` (compressed sequence-set) when
+    QRESYNC is enabled instead of per-message `* n EXPUNGE` lines. Covered by
+    `TestExpungeWithQResyncReturnsVanished` and `TestSelectQResyncReplaysChanges`.
+  - **Stage 3b (next, QRESYNC offline tracking):** persistent expunged-UID tombstones (DB 6002→6003)
+    to back `* VANISHED (EARLIER)` on `SELECT (QRESYNC (… known-uids))` and
+    `UID FETCH … (CHANGEDSINCE n VANISHED)` for messages expunged while the client was disconnected.
+- ⏳ Remaining: CONDSTORE/QRESYNC Stage 3b (QRESYNC offline tombstones, above); LIST-EXTENDED/SEARCHRES;
+  consider IMAP4rev2. (`IMAPCommandCapability` + command map.)
 - Verify: fast resync in Thunderbird/Apple Mail.
 
 ## B6 — Standards-based filtering

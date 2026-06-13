@@ -517,6 +517,63 @@ namespace RegressionTests.IMAP
       }
 
       [Test]
+      [Description("RFC 7162 (QRESYNC): once QRESYNC is enabled, EXPUNGE reports removed messages " +
+                   "as a single * VANISHED UID set instead of per-message * n EXPUNGE lines.")]
+      public void TestExpungeWithQResyncReturnsVanished()
+      {
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "vanished@example.test", "test");
+
+         var simulator = new ImapClientSimulator();
+         simulator.Connect();
+         simulator.LogonWithLiteral("vanished@example.test", "test");
+
+         simulator.SendSingleCommandWithLiteral("A01 APPEND INBOX {4}", "ABCD");
+         simulator.SendSingleCommand("A02 ENABLE QRESYNC");
+         simulator.SelectFolder("INBOX");
+         simulator.SetDeletedFlag(1);
+
+         string result = simulator.SendSingleCommand("A05 EXPUNGE");
+         Assert.IsTrue(result.Contains("* VANISHED 1"),
+            "QRESYNC EXPUNGE should emit * VANISHED with the message UID. " + result);
+         Assert.IsFalse(result.Contains("* 1 EXPUNGE"),
+            "QRESYNC EXPUNGE must not also emit a * n EXPUNGE line. " + result);
+
+         simulator.Disconnect();
+      }
+
+      [Test]
+      [Description("RFC 7162 (QRESYNC): SELECT (QRESYNC (uidvalidity modseq)) replays flag/MODSEQ " +
+                   "changes since the supplied mod-sequence as untagged FETCH responses.")]
+      public void TestSelectQResyncReplaysChanges()
+      {
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "qresyncsel@example.test", "test");
+
+         var simulator = new ImapClientSimulator();
+         simulator.Connect();
+         simulator.LogonWithLiteral("qresyncsel@example.test", "test");
+
+         simulator.SendSingleCommandWithLiteral("A01 APPEND INBOX {4}", "ABCD");
+         simulator.SendSingleCommand("A02 ENABLE QRESYNC");
+         simulator.SelectFolder("INBOX");
+
+         long modseq = ParseModSeq(simulator.SendSingleCommand("A03 FETCH 1 (MODSEQ)"));
+
+         // Change a flag to bump the message mod-sequence past the value we will resync from.
+         simulator.SendSingleCommand("A04 STORE 1 +FLAGS (\\Seen)");
+
+         // Re-select with QRESYNC referencing the earlier mod-sequence; the change must be replayed.
+         string result = simulator.SendSingleCommand("A05 SELECT INBOX (QRESYNC (1 " + modseq + "))");
+         Assert.IsTrue(result.Contains("* 1 FETCH"),
+            "QRESYNC SELECT should replay the changed message. " + result);
+         Assert.IsTrue(result.Contains("MODSEQ ("),
+            "A replayed QRESYNC FETCH should include MODSEQ. " + result);
+         Assert.IsTrue(result.Contains("HIGHESTMODSEQ"),
+            "QRESYNC SELECT should report HIGHESTMODSEQ. " + result);
+
+         simulator.Disconnect();
+      }
+
+      [Test]
       public void TestAppendDeletedMessage()
 
       {
