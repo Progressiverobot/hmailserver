@@ -130,6 +130,15 @@ namespace HM
 
 		if (!pAccount)
 		{
+			if (pConnection->RegisterAuthenticationFailure())
+			{
+				String sResponse = "* Too many invalid logon attempts.\r\n";
+				sResponse += pArgument->Tag() + " BAD Goodbye\r\n";
+				pConnection->Logout(sResponse);
+
+				return IMAPResult(IMAPResult::ResultOKSupressRead, "");
+			}
+
 			return IMAPResult(IMAPResult::ResultNo, "Invalid user name or password.");
 		}
 

@@ -116,7 +116,12 @@ namespace HM
 
       void Login(std::shared_ptr<const Account> account);
       void Logout(const String &goodbyeMessage);
-  
+
+      // Defense-in-depth brute-force protection: counts failed authentication
+      // attempts on this single connection and returns true once the hard cap
+      // is reached, regardless of whether the per-IP auto-ban is enabled.
+      bool RegisterAuthenticationFailure();
+
       bool IsAuthenticated();
       bool GetCurrentFolderReadOnly() {return current_folder_read_only_; }
 
@@ -183,6 +188,8 @@ namespace HM
       String literal_buffer_;
 
       bool pending_disconnect_;
+
+      int authentication_failure_count_;
 
       std::shared_ptr<IMAPNotificationClient> notification_client_;
 

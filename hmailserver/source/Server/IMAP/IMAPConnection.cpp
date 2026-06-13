@@ -55,6 +55,7 @@ namespace HM
       literal_data_to_receive_(0),
       pending_disconnect_(false),
       current_folder_read_only_(false),
+      authentication_failure_count_(0),
       log_level_(0)
    {
       imap_folders_.reset();
@@ -959,6 +960,16 @@ namespace HM
    IMAPConnection::IsAuthenticated()
    {
       return account_ != 0;
+   }
+
+   bool
+   IMAPConnection::RegisterAuthenticationFailure()
+   {
+      // Defense-in-depth on top of the per-IP auto-ban: never let a single
+      // connection make an unbounded number of authentication attempts, even
+      // when the auto-ban feature is disabled.
+      authentication_failure_count_++;
+      return authentication_failure_count_ >= 10;
    }
 
    void

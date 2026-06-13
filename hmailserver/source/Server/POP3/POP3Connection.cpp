@@ -45,7 +45,8 @@ namespace HM
       TCPConnection(connection_security, io_context, context, std::shared_ptr<Event>(), ""),
       current_state_(AUTHORIZATION),
       transmission_buffer_(true),
-      pending_disconnect_(false)
+      pending_disconnect_(false),
+      authentication_failure_count_(0)
    {
 
       /*
@@ -485,6 +486,16 @@ namespace HM
 
       if (!account_)
       {
+         // Defense-in-depth on top of the per-IP auto-ban: never let a single
+         // connection make an unbounded number of authentication attempts, even
+         // when the auto-ban feature is disabled.
+         authentication_failure_count_++;
+         if (authentication_failure_count_ >= 10)
+         {
+            EnqueueWrite_("-ERR Invalid user name or password. Too many invalid logon attempts.");
+            return ResultDisconnect;
+         }
+
          if (username_.Find(_T("@")) == -1)
             EnqueueWrite_("-ERR Invalid user name or password. Please use full email address as user name.");
          else
