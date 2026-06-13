@@ -320,8 +320,15 @@ upgrading the management/admin INI password from MD5.
   response codes (destination UIDVALIDITY + assigned UIDs) and `UID EXPUNGE` removes only \Deleted
   messages whose UID is in the supplied set. Advertised in CAPABILITY. Covered by
   `TestAppendReturnsAppendUid`, `TestCopyReturnsCopyUid`, `TestUidExpungeOnlyRemovesMatchingUids`.
-- ⏳ Remaining: CONDSTORE/QRESYNC (7162), ENABLE (5161), LIST-EXTENDED/ESEARCH/SEARCHRES,
-  STATUS=SIZE; consider IMAP4rev2. (`IMAPCommandCapability` + command map.)
+- ✅ **ENABLE (RFC 5161)** — delivered in v6.2.0. Negotiates opt-in extensions; returns a tagged OK
+  (no enable-able extensions yet, so the untagged `ENABLED` line is omitted). Advertised in
+  CAPABILITY. Covered by `TestEnableReturnsOk`.
+- ✅ **STATUS=SIZE (RFC 8438)** — delivered in v6.2.0. `STATUS` answers the `SIZE` attribute (total
+  mailbox size in octets). Advertised in CAPABILITY. Covered by `TestStatusReturnsMailboxSize`.
+- ✅ **ESEARCH (RFC 4731)** — delivered in v6.2.0. `SEARCH RETURN (MIN MAX ALL COUNT)` emits the
+  `* ESEARCH` response. Advertised in CAPABILITY. Covered by `TestEsearchReturnsExtendedResponse`.
+- ⏳ Remaining: CONDSTORE/QRESYNC (7162) [needs persistent per-message MODSEQ — DB schema change],
+  LIST-EXTENDED/SEARCHRES; consider IMAP4rev2. (`IMAPCommandCapability` + command map.)
 - Verify: fast resync in Thunderbird/Apple Mail.
 
 ## B6 — Standards-based filtering
