@@ -24,6 +24,22 @@ namespace hMailServer.ControlPanel.Views
 
       private int selectedRuleId_;
       private bool suppressMatchMode_;
+      private Func<dynamic> rulesProvider_ = () => ServerSession.Current.Application.Rules;
+      private bool serverLevel_ = true;
+
+      /// <summary>
+      /// Re-targets this view at a different rule collection (e.g. an account's
+      /// rules) and hides the page header when embedded in another dialog.
+      /// </summary>
+      public void ConfigureForRules(Func<dynamic> rulesProvider, bool serverLevel, bool embedded)
+      {
+         rulesProvider_ = rulesProvider;
+         serverLevel_ = serverLevel;
+         if (embedded && HeaderPanel != null)
+            HeaderPanel.Visibility = Visibility.Collapsed;
+      }
+
+      private dynamic OpenRules() => rulesProvider_();
 
       public RulesView()
       {
@@ -45,7 +61,7 @@ namespace hMailServer.ControlPanel.Views
       private void Reload()
       {
          var rows = new List<RuleRow>();
-         dynamic rules = ServerSession.Current.Application.Rules;
+         dynamic rules = OpenRules();
          try
          {
             int count = (int) rules.Count;
@@ -69,7 +85,7 @@ namespace hMailServer.ControlPanel.Views
 
          RuleGrid.ItemsSource = rows;
          SubtitleText.Text = rows.Count == 0
-            ? "No global rules defined yet - create one below."
+            ? "No rules defined yet - create one below."
             : rows.Count + " rule(s), evaluated top to bottom.";
 
          CriteriaGrid.ItemsSource = null;
@@ -112,7 +128,7 @@ namespace hMailServer.ControlPanel.Views
          var actions = new List<DetailRow>();
          bool useAnd = true;
 
-         dynamic rules = ServerSession.Current.Application.Rules;
+         dynamic rules = OpenRules();
          try
          {
             dynamic rule = rules.ItemByDBID[selectedRuleId_];
@@ -199,7 +215,7 @@ namespace hMailServer.ControlPanel.Views
 
          int selectedIndex = RuleGrid.SelectedIndex;
 
-         dynamic rules = ServerSession.Current.Application.Rules;
+         dynamic rules = OpenRules();
          try
          {
             dynamic rule = rules.Item[row.Position - 1];
@@ -252,7 +268,7 @@ namespace hMailServer.ControlPanel.Views
             return;
          }
 
-         dynamic rules = ServerSession.Current.Application.Rules;
+         dynamic rules = OpenRules();
          try
          {
             dynamic rule = rules.Add();
@@ -281,7 +297,7 @@ namespace hMailServer.ControlPanel.Views
             return;
 
          bool useAnd = MatchMode.SelectedIndex == 0;
-         dynamic rules = ServerSession.Current.Application.Rules;
+         dynamic rules = OpenRules();
          try
          {
             dynamic rule = rules.ItemByDBID[selectedRuleId_];
@@ -307,7 +323,7 @@ namespace hMailServer.ControlPanel.Views
       private void AddCriterion_Click(object sender, RoutedEventArgs e)
       {
          if (selectedRuleId_ == 0) { MessageBox.Show("Select a rule first.", "Control Panel"); return; }
-         new RuleCriteriaDialog(Window.GetWindow(this), selectedRuleId_, 0).ShowDialog();
+         new RuleCriteriaDialog(Window.GetWindow(this), selectedRuleId_, 0, rulesProvider_).ShowDialog();
          RefreshDetails();
       }
 
@@ -315,7 +331,7 @@ namespace hMailServer.ControlPanel.Views
       {
          if (selectedRuleId_ == 0 || CriteriaGrid.SelectedItem is not DetailRow row)
             return;
-         new RuleCriteriaDialog(Window.GetWindow(this), selectedRuleId_, row.Id).ShowDialog();
+         new RuleCriteriaDialog(Window.GetWindow(this), selectedRuleId_, row.Id, rulesProvider_).ShowDialog();
          RefreshDetails();
       }
 
@@ -324,7 +340,7 @@ namespace hMailServer.ControlPanel.Views
          if (selectedRuleId_ == 0 || CriteriaGrid.SelectedItem is not DetailRow row)
             return;
 
-         dynamic rules = ServerSession.Current.Application.Rules;
+         dynamic rules = OpenRules();
          try
          {
             dynamic rule = rules.ItemByDBID[selectedRuleId_];
@@ -351,7 +367,7 @@ namespace hMailServer.ControlPanel.Views
       private void AddAction_Click(object sender, RoutedEventArgs e)
       {
          if (selectedRuleId_ == 0) { MessageBox.Show("Select a rule first.", "Control Panel"); return; }
-         new RuleActionDialog(Window.GetWindow(this), selectedRuleId_, 0).ShowDialog();
+         new RuleActionDialog(Window.GetWindow(this), selectedRuleId_, 0, rulesProvider_, serverLevel_).ShowDialog();
          RefreshDetails();
       }
 
@@ -359,7 +375,7 @@ namespace hMailServer.ControlPanel.Views
       {
          if (selectedRuleId_ == 0 || ActionsGrid.SelectedItem is not DetailRow row)
             return;
-         new RuleActionDialog(Window.GetWindow(this), selectedRuleId_, row.Id).ShowDialog();
+         new RuleActionDialog(Window.GetWindow(this), selectedRuleId_, row.Id, rulesProvider_, serverLevel_).ShowDialog();
          RefreshDetails();
       }
 
@@ -368,7 +384,7 @@ namespace hMailServer.ControlPanel.Views
          if (selectedRuleId_ == 0 || ActionsGrid.SelectedItem is not DetailRow row)
             return;
 
-         dynamic rules = ServerSession.Current.Application.Rules;
+         dynamic rules = OpenRules();
          try
          {
             dynamic rule = rules.ItemByDBID[selectedRuleId_];
@@ -399,7 +415,7 @@ namespace hMailServer.ControlPanel.Views
          if (selectedRuleId_ == 0 || ActionsGrid.SelectedItem is not DetailRow row)
             return;
 
-         dynamic rules = ServerSession.Current.Application.Rules;
+         dynamic rules = OpenRules();
          try
          {
             dynamic rule = rules.ItemByDBID[selectedRuleId_];

@@ -10,6 +10,7 @@ namespace hMailServer.ControlPanel.Views
    {
       private readonly int ruleId_;
       private readonly int criteriaId_; // 0 = new
+      private readonly Func<dynamic> rulesProvider_;
 
       private readonly ComboBox field_ = new() { FontSize = 13, Margin = new Thickness(0, 0, 0, 8) };
       private readonly TextBox header_ = new();
@@ -17,10 +18,11 @@ namespace hMailServer.ControlPanel.Views
       private readonly ComboBox match_ = new() { FontSize = 13, Margin = new Thickness(0, 0, 0, 8) };
       private readonly TextBox value_ = new();
 
-      public RuleCriteriaDialog(Window owner, int ruleId, int criteriaId)
+      public RuleCriteriaDialog(Window owner, int ruleId, int criteriaId, Func<dynamic> rulesProvider = null)
       {
          ruleId_ = ruleId;
          criteriaId_ = criteriaId;
+         rulesProvider_ = rulesProvider ?? (() => ServerSession.Current.Application.Rules);
          Owner = owner;
          Title = criteriaId == 0 ? "Add criterion" : "Edit criterion";
          Width = 480;
@@ -103,7 +105,7 @@ namespace hMailServer.ControlPanel.Views
             return;
          }
 
-         dynamic rules = ServerSession.Current.Application.Rules;
+         dynamic rules = rulesProvider_();
          try
          {
             dynamic rule = rules.ItemByDBID[ruleId_];
@@ -147,7 +149,7 @@ namespace hMailServer.ControlPanel.Views
       {
          int field = ComboValue(field_);
 
-         dynamic rules = ServerSession.Current.Application.Rules;
+         dynamic rules = rulesProvider_();
          try
          {
             dynamic rule = rules.ItemByDBID[ruleId_];

@@ -49,7 +49,7 @@ namespace hMailServer.ControlPanel.Views
 
       // External (fetch) accounts, account rules, IMAP folders — embedded editors
       private CollectionEditorView fetchEditor_;
-      private CollectionEditorView rulesEditor_;
+      private RulesView accountRules_;
       private readonly ListBox folderList_ = new() { Height = 220, FontSize = 13, Margin = new Thickness(0, 0, 0, 10) };
       private readonly TextBlock folderStatus_ = new() { FontSize = 12, Margin = new Thickness(0, 4, 0, 0) };
 
@@ -108,7 +108,7 @@ namespace hMailServer.ControlPanel.Views
          {
             Load();
             fetchEditor_?.OnEnter();
-            rulesEditor_?.OnEnter();
+            accountRules_?.OnEnter();
             LoadFolders();
          };
       }
@@ -199,9 +199,20 @@ namespace hMailServer.ControlPanel.Views
 
       private FrameworkElement BuildRules()
       {
-         rulesEditor_ = CollectionSpecs.AccountRules(domainName_, address_);
-         rulesEditor_.Margin = new Thickness(4, 8, 4, 4);
-         return rulesEditor_;
+         accountRules_ = new RulesView();
+         accountRules_.ConfigureForRules(OpenAccountRules, serverLevel: false, embedded: true);
+         accountRules_.Margin = new Thickness(4, 8, 4, 4);
+         return accountRules_;
+      }
+
+      private dynamic OpenAccountRules()
+      {
+         dynamic domains = ServerSession.Current.Application.Domains;
+         dynamic account = OpenAccount(domains);
+         dynamic rules = account.Rules;
+         ServerSession.Release(account);
+         ServerSession.Release(domains);
+         return rules;
       }
 
       private FrameworkElement BuildFolders()

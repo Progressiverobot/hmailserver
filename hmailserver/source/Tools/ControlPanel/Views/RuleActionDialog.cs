@@ -10,6 +10,8 @@ namespace hMailServer.ControlPanel.Views
    {
       private readonly int ruleId_;
       private readonly int actionId_; // 0 = new
+      private readonly Func<dynamic> rulesProvider_;
+      private readonly bool serverLevel_;
 
       private readonly ComboBox type_ = new() { FontSize = 13, Margin = new Thickness(0, 0, 0, 12) };
 
@@ -35,10 +37,12 @@ namespace hMailServer.ControlPanel.Views
       private readonly StackPanel bindPanel_ = new();
       private readonly TextBlock noParams_ = new() { Text = "This action has no additional parameters.", FontSize = 12.5, Margin = new Thickness(0, 4, 0, 0) };
 
-      public RuleActionDialog(Window owner, int ruleId, int actionId)
+      public RuleActionDialog(Window owner, int ruleId, int actionId, Func<dynamic> rulesProvider = null, bool serverLevel = true)
       {
          ruleId_ = ruleId;
          actionId_ = actionId;
+         rulesProvider_ = rulesProvider ?? (() => ServerSession.Current.Application.Rules);
+         serverLevel_ = serverLevel;
          Owner = owner;
          Title = actionId == 0 ? "Add action" : "Edit action";
          Width = 520;
@@ -65,9 +69,11 @@ namespace hMailServer.ControlPanel.Views
          type_.Items.Add(Combo("Run script function", 5));
          type_.Items.Add(Combo("Stop rule processing", 6));
          type_.Items.Add(Combo("Set header value", 7));
-         type_.Items.Add(Combo("Send using route", 8));
+         if (serverLevel)
+            type_.Items.Add(Combo("Send using route", 8));
          type_.Items.Add(Combo("Create copy", 9));
-         type_.Items.Add(Combo("Bind to address", 10));
+         if (serverLevel)
+            type_.Items.Add(Combo("Bind to address", 10));
          type_.SelectionChanged += (s, e) => UpdateVisibility();
          body.Children.Add(type_);
 
@@ -182,7 +188,7 @@ namespace hMailServer.ControlPanel.Views
             return;
          }
 
-         dynamic rules = ServerSession.Current.Application.Rules;
+         dynamic rules = rulesProvider_();
          try
          {
             dynamic rule = FindRule(rules);
@@ -231,7 +237,7 @@ namespace hMailServer.ControlPanel.Views
       {
          int type = ComboValue(type_);
 
-         dynamic rules = ServerSession.Current.Application.Rules;
+         dynamic rules = rulesProvider_();
          try
          {
             dynamic rule = FindRule(rules);
