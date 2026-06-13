@@ -10,26 +10,30 @@ namespace hMailServer.ControlPanel.Views
    {
       public class RuleRow
       {
+         public int Id { get; set; }
          public int Position { get; set; }
          public string Name { get; set; }
          public string Enabled { get; set; }
       }
 
+      public class DetailRow
+      {
+         public int Id { get; set; }
+         public string Description { get; set; }
+      }
+
+      private int selectedRuleId_;
+      private bool suppressMatchMode_;
+
       public RulesView()
       {
          InitializeComponent();
 
-         for (int i = 1; i < FieldNames.Length; i++)
-            CritField.Items.Add(FieldNames[i]);
-         CritField.SelectedIndex = 0;
-
-         for (int i = 1; i < MatchNames.Length; i++)
-            CritMatch.Items.Add(MatchNames[i]);
-         CritMatch.SelectedIndex = 1;
-
-         for (int i = 1; i < ActionNames.Length; i++)
-            ActionType.Items.Add(ActionNames[i]);
-         ActionType.SelectedIndex = 0;
+         suppressMatchMode_ = true;
+         MatchMode.Items.Add("Match ALL criteria (AND)");
+         MatchMode.Items.Add("Match ANY criterion (OR)");
+         MatchMode.SelectedIndex = 0;
+         suppressMatchMode_ = false;
       }
 
       public void OnEnter() => Reload();
@@ -50,6 +54,7 @@ namespace hMailServer.ControlPanel.Views
                dynamic rule = rules.Item[i];
                rows.Add(new RuleRow
                {
+                  Id = (int) rule.ID,
                   Position = i + 1,
                   Name = (string) rule.Name,
                   Enabled = (bool) rule.Active ? "Yes" : "No"
@@ -66,6 +71,9 @@ namespace hMailServer.ControlPanel.Views
          SubtitleText.Text = rows.Count == 0
             ? "No global rules defined yet - create one below."
             : rows.Count + " rule(s), evaluated top to bottom.";
+
+         CriteriaGrid.ItemsSource = null;
+         ActionsGrid.ItemsSource = null;
       }
 
       private static readonly string[] FieldNames =
@@ -85,75 +93,104 @@ namespace hMailServer.ControlPanel.Views
       {
          if (RuleGrid.SelectedItem is not RuleRow row)
          {
-            DetailText.Text = "Select a rule to see its criteria and actions.";
+            selectedRuleId_ = 0;
+            CriteriaGrid.ItemsSource = null;
+            ActionsGrid.ItemsSource = null;
             return;
          }
 
+         selectedRuleId_ = row.Id;
+         RefreshDetails();
+      }
+
+      private void RefreshDetails()
+      {
+         if (selectedRuleId_ == 0)
+            return;
+
+         var criteria = new List<DetailRow>();
+         var actions = new List<DetailRow>();
+         bool useAnd = true;
+
+         dynamic rules = ServerSession.Current.Application.Rules;
          try
          {
-            dynamic rules = ServerSession.Current.Application.Rules;
-            dynamic rule = rules.Item[row.Position - 1];
+            dynamic rule = rules.ItemByDBID[selectedRuleId_];
+            if (rule == null)
+               return;
 
-            var text = new System.Text.StringBuilder();
+            useAnd = (bool) rule.UseAND;
 
-            text.Append("IF  ");
             dynamic criterias = rule.Criterias;
-            int criteriaCount = (int) criterias.Count;
-            for (int i = 0; i < criteriaCount; i++)
+            int cc = (int) criterias.Count;
+            for (int i = 0; i < cc; i++)
             {
-               dynamic criteria = criterias.Item[i];
-               if (i > 0)
-                  text.Append("  AND  ");
-               string field = (bool) criteria.UsePredefined
-                  ? Pick(FieldNames, (int) criteria.PredefinedField)
-                  : "header '" + (string) criteria.HeaderField + "'";
-               text.Append(field + " " + Pick(MatchNames, (int) criteria.MatchType) + " '" + (string) criteria.MatchValue + "'");
-               ServerSession.Release(criteria);
+               dynamic c = criterias.Item[i];
+               string field = (bool) c.UsePredefined
+                  ? Pick(FieldNames, (int) c.PredefinedField)
+                  : "header '" + (string) c.HeaderField + "'";
+               criteria.Add(new DetailRow
+               {
+                  Id = (int) c.ID,
+                  Description = field + " " + Pick(MatchNames, (int) c.MatchType) + " '" + (string) c.MatchValue + "'"
+               });
+               ServerSession.Release(c);
             }
-            if (criteriaCount == 0)
-               text.Append("(no criteria - matches everything)");
             ServerSession.Release(criterias);
 
-            text.AppendLine();
-            text.Append("THEN  ");
-            dynamic actions = rule.Actions;
-            int actionCount = (int) actions.Count;
-            for (int i = 0; i < actionCount; i++)
+            dynamic acts = rule.Actions;
+            int ac = (int) acts.Count;
+            for (int i = 0; i < ac; i++)
             {
-               dynamic action = actions.Item[i];
-               if (i > 0)
-                  text.Append("  ;  ");
-               int type = (int) action.Type;
-               text.Append(Pick(ActionNames, type));
-               try
-               {
-                  switch (type)
-                  {
-                     case 2: text.Append(" -> " + (string) action.To); break;
-                     case 4: text.Append(" '" + (string) action.IMAPFolder + "'"); break;
-                     case 5: text.Append(" " + (string) action.ScriptFunction); break;
-                     case 7: text.Append(" " + (string) action.HeaderName + "=" + (string) action.Value); break;
-                  }
-               }
-               catch (Exception)
-               {
-               }
-               ServerSession.Release(action);
+               dynamic a = acts.Item[i];
+               actions.Add(new DetailRow { Id = (int) a.ID, Description = DescribeAction(a) });
+               ServerSession.Release(a);
             }
-            if (actionCount == 0)
-               text.Append("(no actions)");
-            ServerSession.Release(actions);
+            ServerSession.Release(acts);
 
             ServerSession.Release(rule);
-            ServerSession.Release(rules);
-
-            DetailText.Text = text.ToString();
          }
-         catch (Exception ex)
+         catch (Exception)
          {
-            DetailText.Text = "Could not read the rule details: " + ex.Message;
+            // leave lists as built so far
          }
+         finally
+         {
+            ServerSession.Release(rules);
+         }
+
+         CriteriaGrid.ItemsSource = criteria;
+         ActionsGrid.ItemsSource = actions;
+
+         suppressMatchMode_ = true;
+         MatchMode.SelectedIndex = useAnd ? 0 : 1;
+         suppressMatchMode_ = false;
       }
+
+      private static string DescribeAction(dynamic a)
+      {
+         int type = (int) a.Type;
+         string text = Pick(ActionNames, type);
+         try
+         {
+            switch (type)
+            {
+               case 2: text += " -> " + (string) a.To; break;
+               case 3: text += " (subject '" + (string) a.Subject + "')"; break;
+               case 4: text += " '" + (string) a.IMAPFolder + "'"; break;
+               case 5: text += " " + (string) a.ScriptFunction; break;
+               case 7: text += " " + (string) a.HeaderName + "=" + (string) a.Value; break;
+               case 8: text += " (route #" + (int) a.RouteID + ")"; break;
+               case 10: text += " " + (string) a.Value; break;
+            }
+         }
+         catch (Exception)
+         {
+         }
+         return text;
+      }
+
+      // ---- Rule-level operations ----
 
       private void WithSelectedRule(Action<dynamic> action)
       {
@@ -180,7 +217,6 @@ namespace hMailServer.ControlPanel.Views
 
          Reload();
 
-         // Keep the rule selected so consecutive edits chain naturally.
          if (selectedIndex >= 0 && selectedIndex < RuleGrid.Items.Count)
             RuleGrid.SelectedIndex = selectedIndex;
       }
@@ -239,72 +275,153 @@ namespace hMailServer.ControlPanel.Views
          Reload();
       }
 
-      private void AddCriterion_Click(object sender, RoutedEventArgs e) => WithSelectedRule(rule =>
+      private void MatchMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
       {
-         dynamic criterias = rule.Criterias;
-         dynamic criteria = criterias.Add();
-         criteria.UsePredefined = true;
-         criteria.PredefinedField = CritField.SelectedIndex + 1;   // eFT* starts at 1
-         criteria.MatchType = CritMatch.SelectedIndex + 1;         // eMT* starts at 1
-         criteria.MatchValue = CritValue.Text;
-         criteria.Save();
-         ServerSession.Release(criteria);
-         ServerSession.Release(criterias);
-         rule.Save();
-      });
+         if (suppressMatchMode_ || selectedRuleId_ == 0)
+            return;
 
-      private void RemoveCriterion_Click(object sender, RoutedEventArgs e) => WithSelectedRule(rule =>
-      {
-         dynamic criterias = rule.Criterias;
-         int count = (int) criterias.Count;
-         if (count > 0)
+         bool useAnd = MatchMode.SelectedIndex == 0;
+         dynamic rules = ServerSession.Current.Application.Rules;
+         try
          {
-            dynamic last = criterias.Item[count - 1];
-            last.Delete();
-            ServerSession.Release(last);
+            dynamic rule = rules.ItemByDBID[selectedRuleId_];
+            if (rule != null)
+            {
+               rule.UseAND = useAnd;
+               rule.Save();
+               ServerSession.Release(rule);
+            }
+         }
+         catch (Exception ex)
+         {
+            MessageBox.Show("Could not change the match mode: " + ex.Message, "Control Panel");
+         }
+         finally
+         {
+            ServerSession.Release(rules);
+         }
+      }
+
+      // ---- Criteria operations ----
+
+      private void AddCriterion_Click(object sender, RoutedEventArgs e)
+      {
+         if (selectedRuleId_ == 0) { MessageBox.Show("Select a rule first.", "Control Panel"); return; }
+         new RuleCriteriaDialog(Window.GetWindow(this), selectedRuleId_, 0).ShowDialog();
+         RefreshDetails();
+      }
+
+      private void EditCriterion_Click(object sender, RoutedEventArgs e)
+      {
+         if (selectedRuleId_ == 0 || CriteriaGrid.SelectedItem is not DetailRow row)
+            return;
+         new RuleCriteriaDialog(Window.GetWindow(this), selectedRuleId_, row.Id).ShowDialog();
+         RefreshDetails();
+      }
+
+      private void RemoveCriterion_Click(object sender, RoutedEventArgs e)
+      {
+         if (selectedRuleId_ == 0 || CriteriaGrid.SelectedItem is not DetailRow row)
+            return;
+
+         dynamic rules = ServerSession.Current.Application.Rules;
+         try
+         {
+            dynamic rule = rules.ItemByDBID[selectedRuleId_];
+            dynamic criterias = rule.Criterias;
+            criterias.DeleteByDBID(row.Id);
             rule.Save();
+            ServerSession.Release(criterias);
+            ServerSession.Release(rule);
          }
-         ServerSession.Release(criterias);
-      });
-
-      private void AddAction_Click(object sender, RoutedEventArgs e) => WithSelectedRule(rule =>
-      {
-         int type = ActionType.SelectedIndex + 1; // eRA* starts at 1
-         string param = ActionParam.Text.Trim();
-
-         dynamic actions = rule.Actions;
-         dynamic action = actions.Add();
-         action.Type = type;
-         switch (type)
+         catch (Exception ex)
          {
-            case 2: action.To = param; break;                       // forward
-            case 3: action.Subject = "Re:"; action.Body = param; break; // reply
-            case 4: action.IMAPFolder = param; break;               // move to folder
-            case 5: action.ScriptFunction = param; break;           // run script
-            case 7:                                                  // set header
-               string[] parts = param.Split(new[] { '=' }, 2);
-               action.HeaderName = parts[0];
-               action.Value = parts.Length > 1 ? parts[1] : "";
-               break;
+            MessageBox.Show("Could not remove the criterion: " + ex.Message, "Control Panel");
          }
-         action.Save();
-         ServerSession.Release(action);
-         ServerSession.Release(actions);
-         rule.Save();
-      });
-
-      private void RemoveAction_Click(object sender, RoutedEventArgs e) => WithSelectedRule(rule =>
-      {
-         dynamic actions = rule.Actions;
-         int count = (int) actions.Count;
-         if (count > 0)
+         finally
          {
-            dynamic last = actions.Item[count - 1];
-            last.Delete();
-            ServerSession.Release(last);
+            ServerSession.Release(rules);
+         }
+
+         RefreshDetails();
+      }
+
+      // ---- Action operations ----
+
+      private void AddAction_Click(object sender, RoutedEventArgs e)
+      {
+         if (selectedRuleId_ == 0) { MessageBox.Show("Select a rule first.", "Control Panel"); return; }
+         new RuleActionDialog(Window.GetWindow(this), selectedRuleId_, 0).ShowDialog();
+         RefreshDetails();
+      }
+
+      private void EditAction_Click(object sender, RoutedEventArgs e)
+      {
+         if (selectedRuleId_ == 0 || ActionsGrid.SelectedItem is not DetailRow row)
+            return;
+         new RuleActionDialog(Window.GetWindow(this), selectedRuleId_, row.Id).ShowDialog();
+         RefreshDetails();
+      }
+
+      private void RemoveAction_Click(object sender, RoutedEventArgs e)
+      {
+         if (selectedRuleId_ == 0 || ActionsGrid.SelectedItem is not DetailRow row)
+            return;
+
+         dynamic rules = ServerSession.Current.Application.Rules;
+         try
+         {
+            dynamic rule = rules.ItemByDBID[selectedRuleId_];
+            dynamic actions = rule.Actions;
+            actions.DeleteByDBID(row.Id);
             rule.Save();
+            ServerSession.Release(actions);
+            ServerSession.Release(rule);
          }
-         ServerSession.Release(actions);
-      });
+         catch (Exception ex)
+         {
+            MessageBox.Show("Could not remove the action: " + ex.Message, "Control Panel");
+         }
+         finally
+         {
+            ServerSession.Release(rules);
+         }
+
+         RefreshDetails();
+      }
+
+      private void ActionUp_Click(object sender, RoutedEventArgs e) => MoveAction(true);
+
+      private void ActionDown_Click(object sender, RoutedEventArgs e) => MoveAction(false);
+
+      private void MoveAction(bool up)
+      {
+         if (selectedRuleId_ == 0 || ActionsGrid.SelectedItem is not DetailRow row)
+            return;
+
+         dynamic rules = ServerSession.Current.Application.Rules;
+         try
+         {
+            dynamic rule = rules.ItemByDBID[selectedRuleId_];
+            dynamic actions = rule.Actions;
+            dynamic a = actions.ItemByDBID[row.Id];
+            if (up) a.MoveUp(); else a.MoveDown();
+            a.Save();
+            rule.Save();
+            ServerSession.Release(a);
+            ServerSession.Release(actions);
+            ServerSession.Release(rule);
+         }
+         catch (Exception ex)
+         {
+            MessageBox.Show("Could not move the action: " + ex.Message, "Control Panel");
+         }
+         finally
+         {
+            ServerSession.Release(rules);
+         }
+
+         RefreshDetails();
+      }
    }
 }
