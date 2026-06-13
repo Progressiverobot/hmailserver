@@ -114,6 +114,13 @@ namespace HM
       bool GetIsIdling() const;
       void SetIsIdling(bool bNewVal);
 
+      // RFC 7162 (CONDSTORE/QRESYNC): whether the client has switched these
+      // extensions on for this session via ENABLE (or a CONDSTORE-enabling command).
+      bool GetCondstoreEnabled() const { return condstore_enabled_; }
+      void SetCondstoreEnabled(bool bNewVal) { condstore_enabled_ = bNewVal; }
+      bool GetQResyncEnabled() const { return qresync_enabled_; }
+      void SetQResyncEnabled(bool bNewVal) { qresync_enabled_ = bNewVal; }
+
       void SetDelayedChangeNotification(std::shared_ptr<ChangeNotification> pNotification);
 
       void Login(std::shared_ptr<const Account> account);
@@ -185,6 +192,9 @@ namespace HM
 
       String command_buffer_;
       bool is_idling_;
+
+      bool condstore_enabled_;
+      bool qresync_enabled_;
 
       int literal_data_to_receive_;
       String literal_buffer_;

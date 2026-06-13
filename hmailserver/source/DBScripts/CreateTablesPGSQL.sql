@@ -174,7 +174,8 @@ create table hm_messages
 	messageflags smallint not null,
 	messagecreatetime timestamp not null,
 	messagelocked smallint not null,
-   messageuid bigint not null
+   messageuid bigint not null,
+   messagemodseq bigint not null default 1
 );
 
 CREATE INDEX idx_hm_messages ON hm_messages (messageaccountid, messagefolderid);
@@ -252,7 +253,8 @@ create table hm_imapfolders
   foldername varchar(255) NOT NULL,
   folderissubscribed smallint NOT NULL,
   foldercreationtime timestamp NOT NULL,
-  foldercurrentuid bigint NOT NULL
+  foldercurrentuid bigint NOT NULL,
+  foldercurrentmodseq bigint NOT NULL default 1
 );
 
 CREATE INDEX idx_hm_imapfolders ON hm_imapfolders (folderaccountid);
@@ -807,4 +809,4 @@ insert into hm_tcpipports (portprotocol, portnumber, portaddress1, portaddress2,
 
 insert into hm_tcpipports (portprotocol, portnumber, portaddress1, portaddress2, portconnectionsecurity, portsslcertificateid) values (5, 143, 0, NULL, 0, 0);
 
-insert into hm_dbversion values (6001);
+insert into hm_dbversion values (6002);

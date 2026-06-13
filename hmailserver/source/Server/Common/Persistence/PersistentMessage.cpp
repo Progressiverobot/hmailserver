@@ -207,6 +207,7 @@ namespace HM
 
       pMessage->SetFlags((short) pRS->GetLongValue("messageflags"));
       pMessage->SetUID((unsigned int) pRS->GetLongValue("messageuid"));
+      pMessage->SetModSeq(pRS->GetInt64Value("messagemodseq"));
 
       if (bReadRecipients)
       {
@@ -618,12 +619,21 @@ namespace HM
 
          oStatement.AddColumnInt64("messageuid", pMessage->GetUID());
 
+         // RFC 7162 (CONDSTORE/QRESYNC): a message arriving in a mailbox is a
+         // metadata change, so assign it the next per-mailbox mod-sequence.
+         __int64 newModSeq = PersistentIMAPFolder::GetNextModSeq(pMessage->GetAccountID(), pMessage->GetFolderID());
+         if (newModSeq > 0)
+            pMessage->SetModSeq(newModSeq);
+
+         oStatement.AddColumnInt64("messagemodseq", pMessage->GetModSeq());
       }
       else
       {
          // Save the already existing UID. This happens for example if we update an existing
          // message or restore a backup.
          oStatement.AddColumnInt64("messageuid", pMessage->GetUID());
+
+         oStatement.AddColumnInt64("messagemodseq", pMessage->GetModSeq());
       }
 
 
@@ -1261,11 +1271,18 @@ namespace HM
    bool 
    PersistentMessage::SaveFlags(std::shared_ptr<Message> message)
    {
+      // RFC 7162 (CONDSTORE/QRESYNC): a flag change is a metadata change, so assign
+      // the message the next per-mailbox mod-sequence and persist it alongside the flags.
+      __int64 newModSeq = PersistentIMAPFolder::GetNextModSeq(message->GetAccountID(), message->GetFolderID());
+      if (newModSeq > 0)
+         message->SetModSeq(newModSeq);
+
       // Create a statement object.
-      String statement = "UPDATE hm_messages SET messageflags = @FLAGS WHERE messageid = @MESSAGEID";
+      String statement = "UPDATE hm_messages SET messageflags = @FLAGS, messagemodseq = @MODSEQ WHERE messageid = @MESSAGEID";
 
       SQLCommand sqlCommand(statement);
       sqlCommand.AddParameter("@FLAGS", message->GetFlags());
+      sqlCommand.AddParameter("@MODSEQ", message->GetModSeq());
       sqlCommand.AddParameter("@MESSAGEID", message->GetID());
 
       return Application::Instance()->GetDBManager()->Execute(sqlCommand);

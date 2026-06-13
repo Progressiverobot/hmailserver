@@ -148,6 +148,20 @@ namespace HM
          sResponse += sTemp;
       }
 
+      if (sFlags.FindNoCase(_T("HIGHESTMODSEQ")) >= 0)
+      {
+         // RFC 7162 (CONDSTORE/QRESYNC): the mailbox highest mod-sequence.
+         String sTemp;
+         sTemp.Format(_T("HIGHESTMODSEQ %I64d"), pTheFolder->GetCurrentModSeq());
+
+         if (bAddSpace)
+            sResponse += " ";
+         else
+            bAddSpace = true;
+
+         sResponse += sTemp;
+      }
+
 
       sResponse+= ")\r\n";
 

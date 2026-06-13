@@ -127,6 +127,7 @@ namespace HM
          // This column is always updated by GetUniqueMessageID below
          // but we still need to create it.
          oStatement.AddColumn("foldercurrentuid", pFolder->GetCurrentUID());
+         oStatement.AddColumnInt64("foldercurrentmodseq", pFolder->GetCurrentModSeq());
          oStatement.AddColumnDate("foldercreationtime", pFolder->GetCreationTime());
       }
       else
@@ -245,5 +246,47 @@ namespace HM
       IMAPFolderContainer::Instance()->UpdateCurrentUID(accountID, folderID, newUID);
 
       return newUID;
+   }
+
+   bool 
+   PersistentIMAPFolder::IncreaseCurrentModSeq_(__int64 folderID)
+   {
+      SQLCommand command("UPDATE hm_imapfolders SET foldercurrentmodseq = foldercurrentmodseq + 1 WHERE folderid = @FOLDERID");
+      command.AddParameter("@FOLDERID", folderID);
+
+      return Application::Instance()->GetDBManager()->Execute(command);
+   }
+
+   __int64
+   PersistentIMAPFolder::GetCurrentModSeq_(__int64 folderID)
+   {
+      if (folderID == 0)
+         return 0;
+
+      SQLCommand command("SELECT foldercurrentmodseq FROM hm_imapfolders WHERE folderid = @FOLDERID");
+      command.AddParameter("@FOLDERID", folderID);
+
+      std::shared_ptr<DALRecordset> pRS = Application::Instance()->GetDBManager()->OpenRecordset(command);
+      if (!pRS || pRS->IsEOF())
+         return 0;
+
+      return pRS->GetInt64Value("foldercurrentmodseq");
+   }
+
+   __int64
+   PersistentIMAPFolder::GetNextModSeq(__int64 accountID, __int64 folderID)
+   {
+      if (folderID == 0)
+         return 0;
+
+      // RFC 7162: per-mailbox mod-sequence values must increase strictly and never
+      // decrease (even across expunges), so we use a monotonic per-folder counter
+      // mirroring the existing UID counter.
+      IncreaseCurrentModSeq_(folderID);
+      __int64 newModSeq = GetCurrentModSeq_(folderID);
+
+      IMAPFolderContainer::Instance()->UpdateCurrentModSeq(accountID, folderID, newModSeq);
+
+      return newModSeq;
    }
 }

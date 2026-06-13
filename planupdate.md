@@ -327,19 +327,32 @@ upgrading the management/admin INI password from MD5.
   mailbox size in octets). Advertised in CAPABILITY. Covered by `TestStatusReturnsMailboxSize`.
 - ✅ **ESEARCH (RFC 4731)** — delivered in v6.2.0. `SEARCH RETURN (MIN MAX ALL COUNT)` emits the
   `* ESEARCH` response. Advertised in CAPABILITY. Covered by `TestEsearchReturnsExtendedResponse`.
-- ⏳ Remaining: CONDSTORE/QRESYNC (7162) [needs persistent per-message MODSEQ — DB schema change],
-  LIST-EXTENDED/SEARCHRES; consider IMAP4rev2. (`IMAPCommandCapability` + command map.)
-- 🅿️ **CONDSTORE/QRESYNC (RFC 7162) — DEFERRED to a dedicated, supervised cycle.** Rationale: it is
-  the only remaining B5 item that requires a **database schema migration** (a persistent per-message
-  `MODSEQ` + per-folder `HIGHESTMODSEQ`). That means bumping `REQUIRED_DB_VERSION` 6001→6002
-  (`Common/Application/Constants.h`), adding the `modseq` column to all four `CreateTables*` scripts
-  **and** writing `Upgrade6001to6002{MSSQL,MSSQLCE,MySQL,PGSQL}.sql`. Only the MySQL/MariaDB backend
-  is exercised by the regression suite in this environment, so the MSSQL/PGSQL/SQLCE migrations would
-  ship unvalidated, and a partial/incorrect MODSEQ actively corrupts client sync state (worse than
-  not advertising it). Command surface also touches SELECT/EXAMINE (`HIGHESTMODSEQ`), FETCH
-  (`MODSEQ`, `CHANGEDSINCE`), STORE (`UNCHANGEDSINCE` + `MODIFIED`), SEARCH (`MODSEQ`), STATUS
-  (`HIGHESTMODSEQ`), ENABLE wiring, and QRESYNC `VANISHED`/SELECT params. Do this as its own release
-  with real cross-backend upgrade testing.
+- ◑ **CONDSTORE/QRESYNC (RFC 7162) — Stage 1 (CONDSTORE foundation) DELIVERED in v6.2.0.** This is
+  the one B5 item that requires a **database schema migration**, so it is shipped in supervised
+  stages.
+  - **Stage 1 (done):** persistent mod-sequence storage + read surface. Bumped
+    `REQUIRED_DB_VERSION` 6001→6002 (`Common/Application/Constants.h`); added a per-message
+    `messagemodseq` column to `hm_messages` and a per-folder monotonic `foldercurrentmodseq`
+    counter to `hm_imapfolders` across all four `CreateTables*` scripts; wrote
+    `Upgrade6001to6002{MSSQL,MSSQLCE,MySQL,PGSQL}.sql` (each ALTERs both columns `DEFAULT 1` and
+    sets `hm_dbversion=6002`). The mod-sequence is a per-mailbox monotonic counter (mirrors the UID
+    counter): assigned on message arrival and bumped on every flag change (`SaveFlags`), so it only
+    ever increases. Command surface: `CAPABILITY` advertises `CONDSTORE QRESYNC`; `ENABLE
+    CONDSTORE`/`ENABLE QRESYNC` echo `* ENABLED …`; `SELECT`/`EXAMINE (CONDSTORE)` and
+    `SELECT`/`EXAMINE` after `ENABLE CONDSTORE` emit `* OK [HIGHESTMODSEQ n]`; `STATUS (HIGHESTMODSEQ)`
+    answers the attribute; `FETCH … (MODSEQ)` returns the per-message `MODSEQ (n)`. Covered by
+    `TestEnableCondstoreEchoesEnabled`, `TestSelectAndStatusReportHighestModSeq`,
+    `TestFetchModSeqIncrementsOnFlagChange`. MySQL/MariaDB migration validated end-to-end against the
+    live regression DB (316/316 IMAP+persistence tests green); MSSQL/PGSQL/SQLCE scripts authored to
+    match but await cross-backend upgrade testing.
+  - **Stage 2 (next):** `FETCH`/`STORE (CHANGEDSINCE n)` / `(UNCHANGEDSINCE n)` modifiers, the
+    `STORE … [MODIFIED …]` response code, `STORE` returning `MODSEQ` in its `FETCH` when CONDSTORE is
+    on, and the `SEARCH MODSEQ` criterion (+ `(MODSEQ n)` in the SEARCH reply).
+  - **Stage 3 (QRESYNC):** `SELECT`/`EXAMINE (QRESYNC (uidvalidity modseq …))` params, `* VANISHED
+    (EARLIER)` responses, `EXPUNGE` emitting `* VANISHED` when QRESYNC is enabled, and
+    `UID FETCH … (CHANGEDSINCE n VANISHED)`.
+- ⏳ Remaining: CONDSTORE/QRESYNC Stages 2–3 (above); LIST-EXTENDED/SEARCHRES; consider IMAP4rev2.
+  (`IMAPCommandCapability` + command map.)
 - Verify: fast resync in Thunderbird/Apple Mail.
 
 ## B6 — Standards-based filtering

@@ -54,6 +54,7 @@ namespace HM
       flags_ = other.flags_;
 
       uid_ = other.uid_;
+      message_modseq_ = other.message_modseq_;
    }
 
 
@@ -66,6 +67,7 @@ namespace HM
       message_size_ = 0;
       no_of_retries_ = 0;
       uid_ = 0;
+      message_modseq_ = 0;
 
       if (generateFileName)
       {

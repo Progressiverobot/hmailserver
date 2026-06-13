@@ -36,6 +36,7 @@ namespace HM
       show_body_structure_ = false;
       set_seen_ = false;
       show_body_structure_NonExtensible = false;
+      show_modseq_ = false;
    }
 
    IMAPFetchParser::~IMAPFetchParser()
@@ -187,6 +188,12 @@ namespace HM
             case FLAGS:
             {
                show_flags_ = true;
+               break;
+            }
+
+            case MODSEQ:
+            {
+               show_modseq_ = true;
                break;
             }
 
@@ -464,6 +471,9 @@ namespace HM
 
       if (sPart.CompareNoCase(_T("FLAGS")) == 0)
          return FLAGS;  
+
+      if (sPart.CompareNoCase(_T("MODSEQ")) == 0)
+         return MODSEQ;  
 
       if (sPart.CompareNoCase(_T("INTERNALDATE")) == 0)
          return INTERNALDATE;  

@@ -268,7 +268,8 @@ create table hm_messages (
 	messageflags tinyint not null,
 	messagecreatetime datetime not null,
 	messagelocked tinyint not null,
-   messageuid bigint not null
+   messageuid bigint not null,
+   messagemodseq bigint not null
 ) 
 
 ALTER TABLE hm_messages ADD CONSTRAINT hm_messages_pk PRIMARY KEY NONCLUSTERED (messageid) 
@@ -360,7 +361,8 @@ create table hm_imapfolders
 	foldername nvarchar(255) NOT NULL,
 	folderissubscribed tinyint NOT NULL,
    foldercreationtime datetime NOT NULL,
-   foldercurrentuid bigint NOT NULL
+   foldercurrentuid bigint NOT NULL,
+   foldercurrentmodseq bigint NOT NULL
 ) 
 
 ALTER TABLE hm_imapfolders ADD CONSTRAINT hm_imapfolders_pk PRIMARY KEY NONCLUSTERED (folderid) 
@@ -966,4 +968,4 @@ insert into hm_tcpipports (portprotocol, portnumber, portaddress1, portaddress2,
 
 insert into hm_tcpipports (portprotocol, portnumber, portaddress1, portaddress2, portconnectionsecurity, portsslcertificateid) values (5, 143, 0, NULL, 0, 0) 
 
-insert into hm_dbversion values (6001)
+insert into hm_dbversion values (6002)

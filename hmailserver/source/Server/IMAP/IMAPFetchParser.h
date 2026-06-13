@@ -30,7 +30,8 @@ namespace HM
          FULL = 212,
          RFC822HEADER = 213,
          RFC822TEXT = 214,
-         BODYSTRUCTURENONEXTENSIBLE = 215
+         BODYSTRUCTURENONEXTENSIBLE = 215,
+         MODSEQ = 216
             
       };
 
@@ -121,6 +122,8 @@ namespace HM
       bool GetShowBodyStructure() { return show_body_structure_; }
       bool GetShowBodyStructureNonExtensible() { return show_body_structure_NonExtensible; }
       
+      // RFC 7162 (CONDSTORE/QRESYNC): the MODSEQ FETCH data item.
+      bool GetShowModSeq() { return show_modseq_; }
 
       bool GetSetSeenFlag() { return set_seen_; }
 
@@ -147,6 +150,7 @@ namespace HM
       bool show_internal_date_;
       bool show_body_structure_;
       bool show_body_structure_NonExtensible;
+      bool show_modseq_;
 
       bool set_seen_;
       

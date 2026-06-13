@@ -24,6 +24,7 @@ namespace HM
       void UncacheAccount(__int64 iAccountID);
 
       void UpdateCurrentUID(__int64 accountID, __int64 folderID, unsigned int currentUID);
+      void UpdateCurrentModSeq(__int64 accountID, __int64 folderID, __int64 currentModSeq);
 
       bool Clear();
 

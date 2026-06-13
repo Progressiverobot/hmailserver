@@ -52,6 +52,11 @@ namespace HM
       unsigned int GetUID() const { return uid_; }
       void SetUID(unsigned int  uid) { uid_ = uid; }
 
+      // RFC 7162 (CONDSTORE/QRESYNC): per-mailbox mod-sequence value, bumped on
+      // arrival and on every metadata (flag) change.
+      __int64 GetModSeq() const { return message_modseq_; }
+      void SetModSeq(__int64 modSeq) { message_modseq_ = modSeq; }
+
       __int64 GetAccountID() const { return message_account_id_; }
       void SetAccountID(__int64 MsgAccountID) { message_account_id_ = (int) MsgAccountID; }
    
@@ -113,6 +118,8 @@ namespace HM
       short flags_;
 
       unsigned int uid_;
+
+      __int64 message_modseq_;
       
    private:
 

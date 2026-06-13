@@ -313,6 +313,94 @@ namespace RegressionTests.IMAP
       }
 
       [Test]
+      [Description("RFC 7162 (CONDSTORE/QRESYNC): CONDSTORE and QRESYNC are advertised in CAPABILITY and " +
+                   "ENABLE CONDSTORE echoes an * ENABLED CONDSTORE response.")]
+      public void TestEnableCondstoreEchoesEnabled()
+      {
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "condstore@example.test", "test");
+
+         var simulator = new ImapClientSimulator();
+         simulator.Connect();
+         simulator.LogonWithLiteral("condstore@example.test", "test");
+
+         var caps = simulator.GetCapabilities();
+         Assert.IsTrue(caps.Contains("CONDSTORE"), "CAPABILITY should advertise CONDSTORE. " + caps);
+         Assert.IsTrue(caps.Contains("QRESYNC"), "CAPABILITY should advertise QRESYNC. " + caps);
+
+         string result = simulator.SendSingleCommand("A01 ENABLE CONDSTORE");
+         Assert.IsTrue(result.Contains("* ENABLED CONDSTORE"),
+            "ENABLE CONDSTORE should echo an ENABLED response. " + result);
+         Assert.IsTrue(result.Contains("A01 OK"), result);
+
+         simulator.Disconnect();
+      }
+
+      [Test]
+      [Description("RFC 7162: after ENABLE CONDSTORE, SELECT reports the mailbox HIGHESTMODSEQ; " +
+                   "STATUS reports the HIGHESTMODSEQ attribute.")]
+      public void TestSelectAndStatusReportHighestModSeq()
+      {
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "highestmodseq@example.test", "test");
+
+         var simulator = new ImapClientSimulator();
+         simulator.Connect();
+         simulator.LogonWithLiteral("highestmodseq@example.test", "test");
+
+         simulator.SendSingleCommand("A01 ENABLE CONDSTORE");
+
+         string select = simulator.SendSingleCommand("A02 SELECT INBOX");
+         Assert.IsTrue(select.Contains("[HIGHESTMODSEQ"),
+            "SELECT should report HIGHESTMODSEQ once CONDSTORE is enabled. " + select);
+
+         string status = simulator.SendSingleCommand("A03 STATUS INBOX (HIGHESTMODSEQ)");
+         Assert.IsTrue(status.Contains("HIGHESTMODSEQ"),
+            "STATUS should report the HIGHESTMODSEQ attribute. " + status);
+
+         simulator.Disconnect();
+      }
+
+      [Test]
+      [Description("RFC 7162: FETCH MODSEQ returns a per-message mod-sequence, and a flag change must " +
+                   "increase that message's mod-sequence (persisted).")]
+      public void TestFetchModSeqIncrementsOnFlagChange()
+      {
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "modseqfetch@example.test", "test");
+
+         var simulator = new ImapClientSimulator();
+         simulator.Connect();
+         simulator.LogonWithLiteral("modseqfetch@example.test", "test");
+
+         simulator.SendSingleCommandWithLiteral("A01 APPEND INBOX {4}", "ABCD");
+         simulator.SendSingleCommand("A02 ENABLE CONDSTORE");
+         simulator.SelectFolder("INBOX");
+
+         string before = simulator.SendSingleCommand("A03 FETCH 1 (MODSEQ)");
+         Assert.IsTrue(before.Contains("MODSEQ ("), "FETCH should return a MODSEQ data item. " + before);
+         long modseqBefore = ParseModSeq(before);
+
+         // Changing a flag is a metadata change and must bump the message mod-sequence.
+         simulator.SendSingleCommand("A04 STORE 1 +FLAGS (\\Seen)");
+
+         string after = simulator.SendSingleCommand("A05 FETCH 1 (MODSEQ)");
+         long modseqAfter = ParseModSeq(after);
+
+         Assert.Greater(modseqAfter, modseqBefore,
+            "A flag change must increase the message MODSEQ. before=" + before + " after=" + after);
+
+         simulator.Disconnect();
+      }
+
+      private static long ParseModSeq(string fetchResponse)
+      {
+         const string marker = "MODSEQ (";
+         int p = fetchResponse.IndexOf(marker);
+         Assert.Greater(p, -1, "Response did not contain a MODSEQ item: " + fetchResponse);
+         p += marker.Length;
+         int e = fetchResponse.IndexOf(")", p);
+         return long.Parse(fetchResponse.Substring(p, e - p));
+      }
+
+      [Test]
       public void TestAppendDeletedMessage()
 
       {

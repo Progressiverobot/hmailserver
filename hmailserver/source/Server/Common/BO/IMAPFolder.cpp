@@ -26,6 +26,7 @@ namespace HM
       account_id_(iAccountID), 
       dbid_(0),
       current_uid_(0),
+      current_modseq_(1),
       folder_is_subscribed_(false),
       parent_folder_id_(iParentFolderID)
    {
@@ -36,6 +37,7 @@ namespace HM
       account_id_(0), 
       dbid_(0),
       current_uid_(0),
+      current_modseq_(1),
       folder_is_subscribed_(false),
       parent_folder_id_(-1)
    {

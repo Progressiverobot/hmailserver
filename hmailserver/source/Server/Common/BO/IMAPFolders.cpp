@@ -46,7 +46,7 @@ namespace HM
 
       vecObjects.clear();
 
-      SQLCommand command("select folderid, folderparentid, foldername, folderissubscribed, foldercurrentuid, foldercreationtime from hm_imapfolders "
+      SQLCommand command("select folderid, folderparentid, foldername, folderissubscribed, foldercurrentuid, foldercurrentmodseq, foldercreationtime from hm_imapfolders "
                          " where folderaccountid = @FOLDERACCOUNTID order by folderid asc");
 
       command.AddParameter("@FOLDERACCOUNTID", account_id_);
@@ -65,6 +65,7 @@ namespace HM
          bool bIsSubscribed = false;   
          bool bShared = false;
          unsigned int currentUID = 0;
+         __int64 currentModSeq = 1;
          DateTime creationTime;
 
          while (!pRS->IsEOF())
@@ -74,6 +75,7 @@ namespace HM
             sFolderName = pRS->GetStringValue("foldername");
             bIsSubscribed = (pRS->GetLongValue("folderissubscribed") == 1) ? true : false;
             currentUID = (unsigned int) pRS->GetInt64Value("foldercurrentuid");
+            currentModSeq = pRS->GetInt64Value("foldercurrentmodseq");
             creationTime = Time::GetDateFromSystemDate(pRS->GetStringValue("foldercreationtime"));
 
             // Initialize with dummy parent folder. We can't set it here since it may not
@@ -84,6 +86,7 @@ namespace HM
             pFolder->SetFolderName(sFolderName);
             pFolder->SetIsSubscribed(bIsSubscribed);
             pFolder->SetCurrentUID(currentUID);
+            pFolder->SetCurrentModSeq(currentModSeq);
             pFolder->SetCreationTime(creationTime);
 
             vecIMAPFolders.push_back(std::make_pair(iParentID, pFolder));

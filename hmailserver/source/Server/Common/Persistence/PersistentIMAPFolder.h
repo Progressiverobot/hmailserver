@@ -28,12 +28,19 @@ namespace HM
 
       static unsigned int GetUniqueMessageID(__int64 accountID, __int64 folderID);
 
+      // RFC 7162 (CONDSTORE/QRESYNC): atomically bumps and returns the next
+      // per-mailbox mod-sequence value, used when a message arrives or its flags change.
+      static __int64 GetNextModSeq(__int64 accountID, __int64 folderID);
+
       static __int64 GetUserInboxFolder(__int64 accountID);
 
    private:
 
       static bool IncreaseCurrentUID_(__int64 folderID);
       static unsigned int GetCurrentUID_(__int64 folderID);
+
+      static bool IncreaseCurrentModSeq_(__int64 folderID);
+      static __int64 GetCurrentModSeq_(__int64 folderID);
 
 
    };

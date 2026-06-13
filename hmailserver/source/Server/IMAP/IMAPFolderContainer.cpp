@@ -159,6 +159,41 @@ namespace HM
 
    }
 
+   void
+   IMAPFolderContainer::UpdateCurrentModSeq(__int64 accountID, __int64 folderID, __int64 currentModSeq)
+   {
+      if (accountID == 0)
+      {
+         std::shared_ptr<IMAPFolder> folder = GetPublicFolders()->GetItemByDBIDRecursive(folderID);
+         if (!folder)
+         {
+            assert(0);
+            return;
+         }
+
+         folder->SetCurrentModSeq(currentModSeq);
+      }
+      else
+      {
+         boost::lock_guard<boost::recursive_mutex> guard(fetch_list_mutex_);
+
+         auto iter = folders_.find(accountID);
+
+         if (iter == folders_.end())
+            return;
+
+         std::shared_ptr<IMAPFolder> folder = (*iter).second->GetItemByDBIDRecursive(folderID);
+         if (!folder)
+         {
+            assert(0);
+            return;
+         }
+
+         folder->SetCurrentModSeq(currentModSeq);
+      }
+
+   }
+
 
 
 }

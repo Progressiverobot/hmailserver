@@ -26,6 +26,14 @@ namespace HM
       if (!pConnection->IsAuthenticated())
          return IMAPResult(IMAPResult::ResultNo, "Authenticate first");
 
+      // RFC 7162: a "SELECT mailbox (CONDSTORE)" parameter enables CONDSTORE for the session.
+      {
+         String sCmdUpper = pArgument->Command();
+         sCmdUpper.MakeUpper();
+         if (sCmdUpper.Find(_T("CONDSTORE")) >= 0)
+            pConnection->SetCondstoreEnabled(true);
+      }
+
       std::shared_ptr<IMAPSimpleCommandParser> pParser = std::shared_ptr<IMAPSimpleCommandParser>(new IMAPSimpleCommandParser());
 
       pParser->Parse(pArgument);
@@ -81,6 +89,13 @@ namespace HM
       
       sRespTemp.Format(_T("* OK [UIDNEXT %d] next uid\r\n"), pSelectedFolder->GetCurrentUID()+1);
       sResponse += sRespTemp;
+
+      // RFC 7162 (CONDSTORE/QRESYNC): report the mailbox HIGHESTMODSEQ once CONDSTORE is enabled.
+      if (pConnection->GetCondstoreEnabled())
+      {
+         sRespTemp.Format(_T("* OK [HIGHESTMODSEQ %I64d] highest mod-sequence\r\n"), pSelectedFolder->GetCurrentModSeq());
+         sResponse += sRespTemp;
+      }
 
       sResponse += _T("* OK [PERMANENTFLAGS (\\Deleted \\Seen \\Draft \\Answered \\Flagged)] limited\r\n");
 

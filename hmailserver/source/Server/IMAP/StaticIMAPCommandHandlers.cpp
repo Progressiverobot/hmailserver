@@ -144,9 +144,30 @@ namespace HM
       if (sCapabilities.IsEmpty())
          return IMAPResult(IMAPResult::ResultBad, "The ENABLE command requires at least one capability name.");
 
-      // hMailServer currently advertises no capabilities that require ENABLE, so
-      // no extension is switched on. Per RFC 5161 the server still answers OK and
-      // simply omits the untagged ENABLED response when nothing was enabled.
+      String sUpper = sCapabilities;
+      sUpper.MakeUpper();
+
+      String sEnabled;
+
+      // RFC 7162: enabling QRESYNC implicitly enables CONDSTORE.
+      if (sUpper.Find(_T("QRESYNC")) >= 0)
+      {
+         pConnection->SetQResyncEnabled(true);
+         pConnection->SetCondstoreEnabled(true);
+         sEnabled += _T(" QRESYNC");
+      }
+
+      if (sUpper.Find(_T("CONDSTORE")) >= 0)
+      {
+         pConnection->SetCondstoreEnabled(true);
+         sEnabled += _T(" CONDSTORE");
+      }
+
+      // RFC 5161: only emit the untagged ENABLED response when at least one
+      // recognised extension was actually switched on.
+      if (!sEnabled.IsEmpty())
+         pConnection->SendAsciiData("* ENABLED" + sEnabled + "\r\n");
+
       pConnection->SendAsciiData(pArgument->Tag() + " OK ENABLE completed\r\n");
 
       return IMAPResult();

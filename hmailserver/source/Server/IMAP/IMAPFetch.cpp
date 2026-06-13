@@ -84,6 +84,14 @@ namespace HM
          AppendOutput_(sOutput, sUIDTag);
       }
 
+      // RFC 7162 (CONDSTORE/QRESYNC): emit MODSEQ when the data item is requested.
+      if (parser_->GetShowModSeq())
+      {
+         String sModSeq;
+         sModSeq.Format(_T("MODSEQ (%I64d)"), pMessage->GetModSeq());
+         AppendOutput_(sOutput, sModSeq);
+      }
+
       if (parser_->GetShowRFCSize())
       {
          String sTemp;

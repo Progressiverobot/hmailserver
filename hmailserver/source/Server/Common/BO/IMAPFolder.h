@@ -40,6 +40,11 @@ namespace HM
       unsigned int GetCurrentUID() const { return current_uid_;} 
       void SetCurrentUID(unsigned int currentUID) {current_uid_ = currentUID;}
 
+      // RFC 7162 (CONDSTORE/QRESYNC): the mailbox HIGHESTMODSEQ, i.e. the largest
+      // mod-sequence ever assigned to a message in (or removed from) this folder.
+      __int64 GetCurrentModSeq() const { return current_modseq_;}
+      void SetCurrentModSeq(__int64 currentModSeq) {current_modseq_ = currentModSeq;}
+
       const DateTime &GetCreationTime() const { return create_time_;} 
       void SetCreationTime(const DateTime &currentUID) {create_time_ = currentUID;}
 
@@ -76,6 +81,7 @@ namespace HM
       __int64 account_id_;
       __int64 parent_folder_id_;
       unsigned int current_uid_;
+      __int64 current_modseq_;
 
       bool folder_is_subscribed_;
       AnsiString folder_name_;
