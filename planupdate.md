@@ -60,6 +60,7 @@ Commits: `6f7e019` (defects), `53ec538` (line-ending default), `9f3a51e` (AUTH c
 | ✅ Listener slow-loris | (REST/Web/Metrics) | Verified already mitigated — 64 KB / fixed-buffer request caps + 5–10 s read deadlines already present. |
 | ✅ Secure default: strict SMTP line endings | `DBScripts/CreateTables{MYSQL,MSSQL,PGSQL}.sql` | `smtpallowincorrectlineendings` default 1→0 on fresh installs (SMTP-smuggling hardening). Validated: SMTP suite 175/175 under strict mode. Commit `53ec538`. |
 | ✅ Per-connection SMTP AUTH cap | `SMTP/SMTPConnection.cpp/.h` | 10 failed AUTH attempts per connection → 535 + disconnect (defense-in-depth over per-IP auto-ban). Validated: SMTP 175/175. Commit `9f3a51e`. |
+| ✅ Per-connection IMAP/POP3 auth cap | `IMAP/IMAPConnection.*`, `IMAP/IMAPCommandLogin.cpp`, `IMAP/IMAPCommandAuthenticate.cpp`, `POP3/POP3Connection.*` | 10 failed logins per connection → disconnect, even when the per-IP auto-ban is disabled (parity with SMTP). Validated: IMAP 217/217, POP3 48/48. Commit `b8a3829`. |
 
 ### ⏳ Next
 
@@ -246,8 +247,8 @@ correct dot-stuffing, parameterized SQL.*
 Delivered and validated — see **Implementation progress** above (commits `6f7e019`,
 `53ec538`, `9f3a51e`; IMAP 215/215 + SMTP 175/175).
 Deferred from B1 (do with the TLS/auth work, higher regression risk): modern default
-TLS cipher list (drop RC4/legacy CBC) and MD5-hash-accept deprecation; per-connection
-AUTH cap for IMAP/POP3 (they already inherit the per-IP auto-ban).
+TLS cipher list (drop RC4/legacy CBC) and MD5-hash-accept deprecation. (The
+per-connection IMAP/POP3 AUTH cap is now done — commit `b8a3829`.)
 
 ## B2 — Authentication modernization
 - OAuth2 SASL **XOAUTH2 + OAUTHBEARER** (IMAP / SMTP submission / POP3); token validation
