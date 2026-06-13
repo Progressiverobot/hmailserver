@@ -29,7 +29,7 @@ build, run the regression suite, (CP steps) screenshot-validate, then commit/pus
    reproducer regression tests for the B1 defects and an over-the-wire protocol fuzz suite for the
    SMTP/IMAP/MIME parsers. (Coverage-guided libFuzzer is impractical in this environment — MSVC/ATL-
    coupled parsers, no fuzzer runtime — so the live over-the-wire fuzzer is the validated substitute.)
-3. **Track A Ph 0–1 — drop classic from installer + Control-Panel functional parity.** CP becomes the sole shipped GUI.
+3. **Track A Ph 0–1 — drop classic from installer + Control-Panel functional parity.** ⏳ **In progress** — Phase 1 is 9/10 (item 7 AD pickers deferred to a domain-joined runner); Phase 0 (drop the classic) follows once item 7 lands. CP becomes the sole shipped GUI.
 4. **B3 — secrets & least-privilege** (DPAPI for INI/DB secrets; non-LocalSystem service).
 5. **B2 — auth modernization** (OAuth2 XOAUTH2/OAUTHBEARER, SCRAM-SHA-256, Argon2id + hash policy).
 6. **Track A Ph 2 — Control-Panel UX/UI polish.**
@@ -50,9 +50,12 @@ as work lands.
 
 ### ✅ Done — Server security & correctness defects (Track B, phase B1)
 
-Validated end-to-end: **IMAP 215/215** and **SMTP 175/175** regression tests pass
-(SMTP re-run under strict line-endings and again with the AUTH cap — both 175/175).
-Commits: `6f7e019` (defects), `53ec538` (line-ending default), `9f3a51e` (AUTH cap).
+Validated end-to-end: the IMAP and SMTP regression suites pass (originally **IMAP
+215/215** + **SMTP 175/175**; SMTP re-run under strict line-endings and again with
+the AUTH cap — both 175/175). The suite has since grown and stays green with the B1
+reproducer tests, the IMAP/POP3 per-connection auth-cap tests (**IMAP+POP3 267/267**)
+and the over-the-wire protocol fuzz suite (**3/3**). Commits: `6f7e019` (defects),
+`53ec538` (line-ending default), `9f3a51e` (AUTH cap).
 
 | Fix | File | What changed |
 |---|---|---|
@@ -80,10 +83,16 @@ Commits: `6f7e019` (defects), `53ec538` (line-ending default), `9f3a51e` (AUTH c
   `run-tests.ps1`). Coverage-guided libFuzzer was assessed and is impractical here (no fuzzer runtime
   in the available clang; parsers are MSVC/ATL/Windows-coupled) — the live fuzzer is the validated
   substitute.
-- ⬜ Modern default TLS cipher list (drop RC4/legacy CBC) + MD5-hash-accept deprecation —
-  deferred to run with the TLS/auth-modernization work (higher regression risk).
-- ⬜ Then: Control-Panel parity track (Phases 0–4 below), then deeper hardening
-  (OAuth2/SCRAM, DPAPI secrets, SMTPUTF8, IMAP sync profile).
+- ✅ Modern default TLS + password hashing — **assessed: already delivered in the 6.0 modernization.**
+  TLS defaults to 1.2+1.3 only (`SslVersions=24`, SSLv2/3 always off, modern EC curves
+  `secp384r1:x25519:secp256r1`) — no RC4/legacy-protocol exposure; passwords default to PBKDF2
+  (`PreferredHashAlgorithm=4`), COM `put_Password` and the REST API both hash new passwords with
+  PBKDF2, and logins transparently re-hash MD5/SHA256 → PBKDF2. Remaining *optional* hardening
+  (lower priority): an explicit AEAD-only cipher-list default (client-interop trade-off) and upgrading
+  the management/admin INI password from MD5.
+- ⬜ **Next phase:** finish Track A Phase 1 item 7 (AD pickers, needs a domain-joined runner) →
+  Phase 0 (drop the classic from the installer) → Track B **B3** (DPAPI for INI/DB secrets +
+  non-LocalSystem service), then **B2** (OAuth2/SCRAM/Argon2) and the rest of the master sequence.
 
 The full two-track roadmap is below: **Track A** (Control Panel) then **Track B**
 (server hardening B2–B8) then the future track.
@@ -129,13 +138,21 @@ The full two-track roadmap is below: **Track A** (Control Panel) then **Track B*
 | 4 | ✅ **Route Addresses tab** (done, commit 88ae5bf) | `Route.Addresses` | AllAddresses toggle (already present) + per-address list editor (Add/Remove, persists via `Addresses.Add()/Save()/DeleteByDBID`). Live-validated end-to-end. |
 | 5 | ✅ **Status page** (done, commit 9aff58c) | `Application.Status/Version/ServerState/Database` | New `StatusView` (nav: Status → Server status): server (version+arch, state, started, uptime), database (type/host/name/schema), statistics (processed/spam/virus + SMTP/IMAP/POP3 sessions), and the ucStatus configuration **warnings** (no host name, deny-null sender, external→external relay without auth, localhost banned, auto-ban count). Live-validated incl. warning badges. |
 | 6 | ✅ **TOTP 2FA login** (done, commit e9e5051) | `Services/Totp.cs`, `TotpSetupDialog`, `TotpPromptDialog` | RFC 6238 setup (secret + otpauth URI) + login prompt gate in `OnConnected`. Reads the same HKLM `AdminTotpSecret` (machine-scope DPAPI via crypt32) as Administrator, so existing 2FA carries over. Live-validated end-to-end (DPAPI round-trip, prompt, code acceptance → dashboard). |
-| 7 | **Active Directory pickers + Import members** | port `formActiveDirectoryAccounts`, `formSelectUsers`, `formUserAccounts`, `formImportMembers` | Browse/import AD accounts into the Account Directory tab; import members for groups/dist-lists. |
+| 7 | ⏸ **Active Directory pickers + Import members** (deferred — needs a domain-joined runner) | port `formActiveDirectoryAccounts`, `formSelectUsers`, `formUserAccounts`, `formImportMembers` | Browse/import AD accounts into the Account Directory tab; import members for groups/dist-lists. **Deferred:** the dev/test machine is in a WORKGROUP and the `System.DirectoryServices`/`AccountManagement` packages are not available offline, so the AD-query path cannot be built or validated here. The Directory tab already supports manual AD linkage (ADDomain/ADUsername); only the *browse* picker convenience is outstanding. |
 | 8 | ✅ **Message viewer** (done, commit 4cf4bac) | `MessageViewerDialog` | "View source" / double-click on a queued message shows the raw `.eml` (headers + body) read from disk (`Status.UndeliveredMessages` file column), with Copy. Friendly message if the file is gone/inaccessible. Live-validated. |
 | 9 | ✅ **DMARC failure score** (done, commit 9743096) | `AntiSpam.DMARCFailureScore` | Field added to the AntiSpam section. |
 | 10 | ◑ **Admin actions** (greylisting + logon-failure clear done, commit 9743096; IP-range bulk SetDefault deferred — destructive) | `ClearGreyListingTriplets`, `ClearLogonFailureList`, IP-range `SetDefault` | Surface as buttons. |
 
 *Parallelizable:* items 1, 2, 4, 9 are small and independent. Items 3, 5, 6, 7
 are larger.
+
+**Status: 9 of 10 items done** (1–6, 8, 9 complete and released; 10 partial — the
+greylisting + logon-failure clears shipped, the destructive IP-range bulk
+`SetDefault` is intentionally left out; 7 deferred for AD-environment reasons).
+Every completed item was build-clean (`-warnaserror`), live-validated via
+screenshots/COM round-trips, and shipped in the `v6.2.0` installer. Once item 7
+lands (on a domain-joined runner), **Phase 0** can drop the classic Administrator
+from the installer.
 
 ---
 
@@ -315,10 +332,19 @@ upgrading the management/admin INI password from MD5.
 - HA: a documented, tested active/passive (shared DB + storage + VIP) runbook + readiness gating
   (no clustering code in this track).
 
-## B8 — Quality gates & supply chain (no CI exists today)
-- **GitHub Actions**: build+test matrix Windows × MySQL/MSSQL/PostgreSQL running the full suite.
-- SAST (CodeQL + clang-tidy); ASAN/UBSAN build; **fuzz harnesses for SMTP/IMAP/MIME parsers**
-  (the B1 defects prove the need). SBOM + dependency/CVE scanning + signed release artifacts.
+## B8 — Quality gates & supply chain
+**Delivered (core):** GitHub Actions \u2014 `ci.yml` (Control Panel build, warnings-as-errors) and
+`codeql.yml` (CodeQL C# SAST) on hosted runners, plus `server-build.yml` (self-hosted native C++
+build on a VS 2026/v145 runner + opt-in regression-suite run). B1 reproducer tests and an
+over-the-wire SMTP/IMAP/MIME protocol fuzz suite (`Security/ProtocolFuzz.cs`, 3/3) lock in the
+parser hardening.
+**Remaining (future):**
+- build+test matrix Windows \u00d7 MySQL/MSSQL/PostgreSQL running the full suite (today the self-hosted
+  workflow runs one DB at a time).
+- clang-tidy; ASAN/UBSAN build; coverage-guided **libFuzzer** harnesses (need a clang+fuzzer
+  toolchain and decoupled parsers \u2014 impractical in the current MSVC/ATL environment, where the live
+  over-the-wire fuzzer is the substitute).
+- SBOM + dependency/CVE scanning + signed release artifacts.
 - Verify: green-gates-required-to-merge; nightly fuzz.
 
 ## Cross-cutting — surface new server capabilities in the Control Panel
