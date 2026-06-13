@@ -23,9 +23,11 @@ build, run the regression suite, (CP steps) screenshot-validate, then commit/pus
 + move tag `v6.2.0` + clobber the release asset.
 
 1. **B1 — security & correctness defects + secure defaults.** ✅ **Done** (see Progress).
-2. **B8 (core) — CI + fuzzing.** ⏳ **In progress** — GitHub Actions added (CP build + CodeQL C#) and
-   reproducer regression tests for the B1 defects; remaining: native server-build CI (cached deps +
-   DB service running the 898 suite) and libFuzzer harnesses for the SMTP/IMAP/MIME parsers.
+2. **B8 (core) — CI + fuzzing.** ⏳ **In progress** — GitHub Actions added (CP build + CodeQL C#),
+   reproducer regression tests for the B1 defects, and an over-the-wire protocol fuzz suite for the
+   SMTP/IMAP/MIME parsers; remaining: native server-build CI (cached deps + DB service running the
+   898 suite). (Coverage-guided libFuzzer is impractical in this environment — MSVC/ATL-coupled
+   parsers, no fuzzer runtime — so the live over-the-wire fuzzer is the validated substitute.)
 3. **Track A Ph 0–1 — drop classic from installer + Control-Panel functional parity.** CP becomes the sole shipped GUI.
 4. **B3 — secrets & least-privilege** (DPAPI for INI/DB secrets; non-LocalSystem service).
 5. **B2 — auth modernization** (OAuth2 XOAUTH2/OAUTHBEARER, SCRAM-SHA-256, Argon2id + hash policy).
@@ -67,8 +69,14 @@ Commits: `6f7e019` (defects), `53ec538` (line-ending default), `9f3a51e` (AUTH c
 - ⏳ **B8 — CI + fuzzing** *(in progress)*: added `.github/workflows/ci.yml` (Control Panel
   build, warnings-as-errors) and `codeql.yml` (C# static analysis), plus reproducer tests
   `TestAppendOversizedLiteralRejected` / `TestOversizedCommandLiteralRejected` (guard the B1
-  IMAP fixes; pass 2/2). Remaining: native **server-build CI** (cached OpenSSL/Boost/libpq +
-  DB service running the 898 suite) and **libFuzzer harnesses** for the SMTP/IMAP/MIME parsers.
+  IMAP fixes; pass 2/2). ✅ Added an **over-the-wire protocol fuzz suite**
+  (`Security/ProtocolFuzz.cs`, commit `fc6d1da`): seeded malformed-input barrage against the live
+  SMTP and IMAP command parsers and the inbound MIME parser, asserting the server never
+  crashes/hangs/logs a fault (layered detection: liveness check + `ServiceRestartDetector` +
+  `AssertNoReportedError`, with per-test `[Timeout]`). 3/3 pass (~231 s). Remaining: native
+  **server-build CI** (cached OpenSSL/Boost/libpq + DB service running the 898 suite). Coverage-guided
+  libFuzzer was assessed and is impractical here (no fuzzer runtime in the available clang; parsers
+  are MSVC/ATL/Windows-coupled) — the live fuzzer is the validated substitute.
 - ⬜ Modern default TLS cipher list (drop RC4/legacy CBC) + MD5-hash-accept deprecation —
   deferred to run with the TLS/auth-modernization work (higher regression risk).
 - ⬜ Then: Control-Panel parity track (Phases 0–4 below), then deeper hardening
