@@ -313,7 +313,10 @@ upgrading the management/admin INI password from MD5.
 - Verify: EAI roundtrip; SPF passes on forwarded mail; DSN interop.
 
 ## B5 — IMAP modern sync profile
-- CONDSTORE/QRESYNC (7162), UIDPLUS (4315), ENABLE (5161), LIST-EXTENDED/ESEARCH/SEARCHRES,
+- ✅ **UNSELECT (RFC 3691)** — delivered in v6.2.0. Closes the selected mailbox without the
+  implicit EXPUNGE that CLOSE performs (\Deleted retained). Advertised in CAPABILITY. Covered by
+  `RegressionTests.IMAP.Basics.TestUnselectKeepsDeletedMessages`.
+- ⏳ Remaining: CONDSTORE/QRESYNC (7162), UIDPLUS (4315), ENABLE (5161), LIST-EXTENDED/ESEARCH/SEARCHRES,
   STATUS=SIZE; consider IMAP4rev2. (`IMAPCommandCapability` + command map.)
 - Verify: fast resync in Thunderbird/Apple Mail.
 
