@@ -42,6 +42,12 @@ namespace HM
       virtual IMAPResult ExecuteCommand(std::shared_ptr<HM::IMAPConnection> pConnection, std::shared_ptr<IMAPCommandArgument> pArgument);
    };
 
+   // RFC 5161: negotiates use of extensions that change behaviour the client must opt in to.
+   class IMAPCommandENABLE : public IMAPCommand
+   {
+      virtual IMAPResult ExecuteCommand(std::shared_ptr<HM::IMAPConnection> pConnection, std::shared_ptr<IMAPCommandArgument> pArgument);
+   };
+
 
 
 }

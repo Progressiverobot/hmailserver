@@ -84,6 +84,7 @@ namespace HM
       mapCommandHandlers[IMAPConnection::IMAP_LISTRIGHTS] = std::shared_ptr<IMAPCommandListRights>(new IMAPCommandListRights());
       mapCommandHandlers[IMAPConnection::IMAP_STARTTLS] = std::shared_ptr<IMAPCommandStartTls>(new IMAPCommandStartTls());
       mapCommandHandlers[IMAPConnection::IMAP_UNSELECT] = std::shared_ptr<IMAPCommandUNSELECT>(new IMAPCommandUNSELECT());
+      mapCommandHandlers[IMAPConnection::IMAP_ENABLE] = std::shared_ptr<IMAPCommandENABLE>(new IMAPCommandENABLE());
    }
 
 
@@ -122,6 +123,31 @@ namespace HM
       pConnection->CloseCurrentFolder();
 
       pConnection->SendAsciiData(pArgument->Tag() + " OK UNSELECT completed\r\n");
+
+      return IMAPResult();
+   }
+
+   IMAPResult
+   IMAPCommandENABLE::ExecuteCommand(std::shared_ptr<IMAPConnection> pConnection, std::shared_ptr<IMAPCommandArgument> pArgument)
+   {
+      if (!pConnection->IsAuthenticated())
+         return IMAPResult(IMAPResult::ResultNo, "Authenticate first");
+
+      // RFC 5161: ENABLE takes a non-empty, space-separated list of capability
+      // names following the command word. Strip the leading "ENABLE".
+      String sLine = pArgument->Command();
+      int iSpace = sLine.Find(_T(" "));
+      String sCapabilities = (iSpace >= 0) ? sLine.Mid(iSpace + 1) : _T("");
+      sCapabilities.TrimLeft();
+      sCapabilities.TrimRight();
+
+      if (sCapabilities.IsEmpty())
+         return IMAPResult(IMAPResult::ResultBad, "The ENABLE command requires at least one capability name.");
+
+      // hMailServer currently advertises no capabilities that require ENABLE, so
+      // no extension is switched on. Per RFC 5161 the server still answers OK and
+      // simply omits the untagged ENABLED response when nothing was enabled.
+      pConnection->SendAsciiData(pArgument->Tag() + " OK ENABLE completed\r\n");
 
       return IMAPResult();
    }

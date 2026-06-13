@@ -130,6 +130,24 @@ namespace HM
          sResponse +=sTemp;
       }
 
+      if (sFlags.FindNoCase(_T("SIZE")) >= 0)
+      {
+         // RFC 8438: total size of the mailbox in octets (sum of RFC822.SIZE).
+         __int64 iTotalSize = 0;
+         for (std::shared_ptr<Message> oMessage : pMessages->GetCopy())
+            iTotalSize += oMessage->GetSize();
+
+         String sTemp;
+         sTemp.Format(_T("SIZE %I64d"), iTotalSize);
+
+         if (bAddSpace)
+            sResponse += " ";
+         else
+            bAddSpace = true;
+
+         sResponse += sTemp;
+      }
+
 
       sResponse+= ")\r\n";
 

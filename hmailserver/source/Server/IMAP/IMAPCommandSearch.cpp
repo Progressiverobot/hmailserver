@@ -27,7 +27,12 @@ namespace HM
 {
    IMAPCommandSEARCH::IMAPCommandSEARCH(bool bIsSort) :
       is_sort_(bIsSort),
-      is_uid_(false)
+      is_uid_(false),
+      is_esearch_(false),
+      esearch_min_(false),
+      esearch_max_(false),
+      esearch_all_(false),
+      esearch_count_(false)
    {
 
    }
@@ -68,6 +73,41 @@ namespace HM
          sCommand = sCommand.Mid(iCommandStartPos); // 3 as in UID
 
          pArgument->Command(sCommand);
+      }
+
+      // RFC 4731 (ESEARCH): an optional "RETURN (...)" result-options clause may
+      // follow the SEARCH keyword. Detect and consume it before criteria parsing.
+      // (RETURN with SORT is ESORT/RFC 5267 and is intentionally not handled here.)
+      if (!is_sort_)
+      {
+         String sTrimmed = pArgument->Command();
+         sTrimmed.TrimLeft();
+
+         if (sTrimmed.Mid(0, 6).CompareNoCase(_T("RETURN")) == 0)
+         {
+            int iOpen = sTrimmed.Find(_T("("));
+            int iClose = (iOpen >= 0) ? sTrimmed.Find(_T(")"), iOpen) : -1;
+            if (iOpen < 0 || iClose < 0)
+               return IMAPResult(IMAPResult::ResultBad, "Invalid ESEARCH RETURN options.");
+
+            is_esearch_ = true;
+
+            String sOptions = sTrimmed.Mid(iOpen + 1, iClose - iOpen - 1);
+            sOptions.MakeUpper();
+            if (sOptions.Find(_T("MIN")) >= 0)   esearch_min_ = true;
+            if (sOptions.Find(_T("MAX")) >= 0)   esearch_max_ = true;
+            if (sOptions.Find(_T("COUNT")) >= 0) esearch_count_ = true;
+            if (sOptions.Find(_T("ALL")) >= 0)   esearch_all_ = true;
+
+            // RFC 4731: an empty RETURN option list is equivalent to (ALL).
+            if (!esearch_min_ && !esearch_max_ && !esearch_count_ && !esearch_all_)
+               esearch_all_ = true;
+
+            // The search criteria follow the closing parenthesis.
+            String sCriteria = sTrimmed.Mid(iClose + 1);
+            sCriteria.TrimLeft();
+            pArgument->Command(sCriteria);
+         }
       }
 
       std::shared_ptr<IMAPSearchParser> pParser = std::shared_ptr<IMAPSearchParser>(new IMAPSearchParser());
@@ -139,7 +179,38 @@ namespace HM
       }
       
       String sResponse;
-      if (is_sort_)
+      if (is_esearch_)
+      {
+         // RFC 4731 ESEARCH response. Messages are accumulated in ascending
+         // sequence/UID order, so the first match is the minimum and the last
+         // is the maximum.
+         sResponse = "* ESEARCH (TAG \"" + pArgument->Tag() + "\")";
+
+         if (is_uid_)
+            sResponse += " UID";
+
+         if (!sMatchingVec.empty())
+         {
+            if (esearch_min_)
+               sResponse += " MIN " + sMatchingVec.front();
+
+            if (esearch_max_)
+               sResponse += " MAX " + sMatchingVec.back();
+
+            if (esearch_all_)
+               sResponse += " ALL " + StringParser::JoinVector(sMatchingVec, ",");
+         }
+
+         if (esearch_count_)
+         {
+            String sCount;
+            sCount.Format(_T(" COUNT %u"), (unsigned int) sMatchingVec.size());
+            sResponse += sCount;
+         }
+
+         sResponse += "\r\n";
+      }
+      else if (is_sort_)
          sResponse = "* SORT" + sMatching + "\r\n";
       else
          sResponse = "* SEARCH" + sMatching + "\r\n";

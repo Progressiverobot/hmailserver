@@ -227,7 +227,94 @@ namespace RegressionTests.IMAP
       }
 
       [Test]
+      [Description("RFC 5161 (ENABLE): ENABLE is advertised in CAPABILITY and the command returns a tagged OK.")]
+      public void TestEnableReturnsOk()
+      {
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "enable@example.test", "test");
+
+         var simulator = new ImapClientSimulator();
+         simulator.Connect();
+         simulator.LogonWithLiteral("enable@example.test", "test");
+
+         Assert.IsTrue(simulator.GetCapabilities().Contains("ENABLE"),
+            "The CAPABILITY response should advertise the ENABLE extension.");
+
+         string result = simulator.SendSingleCommand("A01 ENABLE CONDSTORE");
+         Assert.IsTrue(result.Contains("A01 OK"),
+            "ENABLE should return a tagged OK. Response: " + result);
+
+         simulator.Disconnect();
+      }
+
+      [Test]
+      [Description("RFC 8438 (STATUS=SIZE): STATUS returns the total mailbox SIZE and STATUS=SIZE is " +
+                   "advertised in CAPABILITY.")]
+      public void TestStatusReturnsMailboxSize()
+      {
+         var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "statussize@example.test", "test");
+
+         var smtp = new SmtpClientSimulator();
+         smtp.Send(account.Address, account.Address, "Size test", "Body");
+         ImapClientSimulator.AssertMessageCount(account.Address, "test", "INBOX", 1);
+
+         var simulator = new ImapClientSimulator();
+         Assert.IsTrue(simulator.ConnectAndLogon(account.Address, "test"));
+
+         Assert.IsTrue(simulator.GetCapabilities().Contains("STATUS=SIZE"),
+            "The CAPABILITY response should advertise STATUS=SIZE.");
+
+         string result = simulator.SendSingleCommand("A01 STATUS INBOX (MESSAGES SIZE)");
+
+         int sizePos = result.IndexOf("SIZE ");
+         Assert.Greater(sizePos, 0, "STATUS should return a SIZE item. Response: " + result);
+
+         string after = result.Substring(sizePos + 5);
+         int end = after.IndexOfAny(new[] { ' ', ')' });
+         int size = int.Parse(after.Substring(0, end));
+         Assert.Greater(size, 0, "STATUS SIZE should be greater than zero for a non-empty mailbox. Response: " + result);
+
+         simulator.Disconnect();
+      }
+
+      [Test]
+      [Description("RFC 4731 (ESEARCH): SEARCH RETURN (...) yields a * ESEARCH response carrying MIN/MAX/COUNT/ALL " +
+                   "and ESEARCH is advertised in CAPABILITY.")]
+      public void TestEsearchReturnsExtendedResponse()
+      {
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "esearch@example.test", "test");
+
+         var simulator = new ImapClientSimulator();
+         simulator.Connect();
+         simulator.LogonWithLiteral("esearch@example.test", "test");
+
+         Assert.IsTrue(simulator.GetCapabilities().Contains("ESEARCH"),
+            "The CAPABILITY response should advertise the ESEARCH extension.");
+
+         // Append three messages; they receive sequence numbers / UIDs 1..3.
+         simulator.SendSingleCommandWithLiteral("A01 APPEND INBOX {4}", "AAAA");
+         simulator.SendSingleCommandWithLiteral("A02 APPEND INBOX {4}", "BBBB");
+         simulator.SendSingleCommandWithLiteral("A03 APPEND INBOX {4}", "CCCC");
+
+         simulator.SelectFolder("INBOX");
+
+         string result = simulator.SendSingleCommand("A04 SEARCH RETURN (MIN MAX COUNT ALL) ALL");
+         Assert.IsTrue(result.Contains("* ESEARCH"),
+            "SEARCH RETURN must produce an ESEARCH response. Response: " + result);
+         Assert.IsTrue(result.Contains("(TAG \"A04\")"),
+            "The ESEARCH response must echo the command tag. Response: " + result);
+         Assert.IsTrue(result.Contains("MIN 1"),
+            "ESEARCH MIN should be 1. Response: " + result);
+         Assert.IsTrue(result.Contains("MAX 3"),
+            "ESEARCH MAX should be 3. Response: " + result);
+         Assert.IsTrue(result.Contains("COUNT 3"),
+            "ESEARCH COUNT should be 3. Response: " + result);
+
+         simulator.Disconnect();
+      }
+
+      [Test]
       public void TestAppendDeletedMessage()
+
       {
          var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "check@example.test", "test");
 

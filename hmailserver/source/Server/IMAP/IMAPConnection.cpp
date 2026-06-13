@@ -600,6 +600,8 @@ namespace HM
          return IMAP_ID;
       else if (sCommand == _T("UNSELECT"))
          return IMAP_UNSELECT;
+      else if (sCommand == _T("ENABLE"))
+         return IMAP_ENABLE;
 
       return IMAP_UNKNOWN;
    }

@@ -53,5 +53,12 @@ namespace HM
 
       bool is_sort_;
       bool is_uid_;
+
+      // RFC 4731 (ESEARCH) result-option state, parsed from a "RETURN (...)" clause.
+      bool is_esearch_;
+      bool esearch_min_;
+      bool esearch_max_;
+      bool esearch_all_;
+      bool esearch_count_;
    };
 }

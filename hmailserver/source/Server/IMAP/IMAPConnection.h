@@ -82,7 +82,8 @@ namespace HM
          IMAP_STARTTLS = 135,
          IMAP_MOVE = 136,
          IMAP_ID = 137,
-         IMAP_UNSELECT = 138
+         IMAP_UNSELECT = 138,
+         IMAP_ENABLE = 139
       };
 
       void ParseData(const AnsiString &Request);
