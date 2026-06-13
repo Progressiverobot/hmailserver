@@ -1,0 +1,104 @@
+name: Server build & regression tests
+
+# Builds the native C++ hMailServer service and (optionally) runs the regression
+# suite.
+#
+# This workflow REQUIRES a self-hosted Windows runner. The GitHub-hosted runners
+# cannot build the server because it needs:
+#   * Visual Studio 2026 Build Tools — platform toolset v145 (MSVC 14.51); and
+#   * the prebuilt native dependencies (boost_1_91_0, openssl-4.0.1,
+#     postgresql-18.3) pointed to by the machine environment variable
+#     hMailServerLibs (see libraries/build-dependencies.ps1 and
+#     IMPLEMENTATION-NOTES.md).
+#
+# Set up a self-hosted runner with the labels [self-hosted, windows] on a machine
+# that has the build prerequisites above. The "Build server" job only needs the
+# toolchain + dependencies and is the primary compile gate.
+#
+# Running the regression suite (run_tests = true) additionally needs:
+#   * the runner process to be elevated (post-build.ps1 registers the COM server
+#     and the steps control the Windows service);
+#   * the hMailServer Windows service installed on the runner, with its image path
+#     pointing at this checkout's build output; and
+#   * a reachable database plus the test-environment integrations (see AGENTS.md /
+#     IMPLEMENTATION-NOTES.md for the recipe behind the full 898/898 result).
+
+on:
+  workflow_dispatch:
+    inputs:
+      configuration:
+        description: 'Build configuration'
+        type: choice
+        options: [Release, Debug]
+        default: Release
+      run_tests:
+        description: 'Also build and run the regression suite (needs DB + deployed service on the runner)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  server-build:
+    name: Build server (VS 2026 / v145)
+    runs-on: [self-hosted, windows]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify native dependencies
+        shell: powershell
+        run: |
+          if (-not $env:hMailServerLibs) { throw "hMailServerLibs is not set on this runner." }
+          if (-not (Test-Path $env:hMailServerLibs)) { throw "hMailServerLibs path '$($env:hMailServerLibs)' does not exist." }
+          foreach ($d in 'boost_1_91_0', 'openssl-4.0.1', 'postgresql-18.3') {
+            if (-not (Test-Path (Join-Path $env:hMailServerLibs $d))) {
+              Write-Warning "Expected dependency folder not found under hMailServerLibs: $d (the build may fail to link)."
+            }
+          }
+          Write-Host "hMailServerLibs = $($env:hMailServerLibs)"
+
+      - name: Stop hMailServer service (free the executable)
+        shell: powershell
+        run: Stop-Service hMailServer -ErrorAction SilentlyContinue
+
+      - name: Build server (warnings = errors via /WX in the project)
+        shell: powershell
+        run: ./build/build.ps1 -Configuration ${{ github.event.inputs.configuration }}
+
+      - name: Build regression tests
+        if: ${{ github.event.inputs.run_tests == 'true' }}
+        shell: powershell
+        run: ./build/build-tests.ps1
+
+      - name: Deploy & register COM (post-build)
+        if: ${{ github.event.inputs.run_tests == 'true' }}
+        shell: powershell
+        run: ./build/post-build.ps1 -Configuration ${{ github.event.inputs.configuration }}
+
+      - name: Start hMailServer service
+        if: ${{ github.event.inputs.run_tests == 'true' }}
+        shell: powershell
+        run: |
+          Remove-Item 'C:\HM\Logs\ERROR_hmailserver_*.log' -ErrorAction SilentlyContinue
+          Start-Service hMailServer
+          Start-Sleep -Seconds 5
+
+      - name: Run regression suite
+        if: ${{ github.event.inputs.run_tests == 'true' }}
+        shell: powershell
+        run: ./build/run-tests.ps1
+
+      - name: Upload test results
+        if: ${{ always() && github.event.inputs.run_tests == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-test-results
+          path: TestResult.xml
+          if-no-files-found: ignore
+
+      - name: Restart hMailServer service
+        if: ${{ always() }}
+        shell: powershell
+        run: Start-Service hMailServer -ErrorAction SilentlyContinue
