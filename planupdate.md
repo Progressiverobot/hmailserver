@@ -23,7 +23,9 @@ build, run the regression suite, (CP steps) screenshot-validate, then commit/pus
 + move tag `v6.2.0` + clobber the release asset.
 
 1. **B1 — security & correctness defects + secure defaults.** ✅ **Done** (see Progress).
-2. **B8 (core) — CI + fuzzing.** GitHub Actions matrix running the suite; ASAN/UBSAN; SMTP/IMAP/MIME fuzz harnesses.
+2. **B8 (core) — CI + fuzzing.** ⏳ **In progress** — GitHub Actions added (CP build + CodeQL C#) and
+   reproducer regression tests for the B1 defects; remaining: native server-build CI (cached deps +
+   DB service running the 898 suite) and libFuzzer harnesses for the SMTP/IMAP/MIME parsers.
 3. **Track A Ph 0–1 — drop classic from installer + Control-Panel functional parity.** CP becomes the sole shipped GUI.
 4. **B3 — secrets & least-privilege** (DPAPI for INI/DB secrets; non-LocalSystem service).
 5. **B2 — auth modernization** (OAuth2 XOAUTH2/OAUTHBEARER, SCRAM-SHA-256, Argon2id + hash policy).
@@ -61,9 +63,13 @@ Commits: `6f7e019` (defects), `53ec538` (line-ending default), `9f3a51e` (AUTH c
 
 ### ⏳ Next
 
+- ⏳ **B8 — CI + fuzzing** *(in progress)*: added `.github/workflows/ci.yml` (Control Panel
+  build, warnings-as-errors) and `codeql.yml` (C# static analysis), plus reproducer tests
+  `TestAppendOversizedLiteralRejected` / `TestOversizedCommandLiteralRejected` (guard the B1
+  IMAP fixes; pass 2/2). Remaining: native **server-build CI** (cached OpenSSL/Boost/libpq +
+  DB service running the 898 suite) and **libFuzzer harnesses** for the SMTP/IMAP/MIME parsers.
 - ⬜ Modern default TLS cipher list (drop RC4/legacy CBC) + MD5-hash-accept deprecation —
   deferred to run with the TLS/auth-modernization work (higher regression risk).
-- ⬜ CI + fuzzing (GitHub Actions matrix, ASAN/UBSAN, SMTP/IMAP/MIME fuzz harnesses).
 - ⬜ Then: Control-Panel parity track (Phases 0–4 below), then deeper hardening
   (OAuth2/SCRAM, DPAPI secrets, SMTPUTF8, IMAP sync profile).
 
