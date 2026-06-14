@@ -225,10 +225,14 @@ Administration and monitoring:
    RestApiBindAddress=127.0.0.1  ; TLS is required unless bound to 127.0.0.1
    RestApiCertificateFile=       ; PEM; falls back to the ACME certificate
    RestApiPrivateKeyFile=
-   MetricsServerPort=0           ; Prometheus metrics endpoint (/metrics)
+   MetricsServerPort=0           ; Prometheus metrics endpoint (/metrics) + health probes
    MetricsServerBindAddress=127.0.0.1
+   LogDeleteDays=0               ; prune hMailServer's own date-stamped logs older than N days (0 = keep all)
+   ShutdownDrainSeconds=0        ; on stop, wait up to N seconds for active sessions to finish (0 = stop immediately)
    JsonLogging=0                 ; write logs as JSON lines
    </pre>
+
+   The metrics listener also serves Kubernetes-style health probes: `/livez` (process liveness), `/readyz` (200 when `StateRunning` and the database pool is connected, else 503 — and 503 while the server is draining/stopping) and `/healthz` (JSON: status, server state, database). `/metrics` exposes counters and gauges for processed/spam/virus messages, TLS handshakes (success/failure), authentication (success/failure), sessions per protocol, uptime, database up/pool, and the SMTP delivery-queue depth.
 
    REST endpoints: `/api/v1/status`, `/api/v1/domains`, `/api/v1/domains/<name>/accounts` (GET/POST), `/api/v1/accounts/<address>` (DELETE), `/api/v1/queue` (GET), `/api/v1/queue/<id>/retry` (POST), `/api/v1/queue/<id>` (DELETE), `/api/v1/tlsa` (GET, publish-ready DANE TLSA records).
 

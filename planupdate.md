@@ -258,8 +258,12 @@ SRS for forwarding (SPF alignment), and per-IP / per-destination rate shaping.*
   while a session is held open).
 - Message-store durability: configurable fsync + consistency checker + recovery
   tooling.
-- HA: a documented, tested active/passive (shared DB + storage + VIP) runbook +
-  readiness gating (no clustering code in this track).
+- **Done — HA active/passive runbook.** A documented, validated active/passive
+  topology (shared external database + shared message store + floating VIP) with
+  readiness gating on `/readyz` and graceful-drain failover, in
+  [hmailserver/docs/HighAvailabilityRunbook.md](hmailserver/docs/HighAvailabilityRunbook.md).
+  No clustering code — failover is driven by external infrastructure plus the
+  readiness/drain primitives already shipped in this track.
 
 ### B8 — Quality gates & supply chain (remaining)
 
