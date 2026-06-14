@@ -76,6 +76,12 @@ namespace HM
       static bool Base64Decode_(const AnsiString &input, std::vector<unsigned char> &out);
       static AnsiString GenerateNonce_();
 
+      // Produce a stable per-installation salt for an unknown/non-PBKDF2 account so
+      // that repeated probes for the same name always return the same salt, making a
+      // non-existent account indistinguishable from a real one (a per-exchange random
+      // salt would change on every probe and so leak whether the account exists).
+      static void DeriveAntiEnumerationSalt_(const AnsiString &username, std::vector<unsigned char> &saltOut);
+
       State state_;
       bool real_account_;   // false => unknown user / non-PBKDF2: always fail at the end
       std::vector<unsigned char> salted_password_;

@@ -307,8 +307,8 @@ upgrading the management/admin INI password from MD5.
   the LOGIN/PLAIN path, and the per-connection brute-force cap also applies. Advertised in CAPABILITY
   as `AUTH=SCRAM-SHA-256`. Validated end-to-end with an over-the-wire C# SCRAM client
   (`TestScramSha256Authenticates`, `TestScramSha256WrongPasswordFails`, `TestScramSha256Capability`)
-  plus the full IMAP regression suite. Follow-ups: SCRAM-SHA-256-**PLUS** (TLS channel binding),
-  full SASLprep of non-ASCII credentials, and deterministic anti-enumeration salts.
+  plus the full IMAP regression suite. Follow-ups: SCRAM-SHA-256-**PLUS** (TLS channel binding) and
+  full SASLprep of non-ASCII credentials.
 - ✅ **SCRAM-SHA-256 SASL mechanism (SMTP submission) — delivered in v6.2.0.** Extended the same
   mechanism to SMTP `AUTH` (RFC 4954 SASL framing), reusing the `Common/Util/Hashing/ScramSha256`
   helper. Per-connection SASL state lives on `SMTPConnection` (`scram_session_`); the multi-step
@@ -341,6 +341,25 @@ upgrading the management/admin INI password from MD5.
   log. Validated with an over-the-wire C# POP3 SASL client (`TestSaslAdvertised`,
   `TestAuthPlainAuthenticates`, `TestScramSha256Authenticates`, `TestScramSha256WrongPasswordFails`)
   plus the full POP3 regression suite. This completes SCRAM-SHA-256 across IMAP, SMTP and POP3.
+- ✅ **SCRAM deterministic anti-enumeration salts — delivered in v6.2.0.** Closed a user-enumeration
+  side-channel in the SCRAM forced-failure path shared by IMAP, SMTP and POP3. When a client begins
+  SCRAM for an unknown or non-PBKDF2 account, the server still completes a full exchange (failing only
+  at proof verification) so the protocol does not reveal whether the account exists — but it
+  previously fabricated a **fresh random salt on every probe**, so repeating the same probe returned a
+  different `s=` each time, whereas a real account always returns its stored salt: that difference was
+  itself an existence oracle. The fabricated salt is now **deterministic per identity**
+  (`ScramSha256::DeriveAntiEnumerationSalt_`): `HMAC-SHA256(key, "scram-anti-enum-salt:" +
+  lowercased-identity)` truncated to 16 bytes (matching a real PBKDF2 salt length), with the
+  iteration count already fixed at the 210000 default. The HMAC key is derived from server-side
+  secrets a mail client never sees (the admin password hash plus the database credentials/name/server,
+  domain-separated), so the salt is stable per installation yet cannot be precomputed off-box. Real
+  PBKDF2 accounts are entirely unaffected (their real salt/iterations are used); only the
+  unknown-account branch changed, and the random salted-password it feeds to the always-failing proof
+  check is untouched. Validated over the wire (`TestScramSha256UnknownAccountSaltIsStable`: same
+  unknown identity returns an identical salt across separate connections, different unknown identities
+  differ) plus the full IMAP regression suite. Residual note: an installation with neither an admin
+  password nor database credentials set has a low-entropy key (acceptable — such an install is already
+  unprotected); a persisted random server secret (B3/DPAPI) would harden that edge case further.
 - ✅ **Argon2id KDF option — delivered in v6.2.0.** Added the OWASP-recommended memory-hard KDF as
   password-hash algorithm **5** (`Crypt::ETArgon2id`), implemented in `HashCreator`
   (`GenerateArgon2id`/`ValidateArgon2id`/`IsArgon2idHash`) over OpenSSL's `EVP_KDF` `ARGON2ID`

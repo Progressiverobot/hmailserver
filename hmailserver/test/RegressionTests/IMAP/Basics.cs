@@ -804,6 +804,49 @@ namespace RegressionTests.IMAP
       }
 
       [Test]
+      [Description("RFC 5802/7677 (SCRAM-SHA-256) anti-enumeration: an unknown account returns a stable, " +
+                   "per-identity salt on every probe (a fresh random salt would reveal that the account " +
+                   "does not exist), while different unknown identities receive different salts.")]
+      public void TestScramSha256UnknownAccountSaltIsStable()
+      {
+         var application = SingletonProvider<TestSetup>.Instance.GetApp();
+         application.Settings.IMAPSASLPlainEnabled = true;
+         // No exchange is completed (we stop at server-first), but disable auto-ban anyway.
+         bool autoBan = application.Settings.AutoBanOnLogonFailure;
+         application.Settings.AutoBanOnLogonFailure = false;
+         try
+         {
+            const string ghost = "ghost-nonexistent@example.test";
+
+            string salt1 = ProbeSalt(ghost);
+            string salt2 = ProbeSalt(ghost);
+            string otherSalt = ProbeSalt("another-ghost@example.test");
+
+            Assert.IsFalse(string.IsNullOrEmpty(salt1), "Server-first must offer a salt.");
+            Assert.AreEqual(salt1, salt2,
+               "An unknown account must return the same salt on every probe, otherwise the " +
+               "changing salt leaks that the account does not exist.");
+            Assert.AreNotEqual(salt1, otherSalt,
+               "Different unknown identities must receive different salts.");
+         }
+         finally
+         {
+            application.Settings.AutoBanOnLogonFailure = autoBan;
+            application.Settings.IMAPSASLPlainEnabled = false;
+         }
+      }
+
+      private static string ProbeSalt(string username)
+      {
+         using (var con = new TcpConnection())
+         {
+            Assert.IsTrue(con.Connect(143), "Could not connect to IMAP.");
+            con.Receive(); // banner
+            return ScramTestClient.ProbeServerSalt(con, "A01", username);
+         }
+      }
+
+      [Test]
       public void TestAppendDeletedMessage()
 
       {
@@ -2397,6 +2440,29 @@ namespace RegressionTests.IMAP
          // Empty client response acknowledges the server-final; server completes auth.
          con.Send("\r\n");
          return con.ReadUntil(tag);
+      }
+
+      /// <summary>
+      ///    Sends only the SCRAM client-first message and returns the base64 salt (s=)
+      ///    the server offers in its server-first reply, then abandons the exchange.
+      ///    Used to verify the anti-enumeration salt for an unknown account is stable.
+      /// </summary>
+      public static string ProbeServerSalt(TcpConnection con, string tag, string username)
+      {
+         var nonceBytes = new byte[18];
+         using (var rng = RandomNumberGenerator.Create())
+            rng.GetBytes(nonceBytes);
+         string clientNonce = Convert.ToBase64String(nonceBytes);
+
+         string clientFirstBare = "n=" + SaslName(username) + ",r=" + clientNonce;
+         string clientFirst = "n,," + clientFirstBare;
+
+         con.Send(tag + " AUTHENTICATE SCRAM-SHA-256\r\n");
+         con.ReadUntil("+");
+
+         con.Send(Base64(clientFirst) + "\r\n");
+         string serverFirst = DecodeContinuation(con.ReadUntil("\r\n"));
+         return Attribute(serverFirst, "s");
       }
 
       private static string SaslName(string name)

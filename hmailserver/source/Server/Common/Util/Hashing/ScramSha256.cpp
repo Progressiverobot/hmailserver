@@ -5,6 +5,7 @@
 #include "ScramSha256.h"
 
 #include "../Parsing/StringParser.h"
+#include "../../Application/IniFileSettings.h"
 
 #include <openssl/rand.h>
 #include <openssl/hmac.h>
@@ -133,6 +134,41 @@ namespace HM
          memset(raw, 0, sizeof(raw));
       }
       return Base64Encode_(raw, sizeof(raw));
+   }
+
+   void
+   ScramSha256::DeriveAntiEnumerationSalt_(const AnsiString &username, std::vector<unsigned char> &saltOut)
+   {
+      // Key the derivation with server-side secrets that a mail client never sees (the
+      // admin password hash and the database credentials) so the fabricated salt is
+      // stable per installation yet cannot be precomputed off-box by an attacker; a
+      // predictable salt would re-open the very enumeration oracle this closes. A
+      // domain-separation prefix keeps this key distinct from any other use of these
+      // values.
+      IniFileSettings *settings = IniFileSettings::Instance();
+
+      AnsiString keyMaterial = "hMailServer-SCRAM-anti-enumeration-key";
+      keyMaterial += "\x1f";
+      keyMaterial += AnsiString(settings->GetAdministratorPassword());
+      keyMaterial += "\x1f";
+      keyMaterial += AnsiString(settings->GetPassword());
+      keyMaterial += "\x1f";
+      keyMaterial += AnsiString(settings->GetDatabaseName());
+      keyMaterial += "\x1f";
+      keyMaterial += AnsiString(settings->GetDatabaseServer());
+
+      AnsiString lowerUser = username;
+      lowerUser.MakeLower();
+
+      AnsiString data = "scram-anti-enum-salt:";
+      data += lowerUser;
+
+      unsigned char mac[32];
+      HmacSha256_((const unsigned char *) keyMaterial.c_str(), keyMaterial.GetLength(),
+                  (const unsigned char *) data.c_str(), data.GetLength(), mac);
+
+      // A real PBKDF2 salt is 16 bytes; mirror that length exactly.
+      saltOut.assign(mac, mac + 16);
    }
 
    AnsiString
@@ -276,8 +312,20 @@ namespace HM
          // avoids revealing through the protocol whether the account exists.
          real_account_ = false;
          iterations = 210000;
-         salt.resize(16);
-         RAND_bytes(salt.data(), (int) salt.size());
+
+         // Derive the salt deterministically from the requested identity so that
+         // repeated probes for the same name always return an identical salt and
+         // iteration count, exactly as a real account would. A per-exchange random
+         // salt (the previous behaviour) changed on every probe and so leaked the
+         // account's non-existence. The salted password stays random: it only feeds
+         // the (always-failing) proof check and is never observable.
+         AnsiString probedUser = GetAttribute_(client_first_bare_, 'n');
+         probedUser.Replace("=2C", ",");
+         probedUser.Replace("=2c", ",");
+         probedUser.Replace("=3D", "=");
+         probedUser.Replace("=3d", "=");
+         DeriveAntiEnumerationSalt_(probedUser, salt);
+
          salted_password_.resize(32);
          RAND_bytes(salted_password_.data(), (int) salted_password_.size());
       }
