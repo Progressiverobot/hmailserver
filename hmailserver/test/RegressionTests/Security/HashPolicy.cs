@@ -4,6 +4,7 @@
 using System.IO;
 using System.Runtime.InteropServices;
 using NUnit.Framework;
+using RegressionTests.POP3;
 using RegressionTests.Shared;
 
 namespace RegressionTests.Security
@@ -92,6 +93,50 @@ namespace RegressionTests.Security
          finally
          {
             // Restore the default (disabled) so later tests are unaffected.
+            SetMinimumAcceptedHashAlgorithm(0);
+            _settings.ClearLogonFailureList();
+         }
+      }
+
+      [Test]
+      [Description("SCRAM can only be served from a PBKDF2 hash, so when MinimumAcceptedHashAlgorithm " +
+                   "is raised above PBKDF2 (to Argon2id) a SCRAM-SHA-256 exchange must fail even with the " +
+                   "correct password, and succeed again once the minimum is lowered back to PBKDF2.")]
+      public void TestMinimumAcceptedHashAlgorithmDisablesScram()
+      {
+         _settings.AutoBanOnLogonFailure = false;
+         _settings.ClearLogonFailureList();
+
+         var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "hashpolicyscram@example.test", "SeC-r3t Pass!");
+
+         try
+         {
+            // Require Argon2id: SCRAM (PBKDF2-only) must no longer authenticate anyone.
+            SetMinimumAcceptedHashAlgorithm(CryptArgon2id);
+            using (var tc = new TcpConnection())
+            {
+               Assert.IsTrue(tc.Connect(110));
+               tc.ReadUntil("+OK"); // banner
+               string final = Pop3SaslTestClient.AuthenticateScram(tc, account.Address, "SeC-r3t Pass!");
+               Assert.IsTrue(final.StartsWith("-ERR"),
+                  "SCRAM must be refused when the minimum hash type is above PBKDF2. Got: " + final);
+               tc.Disconnect();
+            }
+
+            // Lower the minimum to PBKDF2: SCRAM works again.
+            SetMinimumAcceptedHashAlgorithm(CryptPbkdf2);
+            using (var tc = new TcpConnection())
+            {
+               Assert.IsTrue(tc.Connect(110));
+               tc.ReadUntil("+OK"); // banner
+               string final = Pop3SaslTestClient.AuthenticateScram(tc, account.Address, "SeC-r3t Pass!");
+               Assert.IsTrue(final.StartsWith("+OK"),
+                  "SCRAM must succeed when the minimum hash type is PBKDF2. Got: " + final);
+               tc.Disconnect();
+            }
+         }
+         finally
+         {
             SetMinimumAcceptedHashAlgorithm(0);
             _settings.ClearLogonFailureList();
          }

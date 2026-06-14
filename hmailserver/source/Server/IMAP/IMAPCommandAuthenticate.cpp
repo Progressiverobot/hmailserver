@@ -8,6 +8,7 @@
 #include "IMAPConfiguration.h"
 #include "IMAPSimpleCommandParser.h"
 #include "../common/Application/DefaultDomain.h"
+#include "../common/Application/IniFileSettings.h"
 #include "../common/Application/ObjectCache.h"
 #include "../common/Cache/CacheContainer.h"
 #include "../common/Util/AccountLogon.h"
@@ -379,6 +380,13 @@ namespace HM
       String sDomain = StringParser::ExtractDomain(sAccountAddress);
       std::shared_ptr<const Domain> pDomain = CacheContainer::Instance()->GetDomain(sDomain);
       if (!pDomain || !pDomain->GetIsActive())
+         return std::shared_ptr<const Account>();
+
+      // Honour the MinimumAcceptedHashAlgorithm policy: SCRAM can only be served from a
+      // PBKDF2 hash, so when the administrator requires a stronger hash type than PBKDF2
+      // no account is eligible. Returning an empty handle makes the exchange a forced
+      // failure (the same as an unknown account) rather than revealing the policy.
+      if (IniFileSettings::Instance()->GetMinimumAcceptedHashAlgorithm() > Crypt::ETPBKDF2)
          return std::shared_ptr<const Account>();
 
       if (pAccount->GetPasswordEncryption() != Crypt::ETPBKDF2)

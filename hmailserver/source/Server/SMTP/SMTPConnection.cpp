@@ -2472,6 +2472,13 @@ namespace HM
       if (!pDomain || !pDomain->GetIsActive())
          return std::shared_ptr<const Account>();
 
+      // Honour the MinimumAcceptedHashAlgorithm policy: SCRAM can only be served from a
+      // PBKDF2 hash, so when the administrator requires a stronger hash type than PBKDF2
+      // no account is eligible. Returning an empty handle makes the exchange a forced
+      // failure (the same as an unknown account) rather than revealing the policy.
+      if (IniFileSettings::Instance()->GetMinimumAcceptedHashAlgorithm() > Crypt::ETPBKDF2)
+         return std::shared_ptr<const Account>();
+
       if (pAccount->GetPasswordEncryption() != Crypt::ETPBKDF2)
          return std::shared_ptr<const Account>();
 
