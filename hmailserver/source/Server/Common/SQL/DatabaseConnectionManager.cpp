@@ -212,6 +212,9 @@ namespace HM
 
       // Locate an available connection
       available_connections_.insert(pConnection);
+
+      // Wake one waiter (if any) in GetConnection_ now that a connection is free.
+      connection_released_.notify_one();
    }
 
    int 
@@ -230,40 +233,38 @@ namespace HM
    std::shared_ptr<DALConnection>
    DatabaseConnectionManager::GetConnection_()
    {
-      // Loop until we find a free connection
+      boost::unique_lock<boost::recursive_mutex> guard(mutex_);
+
+      // Loop until we find a free connection (re-checking after each wakeup).
       while (1)
       {
-         // We want to sleep outside of the lock-scope. Hence the inner scope here.
+         // Locate an available connection
+         auto iterConnection = available_connections_.begin();
+
+         if (iterConnection != available_connections_.end())
          {
-            boost::lock_guard<boost::recursive_mutex> guard(mutex_);
+            // Remove the connection from free and add to busy
+            std::shared_ptr<DALConnection> pConn = (*iterConnection);
 
-            // Locate an available connection
-            auto iterConnection = available_connections_.begin();
+            // Remove it from the list of available connections
+            available_connections_.erase(iterConnection);
 
-            if (iterConnection != available_connections_.end())
-            {
-               // Remove the connection from free and add to busy
-               std::shared_ptr<DALConnection> pConn = (*iterConnection);
-
-               // Remove it from the list of available connections
-               available_connections_.erase(iterConnection);
-
-               busy_connections_.insert(pConn);
-               return pConn;
-            }
-            else
-            {
-               if (busy_connections_.size() == 0 &&
-                  available_connections_.size() == 0)
-               {
-                  // There's no available connections at all. Nothing to wait for.
-                  std::shared_ptr<DALConnection> pEmpty;
-                  return pEmpty;
-               }
-            }
+            busy_connections_.insert(pConn);
+            return pConn;
          }
 
-         Sleep(10);
+         if (busy_connections_.size() == 0 &&
+            available_connections_.size() == 0)
+         {
+            // There's no available connections at all. Nothing to wait for.
+            std::shared_ptr<DALConnection> pEmpty;
+            return pEmpty;
+         }
+
+         // All connections are busy. Wait until one is released instead of
+         // polling. A timeout bounds the wait as a defensive backstop so a lost
+         // notification can never wedge the caller indefinitely.
+         connection_released_.wait_for(guard, boost::chrono::milliseconds(100));
       }
    }
 

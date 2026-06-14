@@ -6,6 +6,9 @@
 
 #include "DALConnection.h"
 
+#include <boost/thread/recursive_mutex.hpp>
+#include <boost/thread/condition_variable.hpp>
+
 namespace HM
 {
    class SQLCommand;
@@ -53,6 +56,9 @@ namespace HM
       std::set<std::shared_ptr<DALConnection> > busy_connections_;
       std::set<std::shared_ptr<DALConnection> > available_connections_;
       
+      // Signalled whenever a connection is returned to the pool, so a waiter in
+      // GetConnection_ can wake immediately instead of polling.
+      boost::condition_variable_any connection_released_;
 
    };
 }

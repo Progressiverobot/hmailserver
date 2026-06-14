@@ -235,9 +235,13 @@ SRS for forwarding (SPF alignment), and per-IP / per-destination rate shaping.*
   Asserted by the `HealthProbes` test.
 - **OpenTelemetry** tracing (SMTP/IMAP/POP/DB spans + correlation IDs); further
   metrics (per-command latency).
-- Async/DB isolation: dedicated DB executor; replace the connection-pool `Sleep`
-  polling with condition variables (`DatabaseConnectionManager`);
-  prepared-statement caches (MySQL/PG).
+- **Done — connection-pool condition variable.** `DatabaseConnectionManager`'s
+  `GetConnection_` no longer busy-polls with `Sleep(10)` while waiting for a free
+  connection; it blocks on a `condition_variable_any` signalled by
+  `ReleaseConnection_` (with a 100ms backstop timeout). Removes scrape/latency
+  jitter under pool exhaustion. Validated by 64 DB-intensive regression tests.
+- Async/DB isolation: dedicated DB executor; prepared-statement caches
+  (MySQL/PG).
 - Message-store durability: configurable fsync + consistency checker + recovery
   tooling. Graceful shutdown: readiness/drain + connection draining.
 - HA: a documented, tested active/passive (shared DB + storage + VIP) runbook +
