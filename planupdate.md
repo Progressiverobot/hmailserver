@@ -78,8 +78,8 @@ installer.
 
 ### Phase 2 — UX/UI polish (after parity)
 
-1. **Reload-on-enter** for cached pages (`FeatureSettingsView.OnEnter` is empty;
-   ensure every settings page refreshes on navigation).
+1. ✅ **Reload-on-enter** for cached pages (`FeatureSettingsView.OnEnter` now re-reads
+   the INI on navigation, matching `ServerSettingsView`; every settings page refreshes).
 2. **No silent `catch{}`** — `DomainsView` alias/dist-list loads must show real
    empty/error states.
 3. **Search/filter** on long lists: Domains, Accounts, Rules, Queue, Ports,

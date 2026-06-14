@@ -100,6 +100,12 @@ namespace hMailServer.ControlPanel.Views
 
       public void OnEnter()
       {
+         // The page instance is cached by MainWindow, so re-read the INI from disk
+         // on every navigation. This keeps the editors in sync with values changed
+         // elsewhere (a prior save, another tool, or a hand edit) instead of showing
+         // stale data captured when the page was first constructed.
+         BuildDefinition();
+         BuildUi();
       }
 
       public void OnLeave()
