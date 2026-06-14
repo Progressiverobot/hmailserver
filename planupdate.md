@@ -280,7 +280,16 @@ SRS for forwarding (SPF alignment), and per-IP / per-destination rate shaping.*
   is found. The check never deletes or repairs anything. Default 0 keeps the
   (potentially expensive) store walk off. Validated by the
   `MessageStoreConsistency` test (delete a delivered message's file → gauge reports
-  the missing file). Active recovery/repair tooling remains future work.
+  the missing file).
+- **Done — message-store recovery report.** When the consistency check finds
+  missing files it writes `hMailServer_messagestore_consistency.report` to the log
+  directory: a timestamped, tab-separated list of every affected message
+  (`PersistentMessage::GetMissingFileDetails()` → `messageid`, account, expected
+  on-disk path) so an administrator has an actionable artifact to drive recovery
+  (restore-from-backup, user notification, orphan cleanup). Read-only; the report
+  is regenerated on each scan. Asserted by the `MessageStoreConsistency` test (the
+  report lists the missing message's path and account). Active automated
+  repair/re-fetch remains future work.
 - **Done — HA active/passive runbook.** A documented, validated active/passive
   topology (shared external database + shared message store + floating VIP) with
   readiness gating on `/readyz` and graceful-drain failover, in

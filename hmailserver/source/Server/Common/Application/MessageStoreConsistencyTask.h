@@ -22,5 +22,9 @@ namespace HM
       ~MessageStoreConsistencyTask(void);
 
       virtual void DoWork();
+
+   private:
+
+      void WriteReport_(const std::vector<String> &missingFiles);
    };
 }

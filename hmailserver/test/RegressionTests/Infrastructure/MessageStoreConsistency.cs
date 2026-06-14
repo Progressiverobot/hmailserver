@@ -149,6 +149,32 @@ namespace RegressionTests.Infrastructure
 
             Assert.GreaterOrEqual(missing, 1,
                "Expected the consistency check to report at least one missing message file.");
+
+            // A recovery report listing the affected message must be written to the
+            // log directory so an administrator can act on it.
+            string reportPath = Path.Combine(
+               _application.Settings.Directories.LogDirectory,
+               "hMailServer_messagestore_consistency.report");
+
+            string reportContents = null;
+            for (int attempt = 0; attempt < 50; attempt++)
+            {
+               if (File.Exists(reportPath))
+               {
+                  reportContents = File.ReadAllText(reportPath);
+                  if (reportContents.Contains(messageFile))
+                     break;
+               }
+
+               System.Threading.Thread.Sleep(200);
+            }
+
+            Assert.IsNotNull(reportContents, "Expected a consistency recovery report to be written.");
+            StringAssert.Contains("Missing files:", reportContents);
+            StringAssert.Contains(messageFile, reportContents,
+               "The recovery report should list the missing message's expected path.");
+            StringAssert.Contains(account.Address, reportContents,
+               "The recovery report should identify the affected account.");
          }
          finally
          {

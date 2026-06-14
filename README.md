@@ -231,6 +231,7 @@ Administration and monitoring:
    ShutdownDrainSeconds=0        ; on stop, wait up to N seconds for active sessions to finish (0 = stop immediately)
    MessageStoreFsync=0           ; force each received message to physical disk before it is acknowledged (1 = on)
    MessageStoreConsistencyCheck=0; periodically cross-check message rows against files on disk (1 = on, read-only)
+                                 ; writes hMailServer_messagestore_consistency.report listing any affected messages
    JsonLogging=0                 ; write logs as JSON lines
    </pre>
 

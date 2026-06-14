@@ -63,6 +63,11 @@ namespace HM
       // potentially expensive on large stores, so it is driven by an opt-in
       // scheduled task rather than run on every metrics scrape.
       static int GetMissingFileCount();
+
+      // As GetMissingFileCount, but returns a tab-separated
+      // "messageid<TAB>account<TAB>expected-path" line for each missing message so
+      // a recovery report can be produced.
+      static std::vector<String> GetMissingFileDetails();
       
       static bool DeleteByAccountID(__int64 iAccountID);
 

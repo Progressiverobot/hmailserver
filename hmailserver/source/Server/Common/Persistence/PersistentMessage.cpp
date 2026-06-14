@@ -935,18 +935,26 @@ namespace HM
    int
    PersistentMessage::GetMissingFileCount()
    {
+      return static_cast<int>(GetMissingFileDetails().size());
+   }
+
+   std::vector<String>
+   PersistentMessage::GetMissingFileDetails()
+   {
       // Walk every message row and confirm its backing file exists on disk. The
       // account address (needed to resolve account-folder paths) is joined in so
       // GetFileName can reconstruct the exact on-disk path the server would use.
+      // Returns one tab-separated "messageid<TAB>account<TAB>expected-path" line
+      // per message whose backing file is missing.
+      std::vector<String> missing;
+
       SQLCommand command(
-         "select m.messagefilename, m.messageaccountid, m.messagefolderid, a.accountaddress "
+         "select m.messageid, m.messagefilename, m.messageaccountid, m.messagefolderid, a.accountaddress "
          "from hm_messages m left join hm_accounts a on m.messageaccountid = a.accountid");
 
       std::shared_ptr<DALRecordset> pRS = Application::Instance()->GetDBManager()->OpenRecordset(command);
       if (!pRS)
-         return 0;
-
-      int missingCount = 0;
+         return missing;
 
       while (!pRS->IsEOF())
       {
@@ -963,13 +971,20 @@ namespace HM
             String fullFileName = GetFileName(accountAddress, message);
 
             if (!FileUtilities::Exists(fullFileName))
-               missingCount++;
+            {
+               String line;
+               line.Format(_T("%I64d\t%s\t%s"),
+                  pRS->GetInt64Value("messageid"),
+                  accountAddress.c_str(),
+                  fullFileName.c_str());
+               missing.push_back(line);
+            }
          }
 
          pRS->MoveNext();
       }
 
-      return missingCount;
+      return missing;
    }
 
    bool
