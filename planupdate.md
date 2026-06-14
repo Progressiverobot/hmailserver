@@ -433,8 +433,29 @@ upgrading the management/admin INI password from MD5.
   change. Validated by `RegressionTests.Security.HashPolicy` (a PBKDF2 account is refused when the
   minimum is Argon2id, then accepted again when the minimum is lowered to PBKDF2 or disabled), with
   the combined Security, SCRAM and POP3 suites 109/109 green and no errors logged.
-- Remaining B2: an optional pepper building on the Argon2id/hash-policy work; enforcing the same
-  minimum on SCRAM logins when it is set above PBKDF2; OAuth2 XOAUTH2/OAUTHBEARER;
+- ✅ **SCRAM minimum-hash enforcement — delivered in v6.2.0.** SCRAM-SHA-256 can only be served from a
+  PBKDF2-structured stored hash (the PBKDF2 key doubles as the SCRAM `SaltedPassword`), so when an
+  administrator raises `MinimumAcceptedHashAlgorithm` above PBKDF2 (i.e. requires Argon2id) the
+  `LookupPbkdf2Account_` helper on all three protocols (`IMAPCommandAuthenticate`, `POP3Connection`,
+  `SMTPConnection`) now returns no account, turning every SCRAM exchange into the existing
+  anti-enumeration forced-failure (random salt, correct-password-still-fails). This closes the gap
+  where SCRAM would otherwise keep authenticating against a PBKDF2 hash the cleartext path already
+  refuses. Validated by `RegressionTests.Security.HashPolicy` (a correct-password SCRAM exchange is
+  rejected when the minimum is Argon2id and succeeds again when it is lowered to PBKDF2), with the
+  Security 39/39 and SCRAM+POP3 73/73 suites green and no errors logged.
+- ✅ **Optional server-side password pepper — delivered in v6.2.0.** New `[Settings] PasswordPepper`
+  INI key (read by `IniFileSettings`, default empty = no behaviour change). When set, the pepper is
+  applied as an HMAC-SHA-256 keyed transform of the password (`HashCreator::ComputeHMACSHA256Hex`,
+  OpenSSL one-shot HMAC) before the **Argon2id** hash is computed and verified, so a stolen password
+  database cannot be brute-forced without also stealing the pepper (which lives outside the database,
+  in the INI). The pepper deliberately applies to Argon2id **only**: PBKDF2 hashes double as the SCRAM
+  `SaltedPassword` that clients reconstruct from the raw password, so peppering PBKDF2 would break
+  SCRAM — the pepper therefore takes effect only with `PreferredHashAlgorithm = Argon2id`. An empty
+  pepper is a no-op, and a known-answer HMAC self-test runs in `HashCreatorTester`. No COM/IDL/schema
+  change. Validated by `RegressionTests.Security.PasswordPepper` (an account created under a pepper
+  authenticates, fails once the pepper is changed, and authenticates again when the original pepper is
+  restored), Security 39/39 green and no errors logged.
+- Remaining B2: OAuth2 XOAUTH2/OAUTHBEARER;
   POP3/IMAP UTF8 (RFC 6856 / UTF8=ACCEPT) and full SASLprep of non-ASCII credentials.
 - Verify: O365/Gmail XOAUTH2 + Thunderbird SCRAM interop.
 

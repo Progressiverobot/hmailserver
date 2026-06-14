@@ -13,6 +13,7 @@
 #include <openssl/kdf.h>
 #include <openssl/core_names.h>
 #include <openssl/params.h>
+#include <openssl/hmac.h>
 
 #include "HashCreator.h"
 
@@ -295,6 +296,23 @@ namespace HM
       return match;
    }
 
+   AnsiString
+   HashCreator::ComputeHMACSHA256Hex(const AnsiString &key, const AnsiString &data)
+   {
+      unsigned char mac[EVP_MAX_MD_SIZE];
+      unsigned int macLen = 0;
+
+      if (HMAC(EVP_sha256(),
+               key.c_str(), key.GetLength(),
+               (const unsigned char *) data.c_str(), data.GetLength(),
+               mac, &macLen) == nullptr)
+         return "";
+
+      AnsiString result = BytesToHex(mac, (int) macLen);
+      OPENSSL_cleanse(mac, sizeof(mac));
+      return result;
+   }
+
    AnsiString HashCreator::GetSalt_(const AnsiString &inputString)
    {
       AnsiString result = inputString.Mid(0,SALT_LENGTH);
@@ -405,6 +423,11 @@ namespace HM
       if (HashCreator::ValidatePBKDF2("The quick brown fox jumps over the lazy dog", argon2Hash))
          throw 0;
       if (HashCreator::ValidateArgon2id("The quick brown fox jumps over the lazy dog", pbkdf2Hash))
+         throw 0;
+
+      // HMAC-SHA256 known-answer test (RFC-style vector) for the password pepper helper.
+      if (HashCreator::ComputeHMACSHA256Hex("key", "The quick brown fox jumps over the lazy dog")
+            != "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8")
          throw 0;
 
       for (int i = 0; i < 250; i++)

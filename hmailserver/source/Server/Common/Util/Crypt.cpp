@@ -6,6 +6,7 @@
 #include "Crypt.h"
 #include "BlowFish.h"
 #include "Hashing/HashCreator.h"
+#include "../Application/IniFileSettings.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -58,7 +59,7 @@ namespace HM
          }
       case ETArgon2id:
          {
-            AnsiString input = sInput;
+            AnsiString input = ApplyPepper_(sInput);
             AnsiString result = HashCreator::GenerateArgon2id(input);
             return result;
          }
@@ -99,7 +100,7 @@ namespace HM
          }
       case ETArgon2id:
          {
-            AnsiString ansiPassword = password;
+            AnsiString ansiPassword = ApplyPepper_(password);
             AnsiString ansiHash = originalHash;
             return HashCreator::ValidateArgon2id(ansiPassword, ansiHash);
          }
@@ -152,5 +153,24 @@ namespace HM
       }
       
       return "";
+   }
+
+   AnsiString
+   Crypt::ApplyPepper_(const AnsiString &password) const
+   {
+      // The pepper is a server-wide secret that is never stored alongside the hash.
+      // When configured, the password is HMAC-SHA256'd under the pepper before it is
+      // fed to Argon2id, so a stolen hash database cannot be attacked without also
+      // obtaining the pepper. An empty pepper preserves the previous behaviour.
+      //
+      // This is applied to Argon2id only: PBKDF2 hashes double as the SCRAM
+      // SaltedPassword, which the client reconstructs from the raw password, so they
+      // must remain un-peppered to keep SCRAM working.
+      String pepper = IniFileSettings::Instance()->GetPasswordPepper();
+      if (pepper.IsEmpty())
+         return password;
+
+      AnsiString ansiPepper = pepper;
+      return HashCreator::ComputeHMACSHA256Hex(ansiPepper, password);
    }
 }

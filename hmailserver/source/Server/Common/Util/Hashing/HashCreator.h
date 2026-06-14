@@ -43,6 +43,10 @@ namespace HM
       static bool ValidateArgon2id(const AnsiString &password, const AnsiString &storedHash);
       static bool IsArgon2idHash(const AnsiString &storedHash);
 
+      // HMAC-SHA256 of data under key, returned as a lower-case hex string. Used by the
+      // optional server-wide password pepper (Crypt::ApplyPepper_).
+      static AnsiString ComputeHMACSHA256Hex(const AnsiString &key, const AnsiString &data);
+
    private:
    
       AnsiString GetSalt_(const AnsiString &inputString);

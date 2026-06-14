@@ -33,6 +33,11 @@ namespace HM
 
    private:
 
+      // Applies the optional server-wide password pepper (HMAC-SHA256 under the
+      // configured secret) ahead of Argon2id hashing/verification. Returns the
+      // password unchanged when no pepper is configured.
+      AnsiString ApplyPepper_(const AnsiString &password) const;
+
       BlowFishEncryptor *blow_fish_;
 
    };

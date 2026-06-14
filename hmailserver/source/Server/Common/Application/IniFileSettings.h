@@ -79,6 +79,7 @@ namespace HM
       int GetGreylistingExpirationInterval() {return greylisting_expiration_interval_; }
       int GetPreferredHashAlgorithm() {return preferred_hash_algorithm_;}
       int GetMinimumAcceptedHashAlgorithm() {return minimum_accepted_hash_algorithm_;}
+      String GetPasswordPepper() {return password_pepper_;}
       bool GetDNSBLChecksAfterMailFrom() {return dnsbl_checks_after_mail_from_; }
       bool GetSepSvcLogs() {return sep_svc_logs_; }
       int GetLogLevel() {return log_level_; }
@@ -192,6 +193,8 @@ namespace HM
       int preferred_hash_algorithm_;
 
       int minimum_accepted_hash_algorithm_;
+
+      String password_pepper_;
 
       String log_directory_;
       static String ini_file_;

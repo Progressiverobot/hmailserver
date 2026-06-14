@@ -163,6 +163,11 @@ namespace HM
       // refused. 0 (ETNone) disables the policy and preserves prior behaviour.
       minimum_accepted_hash_algorithm_ = ReadIniSettingInteger_("Settings", "MinimumAcceptedHashAlgorithm", 0);
 
+      // Optional server-wide secret ("pepper") HMAC-mixed into Argon2id password hashes
+      // (see Crypt::EnCrypt/Validate). Empty disables it (no behaviour change). It only
+      // affects Argon2id hashes so PBKDF2 stays usable as the SCRAM SaltedPassword.
+      password_pepper_ = ReadIniSettingString_("Settings", "PasswordPepper", "");
+
       dnsbl_checks_after_mail_from_ = ReadIniSettingInteger_("Settings", "DNSBLChecksAfterMailFrom", 1) == 1;
 
       sep_svc_logs_ = ReadIniSettingInteger_("Settings", "SepSvcLogs", 0) == 1;
