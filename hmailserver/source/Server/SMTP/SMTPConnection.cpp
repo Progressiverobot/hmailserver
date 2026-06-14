@@ -1554,6 +1554,11 @@ namespace HM
          // whenever AUTH is enabled, independent of the plain-text setting.
          sAuth += " SCRAM-SHA-256";
 
+         // SCRAM-SHA-256-PLUS (RFC 5802 + RFC 5929 tls-server-end-point) binds the
+         // exchange to the TLS channel, so it is only offered on a TLS connection.
+         if (IsSSLConnection())
+            sAuth += " SCRAM-SHA-256-PLUS";
+
          sData += sAuth;
       }
 
@@ -1972,11 +1977,56 @@ namespace HM
 
          return;
       }
+      else if (sAuthenticationType == _T("SCRAM-SHA-256-PLUS"))
+      {
+         // Channel binding only has meaning over TLS; the mechanism is advertised
+         // (and accepted) only on a TLS connection.
+         if (!IsSSLConnection())
+         {
+            SendErrorResponse_(504, "SCRAM-SHA-256-PLUS requires a TLS connection.");
+            return;
+         }
+
+         // Bind the exchange to this TLS channel via the server certificate
+         // (RFC 5929 tls-server-end-point).
+         std::vector<unsigned char> cbindData;
+         if (!GetTlsServerEndPoint(cbindData))
+         {
+            SendErrorResponse_(504, "Channel binding is not available on this connection.");
+            return;
+         }
+
+         requestedAuthenticationType_ = AUTH_SCRAM_SHA256;
+
+         scram_session_ = std::make_shared<ScramSha256>();
+         scram_session_->SetChannelBinding(cbindData);
+
+         // RFC 4954: a SASL-IR of "=" means an empty initial response. SCRAM never
+         // sends an empty client-first, so treat "=" as "no initial response".
+         if (vecParams.size() >= 3 && vecParams[2] != _T("="))
+         {
+            ProtocolScramClientFirst_(vecParams[2]);
+         }
+         else
+         {
+            // Empty server challenge asks the client for the client-first message.
+            EnqueueWrite_("334 ");
+            current_state_ = SMTPSCRAMFIRST;
+         }
+
+         return;
+      }
       else if (sAuthenticationType == _T("SCRAM-SHA-256"))
       {
          requestedAuthenticationType_ = AUTH_SCRAM_SHA256;
 
          scram_session_ = std::make_shared<ScramSha256>();
+
+         // On a TLS connection the server also advertises SCRAM-SHA-256-PLUS, so a
+         // non-PLUS client that sends the 'y' gs2 flag is signalling a stripped-PLUS
+         // downgrade and is rejected (RFC 5802 section 6).
+         if (IsSSLConnection())
+            scram_session_->SetServerSupportsChannelBinding();
 
          // RFC 4954: a SASL-IR of "=" means an empty initial response. SCRAM never
          // sends an empty client-first, so treat "=" as "no initial response".

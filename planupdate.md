@@ -381,6 +381,19 @@ upgrading the management/admin INI password from MD5.
   (`TestScramPlusRejectedWithoutTls`). Full IMAP suite 246/246 and the SCRAM set 13/13 green.
   Follow-ups: SCRAM-SHA-256-PLUS for SMTP and POP3 (the shared `GetTlsServerEndPoint` + PLUS helper
   are protocol-agnostic, so each is a thin wiring increment).
+- ✅ **SCRAM-SHA-256-PLUS channel binding (SMTP submission) — delivered in v6.2.0.** Extended the
+  same channel-binding mechanism to SMTP `AUTH` (RFC 4954), reusing `TCPConnection::GetTlsServerEndPoint`
+  and the `ScramSha256` PLUS mode unchanged. `SMTPConnection::ProtocolAUTH_` gained an
+  `AUTH SCRAM-SHA-256-PLUS` branch that requires a TLS connection (else `504`), fetches the
+  tls-server-end-point binding and calls `SetChannelBinding` before driving the existing
+  `SMTPSCRAMFIRST`/`SMTPSCRAMFINAL`/`SMTPSCRAMACK` exchange; the non-PLUS `SCRAM-SHA-256` branch now
+  calls `SetServerSupportsChannelBinding()` on a TLS connection so a stripped-PLUS `y` gs2 flag is
+  rejected (RFC 5802 §6). EHLO advertises `SCRAM-SHA-256-PLUS` only on a TLS connection (alongside the
+  always-offered `SCRAM-SHA-256`). Validated over a real TLS SMTP connection
+  (`RegressionTests.SSL.ScramPlusSmtp`): advertised-on-TLS-only, full channel-bound auth + a usable
+  session afterwards, tampered-binding-rejected-with-the-correct-password (the MITM case), and
+  refused-without-TLS. SCRAM set 17/17 and the full SMTP suite 178/178 green. Follow-up: SCRAM-SHA-256-PLUS
+  for POP3.
 - ✅ **Argon2id KDF option — delivered in v6.2.0.** Added the OWASP-recommended memory-hard KDF as
   password-hash algorithm **5** (`Crypt::ETArgon2id`), implemented in `HashCreator`
   (`GenerateArgon2id`/`ValidateArgon2id`/`IsArgon2idHash`) over OpenSSL's `EVP_KDF` `ARGON2ID`
@@ -394,7 +407,7 @@ upgrading the management/admin INI password from MD5.
   self-tests (`HashCreatorTester` Argon2id round-trip/negative/salt-uniqueness/cross-scheme checks +
   a `Crypt` `EnCrypt`→`GetHashType`→`Validate` dispatch check for Argon2id and PBKDF2), with the
   full auth regression (default PBKDF2 path) green.
-- Remaining B2: SCRAM-SHA-256-`PLUS` for SMTP and POP3 (IMAP delivered); a hash-policy engine (min accepted type,
+- Remaining B2: SCRAM-SHA-256-`PLUS` for POP3 (IMAP and SMTP delivered); a hash-policy engine (min accepted type,
   phase out MD5/SHA256) and optional pepper building on the Argon2id work; OAuth2 XOAUTH2/OAUTHBEARER;
   POP3/IMAP UTF8 (RFC 6856 / UTF8=ACCEPT) and full SASLprep of non-ASCII credentials.
 - Verify: O365/Gmail XOAUTH2 + Thunderbird SCRAM interop.

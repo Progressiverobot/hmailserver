@@ -1295,6 +1295,80 @@ namespace RegressionTests.SMTP
          return con.Receive();
       }
 
+      /// <summary>
+      ///    Runs a full SCRAM-SHA-256-PLUS exchange with tls-server-end-point channel
+      ///    binding (no SASL-IR) over an already-EHLO'd TLS connection. Returns the
+      ///    server's final reply line: the 235 on success, or the 5xx rejection on a
+      ///    bad proof / channel-binding mismatch.
+      /// </summary>
+      public static string AuthenticatePlus(TcpConnection con, string username, string password, byte[] channelBindingData)
+      {
+         var nonceBytes = new byte[18];
+         using (var rng = RandomNumberGenerator.Create())
+            rng.GetBytes(nonceBytes);
+         string clientNonce = Convert.ToBase64String(nonceBytes);
+
+         const string gs2Header = "p=tls-server-end-point,,";
+         string clientFirstBare = "n=" + SaslName(username) + ",r=" + clientNonce;
+         string clientFirst = gs2Header + clientFirstBare;
+
+         // Mechanism selection -> empty 334 challenge.
+         con.Send("AUTH SCRAM-SHA-256-PLUS\r\n");
+         string challenge = con.Receive();
+         if (!challenge.StartsWith("334"))
+            return challenge; // rejected (e.g. not on TLS)
+
+         // client-first -> server-first.
+         con.Send(Base64(clientFirst) + "\r\n");
+         string serverFirstLine = con.Receive();
+         if (!serverFirstLine.StartsWith("334"))
+            return serverFirstLine; // protocol error
+         string serverFirst = DecodeChallenge(serverFirstLine);
+
+         string combinedNonce = Attribute(serverFirst, "r");
+         byte[] salt = Convert.FromBase64String(Attribute(serverFirst, "s"));
+         int iterations = int.Parse(Attribute(serverFirst, "i"));
+         Assert.IsTrue(combinedNonce.StartsWith(clientNonce),
+            "Server nonce must start with the client nonce. Got: " + combinedNonce);
+
+         byte[] saltedPassword;
+         using (var pbkdf2 = new Rfc2898DeriveBytes(password, salt, iterations, HashAlgorithmName.SHA256))
+            saltedPassword = pbkdf2.GetBytes(32);
+
+         byte[] clientKey = Hmac(saltedPassword, "Client Key");
+         byte[] storedKey = Sha256(clientKey);
+
+         // c= is base64( gs2-header-bytes || channel-binding-data ).
+         byte[] gs2Bytes = Encoding.UTF8.GetBytes(gs2Header);
+         var cbindInput = new byte[gs2Bytes.Length + channelBindingData.Length];
+         Buffer.BlockCopy(gs2Bytes, 0, cbindInput, 0, gs2Bytes.Length);
+         Buffer.BlockCopy(channelBindingData, 0, cbindInput, gs2Bytes.Length, channelBindingData.Length);
+         string cbind = Convert.ToBase64String(cbindInput);
+
+         string clientFinalWithoutProof = "c=" + cbind + ",r=" + combinedNonce;
+         string authMessage = clientFirstBare + "," + serverFirst + "," + clientFinalWithoutProof;
+         byte[] clientSignature = Hmac(storedKey, authMessage);
+         byte[] clientProof = Xor(clientKey, clientSignature);
+
+         string clientFinal = clientFinalWithoutProof + ",p=" + Convert.ToBase64String(clientProof);
+         con.Send(Base64(clientFinal) + "\r\n");
+
+         string afterFinal = con.Receive();
+         if (!afterFinal.StartsWith("334"))
+            return afterFinal; // rejected proof / channel-binding mismatch (5xx)
+
+         // Verify the server proved knowledge of the key (ServerSignature).
+         string serverFinal = DecodeChallenge(afterFinal);
+         byte[] serverKey = Hmac(saltedPassword, "Server Key");
+         byte[] serverSignature = Hmac(serverKey, authMessage);
+         Assert.AreEqual("v=" + Convert.ToBase64String(serverSignature), serverFinal,
+            "Server signature (v=) did not verify.");
+
+         // Empty client response acknowledges the server-final; server completes auth.
+         con.Send("\r\n");
+         return con.Receive();
+      }
+
       private static string SaslName(string name)
       {
          // saslname: '=' must be escaped before ',' so an escaped '=' is not re-encoded.
