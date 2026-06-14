@@ -61,6 +61,10 @@ namespace HM
       bool esearch_all_;
       bool esearch_count_;
 
+      // RFC 5182 (SEARCHRES): set when the "SAVE" result option is present, in which case
+      // the matched UIDs are stored on the connection for later reference via "$".
+      bool esearch_save_;
+
       // RFC 7162 (CONDSTORE): set when a MODSEQ search key is present, so the SEARCH/ESEARCH
       // response can report the highest mod-sequence among the matched messages.
       bool modseq_search_;

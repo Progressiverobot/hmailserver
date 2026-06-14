@@ -379,7 +379,16 @@ upgrading the management/admin INI password from MD5.
   parenthesised list of mailbox patterns (each mailbox listed once). Advertised in CAPABILITY as
   `LIST-EXTENDED`. Covered by `TestListExtendedReturnSubscribed`, `TestListExtendedSelectSubscribed`
   and `TestListExtendedMultiplePatterns`.
-- ⏳ Remaining: SEARCHRES (RFC 5182, the `$` saved-search marker); consider IMAP4rev2.
+- ✅ **SEARCHRES (RFC 5182)** — delivered in v6.2.0. `SEARCH RETURN (SAVE)` (UID and sequence
+  variants) saves the matched messages for the session; the `$` marker then references that result in
+  a subsequent `FETCH`/`STORE`/`COPY`/`MOVE`/`UID EXPUNGE`. The result is stored as UIDs on the
+  connection so it stays stable across expunges; `$` is expanded centrally in
+  `IMAPCommandRangeAction::DoForMails` (mapped to sequence numbers for non-UID commands) and in
+  `UID EXPUNGE`. When `SAVE` is combined only with `MIN`/`MAX`, just those extremes are saved.
+  Advertised in CAPABILITY as `SEARCHRES`. Covered by `TestSearchResSaveAndFetch`,
+  `TestSearchResSaveAndStore` and `TestSearchResCapability`. Follow-up: `$` inside `SEARCH` criteria
+  (set intersection) is not yet supported.
+- ⏳ Remaining: consider IMAP4rev2.
   (`IMAPCommandCapability` + command map.)
 - Verify: fast resync in Thunderbird/Apple Mail.
 

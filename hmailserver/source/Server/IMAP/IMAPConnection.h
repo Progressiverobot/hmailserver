@@ -121,6 +121,12 @@ namespace HM
       bool GetQResyncEnabled() const { return qresync_enabled_; }
       void SetQResyncEnabled(bool bNewVal) { qresync_enabled_ = bNewVal; }
 
+      // RFC 5182 (SEARCHRES): the most recent "SEARCH RETURN (SAVE)" result for this
+      // session, stored as UIDs so the "$" marker stays stable across expunges. An
+      // empty vector means the saved result is the empty set.
+      void SetSavedSearchResult(const std::vector<__int64> &uids) { saved_search_result_ = uids; }
+      const std::vector<__int64> & GetSavedSearchResult() const { return saved_search_result_; }
+
       // RFC 7162 (QRESYNC): compress a list of UIDs into a sequence-set string
       // (e.g. "1:3,5,7:9") for use in "* VANISHED" responses. Sorts and de-dupes.
       static String CompactUidSet(std::vector<__int64> uids);
@@ -203,6 +209,9 @@ namespace HM
 
       bool condstore_enabled_;
       bool qresync_enabled_;
+
+      // RFC 5182 (SEARCHRES): UIDs saved by the last "SEARCH RETURN (SAVE)".
+      std::vector<__int64> saved_search_result_;
 
       int literal_data_to_receive_;
       String literal_buffer_;

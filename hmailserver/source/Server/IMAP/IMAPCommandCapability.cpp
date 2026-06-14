@@ -43,7 +43,7 @@ namespace HM
       if (pConfig->GetUseIMAPSASLInitialResponse())
 	      sResponse += " SASL-IR";
 
-      sResponse += " NAMESPACE RIGHTS=texk MOVE ID SPECIAL-USE UNSELECT UIDPLUS ENABLE STATUS=SIZE ESEARCH CONDSTORE QRESYNC LIST-EXTENDED";
+      sResponse += " NAMESPACE RIGHTS=texk MOVE ID SPECIAL-USE UNSELECT UIDPLUS ENABLE STATUS=SIZE ESEARCH CONDSTORE QRESYNC LIST-EXTENDED SEARCHRES";
 
       sResponse += "\r\n";
       sResponse += pArgument->Tag() + " OK CAPABILITY completed\r\n";

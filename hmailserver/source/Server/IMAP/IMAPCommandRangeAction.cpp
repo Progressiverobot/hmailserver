@@ -46,7 +46,47 @@ namespace HM
    {
       long lColonPos = -1;
 
-      std::vector<String> sSplitted = StringParser::SplitString(sMailNos, ",");
+      // RFC 5182 (SEARCHRES): "$" references the result saved by "SEARCH RETURN (SAVE)".
+      // Expand it here, the single chokepoint for FETCH/STORE/COPY/MOVE sequence-sets, so
+      // every consumer sees a concrete set. The saved result is stored as UIDs; for a
+      // sequence-number command they are mapped to the current message positions. An empty
+      // saved result expands to "0", which matches nothing (the command succeeds, no-op).
+      String sExpandedMailNos = sMailNos;
+      if (sExpandedMailNos.Find(_T("$")) >= 0)
+      {
+         const std::vector<__int64> &savedUids = pConnection->GetSavedSearchResult();
+         std::vector<String> tokens;
+
+         if (is_uid_)
+         {
+            for (__int64 uid : savedUids)
+            {
+               String s;
+               s.Format(_T("%I64d"), uid);
+               tokens.push_back(s);
+            }
+         }
+         else if (pConnection->GetCurrentFolder())
+         {
+            std::shared_ptr<Messages> messages = pConnection->GetCurrentFolder()->GetMessages();
+            for (__int64 uid : savedUids)
+            {
+               unsigned int foundIndex = 0;
+               std::shared_ptr<Message> message = messages->GetItemByUID((unsigned int) uid, foundIndex);
+               if (message)
+               {
+                  String s;
+                  s.Format(_T("%u"), foundIndex);
+                  tokens.push_back(s);
+               }
+            }
+         }
+
+         String sSubstitution = tokens.empty() ? String(_T("0")) : StringParser::JoinVector(tokens, _T(","));
+         sExpandedMailNos.Replace(_T("$"), sSubstitution.c_str());
+      }
+
+      std::vector<String> sSplitted = StringParser::SplitString(sExpandedMailNos, ",");
 
       if (is_uid_)
       {

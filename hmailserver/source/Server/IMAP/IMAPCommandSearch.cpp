@@ -32,7 +32,8 @@ namespace HM
       esearch_min_(false),
       esearch_max_(false),
       esearch_all_(false),
-      esearch_count_(false)
+      esearch_count_(false),
+      esearch_save_(false)
    {
       modseq_search_ = false;
       highest_modseq_ = 0;
@@ -99,9 +100,12 @@ namespace HM
             if (sOptions.Find(_T("MAX")) >= 0)   esearch_max_ = true;
             if (sOptions.Find(_T("COUNT")) >= 0) esearch_count_ = true;
             if (sOptions.Find(_T("ALL")) >= 0)   esearch_all_ = true;
+            // RFC 5182 (SEARCHRES): "SAVE" stores the result for later "$" references.
+            if (sOptions.Find(_T("SAVE")) >= 0)  esearch_save_ = true;
 
-            // RFC 4731: an empty RETURN option list is equivalent to (ALL).
-            if (!esearch_min_ && !esearch_max_ && !esearch_count_ && !esearch_all_)
+            // RFC 4731: an empty RETURN option list is equivalent to (ALL). SAVE on its
+            // own does not imply ALL: it updates "$" but adds no data to the response.
+            if (!esearch_min_ && !esearch_max_ && !esearch_count_ && !esearch_all_ && !esearch_save_)
                esearch_all_ = true;
 
             // The search criteria follow the closing parenthesis.
@@ -128,6 +132,9 @@ namespace HM
       std::vector<std::shared_ptr<Message>> messages = pCurFolder->GetMessages()->GetCopy();
 
       std::vector<String> sMatchingVec;
+      // RFC 5182 (SEARCHRES): UIDs of the matched messages in ascending order, used when SAVE
+      // is requested. Captured regardless of UID/sequence mode so "$" stays stable.
+      std::vector<__int64> sMatchingUids;
       if (messages.size() > 0)
       {
          // Iterate through the messages and see which ones match.
@@ -170,6 +177,7 @@ namespace HM
                sID.Format(_T("%d"), index);
 
             sMatchingVec.push_back(sID);
+            sMatchingUids.push_back((__int64) pMessage->GetUID());
          }
 
       }
@@ -238,6 +246,31 @@ namespace HM
          }
 
          sResponse += "\r\n";
+      }
+
+      // RFC 5182 (SEARCHRES): store the result referenced later by "$". When SAVE is combined
+      // only with MIN and/or MAX (and not ALL/COUNT), just those extremes are saved; otherwise
+      // the complete set of matched messages is saved.
+      if (esearch_save_)
+      {
+         std::vector<__int64> savedUids;
+         if ((esearch_min_ || esearch_max_) && !esearch_all_ && !esearch_count_)
+         {
+            if (esearch_min_ && !sMatchingUids.empty())
+               savedUids.push_back(sMatchingUids.front());
+            if (esearch_max_ && !sMatchingUids.empty())
+            {
+               __int64 maxUid = sMatchingUids.back();
+               if (savedUids.empty() || savedUids.back() != maxUid)
+                  savedUids.push_back(maxUid);
+            }
+         }
+         else
+         {
+            savedUids = sMatchingUids;
+         }
+
+         pConnection->SetSavedSearchResult(savedUids);
       }
 
       if (!is_uid_) 

@@ -635,6 +635,84 @@ namespace RegressionTests.IMAP
       }
 
       [Test]
+      [Description("RFC 5182 (SEARCHRES): UID SEARCH RETURN (SAVE) stores the result, which a " +
+                   "subsequent UID FETCH can reference via the \"$\" marker.")]
+      public void TestSearchResSaveAndFetch()
+      {
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "searchres@example.test", "test");
+
+         var simulator = new ImapClientSimulator();
+         simulator.Connect();
+         simulator.LogonWithLiteral("searchres@example.test", "test");
+
+         simulator.SendSingleCommandWithLiteral("A01 APPEND INBOX {4}", "ABCD");
+         simulator.SendSingleCommandWithLiteral("A02 APPEND INBOX {4}", "EFGH");
+         simulator.SendSingleCommandWithLiteral("A03 APPEND INBOX {4}", "IJKL");
+         simulator.SelectFolder("INBOX");
+
+         // Flag the second message \Seen, then save the SEEN search result.
+         simulator.SendSingleCommand("A04 STORE 2 +FLAGS (\\Seen)");
+
+         string save = simulator.SendSingleCommand("A05 UID SEARCH RETURN (SAVE) SEEN");
+         Assert.IsTrue(save.Contains("A05 OK"), "SEARCH RETURN (SAVE) should succeed. " + save);
+
+         // "$" must now resolve to the single saved message (UID 2).
+         string fetch = simulator.SendSingleCommand("A06 UID FETCH $ (UID)");
+         Assert.IsTrue(fetch.Contains("UID 2"),
+            "UID FETCH $ should resolve to the saved message UID 2. " + fetch);
+         Assert.IsFalse(fetch.Contains("UID 1"),
+            "UID FETCH $ should not include unsaved messages. " + fetch);
+         Assert.IsFalse(fetch.Contains("UID 3"),
+            "UID FETCH $ should not include unsaved messages. " + fetch);
+
+         simulator.Disconnect();
+      }
+
+      [Test]
+      [Description("RFC 5182 (SEARCHRES): the saved \"$\" result can be referenced by a UID STORE, " +
+                   "applying flags to exactly the saved messages.")]
+      public void TestSearchResSaveAndStore()
+      {
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "searchresstore@example.test", "test");
+
+         var simulator = new ImapClientSimulator();
+         simulator.Connect();
+         simulator.LogonWithLiteral("searchresstore@example.test", "test");
+
+         simulator.SendSingleCommandWithLiteral("A01 APPEND INBOX {4}", "ABCD");
+         simulator.SendSingleCommandWithLiteral("A02 APPEND INBOX {4}", "EFGH");
+         simulator.SelectFolder("INBOX");
+
+         // Save all messages, then flag the saved set \Flagged via "$".
+         simulator.SendSingleCommand("A04 UID SEARCH RETURN (SAVE) ALL");
+         simulator.SendSingleCommand("A05 UID STORE $ +FLAGS (\\Flagged)");
+
+         // Both messages must now carry \Flagged.
+         string flagged = simulator.Search("FLAGGED");
+         Assert.AreEqual("1 2", flagged,
+            "Both saved messages should be \\Flagged after UID STORE $. Got: " + flagged);
+
+         simulator.Disconnect();
+      }
+
+      [Test]
+      [Description("RFC 5182 (SEARCHRES): SEARCH RETURN (SAVE) advertised in CAPABILITY.")]
+      public void TestSearchResCapability()
+      {
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "searchrescap@example.test", "test");
+
+         var simulator = new ImapClientSimulator();
+         simulator.Connect();
+         simulator.LogonWithLiteral("searchrescap@example.test", "test");
+
+         string caps = simulator.SendSingleCommand("A01 CAPABILITY");
+         Assert.IsTrue(caps.Contains("SEARCHRES"),
+            "CAPABILITY should advertise SEARCHRES. " + caps);
+
+         simulator.Disconnect();
+      }
+
+      [Test]
       public void TestAppendDeletedMessage()
 
       {

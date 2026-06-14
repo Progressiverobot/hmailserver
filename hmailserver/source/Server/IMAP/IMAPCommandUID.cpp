@@ -150,7 +150,8 @@ namespace HM
          if (sUidMailNo.IsEmpty())
             return IMAPResult(IMAPResult::ResultBad, "No mail number specified");
 
-         if (!StringParser::ValidateString(sUidMailNo, "01234567890,.:*"))
+         // "$" allowed (RFC 5182 SEARCHRES); DoForMails expands it to the saved result.
+         if (!StringParser::ValidateString(sUidMailNo, "01234567890,.:*$"))
             return IMAPResult(IMAPResult::ResultBad, "Incorrect mail number");
 
          pArgument->Command(sUidShowPart);
@@ -213,6 +214,22 @@ namespace HM
             return IMAPResult(IMAPResult::ResultBad, "ACL: Expunge permission denied (Required for UID EXPUNGE command).");
 
          String sUidSet = pParser->Word(2)->Value();
+
+         // RFC 5182 (SEARCHRES): expand "$" to the saved result before parsing the set.
+         if (sUidSet.Find(_T("$")) >= 0)
+         {
+            const std::vector<__int64> &savedUids = pConnection->GetSavedSearchResult();
+            std::vector<String> tokens;
+            for (__int64 uid : savedUids)
+            {
+               String s;
+               s.Format(_T("%I64d"), uid);
+               tokens.push_back(s);
+            }
+            String sSubstitution = tokens.empty() ? String(_T("0")) : StringParser::JoinVector(tokens, _T(","));
+            sUidSet.Replace(_T("$"), sSubstitution.c_str());
+         }
+
          if (sUidSet.IsEmpty() || !StringParser::ValidateString(sUidSet, "01234567890,.:*"))
             return IMAPResult(IMAPResult::ResultBad, "Incorrect mail number");
 
@@ -294,7 +311,8 @@ namespace HM
       if (sMailNo.IsEmpty())
          return IMAPResult(IMAPResult::ResultBad, "No mail number specified");
 
-      if (!StringParser::ValidateString(sMailNo, "01234567890,.:*"))
+      // "$" allowed (RFC 5182 SEARCHRES); DoForMails expands it to the saved result.
+      if (!StringParser::ValidateString(sMailNo, "01234567890,.:*$"))
          return IMAPResult(IMAPResult::ResultBad, "Incorrect mail number");
 
       // RFC 7162 (QRESYNC): "UID FETCH <set> (… CHANGEDSINCE n VANISHED)" asks the server to also
