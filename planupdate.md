@@ -34,17 +34,15 @@ the release asset.
 2. **B2 — authentication modernization follow-ups** (live JWKS/introspection +
    RS256 interop, O365/Gmail XOAUTH2 + Thunderbird SCRAM interop, full SASLprep).
 3. **Track A Phase 2 — Control-Panel UX/UI polish.**
-4. **B4 — deliverability & SMTP standards** (SMTPUTF8/EAI, SRS, PIPELINING/DSN/
-   ENHANCEDSTATUSCODES, rate shaping).
-5. **Track A Phase 3 — AV/security extensibility + INI hardening knobs.**
-6. **B7 — operability & observability** (OpenTelemetry, health probes, DB pool/
+4. **Track A Phase 3 — AV/security extensibility + INI hardening knobs.**
+5. **B7 — operability & observability** (OpenTelemetry, health probes, DB pool/
    executor, durability, HA runbook).
-7. **B6 — Sieve + ManageSieve.**
-8. **Track A Phase 4 — finalize** (gap doc, release cadence).
-9. **B8 — quality gates remaining** (CI DB matrix, clang-tidy/ASAN/UBSAN,
+6. **B6 — Sieve + ManageSieve.**
+7. **Track A Phase 4 — finalize** (gap doc, release cadence).
+8. **B8 — quality gates remaining** (CI DB matrix, clang-tidy/ASAN/UBSAN,
    libFuzzer, SBOM/CVE scanning, signed artifacts).
-10. **Cross-cutting** — surface every new server capability in the Control Panel.
-11. **Future track (Tier 3)** — documented, not scheduled.
+9. **Cross-cutting** — surface every new server capability in the Control Panel.
+10. **Future track (Tier 3)** — documented, not scheduled.
 
 ---
 
@@ -285,6 +283,8 @@ MTA-STS, TLS-RPT, auto-ban, correct dot-stuffing, parameterized SQL.*
    SCRAM-PLUS (all three), Argon2id, hash policy, pepper, UTF8/SASLprep, offline
    OAuth2 — all v6.2.0. (Remaining follow-ups are in Part 1.)
 6. **Track A Phase 1 — functional parity.** ✅ 9/10 (item 7 deferred — Part 1).
+7. **B4 — deliverability & SMTP standards.** ✅ Done (v6.2.1) — SMTPUTF8/EAI,
+   PIPELINING, ENHANCEDSTATUSCODES, DSN, SRS, per-IP/per-destination rate shaping.
 
 ---
 
@@ -446,7 +446,7 @@ and upgrading the management/admin INI password from MD5.
 - Validated: in-server `DataProtector` self-test (round-trip + tamper + machine-binding) and
   `RegressionTests.Security.SecretProtection`; 287/287 Security+SMTP+POP3 green, server builds 0/0.
 
-### B4 — Deliverability & SMTP standards (delivered parts) ◑
+### B4 — Deliverability & SMTP standards ✅ DELIVERED (v6.2.1)
 
 All over-the-wire, validated against the live server (regression suite green, builds 0/0). Default-off
 toggles preserve backwards compatibility.
