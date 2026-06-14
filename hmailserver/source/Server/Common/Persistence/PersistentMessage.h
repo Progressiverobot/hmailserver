@@ -57,6 +57,12 @@ namespace HM
       static int GetTotalMessageCount();
       static int GetTotalMessageCountDelivered();
       static int GetDeliveryQueueCount();
+
+      // Consistency check: cross-check every message row against its backing file
+      // on disk and return the number of rows whose file is missing. Read-only;
+      // potentially expensive on large stores, so it is driven by an opt-in
+      // scheduled task rather than run on every metrics scrape.
+      static int GetMissingFileCount();
       
       static bool DeleteByAccountID(__int64 iAccountID);
 

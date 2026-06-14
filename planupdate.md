@@ -264,6 +264,17 @@ SRS for forwarding (SPF alignment), and per-IP / per-destination rate shaping.*
   (no per-message fsync cost). Validated by the `MessageStoreDurability` test
   (delivery still succeeds end-to-end with the barrier on). The broader consistency
   checker / recovery tooling remains future work.
+- **Done — message-store consistency check.** Opt-in via
+  `[Settings] MessageStoreConsistencyCheck = 1`: a scheduled, read-only task
+  (`MessageStoreConsistencyTask`, run once at startup then hourly) cross-checks
+  every message row against its backing file on disk
+  (`PersistentMessage::GetMissingFileCount()` reconstructs each on-disk path with
+  the same logic the server uses) and publishes the count of missing files as the
+  `hmailserver_messagestore_missing_files` gauge, logging a warning when divergence
+  is found. The check never deletes or repairs anything. Default 0 keeps the
+  (potentially expensive) store walk off. Validated by the
+  `MessageStoreConsistency` test (delete a delivered message's file → gauge reports
+  the missing file). Active recovery/repair tooling remains future work.
 - **Done — HA active/passive runbook.** A documented, validated active/passive
   topology (shared external database + shared message store + floating VIP) with
   readiness gating on `/readyz` and graceful-drain failover, in

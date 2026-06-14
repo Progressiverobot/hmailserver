@@ -932,6 +932,46 @@ namespace HM
       return result;
    }
 
+   int
+   PersistentMessage::GetMissingFileCount()
+   {
+      // Walk every message row and confirm its backing file exists on disk. The
+      // account address (needed to resolve account-folder paths) is joined in so
+      // GetFileName can reconstruct the exact on-disk path the server would use.
+      SQLCommand command(
+         "select m.messagefilename, m.messageaccountid, m.messagefolderid, a.accountaddress "
+         "from hm_messages m left join hm_accounts a on m.messageaccountid = a.accountid");
+
+      std::shared_ptr<DALRecordset> pRS = Application::Instance()->GetDBManager()->OpenRecordset(command);
+      if (!pRS)
+         return 0;
+
+      int missingCount = 0;
+
+      while (!pRS->IsEOF())
+      {
+         String partialFileName = pRS->GetStringValue("messagefilename");
+
+         if (!partialFileName.IsEmpty())
+         {
+            std::shared_ptr<Message> message = std::shared_ptr<Message>(new Message);
+            message->SetPartialFileName(partialFileName);
+            message->SetAccountID(pRS->GetLongValue("messageaccountid"));
+            message->SetFolderID(pRS->GetLongValue("messagefolderid"));
+
+            String accountAddress = pRS->GetStringValue("accountaddress");
+            String fullFileName = GetFileName(accountAddress, message);
+
+            if (!FileUtilities::Exists(fullFileName))
+               missingCount++;
+         }
+
+         pRS->MoveNext();
+      }
+
+      return missingCount;
+   }
+
    bool
    PersistentMessage::DeleteByAccountID(__int64 iAccountID)
    {

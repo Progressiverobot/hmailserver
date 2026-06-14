@@ -275,6 +275,11 @@ namespace HM
       line.Format("hmailserver_delivery_queue_messages %d\n", GetDeliveryQueueDepthCached_());
       body += line;
 
+      body += "# HELP hmailserver_messagestore_missing_files Number of messages whose backing file was missing on disk at the last consistency check (0 when consistent or the check is disabled).\n";
+      body += "# TYPE hmailserver_messagestore_missing_files gauge\n";
+      line.Format("hmailserver_messagestore_missing_files %d\n", status->GetMessageStoreMissingFiles());
+      body += line;
+
       return body;
    }
 

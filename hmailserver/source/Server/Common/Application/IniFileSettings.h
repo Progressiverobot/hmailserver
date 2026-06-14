@@ -143,6 +143,7 @@ namespace HM
       int GetLogDeleteDays() const { return log_delete_days_; }
       int GetShutdownDrainSeconds() const { return shutdown_drain_seconds_; }
       bool GetMessageStoreFsync() const { return message_store_fsync_; }
+      bool GetMessageStoreConsistencyCheck() const { return message_store_consistency_check_; }
       int GetMetricsServerPort() const { return metrics_server_port_; }
       String GetMetricsServerBindAddress() const { return metrics_server_bind_address_; }
       bool GetArcSealingEnabled() const { return arc_sealing_enabled_; }
@@ -281,6 +282,7 @@ namespace HM
       int log_delete_days_ = 0;
       int shutdown_drain_seconds_ = 0;
       bool message_store_fsync_ = false;
+      bool message_store_consistency_check_ = false;
       int metrics_server_port_ = 0;
       String metrics_server_bind_address_;
       bool arc_sealing_enabled_ = false;

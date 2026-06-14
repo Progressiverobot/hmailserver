@@ -24,6 +24,7 @@ namespace HM
       number_of_tls_handshake_failures_ = 0;
       number_of_authentications_succeeded_ = 0;
       number_of_authentication_failures_ = 0;
+      message_store_missing_files_ = 0;
       state_ = StateUnknown ;
 
    }
@@ -199,6 +200,20 @@ namespace HM
       // Called when an authentication attempt fails (any protocol).
       boost::lock_guard<boost::recursive_mutex> guard(authentication_mutex_);
       number_of_authentication_failures_++;
+   }
+
+   int
+   ServerStatus::GetMessageStoreMissingFiles() const
+   {
+      return message_store_missing_files_;
+   }
+
+   void
+   ServerStatus::SetMessageStoreMissingFiles(int count)
+   {
+      // Updated by the scheduled message-store consistency task.
+      boost::lock_guard<boost::recursive_mutex> guard(message_store_consistency_mutex_);
+      message_store_missing_files_ = count;
    }
    
    int

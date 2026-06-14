@@ -44,6 +44,13 @@ namespace HM
       void OnAuthenticationFailed();
       int GetNumberOfAuthenticationFailures() const;
 
+      // Last result of the message-store consistency check: the number of message
+      // rows whose backing file was missing on disk. Updated by the scheduled
+      // MessageStoreConsistencyTask; 0 when the store is consistent (or the check
+      // is disabled).
+      void SetMessageStoreMissingFiles(int count);
+      int GetMessageStoreMissingFiles() const;
+
       void SetState(ServerState i);
       int GetState() const;
 
@@ -60,11 +67,13 @@ namespace HM
       int number_of_tls_handshake_failures_;
       int number_of_authentications_succeeded_;
       int number_of_authentication_failures_;
+      int message_store_missing_files_;
 
       boost::recursive_mutex spam_message_dropped_mutex_;
       boost::recursive_mutex virus_removed_mutex_;
       boost::recursive_mutex tls_handshake_mutex_;
       boost::recursive_mutex authentication_mutex_;
+      boost::recursive_mutex message_store_consistency_mutex_;
 
       ServerState state_;
    };

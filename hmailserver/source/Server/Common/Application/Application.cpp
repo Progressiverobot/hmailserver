@@ -57,6 +57,7 @@
 #include "../Persistence/PersistentDomain.h"
 #include "RemoveExpiredRecords.h"
 #include "LogRetentionTask.h"
+#include "MessageStoreConsistencyTask.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -464,6 +465,19 @@ namespace HM
       logRetentionTask->SetReoccurance(ScheduledTask::RunInfinitely);
       logRetentionTask->SetMinutesBetweenRun(6 * 60);
       scheduler_->ScheduleTask(logRetentionTask);
+
+      // Message-store consistency: cross-check the message database against the
+      // files on disk and publish the number of missing files. The task no-ops
+      // when MessageStoreConsistencyCheck is disabled (the default). Run once
+      // promptly at startup, then periodically thereafter.
+      std::shared_ptr<MessageStoreConsistencyTask> consistencyStartupTask = std::shared_ptr<MessageStoreConsistencyTask>(new MessageStoreConsistencyTask);
+      consistencyStartupTask->SetReoccurance(ScheduledTask::RunOnce);
+      scheduler_->ScheduleTask(consistencyStartupTask);
+
+      std::shared_ptr<MessageStoreConsistencyTask> consistencyTask = std::shared_ptr<MessageStoreConsistencyTask>(new MessageStoreConsistencyTask);
+      consistencyTask->SetReoccurance(ScheduledTask::RunInfinitely);
+      consistencyTask->SetMinutesBetweenRun(60);
+      scheduler_->ScheduleTask(consistencyTask);
 
       // Automatic certificate renewal via ACME (Let's Encrypt).
       if (IniFileSettings::Instance()->GetAcmeEnabled())
