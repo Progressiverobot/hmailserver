@@ -15,6 +15,7 @@
 #include "../Common/Util/Crypt.h"
 #include "../Common/Util/Time.h"
 #include "../Common/Cache/AccountSizeCache.h"
+#include "../Common/Sieve/SieveStorage.h"
 
 #include "../POP3/POP3Sessions.h"
 #include "../IMAP/IMAPFolderUtilities.h"
@@ -929,6 +930,42 @@ STDMETHODIMP InterfaceAccount::put_ForwardAddress(BSTR newVal)
          return GetAccessDenied();
 
       object_->SetForwardAddress(newVal);
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceAccount::get_SieveScript(BSTR *pVal)
+{
+   try
+   {
+      if (!object_)
+         return GetAccessDenied();
+
+      // Sieve scripts are stored as files keyed by the account address, so this
+      // property reads directly from SieveStorage (no Save() required).
+      *pVal = HM::SieveStorage::GetActiveScript(object_->GetAddress()).AllocSysString();
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceAccount::put_SieveScript(BSTR newVal)
+{
+   try
+   {
+      if (!object_)
+         return GetAccessDenied();
+
+      // The script is persisted to disk immediately (file-backed, not part of the
+      // account row), so this does not require a subsequent Save().
+      HM::SieveStorage::SetActiveScript(object_->GetAddress(), HM::String(newVal));
       return S_OK;
    }
    catch (...)

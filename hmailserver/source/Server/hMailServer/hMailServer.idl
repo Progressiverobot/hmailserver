@@ -882,6 +882,8 @@ interface IInterfaceAccount : IDispatch
     [propput, id(38), helpstring("Vacation message is set to be aborted on messages marked as spam.")] HRESULT VacationMessageAbortSpamFlagged([in] VARIANT_BOOL newVal);
     [propget, id(39), helpstring("Forwarding is set to be aborted on messages marked as spam.")] HRESULT ForwardAbortSpamFlagged([out, retval] VARIANT_BOOL *pVal);
     [propput, id(39), helpstring("Forwarding is set to be aborted on messages marked as spam.")] HRESULT ForwardAbortSpamFlagged([in] VARIANT_BOOL newVal);
+    [propget, id(40), helpstring("The account's active Sieve (RFC 5228) filter script.")] HRESULT SieveScript([out, retval] BSTR *pVal);
+    [propput, id(40), helpstring("The account's active Sieve (RFC 5228) filter script.")] HRESULT SieveScript([in] BSTR newVal);
 };
 
 

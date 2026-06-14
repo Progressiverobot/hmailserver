@@ -227,6 +227,14 @@ SRS for forwarding (SPF alignment), and per-IP / per-destination rate shaping.*
     `;`-joined action summary (or `error: …`). Validated by the `SieveEvaluation`
     regression test. Next: per-account script storage + wiring into `LocalDelivery`,
     then the ManageSieve service.
+  - **In progress — per-account script storage.** `SieveStorage` persists each
+    account's active Sieve script as a file under
+    `{DataDirectory}\Sieve\{domain}\{localpart}\active.sieve` (filesystem-safe path
+    sanitization; no DB schema change — the named-script model for ManageSieve
+    layers on top of this directory). Surfaced as the COM `Account.SieveScript`
+    get/put property (file-backed, written immediately). Validated by the
+    `SieveAccountScript` round-trip test. Next: evaluate the stored script in
+    `LocalDelivery` and apply fileinto/redirect/discard, then ManageSieve.
 
 ### B7 — Operability & observability
 

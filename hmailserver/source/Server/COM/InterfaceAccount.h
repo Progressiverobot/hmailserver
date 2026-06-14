@@ -144,6 +144,9 @@ public:
    STDMETHOD(get_PersonLastName)(/*[out, retval]*/ BSTR *pVal);
    STDMETHOD(put_PersonLastName)(/*[in]*/ BSTR newVal);
 
+   STDMETHOD(get_SieveScript)(/*[out, retval]*/ BSTR *pVal);
+   STDMETHOD(put_SieveScript)(/*[in]*/ BSTR newVal);
+
 
 private:
 

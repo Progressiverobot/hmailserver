@@ -220,6 +220,7 @@ EXIT 0
     <ClCompile Include="..\Common\Sieve\SieveEvaluator.cpp" />
     <ClCompile Include="..\Common\Sieve\SieveParser.cpp" />
     <ClCompile Include="..\Common\Sieve\SieveScript.cpp" />
+    <ClCompile Include="..\Common\Sieve\SieveStorage.cpp" />
     <ClCompile Include="..\Common\Application\RemoveExpiredRecords.cpp" />
     <ClCompile Include="..\Common\Application\Scheduler.cpp" />
     <ClCompile Include="..\Common\Application\SessionManager.cpp" />
@@ -736,6 +737,7 @@ EXIT 0
     <ClInclude Include="..\Common\Sieve\SieveEvaluator.h" />
     <ClInclude Include="..\Common\Sieve\SieveParser.h" />
     <ClInclude Include="..\Common\Sieve\SieveScript.h" />
+    <ClInclude Include="..\Common\Sieve\SieveStorage.h" />
     <ClInclude Include="..\Common\Application\RemoveExpiredRecords.h" />
     <ClInclude Include="..\Common\Application\Scheduler.h" />
     <ClInclude Include="..\Common\Application\SessionManager.h" />
