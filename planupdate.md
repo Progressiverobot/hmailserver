@@ -324,6 +324,23 @@ upgrading the management/admin INI password from MD5.
   Validated with an over-the-wire C# SMTP SCRAM client (`TestScramSha256Authenticates`,
   `TestScramSha256WrongPasswordFails`, `TestScramSha256Advertised`) plus the full SMTP regression
   suite. Follow-ups: SCRAM over POP3 (POP3 has no AUTH/SASL command today) and SCRAM-SHA-256-**PLUS**.
+- ✅ **SASL AUTH for POP3 — PLAIN + SCRAM-SHA-256 — delivered in v6.2.0.** POP3 previously had only the
+  legacy `USER`/`PASS` login; added the RFC 5034 `AUTH` command supporting `PLAIN` and
+  `SCRAM-SHA-256` (RFC 5802 / RFC 7677), reusing the `Common/Util/Hashing/ScramSha256` helper. POP3 is
+  command-dispatched (not a per-line auth state machine), so SASL continuation lines are routed at the
+  top of `InternalParseData` before command parsing: a `scram_session_` (per-connection `ScramSha256`)
+  or a `sasl_plain_pending_` flag consumes the next line(s) as base64 SASL data, exchanged over `+ `
+  continuations; the SCRAM server-final (`v=...`) is sent as a `+ ` challenge acknowledged by an empty
+  client line, then completion locks the mailbox and enters TRANSACTION exactly like `PASS`. Honours
+  SASL-IR and `*` cancellation. `AUTH` with no argument lists the mechanisms; `CAPA` advertises
+  `SASL PLAIN SCRAM-SHA-256` (gated on TLS like `USER`). Unknown / non-PBKDF2 accounts run the same
+  forced-failure SCRAM exchange (anti-enumeration); SCRAM failures feed `AccountLogon::RegisterFailedLogin`
+  (auto-ban) and the per-connection brute-force cap. The post-login success tail and the `OnClientLogon`
+  script event were refactored into shared `HandleSuccessfulLogin_` / `FinishPasswordLogin_` /
+  `FireOnClientLogon_` used by both `PASS` and the SASL paths; the PLAIN response is masked in the POP3
+  log. Validated with an over-the-wire C# POP3 SASL client (`TestSaslAdvertised`,
+  `TestAuthPlainAuthenticates`, `TestScramSha256Authenticates`, `TestScramSha256WrongPasswordFails`)
+  plus the full POP3 regression suite. This completes SCRAM-SHA-256 across IMAP, SMTP and POP3.
 - ✅ **Argon2id KDF option — delivered in v6.2.0.** Added the OWASP-recommended memory-hard KDF as
   password-hash algorithm **5** (`Crypt::ETArgon2id`), implemented in `HashCreator`
   (`GenerateArgon2id`/`ValidateArgon2id`/`IsArgon2idHash`) over OpenSSL's `EVP_KDF` `ARGON2ID`
@@ -337,9 +354,9 @@ upgrading the management/admin INI password from MD5.
   self-tests (`HashCreatorTester` Argon2id round-trip/negative/salt-uniqueness/cross-scheme checks +
   a `Crypt` `EnCrypt`→`GetHashType`→`Validate` dispatch check for Argon2id and PBKDF2), with the
   full auth regression (default PBKDF2 path) green.
-- Remaining B2: SCRAM-SHA-256-`PLUS` (channel binding) and SCRAM over POP3 (no AUTH/SASL command
-  there today); a hash-policy engine (min accepted type, phase out MD5/SHA256) and optional pepper
-  building on the Argon2id work; OAuth2 XOAUTH2/OAUTHBEARER; POP3 SASL + UTF8 (RFC 6856).
+- Remaining B2: SCRAM-SHA-256-`PLUS` (channel binding); a hash-policy engine (min accepted type,
+  phase out MD5/SHA256) and optional pepper building on the Argon2id work; OAuth2 XOAUTH2/OAUTHBEARER;
+  POP3/IMAP UTF8 (RFC 6856 / UTF8=ACCEPT) and full SASLprep of non-ASCII credentials.
 - Verify: O365/Gmail XOAUTH2 + Thunderbird SCRAM interop.
 
 ## B3 — Secrets & least-privilege

@@ -91,6 +91,94 @@ namespace RegressionTests.POP3
       }
 
       [Test]
+      [Description("RFC 5034: CAPA advertises SASL PLAIN SCRAM-SHA-256.")]
+      public void TestSaslAdvertised()
+      {
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "saslcapa@example.test", "test");
+
+         var tc = new TcpConnection();
+         Assert.IsTrue(tc.Connect(110));
+         tc.ReadUntil("+OK"); // banner
+         tc.Send("CAPA\r\n");
+         string caps = tc.Receive();
+         Assert.IsTrue(caps.Contains("SASL PLAIN SCRAM-SHA-256"),
+            "CAPA should advertise SASL PLAIN SCRAM-SHA-256. Got: " + caps);
+         tc.Send("QUIT\r\n");
+         tc.Disconnect();
+      }
+
+      [Test]
+      [Description("RFC 5034 SASL PLAIN over POP3 authenticates a local account.")]
+      public void TestAuthPlainAuthenticates()
+      {
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "saslplain@example.test", "SeC-r3t Pass!");
+
+         var tc = new TcpConnection();
+         Assert.IsTrue(tc.Connect(110));
+         tc.ReadUntil("+OK"); // banner
+
+         string final = Pop3SaslTestClient.AuthenticatePlain(tc, "saslplain@example.test", "SeC-r3t Pass!");
+         Assert.IsTrue(final.StartsWith("+OK"),
+            "SASL PLAIN authentication should succeed. Got: " + final);
+
+         // The session must be in TRANSACTION state and usable.
+         tc.Send("STAT\r\n");
+         Assert.IsTrue(tc.Receive().StartsWith("+OK"), "Session should be usable after AUTH PLAIN.");
+         tc.Send("QUIT\r\n");
+         tc.Disconnect();
+      }
+
+      [Test]
+      [Description("RFC 5802/7677 (SCRAM-SHA-256) over POP3 (RFC 5034): a full SCRAM exchange " +
+                   "authenticates a PBKDF2-hashed account and the server proves it knows the key.")]
+      public void TestScramSha256Authenticates()
+      {
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "scrampop@example.test", "SeC-r3t Pass!");
+
+         var tc = new TcpConnection();
+         Assert.IsTrue(tc.Connect(110));
+         tc.ReadUntil("+OK"); // banner
+
+         string final = Pop3SaslTestClient.AuthenticateScram(tc, "scrampop@example.test", "SeC-r3t Pass!");
+         Assert.IsTrue(final.StartsWith("+OK"),
+            "SCRAM-SHA-256 authentication should succeed. Got: " + final);
+
+         tc.Send("STAT\r\n");
+         Assert.IsTrue(tc.Receive().StartsWith("+OK"), "Session should be usable after SCRAM logon.");
+         tc.Send("QUIT\r\n");
+         tc.Disconnect();
+      }
+
+      [Test]
+      [Description("RFC 5802/7677 (SCRAM-SHA-256) over POP3: a wrong password produces an invalid " +
+                   "client proof and the server rejects the exchange without authenticating.")]
+      public void TestScramSha256WrongPasswordFails()
+      {
+         var settings = SingletonProvider<TestSetup>.Instance.GetApp().Settings;
+         bool originalAutoBan = settings.AutoBanOnLogonFailure;
+         settings.AutoBanOnLogonFailure = false;
+         settings.ClearLogonFailureList();
+         try
+         {
+            SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "scrambadpop@example.test", "correct horse");
+
+            var tc = new TcpConnection();
+            Assert.IsTrue(tc.Connect(110));
+            tc.ReadUntil("+OK"); // banner
+
+            string final = Pop3SaslTestClient.AuthenticateScram(tc, "scrambadpop@example.test", "wrong password");
+            Assert.IsTrue(final.StartsWith("-ERR"),
+               "SCRAM-SHA-256 with a wrong password must be rejected. Got: " + final);
+            tc.Disconnect();
+         }
+         finally
+         {
+            settings.AutoBanOnLogonFailure = originalAutoBan;
+            settings.ClearLogonFailureList();
+         }
+      }
+
+      [Test]
       [Description("Test to send a number of attachments...")]
       public void TestAttachmentEncoding()
       {
@@ -538,6 +626,137 @@ namespace RegressionTests.POP3
 
          //return the hashed value
          return hash.ToString();
+      }
+   }
+
+   /// <summary>
+   ///    A minimal SASL client for POP3 (RFC 5034) used to exercise the server's AUTH
+   ///    PLAIN and AUTH SCRAM-SHA-256 (RFC 5802 / RFC 7677) implementation over a raw
+   ///    connection that has already read the +OK banner.
+   /// </summary>
+   internal static class Pop3SaslTestClient
+   {
+      /// <summary>Runs AUTH PLAIN (no initial response). Returns the final +OK/-ERR line.</summary>
+      public static string AuthenticatePlain(TcpConnection con, string username, string password)
+      {
+         con.Send("AUTH PLAIN\r\n");
+         string challenge = con.Receive();
+         Assert.IsTrue(challenge.TrimStart().StartsWith("+"),
+            "Expected a continuation for AUTH PLAIN. Got: " + challenge);
+
+         string plain = "\0" + username + "\0" + password;
+         con.Send(Convert.ToBase64String(Encoding.UTF8.GetBytes(plain)) + "\r\n");
+         return con.Receive();
+      }
+
+      /// <summary>
+      ///    Runs a full SCRAM-SHA-256 exchange (no SASL-IR). Returns the final
+      ///    +OK on success or the -ERR rejection on a bad proof.
+      /// </summary>
+      public static string AuthenticateScram(TcpConnection con, string username, string password)
+      {
+         var nonceBytes = new byte[18];
+         using (var rng = RandomNumberGenerator.Create())
+            rng.GetBytes(nonceBytes);
+         string clientNonce = Convert.ToBase64String(nonceBytes);
+
+         string clientFirstBare = "n=" + SaslName(username) + ",r=" + clientNonce;
+         string clientFirst = "n,," + clientFirstBare;
+
+         con.Send("AUTH SCRAM-SHA-256\r\n");
+         string challenge = con.Receive();
+         Assert.IsTrue(challenge.TrimStart().StartsWith("+"),
+            "Expected an empty SCRAM continuation. Got: " + challenge);
+
+         con.Send(Base64(clientFirst) + "\r\n");
+         string serverFirstLine = con.Receive();
+         if (!serverFirstLine.TrimStart().StartsWith("+"))
+            return serverFirstLine; // protocol error
+         string serverFirst = DecodeContinuation(serverFirstLine);
+
+         string combinedNonce = Attribute(serverFirst, "r");
+         byte[] salt = Convert.FromBase64String(Attribute(serverFirst, "s"));
+         int iterations = int.Parse(Attribute(serverFirst, "i"));
+         Assert.IsTrue(combinedNonce.StartsWith(clientNonce),
+            "Server nonce must start with the client nonce. Got: " + combinedNonce);
+
+         byte[] saltedPassword;
+         using (var pbkdf2 = new Rfc2898DeriveBytes(password, salt, iterations, HashAlgorithmName.SHA256))
+            saltedPassword = pbkdf2.GetBytes(32);
+
+         byte[] clientKey = Hmac(saltedPassword, "Client Key");
+         byte[] storedKey = Sha256(clientKey);
+
+         string clientFinalWithoutProof = "c=biws,r=" + combinedNonce;
+         string authMessage = clientFirstBare + "," + serverFirst + "," + clientFinalWithoutProof;
+         byte[] clientSignature = Hmac(storedKey, authMessage);
+         byte[] clientProof = Xor(clientKey, clientSignature);
+
+         string clientFinal = clientFinalWithoutProof + ",p=" + Convert.ToBase64String(clientProof);
+         con.Send(Base64(clientFinal) + "\r\n");
+
+         string afterFinal = con.Receive();
+         if (!afterFinal.TrimStart().StartsWith("+"))
+            return afterFinal; // rejected proof (-ERR)
+
+         // Verify the server proved knowledge of the key (ServerSignature).
+         string serverFinal = DecodeContinuation(afterFinal);
+         byte[] serverKey = Hmac(saltedPassword, "Server Key");
+         byte[] serverSignature = Hmac(serverKey, authMessage);
+         Assert.AreEqual("v=" + Convert.ToBase64String(serverSignature), serverFinal,
+            "Server signature (v=) did not verify.");
+
+         // Empty client response acknowledges the server-final; server completes auth.
+         con.Send("\r\n");
+         return con.Receive();
+      }
+
+      private static string SaslName(string name)
+      {
+         return name.Replace("=", "=3D").Replace(",", "=2C");
+      }
+
+      private static string Base64(string s)
+      {
+         return Convert.ToBase64String(Encoding.UTF8.GetBytes(s));
+      }
+
+      private static string DecodeContinuation(string line)
+      {
+         string t = line.Trim();
+         if (t.StartsWith("+"))
+            t = t.Substring(1).Trim();
+         if (t.Length == 0)
+            return "";
+         return Encoding.UTF8.GetString(Convert.FromBase64String(t));
+      }
+
+      private static string Attribute(string message, string key)
+      {
+         foreach (var part in message.Split(','))
+            if (part.StartsWith(key + "="))
+               return part.Substring(key.Length + 1);
+         return "";
+      }
+
+      private static byte[] Hmac(byte[] key, string data)
+      {
+         using (var h = new HMACSHA256(key))
+            return h.ComputeHash(Encoding.ASCII.GetBytes(data));
+      }
+
+      private static byte[] Sha256(byte[] data)
+      {
+         using (var sha = SHA256.Create())
+            return sha.ComputeHash(data);
+      }
+
+      private static byte[] Xor(byte[] a, byte[] b)
+      {
+         var r = new byte[a.Length];
+         for (int i = 0; i < a.Length; i++)
+            r[i] = (byte) (a[i] ^ b[i]);
+         return r;
       }
    }
 }

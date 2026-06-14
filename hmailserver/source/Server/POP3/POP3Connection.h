@@ -12,6 +12,8 @@ namespace HM
 {
    class Messages;
    class ByteBuffer;
+   class Account;
+   class ScramSha256;
 
    class POP3Connection : public TCPConnection
    {
@@ -67,7 +69,8 @@ namespace HM
          DELE = 11,
          UIDL = 12,
          CAPA = 13,
-         STLS = 14
+         STLS = 14,
+         AUTH = 15
       };
 
       enum ConnectionState
@@ -90,6 +93,22 @@ namespace HM
       bool ProtocolDELE_(const String &Parameter);
       void ProtocolUSER_(const String &Parameter);
       ParseResult ProtocolPASS_(const String &Parameter);
+
+      // SASL AUTH (RFC 5034): PLAIN and SCRAM-SHA-256 (RFC 5802 / RFC 7677). State
+      // lives on the connection; continuation lines are routed in InternalParseData
+      // before normal command parsing, and SASL messages use "+ " continuations.
+      ParseResult ProtocolAUTH_(const String &sParameter);
+      ParseResult ProcessAuthPlain_(const String &sBase64);
+      ParseResult ContinueScram_(const String &sRequest);
+      ParseResult ProcessScramClientFirst_(const String &sBase64);
+      ParseResult ProcessScramClientFinal_(const String &sBase64);
+      ParseResult ProcessScramAck_();
+      ParseResult ScramAuthFailed_();
+      ParseResult FinishPasswordLogin_();
+      ParseResult HandleSuccessfulLogin_();
+      void FireOnClientLogon_(const String &sUsername, bool isAuthenticated);
+      std::shared_ptr<const Account> LookupPbkdf2Account_(const String &sAddress);
+
       bool ProtocolTOP_(const String &Parameter);
       bool ProtocolUIDL_(const String &Parameter);
       bool ProtocolSTAT_(const String &sParameter);
@@ -120,6 +139,10 @@ namespace HM
 
       bool pending_disconnect_;
       int authentication_failure_count_;
+
+      bool sasl_plain_pending_;
+      std::shared_ptr<ScramSha256> scram_session_;
+
       File current_file_;
    };
 }

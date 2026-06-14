@@ -10,12 +10,18 @@
 #include "../common/util/file.h"
 #include "../common/Util/AccountLogon.h"
 #include "../common/util/ByteBuffer.h"
+#include "../common/Util/Crypt.h"
+#include "../common/Util/Hashing/ScramSha256.h"
+#include "../common/Util/Parsing/StringParser.h"
 #include "../Common/Application/TimeoutCalculator.h"
 
 #include "../Common/Application/FolderManager.h"
 #include "../Common/Application/ObjectCache.h"
+#include "../Common/Application/DefaultDomain.h"
 #include "../Common/Application/SessionManager.h"
+#include "../Common/Cache/CacheContainer.h"
 #include "../Common/BO/DomainAliases.h"
+#include "../Common/BO/Domain.h"
 #include "../Common/Persistence/PersistentMessage.h"
 
 #include "POP3Sessions.h"
@@ -46,7 +52,8 @@ namespace HM
       current_state_(AUTHORIZATION),
       transmission_buffer_(true),
       pending_disconnect_(false),
-      authentication_failure_count_(0)
+      authentication_failure_count_(0),
+      sasl_plain_pending_(false)
    {
 
       /*
@@ -136,8 +143,11 @@ namespace HM
 
       String sLogData = sClientData;
 
-      // Remove any password from the log.
-      PasswordRemover::Remove(PasswordRemover::PRPOP3, sLogData);
+      // A SASL PLAIN response line carries the password in base64, so never log it.
+      if (sasl_plain_pending_)
+         sLogData = "***";
+      else
+         PasswordRemover::Remove(PasswordRemover::PRPOP3, sLogData);
 
       // Append
       sLogData = "RECEIVED: " + sLogData;
@@ -180,6 +190,8 @@ namespace HM
          resolvedCommand = UIDL;
       else if (command == _T("CAPA"))
          resolvedCommand = CAPA;
+      else if (command == _T("AUTH"))
+         resolvedCommand = AUTH;
       
       // Some commands are always allowed, regardless of state.
       if (resolvedCommand == NOOP || resolvedCommand == HELP || resolvedCommand == QUIT || resolvedCommand == CAPA)
@@ -193,6 +205,7 @@ namespace HM
             {
             case USER:
             case PASS:
+            case AUTH:
             case STLS:
                return resolvedCommand;
             default:
@@ -267,6 +280,22 @@ namespace HM
          EnqueueWrite_("-ERR Line too long.");
          return ResultNormalResponse;
       }
+
+      // A SASL exchange in progress consumes the next line(s) as continuation data
+      // rather than as a POP3 command.
+      if (scram_session_)
+         return ContinueScram_(Request);
+
+      if (sasl_plain_pending_)
+      {
+         sasl_plain_pending_ = false;
+         if (Request == "*")
+         {
+            EnqueueWrite_("-ERR Authentication cancelled.");
+            return ResultNormalResponse;
+         }
+         return ProcessAuthPlain_(Request);
+      }
       
       String sCommand;
       String sParameter;
@@ -299,6 +328,8 @@ namespace HM
             return ResultNormalResponse;
          case PASS:
             return ProtocolPASS_(sParameter);
+         case AUTH:
+            return ProtocolAUTH_(sParameter);
          case STAT:
             ProtocolSTAT_(sParameter);
             return ResultNormalResponse;
@@ -373,7 +404,11 @@ namespace HM
       String capabilities = "UIDL\r\nTOP\r\n";
 
       if (IsSSLConnection() || GetConnectionSecurity() != CSSTARTTLSRequired)
+      {
          capabilities+="USER\r\n";
+         // RFC 5034: advertise the SASL mechanisms available for the AUTH command.
+         capabilities+="SASL PLAIN SCRAM-SHA-256\r\n";
+      }
 
       if (GetConnectionSecurity() == CSSTARTTLSOptional ||
           GetConnectionSecurity() == CSSTARTTLSRequired)
@@ -445,7 +480,41 @@ namespace HM
    POP3Connection::ProtocolPASS_(const String &Parameter)
    {
       password_ = Parameter;
+      return FinishPasswordLogin_();
+   }
 
+   void
+   POP3Connection::FireOnClientLogon_(const String &sUsername, bool isAuthenticated)
+   {
+      if (!Configuration::Instance()->GetUseScriptServer())
+         return;
+
+      std::shared_ptr<ScriptObjectContainer> pContainer = std::shared_ptr<ScriptObjectContainer>(new ScriptObjectContainer);
+      std::shared_ptr<ClientInfo> pClientInfo = std::shared_ptr<ClientInfo>(new ClientInfo);
+
+      pClientInfo->SetUsername(sUsername);
+      pClientInfo->SetIPAddress(GetIPAddressString());
+      pClientInfo->SetPort(GetLocalEndpointPort());
+      pClientInfo->SetSessionID(GetSessionID());
+      pClientInfo->SetIsAuthenticated(isAuthenticated);
+      pClientInfo->SetIsEncryptedConnection(IsSSLConnection());
+      if (IsSSLConnection())
+      {
+         auto cipher_info = GetCipherInfo();
+         pClientInfo->SetCipherVersion(cipher_info.GetVersion().c_str());
+         pClientInfo->SetCipherName(cipher_info.GetName().c_str());
+         pClientInfo->SetCipherBits(cipher_info.GetBits());
+      }
+
+      pContainer->AddObject("HMAILSERVER_CLIENT", pClientInfo, ScriptObject::OTClient);
+
+      String sEventCaller = "OnClientLogon(HMAILSERVER_CLIENT)";
+      ScriptServer::Instance()->FireEvent(ScriptServer::EventOnClientLogon, sEventCaller, pContainer);
+   }
+
+   POP3Connection::ParseResult
+   POP3Connection::FinishPasswordLogin_()
+   {
       AccountLogon accountLogon;
       bool disconnect = false;
       String sUsername = username_;
@@ -459,30 +528,7 @@ namespace HM
 
       const bool isAuthenticated = account_ != nullptr;
 
-      if (Configuration::Instance()->GetUseScriptServer())
-      {
-         std::shared_ptr<ScriptObjectContainer> pContainer = std::shared_ptr<ScriptObjectContainer>(new ScriptObjectContainer);
-         std::shared_ptr<ClientInfo> pClientInfo = std::shared_ptr<ClientInfo>(new ClientInfo);
-
-         pClientInfo->SetUsername(sUsername);
-         pClientInfo->SetIPAddress(GetIPAddressString());
-         pClientInfo->SetPort(GetLocalEndpointPort());
-         pClientInfo->SetSessionID(GetSessionID());
-         pClientInfo->SetIsAuthenticated(isAuthenticated);
-         pClientInfo->SetIsEncryptedConnection(IsSSLConnection());
-         if (IsSSLConnection())
-         {
-            auto cipher_info = GetCipherInfo();
-            pClientInfo->SetCipherVersion(cipher_info.GetVersion().c_str());
-            pClientInfo->SetCipherName(cipher_info.GetName().c_str());
-            pClientInfo->SetCipherBits(cipher_info.GetBits());
-         }
-
-         pContainer->AddObject("HMAILSERVER_CLIENT", pClientInfo, ScriptObject::OTClient);
-
-         String sEventCaller = "OnClientLogon(HMAILSERVER_CLIENT)";
-         ScriptServer::Instance()->FireEvent(ScriptServer::EventOnClientLogon, sEventCaller, pContainer);
-      }
+      FireOnClientLogon_(sUsername, isAuthenticated);
 
       if (!account_)
       {
@@ -504,6 +550,12 @@ namespace HM
          return ResultNormalResponse;
       }
 
+      return HandleSuccessfulLogin_();
+   }
+
+   POP3Connection::ParseResult
+   POP3Connection::HandleSuccessfulLogin_()
+   {
       // Try to lock mailbox.
       if (!POP3Sessions::Instance()->Lock(account_->GetID()))
       {
@@ -523,6 +575,250 @@ namespace HM
       current_state_ = TRANSACTION;
       
       return ResultNormalResponse;
+   }
+
+   POP3Connection::ParseResult
+   POP3Connection::ProtocolAUTH_(const String &sParameter)
+   {
+      if (GetConnectionSecurity() == CSSTARTTLSRequired && !IsSSLConnection())
+      {
+         EnqueueWrite_("-ERR STLS is required.");
+         return ResultNormalResponse;
+      }
+
+      if (GetSecurityRange()->GetRequireTLSForAuth() && !IsSSLConnection())
+      {
+         EnqueueWrite_("-ERR A SSL/TLS-connection is required for authentication.");
+         return ResultNormalResponse;
+      }
+
+      if (sParameter.IsEmpty())
+      {
+         // RFC 5034: list the supported SASL mechanisms.
+         EnqueueWrite_("+OK List of SASL mechanisms follows\r\nPLAIN\r\nSCRAM-SHA-256\r\n.");
+         return ResultNormalResponse;
+      }
+
+      std::vector<String> parts = StringParser::SplitString(sParameter, " ");
+      String mechanism = parts[0];
+      mechanism.MakeUpper();
+
+      // RFC 4959 SASL-IR: a single "=" means an empty initial response.
+      bool hasInitialResponse = parts.size() >= 2 && parts[1] != _T("=");
+
+      if (mechanism == _T("PLAIN"))
+      {
+         if (hasInitialResponse)
+            return ProcessAuthPlain_(parts[1]);
+
+         sasl_plain_pending_ = true;
+         EnqueueWrite_("+ ");
+         return ResultNormalResponse;
+      }
+
+      if (mechanism == _T("SCRAM-SHA-256"))
+      {
+         scram_session_ = std::make_shared<ScramSha256>();
+
+         if (hasInitialResponse)
+            return ProcessScramClientFirst_(parts[1]);
+
+         EnqueueWrite_("+ ");
+         return ResultNormalResponse;
+      }
+
+      EnqueueWrite_("-ERR Unsupported authentication mechanism.");
+      return ResultNormalResponse;
+   }
+
+   POP3Connection::ParseResult
+   POP3Connection::ProcessAuthPlain_(const String &sBase64)
+   {
+      String sDecoded;
+      StringParser::Base64Decode(sBase64, sDecoded);
+
+      // SASL PLAIN = authzid NUL authcid NUL passwd. Base64Decode maps NUL -> tab.
+      std::vector<String> parts = StringParser::SplitString(sDecoded, "\t");
+      if (parts.size() != 3 || parts[1].IsEmpty())
+      {
+         EnqueueWrite_("-ERR Invalid SASL PLAIN response.");
+         return ResultNormalResponse;
+      }
+
+      // Apply domain aliases to the user name (parity with the USER command).
+      std::shared_ptr<DomainAliases> pDA = ObjectCache::Instance()->GetDomainAliases();
+      username_ = pDA->ApplyAliasesOnAddress(parts[1]);
+      password_ = parts[2];
+
+      return FinishPasswordLogin_();
+   }
+
+   POP3Connection::ParseResult
+   POP3Connection::ContinueScram_(const String &sRequest)
+   {
+      // A bare "*" cancels the SASL exchange (RFC 4954 / RFC 5034).
+      if (sRequest == _T("*"))
+      {
+         scram_session_.reset();
+         EnqueueWrite_("-ERR Authentication cancelled.");
+         return ResultNormalResponse;
+      }
+
+      switch (scram_session_->GetState())
+      {
+      case ScramSha256::NeedClientFirst:
+         return ProcessScramClientFirst_(sRequest);
+      case ScramSha256::NeedClientFinal:
+         return ProcessScramClientFinal_(sRequest);
+      case ScramSha256::NeedAck:
+         return ProcessScramAck_();
+      default:
+         scram_session_.reset();
+         EnqueueWrite_("-ERR Invalid authentication state.");
+         return ResultNormalResponse;
+      }
+   }
+
+   POP3Connection::ParseResult
+   POP3Connection::ProcessScramClientFirst_(const String &sBase64)
+   {
+      String sDecoded;
+      StringParser::Base64Decode(sBase64, sDecoded);
+      AnsiString clientFirst = sDecoded;
+
+      AnsiString username;
+      if (!ScramSha256::ExtractUsername(clientFirst, username))
+      {
+         scram_session_.reset();
+         EnqueueWrite_("-ERR Invalid SCRAM client-first message.");
+         return ResultNormalResponse;
+      }
+
+      // Canonicalize the user name the same way the IMAP/SMTP SCRAM paths do.
+      String sUsername = username;
+      if (sUsername.Find(_T("@")) == -1)
+      {
+         String sDefaultDomain = Configuration::Instance()->GetDefaultDomain();
+         if (!sDefaultDomain.IsEmpty())
+            sUsername = DefaultDomain::ApplyDefaultDomain(sUsername);
+      }
+      scram_session_->SetUsername(sUsername);
+      username_ = sUsername;
+
+      // Only a PBKDF2-hashed account can serve SCRAM (its stored key is the SCRAM
+      // SaltedPassword). For any other account the helper runs a forced-failure
+      // exchange so the protocol does not reveal whether the account exists.
+      AnsiString storedHash = "";
+      std::shared_ptr<const Account> pAccount = LookupPbkdf2Account_(sUsername);
+      if (pAccount)
+      {
+         scram_session_->SetAccount(pAccount);
+         storedHash = pAccount->GetPassword();
+      }
+
+      AnsiString serverFirst;
+      if (!scram_session_->ProcessClientFirst(clientFirst, storedHash, serverFirst))
+      {
+         scram_session_.reset();
+         EnqueueWrite_("-ERR Invalid SCRAM client-first message.");
+         return ResultNormalResponse;
+      }
+
+      String sServerFirst = serverFirst;
+      String sEncoded;
+      StringParser::Base64Encode(sServerFirst, sEncoded);
+
+      EnqueueWrite_("+ " + sEncoded);
+      return ResultNormalResponse;
+   }
+
+   POP3Connection::ParseResult
+   POP3Connection::ProcessScramClientFinal_(const String &sBase64)
+   {
+      String sDecoded;
+      StringParser::Base64Decode(sBase64, sDecoded);
+      AnsiString clientFinal = sDecoded;
+
+      AnsiString serverFinal;
+      if (!scram_session_->ProcessClientFinal(clientFinal, serverFinal))
+         return ScramAuthFailed_();
+
+      String sServerFinal = serverFinal;
+      String sEncoded;
+      StringParser::Base64Encode(sServerFinal, sEncoded);
+
+      // Send the server-final (v=...) as a challenge; the client acknowledges with an
+      // empty line, then we complete the authentication.
+      EnqueueWrite_("+ " + sEncoded);
+      return ResultNormalResponse;
+   }
+
+   POP3Connection::ParseResult
+   POP3Connection::ProcessScramAck_()
+   {
+      std::shared_ptr<const Account> pAccount = scram_session_ ? scram_session_->GetAccount() : nullptr;
+      String sUsername = scram_session_ ? String(scram_session_->GetUsername()) : username_;
+
+      scram_session_.reset();
+
+      if (!pAccount)
+         return ScramAuthFailed_();
+
+      account_ = pAccount;
+
+      FireOnClientLogon_(sUsername, true);
+
+      return HandleSuccessfulLogin_();
+   }
+
+   POP3Connection::ParseResult
+   POP3Connection::ScramAuthFailed_()
+   {
+      String sUsername = scram_session_ ? String(scram_session_->GetUsername()) : username_;
+      scram_session_.reset();
+
+      // Feed the per-IP auto-ban accounting (parity with the USER/PASS path).
+      AccountLogon accountLogon;
+      bool disconnect = false;
+      accountLogon.RegisterFailedLogin(GetRemoteEndpointAddress(), sUsername, disconnect);
+
+      authentication_failure_count_++;
+
+      // Per-connection brute-force cap (effective even when auto-ban is disabled).
+      if (disconnect || authentication_failure_count_ >= 10)
+      {
+         EnqueueWrite_("-ERR Invalid user name or password. Too many invalid logon attempts.");
+         return ResultDisconnect;
+      }
+
+      EnqueueWrite_("-ERR Invalid user name or password.");
+      return ResultNormalResponse;
+   }
+
+   std::shared_ptr<const Account>
+   POP3Connection::LookupPbkdf2Account_(const String &sAddress)
+   {
+      std::shared_ptr<DomainAliases> pDA = ObjectCache::Instance()->GetDomainAliases();
+      String sAccountAddress = pDA->ApplyAliasesOnAddress(sAddress);
+      sAccountAddress = DefaultDomain::ApplyDefaultDomain(sAccountAddress);
+
+      std::shared_ptr<const Account> pAccount = CacheContainer::Instance()->GetAccount(sAccountAddress);
+      if (!pAccount || !pAccount->GetActive())
+         return std::shared_ptr<const Account>();
+
+      // Active Directory accounts authenticate via SSPI, not a stored hash.
+      if (pAccount->GetIsAD())
+         return std::shared_ptr<const Account>();
+
+      String sDomain = StringParser::ExtractDomain(sAccountAddress);
+      std::shared_ptr<const Domain> pDomain = CacheContainer::Instance()->GetDomain(sDomain);
+      if (!pDomain || !pDomain->GetIsActive())
+         return std::shared_ptr<const Account>();
+
+      if (pAccount->GetPasswordEncryption() != Crypt::ETPBKDF2)
+         return std::shared_ptr<const Account>();
+
+      return pAccount;
    }
 
    bool
