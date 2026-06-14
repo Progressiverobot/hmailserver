@@ -25,6 +25,9 @@ namespace HM
       number_of_authentications_succeeded_ = 0;
       number_of_authentication_failures_ = 0;
       message_store_missing_files_ = 0;
+      number_of_messages_delivered_ = 0;
+      number_of_messages_deferred_ = 0;
+      number_of_messages_bounced_ = 0;
       command_processing_micros_total_ = 0;
       commands_processed_count_ = 0;
       state_ = StateUnknown ;
@@ -237,6 +240,51 @@ namespace HM
       boost::lock_guard<boost::recursive_mutex> guard(command_latency_mutex_);
       command_processing_micros_total_ += microseconds;
       commands_processed_count_++;
+   }
+   
+   int
+   ServerStatus::GetNumberOfMessagesDelivered() const
+   {
+      return number_of_messages_delivered_;
+   }
+
+   void
+   ServerStatus::OnMessageDelivered()
+   {
+      // Called from the SMTP delivery threads when a message pass completes with
+      // no errors and is not rescheduled.
+      boost::lock_guard<boost::recursive_mutex> guard(delivery_outcome_mutex_);
+      number_of_messages_delivered_++;
+   }
+
+   int
+   ServerStatus::GetNumberOfMessagesDeferred() const
+   {
+      return number_of_messages_deferred_;
+   }
+
+   void
+   ServerStatus::OnMessageDeferred()
+   {
+      // Called when a message pass is rescheduled for a later delivery attempt
+      // (temporary failure).
+      boost::lock_guard<boost::recursive_mutex> guard(delivery_outcome_mutex_);
+      number_of_messages_deferred_++;
+   }
+
+   int
+   ServerStatus::GetNumberOfMessagesBounced() const
+   {
+      return number_of_messages_bounced_;
+   }
+
+   void
+   ServerStatus::OnMessageBounced()
+   {
+      // Called when a bounce/NDR is generated for one or more recipients
+      // (permanent failure).
+      boost::lock_guard<boost::recursive_mutex> guard(delivery_outcome_mutex_);
+      number_of_messages_bounced_++;
    }
    
    int

@@ -240,6 +240,14 @@ SRS for forwarding (SPF alignment), and per-IP / per-destination rate shaping.*
   The `HealthProbes` test performs a real failed POP3 login and asserts the failure
   counter increments (wiring, not just presence).
 - **OpenTelemetry** tracing (SMTP/IMAP/POP/DB spans + correlation IDs).
+- **Done — delivery-outcome metrics.** `/metrics` exposes
+  `hmailserver_messages_delivered_total`, `hmailserver_messages_deferred_total`
+  and `hmailserver_messages_bounced_total` counters, incremented from the SMTP
+  delivery threads (`SMTPDeliverer`): delivered/deferred at the terminal delivery
+  outcome and bounced at the point an NDR is actually generated. Enables
+  delivery-success-rate, retry-pressure and bounce-rate alerting. Asserted by the
+  `DeliveryMetrics` test (the delivered counter advances after a successful local
+  delivery).
 - **Done — per-command processing-latency metric.** `/metrics` now exposes the
   Prometheus summary `hmailserver_command_processing_seconds` (`_sum` + `_count`),
   accumulated centrally in `TCPConnection`'s line-command dispatch (covers every

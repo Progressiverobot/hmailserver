@@ -44,6 +44,17 @@ namespace HM
       void OnAuthenticationFailed();
       int GetNumberOfAuthenticationFailures() const;
 
+      // Outbound/delivery outcome counters, incremented from the SMTP delivery
+      // threads as each queued message reaches a terminal outcome for a pass.
+      void OnMessageDelivered();
+      int GetNumberOfMessagesDelivered() const;
+
+      void OnMessageDeferred();
+      int GetNumberOfMessagesDeferred() const;
+
+      void OnMessageBounced();
+      int GetNumberOfMessagesBounced() const;
+
       // Aggregate processing latency of client protocol command lines (SMTP/IMAP/
       // POP3), recorded as a Prometheus-style summary (running microsecond sum +
       // count) so average command latency can be derived without per-command
@@ -76,6 +87,9 @@ namespace HM
       int number_of_authentications_succeeded_;
       int number_of_authentication_failures_;
       int message_store_missing_files_;
+      int number_of_messages_delivered_;
+      int number_of_messages_deferred_;
+      int number_of_messages_bounced_;
       unsigned __int64 command_processing_micros_total_;
       unsigned __int64 commands_processed_count_;
 
@@ -85,6 +99,7 @@ namespace HM
       boost::recursive_mutex authentication_mutex_;
       boost::recursive_mutex message_store_consistency_mutex_;
       boost::recursive_mutex command_latency_mutex_;
+      boost::recursive_mutex delivery_outcome_mutex_;
 
       ServerState state_;
    };

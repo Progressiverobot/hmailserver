@@ -134,6 +134,14 @@ namespace HM
       if (saErrorMessages.size() > 0)
          SubmitErrorLog_(pMessage, saErrorMessages);
 
+      // Record the delivery outcome of this pass for the metrics endpoint. A
+      // bounce (permanent failure) is counted separately inside SubmitErrorLog_;
+      // here we count the terminal delivered/deferred outcomes.
+      if (messageRescheduled)
+         ServerStatus::Instance()->OnMessageDeferred();
+      else if (saErrorMessages.empty())
+         ServerStatus::Instance()->OnMessageDelivered();
+
       // Unless the message has been re-used, or has been rescheduled for
       // later delivery, we should delete it now.
       bool deleteMessageNow = !messageReused && !messageRescheduled;
@@ -316,8 +324,13 @@ namespace HM
       recipientParser.CreateMessageRecipientList(pOrigMessage->GetFromAddress(), pMsg->GetRecipients(), recipientOK);
 
       if (pMsg->GetRecipients()->GetCount() > 0)
+      {
          // Save message
          PersistentMessage::SaveObject(pMsg);
+
+         // A bounce/NDR was actually generated and queued for the sender.
+         ServerStatus::Instance()->OnMessageBounced();
+      }
 
       LOG_DEBUG("SD::~SubmitErrorLog_"); 
 

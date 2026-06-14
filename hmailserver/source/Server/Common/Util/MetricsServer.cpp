@@ -232,6 +232,21 @@ namespace HM
       line.Format("hmailserver_auth_failures_total %d\n", status->GetNumberOfAuthenticationFailures());
       body += line;
 
+      body += "# HELP hmailserver_messages_delivered_total Number of message delivery passes that completed successfully.\n";
+      body += "# TYPE hmailserver_messages_delivered_total counter\n";
+      line.Format("hmailserver_messages_delivered_total %d\n", status->GetNumberOfMessagesDelivered());
+      body += line;
+
+      body += "# HELP hmailserver_messages_deferred_total Number of message delivery passes rescheduled for a later attempt (temporary failure).\n";
+      body += "# TYPE hmailserver_messages_deferred_total counter\n";
+      line.Format("hmailserver_messages_deferred_total %d\n", status->GetNumberOfMessagesDeferred());
+      body += line;
+
+      body += "# HELP hmailserver_messages_bounced_total Number of bounce/NDR messages generated for permanently failed recipients.\n";
+      body += "# TYPE hmailserver_messages_bounced_total counter\n";
+      line.Format("hmailserver_messages_bounced_total %d\n", status->GetNumberOfMessagesBounced());
+      body += line;
+
       body += "# HELP hmailserver_sessions Current number of active sessions per protocol.\n";
       body += "# TYPE hmailserver_sessions gauge\n";
       line.Format("hmailserver_sessions{protocol=\"smtp\"} %d\n", status->GetNumberOfSessions(STSMTP));
