@@ -232,6 +232,18 @@ Administration and monitoring:
 
    REST endpoints: `/api/v1/status`, `/api/v1/domains`, `/api/v1/domains/<name>/accounts` (GET/POST), `/api/v1/accounts/<address>` (DELETE), `/api/v1/queue` (GET), `/api/v1/queue/<id>/retry` (POST), `/api/v1/queue/<id>` (DELETE), `/api/v1/tlsa` (GET, publish-ready DANE TLSA records).
 
+Secret protection and least-privilege:
+
+   <pre>
+   ProtectStoredSecretsWithDPAPI=1   ; protect reversible stored secrets with machine-scoped Windows DPAPI
+   ServiceAccountName=               ; run the service under this account (empty = LocalSystem)
+   ServiceAccountPassword=           ; leave empty for virtual/managed accounts
+   </pre>
+
+   With `ProtectStoredSecretsWithDPAPI=1` (the default) the database password in `hMailServer.INI` and the database-stored route, fetch-account and SMTP-relayer passwords are stored as machine-scoped DPAPI envelopes instead of the legacy reversible Blowfish encoding. Because the protection is machine-bound, these secrets cannot be decrypted on another machine, so a configuration/database backup restored elsewhere must have them re-entered; set the key to `0` to keep portable Blowfish. Existing Blowfish values are always still read, and the server never loses a secret (it falls back to Blowfish if DPAPI is unavailable).
+
+   Set `ServiceAccountName` to run the Windows service under a least-privilege account instead of LocalSystem — the recommended choice is the password-less virtual account `NT SERVICE\hMailServer` (leave `ServiceAccountPassword` empty). The account must be granted *Log on as a service* and access to the hMailServer program, data and database directories. The setting is applied when the service is (re)registered.
+
 Running in Debug
 ----------------
 

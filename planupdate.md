@@ -30,7 +30,7 @@ build, run the regression suite, (CP steps) screenshot-validate, then commit/pus
    SMTP/IMAP/MIME parsers. (Coverage-guided libFuzzer is impractical in this environment — MSVC/ATL-
    coupled parsers, no fuzzer runtime — so the live over-the-wire fuzzer is the validated substitute.)
 3. **Track A Ph 0–1 — drop classic from installer + Control-Panel functional parity.** ⏳ **In progress** — Phase 1 is 9/10 (item 7 AD pickers deferred to a domain-joined runner); Phase 0 (drop the classic) follows once item 7 lands. CP becomes the sole shipped GUI.
-4. **B3 — secrets & least-privilege** (DPAPI for INI/DB secrets; non-LocalSystem service).
+4. **B3 — secrets & least-privilege** ✅ **Done (v6.2.0)** — machine-scoped DPAPI for the INI DB password + DB-stored route/fetch/relayer secrets (`ProtectStoredSecretsWithDPAPI`, default on, Blowfish back-compat) and an opt-in non-LocalSystem service account (`ServiceAccountName`).
 5. **B2 — auth modernization** (OAuth2 XOAUTH2/OAUTHBEARER, SCRAM-SHA-256, Argon2id + hash policy).
 6. **Track A Ph 2 — Control-Panel UX/UI polish.**
 7. **B4 — deliverability & SMTP standards** (SMTPUTF8/EAI, SRS, PIPELINING/DSN, rate shaping).
@@ -492,13 +492,31 @@ upgrading the management/admin INI password from MD5.
   is implemented but not covered by an automated test).
 - Verify: O365/Gmail XOAUTH2 + Thunderbird SCRAM interop.
 
-## B3 — Secrets & least-privilege
-- **DPAPI** envelope encryption (machine/service-SID) for the DB password in `hMailServer.INI`
-  (`IniFileSettings`) and the DB-stored reversible Blowfish secrets — route (`PersistentRoute`),
-  fetch (`PersistentFetchAccount`), relayer (`Property`). External-secret-provider abstraction.
-- Run the service as a **least-privileged virtual account** (not LocalSystem; `ServiceManager`),
-  with explicit ACLs + privilege drop.
-- Verify: secrets not reversible off-box; service runs non-SYSTEM.
+## B3 — Secrets & least-privilege ✅ DELIVERED (v6.2.0)
+- ✅ **DPAPI envelope encryption** (machine-scoped, `CRYPTPROTECT_LOCAL_MACHINE`) for all reversible
+  stored secrets, gated by the new `[Settings] ProtectStoredSecretsWithDPAPI` key (default **on**):
+  - New `DataProtector` primitive (`Common/Util/DataProtector.{h,cpp}`) wrapping `CryptProtectData`/
+    `CryptUnprotectData`, plus a `Crypt::ETDPAPI` type and self-describing `Crypt::ProtectSecret`/
+    `UnprotectSecret` helpers that emit a `DPAPI:<base64>` envelope and transparently fall back to
+    (and keep reading) legacy Blowfish values.
+  - The **DB password** in `hMailServer.INI` (`IniFileSettings::SetPassword`, via the typed
+    `PasswordEncryption` column so plaintext/Blowfish/DPAPI are all distinguishable).
+  - The DB-stored route (`PersistentRoute`), fetch-account (`PersistentFetchAccount`) and
+    SMTP-relayer/crypted-property (`Property`/`PropertySet`) passwords.
+  - DPAPI blobs are larger than the old Blowfish hex, so `routeauthenticationpassword` and
+    `fapassword` were widened `255→1024` (DB version `6003→6004`: create scripts + new
+    `Upgrade6003to6004{MySQL,PGSQL,MSSQL,MSSQLCE}.sql`, DBUpdater path completed).
+  - Trade-off (documented): machine-scoped DPAPI means secrets are **not reversible off-box**, so a
+    backup restored onto a different machine must re-enter them; set `ProtectStoredSecretsWithDPAPI=0`
+    to keep portable Blowfish. Secrets are never lost (Blowfish fallback if DPAPI fails).
+- ✅ **Least-privileged service account** (opt-in): `ServiceManager` passes the new `[Settings]`
+  `ServiceAccountName`/`ServiceAccountPassword` to `CreateService`/`ChangeServiceConfig`. Default
+  empty = LocalSystem (unchanged); recommended value is the password-less virtual account
+  `NT SERVICE\hMailServer`. Explicit ACL/privilege-drop automation left to the administrator
+  (account must be granted *Log on as a service* + access to the program/data/database directories).
+- Validated: in-server `DataProtector` self-test (round-trip + tamper + machine-binding) and
+  `RegressionTests.Security.SecretProtection` (fetch-account COM round-trip under DPAPI, Unicode,
+  Blowfish-disabled fallback, route persistence); 287/287 Security+SMTP+POP3 green, server builds 0/0.
 
 ## B4 — Deliverability & SMTP standards
 - **SMTPUTF8 / EAI** (RFC 6531/6532) end-to-end (parser, validator currently ASCII-only, storage, delivery).
