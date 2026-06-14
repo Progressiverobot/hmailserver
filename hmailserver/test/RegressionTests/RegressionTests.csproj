@@ -89,6 +89,7 @@
     <Compile Include="Sieve\SieveEvaluation.cs" />
     <Compile Include="Sieve\SieveAccountScript.cs" />
     <Compile Include="Sieve\SieveDelivery.cs" />
+    <Compile Include="Sieve\ManageSieve.cs" />
     <Compile Include="Infrastructure\LogHandler.cs" />
     <Compile Include="Infrastructure\Persistence\AccountNameValidation.cs" />
     <Compile Include="Infrastructure\Persistence\AliasNameValidation.cs" />

@@ -22,6 +22,7 @@ namespace HM
    class MetricsServer;
    class RestApiServer;
    class WebServicesServer;
+   class ManageSieveServer;
 
    class Application : public Singleton<Application>
    {
@@ -102,6 +103,7 @@ namespace HM
       std::shared_ptr<MetricsServer> metrics_server_;
       std::shared_ptr<RestApiServer> rest_api_server_;
       std::shared_ptr<WebServicesServer> web_services_server_;
+      std::shared_ptr<ManageSieveServer> manage_sieve_server_;
 
       const String maintenance_queue_;
       // The random work queue can run any type of task.

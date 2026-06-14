@@ -48,6 +48,7 @@
 #include "../Util/AcmeClient.h"
 #include "../Util/FileUtilities.h"
 #include "../Util/RestApiServer.h"
+#include "../Sieve/ManageSieveServer.h"
 #include "../Util/WebServicesServer.h"
 #include "../TCPIP/IOService.h"
 
@@ -396,6 +397,14 @@ namespace HM
             IniFileSettings::Instance()->GetWebServicesPrivateKeyFile());
       }
 
+      // Start the ManageSieve (RFC 5804) script-management listener if enabled.
+      int manageSievePort = IniFileSettings::Instance()->GetManageSieveServerPort();
+      if (manageSievePort > 0)
+      {
+         manage_sieve_server_ = std::shared_ptr<ManageSieveServer>(new ManageSieveServer());
+         manage_sieve_server_->Start(IniFileSettings::Instance()->GetManageSieveServerBindAddress(), manageSievePort);
+      }
+
       LOG_APPLICATION("Servers started.")
 
       return true;
@@ -561,6 +570,12 @@ namespace HM
       {
          web_services_server_->Stop();
          web_services_server_.reset();
+      }
+
+      if (manage_sieve_server_)
+      {
+         manage_sieve_server_->Stop();
+         manage_sieve_server_.reset();
       }
 
       LOG_DEBUG("Application::StopServers() - Removing server work queue");

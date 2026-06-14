@@ -146,6 +146,8 @@ namespace HM
       bool GetMessageStoreConsistencyCheck() const { return message_store_consistency_check_; }
       int GetMetricsServerPort() const { return metrics_server_port_; }
       String GetMetricsServerBindAddress() const { return metrics_server_bind_address_; }
+      int GetManageSieveServerPort() const { return manage_sieve_server_port_; }
+      String GetManageSieveServerBindAddress() const { return manage_sieve_server_bind_address_; }
       bool GetArcSealingEnabled() const { return arc_sealing_enabled_; }
       String GetTlsRptFromAddress() const { return tls_rpt_from_address_; }
       String GetTlsRptOrganizationName() const { return tls_rpt_organization_name_; }
@@ -285,6 +287,8 @@ namespace HM
       bool message_store_consistency_check_ = false;
       int metrics_server_port_ = 0;
       String metrics_server_bind_address_;
+      int manage_sieve_server_port_ = 0;
+      String manage_sieve_server_bind_address_;
       bool arc_sealing_enabled_ = false;
       String tls_rpt_from_address_;
       String tls_rpt_organization_name_;

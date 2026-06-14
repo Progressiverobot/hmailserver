@@ -38,7 +38,8 @@ the release asset.
 4. **Track A Phase 3 — AV/security extensibility + INI hardening knobs.**
 5. **B7 — operability & observability** (OpenTelemetry, health probes, DB pool/
    executor, durability, HA runbook).
-6. **B6 — Sieve + ManageSieve.**
+6. **B6 — Sieve + ManageSieve.** ✅ Done — RFC 5228 interpreter (live in delivery:
+   keep/fileinto/discard/redirect) + RFC 5804 ManageSieve service.
 7. **Track A Phase 4 — finalize** (gap doc, release cadence).
 8. **B8 — quality gates remaining** (CI DB matrix, clang-tidy/ASAN/UBSAN,
    libFuzzer, SBOM/CVE scanning, signed artifacts).
@@ -256,6 +257,22 @@ SRS for forwarding (SPF alignment), and per-IP / per-destination rate shaping.*
     — parse → syntax-check → evaluate → per-account storage → live filtering with
     keep/fileinto/discard/redirect. Remaining B6: the **ManageSieve (RFC 5804)**
     service for multi-script upload/management.
+  - **Done — ManageSieve (RFC 5804) service.** A new optional listener
+    (`ManageSieveServer`, a raw-socket + `std::thread` service like
+    `MetricsServer`/`RestApiServer`, enabled via `[Settings] ManageSieveServerPort`
+    and disabled by default) lets a client manage multiple named Sieve scripts over
+    TCP: `CAPABILITY`, SASL `PLAIN` `AUTHENTICATE` (against the regular account
+    database via `PasswordValidator`), `PUTSCRIPT`/`CHECKSCRIPT` (syntax-checked
+    through `SieveScript::CheckSyntax`), `LISTSCRIPTS`, `GETSCRIPT`, `SETACTIVE`,
+    `DELETESCRIPT` (refusing the active script per RFC 5804), `HAVESPACE`, `NOOP`
+    and `LOGOUT`, including non-synchronizing literal (`{NNN+}`) handling.
+    `SieveStorage` gained a named-script model (`scripts\{name}.sieve` + an
+    `active.name` marker) layered on the existing `active.sieve` that delivery
+    reads, so activating a script over ManageSieve is immediately honoured by local
+    delivery — no DB schema change. Validated by the `ManageSieve` regression test
+    (auth, full PUT/LIST/GET/SETACTIVE/DELETE round-trip, then an activated script
+    filing a delivered message). **B6 is complete** — Sieve interpreter +
+    ManageSieve service both shipped.
 
 ### B7 — Operability & observability
 
