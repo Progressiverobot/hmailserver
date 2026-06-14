@@ -280,6 +280,14 @@ namespace HM
       line.Format("hmailserver_messagestore_missing_files %d\n", status->GetMessageStoreMissingFiles());
       body += line;
 
+      body += "# HELP hmailserver_command_processing_seconds Aggregate processing time of client protocol command lines (SMTP/IMAP/POP3).\n";
+      body += "# TYPE hmailserver_command_processing_seconds summary\n";
+      line.Format("hmailserver_command_processing_seconds_sum %.6f\n",
+         static_cast<double>(status->GetCommandProcessingMicrosecondsTotal()) / 1000000.0);
+      body += line;
+      line.Format("hmailserver_command_processing_seconds_count %I64u\n", status->GetCommandsProcessedCount());
+      body += line;
+
       return body;
    }
 

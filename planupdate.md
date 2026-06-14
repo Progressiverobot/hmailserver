@@ -239,8 +239,14 @@ SRS for forwarding (SPF alignment), and per-IP / per-destination rate shaping.*
   authentication). Enables alerting on credential-stuffing / brute-force spikes.
   The `HealthProbes` test performs a real failed POP3 login and asserts the failure
   counter increments (wiring, not just presence).
-- **OpenTelemetry** tracing (SMTP/IMAP/POP/DB spans + correlation IDs); further
-  metrics (per-command latency).
+- **OpenTelemetry** tracing (SMTP/IMAP/POP/DB spans + correlation IDs).
+- **Done — per-command processing-latency metric.** `/metrics` now exposes the
+  Prometheus summary `hmailserver_command_processing_seconds` (`_sum` + `_count`),
+  accumulated centrally in `TCPConnection`'s line-command dispatch (covers every
+  SMTP/IMAP/POP3 command line) via `ServerStatus::OnCommandProcessed`. Average
+  command latency is derivable without per-command histograms. Asserted by the
+  `HealthProbes` test (the metric is present and its count advances after protocol
+  activity).
 - **Done — connection-pool condition variable.** `DatabaseConnectionManager`'s
   `GetConnection_` no longer busy-polls with `Sleep(10)` while waiting for a free
   connection; it blocks on a `condition_variable_any` signalled by

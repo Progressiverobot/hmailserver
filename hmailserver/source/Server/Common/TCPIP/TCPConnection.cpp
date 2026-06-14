@@ -8,6 +8,8 @@
 #include <limits>
 #include <cstddef>
 
+#include <boost/chrono.hpp>
+
 #include "DisconnectedException.h"
 
 #include "../Util/ByteBuffer.h"
@@ -615,7 +617,15 @@ namespace HM
 
             try
             {
+               boost::chrono::steady_clock::time_point commandStart = boost::chrono::steady_clock::now();
+
                ParseData(s);
+
+               // Record per-command processing latency (one client command line)
+               // as an aggregate summary for the metrics endpoint.
+               boost::chrono::microseconds elapsed =
+                  boost::chrono::duration_cast<boost::chrono::microseconds>(boost::chrono::steady_clock::now() - commandStart);
+               ServerStatus::Instance()->OnCommandProcessed(static_cast<unsigned __int64>(elapsed.count()));
             }
             catch (DisconnectedException&)
             {

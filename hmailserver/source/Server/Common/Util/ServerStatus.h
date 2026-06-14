@@ -44,6 +44,14 @@ namespace HM
       void OnAuthenticationFailed();
       int GetNumberOfAuthenticationFailures() const;
 
+      // Aggregate processing latency of client protocol command lines (SMTP/IMAP/
+      // POP3), recorded as a Prometheus-style summary (running microsecond sum +
+      // count) so average command latency can be derived without per-command
+      // histograms.
+      void OnCommandProcessed(unsigned __int64 microseconds);
+      unsigned __int64 GetCommandProcessingMicrosecondsTotal() const;
+      unsigned __int64 GetCommandsProcessedCount() const;
+
       // Last result of the message-store consistency check: the number of message
       // rows whose backing file was missing on disk. Updated by the scheduled
       // MessageStoreConsistencyTask; 0 when the store is consistent (or the check
@@ -68,12 +76,15 @@ namespace HM
       int number_of_authentications_succeeded_;
       int number_of_authentication_failures_;
       int message_store_missing_files_;
+      unsigned __int64 command_processing_micros_total_;
+      unsigned __int64 commands_processed_count_;
 
       boost::recursive_mutex spam_message_dropped_mutex_;
       boost::recursive_mutex virus_removed_mutex_;
       boost::recursive_mutex tls_handshake_mutex_;
       boost::recursive_mutex authentication_mutex_;
       boost::recursive_mutex message_store_consistency_mutex_;
+      boost::recursive_mutex command_latency_mutex_;
 
       ServerState state_;
    };

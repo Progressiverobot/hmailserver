@@ -234,7 +234,7 @@ Administration and monitoring:
    JsonLogging=0                 ; write logs as JSON lines
    </pre>
 
-   The metrics listener also serves Kubernetes-style health probes: `/livez` (process liveness), `/readyz` (200 when `StateRunning` and the database pool is connected, else 503 — and 503 while the server is draining/stopping) and `/healthz` (JSON: status, server state, database). `/metrics` exposes counters and gauges for processed/spam/virus messages, TLS handshakes (success/failure), authentication (success/failure), sessions per protocol, uptime, database up/pool, the SMTP delivery-queue depth, and the message-store consistency result (`hmailserver_messagestore_missing_files`).
+   The metrics listener also serves Kubernetes-style health probes: `/livez` (process liveness), `/readyz` (200 when `StateRunning` and the database pool is connected, else 503 — and 503 while the server is draining/stopping) and `/healthz` (JSON: status, server state, database). `/metrics` exposes counters and gauges for processed/spam/virus messages, TLS handshakes (success/failure), authentication (success/failure), sessions per protocol, uptime, database up/pool, the SMTP delivery-queue depth, the message-store consistency result (`hmailserver_messagestore_missing_files`), and aggregate per-command processing latency (`hmailserver_command_processing_seconds` summary).
 
    REST endpoints: `/api/v1/status`, `/api/v1/domains`, `/api/v1/domains/<name>/accounts` (GET/POST), `/api/v1/accounts/<address>` (DELETE), `/api/v1/queue` (GET), `/api/v1/queue/<id>/retry` (POST), `/api/v1/queue/<id>` (DELETE), `/api/v1/tlsa` (GET, publish-ready DANE TLSA records).
 

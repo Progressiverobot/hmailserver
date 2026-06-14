@@ -171,6 +171,12 @@ namespace RegressionTests.Infrastructure
             int beforeFailures = ParseCounter(metrics.body, "hmailserver_auth_failures_total");
             Assert.GreaterOrEqual(beforeFailures, 0, "auth failure counter should be present and numeric.");
 
+            // The command-processing summary must be present and is wired to the TCP
+            // command loop; capture the baseline command count to confirm it advances.
+            Assert.IsTrue(metrics.body.Contains("hmailserver_command_processing_seconds_sum"), "Metrics body missing command latency sum. Body: " + metrics.body);
+            int beforeCommands = ParseCounter(metrics.body, "hmailserver_command_processing_seconds_count");
+            Assert.GreaterOrEqual(beforeCommands, 0, "command count should be present and numeric.");
+
             Pop3ClientSimulator pop3 = new Pop3ClientSimulator();
             bool loggedOn = pop3.ConnectAndLogon("no-such-user@example.test", "definitely-wrong-password");
             Assert.IsFalse(loggedOn, "A bad login must not succeed.");
@@ -178,6 +184,11 @@ namespace RegressionTests.Infrastructure
             (int status, string body) afterMetrics = HttpGet("/metrics");
             int afterFailures = ParseCounter(afterMetrics.body, "hmailserver_auth_failures_total");
             Assert.Greater(afterFailures, beforeFailures, "auth failure counter should increase after a bad login. Body: " + afterMetrics.body);
+
+            // The bad login issued protocol command lines (USER/PASS/QUIT), so the
+            // command-processing counter must have advanced too.
+            int afterCommands = ParseCounter(afterMetrics.body, "hmailserver_command_processing_seconds_count");
+            Assert.Greater(afterCommands, beforeCommands, "command counter should increase after protocol activity. Body: " + afterMetrics.body);
 
             // Unknown paths return 404.
             (int status, string body) notFound = HttpGet("/does-not-exist");

@@ -25,6 +25,8 @@ namespace HM
       number_of_authentications_succeeded_ = 0;
       number_of_authentication_failures_ = 0;
       message_store_missing_files_ = 0;
+      command_processing_micros_total_ = 0;
+      commands_processed_count_ = 0;
       state_ = StateUnknown ;
 
    }
@@ -214,6 +216,27 @@ namespace HM
       // Updated by the scheduled message-store consistency task.
       boost::lock_guard<boost::recursive_mutex> guard(message_store_consistency_mutex_);
       message_store_missing_files_ = count;
+   }
+   
+   unsigned __int64
+   ServerStatus::GetCommandsProcessedCount() const
+   {
+      return commands_processed_count_;
+   }
+
+   unsigned __int64
+   ServerStatus::GetCommandProcessingMicrosecondsTotal() const
+   {
+      return command_processing_micros_total_;
+   }
+
+   void
+   ServerStatus::OnCommandProcessed(unsigned __int64 microseconds)
+   {
+      // Called from TCP worker threads after each client command line is parsed.
+      boost::lock_guard<boost::recursive_mutex> guard(command_latency_mutex_);
+      command_processing_micros_total_ += microseconds;
+      commands_processed_count_++;
    }
    
    int
