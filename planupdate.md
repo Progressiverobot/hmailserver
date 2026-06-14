@@ -204,6 +204,18 @@ SRS for forwarding (SPF alignment), and per-IP / per-destination rate shaping.*
 - **Sieve** (RFC 5228) interpreter + **ManageSieve** (RFC 5804) service alongside
   the proprietary rules engine (`RuleApplier`). Verify with Sieve test vectors +
   a ManageSieve client.
+  - **In progress — Sieve parser foundation.** A new `Common/Sieve/` module
+    implements an RFC 5228 lexer (`SieveLexer`: comments, quoted + multi-line
+    `text:` strings with dot-stuffing, K/M/G numbers, tags, punctuation) and a
+    recursive-descent parser (`SieveParser`) that builds an AST
+    (`SieveCommand`/`SieveTest`/`SieveArgument`) while validating the grammar, the
+    supported command/test set, and `require` placement. Surfaced through the COM
+    API as `Utilities.CheckSieveSyntax` (returns an empty string when valid, else a
+    line-numbered error), mirroring the event-script `CheckSyntax` precedent.
+    Validated by the `SieveSyntax` regression test (valid + invalid scripts).
+    Next: evaluate the AST against a delivered message and apply
+    keep/fileinto/discard/redirect, then per-account script storage and the
+    ManageSieve service.
 
 ### B7 — Operability & observability
 

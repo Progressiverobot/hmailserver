@@ -19,6 +19,7 @@
 #include "../Common/Persistence/PersistentMessage.h"
 #include "../Common/Persistence/Maintenance/Maintenance.h"
 #include "../Common/Util/Parsing/StringParser.h"
+#include "../Common/Sieve/SieveScript.h"
 #include "COMError.h"
 
 STDMETHODIMP InterfaceUtilities::InterfaceSupportsErrorInfo(REFIID riid)
@@ -106,6 +107,24 @@ STDMETHODIMP InterfaceUtilities::SHA256(BSTR Input, BSTR *Output)
    
       *Output = sOutput.AllocSysString();
    
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceUtilities::CheckSieveSyntax(BSTR Script, BSTR *Result)
+{
+   try
+   {
+      HM::String sScript(Script);
+
+      HM::String sError = HM::SieveScript::CheckSyntax(sScript);
+
+      *Result = sError.AllocSysString();
+
       return S_OK;
    }
    catch (...)
