@@ -10,6 +10,7 @@
 
 #include "../Application/Application.h"
 #include "../SQL/DatabaseConnectionManager.h"
+#include "../Persistence/PersistentMessage.h"
 #include "../TCPIP/SocketConstants.h"
 
 #include <ws2tcpip.h>
@@ -24,7 +25,9 @@ namespace HM
    MetricsServer::MetricsServer() :
       listen_socket_(INVALID_SOCKET),
       running_(false),
-      start_tick_count_(0)
+      start_tick_count_(0),
+      queue_depth_cache_tick_(0),
+      queue_depth_cache_value_(0)
    {
 
    }
@@ -257,7 +260,33 @@ namespace HM
       line.Format("hmailserver_db_connections{state=\"available\"} %d\n", db_available);
       body += line;
 
+      body += "# HELP hmailserver_delivery_queue_messages Number of messages currently in the SMTP delivery queue.\n";
+      body += "# TYPE hmailserver_delivery_queue_messages gauge\n";
+      line.Format("hmailserver_delivery_queue_messages %d\n", GetDeliveryQueueDepthCached_());
+      body += line;
+
       return body;
+   }
+
+   int
+   MetricsServer::GetDeliveryQueueDepthCached_()
+   {
+      // Cache the delivery-queue count for a few seconds so frequent scrapes do
+      // not issue a COUNT(*) against hm_messages on every request. Clients are
+      // handled serially on the listener thread, so no extra locking is needed.
+      const ULONGLONG cacheWindowMs = 10000;
+      ULONGLONG now = GetTickCount64();
+
+      if (queue_depth_cache_tick_ == 0 || (now - queue_depth_cache_tick_) >= cacheWindowMs)
+      {
+         std::shared_ptr<DatabaseConnectionManager> db_manager = Application::Instance()->GetDBManager();
+         if (db_manager && db_manager->GetIsConnected())
+            queue_depth_cache_value_ = PersistentMessage::GetDeliveryQueueCount();
+
+         queue_depth_cache_tick_ = now;
+      }
+
+      return queue_depth_cache_value_;
    }
 
    AnsiString

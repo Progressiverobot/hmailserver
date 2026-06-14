@@ -915,6 +915,23 @@ namespace HM
       return result;
    }
 
+   int
+   PersistentMessage::GetDeliveryQueueCount()
+   {
+      // Messages awaiting/undergoing SMTP delivery (the delivery queue shown in
+      // the Administrator), i.e. those in the Delivering state.
+      SQLCommand command ("select count(*) as c from hm_messages where messagetype = @MESSAGETYPE");
+      command.AddParameter("@MESSAGETYPE", Message::Delivering);
+
+      std::shared_ptr<DALRecordset> pRS = Application::Instance()->GetDBManager()->OpenRecordset(command);
+      if (!pRS)
+         return 0;
+
+      int result = pRS->GetLongValue("c");
+
+      return result;
+   }
+
    bool
    PersistentMessage::DeleteByAccountID(__int64 iAccountID)
    {

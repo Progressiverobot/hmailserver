@@ -25,6 +25,10 @@ namespace HM
       void HandleClient_(SOCKET client_socket);
       AnsiString BuildMetricsBody_();
 
+      // Returns the SMTP delivery-queue depth, querying the database at most once
+      // every few seconds and caching the result so scrapes never hammer the DB.
+      int GetDeliveryQueueDepthCached_();
+
       // Health probes (Kubernetes-style): liveness is always served, readiness and
       // health additionally check that the server is running and the database is
       // connected.
@@ -36,5 +40,8 @@ namespace HM
       std::thread worker_;
       bool running_;
       ULONGLONG start_tick_count_;
+
+      ULONGLONG queue_depth_cache_tick_;
+      int queue_depth_cache_value_;
    };
 }

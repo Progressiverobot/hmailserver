@@ -56,6 +56,7 @@ namespace HM
 
       static int GetTotalMessageCount();
       static int GetTotalMessageCountDelivered();
+      static int GetDeliveryQueueCount();
       
       static bool DeleteByAccountID(__int64 iAccountID);
 

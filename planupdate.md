@@ -227,8 +227,14 @@ SRS for forwarding (SPF alignment), and per-IP / per-destination rate shaping.*
   TLS/SSL handshakes (incremented in `TCPConnection`), exposed on `/metrics` as
   `hmailserver_tls_handshakes_total` and `hmailserver_tls_handshake_failures_total`
   counters for TLS health alerting. Asserted by the `HealthProbes` test.
+- **Done — delivery-queue depth metric.** `/metrics` exposes
+  `hmailserver_delivery_queue_messages` (count of messages in the SMTP delivery
+  queue, i.e. in the `Delivering` state). The count is queried via
+  `PersistentMessage::GetDeliveryQueueCount()` and cached for 10s inside the
+  metrics listener so frequent scrapes never issue a `COUNT(*)` per request.
+  Asserted by the `HealthProbes` test.
 - **OpenTelemetry** tracing (SMTP/IMAP/POP/DB spans + correlation IDs); further
-  metrics (queue depth, per-command latency).
+  metrics (per-command latency).
 - Async/DB isolation: dedicated DB executor; replace the connection-pool `Sleep`
   polling with condition variables (`DatabaseConnectionManager`);
   prepared-statement caches (MySQL/PG).
