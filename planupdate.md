@@ -101,7 +101,13 @@ installer.
    (theme toggle, ✕ delete buttons), every page search box, the nav tree and the
    content host so screen readers announce them. (Wpf.Ui buttons render the `_`
    mnemonic literally, so access keys are left to the standard menu/dialog defaults;
-   tab order follows the logical visual tree.)
+   tab order follows the logical visual tree.) **Automation-quality pass (WPF Buddy
+   MCP):** every navigation node (`nav-*`/`navgroup-*`) and every data-driven
+   settings editor (`ServerSettingsView`/`FeatureSettingsView`, keyed by COM path /
+   INI key) now carries a stable `AutomationId` — the MCP audit went from 20/F
+   (12/58 actionable controls identified) to 100/A (58/58). The only residual
+   "duplicate" is the WPF default `TreeViewItem` expander toggle (`Expander`, one
+   per nav group), a framework template part left untouched to avoid retemplating.
 8. ✅ **Theme** — follows the OS theme by default (and tracks live OS changes via
    `SystemThemeWatcher`) until the manual toggle sets an explicit Light/Dark
    preference, which then persists and stops OS tracking.

@@ -38,6 +38,24 @@ namespace hMailServer.ControlPanel.Views
          public abstract FrameworkElement CreateEditor(object value);
          public abstract object ReadEditor();
 
+         // Give the interactive editor control a stable AutomationId so screen
+         // readers and UI-automation can address it reliably.
+         protected static void SetAid(FrameworkElement element, string id)
+         {
+            if (element != null && !string.IsNullOrEmpty(id))
+               System.Windows.Automation.AutomationProperties.SetAutomationId(element, id);
+         }
+
+         protected static string Slug(string text)
+         {
+            if (string.IsNullOrEmpty(text))
+               return "";
+            var sb = new System.Text.StringBuilder(text.Length);
+            foreach (char c in text.ToLowerInvariant())
+               sb.Append(char.IsLetterOrDigit(c) ? c : '-');
+            return sb.ToString();
+         }
+
          public virtual void Write(object owner, string property)
          {
             object value = ReadEditor();
@@ -58,6 +76,7 @@ namespace hMailServer.ControlPanel.Views
          public override FrameworkElement CreateEditor(object value)
          {
             box_ = new CheckBox { Content = Label, IsChecked = value is bool b && b, FontSize = 13.5 };
+            SetAid(box_, Path);
             return box_;
          }
 
@@ -96,6 +115,7 @@ namespace hMailServer.ControlPanel.Views
                HorizontalAlignment = HorizontalAlignment.Left,
                MinWidth = 320
             };
+            SetAid(box_, Path);
             panel.Children.Add(box_);
             return panel;
          }
@@ -131,6 +151,7 @@ namespace hMailServer.ControlPanel.Views
             }
             if (combo_.SelectedItem == null && combo_.Items.Count > 0)
                combo_.SelectedIndex = 0;
+            SetAid(combo_, Path);
             panel.Children.Add(combo_);
             return panel;
          }
@@ -157,6 +178,7 @@ namespace hMailServer.ControlPanel.Views
                Padding = new Thickness(6),
                HorizontalAlignment = HorizontalAlignment.Left
             };
+            SetAid(box_, Path);
             panel.Children.Add(box_);
             return panel;
          }
@@ -213,6 +235,7 @@ namespace hMailServer.ControlPanel.Views
             };
             panel.Children.Add(btn);
             panel.Children.Add(result_);
+            SetAid(btn, "action-" + Slug(ButtonText));
             return panel;
          }
 
@@ -254,6 +277,7 @@ namespace hMailServer.ControlPanel.Views
             };
 
             panel.Children.Add(combo);
+            SetAid(combo, "preset-" + Slug(Label));
             return panel;
          }
 

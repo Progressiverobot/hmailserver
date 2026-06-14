@@ -29,6 +29,12 @@ namespace hMailServer.ControlPanel.Views
          public string Label;
          public abstract FrameworkElement CreateEditor(IniFeatureStore store);
          public abstract void Save(IniFeatureStore store);
+
+         protected static void SetAid(FrameworkElement element, string id)
+         {
+            if (element != null && !string.IsNullOrEmpty(id))
+               System.Windows.Automation.AutomationProperties.SetAutomationId(element, id);
+         }
       }
 
       private class BoolSetting : Setting
@@ -44,6 +50,7 @@ namespace hMailServer.ControlPanel.Views
                IsChecked = store.ReadBool(Key, Default),
                FontSize = 13.5
             };
+            SetAid(box_, Key);
             return box_;
          }
 
@@ -72,6 +79,7 @@ namespace hMailServer.ControlPanel.Views
                PlaceholderText = Placeholder,
                FontSize = 13
             };
+            SetAid(box_, Key);
             panel.Children.Add(box_);
             return panel;
          }
@@ -109,6 +117,7 @@ namespace hMailServer.ControlPanel.Views
             if (combo_.SelectedItem == null && combo_.Items.Count > 0)
                combo_.SelectedIndex = 0;
 
+            SetAid(combo_, Key);
             panel.Children.Add(combo_);
             return panel;
          }

@@ -99,11 +99,13 @@ namespace hMailServer.ControlPanel
          pageFactories_["about"] = () => new AboutView();
       }
 
-      private TreeViewItem Item(string title, string key) => new()
+      private TreeViewItem Item(string title, string key)
       {
-         Header = title,
-         Tag = key
-      };
+         var item = new TreeViewItem { Header = title, Tag = key };
+         System.Windows.Automation.AutomationProperties.SetAutomationId(item, "nav-" + key);
+         System.Windows.Automation.AutomationProperties.SetName(item, title);
+         return item;
+      }
 
       private TreeViewItem Group(string title, params TreeViewItem[] children)
       {
@@ -113,6 +115,8 @@ namespace hMailServer.ControlPanel
             IsExpanded = true,
             FontWeight = FontWeights.SemiBold
          };
+         System.Windows.Automation.AutomationProperties.SetAutomationId(group, "navgroup-" + Slug(title));
+         System.Windows.Automation.AutomationProperties.SetName(group, title);
          foreach (TreeViewItem child in children)
          {
             child.FontWeight = FontWeights.Normal;
@@ -120,6 +124,9 @@ namespace hMailServer.ControlPanel
          }
          return group;
       }
+
+      private static string Slug(string text)
+         => new string((text ?? "").ToLowerInvariant().Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray());
 
       /// <summary>Mirrors the classic Administrator tree layout.</summary>
       private void BuildNavTree()
