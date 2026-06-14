@@ -29,6 +29,7 @@
 #include "../Common/Persistence/PersistentDistributionListRecipient.h"
 
 #include "../Common/Util/SRS.h"
+#include "../Common/Util/BATV.h"
 #include "../Common/Application/IniFileSettings.h"
 
 #ifdef _DEBUG
@@ -102,6 +103,30 @@ namespace HM
             }
 
             // An SRS0 address that fails signature validation is rejected.
+            sErrMsg = CONST_UNKNOWN_USER;
+            return DP_RecipientUnknown;
+         }
+
+         // BATV (prvs) reverse at RCPT time: a bounce addressed to a prvs-signed
+         // local return-path is validated and stripped back to the original local
+         // recipient. An invalid or expired signature is forged backscatter and is
+         // rejected, which is the whole point of bounce-address tag validation.
+         if (pDomain && pDomain->GetIsActive() &&
+             IniFileSettings::Instance()->GetBATVEnabled() &&
+             BATV::IsPrvs(primaryAddressWithoutPlusaddressing))
+         {
+            String originalRecipient;
+            if (BATV::Verify(primaryAddressWithoutPlusaddressing, IniFileSettings::Instance()->GetBATVSecret(), originalRecipient))
+            {
+               // A valid prvs signature proves this is one of our own signed
+               // return-paths, so authorize the (local) delivery without imposing
+               // the SMTP authentication / relay restriction.
+               bTreatSecurityAsLocal = true;
+               recipientAddress = originalRecipient;
+               continue;
+            }
+
+            // A prvs address that fails validation is rejected as backscatter.
             sErrMsg = CONST_UNKNOWN_USER;
             return DP_RecipientUnknown;
          }
@@ -275,6 +300,20 @@ namespace HM
 
          // An SRS address is never a real local account; an invalid or expired
          // one is simply rejected (recipientOK stays false).
+         return;
+      }
+
+      // BATV (prvs) reverse: a validated prvs return-path is stripped to the
+      // original local recipient; an invalid one is dropped (forged backscatter).
+      if (pDomain && pDomain->GetIsActive() &&
+          IniFileSettings::Instance()->GetBATVEnabled() && BATV::IsPrvs(primaryAddress))
+      {
+         String originalRecipient;
+         if (BATV::Verify(primaryAddress, IniFileSettings::Instance()->GetBATVSecret(), originalRecipient))
+            CreateMessageRecipientList_(originalRecipient, sOriginalAddress, lRecurse, pRecipients, recipientOK);
+
+         // A prvs address is never itself a real local account; an invalid one is
+         // simply dropped (recipientOK stays false).
          return;
       }
 

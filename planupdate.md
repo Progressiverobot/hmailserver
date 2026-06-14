@@ -207,7 +207,15 @@ Remaining:
 *Delivered already (see Part 2): SMTPUTF8/EAI, PIPELINING, ENHANCEDSTATUSCODES, DSN (RFC 3461/3464),
 SRS for forwarding (SPF alignment), and per-IP / per-destination rate shaping.*
 
-- Optional: **BATV**, **CHUNKING/BDAT** (RFC 3030).
+- ✅ **BATV** (Bounce Address Tag Validation, `prvs` scheme) — backscatter
+  protection. Local outbound MAIL FROM is signed `prvs=<K><DDD><6-hex HMAC>=local@domain`
+  (wire-only, envelope domain preserved so SPF/DKIM stay aligned); inbound bounces to
+  a prvs return-path are HMAC/day-window validated and stripped back to the original
+  recipient, while forged null-sender bounces to invalid tags are rejected. Default-off
+  via `[Settings] BATVEnabled` / `BATVSecret`. Covered by `SMTP/Batv.cs`
+  (over-the-wire sign + validate + tamper-reject) and a `ClassTester` self-test.
+- Optional/future: **CHUNKING/BDAT** (RFC 3030) — higher risk, rewrites the
+  line-oriented binary read loop in the mail-reception path; deferred.
 - Verify: SPF passes on forwarded mail (SRS); DSN interop.
 
 ### B6 — Standards-based filtering

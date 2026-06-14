@@ -23,6 +23,7 @@
 #include "Crypt.h"
 #include "DataProtector.h"
 #include "SRS.h"
+#include "BATV.h"
 #include "RateLimiter.h"
 #include "../Persistence/PersistentMessage.h"
 #include "../../SMTP/SPF/SPF.h"
@@ -187,6 +188,66 @@ namespace HM
          if (!SRS::Reverse(srs2, secret, reversed2))
             throw 0;
          if (reversed2.CompareNoCase(original2) != 0)
+            throw 0;
+      }
+
+      OutputDebugString(_T("hMailServer: Testing BATV\n"));
+      {
+         // BATV (prvs): sign/verify round-trip + tamper and wrong-secret detection.
+         const String secret = _T("batv-test-secret-key");
+         const String mailbox = _T("alice@example.test");
+
+         String tagged = BATV::Sign(mailbox, secret);
+
+         if (tagged.IsEmpty())
+            throw 0;
+         if (!BATV::IsPrvs(tagged))
+            throw 0;
+         // The original domain is preserved (so SPF stays aligned).
+         if (tagged.Find(_T("@example.test")) < 0)
+            throw 0;
+         if (tagged.Find(_T("prvs=")) != 0)
+            throw 0;
+
+         // A valid prvs address verifies back to the original mailbox.
+         String original;
+         if (!BATV::Verify(tagged, secret, original))
+            throw 0;
+         if (original.CompareNoCase(mailbox) != 0)
+            throw 0;
+
+         // Tamper detection: flip a character of the signature (the last hex digit
+         // of the 10-char tag value, at index 5 + 9 = 14 of the local-part).
+         wchar_t sigChar = tagged.GetAt(14);
+         String tampered = tagged.Mid(0, 14) + ((sigChar == L'0') ? _T("1") : _T("0")) + tagged.Mid(15);
+         if (BATV::Verify(tampered, secret, original))
+            throw 0;
+
+         // A different secret must not validate.
+         if (BATV::Verify(tagged, _T("a-different-secret"), original))
+            throw 0;
+
+         // A plain address is neither detected as prvs nor verifiable, and an
+         // empty sender (a bounce) is never signed.
+         if (BATV::IsPrvs(_T("bob@example.test")))
+            throw 0;
+         if (BATV::Verify(_T("bob@example.test"), secret, original))
+            throw 0;
+         if (!BATV::Sign(_T(""), secret).IsEmpty())
+            throw 0;
+         // An already-tagged address is never double-signed.
+         if (!BATV::Sign(tagged, secret).IsEmpty())
+            throw 0;
+
+         // An original local-part containing '=' survives the round trip.
+         const String mailbox2 = _T("a=b@example.test");
+         String tagged2 = BATV::Sign(mailbox2, secret);
+         if (tagged2.IsEmpty())
+            throw 0;
+         String original2;
+         if (!BATV::Verify(tagged2, secret, original2))
+            throw 0;
+         if (original2.CompareNoCase(mailbox2) != 0)
             throw 0;
       }
 

@@ -10,7 +10,11 @@
 #include "../common/Util/File.h"
 #include "../common/Util/ByteBuffer.h"
 #include "../Common/Util/TransparentTransmissionBuffer.h"
+#include "../Common/Util/BATV.h"
+#include "../Common/Util/SRS.h"
 #include "../Common/Persistence/PersistentMessage.h"
+#include "../common/Cache/CacheContainer.h"
+#include "../Common/BO/Domain.h"
 
 #include "../Common/Application/TimeoutCalculator.h"
 
@@ -404,6 +408,26 @@ namespace HM
    SMTPClientConnection::ProtocolSendMailFrom_()
    {
       String sFrom = delivery_message_->GetFromAddress();
+
+      // BATV (prvs): sign the envelope return-path of locally-originated outbound
+      // mail so that any bounce sent back to it can be validated (backscatter
+      // protection). Only non-empty senders at one of our own local domains are
+      // signed, and an already-tagged address (SRS0 or prvs) is never re-signed.
+      // The signature is applied to the wire envelope only; the stored message is
+      // left untouched, and the envelope domain is preserved so SPF stays aligned.
+      if (!sFrom.IsEmpty() &&
+          IniFileSettings::Instance()->GetBATVEnabled() &&
+          !SRS::IsSRS0(sFrom) && !BATV::IsPrvs(sFrom))
+      {
+         String fromDomain = StringParser::ExtractDomain(sFrom);
+         if (CacheContainer::Instance()->GetDomain(fromDomain))
+         {
+            String tagged = BATV::Sign(sFrom, IniFileSettings::Instance()->GetBATVSecret());
+            if (!tagged.IsEmpty())
+               sFrom = tagged;
+         }
+      }
+
       String sData = "MAIL FROM:<" + sFrom + ">";
 
       // RFC 6531: if the envelope contains an internationalized (UTF-8) address and

@@ -68,6 +68,10 @@ namespace RegressionTests.Shared
 
       public string MessageData { get; private set; } = "";
 
+      // The most recent MAIL FROM command line received (including the envelope
+      // address and any parameters), so tests can assert the transmitted sender.
+      public string MailFromCommand { get; private set; } = "";
+
       public void AddRecipientResult(Dictionary<string, int> result)
       {
          _recipientResults.Add(result);
@@ -165,6 +169,8 @@ namespace RegressionTests.Shared
 
             if (_mailFromresult == 250)
                _hasMailFrom = true;
+
+            MailFromCommand = command;
 
             return false;
          }
