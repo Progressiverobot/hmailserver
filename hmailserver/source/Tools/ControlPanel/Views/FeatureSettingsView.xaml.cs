@@ -19,7 +19,8 @@ namespace hMailServer.ControlPanel.Views
       {
          Security,
          Automation,
-         Integration
+         Integration,
+         Hardening
       }
 
       private abstract class Setting
@@ -77,6 +78,46 @@ namespace hMailServer.ControlPanel.Views
 
          public override void Save(IniFeatureStore store)
             => store.Write(Key, box_.Text.Trim());
+      }
+
+      private class ChoiceSetting : Setting
+      {
+         public int Default;
+         public (int Value, string Label)[] Options;
+         private ComboBox combo_;
+
+         public override FrameworkElement CreateEditor(IniFeatureStore store)
+         {
+            var panel = new StackPanel();
+            panel.Children.Add(new TextBlock
+            {
+               Text = Label,
+               FontSize = 13,
+               Margin = new Thickness(0, 0, 0, 4)
+            });
+
+            combo_ = new ComboBox { FontSize = 13, MinWidth = 320, HorizontalAlignment = HorizontalAlignment.Left };
+            if (!int.TryParse(store.Read(Key, Default.ToString()), out int current))
+               current = Default;
+            foreach ((int value, string label) in Options)
+            {
+               var item = new ComboBoxItem { Content = label, Tag = value };
+               combo_.Items.Add(item);
+               if (value == current)
+                  combo_.SelectedItem = item;
+            }
+            if (combo_.SelectedItem == null && combo_.Items.Count > 0)
+               combo_.SelectedIndex = 0;
+
+            panel.Children.Add(combo_);
+            return panel;
+         }
+
+         public override void Save(IniFeatureStore store)
+         {
+            int value = combo_.SelectedItem is ComboBoxItem cbi ? (int) cbi.Tag : Default;
+            store.Write(Key, value.ToString());
+         }
       }
 
       private class CardDef
@@ -229,6 +270,83 @@ namespace hMailServer.ControlPanel.Views
                      new TextSetting { Key = "MetricsServerPort", Default = "0", Label = "Metrics port (0 = disabled)", Placeholder = "9090" },
                      new TextSetting { Key = "MetricsServerBindAddress", Default = "127.0.0.1", Label = "Metrics bind address" },
                      new BoolSetting { Key = "JsonLogging", Default = false, Label = "Write logs as JSON lines" }
+                  }
+               });
+               break;
+
+            case Section.Hardening:
+               TitleText.Text = "Advanced hardening";
+               SubtitleText.Text = "Lower-level hMailServer.INI [Settings] knobs that are not exposed on the other " +
+                                   "pages. The defaults are safe; change these only with a specific reason. " +
+                                   "Changes take effect after a service restart.";
+               cards_.Add(new CardDef
+               {
+                  Title = "Greylisting",
+                  Blurb = "Behaviour while a greylisting triplet is still within its expiration window.",
+                  Settings =
+                  {
+                     new BoolSetting { Key = "GreylistingEnabledDuringRecordExpiration", Default = true, Label = "Keep greylisting active during the record-expiration window" },
+                     new TextSetting { Key = "GreylistingRecordExpirationInterval", Default = "240", Label = "Record expiration interval (minutes, default 240)" }
+                  }
+               });
+               cards_.Add(new CardDef
+               {
+                  Title = "Scanner timeouts",
+                  Blurb = "Per-message minimum and maximum wait for the external SpamAssassin and ClamAV scanners (seconds).",
+                  Settings =
+                  {
+                     new TextSetting { Key = "SAMinTimeout", Default = "30", Label = "SpamAssassin minimum timeout (s)" },
+                     new TextSetting { Key = "SAMaxTimeout", Default = "90", Label = "SpamAssassin maximum timeout (s)" },
+                     new TextSetting { Key = "ClamMinTimeout", Default = "15", Label = "ClamAV minimum timeout (s)" },
+                     new TextSetting { Key = "ClamMaxTimeout", Default = "90", Label = "ClamAV maximum timeout (s)" }
+                  }
+               });
+               cards_.Add(new CardDef
+               {
+                  Title = "DNS",
+                  Blurb = "Resolver behaviour for MX / SPF / DNSBL lookups.",
+                  Settings =
+                  {
+                     new BoolSetting { Key = "UseDNSCache", Default = true, Label = "Cache DNS lookups in-process" },
+                     new TextSetting { Key = "DNSServer", Label = "Override DNS server (empty = system resolvers)", Placeholder = "1.1.1.1" },
+                     new BoolSetting { Key = "DNSBLChecksAfterMailFrom", Default = true, Label = "Run DNSBL checks after MAIL FROM (rather than at connect)" }
+                  }
+               });
+               cards_.Add(new CardDef
+               {
+                  Title = "Authentication & received headers",
+                  Blurb = "Submission identity handling and the diagnostic headers added to received mail.",
+                  Settings =
+                  {
+                     new TextSetting { Key = "AuthUserReplacementIP", Label = "Replace the client IP for authenticated users (empty = keep the real IP)", Placeholder = "e.g. 127.0.0.1" },
+                     new TextSetting { Key = "DisableAUTHList", Label = "Disable AUTH for these IPs / ranges (semicolon separated)", Placeholder = "203.0.113.0/24; 198.51.100.7" },
+                     new BoolSetting { Key = "AddXAuthUserHeader", Default = false, Label = "Add an X-AuthUser header with the authenticated account" },
+                     new BoolSetting { Key = "AddXAuthUserIP", Default = true, Label = "Include the client IP in the X-AuthUser header" },
+                     new BoolSetting { Key = "AddXOriginalRcptTo", Default = false, Label = "Add an X-OriginalRcptTo header" }
+                  }
+               });
+               cards_.Add(new CardDef
+               {
+                  Title = "Other",
+                  Blurb = "Miscellaneous hardening knobs.",
+                  Settings =
+                  {
+                     new TextSetting { Key = "BlockedIPHoldSeconds", Default = "0", Label = "Hold a blocked connection open before dropping it (seconds, 0 = drop immediately)" },
+                     new BoolSetting { Key = "RewriteEnvelopeFromWhenForwarding", Default = false, Label = "Rewrite the envelope sender when forwarding (helps SPF; see also SRS)" },
+                     new ChoiceSetting
+                     {
+                        Key = "PreferredHashAlgorithm",
+                        Default = 4,
+                        Label = "Password hash for new or changed account passwords",
+                        Options = new (int, string)[]
+                        {
+                           (5, "Argon2id (strongest)"),
+                           (4, "PBKDF2 (default)"),
+                           (3, "SHA-256"),
+                           (2, "MD5 (legacy)"),
+                           (1, "Blowfish (legacy)")
+                        }
+                     }
                   }
                });
                break;

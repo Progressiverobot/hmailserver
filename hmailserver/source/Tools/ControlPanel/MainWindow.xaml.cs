@@ -91,6 +91,7 @@ namespace hMailServer.ControlPanel
          pageFactories_["security"] = () => new FeatureSettingsView(FeatureSettingsView.Section.Security);
          pageFactories_["acme"] = () => new FeatureSettingsView(FeatureSettingsView.Section.Automation);
          pageFactories_["api"] = () => new FeatureSettingsView(FeatureSettingsView.Section.Integration);
+         pageFactories_["hardening"] = () => new FeatureSettingsView(FeatureSettingsView.Section.Hardening);
          pageFactories_["backup"] = () => new BackupView();
          pageFactories_["mxquery"] = () => new MxQueryView();
          pageFactories_["sendout"] = () => new SendoutView();
@@ -154,7 +155,8 @@ namespace hMailServer.ControlPanel
                Item("IP ranges", "ipranges"),
                Item("SSL certificates", "certs"),
                Item("Transport security", "security"),
-               Item("Certificates (ACME)", "acme")),
+               Item("Certificates (ACME)", "acme"),
+               Item("Advanced hardening", "hardening")),
             Group("Network",
                Item("TCP/IP ports", "ports"),
                Item("Incoming relays", "relays"),

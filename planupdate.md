@@ -138,13 +138,17 @@ installer.
    external AV/DLP scanner via `WScript.Shell`, fire a webhook to a SIEM/Slack/Teams
    endpoint, or call an external HTTP API and act on its verdict); the AntiVirus
    custom-scanner card points admins here for engines without a CLI.
-3. **Advanced hardening card** (INI-backed) — surface the unexposed
-   `IniFileSettings` knobs: `GreylistingEnabledDuringRecordExpiration`,
-   `GreylistingRecordExpirationInterval`, `PreferredHashAlgorithm`,
-   `DNSBLChecksAfterMailFrom`, `SAMinTimeout`/`SAMaxTimeout`,
-   `ClamMinTimeout`/`ClamMaxTimeout`, `BlockedIPHoldSeconds`, `UseDNSCache`,
-   `DNSServer`, `AuthUserReplacementIP`, `RewriteEnvelopeFromWhenForwarding`,
-   `DisableAUTHList`, `AddXAuthUserHeader`/`AddXAuthUserIP`, `AddXOriginalRcptTo`.
+3. ✅ **Advanced hardening card** (INI-backed) — a new "Advanced hardening" page
+   (under Security) surfaces the previously unexposed `IniFileSettings` knobs,
+   grouped into Greylisting (`GreylistingEnabledDuringRecordExpiration`,
+   `GreylistingRecordExpirationInterval`), Scanner timeouts
+   (`SAMinTimeout`/`SAMaxTimeout`, `ClamMinTimeout`/`ClamMaxTimeout`), DNS
+   (`UseDNSCache`, `DNSServer`, `DNSBLChecksAfterMailFrom`), Authentication &
+   headers (`AuthUserReplacementIP`, `DisableAUTHList`,
+   `AddXAuthUserHeader`/`AddXAuthUserIP`, `AddXOriginalRcptTo`) and Other
+   (`BlockedIPHoldSeconds`, `RewriteEnvelopeFromWhenForwarding`, and a
+   `PreferredHashAlgorithm` picker: Argon2id/PBKDF2/SHA-256/MD5/Blowfish). Defaults
+   mirror the server's; a new `ChoiceSetting` (combo) was added to the INI editor.
 4. **Account password-strength validation** before save.
 
 ### Phase 4 — Finalize
