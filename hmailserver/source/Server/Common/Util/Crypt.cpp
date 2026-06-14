@@ -5,6 +5,8 @@
 #include "stdafx.h"
 #include "Crypt.h"
 #include "BlowFish.h"
+#include "DataProtector.h"
+#include "Unicode.h"
 #include "Hashing/HashCreator.h"
 #include "../Application/IniFileSettings.h"
 
@@ -62,6 +64,20 @@ namespace HM
             AnsiString input = ApplyPepper_(sInput);
             AnsiString result = HashCreator::GenerateArgon2id(input);
             return result;
+         }
+      case ETDPAPI:
+         {
+            if (sInput.IsEmpty())
+               return "";
+
+            AnsiString utf8;
+            Unicode::WideToMultiByte(sInput, utf8);
+
+            AnsiString protectedBase64;
+            if (!DataProtector::Protect(utf8, protectedBase64))
+               return "";
+
+            return protectedBase64;
          }
       default:
          {
@@ -148,11 +164,59 @@ namespace HM
                return blow_fish_->DecryptFromString(sInput);
             }
             break;
+         case ETDPAPI:
+            {
+               if (sInput.IsEmpty())
+                  return "";
+
+               AnsiString protectedBase64 = sInput;
+               AnsiString utf8;
+               if (!DataProtector::Unprotect(protectedBase64, utf8))
+                  return "";
+
+               String result;
+               Unicode::MultiByteToWide(utf8, result);
+               return result;
+            }
+            break;
          default:
             assert(0);
       }
       
       return "";
+   }
+
+   String
+   Crypt::ProtectSecret(const String &sInput) const
+   {
+      if (sInput.IsEmpty())
+         return "";
+
+      // When DPAPI protection is enabled (default) and available, store a
+      // self-describing, machine-bound envelope. If DPAPI fails for any reason
+      // fall back to Blowfish so a secret is never lost.
+      if (IniFileSettings::Instance()->GetProtectStoredSecretsWithDPAPI())
+      {
+         String protectedValue = EnCrypt(sInput, ETDPAPI);
+         if (!protectedValue.IsEmpty())
+            return _T("DPAPI:") + protectedValue;
+      }
+
+      return EnCrypt(sInput, ETBlowFish);
+   }
+
+   String
+   Crypt::UnprotectSecret(const String &sStored) const
+   {
+      if (sStored.IsEmpty())
+         return "";
+
+      // A DPAPI envelope is self-describing; everything else is a legacy
+      // Blowfish value, so existing stored secrets keep working transparently.
+      if (sStored.Left(6) == _T("DPAPI:"))
+         return DeCrypt(sStored.Mid(6), ETDPAPI);
+
+      return DeCrypt(sStored, ETBlowFish);
    }
 
    AnsiString

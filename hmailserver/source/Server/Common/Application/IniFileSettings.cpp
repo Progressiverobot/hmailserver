@@ -186,6 +186,13 @@ namespace HM
       // Claim that carries the account's e-mail address / login name.
       oauth2_username_claim_ = ReadIniSettingString_("Settings", "OAuth2UsernameClaim", "email");
 
+      // Protect reversible secrets at rest (the database password in this INI plus
+      // the DB-stored route/fetch/relayer passwords) with machine-scoped Windows
+      // DPAPI so they cannot be decrypted off-box. Enabled by default. Set to 0 to
+      // keep the legacy Blowfish scheme (e.g. to allow restoring a backup onto a
+      // different machine). Existing legacy values are always still readable.
+      protect_stored_secrets_with_dpapi_ = ReadIniSettingInteger_("Settings", "ProtectStoredSecretsWithDPAPI", 1) == 1;
+
       dnsbl_checks_after_mail_from_ = ReadIniSettingInteger_("Settings", "DNSBLChecksAfterMailFrom", 1) == 1;
 
       sep_svc_logs_ = ReadIniSettingInteger_("Settings", "SepSvcLogs", 0) == 1;

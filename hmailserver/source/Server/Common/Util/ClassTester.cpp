@@ -21,6 +21,7 @@
 #include "../../IMAP/IMAPSimpleCommandParser.h"
 #include "BlowFish.h"
 #include "Crypt.h"
+#include "DataProtector.h"
 #include "../Persistence/PersistentMessage.h"
 #include "../../SMTP/SPF/SPF.h"
 #include "../../SMTP/BLCheck.h"
@@ -134,6 +135,24 @@ namespace HM
       {
          OAuth2TokenValidatorTester oauth2Tester;
          oauth2Tester.Test();
+      }
+
+      OutputDebugString(_T("hMailServer: Testing DataProtector (DPAPI)\n"));
+      {
+         DataProtectorTester dpapiTester;
+         dpapiTester.Test();
+
+         // Also exercise the Crypt secret envelope used for stored secrets.
+         const String secret = _T("route-relay-p@ssw0rd");
+         String envelope = Crypt::Instance()->ProtectSecret(secret);
+         if (envelope.IsEmpty())
+            throw 0;
+         if (Crypt::Instance()->UnprotectSecret(envelope) != secret)
+            throw 0;
+         // A legacy Blowfish value (no DPAPI prefix) must still round-trip.
+         String legacy = Crypt::Instance()->EnCrypt(secret, Crypt::ETBlowFish);
+         if (Crypt::Instance()->UnprotectSecret(legacy) != secret)
+            throw 0;
       }
 
 

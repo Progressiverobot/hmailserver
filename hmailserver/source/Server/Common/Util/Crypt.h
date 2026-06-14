@@ -21,7 +21,8 @@ namespace HM
          ETMD5 = 2,
          ETSHA256 = 3,
          ETPBKDF2 = 4,
-         ETArgon2id = 5
+         ETArgon2id = 5,
+         ETDPAPI = 6
       };
 
       EncryptionType GetHashType(const String &hash);
@@ -30,6 +31,17 @@ namespace HM
       String DeCrypt(const String &sInput, EncryptionType iType) const;
 
       bool Validate(const String &password, const String &originalHash, EncryptionType iType) const;
+
+      // Protects a reversible secret for storage (route/fetch/relayer passwords).
+      // When DPAPI protection is enabled (the default) and available the result is
+      // a self-describing, machine-bound "DPAPI:<base64>" envelope; otherwise it
+      // falls back to the legacy Blowfish form. Empty input returns empty.
+      String ProtectSecret(const String &sInput) const;
+
+      // Reverses ProtectSecret. A "DPAPI:" prefixed value is unprotected with
+      // DPAPI; any other (legacy) value is decrypted with Blowfish, so existing
+      // stored secrets keep working transparently. Empty input returns empty.
+      String UnprotectSecret(const String &sStored) const;
 
    private:
 

@@ -411,6 +411,7 @@ EXIT 0
     <ClCompile Include="..\Common\Util\Compression.cpp" />
     <ClCompile Include="..\Common\Util\CrashSimulation.cpp" />
     <ClCompile Include="..\Common\Util\Crypt.cpp" />
+    <ClCompile Include="..\Common\Util\DataProtector.cpp" />
     <ClCompile Include="..\Common\Util\OAuth2TokenValidator.cpp" />
     <ClCompile Include="..\Common\Util\EmailAllUsers.cpp" />
     <ClCompile Include="..\Common\Util\Encoding\Base64.cpp" />
@@ -931,6 +932,7 @@ EXIT 0
     <ClInclude Include="..\Common\Util\Compression.h" />
     <ClInclude Include="..\Common\Util\CrashSimulation.h" />
     <ClInclude Include="..\Common\Util\Crypt.h" />
+    <ClInclude Include="..\Common\Util\DataProtector.h" />
     <ClInclude Include="..\Common\Util\EmailAllUsers.h" />
     <ClInclude Include="..\Common\Util\Encoding\Base64.h" />
     <ClInclude Include="..\Common\Util\Encoding\ModifiedUTF7.h" />
