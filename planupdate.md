@@ -135,7 +135,7 @@ installer.
    ClamWin scanner" call the server COM `TestClamAVScanner`/`TestClamWinScanner`
    (live values, result line); "Test custom scanner" validates the `%FILE%`
    command's executable client-side; a Custom-scanner **preset picker** fills the
-   command line + infected return value for common engines (Microsoft Defender
+   09-0command line + infected return value for common engines (Microsoft Defender
    `MpCmdRun`, Sophos `savscan`, ESET `ecls`, Bitdefender `bdscan`, Kaspersky
    `avp.com`); plus a **ClamWin auto-detect** that locates `clamscan.exe` and the
    database folder.
@@ -256,8 +256,14 @@ SRS for forwarding (SPF alignment), and per-IP / per-destination rate shaping.*
   drain. Default 0 preserves the previous immediate-stop behaviour. Validated by
   the `ShutdownDrain` test (Stop() returns promptly when idle, waits ~the window
   while a session is held open).
-- Message-store durability: configurable fsync + consistency checker + recovery
-  tooling.
+- **Done — configurable message-store fsync.** With `[Settings] MessageStoreFsync = 1`
+  a received message is forced to physical disk (`fflush` + `_commit` →
+  `FlushFileBuffers`, via the new `File::FlushToDisk()`) before the spool file is
+  closed at the SMTP accept point — so the message is durable before the server
+  acknowledges it to the sender. Default 0 keeps the previous OS-buffered behaviour
+  (no per-message fsync cost). Validated by the `MessageStoreDurability` test
+  (delivery still succeeds end-to-end with the barrier on). The broader consistency
+  checker / recovery tooling remains future work.
 - **Done — HA active/passive runbook.** A documented, validated active/passive
   topology (shared external database + shared message store + floating VIP) with
   readiness gating on `/readyz` and graceful-drain failover, in
@@ -358,7 +364,7 @@ MTA-STS, TLS-RPT, auto-ban, correct dot-stuffing, parameterized SQL.*
 
 ---
 
-# PART 2 — COMPLETED WORK (record)
+90p09op# PART 2 — COMPLETED WORK (record)
 
 ## Completed master-sequence steps
 

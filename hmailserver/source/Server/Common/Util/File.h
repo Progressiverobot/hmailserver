@@ -41,6 +41,10 @@ namespace HM
       bool Write(File &sourceFile);
       bool WriteBOF();
 
+      // Forces buffered data all the way to the physical disk (fflush + _commit).
+      // Returns false if the file is not open or the flush fails.
+      bool FlushToDisk();
+
       void Write_(void *buffer, int item_size, int item_count);
       int GetSize();
 

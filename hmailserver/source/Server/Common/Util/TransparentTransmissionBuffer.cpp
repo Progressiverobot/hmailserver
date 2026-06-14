@@ -7,6 +7,7 @@
 #include ".\transparenttransmissionbuffer.h"
 
 #include "ByteBuffer.h"
+#include "../Application/IniFileSettings.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -233,6 +234,12 @@ namespace HM
 
       if (transmission_ended_ && file_.IsOpen())
       {
+         // Durability: when configured, force the fully-received message to physical
+         // disk before we close it. This is the SMTP accept point, so the spool file
+         // is durable before the server acknowledges the message to the sender.
+         if (!is_sending_ && IniFileSettings::Instance()->GetMessageStoreFsync())
+            file_.FlushToDisk();
+
          file_.Close();
       }
 

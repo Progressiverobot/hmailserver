@@ -6,6 +6,7 @@
 #include "File.h"
 #include "ByteBuffer.h"
 
+#include <io.h>
 #include <boost/filesystem.hpp>
 
 #ifdef _DEBUG
@@ -39,13 +40,27 @@ namespace HM
 
    }
 
-   bool 
+   bool
    File::IsOpen() const
    {
       if (file_ == nullptr)
          return false;
       
       return true;
+   }
+
+   bool
+   File::FlushToDisk()
+   {
+      // Durability barrier: push the C runtime buffer to the OS (fflush) and then
+      // force the OS file-system cache to physical storage (_commit -> FlushFileBuffers).
+      if (file_ == nullptr)
+         return false;
+
+      if (fflush(file_) != 0)
+         return false;
+
+      return _commit(_fileno(file_)) == 0;
    }
 
    bool

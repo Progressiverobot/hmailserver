@@ -142,6 +142,7 @@ namespace HM
       bool GetJsonLogging() const { return json_logging_; }
       int GetLogDeleteDays() const { return log_delete_days_; }
       int GetShutdownDrainSeconds() const { return shutdown_drain_seconds_; }
+      bool GetMessageStoreFsync() const { return message_store_fsync_; }
       int GetMetricsServerPort() const { return metrics_server_port_; }
       String GetMetricsServerBindAddress() const { return metrics_server_bind_address_; }
       bool GetArcSealingEnabled() const { return arc_sealing_enabled_; }
@@ -279,6 +280,7 @@ namespace HM
       bool json_logging_ = false;
       int log_delete_days_ = 0;
       int shutdown_drain_seconds_ = 0;
+      bool message_store_fsync_ = false;
       int metrics_server_port_ = 0;
       String metrics_server_bind_address_;
       bool arc_sealing_enabled_ = false;
