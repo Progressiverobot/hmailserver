@@ -6,4 +6,4 @@ Filename: {ini:{tmp}\dep.ini,install,mdac}; Description: {cm:MDACTitle}; StatusM
 Filename: {ini:{tmp}\dep.ini,install,jet}; Description: {cm:JETTitle}; StatusMsg: {cm:JETInstallMsg}; Parameters: /Q; Flags: skipifdoesntexist
 Filename: {ini:{tmp}\dep.ini,install,dotnet20}; Description: {cm:DOTNET20Title}; StatusMsg: {cm:DOTNET20InstallMsg}; Parameters: "/Q /T:{tmp}\dotnetfx /C:""install /q"""; Flags: skipifdoesntexist
 Filename: "{tmp}\windowsdesktop-runtime-8.0-win-x64.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "Installing .NET 8 Desktop Runtime..."; Check: DotNetDesktopMissing; Components: controlpanel;
-Filename: "{app}\Bin\hMailAdmin.exe";  Flags: skipifsilent postinstall nowait; Description: Run hMailServer Administrator; Components: admintools;
+Filename: "{app}\ControlPanel\hMailCP.exe";  Flags: skipifsilent postinstall nowait; Description: Run hMailServer Control Panel; Components: controlpanel;

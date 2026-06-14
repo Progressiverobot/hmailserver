@@ -490,6 +490,15 @@ begin
 		Exit;
 	end;
 	
+	if (FindWindowByWindowName('hMailServer Control Panel') > 0) then
+	begin
+		MsgBox('hMailServer Control Panel is started. You must close down this application before starting the installation.',mbInformation, MB_OK);	
+		Result := false;
+		Exit;
+	end;
+
+	// Guard against a legacy hMailServer Administrator from an earlier version
+	// still running (it is no longer shipped, but may linger on upgrades).
 	if (FindWindowByWindowName('hMailServer Administrator') > 0) then
 	begin
 		MsgBox('hMailServer Administrator is started. You must close down this application before starting the installation.',mbInformation, MB_OK);	

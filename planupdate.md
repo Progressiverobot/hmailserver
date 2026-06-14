@@ -29,8 +29,8 @@ the release asset.
 ## Execution order (what's left)
 
 1. **Track A Phase 1 — item 7: Active Directory pickers** (deferred; needs a
-   domain-joined runner) → then **Track A Phase 0** (drop the classic from the
-   installer). CP becomes the sole shipped GUI.
+   domain-joined runner). **Track A Phase 0** (drop the classic from the
+   installer) is ✅ done — the Control Panel is now the sole shipped GUI.
 2. **B2 — authentication modernization follow-ups** (live JWKS/introspection +
    O365/Gmail XOAUTH2 + Thunderbird SCRAM interop). *RS256 auto-test coverage and
    full RFC 4013 SASLprep are done (v6.2.2).*
@@ -63,19 +63,29 @@ be built or validated here. The Directory tab already supports manual AD linkage
 *Also intentionally left out of Phase 1:* the destructive IP-range bulk
 `SetDefault` admin action (item 10) — deferred by design.
 
-Once item 7 lands, **Phase 0** can drop the classic Administrator from the
-installer.
+Item 7 stays deferred, but it is not a blocker: **Phase 0** has already dropped the
+classic Administrator from the installer (the Directory tab's manual AD linkage
+covers the non-picker path).
 
-### Phase 0 — Drop the classic from the installer
+### Phase 0 — Drop the classic from the installer ✅ Done
 
-1. Remove the Administrator executable/DLLs from `section_files_64.iss` and
-   `section_files_common.iss`.
-2. Remove its Start-menu shortcut from `section_icons.iss`; replace the
-   end-of-setup "run Administrator" with "run Control Panel" in
-   `section_run.iss`; clean `section_uninstallrun.iss` / `section_components.iss`
-   if referenced.
-3. Keep DBSetup / DBUpdater / DataDirectorySynchronizer.
-4. Verify ISCC builds and the post-install database step still runs.
+1. ✅ Removed the Administrator executable (`hMailAdmin.exe`) from
+   `section_files_64.iss`. Its COM interop assembly (`Interop.hMailServer.dll`) is
+   still produced by the (retained) Administrator project build and is now shipped
+   under the `server` component instead of `admintools`, because it is consumed by
+   the retained DBSetup/DBUpdater and the Data Directory Synchronizer — not by any
+   GUI. `section_files_common.iss` had no Administrator-only executable to remove.
+2. ✅ Removed the Administrator Start-menu shortcut from `section_icons.iss`;
+   replaced the end-of-setup "run Administrator" with "run Control Panel" in
+   `section_run.iss`. `section_uninstallrun.iss` referenced no GUI; the
+   `admintools` component is retained (it still gates the legacy PHP web admin and
+   translations). The `hMailServerInnoExtension.iss` running-app guard now blocks
+   install when the **Control Panel** is open (and still blocks a lingering legacy
+   Administrator from an upgrade).
+3. ✅ Kept DBSetup / DBUpdater / DataDirectorySynchronizer.
+4. ✅ Verified: `ISCC.exe hMailServer64.iss` compiles successfully (exit 0,
+   produces `hMailServer-6.2.2-x64.exe`); the post-install database step
+   (`RunPostInstallTasks` under the `server` component) is untouched.
 
 ### Phase 2 — UX/UI polish (after parity)
 

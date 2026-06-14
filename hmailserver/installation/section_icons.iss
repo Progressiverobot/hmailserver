@@ -1,6 +1,5 @@
 [Icons]
 Name: "{group}\hMailServer Database Setup"; Filename: "{app}\Bin\DBSetup.exe"; Components: server;
-Name: "{group}\hMailServer Administrator"; Filename: "{app}\Bin\hMailAdmin.exe"; Components: admintools;
 Name: "{group}\hMailServer Control Panel"; Filename: "{app}\ControlPanel\hMailCP.exe"; Components: controlpanel;
 Name: "{group}\Addons\Data Directory Synchronizer"; Filename: "{app}\Addons\DataDirectorySynchronizer\DataDirectorySynchronizer.exe"; Components: server;
 Name: "{group}\Installation\Uninstall hMailServer"; Filename: "{app}\unins000.exe"; Components: admintools server;
