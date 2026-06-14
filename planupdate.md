@@ -107,8 +107,10 @@ installer.
 10. **Style unification** — reconcile code-built pages (PublicFoldersView,
     UtilityViews, dialogs) with the XAML card pages; prefer Wpf.Ui controls and
     shared card/list styles.
-11. **Global exception handler** — log to file and offer restart instead of
-    silently marking handled.
+11. ✅ **Global exception handler** — unhandled UI-thread exceptions are appended
+    (with full stack) to `%LOCALAPPDATA%\hMailServer\ControlPanel\control-panel-errors.log`
+    and the user is offered a restart (preserving the original `/connect` args);
+    background-thread failures are logged too, instead of being silently handled.
 12. **Responsiveness** — relax fixed widths (MainWindow 980×640 min, 248 px nav,
     ConnectView) for small/zoomed/RDP sessions.
 
