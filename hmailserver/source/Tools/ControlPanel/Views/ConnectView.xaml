@@ -5,7 +5,7 @@
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
 
     <Grid>
-        <Border Style="{StaticResource Card}" Width="400" Padding="34"
+        <Border Style="{StaticResource Card}" MaxWidth="400" MinWidth="300" Padding="34" Margin="20"
                 HorizontalAlignment="Center" VerticalAlignment="Center">
             <StackPanel>
                 <Border Width="52" Height="52" CornerRadius="14" Background="{StaticResource BrandGradient}"

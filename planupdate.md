@@ -111,8 +111,9 @@ installer.
     (with full stack) to `%LOCALAPPDATA%\hMailServer\ControlPanel\control-panel-errors.log`
     and the user is offered a restart (preserving the original `/connect` args);
     background-thread failures are logged too, instead of being silently handled.
-12. **Responsiveness** — relax fixed widths (MainWindow 980×640 min, 248 px nav,
-    ConnectView) for small/zoomed/RDP sessions.
+12. ✅ **Responsiveness** — lowered the window minimum to 760×520, made the sidebar
+    a bounded proportional column (200–260 px, 24% of width) and the Connect card
+    adaptive (300–400 px) so the UI works on small/zoomed/RDP sessions.
 
 ### Phase 3 — AV + security extensibility & hardening (CP-only)
 
