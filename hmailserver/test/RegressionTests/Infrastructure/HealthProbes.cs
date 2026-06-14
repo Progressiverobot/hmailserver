@@ -49,6 +49,24 @@ namespace RegressionTests.Infrastructure
          Assert.IsTrue(wroteAny, "Could not locate an existing hMailServer.ini to update.");
       }
 
+      // Parses a Prometheus counter/gauge value from a /metrics body. Returns -1 if absent.
+      private static int ParseCounter(string body, string name)
+      {
+         foreach (string raw in body.Split('\n'))
+         {
+            string line = raw.Trim();
+            if (line.StartsWith(name + " "))
+            {
+               string[] parts = line.Split(' ');
+               int value;
+               if (parts.Length >= 2 && int.TryParse(parts[parts.Length - 1], out value))
+                  return value;
+            }
+         }
+
+         return -1;
+      }
+
       // Issues a minimal HTTP/1.0 GET against the metrics listener and returns the
       // parsed status code and body. Retries the initial connect briefly to absorb
       // the listener bind race right after a server restart.
@@ -144,7 +162,22 @@ namespace RegressionTests.Infrastructure
             Assert.IsTrue(metrics.body.Contains("hmailserver_db_connections{state=\"available\"}"), "Metrics body missing available pool gauge. Body: " + metrics.body);
             Assert.IsTrue(metrics.body.Contains("hmailserver_tls_handshakes_total"), "Metrics body missing TLS handshake counter. Body: " + metrics.body);
             Assert.IsTrue(metrics.body.Contains("hmailserver_tls_handshake_failures_total"), "Metrics body missing TLS handshake failure counter. Body: " + metrics.body);
+            Assert.IsTrue(metrics.body.Contains("hmailserver_auth_success_total"), "Metrics body missing auth success counter. Body: " + metrics.body);
+            Assert.IsTrue(metrics.body.Contains("hmailserver_auth_failures_total"), "Metrics body missing auth failure counter. Body: " + metrics.body);
             Assert.IsTrue(metrics.body.Contains("hmailserver_delivery_queue_messages"), "Metrics body missing delivery queue gauge. Body: " + metrics.body);
+
+            // Functional check: a failed authentication increments the auth-failure counter,
+            // proving the gauge is wired to the AccountLogon path (not merely emitted).
+            int beforeFailures = ParseCounter(metrics.body, "hmailserver_auth_failures_total");
+            Assert.GreaterOrEqual(beforeFailures, 0, "auth failure counter should be present and numeric.");
+
+            Pop3ClientSimulator pop3 = new Pop3ClientSimulator();
+            bool loggedOn = pop3.ConnectAndLogon("no-such-user@example.test", "definitely-wrong-password");
+            Assert.IsFalse(loggedOn, "A bad login must not succeed.");
+
+            (int status, string body) afterMetrics = HttpGet("/metrics");
+            int afterFailures = ParseCounter(afterMetrics.body, "hmailserver_auth_failures_total");
+            Assert.Greater(afterFailures, beforeFailures, "auth failure counter should increase after a bad login. Body: " + afterMetrics.body);
 
             // Unknown paths return 404.
             (int status, string body) notFound = HttpGet("/does-not-exist");

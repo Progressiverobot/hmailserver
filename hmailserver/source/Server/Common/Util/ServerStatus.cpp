@@ -22,6 +22,8 @@ namespace HM
       number_of_viruses_removed_ = 0;
       number_of_tls_handshakes_completed_ = 0;
       number_of_tls_handshake_failures_ = 0;
+      number_of_authentications_succeeded_ = 0;
+      number_of_authentication_failures_ = 0;
       state_ = StateUnknown ;
 
    }
@@ -169,6 +171,34 @@ namespace HM
       // Called from TCP worker threads when a TLS handshake fails.
       boost::lock_guard<boost::recursive_mutex> guard(tls_handshake_mutex_);
       number_of_tls_handshake_failures_++;
+   }
+   
+   int
+   ServerStatus::GetNumberOfAuthenticationsSucceeded() const
+   {
+      return number_of_authentications_succeeded_;
+   }
+
+   void
+   ServerStatus::OnAuthenticationSucceeded()
+   {
+      // Called when an account successfully authenticates (any protocol).
+      boost::lock_guard<boost::recursive_mutex> guard(authentication_mutex_);
+      number_of_authentications_succeeded_++;
+   }
+
+   int
+   ServerStatus::GetNumberOfAuthenticationFailures() const
+   {
+      return number_of_authentication_failures_;
+   }
+
+   void
+   ServerStatus::OnAuthenticationFailed()
+   {
+      // Called when an authentication attempt fails (any protocol).
+      boost::lock_guard<boost::recursive_mutex> guard(authentication_mutex_);
+      number_of_authentication_failures_++;
    }
    
    int

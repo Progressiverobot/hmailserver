@@ -222,6 +222,16 @@ namespace HM
       line.Format("hmailserver_tls_handshake_failures_total %d\n", status->GetNumberOfTlsHandshakeFailures());
       body += line;
 
+      body += "# HELP hmailserver_auth_success_total Number of successful authentications since server start.\n";
+      body += "# TYPE hmailserver_auth_success_total counter\n";
+      line.Format("hmailserver_auth_success_total %d\n", status->GetNumberOfAuthenticationsSucceeded());
+      body += line;
+
+      body += "# HELP hmailserver_auth_failures_total Number of failed authentication attempts since server start.\n";
+      body += "# TYPE hmailserver_auth_failures_total counter\n";
+      line.Format("hmailserver_auth_failures_total %d\n", status->GetNumberOfAuthenticationFailures());
+      body += line;
+
       body += "# HELP hmailserver_sessions Current number of active sessions per protocol.\n";
       body += "# TYPE hmailserver_sessions gauge\n";
       line.Format("hmailserver_sessions{protocol=\"smtp\"} %d\n", status->GetNumberOfSessions(STSMTP));

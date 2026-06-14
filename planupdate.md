@@ -233,6 +233,12 @@ SRS for forwarding (SPF alignment), and per-IP / per-destination rate shaping.*
   `PersistentMessage::GetDeliveryQueueCount()` and cached for 10s inside the
   metrics listener so frequent scrapes never issue a `COUNT(*)` per request.
   Asserted by the `HealthProbes` test.
+- **Done — authentication metrics.** `/metrics` exposes
+  `hmailserver_auth_success_total` and `hmailserver_auth_failures_total` counters,
+  incremented from the central `AccountLogon::Logon` path (covers every protocol's
+  authentication). Enables alerting on credential-stuffing / brute-force spikes.
+  The `HealthProbes` test performs a real failed POP3 login and asserts the failure
+  counter increments (wiring, not just presence).
 - **OpenTelemetry** tracing (SMTP/IMAP/POP/DB spans + correlation IDs); further
   metrics (per-command latency).
 - **Done — connection-pool condition variable.** `DatabaseConnectionManager`'s

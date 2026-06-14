@@ -16,6 +16,7 @@
 #include "Time.h"
 #include "GUIDCreator.h"
 #include "PasswordGenerator.h"
+#include "ServerStatus.h"
 
 
 #ifdef _DEBUG
@@ -50,8 +51,11 @@ namespace HM
       if (account)
       {
          PersistentAccount::UpdateLastLogonTime(account);
+         ServerStatus::Instance()->OnAuthenticationSucceeded();
          return account;
       }
+
+      ServerStatus::Instance()->OnAuthenticationFailed();
 
       RegisterFailedLogin(ipaddress, username, disconnect);
 

@@ -38,6 +38,12 @@ namespace HM
       void OnTlsHandshakeFailed();
       int GetNumberOfTlsHandshakeFailures() const;
 
+      void OnAuthenticationSucceeded();
+      int GetNumberOfAuthenticationsSucceeded() const;
+
+      void OnAuthenticationFailed();
+      int GetNumberOfAuthenticationFailures() const;
+
       void SetState(ServerState i);
       int GetState() const;
 
@@ -52,10 +58,13 @@ namespace HM
       int number_of_viruses_removed_;
       int number_of_tls_handshakes_completed_;
       int number_of_tls_handshake_failures_;
+      int number_of_authentications_succeeded_;
+      int number_of_authentication_failures_;
 
       boost::recursive_mutex spam_message_dropped_mutex_;
       boost::recursive_mutex virus_removed_mutex_;
       boost::recursive_mutex tls_handshake_mutex_;
+      boost::recursive_mutex authentication_mutex_;
 
       ServerState state_;
    };
