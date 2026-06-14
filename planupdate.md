@@ -394,6 +394,17 @@ upgrading the management/admin INI password from MD5.
   session afterwards, tampered-binding-rejected-with-the-correct-password (the MITM case), and
   refused-without-TLS. SCRAM set 17/17 and the full SMTP suite 178/178 green. Follow-up: SCRAM-SHA-256-PLUS
   for POP3.
+- ✅ **SCRAM-SHA-256-PLUS channel binding (POP3) — delivered in v6.2.0.** Completed the channel-binding
+  rollout across all three retrieval/submission protocols by extending the same mechanism to POP3 `AUTH`
+  (RFC 5034), again reusing `TCPConnection::GetTlsServerEndPoint` and the `ScramSha256` PLUS mode unchanged.
+  `POP3Connection::ProtocolAUTH_` gained a `SCRAM-SHA-256-PLUS` branch that requires a TLS connection (else
+  `-ERR`), derives the tls-server-end-point binding and calls `SetChannelBinding` before driving the existing
+  SCRAM exchange; the non-PLUS `SCRAM-SHA-256` branch now calls `SetServerSupportsChannelBinding()` on a TLS
+  connection for stripped-PLUS downgrade protection (RFC 5802 §6). `CAPA` and the bare-`AUTH` mechanism list
+  advertise `SCRAM-SHA-256-PLUS` only over TLS. Validated over a real TLS POP3 connection
+  (`RegressionTests.SSL.ScramPlusPop3`): advertised-on-TLS-only, full channel-bound auth + a usable session,
+  tampered-binding-rejected-with-the-correct-password (the MITM case), and refused-without-TLS. SCRAM set
+  21/21 and the full POP3 suite 53/53 green.
 - ✅ **Argon2id KDF option — delivered in v6.2.0.** Added the OWASP-recommended memory-hard KDF as
   password-hash algorithm **5** (`Crypt::ETArgon2id`), implemented in `HashCreator`
   (`GenerateArgon2id`/`ValidateArgon2id`/`IsArgon2idHash`) over OpenSSL's `EVP_KDF` `ARGON2ID`
@@ -407,7 +418,7 @@ upgrading the management/admin INI password from MD5.
   self-tests (`HashCreatorTester` Argon2id round-trip/negative/salt-uniqueness/cross-scheme checks +
   a `Crypt` `EnCrypt`→`GetHashType`→`Validate` dispatch check for Argon2id and PBKDF2), with the
   full auth regression (default PBKDF2 path) green.
-- Remaining B2: SCRAM-SHA-256-`PLUS` for POP3 (IMAP and SMTP delivered); a hash-policy engine (min accepted type,
+- Remaining B2: a hash-policy engine (min accepted type,
   phase out MD5/SHA256) and optional pepper building on the Argon2id work; OAuth2 XOAUTH2/OAUTHBEARER;
   POP3/IMAP UTF8 (RFC 6856 / UTF8=ACCEPT) and full SASLprep of non-ASCII credentials.
 - Verify: O365/Gmail XOAUTH2 + Thunderbird SCRAM interop.

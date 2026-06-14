@@ -407,7 +407,12 @@ namespace HM
       {
          capabilities+="USER\r\n";
          // RFC 5034: advertise the SASL mechanisms available for the AUTH command.
-         capabilities+="SASL PLAIN SCRAM-SHA-256\r\n";
+         // SCRAM-SHA-256-PLUS (RFC 5802 + RFC 5929 tls-server-end-point) binds the
+         // exchange to the TLS channel, so it is only offered on a TLS connection.
+         if (IsSSLConnection())
+            capabilities+="SASL PLAIN SCRAM-SHA-256 SCRAM-SHA-256-PLUS\r\n";
+         else
+            capabilities+="SASL PLAIN SCRAM-SHA-256\r\n";
       }
 
       if (GetConnectionSecurity() == CSSTARTTLSOptional ||
@@ -594,8 +599,12 @@ namespace HM
 
       if (sParameter.IsEmpty())
       {
-         // RFC 5034: list the supported SASL mechanisms.
-         EnqueueWrite_("+OK List of SASL mechanisms follows\r\nPLAIN\r\nSCRAM-SHA-256\r\n.");
+         // RFC 5034: list the supported SASL mechanisms. SCRAM-SHA-256-PLUS is only
+         // offered on a TLS connection, where channel binding is meaningful.
+         if (IsSSLConnection())
+            EnqueueWrite_("+OK List of SASL mechanisms follows\r\nPLAIN\r\nSCRAM-SHA-256\r\nSCRAM-SHA-256-PLUS\r\n.");
+         else
+            EnqueueWrite_("+OK List of SASL mechanisms follows\r\nPLAIN\r\nSCRAM-SHA-256\r\n.");
          return ResultNormalResponse;
       }
 
@@ -616,9 +625,44 @@ namespace HM
          return ResultNormalResponse;
       }
 
+      if (mechanism == _T("SCRAM-SHA-256-PLUS"))
+      {
+         // Channel binding only has meaning over TLS; the mechanism is advertised
+         // (and accepted) only on a TLS connection.
+         if (!IsSSLConnection())
+         {
+            EnqueueWrite_("-ERR SCRAM-SHA-256-PLUS requires a TLS connection.");
+            return ResultNormalResponse;
+         }
+
+         // Bind the exchange to this TLS channel via the server certificate
+         // (RFC 5929 tls-server-end-point).
+         std::vector<unsigned char> cbindData;
+         if (!GetTlsServerEndPoint(cbindData))
+         {
+            EnqueueWrite_("-ERR Channel binding is not available on this connection.");
+            return ResultNormalResponse;
+         }
+
+         scram_session_ = std::make_shared<ScramSha256>();
+         scram_session_->SetChannelBinding(cbindData);
+
+         if (hasInitialResponse)
+            return ProcessScramClientFirst_(parts[1]);
+
+         EnqueueWrite_("+ ");
+         return ResultNormalResponse;
+      }
+
       if (mechanism == _T("SCRAM-SHA-256"))
       {
          scram_session_ = std::make_shared<ScramSha256>();
+
+         // On a TLS connection the server also advertises SCRAM-SHA-256-PLUS, so a
+         // non-PLUS client that sends the 'y' gs2 flag is signalling a stripped-PLUS
+         // downgrade and is rejected (RFC 5802 section 6).
+         if (IsSSLConnection())
+            scram_session_->SetServerSupportsChannelBinding();
 
          if (hasInitialResponse)
             return ProcessScramClientFirst_(parts[1]);

@@ -179,6 +179,7 @@
     <Compile Include="SSL\CertificateTypes.cs" />
     <Compile Include="SSL\ScramPlus.cs" />
     <Compile Include="SSL\ScramPlusSmtp.cs" />
+    <Compile Include="SSL\ScramPlusPop3.cs" />
     <Compile Include="Stress\StabilitySanityTests.cs" />
   </ItemGroup>
   <ItemGroup>
