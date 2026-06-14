@@ -235,6 +235,17 @@ SRS for forwarding (SPF alignment), and per-IP / per-destination rate shaping.*
     get/put property (file-backed, written immediately). Validated by the
     `SieveAccountScript` round-trip test. Next: evaluate the stored script in
     `LocalDelivery` and apply fileinto/redirect/discard, then ManageSieve.
+  - **Done — Sieve filtering live in local delivery.** `LocalDelivery` now loads
+    the recipient account's active Sieve script and evaluates it against the
+    message during delivery (`EvaluateSieveScript_`): a `fileinto` routes the
+    message into the named IMAP folder (overriding the rule-selected folder), a
+    `discard` silently drops it, and the implicit `keep` delivers to INBOX as
+    normal. A no-script account is unaffected (zero overhead), and an unparseable
+    script never breaks delivery (logged, falls through to keep). Validated by the
+    `SieveDelivery` test (matching message filed into a folder; matching message
+    discarded while a normal message is still delivered). Remaining: `redirect`
+    (needs forwarding plumbing) and the **ManageSieve (RFC 5804)** service for
+    multi-script management.
 
 ### B7 — Operability & observability
 

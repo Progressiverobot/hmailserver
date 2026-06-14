@@ -26,6 +26,11 @@ namespace HM
       bool RunAccountRules_(std::shared_ptr<const Account> pAccount, std::shared_ptr<Message> pMessage, RuleResult &accountRuleResult);
       bool CheckAccountQuotas_(std::shared_ptr<const Account> pAccount, std::vector<String> &saErrorMessages, bool suppressFailureDsn);
 
+      // Evaluates the recipient account's active Sieve script (if any) against the
+      // message. Sets sieveFolder to a fileinto target (empty when none) and
+      // sieveDiscard true when the message should be silently dropped.
+      void EvaluateSieveScript_(std::shared_ptr<const Account> account, std::shared_ptr<Message> message, String &sieveFolder, bool &sieveDiscard);
+
       std::shared_ptr<Message>  CreateAccountLevelMessage_(std::shared_ptr<Message> pOriginalMessage, std::shared_ptr<const Account> pRecipientAccount, bool reuseMessage, const String &sOriginalAddress);
 
       const String &_sendersIP;

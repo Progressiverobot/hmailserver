@@ -26,6 +26,10 @@
 #include "../Common/Util/AWstats.h"
 #include "../common/Util/TraceHeaderWriter.h"
 #include "../common/Util/MessageUtilities.h"
+#include "../common/Util/FileUtilities.h"
+#include "../common/Util/Parsing/StringParser.h"
+#include "../common/Sieve/SieveStorage.h"
+#include "../common/Sieve/SieveScript.h"
 
 #include "../IMAP/MessagesContainer.h"
 
@@ -209,6 +213,20 @@ namespace HM
       // Do the final delivery of the message.
       AddTraceHeaders_(account, accountLevelMessage, sOriginalAddress);
 
+      // Evaluate the recipient account's Sieve script (if any). A discard drops
+      // the message silently; a fileinto target overrides the destination folder.
+      String sieveFolder;
+      bool sieveDiscard = false;
+      EvaluateSieveScript_(account, accountLevelMessage, sieveFolder, sieveDiscard);
+
+      if (sieveDiscard)
+      {
+         String sMessage = Formatter::Format("SMTPDeliverer - Message {0}: discarded by the Sieve script for {1}.",
+                                                original_message_->GetID(), account->GetAddress());
+         LOG_APPLICATION(sMessage);
+         return false;
+      }
+
       //
       // Move to IMAP folder. This must be done after we've executed account level rules
       // since the account level rules may override the folders. 
@@ -221,6 +239,13 @@ namespace HM
       if (!accountRuleResult.GetMoveToFolder().IsEmpty())
       {
          sIMAPFolder = accountRuleResult.GetMoveToFolder();
+         bSetByGlobalRule = false;
+      }
+
+      // A Sieve fileinto takes precedence over the rule-selected folder.
+      if (!sieveFolder.IsEmpty())
+      {
+         sIMAPFolder = sieveFolder;
          bSetByGlobalRule = false;
       }
 
@@ -239,6 +264,53 @@ namespace HM
       }
 
       return true;
+   }
+
+   void
+   LocalDelivery::EvaluateSieveScript_(std::shared_ptr<const Account> account, std::shared_ptr<Message> message, String &sieveFolder, bool &sieveDiscard)
+   {
+      sieveFolder = _T("");
+      sieveDiscard = false;
+
+      String script = SieveStorage::GetActiveScript(account->GetAddress());
+      if (script.IsEmpty())
+         return;
+
+      // Load the raw message so the script's header/address/size tests can run.
+      String messageFileName = PersistentMessage::GetFileName(account, message);
+      String rawMessage = FileUtilities::ReadCompleteTextFile(messageFileName);
+
+      String actions = SieveScript::Evaluate(script, rawMessage);
+
+      // A script that fails to parse must never break delivery; fall through to a
+      // normal keep.
+      if (actions.StartsWith(_T("error:")))
+      {
+         String sMessage = Formatter::Format("SMTPDeliverer - Message {0}: Sieve script for {1} could not be evaluated ({2}).",
+                                                original_message_->GetID(), account->GetAddress(), actions);
+         LOG_APPLICATION(sMessage);
+         return;
+      }
+
+      bool discard = false;
+      String fileInto;
+
+      std::vector<String> tokens = StringParser::SplitString(actions, _T(";"));
+      for (const String &token : tokens)
+      {
+         if (token.CompareNoCase(_T("discard")) == 0)
+            discard = true;
+         else if (token.StartsWith(_T("fileinto:")))
+            fileInto = token.Mid(9);
+         // "keep" is the default delivery; "redirect:" is not applied at this
+         // seam yet (it requires forwarding plumbing) and falls through to keep.
+      }
+
+      // A fileinto target takes precedence over a discard.
+      if (!fileInto.IsEmpty())
+         sieveFolder = fileInto;
+      else if (discard)
+         sieveDiscard = true;
    }
 
    bool 
