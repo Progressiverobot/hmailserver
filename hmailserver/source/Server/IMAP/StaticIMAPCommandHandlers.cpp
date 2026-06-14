@@ -163,6 +163,13 @@ namespace HM
          sEnabled += _T(" CONDSTORE");
       }
 
+      // RFC 6855: the client declares it can accept UTF-8 in message data and responses.
+      if (sUpper.Find(_T("UTF8=ACCEPT")) >= 0)
+      {
+         pConnection->SetUtf8AcceptEnabled(true);
+         sEnabled += _T(" UTF8=ACCEPT");
+      }
+
       // RFC 5161: only emit the untagged ENABLED response when at least one
       // recognised extension was actually switched on.
       if (!sEnabled.IsEmpty())

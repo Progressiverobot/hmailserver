@@ -53,7 +53,8 @@ namespace HM
       transmission_buffer_(true),
       pending_disconnect_(false),
       authentication_failure_count_(0),
-      sasl_plain_pending_(false)
+      sasl_plain_pending_(false),
+      utf8_enabled_(false)
    {
 
       /*
@@ -192,6 +193,8 @@ namespace HM
          resolvedCommand = CAPA;
       else if (command == _T("AUTH"))
          resolvedCommand = AUTH;
+      else if (command == _T("UTF8"))
+         resolvedCommand = UTF8;
       
       // Some commands are always allowed, regardless of state.
       if (resolvedCommand == NOOP || resolvedCommand == HELP || resolvedCommand == QUIT || resolvedCommand == CAPA)
@@ -207,6 +210,7 @@ namespace HM
             case PASS:
             case AUTH:
             case STLS:
+            case UTF8:
                return resolvedCommand;
             default:
                return INVALID;
@@ -356,6 +360,9 @@ namespace HM
          case CAPA:
             ProtocolCAPA_();
             return ResultNormalResponse; 
+         case UTF8:
+            ProtocolUTF8_();
+            return ResultNormalResponse;
          case INVALID:
             EnqueueWrite_("-ERR Invalid command in current state." );
             return ResultNormalResponse;  
@@ -419,8 +426,29 @@ namespace HM
           GetConnectionSecurity() == CSSTARTTLSRequired)
          capabilities+="STLS\r\n";
 
+      // RFC 6856: advertise UTF-8 support so clients may issue the UTF8 command.
+      capabilities+="UTF8\r\n";
+
       String response = "+OK CAPA list follows\r\n" + capabilities + ".";
       EnqueueWrite_(response);
+   }
+
+   void
+   POP3Connection::ProtocolUTF8_()
+   {
+      // RFC 6856: the UTF8 command is only valid in the AUTHORIZATION state, before
+      // a mailbox is selected. It tells the server the client can handle UTF-8 in
+      // responses (and may send UTF-8 in the USER name). hMailServer already stores
+      // and transmits message data verbatim as bytes, so enabling the mode simply
+      // records the client's intent and acknowledges it.
+      if (current_state_ != AUTHORIZATION)
+      {
+         EnqueueWrite_("-ERR UTF8 command only valid in AUTHORIZATION state.");
+         return;
+      }
+
+      utf8_enabled_ = true;
+      EnqueueWrite_("+OK UTF8 enabled");
    }
 
    void
@@ -678,12 +706,17 @@ namespace HM
    POP3Connection::ParseResult
    POP3Connection::ProcessAuthPlain_(const String &sBase64)
    {
-      String sDecoded;
-      StringParser::Base64Decode(sBase64, sDecoded);
+      // SASL PLAIN (RFC 4616): authzid NUL authcid NUL passwd, UTF-8 encoded.
+      String sAuthzid, sUser, sPassword;
+      if (!StringParser::DecodeSaslPlain(sBase64, sAuthzid, sUser, sPassword) || sUser.IsEmpty())
+      {
+         EnqueueWrite_("-ERR Invalid SASL PLAIN response.");
+         return ResultNormalResponse;
+      }
 
-      // SASL PLAIN = authzid NUL authcid NUL passwd. Base64Decode maps NUL -> tab.
-      std::vector<String> parts = StringParser::SplitString(sDecoded, "\t");
-      if (parts.size() != 3 || parts[1].IsEmpty())
+      // RFC 4422/4013: prepare the authcid (username) with SASLprep before lookup.
+      String sPreppedUser;
+      if (!StringParser::SaslPrep(sUser, sPreppedUser))
       {
          EnqueueWrite_("-ERR Invalid SASL PLAIN response.");
          return ResultNormalResponse;
@@ -691,8 +724,8 @@ namespace HM
 
       // Apply domain aliases to the user name (parity with the USER command).
       std::shared_ptr<DomainAliases> pDA = ObjectCache::Instance()->GetDomainAliases();
-      username_ = pDA->ApplyAliasesOnAddress(parts[1]);
-      password_ = parts[2];
+      username_ = pDA->ApplyAliasesOnAddress(sPreppedUser);
+      password_ = sPassword;
 
       return FinishPasswordLogin_();
    }

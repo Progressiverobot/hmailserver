@@ -9,6 +9,7 @@
 
 #include "../RegularExpression.h"
 #include "../../MIME/MimeCode.h"
+#include "../Unicode.h"
 #include <boost/lexical_cast.hpp>
 
 #ifdef _DEBUG
@@ -514,6 +515,102 @@ namespace HM
       }
    }
 
+   bool
+   StringParser::SaslPrep(const String &sInput, String &sOutput)
+   {
+      // RFC 4013 SASLprep over a pragmatic subset (no NFKC). We walk the UTF-16 code
+      // units: map RFC 3454 table C.1.2 non-ASCII spaces to U+0020, drop table B.1
+      // "mapped to nothing" code points, and reject prohibited control characters
+      // (tables C.2.1 ASCII controls and C.2.2 non-ASCII controls). ASCII text that
+      // contains no controls passes through unchanged, so existing credentials are
+      // unaffected.
+      String result;
+      result.reserve(sInput.GetLength());
+
+      for (int i = 0; i < sInput.GetLength(); i++)
+      {
+         wchar_t c = sInput[i];
+
+         switch (c)
+         {
+         // RFC 3454 B.1 - commonly mapped to nothing.
+         case 0x00AD: // SOFT HYPHEN
+         case 0x034F: // COMBINING GRAPHEME JOINER
+         case 0x1806: // MONGOLIAN TODO SOFT HYPHEN
+         case 0x180B: case 0x180C: case 0x180D: // MONGOLIAN FREE VARIATION SELECTORS
+         case 0x200B: // ZERO WIDTH SPACE
+         case 0x200C: // ZERO WIDTH NON-JOINER
+         case 0x200D: // ZERO WIDTH JOINER
+         case 0x2060: // WORD JOINER
+         case 0xFEFF: // ZERO WIDTH NO-BREAK SPACE / BOM
+            continue;
+
+         // RFC 3454 C.1.2 - non-ASCII space characters mapped to U+0020.
+         case 0x00A0: case 0x1680:
+         case 0x2000: case 0x2001: case 0x2002: case 0x2003: case 0x2004:
+         case 0x2005: case 0x2006: case 0x2007: case 0x2008: case 0x2009:
+         case 0x200A: case 0x202F: case 0x205F: case 0x3000:
+            result += L' ';
+            continue;
+         }
+
+         // Variation selectors VS1-VS16 (B.1) mapped to nothing.
+         if (c >= 0xFE00 && c <= 0xFE0F)
+            continue;
+
+         // RFC 3454 C.2.1 (ASCII control characters) and C.2.2 (C1 controls plus DEL)
+         // are prohibited in a SASL credential.
+         if (c <= 0x001F || c == 0x007F || (c >= 0x0080 && c <= 0x009F))
+            return false;
+
+         result += c;
+      }
+
+      sOutput = result;
+      return true;
+   }
+
+   bool
+   StringParser::DecodeSaslPlain(const String &sBase64, String &sAuthzid, String &sAuthcid, String &sPassword)
+   {
+      // SASL PLAIN (RFC 4616): authzid NUL authcid NUL passwd, UTF-8 encoded.
+      // Decode the base64 to raw bytes so embedded NULs and UTF-8 sequences are
+      // preserved (a system-codepage conversion would mangle non-ASCII credentials).
+      AnsiString sEncoded = sBase64;
+      MimeCodeBase64 decoder;
+      decoder.AddLineBreak(false);
+      decoder.SetInput(sEncoded, sEncoded.GetLength(), false);
+      AnsiString sDecoded;
+      decoder.GetOutput(sDecoded);
+
+      // Split the raw bytes on NUL into the three SASL PLAIN fields.
+      std::vector<AnsiString> raw_parts;
+      const char *pBuffer = sDecoded;
+      int iLength = sDecoded.GetLength();
+      int iStart = 0;
+      for (int i = 0; i <= iLength; i++)
+      {
+         if (i == iLength || pBuffer[i] == 0)
+         {
+            AnsiString part;
+            if (i > iStart)
+               part.append(pBuffer + iStart, i - iStart);
+            raw_parts.push_back(part);
+            iStart = i + 1;
+         }
+      }
+
+      if (raw_parts.size() != 3)
+         return false;
+
+      // RFC 4616: the fields are UTF-8. Decode to wide strings.
+      Unicode::MultiByteToWide(raw_parts[0], sAuthzid);
+      Unicode::MultiByteToWide(raw_parts[1], sAuthcid);
+      Unicode::MultiByteToWide(raw_parts[2], sPassword);
+
+      return true;
+   }
+
    void Assert(bool result)
    {
       if (result == false)
@@ -782,6 +879,20 @@ namespace HM
      s1 = "ABCDEFGHIJKLMNOPQ";
      s2 = "hijkl";
      Assert(!s1.Contains(s2));
+
+     // SaslPrep (RFC 4013 pragmatic subset).
+     String saslPrepped;
+     // ASCII passes through unchanged.
+     Assert(StringParser::SaslPrep(_T("user@example.test"), saslPrepped));
+     Assert(saslPrepped == _T("user@example.test"));
+     // Soft hyphen (U+00AD, table B.1) is removed.
+     Assert(StringParser::SaslPrep(L"us\x00ADer", saslPrepped));
+     Assert(saslPrepped == _T("user"));
+     // Non-ASCII space (U+00A0, table C.1.2) maps to U+0020.
+     Assert(StringParser::SaslPrep(L"a\x00A0\x62", saslPrepped));
+     Assert(saslPrepped == _T("a b"));
+     // A prohibited control character (U+0000, table C.2.1) is rejected.
+     Assert(!StringParser::SaslPrep(L"a\x0000\x62", saslPrepped));
 
    }
  

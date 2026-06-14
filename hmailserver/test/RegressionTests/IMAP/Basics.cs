@@ -337,6 +337,28 @@ namespace RegressionTests.IMAP
       }
 
       [Test]
+      [Description("RFC 6855: UTF8=ACCEPT is advertised in CAPABILITY and ENABLE UTF8=ACCEPT echoes " +
+                   "an * ENABLED UTF8=ACCEPT response.")]
+      public void TestEnableUtf8AcceptEchoesEnabled()
+      {
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "utf8accept@example.test", "test");
+
+         var simulator = new ImapClientSimulator();
+         simulator.Connect();
+         simulator.LogonWithLiteral("utf8accept@example.test", "test");
+
+         var caps = simulator.GetCapabilities();
+         Assert.IsTrue(caps.Contains("UTF8=ACCEPT"), "CAPABILITY should advertise UTF8=ACCEPT. " + caps);
+
+         string result = simulator.SendSingleCommand("A01 ENABLE UTF8=ACCEPT");
+         Assert.IsTrue(result.Contains("* ENABLED UTF8=ACCEPT"),
+            "ENABLE UTF8=ACCEPT should echo an ENABLED response. " + result);
+         Assert.IsTrue(result.Contains("A01 OK"), result);
+
+         simulator.Disconnect();
+      }
+
+      [Test]
       [Description("RFC 7162: after ENABLE CONDSTORE, SELECT reports the mailbox HIGHESTMODSEQ; " +
                    "STATUS reports the HIGHESTMODSEQ attribute.")]
       public void TestSelectAndStatusReportHighestModSeq()

@@ -2190,19 +2190,18 @@ namespace HM
    void
    SMTPConnection::AuthenticateUsingPLAIN_(const String &sLine)
    {
-      String sAuthentication;
-      StringParser::Base64Decode(sLine, sAuthentication);
-
-      // Extract the username and password from the decoded string.
-      int iSecondTab = sAuthentication.Find(_T("\t"),1);
-      if (iSecondTab < 0)
+      // SASL PLAIN (RFC 4616): authzid NUL authcid NUL passwd, UTF-8 encoded.
+      String sAuthzid;
+      if (!StringParser::DecodeSaslPlain(sLine, sAuthzid, username_, password_))
       {
          RestartAuthentication_();
          return;
       }
 
-      username_ = sAuthentication.Mid(1, iSecondTab-1);
-      password_ = sAuthentication.Mid(iSecondTab+1);
+      // RFC 4422/4013: prepare the authcid (username) with SASLprep before lookup.
+      String sPreppedUser;
+      if (StringParser::SaslPrep(username_, sPreppedUser))
+         username_ = sPreppedUser;
 
       // Authenticate the user.
       Authenticate_();      

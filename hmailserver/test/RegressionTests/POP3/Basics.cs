@@ -108,6 +108,48 @@ namespace RegressionTests.POP3
       }
 
       [Test]
+      [Description("RFC 6856: CAPA advertises UTF8 and the UTF8 command is accepted in the " +
+                   "AUTHORIZATION state.")]
+      public void TestUtf8CapabilityAndCommand()
+      {
+         var tc = new TcpConnection();
+         Assert.IsTrue(tc.Connect(110));
+         tc.ReadUntil("+OK"); // banner
+
+         tc.Send("CAPA\r\n");
+         string caps = tc.Receive();
+         Assert.IsTrue(caps.Contains("UTF8"), "CAPA should advertise UTF8. Got: " + caps);
+
+         tc.Send("UTF8\r\n");
+         string utf8 = tc.Receive();
+         Assert.IsTrue(utf8.StartsWith("+OK"), "UTF8 command should be accepted. Got: " + utf8);
+
+         tc.Send("QUIT\r\n");
+         tc.Disconnect();
+      }
+
+      [Test]
+      [Description("RFC 4422/4013: the server applies SASLprep to the SASL PLAIN username, so a " +
+                   "username carrying an RFC 3454 'mapped to nothing' code point (soft hyphen) still " +
+                   "matches the registered ASCII account.")]
+      public void TestAuthPlainSaslPrepsUsername()
+      {
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "saslprep@example.test", "SeC-r3t Pass!");
+
+         var tc = new TcpConnection();
+         Assert.IsTrue(tc.Connect(110));
+         tc.ReadUntil("+OK"); // banner
+
+         // Insert a SOFT HYPHEN (U+00AD) into the username; SASLprep must remove it.
+         string final = Pop3SaslTestClient.AuthenticatePlain(tc, "sasl\u00ADprep@example.test", "SeC-r3t Pass!");
+         Assert.IsTrue(final.StartsWith("+OK"),
+            "SASLprep should strip the soft hyphen so the account matches. Got: " + final);
+
+         tc.Send("QUIT\r\n");
+         tc.Disconnect();
+      }
+
+      [Test]
       [Description("RFC 5034 SASL PLAIN over POP3 authenticates a local account.")]
       public void TestAuthPlainAuthenticates()
       {

@@ -455,8 +455,21 @@ upgrading the management/admin INI password from MD5.
   change. Validated by `RegressionTests.Security.PasswordPepper` (an account created under a pepper
   authenticates, fails once the pepper is changed, and authenticates again when the original pepper is
   restored), Security 39/39 green and no errors logged.
-- Remaining B2: OAuth2 XOAUTH2/OAUTHBEARER;
-  POP3/IMAP UTF8 (RFC 6856 / UTF8=ACCEPT) and full SASLprep of non-ASCII credentials.
+- ✅ **POP3/IMAP UTF8 and SASLprep of non-ASCII SASL credentials — delivered in v6.2.0.** POP3 now
+  advertises `UTF8` in `CAPA` and accepts the `UTF8` command in the AUTHORIZATION state (RFC 6856),
+  and IMAP advertises `UTF8=ACCEPT` in `CAPABILITY` and honours `ENABLE UTF8=ACCEPT` (RFC 6855),
+  echoing `* ENABLED UTF8=ACCEPT`. SASL `PLAIN` tokens are now decoded as raw UTF-8 bytes via the
+  shared `StringParser::DecodeSaslPlain` helper (no longer mangled through the system codepage), and
+  the decoded authcid is passed through a pragmatic RFC 4013 `StringParser::SaslPrep` (maps non-ASCII
+  spaces to U+0020, drops RFC 3454 B.1 "mapped to nothing" code points such as the soft hyphen, and
+  rejects prohibited control characters) on the POP3, IMAP and SMTP authentication paths before the
+  account lookup. ASCII credentials are unaffected. No COM/IDL/schema change. Validated by
+  `RegressionTests.POP3.Basics.TestUtf8CapabilityAndCommand`,
+  `RegressionTests.POP3.Basics.TestAuthPlainSaslPrepsUsername` (a login carrying a soft hyphen in the
+  username still matches the registered ASCII account) and
+  `RegressionTests.IMAP.Basics.TestEnableUtf8AcceptEchoesEnabled`, with the in-server `SaslPrep`
+  self-test plus the POP3/Security/IMAP/SMTP suites (178/178) green and no errors logged.
+- Remaining B2: OAuth2 XOAUTH2/OAUTHBEARER.
 - Verify: O365/Gmail XOAUTH2 + Thunderbird SCRAM interop.
 
 ## B3 — Secrets & least-privilege

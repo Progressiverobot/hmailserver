@@ -33,7 +33,7 @@ namespace HM
          return IMAPResult(IMAPResult::ResultNo, "IMAP AUTHENTICATE is not enabled.");
 
       String imapmasteruser = Configuration::Instance()->GetIMAPConfiguration()->GetIMAPMasterUser();
-		String sParam, authzid, authcid, password, sDecode64;
+		String sParam, authzid, authcid, password;
 		String sDefaultDomain = Configuration::Instance()->GetDefaultDomain();
 
 		if (pConnection->GetConnectionSecurity() == CSSTARTTLSRequired)
@@ -96,20 +96,17 @@ namespace HM
 		}
 
 		sParam = pParser->GetParamValue(pArgument, 1);
-		StringParser::Base64Decode(sParam, sDecode64);
-		std::vector<String> plain_args = StringParser::SplitString(sDecode64, "\t");
-
-		if (plain_args.size() != 3)
+		if (!StringParser::DecodeSaslPlain(sParam, authzid, authcid, password))
 			return IMAPResult(IMAPResult::ResultBad, "Command has malformed base64 token.");
 
-		authzid = plain_args[0];
-
-		authcid = plain_args[1];
-		if (plain_args[1].GetLength() == 0)
+		if (authcid.GetLength() == 0)
 			return IMAPResult(IMAPResult::ResultBad, "Command is missing username.");
 
-		password = plain_args[2];
-		if (plain_args[2].GetLength() == 0)
+		// RFC 4422/4013: prepare the authcid (username) with SASLprep before lookup.
+		if (!StringParser::SaslPrep(authcid, authcid))
+			return IMAPResult(IMAPResult::ResultBad, "Command has an invalid username.");
+
+		if (password.GetLength() == 0)
 			return IMAPResult(IMAPResult::ResultBad, "Command is missing password.");
 
 		// we don't really need to canonicalize the username(s), but it makes it much

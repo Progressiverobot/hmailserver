@@ -48,6 +48,20 @@ namespace HM
       static bool ValidateString(const String &sString, const String &sAllowedChars);
 
       static void RemoveDuplicateItems(std::vector<String> &items);
+
+      // RFC 4013 SASLprep (pragmatic subset): normalises a SASL credential string by
+      // mapping non-ASCII space characters to U+0020 and removing the RFC 3454 table B.1
+      // "mapped to nothing" characters (soft hyphen, zero-width spaces/joiners, BOM, ...).
+      // Returns true and the prepared string on success; returns false if the input
+      // contains a prohibited control character (RFC 3454 tables C.2.1/C.2.2). Full NFKC
+      // normalisation is not performed (it would require a Unicode library); ASCII input
+      // is therefore returned unchanged.
+      static bool SaslPrep(const String &sInput, String &sOutput);
+
+      // Decodes a SASL PLAIN base64 token (RFC 4616: authzid NUL authcid NUL passwd)
+      // into its three UTF-8 fields. Returns true when exactly three fields are present.
+      static bool DecodeSaslPlain(const String &sBase64, String &sAuthzid, String &sAuthcid, String &sPassword);
+
    private:
 
       static bool AnyOfCharsExists_(const String &sChars, const String &sLookIn);

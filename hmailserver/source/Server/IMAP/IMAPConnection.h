@@ -122,6 +122,11 @@ namespace HM
       bool GetQResyncEnabled() const { return qresync_enabled_; }
       void SetQResyncEnabled(bool bNewVal) { qresync_enabled_ = bNewVal; }
 
+      // RFC 6855 (UTF8=ACCEPT): whether the client has accepted UTF-8 message data
+      // for this session via ENABLE UTF8=ACCEPT.
+      bool GetUtf8AcceptEnabled() const { return utf8_accept_enabled_; }
+      void SetUtf8AcceptEnabled(bool bNewVal) { utf8_accept_enabled_ = bNewVal; }
+
       // RFC 5182 (SEARCHRES): the most recent "SEARCH RETURN (SAVE)" result for this
       // session, stored as UIDs so the "$" marker stays stable across expunges. An
       // empty vector means the saved result is the empty set.
@@ -215,6 +220,7 @@ namespace HM
 
       bool condstore_enabled_;
       bool qresync_enabled_;
+      bool utf8_accept_enabled_;
 
       // RFC 5182 (SEARCHRES): UIDs saved by the last "SEARCH RETURN (SAVE)".
       std::vector<__int64> saved_search_result_;

@@ -70,7 +70,8 @@ namespace HM
          UIDL = 12,
          CAPA = 13,
          STLS = 14,
-         AUTH = 15
+         AUTH = 15,
+         UTF8 = 16
       };
 
       enum ConnectionState
@@ -116,6 +117,8 @@ namespace HM
       void ProtocolQUIT_();
       bool ProtocolSTLS_();
       void ProtocolCAPA_();
+      // RFC 6856: switch the session to UTF-8 mode (AUTHORIZATION state only).
+      void ProtocolUTF8_();
 
       bool SendFileHeader_(const String &sFilename, int iNoOfLines = 0);
 
@@ -142,6 +145,9 @@ namespace HM
 
       bool sasl_plain_pending_;
       std::shared_ptr<ScramSha256> scram_session_;
+
+      // RFC 6856 UTF8 mode: set by the UTF8 command, advertised via CAPA.
+      bool utf8_enabled_;
 
       File current_file_;
    };
