@@ -15,7 +15,7 @@ namespace hMailServer.ControlPanel.Views
 
       // General
       private readonly CheckBox active_ = new() { Content = "Domain enabled", FontSize = 13 };
-      private readonly TextBox postmaster_ = new();
+      private readonly TextBox postmaster_ = NewInput();
 
       private readonly TextBlock status_ = new()
       {
@@ -26,17 +26,17 @@ namespace hMailServer.ControlPanel.Views
       };
 
       // Limits
-      private readonly TextBox maxSize_ = new();
-      private readonly TextBox maxMessageSize_ = new();
-      private readonly TextBox maxAccountSize_ = new();
+      private readonly TextBox maxSize_ = NewInput();
+      private readonly TextBox maxMessageSize_ = NewInput();
+      private readonly TextBox maxAccountSize_ = NewInput();
       private readonly CheckBox maxAccountsOn_ = new() { Content = "Limit number of accounts", FontSize = 13 };
-      private readonly TextBox maxAccounts_ = new();
+      private readonly TextBox maxAccounts_ = NewInput();
       private readonly CheckBox maxAliasesOn_ = new() { Content = "Limit number of aliases", FontSize = 13 };
-      private readonly TextBox maxAliases_ = new();
+      private readonly TextBox maxAliases_ = NewInput();
       private readonly CheckBox maxDistsOn_ = new() { Content = "Limit number of distribution lists", FontSize = 13 };
-      private readonly TextBox maxDists_ = new();
+      private readonly TextBox maxDists_ = NewInput();
       private readonly CheckBox plusAddressingOn_ = new() { Content = "Enable plus addressing", FontSize = 13 };
-      private readonly TextBox plusChar_ = new();
+      private readonly TextBox plusChar_ = NewInput();
       private readonly CheckBox greylisting_ = new() { Content = "Enable greylisting for this domain", FontSize = 13 };
 
       // Signature
@@ -50,8 +50,8 @@ namespace hMailServer.ControlPanel.Views
       // DKIM
       private readonly CheckBox dkimOn_ = new() { Content = "Enable DKIM signing", FontSize = 13 };
       private readonly CheckBox dkimAliases_ = new() { Content = "Sign aliases too", FontSize = 13 };
-      private readonly TextBox dkimSelector_ = new();
-      private readonly TextBox dkimKeyFile_ = new();
+      private readonly TextBox dkimSelector_ = NewInput();
+      private readonly TextBox dkimKeyFile_ = NewInput();
       private readonly ComboBox dkimHeaderCanon_ = new();
       private readonly ComboBox dkimBodyCanon_ = new();
       private readonly ComboBox dkimAlgorithm_ = new();
@@ -331,6 +331,8 @@ namespace hMailServer.ControlPanel.Views
          VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
          HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
       };
+
+      private static TextBox NewInput() => new Wpf.Ui.Controls.TextBox();
 
       private static TextBox NewMemo() => new()
       {

@@ -99,8 +99,9 @@ installer.
    subtitles).
 7. ✅ **Accessibility** — `AutomationProperties.Name` on the icon-only controls
    (theme toggle, ✕ delete buttons), every page search box, the nav tree and the
-   content host so screen readers announce them; access-key mnemonics on the
-   Domains action buttons. Tab order follows the logical visual tree.
+   content host so screen readers announce them. (Wpf.Ui buttons render the `_`
+   mnemonic literally, so access keys are left to the standard menu/dialog defaults;
+   tab order follows the logical visual tree.)
 8. ✅ **Theme** — follows the OS theme by default (and tracks live OS changes via
    `SystemThemeWatcher`) until the manual toggle sets an explicit Light/Dark
    preference, which then persists and stops OS tracking.
@@ -109,9 +110,11 @@ installer.
    ACME), **Network** (ports, incoming relays, API & monitoring) and **Maintenance**
    (performance, scripting, event scripts, server messages, groups); the top-level
    **Status** node was already present.
-10. **Style unification** — reconcile code-built pages (PublicFoldersView,
-    UtilityViews, dialogs) with the XAML card pages; prefer Wpf.Ui controls and
-    shared card/list styles.
+10. ✅ **Style unification** — app-wide `ui:ControlsDictionary` already themes the
+    standard controls and all code-built pages use the shared `Card`/`PageTitle`/
+    `PageSubtitle` styles and `Wpf.Ui` buttons; the Domain/Account/Route dialog text
+    inputs were converted from plain `TextBox` to `Wpf.Ui.Controls.TextBox` so they
+    match the card pages exactly.
 11. ✅ **Global exception handler** — unhandled UI-thread exceptions are appended
     (with full stack) to `%LOCALAPPDATA%\hMailServer\ControlPanel\control-panel-errors.log`
     and the user is offered a restart (preserving the original `/connect` args);

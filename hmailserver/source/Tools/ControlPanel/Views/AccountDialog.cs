@@ -25,24 +25,24 @@ namespace hMailServer.ControlPanel.Views
       // General
       private readonly CheckBox active_ = new() { Content = "Account enabled", FontSize = 13 };
       private readonly ComboBox adminLevel_ = new();
-      private readonly TextBox quota_ = new();
-      private readonly TextBox firstName_ = new();
-      private readonly TextBox lastName_ = new();
+      private readonly TextBox quota_ = NewInput();
+      private readonly TextBox firstName_ = NewInput();
+      private readonly TextBox lastName_ = NewInput();
       private readonly PasswordBox password_ = new();
       private readonly TextBlock lastLogon_ = new() { FontSize = 12.5, Margin = new Thickness(0, 0, 0, 8) };
 
       // Forwarding
       private readonly CheckBox forwardOn_ = new() { Content = "Forward incoming mail", FontSize = 13 };
-      private readonly TextBox forwardTo_ = new();
+      private readonly TextBox forwardTo_ = NewInput();
       private readonly CheckBox forwardKeep_ = new() { Content = "Keep original message", FontSize = 13 };
       private readonly CheckBox forwardAbortSpam_ = new() { Content = "Do not forward messages flagged as spam", FontSize = 13 };
 
       // Auto-reply
       private readonly CheckBox vacationOn_ = new() { Content = "Send automatic reply (vacation message)", FontSize = 13 };
-      private readonly TextBox vacationSubject_ = new();
+      private readonly TextBox vacationSubject_ = NewInput();
       private readonly TextBox vacationBody_ = NewMemo();
       private readonly CheckBox vacationExpires_ = new() { Content = "Stop sending replies after a date", FontSize = 13 };
-      private readonly TextBox vacationExpiresDate_ = new();
+      private readonly TextBox vacationExpiresDate_ = NewInput();
       private readonly CheckBox vacationAbortSpam_ = new() { Content = "Do not reply to messages flagged as spam", FontSize = 13 };
 
       // Signature
@@ -52,8 +52,8 @@ namespace hMailServer.ControlPanel.Views
 
       // Active Directory
       private readonly CheckBox isAd_ = new() { Content = "This account is linked to Active Directory", FontSize = 13 };
-      private readonly TextBox adDomain_ = new();
-      private readonly TextBox adUser_ = new();
+      private readonly TextBox adDomain_ = NewInput();
+      private readonly TextBox adUser_ = NewInput();
 
       // External (fetch) accounts, account rules, IMAP folders — embedded editors
       private CollectionEditorView fetchEditor_;
@@ -556,6 +556,8 @@ namespace hMailServer.ControlPanel.Views
          VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
          HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
       };
+
+      private static TextBox NewInput() => new Wpf.Ui.Controls.TextBox();
 
       private static TextBox NewMemo() => new()
       {

@@ -60,7 +60,7 @@
                     </ListView>
                     <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="4,10,0,2">
                         <ui:TextBox x:Name="NewDomainBox" PlaceholderText="newdomain.com" Width="180" />
-                        <ui:Button Content="Add _domain" Margin="8,0,0,0" Click="AddDomain_Click" />
+                        <ui:Button Content="Add domain" Margin="8,0,0,0" Click="AddDomain_Click" />
                     </StackPanel>
                 </Grid>
             </Border>
@@ -115,7 +115,7 @@
                         </Grid.ColumnDefinitions>
                         <ui:TextBox x:Name="NewAccountBox" PlaceholderText="user@domain" Margin="0,0,8,0" />
                         <ui:PasswordBox x:Name="NewAccountPassword" Grid.Column="1" PlaceholderText="Password" Margin="0,0,8,0" />
-                        <ui:Button Grid.Column="2" Content="_Create account" Appearance="Primary" Click="AddAccount_Click" />
+                        <ui:Button Grid.Column="2" Content="Create account" Appearance="Primary" Click="AddAccount_Click" />
                     </Grid>
                 </Grid>
             </Border>

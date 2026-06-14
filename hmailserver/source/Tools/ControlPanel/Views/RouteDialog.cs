@@ -11,22 +11,22 @@ namespace hMailServer.ControlPanel.Views
       private readonly string domainName_;
       private int routeId_;
 
-      private readonly TextBox host_ = new();
-      private readonly TextBox port_ = new();
-      private readonly TextBox description_ = new();
-      private readonly TextBox tries_ = new();
-      private readonly TextBox minutes_ = new();
+      private readonly Wpf.Ui.Controls.TextBox host_ = new();
+      private readonly Wpf.Ui.Controls.TextBox port_ = new();
+      private readonly Wpf.Ui.Controls.TextBox description_ = new();
+      private readonly Wpf.Ui.Controls.TextBox tries_ = new();
+      private readonly Wpf.Ui.Controls.TextBox minutes_ = new();
       private readonly CheckBox allAddresses_ = new() { Content = "Deliver to all addresses (not only known accounts)", FontSize = 13 };
 
       private readonly ListBox addressList_ = new() { Height = 200, FontSize = 13 };
-      private readonly TextBox newAddress_ = new();
+      private readonly Wpf.Ui.Controls.TextBox newAddress_ = new();
 
       private readonly ComboBox connSecurity_ = new();
       private readonly CheckBox treatSenderLocal_ = new() { Content = "Treat sender domain as local", FontSize = 13 };
       private readonly CheckBox treatRecipientLocal_ = new() { Content = "Treat recipient domain as local", FontSize = 13 };
 
       private readonly CheckBox requiresAuth_ = new() { Content = "Target server requires authentication", FontSize = 13 };
-      private readonly TextBox authUser_ = new();
+      private readonly Wpf.Ui.Controls.TextBox authUser_ = new();
       private readonly PasswordBox authPassword_ = new();
 
       private readonly TextBlock status_ = new()
