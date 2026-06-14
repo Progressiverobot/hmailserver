@@ -99,8 +99,9 @@ installer.
    subtitles).
 7. **Accessibility** — AutomationProperties.Name + access keys + tab order on
    all dialogs/pages.
-8. **Theme** — follow the OS theme by default (currently hard dark); keep the
-   manual toggle.
+8. ✅ **Theme** — follows the OS theme by default (and tracks live OS changes via
+   `SystemThemeWatcher`) until the manual toggle sets an explicit Light/Dark
+   preference, which then persists and stops OS tracking.
 9. **Navigation restructure** — split the overloaded **Advanced** group into
    Security / Network / Maintenance; add a top-level **Status** node.
 10. **Style unification** — reconcile code-built pages (PublicFoldersView,

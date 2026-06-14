@@ -294,11 +294,39 @@ namespace hMailServer.ControlPanel
          }
 
          if (saved == "Light")
+         {
             ApplicationThemeManager.Apply(ApplicationTheme.Light);
+         }
+         else if (saved == "Dark")
+         {
+            ApplicationThemeManager.Apply(ApplicationTheme.Dark);
+         }
+         else
+         {
+            // No saved preference: follow the OS theme and keep tracking it until
+            // the user makes an explicit choice with the theme toggle.
+            try
+            {
+               ApplicationThemeManager.ApplySystemTheme();
+               SystemThemeWatcher.Watch(this);
+            }
+            catch (Exception)
+            {
+            }
+         }
       }
 
       private void Theme_Click(object sender, RoutedEventArgs e)
       {
+         // An explicit toggle takes over from the OS, so stop following it.
+         try
+         {
+            SystemThemeWatcher.UnWatch(this);
+         }
+         catch (Exception)
+         {
+         }
+
          bool toLight = ApplicationThemeManager.GetAppTheme() == ApplicationTheme.Dark;
          ApplicationThemeManager.Apply(toLight ? ApplicationTheme.Light : ApplicationTheme.Dark);
 
