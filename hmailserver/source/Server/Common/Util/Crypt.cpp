@@ -56,6 +56,12 @@ namespace HM
             AnsiString result = HashCreator::GeneratePBKDF2(input);
             return result;
          }
+      case ETArgon2id:
+         {
+            AnsiString input = sInput;
+            AnsiString result = HashCreator::GenerateArgon2id(input);
+            return result;
+         }
       default:
          {
             assert(0);
@@ -91,6 +97,12 @@ namespace HM
             AnsiString ansiHash = originalHash;
             return HashCreator::ValidatePBKDF2(ansiPassword, ansiHash);
          }
+      case ETArgon2id:
+         {
+            AnsiString ansiPassword = password;
+            AnsiString ansiHash = originalHash;
+            return HashCreator::ValidateArgon2id(ansiPassword, ansiHash);
+         }
       default:
          {
             assert(0);
@@ -107,6 +119,9 @@ namespace HM
       AnsiString ansiHash = hash;
       if (HashCreator::IsPBKDF2Hash(ansiHash))
          return ETPBKDF2;
+
+      if (HashCreator::IsArgon2idHash(ansiHash))
+         return ETArgon2id;
 
       int length = hash.GetLength();
       if (length == 32)

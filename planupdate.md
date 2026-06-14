@@ -292,9 +292,22 @@ upgrading the management/admin INI password from MD5.
   via JWKS/introspection. Today only AUTH LOGIN/PLAIN (`SMTPConnection`, `IMAPCommandAuthenticate`,
   outbound `SMTPClientConnection`).
 - **SCRAM-SHA-256** (+ `-PLUS` channel binding).
-- **Argon2id** KDF option (keep PBKDF2); hash-policy engine (min accepted type, rehash stale,
-  phase out MD5/SHA256); optional pepper. `HashCreator`.
-- POP3 SASL + UTF8 (RFC 6856).
+- ✅ **Argon2id KDF option — delivered in v6.2.0.** Added the OWASP-recommended memory-hard KDF as
+  password-hash algorithm **5** (`Crypt::ETArgon2id`), implemented in `HashCreator`
+  (`GenerateArgon2id`/`ValidateArgon2id`/`IsArgon2idHash`) over OpenSSL's `EVP_KDF` `ARGON2ID`
+  (no new dependency; default params m=19456 KiB, t=2, p=1; self-describing
+  `$a2$<m>$<t>$<p>$<salt-hex>$<key-hex>` hash with defense-in-depth bounds on verify). `Crypt`
+  (`EnCrypt`/`Validate`/`GetHashType`) dispatches it, and `PasswordValidator`'s transparent
+  rehash-on-login was generalised to upgrade to whichever strong KDF is configured in
+  `PreferredHashAlgorithm` **without ever downgrading** (PBKDF2 `<` Argon2id by enum value; both
+  outrank legacy MD5/SHA256). PBKDF2 remains the default; Argon2id is opt-in via
+  `PreferredHashAlgorithm=5`. Validated end-to-end inside the live server by the `RunTestSuite`
+  self-tests (`HashCreatorTester` Argon2id round-trip/negative/salt-uniqueness/cross-scheme checks +
+  a `Crypt` `EnCrypt`→`GetHashType`→`Validate` dispatch check for Argon2id and PBKDF2), with the
+  full auth regression (default PBKDF2 path) green.
+- Remaining B2: SCRAM-SHA-256 (+`-PLUS`); a hash-policy engine (min accepted type, phase out
+  MD5/SHA256) and optional pepper building on the Argon2id work; OAuth2 XOAUTH2/OAUTHBEARER; POP3
+  SASL + UTF8 (RFC 6856).
 - Verify: O365/Gmail XOAUTH2 + Thunderbird SCRAM interop.
 
 ## B3 — Secrets & least-privilege

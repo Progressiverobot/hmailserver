@@ -20,6 +20,7 @@
 #include "Parsing\AddresslistParser.h"
 #include "../../IMAP/IMAPSimpleCommandParser.h"
 #include "BlowFish.h"
+#include "Crypt.h"
 #include "../Persistence/PersistentMessage.h"
 #include "../../SMTP/SPF/SPF.h"
 #include "../../SMTP/BLCheck.h"
@@ -106,6 +107,27 @@ namespace HM
       OutputDebugString(_T("hMailServer: Testing SHA256\n"));
       HashCreatorTester tester;
       tester.Test();
+
+      OutputDebugString(_T("hMailServer: Testing password hash dispatch (Crypt)\n"));
+      {
+         // Validate the exact server-side login dispatch (EnCrypt -> GetHashType ->
+         // Validate) for the strong password KDFs, including Argon2id.
+         const String testPwd = _T("Corr3ct H0rse Battery Staple!");
+
+         String argonHash = Crypt::Instance()->EnCrypt(testPwd, Crypt::ETArgon2id);
+         if (Crypt::Instance()->GetHashType(argonHash) != Crypt::ETArgon2id)
+            throw 0;
+         if (!Crypt::Instance()->Validate(testPwd, argonHash, Crypt::ETArgon2id))
+            throw 0;
+         if (Crypt::Instance()->Validate(_T("the wrong password"), argonHash, Crypt::ETArgon2id))
+            throw 0;
+
+         String pbkdf2Hash = Crypt::Instance()->EnCrypt(testPwd, Crypt::ETPBKDF2);
+         if (Crypt::Instance()->GetHashType(pbkdf2Hash) != Crypt::ETPBKDF2)
+            throw 0;
+         if (!Crypt::Instance()->Validate(testPwd, pbkdf2Hash, Crypt::ETPBKDF2))
+            throw 0;
+      }
 
 
       OutputDebugString(_T("hMailServer: Testing RegularExpressionTester\n"));

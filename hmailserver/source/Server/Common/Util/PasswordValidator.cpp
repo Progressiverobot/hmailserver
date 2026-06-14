@@ -171,7 +171,8 @@ namespace HM
       }
       else if (iPasswordEncryption == Crypt::ETMD5 ||
                iPasswordEncryption == Crypt::ETSHA256 ||
-               iPasswordEncryption == Crypt::ETPBKDF2)
+               iPasswordEncryption == Crypt::ETPBKDF2 ||
+               iPasswordEncryption == Crypt::ETArgon2id)
       {
          // Compare hashs
          bool result = Crypt::Instance()->Validate(sPassword, sComparePassword, iPasswordEncryption);
@@ -181,13 +182,17 @@ namespace HM
 
          // The password is correct. If the account hash uses an older, weaker scheme
          // than the preferred one, transparently upgrade it now while we have the
-         // clear-text password available.
+         // clear-text password available. Only ever upgrade to a stronger scheme,
+         // never downgrade: the strong KDFs are ordered PBKDF2 < Argon2id by enum
+         // value and both outrank the legacy MD5/SHA256 hashes.
          int preferredHashAlgorithm = IniFileSettings::Instance()->GetPreferredHashAlgorithm();
-         if (preferredHashAlgorithm == Crypt::ETPBKDF2 && iPasswordEncryption != Crypt::ETPBKDF2)
+         bool preferredIsStrongKdf = (preferredHashAlgorithm == Crypt::ETPBKDF2 ||
+                                      preferredHashAlgorithm == Crypt::ETArgon2id);
+         if (preferredIsStrongKdf && preferredHashAlgorithm > iPasswordEncryption)
          {
             std::shared_ptr<Account> upgradedAccount = std::make_shared<Account>(*pAccount);
-            upgradedAccount->SetPassword(Crypt::Instance()->EnCrypt(sPassword, Crypt::ETPBKDF2));
-            upgradedAccount->SetPasswordEncryption(Crypt::ETPBKDF2);
+            upgradedAccount->SetPassword(Crypt::Instance()->EnCrypt(sPassword, (Crypt::EncryptionType) preferredHashAlgorithm));
+            upgradedAccount->SetPasswordEncryption(preferredHashAlgorithm);
             PersistentAccount::SaveObject(upgradedAccount);
          }
       }

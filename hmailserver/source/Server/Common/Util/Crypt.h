@@ -20,7 +20,8 @@ namespace HM
          ETBlowFish = 1,
          ETMD5 = 2,
          ETSHA256 = 3,
-         ETPBKDF2 = 4
+         ETPBKDF2 = 4,
+         ETArgon2id = 5
       };
 
       EncryptionType GetHashType(const String &hash);
