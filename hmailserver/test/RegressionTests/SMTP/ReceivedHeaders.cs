@@ -47,6 +47,25 @@ namespace RegressionTests.SMTP
       }
 
       [Test]
+      [Description("Received header should carry a correlation id tying the message to its SMTP session log.")]
+      public void TestReceivedHeaderContainsCorrelationId()
+      {
+         string errorMessage;
+
+         var client = new SmtpClientSimulator();
+         client.Send(false, _account.Address, "test", _account.Address, _account.Address, "Test", "Test",
+            out errorMessage);
+
+         var message = Pop3ClientSimulator.AssertGetFirstMessageText(_account.Address, "test");
+
+         // The Received header added by the server should include an RFC 5321
+         // "id" clause whose value is the numeric session id (also logged on every
+         // SMTP session log line), so a delivered message can be traced back to the
+         // exact session that received it.
+         StringAssert.IsMatch(@"with ESMTP\w* id \d+", message);
+      }
+
+      [Test]
       [Description("Header should contain ESMTPS if STARTTLS is used.")]
       public void TestESMTPSInHeader()
       {

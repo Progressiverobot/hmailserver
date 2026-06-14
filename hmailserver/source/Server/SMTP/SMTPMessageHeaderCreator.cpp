@@ -24,14 +24,15 @@
 
 namespace HM
 {
-   SMTPMessageHeaderCreator::SMTPMessageHeaderCreator(const String &username, const AnsiString &remote_ip_address, bool is_authenticated, String helo_host, std::shared_ptr<MimeHeader> original_headers, std::shared_ptr<Message> message) :
+   SMTPMessageHeaderCreator::SMTPMessageHeaderCreator(const String &username, const AnsiString &remote_ip_address, bool is_authenticated, String helo_host, std::shared_ptr<MimeHeader> original_headers, std::shared_ptr<Message> message, int session_id) :
       username_(username),
       remote_ip_address_(remote_ip_address),
       is_authenticated_(is_authenticated),
       original_headers_(original_headers),
       helo_host_(helo_host),
       is_tls_(false),
-      message_(message)
+      message_(message),
+      session_id_(session_id)
    {
 
    }
@@ -164,7 +165,7 @@ namespace HM
 
       String sResult;
       sResult.Format(_T("Received: from %s (%s [%s])\r\n")
-         _T("\tby %s with ESMTP%s\r\n")
+         _T("\tby %s with ESMTP%s id %d\r\n")
          _T("%s")
          _T("\t; %s\r\n"),
          remote_hostname.c_str(),
@@ -172,6 +173,7 @@ namespace HM
          overriden_received_ip.c_str(),
          local_computer_name.c_str(),
          esmtp_additions.c_str(),
+         session_id_,
          cipher_line.c_str(),
          Time::GetCurrentMimeDate().c_str());
 

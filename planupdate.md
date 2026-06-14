@@ -319,6 +319,14 @@ SRS for forwarding (SPF alignment), and per-IP / per-destination rate shaping.*
   The `HealthProbes` test performs a real failed POP3 login and asserts the failure
   counter increments (wiring, not just presence).
 - **OpenTelemetry** tracing (SMTP/IMAP/POP/DB spans + correlation IDs).
+- **Done — message-to-session correlation IDs.** The SMTP `Received` header the
+  server stamps on every accepted message now carries an RFC 5321 `id` clause whose
+  value is the numeric TCP session id (`Received: ... with ESMTP<flags> id <n>`).
+  The same session id prefixes every line of that connection's SMTP session log, so
+  a delivered message can be traced back to the exact session that received it
+  without any external trace system. Asserted by the `ReceivedHeaders`
+  `TestReceivedHeaderContainsCorrelationId` test (6/6 green). Full OpenTelemetry
+  spans / OTLP export across SMTP/IMAP/POP/DB remain future work.
 - **Done — delivery-outcome metrics.** `/metrics` exposes
   `hmailserver_messages_delivered_total`, `hmailserver_messages_deferred_total`
   and `hmailserver_messages_bounced_total` counters, incremented from the SMTP

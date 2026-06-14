@@ -16,7 +16,7 @@ namespace HM
    {
    public:
       
-      SMTPMessageHeaderCreator(const String &username, const AnsiString &remote_ip_address, bool is_authenticated, String helo_host, std::shared_ptr<MimeHeader> original_headers, std::shared_ptr<Message> message);
+      SMTPMessageHeaderCreator(const String &username, const AnsiString &remote_ip_address, bool is_authenticated, String helo_host, std::shared_ptr<MimeHeader> original_headers, std::shared_ptr<Message> message, int session_id);
 
       AnsiString Create();
 
@@ -35,6 +35,7 @@ namespace HM
       CipherInfo cipher_info_;
       bool is_tls_;
       bool is_authenticated_;
+      int session_id_;
       
    };
 }
