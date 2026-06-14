@@ -72,6 +72,13 @@ namespace hMailServer.ControlPanel.Views
 
          /// <summary>Current text in the editor (for live test buttons).</summary>
          public string CurrentText => box_?.Text?.Trim() ?? "";
+
+         /// <summary>Overwrites the editor text (for preset pickers / auto-detect).</summary>
+         public void SetText(string text)
+         {
+            if (box_ != null)
+               box_.Text = text ?? "";
+         }
          public override FrameworkElement CreateEditor(object value)
          {
             var panel = new StackPanel();
@@ -212,6 +219,48 @@ namespace hMailServer.ControlPanel.Views
          public override object ReadEditor() => null;
          public override void Write(object owner, string property) { }
       }
+
+      /// <summary>
+      /// A non-persistent preset picker that fills other <see cref="ComText"/>
+      /// editors when a preset is chosen (e.g. fill the custom-scanner command line
+      /// and infected return value for a known AV engine).
+      /// </summary>
+      private class ComPreset : ComSetting
+      {
+         public (string Name, string Exe, int ReturnValue)[] Presets;
+         public ComText ExeTarget;
+         public ComText ReturnTarget;
+         public override bool WantsInitialValue => false;
+
+         public override FrameworkElement CreateEditor(object value)
+         {
+            var panel = new StackPanel();
+            panel.Children.Add(new TextBlock { Text = Label, FontSize = 13, Margin = new Thickness(0, 0, 0, 4) });
+
+            var combo = new ComboBox { MinWidth = 320, HorizontalAlignment = HorizontalAlignment.Left, FontSize = 13 };
+            combo.Items.Add(new ComboBoxItem { Content = "Choose a preset\u2026", Tag = -1 });
+            for (int i = 0; i < Presets.Length; i++)
+               combo.Items.Add(new ComboBoxItem { Content = Presets[i].Name, Tag = i });
+            combo.SelectedIndex = 0;
+
+            combo.SelectionChanged += (s, e) =>
+            {
+               if (combo.SelectedItem is ComboBoxItem cbi && cbi.Tag is int idx && idx >= 0 && idx < Presets.Length)
+               {
+                  (string Name, string Exe, int ReturnValue) p = Presets[idx];
+                  ExeTarget?.SetText(p.Exe);
+                  ReturnTarget?.SetText(p.ReturnValue.ToString());
+               }
+            };
+
+            panel.Children.Add(combo);
+            return panel;
+         }
+
+         public override object ReadEditor() => null;
+         public override void Write(object owner, string property) { }
+      }
+
 
       private class CardDef
       {
@@ -447,20 +496,53 @@ namespace hMailServer.ControlPanel.Views
 
          var clamav = Card("ClamAV (network daemon)");
          clamav.Settings.Add(new ComBool { Path = "AntiVirus.ClamAVEnabled", Label = "Scan with clamd" });
-         clamav.Settings.Add(new ComText { Path = "AntiVirus.ClamAVHost", Label = "Host" });
-         clamav.Settings.Add(new ComText { Path = "AntiVirus.ClamAVPort", Label = "Port", Numeric = true });
+         var clamHost = new ComText { Path = "AntiVirus.ClamAVHost", Label = "Host" };
+         var clamPort = new ComText { Path = "AntiVirus.ClamAVPort", Label = "Port", Numeric = true };
+         clamav.Settings.Add(clamHost);
+         clamav.Settings.Add(clamPort);
+         clamav.Settings.Add(new ComAction
+         {
+            ButtonText = "Test ClamAV connection",
+            Action = () => TestClamAv(clamHost.CurrentText, ParsePort(clamPort.CurrentText))
+         });
          Tab("ClamAV").Cards.Add(clamav);
 
          var clamwin = Card("ClamWin (local executable)");
          clamwin.Settings.Add(new ComBool { Path = "AntiVirus.ClamWinEnabled", Label = "Scan with ClamWin" });
-         clamwin.Settings.Add(new ComText { Path = "AntiVirus.ClamWinExecutable", Label = "clamscan.exe path" });
-         clamwin.Settings.Add(new ComText { Path = "AntiVirus.ClamWinDBFolder", Label = "Database folder" });
+         var clamWinExe = new ComText { Path = "AntiVirus.ClamWinExecutable", Label = "clamscan.exe path" };
+         var clamWinDb = new ComText { Path = "AntiVirus.ClamWinDBFolder", Label = "Database folder" };
+         clamwin.Settings.Add(clamWinExe);
+         clamwin.Settings.Add(clamWinDb);
+         clamwin.Settings.Add(new ComAction
+         {
+            ButtonText = "Auto-detect ClamWin",
+            Action = () => AutoDetectClamWin(clamWinExe, clamWinDb)
+         });
+         clamwin.Settings.Add(new ComAction
+         {
+            ButtonText = "Test ClamWin scanner",
+            Action = () => TestClamWin(clamWinExe.CurrentText, clamWinDb.CurrentText)
+         });
          Tab("ClamWin").Cards.Add(clamwin);
 
-         var custom = Card("Custom scanner", "Run an external command; a configured return value indicates an infected message.");
+         var custom = Card("Custom scanner", "Run an external command; a configured return value indicates an infected message. Use %FILE% where the file to scan should be passed on the command line.");
          custom.Settings.Add(new ComBool { Path = "AntiVirus.CustomScannerEnabled", Label = "Use a custom virus scanner" });
-         custom.Settings.Add(new ComText { Path = "AntiVirus.CustomScannerExecutable", Label = "Executable" });
-         custom.Settings.Add(new ComText { Path = "AntiVirus.CustomScannerReturnValue", Label = "Return value for infected", Numeric = true });
+         var customExe = new ComText { Path = "AntiVirus.CustomScannerExecutable", Label = "Command line (use %FILE% for the scanned file)" };
+         var customReturn = new ComText { Path = "AntiVirus.CustomScannerReturnValue", Label = "Return value for infected", Numeric = true };
+         custom.Settings.Add(new ComPreset
+         {
+            Label = "Preset engine (fills the command line and return value below \u2013 adjust the path/exit code for your version)",
+            ExeTarget = customExe,
+            ReturnTarget = customReturn,
+            Presets = CustomScannerPresets
+         });
+         custom.Settings.Add(customExe);
+         custom.Settings.Add(customReturn);
+         custom.Settings.Add(new ComAction
+         {
+            ButtonText = "Test custom scanner",
+            Action = () => TestCustomScanner(customExe.CurrentText)
+         });
          Tab("Custom").Cards.Add(custom);
       }
 
@@ -706,6 +788,141 @@ namespace hMailServer.ControlPanel.Views
             ServerSession.Release((object) antispam);
          }
       }
+
+      // ---- anti-virus scanner test / preset helpers --------------------------
+
+      // Common single-engine custom-scanner command lines. Exit codes vary by
+      // product version, so the preset is a starting point the admin can adjust.
+      private static readonly (string Name, string Exe, int ReturnValue)[] CustomScannerPresets =
+      {
+         ("Microsoft Defender (MpCmdRun)",
+            "\"C:\\Program Files\\Windows Defender\\MpCmdRun.exe\" -Scan -ScanType 3 -File \"%FILE%\" -DisableRemediation", 2),
+         ("Sophos (savscan)",
+            "\"C:\\Program Files\\Sophos\\Sophos Anti-Virus\\savscan.exe\" -ss -archive \"%FILE%\"", 3),
+         ("ESET (ecls)",
+            "\"C:\\Program Files\\ESET\\ESET Security\\ecls.exe\" \"%FILE%\"", 50),
+         ("Bitdefender (bdscan)",
+            "\"C:\\Program Files\\Bitdefender\\Endpoint Security\\bdscan.exe\" \"%FILE%\"", 1),
+         ("Kaspersky (avp.com)",
+            "\"C:\\Program Files (x86)\\Kaspersky Lab\\Kaspersky Endpoint Security\\avp.com\" SCAN \"%FILE%\"", 2),
+      };
+
+      private static int ParsePort(string text) => int.TryParse(text, out int p) ? p : 0;
+
+      private static (bool ok, string text) TestClamAv(string host, int port)
+      {
+         if (string.IsNullOrWhiteSpace(host) || port <= 0)
+            return (false, "Enter a host name and port first.");
+
+         dynamic av = ServerSession.Current.Application.Settings.AntiVirus;
+         try
+         {
+            object[] args = { host, port, "" };
+            object ret = ((object) av).GetType().InvokeMember(
+               "TestClamAVScanner", BindingFlags.InvokeMethod, null, (object) av, args);
+            bool ok = ret is bool b && b;
+            string msg = args.Length > 2 ? args[2] as string : null;
+            if (string.IsNullOrEmpty(msg))
+               msg = ok ? "Connection succeeded." : "Connection failed.";
+            return (ok, msg);
+         }
+         finally
+         {
+            ServerSession.Release((object) av);
+         }
+      }
+
+      private static (bool ok, string text) TestClamWin(string executable, string database)
+      {
+         if (string.IsNullOrWhiteSpace(executable))
+            return (false, "Enter the clamscan.exe path first.");
+
+         dynamic av = ServerSession.Current.Application.Settings.AntiVirus;
+         try
+         {
+            object[] args = { executable, database ?? "", "" };
+            object ret = ((object) av).GetType().InvokeMember(
+               "TestClamWinScanner", BindingFlags.InvokeMethod, null, (object) av, args);
+            bool ok = ret is bool b && b;
+            string msg = args.Length > 2 ? args[2] as string : null;
+            if (string.IsNullOrEmpty(msg))
+               msg = ok ? "Scanner test succeeded." : "Scanner test failed.";
+            return (ok, msg);
+         }
+         finally
+         {
+            ServerSession.Release((object) av);
+         }
+      }
+
+      private static (bool ok, string text) TestCustomScanner(string command)
+      {
+         if (string.IsNullOrWhiteSpace(command))
+            return (false, "Enter the scanner command first.");
+
+         string path = ExtractProgramPath(command);
+         if (string.IsNullOrEmpty(path))
+            return (false, "Couldn't determine the executable from the command.");
+
+         if (System.IO.File.Exists(path))
+            return (true, "Executable found: " + path);
+
+         return (false, "Executable not found: " + path);
+      }
+
+      // Pulls the program path out of a command line that may be quoted and carry
+      // arguments / the %FILE% macro.
+      private static string ExtractProgramPath(string command)
+      {
+         command = command.Trim();
+         if (command.StartsWith("\""))
+         {
+            int end = command.IndexOf('"', 1);
+            return end > 1 ? command.Substring(1, end - 1) : "";
+         }
+         int space = command.IndexOf(' ');
+         return space < 0 ? command : command.Substring(0, space);
+      }
+
+      private static (bool ok, string text) AutoDetectClamWin(ComText exeField, ComText dbField)
+      {
+         string[] exeCandidates =
+         {
+            @"C:\Program Files\ClamWin\bin\clamscan.exe",
+            @"C:\Program Files (x86)\ClamWin\bin\clamscan.exe",
+         };
+
+         foreach (string candidate in exeCandidates)
+         {
+            if (System.IO.File.Exists(candidate))
+            {
+               exeField.SetText(candidate);
+               string db = FindClamWinDatabase();
+               if (!string.IsNullOrEmpty(db))
+                  dbField.SetText(db);
+               return (true, "Found ClamWin at " + candidate +
+                  (string.IsNullOrEmpty(db) ? "" : "; database folder " + db));
+            }
+         }
+
+         return (false, "ClamWin was not found in the standard install locations.");
+      }
+
+      private static string FindClamWinDatabase()
+      {
+         string[] candidates =
+         {
+            System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), @"ClamWin\db"),
+            @"C:\ProgramData\ClamWin\db",
+         };
+
+         foreach (string candidate in candidates)
+            if (System.IO.Directory.Exists(candidate))
+               return candidate;
+
+         return "";
+      }
+
 
       private static void WireChaChaDependency(ComBool preferServer, ComBool chacha, ComBool tls12, ComBool tls13)
       {

@@ -125,11 +125,14 @@ installer.
 
 ### Phase 3 — AV + security extensibility & hardening (CP-only)
 
-1. **Scanner presets + Test buttons** — `TestClamAVScanner`,
-   `TestClamWinScanner`, `TestCustomScanner` plus a Custom-scanner **preset
-   picker** that fills Executable / ReturnValue / args for common engines
-   (Windows Defender `MpCmdRun`, Sophos, ESET, Bitdefender, Kaspersky CLI) and
-   a ClamWin path auto-detect.
+1. ✅ **Scanner presets + Test buttons** — "Test ClamAV connection" and "Test
+   ClamWin scanner" call the server COM `TestClamAVScanner`/`TestClamWinScanner`
+   (live values, result line); "Test custom scanner" validates the `%FILE%`
+   command's executable client-side; a Custom-scanner **preset picker** fills the
+   command line + infected return value for common engines (Microsoft Defender
+   `MpCmdRun`, Sophos `savscan`, ESET `ecls`, Bitdefender `bdscan`, Kaspersky
+   `avp.com`); plus a **ClamWin auto-detect** that locates `clamscan.exe` and the
+   database folder.
 2. **Event-script integration hooks** — script templates in `ScriptsView`
    (OnAcceptMessage → AV/DLP/SIEM/webhook/external-API), with a pointer from the
    AntiVirus page for non-CLI engines.
