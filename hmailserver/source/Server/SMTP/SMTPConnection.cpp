@@ -58,6 +58,7 @@
 #include "../Common/Application/IniFileSettings.h"
 
 #include "../Common/Util/CrashSimulation.h"
+#include "../Common/Util/RateLimiter.h"
 
 #include "SMTPConnection.h"
 #include "SMTPConfiguration.h"
@@ -532,6 +533,20 @@ namespace HM
 
       if (!CheckIfValidSenderAddress(sFromAddress))
          return;
+
+      // Per-IP submission rate shaping (anti-abuse). A configured [Settings]
+      // MaxSubmissionsPerIPPerMinute caps how many message transactions a single
+      // source IP may start per minute; 0 = unlimited (default, no-op).
+      int maxSubmissionsPerIp = IniFileSettings::Instance()->GetMaxSubmissionsPerIPPerMinute();
+      if (maxSubmissionsPerIp > 0)
+      {
+         String remoteIp = String(GetIPAddressString());
+         if (!RateLimiter::Instance()->TryConsume(_T("smtp-submit:") + remoteIp, maxSubmissionsPerIp))
+         {
+            SendErrorResponse_(421, "Too many messages from your IP address. Please slow down and try again later.");
+            return;
+         }
+      }
 
       // Parse the extensions 
       std::vector<String> vecParams = StringParser::SplitString(sParameters, " ");

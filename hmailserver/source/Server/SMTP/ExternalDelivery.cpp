@@ -24,6 +24,7 @@
 #include "../Common/Util/AWstats.h"
 #include "../common/Util/ServerInfo.h"
 #include "../Common/Util/TlsRptStore.h"
+#include "../Common/Util/RateLimiter.h"
 
 #include "ServerTargetResolver.h"
 #include "SMTPConfiguration.h"
@@ -133,6 +134,22 @@ namespace HM
       // deliveries the server info host name holds the domain name at this
       // point; it is replaced by individual MX host names further down.
       String recipientDomain = serverInfo->GetHostName();
+
+      // Per-destination outbound rate shaping. A configured [Settings]
+      // MaxOutboundPerDestinationPerMinute caps how many messages this server
+      // sends to a single destination per minute; when exceeded the delivery is
+      // deferred (non-fatal) and retried later. 0 = unlimited (default, no-op).
+      int maxOutboundPerDestination = IniFileSettings::Instance()->GetMaxOutboundPerDestinationPerMinute();
+      if (maxOutboundPerDestination > 0)
+      {
+         if (!RateLimiter::Instance()->TryConsume(_T("smtp-out:") + recipientDomain.ToLower(), maxOutboundPerDestination))
+         {
+            LOG_APPLICATION("SMTPDeliverer - Message " + StringParser::IntToString(original_message_->GetID()) + ": Delivery to " + recipientDomain + " deferred due to the per-destination rate limit.");
+            String errorMessage = _T("   Error Type: SMTP\r\n   Error Description: Delivery temporarily deferred by the sending server's per-destination rate limit.\r\n\r\n");
+            HandleExternalDeliveryFailure_(vecRecipients, false, errorMessage);
+            return;
+         }
+      }
 
       // Run DNS query to find the recipient servers IP addresses.
       if (!ResolveRecipientServers_(serverInfo, vecRecipients, mail_servers))

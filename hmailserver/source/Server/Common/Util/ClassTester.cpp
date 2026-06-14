@@ -23,6 +23,7 @@
 #include "Crypt.h"
 #include "DataProtector.h"
 #include "SRS.h"
+#include "RateLimiter.h"
 #include "../Persistence/PersistentMessage.h"
 #include "../../SMTP/SPF/SPF.h"
 #include "../../SMTP/BLCheck.h"
@@ -187,6 +188,35 @@ namespace HM
             throw 0;
          if (reversed2.CompareNoCase(original2) != 0)
             throw 0;
+      }
+
+      OutputDebugString(_T("hMailServer: Testing RateLimiter\n"));
+      {
+         // Sliding-window rate limiter: limit is enforced per key, 0 = unlimited.
+         RateLimiter::Instance()->Clear();
+
+         // A maxPerMinute of 0 never throttles.
+         for (int i = 0; i < 1000; i++)
+         {
+            if (!RateLimiter::Instance()->TryConsume(_T("unlimited"), 0))
+               throw 0;
+         }
+
+         // With a limit of 3, the first three succeed and the fourth fails.
+         if (!RateLimiter::Instance()->TryConsume(_T("keyA"), 3))
+            throw 0;
+         if (!RateLimiter::Instance()->TryConsume(_T("keyA"), 3))
+            throw 0;
+         if (!RateLimiter::Instance()->TryConsume(_T("keyA"), 3))
+            throw 0;
+         if (RateLimiter::Instance()->TryConsume(_T("keyA"), 3))
+            throw 0;
+
+         // A different key has an independent budget.
+         if (!RateLimiter::Instance()->TryConsume(_T("keyB"), 3))
+            throw 0;
+
+         RateLimiter::Instance()->Clear();
       }
 
       OutputDebugString(_T("hMailServer: Testing DataProtector (DPAPI)\n"));

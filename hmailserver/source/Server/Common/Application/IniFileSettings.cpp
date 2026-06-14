@@ -41,6 +41,8 @@ namespace HM
       sep_svc_logs_(false),
 	  rewrite_envelope_from_when_forwarding_(false),
       srs_enabled_(false),
+      max_submissions_per_ip_per_minute_(0),
+      max_outbound_per_destination_per_minute_(0),
       archive_hardlinks_(false),
       pop3dmin_timeout_(0),
       pop3dmax_timeout_(0),
@@ -283,6 +285,8 @@ namespace HM
       rewrite_envelope_from_when_forwarding_ = ReadIniSettingInteger_("Settings", "RewriteEnvelopeFromWhenForwarding", 0) == 1;
       srs_enabled_ = ReadIniSettingInteger_("Settings", "SRSEnabled", 0) == 1;
       srs_secret_ = ReadIniSettingString_("Settings", "SRSSecret", "");
+      max_submissions_per_ip_per_minute_ = ReadIniSettingInteger_("Settings", "MaxSubmissionsPerIPPerMinute", 0);
+      max_outbound_per_destination_per_minute_ = ReadIniSettingInteger_("Settings", "MaxOutboundPerDestinationPerMinute", 0);
       m_sDisableAUTHList = ReadIniSettingString_("Settings", "DisableAUTHList", "");
    }
 

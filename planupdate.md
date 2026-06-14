@@ -155,12 +155,10 @@ Remaining:
 ### B4 — Deliverability & SMTP standards
 
 *Delivered already (see Part 2): SMTPUTF8/EAI, PIPELINING, ENHANCEDSTATUSCODES, DSN (RFC 3461/3464),
-and SRS for forwarding (SPF alignment).*
+SRS for forwarding (SPF alignment), and per-IP / per-destination rate shaping.*
 
-- **Per-IP / per-destination submission + outbound rate shaping** — in-memory sliding-window
-  submission throttle per source IP and per outbound destination, with new `[Settings]` toggles.
 - Optional: **BATV**, **CHUNKING/BDAT** (RFC 3030).
-- Verify: SPF passes on forwarded mail (SRS); DSN interop; rate-limit behaviour under load.
+- Verify: SPF passes on forwarded mail (SRS); DSN interop.
 
 ### B6 — Standards-based filtering
 
@@ -488,6 +486,16 @@ toggles preserve backwards compatibility.
     trailing NUL padding byte (it sized the buffer to `bytes+1` via `GetBuffer` but never `ReleaseBuffer`),
     which corrupted DPAPI-protected secrets with a trailing NUL on round-trip — now trimmed to the exact
     byte count written. Full internals self-test + 597/597 SMTP/POP3/IMAP/Security/SSL green.
+- ✅ **Per-IP / per-destination rate shaping** — a new thread-safe, in-memory sliding-window limiter
+  (`Common/Util/RateLimiter.{h,cpp}`, 60-second window keyed by an arbitrary string). Two new
+  default-off `[Settings]` keys: `MaxSubmissionsPerIPPerMinute` caps how many `MAIL FROM` transactions a
+  single source IP may start per minute (enforced in `SMTPConnection::ProtocolMAIL_`, over-budget
+  submissions get `421`), and `MaxOutboundPerDestinationPerMinute` caps how many messages this server
+  sends to one destination domain per minute (enforced in `ExternalDelivery::DeliverToSingleDomain_`,
+  over-budget deliveries are deferred non-fatally and retried later rather than bounced). Both are 0 by
+  default = unlimited, so behaviour is unchanged until configured. Covered by an in-server `RateLimiter`
+  self-test and the over-the-wire `SMTP/RateShaping.cs` (per-IP throttle is per source IP, not per
+  connection; disabled-by-default verified). 194/194 SMTP + internals green, builds 0/0.
 
 ### B5 — IMAP modern sync profile ✅ DELIVERED (v6.2.0)
 

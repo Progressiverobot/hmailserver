@@ -129,6 +129,9 @@ namespace HM
       // SRS (Sender Rewriting Scheme) for forwarded mail (SPF alignment).
       bool GetSRSEnabled() const { return srs_enabled_; }
       String GetSRSSecret() const { return srs_secret_; }
+      // Rate shaping (0 = unlimited / disabled).
+      int GetMaxSubmissionsPerIPPerMinute() const { return max_submissions_per_ip_per_minute_; }
+      int GetMaxOutboundPerDestinationPerMinute() const { return max_outbound_per_destination_per_minute_; }
       bool GetUseDNSCache() const { return use_dns_cache_; }
       String GetDNSServer() const { return dns_server_; }
 
@@ -262,6 +265,8 @@ namespace HM
       bool rewrite_envelope_from_when_forwarding_;
       bool srs_enabled_;
       String srs_secret_;
+      int max_submissions_per_ip_per_minute_;
+      int max_outbound_per_destination_per_minute_;
       bool use_dns_cache_;
       String dns_server_;
 
