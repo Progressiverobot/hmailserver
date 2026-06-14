@@ -244,6 +244,21 @@ Secret protection and least-privilege:
 
    Set `ServiceAccountName` to run the Windows service under a least-privilege account instead of LocalSystem — the recommended choice is the password-less virtual account `NT SERVICE\hMailServer` (leave `ServiceAccountPassword` empty). The account must be granted *Log on as a service* and access to the hMailServer program, data and database directories. The setting is applied when the service is (re)registered.
 
+Deliverability and SMTP standards:
+
+   <pre>
+   SRSEnabled=0                       ; Sender Rewriting Scheme for forwarded mail (SPF alignment)
+   SRSSecret=                         ; HMAC signing secret for SRS addresses (required when SRSEnabled=1)
+   MaxSubmissionsPerIPPerMinute=0     ; cap MAIL FROM transactions per source IP per minute (0 = unlimited)
+   MaxOutboundPerDestinationPerMinute=0 ; cap outbound messages per destination domain per minute (0 = unlimited)
+   </pre>
+
+   The ESMTP extensions `PIPELINING`, `SMTPUTF8`/EAI (RFC 6531/6532), `ENHANCEDSTATUSCODES` (RFC 2034) and `DSN` (RFC 3461) are advertised automatically and need no configuration; legacy `HELO` sessions keep the classic non-enhanced replies.
+
+   With `SRSEnabled=1` the envelope `MAIL FROM` of a message forwarded from an external sender is rewritten to a reversible, HMAC-signed `SRS0=` address at the local forwarding domain so the forwarder (not the original sender) owns the envelope domain and SPF stays aligned; a bounce sent back to that address is verified, decoded and relayed to the original sender. `SRSSecret` must be a stable, non-empty secret — changing it invalidates outstanding SRS addresses (they remain valid for 21 days). SRS replaces the older naive forwarding rewrite.
+
+   `MaxSubmissionsPerIPPerMinute` throttles inbound submissions: when a single source IP starts more `MAIL FROM` transactions than the limit within a 60-second sliding window, further attempts are refused with a `421` until the window drains. `MaxOutboundPerDestinationPerMinute` throttles outbound delivery: when the server has sent the configured number of messages to one destination domain within the window, additional deliveries to that domain are deferred (and retried later) rather than bounced. Both default to `0` (unlimited).
+
 Running in Debug
 ----------------
 
