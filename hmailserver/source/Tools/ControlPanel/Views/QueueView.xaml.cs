@@ -119,6 +119,7 @@ namespace hMailServer.ControlPanel.Views
             }
 
             QueueGrid.ItemsSource = rows;
+            ListSearch.Apply(QueueGrid, SearchBox.Text);
             SubtitleText.Text = rows.Count == 0
                ? "The delivery queue is empty."
                : rows.Count + " message(s) waiting for delivery.";
@@ -128,5 +129,8 @@ namespace hMailServer.ControlPanel.Views
             SubtitleText.Text = "Could not read the queue: " + ex.Message;
          }
       }
+
+      private void Search_TextChanged(object sender, TextChangedEventArgs e)
+         => ListSearch.Apply(QueueGrid, SearchBox.Text);
    }
 }

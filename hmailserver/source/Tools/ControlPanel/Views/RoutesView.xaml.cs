@@ -55,7 +55,11 @@ namespace hMailServer.ControlPanel.Views
          }
 
          RouteGrid.ItemsSource = rows;
+         ListSearch.Apply(RouteGrid, SearchBox.Text);
       }
+
+      private void Search_TextChanged(object sender, TextChangedEventArgs e)
+         => ListSearch.Apply(RouteGrid, SearchBox.Text);
 
       private void Add_Click(object sender, RoutedEventArgs e)
       {

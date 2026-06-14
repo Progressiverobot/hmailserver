@@ -61,7 +61,11 @@ namespace hMailServer.ControlPanel.Views
          }
 
          RangeGrid.ItemsSource = rows;
+         ListSearch.Apply(RangeGrid, SearchBox.Text);
       }
+
+      private void Search_TextChanged(object sender, TextChangedEventArgs e)
+         => ListSearch.Apply(RangeGrid, SearchBox.Text);
 
       private void RangeGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
       {

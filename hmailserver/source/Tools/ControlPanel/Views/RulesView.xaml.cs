@@ -84,6 +84,7 @@ namespace hMailServer.ControlPanel.Views
          }
 
          RuleGrid.ItemsSource = rows;
+         ListSearch.Apply(RuleGrid, SearchBox.Text);
          SubtitleText.Text = rows.Count == 0
             ? "No rules defined yet - create one below."
             : rows.Count + " rule(s), evaluated top to bottom.";
@@ -91,6 +92,9 @@ namespace hMailServer.ControlPanel.Views
          CriteriaGrid.ItemsSource = null;
          ActionsGrid.ItemsSource = null;
       }
+
+      private void Search_TextChanged(object sender, TextChangedEventArgs e)
+         => ListSearch.Apply(RuleGrid, SearchBox.Text);
 
       private static readonly string[] FieldNames =
          { "?", "From", "To", "CC", "Subject", "Body", "Message size", "Recipient list", "Delivery attempts" };

@@ -30,10 +30,15 @@
             <Border Style="{StaticResource Card}" Margin="0,0,12,0" Padding="10" Grid.RowSpan="2">
                 <Grid>
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
-                    <ListView x:Name="DomainList" SelectionChanged="DomainList_SelectionChanged"
+                    <ui:TextBox x:Name="DomainSearch" Grid.Row="0" PlaceholderText="Search domains..."
+                                Margin="4,0,4,8" TextChanged="DomainSearch_TextChanged">
+                        <ui:TextBox.Icon><ui:SymbolIcon Symbol="Search24" /></ui:TextBox.Icon>
+                    </ui:TextBox>
+                    <ListView x:Name="DomainList" Grid.Row="1" SelectionChanged="DomainList_SelectionChanged"
                               BorderThickness="0" Background="Transparent">
                         <ListView.ItemTemplate>
                             <DataTemplate>
@@ -52,7 +57,7 @@
                             </DataTemplate>
                         </ListView.ItemTemplate>
                     </ListView>
-                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="4,10,0,2">
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="4,10,0,2">
                         <ui:TextBox x:Name="NewDomainBox" PlaceholderText="newdomain.com" Width="180" />
                         <ui:Button Content="Add domain" Margin="8,0,0,0" Click="AddDomain_Click" />
                     </StackPanel>
@@ -64,6 +69,7 @@
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
@@ -72,7 +78,12 @@
                                FontSize="14" Margin="6,4,0,8"
                                Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
 
-                    <ListView x:Name="AccountList" Grid.Row="1" BorderThickness="0" Background="Transparent">
+                    <ui:TextBox x:Name="AccountSearch" Grid.Row="1" PlaceholderText="Search accounts..."
+                                Margin="6,0,0,8" TextChanged="AccountSearch_TextChanged">
+                        <ui:TextBox.Icon><ui:SymbolIcon Symbol="Search24" /></ui:TextBox.Icon>
+                    </ui:TextBox>
+
+                    <ListView x:Name="AccountList" Grid.Row="2" BorderThickness="0" Background="Transparent">
                         <ListView.ItemTemplate>
                             <DataTemplate>
                                 <Grid Margin="4,5">
@@ -94,7 +105,7 @@
                         </ListView.ItemTemplate>
                     </ListView>
 
-                    <Grid Grid.Row="2" Margin="4,10,0,2">
+                    <Grid Grid.Row="3" Margin="4,10,0,2">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="2*" />
                             <ColumnDefinition Width="*" />

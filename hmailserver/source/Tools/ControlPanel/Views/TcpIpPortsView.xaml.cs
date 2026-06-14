@@ -70,7 +70,11 @@ namespace hMailServer.ControlPanel.Views
          }
 
          PortGrid.ItemsSource = rows;
+         ListSearch.Apply(PortGrid, SearchBox.Text);
       }
+
+      private void Search_TextChanged(object sender, TextChangedEventArgs e)
+         => ListSearch.Apply(PortGrid, SearchBox.Text);
 
       private static Dictionary<int, string> LoadCertNames()
       {

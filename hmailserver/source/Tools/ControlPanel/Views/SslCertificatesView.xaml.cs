@@ -52,7 +52,11 @@ namespace hMailServer.ControlPanel.Views
          }
 
          CertGrid.ItemsSource = rows;
+         ListSearch.Apply(CertGrid, SearchBox.Text);
       }
+
+      private void Search_TextChanged(object sender, TextChangedEventArgs e)
+         => ListSearch.Apply(CertGrid, SearchBox.Text);
 
       private static string BrowsePem()
       {

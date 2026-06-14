@@ -83,8 +83,9 @@ installer.
 2. ✅ **No silent `catch{}`** — `DomainsView` alias/dist-list loads now surface real
    empty/error states (centered placeholder over the list; the swallowed exception
    message is shown instead of an empty list).
-3. **Search/filter** on long lists: Domains, Accounts, Rules, Queue, Ports,
-   Certs, IP ranges, Routes.
+3. ✅ **Search/filter** on long lists: Domains, Accounts, Rules, Queue, Ports,
+   Certs, IP ranges, Routes (shared `ListSearch` reflection-based substring filter
+   over each list's `ICollectionView`; per-page search box, re-applied on reload).
 4. **Consistent destructive-action confirmations** (aliases, dist-list
    recipients, incoming relays currently skip them).
 5. **Input validation + inline feedback** in Domain/Account/Route dialogs

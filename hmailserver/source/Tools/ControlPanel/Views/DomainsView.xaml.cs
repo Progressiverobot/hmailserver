@@ -39,9 +39,16 @@ namespace hMailServer.ControlPanel.Views
          }
 
          DomainList.ItemsSource = names;
+         ListSearch.Apply(DomainList, DomainSearch.Text);
          if (names.Count > 0 && DomainList.SelectedIndex < 0)
             DomainList.SelectedIndex = 0;
       }
+
+      private void DomainSearch_TextChanged(object sender, TextChangedEventArgs e)
+         => ListSearch.Apply(DomainList, DomainSearch.Text);
+
+      private void AccountSearch_TextChanged(object sender, TextChangedEventArgs e)
+         => ListSearch.Apply(AccountList, AccountSearch.Text);
 
       private void DomainList_SelectionChanged(object sender, SelectionChangedEventArgs e)
       {
@@ -360,6 +367,7 @@ namespace hMailServer.ControlPanel.Views
          }
 
          AccountList.ItemsSource = addresses;
+         ListSearch.Apply(AccountList, AccountSearch.Text);
       }
 
       private void EditDomain_Click(object sender, RoutedEventArgs e)
