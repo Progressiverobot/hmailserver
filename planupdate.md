@@ -86,8 +86,9 @@ installer.
 3. ✅ **Search/filter** on long lists: Domains, Accounts, Rules, Queue, Ports,
    Certs, IP ranges, Routes (shared `ListSearch` reflection-based substring filter
    over each list's `ICollectionView`; per-page search box, re-applied on reload).
-4. **Consistent destructive-action confirmations** (aliases, dist-list
-   recipients, incoming relays currently skip them).
+4. ✅ **Consistent destructive-action confirmations** — aliases, distribution
+   lists, distribution-list recipients and incoming relays now prompt Yes/No
+   before deleting (matching accounts, IP ranges, queue and public folders).
 5. **Input validation + inline feedback** in Domain/Account/Route dialogs
    (bad numeric input is silently ignored today).
 6. **Standardized loading/empty/error states** (shared status-line pattern).

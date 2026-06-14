@@ -208,6 +208,10 @@ namespace hMailServer.ControlPanel.Views
          if (name == null || DomainList.SelectedItem == null)
             return;
 
+         if (MessageBox.Show("Delete the alias " + name + "?", "Control Panel",
+             MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            return;
+
          dynamic domains = ServerSession.Current.Application.Domains;
          try
          {
@@ -298,6 +302,10 @@ namespace hMailServer.ControlPanel.Views
       {
          string address = (sender as FrameworkElement)?.Tag as string;
          if (address == null || DomainList.SelectedItem == null)
+            return;
+
+         if (MessageBox.Show("Delete the distribution list " + address + "?", "Control Panel",
+             MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
             return;
 
          dynamic domains = ServerSession.Current.Application.Domains;

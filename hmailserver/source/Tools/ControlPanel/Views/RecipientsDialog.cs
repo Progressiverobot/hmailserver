@@ -165,6 +165,10 @@ namespace hMailServer.ControlPanel.Views
          if (address == null)
             return;
 
+         if (MessageBox.Show("Remove the recipient " + address + " from this list?", "Control Panel",
+             MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            return;
+
          dynamic domains = ServerSession.Current.Application.Domains;
          try
          {

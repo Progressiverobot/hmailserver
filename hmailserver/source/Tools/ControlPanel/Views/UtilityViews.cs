@@ -141,6 +141,10 @@ namespace hMailServer.ControlPanel.Views
 
          string relayName = selected.Split("   (")[0];
 
+         if (MessageBox.Show("Delete the incoming relay " + relayName + "?", "Control Panel",
+             MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            return;
+
          dynamic relays = ServerSession.Current.Application.Settings.IncomingRelays;
          try
          {
