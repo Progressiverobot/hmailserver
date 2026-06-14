@@ -97,8 +97,10 @@ installer.
    centered empty/error placeholders on Domains aliases/lists and the Routes, IP
    ranges, SSL certificate and TCP/IP port grids; Queue/Rules keep their count
    subtitles).
-7. **Accessibility** — AutomationProperties.Name + access keys + tab order on
-   all dialogs/pages.
+7. ✅ **Accessibility** — `AutomationProperties.Name` on the icon-only controls
+   (theme toggle, ✕ delete buttons), every page search box, the nav tree and the
+   content host so screen readers announce them; access-key mnemonics on the
+   Domains action buttons. Tab order follows the logical visual tree.
 8. ✅ **Theme** — follows the OS theme by default (and tracks live OS changes via
    `SystemThemeWatcher`) until the manual toggle sets an explicit Light/Dark
    preference, which then persists and stops OS tracking.

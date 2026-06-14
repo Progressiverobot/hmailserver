@@ -18,7 +18,8 @@
                        Text="Server-wide message rules, evaluated top to bottom."
                        Style="{StaticResource PageSubtitle}" />
             <ui:TextBox x:Name="SearchBox" PlaceholderText="Search rules..." Width="300"
-                        HorizontalAlignment="Left" Margin="0,10,0,0" TextChanged="Search_TextChanged">
+                        HorizontalAlignment="Left" Margin="0,10,0,0" TextChanged="Search_TextChanged"
+                        AutomationProperties.Name="Search rules">
                 <ui:TextBox.Icon><ui:SymbolIcon Symbol="Search24" /></ui:TextBox.Icon>
             </ui:TextBox>
         </StackPanel>

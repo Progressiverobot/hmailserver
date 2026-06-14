@@ -53,6 +53,7 @@
                 <!-- Navigation tree (structure mirrors the classic Administrator) -->
                 <TreeView x:Name="NavTree" Grid.Row="1" Background="Transparent" BorderThickness="0"
                           Margin="8,0" SelectedItemChanged="NavTree_SelectedItemChanged"
+                          AutomationProperties.Name="Main navigation"
                           ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                     <TreeView.ItemContainerStyle>
                         <Style TargetType="TreeViewItem">
@@ -81,6 +82,7 @@
                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
                         <ui:Button x:Name="ThemeButton" Content="◐" FontSize="13" Padding="7,3"
                                    HorizontalAlignment="Right" ToolTip="Toggle light/dark theme"
+                                   AutomationProperties.Name="Toggle light or dark theme"
                                    Click="Theme_Click" />
                     </Grid>
                 </StackPanel>
@@ -89,7 +91,7 @@
             <!-- Content -->
             <Border Grid.Column="1" Background="{DynamicResource ApplicationBackgroundBrush}"
                     CornerRadius="8,0,0,0" Margin="0,4,0,0">
-                <ContentControl x:Name="ContentHost" />
+                <ContentControl x:Name="ContentHost" AutomationProperties.Name="Page content" />
             </Border>
         </Grid>
     </Grid>

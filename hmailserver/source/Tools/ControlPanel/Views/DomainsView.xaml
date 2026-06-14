@@ -35,7 +35,8 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
                     <ui:TextBox x:Name="DomainSearch" Grid.Row="0" PlaceholderText="Search domains..."
-                                Margin="4,0,4,8" TextChanged="DomainSearch_TextChanged">
+                                Margin="4,0,4,8" TextChanged="DomainSearch_TextChanged"
+                                AutomationProperties.Name="Search domains">
                         <ui:TextBox.Icon><ui:SymbolIcon Symbol="Search24" /></ui:TextBox.Icon>
                     </ui:TextBox>
                     <ListView x:Name="DomainList" Grid.Row="1" SelectionChanged="DomainList_SelectionChanged"
@@ -59,7 +60,7 @@
                     </ListView>
                     <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="4,10,0,2">
                         <ui:TextBox x:Name="NewDomainBox" PlaceholderText="newdomain.com" Width="180" />
-                        <ui:Button Content="Add domain" Margin="8,0,0,0" Click="AddDomain_Click" />
+                        <ui:Button Content="Add _domain" Margin="8,0,0,0" Click="AddDomain_Click" />
                     </StackPanel>
                 </Grid>
             </Border>
@@ -79,7 +80,8 @@
                                Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
 
                     <ui:TextBox x:Name="AccountSearch" Grid.Row="1" PlaceholderText="Search accounts..."
-                                Margin="6,0,0,8" TextChanged="AccountSearch_TextChanged">
+                                Margin="6,0,0,8" TextChanged="AccountSearch_TextChanged"
+                                AutomationProperties.Name="Search accounts">
                         <ui:TextBox.Icon><ui:SymbolIcon Symbol="Search24" /></ui:TextBox.Icon>
                     </ui:TextBox>
 
@@ -113,7 +115,7 @@
                         </Grid.ColumnDefinitions>
                         <ui:TextBox x:Name="NewAccountBox" PlaceholderText="user@domain" Margin="0,0,8,0" />
                         <ui:PasswordBox x:Name="NewAccountPassword" Grid.Column="1" PlaceholderText="Password" Margin="0,0,8,0" />
-                        <ui:Button Grid.Column="2" Content="Create account" Appearance="Primary" Click="AddAccount_Click" />
+                        <ui:Button Grid.Column="2" Content="_Create account" Appearance="Primary" Click="AddAccount_Click" />
                     </Grid>
                 </Grid>
             </Border>
@@ -143,6 +145,7 @@
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Text="{Binding Display}" FontSize="12.5" VerticalAlignment="Center" />
                                         <ui:Button Grid.Column="1" Content="✕" FontSize="10" Padding="6,2"
+                                                   ToolTip="Delete alias" AutomationProperties.Name="Delete alias"
                                                    Tag="{Binding Name}" Click="DeleteAlias_Click" />
                                     </Grid>
                                 </DataTemplate>
@@ -160,7 +163,8 @@
                             </Grid.ColumnDefinitions>
                             <ui:TextBox x:Name="NewAliasName" PlaceholderText="alias@domain" FontSize="12" Margin="0,0,6,0" />
                             <ui:TextBox x:Name="NewAliasValue" Grid.Column="1" PlaceholderText="target@anywhere" FontSize="12" Margin="0,0,6,0" />
-                            <ui:Button Grid.Column="2" Content="Add" FontSize="12" Click="AddAlias_Click" />
+                            <ui:Button Grid.Column="2" Content="Add" FontSize="12" Click="AddAlias_Click"
+                                       AutomationProperties.Name="Add alias" />
                         </Grid>
                     </Grid>
                 </Border>
@@ -189,6 +193,7 @@
                                         <ui:Button Grid.Column="2" Content="Members" FontSize="10" Padding="6,2" Margin="0,0,4,0"
                                                    Tag="{Binding}" Click="EditRecipients_Click" />
                                         <ui:Button Grid.Column="3" Content="✕" FontSize="10" Padding="6,2"
+                                                   ToolTip="Delete distribution list" AutomationProperties.Name="Delete distribution list"
                                                    Tag="{Binding}" Click="DeleteDistList_Click" />
                                     </Grid>
                                 </DataTemplate>
@@ -204,7 +209,8 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <ui:TextBox x:Name="NewDistAddress" PlaceholderText="list@domain" FontSize="12" Margin="0,0,6,0" />
-                            <ui:Button Grid.Column="1" Content="Add" FontSize="12" Click="AddDistList_Click" />
+                            <ui:Button Grid.Column="1" Content="Add" FontSize="12" Click="AddDistList_Click"
+                                       AutomationProperties.Name="Add distribution list" />
                         </Grid>
                     </Grid>
                 </Border>

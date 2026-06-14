@@ -16,7 +16,8 @@
                 <TextBlock x:Name="SubtitleText" Text="Messages waiting for delivery."
                            Style="{StaticResource PageSubtitle}" />
                 <ui:TextBox x:Name="SearchBox" PlaceholderText="Search queue..." Width="300"
-                            HorizontalAlignment="Left" Margin="0,10,0,0" TextChanged="Search_TextChanged">
+                            HorizontalAlignment="Left" Margin="0,10,0,0" TextChanged="Search_TextChanged"
+                            AutomationProperties.Name="Search the delivery queue">
                     <ui:TextBox.Icon><ui:SymbolIcon Symbol="Search24" /></ui:TextBox.Icon>
                 </ui:TextBox>
             </StackPanel>
