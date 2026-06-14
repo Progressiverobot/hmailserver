@@ -372,7 +372,15 @@ upgrading the management/admin INI password from MD5.
     scripts shipped for MySQL/MSSQL/PGSQL/SQLCE; only the MySQL path is validated in CI here.
     Follow-up: tombstone pruning/retention beyond folder deletion is not yet implemented (RFC 7162
     permits the server to fall back to a full resync, which the client handles).
-- ⏳ Remaining: LIST-EXTENDED/SEARCHRES; consider IMAP4rev2. (`IMAPCommandCapability` + command map.)
+- ✅ **LIST-EXTENDED (RFC 5258)** — delivered in v6.2.0. `LIST` accepts an optional leading
+  selection-option list (`(SUBSCRIBED)` returns only subscribed mailboxes as `* LIST`; `REMOTE`/
+  `RECURSIVEMATCH` are accepted as no-ops), an optional trailing `RETURN (SUBSCRIBED CHILDREN)`
+  (annotates the `\Subscribed` attribute; `\HasChildren`/`\HasNoChildren` are always reported), and a
+  parenthesised list of mailbox patterns (each mailbox listed once). Advertised in CAPABILITY as
+  `LIST-EXTENDED`. Covered by `TestListExtendedReturnSubscribed`, `TestListExtendedSelectSubscribed`
+  and `TestListExtendedMultiplePatterns`.
+- ⏳ Remaining: SEARCHRES (RFC 5182, the `$` saved-search marker); consider IMAP4rev2.
+  (`IMAPCommandCapability` + command map.)
 - Verify: fast resync in Thunderbird/Apple Mail.
 
 ## B6 — Standards-based filtering

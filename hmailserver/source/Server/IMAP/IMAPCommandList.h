@@ -16,6 +16,10 @@ namespace HM
 	   virtual ~IMAPCommandLIST();
 
       virtual IMAPResult ExecuteCommand(std::shared_ptr<HM::IMAPConnection> pConnection, std::shared_ptr<IMAPCommandArgument> pArgument);
+
+   private:
+      // RFC 5258: split a parenthesised mailbox-pattern list into individual patterns.
+      static void ExtractPatterns_(const String &sParenContent, std::vector<String> &patterns);
    };
 
 }

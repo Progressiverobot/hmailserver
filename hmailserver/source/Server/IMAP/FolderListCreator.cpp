@@ -36,7 +36,7 @@ namespace HM
       std::vector<String> vecCurrentFolder;
       std::vector<String> vecMatchingFolders;
 
-      CreateIMAPFolderList_(iAccountID, pStartFolders, sWildcard, false, sPrefix, vecCurrentFolder, vecMatchingFolders);
+      CreateIMAPFolderList_(iAccountID, pStartFolders, sWildcard, false, sPrefix, vecCurrentFolder, vecMatchingFolders, true, false);
 
       String sRet = StringParser::JoinVector(vecMatchingFolders, "\r\n");
 
@@ -52,7 +52,23 @@ namespace HM
       std::vector<String> vecCurrentFolder;
       std::vector<String> vecMatchingFolders;
 
-      CreateIMAPFolderList_(iAccountID, pStartFolders, sWildcard, true, sPrefix, vecCurrentFolder, vecMatchingFolders);
+      CreateIMAPFolderList_(iAccountID, pStartFolders, sWildcard, true, sPrefix, vecCurrentFolder, vecMatchingFolders, false, false);
+
+      String sRet = StringParser::JoinVector(vecMatchingFolders, "\r\n");
+
+      if (!sRet.IsEmpty())
+         sRet += "\r\n";
+
+      return sRet;
+   }
+
+   String
+   FolderListCreator::GetIMAPFolderListExtended(__int64 iAccountID, std::shared_ptr<IMAPFolders> pStartFolders, const String &sWildcard, const String &sPrefix, bool bOnlySubscribed, bool bAnnotateSubscribed)
+   {
+      std::vector<String> vecCurrentFolder;
+      std::vector<String> vecMatchingFolders;
+
+      CreateIMAPFolderList_(iAccountID, pStartFolders, sWildcard, bOnlySubscribed, sPrefix, vecCurrentFolder, vecMatchingFolders, true, bAnnotateSubscribed);
 
       String sRet = StringParser::JoinVector(vecMatchingFolders, "\r\n");
 
@@ -63,7 +79,7 @@ namespace HM
    }
 
    void
-   FolderListCreator::CreateIMAPFolderList_(__int64 iAccountID, std::shared_ptr<IMAPFolders> pStartFolders, const String &sWildcard, bool bOnlySubscribed, const String &sPrefix, std::vector<String> &vecCurrentFolder, std::vector<String> &vecMatchingFolders) 
+   FolderListCreator::CreateIMAPFolderList_(__int64 iAccountID, std::shared_ptr<IMAPFolders> pStartFolders, const String &sWildcard, bool bOnlySubscribed, const String &sPrefix, std::vector<String> &vecCurrentFolder, std::vector<String> &vecMatchingFolders, bool bEmitAsList, bool bAnnotateSubscribed) 
    {
       if (vecCurrentFolder.size() > IMAPFolder::MaxFolderDepth)    
          return;
@@ -98,14 +114,14 @@ namespace HM
          // Do we match?
          if (FolderWildcardMatch_(sFullPath, sWildcard, hierarchyDelimiter))
          {
-            String sFolderLine = CreateFolderLine_(currentFolder, bOnlySubscribed, hasSubFolders, sFullPath, sWildcard, true, hierarchyDelimiter );
+            String sFolderLine = CreateFolderLine_(currentFolder, bOnlySubscribed, hasSubFolders, sFullPath, sWildcard, true, hierarchyDelimiter, bEmitAsList, bAnnotateSubscribed );
 
             if (!sFolderLine.IsEmpty())
                vecMatchingFolders.push_back(sFolderLine);
          }
 
          if (hasSubFolders)
-            CreateIMAPFolderList_(iAccountID, subFolders, sWildcard, bOnlySubscribed, sPrefix, vecCurrentFolder, vecMatchingFolders);
+            CreateIMAPFolderList_(iAccountID, subFolders, sWildcard, bOnlySubscribed, sPrefix, vecCurrentFolder, vecMatchingFolders, bEmitAsList, bAnnotateSubscribed);
 
          vecCurrentFolder.erase(vecCurrentFolder.end() - 1);
       }
@@ -119,7 +135,7 @@ namespace HM
          if (FolderWildcardMatch_(publicFolderName, sWildcard, hierarchyDelimiter))
          {
             std::shared_ptr<IMAPFolder> pFolderDummy;
-            String sFolderLine = CreateFolderLine_(pFolderDummy, bOnlySubscribed, true, publicFolderName, sWildcard, false, hierarchyDelimiter);
+            String sFolderLine = CreateFolderLine_(pFolderDummy, bOnlySubscribed, true, publicFolderName, sWildcard, false, hierarchyDelimiter, bEmitAsList, bAnnotateSubscribed);
 
             if (!sFolderLine.IsEmpty())
                vecMatchingFolders.push_back(sFolderLine);
@@ -130,7 +146,7 @@ namespace HM
    }
 
    String 
-   FolderListCreator::CreateFolderLine_(std::shared_ptr<IMAPFolder> currentFolder, bool bOnlySubscribed, bool hasSubFolders, String &sFullPath, const String &sWildcard, bool isSelectable, String hierarchyDelimiter)
+   FolderListCreator::CreateFolderLine_(std::shared_ptr<IMAPFolder> currentFolder, bool bOnlySubscribed, bool hasSubFolders, String &sFullPath, const String &sWildcard, bool isSelectable, String hierarchyDelimiter, bool bEmitAsList, bool bAnnotateSubscribed)
    {
       String nameAttributes = hasSubFolders ? "\\HasChildren" : "\\HasNoChildren";
 
@@ -146,6 +162,11 @@ namespace HM
          if (!specialUse.IsEmpty())
             nameAttributes += " " + specialUse;
       }
+
+      // RFC 5258 (LIST-EXTENDED) return option SUBSCRIBED: annotate folders the
+      // user is subscribed to with the \Subscribed attribute.
+      if (bAnnotateSubscribed && (!currentFolder || currentFolder->GetIsSubscribed()))
+         nameAttributes += " \\Subscribed";
 
       // Workaround for Outlook "feature".
       AdjustCaseToClientCase_(sFullPath, sWildcard, hierarchyDelimiter);
@@ -164,10 +185,21 @@ namespace HM
       // \ needs to be escaped.
       hierarchyDelimiter.Replace(_T("\\"), _T("\\\\"));
 
-      if (bOnlySubscribed && (!currentFolder || currentFolder->GetIsSubscribed()))
-         sFolderLine.Format(_T("* LSUB (%s) \"%s\" %s"), nameAttributes.c_str(), hierarchyDelimiter.c_str(), sFullPath.c_str());
-      else if (!bOnlySubscribed) 
+      if (!bEmitAsList)
+      {
+         // LSUB listing: only subscribed folders, emitted as "* LSUB".
+         if (bOnlySubscribed && (!currentFolder || currentFolder->GetIsSubscribed()))
+            sFolderLine.Format(_T("* LSUB (%s) \"%s\" %s"), nameAttributes.c_str(), hierarchyDelimiter.c_str(), sFullPath.c_str());
+      }
+      else
+      {
+         // LIST / LIST-EXTENDED listing, emitted as "* LIST". When the SUBSCRIBED
+         // selection option is active, unsubscribed folders are filtered out.
+         if (bOnlySubscribed && currentFolder && !currentFolder->GetIsSubscribed())
+            return _T("");
+
          sFolderLine.Format(_T("* LIST (%s) \"%s\" %s"), nameAttributes.c_str(), hierarchyDelimiter.c_str(), sFullPath.c_str());
+      }
 
       return sFolderLine;
    }

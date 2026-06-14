@@ -367,6 +367,76 @@ namespace RegressionTests.IMAP
       }
 
       [Test]
+      [Description("RFC 5258 (LIST-EXTENDED): RETURN (SUBSCRIBED) annotates subscribed mailboxes " +
+                   "with the \\Subscribed attribute and leaves unsubscribed ones unannotated.")]
+      public void TestListExtendedReturnSubscribed()
+      {
+         var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "listext1@example.test", "test");
+
+         var simulator = new ImapClientSimulator();
+         simulator.ConnectAndLogon(account.Address, "test");
+         simulator.CreateFolder("SubFolder");
+         simulator.CreateFolder("UnsubFolder");
+         simulator.Subscribe("SubFolder");
+
+         string response = simulator.SendSingleCommand("A10 LIST \"\" \"*\" RETURN (SUBSCRIBED)");
+         Assert.IsTrue(response.Contains("\"SubFolder\""), response);
+         Assert.IsTrue(response.Contains("\"UnsubFolder\""), response);
+
+         foreach (var line in response.Split(new[] {"\r\n"}, StringSplitOptions.None))
+         {
+            if (line.Contains("\"SubFolder\""))
+               Assert.IsTrue(line.Contains("\\Subscribed"), "Subscribed folder should be annotated: " + line);
+            if (line.Contains("\"UnsubFolder\""))
+               Assert.IsFalse(line.Contains("\\Subscribed"), "Unsubscribed folder must not be annotated: " + line);
+         }
+
+         simulator.Disconnect();
+      }
+
+      [Test]
+      [Description("RFC 5258 (LIST-EXTENDED): the SUBSCRIBED selection option returns only " +
+                   "subscribed mailboxes, emitted as * LIST with the \\Subscribed attribute.")]
+      public void TestListExtendedSelectSubscribed()
+      {
+         var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "listext2@example.test", "test");
+
+         var simulator = new ImapClientSimulator();
+         simulator.ConnectAndLogon(account.Address, "test");
+         simulator.CreateFolder("SubOnly");
+         simulator.CreateFolder("NotSubscribed");
+         simulator.Subscribe("SubOnly");
+
+         string response = simulator.SendSingleCommand("A10 LIST (SUBSCRIBED) \"\" \"*\"");
+         Assert.IsTrue(response.Contains("* LIST"), response);
+         Assert.IsTrue(response.Contains("\"SubOnly\""), response);
+         Assert.IsTrue(response.Contains("\\Subscribed"), response);
+         Assert.IsFalse(response.Contains("\"NotSubscribed\""), response);
+
+         simulator.Disconnect();
+      }
+
+      [Test]
+      [Description("RFC 5258 (LIST-EXTENDED): a parenthesised list of mailbox patterns matches " +
+                   "each pattern and lists every matching mailbox exactly once.")]
+      public void TestListExtendedMultiplePatterns()
+      {
+         var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "listext3@example.test", "test");
+
+         var simulator = new ImapClientSimulator();
+         simulator.ConnectAndLogon(account.Address, "test");
+         simulator.CreateFolder("Alpha");
+         simulator.CreateFolder("Beta");
+
+         string response = simulator.SendSingleCommand("A10 LIST \"\" (\"Alpha\" \"Beta\")");
+         Assert.IsTrue(response.Contains("\"Alpha\""), response);
+         Assert.IsTrue(response.Contains("\"Beta\""), response);
+         Assert.IsTrue(response.Contains("A10 OK"), response);
+
+         simulator.Disconnect();
+      }
+
+      [Test]
       [Description("Test to include reference in LIST command (test case from issue 165).")]
       public void TestListWithReferenceTestCase2()
       {
