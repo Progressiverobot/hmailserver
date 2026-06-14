@@ -78,6 +78,7 @@ namespace HM
       bool GetGreylistingEnabledDuringRecordExpiration() {return greylisting_enabled_during_record_expiration_;}
       int GetGreylistingExpirationInterval() {return greylisting_expiration_interval_; }
       int GetPreferredHashAlgorithm() {return preferred_hash_algorithm_;}
+      int GetMinimumAcceptedHashAlgorithm() {return minimum_accepted_hash_algorithm_;}
       bool GetDNSBLChecksAfterMailFrom() {return dnsbl_checks_after_mail_from_; }
       bool GetSepSvcLogs() {return sep_svc_logs_; }
       int GetLogLevel() {return log_level_; }
@@ -189,6 +190,8 @@ namespace HM
       int greylisting_expiration_interval_;
       
       int preferred_hash_algorithm_;
+
+      int minimum_accepted_hash_algorithm_;
 
       String log_directory_;
       static String ini_file_;

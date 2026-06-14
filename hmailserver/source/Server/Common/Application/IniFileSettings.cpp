@@ -29,6 +29,7 @@ namespace HM
       greylisting_enabled_during_record_expiration_(true),
       greylisting_expiration_interval_(240),
       preferred_hash_algorithm_(3),
+      minimum_accepted_hash_algorithm_(0),
       dnsbl_checks_after_mail_from_(false),
       log_level_(0),
       max_log_line_len_(500),
@@ -156,6 +157,11 @@ namespace HM
       valid_languages_ = StringParser::SplitString(sValidLanguages, ",");
 
       preferred_hash_algorithm_ = ReadIniSettingInteger_("Settings", "PreferredHashAlgorithm", 4);
+
+      // Minimum password hash scheme an account may use to authenticate. Accounts
+      // whose stored hash is weaker than this (Crypt::EncryptionType ordering) are
+      // refused. 0 (ETNone) disables the policy and preserves prior behaviour.
+      minimum_accepted_hash_algorithm_ = ReadIniSettingInteger_("Settings", "MinimumAcceptedHashAlgorithm", 0);
 
       dnsbl_checks_after_mail_from_ = ReadIniSettingInteger_("Settings", "DNSBLChecksAfterMailFrom", 1) == 1;
 

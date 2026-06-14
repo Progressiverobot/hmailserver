@@ -8,6 +8,7 @@
 #include "../Application/ObjectCache.h"
 #include "../Application/DefaultDomain.h"
 #include "../Application/IniFileSettings.h"
+#include "../Application/Logger.h"
 #include "../Cache/CacheContainer.h"
 #include "../BO/Account.h"
 #include "../BO/Domain.h"
@@ -150,6 +151,24 @@ namespace HM
       }
 
       Crypt::EncryptionType iPasswordEncryption = (Crypt::EncryptionType) pAccount->GetPasswordEncryption();
+
+      // Hash-policy enforcement: an administrator can require that stored account
+      // passwords use at least a given hash scheme (the Crypt::EncryptionType values
+      // are ordered weakest-to-strongest). A login whose stored hash is weaker than
+      // the configured minimum is refused outright -- even with the correct password
+      // -- so legacy plaintext/MD5/SHA256 hashes must be reset to a strong scheme
+      // rather than continuing to be accepted (and exposed in any database leak).
+      // The default of 0 (ETNone) disables the policy and preserves prior behaviour.
+      // Active Directory accounts are exempt (handled above); they hold no local hash.
+      int minimumAcceptedHashAlgorithm = IniFileSettings::Instance()->GetMinimumAcceptedHashAlgorithm();
+      if (minimumAcceptedHashAlgorithm > 0 && (int) iPasswordEncryption < minimumAcceptedHashAlgorithm)
+      {
+         String sMessage;
+         sMessage.Format(_T("Authentication refused for account %s: the stored password hash type (%d) is weaker than the configured minimum (%d). The password must be reset."),
+            pAccount->GetAddress().c_str(), (int) iPasswordEncryption, minimumAcceptedHashAlgorithm);
+         LOG_APPLICATION(sMessage);
+         return false;
+      }
 
       String sComparePassword = pAccount->GetPassword();
 

@@ -418,8 +418,23 @@ upgrading the management/admin INI password from MD5.
   self-tests (`HashCreatorTester` Argon2id round-trip/negative/salt-uniqueness/cross-scheme checks +
   a `Crypt` `EnCrypt`→`GetHashType`→`Validate` dispatch check for Argon2id and PBKDF2), with the
   full auth regression (default PBKDF2 path) green.
-- Remaining B2: a hash-policy engine (min accepted type,
-  phase out MD5/SHA256) and optional pepper building on the Argon2id work; OAuth2 XOAUTH2/OAUTHBEARER;
+- ✅ **Password hash-policy engine (MinimumAcceptedHashAlgorithm) — delivered in v6.2.0.** Added a
+  configurable minimum-accepted password-hash type so administrators can phase out legacy weak hashes
+  (plaintext/MD5/SHA256) after a database leak instead of letting them stay accepted (and crackable)
+  indefinitely. New `[Settings] MinimumAcceptedHashAlgorithm` INI key (read by `IniFileSettings`,
+  default `0` = disabled, no behaviour change) is compared against the account's stored
+  `Crypt::EncryptionType` (ordered weak→strong: `None`=0, `BlowFish`=1, `MD5`=2, `SHA256`=3,
+  `PBKDF2`=4, `Argon2id`=5). `PasswordValidator::ValidatePassword` now refuses any cleartext login
+  whose stored hash type is **below** the configured minimum *before* verifying the password — so a
+  correct password against a too-weak hash is still rejected (forcing a reset to a strong scheme),
+  while it composes cleanly with the existing transparent rehash-on-login for accepted hashes.
+  Active-Directory accounts are exempt (their lookup returns earlier), and each refusal is logged via
+  `LOG_APPLICATION`. The policy needs only the INI key plus a server restart — no COM/IDL/schema
+  change. Validated by `RegressionTests.Security.HashPolicy` (a PBKDF2 account is refused when the
+  minimum is Argon2id, then accepted again when the minimum is lowered to PBKDF2 or disabled), with
+  the combined Security, SCRAM and POP3 suites 109/109 green and no errors logged.
+- Remaining B2: an optional pepper building on the Argon2id/hash-policy work; enforcing the same
+  minimum on SCRAM logins when it is set above PBKDF2; OAuth2 XOAUTH2/OAUTHBEARER;
   POP3/IMAP UTF8 (RFC 6856 / UTF8=ACCEPT) and full SASLprep of non-ASCII credentials.
 - Verify: O365/Gmail XOAUTH2 + Thunderbird SCRAM interop.
 
