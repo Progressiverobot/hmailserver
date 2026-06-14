@@ -39,8 +39,8 @@ moved to **Part 2 — Completed work**.*
 3. **B2 — authentication follow-ups** — live JWKS / token introspection +
    O365 / Gmail XOAUTH2 + Thunderbird SCRAM interop. *(Offline OAuth2 and RS256
    auto-test coverage are already done.)*
-4. **B4 — optional / future** — CHUNKING/BDAT (RFC 3030); verify SPF-on-forward
-   (SRS) + DSN interop.
+4. **B4 — verify only** — confirm SPF passes on forwarded mail (SRS) + DSN interop.
+   *(CHUNKING/BDAT is done — see Part 2.)*
 5. **B7 — observability remaining** — OpenTelemetry tracing (SMTP/IMAP/POP/DB
    spans + OTLP export); dedicated DB executor + prepared-statement caches
    (MySQL/PG).
@@ -102,14 +102,13 @@ Remaining:
 ### B4 — Deliverability & SMTP standards
 
 *Delivered already (see Part 2): SMTPUTF8/EAI, PIPELINING, ENHANCEDSTATUSCODES, DSN (RFC 3461/3464),
-SRS for forwarding (SPF alignment), and per-IP / per-destination rate shaping.*
+SRS for forwarding (SPF alignment), per-IP / per-destination rate shaping, and
+**CHUNKING/BDAT** (RFC 3030).*
 
-- Optional/future: **CHUNKING/BDAT** (RFC 3030) — higher risk, rewrites the
-  line-oriented binary read loop in the mail-reception path; deferred.
 - Verify: SPF passes on forwarded mail (SRS); DSN interop.
 
-*(Delivered B4 work — incl. the shipped **BATV** `prvs` backscatter protection —
-is recorded in Part 2.)*
+*(Delivered B4 work — incl. the shipped **BATV** `prvs` backscatter protection and
+**CHUNKING/BDAT** — is recorded in Part 2.)*
 
 ### B7 — Operability & observability
 
@@ -346,6 +345,22 @@ MTA-STS, TLS-RPT, auto-ban, correct dot-stuffing, parameterized SQL.*
   recipient, while forged null-sender bounces to invalid tags are rejected. Default-off
   via `[Settings] BATVEnabled` / `BATVSecret`. Covered by `SMTP/Batv.cs`
   (over-the-wire sign + validate + tamper-reject) and a `ClassTester` self-test.
+
+#### B4 — CHUNKING/BDAT (RFC 3030) ✅ Done
+
+- ✅ **CHUNKING/BDAT** (RFC 3030) — EHLO advertises `CHUNKING` and message data
+  may be submitted as one or more byte-counted `BDAT chunk-size [LAST]` commands
+  instead of a dot-terminated DATA stream. Chunk payloads are read verbatim
+  (byte-transparent: no dot-unstuffing, no `<CRLF>.<CRLF>` terminator) and
+  concatenated into one message spooled across chunks; `LAST` runs the same
+  accept/save/queue finalization as DATA. `DATA` after `BDAT` is rejected `503`;
+  a non-numeric chunk-size is rejected `501`. Implemented **additively** — a
+  counted exact-read path (`TCPConnection::EnqueueReadExact` via
+  `boost::asio::transfer_exactly`) and a binary mode on
+  `TransparentTransmissionBuffer`, both defaulting to the existing behavior so the
+  DATA reception path is untouched. Covered by `SMTP/Bdat.cs` (CHUNKING advertised,
+  two-chunk concatenation, dot-line transparency, DATA-after-BDAT 503,
+  invalid-size 501); Deliverability suite unaffected.
 
 #### B6 — Standards-based filtering (Sieve + ManageSieve) ✅ Done
 
@@ -775,6 +790,16 @@ toggles preserve backwards compatibility.
   default = unlimited, so behaviour is unchanged until configured. Covered by an in-server `RateLimiter`
   self-test and the over-the-wire `SMTP/RateShaping.cs` (per-IP throttle is per source IP, not per
   connection; disabled-by-default verified). 194/194 SMTP + internals green, builds 0/0.
+- ✅ **CHUNKING/BDAT (RFC 3030)** — `CHUNKING` advertised in EHLO; message data may be submitted as one
+  or more byte-counted `BDAT chunk-size [LAST]` commands instead of a dot-terminated DATA stream. Chunk
+  payloads are read verbatim (byte-transparent: no dot-unstuffing, no `<CRLF>.<CRLF>` terminator) and
+  concatenated into one message spooled across chunks; `LAST` runs the same accept/save/queue
+  finalization as DATA. `DATA` after `BDAT` is rejected `503`; a non-numeric chunk-size is rejected
+  `501`. Implemented **additively** to keep the DATA path untouched — a counted exact-read
+  (`TCPConnection::EnqueueReadExact` via `boost::asio::transfer_exactly`) and a binary mode on
+  `TransparentTransmissionBuffer`, both defaulting to the prior behavior. Covered by `SMTP/Bdat.cs`
+  (CHUNKING advertised, two-chunk concatenation, dot-line transparency, DATA-after-BDAT 503, invalid-size
+  501); Deliverability suite 13/13 unaffected, builds 0/0.
 
 ### B5 — IMAP modern sync profile ✅ DELIVERED (v6.2.0)
 
