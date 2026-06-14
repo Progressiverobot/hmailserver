@@ -50,6 +50,7 @@ namespace HM
 
       void ProtocolStateHELOEHLO_(const AnsiString &request);
       void ProtocolSendMailFrom_();
+      bool EnvelopeRequiresSmtpUtf8_() const;
       void ProtocolHELOSent_(const AnsiString &request);
       void ProtocolEHLOSent_(int code, const AnsiString &request);
       void ProtocolSTARTTLSSent_(int code);
@@ -112,6 +113,10 @@ namespace HM
       std::set<std::shared_ptr<MessageRecipient> > actual_recipients_;
 
       bool use_smtpauth_;
+
+      // RFC 6531: set when the remote server advertised SMTPUTF8 in its EHLO reply,
+      // so an internationalized envelope address can be sent with the SMTPUTF8 mark.
+      bool remote_supports_smtputf8_;
 
       String username_;
       String password_;

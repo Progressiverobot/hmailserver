@@ -32,6 +32,7 @@ namespace HM
       use_smtpauth_(false),
       cur_recipient_(-1),
       session_ended_(false),
+      remote_supports_smtputf8_(false),
       transmission_buffer_(true)
    {
       
@@ -346,6 +347,10 @@ namespace HM
          return;
       }
 
+      // Remember whether the remote server can accept internationalized (UTF-8)
+      // envelope addresses (RFC 6531), so MAIL FROM can carry the SMTPUTF8 mark.
+      remote_supports_smtputf8_ = request.Contains("SMTPUTF8");
+
       if (GetConnectionSecurity() == CSSTARTTLSRequired || 
           GetConnectionSecurity() == CSSTARTTLSOptional)
       {
@@ -400,8 +405,29 @@ namespace HM
    {
       String sFrom = delivery_message_->GetFromAddress();
       String sData = "MAIL FROM:<" + sFrom + ">";
+
+      // RFC 6531: if the envelope contains an internationalized (UTF-8) address and
+      // the remote server advertised SMTPUTF8, mark the transaction accordingly.
+      if (remote_supports_smtputf8_ && EnvelopeRequiresSmtpUtf8_())
+         sData += " SMTPUTF8";
+
       EnqueueWrite_(sData);
       current_state_ = MAILFROMSENT;
+   }
+
+   bool
+   SMTPClientConnection::EnvelopeRequiresSmtpUtf8_() const
+   {
+      if (StringParser::ContainsNonAscii(delivery_message_->GetFromAddress()))
+         return true;
+
+      for (std::shared_ptr<MessageRecipient> recipient : recipients_)
+      {
+         if (StringParser::ContainsNonAscii(recipient->GetAddress()))
+            return true;
+      }
+
+      return false;
    }
 
    //---------------------------------------------------------------------------()

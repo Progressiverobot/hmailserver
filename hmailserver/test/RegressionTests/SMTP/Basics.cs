@@ -82,7 +82,7 @@ namespace RegressionTests.SMTP
 
          // Login a second time
          sock.Send("AUTH LOGIN " + base64EncodedUsername + "\r\n");
-         Assert.IsTrue(sock.Receive().StartsWith("503 Already authenticated."));
+         Assert.IsTrue(sock.Receive().StartsWith("503 5.5.1 Already authenticated."));
       }
 
       [Test]
@@ -992,7 +992,7 @@ namespace RegressionTests.SMTP
                return;
             }
 
-            StringAssert.Contains("535 Authentication failed. Restarting authentication process.", loginResult);
+            StringAssert.Contains("535 5.7.8 Authentication failed. Restarting authentication process.", loginResult);
          }
 
          Assert.Fail("Wasn't disconnected");
@@ -1114,7 +1114,7 @@ namespace RegressionTests.SMTP
 
             res = sim.Receive();
 
-            Assert.AreEqual("451 Please try again later.\r\n", res);
+            Assert.AreEqual("451 4.3.0 Please try again later.\r\n", res);
          }
 
          sim.Disconnect();

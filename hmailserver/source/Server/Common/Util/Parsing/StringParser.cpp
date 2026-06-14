@@ -80,6 +80,92 @@ namespace HM
    }
 
    bool
+   StringParser::ContainsNonAscii(const String &sValue)
+   {
+      const int length = sValue.GetLength();
+      for (int i = 0; i < length; i++)
+      {
+         if (sValue.GetAt(i) > 127 || sValue.GetAt(i) < 0)
+            return true;
+      }
+
+      return false;
+   }
+
+   bool
+   StringParser::IsValidEmailAddress(const String &sEmailAddress, bool allowInternationalized)
+   {
+      // The strict ASCII validator handles everything when internationalization is
+      // not requested, or when the address is plain ASCII (so existing behaviour and
+      // the ASCII test corpus are untouched).
+      if (!allowInternationalized || !ContainsNonAscii(sEmailAddress))
+         return IsValidEmailAddress(sEmailAddress);
+
+      // RFC 6531/6532: validate an internationalized (UTF-8) address. The strict
+      // regex rejects non-ASCII in the domain, so apply a structural check that
+      // permits Unicode letters in both the local-part and the domain while still
+      // enforcing the basic shape and length limits.
+      const int maxEmailAddressLength = 254;
+      if (sEmailAddress.GetLength() > maxEmailAddressLength)
+         return false;
+
+      int atPosition = sEmailAddress.ReverseFind('@');
+      if (atPosition <= 0 || atPosition == sEmailAddress.GetLength() - 1)
+         return false;
+
+      String localPart = sEmailAddress.Left(atPosition);
+      String domainPart = sEmailAddress.Mid(atPosition + 1);
+
+      // Local-part: reject control characters and the characters that delimit an
+      // SMTP path. A quoted local-part ("...") may contain spaces; otherwise spaces
+      // are not allowed.
+      bool quotedLocalPart = localPart.GetLength() >= 2 && localPart.StartsWith(_T("\"")) && localPart.EndsWith(_T("\""));
+      const int localLength = localPart.GetLength();
+      for (int i = 0; i < localLength; i++)
+      {
+         wchar_t c = localPart.GetAt(i);
+         if (c < 0x20)
+            return false;
+         if (c == '<' || c == '>')
+            return false;
+         if (c == ' ' && !quotedLocalPart)
+            return false;
+      }
+
+      // Domain: a sequence of dot-separated labels. Each label must be non-empty,
+      // must not start or end with a hyphen, and may contain ASCII letters/digits/
+      // hyphen or any non-ASCII (U-label) character. An ASCII-only domain is handed
+      // to the strict domain validator.
+      if (!ContainsNonAscii(domainPart))
+         return IsValidDomainName(domainPart);
+
+      std::vector<String> labels = StringParser::SplitString(domainPart, _T("."));
+      if (labels.empty())
+         return false;
+
+      for (const String &label : labels)
+      {
+         const int labelLength = label.GetLength();
+         if (labelLength == 0)
+            return false;
+         if (label.StartsWith(_T("-")) || label.EndsWith(_T("-")))
+            return false;
+
+         for (int i = 0; i < labelLength; i++)
+         {
+            wchar_t c = label.GetAt(i);
+            bool isAsciiLetterDigit = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9');
+            bool isHyphen = (c == '-');
+            bool isNonAscii = (c > 127 || c < 0);
+            if (!isAsciiLetterDigit && !isHyphen && !isNonAscii)
+               return false;
+         }
+      }
+
+      return true;
+   }
+
+   bool
    StringParser::IsValidDomainName(const String &sDomainName)
    {
       // Original: ^(\[([0-9]{1,3}\.){3}[0-9]{1,3}\]|\[IPv6:(?:[A-Fa-f0-9]{1,4}:){7}[A-Fa-f0-9]{1,4}\]|(?=.{1,255}$)((?!-|\.)[a-zA-Z0-9-]{0,62}[a-zA-Z0-9])(|\.(?!-|\.)[a-zA-Z0-9-]{0,62}[a-zA-Z0-9]){1,126})$

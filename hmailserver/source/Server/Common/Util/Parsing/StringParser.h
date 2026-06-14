@@ -16,7 +16,12 @@ namespace HM
       static String ExtractAddress(const String &sEMailAddress);
 
       static bool IsValidEmailAddress(const String &sEmailAddress);
+      // RFC 6531/6532 (SMTPUTF8/EAI): when allowInternationalized is true the
+      // local-part and domain may contain non-ASCII (UTF-8) characters.
+      static bool IsValidEmailAddress(const String &sEmailAddress, bool allowInternationalized);
       static bool IsValidDomainName(const String &sEmailAddress);
+      // Returns true if the value contains any character outside the 7-bit US-ASCII range.
+      static bool ContainsNonAscii(const String &sValue);
       static bool WildcardMatch(const String &pattern, const String &value);
       static bool WildcardMatchNoCase(const String &sWildcard, const String &sString);
 

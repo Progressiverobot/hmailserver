@@ -174,7 +174,10 @@ namespace HM
       bool ReadDomainAddressFromHelo_(const String &sRequest);
 
       void SendErrorResponse_(int iErrorCode, const String &sResponse);
-
+      // RFC 2034: enqueue a response, prefixing the RFC 3463 enhanced status code
+      // when the session is ESMTP (the client greeted with EHLO).
+      void SendResponse_(int code, const String &enhancedCode, const String &text);
+      static String DeriveEnhancedStatusCode_(int code);
       bool GetDoSpamProtection_();
 
       bool GetIsLocalSender_();
@@ -251,6 +254,18 @@ namespace HM
       bool isAuthenticated_;
       int authentication_failure_count_;
       SpamProtectionType type_;
+
+      // True once the client greeted with EHLO (ESMTP). Used to decide whether to
+      // emit RFC 2034 enhanced status codes in responses.
+      bool esmtp_session_;
+
+      // RFC 6531 (SMTPUTF8): set for the current transaction when the client added
+      // the SMTPUTF8 parameter to MAIL FROM, relaxing address validation to UTF-8.
+      bool smtputf8_requested_;
+
+      // RFC 3461 (DSN) per-transaction parameters from MAIL FROM.
+      String dsn_envid_;
+      String dsn_ret_;
 
       RecipientParser recipientParser_;
       bool start_tls_used_;

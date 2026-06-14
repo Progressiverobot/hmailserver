@@ -87,7 +87,7 @@ namespace RegressionTests.SSL.StartTls
          Assert.IsTrue(capabilities1.Contains("STARTTLS"));
 
          var startTlsResultText = smtpClientSimulator.SendAndReceive("STARTTLS A=B\r\n");
-         StringAssert.Contains("501 Syntax error (no parameters allowed)", startTlsResultText);
+         StringAssert.Contains("501 5.5.4 Syntax error (no parameters allowed)", startTlsResultText);
       }
 
 
@@ -138,7 +138,7 @@ namespace RegressionTests.SSL.StartTls
          Assert.IsTrue(capabilities1.Contains("STARTTLS"));
 
          var loginResult = smtpClientSimulator.SendAndReceive("AUTH LOGIN\r\n");
-         Assert.IsTrue(loginResult.StartsWith("530 Must issue STARTTLS first."));
+         Assert.IsTrue(loginResult.StartsWith("530 5.7.0 Must issue STARTTLS first."));
       }
 
       [Test]
@@ -158,7 +158,7 @@ namespace RegressionTests.SSL.StartTls
          var loginResult = smtpClientSimulator.SendAndReceive("AUTH LOGIN\r\n");
          Assert.IsTrue(
             loginResult.StartsWith(
-               "530 A SSL/TLS-connection is required for authentication.")); // must run starttls first.
+               "530 5.7.0 A SSL/TLS-connection is required for authentication.")); // must run starttls first.
       }
 
 

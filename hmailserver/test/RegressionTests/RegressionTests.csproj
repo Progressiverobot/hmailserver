@@ -104,8 +104,8 @@
     <Compile Include="Rules\Rules.cs" />
     <Compile Include="Shared\SingletonProvider.cs" />
     <Compile Include="SMTP\AWStatsLoggingTests.cs" />
-    <Compile Include="SMTP\Basics.cs" />
-    <Compile Include="SMTP\ESmtpTests.cs" />
+    <Compile Include="SMTP\Basics.cs" />    <Compile Include="SMTP\ESmtpTests.cs" />
+    <Compile Include="SMTP\Deliverability.cs" />
     <Compile Include="SMTP\RcptToParsing.cs" />
     <Compile Include="SMTP\MailFromParsing.cs" />
     <Compile Include="SMTP\XOriginalRcptHeaderTests.cs" />

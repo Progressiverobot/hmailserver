@@ -90,9 +90,10 @@ namespace HM
       pending_disconnect_(false),
       isAuthenticated_(false),
       authentication_failure_count_(0),
+      esmtp_session_(false),
+      smtputf8_requested_(false),
       start_tls_used_(false)
    {
-
       smtpconf_ = Configuration::Instance()->GetSMTPConfiguration();
 
       /* RFC 2821:    
@@ -462,7 +463,7 @@ namespace HM
    void 
    SMTPConnection::ProtocolNOOP_()
    {
-      EnqueueWrite_("250 OK");
+      SendResponse_(250, _T("2.0.0"), _T("OK"));
    }
 
    void
@@ -475,7 +476,7 @@ namespace HM
 
       ResetCurrentMessage_();
 
-      EnqueueWrite_("250 OK");
+      SendResponse_(250, _T("2.0.0"), _T("OK"));
 
       return;
    }
@@ -520,6 +521,15 @@ namespace HM
 
       sFromAddress = DefaultDomain::ApplyDefaultDomain(sFromAddress);
 
+      // Detect the SMTPUTF8 parameter (RFC 6531) before validating the sender so an
+      // internationalized (UTF-8) address is accepted.
+      smtputf8_requested_ = false;
+      for (const String &peekParam : StringParser::SplitString(sParameters, " "))
+      {
+         if (peekParam.CompareNoCase(_T("SMTPUTF8")) == 0)
+            smtputf8_requested_ = true;
+      }
+
       if (!CheckIfValidSenderAddress(sFromAddress))
          return;
 
@@ -541,6 +551,11 @@ namespace HM
          {
             // 8BITMIME (RFC 6152): the transmission channel is 8-bit clean,
             // so both body types are accepted as-is.
+         }
+         else if (parameter.CompareNoCase(_T("SMTPUTF8")) == 0)
+         {
+            // SMTPUTF8 (RFC 6531): already handled above; accept the parameter so
+            // it is not reported as an unsupported extension.
          }
          else
          {
@@ -601,7 +616,8 @@ namespace HM
       current_message_->SetFromAddress(sFromAddress);
       current_message_->SetState(Message::Delivering);
       
-      EnqueueWrite_("250 OK"); 
+      // 2.1.0 = originator (sender) address is valid (RFC 3463).
+      SendResponse_(250, _T("2.1.0"), _T("OK")); 
    }
 
    bool 
@@ -643,7 +659,7 @@ namespace HM
       }
       else
       {
-         if (!StringParser::IsValidEmailAddress(sFromAddress))
+         if (!StringParser::IsValidEmailAddress(sFromAddress, smtputf8_requested_))
          {
             // The address is not valid...
             SendErrorResponse_(550, "The address is not valid.");
@@ -701,7 +717,7 @@ namespace HM
 
       sRecipientAddress = DefaultDomain::ApplyDefaultDomain(sRecipientAddress);
 
-      if (!StringParser::IsValidEmailAddress(sRecipientAddress))
+      if (!StringParser::IsValidEmailAddress(sRecipientAddress, smtputf8_requested_))
       {
          // The address is not valid...
          SendErrorResponse_(550, "A valid address is required.");
@@ -826,7 +842,8 @@ namespace HM
          return;
       }
    
-      EnqueueWrite_("250 OK");
+      // 2.1.5 = destination (recipient) address is valid (RFC 3463).
+      SendResponse_(250, _T("2.1.5"), _T("OK"));
    }
 
    bool
@@ -1177,9 +1194,9 @@ namespace HM
             // Tell the client that everything went fine. This
             // will cause the client to either disconnect or to
             // start a new message.
-            String sResponse;
-            sResponse.Format(_T("250 Queued (%.3f seconds)"), dTCDiff);
-            EnqueueWrite_(sResponse);
+            String sQueuedText;
+            sQueuedText.Format(_T("Queued (%.3f seconds)"), dTCDiff);
+            SendResponse_(250, _T("2.0.0"), sQueuedText);
 
             // The message delivery is complete, or
             // it has failed. Any way, we should start
@@ -1513,6 +1530,11 @@ namespace HM
       // message.
       cur_no_of_rcptto_ = 0;
 
+      // Reset per-transaction ESMTP parameters (SMTPUTF8 / DSN).
+      smtputf8_requested_ = false;
+      dsn_envid_.Empty();
+      dsn_ret_.Empty();
+
       // Switch back to normal ASCII mode and start of session, in
       // case we are in binary transmission mode.
       current_state_ = HEADER;
@@ -1539,6 +1561,17 @@ namespace HM
 
       // The message transmission path is 8-bit clean (RFC 6152).
       sData += "\r\n250-8BITMIME";
+
+      // PIPELINING (RFC 2920): the command reader processes batched commands
+      // line by line and enqueues every reply in order, so a client may stream
+      // a group of commands without waiting for each intermediate response.
+      sData += "\r\n250-PIPELINING";
+
+      // SMTPUTF8 (RFC 6531): accept internationalized (UTF-8) envelope addresses.
+      sData += "\r\n250-SMTPUTF8";
+
+      // ENHANCEDSTATUSCODES (RFC 2034): responses carry an RFC 3463 status code.
+      sData += "\r\n250-ENHANCEDSTATUSCODES";
 
       if (!IsSSLConnection())
       {
@@ -1701,6 +1734,10 @@ namespace HM
 
       SendEHLOKeywords_();
 
+      // The client greeted with EHLO, so it is an ESMTP session and may receive
+      // RFC 2034 enhanced status codes.
+      esmtp_session_ = true;
+
       if (current_state_ == INITIAL)
          current_state_ = HEADER;
    }
@@ -1772,6 +1809,10 @@ namespace HM
       }
 
       EnqueueWrite_("250 Hello.");
+
+      // HELO selects basic SMTP, so RFC 2034 enhanced status codes are not used
+      // (even if the client previously issued EHLO on this connection).
+      esmtp_session_ = false;
 
       if (current_state_ == INITIAL)
          current_state_ = HEADER;
@@ -2201,7 +2242,7 @@ namespace HM
             {
                // Need to tell hmail to reload the settings
                //Configuration::Instance()->Load();
-               EnqueueWrite_("250 OK, message queuing started for " + sETRNDomain.ToLower());
+               SendResponse_(250, _T("2.0.0"), _T("OK, message queuing started for ") + sETRNDomain.ToLower());
                LOG_SMTP(GetSessionID(), GetIPAddressString(), "SMTPDeliverer - ETRN - 250 OK, message queuing started.");      
             }
             else
@@ -2300,7 +2341,7 @@ namespace HM
 
       if (pAccount)
       {
-         EnqueueWrite_("235 authenticated.");
+         SendResponse_(235, _T("2.7.0"), _T("authenticated."));
          current_state_ = HEADER;
          return;
       }
@@ -2365,7 +2406,7 @@ namespace HM
      
       if (pAccount)
       {
-         EnqueueWrite_("235 authenticated.");
+         SendResponse_(235, _T("2.7.0"), _T("authenticated."));
          current_state_ = HEADER;
       }
       else
@@ -2556,7 +2597,7 @@ namespace HM
 
       FireOnClientLogon_(sUsername, true);
 
-      EnqueueWrite_("235 authenticated.");
+      SendResponse_(235, _T("2.7.0"), _T("authenticated."));
       current_state_ = HEADER;
    }
 
@@ -2717,10 +2758,64 @@ namespace HM
       }
 
       String sData;
-      sData.Format(_T("%d %s"), iErrorCode, sResponse.c_str());
+      String enhancedCode = DeriveEnhancedStatusCode_(iErrorCode);
+      if (esmtp_session_ && !enhancedCode.IsEmpty())
+         sData.Format(_T("%d %s %s"), iErrorCode, enhancedCode.c_str(), sResponse.c_str());
+      else
+         sData.Format(_T("%d %s"), iErrorCode, sResponse.c_str());
       
       EnqueueWrite_(sData);
      
+   }
+
+   void
+   SMTPConnection::SendResponse_(int code, const String &enhancedCode, const String &text)
+   {
+      String sData;
+      if (esmtp_session_ && !enhancedCode.IsEmpty())
+         sData.Format(_T("%d %s %s"), code, enhancedCode.c_str(), text.c_str());
+      else
+         sData.Format(_T("%d %s"), code, text.c_str());
+
+      EnqueueWrite_(sData);
+   }
+
+   String
+   SMTPConnection::DeriveEnhancedStatusCode_(int code)
+   {
+      // RFC 3463 status codes for the SMTP replies hMailServer emits. Replies that
+      // RFC 2034 does not decorate (1xx/2xx greetings, 220/221, 354) return empty.
+      switch (code)
+      {
+      case 235: return _T("2.7.0");
+      case 250: return _T("2.0.0");
+      case 251:
+      case 252: return _T("2.1.5");
+      case 421: return _T("4.3.2");
+      case 450: return _T("4.2.0");
+      case 451: return _T("4.3.0");
+      case 452: return _T("4.3.1");
+      case 454: return _T("4.7.0");
+      case 500: return _T("5.5.2");
+      case 501: return _T("5.5.4");
+      case 502:
+      case 503: return _T("5.5.1");
+      case 504: return _T("5.5.4");
+      case 530: return _T("5.7.0");
+      case 535: return _T("5.7.8");
+      case 550: return _T("5.7.1");
+      case 551: return _T("5.1.6");
+      case 552: return _T("5.3.4");
+      case 553: return _T("5.1.3");
+      case 554: return _T("5.5.0");
+      }
+
+      // Fall back to a generic class-based code (x.0.0 = "other/undefined").
+      if (code >= 200 && code < 300) return _T("2.0.0");
+      if (code >= 400 && code < 500) return _T("4.0.0");
+      if (code >= 500 && code < 600) return _T("5.0.0");
+
+      return _T("");
    }
 
    bool

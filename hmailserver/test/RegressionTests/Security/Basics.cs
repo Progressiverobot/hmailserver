@@ -29,7 +29,7 @@ namespace RegressionTests.Security
          var simSMTP = new SmtpClientSimulator();
          CustomAsserts.Throws<AuthenticationException>(() =>
             simSMTP.ConnectAndLogon("dGVzdEB0ZXN0LmNvbQ==", "", out message));
-         Assert.AreEqual("535 Authentication failed. Restarting authentication process.\r\n", message);
+         Assert.AreEqual("535 5.7.8 Authentication failed. Restarting authentication process.\r\n", message);
       }
    }
 }
