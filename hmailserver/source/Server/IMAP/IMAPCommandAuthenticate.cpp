@@ -8,8 +8,14 @@
 #include "IMAPConfiguration.h"
 #include "IMAPSimpleCommandParser.h"
 #include "../common/Application/DefaultDomain.h"
+#include "../common/Application/ObjectCache.h"
+#include "../common/Cache/CacheContainer.h"
 #include "../common/Util/AccountLogon.h"
+#include "../common/Util/Crypt.h"
+#include "../common/Util/Hashing/ScramSha256.h"
 #include "../common/BO/Account.h"
+#include "../common/BO/Domain.h"
+#include "../common/BO/DomainAliases.h"
 #include "../common/BO/SecurityRange.h"
 
 #ifdef _DEBUG
@@ -48,10 +54,25 @@ namespace HM
 
 		size_t paramcount = pParser->ParamCount();
 
+		// Continuation line of an in-progress SCRAM-SHA-256 exchange. Once a SCRAM
+		// session exists on the connection, every subsequent line belongs to it.
+		if (pConnection->GetScramSession())
+		{
+			String sClientData = paramcount >= 2 ? pParser->GetParamValue(pArgument, 1) : String();
+			return ContinueScram_(pConnection, pArgument, sClientData);
+		}
+
 		if (paramcount < 1 || paramcount > 2)
 			return IMAPResult(IMAPResult::ResultBad, "Unsupported Authenticate mechanism.");
 
 		sParam = pParser->GetParamValue(pArgument, 0);
+
+		if (sParam == _T("SCRAM-SHA-256"))
+		{
+			String sInitialResponse = paramcount == 2 ? pParser->GetParamValue(pArgument, 1) : String();
+			return StartScram_(pConnection, pArgument, sInitialResponse, paramcount == 2);
+		}
+
 		if (sParam != _T("PLAIN"))
 			return IMAPResult(IMAPResult::ResultBad, "Unsupported Authenticate mechanism.");
 
@@ -151,4 +172,188 @@ namespace HM
 
 		return IMAPResult();
 	}
+
+   IMAPResult
+   IMAPCommandAUTHENTICATE::StartScram_(std::shared_ptr<IMAPConnection> pConnection, std::shared_ptr<IMAPCommandArgument> pArgument, const String &sInitialResponse, bool bHasInitialResponse)
+   {
+      // Begin a fresh SCRAM-SHA-256 conversation for this connection.
+      pConnection->SetScramSession(std::make_shared<ScramSha256>());
+
+      if (!bHasInitialResponse)
+      {
+         // No SASL-IR: ask the client for the client-first message via a continuation.
+         pConnection->SetCommandBuffer(pArgument->Tag() + " AUTHENTICATE SCRAM-SHA-256 ");
+         pConnection->SendAsciiData("+ \r\n");
+         return IMAPResult();
+      }
+
+      return ProcessScramClientFirst_(pConnection, pArgument, sInitialResponse);
+   }
+
+   IMAPResult
+   IMAPCommandAUTHENTICATE::ContinueScram_(std::shared_ptr<IMAPConnection> pConnection, std::shared_ptr<IMAPCommandArgument> pArgument, const String &sClientData)
+   {
+      std::shared_ptr<ScramSha256> session = pConnection->GetScramSession();
+      if (!session)
+         return IMAPResult(IMAPResult::ResultBad, "No authentication in progress.");
+
+      // A bare "*" cancels the SASL exchange (RFC 3501).
+      if (sClientData == _T("*"))
+         return AbortScram_(pConnection, pArgument, "AUTHENTICATE cancelled.");
+
+      switch (session->GetState())
+      {
+      case ScramSha256::NeedClientFirst:
+         return ProcessScramClientFirst_(pConnection, pArgument, sClientData);
+      case ScramSha256::NeedClientFinal:
+         return ProcessScramClientFinal_(pConnection, pArgument, sClientData);
+      case ScramSha256::NeedAck:
+         return FinishScram_(pConnection, pArgument);
+      default:
+         return AbortScram_(pConnection, pArgument, "Invalid authentication state.");
+      }
+   }
+
+   IMAPResult
+   IMAPCommandAUTHENTICATE::ProcessScramClientFirst_(std::shared_ptr<IMAPConnection> pConnection, std::shared_ptr<IMAPCommandArgument> pArgument, const String &sClientData)
+   {
+      std::shared_ptr<ScramSha256> session = pConnection->GetScramSession();
+
+      String sDecoded;
+      StringParser::Base64Decode(sClientData, sDecoded);
+      AnsiString clientFirst = sDecoded;
+
+      AnsiString username;
+      if (!ScramSha256::ExtractUsername(clientFirst, username))
+         return AbortScram_(pConnection, pArgument, "Invalid SCRAM client-first message.");
+
+      // Canonicalize the user name the same way the PLAIN path does.
+      String sUsername = username;
+      if (sUsername.Find(_T("@")) == -1)
+      {
+         String sDefaultDomain = Configuration::Instance()->GetDefaultDomain();
+         if (!sDefaultDomain.IsEmpty())
+            sUsername = DefaultDomain::ApplyDefaultDomain(sUsername);
+      }
+      session->SetUsername(sUsername);
+
+      // Only a PBKDF2-hashed account can serve SCRAM (its stored key is the SCRAM
+      // SaltedPassword). For any other account the helper runs a forced-failure
+      // exchange so the protocol does not reveal whether the account exists.
+      AnsiString storedHash = "";
+      std::shared_ptr<const Account> pAccount = LookupPbkdf2Account_(sUsername);
+      if (pAccount)
+      {
+         session->SetAccount(pAccount);
+         storedHash = pAccount->GetPassword();
+      }
+
+      AnsiString serverFirst;
+      if (!session->ProcessClientFirst(clientFirst, storedHash, serverFirst))
+         return AbortScram_(pConnection, pArgument, "Invalid SCRAM client-first message.");
+
+      String sServerFirst = serverFirst;
+      String sEncoded;
+      StringParser::Base64Encode(sServerFirst, sEncoded);
+
+      pConnection->SetCommandBuffer(pArgument->Tag() + " AUTHENTICATE SCRAM-SHA-256 ");
+      pConnection->SendAsciiData("+ " + sEncoded + "\r\n");
+      return IMAPResult();
+   }
+
+   IMAPResult
+   IMAPCommandAUTHENTICATE::ProcessScramClientFinal_(std::shared_ptr<IMAPConnection> pConnection, std::shared_ptr<IMAPCommandArgument> pArgument, const String &sClientData)
+   {
+      std::shared_ptr<ScramSha256> session = pConnection->GetScramSession();
+
+      String sDecoded;
+      StringParser::Base64Decode(sClientData, sDecoded);
+      AnsiString clientFinal = sDecoded;
+
+      AnsiString serverFinal;
+      if (!session->ProcessClientFinal(clientFinal, serverFinal))
+         return ScramAuthFailed_(pConnection, pArgument, session->GetUsername());
+
+      String sServerFinal = serverFinal;
+      String sEncoded;
+      StringParser::Base64Encode(sServerFinal, sEncoded);
+
+      pConnection->SetCommandBuffer(pArgument->Tag() + " AUTHENTICATE SCRAM-SHA-256 ");
+      pConnection->SendAsciiData("+ " + sEncoded + "\r\n");
+      return IMAPResult();
+   }
+
+   IMAPResult
+   IMAPCommandAUTHENTICATE::FinishScram_(std::shared_ptr<IMAPConnection> pConnection, std::shared_ptr<IMAPCommandArgument> pArgument)
+   {
+      std::shared_ptr<ScramSha256> session = pConnection->GetScramSession();
+      std::shared_ptr<const Account> pAccount = session->GetAccount();
+
+      pConnection->SetScramSession(nullptr);
+
+      if (!pAccount)
+         return IMAPResult(IMAPResult::ResultNo, "Invalid user name or password.");
+
+      pConnection->Login(pAccount);
+
+      String sResponse = pArgument->Tag() + " OK AUTHENTICATE completed\r\n";
+      pConnection->SendAsciiData(sResponse);
+      return IMAPResult();
+   }
+
+   IMAPResult
+   IMAPCommandAUTHENTICATE::AbortScram_(std::shared_ptr<IMAPConnection> pConnection, std::shared_ptr<IMAPCommandArgument> pArgument, const String &sMessage)
+   {
+      pConnection->SetScramSession(nullptr);
+      return IMAPResult(IMAPResult::ResultBad, sMessage);
+   }
+
+   IMAPResult
+   IMAPCommandAUTHENTICATE::ScramAuthFailed_(std::shared_ptr<IMAPConnection> pConnection, std::shared_ptr<IMAPCommandArgument> pArgument, const String &sUsername)
+   {
+      pConnection->SetScramSession(nullptr);
+
+      // Feed the per-IP auto-ban accounting (parity with the LOGIN/PLAIN path)...
+      AccountLogon accountLogon;
+      bool disconnect = false;
+      accountLogon.RegisterFailedLogin(pConnection->GetRemoteEndpointAddress(), sUsername, disconnect);
+
+      // ...and the per-connection brute-force cap (effective even when auto-ban is off).
+      if (disconnect || pConnection->RegisterAuthenticationFailure())
+      {
+         String sResponse = "* Too many invalid logon attempts.\r\n";
+         sResponse += pArgument->Tag() + " BAD Goodbye\r\n";
+         pConnection->Logout(sResponse);
+
+         return IMAPResult(IMAPResult::ResultOKSupressRead, "");
+      }
+
+      return IMAPResult(IMAPResult::ResultNo, "Invalid user name or password.");
+   }
+
+   std::shared_ptr<const Account>
+   IMAPCommandAUTHENTICATE::LookupPbkdf2Account_(const String &sAddress)
+   {
+      std::shared_ptr<DomainAliases> pDA = ObjectCache::Instance()->GetDomainAliases();
+      String sAccountAddress = pDA->ApplyAliasesOnAddress(sAddress);
+      sAccountAddress = DefaultDomain::ApplyDefaultDomain(sAccountAddress);
+
+      std::shared_ptr<const Account> pAccount = CacheContainer::Instance()->GetAccount(sAccountAddress);
+      if (!pAccount || !pAccount->GetActive())
+         return std::shared_ptr<const Account>();
+
+      // Active Directory accounts authenticate via SSPI, not a stored hash.
+      if (pAccount->GetIsAD())
+         return std::shared_ptr<const Account>();
+
+      String sDomain = StringParser::ExtractDomain(sAccountAddress);
+      std::shared_ptr<const Domain> pDomain = CacheContainer::Instance()->GetDomain(sDomain);
+      if (!pDomain || !pDomain->GetIsActive())
+         return std::shared_ptr<const Account>();
+
+      if (pAccount->GetPasswordEncryption() != Crypt::ETPBKDF2)
+         return std::shared_ptr<const Account>();
+
+      return pAccount;
+   }
 }

@@ -53,14 +53,22 @@ namespace HM
          return account;
       }
 
+      RegisterFailedLogin(ipaddress, username, disconnect);
+
+      std::shared_ptr<Account> empty;
+      return empty;
+   }
+
+   void
+   AccountLogon::RegisterFailedLogin(const IPAddress &ipaddress, const String &username, bool &disconnect)
+   {
+      disconnect = false;
+
       // is auto banning enabled?
       int maxInvalidLogonAttempts = Configuration::Instance()->GetMaxInvalidLogonAttempts();
 
       if (Configuration::Instance()->GetAutoBanLogonEnabled() == false || maxInvalidLogonAttempts == 0)
-      {
-         std::shared_ptr<Account> empty;
-         return empty;
-      }
+         return;
 
       // Log on has failed.
       PersistentLogonFailure logonFailure;
@@ -75,24 +83,17 @@ namespace HM
          {
             // disconnect, but don't block.
             disconnect = true;
-            std::shared_ptr<Account> empty;
-            return empty;
+            return;
          }
 
          CreateIPRange(ipaddress, username, minutes);
 
          disconnect = true;
-
-         // logon failed!
-         std::shared_ptr<Account> empty;
-         return empty;
+         return;
       }
 
       // logon failed, add new failure.
       logonFailure.AddFailure(ipaddress);
-
-      std::shared_ptr<Account> empty;
-      return empty;
    }
 
    void

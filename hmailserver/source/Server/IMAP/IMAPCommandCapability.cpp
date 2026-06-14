@@ -40,6 +40,11 @@ namespace HM
       if (pConfig->GetUseIMAPSASLPlain() && (pConnection->IsSSLConnection() || pConnection->GetConnectionSecurity() != CSSTARTTLSRequired))
 	      sResponse += " AUTH=PLAIN";
 
+      // SCRAM-SHA-256 (RFC 7677) never transmits the password, so it is offered
+      // alongside AUTH=PLAIN whenever IMAP AUTHENTICATE is enabled.
+      if (pConfig->GetUseIMAPSASLPlain() && (pConnection->IsSSLConnection() || pConnection->GetConnectionSecurity() != CSSTARTTLSRequired))
+	      sResponse += " AUTH=SCRAM-SHA-256";
+
       if (pConfig->GetUseIMAPSASLInitialResponse())
 	      sResponse += " SASL-IR";
 

@@ -26,6 +26,7 @@
 // Common utilities
 #include "../Common/Util/ByteBuffer.h"
 #include "../Common/Util/PasswordRemover.h"
+#include "../Common/Util/Hashing/ScramSha256.h"
 
 // Commands
 #include "IMAPCommandAppend.h"

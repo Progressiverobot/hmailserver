@@ -3,6 +3,7 @@
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 
 using System;
+using System.Security.Cryptography;
 using System.Text;
 using hMailServer;
 using NUnit.Framework;
@@ -710,6 +711,96 @@ namespace RegressionTests.IMAP
             "CAPABILITY should advertise SEARCHRES. " + caps);
 
          simulator.Disconnect();
+      }
+
+      [Test]
+      [Description("RFC 7677 (SCRAM-SHA-256): AUTH=SCRAM-SHA-256 is advertised in CAPABILITY when " +
+                   "IMAP SASL AUTHENTICATE is enabled.")]
+      public void TestScramSha256Capability()
+      {
+         var application = SingletonProvider<TestSetup>.Instance.GetApp();
+         application.Settings.IMAPSASLPlainEnabled = true;
+         try
+         {
+            SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "scramcap@example.test", "test");
+
+            var simulator = new ImapClientSimulator();
+            simulator.Connect();
+            simulator.LogonWithLiteral("scramcap@example.test", "test");
+
+            string caps = simulator.SendSingleCommand("A01 CAPABILITY");
+            Assert.IsTrue(caps.Contains("AUTH=SCRAM-SHA-256"),
+               "CAPABILITY should advertise AUTH=SCRAM-SHA-256. " + caps);
+
+            simulator.Disconnect();
+         }
+         finally
+         {
+            application.Settings.IMAPSASLPlainEnabled = false;
+         }
+      }
+
+      [Test]
+      [Description("RFC 5802/7677 (SCRAM-SHA-256): a full SCRAM exchange authenticates a PBKDF2-hashed " +
+                   "account, and the server proves it knows the key by returning a valid ServerSignature.")]
+      public void TestScramSha256Authenticates()
+      {
+         var application = SingletonProvider<TestSetup>.Instance.GetApp();
+         application.Settings.IMAPSASLPlainEnabled = true;
+         try
+         {
+            SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "scramok@example.test", "SeC-r3t Pass!");
+
+            using (var con = new TcpConnection())
+            {
+               Assert.IsTrue(con.Connect(143), "Could not connect to IMAP.");
+               con.Receive(); // banner
+
+               string final = ScramTestClient.Authenticate(con, "A01", "scramok@example.test", "SeC-r3t Pass!");
+               Assert.IsTrue(final.Contains("A01 OK"),
+                  "SCRAM-SHA-256 authentication should succeed. Got: " + final);
+
+               // The connection must be authenticated and usable afterwards.
+               string noop = con.SendAndReceive("A02 NOOP\r\n");
+               Assert.IsTrue(noop.Contains("A02 OK"),
+                  "Connection should be usable after SCRAM logon. Got: " + noop);
+            }
+         }
+         finally
+         {
+            application.Settings.IMAPSASLPlainEnabled = false;
+         }
+      }
+
+      [Test]
+      [Description("RFC 5802/7677 (SCRAM-SHA-256): a wrong password produces an invalid client proof " +
+                   "and the server rejects the exchange without authenticating.")]
+      public void TestScramSha256WrongPasswordFails()
+      {
+         var application = SingletonProvider<TestSetup>.Instance.GetApp();
+         application.Settings.IMAPSASLPlainEnabled = true;
+         // Disable auto-ban so a single bad attempt does not ban the loopback address.
+         bool autoBan = application.Settings.AutoBanOnLogonFailure;
+         application.Settings.AutoBanOnLogonFailure = false;
+         try
+         {
+            SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "scrambad@example.test", "correct horse");
+
+            using (var con = new TcpConnection())
+            {
+               Assert.IsTrue(con.Connect(143), "Could not connect to IMAP.");
+               con.Receive(); // banner
+
+               string final = ScramTestClient.Authenticate(con, "A01", "scrambad@example.test", "wrong password");
+               Assert.IsTrue(final.Contains("A01 NO") || final.Contains("A01 BAD"),
+                  "SCRAM-SHA-256 with a wrong password must be rejected. Got: " + final);
+            }
+         }
+         finally
+         {
+            application.Settings.AutoBanOnLogonFailure = autoBan;
+            application.Settings.IMAPSASLPlainEnabled = false;
+         }
       }
 
       [Test]
@@ -2239,6 +2330,120 @@ namespace RegressionTests.IMAP
 
          if (sWelcomeMessage != "* OK HOWDYHO IMAP\r\n")
             throw new Exception("ERROR - Wrong welcome message.");
+      }
+   }
+
+   /// <summary>
+   ///    A minimal SCRAM-SHA-256 (RFC 5802 / RFC 7677) client used to exercise the
+   ///    server's AUTHENTICATE SCRAM-SHA-256 implementation over a raw connection.
+   /// </summary>
+   internal static class ScramTestClient
+   {
+      /// <summary>
+      ///    Runs a full SCRAM-SHA-256 exchange (no SASL-IR) on an already-connected,
+      ///    post-banner IMAP connection. Returns the server's final response line:
+      ///    the tagged OK on success, or the tagged NO/BAD on a rejected proof.
+      /// </summary>
+      public static string Authenticate(TcpConnection con, string tag, string username, string password)
+      {
+         var nonceBytes = new byte[18];
+         using (var rng = RandomNumberGenerator.Create())
+            rng.GetBytes(nonceBytes);
+         string clientNonce = Convert.ToBase64String(nonceBytes);
+
+         string clientFirstBare = "n=" + SaslName(username) + ",r=" + clientNonce;
+         string clientFirst = "n,," + clientFirstBare;
+
+         // Mechanism selection -> empty server challenge.
+         con.Send(tag + " AUTHENTICATE SCRAM-SHA-256\r\n");
+         con.ReadUntil("+");
+
+         // client-first -> server-first.
+         con.Send(Base64(clientFirst) + "\r\n");
+         string serverFirst = DecodeContinuation(con.ReadUntil("\r\n"));
+
+         string combinedNonce = Attribute(serverFirst, "r");
+         byte[] salt = Convert.FromBase64String(Attribute(serverFirst, "s"));
+         int iterations = int.Parse(Attribute(serverFirst, "i"));
+         Assert.IsTrue(combinedNonce.StartsWith(clientNonce),
+            "Server nonce must start with the client nonce. Got: " + combinedNonce);
+
+         byte[] saltedPassword;
+         using (var pbkdf2 = new Rfc2898DeriveBytes(password, salt, iterations, HashAlgorithmName.SHA256))
+            saltedPassword = pbkdf2.GetBytes(32);
+
+         byte[] clientKey = Hmac(saltedPassword, "Client Key");
+         byte[] storedKey = Sha256(clientKey);
+
+         string clientFinalWithoutProof = "c=biws,r=" + combinedNonce;
+         string authMessage = clientFirstBare + "," + serverFirst + "," + clientFinalWithoutProof;
+         byte[] clientSignature = Hmac(storedKey, authMessage);
+         byte[] clientProof = Xor(clientKey, clientSignature);
+
+         string clientFinal = clientFinalWithoutProof + ",p=" + Convert.ToBase64String(clientProof);
+         con.Send(Base64(clientFinal) + "\r\n");
+
+         string afterFinal = con.ReadUntil("\r\n");
+         if (!afterFinal.TrimStart().StartsWith("+"))
+            return afterFinal; // rejected proof: tagged NO/BAD
+
+         // Verify the server proved knowledge of the key (ServerSignature).
+         string serverFinal = DecodeContinuation(afterFinal);
+         byte[] serverKey = Hmac(saltedPassword, "Server Key");
+         byte[] serverSignature = Hmac(serverKey, authMessage);
+         Assert.AreEqual("v=" + Convert.ToBase64String(serverSignature), serverFinal,
+            "Server signature (v=) did not verify.");
+
+         // Empty client response acknowledges the server-final; server completes auth.
+         con.Send("\r\n");
+         return con.ReadUntil(tag);
+      }
+
+      private static string SaslName(string name)
+      {
+         // saslname: '=' must be escaped before ',' so an escaped '=' is not re-encoded.
+         return name.Replace("=", "=3D").Replace(",", "=2C");
+      }
+
+      private static string Base64(string s)
+      {
+         return Convert.ToBase64String(Encoding.UTF8.GetBytes(s));
+      }
+
+      private static string DecodeContinuation(string line)
+      {
+         string t = line.Trim();
+         if (t.StartsWith("+"))
+            t = t.Substring(1).Trim();
+         return Encoding.UTF8.GetString(Convert.FromBase64String(t));
+      }
+
+      private static string Attribute(string message, string key)
+      {
+         foreach (var part in message.Split(','))
+            if (part.StartsWith(key + "="))
+               return part.Substring(key.Length + 1);
+         return "";
+      }
+
+      private static byte[] Hmac(byte[] key, string data)
+      {
+         using (var h = new HMACSHA256(key))
+            return h.ComputeHash(Encoding.ASCII.GetBytes(data));
+      }
+
+      private static byte[] Sha256(byte[] data)
+      {
+         using (var sha = SHA256.Create())
+            return sha.ComputeHash(data);
+      }
+
+      private static byte[] Xor(byte[] a, byte[] b)
+      {
+         var r = new byte[a.Length];
+         for (int i = 0; i < a.Length; i++)
+            r[i] = (byte) (a[i] ^ b[i]);
+         return r;
       }
    }
 }

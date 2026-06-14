@@ -21,6 +21,7 @@ namespace HM
    class Message;
    class IMAPMailboxChangeNotifier;
    class IMailboxChangeClient;
+   class ScramSha256;
 
    class IMAPClientCommand
    {
@@ -127,6 +128,11 @@ namespace HM
       void SetSavedSearchResult(const std::vector<__int64> &uids) { saved_search_result_ = uids; }
       const std::vector<__int64> & GetSavedSearchResult() const { return saved_search_result_; }
 
+      // RFC 5802/7677 (SCRAM-SHA-256): the in-progress SASL conversation for this
+      // connection, or null when no SCRAM authentication is underway.
+      std::shared_ptr<ScramSha256> GetScramSession() const { return scram_session_; }
+      void SetScramSession(std::shared_ptr<ScramSha256> session) { scram_session_ = session; }
+
       // RFC 7162 (QRESYNC): compress a list of UIDs into a sequence-set string
       // (e.g. "1:3,5,7:9") for use in "* VANISHED" responses. Sorts and de-dupes.
       static String CompactUidSet(std::vector<__int64> uids);
@@ -212,6 +218,9 @@ namespace HM
 
       // RFC 5182 (SEARCHRES): UIDs saved by the last "SEARCH RETURN (SAVE)".
       std::vector<__int64> saved_search_result_;
+
+      // RFC 5802/7677 (SCRAM-SHA-256): in-progress SASL conversation, or null.
+      std::shared_ptr<ScramSha256> scram_session_;
 
       int literal_data_to_receive_;
       String literal_buffer_;
