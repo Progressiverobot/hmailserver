@@ -65,6 +65,7 @@ namespace hMailServer.ControlPanel.Views
       private void ReloadAliases()
       {
          var rows = new List<AliasRow>();
+         string error = null;
          if (DomainList.SelectedItem != null)
          {
             dynamic domains = ServerSession.Current.Application.Domains;
@@ -86,8 +87,9 @@ namespace hMailServer.ControlPanel.Views
                ServerSession.Release(aliases);
                ServerSession.Release(domain);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+               error = ex.Message;
             }
             finally
             {
@@ -95,11 +97,15 @@ namespace hMailServer.ControlPanel.Views
             }
          }
          AliasList.ItemsSource = rows;
+         SetListStatus(AliasStatus, rows.Count, error,
+            DomainList.SelectedItem == null ? "Select a domain to see its aliases." : "No aliases for this domain.",
+            "Couldn't load aliases: ");
       }
 
       private void ReloadDistLists()
       {
          var rows = new List<string>();
+         string error = null;
          if (DomainList.SelectedItem != null)
          {
             dynamic domains = ServerSession.Current.Application.Domains;
@@ -117,8 +123,9 @@ namespace hMailServer.ControlPanel.Views
                ServerSession.Release(lists);
                ServerSession.Release(domain);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+               error = ex.Message;
             }
             finally
             {
@@ -126,6 +133,31 @@ namespace hMailServer.ControlPanel.Views
             }
          }
          DistList.ItemsSource = rows;
+         SetListStatus(DistStatus, rows.Count, error,
+            DomainList.SelectedItem == null ? "Select a domain to see its distribution lists." : "No distribution lists for this domain.",
+            "Couldn't load distribution lists: ");
+      }
+
+      // Shows a centered empty/error placeholder over a list when it has no rows.
+      private static void SetListStatus(TextBlock status, int rowCount, string error, string emptyText, string errorPrefix)
+      {
+         if (status == null)
+            return;
+
+         if (error != null)
+         {
+            status.Text = errorPrefix + error;
+            status.Visibility = Visibility.Visible;
+         }
+         else if (rowCount == 0)
+         {
+            status.Text = emptyText;
+            status.Visibility = Visibility.Visible;
+         }
+         else
+         {
+            status.Visibility = Visibility.Collapsed;
+         }
       }
 
       private void AddAlias_Click(object sender, RoutedEventArgs e)

@@ -80,8 +80,9 @@ installer.
 
 1. ✅ **Reload-on-enter** for cached pages (`FeatureSettingsView.OnEnter` now re-reads
    the INI on navigation, matching `ServerSettingsView`; every settings page refreshes).
-2. **No silent `catch{}`** — `DomainsView` alias/dist-list loads must show real
-   empty/error states.
+2. ✅ **No silent `catch{}`** — `DomainsView` alias/dist-list loads now surface real
+   empty/error states (centered placeholder over the list; the swallowed exception
+   message is shown instead of an empty list).
 3. **Search/filter** on long lists: Domains, Accounts, Rules, Queue, Ports,
    Certs, IP ranges, Routes.
 4. **Consistent destructive-action confirmations** (aliases, dist-list

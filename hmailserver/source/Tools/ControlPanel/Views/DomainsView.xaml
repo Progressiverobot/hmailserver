@@ -137,6 +137,10 @@
                                 </DataTemplate>
                             </ListView.ItemTemplate>
                         </ListView>
+                        <TextBlock x:Name="AliasStatus" Grid.Row="1" Visibility="Collapsed"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   TextWrapping="Wrap" TextAlignment="Center" FontSize="12" Opacity="0.7"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="12" />
                         <Grid Grid.Row="2" Margin="4,8,0,2">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
@@ -179,6 +183,10 @@
                                 </DataTemplate>
                             </ListView.ItemTemplate>
                         </ListView>
+                        <TextBlock x:Name="DistStatus" Grid.Row="1" Visibility="Collapsed"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   TextWrapping="Wrap" TextAlignment="Center" FontSize="12" Opacity="0.7"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="12" />
                         <Grid Grid.Row="2" Margin="4,8,0,2">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
