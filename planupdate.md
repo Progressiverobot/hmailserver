@@ -34,7 +34,7 @@ build, run the regression suite, (CP steps) screenshot-validate, then commit/pus
 5. **B2 — auth modernization** (OAuth2 XOAUTH2/OAUTHBEARER, SCRAM-SHA-256, Argon2id + hash policy).
 6. **Track A Ph 2 — Control-Panel UX/UI polish.**
 7. **B4 — deliverability & SMTP standards** (SMTPUTF8/EAI, SRS, PIPELINING/DSN, rate shaping).
-8. **B5 — IMAP modern sync profile** (CONDSTORE/QRESYNC/UIDPLUS/ENABLE/ESEARCH/STATUS=SIZE).
+8. **B5 — IMAP modern sync profile** (CONDSTORE/QRESYNC/UIDPLUS/ENABLE/ESEARCH/STATUS=SIZE). ✅ **Done** — UNSELECT, UIDPLUS, ENABLE, STATUS=SIZE, ESEARCH, CONDSTORE/QRESYNC (Stages 1–3b), LIST-EXTENDED and SEARCHRES all shipped in `v6.2.0`. Full IMAP regression suite green (242/242). IMAP4rev2 (RFC 9051) assessed and deferred to its own milestone (see B5).
 9. **Track A Ph 3 — AV/security extensibility + INI hardening knobs.**
 10. **B7 — operability & observability** (OpenTelemetry, health probes, DB pool/executor, durability, HA runbook).
 11. **B6 — Sieve + ManageSieve.**
@@ -388,9 +388,22 @@ upgrading the management/admin INI password from MD5.
   Advertised in CAPABILITY as `SEARCHRES`. Covered by `TestSearchResSaveAndFetch`,
   `TestSearchResSaveAndStore` and `TestSearchResCapability`. Follow-up: `$` inside `SEARCH` criteria
   (set intersection) is not yet supported.
-- ⏳ Remaining: consider IMAP4rev2.
-  (`IMAPCommandCapability` + command map.)
-- Verify: fast resync in Thunderbird/Apple Mail.
+- ⏸ **IMAP4rev2 (RFC 9051) — assessed and deferred to its own milestone.** hMailServer already
+  implements the individual extensions IMAP4rev2 folds into the base (UIDPLUS, ENABLE, IDLE,
+  NAMESPACE, MOVE, SPECIAL-USE, UNSELECT, ESEARCH, SEARCHRES, STATUS=SIZE, LIST-EXTENDED, SASL-IR,
+  CONDSTORE), so the building blocks are in place. Full RFC 9051 conformance is **not** a single safe
+  increment, however: advertising `IMAP4rev2` obliges the server to (1) use **UTF-8 mailbox names**
+  instead of modified UTF-7 once the session enables rev2 — a session-scoped encode/decode switch
+  threaded through every command that carries a mailbox name (`LIST`/`LSUB`/`SELECT`/`EXAMINE`/
+  `CREATE`/`RENAME`/`DELETE`/`SUBSCRIBE`/`STATUS`/`APPEND`/`COPY`/`MOVE`, currently all via
+  `ModifiedUTF7`); (2) return `SEARCH` results in the **ESEARCH** form by default; (3) drop the
+  `\Recent` flag and `RECENT` responses; (4) treat `LSUB` as deprecated in favour of
+  `LIST (SUBSCRIBED)`; and (5) audit the changed/added response codes. Shipping a partial rev2 under
+  the `IMAP4rev2` capability would be non-conformant and risk client interop, so it is tracked as a
+  dedicated future milestone rather than bundled into the `v6.2.0` profile. The `ENABLE` handler and
+  `CAPABILITY` are the entry points when that milestone is scheduled.
+- ✅ **B5 modern-sync profile complete for v6.2.0.** All targeted extensions delivered and validated
+  (full IMAP suite 242/242). Verify in the field: fast resync in Thunderbird/Apple Mail.
 
 ## B6 — Standards-based filtering
 - **Sieve** (RFC 5228) interpreter + **ManageSieve** (RFC 5804) service alongside the
