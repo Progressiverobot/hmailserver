@@ -26,25 +26,28 @@ Risk/value-ordered. Each step ends with: clean build, run the regression suite,
 (CP steps) screenshot-validate, then commit/push + move the release tag + clobber
 the release asset.
 
-## Execution order (what's left)
+## Pending / in-progress (everything not yet done)
 
-1. **Track A Phase 1 — item 7: Active Directory pickers** (deferred; needs a
-   domain-joined runner). **Track A Phase 0** (drop the classic from the
-   installer) is ✅ done — the Control Panel is now the sole shipped GUI.
-2. **B2 — authentication modernization follow-ups** (live JWKS/introspection +
-   O365/Gmail XOAUTH2 + Thunderbird SCRAM interop). *RS256 auto-test coverage and
-   full RFC 4013 SASLprep are done (v6.2.2).*
-3. **Track A Phase 2 — Control-Panel UX/UI polish.**
-4. **Track A Phase 3 — AV/security extensibility + INI hardening knobs.**
-5. **B7 — operability & observability** (OpenTelemetry, health probes, DB pool/
-   executor, durability, HA runbook).
-6. **B6 — Sieve + ManageSieve.** ✅ Done — RFC 5228 interpreter (live in delivery:
-   keep/fileinto/discard/redirect) + RFC 5804 ManageSieve service.
-7. **Track A Phase 4 — finalize** (gap doc, release cadence).
-8. **B8 — quality gates remaining** (CI DB matrix, clang-tidy/ASAN/UBSAN,
-   libFuzzer, SBOM/CVE scanning, signed artifacts).
-9. **Cross-cutting** — surface every new server capability in the Control Panel.
-10. **Future track (Tier 3)** — documented, not scheduled.
+*Only outstanding work lives in Part 1. Everything already delivered has been
+moved to **Part 2 — Completed work**.*
+
+1. **Track A Phase 1 — item 7: Active Directory pickers** — ⏸ deferred (needs a
+   domain-joined runner; the dev/test box is in a WORKGROUP).
+2. **Track A Phase 4 — finalize** — screenshot-validate every page/dialog, rewrite
+   `CONTROL-PANEL-GAP-ANALYSIS.md`, then publish the CP + rebuild the installer +
+   move the release tag.
+3. **B2 — authentication follow-ups** — live JWKS / token introspection +
+   O365 / Gmail XOAUTH2 + Thunderbird SCRAM interop. *(Offline OAuth2 and RS256
+   auto-test coverage are already done.)*
+4. **B4 — optional / future** — CHUNKING/BDAT (RFC 3030); verify SPF-on-forward
+   (SRS) + DSN interop.
+5. **B7 — observability remaining** — OpenTelemetry tracing (SMTP/IMAP/POP/DB
+   spans + OTLP export); dedicated DB executor + prepared-statement caches
+   (MySQL/PG).
+6. **B8 — quality gates remaining** — CI build+test matrix (Windows ×
+   MySQL/MSSQL/PostgreSQL); clang-tidy / ASAN / UBSAN / libFuzzer; signed release
+   artifacts.
+7. **Future track (Tier 3)** — documented, not scheduled (see end of Part 1).
 
 ---
 
@@ -66,112 +69,6 @@ be built or validated here. The Directory tab already supports manual AD linkage
 Item 7 stays deferred, but it is not a blocker: **Phase 0** has already dropped the
 classic Administrator from the installer (the Directory tab's manual AD linkage
 covers the non-picker path).
-
-### Phase 0 — Drop the classic from the installer ✅ Done
-
-1. ✅ Removed the Administrator executable (`hMailAdmin.exe`) from
-   `section_files_64.iss`. Its COM interop assembly (`Interop.hMailServer.dll`) is
-   still produced by the (retained) Administrator project build and is now shipped
-   under the `server` component instead of `admintools`, because it is consumed by
-   the retained DBSetup/DBUpdater and the Data Directory Synchronizer — not by any
-   GUI. `section_files_common.iss` had no Administrator-only executable to remove.
-2. ✅ Removed the Administrator Start-menu shortcut from `section_icons.iss`;
-   replaced the end-of-setup "run Administrator" with "run Control Panel" in
-   `section_run.iss`. `section_uninstallrun.iss` referenced no GUI; the
-   `admintools` component is retained (it still gates the legacy PHP web admin and
-   translations). The `hMailServerInnoExtension.iss` running-app guard now blocks
-   install when the **Control Panel** is open (and still blocks a lingering legacy
-   Administrator from an upgrade).
-3. ✅ Kept DBSetup / DBUpdater / DataDirectorySynchronizer.
-4. ✅ Verified: `ISCC.exe hMailServer64.iss` compiles successfully (exit 0,
-   produces `hMailServer-6.2.2-x64.exe`); the post-install database step
-   (`RunPostInstallTasks` under the `server` component) is untouched.
-
-### Phase 2 — UX/UI polish (after parity)
-
-1. ✅ **Reload-on-enter** for cached pages (`FeatureSettingsView.OnEnter` now re-reads
-   the INI on navigation, matching `ServerSettingsView`; every settings page refreshes).
-2. ✅ **No silent `catch{}`** — `DomainsView` alias/dist-list loads now surface real
-   empty/error states (centered placeholder over the list; the swallowed exception
-   message is shown instead of an empty list).
-3. ✅ **Search/filter** on long lists: Domains, Accounts, Rules, Queue, Ports,
-   Certs, IP ranges, Routes (shared `ListSearch` reflection-based substring filter
-   over each list's `ICollectionView`; per-page search box, re-applied on reload).
-4. ✅ **Consistent destructive-action confirmations** — aliases, distribution
-   lists, distribution-list recipients and incoming relays now prompt Yes/No
-   before deleting (matching accounts, IP ranges, queue and public folders).
-5. ✅ **Input validation + inline feedback** in Domain/Account/Route dialogs —
-   non-empty numeric fields (sizes, limits, port, retries) are validated against a
-   range via the shared `NumericField` helper and bad input is reported in an
-   inline status line instead of being silently dropped on save.
-6. ✅ **Standardized loading/empty/error states** (shared `StatusText` helper;
-   centered empty/error placeholders on Domains aliases/lists and the Routes, IP
-   ranges, SSL certificate and TCP/IP port grids; Queue/Rules keep their count
-   subtitles).
-7. ✅ **Accessibility** — `AutomationProperties.Name` on the icon-only controls
-   (theme toggle, ✕ delete buttons), every page search box, the nav tree and the
-   content host so screen readers announce them. (Wpf.Ui buttons render the `_`
-   mnemonic literally, so access keys are left to the standard menu/dialog defaults;
-   tab order follows the logical visual tree.) **Automation-quality pass (WPF Buddy
-   MCP):** every navigation node (`nav-*`/`navgroup-*`) and every data-driven
-   settings editor (`ServerSettingsView`/`FeatureSettingsView`, keyed by COM path /
-   INI key) now carries a stable `AutomationId` — the MCP audit went from 20/F
-   (12/58 actionable controls identified) to 100/A (58/58). The only residual
-   "duplicate" is the WPF default `TreeViewItem` expander toggle (`Expander`, one
-   per nav group), a framework template part left untouched to avoid retemplating.
-8. ✅ **Theme** — follows the OS theme by default (and tracks live OS changes via
-   `SystemThemeWatcher`) until the manual toggle sets an explicit Light/Dark
-   preference, which then persists and stops OS tracking.
-9. ✅ **Navigation restructure** — the overloaded 13-item **Advanced** group is
-   split into **Security** (auto-ban/TLS, IP ranges, SSL certs, transport security,
-   ACME), **Network** (ports, incoming relays, API & monitoring) and **Maintenance**
-   (performance, scripting, event scripts, server messages, groups); the top-level
-   **Status** node was already present.
-10. ✅ **Style unification** — app-wide `ui:ControlsDictionary` already themes the
-    standard controls and all code-built pages use the shared `Card`/`PageTitle`/
-    `PageSubtitle` styles and `Wpf.Ui` buttons; the Domain/Account/Route dialog text
-    inputs were converted from plain `TextBox` to `Wpf.Ui.Controls.TextBox` so they
-    match the card pages exactly.
-11. ✅ **Global exception handler** — unhandled UI-thread exceptions are appended
-    (with full stack) to `%LOCALAPPDATA%\hMailServer\ControlPanel\control-panel-errors.log`
-    and the user is offered a restart (preserving the original `/connect` args);
-    background-thread failures are logged too, instead of being silently handled.
-12. ✅ **Responsiveness** — lowered the window minimum to 760×520, made the sidebar
-    a bounded proportional column (200–260 px, 24% of width) and the Connect card
-    adaptive (300–400 px) so the UI works on small/zoomed/RDP sessions.
-
-### Phase 3 — AV + security extensibility & hardening (CP-only)
-
-1. ✅ **Scanner presets + Test buttons** — "Test ClamAV connection" and "Test
-   ClamWin scanner" call the server COM `TestClamAVScanner`/`TestClamWinScanner`
-   (live values, result line); "Test custom scanner" validates the `%FILE%`
-   command's executable client-side; a Custom-scanner **preset picker** fills the
-   09-0command line + infected return value for common engines (Microsoft Defender
-   `MpCmdRun`, Sophos `savscan`, ESET `ecls`, Bitdefender `bdscan`, Kaspersky
-   `avp.com`); plus a **ClamWin auto-detect** that locates `clamscan.exe` and the
-   database folder.
-2. ✅ **Event-script integration hooks** — an "Insert template" picker on the Event
-   scripts page appends ready-made `OnAcceptMessage` VBScript handlers (run an
-   external AV/DLP scanner via `WScript.Shell`, fire a webhook to a SIEM/Slack/Teams
-   endpoint, or call an external HTTP API and act on its verdict); the AntiVirus
-   custom-scanner card points admins here for engines without a CLI.
-3. ✅ **Advanced hardening card** (INI-backed) — a new "Advanced hardening" page
-   (under Security) surfaces the previously unexposed `IniFileSettings` knobs,
-   grouped into Greylisting (`GreylistingEnabledDuringRecordExpiration`,
-   `GreylistingRecordExpirationInterval`), Scanner timeouts
-   (`SAMinTimeout`/`SAMaxTimeout`, `ClamMinTimeout`/`ClamMaxTimeout`), DNS
-   (`UseDNSCache`, `DNSServer`, `DNSBLChecksAfterMailFrom`), Authentication &
-   headers (`AuthUserReplacementIP`, `DisableAUTHList`,
-   `AddXAuthUserHeader`/`AddXAuthUserIP`, `AddXOriginalRcptTo`) and Other
-   (`BlockedIPHoldSeconds`, `RewriteEnvelopeFromWhenForwarding`, and a
-   `PreferredHashAlgorithm` picker: Argon2id/PBKDF2/SHA-256/MD5/Blowfish). Defaults
-   mirror the server's; a new `ChoiceSetting` (combo) was added to the INI editor.
-4. ✅ **Account password-strength validation** — the account dialog shows a live
-   strength indicator (Weak/Fair/Strong, colour-coded, with what's missing) under
-   the password field as it is typed, and saving a weak password (under 8 chars or
-   a single character class) prompts a confirmation the admin can override. Backed
-   by a shared offline `PasswordStrength` heuristic (length + character-class
-   variety).
 
 ### Phase 4 — Finalize
 
@@ -207,214 +104,34 @@ Remaining:
 *Delivered already (see Part 2): SMTPUTF8/EAI, PIPELINING, ENHANCEDSTATUSCODES, DSN (RFC 3461/3464),
 SRS for forwarding (SPF alignment), and per-IP / per-destination rate shaping.*
 
-- ✅ **BATV** (Bounce Address Tag Validation, `prvs` scheme) — backscatter
-  protection. Local outbound MAIL FROM is signed `prvs=<K><DDD><6-hex HMAC>=local@domain`
-  (wire-only, envelope domain preserved so SPF/DKIM stay aligned); inbound bounces to
-  a prvs return-path are HMAC/day-window validated and stripped back to the original
-  recipient, while forged null-sender bounces to invalid tags are rejected. Default-off
-  via `[Settings] BATVEnabled` / `BATVSecret`. Covered by `SMTP/Batv.cs`
-  (over-the-wire sign + validate + tamper-reject) and a `ClassTester` self-test.
 - Optional/future: **CHUNKING/BDAT** (RFC 3030) — higher risk, rewrites the
   line-oriented binary read loop in the mail-reception path; deferred.
 - Verify: SPF passes on forwarded mail (SRS); DSN interop.
 
-### B6 — Standards-based filtering
-
-- **Sieve** (RFC 5228) interpreter + **ManageSieve** (RFC 5804) service alongside
-  the proprietary rules engine (`RuleApplier`). Verify with Sieve test vectors +
-  a ManageSieve client.
-  - **In progress — Sieve parser foundation.** A new `Common/Sieve/` module
-    implements an RFC 5228 lexer (`SieveLexer`: comments, quoted + multi-line
-    `text:` strings with dot-stuffing, K/M/G numbers, tags, punctuation) and a
-    recursive-descent parser (`SieveParser`) that builds an AST
-    (`SieveCommand`/`SieveTest`/`SieveArgument`) while validating the grammar, the
-    supported command/test set, and `require` placement. Surfaced through the COM
-    API as `Utilities.CheckSieveSyntax` (returns an empty string when valid, else a
-    line-numbered error), mirroring the event-script `CheckSyntax` precedent.
-    Validated by the `SieveSyntax` regression test (valid + invalid scripts).
-    Next: evaluate the AST against a delivered message and apply
-    keep/fileinto/discard/redirect, then per-account script storage and the
-    ManageSieve service.
-  - **In progress — Sieve evaluator.** `SieveEvaluator` executes the AST against a
-    `SieveMessage` (an unfolded-header + octet-size read model) and produces an
-    action summary: RFC 5228 control flow (`if`/`elsif`/`else`/`stop`), the core
-    tests (`true`/`false`/`not`/`allof`/`anyof`/`header`/`address`/`exists`/`size`
-    with `:is`/`:contains`/`:matches`, address parts `:all`/`:localpart`/`:domain`,
-    and the default + `i;octet` comparators) and the core actions
-    (`keep`/`fileinto`/`discard`/`redirect` plus implicit keep). Surfaced through
-    COM as `Utilities.EvaluateSieveScript(script, rawMessage)` returning the
-    `;`-joined action summary (or `error: …`). Validated by the `SieveEvaluation`
-    regression test. Next: per-account script storage + wiring into `LocalDelivery`,
-    then the ManageSieve service.
-  - **In progress — per-account script storage.** `SieveStorage` persists each
-    account's active Sieve script as a file under
-    `{DataDirectory}\Sieve\{domain}\{localpart}\active.sieve` (filesystem-safe path
-    sanitization; no DB schema change — the named-script model for ManageSieve
-    layers on top of this directory). Surfaced as the COM `Account.SieveScript`
-    get/put property (file-backed, written immediately). Validated by the
-    `SieveAccountScript` round-trip test. Next: evaluate the stored script in
-    `LocalDelivery` and apply fileinto/redirect/discard, then ManageSieve.
-  - **Done — Sieve filtering live in local delivery.** `LocalDelivery` now loads
-    the recipient account's active Sieve script and evaluates it against the
-    message during delivery (`EvaluateSieveScript_`): a `fileinto` routes the
-    message into the named IMAP folder (overriding the rule-selected folder), a
-    `discard` silently drops it, and the implicit `keep` delivers to INBOX as
-    normal. A no-script account is unaffected (zero overhead), and an unparseable
-    script never breaks delivery (logged, falls through to keep). Validated by the
-    `SieveDelivery` test (matching message filed into a folder; matching message
-    discarded while a normal message is still delivered). Remaining: `redirect`
-    (needs forwarding plumbing) and the **ManageSieve (RFC 5804)** service for
-    multi-script management.
-  - **Done — Sieve `redirect` action.** A `redirect "addr"` now queues a copy of
-    the message for delivery to the target address (`SMTPForwarding::RedirectToAddress`,
-    reusing the account-forwarding copy/loop-guard/SRS path) and cancels the
-    implicit local keep (unless the script also `keep`s or `fileinto`s). The
-    delivery manager is signalled (`DeliveryQueue::StartDelivery`) so the copy is
-    sent promptly. Validated by the `SieveDelivery` redirect test (target receives
-    the copy; source keeps none). **Sieve (RFC 5228) is now functionally complete**
-    — parse → syntax-check → evaluate → per-account storage → live filtering with
-    keep/fileinto/discard/redirect. Remaining B6: the **ManageSieve (RFC 5804)**
-    service for multi-script upload/management.
-  - **Done — ManageSieve (RFC 5804) service.** A new optional listener
-    (`ManageSieveServer`, a raw-socket + `std::thread` service like
-    `MetricsServer`/`RestApiServer`, enabled via `[Settings] ManageSieveServerPort`
-    and disabled by default) lets a client manage multiple named Sieve scripts over
-    TCP: `CAPABILITY`, SASL `PLAIN` `AUTHENTICATE` (against the regular account
-    database via `PasswordValidator`), `PUTSCRIPT`/`CHECKSCRIPT` (syntax-checked
-    through `SieveScript::CheckSyntax`), `LISTSCRIPTS`, `GETSCRIPT`, `SETACTIVE`,
-    `DELETESCRIPT` (refusing the active script per RFC 5804), `HAVESPACE`, `NOOP`
-    and `LOGOUT`, including non-synchronizing literal (`{NNN+}`) handling.
-    `SieveStorage` gained a named-script model (`scripts\{name}.sieve` + an
-    `active.name` marker) layered on the existing `active.sieve` that delivery
-    reads, so activating a script over ManageSieve is immediately honoured by local
-    delivery — no DB schema change. Validated by the `ManageSieve` regression test
-    (auth, full PUT/LIST/GET/SETACTIVE/DELETE round-trip, then an activated script
-    filing a delivered message). **B6 is complete** — Sieve interpreter +
-    ManageSieve service both shipped.
+*(Delivered B4 work — incl. the shipped **BATV** `prvs` backscatter protection —
+is recorded in Part 2.)*
 
 ### B7 — Operability & observability
 
-- **Done — health/readiness/liveness probes.** The local unauthenticated metrics
-  listener (`MetricsServer`, enabled via `[Settings] MetricsServerPort`) now also
-  serves Kubernetes-style probes alongside `/metrics`: `/livez` (always 200 once
-  the listener is up), `/readyz` (200 when the server is `StateRunning` and the DB
-  pool reports connected, else 503), and `/healthz` (JSON: status, server state,
-  database up/down, per-protocol session counts, uptime). Covered by the
-  `HealthProbes` regression test.
-- **Done — database observability metrics.** `/metrics` now also exposes
-  `hmailserver_database_up` (1/0) and `hmailserver_db_connections{state="busy|available"}`
-  gauges sourced from the `DatabaseConnectionManager` pool, giving DB connectivity
-  and pool-saturation visibility. Asserted by the `HealthProbes` test.
-- **Done — log retention/rotation.** A scheduled `LogRetentionTask` (runs once at
-  startup, then every 6h) deletes hMailServer's own date-stamped log files older
-  than `[Settings] LogDeleteDays` (0 = disabled, the default, so historical
-  behaviour is unchanged). Only files named `hmailserver_*.log` /
-  `ERROR_hmailserver_*.log` are ever touched. Covered by the `LogRetention` test.
-- **Done — TLS handshake metrics.** `ServerStatus` now counts completed and failed
-  TLS/SSL handshakes (incremented in `TCPConnection`), exposed on `/metrics` as
-  `hmailserver_tls_handshakes_total` and `hmailserver_tls_handshake_failures_total`
-  counters for TLS health alerting. Asserted by the `HealthProbes` test.
-- **Done — delivery-queue depth metric.** `/metrics` exposes
-  `hmailserver_delivery_queue_messages` (count of messages in the SMTP delivery
-  queue, i.e. in the `Delivering` state). The count is queried via
-  `PersistentMessage::GetDeliveryQueueCount()` and cached for 10s inside the
-  metrics listener so frequent scrapes never issue a `COUNT(*)` per request.
-  Asserted by the `HealthProbes` test.
-- **Done — authentication metrics.** `/metrics` exposes
-  `hmailserver_auth_success_total` and `hmailserver_auth_failures_total` counters,
-  incremented from the central `AccountLogon::Logon` path (covers every protocol's
-  authentication). Enables alerting on credential-stuffing / brute-force spikes.
-  The `HealthProbes` test performs a real failed POP3 login and asserts the failure
-  counter increments (wiring, not just presence).
-- **OpenTelemetry** tracing (SMTP/IMAP/POP/DB spans + correlation IDs).
-- **Done — message-to-session correlation IDs.** The SMTP `Received` header the
-  server stamps on every accepted message now carries an RFC 5321 `id` clause whose
-  value is the numeric TCP session id (`Received: ... with ESMTP<flags> id <n>`).
-  The same session id prefixes every line of that connection's SMTP session log, so
-  a delivered message can be traced back to the exact session that received it
-  without any external trace system. Asserted by the `ReceivedHeaders`
-  `TestReceivedHeaderContainsCorrelationId` test (6/6 green). Full OpenTelemetry
-  spans / OTLP export across SMTP/IMAP/POP/DB remain future work.
-- **Done — delivery-outcome metrics.** `/metrics` exposes
-  `hmailserver_messages_delivered_total`, `hmailserver_messages_deferred_total`
-  and `hmailserver_messages_bounced_total` counters, incremented from the SMTP
-  delivery threads (`SMTPDeliverer`): delivered/deferred at the terminal delivery
-  outcome and bounced at the point an NDR is actually generated. Enables
-  delivery-success-rate, retry-pressure and bounce-rate alerting. Asserted by the
-  `DeliveryMetrics` test (the delivered counter advances after a successful local
-  delivery).
-- **Done — per-command processing-latency metric.** `/metrics` now exposes the
-  Prometheus summary `hmailserver_command_processing_seconds` (`_sum` + `_count`),
-  accumulated centrally in `TCPConnection`'s line-command dispatch (covers every
-  SMTP/IMAP/POP3 command line) via `ServerStatus::OnCommandProcessed`. Average
-  command latency is derivable without per-command histograms. Asserted by the
-  `HealthProbes` test (the metric is present and its count advances after protocol
-  activity).
-- **Done — connection-pool condition variable.** `DatabaseConnectionManager`'s
-  `GetConnection_` no longer busy-polls with `Sleep(10)` while waiting for a free
-  connection; it blocks on a `condition_variable_any` signalled by
-  `ReleaseConnection_` (with a 100ms backstop timeout). Removes scrape/latency
-  jitter under pool exhaustion. Validated by 64 DB-intensive regression tests.
+*Delivered already (see Part 2): health/readiness/liveness probes; DB, TLS,
+delivery-queue, auth, delivery-outcome and per-command-latency metrics; log
+retention/rotation; message-to-session correlation IDs; the connection-pool
+condition variable; graceful shutdown drain; configurable message-store fsync;
+the message-store consistency check + recovery report; and the HA active/passive
+runbook.*
+
+Remaining:
+
+- **OpenTelemetry** tracing (SMTP/IMAP/POP/DB spans + OTLP export). Message-to-
+  session correlation IDs already ship; full span/OTLP export is future work.
 - Async/DB isolation: dedicated DB executor; prepared-statement caches
   (MySQL/PG).
-- **Done — graceful shutdown drain.** On shutdown the server moves to
-  `StateStopping` (so `/readyz` returns 503 and load balancers stop routing) and,
-  if `[Settings] ShutdownDrainSeconds > 0`, waits up to that window for active
-  SMTP/IMAP/POP sessions (`SessionManager::GetNumberOfConnections()`) to finish
-  before tearing the listeners down — keeping the metrics listener up during the
-  drain. Default 0 preserves the previous immediate-stop behaviour. Validated by
-  the `ShutdownDrain` test (Stop() returns promptly when idle, waits ~the window
-  while a session is held open).
-- **Done — configurable message-store fsync.** With `[Settings] MessageStoreFsync = 1`
-  a received message is forced to physical disk (`fflush` + `_commit` →
-  `FlushFileBuffers`, via the new `File::FlushToDisk()`) before the spool file is
-  closed at the SMTP accept point — so the message is durable before the server
-  acknowledges it to the sender. Default 0 keeps the previous OS-buffered behaviour
-  (no per-message fsync cost). Validated by the `MessageStoreDurability` test
-  (delivery still succeeds end-to-end with the barrier on). The broader consistency
-  checker / recovery tooling remains future work.
-- **Done — message-store consistency check.** Opt-in via
-  `[Settings] MessageStoreConsistencyCheck = 1`: a scheduled, read-only task
-  (`MessageStoreConsistencyTask`, run once at startup then hourly) cross-checks
-  every message row against its backing file on disk
-  (`PersistentMessage::GetMissingFileCount()` reconstructs each on-disk path with
-  the same logic the server uses) and publishes the count of missing files as the
-  `hmailserver_messagestore_missing_files` gauge, logging a warning when divergence
-  is found. The check never deletes or repairs anything. Default 0 keeps the
-  (potentially expensive) store walk off. Validated by the
-  `MessageStoreConsistency` test (delete a delivered message's file → gauge reports
-  the missing file).
-- **Done — message-store recovery report.** When the consistency check finds
-  missing files it writes `hMailServer_messagestore_consistency.report` to the log
-  directory: a timestamped, tab-separated list of every affected message
-  (`PersistentMessage::GetMissingFileDetails()` → `messageid`, account, expected
-  on-disk path) so an administrator has an actionable artifact to drive recovery
-  (restore-from-backup, user notification, orphan cleanup). Read-only; the report
-  is regenerated on each scan. Asserted by the `MessageStoreConsistency` test (the
-  report lists the missing message's path and account). Active automated
-  repair/re-fetch remains future work.
-- **Done — HA active/passive runbook.** A documented, validated active/passive
-  topology (shared external database + shared message store + floating VIP) with
-  readiness gating on `/readyz` and graceful-drain failover, in
-  [hmailserver/docs/HighAvailabilityRunbook.md](hmailserver/docs/HighAvailabilityRunbook.md).
-  No clustering code — failover is driven by external infrastructure plus the
-  readiness/drain primitives already shipped in this track.
 
 ### B8 — Quality gates & supply chain (remaining)
 
 *Delivered already (see Part 2): `ci.yml`, `codeql.yml`, `server-build.yml`, B1
-reproducer tests and the over-the-wire SMTP/IMAP/MIME protocol fuzz suite.*
-
-- **Done — SBOM + dependency/CVE scanning (GitHub-native).** Three additive
-  supply-chain pieces under `.github/`: **Dependabot** (`dependabot.yml`) raises
-  CVE/security-advisory alerts and grouped weekly update PRs for the NuGet
-  packages (Control Panel + C# tests/tooling) and the GitHub Actions; an **SBOM**
-  workflow (`sbom.yml`, Syft via `anchore/sbom-action`) emits SPDX + CycloneDX
-  inventories on every push to master and attaches them to each published release;
-  and a **dependency-review** PR gate (`dependency-review.yml`,
-  `actions/dependency-review-action`) fails any PR that introduces a
-  high/critical-CVE dependency. (Vendored native C++ libs have no Dependabot
-  ecosystem and stay tracked in `libraries/build-dependencies.ps1`.)
+reproducer tests, the over-the-wire SMTP/IMAP/MIME protocol fuzz suite, and the
+GitHub-native SBOM + Dependabot + dependency-review supply-chain gates.*
 
 Remaining:
 
@@ -434,18 +151,8 @@ Remaining:
 OAuth2 provider config, SCRAM/Argon2 policy, SMTPUTF8/SRS/rate-limit toggles, IMAP
 profile, Sieve/ManageSieve editor, secrets/least-priv status, health/trace
 endpoints, AV scanner presets + tests (Track A Phase 3), a security-diagnostics
-report.
-
-- **Done — Sieve filter editor + operability/durability/ManageSieve settings.** The
-  Control Panel account dialog gained a **Sieve** tab (a monospace editor bound to
-  the late-bound COM `Account.SieveScript` property — runs during local delivery,
-  supports keep/fileinto/discard/redirect). The data-driven feature-settings pages
-  (`FeatureSettingsView` over `hMailServer.INI`) gained cards for **ManageSieve**
-  (`ManageSieveServerPort`/`BindAddress`), **Operability** (`LogDeleteDays`,
-  `ShutdownDrainSeconds`) and **Message store durability** (`MessageStoreFsync`,
-  `MessageStoreConsistencyCheck`); the existing Monitoring card already surfaced
-  `MetricsServerPort`/`BindAddress`/`JsonLogging`. Control Panel builds 0/0 with
-  `-warnaserror`.
+report. *(Everything delivered so far is recorded in Part 2; surfacing each new
+server capability in the Control Panel remains a standing principle.)*
 
 ## Future track (Tier 3 — documented, not scheduled)
 
@@ -516,7 +223,325 @@ MTA-STS, TLS-RPT, auto-ban, correct dot-stuffing, parameterized SQL.*
 
 ---
 
-90p09op# PART 2 — COMPLETED WORK (record)
+# PART 2 — COMPLETED WORK (record)
+
+## Recently completed (moved from Part 1)
+
+### Track A — delivered (continued)
+
+#### Phase 0 — Drop the classic from the installer ✅ Done
+
+1. ✅ Removed the Administrator executable (`hMailAdmin.exe`) from
+   `section_files_64.iss`. Its COM interop assembly (`Interop.hMailServer.dll`) is
+   still produced by the (retained) Administrator project build and is now shipped
+   under the `server` component instead of `admintools`, because it is consumed by
+   the retained DBSetup/DBUpdater and the Data Directory Synchronizer — not by any
+   GUI. `section_files_common.iss` had no Administrator-only executable to remove.
+2. ✅ Removed the Administrator Start-menu shortcut from `section_icons.iss`;
+   replaced the end-of-setup "run Administrator" with "run Control Panel" in
+   `section_run.iss`. `section_uninstallrun.iss` referenced no GUI; the
+   `admintools` component is retained (it still gates the legacy PHP web admin and
+   translations). The `hMailServerInnoExtension.iss` running-app guard now blocks
+   install when the **Control Panel** is open (and still blocks a lingering legacy
+   Administrator from an upgrade).
+3. ✅ Kept DBSetup / DBUpdater / DataDirectorySynchronizer.
+4. ✅ Verified: `ISCC.exe hMailServer64.iss` compiles successfully (exit 0,
+   produces `hMailServer-6.2.2-x64.exe`); the post-install database step
+   (`RunPostInstallTasks` under the `server` component) is untouched.
+
+#### Phase 2 — UX/UI polish ✅ Done
+
+1. ✅ **Reload-on-enter** for cached pages (`FeatureSettingsView.OnEnter` now re-reads
+   the INI on navigation, matching `ServerSettingsView`; every settings page refreshes).
+2. ✅ **No silent `catch{}`** — `DomainsView` alias/dist-list loads now surface real
+   empty/error states (centered placeholder over the list; the swallowed exception
+   message is shown instead of an empty list).
+3. ✅ **Search/filter** on long lists: Domains, Accounts, Rules, Queue, Ports,
+   Certs, IP ranges, Routes (shared `ListSearch` reflection-based substring filter
+   over each list's `ICollectionView`; per-page search box, re-applied on reload).
+4. ✅ **Consistent destructive-action confirmations** — aliases, distribution
+   lists, distribution-list recipients and incoming relays now prompt Yes/No
+   before deleting (matching accounts, IP ranges, queue and public folders).
+5. ✅ **Input validation + inline feedback** in Domain/Account/Route dialogs —
+   non-empty numeric fields (sizes, limits, port, retries) are validated against a
+   range via the shared `NumericField` helper and bad input is reported in an
+   inline status line instead of being silently dropped on save.
+6. ✅ **Standardized loading/empty/error states** (shared `StatusText` helper;
+   centered empty/error placeholders on Domains aliases/lists and the Routes, IP
+   ranges, SSL certificate and TCP/IP port grids; Queue/Rules keep their count
+   subtitles).
+7. ✅ **Accessibility** — `AutomationProperties.Name` on the icon-only controls
+   (theme toggle, ✕ delete buttons), every page search box, the nav tree and the
+   content host so screen readers announce them. (Wpf.Ui buttons render the `_`
+   mnemonic literally, so access keys are left to the standard menu/dialog defaults;
+   tab order follows the logical visual tree.) **Automation-quality pass (WPF Buddy
+   MCP):** every navigation node (`nav-*`/`navgroup-*`) and every data-driven
+   settings editor (`ServerSettingsView`/`FeatureSettingsView`, keyed by COM path /
+   INI key) now carries a stable `AutomationId` — the MCP audit went from 20/F
+   (12/58 actionable controls identified) to 100/A (58/58). The only residual
+   "duplicate" is the WPF default `TreeViewItem` expander toggle (`Expander`, one
+   per nav group), a framework template part left untouched to avoid retemplating.
+8. ✅ **Theme** — follows the OS theme by default (and tracks live OS changes via
+   `SystemThemeWatcher`) until the manual toggle sets an explicit Light/Dark
+   preference, which then persists and stops OS tracking.
+9. ✅ **Navigation restructure** — the overloaded 13-item **Advanced** group is
+   split into **Security** (auto-ban/TLS, IP ranges, SSL certs, transport security,
+   ACME), **Network** (ports, incoming relays, API & monitoring) and **Maintenance**
+   (performance, scripting, event scripts, server messages, groups); the top-level
+   **Status** node was already present.
+10. ✅ **Style unification** — app-wide `ui:ControlsDictionary` already themes the
+    standard controls and all code-built pages use the shared `Card`/`PageTitle`/
+    `PageSubtitle` styles and `Wpf.Ui` buttons; the Domain/Account/Route dialog text
+    inputs were converted from plain `TextBox` to `Wpf.Ui.Controls.TextBox` so they
+    match the card pages exactly.
+11. ✅ **Global exception handler** — unhandled UI-thread exceptions are appended
+    (with full stack) to `%LOCALAPPDATA%\hMailServer\ControlPanel\control-panel-errors.log`
+    and the user is offered a restart (preserving the original `/connect` args);
+    background-thread failures are logged too, instead of being silently handled.
+12. ✅ **Responsiveness** — lowered the window minimum to 760×520, made the sidebar
+    a bounded proportional column (200–260 px, 24% of width) and the Connect card
+    adaptive (300–400 px) so the UI works on small/zoomed/RDP sessions.
+
+#### Phase 3 — AV + security extensibility & hardening (CP-only) ✅ Done
+
+1. ✅ **Scanner presets + Test buttons** — "Test ClamAV connection" and "Test
+   ClamWin scanner" call the server COM `TestClamAVScanner`/`TestClamWinScanner`
+   (live values, result line); "Test custom scanner" validates the `%FILE%`
+   command's executable client-side; a Custom-scanner **preset picker** fills the
+   command line + infected return value for common engines (Microsoft Defender
+   `MpCmdRun`, Sophos `savscan`, ESET `ecls`, Bitdefender `bdscan`, Kaspersky
+   `avp.com`); plus a **ClamWin auto-detect** that locates `clamscan.exe` and the
+   database folder.
+2. ✅ **Event-script integration hooks** — an "Insert template" picker on the Event
+   scripts page appends ready-made `OnAcceptMessage` VBScript handlers (run an
+   external AV/DLP scanner via `WScript.Shell`, fire a webhook to a SIEM/Slack/Teams
+   endpoint, or call an external HTTP API and act on its verdict); the AntiVirus
+   custom-scanner card points admins here for engines without a CLI.
+3. ✅ **Advanced hardening card** (INI-backed) — a new "Advanced hardening" page
+   (under Security) surfaces the previously unexposed `IniFileSettings` knobs,
+   grouped into Greylisting (`GreylistingEnabledDuringRecordExpiration`,
+   `GreylistingRecordExpirationInterval`), Scanner timeouts
+   (`SAMinTimeout`/`SAMaxTimeout`, `ClamMinTimeout`/`ClamMaxTimeout`), DNS
+   (`UseDNSCache`, `DNSServer`, `DNSBLChecksAfterMailFrom`), Authentication &
+   headers (`AuthUserReplacementIP`, `DisableAUTHList`,
+   `AddXAuthUserHeader`/`AddXAuthUserIP`, `AddXOriginalRcptTo`) and Other
+   (`BlockedIPHoldSeconds`, `RewriteEnvelopeFromWhenForwarding`, and a
+   `PreferredHashAlgorithm` picker: Argon2id/PBKDF2/SHA-256/MD5/Blowfish). Defaults
+   mirror the server's; a new `ChoiceSetting` (combo) was added to the INI editor.
+4. ✅ **Account password-strength validation** — the account dialog shows a live
+   strength indicator (Weak/Fair/Strong, colour-coded, with what's missing) under
+   the password field as it is typed, and saving a weak password (under 8 chars or
+   a single character class) prompts a confirmation the admin can override. Backed
+   by a shared offline `PasswordStrength` heuristic (length + character-class
+   variety).
+
+### Track B — delivered (continued)
+
+#### B4 — BATV (prvs) backscatter protection ✅ Done
+
+- ✅ **BATV** (Bounce Address Tag Validation, `prvs` scheme) — backscatter
+  protection. Local outbound MAIL FROM is signed `prvs=<K><DDD><6-hex HMAC>=local@domain`
+  (wire-only, envelope domain preserved so SPF/DKIM stay aligned); inbound bounces to
+  a prvs return-path are HMAC/day-window validated and stripped back to the original
+  recipient, while forged null-sender bounces to invalid tags are rejected. Default-off
+  via `[Settings] BATVEnabled` / `BATVSecret`. Covered by `SMTP/Batv.cs`
+  (over-the-wire sign + validate + tamper-reject) and a `ClassTester` self-test.
+
+#### B6 — Standards-based filtering (Sieve + ManageSieve) ✅ Done
+
+- **Sieve** (RFC 5228) interpreter + **ManageSieve** (RFC 5804) service alongside
+  the proprietary rules engine (`RuleApplier`).
+  - **Sieve parser foundation.** A new `Common/Sieve/` module
+    implements an RFC 5228 lexer (`SieveLexer`: comments, quoted + multi-line
+    `text:` strings with dot-stuffing, K/M/G numbers, tags, punctuation) and a
+    recursive-descent parser (`SieveParser`) that builds an AST
+    (`SieveCommand`/`SieveTest`/`SieveArgument`) while validating the grammar, the
+    supported command/test set, and `require` placement. Surfaced through the COM
+    API as `Utilities.CheckSieveSyntax` (returns an empty string when valid, else a
+    line-numbered error), mirroring the event-script `CheckSyntax` precedent.
+    Validated by the `SieveSyntax` regression test (valid + invalid scripts).
+  - **Sieve evaluator.** `SieveEvaluator` executes the AST against a
+    `SieveMessage` (an unfolded-header + octet-size read model) and produces an
+    action summary: RFC 5228 control flow (`if`/`elsif`/`else`/`stop`), the core
+    tests (`true`/`false`/`not`/`allof`/`anyof`/`header`/`address`/`exists`/`size`
+    with `:is`/`:contains`/`:matches`, address parts `:all`/`:localpart`/`:domain`,
+    and the default + `i;octet` comparators) and the core actions
+    (`keep`/`fileinto`/`discard`/`redirect` plus implicit keep). Surfaced through
+    COM as `Utilities.EvaluateSieveScript(script, rawMessage)` returning the
+    `;`-joined action summary (or `error: …`). Validated by the `SieveEvaluation`
+    regression test.
+  - **Per-account script storage.** `SieveStorage` persists each
+    account's active Sieve script as a file under
+    `{DataDirectory}\Sieve\{domain}\{localpart}\active.sieve` (filesystem-safe path
+    sanitization; no DB schema change — the named-script model for ManageSieve
+    layers on top of this directory). Surfaced as the COM `Account.SieveScript`
+    get/put property (file-backed, written immediately). Validated by the
+    `SieveAccountScript` round-trip test.
+  - **Sieve filtering live in local delivery.** `LocalDelivery` now loads
+    the recipient account's active Sieve script and evaluates it against the
+    message during delivery (`EvaluateSieveScript_`): a `fileinto` routes the
+    message into the named IMAP folder (overriding the rule-selected folder), a
+    `discard` silently drops it, and the implicit `keep` delivers to INBOX as
+    normal. A no-script account is unaffected (zero overhead), and an unparseable
+    script never breaks delivery (logged, falls through to keep). Validated by the
+    `SieveDelivery` test (matching message filed into a folder; matching message
+    discarded while a normal message is still delivered).
+  - **Sieve `redirect` action.** A `redirect "addr"` now queues a copy of
+    the message for delivery to the target address (`SMTPForwarding::RedirectToAddress`,
+    reusing the account-forwarding copy/loop-guard/SRS path) and cancels the
+    implicit local keep (unless the script also `keep`s or `fileinto`s). The
+    delivery manager is signalled (`DeliveryQueue::StartDelivery`) so the copy is
+    sent promptly. Validated by the `SieveDelivery` redirect test (target receives
+    the copy; source keeps none). **Sieve (RFC 5228) is now functionally complete**
+    — parse → syntax-check → evaluate → per-account storage → live filtering with
+    keep/fileinto/discard/redirect.
+  - **ManageSieve (RFC 5804) service.** A new optional listener
+    (`ManageSieveServer`, a raw-socket + `std::thread` service like
+    `MetricsServer`/`RestApiServer`, enabled via `[Settings] ManageSieveServerPort`
+    and disabled by default) lets a client manage multiple named Sieve scripts over
+    TCP: `CAPABILITY`, SASL `PLAIN` `AUTHENTICATE` (against the regular account
+    database via `PasswordValidator`), `PUTSCRIPT`/`CHECKSCRIPT` (syntax-checked
+    through `SieveScript::CheckSyntax`), `LISTSCRIPTS`, `GETSCRIPT`, `SETACTIVE`,
+    `DELETESCRIPT` (refusing the active script per RFC 5804), `HAVESPACE`, `NOOP`
+    and `LOGOUT`, including non-synchronizing literal (`{NNN+}`) handling.
+    `SieveStorage` gained a named-script model (`scripts\{name}.sieve` + an
+    `active.name` marker) layered on the existing `active.sieve` that delivery
+    reads, so activating a script over ManageSieve is immediately honoured by local
+    delivery — no DB schema change. Validated by the `ManageSieve` regression test
+    (auth, full PUT/LIST/GET/SETACTIVE/DELETE round-trip, then an activated script
+    filing a delivered message). **B6 is complete** — Sieve interpreter +
+    ManageSieve service both shipped.
+
+#### B7 — Operability & observability ✅ Done (delivered items)
+
+- **Done — health/readiness/liveness probes.** The local unauthenticated metrics
+  listener (`MetricsServer`, enabled via `[Settings] MetricsServerPort`) now also
+  serves Kubernetes-style probes alongside `/metrics`: `/livez` (always 200 once
+  the listener is up), `/readyz` (200 when the server is `StateRunning` and the DB
+  pool reports connected, else 503), and `/healthz` (JSON: status, server state,
+  database up/down, per-protocol session counts, uptime). Covered by the
+  `HealthProbes` regression test.
+- **Done — database observability metrics.** `/metrics` now also exposes
+  `hmailserver_database_up` (1/0) and `hmailserver_db_connections{state="busy|available"}`
+  gauges sourced from the `DatabaseConnectionManager` pool, giving DB connectivity
+  and pool-saturation visibility. Asserted by the `HealthProbes` test.
+- **Done — log retention/rotation.** A scheduled `LogRetentionTask` (runs once at
+  startup, then every 6h) deletes hMailServer's own date-stamped log files older
+  than `[Settings] LogDeleteDays` (0 = disabled, the default, so historical
+  behaviour is unchanged). Only files named `hmailserver_*.log` /
+  `ERROR_hmailserver_*.log` are ever touched. Covered by the `LogRetention` test.
+- **Done — TLS handshake metrics.** `ServerStatus` now counts completed and failed
+  TLS/SSL handshakes (incremented in `TCPConnection`), exposed on `/metrics` as
+  `hmailserver_tls_handshakes_total` and `hmailserver_tls_handshake_failures_total`
+  counters for TLS health alerting. Asserted by the `HealthProbes` test.
+- **Done — delivery-queue depth metric.** `/metrics` exposes
+  `hmailserver_delivery_queue_messages` (count of messages in the SMTP delivery
+  queue, i.e. in the `Delivering` state). The count is queried via
+  `PersistentMessage::GetDeliveryQueueCount()` and cached for 10s inside the
+  metrics listener so frequent scrapes never issue a `COUNT(*)` per request.
+  Asserted by the `HealthProbes` test.
+- **Done — authentication metrics.** `/metrics` exposes
+  `hmailserver_auth_success_total` and `hmailserver_auth_failures_total` counters,
+  incremented from the central `AccountLogon::Logon` path (covers every protocol's
+  authentication). Enables alerting on credential-stuffing / brute-force spikes.
+  The `HealthProbes` test performs a real failed POP3 login and asserts the failure
+  counter increments (wiring, not just presence).
+- **Done — message-to-session correlation IDs.** The SMTP `Received` header the
+  server stamps on every accepted message now carries an RFC 5321 `id` clause whose
+  value is the numeric TCP session id (`Received: ... with ESMTP<flags> id <n>`).
+  The same session id prefixes every line of that connection's SMTP session log, so
+  a delivered message can be traced back to the exact session that received it
+  without any external trace system. Asserted by the `ReceivedHeaders`
+  `TestReceivedHeaderContainsCorrelationId` test (6/6 green). Full OpenTelemetry
+  spans / OTLP export across SMTP/IMAP/POP/DB remain future work.
+- **Done — delivery-outcome metrics.** `/metrics` exposes
+  `hmailserver_messages_delivered_total`, `hmailserver_messages_deferred_total`
+  and `hmailserver_messages_bounced_total` counters, incremented from the SMTP
+  delivery threads (`SMTPDeliverer`): delivered/deferred at the terminal delivery
+  outcome and bounced at the point an NDR is actually generated. Enables
+  delivery-success-rate, retry-pressure and bounce-rate alerting. Asserted by the
+  `DeliveryMetrics` test (the delivered counter advances after a successful local
+  delivery).
+- **Done — per-command processing-latency metric.** `/metrics` now exposes the
+  Prometheus summary `hmailserver_command_processing_seconds` (`_sum` + `_count`),
+  accumulated centrally in `TCPConnection`'s line-command dispatch (covers every
+  SMTP/IMAP/POP3 command line) via `ServerStatus::OnCommandProcessed`. Average
+  command latency is derivable without per-command histograms. Asserted by the
+  `HealthProbes` test (the metric is present and its count advances after protocol
+  activity).
+- **Done — connection-pool condition variable.** `DatabaseConnectionManager`'s
+  `GetConnection_` no longer busy-polls with `Sleep(10)` while waiting for a free
+  connection; it blocks on a `condition_variable_any` signalled by
+  `ReleaseConnection_` (with a 100ms backstop timeout). Removes scrape/latency
+  jitter under pool exhaustion. Validated by 64 DB-intensive regression tests.
+- **Done — graceful shutdown drain.** On shutdown the server moves to
+  `StateStopping` (so `/readyz` returns 503 and load balancers stop routing) and,
+  if `[Settings] ShutdownDrainSeconds > 0`, waits up to that window for active
+  SMTP/IMAP/POP sessions (`SessionManager::GetNumberOfConnections()`) to finish
+  before tearing the listeners down — keeping the metrics listener up during the
+  drain. Default 0 preserves the previous immediate-stop behaviour. Validated by
+  the `ShutdownDrain` test (Stop() returns promptly when idle, waits ~the window
+  while a session is held open).
+- **Done — configurable message-store fsync.** With `[Settings] MessageStoreFsync = 1`
+  a received message is forced to physical disk (`fflush` + `_commit` →
+  `FlushFileBuffers`, via the new `File::FlushToDisk()`) before the spool file is
+  closed at the SMTP accept point — so the message is durable before the server
+  acknowledges it to the sender. Default 0 keeps the previous OS-buffered behaviour
+  (no per-message fsync cost). Validated by the `MessageStoreDurability` test
+  (delivery still succeeds end-to-end with the barrier on). The broader consistency
+  checker / recovery tooling remains future work.
+- **Done — message-store consistency check.** Opt-in via
+  `[Settings] MessageStoreConsistencyCheck = 1`: a scheduled, read-only task
+  (`MessageStoreConsistencyTask`, run once at startup then hourly) cross-checks
+  every message row against its backing file on disk
+  (`PersistentMessage::GetMissingFileCount()` reconstructs each on-disk path with
+  the same logic the server uses) and publishes the count of missing files as the
+  `hmailserver_messagestore_missing_files` gauge, logging a warning when divergence
+  is found. The check never deletes or repairs anything. Default 0 keeps the
+  (potentially expensive) store walk off. Validated by the
+  `MessageStoreConsistency` test (delete a delivered message's file → gauge reports
+  the missing file).
+- **Done — message-store recovery report.** When the consistency check finds
+  missing files it writes `hMailServer_messagestore_consistency.report` to the log
+  directory: a timestamped, tab-separated list of every affected message
+  (`PersistentMessage::GetMissingFileDetails()` → `messageid`, account, expected
+  on-disk path) so an administrator has an actionable artifact to drive recovery
+  (restore-from-backup, user notification, orphan cleanup). Read-only; the report
+  is regenerated on each scan. Asserted by the `MessageStoreConsistency` test (the
+  report lists the missing message's path and account). Active automated
+  repair/re-fetch remains future work.
+- **Done — HA active/passive runbook.** A documented, validated active/passive
+  topology (shared external database + shared message store + floating VIP) with
+  readiness gating on `/readyz` and graceful-drain failover, in
+  [hmailserver/docs/HighAvailabilityRunbook.md](hmailserver/docs/HighAvailabilityRunbook.md).
+  No clustering code — failover is driven by external infrastructure plus the
+  readiness/drain primitives already shipped in this track.
+
+#### B8 — SBOM + dependency/CVE scanning ✅ Done
+
+- **Done — SBOM + dependency/CVE scanning (GitHub-native).** Three additive
+  supply-chain pieces under `.github/`: **Dependabot** (`dependabot.yml`) raises
+  CVE/security-advisory alerts and grouped weekly update PRs for the NuGet
+  packages (Control Panel + C# tests/tooling) and the GitHub Actions; an **SBOM**
+  workflow (`sbom.yml`, Syft via `anchore/sbom-action`) emits SPDX + CycloneDX
+  inventories on every push to master and attaches them to each published release;
+  and a **dependency-review** PR gate (`dependency-review.yml`,
+  `actions/dependency-review-action`) fails any PR that introduces a
+  high/critical-CVE dependency. (Vendored native C++ libs have no Dependabot
+  ecosystem and stay tracked in `libraries/build-dependencies.ps1`.)
+
+### Cross-cutting — delivered
+
+- **Done — Sieve filter editor + operability/durability/ManageSieve settings.** The
+  Control Panel account dialog gained a **Sieve** tab (a monospace editor bound to
+  the late-bound COM `Account.SieveScript` property — runs during local delivery,
+  supports keep/fileinto/discard/redirect). The data-driven feature-settings pages
+  (`FeatureSettingsView` over `hMailServer.INI`) gained cards for **ManageSieve**
+  (`ManageSieveServerPort`/`BindAddress`), **Operability** (`LogDeleteDays`,
+  `ShutdownDrainSeconds`) and **Message store durability** (`MessageStoreFsync`,
+  `MessageStoreConsistencyCheck`); the existing Monitoring card already surfaced
+  `MetricsServerPort`/`BindAddress`/`JsonLogging`. Control Panel builds 0/0 with
+  `-warnaserror`.
 
 ## Completed master-sequence steps
 
