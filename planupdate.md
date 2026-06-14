@@ -32,7 +32,8 @@ the release asset.
    domain-joined runner) → then **Track A Phase 0** (drop the classic from the
    installer). CP becomes the sole shipped GUI.
 2. **B2 — authentication modernization follow-ups** (live JWKS/introspection +
-   RS256 interop, O365/Gmail XOAUTH2 + Thunderbird SCRAM interop, full SASLprep).
+   O365/Gmail XOAUTH2 + Thunderbird SCRAM interop). *RS256 auto-test coverage and
+   full RFC 4013 SASLprep are done (v6.2.2).*
 3. **Track A Phase 2 — Control-Panel UX/UI polish.**
 4. **Track A Phase 3 — AV/security extensibility + INI hardening knobs.**
 5. **B7 — operability & observability** (OpenTelemetry, health probes, DB pool/
@@ -140,14 +141,14 @@ installer.
 SCRAM-SHA-256-PLUS channel binding across all three, deterministic
 anti-enumeration salts, Argon2id KDF, the hash-policy engine
 (`MinimumAcceptedHashAlgorithm`) + SCRAM min-hash enforcement, optional server-side
-pepper, POP3/IMAP UTF8 + SASLprep, and offline OAuth2 XOAUTH2/OAUTHBEARER.*
+pepper, POP3/IMAP UTF8 + full RFC 4013 SASLprep, and offline OAuth2 XOAUTH2/OAUTHBEARER
+(incl. automated RS256 public-key coverage).*
 
 Remaining:
 
 - **OAuth2 live validation** — JWKS fetch / token introspection (today validation
   is offline/local only). RS256 public-key tokens are now covered by automated
   regression tests; live-IdP JWKS/introspection still needs a running provider.
-- **Full SASLprep** of non-ASCII credentials (today a pragmatic RFC 4013 subset).
 - **Interop verification** — O365/Gmail XOAUTH2 + Thunderbird SCRAM.
 
 ### B4 — Deliverability & SMTP standards
@@ -401,13 +402,21 @@ and upgrading the management/admin INI password from MD5.
   key (default empty). When set, applied as an HMAC-SHA-256 keyed transform of the password before the
   **Argon2id** hash (Argon2id only — peppering PBKDF2 would break SCRAM). Validated by
   `RegressionTests.Security.PasswordPepper`; Security 39/39 green.
-- ✅ **POP3/IMAP UTF8 and SASLprep of non-ASCII SASL credentials — delivered in v6.2.0.** POP3 advertises
+- ✅ **POP3/IMAP UTF8 and SASLprep of non-ASCII SASL credentials — delivered in v6.2.0; SASLprep
+  completed to full RFC 4013 in v6.2.2.** POP3 advertises
   `UTF8` in `CAPA` and accepts `UTF8` (RFC 6856); IMAP advertises `UTF8=ACCEPT` and honours
   `ENABLE UTF8=ACCEPT` (RFC 6855). SASL `PLAIN` tokens decoded as raw UTF-8 via
-  `StringParser::DecodeSaslPlain`, and the decoded authcid passed through a pragmatic RFC 4013
-  `StringParser::SaslPrep` on the POP3/IMAP/SMTP paths. Validated by
-  `TestUtf8CapabilityAndCommand`, `TestAuthPlainSaslPrepsUsername`, `TestEnableUtf8AcceptEchoesEnabled`;
-  POP3/Security/IMAP/SMTP 178/178 green.
+  `StringParser::DecodeSaslPlain`, and the decoded authcid passed through a full RFC 4013
+  `StringParser::SaslPrep` on the POP3/IMAP/SMTP paths: RFC 3454 mapping (B.1 → nothing,
+  C.1.2 → space), **Unicode NFKC normalization** (Win32 `NormalizeString`), the complete
+  prohibited-output tables (C.2.1, C.2.2, C.3–C.9 — controls, private-use, non-characters,
+  surrogates, etc.), and the RFC 3454 §6 bidirectional check (a RandALCat string must contain
+  no LCat character and must start and end RandALCat). NFKC is a no-op on ASCII, so existing
+  credentials are unaffected; the A.1 (unassigned) and exhaustive D.2 (LCat) tables are out of
+  scope (require the full UCD; StringPrep is superseded by PRECIS/RFC 7613). Validated by
+  `TestUtf8CapabilityAndCommand`, `TestAuthPlainSaslPrepsUsername`, `TestAuthPlainSaslPrepNfkcUsername`,
+  the in-server `StringParserTester` self-test (NFKC/prohibition/bidi vectors), and
+  `TestEnableUtf8AcceptEchoesEnabled`; POP3/Security/Infrastructure green.
 - ✅ **OAuth2 bearer authentication — SASL XOAUTH2 + OAUTHBEARER (RFC 7628) — delivered in v6.2.0.**
   POP3, IMAP and SMTP submission accept bearer-token logins. The new `OAuth2TokenValidator`
   (`Common/Util`) validates the JWT **locally**: enforces an algorithm allow-list

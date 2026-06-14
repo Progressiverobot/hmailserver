@@ -12,6 +12,9 @@
 #include "../Unicode.h"
 #include <boost/lexical_cast.hpp>
 
+// NormalizeString (NFKC) for SASLprep lives in Normaliz.lib.
+#pragma comment(lib, "Normaliz.lib")
+
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
 #define new DEBUG_NEW
@@ -601,58 +604,267 @@ namespace HM
       }
    }
 
+   // ---------------------------------------------------------------------------
+   // SASLprep (RFC 4013) helper tables / routines.
+   //
+   // Link the Windows normalisation API used for the NFKC step.
+   // ---------------------------------------------------------------------------
+   namespace
+   {
+      struct CpRange { unsigned int lo; unsigned int hi; };
+
+      bool InRanges(unsigned int cp, const CpRange *ranges, size_t count)
+      {
+         for (size_t i = 0; i < count; i++)
+            if (cp >= ranges[i].lo && cp <= ranges[i].hi)
+               return true;
+         return false;
+      }
+
+      // RFC 3454 B.1 - commonly mapped to nothing.
+      bool SaslMapToNothing(unsigned int cp)
+      {
+         static const CpRange ranges[] = {
+            {0x00AD, 0x00AD}, {0x034F, 0x034F}, {0x1806, 0x1806},
+            {0x180B, 0x180D}, {0x200B, 0x200D}, {0x2060, 0x2060},
+            {0xFE00, 0xFE0F}, {0xFEFF, 0xFEFF},
+         };
+         return InRanges(cp, ranges, sizeof(ranges) / sizeof(ranges[0]));
+      }
+
+      // RFC 3454 C.1.2 - non-ASCII space characters mapped to U+0020.
+      bool SaslMapToSpace(unsigned int cp)
+      {
+         static const CpRange ranges[] = {
+            {0x00A0, 0x00A0}, {0x1680, 0x1680}, {0x2000, 0x200A},
+            {0x202F, 0x202F}, {0x205F, 0x205F}, {0x3000, 0x3000},
+         };
+         return InRanges(cp, ranges, sizeof(ranges) / sizeof(ranges[0]));
+      }
+
+      // RFC 3454 prohibited output: C.2.1, C.2.2, C.3, C.4, C.5, C.6, C.7, C.8, C.9.
+      bool SaslProhibited(unsigned int cp)
+      {
+         static const CpRange ranges[] = {
+            // C.2.1 ASCII control characters.
+            {0x0000, 0x001F}, {0x007F, 0x007F},
+            // C.2.2 non-ASCII control characters.
+            {0x0080, 0x009F}, {0x06DD, 0x06DD}, {0x070F, 0x070F},
+            {0x180E, 0x180E}, {0x200C, 0x200D}, {0x2028, 0x2029},
+            {0x2060, 0x2063}, {0x206A, 0x206F}, {0x1D173, 0x1D17A},
+            // C.3 private use.
+            {0xE000, 0xF8FF}, {0xF0000, 0xFFFFD}, {0x100000, 0x10FFFD},
+            // C.4 non-character code points.
+            {0xFDD0, 0xFDEF}, {0xFFFE, 0xFFFF}, {0x1FFFE, 0x1FFFF},
+            {0x2FFFE, 0x2FFFF}, {0x3FFFE, 0x3FFFF}, {0x4FFFE, 0x4FFFF},
+            {0x5FFFE, 0x5FFFF}, {0x6FFFE, 0x6FFFF}, {0x7FFFE, 0x7FFFF},
+            {0x8FFFE, 0x8FFFF}, {0x9FFFE, 0x9FFFF}, {0xAFFFE, 0xAFFFF},
+            {0xBFFFE, 0xBFFFF}, {0xCFFFE, 0xCFFFF}, {0xDFFFE, 0xDFFFF},
+            {0xEFFFE, 0xEFFFF}, {0xFFFFE, 0xFFFFF}, {0x10FFFE, 0x10FFFF},
+            // C.5 surrogate code points.
+            {0xD800, 0xDFFF},
+            // C.6 inappropriate for plain text.
+            {0xFFF9, 0xFFFD},
+            // C.7 inappropriate for canonical representation.
+            {0x2FF0, 0x2FFB},
+            // C.8 change display properties / deprecated.
+            {0x0340, 0x0341}, {0x200E, 0x200F}, {0x202A, 0x202E}, {0x206A, 0x206F},
+            // C.9 tagging characters.
+            {0xE0001, 0xE0001}, {0xE0020, 0xE007F},
+         };
+         return InRanges(cp, ranges, sizeof(ranges) / sizeof(ranges[0]));
+      }
+
+      // RFC 3454 D.1 - characters with bidirectional property R or AL (RandALCat).
+      bool SaslRandALCat(unsigned int cp)
+      {
+         static const CpRange ranges[] = {
+            {0x05BE, 0x05BE}, {0x05C0, 0x05C0}, {0x05C3, 0x05C3},
+            {0x05D0, 0x05EA}, {0x05F0, 0x05F4}, {0x061B, 0x061B},
+            {0x061F, 0x061F}, {0x0621, 0x063A}, {0x0640, 0x064A},
+            {0x066D, 0x066F}, {0x0671, 0x06D5}, {0x06DD, 0x06DD},
+            {0x06E5, 0x06E6}, {0x06FA, 0x06FE}, {0x0700, 0x070D},
+            {0x0710, 0x0710}, {0x0712, 0x072C}, {0x0780, 0x07A5},
+            {0x07B1, 0x07B1}, {0x200F, 0x200F}, {0xFB1D, 0xFB1D},
+            {0xFB1F, 0xFB28}, {0xFB2A, 0xFB36}, {0xFB38, 0xFB3C},
+            {0xFB3E, 0xFB3E}, {0xFB40, 0xFB41}, {0xFB43, 0xFB44},
+            {0xFB46, 0xFBB1}, {0xFBD3, 0xFD3D}, {0xFD50, 0xFD8F},
+            {0xFD92, 0xFDC7}, {0xFDF0, 0xFDFC}, {0xFE70, 0xFE74},
+            {0xFE76, 0xFEFC},
+         };
+         return InRanges(cp, ranges, sizeof(ranges) / sizeof(ranges[0]));
+      }
+
+      // RFC 3454 D.2 - characters with bidirectional property L (LCat). The full
+      // table is enormous; we cover the principal strong-left scripts (Latin, Greek,
+      // Cyrillic, Armenian, the major Indic blocks, CJK, Kana and Hangul) which is
+      // sufficient to detect a mixed L/RandAL string. Missing an exotic L code point
+      // only relaxes the check (a lenient accept), never causes a false reject.
+      bool SaslLCat(unsigned int cp)
+      {
+         static const CpRange ranges[] = {
+            {0x0041, 0x005A}, {0x0061, 0x007A}, {0x00AA, 0x00AA},
+            {0x00B5, 0x00B5}, {0x00BA, 0x00BA}, {0x00C0, 0x00D6},
+            {0x00D8, 0x00F6}, {0x00F8, 0x02B8}, {0x02BB, 0x02C1},
+            {0x0386, 0x0386}, {0x0388, 0x038A}, {0x038C, 0x038C},
+            {0x038E, 0x03A1}, {0x03A3, 0x03CE}, {0x03D0, 0x03F5},
+            {0x0400, 0x0482}, {0x048A, 0x04CE}, {0x04D0, 0x04F9},
+            {0x0531, 0x0556}, {0x0561, 0x0587}, {0x0905, 0x0939},
+            {0x0958, 0x0961}, {0x0985, 0x09B9}, {0x0A05, 0x0A39},
+            {0x0A85, 0x0AB9}, {0x0B05, 0x0B39}, {0x0B85, 0x0BB9},
+            {0x0C05, 0x0C39}, {0x0C85, 0x0CB9}, {0x0D05, 0x0D39},
+            {0x0E01, 0x0E30}, {0x0E40, 0x0E45}, {0x10A0, 0x10C5},
+            {0x10D0, 0x10F6}, {0x1100, 0x1159}, {0x1E00, 0x1FBC},
+            {0x3041, 0x3096}, {0x309D, 0x309F}, {0x30A1, 0x30FA},
+            {0x30FC, 0x30FF}, {0x3105, 0x312C}, {0x3131, 0x318E},
+            {0x3400, 0x4DB5}, {0x4E00, 0x9FA5}, {0xA000, 0xA48C},
+            {0xAC00, 0xD7A3}, {0xF900, 0xFA2D}, {0xFF21, 0xFF3A},
+            {0xFF41, 0xFF5A}, {0xFF66, 0xFFDC},
+         };
+         return InRanges(cp, ranges, sizeof(ranges) / sizeof(ranges[0]));
+      }
+
+      // Decode the UTF-16 code unit(s) at index i into a Unicode scalar value and
+      // advance i past the consumed unit(s).
+      unsigned int SaslNextCodePoint(const wchar_t *s, int len, int &i)
+      {
+         wchar_t c = s[i];
+         if (c >= 0xD800 && c <= 0xDBFF && i + 1 < len)
+         {
+            wchar_t c2 = s[i + 1];
+            if (c2 >= 0xDC00 && c2 <= 0xDFFF)
+            {
+               i += 2;
+               return 0x10000u + (((unsigned int)(c - 0xD800)) << 10) + (unsigned int)(c2 - 0xDC00);
+            }
+         }
+         i += 1;
+         return (unsigned int)c;
+      }
+
+      void SaslAppendCodePoint(std::wstring &out, unsigned int cp)
+      {
+         if (cp <= 0xFFFF)
+         {
+            out.push_back((wchar_t)cp);
+         }
+         else
+         {
+            cp -= 0x10000;
+            out.push_back((wchar_t)(0xD800 + (cp >> 10)));
+            out.push_back((wchar_t)(0xDC00 + (cp & 0x3FF)));
+         }
+      }
+
+      // NFKC (Normalization Form KC) via the Win32 normalisation API. Returns false
+      // if the input is not valid Unicode (e.g. an unpaired surrogate), which for a
+      // credential is treated as prohibited.
+      bool SaslNormalizeKC(const std::wstring &input, std::wstring &output)
+      {
+         if (input.empty())
+         {
+            output.clear();
+            return true;
+         }
+
+         int needed = NormalizeString(NormalizationKC, input.c_str(), (int)input.size(), NULL, 0);
+         if (needed <= 0)
+            return false; // ERROR_NO_UNICODE_TRANSLATION or other invalid input.
+
+         std::wstring buffer;
+         buffer.resize((size_t)needed);
+         int written = NormalizeString(NormalizationKC, input.c_str(), (int)input.size(), &buffer[0], needed);
+         if (written < 0)
+         {
+            // The estimate was too small; retry with the corrected size.
+            buffer.resize((size_t)(-written));
+            written = NormalizeString(NormalizationKC, input.c_str(), (int)input.size(), &buffer[0], (int)buffer.size());
+         }
+         if (written <= 0)
+            return false;
+
+         buffer.resize((size_t)written);
+         output.swap(buffer);
+         return true;
+      }
+   }
+
    bool
    StringParser::SaslPrep(const String &sInput, String &sOutput)
    {
-      // RFC 4013 SASLprep over a pragmatic subset (no NFKC). We walk the UTF-16 code
-      // units: map RFC 3454 table C.1.2 non-ASCII spaces to U+0020, drop table B.1
-      // "mapped to nothing" code points, and reject prohibited control characters
-      // (tables C.2.1 ASCII controls and C.2.2 non-ASCII controls). ASCII text that
-      // contains no controls passes through unchanged, so existing credentials are
-      // unaffected.
-      String result;
-      result.reserve(sInput.GetLength());
+      // RFC 4013 SASLprep. Four steps:
+      //   1. Map (RFC 3454 B.1 -> nothing, C.1.2 non-ASCII spaces -> U+0020).
+      //   2. Normalise with Unicode NFKC.
+      //   3. Prohibit output characters (tables C.2.1, C.2.2, C.3-C.9).
+      //   4. Check bidirectional text (RFC 3454 section 6).
+      // ASCII text without controls is unchanged by every step (NFKC is a no-op on
+      // ASCII), so existing credentials are unaffected. The A.1 (unassigned) and the
+      // exhaustive D.2 (LCat) tables require the full Unicode Character Database and
+      // are out of scope; StringPrep is superseded by PRECIS/RFC 7613.
 
-      for (int i = 0; i < sInput.GetLength(); i++)
+      // Step 1 - mapping.
+      std::wstring mapped;
+      mapped.reserve((size_t)sInput.GetLength());
+      const wchar_t *in = (LPCWSTR)sInput;
+      int inLen = sInput.GetLength();
+      for (int i = 0; i < inLen; )
       {
-         wchar_t c = sInput[i];
-
-         switch (c)
-         {
-         // RFC 3454 B.1 - commonly mapped to nothing.
-         case 0x00AD: // SOFT HYPHEN
-         case 0x034F: // COMBINING GRAPHEME JOINER
-         case 0x1806: // MONGOLIAN TODO SOFT HYPHEN
-         case 0x180B: case 0x180C: case 0x180D: // MONGOLIAN FREE VARIATION SELECTORS
-         case 0x200B: // ZERO WIDTH SPACE
-         case 0x200C: // ZERO WIDTH NON-JOINER
-         case 0x200D: // ZERO WIDTH JOINER
-         case 0x2060: // WORD JOINER
-         case 0xFEFF: // ZERO WIDTH NO-BREAK SPACE / BOM
+         unsigned int cp = SaslNextCodePoint(in, inLen, i);
+         if (SaslMapToNothing(cp))
             continue;
-
-         // RFC 3454 C.1.2 - non-ASCII space characters mapped to U+0020.
-         case 0x00A0: case 0x1680:
-         case 0x2000: case 0x2001: case 0x2002: case 0x2003: case 0x2004:
-         case 0x2005: case 0x2006: case 0x2007: case 0x2008: case 0x2009:
-         case 0x200A: case 0x202F: case 0x205F: case 0x3000:
-            result += L' ';
+         if (SaslMapToSpace(cp))
+         {
+            mapped.push_back(L' ');
             continue;
          }
-
-         // Variation selectors VS1-VS16 (B.1) mapped to nothing.
-         if (c >= 0xFE00 && c <= 0xFE0F)
-            continue;
-
-         // RFC 3454 C.2.1 (ASCII control characters) and C.2.2 (C1 controls plus DEL)
-         // are prohibited in a SASL credential.
-         if (c <= 0x001F || c == 0x007F || (c >= 0x0080 && c <= 0x009F))
-            return false;
-
-         result += c;
+         SaslAppendCodePoint(mapped, cp);
       }
 
-      sOutput = result;
+      // Step 2 - NFKC normalisation.
+      std::wstring normalized;
+      if (!SaslNormalizeKC(mapped, normalized))
+         return false;
+
+      // Steps 3 and 4 - prohibition and bidi.
+      bool hasRandAL = false;
+      bool hasL = false;
+      unsigned int firstCp = 0;
+      unsigned int lastCp = 0;
+      bool firstSet = false;
+      int normLen = (int)normalized.size();
+      const wchar_t *norm = normalized.c_str();
+      for (int i = 0; i < normLen; )
+      {
+         unsigned int cp = SaslNextCodePoint(norm, normLen, i);
+
+         if (SaslProhibited(cp))
+            return false;
+
+         if (!firstSet)
+         {
+            firstCp = cp;
+            firstSet = true;
+         }
+         lastCp = cp;
+
+         if (SaslRandALCat(cp))
+            hasRandAL = true;
+         else if (SaslLCat(cp))
+            hasL = true;
+      }
+
+      // RFC 3454 section 6: if a string contains any RandALCat character it must not
+      // contain any LCat character, and the first and last characters must both be
+      // RandALCat.
+      if (hasRandAL)
+      {
+         if (hasL)
+            return false;
+         if (!SaslRandALCat(firstCp) || !SaslRandALCat(lastCp))
+            return false;
+      }
+
+      sOutput = normalized.c_str();
       return true;
    }
 
@@ -965,7 +1177,7 @@ namespace HM
      s2 = "hijkl";
      Assert(!s1.Contains(s2));
 
-     // SaslPrep (RFC 4013 pragmatic subset).
+     // SaslPrep (RFC 4013: map -> NFKC -> prohibit -> bidi).
      String saslPrepped;
      // ASCII passes through unchanged.
      Assert(StringParser::SaslPrep(_T("user@example.test"), saslPrepped));
@@ -979,6 +1191,36 @@ namespace HM
      Assert(saslPrepped == _T("a b"));
      // A prohibited control character (U+0001, table C.2.1) is rejected.
      Assert(!StringParser::SaslPrep(L"a\u0001b", saslPrepped));
+
+     // NFKC normalisation: the Latin small ligature fi (U+FB01) decomposes to "fi".
+     Assert(StringParser::SaslPrep(L"\uFB01le", saslPrepped));
+     Assert(saslPrepped == _T("file"));
+     // NFKC: fullwidth Latin A (U+FF21) folds to ASCII "A".
+     Assert(StringParser::SaslPrep(L"\uFF21", saslPrepped));
+     Assert(saslPrepped == _T("A"));
+     // NFKC: superscript two (U+00B2) folds to "2".
+     Assert(StringParser::SaslPrep(L"x\u00B2", saslPrepped));
+     Assert(saslPrepped == _T("x2"));
+     // Mapping then NFKC: U+00AD (soft hyphen) is removed, leaving "IX".
+     Assert(StringParser::SaslPrep(L"I\u00ADX", saslPrepped));
+     Assert(saslPrepped == _T("IX"));
+
+     // C.3 private-use code point is prohibited.
+     Assert(!StringParser::SaslPrep(L"a\uE000b", saslPrepped));
+     // C.4 non-character code point is prohibited.
+     Assert(!StringParser::SaslPrep(L"a\uFDD0b", saslPrepped));
+     // C.6 inappropriate-for-plain-text code point is prohibited.
+     Assert(!StringParser::SaslPrep(L"a\uFFFDb", saslPrepped));
+
+     // Bidi (RFC 3454 section 6): an all-RandALCat string (two Hebrew letters) is
+     // accepted unchanged.
+     Assert(StringParser::SaslPrep(L"\u05D0\u05D1", saslPrepped));
+     Assert(saslPrepped == String(L"\u05D0\u05D1"));
+     // Bidi: mixing an L character (ASCII 'a') with a RandALCat character is rejected.
+     Assert(!StringParser::SaslPrep(L"a\u05D0", saslPrepped));
+     // Bidi: a RandALCat string must start and end with RandALCat - a trailing ASCII
+     // digit (European Number, not RandALCat) is rejected.
+     Assert(!StringParser::SaslPrep(L"\u05D0\u05D11", saslPrepped));
    }
  
    

@@ -150,6 +150,27 @@ namespace RegressionTests.POP3
       }
 
       [Test]
+      [Description("RFC 4013 SASLprep applies Unicode NFKC normalization to the SASL PLAIN " +
+                   "username, so a fullwidth Latin letter (U+FF4E) folds to its ASCII form and " +
+                   "still matches the registered account.")]
+      public void TestAuthPlainSaslPrepNfkcUsername()
+      {
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "nfkcprep@example.test", "SeC-r3t Pass!");
+
+         var tc = new TcpConnection();
+         Assert.IsTrue(tc.Connect(110));
+         tc.ReadUntil("+OK"); // banner
+
+         // FULLWIDTH LATIN SMALL LETTER N (U+FF4E) NFKC-folds to ASCII 'n'.
+         string final = Pop3SaslTestClient.AuthenticatePlain(tc, "\uFF4Efkcprep@example.test", "SeC-r3t Pass!");
+         Assert.IsTrue(final.StartsWith("+OK"),
+            "SASLprep NFKC should fold the fullwidth 'n' so the account matches. Got: " + final);
+
+         tc.Send("QUIT\r\n");
+         tc.Disconnect();
+      }
+
+      [Test]
       [Description("RFC 5034 SASL PLAIN over POP3 authenticates a local account.")]
       public void TestAuthPlainAuthenticates()
       {
