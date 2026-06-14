@@ -543,6 +543,20 @@ namespace HM
    {
       password_ = sNewVal;
 
+      // Prefer machine-scoped DPAPI so the database password in hMailServer.ini
+      // cannot be decrypted off-box. Fall back to the legacy Blowfish scheme when
+      // DPAPI is disabled or unavailable (so a non-empty password is never lost).
+      if (protect_stored_secrets_with_dpapi_)
+      {
+         String protectedValue = Crypt::Instance()->EnCrypt(password_, Crypt::ETDPAPI);
+         if (!protectedValue.IsEmpty() || password_.IsEmpty())
+         {
+            WriteIniSetting_("Database", "Password", protectedValue);
+            WriteIniSetting_("Database", "PasswordEncryption", Crypt::ETDPAPI);
+            return;
+         }
+      }
+
       WriteIniSetting_("Database", "Password", Crypt::Instance()->EnCrypt(password_, Crypt::ETBlowFish));
       WriteIniSetting_("Database", "PasswordEncryption", Crypt::ETBlowFish);
    }
