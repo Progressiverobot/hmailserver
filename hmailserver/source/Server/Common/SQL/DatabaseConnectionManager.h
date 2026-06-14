@@ -30,6 +30,11 @@ namespace HM
 
       bool GetIsConnected();
 
+      // Connection-pool observability (used by the metrics endpoint). Busy =
+      // currently checked out by a caller, available = idle in the pool.
+      int GetBusyConnectionCount();
+      int GetAvailableConnectionCount();
+
       std::shared_ptr<DALConnection> BeginTransaction(String &sErrorMessage);
       bool CommitTransaction(std::shared_ptr<DALConnection> pConnection, String &sErrorMessage);
       bool RollbackTransaction(std::shared_ptr<DALConnection> pConnection, String &sErrorMessage);

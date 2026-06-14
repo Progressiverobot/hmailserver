@@ -139,6 +139,9 @@ namespace RegressionTests.Infrastructure
             (int status, string body) metrics = HttpGet("/metrics");
             Assert.AreEqual(200, metrics.status, "Metrics should be 200. Body: " + metrics.body);
             Assert.IsTrue(metrics.body.Contains("hmailserver_uptime_seconds"), "Metrics body did not contain expected gauge.");
+            Assert.IsTrue(metrics.body.Contains("hmailserver_database_up 1"), "Metrics body should report database up. Body: " + metrics.body);
+            Assert.IsTrue(metrics.body.Contains("hmailserver_db_connections{state=\"busy\"}"), "Metrics body missing busy pool gauge. Body: " + metrics.body);
+            Assert.IsTrue(metrics.body.Contains("hmailserver_db_connections{state=\"available\"}"), "Metrics body missing available pool gauge. Body: " + metrics.body);
 
             // Unknown paths return 404.
             (int status, string body) notFound = HttpGet("/does-not-exist");

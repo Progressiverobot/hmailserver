@@ -214,9 +214,13 @@ SRS for forwarding (SPF alignment), and per-IP / per-destination rate shaping.*
   pool reports connected, else 503), and `/healthz` (JSON: status, server state,
   database up/down, per-protocol session counts, uptime). Covered by the
   `HealthProbes` regression test.
-- **OpenTelemetry** tracing (SMTP/IMAP/POP/DB spans + correlation IDs); richer
-  metrics (queue depth, per-command latency, DB pool saturation, TLS handshake
-  failures); log retention/rotation.
+- **Done — database observability metrics.** `/metrics` now also exposes
+  `hmailserver_database_up` (1/0) and `hmailserver_db_connections{state="busy|available"}`
+  gauges sourced from the `DatabaseConnectionManager` pool, giving DB connectivity
+  and pool-saturation visibility. Asserted by the `HealthProbes` test.
+- **OpenTelemetry** tracing (SMTP/IMAP/POP/DB spans + correlation IDs); further
+  metrics (queue depth, per-command latency, TLS handshake failures); log
+  retention/rotation.
 - Async/DB isolation: dedicated DB executor; replace the connection-pool `Sleep`
   polling with condition variables (`DatabaseConnectionManager`);
   prepared-statement caches (MySQL/PG).

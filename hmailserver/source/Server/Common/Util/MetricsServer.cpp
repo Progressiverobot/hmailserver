@@ -228,6 +228,25 @@ namespace HM
       line.Format("hmailserver_state %d\n", status->GetState());
       body += line;
 
+      // Database connectivity and connection-pool saturation.
+      std::shared_ptr<DatabaseConnectionManager> db_manager = Application::Instance()->GetDBManager();
+      bool database_up = db_manager && db_manager->GetIsConnected();
+
+      body += "# HELP hmailserver_database_up Whether the database connection pool reports at least one live connection (1=up, 0=down).\n";
+      body += "# TYPE hmailserver_database_up gauge\n";
+      line.Format("hmailserver_database_up %d\n", database_up ? 1 : 0);
+      body += line;
+
+      int db_busy = db_manager ? db_manager->GetBusyConnectionCount() : 0;
+      int db_available = db_manager ? db_manager->GetAvailableConnectionCount() : 0;
+
+      body += "# HELP hmailserver_db_connections Number of database connections in the pool by state.\n";
+      body += "# TYPE hmailserver_db_connections gauge\n";
+      line.Format("hmailserver_db_connections{state=\"busy\"} %d\n", db_busy);
+      body += line;
+      line.Format("hmailserver_db_connections{state=\"available\"} %d\n", db_available);
+      body += line;
+
       return body;
    }
 

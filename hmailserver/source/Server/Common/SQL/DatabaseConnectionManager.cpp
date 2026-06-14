@@ -311,6 +311,20 @@ namespace HM
       return true;
    }
 
+   int
+   DatabaseConnectionManager::GetBusyConnectionCount()
+   {
+      boost::lock_guard<boost::recursive_mutex> guard(mutex_);
+      return (int) busy_connections_.size();
+   }
+
+   int
+   DatabaseConnectionManager::GetAvailableConnectionCount()
+   {
+      boost::lock_guard<boost::recursive_mutex> guard(mutex_);
+      return (int) available_connections_.size();
+   }
+
    bool
    DatabaseConnectionManager::ExecuteScript(const String &sFile, String &sErrorMessage)
    {
