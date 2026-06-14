@@ -241,8 +241,27 @@ Signature / External / Rules / Folders / Directory).
 
 ---
 
+## Beyond parity — 6.x server capabilities surfaced in the CP (no classic equivalent)
+
+These are new server features the classic Administrator never had; the Control
+Panel surfaces them so it remains the single admin GUI.
+
+| Capability | Where in the CP | Server setting / API |
+|---|---|---|
+| ✅ **Sieve (RFC 5228) filter editor** | Account editor → **Sieve** tab (monospace editor) | COM `Account.SieveScript` (file-backed active script; keep/fileinto/discard/redirect) |
+| ✅ **ManageSieve (RFC 5804) service** | API & monitoring → **ManageSieve** card | `ManageSieveServerPort`, `ManageSieveServerBindAddress` |
+| ✅ **Prometheus metrics + health probes** | API & monitoring → **Monitoring** card | `MetricsServerPort`, `MetricsServerBindAddress`, `JsonLogging` |
+| ✅ **Operability** (log retention, graceful drain) | API & monitoring → **Operability** card | `LogDeleteDays`, `ShutdownDrainSeconds` |
+| ✅ **Message-store durability** (fsync, consistency check) | Advanced hardening → **Message store durability** card | `MessageStoreFsync`, `MessageStoreConsistencyCheck` |
+| ✅ **INI hardening knobs** (greylisting, scanner timeouts, DNS, auth headers, hash policy) | Advanced hardening page | various `[Settings]` keys |
+| ✅ **AV scanner presets + Test buttons; event-script integration templates** | Anti-virus / Event scripts pages | COM `TestClamAVScanner`/`TestClamWinScanner` |
+
+---
+
 *Generated 2026-06-13 from `source/Tools/Administrator/Main panes/*.cs` vs
-`source/Tools/ControlPanel/Views/*`. Status updated 2026-06-13 after the
-full gap-closure pass (tab-strip redesign, domain/account sub-editors, public
-folders, event scripts, route/distribution-list properties, SpamAssassin test,
-ChaCha interlock).*
+`source/Tools/ControlPanel/Views/*`. Status updated 2026-06-14: added the
+"beyond parity" section for the 6.x server capabilities now surfaced in the CP
+(Sieve editor, ManageSieve/metrics/operability/durability settings). Earlier
+2026-06-13 full gap-closure pass: tab-strip redesign, domain/account sub-editors,
+public folders, event scripts, route/distribution-list properties, SpamAssassin
+test, ChaCha interlock.*
