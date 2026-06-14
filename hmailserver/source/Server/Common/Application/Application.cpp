@@ -497,6 +497,40 @@ namespace HM
 
       ServerStatus::Instance()->SetState(ServerStatus::StateStopping);
 
+      // Graceful drain: give in-flight client sessions a bounded window to finish
+      // before we tear the servers down. The state is already StateStopping, so
+      // /readyz reports 503 and external load balancers stop routing new traffic
+      // (the metrics listener is intentionally kept up until the drain completes).
+      // ShutdownDrainSeconds <= 0 (the default) disables the wait entirely.
+      int drainSeconds = IniFileSettings::Instance()->GetShutdownDrainSeconds();
+      if (drainSeconds > 0)
+      {
+         int activeSessions = SessionManager::Instance()->GetNumberOfConnections();
+         if (activeSessions > 0)
+         {
+            LOG_APPLICATION(Formatter::Format("Graceful shutdown: draining {0} active session(s), up to {1}s...", activeSessions, drainSeconds));
+
+            ULONGLONG deadline = ::GetTickCount64() + (ULONGLONG)drainSeconds * 1000;
+            while (::GetTickCount64() < deadline)
+            {
+               if (SessionManager::Instance()->GetNumberOfConnections() <= 0)
+                  break;
+
+               Sleep(200);
+            }
+
+            int remaining = SessionManager::Instance()->GetNumberOfConnections();
+            if (remaining > 0)
+            {
+               LOG_APPLICATION(Formatter::Format("Graceful shutdown: drain window elapsed with {0} session(s) still active; stopping anyway.", remaining));
+            }
+            else
+            {
+               LOG_APPLICATION("Graceful shutdown: all sessions drained.");
+            }
+         }
+      }
+
       if (metrics_server_)
       {
          metrics_server_->Stop();

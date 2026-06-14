@@ -248,8 +248,16 @@ SRS for forwarding (SPF alignment), and per-IP / per-destination rate shaping.*
   jitter under pool exhaustion. Validated by 64 DB-intensive regression tests.
 - Async/DB isolation: dedicated DB executor; prepared-statement caches
   (MySQL/PG).
+- **Done — graceful shutdown drain.** On shutdown the server moves to
+  `StateStopping` (so `/readyz` returns 503 and load balancers stop routing) and,
+  if `[Settings] ShutdownDrainSeconds > 0`, waits up to that window for active
+  SMTP/IMAP/POP sessions (`SessionManager::GetNumberOfConnections()`) to finish
+  before tearing the listeners down — keeping the metrics listener up during the
+  drain. Default 0 preserves the previous immediate-stop behaviour. Validated by
+  the `ShutdownDrain` test (Stop() returns promptly when idle, waits ~the window
+  while a session is held open).
 - Message-store durability: configurable fsync + consistency checker + recovery
-  tooling. Graceful shutdown: readiness/drain + connection draining.
+  tooling.
 - HA: a documented, tested active/passive (shared DB + storage + VIP) runbook +
   readiness gating (no clustering code in this track).
 
