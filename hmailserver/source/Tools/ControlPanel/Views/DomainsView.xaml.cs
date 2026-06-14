@@ -147,25 +147,7 @@ namespace hMailServer.ControlPanel.Views
 
       // Shows a centered empty/error placeholder over a list when it has no rows.
       private static void SetListStatus(TextBlock status, int rowCount, string error, string emptyText, string errorPrefix)
-      {
-         if (status == null)
-            return;
-
-         if (error != null)
-         {
-            status.Text = errorPrefix + error;
-            status.Visibility = Visibility.Visible;
-         }
-         else if (rowCount == 0)
-         {
-            status.Text = emptyText;
-            status.Visibility = Visibility.Visible;
-         }
-         else
-         {
-            status.Visibility = Visibility.Collapsed;
-         }
-      }
+         => StatusText.Show(status, rowCount, error, emptyText, errorPrefix);
 
       private void AddAlias_Click(object sender, RoutedEventArgs e)
       {

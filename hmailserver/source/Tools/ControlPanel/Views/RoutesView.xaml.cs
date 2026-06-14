@@ -56,6 +56,7 @@ namespace hMailServer.ControlPanel.Views
 
          RouteGrid.ItemsSource = rows;
          ListSearch.Apply(RouteGrid, SearchBox.Text);
+         StatusText.Show(EmptyStatus, rows.Count, null, "No routes defined yet.");
       }
 
       private void Search_TextChanged(object sender, TextChangedEventArgs e)

@@ -53,6 +53,7 @@ namespace hMailServer.ControlPanel.Views
 
          CertGrid.ItemsSource = rows;
          ListSearch.Apply(CertGrid, SearchBox.Text);
+         StatusText.Show(EmptyStatus, rows.Count, null, "No certificates available yet.");
       }
 
       private void Search_TextChanged(object sender, TextChangedEventArgs e)

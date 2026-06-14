@@ -93,7 +93,10 @@ installer.
    non-empty numeric fields (sizes, limits, port, retries) are validated against a
    range via the shared `NumericField` helper and bad input is reported in an
    inline status line instead of being silently dropped on save.
-6. **Standardized loading/empty/error states** (shared status-line pattern).
+6. ✅ **Standardized loading/empty/error states** (shared `StatusText` helper;
+   centered empty/error placeholders on Domains aliases/lists and the Routes, IP
+   ranges, SSL certificate and TCP/IP port grids; Queue/Rules keep their count
+   subtitles).
 7. **Accessibility** — AutomationProperties.Name + access keys + tab order on
    all dialogs/pages.
 8. **Theme** — follow the OS theme by default (currently hard dark); keep the

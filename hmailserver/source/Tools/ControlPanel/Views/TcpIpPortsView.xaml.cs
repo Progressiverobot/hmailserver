@@ -71,6 +71,7 @@ namespace hMailServer.ControlPanel.Views
 
          PortGrid.ItemsSource = rows;
          ListSearch.Apply(PortGrid, SearchBox.Text);
+         StatusText.Show(EmptyStatus, rows.Count, null, "No ports configured.");
       }
 
       private void Search_TextChanged(object sender, TextChangedEventArgs e)

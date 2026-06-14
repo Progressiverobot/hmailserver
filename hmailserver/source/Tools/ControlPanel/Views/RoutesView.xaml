@@ -22,6 +22,7 @@
         </StackPanel>
 
         <Border Grid.Row="1" Style="{StaticResource Card}" Padding="6">
+            <Grid>
             <DataGrid x:Name="RouteGrid" AutoGenerateColumns="False" IsReadOnly="True"
                       HeadersVisibility="Column" GridLinesVisibility="None"
                       Background="Transparent" BorderThickness="0" RowHeight="34"
@@ -34,6 +35,11 @@
                     <DataGridTextColumn Header="Auth" Binding="{Binding Auth}" Width="80" />
                 </DataGrid.Columns>
             </DataGrid>
+            <TextBlock x:Name="EmptyStatus" Visibility="Collapsed"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                       FontSize="13" Opacity="0.7" TextWrapping="Wrap" TextAlignment="Center"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            </Grid>
         </Border>
 
         <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,12,0,0">

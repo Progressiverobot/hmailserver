@@ -62,6 +62,7 @@ namespace hMailServer.ControlPanel.Views
 
          RangeGrid.ItemsSource = rows;
          ListSearch.Apply(RangeGrid, SearchBox.Text);
+         StatusText.Show(EmptyStatus, rows.Count, null, "No IP ranges defined yet.");
       }
 
       private void Search_TextChanged(object sender, TextChangedEventArgs e)
