@@ -89,8 +89,10 @@ installer.
 4. ✅ **Consistent destructive-action confirmations** — aliases, distribution
    lists, distribution-list recipients and incoming relays now prompt Yes/No
    before deleting (matching accounts, IP ranges, queue and public folders).
-5. **Input validation + inline feedback** in Domain/Account/Route dialogs
-   (bad numeric input is silently ignored today).
+5. ✅ **Input validation + inline feedback** in Domain/Account/Route dialogs —
+   non-empty numeric fields (sizes, limits, port, retries) are validated against a
+   range via the shared `NumericField` helper and bad input is reported in an
+   inline status line instead of being silently dropped on save.
 6. **Standardized loading/empty/error states** (shared status-line pattern).
 7. **Accessibility** — AutomationProperties.Name + access keys + tab order on
    all dialogs/pages.

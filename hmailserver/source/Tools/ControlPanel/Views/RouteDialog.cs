@@ -29,6 +29,14 @@ namespace hMailServer.ControlPanel.Views
       private readonly TextBox authUser_ = new();
       private readonly PasswordBox authPassword_ = new();
 
+      private readonly TextBlock status_ = new()
+      {
+         Foreground = System.Windows.Media.Brushes.IndianRed,
+         TextWrapping = TextWrapping.Wrap,
+         VerticalAlignment = VerticalAlignment.Center,
+         Margin = new Thickness(2, 0, 8, 0)
+      };
+
       public RouteDialog(Window owner, string domainName)
       {
          domainName_ = domainName;
@@ -58,15 +66,22 @@ namespace hMailServer.ControlPanel.Views
          Grid.SetRow(tabs, 1);
          root.Children.Add(tabs);
 
-         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
+         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
          var save = new Wpf.Ui.Controls.Button { Content = "Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0) };
          save.Click += (s, e) => Save();
          var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel" };
          cancel.Click += (s, e) => Close();
          buttons.Children.Add(save);
          buttons.Children.Add(cancel);
-         Grid.SetRow(buttons, 2);
-         root.Children.Add(buttons);
+
+         var footer = new Grid { Margin = new Thickness(0, 12, 0, 0) };
+         footer.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+         footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+         footer.Children.Add(status_);
+         Grid.SetColumn(buttons, 1);
+         footer.Children.Add(buttons);
+         Grid.SetRow(footer, 2);
+         root.Children.Add(footer);
 
          Content = root;
          Loaded += (s, e) => Load();
@@ -196,16 +211,25 @@ namespace hMailServer.ControlPanel.Views
 
       private void Save()
       {
+         if (!NumericField.TryValidate(port_.Text, "Target SMTP port", 1, 65535, out int portV, out bool hasPort, out string error)
+          || !NumericField.TryValidate(tries_.Text, "Number of delivery retries", 0, int.MaxValue, out int triesV, out bool hasTries, out error)
+          || !NumericField.TryValidate(minutes_.Text, "Minutes between retries", 0, int.MaxValue, out int minutesV, out bool hasMinutes, out error))
+         {
+            status_.Text = error;
+            return;
+         }
+         status_.Text = "";
+
          dynamic routes = ServerSession.Current.Application.Settings.Routes;
          try
          {
             dynamic r = FindRoute(routes);
             if (r == null) { Close(); return; }
             r.TargetSMTPHost = host_.Text.Trim();
-            if (int.TryParse(port_.Text.Trim(), out int port)) r.TargetSMTPPort = port;
+            if (hasPort) r.TargetSMTPPort = portV;
             r.Description = description_.Text.Trim();
-            if (int.TryParse(tries_.Text.Trim(), out int t)) r.NumberOfTries = t;
-            if (int.TryParse(minutes_.Text.Trim(), out int m)) r.MinutesBetweenTry = m;
+            if (hasTries) r.NumberOfTries = triesV;
+            if (hasMinutes) r.MinutesBetweenTry = minutesV;
             r.AllAddresses = allAddresses_.IsChecked == true;
             int cs = ComboValue(connSecurity_);
             r.ConnectionSecurity = cs;

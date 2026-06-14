@@ -17,6 +17,14 @@ namespace hMailServer.ControlPanel.Views
       private readonly CheckBox active_ = new() { Content = "Domain enabled", FontSize = 13 };
       private readonly TextBox postmaster_ = new();
 
+      private readonly TextBlock status_ = new()
+      {
+         Foreground = System.Windows.Media.Brushes.IndianRed,
+         TextWrapping = TextWrapping.Wrap,
+         VerticalAlignment = VerticalAlignment.Center,
+         Margin = new Thickness(2, 0, 8, 0)
+      };
+
       // Limits
       private readonly TextBox maxSize_ = new();
       private readonly TextBox maxMessageSize_ = new();
@@ -87,15 +95,22 @@ namespace hMailServer.ControlPanel.Views
          Grid.SetRow(tabs, 1);
          root.Children.Add(tabs);
 
-         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
+         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
          var save = new Wpf.Ui.Controls.Button { Content = "Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0) };
          save.Click += (s, e) => Save();
          var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel" };
          cancel.Click += (s, e) => Close();
          buttons.Children.Add(save);
          buttons.Children.Add(cancel);
-         Grid.SetRow(buttons, 2);
-         root.Children.Add(buttons);
+
+         var footer = new Grid { Margin = new Thickness(0, 12, 0, 0) };
+         footer.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+         footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+         footer.Children.Add(status_);
+         Grid.SetColumn(buttons, 1);
+         footer.Children.Add(buttons);
+         Grid.SetRow(footer, 2);
+         root.Children.Add(footer);
 
          Content = root;
          Loaded += (s, e) => { Load(); aliasEditor_?.OnEnter(); };
@@ -241,6 +256,18 @@ namespace hMailServer.ControlPanel.Views
 
       private void Save()
       {
+         if (!NumericField.TryValidate(maxSize_.Text, "Maximum domain size (MB)", 0, int.MaxValue, out int msV, out bool hasMs, out string error)
+          || !NumericField.TryValidate(maxMessageSize_.Text, "Maximum message size (KB)", 0, int.MaxValue, out int mmsV, out bool hasMms, out error)
+          || !NumericField.TryValidate(maxAccountSize_.Text, "Maximum account size (MB)", 0, int.MaxValue, out int masV, out bool hasMas, out error)
+          || !NumericField.TryValidate(maxAccounts_.Text, "Maximum number of accounts", 0, int.MaxValue, out int mnaV, out bool hasMna, out error)
+          || !NumericField.TryValidate(maxAliases_.Text, "Maximum number of aliases", 0, int.MaxValue, out int mnalV, out bool hasMnal, out error)
+          || !NumericField.TryValidate(maxDists_.Text, "Maximum number of distribution lists", 0, int.MaxValue, out int mndV, out bool hasMnd, out error))
+         {
+            status_.Text = error;
+            return;
+         }
+         status_.Text = "";
+
          dynamic domains = ServerSession.Current.Application.Domains;
          try
          {
@@ -248,15 +275,15 @@ namespace hMailServer.ControlPanel.Views
             d.Active = active_.IsChecked == true;
             d.Postmaster = postmaster_.Text.Trim();
 
-            if (int.TryParse(maxSize_.Text.Trim(), out int ms)) d.MaxSize = ms;
-            if (int.TryParse(maxMessageSize_.Text.Trim(), out int mms)) d.MaxMessageSize = mms;
-            if (int.TryParse(maxAccountSize_.Text.Trim(), out int mas)) d.MaxAccountSize = mas;
+            if (hasMs) d.MaxSize = msV;
+            if (hasMms) d.MaxMessageSize = mmsV;
+            if (hasMas) d.MaxAccountSize = masV;
             d.MaxNumberOfAccountsEnabled = maxAccountsOn_.IsChecked == true;
-            if (int.TryParse(maxAccounts_.Text.Trim(), out int mna)) d.MaxNumberOfAccounts = mna;
+            if (hasMna) d.MaxNumberOfAccounts = mnaV;
             d.MaxNumberOfAliasesEnabled = maxAliasesOn_.IsChecked == true;
-            if (int.TryParse(maxAliases_.Text.Trim(), out int mnal)) d.MaxNumberOfAliases = mnal;
+            if (hasMnal) d.MaxNumberOfAliases = mnalV;
             d.MaxNumberOfDistributionListsEnabled = maxDistsOn_.IsChecked == true;
-            if (int.TryParse(maxDists_.Text.Trim(), out int mnd)) d.MaxNumberOfDistributionLists = mnd;
+            if (hasMnd) d.MaxNumberOfDistributionLists = mndV;
             d.PlusAddressingEnabled = plusAddressingOn_.IsChecked == true;
             if (plusChar_.Text.Length > 0) d.PlusAddressingCharacter = plusChar_.Text;
             d.AntiSpamEnableGreylisting = greylisting_.IsChecked == true;

@@ -14,6 +14,14 @@ namespace hMailServer.ControlPanel.Views
       private readonly string domainName_;
       private readonly string address_;
 
+      private readonly TextBlock status_ = new()
+      {
+         Foreground = System.Windows.Media.Brushes.IndianRed,
+         TextWrapping = TextWrapping.Wrap,
+         VerticalAlignment = VerticalAlignment.Center,
+         Margin = new Thickness(2, 0, 8, 0)
+      };
+
       // General
       private readonly CheckBox active_ = new() { Content = "Account enabled", FontSize = 13 };
       private readonly ComboBox adminLevel_ = new();
@@ -93,15 +101,22 @@ namespace hMailServer.ControlPanel.Views
          Grid.SetRow(tabs, 1);
          root.Children.Add(tabs);
 
-         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
+         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
          var save = new Wpf.Ui.Controls.Button { Content = "Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0) };
          save.Click += (s, e) => Save();
          var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel" };
          cancel.Click += (s, e) => Close();
          buttons.Children.Add(save);
          buttons.Children.Add(cancel);
-         Grid.SetRow(buttons, 2);
-         root.Children.Add(buttons);
+
+         var footer = new Grid { Margin = new Thickness(0, 12, 0, 0) };
+         footer.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+         footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+         footer.Children.Add(status_);
+         Grid.SetColumn(buttons, 1);
+         footer.Children.Add(buttons);
+         Grid.SetRow(footer, 2);
+         root.Children.Add(footer);
 
          Content = root;
          Loaded += (s, e) =>
@@ -475,6 +490,13 @@ namespace hMailServer.ControlPanel.Views
 
       private void Save()
       {
+         if (!NumericField.TryValidate(quota_.Text, "Maximum size (MB)", 0, int.MaxValue, out int quotaV, out bool hasQuota, out string error))
+         {
+            status_.Text = error;
+            return;
+         }
+         status_.Text = "";
+
          dynamic domains = ServerSession.Current.Application.Domains;
          try
          {
@@ -482,8 +504,8 @@ namespace hMailServer.ControlPanel.Views
             a.Active = active_.IsChecked == true;
             int lvl = ComboValue(adminLevel_, -1);
             if (lvl >= 0) a.AdminLevel = lvl;
-            if (int.TryParse(quota_.Text.Trim(), out int quota))
-               a.MaxSize = quota;
+            if (hasQuota)
+               a.MaxSize = quotaV;
             a.PersonFirstName = firstName_.Text.Trim();
             a.PersonLastName = lastName_.Text.Trim();
             if (password_.Password.Length > 0)
