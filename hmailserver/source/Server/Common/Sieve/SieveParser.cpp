@@ -362,7 +362,19 @@ namespace HM
          return false;
 
       if (nested)
-         test->tests.push_back(nested);
+      {
+         // A bare test-list comes back as an anonymous container; flatten its
+         // children directly into this test so allof/anyof/not evaluate cleanly.
+         if (nested->name.IsEmpty() && !nested->tests.empty())
+         {
+            for (const std::shared_ptr<SieveTest> &child : nested->tests)
+               test->tests.push_back(child);
+         }
+         else
+         {
+            test->tests.push_back(nested);
+         }
+      }
 
       return true;
    }

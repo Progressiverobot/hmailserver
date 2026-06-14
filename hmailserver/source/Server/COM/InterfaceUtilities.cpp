@@ -133,6 +133,25 @@ STDMETHODIMP InterfaceUtilities::CheckSieveSyntax(BSTR Script, BSTR *Result)
    }
 }
 
+STDMETHODIMP InterfaceUtilities::EvaluateSieveScript(BSTR Script, BSTR RawMessage, BSTR *Result)
+{
+   try
+   {
+      HM::String sScript(Script);
+      HM::String sRawMessage(RawMessage);
+
+      HM::String sResult = HM::SieveScript::Evaluate(sScript, sRawMessage);
+
+      *Result = sResult.AllocSysString();
+
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
 STDMETHODIMP InterfaceUtilities::BlowfishEncrypt(BSTR Input, BSTR *Output)
 {
    try

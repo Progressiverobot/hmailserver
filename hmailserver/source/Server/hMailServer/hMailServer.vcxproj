@@ -216,6 +216,8 @@ EXIT 0
     <ClCompile Include="..\Common\Application\LogRetentionTask.cpp" />
     <ClCompile Include="..\Common\Application\MessageStoreConsistencyTask.cpp" />
     <ClCompile Include="..\Common\Sieve\SieveLexer.cpp" />
+    <ClCompile Include="..\Common\Sieve\SieveMessage.cpp" />
+    <ClCompile Include="..\Common\Sieve\SieveEvaluator.cpp" />
     <ClCompile Include="..\Common\Sieve\SieveParser.cpp" />
     <ClCompile Include="..\Common\Sieve\SieveScript.cpp" />
     <ClCompile Include="..\Common\Application\RemoveExpiredRecords.cpp" />
@@ -730,6 +732,8 @@ EXIT 0
     <ClInclude Include="..\Common\Application\LogRetentionTask.h" />
     <ClInclude Include="..\Common\Application\MessageStoreConsistencyTask.h" />
     <ClInclude Include="..\Common\Sieve\SieveLexer.h" />
+    <ClInclude Include="..\Common\Sieve\SieveMessage.h" />
+    <ClInclude Include="..\Common\Sieve\SieveEvaluator.h" />
     <ClInclude Include="..\Common\Sieve\SieveParser.h" />
     <ClInclude Include="..\Common\Sieve\SieveScript.h" />
     <ClInclude Include="..\Common\Application\RemoveExpiredRecords.h" />

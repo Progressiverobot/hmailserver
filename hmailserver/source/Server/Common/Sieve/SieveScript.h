@@ -28,6 +28,11 @@ namespace HM
       // valid, otherwise a human-readable error message.
       static String CheckSyntax(const String &script);
 
+      // Convenience: parses the script and evaluates it against a raw RFC 822
+      // message, returning the ';'-joined action summary (e.g. "fileinto:Spam",
+      // "discard", "keep") or "error: <message>" when the script does not parse.
+      static String Evaluate(const String &script, const String &rawMessage);
+
    private:
       std::vector<std::shared_ptr<SieveCommand>> commands_;
    };

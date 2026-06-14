@@ -1037,6 +1037,7 @@ interface IInterfaceUtilities : IDispatch{
    [id(18), helpstring("Returns true if the given IP-address is parseable")] HRESULT IsValidIPAddress([in] BSTR IPAddress, [out, retval] VARIANT_BOOL *bIsValid);
    [id(19), helpstring("Performs maintenance operations in the database.")] HRESULT PerformMaintenance([in] eMaintenanceOperation operation);
    [id(20), helpstring("Checks the syntax of a Sieve (RFC 5228) script. Returns an empty string when valid, otherwise the error.")] HRESULT CheckSieveSyntax([in] BSTR Script, [out, retval] BSTR *Result);
+   [id(21), helpstring("Evaluates a Sieve (RFC 5228) script against a raw message and returns the resulting action summary.")] HRESULT EvaluateSieveScript([in] BSTR Script, [in] BSTR RawMessage, [out, retval] BSTR *Result);
 };
 
 [

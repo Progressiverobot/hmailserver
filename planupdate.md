@@ -216,6 +216,17 @@ SRS for forwarding (SPF alignment), and per-IP / per-destination rate shaping.*
     Next: evaluate the AST against a delivered message and apply
     keep/fileinto/discard/redirect, then per-account script storage and the
     ManageSieve service.
+  - **In progress — Sieve evaluator.** `SieveEvaluator` executes the AST against a
+    `SieveMessage` (an unfolded-header + octet-size read model) and produces an
+    action summary: RFC 5228 control flow (`if`/`elsif`/`else`/`stop`), the core
+    tests (`true`/`false`/`not`/`allof`/`anyof`/`header`/`address`/`exists`/`size`
+    with `:is`/`:contains`/`:matches`, address parts `:all`/`:localpart`/`:domain`,
+    and the default + `i;octet` comparators) and the core actions
+    (`keep`/`fileinto`/`discard`/`redirect` plus implicit keep). Surfaced through
+    COM as `Utilities.EvaluateSieveScript(script, rawMessage)` returning the
+    `;`-joined action summary (or `error: …`). Validated by the `SieveEvaluation`
+    regression test. Next: per-account script storage + wiring into `LocalDelivery`,
+    then the ManageSieve service.
 
 ### B7 — Operability & observability
 

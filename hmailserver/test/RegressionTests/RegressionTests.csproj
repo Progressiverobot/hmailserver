@@ -86,6 +86,7 @@
     <Compile Include="Infrastructure\MessageStoreDurability.cs" />
     <Compile Include="Infrastructure\ShutdownDrain.cs" />
     <Compile Include="Sieve\SieveSyntax.cs" />
+    <Compile Include="Sieve\SieveEvaluation.cs" />
     <Compile Include="Infrastructure\LogHandler.cs" />
     <Compile Include="Infrastructure\Persistence\AccountNameValidation.cs" />
     <Compile Include="Infrastructure\Persistence\AliasNameValidation.cs" />

@@ -7,6 +7,8 @@
 
 #include "SieveLexer.h"
 #include "SieveParser.h"
+#include "SieveMessage.h"
+#include "SieveEvaluator.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -47,5 +49,19 @@ namespace HM
       sieveScript.Parse(script, errorMessage);
 
       return errorMessage;
+   }
+
+   String
+   SieveScript::Evaluate(const String &script, const String &rawMessage)
+   {
+      String errorMessage;
+
+      SieveScript sieveScript;
+      if (!sieveScript.Parse(script, errorMessage))
+         return _T("error: ") + errorMessage;
+
+      SieveMessage message(rawMessage);
+      SieveEvaluator evaluator;
+      return evaluator.Evaluate(sieveScript.GetCommands(), message);
    }
 }
