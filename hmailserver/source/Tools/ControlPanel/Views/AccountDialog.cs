@@ -51,6 +51,18 @@ namespace hMailServer.ControlPanel.Views
       private readonly TextBox signaturePlain_ = NewMemo();
       private readonly TextBox signatureHtml_ = NewMemo();
 
+      // Sieve filter (RFC 5228) - the account's active script
+      private readonly TextBox sieveScript_ = new()
+      {
+         AcceptsReturn = true,
+         Height = 300,
+         TextWrapping = TextWrapping.NoWrap,
+         VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+         HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+         FontFamily = new System.Windows.Media.FontFamily("Consolas"),
+         FontSize = 12.5
+      };
+
       // Active Directory
       private readonly CheckBox isAd_ = new() { Content = "This account is linked to Active Directory", FontSize = 13 };
       private readonly TextBox adDomain_ = NewInput();
@@ -95,6 +107,7 @@ namespace hMailServer.ControlPanel.Views
          tabs.Items.Add(new TabItem { Header = "Forwarding", Content = BuildForwarding() });
          tabs.Items.Add(new TabItem { Header = "Auto-reply", Content = BuildAutoReply() });
          tabs.Items.Add(new TabItem { Header = "Signature", Content = BuildSignature() });
+         tabs.Items.Add(new TabItem { Header = "Sieve", Content = BuildSieve() });
          tabs.Items.Add(new TabItem { Header = "External", Content = BuildExternal() });
          tabs.Items.Add(new TabItem { Header = "Rules", Content = BuildRules() });
          tabs.Items.Add(new TabItem { Header = "Folders", Content = BuildFolders() });
@@ -195,6 +208,22 @@ namespace hMailServer.ControlPanel.Views
          panel.Children.Add(signaturePlain_);
          panel.Children.Add(Label("HTML signature"));
          panel.Children.Add(signatureHtml_);
+         return Scroll(panel);
+      }
+
+      private ScrollViewer BuildSieve()
+      {
+         var panel = TabPanel();
+         panel.Children.Add(new TextBlock
+         {
+            Text = "Active Sieve (RFC 5228) filter script for this account. It runs during local " +
+                   "delivery and supports keep, fileinto, discard and redirect. Leave empty to disable. " +
+                   "Multiple named scripts can be managed over ManageSieve.",
+            FontSize = 12,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 0, 0, 8)
+         });
+         panel.Children.Add(sieveScript_);
          return Scroll(panel);
       }
 
@@ -475,6 +504,9 @@ namespace hMailServer.ControlPanel.Views
             signaturePlain_.Text = (string) a.SignaturePlainText ?? "";
             signatureHtml_.Text = (string) a.SignatureHTML ?? "";
 
+            // SieveScript is a file-backed property added in 6.x; tolerate older servers.
+            try { sieveScript_.Text = (string) a.SieveScript ?? ""; } catch { sieveScript_.Text = ""; }
+
             isAd_.IsChecked = (bool) a.IsAD;
             adDomain_.Text = (string) a.ADDomain ?? "";
             adUser_.Text = (string) a.ADUsername ?? "";
@@ -555,6 +587,9 @@ namespace hMailServer.ControlPanel.Views
             a.SignatureEnabled = signatureOn_.IsChecked == true;
             a.SignaturePlainText = signaturePlain_.Text;
             a.SignatureHTML = signatureHtml_.Text;
+
+            // File-backed property (written immediately); tolerate older servers.
+            try { a.SieveScript = sieveScript_.Text ?? ""; } catch { }
 
             a.IsAD = isAd_.IsChecked == true;
             a.ADDomain = adDomain_.Text.Trim();

@@ -398,6 +398,17 @@ profile, Sieve/ManageSieve editor, secrets/least-priv status, health/trace
 endpoints, AV scanner presets + tests (Track A Phase 3), a security-diagnostics
 report.
 
+- **Done — Sieve filter editor + operability/durability/ManageSieve settings.** The
+  Control Panel account dialog gained a **Sieve** tab (a monospace editor bound to
+  the late-bound COM `Account.SieveScript` property — runs during local delivery,
+  supports keep/fileinto/discard/redirect). The data-driven feature-settings pages
+  (`FeatureSettingsView` over `hMailServer.INI`) gained cards for **ManageSieve**
+  (`ManageSieveServerPort`/`BindAddress`), **Operability** (`LogDeleteDays`,
+  `ShutdownDrainSeconds`) and **Message store durability** (`MessageStoreFsync`,
+  `MessageStoreConsistencyCheck`); the existing Monitoring card already surfaced
+  `MetricsServerPort`/`BindAddress`/`JsonLogging`. Control Panel builds 0/0 with
+  `-warnaserror`.
+
 ## Future track (Tier 3 — documented, not scheduled)
 
 Linux/container port (OS-abstraction layer first; today hard-wired to

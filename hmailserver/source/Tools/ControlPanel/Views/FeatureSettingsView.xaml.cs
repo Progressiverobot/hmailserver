@@ -281,6 +281,27 @@ namespace hMailServer.ControlPanel.Views
                      new BoolSetting { Key = "JsonLogging", Default = false, Label = "Write logs as JSON lines" }
                   }
                });
+               cards_.Add(new CardDef
+               {
+                  Title = "ManageSieve (RFC 5804)",
+                  Blurb = "Lets mail clients upload and manage per-account Sieve filter scripts over TCP. " +
+                          "Authentication is SASL PLAIN against the account database; bind to 127.0.0.1 unless fronted by a TLS terminator.",
+                  Settings =
+                  {
+                     new TextSetting { Key = "ManageSieveServerPort", Default = "0", Label = "ManageSieve port (0 = disabled)", Placeholder = "4190" },
+                     new TextSetting { Key = "ManageSieveServerBindAddress", Default = "127.0.0.1", Label = "ManageSieve bind address" }
+                  }
+               });
+               cards_.Add(new CardDef
+               {
+                  Title = "Operability",
+                  Blurb = "Log retention and graceful shutdown behaviour for unattended / clustered operation.",
+                  Settings =
+                  {
+                     new TextSetting { Key = "LogDeleteDays", Default = "0", Label = "Delete own logs older than N days (0 = keep all)", Placeholder = "30" },
+                     new TextSetting { Key = "ShutdownDrainSeconds", Default = "0", Label = "On stop, wait up to N seconds for active sessions to finish (0 = stop immediately)", Placeholder = "30" }
+                  }
+               });
                break;
 
             case Section.Hardening:
@@ -356,6 +377,17 @@ namespace hMailServer.ControlPanel.Views
                            (1, "Blowfish (legacy)")
                         }
                      }
+                  }
+               });
+               cards_.Add(new CardDef
+               {
+                  Title = "Message store durability",
+                  Blurb = "Crash-durability barrier and an optional integrity scan for the on-disk message store. " +
+                          "The defaults preserve the previous behaviour; enabling fsync adds a small per-message cost.",
+                  Settings =
+                  {
+                     new BoolSetting { Key = "MessageStoreFsync", Default = false, Label = "Flush each received message to disk before it is acknowledged (durable, slower)" },
+                     new BoolSetting { Key = "MessageStoreConsistencyCheck", Default = false, Label = "Periodically cross-check message rows against files on disk (read-only; writes a report on divergence)" }
                   }
                });
                break;
