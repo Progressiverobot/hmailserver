@@ -39,7 +39,8 @@ namespace HM
       SMTP_COMMAND_RSET = 1011,
       SMTP_COMMAND_NOOP = 1012,
       SMTP_COMMAND_ETRN = 1013,
-      SMTP_COMMAND_STARTTLS = 1014
+      SMTP_COMMAND_STARTTLS = 1014,
+      SMTP_COMMAND_BDAT = 1015   // RFC 3030 CHUNKING
    };
 
    class SMTPConnection : public TCPConnection
@@ -83,7 +84,10 @@ namespace HM
          
       enum Constants
       {
-         MaxNumberOfRecipients = 50000
+         MaxNumberOfRecipients = 50000,
+         // RFC 3030: upper bound on the octets read from the socket per BDAT
+         // sub-read, so a large chunk is spooled in bounded, flushable pieces.
+         BDAT_READ_PIECE = 40000
       };
 
       void InitializeSpamProtectionType_(const String &sFromAddress);
@@ -134,6 +138,12 @@ namespace HM
       void ProtocolUsername_(const String &sRequest);
       void ProtocolPassword_(const String &sRequest);
       void ProtocolDATA_();
+
+      // RFC 3030 CHUNKING: handle a "BDAT <size> [LAST]" command and the byte-counted
+      // chunk payload that follows it.
+      void ProtocolBDAT_(const String &sRequest);
+      void HandleBdatChunkData_(std::shared_ptr<ByteBuffer> pBuf);
+      void CompleteBdatMessage_();
 
       void ReportUnsupportedEsmtpExtension_(const String &parameter);
 
@@ -205,7 +215,8 @@ namespace HM
          SMTPSCRAMFIRST = 8,   // awaiting the SCRAM client-first message
          SMTPSCRAMFINAL = 9,   // awaiting the SCRAM client-final message
          SMTPSCRAMACK = 10,    // awaiting the empty ack after the server-final message
-         SMTPBEARERRESPONSE = 11 // awaiting the SASL XOAUTH2 / OAUTHBEARER client response
+         SMTPBEARERRESPONSE = 11, // awaiting the SASL XOAUTH2 / OAUTHBEARER client response
+         BDATDATA = 12         // RFC 3030: receiving the octets of a BDAT chunk
       };
   
       enum AuthenticationType
@@ -270,6 +281,12 @@ namespace HM
       // RFC 3461 (DSN) per-transaction parameters from MAIL FROM.
       String dsn_envid_;
       String dsn_ret_;
+
+      // RFC 3030 (CHUNKING/BDAT) per-transaction state.
+      bool bdat_active_;            // a BDAT chunk has been received in this transaction
+      bool bdat_last_;              // the chunk currently being received carries LAST
+      size_t bdat_chunk_size_;      // declared octet count of the current chunk
+      size_t bdat_chunk_remaining_; // octets of the current chunk still to be received
 
       RecipientParser recipientParser_;
       bool start_tls_used_;

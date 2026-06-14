@@ -18,6 +18,7 @@ namespace HM
 {
    TransparentTransmissionBuffer::TransparentTransmissionBuffer(bool bSending) : 
       is_sending_(bSending),
+      binary_mode_(false),
       transmission_ended_(false),
       last_send_ended_with_newline_(false),
       data_sent_(0),
@@ -96,7 +97,7 @@ namespace HM
       buffer_->Add(pBuffer, iBufferSize);
 
       // Check if we have received the entire buffer.
-      if (buffer_->GetSize() >= 3 && !is_sending_)
+      if (buffer_->GetSize() >= 3 && !is_sending_ && !binary_mode_)
       {
          // If receiving, we should check for end-of-data
          size_t iSize = buffer_->GetSize();
@@ -145,6 +146,34 @@ namespace HM
 
       if (!GetRequiresFlush() && !bForce)
          return dataProcessed;
+
+      if (binary_mode_)
+      {
+         // RFC 3030 BDAT: the chunk payload is byte-transparent. Write whatever has
+         // been buffered verbatim - no line-boundary search, no dot-unstuffing and
+         // no end-of-data sequence handling. The caller bounds memory by flushing
+         // as the buffer grows and marks the end via MarkTransmissionEnded().
+         size_t bufferSize = buffer_->GetSize();
+         if (bufferSize > 0)
+         {
+            std::shared_ptr<ByteBuffer> pOutBuffer = std::shared_ptr<ByteBuffer>(new ByteBuffer);
+            pOutBuffer->Add(buffer_->GetBuffer(), bufferSize);
+            buffer_->Empty();
+
+            SaveToFile_(pOutBuffer);
+            dataProcessed = true;
+         }
+
+         if (transmission_ended_ && file_.IsOpen())
+         {
+            if (IniFileSettings::Instance()->GetMessageStoreFsync())
+               file_.FlushToDisk();
+
+            file_.Close();
+         }
+
+         return dataProcessed;
+      }
 
       if (buffer_->GetSize() > MAX_LINE_LENGTH)
       {

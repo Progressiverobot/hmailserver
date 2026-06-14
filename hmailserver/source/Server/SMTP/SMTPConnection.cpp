@@ -93,6 +93,10 @@ namespace HM
       authentication_failure_count_(0),
       esmtp_session_(false),
       smtputf8_requested_(false),
+      bdat_active_(false),
+      bdat_last_(false),
+      bdat_chunk_size_(0),
+      bdat_chunk_remaining_(0),
       start_tls_used_(false)
    {
       smtpconf_ = Configuration::Instance()->GetSMTPConfiguration();
@@ -222,6 +226,8 @@ namespace HM
          return SMTP_COMMAND_VRFY;
       else if (sFirstWord == _T("DATA"))
          return SMTP_COMMAND_DATA;
+      else if (sFirstWord == _T("BDAT"))
+         return SMTP_COMMAND_BDAT;
       else if (sFirstWord == _T("RSET"))
          return SMTP_COMMAND_RSET;
       else if (sFirstWord == _T("NOOP"))
@@ -321,6 +327,10 @@ namespace HM
          case DATA:
             EnqueueRead("");
             break;
+         case BDATDATA:
+            // RFC 3030: the byte-counted chunk read has already been enqueued by
+            // ProtocolBDAT_ (or finalization is in progress); do not start a line read.
+            break;
          case STARTTLS:
             break;
          default:
@@ -389,6 +399,7 @@ namespace HM
                   case SMTP_COMMAND_ETRN: ProtocolETRN_(sRequest); break;
                   case SMTP_COMMAND_VRFY: EnqueueWrite_("502 VRFY disallowed."); break;
                   case SMTP_COMMAND_DATA: ProtocolDATA_(); break;
+                  case SMTP_COMMAND_BDAT: ProtocolBDAT_(sRequest); break;
                   default:
                      SendErrorResponse_(503, "Bad sequence of commands"); 
                }
@@ -495,6 +506,13 @@ namespace HM
          EnqueueWrite_("503 Issue a reset if you want to start over"); 
          return;
       }
+
+      // Start of a fresh transaction: clear any RFC 3030 (BDAT) state left over from a
+      // previously completed message (the finalization path does not reset it).
+      bdat_active_ = false;
+      bdat_last_ = false;
+      bdat_chunk_size_ = 0;
+      bdat_chunk_remaining_ = 0;
      
       if (Request.GetLength() < 10)
       {
@@ -1038,6 +1056,14 @@ namespace HM
    // Parses a clients SMTP command in Binary mode.
    //---------------------------------------------------------------------------()
    {
+      // RFC 3030 CHUNKING: the byte-counted payload of a BDAT chunk is handled by a
+      // dedicated path (byte-transparent, no dot-unstuffing / no end-of-data scan).
+      if (current_state_ == BDATDATA)
+      {
+         HandleBdatChunkData_(pBuf);
+         return;
+      }
+
       // Move the data from the incoming buffer to the transparent transmission buffer.
       // If we've received more data than the max message size, don't save it.
 
@@ -1609,6 +1635,12 @@ namespace HM
       dsn_envid_.Empty();
       dsn_ret_.Empty();
 
+      // Reset per-transaction RFC 3030 (CHUNKING/BDAT) state.
+      bdat_active_ = false;
+      bdat_last_ = false;
+      bdat_chunk_size_ = 0;
+      bdat_chunk_remaining_ = 0;
+
       // Switch back to normal ASCII mode and start of session, in
       // case we are in binary transmission mode.
       current_state_ = HEADER;
@@ -1640,6 +1672,10 @@ namespace HM
       // line by line and enqueues every reply in order, so a client may stream
       // a group of commands without waiting for each intermediate response.
       sData += "\r\n250-PIPELINING";
+
+      // CHUNKING (RFC 3030): accept message data via one or more BDAT commands,
+      // each carrying an explicit octet count, terminated by "BDAT <n> LAST".
+      sData += "\r\n250-CHUNKING";
 
       // SMTPUTF8 (RFC 6531): accept internationalized (UTF-8) envelope addresses.
       sData += "\r\n250-SMTPUTF8";
@@ -1921,7 +1957,15 @@ namespace HM
       // to every command other than NOOP, EHLO, STARTTLS, or QUIT.
       if (!CheckStartTlsRequired_())
          return;
-      
+
+      // RFC 3030: once a transaction has started using BDAT it must be completed
+      // with BDAT; mixing in a DATA command is illegal.
+      if (bdat_active_)
+      {
+         EnqueueWrite_("503 Bad sequence of commands: BDAT already used in this transaction.");
+         return;
+      }
+
       if (!current_message_)
       {
          // User tried to send a mail without specifying a correct mail from or rcpt to.
@@ -2008,6 +2052,213 @@ namespace HM
       message_start_tc_ = GetTickCount();
 
       EnqueueWrite_("354 OK, send.");
+   }
+
+   void
+   SMTPConnection::ProtocolBDAT_(const String &sRequest)
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // RFC 3030 CHUNKING. Handles "BDAT <chunk-size> [LAST]". The chunk-size octets
+   // that follow the command line are read verbatim (byte-transparent: no SMTP
+   // dot-unstuffing and no \r\n.\r\n end-of-data sequence) and appended to the same
+   // spool file across all chunks of the transaction. "LAST" finalizes the message.
+   //---------------------------------------------------------------------------()
+   {
+      // 530 Must issue STARTTLS first
+      // to every command other than NOOP, EHLO, STARTTLS, or QUIT.
+      if (!CheckStartTlsRequired_())
+         return;
+
+      if (!current_message_ || current_message_->GetRecipients()->GetCount() == 0)
+      {
+         // BDAT issued without a sender and at least one recipient.
+         EnqueueWrite_("503 Must have sender and recipient first.");
+         return;
+      }
+
+      // Parse "BDAT <chunk-size> [LAST]".
+      std::vector<String> tokens = StringParser::SplitString(sRequest, " ");
+      if (tokens.size() < 2 || tokens.size() > 3)
+      {
+         EnqueueWrite_("501 Syntax: BDAT chunk-size [LAST]");
+         return;
+      }
+
+      String sizeToken = tokens[1].Trim();
+      if (sizeToken.IsEmpty() || sizeToken.GetLength() > 18)
+      {
+         // Empty or implausibly large (> 10^18) chunk size.
+         EnqueueWrite_("501 Syntax error: invalid BDAT chunk-size.");
+         return;
+      }
+
+      unsigned __int64 chunkSize = 0;
+      for (int i = 0; i < sizeToken.GetLength(); i++)
+      {
+         TCHAR c = sizeToken[i];
+         if (c < '0' || c > '9')
+         {
+            EnqueueWrite_("501 Syntax error: BDAT chunk-size must be a non-negative integer.");
+            return;
+         }
+         chunkSize = chunkSize * 10 + (unsigned __int64)(c - '0');
+      }
+
+      bool isLast = false;
+      if (tokens.size() == 3)
+      {
+         String lastToken = tokens[2].Trim();
+         lastToken.MakeUpper();
+         if (lastToken != _T("LAST"))
+         {
+            EnqueueWrite_("501 Syntax: BDAT chunk-size [LAST]");
+            return;
+         }
+         isLast = true;
+      }
+
+      // On the first BDAT of the transaction, open the spool file in byte-transparent
+      // (binary) mode.
+      if (!bdat_active_)
+      {
+         transmission_buffer_ = std::shared_ptr<TransparentTransmissionBuffer>(new TransparentTransmissionBuffer(false));
+         transmission_buffer_->SetBinaryMode(true);
+
+         if (!transmission_buffer_->Initialize(PersistentMessage::GetFileName(current_message_)))
+         {
+            HandleUnableToSaveMessageDataFile_(PersistentMessage::GetFileName(current_message_));
+            return;
+         }
+
+         transmission_buffer_->SetMaxSizeKB(max_message_size_kb_);
+         trace_headers_written_ = true;
+         message_start_tc_ = GetTickCount();
+         bdat_active_ = true;
+      }
+
+      bdat_last_ = isLast;
+      bdat_chunk_size_ = (size_t)chunkSize;
+      bdat_chunk_remaining_ = (size_t)chunkSize;
+
+      if (chunkSize == 0)
+      {
+         // Zero-length chunk: there is no payload to read.
+         if (isLast)
+         {
+            // End of message. Suppress the line read in ParseData() and finalize.
+            current_state_ = BDATDATA;
+            CompleteBdatMessage_();
+         }
+         else
+         {
+            SendResponse_(250, _T("2.0.0"), _T("0 octets received"));
+         }
+         return;
+      }
+
+      // Read the chunk payload, byte-for-byte, in memory-bounded pieces.
+      current_state_ = BDATDATA;
+      SetReceiveBinary(true);
+
+      size_t toRead = bdat_chunk_remaining_ < BDAT_READ_PIECE ? bdat_chunk_remaining_ : BDAT_READ_PIECE;
+      EnqueueReadExact(toRead);
+   }
+
+   void
+   SMTPConnection::HandleBdatChunkData_(std::shared_ptr<ByteBuffer> pBuf)
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // Consumes the octets of the current BDAT chunk (delivered exactly chunk-by-piece
+   // by the binary read path) and, when the chunk completes, either acknowledges it
+   // (non-final) or finalizes the message (LAST).
+   //---------------------------------------------------------------------------()
+   {
+      size_t received = pBuf->GetSize();
+
+      transmission_buffer_->Append(pBuf->GetBuffer(), received);
+      pBuf->Empty();
+
+      if (received >= bdat_chunk_remaining_)
+         bdat_chunk_remaining_ = 0;
+      else
+         bdat_chunk_remaining_ -= received;
+
+      // Enforce the same hard drop ceiling used by the DATA path.
+      size_t iBufSizeKB = transmission_buffer_->GetSize() / 1024;
+      size_t iMaxSizeDrop = IniFileSettings::Instance()->GetSMTPDMaxSizeDrop();
+      if (iMaxSizeDrop > 0 && iBufSizeKB >= iMaxSizeDrop)
+      {
+         String sLogData;
+         sLogData.Format(_T("Size: %d KB, Max size: %d KB - DROP!!"), iBufSizeKB, iMaxSizeDrop);
+         LOG_SMTP(GetSessionID(), GetIPAddressString(), sLogData);
+
+         String sMessage;
+         sMessage.Format(_T("552 Message size exceeds the drop maximum message size. Size: %d KB, Max size: %d KB - DROP!"),
+            iBufSizeKB, iMaxSizeDrop);
+         EnqueueWrite_(sMessage);
+         LogAwstatsMessageRejected_();
+         ResetCurrentMessage_();
+         SetReceiveBinary(false);
+         pending_disconnect_ = true;
+         EnqueueDisconnect();
+         return;
+      }
+
+      // Bound memory: flush to the spool file as the buffer grows, prepending the
+      // trace headers on the first flush (exactly as the DATA path does).
+      if (transmission_buffer_->GetRequiresFlush())
+      {
+         AppendMessageHeaders_();
+         transmission_buffer_->Flush();
+      }
+
+      if (bdat_chunk_remaining_ > 0)
+      {
+         // More of the current chunk is still to be received.
+         size_t toRead = bdat_chunk_remaining_ < BDAT_READ_PIECE ? bdat_chunk_remaining_ : BDAT_READ_PIECE;
+         EnqueueReadExact(toRead);
+         return;
+      }
+
+      // The current chunk has been fully received.
+      if (bdat_last_)
+      {
+         CompleteBdatMessage_();
+         return;
+      }
+
+      // Non-final chunk: acknowledge it and return to command (line) mode so the next
+      // BDAT (or RSET) can be read.
+      String sResp;
+      sResp.Format(_T("%I64u octets received"), (unsigned __int64)bdat_chunk_size_);
+      SendResponse_(250, _T("2.0.0"), sResp);
+
+      SetReceiveBinary(false);
+      current_state_ = HEADER;
+      EnqueueRead();
+   }
+
+   void
+   SMTPConnection::CompleteBdatMessage_()
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // Finalizes a BDAT (CHUNKING) message after the LAST chunk has been received:
+   // prepends the trace headers (if not already written), closes the spool file and
+   // runs the shared accept/save/queue pipeline (which emits the final 250 reply).
+   //---------------------------------------------------------------------------()
+   {
+      // Ensure the message trace headers are prepended before the spool is closed.
+      AppendMessageHeaders_();
+
+      transmission_buffer_->MarkTransmissionEnded();
+      transmission_buffer_->Flush(true);
+
+      // Run the (potentially time-consuming) accept/save/queue work asynchronously.
+      std::shared_ptr<AsynchronousTask<TCPConnection> > finalizationTask =
+         std::shared_ptr<AsynchronousTask<TCPConnection> >(new AsynchronousTask<TCPConnection>
+            (std::bind(&SMTPConnection::HandleSMTPFinalizationTaskCompleted_, this), shared_from_this()));
+
+      Application::Instance()->GetAsyncWorkQueue()->AddTask(finalizationTask);
    }
 
    bool 

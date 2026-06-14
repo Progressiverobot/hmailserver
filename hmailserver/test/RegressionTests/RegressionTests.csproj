@@ -119,6 +119,7 @@
     <Compile Include="SMTP\Deliverability.cs" />
     <Compile Include="SMTP\Srs.cs" />
     <Compile Include="SMTP\Batv.cs" />
+    <Compile Include="SMTP\Bdat.cs" />
     <Compile Include="SMTP\RateShaping.cs" />
     <Compile Include="SMTP\RcptToParsing.cs" />
     <Compile Include="SMTP\MailFromParsing.cs" />

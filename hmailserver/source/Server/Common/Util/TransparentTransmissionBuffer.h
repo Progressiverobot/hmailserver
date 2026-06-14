@@ -38,6 +38,17 @@ namespace HM
       bool Initialize(const String &sFilename);
 
       void SetMaxSizeKB(size_t maxSize);
+
+      // RFC 3030 CHUNKING (BDAT): byte-transparent receive mode. In binary mode the
+      // buffer performs no SMTP dot-unstuffing and no \r\n.\r\n end-of-data detection;
+      // the caller controls when the message ends (via the BDAT octet counts). The
+      // default (false) preserves the classic DATA/POP3 transparent-transmission
+      // behaviour unchanged.
+      void SetBinaryMode(bool binary) { binary_mode_ = binary; }
+
+      // BDAT: the caller marks end-of-message once the final (LAST) chunk has been
+      // fully received, so the next Flush closes (and optionally fsyncs) the file.
+      void MarkTransmissionEnded() { transmission_ended_ = true; }
       
       std::shared_ptr<ByteBuffer> GetBuffer() 
       {
@@ -78,6 +89,10 @@ namespace HM
       
       bool is_sending_;
       // Are we sending data, or are we receiving data?
+
+      bool binary_mode_;
+      // RFC 3030 BDAT byte-transparent receive mode (no dot-unstuffing / no
+      // end-of-data sequence detection). Default false = classic DATA behaviour.
 
       bool last_send_ended_with_newline_;
       

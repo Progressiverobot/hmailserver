@@ -49,6 +49,7 @@ namespace HM
       receive_binary_(false),
       remote_port_(0),
       receive_buffer_(250000),
+      exact_read_target_(0),
       disconnected_(disconnected),
       context_(context),
       is_ssl_(false),
@@ -483,6 +484,21 @@ namespace HM
       ProcessOperationQueue_(0);
    }
 
+   void
+   TCPConnection::EnqueueReadExact(size_t numBytes)
+   {
+      ThrowIfNotConnected_();
+
+      // The exact count is consumed by the next AsyncRead. A zero-length BDAT chunk
+      // has no payload, so nothing is enqueued by the caller in that case.
+      exact_read_target_ = numBytes;
+
+      std::shared_ptr<IOOperation> operation = std::shared_ptr<IOOperation>(new IOOperation(IOOperation::BCTRead, AnsiString()));
+      operation_queue_.Push(operation);
+
+      ProcessOperationQueue_(0);
+   }
+
    void 
    TCPConnection::AsyncRead(const AnsiString &delimitor)
    {
@@ -492,6 +508,22 @@ namespace HM
          std::bind(&TCPConnection::AsyncReadCompleted, shared_from_this(), 
          std::placeholders::_1,
          std::placeholders::_2);
+
+      if (exact_read_target_ > 0)
+      {
+         // RFC 3030 BDAT: read exactly the remaining octets of the chunk. Some (or all)
+         // of the chunk may already be buffered from the preceding command-line read,
+         // so only read the shortfall from the socket.
+         size_t already_buffered = receive_buffer_.size();
+         size_t still_needed = exact_read_target_ > already_buffered ? exact_read_target_ - already_buffered : 0;
+
+         if (is_ssl_)
+            boost::asio::async_read(ssl_socket_, receive_buffer_, boost::asio::transfer_exactly(still_needed), AsyncReadCompletedFunction);
+         else
+            boost::asio::async_read(socket_, receive_buffer_, boost::asio::transfer_exactly(still_needed), AsyncReadCompletedFunction);
+
+         return;
+      }
 
       if (is_ssl_)
       {
@@ -576,11 +608,21 @@ namespace HM
       {
          if (receive_binary_)
          {
+            // RFC 3030 BDAT: when an exact octet count was requested, consume only that
+            // many octets and leave any surplus (e.g. a pipelined following command or
+            // chunk) in the receive buffer. Otherwise consume everything available.
+            size_t bytes_to_extract = receive_buffer_.size();
+            if (exact_read_target_ > 0)
+            {
+               bytes_to_extract = exact_read_target_;
+               exact_read_target_ = 0;
+            }
+
             std::shared_ptr<ByteBuffer> pBuffer = std::shared_ptr<ByteBuffer>(new ByteBuffer());
-            pBuffer->Allocate(receive_buffer_.size());
+            pBuffer->Allocate(bytes_to_extract);
 
             std::istream is(&receive_buffer_);
-            is.read((char*)pBuffer->GetBuffer(), receive_buffer_.size());
+            is.read((char*)pBuffer->GetBuffer(), bytes_to_extract);
 
             try
             {

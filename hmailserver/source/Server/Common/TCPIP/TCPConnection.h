@@ -48,6 +48,12 @@ namespace HM
       void EnqueueWrite(std::shared_ptr<ByteBuffer> pByteBuffer);
       void EnqueueRead();
       void EnqueueRead(const AnsiString &delimitor);
+
+      // RFC 3030 CHUNKING (BDAT): read exactly 'numBytes' octets (byte-transparent,
+      // no delimiter) and deliver them to ParseData(ByteBuffer). Any octets that were
+      // already buffered beyond the requested count are left in the receive buffer for
+      // the following read. The connection must be in binary receive mode.
+      void EnqueueReadExact(size_t numBytes);
       void EnqueueShutdownSend();
       void EnqueueDisconnect();
       void EnqueueHandshake();
@@ -158,6 +164,12 @@ namespace HM
       IOOperationQueue operation_queue_;
 
       bool receive_binary_;
+
+      // RFC 3030 BDAT: when non-zero, the next binary read consumes exactly this many
+      // octets (transfer_exactly) and then resets to 0. Zero = classic stream read
+      // (transfer_at_least(1)).
+      size_t exact_read_target_;
+
       ConnectionSecurity connection_security_;
       long remote_port_;
       String remote_ip_address_;
