@@ -20,6 +20,10 @@
 #include "CertificateVerifier.h"
 #include "CipherInfo.h"
 
+#include <openssl/x509.h>
+#include <openssl/evp.h>
+#include <openssl/obj_mac.h>
+
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
 #define new DEBUG_NEW
@@ -800,6 +804,50 @@ namespace HM
       AnsiString version = SSL_get_version(ssl_handle);
       int bits = SSL_get_cipher_bits(ssl_handle, 0);
       return CipherInfo(name, version, bits);
+   }
+
+
+   bool
+   TCPConnection::GetTlsServerEndPoint(std::vector<unsigned char> &out)
+   {
+      // RFC 5929 'tls-server-end-point': the hash of the server's own end-entity
+      // certificate, with the hash function taken from the certificate's signature
+      // algorithm (MD5/SHA-1 upgraded to SHA-256). Used as the channel-binding data
+      // for SCRAM-SHA-256-PLUS.
+      out.clear();
+
+      if (!is_ssl_)
+         return false;
+
+      SSL *ssl = ssl_socket_.native_handle();
+      if (ssl == nullptr)
+         return false;
+
+      // The server's own certificate; owned by the SSL/context, must not be freed.
+      X509 *cert = SSL_get_certificate(ssl);
+      if (cert == nullptr)
+         return false;
+
+      const EVP_MD *md = nullptr;
+      int mdnid = 0;
+      int pknid = 0;
+      if (X509_get_signature_info(cert, &mdnid, &pknid, nullptr, nullptr) == 1 &&
+          mdnid != NID_undef && mdnid != NID_md5 && mdnid != NID_sha1)
+      {
+         md = EVP_get_digestbynid(mdnid);
+      }
+
+      // Default (and the MD5/SHA-1 substitution) is SHA-256.
+      if (md == nullptr)
+         md = EVP_sha256();
+
+      unsigned char digest[EVP_MAX_MD_SIZE];
+      unsigned int digest_len = 0;
+      if (X509_digest(cert, md, digest, &digest_len) != 1)
+         return false;
+
+      out.assign(digest, digest + digest_len);
+      return true;
    }
 
 

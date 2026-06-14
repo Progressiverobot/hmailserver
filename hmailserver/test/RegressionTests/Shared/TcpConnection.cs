@@ -54,6 +54,11 @@ namespace RegressionTests.Shared
 
       public bool IsSslConnection { get; private set; }
 
+      // The server certificate negotiated during the TLS handshake, or null on a
+      // plain connection. Used to derive the RFC 5929 tls-server-end-point channel
+      // binding for SCRAM-SHA-256-PLUS.
+      public X509Certificate RemoteCertificate => _sslStream?.RemoteCertificate;
+
       public void Dispose()
       {
          Disconnect();

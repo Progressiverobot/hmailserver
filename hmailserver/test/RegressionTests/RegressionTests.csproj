@@ -177,6 +177,7 @@
     <Compile Include="SMTP\Signatures.cs" />
     <Compile Include="Infrastructure\Persistence\Limitations.cs" />
     <Compile Include="SSL\CertificateTypes.cs" />
+    <Compile Include="SSL\ScramPlus.cs" />
     <Compile Include="Stress\StabilitySanityTests.cs" />
   </ItemGroup>
   <ItemGroup>

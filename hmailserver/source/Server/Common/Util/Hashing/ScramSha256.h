@@ -47,6 +47,20 @@ namespace HM
       AnsiString GetUsername() const { return username_; }
       void SetUsername(const AnsiString &username) { username_ = username; }
 
+      // Enable the SCRAM-SHA-256-PLUS variant. The client must use the
+      // 'p=tls-server-end-point' gs2 channel-binding flag and its channel-binding
+      // data (sent in the client-final 'c=' attribute) must equal cbindData, which
+      // is the RFC 5929 tls-server-end-point hash of the server certificate. Call
+      // before ProcessClientFirst.
+      void SetChannelBinding(const std::vector<unsigned char> &cbindData);
+
+      // Indicate that the server offers channel binding on this connection (i.e. it
+      // is a TLS connection advertising SCRAM-SHA-256-PLUS). A non-PLUS client that
+      // then sends the 'y' gs2 flag is signalling a stripped-PLUS downgrade and is
+      // rejected (RFC 5802 section 6). Call before ProcessClientFirst on the
+      // non-PLUS mechanism when the connection is TLS.
+      void SetServerSupportsChannelBinding() { server_supports_cbind_ = true; }
+
       // Extract the SCRAM authentication identity (the "n=" attribute) from a decoded
       // client-first message. Returns false on a malformed message.
       static bool ExtractUsername(const AnsiString &clientFirst, AnsiString &usernameOut);
@@ -84,6 +98,9 @@ namespace HM
 
       State state_;
       bool real_account_;   // false => unknown user / non-PBKDF2: always fail at the end
+      bool plus_mode_;             // true => SCRAM-SHA-256-PLUS (channel binding required)
+      bool server_supports_cbind_; // true => server offered PLUS on this connection
+      std::vector<unsigned char> channel_binding_data_; // expected tls-server-end-point
       std::vector<unsigned char> salted_password_;
       AnsiString gs2_header_;
       AnsiString client_first_bare_;

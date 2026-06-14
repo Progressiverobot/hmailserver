@@ -307,8 +307,9 @@ upgrading the management/admin INI password from MD5.
   the LOGIN/PLAIN path, and the per-connection brute-force cap also applies. Advertised in CAPABILITY
   as `AUTH=SCRAM-SHA-256`. Validated end-to-end with an over-the-wire C# SCRAM client
   (`TestScramSha256Authenticates`, `TestScramSha256WrongPasswordFails`, `TestScramSha256Capability`)
-  plus the full IMAP regression suite. Follow-ups: SCRAM-SHA-256-**PLUS** (TLS channel binding) and
-  full SASLprep of non-ASCII credentials.
+  plus the full IMAP regression suite. Follow-up delivered: SCRAM-SHA-256-**PLUS** (TLS channel
+  binding) — see the dedicated bullet below. Remaining follow-up: full SASLprep of non-ASCII
+  credentials.
 - ✅ **SCRAM-SHA-256 SASL mechanism (SMTP submission) — delivered in v6.2.0.** Extended the same
   mechanism to SMTP `AUTH` (RFC 4954 SASL framing), reusing the `Common/Util/Hashing/ScramSha256`
   helper. Per-connection SASL state lives on `SMTPConnection` (`scram_session_`); the multi-step
@@ -360,6 +361,26 @@ upgrading the management/admin INI password from MD5.
   differ) plus the full IMAP regression suite. Residual note: an installation with neither an admin
   password nor database credentials set has a low-entropy key (acceptable — such an install is already
   unprotected); a persisted random server secret (B3/DPAPI) would harden that edge case further.
+- ✅ **SCRAM-SHA-256-PLUS channel binding (IMAP) — delivered in v6.2.0.** Added the
+  `AUTH=SCRAM-SHA-256-PLUS` mechanism (RFC 5802 + RFC 5929 `tls-server-end-point`) so authentication
+  is cryptographically bound to the specific TLS channel, defeating a man-in-the-middle who relays an
+  otherwise-valid SCRAM exchange over a different TLS connection (e.g. behind a terminating proxy or
+  with a mis-issued certificate). `TCPConnection::GetTlsServerEndPoint` derives the channel-binding
+  data as the hash of the server's own certificate using the certificate's signature hash (MD5/SHA-1
+  upgraded to SHA-256 per RFC 5929) via OpenSSL `SSL_get_certificate` / `X509_get_signature_info` /
+  `X509_digest`. The `ScramSha256` helper gained a PLUS mode (`SetChannelBinding`) that requires the
+  `p=tls-server-end-point` gs2 flag and verifies the client's `c=` equals
+  `base64(gs2-header || cert-hash)`. The mechanism is advertised in CAPABILITY and accepted **only**
+  on a TLS connection; on such a connection the non-PLUS mechanism now also rejects a `y` gs2 flag,
+  which signals a stripped-PLUS downgrade (RFC 5802 §6). Validated over a real TLS IMAP connection
+  (`RegressionTests.SSL.ScramPlus`): a full channel-bound exchange authenticates
+  (`TestScramPlusAuthenticates`); a binding that does not match the server certificate is rejected
+  even with the correct password (`TestScramPlusWrongBindingFails` — the exact MITM case the feature
+  defends against); the mechanism is advertised over TLS but never on a plain connection
+  (`TestScramPlusAdvertisedOnTlsOnly`); and it is refused without TLS
+  (`TestScramPlusRejectedWithoutTls`). Full IMAP suite 246/246 and the SCRAM set 13/13 green.
+  Follow-ups: SCRAM-SHA-256-PLUS for SMTP and POP3 (the shared `GetTlsServerEndPoint` + PLUS helper
+  are protocol-agnostic, so each is a thin wiring increment).
 - ✅ **Argon2id KDF option — delivered in v6.2.0.** Added the OWASP-recommended memory-hard KDF as
   password-hash algorithm **5** (`Crypt::ETArgon2id`), implemented in `HashCreator`
   (`GenerateArgon2id`/`ValidateArgon2id`/`IsArgon2idHash`) over OpenSSL's `EVP_KDF` `ARGON2ID`
@@ -373,7 +394,7 @@ upgrading the management/admin INI password from MD5.
   self-tests (`HashCreatorTester` Argon2id round-trip/negative/salt-uniqueness/cross-scheme checks +
   a `Crypt` `EnCrypt`→`GetHashType`→`Validate` dispatch check for Argon2id and PBKDF2), with the
   full auth regression (default PBKDF2 path) green.
-- Remaining B2: SCRAM-SHA-256-`PLUS` (channel binding); a hash-policy engine (min accepted type,
+- Remaining B2: SCRAM-SHA-256-`PLUS` for SMTP and POP3 (IMAP delivered); a hash-policy engine (min accepted type,
   phase out MD5/SHA256) and optional pepper building on the Argon2id work; OAuth2 XOAUTH2/OAUTHBEARER;
   POP3/IMAP UTF8 (RFC 6856 / UTF8=ACCEPT) and full SASLprep of non-ASCII credentials.
 - Verify: O365/Gmail XOAUTH2 + Thunderbird SCRAM interop.

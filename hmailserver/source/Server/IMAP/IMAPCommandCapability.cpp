@@ -45,6 +45,12 @@ namespace HM
       if (pConfig->GetUseIMAPSASLPlain() && (pConnection->IsSSLConnection() || pConnection->GetConnectionSecurity() != CSSTARTTLSRequired))
 	      sResponse += " AUTH=SCRAM-SHA-256";
 
+      // SCRAM-SHA-256-PLUS (RFC 5802/5929) additionally binds the authentication to
+      // the TLS channel via the server certificate, so it is only meaningful — and
+      // only advertised — on a TLS connection.
+      if (pConfig->GetUseIMAPSASLPlain() && pConnection->IsSSLConnection())
+	      sResponse += " AUTH=SCRAM-SHA-256-PLUS";
+
       if (pConfig->GetUseIMAPSASLInitialResponse())
 	      sResponse += " SASL-IR";
 

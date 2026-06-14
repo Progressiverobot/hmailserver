@@ -67,10 +67,21 @@ namespace HM
 
 		sParam = pParser->GetParamValue(pArgument, 0);
 
+		if (sParam == _T("SCRAM-SHA-256-PLUS"))
+		{
+			// Channel binding only has meaning over TLS; the mechanism is advertised
+			// (and accepted) only on a TLS connection.
+			if (!pConnection->IsSSLConnection())
+				return IMAPResult(IMAPResult::ResultBad, "SCRAM-SHA-256-PLUS requires a TLS connection.");
+
+			String sInitialResponse = paramcount == 2 ? pParser->GetParamValue(pArgument, 1) : String();
+			return StartScram_(pConnection, pArgument, sInitialResponse, paramcount == 2, true);
+		}
+
 		if (sParam == _T("SCRAM-SHA-256"))
 		{
 			String sInitialResponse = paramcount == 2 ? pParser->GetParamValue(pArgument, 1) : String();
-			return StartScram_(pConnection, pArgument, sInitialResponse, paramcount == 2);
+			return StartScram_(pConnection, pArgument, sInitialResponse, paramcount == 2, false);
 		}
 
 		if (sParam != _T("PLAIN"))
@@ -174,10 +185,29 @@ namespace HM
 	}
 
    IMAPResult
-   IMAPCommandAUTHENTICATE::StartScram_(std::shared_ptr<IMAPConnection> pConnection, std::shared_ptr<IMAPCommandArgument> pArgument, const String &sInitialResponse, bool bHasInitialResponse)
+   IMAPCommandAUTHENTICATE::StartScram_(std::shared_ptr<IMAPConnection> pConnection, std::shared_ptr<IMAPCommandArgument> pArgument, const String &sInitialResponse, bool bHasInitialResponse, bool bPlus)
    {
       // Begin a fresh SCRAM-SHA-256 conversation for this connection.
-      pConnection->SetScramSession(std::make_shared<ScramSha256>());
+      std::shared_ptr<ScramSha256> session = std::make_shared<ScramSha256>();
+
+      if (bPlus)
+      {
+         // SCRAM-SHA-256-PLUS: bind the exchange to this TLS channel via the
+         // server certificate (RFC 5929 tls-server-end-point).
+         std::vector<unsigned char> cbindData;
+         if (!pConnection->GetTlsServerEndPoint(cbindData))
+            return IMAPResult(IMAPResult::ResultBad, "Channel binding is not available on this connection.");
+
+         session->SetChannelBinding(cbindData);
+      }
+      else if (pConnection->IsSSLConnection())
+      {
+         // The non-PLUS mechanism is being used on a TLS connection where PLUS is
+         // advertised, so reject a stripped-PLUS downgrade (a 'y' gs2 flag).
+         session->SetServerSupportsChannelBinding();
+      }
+
+      pConnection->SetScramSession(session);
 
       if (!bHasInitialResponse)
       {

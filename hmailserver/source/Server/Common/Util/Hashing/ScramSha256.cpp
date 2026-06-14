@@ -21,8 +21,21 @@ namespace HM
 {
    ScramSha256::ScramSha256() :
       state_(NeedClientFirst),
-      real_account_(false)
+      real_account_(false),
+      plus_mode_(false),
+      server_supports_cbind_(false)
    {
+   }
+
+   void
+   ScramSha256::SetChannelBinding(const std::vector<unsigned char> &cbindData)
+   {
+      // Switching to SCRAM-SHA-256-PLUS: bind the exchange to the supplied
+      // tls-server-end-point data. A PLUS session is, by definition, on a TLS
+      // connection that offers channel binding.
+      plus_mode_ = true;
+      server_supports_cbind_ = true;
+      channel_binding_data_ = cbindData;
    }
 
    AnsiString
@@ -280,12 +293,28 @@ namespace HM
       gs2_header_ = clientFirst.Mid(0, secondComma + 1);
       client_first_bare_ = clientFirst.Mid(secondComma + 1);
 
-      // Channel binding: this is the non-PLUS mechanism, so the client must not
-      // require binding ('p'). 'n' (no binding) and 'y' (client thinks the server
-      // does not support binding) are both acceptable.
-      char flag = clientFirst.GetLength() > 0 ? (char) clientFirst.GetAt(0) : '\0';
-      if (flag != 'n' && flag != 'y')
-         return false;
+      // Validate the gs2 channel-binding flag (everything before the first comma).
+      AnsiString cbindFlag = clientFirst.Mid(0, firstComma);
+      if (plus_mode_)
+      {
+         // SCRAM-SHA-256-PLUS: the client must bind to the server certificate.
+         // Anything else (no binding, or "server offers no binding") is invalid for
+         // this mechanism.
+         if (cbindFlag != "p=tls-server-end-point")
+            return false;
+      }
+      else
+      {
+         // Non-PLUS SCRAM-SHA-256: the client must not require binding. 'n' (no
+         // binding) and 'y' (client believes the server offers no binding) are both
+         // acceptable -- except that if the server actually does offer channel
+         // binding on this connection, a 'y' indicates a stripped-PLUS downgrade and
+         // must be rejected (RFC 5802 section 6).
+         if (cbindFlag != "n" && cbindFlag != "y")
+            return false;
+         if (cbindFlag == "y" && server_supports_cbind_)
+            return false;
+      }
 
       // Authorization identity (impersonation) is not supported here.
       AnsiString authzidPart = clientFirst.Mid(firstComma + 1, secondComma - (firstComma + 1));
@@ -359,8 +388,17 @@ namespace HM
          return false;
       }
 
-      // The channel-binding data must be base64(gs2-header) from the first message.
-      AnsiString expectedCbind = Base64Encode_((const unsigned char *) gs2_header_.c_str(), gs2_header_.GetLength());
+      // The channel-binding data echoed by the client must be base64(gs2-header
+      // [|| cbind-data]). For the non-PLUS mechanism only the gs2 header is bound;
+      // for SCRAM-SHA-256-PLUS the server certificate hash (tls-server-end-point) is
+      // appended, so a man-in-the-middle on a different TLS channel cannot replay it.
+      std::vector<unsigned char> cbindInput(
+         (const unsigned char *) gs2_header_.c_str(),
+         (const unsigned char *) gs2_header_.c_str() + gs2_header_.GetLength());
+      if (plus_mode_)
+         cbindInput.insert(cbindInput.end(), channel_binding_data_.begin(), channel_binding_data_.end());
+
+      AnsiString expectedCbind = Base64Encode_(cbindInput.data(), cbindInput.size());
       if (channelBinding != expectedCbind)
       {
          state_ = Failed;

@@ -70,6 +70,13 @@ namespace HM
 
       CipherInfo GetCipherInfo();
 
+      // RFC 5929 'tls-server-end-point' channel binding: the hash of the server's
+      // own TLS certificate, used by SCRAM-SHA-256-PLUS. Per RFC 5929 the hash is
+      // the certificate's signature hash, except MD5/SHA-1 are replaced by SHA-256.
+      // Returns false when the connection is not TLS or the certificate is
+      // unavailable; on success 'out' holds the raw digest bytes.
+      bool GetTlsServerEndPoint(std::vector<unsigned char> &out);
+
       void SetAllowConnectToSelf(bool allow)  { allow_connect_to_self_ = allow; }
 
       // Forces certificate verification for this connection even if the

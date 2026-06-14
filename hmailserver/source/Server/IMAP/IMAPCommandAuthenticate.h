@@ -19,8 +19,9 @@ namespace HM
    private:
       // SCRAM-SHA-256 (RFC 5802 / RFC 7677) multi-step SASL exchange. State lives on
       // the connection (this handler is a shared singleton), driven across lines by
-      // re-seeding the command buffer the same way the PLAIN path does.
-      IMAPResult StartScram_(std::shared_ptr<IMAPConnection> pConnection, std::shared_ptr<IMAPCommandArgument> pArgument, const String &sInitialResponse, bool bHasInitialResponse);
+      // re-seeding the command buffer the same way the PLAIN path does. bPlus selects
+      // the channel-bound SCRAM-SHA-256-PLUS variant (RFC 5929 tls-server-end-point).
+      IMAPResult StartScram_(std::shared_ptr<IMAPConnection> pConnection, std::shared_ptr<IMAPCommandArgument> pArgument, const String &sInitialResponse, bool bHasInitialResponse, bool bPlus);
       IMAPResult ContinueScram_(std::shared_ptr<IMAPConnection> pConnection, std::shared_ptr<IMAPCommandArgument> pArgument, const String &sClientData);
       IMAPResult ProcessScramClientFirst_(std::shared_ptr<IMAPConnection> pConnection, std::shared_ptr<IMAPCommandArgument> pArgument, const String &sClientData);
       IMAPResult ProcessScramClientFinal_(std::shared_ptr<IMAPConnection> pConnection, std::shared_ptr<IMAPCommandArgument> pArgument, const String &sClientData);
