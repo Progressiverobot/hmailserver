@@ -379,14 +379,26 @@ SRS for forwarding (SPF alignment), and per-IP / per-destination rate shaping.*
 *Delivered already (see Part 2): `ci.yml`, `codeql.yml`, `server-build.yml`, B1
 reproducer tests and the over-the-wire SMTP/IMAP/MIME protocol fuzz suite.*
 
+- **Done — SBOM + dependency/CVE scanning (GitHub-native).** Three additive
+  supply-chain pieces under `.github/`: **Dependabot** (`dependabot.yml`) raises
+  CVE/security-advisory alerts and grouped weekly update PRs for the NuGet
+  packages (Control Panel + C# tests/tooling) and the GitHub Actions; an **SBOM**
+  workflow (`sbom.yml`, Syft via `anchore/sbom-action`) emits SPDX + CycloneDX
+  inventories on every push to master and attaches them to each published release;
+  and a **dependency-review** PR gate (`dependency-review.yml`,
+  `actions/dependency-review-action`) fails any PR that introduces a
+  high/critical-CVE dependency. (Vendored native C++ libs have no Dependabot
+  ecosystem and stay tracked in `libraries/build-dependencies.ps1`.)
+
 Remaining:
 
 - build+test matrix Windows × MySQL/MSSQL/PostgreSQL running the full suite (today
-  the self-hosted workflow runs one DB at a time).
+  the self-hosted workflow runs one DB at a time — needs runner-side DB
+  provisioning for all three backends, so it is infrastructure-gated).
 - clang-tidy; ASAN/UBSAN build; coverage-guided **libFuzzer** harnesses (need a
   clang+fuzzer toolchain and decoupled parsers — impractical in the current
   MSVC/ATL environment, where the live over-the-wire fuzzer is the substitute).
-- SBOM + dependency/CVE scanning + signed release artifacts.
+- Signed release artifacts (needs a code-signing certificate / CI secret).
 - Verify: green-gates-required-to-merge; nightly fuzz.
 
 ---

@@ -1,0 +1,29 @@
+version: 2
+
+# Dependabot keeps dependencies patched and surfaces known-CVE advisories for the
+# NuGet packages (Control Panel + the C# test/tooling projects) and the GitHub
+# Actions used by the CI workflows. Security updates are raised automatically;
+# version updates are grouped weekly to keep PR noise low. The vendored native
+# C++ libraries (OpenSSL, Boost, libpq) are tracked manually in
+# libraries/build-dependencies.ps1 — Dependabot has no C++ ecosystem.
+updates:
+  - package-ecosystem: "nuget"
+    directories:
+      - "/**/*"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    groups:
+      dotnet-dependencies:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns:
+          - "*"

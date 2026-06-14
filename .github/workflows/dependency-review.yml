@@ -1,0 +1,30 @@
+name: Dependency review
+
+# On every pull request, fail if the change introduces a dependency with a known
+# high-or-critical CVE (GitHub Advisory Database). This is the merge-time gate
+# that complements Dependabot's continuous alerts and the SBOM workflow, giving
+# the B8 "dependency/CVE scanning" supply-chain requirement a green-gate.
+
+on:
+  pull_request:
+    branches: [ master ]
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-review:
+    name: Dependency review
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Review dependencies
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure
