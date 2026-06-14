@@ -232,8 +232,12 @@ Administration and monitoring:
    MessageStoreFsync=0           ; force each received message to physical disk before it is acknowledged (1 = on)
    MessageStoreConsistencyCheck=0; periodically cross-check message rows against files on disk (1 = on, read-only)
                                  ; writes hMailServer_messagestore_consistency.report listing any affected messages
+   ManageSieveServerPort=0       ; ManageSieve (RFC 5804) script-management service (0 = disabled, standard port 4190)
+   ManageSieveServerBindAddress=127.0.0.1  ; SASL PLAIN over plaintext; bind to localhost unless TLS-fronted
    JsonLogging=0                 ; write logs as JSON lines
    </pre>
+
+   **Mail filtering (Sieve, RFC 5228).** Each account can have an active Sieve script that runs during local delivery, supporting `keep`, `fileinto`, `discard` and `redirect` with the core tests (`header`, `address`, `exists`, `size`, `allof`/`anyof`/`not`) and `:is`/`:contains`/`:matches` match types. Scripts are edited from the Control Panel account **Sieve** tab (or the COM `Account.SieveScript` property) and stored as files under the data directory. With `ManageSieveServerPort` set, mail clients can upload and manage multiple named scripts over **ManageSieve (RFC 5804)** (`CAPABILITY`, SASL `PLAIN` `AUTHENTICATE`, `PUTSCRIPT`/`CHECKSCRIPT`, `LISTSCRIPTS`, `GETSCRIPT`, `SETACTIVE`, `DELETESCRIPT`).
 
    The metrics listener also serves Kubernetes-style health probes: `/livez` (process liveness), `/readyz` (200 when `StateRunning` and the database pool is connected, else 503 — and 503 while the server is draining/stopping) and `/healthz` (JSON: status, server state, database). `/metrics` exposes counters and gauges for processed/spam/virus messages, TLS handshakes (success/failure), authentication (success/failure), sessions per protocol, uptime, database up/pool, the SMTP delivery-queue depth, delivery outcomes (`hmailserver_messages_delivered_total`/`_deferred_total`/`_bounced_total`), the message-store consistency result (`hmailserver_messagestore_missing_files`), and aggregate per-command processing latency (`hmailserver_command_processing_seconds` summary).
 

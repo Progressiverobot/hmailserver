@@ -81,6 +81,7 @@ Shared infrastructure used by SMTP, IMAP, POP3, and the COM layer. Broken into f
 | `Mime/` | MIME encoding and decoding for message parsing and construction |
 | `Persistence/` | ORM-like persistence layer — one class per business object, maps to DB columns |
 | `Scripting/` | Server-side event hooks that fire VBScript/JScript event handlers |
+| `Sieve/` | RFC 5228 Sieve filtering: `SieveLexer`/`SieveParser` (AST), `SieveEvaluator` (runs a script against a `SieveMessage` → keep/fileinto/discard/redirect), `SieveStorage` (per-account file-backed scripts under `{DataDir}\Sieve\`), and `ManageSieveServer` (the optional RFC 5804 management listener). Evaluated during local delivery (`SMTP/LocalDelivery`) |
 | `SQL/` | Low-level database abstraction: connection management, parameterised queries; supports MySQL, MS SQL, and PostgreSQL |
 | `TCPIP/` | Async networking using Boost.Asio: DNS resolution, connection management, TLS. Also `DnssecResolver` (validating DNSSEC stub resolver) and `DaneVerifier` (TLSA certificate matching) |
 | `Threading/` | Thread pool, task queuing, and thread lifecycle management |
@@ -180,7 +181,7 @@ Vendored third-party C++ libraries checked directly into the repository. Large e
 
 **INI-based feature settings.** The 6.0 features (MTA-STS, DANE/DNSSEC, ARC, TLS-RPT, ACME, REST API, web services, metrics, JSON logging) are configured via `hMailServer.INI` `[Settings]` keys read by `IniFileSettings`, not via the database/COM settings. The Administrator "Server features" dialog edits them. See `README.md` for the full key reference. New optional server-wide features should follow this pattern: getter in `IniFileSettings.h`, default in the member declaration, `ReadIniSetting*_` call in `IniFileSettings.cpp`, and a control in `formServerFeatures.cs`.
 
-**Optional listeners are plain threads.** `MetricsServer`, `RestApiServer` and `WebServicesServer` use raw sockets + `std::thread` (with optional OpenSSL TLS), deliberately outside the Boost.Asio `TCPIP/` stack. They are started/stopped from `Application::StartServers`/`StopServers` and only run when their port settings are non-zero.
+**Optional listeners are plain threads.** `MetricsServer`, `RestApiServer`, `WebServicesServer` and `ManageSieveServer` (RFC 5804) use raw sockets + `std::thread` (with optional OpenSSL TLS), deliberately outside the Boost.Asio `TCPIP/` stack. They are started/stopped from `Application::StartServers`/`StopServers` and only run when their port settings are non-zero.
 
 **Scheduled background work** uses `Common/BO/ScheduledTask` and the `Scheduler` (e.g. `TlsRptReporterTask`, `AcmeRenewalTask`). `RunOnce` tasks execute immediately via the maintenance work queue; recurring tasks are polled every minute.
 
