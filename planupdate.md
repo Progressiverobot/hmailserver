@@ -145,8 +145,8 @@ pepper, POP3/IMAP UTF8 + SASLprep, and offline OAuth2 XOAUTH2/OAUTHBEARER.*
 Remaining:
 
 - **OAuth2 live validation** — JWKS fetch / token introspection (today validation
-  is offline/local only). Add automated RS256 coverage (RS256 is implemented but
-  not yet covered by a test).
+  is offline/local only). RS256 public-key tokens are now covered by automated
+  regression tests; live-IdP JWKS/introspection still needs a running provider.
 - **Full SASLprep** of non-ASCII credentials (today a pragmatic RFC 4013 subset).
 - **Interop verification** — O365/Gmail XOAUTH2 + Thunderbird SCRAM.
 
@@ -416,9 +416,10 @@ and upgrading the management/admin INI password from MD5.
   `none`/empty `alg` rejected (algorithm-confusion defence); requires `exp` (60s skew), honours `nbf`,
   checks `iss`/`aud` when configured; the configurable username claim (`OAuth2UsernameClaim`, default
   `email`) maps to a local account. Off by default (`OAuth2Enabled=0`); TLS-only unless
-  `OAuth2RequireTLS=0`. Validated by `RegressionTests.Security.OAuth2Bearer` (11 cases) + self-test;
-  POP3/Security/IMAP/SMTP 189/189 green. **Limitation:** validation is offline/local only — no JWKS
-  fetch / introspection / live-IdP interop yet (RS256 implemented but not auto-tested). *(See Part 1
+  `OAuth2RequireTLS=0`. Validated by `RegressionTests.Security.OAuth2Bearer` (13 cases, incl. RS256
+  public-key tokens over POP3+SMTP with a tamper-rejection check) + self-test;
+  POP3/Security/IMAP/SMTP green. **Limitation:** validation is offline/local only — no JWKS
+  fetch / introspection / live-IdP interop yet. *(See Part 1
   for the remaining live-validation + interop follow-ups.)*
 
 ### B3 — Secrets & least-privilege ✅ DELIVERED (v6.2.0)

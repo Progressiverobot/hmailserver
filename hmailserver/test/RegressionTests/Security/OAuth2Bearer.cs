@@ -77,6 +77,7 @@ namespace RegressionTests.Security
          WriteSetting("OAuth2RequireTLS", "1");
          WriteSetting("OAuth2AllowedAlgorithms", "RS256");
          WriteSetting("OAuth2HmacSecret", "");
+         WriteSetting("OAuth2PublicKeyFile", "");
          WriteSetting("OAuth2UsernameClaim", "email");
          _application.Reinitialize();
       }
@@ -470,6 +471,205 @@ namespace RegressionTests.Security
          {
             DisableOAuth2();
             _settings.ClearLogonFailureList();
+         }
+      }
+
+      // -- RS256 (asymmetric / public-key) ---------------------------------------
+
+      // RS256 tokens are signed with an RSA private key minted in-process; the
+      // matching SubjectPublicKeyInfo PEM is written into the server's program
+      // directory (so the LocalSystem service can read it) and configured via
+      // OAuth2PublicKeyFile. This exercises the OpenSSL EVP_DigestVerify path that
+      // backs real identity-provider tokens, still entirely offline.
+
+      private string _rs256PublicKeyPath;
+
+      private void EnableOAuth2Rs256(string publicKeyPath)
+      {
+         WriteSetting("OAuth2Enabled", "1");
+         WriteSetting("OAuth2RequireTLS", "0");
+         WriteSetting("OAuth2AllowedAlgorithms", "RS256");
+         WriteSetting("OAuth2HmacSecret", "");
+         WriteSetting("OAuth2PublicKeyFile", publicKeyPath);
+         WriteSetting("OAuth2UsernameClaim", "email");
+         WriteSetting("OAuth2Issuer", "");
+         WriteSetting("OAuth2Audience", "");
+         _application.Reinitialize();
+      }
+
+      /// <summary>Mints an RS256 (RSASSA-PKCS1-v1_5 / SHA-256) JWT for <paramref name="email"/>.</summary>
+      private static string MintRs256(string email, long exp, RSA rsa)
+      {
+         string header = "{\"alg\":\"RS256\",\"typ\":\"JWT\"}";
+         string payload = "{\"email\":\"" + email + "\",\"exp\":" + exp + "}";
+
+         string headerSegment = Base64Url(Encoding.UTF8.GetBytes(header));
+         string payloadSegment = Base64Url(Encoding.UTF8.GetBytes(payload));
+         string signingInput = headerSegment + "." + payloadSegment;
+
+         byte[] signature = rsa.SignData(Encoding.ASCII.GetBytes(signingInput),
+            HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+         return signingInput + "." + Base64Url(signature);
+      }
+
+      // .NET Framework 4.8.1 lacks RSA.ExportSubjectPublicKeyInfo, so the SPKI
+      // ("-----BEGIN PUBLIC KEY-----") PEM is hand-DER-encoded from the public
+      // modulus/exponent. PEM_read_bio_PUBKEY on the server reads exactly this.
+      private static string ExportPublicKeyPem(RSA rsa)
+      {
+         RSAParameters p = rsa.ExportParameters(false);
+
+         byte[] algorithmId = DerSequence(Concat(
+            // OID 1.2.840.113549.1.1.1 (rsaEncryption)
+            new byte[] { 0x06, 0x09, 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x01, 0x01 },
+            new byte[] { 0x05, 0x00 })); // NULL parameters
+
+         byte[] rsaPublicKey = DerSequence(Concat(
+            DerInteger(p.Modulus),
+            DerInteger(p.Exponent)));
+
+         // BIT STRING wraps the RSAPublicKey DER with a leading 0x00 "unused bits" octet.
+         byte[] subjectPublicKey = DerTlv(0x03, Concat(new byte[] { 0x00 }, rsaPublicKey));
+
+         byte[] spki = DerSequence(Concat(algorithmId, subjectPublicKey));
+
+         var sb = new StringBuilder();
+         sb.Append("-----BEGIN PUBLIC KEY-----\n");
+         sb.Append(Convert.ToBase64String(spki, Base64FormattingOptions.InsertLineBreaks));
+         sb.Append("\n-----END PUBLIC KEY-----\n");
+         return sb.ToString();
+      }
+
+      private static byte[] Concat(params byte[][] arrays)
+      {
+         int total = 0;
+         foreach (byte[] a in arrays)
+            total += a.Length;
+
+         var result = new byte[total];
+         int offset = 0;
+         foreach (byte[] a in arrays)
+         {
+            Buffer.BlockCopy(a, 0, result, offset, a.Length);
+            offset += a.Length;
+         }
+         return result;
+      }
+
+      private static byte[] DerLength(int length)
+      {
+         if (length < 0x80)
+            return new[] { (byte)length };
+
+         var lengthBytes = new System.Collections.Generic.List<byte>();
+         int v = length;
+         while (v > 0)
+         {
+            lengthBytes.Insert(0, (byte)(v & 0xFF));
+            v >>= 8;
+         }
+         var result = new System.Collections.Generic.List<byte> { (byte)(0x80 | lengthBytes.Count) };
+         result.AddRange(lengthBytes);
+         return result.ToArray();
+      }
+
+      private static byte[] DerTlv(byte tag, byte[] content)
+      {
+         return Concat(new[] { tag }, DerLength(content.Length), content);
+      }
+
+      private static byte[] DerSequence(byte[] content)
+      {
+         return DerTlv(0x30, content);
+      }
+
+      private static byte[] DerInteger(byte[] magnitude)
+      {
+         // DER INTEGER is signed: prepend 0x00 when the high bit is set so the
+         // value is not interpreted as negative (RSA modulus always needs this).
+         if (magnitude.Length > 0 && (magnitude[0] & 0x80) != 0)
+            magnitude = Concat(new byte[] { 0x00 }, magnitude);
+         return DerTlv(0x02, magnitude);
+      }
+
+      [Test]
+      [Description("RFC 7628 SASL XOAUTH2 over POP3 with an RS256 (public-key) token: a JWT signed by " +
+                   "the RSA private key whose SubjectPublicKeyInfo is configured in OAuth2PublicKeyFile " +
+                   "authenticates successfully; a token with a tampered signature is rejected.")]
+      public void TestPop3XOAuth2Rs256Succeeds()
+      {
+         const string address = "oauthrs256@example.test";
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, address, "irrelevant-password");
+
+         _settings.AutoBanOnLogonFailure = false;
+         _settings.ClearLogonFailureList();
+
+         _rs256PublicKeyPath = Path.Combine(
+            _application.Settings.Directories.ProgramDirectory, "hm_oauth2_test_rs256.pem");
+
+         using (RSA rsa = RSA.Create())
+         {
+            rsa.KeySize = 2048;
+            File.WriteAllText(_rs256PublicKeyPath, ExportPublicKeyPem(rsa));
+            try
+            {
+               EnableOAuth2Rs256(_rs256PublicKeyPath);
+
+               string token = MintRs256(address, UnixNow() + 3600, rsa);
+               string response = Pop3AuthXOAuth2(address, token);
+               Assert.IsTrue(response.StartsWith("+OK"),
+                  "A valid RS256 bearer token should authenticate over POP3. Got: " + response);
+
+               // Flip the final signature character: the signature no longer verifies.
+               char last = token[token.Length - 1];
+               string tampered = token.Substring(0, token.Length - 1) + (last == 'A' ? 'B' : 'A');
+               string tamperedResponse = Pop3AuthXOAuth2(address, tampered);
+               Assert.IsTrue(tamperedResponse.StartsWith("-ERR"),
+                  "An RS256 token with a tampered signature must be rejected. Got: " + tamperedResponse);
+            }
+            finally
+            {
+               DisableOAuth2();
+               _settings.ClearLogonFailureList();
+               if (File.Exists(_rs256PublicKeyPath))
+                  File.Delete(_rs256PublicKeyPath);
+            }
+         }
+      }
+
+      [Test]
+      [Description("RFC 7628 SASL XOAUTH2 over SMTP with an RS256 (public-key) token authenticates (235).")]
+      public void TestSmtpXOAuth2Rs256Succeeds()
+      {
+         const string address = "oauthrs256smtp@example.test";
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, address, "irrelevant-password");
+
+         _settings.AutoBanOnLogonFailure = false;
+         _settings.ClearLogonFailureList();
+
+         _rs256PublicKeyPath = Path.Combine(
+            _application.Settings.Directories.ProgramDirectory, "hm_oauth2_test_rs256_smtp.pem");
+
+         using (RSA rsa = RSA.Create())
+         {
+            rsa.KeySize = 2048;
+            File.WriteAllText(_rs256PublicKeyPath, ExportPublicKeyPem(rsa));
+            try
+            {
+               EnableOAuth2Rs256(_rs256PublicKeyPath);
+
+               string token = MintRs256(address, UnixNow() + 3600, rsa);
+               string response = SmtpAuthXOAuth2(address, token);
+               Assert.IsTrue(response.StartsWith("235"),
+                  "A valid RS256 bearer token should authenticate over SMTP. Got: " + response);
+            }
+            finally
+            {
+               DisableOAuth2();
+               _settings.ClearLogonFailureList();
+               if (File.Exists(_rs256PublicKeyPath))
+                  File.Delete(_rs256PublicKeyPath);
+            }
          }
       }
    }
