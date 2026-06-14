@@ -8,6 +8,8 @@
 #include "MetricsServer.h"
 #include "ServerStatus.h"
 
+#include "../Application/Application.h"
+#include "../SQL/DatabaseConnectionManager.h"
 #include "../TCPIP/SocketConstants.h"
 
 #include <ws2tcpip.h>
@@ -75,7 +77,7 @@ namespace HM
       worker_ = std::thread(&MetricsServer::Run_, this);
 
       String message;
-      message.Format(_T("MetricsServer: Listening on %s:%d (/metrics)."), bind_address.c_str(), port);
+      message.Format(_T("MetricsServer: Listening on %s:%d (/metrics, /livez, /readyz, /healthz)."), bind_address.c_str(), port);
       LOG_APPLICATION(message);
 
       return true;
@@ -149,6 +151,27 @@ namespace HM
 
          response = headers + body;
       }
+      else if (request.StartsWith("GET /livez"))
+      {
+         // Liveness: if we got here, the process and the listener thread are
+         // responsive. No dependency checks (so a database outage does not cause
+         // an orchestrator to kill an otherwise-healthy process).
+         response = BuildHttpResponse_(200, "text/plain; charset=utf-8", "alive\n");
+      }
+      else if (request.StartsWith("GET /readyz"))
+      {
+         // Readiness: the server is running and the database is connected.
+         AnsiString reason;
+         bool ready = IsReady_(reason);
+         response = BuildHttpResponse_(ready ? 200 : 503, "text/plain; charset=utf-8",
+            ready ? AnsiString("ready\n") : ("not ready: " + reason + "\n"));
+      }
+      else if (request.StartsWith("GET /healthz"))
+      {
+         bool healthy = false;
+         AnsiString body = BuildHealthBody_(healthy);
+         response = BuildHttpResponse_(healthy ? 200 : 503, "application/json; charset=utf-8", body);
+      }
       else
       {
          response = "HTTP/1.0 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
@@ -204,6 +227,80 @@ namespace HM
       body += "# TYPE hmailserver_state gauge\n";
       line.Format("hmailserver_state %d\n", status->GetState());
       body += line;
+
+      return body;
+   }
+
+   AnsiString
+   MetricsServer::BuildHttpResponse_(int status_code, const char *content_type, const AnsiString &body)
+   {
+      const char *reason;
+      switch (status_code)
+      {
+      case 200: reason = "OK"; break;
+      case 404: reason = "Not Found"; break;
+      case 503: reason = "Service Unavailable"; break;
+      default:  reason = "OK"; break;
+      }
+
+      AnsiString headers;
+      headers.Format("HTTP/1.0 %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\nConnection: close\r\n\r\n",
+         status_code, reason, content_type, body.GetLength());
+
+      return headers + body;
+   }
+
+   bool
+   MetricsServer::IsReady_(AnsiString &reason)
+   {
+      if (ServerStatus::Instance()->GetState() != ServerStatus::StateRunning)
+      {
+         reason = "server not in running state";
+         return false;
+      }
+
+      std::shared_ptr<DatabaseConnectionManager> db_manager = Application::Instance()->GetDBManager();
+      if (!db_manager || !db_manager->GetIsConnected())
+      {
+         reason = "database not connected";
+         return false;
+      }
+
+      return true;
+   }
+
+   AnsiString
+   MetricsServer::BuildHealthBody_(bool &healthy)
+   {
+      ServerStatus *status = ServerStatus::Instance();
+      int state = status->GetState();
+      bool running = state == ServerStatus::StateRunning;
+
+      std::shared_ptr<DatabaseConnectionManager> db_manager = Application::Instance()->GetDBManager();
+      bool database_up = db_manager && db_manager->GetIsConnected();
+
+      healthy = running && database_up;
+
+      ULONGLONG uptime_seconds = (GetTickCount64() - start_tick_count_) / 1000;
+
+      const char *state_name =
+         state == ServerStatus::StateRunning ? "running" :
+         state == ServerStatus::StateStarting ? "starting" :
+         state == ServerStatus::StateStopping ? "stopping" :
+         state == ServerStatus::StateStopped ? "stopped" : "unknown";
+
+      AnsiString body;
+      body.Format(
+         "{\"status\":\"%s\",\"state\":\"%s\",\"database\":\"%s\","
+         "\"sessions\":{\"smtp\":%d,\"imap\":%d,\"pop3\":%d},"
+         "\"uptime_seconds\":%I64u}\n",
+         healthy ? "ok" : "unavailable",
+         state_name,
+         database_up ? "up" : "down",
+         status->GetNumberOfSessions(STSMTP),
+         status->GetNumberOfSessions(STIMAP),
+         status->GetNumberOfSessions(STPOP3),
+         uptime_seconds);
 
       return body;
    }

@@ -207,10 +207,16 @@ SRS for forwarding (SPF alignment), and per-IP / per-destination rate shaping.*
 
 ### B7 — Operability & observability
 
-- **OpenTelemetry** tracing (SMTP/IMAP/POP/DB spans + correlation IDs);
-  unauthenticated local health/readiness/liveness probes; richer metrics (queue
-  depth, per-command latency, DB pool saturation, TLS handshake failures); log
-  retention/rotation.
+- **Done — health/readiness/liveness probes.** The local unauthenticated metrics
+  listener (`MetricsServer`, enabled via `[Settings] MetricsServerPort`) now also
+  serves Kubernetes-style probes alongside `/metrics`: `/livez` (always 200 once
+  the listener is up), `/readyz` (200 when the server is `StateRunning` and the DB
+  pool reports connected, else 503), and `/healthz` (JSON: status, server state,
+  database up/down, per-protocol session counts, uptime). Covered by the
+  `HealthProbes` regression test.
+- **OpenTelemetry** tracing (SMTP/IMAP/POP/DB spans + correlation IDs); richer
+  metrics (queue depth, per-command latency, DB pool saturation, TLS handshake
+  failures); log retention/rotation.
 - Async/DB isolation: dedicated DB executor; replace the connection-pool `Sleep`
   polling with condition variables (`DatabaseConnectionManager`);
   prepared-statement caches (MySQL/PG).
