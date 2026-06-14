@@ -29,6 +29,7 @@ namespace hMailServer.ControlPanel.Views
       private readonly TextBox firstName_ = NewInput();
       private readonly TextBox lastName_ = NewInput();
       private readonly PasswordBox password_ = new();
+      private readonly TextBlock pwStrength_ = new() { FontSize = 11.5, Margin = new Thickness(0, 0, 0, 12), TextWrapping = TextWrapping.Wrap };
       private readonly TextBlock lastLogon_ = new() { FontSize = 12.5, Margin = new Thickness(0, 0, 0, 8) };
 
       // Forwarding
@@ -148,8 +149,11 @@ namespace hMailServer.ControlPanel.Views
          panel.Children.Add(Label("New password (leave empty to keep current)"));
          password_.FontSize = 13;
          password_.Padding = new Thickness(6);
-         password_.Margin = new Thickness(0, 0, 0, 12);
+         password_.Margin = new Thickness(0, 0, 0, 4);
+         password_.PasswordChanged += (s, e) => UpdatePasswordStrength();
          panel.Children.Add(password_);
+         panel.Children.Add(pwStrength_);
+         UpdatePasswordStrength();
          panel.Children.Add(Label("Last logon"));
          lastLogon_.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
          panel.Children.Add(lastLogon_);
@@ -488,6 +492,19 @@ namespace hMailServer.ControlPanel.Views
          }
       }
 
+      private void UpdatePasswordStrength()
+      {
+         (PasswordStrength.Level level, string summary) = PasswordStrength.Evaluate(password_.Password);
+         pwStrength_.Text = summary;
+         pwStrength_.Foreground = level switch
+         {
+            PasswordStrength.Level.Strong => System.Windows.Media.Brushes.MediumSeaGreen,
+            PasswordStrength.Level.Fair => System.Windows.Media.Brushes.Goldenrod,
+            PasswordStrength.Level.Weak => System.Windows.Media.Brushes.IndianRed,
+            _ => System.Windows.Media.Brushes.Gray,
+         };
+      }
+
       private void Save()
       {
          if (!NumericField.TryValidate(quota_.Text, "Maximum size (MB)", 0, int.MaxValue, out int quotaV, out bool hasQuota, out string error))
@@ -496,6 +513,17 @@ namespace hMailServer.ControlPanel.Views
             return;
          }
          status_.Text = "";
+
+         if (password_.Password.Length > 0)
+         {
+            (PasswordStrength.Level level, string summary) = PasswordStrength.Evaluate(password_.Password);
+            if (level == PasswordStrength.Level.Weak &&
+                MessageBox.Show(summary + "\n\nSave this weak password anyway?", "Control Panel",
+                   MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            {
+               return;
+            }
+         }
 
          dynamic domains = ServerSession.Current.Application.Domains;
          try

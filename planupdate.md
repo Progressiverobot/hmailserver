@@ -149,7 +149,12 @@ installer.
    (`BlockedIPHoldSeconds`, `RewriteEnvelopeFromWhenForwarding`, and a
    `PreferredHashAlgorithm` picker: Argon2id/PBKDF2/SHA-256/MD5/Blowfish). Defaults
    mirror the server's; a new `ChoiceSetting` (combo) was added to the INI editor.
-4. **Account password-strength validation** before save.
+4. ✅ **Account password-strength validation** — the account dialog shows a live
+   strength indicator (Weak/Fair/Strong, colour-coded, with what's missing) under
+   the password field as it is typed, and saving a weak password (under 8 chars or
+   a single character class) prompts a confirmation the admin can override. Backed
+   by a shared offline `PasswordStrength` heuristic (length + character-class
+   variety).
 
 ### Phase 4 — Finalize
 
