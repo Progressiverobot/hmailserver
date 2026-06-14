@@ -89,6 +89,8 @@ namespace HM
       String GetOAuth2Audience() {return oauth2_audience_;}
       String GetOAuth2UsernameClaim() {return oauth2_username_claim_;}
       bool GetProtectStoredSecretsWithDPAPI() {return protect_stored_secrets_with_dpapi_;}
+      String GetServiceAccountName() {return service_account_name_;}
+      String GetServiceAccountPassword() {return service_account_password_;}
       bool GetDNSBLChecksAfterMailFrom() {return dnsbl_checks_after_mail_from_; }
       bool GetSepSvcLogs() {return sep_svc_logs_; }
       int GetLogLevel() {return log_level_; }
@@ -215,6 +217,8 @@ namespace HM
       String oauth2_username_claim_;
 
       bool protect_stored_secrets_with_dpapi_;
+      String service_account_name_;
+      String service_account_password_;
 
       String log_directory_;
       static String ini_file_;

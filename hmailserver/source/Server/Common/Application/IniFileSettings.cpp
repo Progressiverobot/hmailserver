@@ -193,6 +193,17 @@ namespace HM
       // different machine). Existing legacy values are always still readable.
       protect_stored_secrets_with_dpapi_ = ReadIniSettingInteger_("Settings", "ProtectStoredSecretsWithDPAPI", 1) == 1;
 
+      // Optional least-privilege Windows service account for the hMailServer service.
+      // Empty (the default) leaves the service running under LocalSystem, exactly as
+      // before. Set ServiceAccountName to run under a dedicated account - the
+      // recommended choice is the password-less virtual account "NT SERVICE\hMailServer"
+      // (leave ServiceAccountPassword empty for virtual/managed accounts). The chosen
+      // account must be granted "Log on as a service" plus access to the hMailServer
+      // program, data and database directories. Takes effect when the service is
+      // (re)registered.
+      service_account_name_ = ReadIniSettingString_("Settings", "ServiceAccountName", "");
+      service_account_password_ = ReadIniSettingString_("Settings", "ServiceAccountPassword", "");
+
       dnsbl_checks_after_mail_from_ = ReadIniSettingInteger_("Settings", "DNSBLChecksAfterMailFrom", 1) == 1;
 
       sep_svc_logs_ = ReadIniSettingInteger_("Settings", "SepSvcLogs", 0) == 1;

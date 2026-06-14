@@ -6,6 +6,8 @@
 
 #include "ServiceManager.h"
 
+#include "../Application/IniFileSettings.h"
+
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
 #define new DEBUG_NEW
@@ -52,6 +54,12 @@ namespace HM
          // Check wether we should set the service dependent on MySQL.
          LPCTSTR szServiceDependencies = _T("RPCSS\0\0");
 
+         // Optional least-privilege service account (empty -> NULL -> LocalSystem).
+         String serviceAccountName = IniFileSettings::Instance()->GetServiceAccountName();
+         String serviceAccountPassword = IniFileSettings::Instance()->GetServiceAccountPassword();
+         LPCTSTR pServiceStartName = serviceAccountName.IsEmpty() ? NULL : serviceAccountName.c_str();
+         LPCTSTR pServicePassword = serviceAccountPassword.IsEmpty() ? NULL : serviceAccountPassword.c_str();
+
          SC_HANDLE hService = CreateService( hSCManager,
                                    ServiceName,
                                    ServiceCaption,
@@ -63,8 +71,8 @@ namespace HM
                                    NULL,
                                    NULL,
                                    szServiceDependencies,
-                                   NULL,
-                                   NULL
+                                   pServiceStartName,
+                                   pServicePassword
                                    );  
 
 
@@ -111,6 +119,12 @@ namespace HM
       // Update the path to the executable
       String sPath = "\"" + Application::GetExecutableName() + "\" RunAsService";
 
+      // Optional least-privilege service account (empty -> NULL -> leave unchanged).
+      String serviceAccountName = IniFileSettings::Instance()->GetServiceAccountName();
+      String serviceAccountPassword = IniFileSettings::Instance()->GetServiceAccountPassword();
+      LPCTSTR pServiceStartName = serviceAccountName.IsEmpty() ? NULL : serviceAccountName.c_str();
+      LPCTSTR pServicePassword = serviceAccountPassword.IsEmpty() ? NULL : serviceAccountPassword.c_str();
+
       if (ChangeServiceConfig(
                hService,        // handle of service 
                SERVICE_NO_CHANGE , // service type: no change 
@@ -120,8 +134,8 @@ namespace HM
                NULL,              // load order group: no change 
                NULL,              // tag ID: no change 
                NULL,              // dependencies: no change 
-               NULL,              // account name: no change 
-               NULL,              // password: no change 
+               pServiceStartName, // account name: change only when configured 
+               pServicePassword,  // password: change only when configured 
                NULL) == 0)             // display name: no change
       {
          String sErrorMessage;
