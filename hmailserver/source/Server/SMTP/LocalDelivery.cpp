@@ -213,15 +213,16 @@ namespace HM
       // Do the final delivery of the message.
       AddTraceHeaders_(account, accountLevelMessage, sOriginalAddress);
 
-      // Evaluate the recipient account's Sieve script (if any). A discard drops
-      // the message silently; a fileinto target overrides the destination folder.
+      // Evaluate the recipient account's Sieve script (if any). It may fire
+      // redirect actions, choose a fileinto folder, and/or cancel the local copy
+      // (a discard, or a redirect with no keep).
       String sieveFolder;
-      bool sieveDiscard = false;
-      EvaluateSieveScript_(account, accountLevelMessage, sieveFolder, sieveDiscard);
+      bool sieveDrop = false;
+      EvaluateSieveScript_(account, accountLevelMessage, sieveFolder, sieveDrop);
 
-      if (sieveDiscard)
+      if (sieveDrop)
       {
-         String sMessage = Formatter::Format("SMTPDeliverer - Message {0}: discarded by the Sieve script for {1}.",
+         String sMessage = Formatter::Format("SMTPDeliverer - Message {0}: not kept locally by the Sieve script for {1}.",
                                                 original_message_->GetID(), account->GetAddress());
          LOG_APPLICATION(sMessage);
          return false;
@@ -267,10 +268,10 @@ namespace HM
    }
 
    void
-   LocalDelivery::EvaluateSieveScript_(std::shared_ptr<const Account> account, std::shared_ptr<Message> message, String &sieveFolder, bool &sieveDiscard)
+   LocalDelivery::EvaluateSieveScript_(std::shared_ptr<const Account> account, std::shared_ptr<Message> message, String &sieveFolder, bool &sieveDrop)
    {
       sieveFolder = _T("");
-      sieveDiscard = false;
+      sieveDrop = false;
 
       String script = SieveStorage::GetActiveScript(account->GetAddress());
       if (script.IsEmpty())
@@ -292,25 +293,39 @@ namespace HM
          return;
       }
 
-      bool discard = false;
+      bool keepLocal = false;
       String fileInto;
+      std::vector<String> redirects;
 
       std::vector<String> tokens = StringParser::SplitString(actions, _T(";"));
       for (const String &token : tokens)
       {
-         if (token.CompareNoCase(_T("discard")) == 0)
-            discard = true;
+         if (token.CompareNoCase(_T("keep")) == 0)
+            keepLocal = true;
          else if (token.StartsWith(_T("fileinto:")))
+         {
             fileInto = token.Mid(9);
-         // "keep" is the default delivery; "redirect:" is not applied at this
-         // seam yet (it requires forwarding plumbing) and falls through to keep.
+            keepLocal = true;
+         }
+         else if (token.StartsWith(_T("redirect:")))
+            redirects.push_back(token.Mid(9));
+         // "discard" leaves keepLocal false (no local delivery).
       }
 
-      // A fileinto target takes precedence over a discard.
+      // Fire any redirect actions (each queues a copy to the target address).
+      for (const String &target : redirects)
+      {
+         SMTPForwarding forwarder;
+         forwarder.RedirectToAddress(account, message, target);
+      }
+
       if (!fileInto.IsEmpty())
          sieveFolder = fileInto;
-      else if (discard)
-         sieveDiscard = true;
+
+      // When the script kept neither an explicit nor implicit local copy (a
+      // discard, or a redirect that cancels the implicit keep), drop it locally.
+      if (!keepLocal)
+         sieveDrop = true;
    }
 
    bool 

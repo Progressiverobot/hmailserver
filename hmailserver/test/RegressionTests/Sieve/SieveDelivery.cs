@@ -64,5 +64,28 @@ namespace RegressionTests.Sieve
          IMAPFolder inbox = account.IMAPFolders.get_ItemByName("INBOX");
          CustomAsserts.AssertFolderMessageCount(inbox, 1);
       }
+
+      [Test]
+      [Description("A redirect action forwards a copy to another address and cancels the implicit local keep.")]
+      public void TestRedirectForwardsAndCancelsKeep()
+      {
+         var source = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "sieve-redir@example.test", "test");
+         var target = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "sieve-target@example.test", "test");
+
+         SetScript(source,
+            "if header :contains \"Subject\" \"fwdme\" {\r\n" +
+            "  redirect \"sieve-target@example.test\";\r\n" +
+            "}");
+
+         SmtpClientSimulator.StaticSend("sender@example.test", source.Address, "Please fwdme along", "body");
+
+         // The target receives the redirected copy.
+         IMAPFolder targetInbox = target.IMAPFolders.get_ItemByName("INBOX");
+         CustomAsserts.AssertFolderMessageCount(targetInbox, 1);
+
+         // The source keeps no local copy (redirect cancels the implicit keep).
+         IMAPFolder sourceInbox = source.IMAPFolders.get_ItemByName("INBOX");
+         CustomAsserts.AssertFolderMessageCount(sourceInbox, 0);
+      }
    }
 }

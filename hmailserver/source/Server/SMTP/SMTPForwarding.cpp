@@ -21,6 +21,7 @@
 
 
 #include "RecipientParser.h"
+#include "DeliveryQueue.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -150,6 +151,103 @@ namespace HM
       bool bKeepOriginal = pRecipientAccount->GetForwardKeepOriginal();
 
       return bKeepOriginal;
+   }
+
+   bool
+   SMTPForwarding::RedirectToAddress(std::shared_ptr<const Account> pRecipientAccount, std::shared_ptr<Message> pOriginalMessage, const String &targetAddress)
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // Queues a copy of the message for delivery to an arbitrary address, as used by
+   // the Sieve "redirect" action. Mirrors the copy/loop-guard/SRS handling of
+   // PerformForwarding but takes an explicit target and ignores the account's own
+   // forward settings.
+   //---------------------------------------------------------------------------()
+   {
+      if (targetAddress.IsEmpty())
+         return false;
+
+      // Avoid an obvious self-redirect loop.
+      if (targetAddress.CompareNoCase(pRecipientAccount->GetAddress()) == 0)
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 4334, "SMTPForwarding::RedirectToAddress", "Could not redirect message since target address is the same as the account address.");
+         return false;
+      }
+
+      String sErrorMessage;
+      bool bTreatSecurityAsLocal = false;
+      RecipientParser recipientParser;
+      if (recipientParser.CheckDeliveryPossibility(false,
+                                                   pRecipientAccount->GetAddress(),
+                                                   targetAddress,
+                                                   sErrorMessage,
+                                                   bTreatSecurityAsLocal,
+                                                   0) != RecipientParser::DP_Possible)
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 4382, "SMTPForwarding::RedirectToAddress",
+            Formatter::Format("Could not redirect message from {0} to {1}. Reason: {2}", pRecipientAccount->GetAddress(), targetAddress, sErrorMessage));
+         return false;
+      }
+
+      const String originalFileName = PersistentMessage::GetFileName(pRecipientAccount, pOriginalMessage);
+
+      std::shared_ptr<MessageData> pOldMsgData = std::shared_ptr<MessageData>(new MessageData());
+      pOldMsgData->LoadFromMessage(originalFileName, pOriginalMessage);
+
+      // Guard against redirect loops via the rule loop counter.
+      if (!RuleApplier::IsGeneratedResponseAllowed(pOldMsgData, false))
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 4333, "SMTPForwarding::RedirectToAddress", "Could not redirect message. Maximum loop count reached.");
+         return false;
+      }
+
+      std::shared_ptr<Message> pNewMessage = PersistentMessage::CopyToQueue(pRecipientAccount, pOriginalMessage);
+
+      String envelopeFrom = pNewMessage->GetFromAddress();
+      if (!envelopeFrom.IsEmpty())
+      {
+         if (IniFileSettings::Instance()->GetSRSEnabled())
+         {
+            String fromDomain = StringParser::ExtractDomain(envelopeFrom);
+            bool fromIsLocal = CacheContainer::Instance()->GetDomain(fromDomain) ? true : false;
+            if (!fromIsLocal)
+            {
+               String forwarderDomain = StringParser::ExtractDomain(pRecipientAccount->GetAddress());
+               String srsAddress = SRS::Forward(envelopeFrom, forwarderDomain, IniFileSettings::Instance()->GetSRSSecret());
+               if (!srsAddress.IsEmpty())
+                  pNewMessage->SetFromAddress(srsAddress);
+            }
+         }
+         else if (IniFileSettings::Instance()->GetRewriteEnvelopeFromWhenForwarding())
+         {
+            pNewMessage->SetFromAddress(pRecipientAccount->GetAddress());
+         }
+      }
+
+      pNewMessage->SetState(Message::Delivering);
+
+      std::shared_ptr<MessageData> pNewMsgData = std::shared_ptr<MessageData>(new MessageData());
+      const String newFileName = PersistentMessage::GetFileName(pNewMessage);
+      pNewMsgData->LoadFromMessage(newFileName, pNewMessage);
+      pNewMsgData->IncreaseRuleLoopCount();
+      pNewMsgData->Write(newFileName);
+
+      bool recipientOK = false;
+      recipientParser.CreateMessageRecipientList(targetAddress, pNewMessage->GetRecipients(), recipientOK);
+
+      if (pNewMessage->GetRecipients()->GetCount() == 0)
+      {
+         FileUtilities::DeleteFile(newFileName);
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 4332, "SMTPForwarding::RedirectToAddress", "Could not redirect message; no recipients.");
+         return false;
+      }
+
+      PersistentMessage::SaveObject(pNewMessage);
+
+      // Wake the delivery manager so the redirected copy is sent promptly rather
+      // than waiting for the next queue poll.
+      DeliveryQueue::StartDelivery();
+
+      return true;
    }
 
 }

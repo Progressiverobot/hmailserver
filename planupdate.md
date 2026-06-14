@@ -246,6 +246,16 @@ SRS for forwarding (SPF alignment), and per-IP / per-destination rate shaping.*
     discarded while a normal message is still delivered). Remaining: `redirect`
     (needs forwarding plumbing) and the **ManageSieve (RFC 5804)** service for
     multi-script management.
+  - **Done — Sieve `redirect` action.** A `redirect "addr"` now queues a copy of
+    the message for delivery to the target address (`SMTPForwarding::RedirectToAddress`,
+    reusing the account-forwarding copy/loop-guard/SRS path) and cancels the
+    implicit local keep (unless the script also `keep`s or `fileinto`s). The
+    delivery manager is signalled (`DeliveryQueue::StartDelivery`) so the copy is
+    sent promptly. Validated by the `SieveDelivery` redirect test (target receives
+    the copy; source keeps none). **Sieve (RFC 5228) is now functionally complete**
+    — parse → syntax-check → evaluate → per-account storage → live filtering with
+    keep/fileinto/discard/redirect. Remaining B6: the **ManageSieve (RFC 5804)**
+    service for multi-script upload/management.
 
 ### B7 — Operability & observability
 
