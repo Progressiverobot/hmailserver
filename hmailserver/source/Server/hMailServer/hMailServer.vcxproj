@@ -213,6 +213,7 @@ EXIT 0
     <ClCompile Include="..\Common\Application\Property.cpp" />
     <ClCompile Include="..\Common\Application\PropertySet.cpp" />
     <ClCompile Include="..\Common\Application\Reinitializator.cpp" />
+    <ClCompile Include="..\Common\Application\LogRetentionTask.cpp" />
     <ClCompile Include="..\Common\Application\RemoveExpiredRecords.cpp" />
     <ClCompile Include="..\Common\Application\Scheduler.cpp" />
     <ClCompile Include="..\Common\Application\SessionManager.cpp" />
@@ -722,6 +723,7 @@ EXIT 0
     <ClInclude Include="..\Common\Application\Property.h" />
     <ClInclude Include="..\Common\Application\PropertySet.h" />
     <ClInclude Include="..\Common\Application\Reinitializator.h" />
+    <ClInclude Include="..\Common\Application\LogRetentionTask.h" />
     <ClInclude Include="..\Common\Application\RemoveExpiredRecords.h" />
     <ClInclude Include="..\Common\Application\Scheduler.h" />
     <ClInclude Include="..\Common\Application\SessionManager.h" />

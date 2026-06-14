@@ -218,9 +218,13 @@ SRS for forwarding (SPF alignment), and per-IP / per-destination rate shaping.*
   `hmailserver_database_up` (1/0) and `hmailserver_db_connections{state="busy|available"}`
   gauges sourced from the `DatabaseConnectionManager` pool, giving DB connectivity
   and pool-saturation visibility. Asserted by the `HealthProbes` test.
+- **Done — log retention/rotation.** A scheduled `LogRetentionTask` (runs once at
+  startup, then every 6h) deletes hMailServer's own date-stamped log files older
+  than `[Settings] LogDeleteDays` (0 = disabled, the default, so historical
+  behaviour is unchanged). Only files named `hmailserver_*.log` /
+  `ERROR_hmailserver_*.log` are ever touched. Covered by the `LogRetention` test.
 - **OpenTelemetry** tracing (SMTP/IMAP/POP/DB spans + correlation IDs); further
-  metrics (queue depth, per-command latency, TLS handshake failures); log
-  retention/rotation.
+  metrics (queue depth, per-command latency, TLS handshake failures).
 - Async/DB isolation: dedicated DB executor; replace the connection-pool `Sleep`
   polling with condition variables (`DatabaseConnectionManager`);
   prepared-statement caches (MySQL/PG).

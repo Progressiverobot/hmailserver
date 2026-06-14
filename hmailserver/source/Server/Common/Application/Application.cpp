@@ -56,6 +56,7 @@
 #include "../Persistence/PersistentMessage.h"
 #include "../Persistence/PersistentDomain.h"
 #include "RemoveExpiredRecords.h"
+#include "LogRetentionTask.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -451,6 +452,18 @@ namespace HM
       tlsRptTask->SetReoccurance(ScheduledTask::RunInfinitely);
       tlsRptTask->SetMinutesBetweenRun(60);
       scheduler_->ScheduleTask(tlsRptTask);
+
+      // Log retention: prune date-stamped log files older than LogDeleteDays.
+      // The task itself no-ops when LogDeleteDays <= 0 (retention disabled).
+      // Run once promptly at startup, then periodically thereafter.
+      std::shared_ptr<LogRetentionTask> logRetentionStartupTask = std::shared_ptr<LogRetentionTask>(new LogRetentionTask);
+      logRetentionStartupTask->SetReoccurance(ScheduledTask::RunOnce);
+      scheduler_->ScheduleTask(logRetentionStartupTask);
+
+      std::shared_ptr<LogRetentionTask> logRetentionTask = std::shared_ptr<LogRetentionTask>(new LogRetentionTask);
+      logRetentionTask->SetReoccurance(ScheduledTask::RunInfinitely);
+      logRetentionTask->SetMinutesBetweenRun(6 * 60);
+      scheduler_->ScheduleTask(logRetentionTask);
 
       // Automatic certificate renewal via ACME (Let's Encrypt).
       if (IniFileSettings::Instance()->GetAcmeEnabled())

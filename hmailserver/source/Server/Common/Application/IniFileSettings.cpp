@@ -255,6 +255,7 @@ namespace HM
       dnssec_validation_enabled_ = ReadIniSettingInteger_("Settings", "DnssecValidationEnabled", 1) == 1;
       dnssec_trust_anchors_ = ReadIniSettingString_("Settings", "DnssecTrustAnchors", "");
       json_logging_ = ReadIniSettingInteger_("Settings", "JsonLogging", 0) == 1;
+      log_delete_days_ = ReadIniSettingInteger_("Settings", "LogDeleteDays", 0);
       metrics_server_port_ = ReadIniSettingInteger_("Settings", "MetricsServerPort", 0);
       metrics_server_bind_address_ = ReadIniSettingString_("Settings", "MetricsServerBindAddress", "127.0.0.1");
       arc_sealing_enabled_ = ReadIniSettingInteger_("Settings", "ArcSealingEnabled", 0) == 1;
