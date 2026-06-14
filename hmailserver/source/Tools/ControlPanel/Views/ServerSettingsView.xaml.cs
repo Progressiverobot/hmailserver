@@ -525,7 +525,7 @@ namespace hMailServer.ControlPanel.Views
          });
          Tab("ClamWin").Cards.Add(clamwin);
 
-         var custom = Card("Custom scanner", "Run an external command; a configured return value indicates an infected message. Use %FILE% where the file to scan should be passed on the command line.");
+         var custom = Card("Custom scanner", "Run an external command; a configured return value indicates an infected message. Use %FILE% where the file to scan should be passed on the command line. For engines without a CLI (HTTP/API, DLP, SIEM), use an OnAcceptMessage handler on the Event scripts page instead.");
          custom.Settings.Add(new ComBool { Path = "AntiVirus.CustomScannerEnabled", Label = "Use a custom virus scanner" });
          var customExe = new ComText { Path = "AntiVirus.CustomScannerExecutable", Label = "Command line (use %FILE% for the scanned file)" };
          var customReturn = new ComText { Path = "AntiVirus.CustomScannerReturnValue", Label = "Return value for infected", Numeric = true };

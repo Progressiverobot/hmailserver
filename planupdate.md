@@ -133,9 +133,11 @@ installer.
    `MpCmdRun`, Sophos `savscan`, ESET `ecls`, Bitdefender `bdscan`, Kaspersky
    `avp.com`); plus a **ClamWin auto-detect** that locates `clamscan.exe` and the
    database folder.
-2. **Event-script integration hooks** — script templates in `ScriptsView`
-   (OnAcceptMessage → AV/DLP/SIEM/webhook/external-API), with a pointer from the
-   AntiVirus page for non-CLI engines.
+2. ✅ **Event-script integration hooks** — an "Insert template" picker on the Event
+   scripts page appends ready-made `OnAcceptMessage` VBScript handlers (run an
+   external AV/DLP scanner via `WScript.Shell`, fire a webhook to a SIEM/Slack/Teams
+   endpoint, or call an external HTTP API and act on its verdict); the AntiVirus
+   custom-scanner card points admins here for engines without a CLI.
 3. **Advanced hardening card** (INI-backed) — surface the unexposed
    `IniFileSettings` knobs: `GreylistingEnabledDuringRecordExpiration`,
    `GreylistingRecordExpirationInterval`, `PreferredHashAlgorithm`,

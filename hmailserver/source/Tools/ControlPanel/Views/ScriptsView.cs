@@ -59,6 +59,22 @@ namespace hMailServer.ControlPanel.Views
 
          var toolbar = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 0, 0, 10) };
          Grid.SetRow(toolbar, 2);
+
+         var templateCombo = new ComboBox { MinWidth = 240, VerticalAlignment = VerticalAlignment.Center };
+         templateCombo.Items.Add(new ComboBoxItem { Content = "Insert template\u2026", Tag = "" });
+         foreach ((string name, string body) in ScriptTemplates)
+            templateCombo.Items.Add(new ComboBoxItem { Content = name, Tag = body });
+         templateCombo.SelectedIndex = 0;
+         templateCombo.SelectionChanged += (s, e) =>
+         {
+            if (templateCombo.SelectedItem is ComboBoxItem cbi && cbi.Tag is string body && body.Length > 0)
+            {
+               InsertTemplate(body);
+               templateCombo.SelectedIndex = 0;
+            }
+         };
+         toolbar.Children.Add(templateCombo);
+
          toolbar.Children.Add(MakeButton("Save & reload", Wpf.Ui.Controls.ControlAppearance.Primary, (_, _) => SaveScript()));
          toolbar.Children.Add(MakeButton("Check syntax", Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => CheckSyntax()));
          toolbar.Children.Add(MakeButton("Reload from disk", Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => LoadScript()));
@@ -83,6 +99,72 @@ namespace hMailServer.ControlPanel.Views
          var b = new Wpf.Ui.Controls.Button { Content = text, Appearance = appearance, Margin = new Thickness(8, 0, 0, 0), MinWidth = 110 };
          b.Click += onClick;
          return b;
+      }
+
+      // VBScript starter snippets for common integrations. Each is a complete
+      // OnAcceptMessage handler; if the script already has one, the two must be
+      // merged into a single Sub before saving.
+      private static readonly (string Name, string Body)[] ScriptTemplates =
+      {
+         ("OnAcceptMessage \u2192 external AV / DLP scanner",
+@"' --- Run an external AV / DLP scanner on the received message ----------------
+' The message is already on disk at oMessage.Filename. A non-zero exit code is
+' treated as ""infected/blocked"". Adjust the path and exit-code handling.
+Sub OnAcceptMessage(oClient, oMessage)
+   Dim oShell, sCmd, nResult
+   sCmd = ""C:\Tools\scan.exe "" & Chr(34) & oMessage.Filename & Chr(34)
+   Set oShell = CreateObject(""WScript.Shell"")
+   nResult = oShell.Run(sCmd, 0, True)   ' 0 = hidden window, True = wait for exit
+   If nResult <> 0 Then
+      Result.Value = 2                   ' 0 = accept, 1 = move to queue, 2 = delete
+      Result.Message = ""Rejected by external scanner (exit "" & nResult & "")""
+   End If
+End Sub
+"),
+         ("OnAcceptMessage \u2192 webhook (SIEM / Slack / Teams)",
+@"' --- Notify a webhook about the received message ----------------------------
+' Fire-and-forget POST; delivery is not blocked if the webhook is unavailable.
+Sub OnAcceptMessage(oClient, oMessage)
+   Dim oHttp, q, sUrl, sBody
+   q = Chr(34)
+   sUrl = ""https://example.com/webhook""
+   sBody = ""{"" & q & ""from"" & q & "":"" & q & oMessage.FromAddress & q & ""}""
+   On Error Resume Next
+   Set oHttp = CreateObject(""MSXML2.ServerXMLHTTP.6.0"")
+   oHttp.Open ""POST"", sUrl, False
+   oHttp.setRequestHeader ""Content-Type"", ""application/json""
+   oHttp.send sBody
+   EventLog.Write ""Webhook notified, status "" & oHttp.Status
+   On Error Goto 0
+End Sub
+"),
+         ("OnAcceptMessage \u2192 external HTTP API verdict",
+@"' --- Ask an external API whether to block the message -----------------------
+' Calls a classification/threat API and deletes the message on a 'block' verdict.
+Sub OnAcceptMessage(oClient, oMessage)
+   Dim oHttp, sUrl
+   sUrl = ""https://api.example.com/classify?from="" & oMessage.FromAddress
+   Set oHttp = CreateObject(""MSXML2.ServerXMLHTTP.6.0"")
+   oHttp.Open ""GET"", sUrl, False
+   oHttp.send
+   If oHttp.Status = 200 And InStr(oHttp.responseText, ""block"") > 0 Then
+      Result.Value = 2
+      Result.Message = ""Blocked by classification API""
+   End If
+End Sub
+"),
+      };
+
+      private void InsertTemplate(string body)
+      {
+         if (!editor_.IsEnabled)
+            return;
+
+         string separator = editor_.Text.Length > 0 ? "\r\n\r\n" : "";
+         editor_.Text = editor_.Text + separator + body;
+         editor_.CaretIndex = editor_.Text.Length;
+         editor_.ScrollToEnd();
+         status_.Text = "Template appended. If you already have an OnAcceptMessage handler, merge the two into a single Sub before saving.";
       }
 
       private void LoadScript()
