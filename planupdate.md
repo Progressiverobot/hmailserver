@@ -223,8 +223,12 @@ SRS for forwarding (SPF alignment), and per-IP / per-destination rate shaping.*
   than `[Settings] LogDeleteDays` (0 = disabled, the default, so historical
   behaviour is unchanged). Only files named `hmailserver_*.log` /
   `ERROR_hmailserver_*.log` are ever touched. Covered by the `LogRetention` test.
+- **Done — TLS handshake metrics.** `ServerStatus` now counts completed and failed
+  TLS/SSL handshakes (incremented in `TCPConnection`), exposed on `/metrics` as
+  `hmailserver_tls_handshakes_total` and `hmailserver_tls_handshake_failures_total`
+  counters for TLS health alerting. Asserted by the `HealthProbes` test.
 - **OpenTelemetry** tracing (SMTP/IMAP/POP/DB spans + correlation IDs); further
-  metrics (queue depth, per-command latency, TLS handshake failures).
+  metrics (queue depth, per-command latency).
 - Async/DB isolation: dedicated DB executor; replace the connection-pool `Sleep`
   polling with condition variables (`DatabaseConnectionManager`);
   prepared-statement caches (MySQL/PG).

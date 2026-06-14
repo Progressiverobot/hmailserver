@@ -11,6 +11,7 @@
 #include "DisconnectedException.h"
 
 #include "../Util/ByteBuffer.h"
+#include "../Util/ServerStatus.h"
 #include "../BO/TCPIPPorts.h"
 #include "../Persistence/PersistentSecurityRange.h"
 
@@ -412,6 +413,8 @@ namespace HM
       {
          is_ssl_ = true;
 
+         ServerStatus::Instance()->OnTlsHandshakeCompleted();
+
          // Send welcome message to client.
          auto cipher_info = GetCipherInfo();
 
@@ -441,6 +444,8 @@ namespace HM
       String sMessage;
       sMessage.Format(_T("TCPConnection - TLS/SSL handshake failed. Session Id: %d, Remote IP: %s, Error code: %d, Message: %s"), session_id_, SafeGetIPAddress().c_str(), error.value(), String(error.message()).c_str());
       LOG_TCPIP(sMessage);
+
+      ServerStatus::Instance()->OnTlsHandshakeFailed();
 
       OnHandshakeFailed();
    }

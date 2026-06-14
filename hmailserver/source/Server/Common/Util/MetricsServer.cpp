@@ -209,6 +209,16 @@ namespace HM
       line.Format("hmailserver_viruses_removed_total %d\n", status->GetNumberOfRemovedViruses());
       body += line;
 
+      body += "# HELP hmailserver_tls_handshakes_total Number of completed TLS/SSL handshakes since server start.\n";
+      body += "# TYPE hmailserver_tls_handshakes_total counter\n";
+      line.Format("hmailserver_tls_handshakes_total %d\n", status->GetNumberOfTlsHandshakesCompleted());
+      body += line;
+
+      body += "# HELP hmailserver_tls_handshake_failures_total Number of failed TLS/SSL handshakes since server start.\n";
+      body += "# TYPE hmailserver_tls_handshake_failures_total counter\n";
+      line.Format("hmailserver_tls_handshake_failures_total %d\n", status->GetNumberOfTlsHandshakeFailures());
+      body += line;
+
       body += "# HELP hmailserver_sessions Current number of active sessions per protocol.\n";
       body += "# TYPE hmailserver_sessions gauge\n";
       line.Format("hmailserver_sessions{protocol=\"smtp\"} %d\n", status->GetNumberOfSessions(STSMTP));

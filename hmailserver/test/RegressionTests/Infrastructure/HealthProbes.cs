@@ -142,6 +142,8 @@ namespace RegressionTests.Infrastructure
             Assert.IsTrue(metrics.body.Contains("hmailserver_database_up 1"), "Metrics body should report database up. Body: " + metrics.body);
             Assert.IsTrue(metrics.body.Contains("hmailserver_db_connections{state=\"busy\"}"), "Metrics body missing busy pool gauge. Body: " + metrics.body);
             Assert.IsTrue(metrics.body.Contains("hmailserver_db_connections{state=\"available\"}"), "Metrics body missing available pool gauge. Body: " + metrics.body);
+            Assert.IsTrue(metrics.body.Contains("hmailserver_tls_handshakes_total"), "Metrics body missing TLS handshake counter. Body: " + metrics.body);
+            Assert.IsTrue(metrics.body.Contains("hmailserver_tls_handshake_failures_total"), "Metrics body missing TLS handshake failure counter. Body: " + metrics.body);
 
             // Unknown paths return 404.
             (int status, string body) notFound = HttpGet("/does-not-exist");

@@ -32,6 +32,12 @@ namespace HM
       void OnVirusRemoved();
       int GetNumberOfRemovedViruses() const;
 
+      void OnTlsHandshakeCompleted();
+      int GetNumberOfTlsHandshakesCompleted() const;
+
+      void OnTlsHandshakeFailed();
+      int GetNumberOfTlsHandshakeFailures() const;
+
       void SetState(ServerState i);
       int GetState() const;
 
@@ -44,9 +50,12 @@ namespace HM
       int processed_messages_;
       int number_of_spam_messages_detected_;
       int number_of_viruses_removed_;
+      int number_of_tls_handshakes_completed_;
+      int number_of_tls_handshake_failures_;
 
       boost::recursive_mutex spam_message_dropped_mutex_;
       boost::recursive_mutex virus_removed_mutex_;
+      boost::recursive_mutex tls_handshake_mutex_;
 
       ServerState state_;
    };

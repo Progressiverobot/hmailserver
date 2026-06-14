@@ -20,6 +20,8 @@ namespace HM
       processed_messages_ = 0;
       number_of_spam_messages_detected_ = 0;
       number_of_viruses_removed_ = 0;
+      number_of_tls_handshakes_completed_ = 0;
+      number_of_tls_handshake_failures_ = 0;
       state_ = StateUnknown ;
 
    }
@@ -139,6 +141,34 @@ namespace HM
       boost::lock_guard<boost::recursive_mutex> guard(virus_removed_mutex_);
 
       number_of_viruses_removed_++;
+   }
+
+   int
+   ServerStatus::GetNumberOfTlsHandshakesCompleted() const
+   {
+      return number_of_tls_handshakes_completed_;
+   }
+
+   void
+   ServerStatus::OnTlsHandshakeCompleted()
+   {
+      // Called from TCP worker threads when a TLS handshake succeeds.
+      boost::lock_guard<boost::recursive_mutex> guard(tls_handshake_mutex_);
+      number_of_tls_handshakes_completed_++;
+   }
+
+   int
+   ServerStatus::GetNumberOfTlsHandshakeFailures() const
+   {
+      return number_of_tls_handshake_failures_;
+   }
+
+   void
+   ServerStatus::OnTlsHandshakeFailed()
+   {
+      // Called from TCP worker threads when a TLS handshake fails.
+      boost::lock_guard<boost::recursive_mutex> guard(tls_handshake_mutex_);
+      number_of_tls_handshake_failures_++;
    }
    
    int
