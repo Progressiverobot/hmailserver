@@ -70,7 +70,7 @@ namespace HM
 
       oStatement.AddColumn("routeuseauthentication", pRoute->GetRelayerRequiresAuth() ? 1 : 0);
       oStatement.AddColumn("routeauthenticationusername", pRoute->GetRelayerAuthUsername());
-      oStatement.AddColumn("routeauthenticationpassword", Crypt::Instance()->EnCrypt(pRoute->GetRelayerAuthPassword(), Crypt::ETBlowFish));
+      oStatement.AddColumn("routeauthenticationpassword", Crypt::Instance()->ProtectSecret(pRoute->GetRelayerAuthPassword()));
       oStatement.AddColumn("routetreatsecurityaslocal", pRoute->GetTreatRecipientAsLocalDomain() ? 1 : 0);
       oStatement.AddColumn("routetreatsenderaslocaldomain", pRoute->GetTreatSenderAsLocalDomain() ? 1 : 0);
       oStatement.AddColumn("routeconnectionsecurity", pRoute->GetConnectionSecurity() );
@@ -136,7 +136,7 @@ namespace HM
       pRoute->SetRelayerRequiresAuth(pRS->GetLongValue("routeuseauthentication") ? true : false);
 
       pRoute->SetRelayerAuthUsername(pRS->GetStringValue("routeauthenticationusername"));
-      pRoute->SetRelayerAuthPassword(Crypt::Instance()->DeCrypt(pRS->GetStringValue("routeauthenticationpassword"), Crypt::ETBlowFish));
+      pRoute->SetRelayerAuthPassword(Crypt::Instance()->UnprotectSecret(pRS->GetStringValue("routeauthenticationpassword")));
       pRoute->SetConnectionSecurity((ConnectionSecurity) pRS->GetLongValue("routeconnectionsecurity"));
 
       return true;

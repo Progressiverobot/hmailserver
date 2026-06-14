@@ -98,7 +98,7 @@ namespace HM
       oFA->SetPort(pRS->GetLongValue("faserverport"));
       oFA->SetServerType((HM::FetchAccount::ServerType)pRS->GetLongValue("faservertype"));
       oFA->SetUsername(pRS->GetStringValue("fausername"));
-      oFA->SetPassword(Crypt::Instance()->DeCrypt(pRS->GetStringValue("fapassword"), Crypt::ETBlowFish));
+      oFA->SetPassword(Crypt::Instance()->UnprotectSecret(pRS->GetStringValue("fapassword")));
       oFA->SetMinutesBetweenTry(pRS->GetLongValue("faminutes"));
       oFA->SetDaysToKeep(pRS->GetLongValue("fadaystokeep"));
       oFA->SetMIMERecipientHeaders(pRS->GetStringValue("famimerecipientheaders"));
@@ -163,7 +163,7 @@ namespace HM
       oStatement.AddColumn("faserverport", pFA->GetPort());
       oStatement.AddColumn("faservertype", pFA->GetServerType());
       oStatement.AddColumn("fausername", pFA->GetUsername());
-      oStatement.AddColumn("fapassword", Crypt::Instance()->EnCrypt(pFA->GetPassword(), Crypt::ETBlowFish));
+      oStatement.AddColumn("fapassword", Crypt::Instance()->ProtectSecret(pFA->GetPassword()));
       oStatement.AddColumn("faminutes", pFA->GetMinutesBetweenTry());
       oStatement.AddColumn("fadaystokeep", pFA->GetDaysToKeep());
       oStatement.AddColumn("fanexttry", Time::GetCurrentDateTime());

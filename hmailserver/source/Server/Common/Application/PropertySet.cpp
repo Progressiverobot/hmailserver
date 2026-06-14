@@ -49,7 +49,7 @@ namespace HM
          if (IsCryptedProperty_(sPropertyName))
          {
             // De-crypt the string after load from DB.
-            sPropertyString = Crypt::Instance()->DeCrypt(sPropertyString, Crypt::ETBlowFish);
+            sPropertyString = Crypt::Instance()->UnprotectSecret(sPropertyString);
             bIsCrypted = true;
          }
       

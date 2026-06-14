@@ -269,7 +269,7 @@ create table hm_routes
   routealladdresses tinyint unsigned NOT NULL,
   routeuseauthentication tinyint NOT NULL,
   routeauthenticationusername varchar(255) NOT NULL,
-  routeauthenticationpassword varchar(255) NOT NULL,
+  routeauthenticationpassword varchar(1024) NOT NULL,
   routetreatsecurityaslocal tinyint NOT NULL,
   routeconnectionsecurity tinyint not null,
   routetreatsenderaslocaldomain tinyint NOT NULL
@@ -316,7 +316,7 @@ create table hm_fetchaccounts
 	faserverport int not null,
 	faservertype tinyint not null,
 	fausername varchar (255) not null,
-	fapassword varchar (255) not null,
+	fapassword varchar (1024) not null,
 	faminutes int not null,
 	fanexttry datetime not null,
 	fadaystokeep int not null,
@@ -803,4 +803,4 @@ insert into hm_tcpipports (portprotocol, portnumber, portaddress1, portaddress2,
 
 insert into hm_tcpipports (portprotocol, portnumber, portaddress1, portaddress2, portconnectionsecurity, portsslcertificateid) values (5, 143, 0, NULL, 0, 0);
 
-insert into hm_dbversion values (6003);
+insert into hm_dbversion values (6004);

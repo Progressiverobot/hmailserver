@@ -140,4 +140,4 @@
 
 #define PROPERTY_TLSOPTIONS                     _T("TlsOptions")
 
-#define REQUIRED_DB_VERSION            6003
+#define REQUIRED_DB_VERSION            6004
