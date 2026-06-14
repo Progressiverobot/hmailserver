@@ -32,8 +32,8 @@ namespace HM
       void HandleExternalDeliveryFailure_(std::vector<std::shared_ptr<MessageRecipient> > &vecRecipients, bool bIsFatal, String &sErrorString);
       void HandleNoRecipientServers_(std::vector<std::shared_ptr<MessageRecipient> > &vecRecipients, bool bDNSQueryOK, bool isSpecificRelayServer);
       
-      void CollectDeliveryResult_(const String &serverHostName, std::vector<std::shared_ptr<MessageRecipient> > &vecRecipients, std::vector<String> &saErrorMessages, std::map<String,String> &mapFailedDueToNonFatalError);
-      bool RescheduleDelivery_(std::map<String,String> &mapFailedDueToNonFatalError, std::vector<String> &saErrorMessages);
+      void CollectDeliveryResult_(const String &serverHostName, std::vector<std::shared_ptr<MessageRecipient> > &vecRecipients, std::vector<String> &saErrorMessages, std::map<String,String> &mapFailedDueToNonFatalError, std::set<String> &suppressFailureDsnAddresses);
+      bool RescheduleDelivery_(std::map<String,String> &mapFailedDueToNonFatalError, std::vector<String> &saErrorMessages, std::set<String> &suppressFailureDsnAddresses);
       // Type changed from void to bool for use with ETRN.
       // Function not called anywhere else to matter
       bool GetRetryOptions_(std::map<String,String> &mapFailedDueToNonFatalError, long &lNoOfRetries, long &lMinutesBetween);

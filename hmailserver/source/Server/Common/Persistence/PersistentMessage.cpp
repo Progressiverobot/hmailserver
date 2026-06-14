@@ -265,6 +265,7 @@ namespace HM
          pRecipient->SetLocalAccountID(pRS->GetLongValue("recipientlocalaccountid"));
          pRecipient->SetMessageID(pRS->GetLongValue ("recipientmessageid"));
          pRecipient->SetOriginalAddress(pRS->GetStringValue("recipientoriginaladdress"));
+         pRecipient->SetDSNNotify((int) pRS->GetLongValue("recipientdsnnotify"));
 
          String sAddress = pRecipient->GetAddress();
 
@@ -342,6 +343,7 @@ namespace HM
          oStatement.AddColumn("recipientaddress", pRecipient->GetAddress());
          oStatement.AddColumnInt64("recipientlocalaccountid", pRecipient->GetLocalAccountID());
          oStatement.AddColumn("recipientoriginaladdress", pRecipient->GetOriginalAddress());
+         oStatement.AddColumnInt64("recipientdsnnotify", pRecipient->GetDSNNotify());
 
          oStatement.SetTable ("hm_messagerecipients");
          oStatement.SetStatementType(SQLStatement::STInsert);

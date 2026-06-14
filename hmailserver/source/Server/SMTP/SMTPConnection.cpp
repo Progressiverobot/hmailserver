@@ -557,6 +557,29 @@ namespace HM
             // SMTPUTF8 (RFC 6531): already handled above; accept the parameter so
             // it is not reported as an unsupported extension.
          }
+         else if (parameter.Left(4).CompareNoCase(_T("RET=")) == 0)
+         {
+            // DSN (RFC 3461): controls whether the full message or only its
+            // headers are returned in a delivery-status notification.
+            String retValue = parameter.Mid(4);
+            if (retValue.CompareNoCase(_T("FULL")) != 0 && retValue.CompareNoCase(_T("HDRS")) != 0)
+            {
+               SendErrorResponse_(501, "Syntax error in RET parameter (must be FULL or HDRS).");
+               return;
+            }
+            dsn_ret_ = retValue;
+         }
+         else if (parameter.Left(6).CompareNoCase(_T("ENVID=")) == 0)
+         {
+            // DSN (RFC 3461): an envelope identifier echoed back in any DSN.
+            String envId = parameter.Mid(6);
+            if (envId.IsEmpty() || envId.GetLength() > 100 || !IsValidXtext_(envId))
+            {
+               SendErrorResponse_(501, "Syntax error in ENVID parameter.");
+               return;
+            }
+            dsn_envid_ = envId;
+         }
          else
          {
             ReportUnsupportedEsmtpExtension_(parameter);
@@ -707,12 +730,38 @@ namespace HM
       std::vector<String> vecParams = StringParser::SplitString(sParameters, " ");
       auto iterParam = vecParams.begin();
 
-      // Parse the extensions 
-      if (iterParam != vecParams.end())
+      // Parse the extensions. DSN (RFC 3461) NOTIFY/ORCPT are accepted here; any
+      // other parameter is reported as an unsupported ESMTP extension.
+      int recipientNotify = MessageRecipient::DSNNotifyDefault;
+      while (iterParam != vecParams.end())
       {
          String parameter = *iterParam;
-         ReportUnsupportedEsmtpExtension_(parameter);
-         return;
+
+         if (parameter.Left(7).CompareNoCase(_T("NOTIFY=")) == 0)
+         {
+            if (!ParseDsnNotify_(parameter.Mid(7), recipientNotify))
+            {
+               SendErrorResponse_(501, "Syntax error in NOTIFY parameter.");
+               return;
+            }
+         }
+         else if (parameter.Left(6).CompareNoCase(_T("ORCPT=")) == 0)
+         {
+            // ORCPT carries the original recipient address; validate its syntax
+            // (addr-type ";" xtext) but it is not otherwise retained.
+            if (!IsValidOrcpt_(parameter.Mid(6)))
+            {
+               SendErrorResponse_(501, "Syntax error in ORCPT parameter.");
+               return;
+            }
+         }
+         else
+         {
+            ReportUnsupportedEsmtpExtension_(parameter);
+            return;
+         }
+
+         iterParam++;
       }
 
       sRecipientAddress = DefaultDomain::ApplyDefaultDomain(sRecipientAddress);
@@ -833,6 +882,7 @@ namespace HM
 
       // OK, the recipient is acceptable.
       std::shared_ptr<MessageRecipients> pRecipients = current_message_->GetRecipients();
+      size_t recipientCountBefore = pRecipients->GetVector().size();
       bool recipientOK = false;
       recipientParser_.CreateMessageRecipientList(sRecipientAddress, pRecipients, recipientOK);
 
@@ -840,6 +890,15 @@ namespace HM
       {
          SendErrorResponse_(550, CONST_UNKNOWN_USER);
          return;
+      }
+
+      // Apply the DSN NOTIFY value (RFC 3461) to the recipient(s) just added for
+      // this RCPT TO command.
+      if (recipientNotify != MessageRecipient::DSNNotifyDefault)
+      {
+         std::vector<std::shared_ptr<MessageRecipient> > &vecAllRecipients = pRecipients->GetVector();
+         for (size_t i = recipientCountBefore; i < vecAllRecipients.size(); i++)
+            vecAllRecipients[i]->SetDSNNotify(recipientNotify);
       }
    
       // 2.1.5 = destination (recipient) address is valid (RFC 3463).
@@ -1572,6 +1631,10 @@ namespace HM
 
       // ENHANCEDSTATUSCODES (RFC 2034): responses carry an RFC 3463 status code.
       sData += "\r\n250-ENHANCEDSTATUSCODES";
+
+      // DSN (RFC 3461): accept RET/ENVID on MAIL FROM and NOTIFY/ORCPT on RCPT TO,
+      // and honour NOTIFY=NEVER when generating delivery-failure notifications.
+      sData += "\r\n250-DSN";
 
       if (!IsSSLConnection())
       {
@@ -2816,6 +2879,112 @@ namespace HM
       if (code >= 500 && code < 600) return _T("5.0.0");
 
       return _T("");
+   }
+
+   bool
+   SMTPConnection::IsValidXtext_(const String &value)
+   {
+      // xtext (RFC 3461 section 4): printable ASCII (33-126) where '+' and '='
+      // must be encoded as "+" followed by two upper-case hexadecimal digits.
+      int length = value.GetLength();
+      for (int i = 0; i < length; i++)
+      {
+         wchar_t c = value.GetAt(i);
+         if (c < 33 || c > 126)
+            return false;
+
+         if (c == '=')
+            return false;
+
+         if (c == '+')
+         {
+            if (i + 2 >= length)
+               return false;
+
+            for (int j = 1; j <= 2; j++)
+            {
+               wchar_t h = value.GetAt(i + j);
+               bool isHex = (h >= '0' && h <= '9') || (h >= 'A' && h <= 'F');
+               if (!isHex)
+                  return false;
+            }
+
+            i += 2;
+         }
+      }
+
+      return true;
+   }
+
+   bool
+   SMTPConnection::IsValidOrcpt_(const String &value)
+   {
+      // ORCPT (RFC 3461) = addr-type ";" xtext.
+      int separator = value.Find(_T(";"));
+      if (separator <= 0 || separator == value.GetLength() - 1)
+         return false;
+
+      String addrType = value.Mid(0, separator);
+      String addrValue = value.Mid(separator + 1);
+
+      // addr-type is an atom of printable ASCII (no ';' or whitespace).
+      for (int i = 0; i < addrType.GetLength(); i++)
+      {
+         wchar_t c = addrType.GetAt(i);
+         if (c <= 32 || c >= 127)
+            return false;
+      }
+
+      return IsValidXtext_(addrValue);
+   }
+
+   bool
+   SMTPConnection::ParseDsnNotify_(const String &value, int &notify)
+   {
+      // NOTIFY (RFC 3461) = "NEVER" / 1#("SUCCESS" / "FAILURE" / "DELAY").
+      // NEVER may not be combined with any other keyword.
+      notify = MessageRecipient::DSNNotifyDefault;
+
+      if (value.IsEmpty())
+         return false;
+
+      std::vector<String> keywords = StringParser::SplitString(value, ",");
+      bool neverSeen = false;
+      bool otherSeen = false;
+
+      for (const String &keyword : keywords)
+      {
+         if (keyword.CompareNoCase(_T("NEVER")) == 0)
+         {
+            neverSeen = true;
+            notify |= MessageRecipient::DSNNotifyNever;
+         }
+         else if (keyword.CompareNoCase(_T("SUCCESS")) == 0)
+         {
+            otherSeen = true;
+            notify |= MessageRecipient::DSNNotifySuccess;
+         }
+         else if (keyword.CompareNoCase(_T("FAILURE")) == 0)
+         {
+            otherSeen = true;
+            notify |= MessageRecipient::DSNNotifyFailure;
+         }
+         else if (keyword.CompareNoCase(_T("DELAY")) == 0)
+         {
+            otherSeen = true;
+            notify |= MessageRecipient::DSNNotifyDelay;
+         }
+         else
+         {
+            return false;
+         }
+      }
+
+      // NEVER is mutually exclusive with the other keywords.
+      if (neverSeen && otherSeen)
+         return false;
+
+      return true;
    }
 
    bool

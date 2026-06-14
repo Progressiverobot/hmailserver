@@ -346,7 +346,8 @@ create table hm_messagerecipients
    recipientmessageid bigint not null,
 	recipientaddress nvarchar(255) not null,
 	recipientlocalaccountid int not null,
-	recipientoriginaladdress nvarchar(255) not null
+	recipientoriginaladdress nvarchar(255) not null,
+	recipientdsnnotify int not null default 0
 ) 
 
 ALTER TABLE hm_messagerecipients ADD CONSTRAINT hm_messagerecipients_pk PRIMARY KEY NONCLUSTERED (recipientid) 

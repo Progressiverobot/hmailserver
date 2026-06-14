@@ -17,7 +17,8 @@ namespace HM
       local_account_id_(0),
       message_id_(0),
       requires_authentication_(false),
-      is_local_name_(false)
+      is_local_name_(false),
+      dsn_notify_(0)
    {
 
    }
@@ -34,6 +35,8 @@ namespace HM
       required_sender_ = pRecip->GetRequiredSender();
 
       is_local_name_ = pRecip->GetIsLocalName();
+
+      dsn_notify_ = pRecip->GetDSNNotify();
    }
 
    MessageRecipient::~MessageRecipient(void)

@@ -44,6 +44,20 @@ namespace HM
       bool GetIsLocalName() const {return is_local_name_; }
       void SetIsLocalName(bool isLocalName) {is_local_name_ = isLocalName; }
 
+      // DSN NOTIFY (RFC 3461) bitmask requested by the client for this recipient.
+      // 0 = default behaviour, NEVER=1, SUCCESS=2, FAILURE=4, DELAY=8.
+      enum DSNNotify
+      {
+         DSNNotifyDefault = 0,
+         DSNNotifyNever = 1,
+         DSNNotifySuccess = 2,
+         DSNNotifyFailure = 4,
+         DSNNotifyDelay = 8
+      };
+
+      int GetDSNNotify() const {return dsn_notify_; }
+      void SetDSNNotify(int newVal) {dsn_notify_ = newVal; }
+
       bool IsEmpty() {return address_.IsEmpty(); }
 
       // -- BEGIN REMOTE DELIVERY
@@ -65,6 +79,8 @@ namespace HM
       bool requires_authentication_;
       String required_sender_;
       String original_address_;
+
+      int dsn_notify_;
       
       // -- BEGIN REMOTE DELIVERY
       DeliveryResult result_;

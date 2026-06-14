@@ -226,7 +226,8 @@ create table hm_messagerecipients
  	recipientmessageid bigint not null,
 	recipientaddress varchar(255) not null,
 	recipientlocalaccountid int not null,
-	recipientoriginaladdress varchar(255) not null
+	recipientoriginaladdress varchar(255) not null,
+	recipientdsnnotify int not null default 0
 ) DEFAULT CHARSET=utf8;
 
 CREATE INDEX idx_hm_messagerecipients ON hm_messagerecipients (recipientmessageid);

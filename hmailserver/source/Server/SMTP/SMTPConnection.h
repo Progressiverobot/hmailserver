@@ -178,6 +178,10 @@ namespace HM
       // when the session is ESMTP (the client greeted with EHLO).
       void SendResponse_(int code, const String &enhancedCode, const String &text);
       static String DeriveEnhancedStatusCode_(int code);
+      // DSN (RFC 3461) parameter validation helpers.
+      static bool IsValidXtext_(const String &value);
+      static bool IsValidOrcpt_(const String &value);
+      static bool ParseDsnNotify_(const String &value, int &notify);
       bool GetDoSpamProtection_();
 
       bool GetIsLocalSender_();

@@ -85,8 +85,13 @@ namespace HM
 
          if (pCheckAccount)
          {
+            // DSN (RFC 3461): does this recipient want a failure notification?
+            int notify = pRecipient->GetDSNNotify();
+            bool suppressFailureDsn = (notify != MessageRecipient::DSNNotifyDefault) &&
+                                      ((notify & MessageRecipient::DSNNotifyFailure) == 0);
+
             // Local recipient has been found. Deliver to it.
-            DeliverToLocalAccount_(pCheckAccount, vecRecipients.size(), saErrorMessages, pRecipient->GetOriginalAddress(), messageReused);
+            DeliverToLocalAccount_(pCheckAccount, vecRecipients.size(), saErrorMessages, pRecipient->GetOriginalAddress(), messageReused, suppressFailureDsn);
          }
          else
          {
@@ -110,12 +115,12 @@ namespace HM
    /// Delivers a single message to a specific account.
    /// Returns true if the delivery was made, false otherwise.
    void
-   LocalDelivery::DeliverToLocalAccount_(std::shared_ptr<const Account> account, size_t iNoOfRecipients, std::vector<String> &saErrorMessages, const String &sOriginalAddress, bool &messageReused)
+   LocalDelivery::DeliverToLocalAccount_(std::shared_ptr<const Account> account, size_t iNoOfRecipients, std::vector<String> &saErrorMessages, const String &sOriginalAddress, bool &messageReused, bool suppressFailureDsn)
    {
       // First check that we're actually able to deliver a message to this account. If the account
       // has reached it's quota, we should cancel delivery immediately. If we create the account-level
       // message below, there's no turning back.
-      if (!CheckAccountQuotas_(account, saErrorMessages))
+      if (!CheckAccountQuotas_(account, saErrorMessages, suppressFailureDsn))
       {
          return;
       }
@@ -237,7 +242,7 @@ namespace HM
    }
 
    bool 
-   LocalDelivery::CheckAccountQuotas_(std::shared_ptr<const Account> pCheckAccount, std::vector<String> &saErrorMessages)
+   LocalDelivery::CheckAccountQuotas_(std::shared_ptr<const Account> pCheckAccount, std::vector<String> &saErrorMessages, bool suppressFailureDsn)
    //---------------------------------------------------------------------------()
    // DESCRIPTION:
    // Checks that the recipient account has enough space available. If not, 
@@ -250,7 +255,10 @@ namespace HM
       {
          String sMsg = Formatter::Format("{0}\r\n   Error Type: SMTP\r\n   Error Description: Inbox is full\r\n   Additional information: The recipients inbox is full.\r\n\r\n",
             pCheckAccount->GetAddress());
-         saErrorMessages.push_back(sMsg);  
+
+         // DSN (RFC 3461): only bounce when the sender did not opt out via NOTIFY.
+         if (!suppressFailureDsn)
+            saErrorMessages.push_back(sMsg);  
 
          __int64 currentSize = AccountSizeCache::Instance()->GetSize(pCheckAccount->GetID()) + original_message_->GetSize();
 

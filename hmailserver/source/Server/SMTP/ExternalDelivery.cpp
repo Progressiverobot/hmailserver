@@ -62,6 +62,10 @@ namespace HM
    {
       std::map<String,String> mapFailedDueToNonFatalError;
 
+      // DSN (RFC 3461): addresses whose recipients opted out of failure
+      // notifications (NOTIFY=NEVER, or a NOTIFY list without FAILURE).
+      std::set<String> suppressFailureDsnAddresses;
+
       ServerTargetResolver serverTargetResolver(original_message_, _globalRuleResult);
       std::map<std::shared_ptr<ServerInfo>, std::vector<std::shared_ptr<MessageRecipient> > > mapRecipients = serverTargetResolver.Resolve();
       auto iterDomain = mapRecipients.begin();
@@ -90,7 +94,7 @@ namespace HM
                DeliverToSingleDomain_(batch, serverInfo);
 
                // Check what status we got on the external deliveries.
-               CollectDeliveryResult_(serverInfo->GetHostName(), batch, saErrorMessages, mapFailedDueToNonFatalError);    
+               CollectDeliveryResult_(serverInfo->GetHostName(), batch, saErrorMessages, mapFailedDueToNonFatalError, suppressFailureDsnAddresses);    
 
                batch.clear();
             }
@@ -102,7 +106,7 @@ namespace HM
 
       if (mapFailedDueToNonFatalError.size() > 0)
       {   
-         bool messageRescheduled = RescheduleDelivery_(mapFailedDueToNonFatalError, saErrorMessages);
+         bool messageRescheduled = RescheduleDelivery_(mapFailedDueToNonFatalError, saErrorMessages, suppressFailureDsnAddresses);
          return messageRescheduled;
       }
       else
@@ -562,7 +566,8 @@ namespace HM
    ExternalDelivery::CollectDeliveryResult_(const String &serverHostName, 
                                              std::vector<std::shared_ptr<MessageRecipient> > &vecRecipients, 
                                              std::vector<String> &saErrorMessages,
-                                             std::map<String,String> &mapFailedDueToNonFatalError)
+                                             std::map<String,String> &mapFailedDueToNonFatalError,
+                                             std::set<String> &suppressFailureDsnAddresses)
    //---------------------------------------------------------------------------()
    // DESCRIPTION:
    // This function is called after delivery has ended. It goes through the recipients
@@ -575,6 +580,14 @@ namespace HM
       // Check how the delivery went.
       for(std::shared_ptr<MessageRecipient> recipient : vecRecipients)
       {
+         // DSN (RFC 3461): remember recipients that opted out of failure
+         // notifications so that any eventual bounce can be suppressed.
+         int notify = recipient->GetDSNNotify();
+         bool wantsFailureDsn = (notify == MessageRecipient::DSNNotifyDefault) ||
+                                ((notify & MessageRecipient::DSNNotifyFailure) != 0);
+         if (!wantsFailureDsn)
+            suppressFailureDsnAddresses.insert(recipient->GetAddress());
+
          if (recipient->GetDeliveryResult() == MessageRecipient::ResultOK)
          {
             AWStats::LogDeliverySuccess(_sendersIP, serverHostName, original_message_, recipient->GetAddress());
@@ -589,13 +602,23 @@ namespace HM
          else if (recipient->GetDeliveryResult() == MessageRecipient::ResultFatalError)
          {
             // Yes, this is a permanent error.
-            String sSingleErrorMsg;
-            String sRecipient = recipient->GetAddress();
-            sSingleErrorMsg = sRecipient + "\r\n";
-            sSingleErrorMsg = sSingleErrorMsg + recipient->GetErrorMessage();
-            sSingleErrorMsg = sSingleErrorMsg + "\r\n";
 
-            saErrorMessages.push_back(sSingleErrorMsg);  
+            // DSN (RFC 3461): only generate a failure notification when the sender
+            // has not opted out via NOTIFY=NEVER (or a NOTIFY list without FAILURE).
+            int notify = recipient->GetDSNNotify();
+            bool sendFailureDsn = (notify == MessageRecipient::DSNNotifyDefault) ||
+                                  ((notify & MessageRecipient::DSNNotifyFailure) != 0);
+
+            if (sendFailureDsn)
+            {
+               String sSingleErrorMsg;
+               String sRecipient = recipient->GetAddress();
+               sSingleErrorMsg = sRecipient + "\r\n";
+               sSingleErrorMsg = sSingleErrorMsg + recipient->GetErrorMessage();
+               sSingleErrorMsg = sSingleErrorMsg + "\r\n";
+
+               saErrorMessages.push_back(sSingleErrorMsg);
+            }
 
             // Delete this recipient from the database.
             PersistentMessageRecipient::DeleteObject(recipient);
@@ -616,7 +639,7 @@ namespace HM
    /// Checks if we should reschedule the message for later delivery. If so, we do.
    /// Returns true if the message is rescheduled.
    bool
-   ExternalDelivery::RescheduleDelivery_(std::map<String,String> &mapFailedDueToNonFatalError, std::vector<String> &saErrorMessages)
+   ExternalDelivery::RescheduleDelivery_(std::map<String,String> &mapFailedDueToNonFatalError, std::vector<String> &saErrorMessages, std::set<String> &suppressFailureDsnAddresses)
    {
 
       LOG_DEBUG("SD::RescheduleDelivery_");
@@ -703,16 +726,25 @@ namespace HM
          auto iterFailed = mapFailedDueToNonFatalError.begin();
          while (iterFailed != mapFailedDueToNonFatalError.end())
          {
-            if (!sErrorMessage.IsEmpty())
-               sErrorMessage += "\r\n";
-
             String sEmailAddress = (*iterFailed).first;
             String sFailed = (*iterFailed).second;
-            sErrorMessage += sEmailAddress + "\r\n" + sFailed;
 
             // Delivery has failed for the last time.
             AWStats::LogDeliveryFailure(_sendersIP, original_message_->GetFromAddress(), sEmailAddress,  550);
             Events::FireOnDeliveryFailed(original_message_, _sendersIP, sEmailAddress, sFailed);
+
+            // DSN (RFC 3461): suppress the bounce text for recipients that opted
+            // out of failure notifications (NOTIFY=NEVER or NOTIFY without FAILURE).
+            if (suppressFailureDsnAddresses.find(sEmailAddress) != suppressFailureDsnAddresses.end())
+            {
+               iterFailed++;
+               continue;
+            }
+
+            if (!sErrorMessage.IsEmpty())
+               sErrorMessage += "\r\n";
+
+            sErrorMessage += sEmailAddress + "\r\n" + sFailed;
 
             iterFailed++;
          }

@@ -10,7 +10,8 @@ namespace RegressionTests.SMTP
 {
    /// <summary>
    /// B4 deliverability and SMTP-standards features: PIPELINING (RFC 2920),
-   /// SMTPUTF8/EAI (RFC 6531/6532) and ENHANCEDSTATUSCODES (RFC 2034).
+   /// SMTPUTF8/EAI (RFC 6531/6532), ENHANCEDSTATUSCODES (RFC 2034) and
+   /// DSN (RFC 3461).
    /// </summary>
    [TestFixture]
    public class Deliverability : TestFixtureBase
@@ -138,6 +139,137 @@ namespace RegressionTests.SMTP
          socket.Disconnect();
 
          Pop3ClientSimulator.AssertMessageCount("pipe@example.test", "test", 1);
+      }
+
+      [Test]
+      public void TestEhloAdvertisesDsn()
+      {
+         var socket = new TcpConnection();
+         Assert.IsTrue(socket.Connect(25));
+         var capabilities = EhloAndGetCapabilities(socket, "example.com");
+         socket.Disconnect();
+
+         Assert.IsTrue(capabilities.Contains("DSN"), "DSN not advertised: " + capabilities);
+      }
+
+      [Test]
+      public void TestMailFromAcceptsRetAndEnvid()
+      {
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "dsn1@example.test", "test");
+
+         var socket = new TcpConnection();
+         Assert.IsTrue(socket.Connect(25));
+         EhloAndGetCapabilities(socket, "example.com");
+
+         // RET and ENVID are valid DSN parameters on MAIL FROM (RFC 3461).
+         var mailFrom = socket.SendAndReceive(
+            "MAIL FROM:<sender@example.test> RET=HDRS ENVID=abc123\r\n");
+         Assert.IsTrue(mailFrom.StartsWith("250"),
+            "MAIL FROM with RET/ENVID should be accepted. Got: " + mailFrom);
+
+         var rcptTo = socket.SendAndReceive("RCPT TO:<dsn1@example.test>\r\n");
+         Assert.IsTrue(rcptTo.StartsWith("250"), "Recipient should be accepted. Got: " + rcptTo);
+
+         socket.Send("QUIT\r\n");
+         socket.Disconnect();
+      }
+
+      [Test]
+      public void TestMailFromRejectsInvalidRet()
+      {
+         var socket = new TcpConnection();
+         Assert.IsTrue(socket.Connect(25));
+         EhloAndGetCapabilities(socket, "example.com");
+
+         // RET only allows FULL or HDRS; anything else is a syntax error.
+         var mailFrom = socket.SendAndReceive("MAIL FROM:<sender@example.test> RET=BOGUS\r\n");
+         Assert.IsTrue(mailFrom.StartsWith("501"),
+            "Invalid RET should be rejected with 501. Got: " + mailFrom);
+
+         socket.Send("QUIT\r\n");
+         socket.Disconnect();
+      }
+
+      [Test]
+      public void TestMailFromRejectsInvalidEnvid()
+      {
+         var socket = new TcpConnection();
+         Assert.IsTrue(socket.Connect(25));
+         EhloAndGetCapabilities(socket, "example.com");
+
+         // ENVID is xtext: a bare '=' is not allowed (must be encoded as +3D).
+         var mailFrom = socket.SendAndReceive("MAIL FROM:<sender@example.test> ENVID=bad=value\r\n");
+         Assert.IsTrue(mailFrom.StartsWith("501"),
+            "Invalid ENVID xtext should be rejected with 501. Got: " + mailFrom);
+
+         socket.Send("QUIT\r\n");
+         socket.Disconnect();
+      }
+
+      [Test]
+      public void TestRcptToAcceptsNotifyAndOrcpt()
+      {
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "dsn2@example.test", "test");
+
+         var socket = new TcpConnection();
+         Assert.IsTrue(socket.Connect(25));
+         EhloAndGetCapabilities(socket, "example.com");
+
+         socket.SendAndReceive("MAIL FROM:<sender@example.test>\r\n");
+
+         // NOTIFY and ORCPT are valid DSN parameters on RCPT TO (RFC 3461).
+         var rcptTo = socket.SendAndReceive(
+            "RCPT TO:<dsn2@example.test> NOTIFY=SUCCESS,FAILURE,DELAY ORCPT=rfc822;dsn2@example.test\r\n");
+         Assert.IsTrue(rcptTo.StartsWith("250"),
+            "RCPT TO with NOTIFY/ORCPT should be accepted. Got: " + rcptTo);
+
+         socket.Send("QUIT\r\n");
+         socket.Disconnect();
+      }
+
+      [Test]
+      public void TestRcptToAcceptsNotifyNever()
+      {
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "dsn3@example.test", "test");
+
+         var socket = new TcpConnection();
+         Assert.IsTrue(socket.Connect(25));
+         EhloAndGetCapabilities(socket, "example.com");
+
+         socket.SendAndReceive("MAIL FROM:<sender@example.test>\r\n");
+
+         // NOTIFY=NEVER is the opt-out value and is accepted on its own.
+         var rcptTo = socket.SendAndReceive("RCPT TO:<dsn3@example.test> NOTIFY=NEVER\r\n");
+         Assert.IsTrue(rcptTo.StartsWith("250"),
+            "RCPT TO with NOTIFY=NEVER should be accepted. Got: " + rcptTo);
+
+         socket.Send("QUIT\r\n");
+         socket.Disconnect();
+      }
+
+      [Test]
+      public void TestRcptToRejectsInvalidNotify()
+      {
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "dsn4@example.test", "test");
+
+         var socket = new TcpConnection();
+         Assert.IsTrue(socket.Connect(25));
+         EhloAndGetCapabilities(socket, "example.com");
+
+         socket.SendAndReceive("MAIL FROM:<sender@example.test>\r\n");
+
+         // NEVER may not be combined with other keywords, and unknown keywords
+         // are a syntax error.
+         var combined = socket.SendAndReceive("RCPT TO:<dsn4@example.test> NOTIFY=NEVER,SUCCESS\r\n");
+         Assert.IsTrue(combined.StartsWith("501"),
+            "NOTIFY=NEVER,SUCCESS should be rejected with 501. Got: " + combined);
+
+         var unknown = socket.SendAndReceive("RCPT TO:<dsn4@example.test> NOTIFY=BOGUS\r\n");
+         Assert.IsTrue(unknown.StartsWith("501"),
+            "Unknown NOTIFY keyword should be rejected with 501. Got: " + unknown);
+
+         socket.Send("QUIT\r\n");
+         socket.Disconnect();
       }
    }
 }
