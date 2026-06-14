@@ -758,7 +758,6 @@ namespace HM
  
       // Check email addresses
 
-      
       if (StringParser::IsValidEmailAddress("@")) throw;
       if (StringParser::IsValidEmailAddress("a")) throw;      
       if (StringParser::IsValidEmailAddress("test@")) throw;
@@ -971,15 +970,15 @@ namespace HM
      // ASCII passes through unchanged.
      Assert(StringParser::SaslPrep(_T("user@example.test"), saslPrepped));
      Assert(saslPrepped == _T("user@example.test"));
-     // Soft hyphen (U+00AD, table B.1) is removed.
-     Assert(StringParser::SaslPrep(L"us\x00ADer", saslPrepped));
+     // Soft hyphen (U+00AD, table B.1) is removed. Use \u (fixed 4-digit) so the
+     // following 'e' is not consumed as part of the escape.
+     Assert(StringParser::SaslPrep(L"us\u00ADer", saslPrepped));
      Assert(saslPrepped == _T("user"));
      // Non-ASCII space (U+00A0, table C.1.2) maps to U+0020.
-     Assert(StringParser::SaslPrep(L"a\x00A0\x62", saslPrepped));
+     Assert(StringParser::SaslPrep(L"a\u00A0b", saslPrepped));
      Assert(saslPrepped == _T("a b"));
-     // A prohibited control character (U+0000, table C.2.1) is rejected.
-     Assert(!StringParser::SaslPrep(L"a\x0000\x62", saslPrepped));
-
+     // A prohibited control character (U+0001, table C.2.1) is rejected.
+     Assert(!StringParser::SaslPrep(L"a\u0001b", saslPrepped));
    }
  
    

@@ -22,6 +22,7 @@
 #include "BlowFish.h"
 #include "Crypt.h"
 #include "DataProtector.h"
+#include "SRS.h"
 #include "../Persistence/PersistentMessage.h"
 #include "../../SMTP/SPF/SPF.h"
 #include "../../SMTP/BLCheck.h"
@@ -137,6 +138,57 @@ namespace HM
          oauth2Tester.Test();
       }
 
+      OutputDebugString(_T("hMailServer: Testing SRS\n"));
+      {
+         // Sender Rewriting Scheme: sign/verify round-trip + tamper detection.
+         const String secret = _T("srs-test-secret-key");
+         const String original = _T("alice@external-sender.com");
+         const String forwarder = _T("relay.example.com");
+
+         String srs = SRS::Forward(original, forwarder, secret);
+
+         if (srs.IsEmpty())
+            throw 0;
+         if (!SRS::IsSRS0(srs))
+            throw 0;
+         if (srs.Find(_T("@relay.example.com")) < 0)
+            throw 0;
+
+         // A valid SRS0 address reverses to the original sender.
+         String reversed;
+         if (!SRS::Reverse(srs, secret, reversed))
+            throw 0;
+         if (reversed.CompareNoCase(original) != 0)
+            throw 0;
+
+         // Tamper detection: a flipped character in the signed local-part fails.
+         wchar_t hashChar = srs.GetAt(5);
+         String tampered = srs.Mid(0, 5) + ((hashChar == L'0') ? _T("1") : _T("0")) + srs.Mid(6);
+         if (SRS::Reverse(tampered, secret, reversed))
+            throw 0;
+
+         // A different secret must not validate.
+         if (SRS::Reverse(srs, _T("a-different-secret"), reversed))
+            throw 0;
+
+         // A plain address is neither detected as SRS nor reversible.
+         if (SRS::IsSRS0(_T("bob@example.com")))
+            throw 0;
+         if (SRS::Reverse(_T("bob@example.com"), secret, reversed))
+            throw 0;
+
+         // An original local-part containing '=' and '+' survives the round trip.
+         const String original2 = _T("a=b+tag@ext.example.org");
+         String srs2 = SRS::Forward(original2, forwarder, secret);
+         if (srs2.IsEmpty())
+            throw 0;
+         String reversed2;
+         if (!SRS::Reverse(srs2, secret, reversed2))
+            throw 0;
+         if (reversed2.CompareNoCase(original2) != 0)
+            throw 0;
+      }
+
       OutputDebugString(_T("hMailServer: Testing DataProtector (DPAPI)\n"));
       {
          DataProtectorTester dpapiTester;
@@ -207,8 +259,6 @@ namespace HM
       IMAPSimpleCommandParserTester *pTest = new IMAPSimpleCommandParserTester();
       pTest->Test();
       delete pTest;
-
-      
 
    }
 

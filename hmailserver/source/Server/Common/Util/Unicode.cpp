@@ -41,10 +41,25 @@ namespace HM
    {
       int iInputLength = sInput.GetLength();
 
-      int nNeedSize = WideCharToMultiByte(CP_UTF8, 0, sInput, iInputLength, NULL, 0, NULL, NULL ) +1;
+      int nNeedSize = WideCharToMultiByte(CP_UTF8, 0, sInput, iInputLength, NULL, 0, NULL, NULL );
 
-      if( WideCharToMultiByte( CP_UTF8, 0, sInput, iInputLength, sOutput.GetBuffer(nNeedSize), nNeedSize, NULL, NULL ) == 0 )
+      if (nNeedSize == 0)
+      {
+         // Either the input was empty or the conversion failed. An empty input
+         // is a valid (empty) result; anything else is an error.
+         sOutput = "";
+         return iInputLength == 0;
+      }
+
+      int nWritten = WideCharToMultiByte( CP_UTF8, 0, sInput, iInputLength, sOutput.GetBuffer(nNeedSize), nNeedSize, NULL, NULL );
+      if (nWritten == 0)
          return false;
+
+      // GetBuffer resized the string to the requested capacity, so trim it back
+      // to the exact number of bytes written. Otherwise the result carries a
+      // trailing padding byte that callers measuring GetLength() (for example
+      // DPAPI protection of stored secrets) would erroneously include.
+      sOutput.ReleaseBuffer(nWritten);
 
       return true;
    }

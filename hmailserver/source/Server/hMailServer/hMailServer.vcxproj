@@ -413,6 +413,7 @@ EXIT 0
     <ClCompile Include="..\Common\Util\Crypt.cpp" />
     <ClCompile Include="..\Common\Util\DataProtector.cpp" />
     <ClCompile Include="..\Common\Util\OAuth2TokenValidator.cpp" />
+    <ClCompile Include="..\Common\Util\SRS.cpp" />
     <ClCompile Include="..\Common\Util\EmailAllUsers.cpp" />
     <ClCompile Include="..\Common\Util\Encoding\Base64.cpp" />
     <ClCompile Include="..\Common\Util\Encoding\ModifiedUTF7.cpp" />
@@ -946,6 +947,7 @@ EXIT 0
     <ClInclude Include="..\Common\Util\GUIDCreator.h" />
     <ClInclude Include="..\Common\Util\Hashing\HashCreator.h" />
     <ClInclude Include="..\Common\Util\OAuth2TokenValidator.h" />
+    <ClInclude Include="..\Common\Util\SRS.h" />
     <ClInclude Include="..\Common\Util\Hashing\ScramSha256.h" />
     <ClInclude Include="..\Common\Util\HeapChecker.h" />
     <ClInclude Include="..\Common\Util\HTTPClient.h" />

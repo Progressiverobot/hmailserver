@@ -1,7 +1,7 @@
 # hMailServer Modernization — Master Plan & Roadmap
 
-*Generated 2026-06-13. This is the single authoritative plan. It covers two
-tracks run as one ordered program:*
+*Generated 2026-06-13, reorganized 2026-06-14. This is the single authoritative
+plan. It covers two tracks run as one ordered program:*
 
 - **Track A — Control Panel becomes the sole admin GUI** (parity with the classic
   WinForms Administrator, drop the classic from the installer, AV/security
@@ -13,109 +13,60 @@ tracks run as one ordered program:*
 (Linux/JMAP/HA) is a documented future track only. Every new server capability is
 surfaced in the Control Panel.*
 
----
+**How this document is organised:**
 
-## Master execution sequence (the chosen order)
-
-Risk/value-ordered. Security defects first, locked by tests/CI, then finish the
-Control Panel as the sole GUI, then deepen hardening. Each step ends with: clean
-build, run the regression suite, (CP steps) screenshot-validate, then commit/push
-+ move tag `v6.2.0` + clobber the release asset.
-
-1. **B1 — security & correctness defects + secure defaults.** ✅ **Done** (see Progress).
-2. **B8 (core) — CI + fuzzing.** ✅ **Done.** GitHub Actions: `ci.yml` (Control Panel build,
-   warnings-as-errors) + `codeql.yml` (C# static analysis) on hosted runners; `server-build.yml`
-   (native C++ build on a self-hosted VS 2026/v145 runner + opt-in regression-suite run). Plus
-   reproducer regression tests for the B1 defects and an over-the-wire protocol fuzz suite for the
-   SMTP/IMAP/MIME parsers. (Coverage-guided libFuzzer is impractical in this environment — MSVC/ATL-
-   coupled parsers, no fuzzer runtime — so the live over-the-wire fuzzer is the validated substitute.)
-3. **Track A Ph 0–1 — drop classic from installer + Control-Panel functional parity.** ⏳ **In progress** — Phase 1 is 9/10 (item 7 AD pickers deferred to a domain-joined runner); Phase 0 (drop the classic) follows once item 7 lands. CP becomes the sole shipped GUI.
-4. **B3 — secrets & least-privilege** ✅ **Done (v6.2.0)** — machine-scoped DPAPI for the INI DB password + DB-stored route/fetch/relayer secrets (`ProtectStoredSecretsWithDPAPI`, default on, Blowfish back-compat) and an opt-in non-LocalSystem service account (`ServiceAccountName`).
-5. **B2 — auth modernization** (OAuth2 XOAUTH2/OAUTHBEARER, SCRAM-SHA-256, Argon2id + hash policy).
-6. **Track A Ph 2 — Control-Panel UX/UI polish.**
-7. **B4 — deliverability & SMTP standards** (SMTPUTF8/EAI, SRS, PIPELINING/DSN, rate shaping).
-8. **B5 — IMAP modern sync profile** (CONDSTORE/QRESYNC/UIDPLUS/ENABLE/ESEARCH/STATUS=SIZE). ✅ **Done** — UNSELECT, UIDPLUS, ENABLE, STATUS=SIZE, ESEARCH, CONDSTORE/QRESYNC (Stages 1–3b), LIST-EXTENDED and SEARCHRES all shipped in `v6.2.0`. Full IMAP regression suite green (242/242). IMAP4rev2 (RFC 9051) assessed and deferred to its own milestone (see B5).
-9. **Track A Ph 3 — AV/security extensibility + INI hardening knobs.**
-10. **B7 — operability & observability** (OpenTelemetry, health probes, DB pool/executor, durability, HA runbook).
-11. **B6 — Sieve + ManageSieve.**
-12. **Track A Ph 4 / ongoing** — finalize gap doc, release cadence. Then the future track (Tier 3).
+- **Part 1 — Remaining work**, in the order it will be done.
+- **Part 2 — Completed work**, a record of everything already delivered.
 
 ---
 
-## Implementation progress
+# PART 1 — REMAINING WORK (planned order)
 
-Execution follows the agreed master sequence (security defects first, locked by
-tests, then Control-Panel parity, then deeper hardening). Status below is updated
-as work lands.
+Risk/value-ordered. Each step ends with: clean build, run the regression suite,
+(CP steps) screenshot-validate, then commit/push + move the release tag + clobber
+the release asset.
 
-### ✅ Done — Server security & correctness defects (Track B, phase B1)
+## Execution order (what's left)
 
-Validated end-to-end: the IMAP and SMTP regression suites pass (originally **IMAP
-215/215** + **SMTP 175/175**; SMTP re-run under strict line-endings and again with
-the AUTH cap — both 175/175). The suite has since grown and stays green with the B1
-reproducer tests, the IMAP/POP3 per-connection auth-cap tests (**IMAP+POP3 267/267**)
-and the over-the-wire protocol fuzz suite (**3/3**). Commits: `6f7e019` (defects),
-`53ec538` (line-ending default), `9f3a51e` (AUTH cap).
-
-| Fix | File | What changed |
-|---|---|---|
-| ✅ IMAP literal overflow / unbounded buffer | `IMAP/IMAPConnection.cpp` | `GetLiteralSize_` validates digits, parses 64-bit, rejects overflow, caps command literals to 10 MB (prevents pre-auth memory pinning). |
-| ✅ IMAP APPEND overflow + over-write | `IMAP/IMAPCommandAppend.cpp` | Validates octet count, hard 2 GB ceiling even when max size is unlimited, writes only the declared literal length (no message corruption / parser desync). |
-| ✅ MIME header over-read | `Common/Mime/Mime.cpp` | `MimeHeader::Load` bounds every read by `nDataSize`; no read past the caller's buffer on an unterminated header. |
-| ✅ AV scanner path hijack | `Common/AntiVirus/ClamWinVirusScanner.cpp`, `CustomVirusScanner.cpp` | Quotes the executable path so a spaced path can't be hijacked by `CreateProcess` (unquoted-path resolution). |
-| ✅ Listener slow-loris | (REST/Web/Metrics) | Verified already mitigated — 64 KB / fixed-buffer request caps + 5–10 s read deadlines already present. |
-| ✅ Secure default: strict SMTP line endings | `DBScripts/CreateTables{MYSQL,MSSQL,PGSQL}.sql` | `smtpallowincorrectlineendings` default 1→0 on fresh installs (SMTP-smuggling hardening). Validated: SMTP suite 175/175 under strict mode. Commit `53ec538`. |
-| ✅ Per-connection SMTP AUTH cap | `SMTP/SMTPConnection.cpp/.h` | 10 failed AUTH attempts per connection → 535 + disconnect (defense-in-depth over per-IP auto-ban). Validated: SMTP 175/175. Commit `9f3a51e`. |
-| ✅ Per-connection IMAP/POP3 auth cap | `IMAP/IMAPConnection.*`, `IMAP/IMAPCommandLogin.cpp`, `IMAP/IMAPCommandAuthenticate.cpp`, `POP3/POP3Connection.*` | 10 failed logins per connection → disconnect, even when the per-IP auto-ban is disabled (parity with SMTP). Validated: IMAP 217/217, POP3 48/48. Regression tests added (commit `4dae4b1`, IMAP+POP3 267/267). Commit `b8a3829`. |
-
-### ⏳ Next
-
-- ✅ **B8 — CI + fuzzing** *(done)*: `.github/workflows/ci.yml` (Control Panel build,
-  warnings-as-errors) and `codeql.yml` (C# static analysis) on hosted runners; reproducer tests
-  `TestAppendOversizedLiteralRejected` / `TestOversizedCommandLiteralRejected` (guard the B1
-  IMAP fixes; pass 2/2); an **over-the-wire protocol fuzz suite** (`Security/ProtocolFuzz.cs`,
-  commit `fc6d1da`): seeded malformed-input barrage against the live SMTP/IMAP command parsers and
-  the inbound MIME parser, asserting the server never crashes/hangs/logs a fault (layered detection:
-  liveness check + `ServiceRestartDetector` + `AssertNoReportedError`, per-test `[Timeout]`); 3/3 pass
-  (~231 s); and a native **server-build workflow** (`server-build.yml`, commit `6b692a8`) for a
-  self-hosted VS 2026/v145 runner that compiles the C++ server (build step locally proven via
-  `build/build.ps1`) with an opt-in regression-suite run (reuses `build-tests.ps1`/`post-build.ps1`/
-  `run-tests.ps1`). Coverage-guided libFuzzer was assessed and is impractical here (no fuzzer runtime
-  in the available clang; parsers are MSVC/ATL/Windows-coupled) — the live fuzzer is the validated
-  substitute.
-- ✅ Modern default TLS + password hashing — **assessed: already delivered in the 6.0 modernization.**
-  TLS defaults to 1.2+1.3 only (`SslVersions=24`, SSLv2/3 always off, modern EC curves
-  `secp384r1:x25519:secp256r1`) — no RC4/legacy-protocol exposure; passwords default to PBKDF2
-  (`PreferredHashAlgorithm=4`), COM `put_Password` and the REST API both hash new passwords with
-  PBKDF2, and logins transparently re-hash MD5/SHA256 → PBKDF2. Remaining *optional* hardening
-  (lower priority): an explicit AEAD-only cipher-list default (client-interop trade-off) and upgrading
-  the management/admin INI password from MD5.
-- ⬜ **Next phase:** finish Track A Phase 1 item 7 (AD pickers, needs a domain-joined runner) →
-  Phase 0 (drop the classic from the installer) → Track B **B3** (DPAPI for INI/DB secrets +
-  non-LocalSystem service), then **B2** (OAuth2/SCRAM/Argon2) and the rest of the master sequence.
-
-The full two-track roadmap is below: **Track A** (Control Panel) then **Track B**
-(server hardening B2–B8) then the future track.
+1. **Track A Phase 1 — item 7: Active Directory pickers** (deferred; needs a
+   domain-joined runner) → then **Track A Phase 0** (drop the classic from the
+   installer). CP becomes the sole shipped GUI.
+2. **B2 — authentication modernization follow-ups** (live JWKS/introspection +
+   RS256 interop, O365/Gmail XOAUTH2 + Thunderbird SCRAM interop, full SASLprep).
+3. **Track A Phase 2 — Control-Panel UX/UI polish.**
+4. **B4 — deliverability & SMTP standards** (SMTPUTF8/EAI, SRS, PIPELINING/DSN/
+   ENHANCEDSTATUSCODES, rate shaping).
+5. **Track A Phase 3 — AV/security extensibility + INI hardening knobs.**
+6. **B7 — operability & observability** (OpenTelemetry, health probes, DB pool/
+   executor, durability, HA runbook).
+7. **B6 — Sieve + ManageSieve.**
+8. **Track A Phase 4 — finalize** (gap doc, release cadence).
+9. **B8 — quality gates remaining** (CI DB matrix, clang-tidy/ASAN/UBSAN,
+   libFuzzer, SBOM/CVE scanning, signed artifacts).
+10. **Cross-cutting** — surface every new server capability in the Control Panel.
+11. **Future track (Tier 3)** — documented, not scheduled.
 
 ---
 
-# TRACK A — Control Panel becomes the sole admin GUI
+## Track A — finish the Control Panel as the sole GUI
 
-## Guiding decisions
+### Phase 1 (remaining) — item 7: Active Directory pickers + Import members
 
-- **Classic removal = installer only.** `source/Tools/Administrator` and the
-  Tools solution stay; only the installer stops shipping the Administrator.
-  DBSetup, DBUpdater and DataDirectorySynchronizer are retained.
-- **AV/security extensibility = Control-Panel only.** Configure external
-  scanners with presets + Test buttons and surface the event-script
-  integration hooks. No server-side (C++) plugin API in this pass.
-- **TOTP 2FA is ported** from the classic to the Control Panel.
-- **Order:** parity-to-retire-classic → UX/UI polish → extensibility/hardening
-  → release.
+⏸ **Deferred — needs a domain-joined runner.** Port `formActiveDirectoryAccounts`,
+`formSelectUsers`, `formUserAccounts`, `formImportMembers`: browse/import AD
+accounts into the Account Directory tab; import members for groups/dist-lists. The
+dev/test machine is in a WORKGROUP and the `System.DirectoryServices`/
+`AccountManagement` packages are not available offline, so the AD-query path cannot
+be built or validated here. The Directory tab already supports manual AD linkage
+(ADDomain/ADUsername); only the *browse* picker convenience is outstanding.
 
----
+*Also intentionally left out of Phase 1:* the destructive IP-range bulk
+`SetDefault` admin action (item 10) — deferred by design.
 
-## Phase 0 — Drop the classic from the installer
+Once item 7 lands, **Phase 0** can drop the classic Administrator from the
+installer.
+
+### Phase 0 — Drop the classic from the installer
 
 1. Remove the Administrator executable/DLLs from `section_files_64.iss` and
    `section_files_common.iss`.
@@ -126,37 +77,7 @@ The full two-track roadmap is below: **Track A** (Control Panel) then **Track B*
 3. Keep DBSetup / DBUpdater / DataDirectorySynchronizer.
 4. Verify ISCC builds and the post-install database step still runs.
 
----
-
-## Phase 1 — Functional parity (so the classic can be retired)
-
-| # | Item | COM / source | Notes |
-|---|---|---|---|
-| 1 | ✅ **IP-range full policy editor** (done, commit 9743096) | `IInterfaceSecurityRange` | Tabbed `IPRangeDialog` (General/Connections/Relaying/Require auth/Protection): RequireSMTPAuth per direction, EnableSpamProtection, EnableAntiVirus, Expires+ExpiresTime, Priority. Wired via Properties button + double-click. Live-validated. |
-| 2 | ✅ **TCP/IP port → SSL certificate binding** (done, commit 9743096) | `IInterfaceTCPIPPort.SSLCertificateID` | `TcpIpPortDialog` picks from `Settings.SSLCertificates`; Certificate column added to grid. Live-validated. |
-| 3 | ✅ **Rules editor parity** (done, commits 139bd91 + fd3a27b account-level) | `IInterfaceRule/RuleCriteria/RuleActions` | Selectable criteria/action grids; per-item **edit** dialogs (`RuleCriteriaDialog`, `RuleActionDialog`) with all 10 action types parameterized (delete, forward+abort-spam, reply, move-to-folder, run-script, stop, set-header, send-using-route, create-copy, bind-to-IP) and predefined-field/custom-header criteria; per-item **remove**; action **move up/down**; **AND/OR** match mode (`UseAND`). Reusable `RulesView` (rule-source provider) now also powers the **account Rules tab** (hides server-only route/bind actions). Live-validated end-to-end (global + account). |
-| 4 | ✅ **Route Addresses tab** (done, commit 88ae5bf) | `Route.Addresses` | AllAddresses toggle (already present) + per-address list editor (Add/Remove, persists via `Addresses.Add()/Save()/DeleteByDBID`). Live-validated end-to-end. |
-| 5 | ✅ **Status page** (done, commit 9aff58c) | `Application.Status/Version/ServerState/Database` | New `StatusView` (nav: Status → Server status): server (version+arch, state, started, uptime), database (type/host/name/schema), statistics (processed/spam/virus + SMTP/IMAP/POP3 sessions), and the ucStatus configuration **warnings** (no host name, deny-null sender, external→external relay without auth, localhost banned, auto-ban count). Live-validated incl. warning badges. |
-| 6 | ✅ **TOTP 2FA login** (done, commit e9e5051) | `Services/Totp.cs`, `TotpSetupDialog`, `TotpPromptDialog` | RFC 6238 setup (secret + otpauth URI) + login prompt gate in `OnConnected`. Reads the same HKLM `AdminTotpSecret` (machine-scope DPAPI via crypt32) as Administrator, so existing 2FA carries over. Live-validated end-to-end (DPAPI round-trip, prompt, code acceptance → dashboard). |
-| 7 | ⏸ **Active Directory pickers + Import members** (deferred — needs a domain-joined runner) | port `formActiveDirectoryAccounts`, `formSelectUsers`, `formUserAccounts`, `formImportMembers` | Browse/import AD accounts into the Account Directory tab; import members for groups/dist-lists. **Deferred:** the dev/test machine is in a WORKGROUP and the `System.DirectoryServices`/`AccountManagement` packages are not available offline, so the AD-query path cannot be built or validated here. The Directory tab already supports manual AD linkage (ADDomain/ADUsername); only the *browse* picker convenience is outstanding. |
-| 8 | ✅ **Message viewer** (done, commit 4cf4bac) | `MessageViewerDialog` | "View source" / double-click on a queued message shows the raw `.eml` (headers + body) read from disk (`Status.UndeliveredMessages` file column), with Copy. Friendly message if the file is gone/inaccessible. Live-validated. |
-| 9 | ✅ **DMARC failure score** (done, commit 9743096) | `AntiSpam.DMARCFailureScore` | Field added to the AntiSpam section. |
-| 10 | ◑ **Admin actions** (greylisting + logon-failure clear done, commit 9743096; IP-range bulk SetDefault deferred — destructive) | `ClearGreyListingTriplets`, `ClearLogonFailureList`, IP-range `SetDefault` | Surface as buttons. |
-
-*Parallelizable:* items 1, 2, 4, 9 are small and independent. Items 3, 5, 6, 7
-are larger.
-
-**Status: 9 of 10 items done** (1–6, 8, 9 complete and released; 10 partial — the
-greylisting + logon-failure clears shipped, the destructive IP-range bulk
-`SetDefault` is intentionally left out; 7 deferred for AD-environment reasons).
-Every completed item was build-clean (`-warnaserror`), live-validated via
-screenshots/COM round-trips, and shipped in the `v6.2.0` installer. Once item 7
-lands (on a domain-joined runner), **Phase 0** can drop the classic Administrator
-from the installer.
-
----
-
-## Phase 2 — UX/UI polish (after parity)
+### Phase 2 — UX/UI polish (after parity)
 
 1. **Reload-on-enter** for cached pages (`FeatureSettingsView.OnEnter` is empty;
    ensure every settings page refreshes on navigation).
@@ -183,9 +104,7 @@ from the installer.
 12. **Responsiveness** — relax fixed widths (MainWindow 980×640 min, 248 px nav,
     ConnectView) for small/zoomed/RDP sessions.
 
----
-
-## Phase 3 — AV + security extensibility & hardening (CP-only)
+### Phase 3 — AV + security extensibility & hardening (CP-only)
 
 1. **Scanner presets + Test buttons** — `TestClamAVScanner`,
    `TestClamWinScanner`, `TestCustomScanner` plus a Custom-scanner **preset
@@ -204,20 +123,131 @@ from the installer.
    `DisableAUTHList`, `AddXAuthUserHeader`/`AddXAuthUserIP`, `AddXOriginalRcptTo`.
 4. **Account password-strength validation** before save.
 
----
-
-## Phase 4 — Finalize
+### Phase 4 — Finalize
 
 1. Build (save-all to disk first), then screenshot-validate every new/changed
    page and dialog with `build/capture-cp.ps1` against `hmailtest2`.
 2. Rewrite `CONTROL-PANEL-GAP-ANALYSIS.md` as the authoritative
    parity + UX + security matrix (classic node → CP page → status).
 3. Publish the CP, rebuild the installer (no Administrator), commit/push, move
-   tag `v6.2.0`, clobber the release asset.
+   the release tag, clobber the release asset.
 
 ---
 
-## Key files
+## Track B — remaining hardening
+
+### B2 — Authentication modernization (remaining follow-ups)
+
+*Delivered already (see Part 2): SCRAM-SHA-256 across IMAP/SMTP/POP3,
+SCRAM-SHA-256-PLUS channel binding across all three, deterministic
+anti-enumeration salts, Argon2id KDF, the hash-policy engine
+(`MinimumAcceptedHashAlgorithm`) + SCRAM min-hash enforcement, optional server-side
+pepper, POP3/IMAP UTF8 + SASLprep, and offline OAuth2 XOAUTH2/OAUTHBEARER.*
+
+Remaining:
+
+- **OAuth2 live validation** — JWKS fetch / token introspection (today validation
+  is offline/local only). Add automated RS256 coverage (RS256 is implemented but
+  not yet covered by a test).
+- **Full SASLprep** of non-ASCII credentials (today a pragmatic RFC 4013 subset).
+- **Interop verification** — O365/Gmail XOAUTH2 + Thunderbird SCRAM.
+
+### B4 — Deliverability & SMTP standards
+
+*Delivered already (see Part 2): SMTPUTF8/EAI, PIPELINING, ENHANCEDSTATUSCODES, DSN (RFC 3461/3464),
+and SRS for forwarding (SPF alignment).*
+
+- **Per-IP / per-destination submission + outbound rate shaping** — in-memory sliding-window
+  submission throttle per source IP and per outbound destination, with new `[Settings]` toggles.
+- Optional: **BATV**, **CHUNKING/BDAT** (RFC 3030).
+- Verify: SPF passes on forwarded mail (SRS); DSN interop; rate-limit behaviour under load.
+
+### B6 — Standards-based filtering
+
+- **Sieve** (RFC 5228) interpreter + **ManageSieve** (RFC 5804) service alongside
+  the proprietary rules engine (`RuleApplier`). Verify with Sieve test vectors +
+  a ManageSieve client.
+
+### B7 — Operability & observability
+
+- **OpenTelemetry** tracing (SMTP/IMAP/POP/DB spans + correlation IDs);
+  unauthenticated local health/readiness/liveness probes; richer metrics (queue
+  depth, per-command latency, DB pool saturation, TLS handshake failures); log
+  retention/rotation.
+- Async/DB isolation: dedicated DB executor; replace the connection-pool `Sleep`
+  polling with condition variables (`DatabaseConnectionManager`);
+  prepared-statement caches (MySQL/PG).
+- Message-store durability: configurable fsync + consistency checker + recovery
+  tooling. Graceful shutdown: readiness/drain + connection draining.
+- HA: a documented, tested active/passive (shared DB + storage + VIP) runbook +
+  readiness gating (no clustering code in this track).
+
+### B8 — Quality gates & supply chain (remaining)
+
+*Delivered already (see Part 2): `ci.yml`, `codeql.yml`, `server-build.yml`, B1
+reproducer tests and the over-the-wire SMTP/IMAP/MIME protocol fuzz suite.*
+
+Remaining:
+
+- build+test matrix Windows × MySQL/MSSQL/PostgreSQL running the full suite (today
+  the self-hosted workflow runs one DB at a time).
+- clang-tidy; ASAN/UBSAN build; coverage-guided **libFuzzer** harnesses (need a
+  clang+fuzzer toolchain and decoupled parsers — impractical in the current
+  MSVC/ATL environment, where the live over-the-wire fuzzer is the substitute).
+- SBOM + dependency/CVE scanning + signed release artifacts.
+- Verify: green-gates-required-to-merge; nightly fuzz.
+
+---
+
+## Cross-cutting — surface new server capabilities in the Control Panel
+
+OAuth2 provider config, SCRAM/Argon2 policy, SMTPUTF8/SRS/rate-limit toggles, IMAP
+profile, Sieve/ManageSieve editor, secrets/least-priv status, health/trace
+endpoints, AV scanner presets + tests (Track A Phase 3), a security-diagnostics
+report.
+
+## Future track (Tier 3 — documented, not scheduled)
+
+Linux/container port (OS-abstraction layer first; today hard-wired to
+Win32/ATL/registry/service), JMAP (RFC 8620/8621), CalDAV/CardDAV, native webmail,
+true clustering/HA, rspamd integration, BIMI + VMC, OCSP stapling, ARF feedback-loop
+processing. Also: **IMAP4rev2 (RFC 9051)** as its own milestone (assessed and
+deferred — see Part 2, B5).
+
+## Verification (per phase)
+
+- **Track A:** `dotnet build` clean (0/0); launch via `build/capture-cp.ps1
+  -Launch`; screenshot each changed page/dialog; confirm load+save round-trips
+  against `hmailtest2` (MariaDB root `tester`; CP `/connect localhost Administrator
+  testar`). Installer: ISCC builds; a clean install shows no Administrator
+  shortcut, the Control Panel present, and DB tools intact. 2FA: setup → reconnect
+  requires TOTP; an incorrect code is rejected.
+- **Track B:** clean build; run the regression suite (`build/run-tests.ps1`) plus
+  new negative/fuzz tests; no `/WX` warnings. Security phases: a reproducer test
+  proves the defect is closed. Interop phases: test against real clients.
+
+## Open considerations (Track A)
+
+1. **Localization** — the classic supports translations; the CP is English-only.
+   Recommended as a later roadmap item, not this pass.
+2. **Active-session management** — Status can show live session *counts* now;
+   *disconnecting* sessions likely needs server support. Recommend view-only.
+3. **Removing Administrator from the Tools `.sln`** — defer until CP parity is
+   proven in production.
+
+## Guiding decisions (Track A)
+
+- **Classic removal = installer only.** `source/Tools/Administrator` and the
+  Tools solution stay; only the installer stops shipping the Administrator.
+  DBSetup, DBUpdater and DataDirectorySynchronizer are retained.
+- **AV/security extensibility = Control-Panel only.** Configure external
+  scanners with presets + Test buttons and surface the event-script
+  integration hooks. No server-side (C++) plugin API in this pass.
+- **TOTP 2FA is ported** from the classic to the Control Panel.
+- **Order:** parity-to-retire-classic → UX/UI polish → extensibility/hardening
+  → release.
+
+## Key files (Track A)
 
 **Installer:** `hmailserver/installation/section_files_64.iss`,
 `section_files_common.iss`, `section_icons.iss`, `section_run.iss`,
@@ -239,59 +269,60 @@ from the installer.
 `source/Server/hMailServer/hMailServer.idl`,
 `source/Server/Common/Application/IniFileSettings.cpp`.
 
----
-
-## Verification
-
-- Per phase: `dotnet build` clean (0/0); launch via `build/capture-cp.ps1 -Launch`;
-  screenshot each changed page/dialog; confirm load+save round-trips against
-  `hmailtest2` (MariaDB root `tester`; CP `/connect localhost Administrator testar`).
-- Installer: ISCC builds; a clean install shows no Administrator shortcut, the
-  Control Panel present, and DB tools intact.
-- 2FA: setup → reconnect requires TOTP; an incorrect code is rejected.
+*Verified strong (do not redo): PBKDF2-HMAC-SHA256 (210k iters, transparent
+rehash-on-login), TLS 1.2/1.3 defaults, DANE+DNSSEC outbound, ARC, Ed25519 DKIM,
+MTA-STS, TLS-RPT, auto-ban, correct dot-stuffing, parameterized SQL.*
 
 ---
 
-## Open considerations
+# PART 2 — COMPLETED WORK (record)
 
-1. **Localization** — the classic supports translations; the CP is English-only.
-   Recommended as a later roadmap item, not this pass.
-2. **Active-session management** — Status can show live session *counts* now;
-   *disconnecting* sessions likely needs server support. Recommend view-only.
-3. **Removing Administrator from the Tools `.sln`** — defer until CP parity is
-   proven in production.
+## Completed master-sequence steps
+
+1. **B1 — security & correctness defects + secure defaults.** ✅ Done.
+2. **B8 (core) — CI + fuzzing.** ✅ Done.
+3. **B3 — secrets & least-privilege.** ✅ Done (v6.2.0).
+4. **B5 — IMAP modern sync profile.** ✅ Done (v6.2.0) — full IMAP suite 242/242.
+5. **B2 (large parts) — auth modernization.** ✅ SCRAM (IMAP/SMTP/POP3),
+   SCRAM-PLUS (all three), Argon2id, hash policy, pepper, UTF8/SASLprep, offline
+   OAuth2 — all v6.2.0. (Remaining follow-ups are in Part 1.)
+6. **Track A Phase 1 — functional parity.** ✅ 9/10 (item 7 deferred — Part 1).
 
 ---
 
-# TRACK B — Server world-class hardening (Tiers 1–2; harden-in-place)
+## Track B — delivered
 
-*Evidence from four code deep-dives (auth/crypto, protocol standards,
-architecture/operability, correctness bug-hunt). Already verified strong (do not
-redo): PBKDF2-HMAC-SHA256 (210k iters, transparent rehash-on-login), TLS 1.2/1.3
-defaults, DANE+DNSSEC outbound, ARC, Ed25519 DKIM, MTA-STS, TLS-RPT, auto-ban,
-correct dot-stuffing, parameterized SQL.*
+### B1 — Protocol correctness & DoS hardening ✅ DONE
 
-## B1 — Protocol correctness & DoS hardening ✅ DONE
-Delivered and validated — see **Implementation progress** above (commits `6f7e019`,
-`53ec538`, `9f3a51e`; IMAP 215/215 + SMTP 175/175).
-Deferred from B1 (do with the TLS/auth work, higher regression risk): modern default
-TLS cipher list (drop RC4/legacy CBC) and MD5-hash-accept deprecation.
+Validated end-to-end: the IMAP and SMTP regression suites pass (originally **IMAP
+215/215** + **SMTP 175/175**; SMTP re-run under strict line-endings and again with
+the AUTH cap — both 175/175). The suite has since grown and stays green with the B1
+reproducer tests, the IMAP/POP3 per-connection auth-cap tests (**IMAP+POP3 267/267**)
+and the over-the-wire protocol fuzz suite (**3/3**). Commits: `6f7e019` (defects),
+`53ec538` (line-ending default), `9f3a51e` (AUTH cap).
 
-**Update (2026-06-13):** the per-connection IMAP/POP3 AUTH cap is done (commit
-`b8a3829`) with regression coverage (commit `4dae4b1`; IMAP+POP3 267/267). Review of the
-remaining two found them already satisfied by the 6.0 modernization: **TLS** defaults to
-1.2+1.3 only (`SslVersions=24`) with SSLv2/3 always off and modern EC curves
-(`secp384r1:x25519:secp256r1`) — no RC4/legacy-protocol exposure; **passwords** default to
-PBKDF2 (`PreferredHashAlgorithm=4`), COM `put_Password` and the REST API both hash new
+| Fix | File | What changed |
+|---|---|---|
+| ✅ IMAP literal overflow / unbounded buffer | `IMAP/IMAPConnection.cpp` | `GetLiteralSize_` validates digits, parses 64-bit, rejects overflow, caps command literals to 10 MB (prevents pre-auth memory pinning). |
+| ✅ IMAP APPEND overflow + over-write | `IMAP/IMAPCommandAppend.cpp` | Validates octet count, hard 2 GB ceiling even when max size is unlimited, writes only the declared literal length (no message corruption / parser desync). |
+| ✅ MIME header over-read | `Common/Mime/Mime.cpp` | `MimeHeader::Load` bounds every read by `nDataSize`; no read past the caller's buffer on an unterminated header. |
+| ✅ AV scanner path hijack | `Common/AntiVirus/ClamWinVirusScanner.cpp`, `CustomVirusScanner.cpp` | Quotes the executable path so a spaced path can't be hijacked by `CreateProcess` (unquoted-path resolution). |
+| ✅ Listener slow-loris | (REST/Web/Metrics) | Verified already mitigated — 64 KB / fixed-buffer request caps + 5–10 s read deadlines already present. |
+| ✅ Secure default: strict SMTP line endings | `DBScripts/CreateTables{MYSQL,MSSQL,PGSQL}.sql` | `smtpallowincorrectlineendings` default 1→0 on fresh installs (SMTP-smuggling hardening). Validated: SMTP suite 175/175 under strict mode. Commit `53ec538`. |
+| ✅ Per-connection SMTP AUTH cap | `SMTP/SMTPConnection.cpp/.h` | 10 failed AUTH attempts per connection → 535 + disconnect (defense-in-depth over per-IP auto-ban). Validated: SMTP 175/175. Commit `9f3a51e`. |
+| ✅ Per-connection IMAP/POP3 auth cap | `IMAP/IMAPConnection.*`, `IMAP/IMAPCommandLogin.cpp`, `IMAP/IMAPCommandAuthenticate.cpp`, `POP3/POP3Connection.*` | 10 failed logins per connection → disconnect, even when the per-IP auto-ban is disabled (parity with SMTP). Validated: IMAP 217/217, POP3 48/48. Regression tests added (commit `4dae4b1`, IMAP+POP3 267/267). Commit `b8a3829`. |
+
+Deferred from B1 (folded into the TLS/auth work, higher regression risk): review found
+both already satisfied by the 6.0 modernization — **TLS** defaults to 1.2+1.3 only
+(`SslVersions=24`) with SSLv2/3 always off and modern EC curves
+(`secp384r1:x25519:secp256r1`) — no RC4/legacy-protocol exposure; **passwords** default
+to PBKDF2 (`PreferredHashAlgorithm=4`), COM `put_Password` and the REST API both hash new
 passwords with PBKDF2, and logins transparently re-hash MD5/SHA256 → PBKDF2. Remaining
-optional hardening: an explicit AEAD-only cipher list default (interop trade-off) and
-upgrading the management/admin INI password from MD5.
+*optional* hardening: an explicit AEAD-only cipher-list default (client-interop trade-off)
+and upgrading the management/admin INI password from MD5.
 
-## B2 — Authentication modernization
-- OAuth2 SASL **XOAUTH2 + OAUTHBEARER** (IMAP / SMTP submission / POP3); token validation
-  via JWKS/introspection. Today only AUTH LOGIN/PLAIN (`SMTPConnection`, `IMAPCommandAuthenticate`,
-  outbound `SMTPClientConnection`).
-- **SCRAM-SHA-256** (+ `-PLUS` channel binding).
+### B2 — Authentication modernization (delivered parts) ✅
+
 - ✅ **SCRAM-SHA-256 SASL mechanism (IMAP) — delivered in v6.2.0.** Added the
   `AUTHENTICATE SCRAM-SHA-256` mechanism (RFC 5802 / RFC 7677) so the password is never sent over
   the wire. The stored PBKDF2-HMAC-SHA256 key is, by construction, exactly the SCRAM SaltedPassword
@@ -307,192 +338,93 @@ upgrading the management/admin INI password from MD5.
   the LOGIN/PLAIN path, and the per-connection brute-force cap also applies. Advertised in CAPABILITY
   as `AUTH=SCRAM-SHA-256`. Validated end-to-end with an over-the-wire C# SCRAM client
   (`TestScramSha256Authenticates`, `TestScramSha256WrongPasswordFails`, `TestScramSha256Capability`)
-  plus the full IMAP regression suite. Follow-up delivered: SCRAM-SHA-256-**PLUS** (TLS channel
-  binding) — see the dedicated bullet below. Remaining follow-up: full SASLprep of non-ASCII
-  credentials.
+  plus the full IMAP regression suite.
 - ✅ **SCRAM-SHA-256 SASL mechanism (SMTP submission) — delivered in v6.2.0.** Extended the same
   mechanism to SMTP `AUTH` (RFC 4954 SASL framing), reusing the `Common/Util/Hashing/ScramSha256`
   helper. Per-connection SASL state lives on `SMTPConnection` (`scram_session_`); the multi-step
   exchange is routed by three new connection states (`SMTPSCRAMFIRST`/`SMTPSCRAMFINAL`/`SMTPSCRAMACK`)
-  with each base64 SASL message carried over `334` continuations and completion signalled with `235`
-  (server-final `v=...` sent as a `334`, acknowledged by an empty client line). Honours SASL-IR
-  (`AUTH SCRAM-SHA-256 <base64>`), `*` cancellation, the per-IP auto-ban
-  (`AccountLogon::RegisterFailedLogin`, shared with LOGIN/PLAIN) and the per-connection brute-force
-  cap; unknown / non-PBKDF2 accounts run
-  the same forced-failure exchange. Advertised in EHLO (`AUTH ... SCRAM-SHA-256`) whenever AUTH is
-  enabled, independent of the plain-text setting. The `OnClientLogon` script event was refactored into
-  a shared `FireOnClientLogon_` so the SCRAM success path fires it exactly like the password path.
-  Validated with an over-the-wire C# SMTP SCRAM client (`TestScramSha256Authenticates`,
-  `TestScramSha256WrongPasswordFails`, `TestScramSha256Advertised`) plus the full SMTP regression
-  suite. Follow-ups: SCRAM over POP3 (POP3 has no AUTH/SASL command today) and SCRAM-SHA-256-**PLUS**.
+  with each base64 SASL message carried over `334` continuations and completion signalled with `235`.
+  Honours SASL-IR (`AUTH SCRAM-SHA-256 <base64>`), `*` cancellation, the per-IP auto-ban and the
+  per-connection brute-force cap; unknown / non-PBKDF2 accounts run the same forced-failure exchange.
+  Advertised in EHLO. Validated with an over-the-wire C# SMTP SCRAM client
+  (`TestScramSha256Authenticates`, `TestScramSha256WrongPasswordFails`, `TestScramSha256Advertised`)
+  plus the full SMTP regression suite.
 - ✅ **SASL AUTH for POP3 — PLAIN + SCRAM-SHA-256 — delivered in v6.2.0.** POP3 previously had only the
   legacy `USER`/`PASS` login; added the RFC 5034 `AUTH` command supporting `PLAIN` and
-  `SCRAM-SHA-256` (RFC 5802 / RFC 7677), reusing the `Common/Util/Hashing/ScramSha256` helper. POP3 is
-  command-dispatched (not a per-line auth state machine), so SASL continuation lines are routed at the
-  top of `InternalParseData` before command parsing: a `scram_session_` (per-connection `ScramSha256`)
-  or a `sasl_plain_pending_` flag consumes the next line(s) as base64 SASL data, exchanged over `+ `
-  continuations; the SCRAM server-final (`v=...`) is sent as a `+ ` challenge acknowledged by an empty
-  client line, then completion locks the mailbox and enters TRANSACTION exactly like `PASS`. Honours
-  SASL-IR and `*` cancellation. `AUTH` with no argument lists the mechanisms; `CAPA` advertises
-  `SASL PLAIN SCRAM-SHA-256` (gated on TLS like `USER`). Unknown / non-PBKDF2 accounts run the same
-  forced-failure SCRAM exchange (anti-enumeration); SCRAM failures feed `AccountLogon::RegisterFailedLogin`
-  (auto-ban) and the per-connection brute-force cap. The post-login success tail and the `OnClientLogon`
-  script event were refactored into shared `HandleSuccessfulLogin_` / `FinishPasswordLogin_` /
-  `FireOnClientLogon_` used by both `PASS` and the SASL paths; the PLAIN response is masked in the POP3
-  log. Validated with an over-the-wire C# POP3 SASL client (`TestSaslAdvertised`,
-  `TestAuthPlainAuthenticates`, `TestScramSha256Authenticates`, `TestScramSha256WrongPasswordFails`)
-  plus the full POP3 regression suite. This completes SCRAM-SHA-256 across IMAP, SMTP and POP3.
+  `SCRAM-SHA-256` (RFC 5802 / RFC 7677), reusing the `Common/Util/Hashing/ScramSha256` helper. SASL
+  continuation lines are routed at the top of `InternalParseData` before command parsing; `CAPA`
+  advertises `SASL PLAIN SCRAM-SHA-256` (gated on TLS like `USER`). Unknown / non-PBKDF2 accounts run
+  the same forced-failure SCRAM exchange (anti-enumeration). Validated with an over-the-wire C# POP3
+  SASL client (`TestSaslAdvertised`, `TestAuthPlainAuthenticates`, `TestScramSha256Authenticates`,
+  `TestScramSha256WrongPasswordFails`) plus the full POP3 regression suite. This completes
+  SCRAM-SHA-256 across IMAP, SMTP and POP3.
 - ✅ **SCRAM deterministic anti-enumeration salts — delivered in v6.2.0.** Closed a user-enumeration
-  side-channel in the SCRAM forced-failure path shared by IMAP, SMTP and POP3. When a client begins
-  SCRAM for an unknown or non-PBKDF2 account, the server still completes a full exchange (failing only
-  at proof verification) so the protocol does not reveal whether the account exists — but it
-  previously fabricated a **fresh random salt on every probe**, so repeating the same probe returned a
-  different `s=` each time, whereas a real account always returns its stored salt: that difference was
-  itself an existence oracle. The fabricated salt is now **deterministic per identity**
+  side-channel in the SCRAM forced-failure path shared by IMAP, SMTP and POP3. The fabricated salt for
+  an unknown/non-PBKDF2 account is now **deterministic per identity**
   (`ScramSha256::DeriveAntiEnumerationSalt_`): `HMAC-SHA256(key, "scram-anti-enum-salt:" +
-  lowercased-identity)` truncated to 16 bytes (matching a real PBKDF2 salt length), with the
-  iteration count already fixed at the 210000 default. The HMAC key is derived from server-side
-  secrets a mail client never sees (the admin password hash plus the database credentials/name/server,
-  domain-separated), so the salt is stable per installation yet cannot be precomputed off-box. Real
-  PBKDF2 accounts are entirely unaffected (their real salt/iterations are used); only the
-  unknown-account branch changed, and the random salted-password it feeds to the always-failing proof
-  check is untouched. Validated over the wire (`TestScramSha256UnknownAccountSaltIsStable`: same
-  unknown identity returns an identical salt across separate connections, different unknown identities
-  differ) plus the full IMAP regression suite. Residual note: an installation with neither an admin
-  password nor database credentials set has a low-entropy key (acceptable — such an install is already
-  unprotected); a persisted random server secret (B3/DPAPI) would harden that edge case further.
-- ✅ **SCRAM-SHA-256-PLUS channel binding (IMAP) — delivered in v6.2.0.** Added the
-  `AUTH=SCRAM-SHA-256-PLUS` mechanism (RFC 5802 + RFC 5929 `tls-server-end-point`) so authentication
-  is cryptographically bound to the specific TLS channel, defeating a man-in-the-middle who relays an
-  otherwise-valid SCRAM exchange over a different TLS connection (e.g. behind a terminating proxy or
-  with a mis-issued certificate). `TCPConnection::GetTlsServerEndPoint` derives the channel-binding
-  data as the hash of the server's own certificate using the certificate's signature hash (MD5/SHA-1
-  upgraded to SHA-256 per RFC 5929) via OpenSSL `SSL_get_certificate` / `X509_get_signature_info` /
-  `X509_digest`. The `ScramSha256` helper gained a PLUS mode (`SetChannelBinding`) that requires the
-  `p=tls-server-end-point` gs2 flag and verifies the client's `c=` equals
-  `base64(gs2-header || cert-hash)`. The mechanism is advertised in CAPABILITY and accepted **only**
-  on a TLS connection; on such a connection the non-PLUS mechanism now also rejects a `y` gs2 flag,
-  which signals a stripped-PLUS downgrade (RFC 5802 §6). Validated over a real TLS IMAP connection
-  (`RegressionTests.SSL.ScramPlus`): a full channel-bound exchange authenticates
-  (`TestScramPlusAuthenticates`); a binding that does not match the server certificate is rejected
-  even with the correct password (`TestScramPlusWrongBindingFails` — the exact MITM case the feature
-  defends against); the mechanism is advertised over TLS but never on a plain connection
-  (`TestScramPlusAdvertisedOnTlsOnly`); and it is refused without TLS
-  (`TestScramPlusRejectedWithoutTls`). Full IMAP suite 246/246 and the SCRAM set 13/13 green.
-  Follow-ups: SCRAM-SHA-256-PLUS for SMTP and POP3 (the shared `GetTlsServerEndPoint` + PLUS helper
-  are protocol-agnostic, so each is a thin wiring increment).
-- ✅ **SCRAM-SHA-256-PLUS channel binding (SMTP submission) — delivered in v6.2.0.** Extended the
-  same channel-binding mechanism to SMTP `AUTH` (RFC 4954), reusing `TCPConnection::GetTlsServerEndPoint`
-  and the `ScramSha256` PLUS mode unchanged. `SMTPConnection::ProtocolAUTH_` gained an
-  `AUTH SCRAM-SHA-256-PLUS` branch that requires a TLS connection (else `504`), fetches the
-  tls-server-end-point binding and calls `SetChannelBinding` before driving the existing
-  `SMTPSCRAMFIRST`/`SMTPSCRAMFINAL`/`SMTPSCRAMACK` exchange; the non-PLUS `SCRAM-SHA-256` branch now
-  calls `SetServerSupportsChannelBinding()` on a TLS connection so a stripped-PLUS `y` gs2 flag is
-  rejected (RFC 5802 §6). EHLO advertises `SCRAM-SHA-256-PLUS` only on a TLS connection (alongside the
-  always-offered `SCRAM-SHA-256`). Validated over a real TLS SMTP connection
-  (`RegressionTests.SSL.ScramPlusSmtp`): advertised-on-TLS-only, full channel-bound auth + a usable
-  session afterwards, tampered-binding-rejected-with-the-correct-password (the MITM case), and
-  refused-without-TLS. SCRAM set 17/17 and the full SMTP suite 178/178 green. Follow-up: SCRAM-SHA-256-PLUS
-  for POP3.
+  lowercased-identity)` truncated to 16 bytes, keyed from server-side secrets a mail client never sees
+  (admin password hash + DB credentials/name/server, domain-separated), so the salt is stable per
+  installation yet cannot be precomputed off-box. Validated over the wire
+  (`TestScramSha256UnknownAccountSaltIsStable`) plus the full IMAP regression suite.
+- ✅ **SCRAM-SHA-256-PLUS channel binding (IMAP) — delivered in v6.2.0.** Added
+  `AUTH=SCRAM-SHA-256-PLUS` (RFC 5802 + RFC 5929 `tls-server-end-point`) so authentication is
+  cryptographically bound to the TLS channel, defeating a MITM who relays an otherwise-valid SCRAM
+  exchange over a different TLS connection. `TCPConnection::GetTlsServerEndPoint` derives the binding
+  data; the `ScramSha256` helper gained a PLUS mode (`SetChannelBinding`). Advertised in CAPABILITY and
+  accepted **only** on TLS; the non-PLUS mechanism now rejects a `y` gs2 flag (stripped-PLUS downgrade,
+  RFC 5802 §6). Validated over real TLS (`RegressionTests.SSL.ScramPlus`): `TestScramPlusAuthenticates`,
+  `TestScramPlusWrongBindingFails`, `TestScramPlusAdvertisedOnTlsOnly`, `TestScramPlusRejectedWithoutTls`.
+  Full IMAP suite 246/246 and the SCRAM set 13/13 green.
+- ✅ **SCRAM-SHA-256-PLUS channel binding (SMTP submission) — delivered in v6.2.0.** Extended the same
+  mechanism to SMTP `AUTH` (RFC 4954), reusing `GetTlsServerEndPoint` and the PLUS mode unchanged. EHLO
+  advertises `SCRAM-SHA-256-PLUS` only on TLS. Validated over real TLS
+  (`RegressionTests.SSL.ScramPlusSmtp`). SCRAM set 17/17 and the full SMTP suite 178/178 green.
 - ✅ **SCRAM-SHA-256-PLUS channel binding (POP3) — delivered in v6.2.0.** Completed the channel-binding
-  rollout across all three retrieval/submission protocols by extending the same mechanism to POP3 `AUTH`
-  (RFC 5034), again reusing `TCPConnection::GetTlsServerEndPoint` and the `ScramSha256` PLUS mode unchanged.
-  `POP3Connection::ProtocolAUTH_` gained a `SCRAM-SHA-256-PLUS` branch that requires a TLS connection (else
-  `-ERR`), derives the tls-server-end-point binding and calls `SetChannelBinding` before driving the existing
-  SCRAM exchange; the non-PLUS `SCRAM-SHA-256` branch now calls `SetServerSupportsChannelBinding()` on a TLS
-  connection for stripped-PLUS downgrade protection (RFC 5802 §6). `CAPA` and the bare-`AUTH` mechanism list
-  advertise `SCRAM-SHA-256-PLUS` only over TLS. Validated over a real TLS POP3 connection
-  (`RegressionTests.SSL.ScramPlusPop3`): advertised-on-TLS-only, full channel-bound auth + a usable session,
-  tampered-binding-rejected-with-the-correct-password (the MITM case), and refused-without-TLS. SCRAM set
-  21/21 and the full POP3 suite 53/53 green.
+  rollout to POP3 `AUTH` (RFC 5034). `CAPA` and the bare-`AUTH` list advertise `SCRAM-SHA-256-PLUS` only
+  over TLS. Validated over real TLS (`RegressionTests.SSL.ScramPlusPop3`). SCRAM set 21/21 and the full
+  POP3 suite 53/53 green.
 - ✅ **Argon2id KDF option — delivered in v6.2.0.** Added the OWASP-recommended memory-hard KDF as
-  password-hash algorithm **5** (`Crypt::ETArgon2id`), implemented in `HashCreator`
-  (`GenerateArgon2id`/`ValidateArgon2id`/`IsArgon2idHash`) over OpenSSL's `EVP_KDF` `ARGON2ID`
-  (no new dependency; default params m=19456 KiB, t=2, p=1; self-describing
-  `$a2$<m>$<t>$<p>$<salt-hex>$<key-hex>` hash with defense-in-depth bounds on verify). `Crypt`
-  (`EnCrypt`/`Validate`/`GetHashType`) dispatches it, and `PasswordValidator`'s transparent
-  rehash-on-login was generalised to upgrade to whichever strong KDF is configured in
-  `PreferredHashAlgorithm` **without ever downgrading** (PBKDF2 `<` Argon2id by enum value; both
-  outrank legacy MD5/SHA256). PBKDF2 remains the default; Argon2id is opt-in via
-  `PreferredHashAlgorithm=5`. Validated end-to-end inside the live server by the `RunTestSuite`
-  self-tests (`HashCreatorTester` Argon2id round-trip/negative/salt-uniqueness/cross-scheme checks +
-  a `Crypt` `EnCrypt`→`GetHashType`→`Validate` dispatch check for Argon2id and PBKDF2), with the
-  full auth regression (default PBKDF2 path) green.
-- ✅ **Password hash-policy engine (MinimumAcceptedHashAlgorithm) — delivered in v6.2.0.** Added a
-  configurable minimum-accepted password-hash type so administrators can phase out legacy weak hashes
-  (plaintext/MD5/SHA256) after a database leak instead of letting them stay accepted (and crackable)
-  indefinitely. New `[Settings] MinimumAcceptedHashAlgorithm` INI key (read by `IniFileSettings`,
-  default `0` = disabled, no behaviour change) is compared against the account's stored
-  `Crypt::EncryptionType` (ordered weak→strong: `None`=0, `BlowFish`=1, `MD5`=2, `SHA256`=3,
-  `PBKDF2`=4, `Argon2id`=5). `PasswordValidator::ValidatePassword` now refuses any cleartext login
-  whose stored hash type is **below** the configured minimum *before* verifying the password — so a
-  correct password against a too-weak hash is still rejected (forcing a reset to a strong scheme),
-  while it composes cleanly with the existing transparent rehash-on-login for accepted hashes.
-  Active-Directory accounts are exempt (their lookup returns earlier), and each refusal is logged via
-  `LOG_APPLICATION`. The policy needs only the INI key plus a server restart — no COM/IDL/schema
-  change. Validated by `RegressionTests.Security.HashPolicy` (a PBKDF2 account is refused when the
-  minimum is Argon2id, then accepted again when the minimum is lowered to PBKDF2 or disabled), with
-  the combined Security, SCRAM and POP3 suites 109/109 green and no errors logged.
-- ✅ **SCRAM minimum-hash enforcement — delivered in v6.2.0.** SCRAM-SHA-256 can only be served from a
-  PBKDF2-structured stored hash (the PBKDF2 key doubles as the SCRAM `SaltedPassword`), so when an
-  administrator raises `MinimumAcceptedHashAlgorithm` above PBKDF2 (i.e. requires Argon2id) the
-  `LookupPbkdf2Account_` helper on all three protocols (`IMAPCommandAuthenticate`, `POP3Connection`,
-  `SMTPConnection`) now returns no account, turning every SCRAM exchange into the existing
-  anti-enumeration forced-failure (random salt, correct-password-still-fails). This closes the gap
-  where SCRAM would otherwise keep authenticating against a PBKDF2 hash the cleartext path already
-  refuses. Validated by `RegressionTests.Security.HashPolicy` (a correct-password SCRAM exchange is
-  rejected when the minimum is Argon2id and succeeds again when it is lowered to PBKDF2), with the
-  Security 39/39 and SCRAM+POP3 73/73 suites green and no errors logged.
-- ✅ **Optional server-side password pepper — delivered in v6.2.0.** New `[Settings] PasswordPepper`
-  INI key (read by `IniFileSettings`, default empty = no behaviour change). When set, the pepper is
-  applied as an HMAC-SHA-256 keyed transform of the password (`HashCreator::ComputeHMACSHA256Hex`,
-  OpenSSL one-shot HMAC) before the **Argon2id** hash is computed and verified, so a stolen password
-  database cannot be brute-forced without also stealing the pepper (which lives outside the database,
-  in the INI). The pepper deliberately applies to Argon2id **only**: PBKDF2 hashes double as the SCRAM
-  `SaltedPassword` that clients reconstruct from the raw password, so peppering PBKDF2 would break
-  SCRAM — the pepper therefore takes effect only with `PreferredHashAlgorithm = Argon2id`. An empty
-  pepper is a no-op, and a known-answer HMAC self-test runs in `HashCreatorTester`. No COM/IDL/schema
-  change. Validated by `RegressionTests.Security.PasswordPepper` (an account created under a pepper
-  authenticates, fails once the pepper is changed, and authenticates again when the original pepper is
-  restored), Security 39/39 green and no errors logged.
-- ✅ **POP3/IMAP UTF8 and SASLprep of non-ASCII SASL credentials — delivered in v6.2.0.** POP3 now
-  advertises `UTF8` in `CAPA` and accepts the `UTF8` command in the AUTHORIZATION state (RFC 6856),
-  and IMAP advertises `UTF8=ACCEPT` in `CAPABILITY` and honours `ENABLE UTF8=ACCEPT` (RFC 6855),
-  echoing `* ENABLED UTF8=ACCEPT`. SASL `PLAIN` tokens are now decoded as raw UTF-8 bytes via the
-  shared `StringParser::DecodeSaslPlain` helper (no longer mangled through the system codepage), and
-  the decoded authcid is passed through a pragmatic RFC 4013 `StringParser::SaslPrep` (maps non-ASCII
-  spaces to U+0020, drops RFC 3454 B.1 "mapped to nothing" code points such as the soft hyphen, and
-  rejects prohibited control characters) on the POP3, IMAP and SMTP authentication paths before the
-  account lookup. ASCII credentials are unaffected. No COM/IDL/schema change. Validated by
-  `RegressionTests.POP3.Basics.TestUtf8CapabilityAndCommand`,
-  `RegressionTests.POP3.Basics.TestAuthPlainSaslPrepsUsername` (a login carrying a soft hyphen in the
-  username still matches the registered ASCII account) and
-  `RegressionTests.IMAP.Basics.TestEnableUtf8AcceptEchoesEnabled`, with the in-server `SaslPrep`
-  self-test plus the POP3/Security/IMAP/SMTP suites (178/178) green and no errors logged.
+  password-hash algorithm **5** (`Crypt::ETArgon2id`), implemented in `HashCreator` over OpenSSL's
+  `EVP_KDF` `ARGON2ID` (no new dependency; default m=19456 KiB, t=2, p=1; self-describing
+  `$a2$<m>$<t>$<p>$<salt-hex>$<key-hex>` hash). Transparent rehash-on-login was generalised to upgrade
+  to whichever strong KDF is configured **without ever downgrading**. PBKDF2 remains the default;
+  Argon2id is opt-in via `PreferredHashAlgorithm=5`. Validated by the `RunTestSuite` self-tests.
+- ✅ **Password hash-policy engine (MinimumAcceptedHashAlgorithm) — delivered in v6.2.0.** New
+  `[Settings] MinimumAcceptedHashAlgorithm` INI key (default `0` = disabled) compared against the
+  account's stored `Crypt::EncryptionType` (weak→strong: None=0, BlowFish=1, MD5=2, SHA256=3, PBKDF2=4,
+  Argon2id=5). `PasswordValidator::ValidatePassword` refuses any cleartext login whose stored hash type
+  is below the configured minimum *before* verifying the password. AD accounts are exempt. Validated by
+  `RegressionTests.Security.HashPolicy`; combined Security/SCRAM/POP3 109/109 green.
+- ✅ **SCRAM minimum-hash enforcement — delivered in v6.2.0.** When the admin raises
+  `MinimumAcceptedHashAlgorithm` above PBKDF2, the `LookupPbkdf2Account_` helper on all three protocols
+  returns no account, turning every SCRAM exchange into the anti-enumeration forced-failure. Validated
+  by `RegressionTests.Security.HashPolicy`; Security 39/39 and SCRAM+POP3 73/73 green.
+- ✅ **Optional server-side password pepper — delivered in v6.2.0.** New `[Settings] PasswordPepper` INI
+  key (default empty). When set, applied as an HMAC-SHA-256 keyed transform of the password before the
+  **Argon2id** hash (Argon2id only — peppering PBKDF2 would break SCRAM). Validated by
+  `RegressionTests.Security.PasswordPepper`; Security 39/39 green.
+- ✅ **POP3/IMAP UTF8 and SASLprep of non-ASCII SASL credentials — delivered in v6.2.0.** POP3 advertises
+  `UTF8` in `CAPA` and accepts `UTF8` (RFC 6856); IMAP advertises `UTF8=ACCEPT` and honours
+  `ENABLE UTF8=ACCEPT` (RFC 6855). SASL `PLAIN` tokens decoded as raw UTF-8 via
+  `StringParser::DecodeSaslPlain`, and the decoded authcid passed through a pragmatic RFC 4013
+  `StringParser::SaslPrep` on the POP3/IMAP/SMTP paths. Validated by
+  `TestUtf8CapabilityAndCommand`, `TestAuthPlainSaslPrepsUsername`, `TestEnableUtf8AcceptEchoesEnabled`;
+  POP3/Security/IMAP/SMTP 178/178 green.
 - ✅ **OAuth2 bearer authentication — SASL XOAUTH2 + OAUTHBEARER (RFC 7628) — delivered in v6.2.0.**
-  POP3, IMAP and SMTP submission now accept bearer-token logins. The new
-  `OAuth2TokenValidator` (`Common/Util`) validates the JWT **locally** (no live identity-provider
-  round-trip): it splits the token, base64url-decodes the segments, and enforces an algorithm
-  allow-list from `OAuth2AllowedAlgorithms` — `HS256` is verified (constant-time) against the
-  configured `OAuth2HmacSecret`, while `RS256`/`ES256` are verified with the PEM public key in
-  `OAuth2PublicKeyFile` (OpenSSL `EVP_DigestVerify`). The `none` algorithm (and an empty/missing
-  `alg`) is rejected outright to defeat the classic JWT algorithm-confusion attack. The validator
-  requires `exp` (with a 60s clock-skew allowance), honours `nbf`, and checks `iss`/`aud` only when
-  `OAuth2Issuer`/`OAuth2Audience` are configured; the configurable username claim
-  (`OAuth2UsernameClaim`, default `email`) is mapped to a local account, and any client-asserted
-  identity (`user=`/`a=`) must match the token. The mechanisms are off by default
-  (`OAuth2Enabled=0`) and, when enabled, are advertised and accepted only over TLS unless
-  `OAuth2RequireTLS=0`. Protocol responses are deliberately generic (`-ERR`/`NO`/`535`) — token
-  contents and crypto errors are never echoed to the client. No COM/IDL/schema change (pure
-  `hMailServer.ini [Settings]` config). Validated by `RegressionTests.Security.OAuth2Bearer` (11
-  cases: HS256 success plus expired-, wrong-secret-, `alg:none`- and disabled-rejection across
-  POP3/IMAP/SMTP) and the `OAuth2TokenValidator` self-test, with the POP3/Security/IMAP/SMTP suites
-  (189/189) green and no errors logged. **Limitation:** validation is offline/local only — there is
-  no JWKS fetch, token-introspection or live-IdP interop test (HS256 is exercised end-to-end; RS256
-  is implemented but not covered by an automated test).
-- Verify: O365/Gmail XOAUTH2 + Thunderbird SCRAM interop.
+  POP3, IMAP and SMTP submission accept bearer-token logins. The new `OAuth2TokenValidator`
+  (`Common/Util`) validates the JWT **locally**: enforces an algorithm allow-list
+  (`OAuth2AllowedAlgorithms`) — `HS256` verified (constant-time) against `OAuth2HmacSecret`,
+  `RS256`/`ES256` against the PEM public key in `OAuth2PublicKeyFile` (OpenSSL `EVP_DigestVerify`).
+  `none`/empty `alg` rejected (algorithm-confusion defence); requires `exp` (60s skew), honours `nbf`,
+  checks `iss`/`aud` when configured; the configurable username claim (`OAuth2UsernameClaim`, default
+  `email`) maps to a local account. Off by default (`OAuth2Enabled=0`); TLS-only unless
+  `OAuth2RequireTLS=0`. Validated by `RegressionTests.Security.OAuth2Bearer` (11 cases) + self-test;
+  POP3/Security/IMAP/SMTP 189/189 green. **Limitation:** validation is offline/local only — no JWKS
+  fetch / introspection / live-IdP interop yet (RS256 implemented but not auto-tested). *(See Part 1
+  for the remaining live-validation + interop follow-ups.)*
 
-## B3 — Secrets & least-privilege ✅ DELIVERED (v6.2.0)
+### B3 — Secrets & least-privilege ✅ DELIVERED (v6.2.0)
+
 - ✅ **DPAPI envelope encryption** (machine-scoped, `CRYPTPROTECT_LOCAL_MACHINE`) for all reversible
   stored secrets, gated by the new `[Settings] ProtectStoredSecretsWithDPAPI` key (default **on**):
   - New `DataProtector` primitive (`Common/Util/DataProtector.{h,cpp}`) wrapping `CryptProtectData`/
@@ -512,153 +444,135 @@ upgrading the management/admin INI password from MD5.
 - ✅ **Least-privileged service account** (opt-in): `ServiceManager` passes the new `[Settings]`
   `ServiceAccountName`/`ServiceAccountPassword` to `CreateService`/`ChangeServiceConfig`. Default
   empty = LocalSystem (unchanged); recommended value is the password-less virtual account
-  `NT SERVICE\hMailServer`. Explicit ACL/privilege-drop automation left to the administrator
-  (account must be granted *Log on as a service* + access to the program/data/database directories).
+  `NT SERVICE\hMailServer`. Explicit ACL/privilege-drop automation left to the administrator.
 - Validated: in-server `DataProtector` self-test (round-trip + tamper + machine-binding) and
-  `RegressionTests.Security.SecretProtection` (fetch-account COM round-trip under DPAPI, Unicode,
-  Blowfish-disabled fallback, route persistence); 287/287 Security+SMTP+POP3 green, server builds 0/0.
+  `RegressionTests.Security.SecretProtection`; 287/287 Security+SMTP+POP3 green, server builds 0/0.
 
-## B4 — Deliverability & SMTP standards
-- **SMTPUTF8 / EAI** (RFC 6531/6532) end-to-end (parser, validator currently ASCII-only, storage, delivery).
-- **SRS** for forwarding (SPF alignment) replacing the naive envelope rewrite (`SMTPForwarding`); optional BATV.
-- PIPELINING, ENHANCEDSTATUSCODES, DSN (RFC 3461; RCPT rejects ext params today); optional CHUNKING/BDAT.
-  Per-IP / per-destination submission + outbound rate shaping.
-- Verify: EAI roundtrip; SPF passes on forwarded mail; DSN interop.
+### B4 — Deliverability & SMTP standards (delivered parts) ◑
 
-## B5 — IMAP modern sync profile
-- ✅ **UNSELECT (RFC 3691)** — delivered in v6.2.0. Closes the selected mailbox without the
-  implicit EXPUNGE that CLOSE performs (\Deleted retained). Advertised in CAPABILITY. Covered by
-  `RegressionTests.IMAP.Basics.TestUnselectKeepsDeletedMessages`.
-- ✅ **UIDPLUS (RFC 4315)** — delivered in v6.2.0. APPEND/COPY/MOVE return `[APPENDUID]`/`[COPYUID]`
-  response codes (destination UIDVALIDITY + assigned UIDs) and `UID EXPUNGE` removes only \Deleted
-  messages whose UID is in the supplied set. Advertised in CAPABILITY. Covered by
-  `TestAppendReturnsAppendUid`, `TestCopyReturnsCopyUid`, `TestUidExpungeOnlyRemovesMatchingUids`.
-- ✅ **ENABLE (RFC 5161)** — delivered in v6.2.0. Negotiates opt-in extensions; returns a tagged OK
-  (no enable-able extensions yet, so the untagged `ENABLED` line is omitted). Advertised in
-  CAPABILITY. Covered by `TestEnableReturnsOk`.
-- ✅ **STATUS=SIZE (RFC 8438)** — delivered in v6.2.0. `STATUS` answers the `SIZE` attribute (total
-  mailbox size in octets). Advertised in CAPABILITY. Covered by `TestStatusReturnsMailboxSize`.
-- ✅ **ESEARCH (RFC 4731)** — delivered in v6.2.0. `SEARCH RETURN (MIN MAX ALL COUNT)` emits the
-  `* ESEARCH` response. Advertised in CAPABILITY. Covered by `TestEsearchReturnsExtendedResponse`.
-- ◑ **CONDSTORE/QRESYNC (RFC 7162) — Stage 1 (CONDSTORE foundation) DELIVERED in v6.2.0.** This is
-  the one B5 item that requires a **database schema migration**, so it is shipped in supervised
-  stages.
-  - **Stage 1 (done):** persistent mod-sequence storage + read surface. Bumped
-    `REQUIRED_DB_VERSION` 6001→6002 (`Common/Application/Constants.h`); added a per-message
-    `messagemodseq` column to `hm_messages` and a per-folder monotonic `foldercurrentmodseq`
-    counter to `hm_imapfolders` across all four `CreateTables*` scripts; wrote
-    `Upgrade6001to6002{MSSQL,MSSQLCE,MySQL,PGSQL}.sql` (each ALTERs both columns `DEFAULT 1` and
-    sets `hm_dbversion=6002`). The mod-sequence is a per-mailbox monotonic counter (mirrors the UID
-    counter): assigned on message arrival and bumped on every flag change (`SaveFlags`), so it only
-    ever increases. Command surface: `CAPABILITY` advertises `CONDSTORE QRESYNC`; `ENABLE
-    CONDSTORE`/`ENABLE QRESYNC` echo `* ENABLED …`; `SELECT`/`EXAMINE (CONDSTORE)` and
-    `SELECT`/`EXAMINE` after `ENABLE CONDSTORE` emit `* OK [HIGHESTMODSEQ n]`; `STATUS (HIGHESTMODSEQ)`
-    answers the attribute; `FETCH … (MODSEQ)` returns the per-message `MODSEQ (n)`. Covered by
-    `TestEnableCondstoreEchoesEnabled`, `TestSelectAndStatusReportHighestModSeq`,
-    `TestFetchModSeqIncrementsOnFlagChange`. MySQL/MariaDB migration validated end-to-end against the
-    live regression DB (316/316 IMAP+persistence tests green); MSSQL/PGSQL/SQLCE scripts authored to
-    match but await cross-backend upgrade testing.
-  - **Stage 2 (done in v6.2.0):** conditional-store semantics. `FETCH … (CHANGEDSINCE n)` returns
-    only messages whose mod-sequence exceeds `n` and implicitly includes `MODSEQ`; `STORE …
-    (UNCHANGEDSINCE n) …` leaves any message changed since `n` untouched and lists it in a tagged
-    `[MODIFIED <set>]` response code; a satisfied/CONDSTORE `STORE` returns the new `MODSEQ` in its
-    untagged `FETCH` (even when `.SILENT`); and `SEARCH MODSEQ n` matches messages with
-    mod-sequence ≥ `n`, appending the highest matched value as `(MODSEQ n)` (and `MODSEQ n` in an
-    `ESEARCH` reply). Covered by `TestFetchChangedSinceFiltersByModSeq`,
-    `TestStoreUnchangedSinceRejectsModified`, `TestStoreUnchangedSinceSucceedsAndReturnsModSeq` and
+All over-the-wire, validated against the live server (regression suite green, builds 0/0). Default-off
+toggles preserve backwards compatibility.
+
+- ✅ **PIPELINING (RFC 2920)** — advertised in EHLO; the async command reader already pipelines, so this
+  is a capability announcement that lets clients batch commands. Covered by `SMTP/Deliverability.cs`.
+- ✅ **SMTPUTF8 / EAI (RFC 6531/6532)** — `SMTPUTF8` advertised in EHLO and accepted as a `MAIL FROM`
+  parameter; a relaxed UTF-8 e-mail validator (the previous one was ASCII-only) accepts internationalized
+  local-parts/domains; outbound the client appends `SMTPUTF8` when the envelope has non-ASCII and the
+  remote advertises it. Covered by `SMTP/Deliverability.cs`.
+- ✅ **ENHANCEDSTATUSCODES (RFC 2034)** — advertised in EHLO; replies carry `x.y.z` enhanced codes via a
+  central helper, gated on `esmtp_session_` (EHLO on / HELO off) so legacy `250 OK`-exact expectations are
+  unaffected. Server-to-server safe (clients parse the leading numeric code). Covered by
+  `SMTP/Deliverability.cs`. *(Features 1–3 committed together as `0d26824`.)*
+- ✅ **DSN (RFC 3461/3464)** — `DSN` advertised in EHLO; `MAIL FROM` accepts+validates `RET=FULL|HDRS`
+  and `ENVID=<xtext>`; `RCPT TO` accepts+validates `NOTIFY` (`NEVER` | combination of
+  `SUCCESS,FAILURE,DELAY`) and `ORCPT=<addr-type>;<xtext>`. The per-recipient `NOTIFY` bitmask is
+  persisted (schema `6004→6005`, new `hm_messagerecipients.recipientdsnnotify`, upgrade scripts for all
+  four backends) and honored: `NOTIFY=NEVER` (and any notify set without `FAILURE`) suppresses the failure
+  DSN in both `ExternalDelivery` and `LocalDelivery`. Covered by the DSN tests in `SMTP/Deliverability.cs`.
+  *(Documented limitation: `RET`/`ENVID`/`ORCPT` are validated but not echoed into the generated report;
+  the existing NDR template is retained rather than rewritten into RFC 3464 multipart/report.)*
+- ✅ **SRS — Sender Rewriting Scheme** (replaces the naive forwarding envelope rewrite): a new
+  `Common/Util/SRS.{h,cpp}` primitive produces and reverses HMAC-SHA256-signed `SRS0=` envelope
+  addresses (base32 day-slot timestamp, 21-day validity + 1-day skew, first-8-hex signature). On
+  forwarding to an external destination `SMTPForwarding` rewrites `MAIL FROM` to a signed local SRS0
+  address so forwarded mail keeps SPF alignment; on the inbound bounce path the signed address is
+  verified and reversed back to the original sender in **both** the RCPT-time check
+  (`RecipientParser::CheckDeliveryPossibility`, which treats a valid reverse as authorized local delivery
+  so the bounce relays without SMTP auth) and the spool-time recipient build
+  (`CreateMessageRecipientList_`). Gated by new `[Settings] SRSEnabled` (default **off**) + `SRSSecret`;
+  the HMAC signature prevents the reverse path from becoming an open relay. Covered by an in-server SRS
+  self-test and the over-the-wire `SMTP/Srs.cs`.
+  - En route, two latent self-test defects in already-committed code were fixed: the `StringParser`
+    SASLprep test used greedy `\x` escapes (`\x00ADer` consumed the following `e` → U+0ADE), corrected to
+    fixed-width `\u`; and `Unicode::WideToMultiByte` returned an `AnsiString` whose length included a
+    trailing NUL padding byte (it sized the buffer to `bytes+1` via `GetBuffer` but never `ReleaseBuffer`),
+    which corrupted DPAPI-protected secrets with a trailing NUL on round-trip — now trimmed to the exact
+    byte count written. Full internals self-test + 597/597 SMTP/POP3/IMAP/Security/SSL green.
+
+### B5 — IMAP modern sync profile ✅ DELIVERED (v6.2.0)
+
+All targeted extensions delivered and validated (full IMAP suite 242/242). Verify in the field: fast
+resync in Thunderbird/Apple Mail.
+
+- ✅ **UNSELECT (RFC 3691)** — closes the selected mailbox without the implicit EXPUNGE that CLOSE
+  performs (\Deleted retained). Covered by `TestUnselectKeepsDeletedMessages`.
+- ✅ **UIDPLUS (RFC 4315)** — APPEND/COPY/MOVE return `[APPENDUID]`/`[COPYUID]`; `UID EXPUNGE` removes
+  only \Deleted messages whose UID is in the set. Covered by `TestAppendReturnsAppendUid`,
+  `TestCopyReturnsCopyUid`, `TestUidExpungeOnlyRemovesMatchingUids`.
+- ✅ **ENABLE (RFC 5161)** — negotiates opt-in extensions; tagged OK. Covered by `TestEnableReturnsOk`.
+- ✅ **STATUS=SIZE (RFC 8438)** — `STATUS` answers `SIZE`. Covered by `TestStatusReturnsMailboxSize`.
+- ✅ **ESEARCH (RFC 4731)** — `SEARCH RETURN (MIN MAX ALL COUNT)` emits `* ESEARCH`. Covered by
+  `TestEsearchReturnsExtendedResponse`.
+- ◑ **CONDSTORE/QRESYNC (RFC 7162)** — the one B5 item requiring a **database schema migration**,
+  shipped in supervised stages:
+  - **Stage 1:** persistent mod-sequence storage + read surface. `REQUIRED_DB_VERSION` 6001→6002; added
+    `messagemodseq` (hm_messages) + `foldercurrentmodseq` (hm_imapfolders) across all four
+    `CreateTables*` scripts; `Upgrade6001to6002{MSSQL,MSSQLCE,MySQL,PGSQL}.sql`. `CAPABILITY` advertises
+    `CONDSTORE QRESYNC`; `ENABLE CONDSTORE`/`QRESYNC` echo `* ENABLED`; `SELECT (CONDSTORE)` emits
+    `* OK [HIGHESTMODSEQ n]`; `STATUS (HIGHESTMODSEQ)` + `FETCH (MODSEQ)`. MySQL/MariaDB validated
+    (316/316); other backends authored.
+  - **Stage 2:** `FETCH (CHANGEDSINCE n)`, `STORE (UNCHANGEDSINCE n)` with `[MODIFIED <set>]`, and
+    `SEARCH MODSEQ n`. Covered by `TestFetchChangedSinceFiltersByModSeq`,
+    `TestStoreUnchangedSinceRejectsModified`, `TestStoreUnchangedSinceSucceedsAndReturnsModSeq`,
     `TestSearchModSeqReportsHighest`.
-  - **Stage 3a (done in v6.2.0, QRESYNC in-session):** `SELECT`/`EXAMINE (QRESYNC (uidvalidity
-    modseq …))` is parsed, enabling QRESYNC+CONDSTORE for the session and replaying flag/`MODSEQ`
-    changes since the supplied mod-sequence as untagged `FETCH (UID … FLAGS … MODSEQ …)` responses;
-    `EXPUNGE` and `UID EXPUNGE` emit a single `* VANISHED <uid-set>` (compressed sequence-set) when
-    QRESYNC is enabled instead of per-message `* n EXPUNGE` lines. Covered by
-    `TestExpungeWithQResyncReturnsVanished` and `TestSelectQResyncReplaysChanges`.
-  - **Stage 3b (done in v6.2.0, QRESYNC offline tracking):** persistent expunged-UID tombstones
-    (new `hm_imapexpunged` table, DB 6002→6003) recorded at the universal
-    `PersistentMessage::DeleteObject` chokepoint (covers IMAP `EXPUNGE`/`UID EXPUNGE`, `CLOSE`,
-    `MOVE` source-delete and POP3 delete; guarded to account/folder-scoped messages), each bumping
-    the folder mod-sequence. `SELECT`/`EXAMINE (QRESYNC (uidvalidity modseq …))` now emits
-    `* VANISHED (EARLIER) <uid-set>` for UIDs expunged since the supplied mod-sequence, and
-    `UID FETCH <set> (CHANGEDSINCE n VANISHED)` emits `* VANISHED (EARLIER)` for the requested UIDs
-    expunged since `n`. Tombstones are pruned when a folder is deleted. Covered by
-    `TestSelectQResyncReportsVanishedEarlier` and `TestUidFetchVanishedReportsEarlier`. Migration
-    scripts shipped for MySQL/MSSQL/PGSQL/SQLCE; only the MySQL path is validated in CI here.
-    Follow-up: tombstone pruning/retention beyond folder deletion is not yet implemented (RFC 7162
-    permits the server to fall back to a full resync, which the client handles).
-- ✅ **LIST-EXTENDED (RFC 5258)** — delivered in v6.2.0. `LIST` accepts an optional leading
-  selection-option list (`(SUBSCRIBED)` returns only subscribed mailboxes as `* LIST`; `REMOTE`/
-  `RECURSIVEMATCH` are accepted as no-ops), an optional trailing `RETURN (SUBSCRIBED CHILDREN)`
-  (annotates the `\Subscribed` attribute; `\HasChildren`/`\HasNoChildren` are always reported), and a
-  parenthesised list of mailbox patterns (each mailbox listed once). Advertised in CAPABILITY as
-  `LIST-EXTENDED`. Covered by `TestListExtendedReturnSubscribed`, `TestListExtendedSelectSubscribed`
-  and `TestListExtendedMultiplePatterns`.
-- ✅ **SEARCHRES (RFC 5182)** — delivered in v6.2.0. `SEARCH RETURN (SAVE)` (UID and sequence
-  variants) saves the matched messages for the session; the `$` marker then references that result in
-  a subsequent `FETCH`/`STORE`/`COPY`/`MOVE`/`UID EXPUNGE`. The result is stored as UIDs on the
-  connection so it stays stable across expunges; `$` is expanded centrally in
-  `IMAPCommandRangeAction::DoForMails` (mapped to sequence numbers for non-UID commands) and in
-  `UID EXPUNGE`. When `SAVE` is combined only with `MIN`/`MAX`, just those extremes are saved.
-  Advertised in CAPABILITY as `SEARCHRES`. Covered by `TestSearchResSaveAndFetch`,
-  `TestSearchResSaveAndStore` and `TestSearchResCapability`. Follow-up: `$` inside `SEARCH` criteria
-  (set intersection) is not yet supported.
-- ⏸ **IMAP4rev2 (RFC 9051) — assessed and deferred to its own milestone.** hMailServer already
-  implements the individual extensions IMAP4rev2 folds into the base (UIDPLUS, ENABLE, IDLE,
+  - **Stage 3a (QRESYNC in-session):** `SELECT (QRESYNC (...))` replays flag/MODSEQ changes; `EXPUNGE`
+    emits `* VANISHED`. Covered by `TestExpungeWithQResyncReturnsVanished`,
+    `TestSelectQResyncReplaysChanges`.
+  - **Stage 3b (QRESYNC offline tracking):** persistent expunged-UID tombstones (`hm_imapexpunged`, DB
+    6002→6003) at the `PersistentMessage::DeleteObject` chokepoint; `* VANISHED (EARLIER)` on resync and
+    `UID FETCH (CHANGEDSINCE n VANISHED)`. Covered by `TestSelectQResyncReportsVanishedEarlier`,
+    `TestUidFetchVanishedReportsEarlier`. Migration scripts for all backends; MySQL validated in CI.
+    Follow-up: tombstone pruning beyond folder deletion not yet implemented (RFC 7162 allows full-resync
+    fallback).
+- ✅ **LIST-EXTENDED (RFC 5258)** — optional leading selection-options (`(SUBSCRIBED)`, `REMOTE`/
+  `RECURSIVEMATCH` no-ops), trailing `RETURN (SUBSCRIBED CHILDREN)`, and parenthesised pattern lists.
+  Covered by `TestListExtendedReturnSubscribed`, `TestListExtendedSelectSubscribed`,
+  `TestListExtendedMultiplePatterns`.
+- ✅ **SEARCHRES (RFC 5182)** — `SEARCH RETURN (SAVE)` + the `$` marker in
+  `FETCH`/`STORE`/`COPY`/`MOVE`/`UID EXPUNGE`. Covered by `TestSearchResSaveAndFetch`,
+  `TestSearchResSaveAndStore`, `TestSearchResCapability`. Follow-up: `$` inside `SEARCH` criteria not yet
+  supported.
+- ⏸ **IMAP4rev2 (RFC 9051) — assessed and deferred to its own milestone** (see Part 1, Future track).
+  hMailServer already implements the individual extensions IMAP4rev2 folds in (UIDPLUS, ENABLE, IDLE,
   NAMESPACE, MOVE, SPECIAL-USE, UNSELECT, ESEARCH, SEARCHRES, STATUS=SIZE, LIST-EXTENDED, SASL-IR,
-  CONDSTORE), so the building blocks are in place. Full RFC 9051 conformance is **not** a single safe
-  increment, however: advertising `IMAP4rev2` obliges the server to (1) use **UTF-8 mailbox names**
-  instead of modified UTF-7 once the session enables rev2 — a session-scoped encode/decode switch
-  threaded through every command that carries a mailbox name (`LIST`/`LSUB`/`SELECT`/`EXAMINE`/
-  `CREATE`/`RENAME`/`DELETE`/`SUBSCRIBE`/`STATUS`/`APPEND`/`COPY`/`MOVE`, currently all via
-  `ModifiedUTF7`); (2) return `SEARCH` results in the **ESEARCH** form by default; (3) drop the
-  `\Recent` flag and `RECENT` responses; (4) treat `LSUB` as deprecated in favour of
-  `LIST (SUBSCRIBED)`; and (5) audit the changed/added response codes. Shipping a partial rev2 under
-  the `IMAP4rev2` capability would be non-conformant and risk client interop, so it is tracked as a
-  dedicated future milestone rather than bundled into the `v6.2.0` profile. The `ENABLE` handler and
-  `CAPABILITY` are the entry points when that milestone is scheduled.
-- ✅ **B5 modern-sync profile complete for v6.2.0.** All targeted extensions delivered and validated
-  (full IMAP suite 242/242). Verify in the field: fast resync in Thunderbird/Apple Mail.
+  CONDSTORE). Full conformance is not a single safe increment: advertising `IMAP4rev2` obliges UTF-8
+  mailbox names (session-scoped encode/decode switch across every mailbox-name command, currently all via
+  `ModifiedUTF7`), ESEARCH-by-default, dropping `\Recent`/`RECENT`, deprecating `LSUB`, and a
+  response-code audit. The `ENABLE` handler and `CAPABILITY` are the entry points when scheduled.
 
-## B6 — Standards-based filtering
-- **Sieve** (RFC 5228) interpreter + **ManageSieve** (RFC 5804) service alongside the
-  proprietary rules engine (`RuleApplier`). Verify with Sieve test vectors + a ManageSieve client.
+### B8 — Quality gates & supply chain (core) ✅ DELIVERED
 
-## B7 — Operability & observability
-- **OpenTelemetry** tracing (SMTP/IMAP/POP/DB spans + correlation IDs); unauthenticated local
-  health/readiness/liveness probes; richer metrics (queue depth, per-command latency, DB pool
-  saturation, TLS handshake failures); log retention/rotation.
-- Async/DB isolation: dedicated DB executor; replace the connection-pool `Sleep` polling with
-  condition variables (`DatabaseConnectionManager`); prepared-statement caches (MySQL/PG).
-- Message-store durability: configurable fsync + consistency checker + recovery tooling.
-  Graceful shutdown: readiness/drain + connection draining.
-- HA: a documented, tested active/passive (shared DB + storage + VIP) runbook + readiness gating
-  (no clustering code in this track).
+GitHub Actions: `ci.yml` (Control Panel build, warnings-as-errors) and `codeql.yml` (CodeQL C# SAST)
+on hosted runners, plus `server-build.yml` (self-hosted native C++ build on a VS 2026/v145 runner +
+opt-in regression-suite run, commit `6b692a8`). B1 reproducer tests
+(`TestAppendOversizedLiteralRejected` / `TestOversizedCommandLiteralRejected`, 2/2) and an
+**over-the-wire protocol fuzz suite** (`Security/ProtocolFuzz.cs`, commit `fc6d1da`): a seeded
+malformed-input barrage against the live SMTP/IMAP command parsers and the inbound MIME parser, asserting
+the server never crashes/hangs/logs a fault (liveness check + `ServiceRestartDetector` +
+`AssertNoReportedError`, per-test `[Timeout]`); 3/3 pass (~231 s). Coverage-guided libFuzzer assessed and
+impractical here (no fuzzer runtime in the available clang; parsers MSVC/ATL/Windows-coupled) — the live
+fuzzer is the validated substitute. *(Remaining B8 items in Part 1.)*
 
-## B8 — Quality gates & supply chain
-**Delivered (core):** GitHub Actions \u2014 `ci.yml` (Control Panel build, warnings-as-errors) and
-`codeql.yml` (CodeQL C# SAST) on hosted runners, plus `server-build.yml` (self-hosted native C++
-build on a VS 2026/v145 runner + opt-in regression-suite run). B1 reproducer tests and an
-over-the-wire SMTP/IMAP/MIME protocol fuzz suite (`Security/ProtocolFuzz.cs`, 3/3) lock in the
-parser hardening.
-**Remaining (future):**
-- build+test matrix Windows \u00d7 MySQL/MSSQL/PostgreSQL running the full suite (today the self-hosted
-  workflow runs one DB at a time).
-- clang-tidy; ASAN/UBSAN build; coverage-guided **libFuzzer** harnesses (need a clang+fuzzer
-  toolchain and decoupled parsers \u2014 impractical in the current MSVC/ATL environment, where the live
-  over-the-wire fuzzer is the substitute).
-- SBOM + dependency/CVE scanning + signed release artifacts.
-- Verify: green-gates-required-to-merge; nightly fuzz.
+---
 
-## Cross-cutting — surface new server capabilities in the Control Panel
-OAuth2 provider config, SCRAM/Argon2 policy, SMTPUTF8/SRS/rate-limit toggles, IMAP profile,
-Sieve/ManageSieve editor, secrets/least-priv status, health/trace endpoints, AV scanner
-presets + tests (Track A Phase 3), a security-diagnostics report.
+## Track A — delivered
 
-## Future track (Tier 3 — documented, not scheduled)
-Linux/container port (OS-abstraction layer first; today hard-wired to Win32/ATL/registry/service),
-JMAP (RFC 8620/8621), CalDAV/CardDAV, native webmail, true clustering/HA, rspamd integration,
-BIMI + VMC, OCSP stapling, ARF feedback-loop processing.
+### Phase 1 — Functional parity (so the classic can be retired) ✅ 9/10
 
-## Track B verification
-Each phase: clean build; run the regression suite (`build/run-tests.ps1`) plus new
-negative/fuzz tests; no `/WX` warnings. Security phases: a reproducer test proves the defect
-is closed. Interop phases: test against real clients.
+| # | Item | COM / source | Notes |
+|---|---|---|---|
+| 1 | ✅ **IP-range full policy editor** (commit 9743096) | `IInterfaceSecurityRange` | Tabbed `IPRangeDialog` (General/Connections/Relaying/Require auth/Protection): RequireSMTPAuth per direction, EnableSpamProtection, EnableAntiVirus, Expires+ExpiresTime, Priority. Wired via Properties button + double-click. Live-validated. |
+| 2 | ✅ **TCP/IP port → SSL certificate binding** (commit 9743096) | `IInterfaceTCPIPPort.SSLCertificateID` | `TcpIpPortDialog` picks from `Settings.SSLCertificates`; Certificate column added to grid. Live-validated. |
+| 3 | ✅ **Rules editor parity** (commits 139bd91 + fd3a27b account-level) | `IInterfaceRule/RuleCriteria/RuleActions` | Selectable criteria/action grids; per-item **edit** dialogs (`RuleCriteriaDialog`, `RuleActionDialog`) with all 10 action types parameterized and predefined-field/custom-header criteria; per-item **remove**; action **move up/down**; **AND/OR** match mode (`UseAND`). Reusable `RulesView` also powers the **account Rules tab**. Live-validated end-to-end. |
+| 4 | ✅ **Route Addresses tab** (commit 88ae5bf) | `Route.Addresses` | AllAddresses toggle + per-address list editor (Add/Remove, persists via `Addresses.Add()/Save()/DeleteByDBID`). Live-validated. |
+| 5 | ✅ **Status page** (commit 9aff58c) | `Application.Status/Version/ServerState/Database` | New `StatusView`: server (version+arch, state, started, uptime), database, statistics (processed/spam/virus + SMTP/IMAP/POP3 sessions), and the ucStatus configuration **warnings**. Live-validated incl. warning badges. |
+| 6 | ✅ **TOTP 2FA login** (commit e9e5051) | `Services/Totp.cs`, `TotpSetupDialog`, `TotpPromptDialog` | RFC 6238 setup + login prompt gate in `OnConnected`. Reads the same HKLM `AdminTotpSecret` (machine-scope DPAPI via crypt32) as Administrator, so existing 2FA carries over. Live-validated end-to-end. |
+| 7 | ⏸ **Active Directory pickers + Import members** (deferred — see Part 1) | port `formActiveDirectoryAccounts`, `formSelectUsers`, `formUserAccounts`, `formImportMembers` | Deferred: the dev/test machine is in a WORKGROUP and the AD packages are unavailable offline. Manual AD linkage (ADDomain/ADUsername) already works; only the *browse* picker is outstanding. |
+| 8 | ✅ **Message viewer** (commit 4cf4bac) | `MessageViewerDialog` | "View source" / double-click on a queued message shows the raw `.eml` read from disk, with Copy. Friendly message if the file is gone. Live-validated. |
+| 9 | ✅ **DMARC failure score** (commit 9743096) | `AntiSpam.DMARCFailureScore` | Field added to the AntiSpam section. |
+| 10 | ◑ **Admin actions** (greylisting + logon-failure clear done, commit 9743096; IP-range bulk SetDefault deferred — destructive) | `ClearGreyListingTriplets`, `ClearLogonFailureList`, IP-range `SetDefault` | Surfaced as buttons. |
+
+**Status: 9 of 10 items done** (1–6, 8, 9 complete and released; 10 partial — the greylisting +
+logon-failure clears shipped, the destructive IP-range bulk `SetDefault` is intentionally left out; 7
+deferred for AD-environment reasons). Every completed item was build-clean (`-warnaserror`),
+live-validated via screenshots/COM round-trips, and shipped in the `v6.2.0` installer.

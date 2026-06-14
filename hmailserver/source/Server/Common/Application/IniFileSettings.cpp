@@ -40,6 +40,7 @@ namespace HM
       sqldbtype_(HM::DatabaseSettings::TypeUnknown),
       sep_svc_logs_(false),
 	  rewrite_envelope_from_when_forwarding_(false),
+      srs_enabled_(false),
       archive_hardlinks_(false),
       pop3dmin_timeout_(0),
       pop3dmax_timeout_(0),
@@ -280,6 +281,8 @@ namespace HM
       autoconfig_enabled_ = ReadIniSettingInteger_("Settings", "AutoconfigEnabled", 1) == 1;
       autoconfig_client_host_ = ReadIniSettingString_("Settings", "AutoconfigClientHost", "");
       rewrite_envelope_from_when_forwarding_ = ReadIniSettingInteger_("Settings", "RewriteEnvelopeFromWhenForwarding", 0) == 1;
+      srs_enabled_ = ReadIniSettingInteger_("Settings", "SRSEnabled", 0) == 1;
+      srs_secret_ = ReadIniSettingString_("Settings", "SRSSecret", "");
       m_sDisableAUTHList = ReadIniSettingString_("Settings", "DisableAUTHList", "");
    }
 

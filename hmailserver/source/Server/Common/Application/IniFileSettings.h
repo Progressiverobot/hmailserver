@@ -126,6 +126,9 @@ namespace HM
       bool GetAddXAuthUserIP () const { return add_xauth_user_ip_; }
       bool GetRewriteEnvelopeFromWhenForwarding() const { return rewrite_envelope_from_when_forwarding_; }
       void SetRewriteEnvelopeFromWhenForwarding(bool value);
+      // SRS (Sender Rewriting Scheme) for forwarded mail (SPF alignment).
+      bool GetSRSEnabled() const { return srs_enabled_; }
+      String GetSRSSecret() const { return srs_secret_; }
       bool GetUseDNSCache() const { return use_dns_cache_; }
       String GetDNSServer() const { return dns_server_; }
 
@@ -257,6 +260,8 @@ namespace HM
       bool backup_messages_dbonly_;
       bool add_xauth_user_ip_;
       bool rewrite_envelope_from_when_forwarding_;
+      bool srs_enabled_;
+      String srs_secret_;
       bool use_dns_cache_;
       String dns_server_;
 

@@ -28,6 +28,9 @@
 
 #include "../Common/Persistence/PersistentDistributionListRecipient.h"
 
+#include "../Common/Util/SRS.h"
+#include "../Common/Application/IniFileSettings.h"
+
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
 #define new DEBUG_NEW
@@ -78,6 +81,30 @@ namespace HM
          
          std::shared_ptr<const Domain> pDomain = CacheContainer::Instance()->GetDomain(primaryDomain);
          bDomainIsLocal = pDomain != 0;
+
+         // SRS reverse at RCPT time: a signed SRS0 bounce address at a local
+         // domain is decoded to the original sender so the bounce can be relayed
+         // back. The HMAC signature ensures only addresses this server generated
+         // are reversible, so this does not create an open relay.
+         if (pDomain && pDomain->GetIsActive() &&
+             IniFileSettings::Instance()->GetSRSEnabled() &&
+             SRS::IsSRS0(primaryAddressWithoutPlusaddressing))
+         {
+            String originalSender;
+            if (SRS::Reverse(primaryAddressWithoutPlusaddressing, IniFileSettings::Instance()->GetSRSSecret(), originalSender))
+            {
+               // The valid SRS signature authorizes relaying this bounce back to
+               // the original sender, so treat it like inbound local delivery
+               // (no SMTP authentication / relay restriction is imposed).
+               bTreatSecurityAsLocal = true;
+               recipientAddress = originalSender;
+               continue;
+            }
+
+            // An SRS0 address that fails signature validation is rejected.
+            sErrMsg = CONST_UNKNOWN_USER;
+            return DP_RecipientUnknown;
+         }
 
          // Apply plus addressing on the recipient address
          const String primaryAddress = PlusAddressing::ExtractAccountAddress(primaryAddressWithoutPlusaddressing, pDomain); 
@@ -235,6 +262,22 @@ namespace HM
       
       std::shared_ptr<const Domain> pDomain = CacheContainer::Instance()->GetDomain(primaryDomain);
       
+      // SRS reverse: a signed SRS0 bounce address at a local domain is decoded
+      // and delivered to the original (external) sender. This must run before
+      // plus-addressing and account resolution because the encoded source
+      // local-part may itself contain '+' or '=' characters.
+      if (pDomain && pDomain->GetIsActive() &&
+          IniFileSettings::Instance()->GetSRSEnabled() && SRS::IsSRS0(primaryAddress))
+      {
+         String originalSender;
+         if (SRS::Reverse(primaryAddress, IniFileSettings::Instance()->GetSRSSecret(), originalSender))
+            CreateMessageRecipientList_(originalSender, sOriginalAddress, lRecurse, pRecipients, recipientOK);
+
+         // An SRS address is never a real local account; an invalid or expired
+         // one is simply rejected (recipientOK stays false).
+         return;
+      }
+
       // Apply plus addressing on the recipient address
       primaryAddress = PlusAddressing::ExtractAccountAddress(primaryAddress, pDomain); 
 

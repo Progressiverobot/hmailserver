@@ -14,6 +14,11 @@
 
 #include "../Common/Persistence/PersistentMessage.h"
 
+#include "../Common/Util/SRS.h"
+#include "../Common/Application/IniFileSettings.h"
+#include "../Common/Cache/CacheContainer.h"
+#include "../Common/BO/Domain.h"
+
 
 #include "RecipientParser.h"
 
@@ -91,8 +96,30 @@ namespace HM
       // Create a copy of the message
       std::shared_ptr<Message> pNewMessage = PersistentMessage::CopyToQueue(pRecipientAccount, pOriginalMessage);
 
-      if (IniFileSettings::Instance()->GetRewriteEnvelopeFromWhenForwarding() && !pNewMessage->GetFromAddress().IsEmpty())
-         pNewMessage->SetFromAddress(pRecipientAccount->GetAddress());
+      String envelopeFrom = pNewMessage->GetFromAddress();
+      if (!envelopeFrom.IsEmpty())
+      {
+         if (IniFileSettings::Instance()->GetSRSEnabled())
+         {
+            // SRS (Sender Rewriting Scheme): when forwarding mail from an external
+            // sender, rewrite the envelope MAIL FROM to a signed, reversible
+            // address at the local forwarding domain so SPF stays aligned. Local
+            // senders are left untouched (our own SPF already covers them).
+            String fromDomain = StringParser::ExtractDomain(envelopeFrom);
+            bool fromIsLocal = CacheContainer::Instance()->GetDomain(fromDomain) ? true : false;
+            if (!fromIsLocal)
+            {
+               String forwarderDomain = StringParser::ExtractDomain(pRecipientAccount->GetAddress());
+               String srsAddress = SRS::Forward(envelopeFrom, forwarderDomain, IniFileSettings::Instance()->GetSRSSecret());
+               if (!srsAddress.IsEmpty())
+                  pNewMessage->SetFromAddress(srsAddress);
+            }
+         }
+         else if (IniFileSettings::Instance()->GetRewriteEnvelopeFromWhenForwarding())
+         {
+            pNewMessage->SetFromAddress(pRecipientAccount->GetAddress());
+         }
+      }
 
       pNewMessage->SetState(Message::Delivering);
 
