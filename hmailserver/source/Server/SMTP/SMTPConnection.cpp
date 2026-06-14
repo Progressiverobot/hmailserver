@@ -12,6 +12,8 @@
 #include "../common/Cache/CacheContainer.h"
 #include "../common/Util/PasswordValidator.h"
 #include "../common/Util/AccountLogon.h"
+#include "../common/Util/Crypt.h"
+#include "../common/Util/Hashing/ScramSha256.h"
 #include "../common/persistence/PersistentMessage.h"
 #include "../common/BO/Message.h"
 #include "../common/BO/SecurityRange.h"
@@ -405,6 +407,21 @@ namespace HM
          case SMTPUPASSWORD:
             {
                ProtocolPassword_(sRequest);
+               break;
+            }
+         case SMTPSCRAMFIRST:
+            {
+               ProtocolScramClientFirst_(sRequest);
+               break;
+            }
+         case SMTPSCRAMFINAL:
+            {
+               ProtocolScramClientFinal_(sRequest);
+               break;
+            }
+         case SMTPSCRAMACK:
+            {
+               FinishScramAuth_();
                break;
             }
          default:
@@ -1533,6 +1550,10 @@ namespace HM
          if (smtpconf_->GetAuthAllowPlainText())
             sAuth += " PLAIN";
 
+         // SCRAM-SHA-256 (RFC 7677) never transmits the password, so it is offered
+         // whenever AUTH is enabled, independent of the plain-text setting.
+         sAuth += " SCRAM-SHA-256";
+
          sData += sAuth;
       }
 
@@ -1951,6 +1972,27 @@ namespace HM
 
          return;
       }
+      else if (sAuthenticationType == _T("SCRAM-SHA-256"))
+      {
+         requestedAuthenticationType_ = AUTH_SCRAM_SHA256;
+
+         scram_session_ = std::make_shared<ScramSha256>();
+
+         // RFC 4954: a SASL-IR of "=" means an empty initial response. SCRAM never
+         // sends an empty client-first, so treat "=" as "no initial response".
+         if (vecParams.size() >= 3 && vecParams[2] != _T("="))
+         {
+            ProtocolScramClientFirst_(vecParams[2]);
+         }
+         else
+         {
+            // Empty server challenge asks the client for the client-first message.
+            EnqueueWrite_("334 ");
+            current_state_ = SMTPSCRAMFIRST;
+         }
+
+         return;
+      }
 
       SendErrorResponse_(504, "Authentication mechanism not supported.");
    }
@@ -2135,31 +2177,7 @@ namespace HM
 
       isAuthenticated_ = pAccount != nullptr;
 
-      if (Configuration::Instance()->GetUseScriptServer())
-      {
-         std::shared_ptr<ScriptObjectContainer> pContainer = std::shared_ptr<ScriptObjectContainer>(new ScriptObjectContainer);
-         std::shared_ptr<ClientInfo> pClientInfo = std::shared_ptr<ClientInfo>(new ClientInfo);
-
-         pClientInfo->SetUsername(sUsername);
-         pClientInfo->SetIPAddress(GetIPAddressString());
-         pClientInfo->SetPort(GetLocalEndpointPort());
-         pClientInfo->SetSessionID(GetSessionID());
-         pClientInfo->SetHELO(helo_host_);
-         pClientInfo->SetIsAuthenticated(isAuthenticated_);
-         pClientInfo->SetIsEncryptedConnection(IsSSLConnection());
-         if (IsSSLConnection())
-         {
-            auto cipher_info = GetCipherInfo();
-            pClientInfo->SetCipherVersion(cipher_info.GetVersion().c_str());
-            pClientInfo->SetCipherName(cipher_info.GetName().c_str());
-            pClientInfo->SetCipherBits(cipher_info.GetBits());
-         }
-
-         pContainer->AddObject("HMAILSERVER_CLIENT", pClientInfo, ScriptObject::OTClient);
-
-         String sEventCaller = "OnClientLogon(HMAILSERVER_CLIENT)";
-         ScriptServer::Instance()->FireEvent(ScriptServer::EventOnClientLogon, sEventCaller, pContainer);
-      }
+      FireOnClientLogon_(sUsername, isAuthenticated_);
      
       if (pAccount)
       {
@@ -2184,6 +2202,36 @@ namespace HM
       }
    }
 
+   void
+   SMTPConnection::FireOnClientLogon_(const String &sUsername, bool isAuthenticated)
+   {
+      if (Configuration::Instance()->GetUseScriptServer())
+      {
+         std::shared_ptr<ScriptObjectContainer> pContainer = std::shared_ptr<ScriptObjectContainer>(new ScriptObjectContainer);
+         std::shared_ptr<ClientInfo> pClientInfo = std::shared_ptr<ClientInfo>(new ClientInfo);
+
+         pClientInfo->SetUsername(sUsername);
+         pClientInfo->SetIPAddress(GetIPAddressString());
+         pClientInfo->SetPort(GetLocalEndpointPort());
+         pClientInfo->SetSessionID(GetSessionID());
+         pClientInfo->SetHELO(helo_host_);
+         pClientInfo->SetIsAuthenticated(isAuthenticated);
+         pClientInfo->SetIsEncryptedConnection(IsSSLConnection());
+         if (IsSSLConnection())
+         {
+            auto cipher_info = GetCipherInfo();
+            pClientInfo->SetCipherVersion(cipher_info.GetVersion().c_str());
+            pClientInfo->SetCipherName(cipher_info.GetName().c_str());
+            pClientInfo->SetCipherBits(cipher_info.GetBits());
+         }
+
+         pContainer->AddObject("HMAILSERVER_CLIENT", pClientInfo, ScriptObject::OTClient);
+
+         String sEventCaller = "OnClientLogon(HMAILSERVER_CLIENT)";
+         ScriptServer::Instance()->FireEvent(ScriptServer::EventOnClientLogon, sEventCaller, pContainer);
+      }
+   }
+
    void 
    SMTPConnection::RestartAuthentication_()
    {
@@ -2198,9 +2246,186 @@ namespace HM
       requestedAuthenticationType_ = AUTH_NONE;
       isAuthenticated_ = false;
 
+      scram_session_.reset();
+
       current_state_ = HEADER;
       username_ = "";
       re_authenticate_user_ = false;
+   }
+
+   void
+   SMTPConnection::ProtocolScramClientFirst_(const String &sRequest)
+   {
+      // A bare "*" cancels the SASL exchange (RFC 4954).
+      if (sRequest == _T("*"))
+      {
+         scram_session_.reset();
+         SendErrorResponse_(501, "Authentication cancelled.");
+         current_state_ = HEADER;
+         return;
+      }
+
+      String sDecoded;
+      StringParser::Base64Decode(sRequest, sDecoded);
+      AnsiString clientFirst = sDecoded;
+
+      AnsiString username;
+      if (!ScramSha256::ExtractUsername(clientFirst, username))
+      {
+         scram_session_.reset();
+         SendErrorResponse_(501, "Invalid SCRAM client-first message.");
+         current_state_ = HEADER;
+         return;
+      }
+
+      // Canonicalize the user name the same way the PLAIN path does.
+      String sUsername = username;
+      if (sUsername.Find(_T("@")) == -1)
+      {
+         String sDefaultDomain = Configuration::Instance()->GetDefaultDomain();
+         if (!sDefaultDomain.IsEmpty())
+            sUsername = DefaultDomain::ApplyDefaultDomain(sUsername);
+      }
+      scram_session_->SetUsername(sUsername);
+      username_ = sUsername;
+
+      // Only a PBKDF2-hashed account can serve SCRAM (its stored key is the SCRAM
+      // SaltedPassword). For any other account the helper runs a forced-failure
+      // exchange so the protocol does not reveal whether the account exists.
+      AnsiString storedHash = "";
+      std::shared_ptr<const Account> pAccount = LookupPbkdf2Account_(sUsername);
+      if (pAccount)
+      {
+         scram_session_->SetAccount(pAccount);
+         storedHash = pAccount->GetPassword();
+      }
+
+      AnsiString serverFirst;
+      if (!scram_session_->ProcessClientFirst(clientFirst, storedHash, serverFirst))
+      {
+         scram_session_.reset();
+         SendErrorResponse_(501, "Invalid SCRAM client-first message.");
+         current_state_ = HEADER;
+         return;
+      }
+
+      String sServerFirst = serverFirst;
+      String sEncoded;
+      StringParser::Base64Encode(sServerFirst, sEncoded);
+
+      EnqueueWrite_("334 " + sEncoded);
+      current_state_ = SMTPSCRAMFINAL;
+   }
+
+   void
+   SMTPConnection::ProtocolScramClientFinal_(const String &sRequest)
+   {
+      // A bare "*" cancels the SASL exchange (RFC 4954).
+      if (sRequest == _T("*"))
+      {
+         scram_session_.reset();
+         SendErrorResponse_(501, "Authentication cancelled.");
+         current_state_ = HEADER;
+         return;
+      }
+
+      String sDecoded;
+      StringParser::Base64Decode(sRequest, sDecoded);
+      AnsiString clientFinal = sDecoded;
+
+      AnsiString serverFinal;
+      if (!scram_session_->ProcessClientFinal(clientFinal, serverFinal))
+      {
+         ScramAuthFailed_();
+         return;
+      }
+
+      String sServerFinal = serverFinal;
+      String sEncoded;
+      StringParser::Base64Encode(sServerFinal, sEncoded);
+
+      // Send the server-final (v=...) as a challenge; the client acknowledges with an
+      // empty line, then we complete the authentication with a 235 reply.
+      EnqueueWrite_("334 " + sEncoded);
+      current_state_ = SMTPSCRAMACK;
+   }
+
+   void
+   SMTPConnection::FinishScramAuth_()
+   {
+      std::shared_ptr<const Account> pAccount;
+      if (scram_session_)
+         pAccount = scram_session_->GetAccount();
+
+      String sUsername = scram_session_ ? String(scram_session_->GetUsername()) : username_;
+
+      scram_session_.reset();
+
+      if (!pAccount)
+      {
+         // Should not be reachable (we only enter the ack state on a verified proof).
+         ScramAuthFailed_();
+         return;
+      }
+
+      isAuthenticated_ = true;
+
+      FireOnClientLogon_(sUsername, true);
+
+      EnqueueWrite_("235 authenticated.");
+      current_state_ = HEADER;
+   }
+
+   void
+   SMTPConnection::ScramAuthFailed_()
+   {
+      String sUsername = scram_session_ ? String(scram_session_->GetUsername()) : username_;
+      scram_session_.reset();
+
+      // Feed the per-IP auto-ban accounting (parity with the LOGIN/PLAIN path).
+      AccountLogon accountLogon;
+      bool disconnect = false;
+      accountLogon.RegisterFailedLogin(GetRemoteEndpointAddress(), sUsername, disconnect);
+
+      authentication_failure_count_++;
+
+      // Per-connection brute-force cap (effective even when auto-ban is disabled).
+      if (disconnect || authentication_failure_count_ >= 10)
+      {
+         SendErrorResponse_(535, "Authentication failed. Too many invalid logon attempts.");
+         pending_disconnect_ = true;
+         EnqueueDisconnect();
+         return;
+      }
+
+      SendErrorResponse_(535, "Authentication failed.");
+      current_state_ = HEADER;
+   }
+
+   std::shared_ptr<const Account>
+   SMTPConnection::LookupPbkdf2Account_(const String &sAddress)
+   {
+      std::shared_ptr<DomainAliases> pDA = ObjectCache::Instance()->GetDomainAliases();
+      String sAccountAddress = pDA->ApplyAliasesOnAddress(sAddress);
+      sAccountAddress = DefaultDomain::ApplyDefaultDomain(sAccountAddress);
+
+      std::shared_ptr<const Account> pAccount = CacheContainer::Instance()->GetAccount(sAccountAddress);
+      if (!pAccount || !pAccount->GetActive())
+         return std::shared_ptr<const Account>();
+
+      // Active Directory accounts authenticate via SSPI, not a stored hash.
+      if (pAccount->GetIsAD())
+         return std::shared_ptr<const Account>();
+
+      String sDomain = StringParser::ExtractDomain(sAccountAddress);
+      std::shared_ptr<const Domain> pDomain = CacheContainer::Instance()->GetDomain(sDomain);
+      if (!pDomain || !pDomain->GetIsActive())
+         return std::shared_ptr<const Account>();
+
+      if (pAccount->GetPasswordEncryption() != Crypt::ETPBKDF2)
+         return std::shared_ptr<const Account>();
+
+      return pAccount;
    }
 
 

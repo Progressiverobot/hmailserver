@@ -6,6 +6,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using hMailServer;
@@ -84,6 +85,80 @@ namespace RegressionTests.SMTP
          Assert.IsTrue(sock.Receive().StartsWith("503 Already authenticated."));
       }
 
+      [Test]
+      [Category("SMTP")]
+      [Description("RFC 7677 (SCRAM-SHA-256): EHLO advertises AUTH ... SCRAM-SHA-256 when AUTH is enabled.")]
+      public void TestScramSha256Advertised()
+      {
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "scramcap@example.test", "test");
+
+         var sock = new TcpConnection();
+         sock.Connect(25);
+         Assert.IsTrue(sock.Receive().StartsWith("220"));
+         sock.Send("EHLO test.com\r\n");
+         string ehlo = sock.Receive();
+         Assert.IsTrue(ehlo.Contains("SCRAM-SHA-256"),
+            "EHLO should advertise AUTH SCRAM-SHA-256. Got: " + ehlo);
+         sock.Send("QUIT\r\n");
+         sock.Disconnect();
+      }
+
+      [Test]
+      [Category("SMTP")]
+      [Description("RFC 5802/7677 (SCRAM-SHA-256): a full SCRAM exchange authenticates a PBKDF2-hashed " +
+                   "account over SMTP, and the server proves it knows the key via a valid ServerSignature.")]
+      public void TestScramSha256Authenticates()
+      {
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "scramok@example.test", "SeC-r3t Pass!");
+
+         var sock = new TcpConnection();
+         sock.Connect(25);
+         Assert.IsTrue(sock.Receive().StartsWith("220"));
+         sock.Send("EHLO test.com\r\n");
+         Assert.IsTrue(sock.Receive().StartsWith("250"));
+
+         string final = SmtpScramTestClient.Authenticate(sock, "scramok@example.test", "SeC-r3t Pass!");
+         Assert.IsTrue(final.StartsWith("235"),
+            "SCRAM-SHA-256 authentication should succeed (235). Got: " + final);
+
+         // The session must be authenticated and usable afterwards.
+         sock.Send("MAIL FROM:<scramok@example.test>\r\n");
+         Assert.IsTrue(sock.Receive().StartsWith("250"),
+            "Session should be usable after SCRAM logon.");
+         sock.Send("QUIT\r\n");
+         sock.Disconnect();
+      }
+
+      [Test]
+      [Category("SMTP")]
+      [Description("RFC 5802/7677 (SCRAM-SHA-256): a wrong password yields an invalid client proof and " +
+                   "the server rejects the exchange without authenticating.")]
+      public void TestScramSha256WrongPasswordFails()
+      {
+         var application = SingletonProvider<TestSetup>.Instance.GetApp();
+         // Disable auto-ban so a single bad attempt does not ban the loopback address.
+         bool autoBan = application.Settings.AutoBanOnLogonFailure;
+         application.Settings.AutoBanOnLogonFailure = false;
+         try
+         {
+            SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "scrambad@example.test", "correct horse");
+
+            var sock = new TcpConnection();
+            sock.Connect(25);
+            Assert.IsTrue(sock.Receive().StartsWith("220"));
+            sock.Send("EHLO test.com\r\n");
+            Assert.IsTrue(sock.Receive().StartsWith("250"));
+
+            string final = SmtpScramTestClient.Authenticate(sock, "scrambad@example.test", "wrong password");
+            Assert.IsTrue(final.StartsWith("535") || final.StartsWith("501"),
+               "SCRAM-SHA-256 with a wrong password must be rejected. Got: " + final);
+            sock.Disconnect();
+         }
+         finally
+         {
+            application.Settings.AutoBanOnLogonFailure = autoBan;
+         }
+      }
 
       [Test]
       [Category("SMTP")]
@@ -1146,6 +1221,127 @@ namespace RegressionTests.SMTP
             Assert.IsTrue(server.MessageData.Contains("Test message"));
             Assert.AreEqual(deliveryResults.Count, server.RcptTosReceived);
          }
+      }
+   }
+
+   /// <summary>
+   ///    A minimal SCRAM-SHA-256 (RFC 5802 / RFC 7677) client used to exercise the
+   ///    server's AUTH SCRAM-SHA-256 implementation over SMTP (RFC 4954) on a raw
+   ///    connection that has already completed EHLO.
+   /// </summary>
+   internal static class SmtpScramTestClient
+   {
+      /// <summary>
+      ///    Runs a full SCRAM-SHA-256 exchange (no SASL-IR). Returns the server's final
+      ///    reply line: the 235 on success, or the 5xx rejection on a bad proof.
+      /// </summary>
+      public static string Authenticate(TcpConnection con, string username, string password)
+      {
+         var nonceBytes = new byte[18];
+         using (var rng = RandomNumberGenerator.Create())
+            rng.GetBytes(nonceBytes);
+         string clientNonce = Convert.ToBase64String(nonceBytes);
+
+         string clientFirstBare = "n=" + SaslName(username) + ",r=" + clientNonce;
+         string clientFirst = "n,," + clientFirstBare;
+
+         // Mechanism selection -> empty 334 challenge.
+         con.Send("AUTH SCRAM-SHA-256\r\n");
+         string challenge = con.Receive();
+         Assert.IsTrue(challenge.StartsWith("334"),
+            "Expected an empty 334 challenge. Got: " + challenge);
+
+         // client-first -> server-first.
+         con.Send(Base64(clientFirst) + "\r\n");
+         string serverFirstLine = con.Receive();
+         if (!serverFirstLine.StartsWith("334"))
+            return serverFirstLine; // protocol error
+         string serverFirst = DecodeChallenge(serverFirstLine);
+
+         string combinedNonce = Attribute(serverFirst, "r");
+         byte[] salt = Convert.FromBase64String(Attribute(serverFirst, "s"));
+         int iterations = int.Parse(Attribute(serverFirst, "i"));
+         Assert.IsTrue(combinedNonce.StartsWith(clientNonce),
+            "Server nonce must start with the client nonce. Got: " + combinedNonce);
+
+         byte[] saltedPassword;
+         using (var pbkdf2 = new Rfc2898DeriveBytes(password, salt, iterations, HashAlgorithmName.SHA256))
+            saltedPassword = pbkdf2.GetBytes(32);
+
+         byte[] clientKey = Hmac(saltedPassword, "Client Key");
+         byte[] storedKey = Sha256(clientKey);
+
+         string clientFinalWithoutProof = "c=biws,r=" + combinedNonce;
+         string authMessage = clientFirstBare + "," + serverFirst + "," + clientFinalWithoutProof;
+         byte[] clientSignature = Hmac(storedKey, authMessage);
+         byte[] clientProof = Xor(clientKey, clientSignature);
+
+         string clientFinal = clientFinalWithoutProof + ",p=" + Convert.ToBase64String(clientProof);
+         con.Send(Base64(clientFinal) + "\r\n");
+
+         string afterFinal = con.Receive();
+         if (!afterFinal.StartsWith("334"))
+            return afterFinal; // rejected proof (5xx)
+
+         // Verify the server proved knowledge of the key (ServerSignature).
+         string serverFinal = DecodeChallenge(afterFinal);
+         byte[] serverKey = Hmac(saltedPassword, "Server Key");
+         byte[] serverSignature = Hmac(serverKey, authMessage);
+         Assert.AreEqual("v=" + Convert.ToBase64String(serverSignature), serverFinal,
+            "Server signature (v=) did not verify.");
+
+         // Empty client response acknowledges the server-final; server completes auth.
+         con.Send("\r\n");
+         return con.Receive();
+      }
+
+      private static string SaslName(string name)
+      {
+         // saslname: '=' must be escaped before ',' so an escaped '=' is not re-encoded.
+         return name.Replace("=", "=3D").Replace(",", "=2C");
+      }
+
+      private static string Base64(string s)
+      {
+         return Convert.ToBase64String(Encoding.UTF8.GetBytes(s));
+      }
+
+      private static string DecodeChallenge(string line)
+      {
+         string t = line.Trim();
+         int sp = t.IndexOf(' ');
+         string b64 = sp >= 0 ? t.Substring(sp + 1).Trim() : "";
+         if (b64.Length == 0)
+            return "";
+         return Encoding.UTF8.GetString(Convert.FromBase64String(b64));
+      }
+
+      private static string Attribute(string message, string key)
+      {
+         foreach (var part in message.Split(','))
+            if (part.StartsWith(key + "="))
+               return part.Substring(key.Length + 1);
+         return "";
+      }
+
+      private static byte[] Hmac(byte[] key, string data)
+      {
+         using (var h = new HMACSHA256(key))
+            return h.ComputeHash(Encoding.ASCII.GetBytes(data));
+      }
+
+      private static byte[] Sha256(byte[] data)
+      {
+         using (var sha = SHA256.Create())
+            return sha.ComputeHash(data);
+      }
+
+      private static byte[] Xor(byte[] a, byte[] b)
+      {
+         var r = new byte[a.Length];
+         for (int i = 0; i < a.Length; i++)
+            r[i] = (byte) (a[i] ^ b[i]);
+         return r;
       }
    }
 }

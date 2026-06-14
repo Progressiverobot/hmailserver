@@ -20,6 +20,8 @@ namespace HM
    class MessageData;
    class Domain;
    class SpamTestResult;
+   class Account;
+   class ScramSha256;
 
    enum eSMTPCommandTypes
    {
@@ -138,6 +140,18 @@ namespace HM
       void AuthenticateUsingPLAIN_(const String &sLine);
       // Authenticates using a PLAIN line.
 
+      // SCRAM-SHA-256 (RFC 5802 / RFC 7677) SASL exchange over SMTP (RFC 4954).
+      // State lives on the connection (scram_session_); each base64 SASL message is
+      // exchanged via 334 continuations and the lines are routed by current_state_.
+      void ProtocolScramClientFirst_(const String &sRequest);
+      void ProtocolScramClientFinal_(const String &sRequest);
+      void FinishScramAuth_();
+      void ScramAuthFailed_();
+      std::shared_ptr<const Account> LookupPbkdf2Account_(const String &sAddress);
+
+      void FireOnClientLogon_(const String &sUsername, bool isAuthenticated);
+      // Fires the OnClientLogon script event (shared by the password and SCRAM paths).
+
       void Authenticate_();
       // validates the username and password.
 
@@ -174,7 +188,10 @@ namespace HM
          SMTPUPASSWORD = 4,
          HEADER = 5,
          DATA = 6,
-         STARTTLS = 7
+         STARTTLS = 7,
+         SMTPSCRAMFIRST = 8,   // awaiting the SCRAM client-first message
+         SMTPSCRAMFINAL = 9,   // awaiting the SCRAM client-final message
+         SMTPSCRAMACK = 10     // awaiting the empty ack after the server-final message
       };
   
       enum AuthenticationType
@@ -182,6 +199,7 @@ namespace HM
          AUTH_NONE = 0,
          AUTH_PLAIN = 2,
          AUTH_LOGIN = 3,
+         AUTH_SCRAM_SHA256 = 4,
       };
 
       
@@ -198,6 +216,8 @@ namespace HM
       std::shared_ptr<SMTPConfiguration> smtpconf_;
    
       AuthenticationType requestedAuthenticationType_;
+
+      std::shared_ptr<ScramSha256> scram_session_;
       
       DWORD message_start_tc_;
 
