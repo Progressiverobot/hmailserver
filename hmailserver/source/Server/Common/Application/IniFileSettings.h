@@ -80,6 +80,14 @@ namespace HM
       int GetPreferredHashAlgorithm() {return preferred_hash_algorithm_;}
       int GetMinimumAcceptedHashAlgorithm() {return minimum_accepted_hash_algorithm_;}
       String GetPasswordPepper() {return password_pepper_;}
+      bool GetOAuth2Enabled() {return oauth2_enabled_;}
+      bool GetOAuth2RequireTLS() {return oauth2_require_tls_;}
+      String GetOAuth2AllowedAlgorithms() {return oauth2_allowed_algorithms_;}
+      String GetOAuth2HmacSecret() {return oauth2_hmac_secret_;}
+      String GetOAuth2RsaPublicKeyFile() {return oauth2_rsa_public_key_file_;}
+      String GetOAuth2Issuer() {return oauth2_issuer_;}
+      String GetOAuth2Audience() {return oauth2_audience_;}
+      String GetOAuth2UsernameClaim() {return oauth2_username_claim_;}
       bool GetDNSBLChecksAfterMailFrom() {return dnsbl_checks_after_mail_from_; }
       bool GetSepSvcLogs() {return sep_svc_logs_; }
       int GetLogLevel() {return log_level_; }
@@ -195,6 +203,15 @@ namespace HM
       int minimum_accepted_hash_algorithm_;
 
       String password_pepper_;
+
+      bool oauth2_enabled_;
+      bool oauth2_require_tls_;
+      String oauth2_allowed_algorithms_;
+      String oauth2_hmac_secret_;
+      String oauth2_rsa_public_key_file_;
+      String oauth2_issuer_;
+      String oauth2_audience_;
+      String oauth2_username_claim_;
 
       String log_directory_;
       static String ini_file_;

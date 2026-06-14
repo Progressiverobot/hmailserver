@@ -140,6 +140,12 @@ namespace HM
       void AuthenticateUsingPLAIN_(const String &sLine);
       // Authenticates using a PLAIN line.
 
+      void AuthenticateUsingBearer_(const String &sLine);
+      // Authenticates using a SASL XOAUTH2 / OAUTHBEARER (RFC 7628) client response.
+
+      std::shared_ptr<const Account> LookupActiveAccount_(const String &sAddress);
+      // Looks up an active account in an active domain (OAuth2 bearer login).
+
       // SCRAM-SHA-256 (RFC 5802 / RFC 7677) SASL exchange over SMTP (RFC 4954).
       // State lives on the connection (scram_session_); each base64 SASL message is
       // exchanged via 334 continuations and the lines are routed by current_state_.
@@ -191,7 +197,8 @@ namespace HM
          STARTTLS = 7,
          SMTPSCRAMFIRST = 8,   // awaiting the SCRAM client-first message
          SMTPSCRAMFINAL = 9,   // awaiting the SCRAM client-final message
-         SMTPSCRAMACK = 10     // awaiting the empty ack after the server-final message
+         SMTPSCRAMACK = 10,    // awaiting the empty ack after the server-final message
+         SMTPBEARERRESPONSE = 11 // awaiting the SASL XOAUTH2 / OAUTHBEARER client response
       };
   
       enum AuthenticationType
@@ -200,6 +207,7 @@ namespace HM
          AUTH_PLAIN = 2,
          AUTH_LOGIN = 3,
          AUTH_SCRAM_SHA256 = 4,
+         AUTH_BEARER = 5,
       };
 
       

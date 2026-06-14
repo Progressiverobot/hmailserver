@@ -100,6 +100,8 @@ namespace HM
       // before normal command parsing, and SASL messages use "+ " continuations.
       ParseResult ProtocolAUTH_(const String &sParameter);
       ParseResult ProcessAuthPlain_(const String &sBase64);
+      // SASL XOAUTH2 / OAUTHBEARER (RFC 7628): verify an OAuth2 bearer token locally.
+      ParseResult ProcessAuthBearer_(const String &sBase64);
       ParseResult ContinueScram_(const String &sRequest);
       ParseResult ProcessScramClientFirst_(const String &sBase64);
       ParseResult ProcessScramClientFinal_(const String &sBase64);
@@ -109,6 +111,7 @@ namespace HM
       ParseResult HandleSuccessfulLogin_();
       void FireOnClientLogon_(const String &sUsername, bool isAuthenticated);
       std::shared_ptr<const Account> LookupPbkdf2Account_(const String &sAddress);
+      std::shared_ptr<const Account> LookupActiveAccount_(const String &sAddress);
 
       bool ProtocolTOP_(const String &Parameter);
       bool ProtocolUIDL_(const String &Parameter);
@@ -144,6 +147,7 @@ namespace HM
       int authentication_failure_count_;
 
       bool sasl_plain_pending_;
+      bool sasl_bearer_pending_;
       std::shared_ptr<ScramSha256> scram_session_;
 
       // RFC 6856 UTF8 mode: set by the UTF8 command, advertised via CAPA.

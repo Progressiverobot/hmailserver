@@ -173,6 +173,7 @@
     <Compile Include="Shared\Pop3ServerSimulator.cs" />
     <Compile Include="Security\AutoBan.cs" />
     <Compile Include="Security\HashPolicy.cs" />
+    <Compile Include="Security\OAuth2Bearer.cs" />
     <Compile Include="Security\PasswordPepper.cs" />
     <Compile Include="Security\ProtocolFuzz.cs" />
     <Compile Include="Security\SMTPAuthentication.cs" />

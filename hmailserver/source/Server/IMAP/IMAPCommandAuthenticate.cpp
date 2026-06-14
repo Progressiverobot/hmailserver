@@ -14,6 +14,7 @@
 #include "../common/Util/AccountLogon.h"
 #include "../common/Util/Crypt.h"
 #include "../common/Util/Hashing/ScramSha256.h"
+#include "../common/Util/OAuth2TokenValidator.h"
 #include "../common/BO/Account.h"
 #include "../common/BO/Domain.h"
 #include "../common/BO/DomainAliases.h"
@@ -83,6 +84,95 @@ namespace HM
 		{
 			String sInitialResponse = paramcount == 2 ? pParser->GetParamValue(pArgument, 1) : String();
 			return StartScram_(pConnection, pArgument, sInitialResponse, paramcount == 2, false);
+		}
+
+		if (sParam == _T("XOAUTH2") || sParam == _T("OAUTHBEARER"))
+		{
+			if (!OAuth2TokenValidator::IsEnabled())
+				return IMAPResult(IMAPResult::ResultNo, "OAuth2 authentication is not enabled.");
+
+			if (OAuth2TokenValidator::RequireTLS() && !pConnection->IsSSLConnection())
+				return IMAPResult(IMAPResult::ResultBad, "A SSL/TLS-connection is required for authentication.");
+
+			if (paramcount == 1)
+			{
+				// No initial response: ask the client for the SASL message via a continuation.
+				pConnection->SetCommandBuffer(pArgument->Tag() + " AUTHENTICATE " + sParam + " ");
+				pConnection->SendAsciiData("+ \r\n");
+				return IMAPResult();
+			}
+
+			String sResponse64 = pParser->GetParamValue(pArgument, 1);
+
+			// A bare "*" cancels the SASL exchange (RFC 3501).
+			if (sResponse64 == _T("*"))
+				return IMAPResult(IMAPResult::ResultBad, "Authentication cancelled.");
+
+			// The XOAUTH2 / OAUTHBEARER client response is ASCII, so the standard base64
+			// decode is sufficient here.
+			String sDecodedW;
+			StringParser::Base64Decode(sResponse64, sDecodedW);
+			AnsiString sDecoded = sDecodedW;
+
+			AnsiString sIdentity, sToken;
+			String sTokenUser;
+			bool authenticated = false;
+			if (OAuth2TokenValidator::ParseSaslBearer(sDecoded, sIdentity, sToken))
+			{
+				AnsiString sError;
+				if (OAuth2TokenValidator::ValidateBearerToken(sToken, sTokenUser, sError))
+				{
+					// When the client also asserts an identity it must match the token.
+					AnsiString sTokenUserA = sTokenUser;
+					if (sIdentity.IsEmpty() || sIdentity.CompareNoCase(sTokenUserA) == 0)
+						authenticated = true;
+				}
+			}
+
+			std::shared_ptr<const Account> pAccount;
+			String sLoginName = sTokenUser;
+			if (authenticated)
+			{
+				std::shared_ptr<DomainAliases> pDA = ObjectCache::Instance()->GetDomainAliases();
+				String sAddress = pDA->ApplyAliasesOnAddress(sTokenUser);
+				sAddress = DefaultDomain::ApplyDefaultDomain(sAddress);
+				sLoginName = sAddress;
+
+				std::shared_ptr<const Account> pCandidate = CacheContainer::Instance()->GetAccount(sAddress);
+				if (pCandidate && pCandidate->GetActive())
+				{
+					String sDomain = StringParser::ExtractDomain(sAddress);
+					std::shared_ptr<const Domain> pDomain = CacheContainer::Instance()->GetDomain(sDomain);
+					if (pDomain && pDomain->GetIsActive())
+						pAccount = pCandidate;
+				}
+			}
+
+			if (!pAccount)
+			{
+				// Feed the per-IP auto-ban accounting, then the per-connection cap.
+				AccountLogon accountLogon;
+				bool disconnect = false;
+				accountLogon.RegisterFailedLogin(pConnection->GetRemoteEndpointAddress(), sLoginName, disconnect);
+
+				if (disconnect || pConnection->RegisterAuthenticationFailure())
+				{
+					String sResponse = "* Too many invalid logon attempts.\r\n";
+					sResponse += pArgument->Tag() + " BAD Goodbye\r\n";
+					pConnection->Logout(sResponse);
+
+					return IMAPResult(IMAPResult::ResultOKSupressRead, "");
+				}
+
+				return IMAPResult(IMAPResult::ResultNo, "Invalid authentication token.");
+			}
+
+			pConnection->Login(pAccount);
+
+			String sResponse = pArgument->Tag() + " OK LOGIN completed\r\n";
+			pConnection->SendAsciiData(sResponse);
+
+			return IMAPResult();
 		}
 
 		if (sParam != _T("PLAIN"))

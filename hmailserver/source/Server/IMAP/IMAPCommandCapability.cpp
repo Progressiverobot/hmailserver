@@ -6,6 +6,7 @@
 #include "IMAPCommandCapability.h"
 #include "IMAPConnection.h"
 #include "IMAPConfiguration.h"
+#include "../common/Util/OAuth2TokenValidator.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -50,6 +51,11 @@ namespace HM
       // only advertised — on a TLS connection.
       if (pConfig->GetUseIMAPSASLPlain() && pConnection->IsSSLConnection())
 	      sResponse += " AUTH=SCRAM-SHA-256-PLUS";
+
+      // OAuth2 bearer mechanisms (RFC 7628), advertised only when enabled and (by
+      // default) only over TLS.
+      if (OAuth2TokenValidator::IsEnabled() && (!OAuth2TokenValidator::RequireTLS() || pConnection->IsSSLConnection()))
+	      sResponse += " AUTH=XOAUTH2 AUTH=OAUTHBEARER";
 
       if (pConfig->GetUseIMAPSASLInitialResponse())
 	      sResponse += " SASL-IR";

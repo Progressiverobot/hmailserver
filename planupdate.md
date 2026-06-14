@@ -469,7 +469,27 @@ upgrading the management/admin INI password from MD5.
   username still matches the registered ASCII account) and
   `RegressionTests.IMAP.Basics.TestEnableUtf8AcceptEchoesEnabled`, with the in-server `SaslPrep`
   self-test plus the POP3/Security/IMAP/SMTP suites (178/178) green and no errors logged.
-- Remaining B2: OAuth2 XOAUTH2/OAUTHBEARER.
+- ✅ **OAuth2 bearer authentication — SASL XOAUTH2 + OAUTHBEARER (RFC 7628) — delivered in v6.2.0.**
+  POP3, IMAP and SMTP submission now accept bearer-token logins. The new
+  `OAuth2TokenValidator` (`Common/Util`) validates the JWT **locally** (no live identity-provider
+  round-trip): it splits the token, base64url-decodes the segments, and enforces an algorithm
+  allow-list from `OAuth2AllowedAlgorithms` — `HS256` is verified (constant-time) against the
+  configured `OAuth2HmacSecret`, while `RS256`/`ES256` are verified with the PEM public key in
+  `OAuth2PublicKeyFile` (OpenSSL `EVP_DigestVerify`). The `none` algorithm (and an empty/missing
+  `alg`) is rejected outright to defeat the classic JWT algorithm-confusion attack. The validator
+  requires `exp` (with a 60s clock-skew allowance), honours `nbf`, and checks `iss`/`aud` only when
+  `OAuth2Issuer`/`OAuth2Audience` are configured; the configurable username claim
+  (`OAuth2UsernameClaim`, default `email`) is mapped to a local account, and any client-asserted
+  identity (`user=`/`a=`) must match the token. The mechanisms are off by default
+  (`OAuth2Enabled=0`) and, when enabled, are advertised and accepted only over TLS unless
+  `OAuth2RequireTLS=0`. Protocol responses are deliberately generic (`-ERR`/`NO`/`535`) — token
+  contents and crypto errors are never echoed to the client. No COM/IDL/schema change (pure
+  `hMailServer.ini [Settings]` config). Validated by `RegressionTests.Security.OAuth2Bearer` (11
+  cases: HS256 success plus expired-, wrong-secret-, `alg:none`- and disabled-rejection across
+  POP3/IMAP/SMTP) and the `OAuth2TokenValidator` self-test, with the POP3/Security/IMAP/SMTP suites
+  (189/189) green and no errors logged. **Limitation:** validation is offline/local only — there is
+  no JWKS fetch, token-introspection or live-IdP interop test (HS256 is exercised end-to-end; RS256
+  is implemented but not covered by an automated test).
 - Verify: O365/Gmail XOAUTH2 + Thunderbird SCRAM interop.
 
 ## B3 — Secrets & least-privilege

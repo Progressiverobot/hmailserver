@@ -28,6 +28,7 @@
 #include "../Util/Encoding/Base64.h"
 #include "../Util/Encoding/ModifiedUTF7.h"
 #include "../Util/Hashing/HashCreator.h"
+#include "../Util/OAuth2TokenValidator.h"
 #include "../Util/EventTester.h"
 #include <boost/pool/object_pool.hpp>
 
@@ -127,6 +128,12 @@ namespace HM
             throw 0;
          if (!Crypt::Instance()->Validate(testPwd, pbkdf2Hash, Crypt::ETPBKDF2))
             throw 0;
+      }
+
+      OutputDebugString(_T("hMailServer: Testing OAuth2TokenValidator\n"));
+      {
+         OAuth2TokenValidatorTester oauth2Tester;
+         oauth2Tester.Test();
       }
 
 

@@ -12,6 +12,7 @@
 #include "../common/Cache/CacheContainer.h"
 #include "../common/Util/PasswordValidator.h"
 #include "../common/Util/AccountLogon.h"
+#include "../common/Util/OAuth2TokenValidator.h"
 #include "../common/Util/Crypt.h"
 #include "../common/Util/Hashing/ScramSha256.h"
 #include "../common/persistence/PersistentMessage.h"
@@ -422,6 +423,11 @@ namespace HM
          case SMTPSCRAMACK:
             {
                FinishScramAuth_();
+               break;
+            }
+         case SMTPBEARERRESPONSE:
+            {
+               AuthenticateUsingBearer_(sRequest);
                break;
             }
          default:
@@ -1559,6 +1565,11 @@ namespace HM
          if (IsSSLConnection())
             sAuth += " SCRAM-SHA-256-PLUS";
 
+         // OAuth2 bearer mechanisms (RFC 7628), advertised only when enabled and (by
+         // default) only over TLS.
+         if (OAuth2TokenValidator::IsEnabled() && (!OAuth2TokenValidator::RequireTLS() || IsSSLConnection()))
+            sAuth += " XOAUTH2 OAUTHBEARER";
+
          sData += sAuth;
       }
 
@@ -2044,6 +2055,37 @@ namespace HM
          return;
       }
 
+      if (sAuthenticationType == _T("XOAUTH2") || sAuthenticationType == _T("OAUTHBEARER"))
+      {
+         if (!OAuth2TokenValidator::IsEnabled())
+         {
+            SendErrorResponse_(504, "Authentication mechanism not supported.");
+            return;
+         }
+
+         if (OAuth2TokenValidator::RequireTLS() && !IsSSLConnection())
+         {
+            SendErrorResponse_(530, "A SSL/TLS-connection is required for authentication.");
+            return;
+         }
+
+         requestedAuthenticationType_ = AUTH_BEARER;
+
+         if (vecParams.size() >= 3)
+         {
+            // Initial response supplied inline with the AUTH command.
+            AuthenticateUsingBearer_(vecParams[2]);
+         }
+         else
+         {
+            // Empty server challenge asks the client for the SASL message.
+            EnqueueWrite_("334 ");
+            current_state_ = SMTPBEARERRESPONSE;
+         }
+
+         return;
+      }
+
       SendErrorResponse_(504, "Authentication mechanism not supported.");
    }
 
@@ -2205,6 +2247,99 @@ namespace HM
 
       // Authenticate the user.
       Authenticate_();      
+   }
+
+   void
+   SMTPConnection::AuthenticateUsingBearer_(const String &sLine)
+   {
+      // A bare "*" cancels the SASL exchange (RFC 4954).
+      if (sLine == _T("*"))
+      {
+         ResetLoginCredentials_();
+         SendErrorResponse_(501, "Authentication cancelled.");
+         return;
+      }
+
+      // The XOAUTH2 / OAUTHBEARER client response is ASCII, so the standard base64
+      // decode is sufficient here.
+      String sDecodedW;
+      StringParser::Base64Decode(sLine, sDecodedW);
+      AnsiString sDecoded = sDecodedW;
+
+      AnsiString sIdentity, sToken;
+      String sTokenUser;
+      bool authenticated = false;
+      if (OAuth2TokenValidator::ParseSaslBearer(sDecoded, sIdentity, sToken))
+      {
+         AnsiString sError;
+         if (OAuth2TokenValidator::ValidateBearerToken(sToken, sTokenUser, sError))
+         {
+            // When the client also asserts an identity it must match the token.
+            AnsiString sTokenUserA = sTokenUser;
+            if (sIdentity.IsEmpty() || sIdentity.CompareNoCase(sTokenUserA) == 0)
+               authenticated = true;
+         }
+      }
+
+      std::shared_ptr<const Account> pAccount;
+      String sLoginName = sTokenUser;
+      if (authenticated)
+      {
+         std::shared_ptr<DomainAliases> pDA = ObjectCache::Instance()->GetDomainAliases();
+         String sAddress = pDA->ApplyAliasesOnAddress(sTokenUser);
+         sAddress = DefaultDomain::ApplyDefaultDomain(sAddress);
+         sLoginName = sAddress;
+         pAccount = LookupActiveAccount_(sAddress);
+      }
+
+      username_ = sLoginName;
+
+      isAuthenticated_ = pAccount != nullptr;
+
+      FireOnClientLogon_(sLoginName, isAuthenticated_);
+
+      if (pAccount)
+      {
+         EnqueueWrite_("235 authenticated.");
+         current_state_ = HEADER;
+         return;
+      }
+
+      // Feed the per-IP auto-ban accounting, then apply the per-connection cap.
+      AccountLogon accountLogon;
+      bool disconnect = false;
+      accountLogon.RegisterFailedLogin(GetRemoteEndpointAddress(), sLoginName, disconnect);
+
+      authentication_failure_count_++;
+
+      if (disconnect || authentication_failure_count_ >= 10)
+      {
+         SendErrorResponse_(535, "Authentication failed. Too many invalid logon attempts.");
+         pending_disconnect_ = true;
+         EnqueueDisconnect();
+         return;
+      }
+
+      RestartAuthentication_();
+   }
+
+   std::shared_ptr<const Account>
+   SMTPConnection::LookupActiveAccount_(const String &sAddress)
+   {
+      // OAuth2 bearer login: the token is the proof of identity, so any active account
+      // in an active domain is eligible regardless of its stored password hash type.
+      String sAccountAddress = DefaultDomain::ApplyDefaultDomain(sAddress);
+
+      std::shared_ptr<const Account> pAccount = CacheContainer::Instance()->GetAccount(sAccountAddress);
+      if (!pAccount || !pAccount->GetActive())
+         return std::shared_ptr<const Account>();
+
+      String sDomain = StringParser::ExtractDomain(sAccountAddress);
+      std::shared_ptr<const Domain> pDomain = CacheContainer::Instance()->GetDomain(sDomain);
+      if (!pDomain || !pDomain->GetIsActive())
+         return std::shared_ptr<const Account>();
+
+      return pAccount;
    }
 
    void

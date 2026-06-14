@@ -13,6 +13,8 @@
 #include "../common/Util/Crypt.h"
 #include "../common/Util/Hashing/ScramSha256.h"
 #include "../common/Util/Parsing/StringParser.h"
+#include "../common/Util/OAuth2TokenValidator.h"
+#include "../common/Application/IniFileSettings.h"
 #include "../Common/Application/TimeoutCalculator.h"
 
 #include "../Common/Application/FolderManager.h"
@@ -54,6 +56,7 @@ namespace HM
       pending_disconnect_(false),
       authentication_failure_count_(0),
       sasl_plain_pending_(false),
+      sasl_bearer_pending_(false),
       utf8_enabled_(false)
    {
 
@@ -145,7 +148,7 @@ namespace HM
       String sLogData = sClientData;
 
       // A SASL PLAIN response line carries the password in base64, so never log it.
-      if (sasl_plain_pending_)
+      if (sasl_plain_pending_ || sasl_bearer_pending_)
          sLogData = "***";
       else
          PasswordRemover::Remove(PasswordRemover::PRPOP3, sLogData);
@@ -300,6 +303,17 @@ namespace HM
          }
          return ProcessAuthPlain_(Request);
       }
+
+      if (sasl_bearer_pending_)
+      {
+         sasl_bearer_pending_ = false;
+         if (Request == "*")
+         {
+            EnqueueWrite_("-ERR Authentication cancelled.");
+            return ResultNormalResponse;
+         }
+         return ProcessAuthBearer_(Request);
+      }
       
       String sCommand;
       String sParameter;
@@ -417,9 +431,16 @@ namespace HM
          // SCRAM-SHA-256-PLUS (RFC 5802 + RFC 5929 tls-server-end-point) binds the
          // exchange to the TLS channel, so it is only offered on a TLS connection.
          if (IsSSLConnection())
-            capabilities+="SASL PLAIN SCRAM-SHA-256 SCRAM-SHA-256-PLUS\r\n";
+            capabilities+="SASL PLAIN SCRAM-SHA-256 SCRAM-SHA-256-PLUS";
          else
-            capabilities+="SASL PLAIN SCRAM-SHA-256\r\n";
+            capabilities+="SASL PLAIN SCRAM-SHA-256";
+
+         // OAuth2 bearer mechanisms, advertised only when enabled and (by default)
+         // only over TLS.
+         if (OAuth2TokenValidator::IsEnabled() && (!OAuth2TokenValidator::RequireTLS() || IsSSLConnection()))
+            capabilities+=" XOAUTH2 OAUTHBEARER";
+
+         capabilities+="\r\n";
       }
 
       if (GetConnectionSecurity() == CSSTARTTLSOptional ||
@@ -629,10 +650,16 @@ namespace HM
       {
          // RFC 5034: list the supported SASL mechanisms. SCRAM-SHA-256-PLUS is only
          // offered on a TLS connection, where channel binding is meaningful.
+         String sMechanisms = "PLAIN\r\nSCRAM-SHA-256\r\n";
          if (IsSSLConnection())
-            EnqueueWrite_("+OK List of SASL mechanisms follows\r\nPLAIN\r\nSCRAM-SHA-256\r\nSCRAM-SHA-256-PLUS\r\n.");
-         else
-            EnqueueWrite_("+OK List of SASL mechanisms follows\r\nPLAIN\r\nSCRAM-SHA-256\r\n.");
+            sMechanisms += "SCRAM-SHA-256-PLUS\r\n";
+
+         // OAuth2 bearer mechanisms are advertised only when enabled and (by default)
+         // only over TLS, since a bearer token is a directly replayable credential.
+         if (OAuth2TokenValidator::IsEnabled() && (!OAuth2TokenValidator::RequireTLS() || IsSSLConnection()))
+            sMechanisms += "XOAUTH2\r\nOAUTHBEARER\r\n";
+
+         EnqueueWrite_("+OK List of SASL mechanisms follows\r\n" + sMechanisms + ".");
          return ResultNormalResponse;
       }
 
@@ -699,6 +726,28 @@ namespace HM
          return ResultNormalResponse;
       }
 
+      if (mechanism == _T("XOAUTH2") || mechanism == _T("OAUTHBEARER"))
+      {
+         if (!OAuth2TokenValidator::IsEnabled())
+         {
+            EnqueueWrite_("-ERR Unsupported authentication mechanism.");
+            return ResultNormalResponse;
+         }
+
+         if (OAuth2TokenValidator::RequireTLS() && !IsSSLConnection())
+         {
+            EnqueueWrite_("-ERR A SSL/TLS-connection is required for OAuth2 authentication.");
+            return ResultNormalResponse;
+         }
+
+         if (hasInitialResponse)
+            return ProcessAuthBearer_(parts[1]);
+
+         sasl_bearer_pending_ = true;
+         EnqueueWrite_("+ ");
+         return ResultNormalResponse;
+      }
+
       EnqueueWrite_("-ERR Unsupported authentication mechanism.");
       return ResultNormalResponse;
    }
@@ -731,8 +780,71 @@ namespace HM
    }
 
    POP3Connection::ParseResult
+   POP3Connection::ProcessAuthBearer_(const String &sBase64)
+   {
+      // The SASL XOAUTH2 / OAUTHBEARER client response is ASCII (user=/auth=Bearer and
+      // a base64url JWT), so the standard base64 decode is sufficient here.
+      String sDecodedW;
+      StringParser::Base64Decode(sBase64, sDecodedW);
+      AnsiString sDecoded = sDecodedW;
+
+      AnsiString sIdentity, sToken;
+      String sTokenUser;
+      bool authenticated = false;
+
+      if (OAuth2TokenValidator::ParseSaslBearer(sDecoded, sIdentity, sToken))
+      {
+         AnsiString sError;
+         if (OAuth2TokenValidator::ValidateBearerToken(sToken, sTokenUser, sError))
+         {
+            // The login identity is the validated token's username claim. When the
+            // client also asserts an identity (user=/a=), it must match the token.
+            AnsiString sTokenUserA = sTokenUser;
+            if (sIdentity.IsEmpty() || sIdentity.CompareNoCase(sTokenUserA) == 0)
+               authenticated = true;
+         }
+      }
+
+      std::shared_ptr<const Account> pAccount;
+      String sAddress = sTokenUser;
+      if (authenticated)
+      {
+         std::shared_ptr<DomainAliases> pDA = ObjectCache::Instance()->GetDomainAliases();
+         sAddress = pDA->ApplyAliasesOnAddress(sTokenUser);
+         pAccount = LookupActiveAccount_(sAddress);
+      }
+
+      username_ = sAddress;
+
+      FireOnClientLogon_(sAddress, pAccount != nullptr);
+
+      if (!pAccount)
+      {
+         // Feed the per-IP auto-ban accounting and the per-connection brute-force cap,
+         // exactly as the password and SCRAM paths do.
+         AccountLogon accountLogon;
+         bool disconnect = false;
+         accountLogon.RegisterFailedLogin(GetRemoteEndpointAddress(), sAddress, disconnect);
+
+         authentication_failure_count_++;
+         if (disconnect || authentication_failure_count_ >= 10)
+         {
+            EnqueueWrite_("-ERR Invalid authentication token. Too many invalid logon attempts.");
+            return ResultDisconnect;
+         }
+
+         EnqueueWrite_("-ERR Invalid authentication token.");
+         return ResultNormalResponse;
+      }
+
+      account_ = pAccount;
+      return HandleSuccessfulLogin_();
+   }
+
+   POP3Connection::ParseResult
    POP3Connection::ContinueScram_(const String &sRequest)
    {
+
       // A bare "*" cancels the SASL exchange (RFC 4954 / RFC 5034).
       if (sRequest == _T("*"))
       {
@@ -900,6 +1012,25 @@ namespace HM
          return std::shared_ptr<const Account>();
 
       if (pAccount->GetPasswordEncryption() != Crypt::ETPBKDF2)
+         return std::shared_ptr<const Account>();
+
+      return pAccount;
+   }
+
+   std::shared_ptr<const Account>
+   POP3Connection::LookupActiveAccount_(const String &sAddress)
+   {
+      // OAuth2 bearer login: the token is the proof of identity, so any active account
+      // in an active domain is eligible regardless of its stored password hash type.
+      String sAccountAddress = DefaultDomain::ApplyDefaultDomain(sAddress);
+
+      std::shared_ptr<const Account> pAccount = CacheContainer::Instance()->GetAccount(sAccountAddress);
+      if (!pAccount || !pAccount->GetActive())
+         return std::shared_ptr<const Account>();
+
+      String sDomain = StringParser::ExtractDomain(sAccountAddress);
+      std::shared_ptr<const Domain> pDomain = CacheContainer::Instance()->GetDomain(sDomain);
+      if (!pDomain || !pDomain->GetIsActive())
          return std::shared_ptr<const Account>();
 
       return pAccount;

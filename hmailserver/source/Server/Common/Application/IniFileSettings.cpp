@@ -168,6 +168,24 @@ namespace HM
       // affects Argon2id hashes so PBKDF2 stays usable as the SCRAM SaltedPassword.
       password_pepper_ = ReadIniSettingString_("Settings", "PasswordPepper", "");
 
+      // OAuth2 bearer-token authentication (SASL XOAUTH2 / OAUTHBEARER). Disabled by
+      // default. When enabled, presented JWT bearer tokens are verified locally against
+      // the configured signing key(s); the mechanism is TLS-gated by default.
+      oauth2_enabled_ = ReadIniSettingInteger_("Settings", "OAuth2Enabled", 0) == 1;
+      oauth2_require_tls_ = ReadIniSettingInteger_("Settings", "OAuth2RequireTLS", 1) == 1;
+      // Comma-separated allow-list of accepted JWT "alg" values (e.g. "RS256,HS256").
+      // "none" is never accepted regardless of this list.
+      oauth2_allowed_algorithms_ = ReadIniSettingString_("Settings", "OAuth2AllowedAlgorithms", "RS256");
+      // Shared secret for HS256 verification (HMAC key).
+      oauth2_hmac_secret_ = ReadIniSettingString_("Settings", "OAuth2HmacSecret", "");
+      // PEM file holding the RSA/EC public key for RS256 verification.
+      oauth2_rsa_public_key_file_ = ReadIniSettingString_("Settings", "OAuth2PublicKeyFile", "");
+      // Expected token issuer (iss) and audience (aud); empty disables that check.
+      oauth2_issuer_ = ReadIniSettingString_("Settings", "OAuth2Issuer", "");
+      oauth2_audience_ = ReadIniSettingString_("Settings", "OAuth2Audience", "");
+      // Claim that carries the account's e-mail address / login name.
+      oauth2_username_claim_ = ReadIniSettingString_("Settings", "OAuth2UsernameClaim", "email");
+
       dnsbl_checks_after_mail_from_ = ReadIniSettingInteger_("Settings", "DNSBLChecksAfterMailFrom", 1) == 1;
 
       sep_svc_logs_ = ReadIniSettingInteger_("Settings", "SepSvcLogs", 0) == 1;
