@@ -146,5 +146,9 @@
                 <ContentControl x:Name="ContentHost" AutomationProperties.Name="Page content" />
             </Border>
         </Grid>
+
+        <ui:SnackbarPresenter Grid.Row="1" x:Name="RootSnackbar"
+                              VerticalAlignment="Bottom" HorizontalAlignment="Center"
+                              Margin="0,0,0,24" />
     </Grid>
 </ui:FluentWindow>

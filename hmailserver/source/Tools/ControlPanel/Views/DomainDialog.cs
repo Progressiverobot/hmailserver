@@ -56,6 +56,19 @@ namespace hMailServer.ControlPanel.Views
       private readonly ComboBox dkimHeaderCanon_ = new();
       private readonly ComboBox dkimBodyCanon_ = new();
       private readonly ComboBox dkimAlgorithm_ = new();
+      private readonly TextBox dkimDns_ = new()
+      {
+         IsReadOnly = true,
+         AcceptsReturn = true,
+         TextWrapping = TextWrapping.Wrap,
+         FontSize = 12,
+         MinHeight = 70,
+         Padding = new Thickness(6),
+         Margin = new Thickness(0, 0, 0, 4),
+         Background = System.Windows.Media.Brushes.Transparent
+      };
+      private StackPanel dkimDnsPanel_;
+      private string dkimDnsValue_ = "";
 
       // Names (domain aliases) — embedded list editor
       private CollectionEditorView aliasEditor_;
@@ -134,6 +147,54 @@ namespace hMailServer.ControlPanel.Views
          adRow.Children.Add(adBrowse);
          panel.Children.Add(adRow);
          return Scroll(panel);
+      }
+
+      private void GenerateDkim()
+      {
+         string selector = dkimSelector_.Text.Trim();
+         if (selector.Length == 0)
+         {
+            selector = "dkim";
+            dkimSelector_.Text = selector;
+         }
+
+         var save = new Microsoft.Win32.SaveFileDialog
+         {
+            Title = "Save the DKIM private key",
+            Filter = "PEM key files (*.pem)|*.pem|All files (*.*)|*.*",
+            FileName = selector + "._domainkey." + domainName_ + ".pem"
+         };
+         try
+         {
+            string existing = dkimKeyFile_.Text.Trim();
+            if (existing.Length > 0)
+            {
+               string dir = System.IO.Path.GetDirectoryName(existing);
+               if (!string.IsNullOrEmpty(dir) && System.IO.Directory.Exists(dir))
+                  save.InitialDirectory = dir;
+            }
+         }
+         catch (Exception) { }
+
+         if (save.ShowDialog() != true)
+            return;
+
+         try
+         {
+            DkimKeyGenerator.Result result = DkimKeyGenerator.Generate(selector, domainName_);
+            System.IO.File.WriteAllText(save.FileName, result.PrivateKeyPem);
+            dkimKeyFile_.Text = save.FileName;
+            dkimOn_.IsChecked = true;
+            dkimDnsValue_ = result.DnsTxtValue;
+            dkimDns_.Text = "Host/Name:  " + result.DnsHost + Environment.NewLine +
+                            "Type:       TXT" + Environment.NewLine +
+                            "Value:      " + result.DnsTxtValue;
+            dkimDnsPanel_.Visibility = Visibility.Visible;
+         }
+         catch (Exception ex)
+         {
+            MessageBox.Show("Could not generate the DKIM key: " + ex.Message, "Control Panel");
+         }
       }
 
       private void BrowseAdDomain(object sender, RoutedEventArgs e)
@@ -247,6 +308,30 @@ namespace hMailServer.ControlPanel.Views
          };
          dkimKeyRow.Children.Add(dkimBrowse);
          panel.Children.Add(dkimKeyRow);
+
+         var dkimGen = new Wpf.Ui.Controls.Button
+         {
+            Content = "Generate key pair\u2026",
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
+            Margin = new Thickness(0, 0, 0, 8)
+         };
+         System.Windows.Automation.AutomationProperties.SetAutomationId(dkimGen, "DkimGenerate");
+         dkimGen.Click += (s, e) => GenerateDkim();
+         panel.Children.Add(dkimGen);
+
+         dkimDnsPanel_ = new StackPanel { Visibility = Visibility.Collapsed, Margin = new Thickness(0, 0, 0, 8) };
+         dkimDnsPanel_.Children.Add(Label("Publish this DNS TXT record at your DNS provider, then enable DKIM:"));
+         dkimDns_.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
+         dkimDnsPanel_.Children.Add(dkimDns_);
+         var dkimCopy = new Wpf.Ui.Controls.Button { Content = "Copy DNS value", Margin = new Thickness(0, 0, 0, 0) };
+         System.Windows.Automation.AutomationProperties.SetAutomationId(dkimCopy, "DkimCopyDns");
+         dkimCopy.Click += (s, e) =>
+         {
+            try { if (!string.IsNullOrEmpty(dkimDnsValue_)) Clipboard.SetText(dkimDnsValue_); } catch (Exception) { }
+         };
+         dkimDnsPanel_.Children.Add(dkimCopy);
+         panel.Children.Add(dkimDnsPanel_);
+
          panel.Children.Add(Label("Header canonicalization"));
          panel.Children.Add(dkimHeaderCanon_);
          panel.Children.Add(Label("Body canonicalization"));

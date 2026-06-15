@@ -27,7 +27,7 @@ namespace hMailServer.ControlPanel.Views
 
       private readonly CheckBox requiresAuth_ = new() { Content = "Target server requires authentication", FontSize = 13 };
       private readonly Wpf.Ui.Controls.TextBox authUser_ = new();
-      private readonly PasswordBox authPassword_ = new();
+      private readonly Wpf.Ui.Controls.PasswordBox authPassword_ = new();
 
       private readonly TextBlock status_ = new()
       {

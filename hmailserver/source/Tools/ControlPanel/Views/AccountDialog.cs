@@ -28,7 +28,8 @@ namespace hMailServer.ControlPanel.Views
       private readonly TextBox quota_ = NewInput();
       private readonly TextBox firstName_ = NewInput();
       private readonly TextBox lastName_ = NewInput();
-      private readonly PasswordBox password_ = new();
+      private readonly Wpf.Ui.Controls.PasswordBox password_ = new();
+      private readonly Wpf.Ui.Controls.TextBox generatedShow_ = new();
       private readonly TextBlock pwStrength_ = new() { FontSize = 11.5, Margin = new Thickness(0, 0, 0, 12), TextWrapping = TextWrapping.Wrap };
       private readonly TextBlock lastLogon_ = new() { FontSize = 12.5, Margin = new Thickness(0, 0, 0, 8) };
 
@@ -43,7 +44,7 @@ namespace hMailServer.ControlPanel.Views
       private readonly TextBox vacationSubject_ = NewInput();
       private readonly TextBox vacationBody_ = NewMemo();
       private readonly CheckBox vacationExpires_ = new() { Content = "Stop sending replies after a date", FontSize = 13 };
-      private readonly TextBox vacationExpiresDate_ = NewInput();
+      private readonly DatePicker vacationExpiresDate_ = new();
       private readonly CheckBox vacationAbortSpam_ = new() { Content = "Do not reply to messages flagged as spam", FontSize = 13 };
 
       // Signature
@@ -164,9 +165,29 @@ namespace hMailServer.ControlPanel.Views
          panel.Children.Add(Label("New password (leave empty to keep current)"));
          password_.FontSize = 13;
          password_.Padding = new Thickness(6);
-         password_.Margin = new Thickness(0, 0, 0, 4);
-         password_.PasswordChanged += (s, e) => UpdatePasswordStrength();
+         password_.Margin = new Thickness(0, 0, 0, 6);
+         password_.PasswordChanged += (s, e) =>
+         {
+            UpdatePasswordStrength();
+            generatedShow_.Visibility = Visibility.Collapsed;
+         };
          panel.Children.Add(password_);
+
+         var genBtn = new Wpf.Ui.Controls.Button { Content = "Generate strong password", Margin = new Thickness(0, 0, 0, 6) };
+         System.Windows.Automation.AutomationProperties.SetAutomationId(genBtn, "GeneratePassword");
+         genBtn.Click += (s, e) => GeneratePassword();
+         panel.Children.Add(genBtn);
+
+         generatedShow_.IsReadOnly = true;
+         generatedShow_.FontSize = 13;
+         generatedShow_.FontFamily = new System.Windows.Media.FontFamily("Consolas");
+         generatedShow_.Visibility = Visibility.Collapsed;
+         generatedShow_.Margin = new Thickness(0, 0, 0, 6);
+         generatedShow_.MaxWidth = 320;
+         generatedShow_.HorizontalAlignment = HorizontalAlignment.Left;
+         System.Windows.Automation.AutomationProperties.SetAutomationId(generatedShow_, "GeneratedPassword");
+         panel.Children.Add(generatedShow_);
+
          panel.Children.Add(pwStrength_);
          UpdatePasswordStrength();
          panel.Children.Add(Label("Last logon"));
@@ -196,8 +217,11 @@ namespace hMailServer.ControlPanel.Views
          panel.Children.Add(vacationBody_);
          panel.Children.Add(Separator());
          panel.Children.Add(vacationExpires_);
-         panel.Children.Add(Label("Expiry date (YYYY-MM-DD)"));
-         panel.Children.Add(Input(vacationExpiresDate_));
+         panel.Children.Add(Label("Expiry date"));
+         vacationExpiresDate_.HorizontalAlignment = HorizontalAlignment.Left;
+         vacationExpiresDate_.MinWidth = 160;
+         vacationExpiresDate_.Margin = new Thickness(0, 0, 0, 8);
+         panel.Children.Add(vacationExpiresDate_);
          panel.Children.Add(vacationAbortSpam_);
          return Scroll(panel);
       }
@@ -520,7 +544,9 @@ namespace hMailServer.ControlPanel.Views
             vacationSubject_.Text = (string) a.VacationSubject ?? "";
             vacationBody_.Text = (string) a.VacationMessage ?? "";
             vacationExpires_.IsChecked = (bool) a.VacationMessageExpires;
-            vacationExpiresDate_.Text = (string) a.VacationMessageExpiresDate ?? "";
+            string expiryText = (string) a.VacationMessageExpiresDate ?? "";
+            vacationExpiresDate_.SelectedDate =
+               DateTime.TryParse(expiryText, out DateTime expiry) ? expiry : (DateTime?) null;
             vacationAbortSpam_.IsChecked = (bool) a.VacationMessageAbortSpamFlagged;
 
             signatureOn_.IsChecked = (bool) a.SignatureEnabled;
@@ -545,6 +571,16 @@ namespace hMailServer.ControlPanel.Views
          {
             ServerSession.Release(domains);
          }
+      }
+
+      private void GeneratePassword()
+      {
+         string pw = Services.PasswordGenerator.Generate(16);
+         password_.Password = pw;
+         generatedShow_.Text = pw;
+         generatedShow_.Visibility = Visibility.Visible;
+         try { Clipboard.SetText(pw); } catch (Exception) { }
+         UpdatePasswordStrength();
       }
 
       private void UpdatePasswordStrength()
@@ -603,8 +639,8 @@ namespace hMailServer.ControlPanel.Views
             a.VacationSubject = vacationSubject_.Text;
             a.VacationMessage = vacationBody_.Text;
             a.VacationMessageExpires = vacationExpires_.IsChecked == true;
-            if (vacationExpiresDate_.Text.Trim().Length > 0)
-               a.VacationMessageExpiresDate = vacationExpiresDate_.Text.Trim();
+            if (vacationExpiresDate_.SelectedDate.HasValue)
+               a.VacationMessageExpiresDate = vacationExpiresDate_.SelectedDate.Value.ToString("yyyy-MM-dd");
             a.VacationMessageAbortSpamFlagged = vacationAbortSpam_.IsChecked == true;
 
             a.SignatureEnabled = signatureOn_.IsChecked == true;

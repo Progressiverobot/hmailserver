@@ -91,14 +91,20 @@ namespace hMailServer.ControlPanel.Views
          public bool BrowseFolder; // show a "..." folder picker next to the box
          public string FileFilter = "All files (*.*)|*.*";
          private TextBox box_;
+         private Wpf.Ui.Controls.NumberBox number_;
 
          /// <summary>Current text in the editor (for live test buttons).</summary>
-         public string CurrentText => box_?.Text?.Trim() ?? "";
+         public string CurrentText
+            => number_ != null
+               ? ((long) (number_.Value ?? 0)).ToString()
+               : (box_?.Text?.Trim() ?? "");
 
          /// <summary>Overwrites the editor text (for preset pickers / auto-detect).</summary>
          public void SetText(string text)
          {
-            if (box_ != null)
+            if (number_ != null)
+               number_.Value = double.TryParse(text, out double d) ? d : 0;
+            else if (box_ != null)
                box_.Text = text ?? "";
          }
          public override FrameworkElement CreateEditor(object value)
@@ -110,13 +116,36 @@ namespace hMailServer.ControlPanel.Views
             {
                try { shown = Convert.ToInt64(value) / Divisor; } catch (Exception) { shown = value; }
             }
+
+            // Numeric settings get an up/down NumberBox; everything else a text box.
+            if (Numeric)
+            {
+               double current = 0;
+               try { current = Convert.ToDouble(shown); } catch (Exception) { current = 0; }
+               number_ = new Wpf.Ui.Controls.NumberBox
+               {
+                  Value = current,
+                  Minimum = 0,
+                  MaxDecimalPlaces = 0,
+                  SmallChange = 1,
+                  LargeChange = 10,
+                  FontSize = 13,
+                  MaxWidth = 180,
+                  MinWidth = 120,
+                  HorizontalAlignment = HorizontalAlignment.Left
+               };
+               SetAid(number_, Path);
+               panel.Children.Add(number_);
+               return panel;
+            }
+
             box_ = new TextBox
             {
                Text = Convert.ToString(shown) ?? "",
                FontSize = 13,
-               MaxWidth = Numeric ? 180 : 520,
+               MaxWidth = 520,
                HorizontalAlignment = HorizontalAlignment.Left,
-               MinWidth = Numeric ? 120 : 320
+               MinWidth = 320
             };
             SetAid(box_, Path);
 
@@ -161,11 +190,12 @@ namespace hMailServer.ControlPanel.Views
 
          public override object ReadEditor()
          {
-            string text = box_.Text.Trim();
-            if (!Numeric)
-               return text;
-            long number = long.TryParse(text, out long v) ? v : 0L;
-            return number * Divisor;
+            if (Numeric)
+            {
+               long number = number_ != null ? (long) (number_.Value ?? 0) : 0L;
+               return number * Divisor;
+            }
+            return box_.Text.Trim();
          }
       }
 
@@ -202,14 +232,14 @@ namespace hMailServer.ControlPanel.Views
       private class ComPassword : ComSetting
       {
          public string MethodName;   // e.g. SetSMTPRelayerPassword
-         private PasswordBox box_;
+         private Wpf.Ui.Controls.PasswordBox box_;
          public override bool WantsInitialValue => false;
 
          public override FrameworkElement CreateEditor(object value)
          {
             var panel = new StackPanel();
             panel.Children.Add(new TextBlock { Text = Label, FontSize = 13, Margin = new Thickness(0, 0, 0, 4) });
-            box_ = new PasswordBox
+            box_ = new Wpf.Ui.Controls.PasswordBox
             {
                FontSize = 13,
                MinWidth = 320,
@@ -1047,6 +1077,11 @@ namespace hMailServer.ControlPanel.Views
          StatusText.Text = failed == 0
             ? "Saved " + saved + " settings at " + DateTime.Now.ToLongTimeString() + " - applied immediately."
             : "Saved " + saved + " settings, " + failed + " could not be written.";
+
+         if (failed == 0)
+            Services.Toast.Success("Saved " + saved + " settings \u2014 applied immediately.");
+         else
+            Services.Toast.Info(failed + " setting(s) could not be written.", "Partly saved");
 
          // Reload the script engine after scripting changes.
          if (section_ == Section.Advanced)

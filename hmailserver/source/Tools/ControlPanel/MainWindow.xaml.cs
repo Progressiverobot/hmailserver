@@ -23,12 +23,16 @@ namespace hMailServer.ControlPanel
       {
          InitializeComponent();
 
+         Services.Toast.Init(RootSnackbar);
          ApplySavedTheme();
+         RestoreWindowBounds();
          RegisterPages();
          BuildNavTree();
 
          NavTree.IsEnabled = false;
          ContentHost.Content = new ConnectView(OnConnected);
+
+         Closing += (s, e) => SaveWindowBounds();
 
          // Ctrl+K command palette.
          PreviewKeyDown += (s, e) =>
@@ -307,6 +311,76 @@ namespace hMailServer.ControlPanel
 
          if (page is IPageLifecycle newPage)
             newPage.OnEnter();
+      }
+
+      private void RestoreWindowBounds()
+      {
+         try
+         {
+            using RegistryKey key = Registry.CurrentUser.OpenSubKey(RegistryPath);
+            if (key == null)
+               return;
+
+            double w = ToDouble(key.GetValue("WindowWidth"));
+            double h = ToDouble(key.GetValue("WindowHeight"));
+            double left = ToDouble(key.GetValue("WindowLeft"), double.NaN);
+            double top = ToDouble(key.GetValue("WindowTop"), double.NaN);
+
+            if (w >= MinWidth && h >= MinHeight)
+            {
+               Width = w;
+               Height = h;
+            }
+
+            // Only restore the position if it lands on a currently-visible screen,
+            // so the window can't open off-screen after a monitor change.
+            if (!double.IsNaN(left) && !double.IsNaN(top) &&
+                left + w > SystemParameters.VirtualScreenLeft + 40 &&
+                top + h > SystemParameters.VirtualScreenTop + 40 &&
+                left < SystemParameters.VirtualScreenLeft + SystemParameters.VirtualScreenWidth - 40 &&
+                top < SystemParameters.VirtualScreenTop + SystemParameters.VirtualScreenHeight - 40)
+            {
+               WindowStartupLocation = WindowStartupLocation.Manual;
+               Left = left;
+               Top = top;
+            }
+
+            if (string.Equals(key.GetValue("WindowMaximized") as string, "1", StringComparison.Ordinal))
+               WindowState = WindowState.Maximized;
+         }
+         catch (Exception)
+         {
+         }
+      }
+
+      private void SaveWindowBounds()
+      {
+         try
+         {
+            using RegistryKey key = Registry.CurrentUser.CreateSubKey(RegistryPath);
+            if (key == null)
+               return;
+
+            bool maximized = WindowState == WindowState.Maximized;
+            // Persist the normal (restored) bounds so un-maximizing next time works.
+            Rect bounds = maximized ? RestoreBounds : new Rect(Left, Top, Width, Height);
+
+            key.SetValue("WindowWidth", (int) bounds.Width);
+            key.SetValue("WindowHeight", (int) bounds.Height);
+            key.SetValue("WindowLeft", (int) bounds.Left);
+            key.SetValue("WindowTop", (int) bounds.Top);
+            key.SetValue("WindowMaximized", maximized ? "1" : "0");
+         }
+         catch (Exception)
+         {
+         }
+      }
+
+      private static double ToDouble(object value, double fallback = 0)
+      {
+         if (value == null)
+            return fallback;
+         return double.TryParse(value.ToString(), out double d) ? d : fallback;
       }
 
       private void ApplySavedTheme()

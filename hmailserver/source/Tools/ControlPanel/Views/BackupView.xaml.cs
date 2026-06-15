@@ -72,7 +72,10 @@ namespace hMailServer.ControlPanel.Views
       private void SaveSettings_Click(object sender, RoutedEventArgs e)
       {
          if (SaveBackupSettings())
+         {
             SubtitleText.Text = "Backup settings saved.";
+            Services.Toast.Success("Backup settings saved.");
+         }
       }
 
       private void StartBackup_Click(object sender, RoutedEventArgs e)
