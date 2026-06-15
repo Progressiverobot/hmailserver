@@ -34,9 +34,13 @@ moved to **Part 2 — Completed work**.*
 1. **Track A Phase 1 — item 7: Active Directory pickers** — ✅ **DONE (v6.2.4)** —
    delivered and validated end-to-end against a live domain controller
    (`progressiverobot.local`); full details in Part 2.
-2. **Track A Phase 4 — finalize** — screenshot-validate every page/dialog, rewrite
-   `CONTROL-PANEL-GAP-ANALYSIS.md`, then publish the CP + rebuild the installer +
-   move the release tag.
+2. **Track A Phase 4 — finalize** — ✅ **validation + docs DONE (2026-06-15)** —
+   build clean (0/0); screenshot-validated the pages against the live dev server
+   (`hmailtest2`), including the now-complete **Server status** page and the
+   **Rules** criteria/action editor; `CONTROL-PANEL-GAP-ANALYSIS.md` rewritten with
+   full parity reached (no outstanding gaps). *Remaining for this item is packaging
+   only (publish CP + rebuild installer + move tag), folded into the final 6.2.5
+   release per the hold-release directive.*
 3. **B2 — authentication follow-ups** — live JWKS / token introspection +
    O365 / Gmail XOAUTH2 + Thunderbird SCRAM interop. *(Offline OAuth2 and RS256
    auto-test coverage are already done.)*

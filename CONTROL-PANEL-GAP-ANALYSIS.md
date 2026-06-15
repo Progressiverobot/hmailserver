@@ -190,7 +190,7 @@ Signature / External / Rules / Folders / Directory).
 | **AdminLevel** (user / domain admin / server admin) | ✅ |
 | **LastLogonTime** (read-only display) | ✅ |
 | **External (download) accounts** (`Account.FetchAccounts`) | ✅ External tab |
-| **Account-level rules** | ✅ Rules tab (add/rename/enable/delete) |
+| **Account-level rules** | ✅ Rules tab — full editor (criteria + actions): embeds `RulesView` with `RuleCriteriaDialog` (field/custom-header, match type, value) and `RuleActionDialog` (all action types) |
 | **IMAP folders editor** (per account) | ✅ Folders tab |
 | Empty account / Unlock buttons | ✅ Folders tab (Empty mailbox / Unlock mailbox) |
 
@@ -203,7 +203,7 @@ Signature / External / Rules / Folders / Directory).
 | **Groups / Group** (security groups & members) | `Application.Groups` | ✅ list editor |
 | **Server messages** (system message templates / bounce text) | `Settings.ServerMessages` | ✅ list editor |
 | **Scripts** (event-script file editor) | event scripts on disk | ✅ Event scripts page |
-| **Status** (uptime, version, session counts, processes) | `Application.Status` | ⚠️ Dashboard covers some |
+| **Status** (uptime, version, session counts, processes) | `Application.Status` | ✅ **Status** page (`StatusView`): version/architecture, server state, database type/host/name/version, processed/spam/virus counts, SMTP/IMAP/POP3 session counts, start time + uptime, and a live configuration-warnings panel (open-relay / missing host-name / localhost-ban diagnostics) |
 | **Distribution list** property editor (Address, Active, Mode, RequireSenderAddress, AnnounceOnly) | `DistributionList` | ✅ Properties dialog + members (RecipientsDialog) |
 | **Incoming relay** full options (beyond Name/LowerIP/UpperIP) | `IncomingRelay` | ✅ (COM exposes only Name/IP range) |
 | **Route** advanced options (RouteAddress, ConnectionSecurity, RelayMode, GreyListing, etc.) | `Route` | ✅ Properties dialog (security, auth, local-domain, retries) |
@@ -232,12 +232,16 @@ Signature / External / Rules / Folders / Directory).
 10. **Routes** advanced properties (connection security, auth, local-domain treatment)
     and **distribution-list** properties dialog (mode, auth, sender) (Section 10).
 11. **SSL/TLS ChaCha ↔ cipher-order/TLS-version** live dependency interlock (Section 4).
+12. **Status** page — version, server state, database details, statistics, session
+    counts, uptime, and a configuration-warnings panel (Section 10).
+13. **Account rule criteria/action** editing — the per-account Rules tab embeds the
+    full rule editor with `RuleCriteriaDialog` and `RuleActionDialog` (Section 9).
 
 ### ⬜ Remaining
-- **Status** pane parity (uptime / session counts / process list) — partly covered by
-  the Dashboard.
-- Full account **rule criteria/action** editing (CP lists and toggles rules; the
-  detailed criteria/action builder is not ported).
+
+*Nothing outstanding — full settings parity with the classic Administrator has been
+reached, and the Control Panel additionally surfaces the 6.x server capabilities
+listed below.*
 
 ---
 
@@ -259,9 +263,14 @@ Panel surfaces them so it remains the single admin GUI.
 ---
 
 *Generated 2026-06-13 from `source/Tools/Administrator/Main panes/*.cs` vs
-`source/Tools/ControlPanel/Views/*`. Status updated 2026-06-14: added the
-"beyond parity" section for the 6.x server capabilities now surfaced in the CP
-(Sieve editor, ManageSieve/metrics/operability/durability settings). Earlier
-2026-06-13 full gap-closure pass: tab-strip redesign, domain/account sub-editors,
-public folders, event scripts, route/distribution-list properties, SpamAssassin
-test, ChaCha interlock.*
+`source/Tools/ControlPanel/Views/*`. Status updated 2026-06-15: closed the last
+two items — the **Status** page (`StatusView`: version, server state, database
+details, statistics, session counts, uptime, configuration warnings) and the
+**account rule criteria/action** editor (per-account Rules tab now embeds the full
+`RulesView` with `RuleCriteriaDialog`/`RuleActionDialog`). Both are registered in
+`MainWindow` navigation and the account editor; Release build is clean. Status
+updated 2026-06-14: added the "beyond parity" section for the 6.x server
+capabilities now surfaced in the CP (Sieve editor, ManageSieve/metrics/operability/
+durability settings). Earlier 2026-06-13 full gap-closure pass: tab-strip redesign,
+domain/account sub-editors, public folders, event scripts, route/distribution-list
+properties, SpamAssassin test, ChaCha interlock.*
