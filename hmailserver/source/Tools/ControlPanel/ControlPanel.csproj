@@ -23,6 +23,7 @@
     <PackageReference Include="LiveChartsCore.SkiaSharpView.WPF" Version="2.0.0-rc2" />
     <PackageReference Include="System.Management" Version="8.0.0" />
     <PackageReference Include="System.ServiceProcess.ServiceController" Version="8.0.0" />
+    <PackageReference Include="System.DirectoryServices" Version="8.0.0" />
   </ItemGroup>
 
 </Project>

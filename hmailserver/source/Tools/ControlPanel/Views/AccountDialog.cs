@@ -235,7 +235,28 @@ namespace hMailServer.ControlPanel.Views
          panel.Children.Add(Input(adDomain_));
          panel.Children.Add(Label("Active Directory user name"));
          panel.Children.Add(Input(adUser_));
+
+         var browse = new Wpf.Ui.Controls.Button
+         {
+            Content = "Browse Active Directory\u2026",
+            Margin = new Thickness(0, 4, 0, 0)
+         };
+         browse.Click += (s, e) => BrowseActiveDirectory();
+         panel.Children.Add(browse);
+
          return Scroll(panel);
+      }
+
+      private void BrowseActiveDirectory()
+      {
+         var picker = new ActiveDirectoryPickerDialog(this, multiSelect: false);
+         if (picker.ShowDialog() == true && picker.SelectedUsers.Count > 0)
+         {
+            AdUser user = picker.SelectedUsers[0];
+            adDomain_.Text = picker.SelectedDomain ?? "";
+            adUser_.Text = user.SamAccountName;
+            isAd_.IsChecked = true;
+         }
       }
 
       private FrameworkElement BuildExternal()

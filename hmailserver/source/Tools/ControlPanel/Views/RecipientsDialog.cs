@@ -43,6 +43,7 @@ namespace hMailServer.ControlPanel.Views
          bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
          bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
          bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+         bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
          addBox_.FontSize = 13;
          addBox_.Padding = new Thickness(6);
@@ -55,6 +56,11 @@ namespace hMailServer.ControlPanel.Views
          Grid.SetColumn(addButton, 1);
          bottom.Children.Add(addButton);
 
+         var adButton = new Wpf.Ui.Controls.Button { Content = "Add from AD\u2026", Margin = new Thickness(8, 0, 0, 0) };
+         adButton.Click += (s, e) => ImportFromActiveDirectory();
+         Grid.SetColumn(adButton, 2);
+         bottom.Children.Add(adButton);
+
          var removeButton = new Wpf.Ui.Controls.Button
          {
             Content = "Remove selected",
@@ -62,7 +68,7 @@ namespace hMailServer.ControlPanel.Views
             Appearance = Wpf.Ui.Controls.ControlAppearance.Danger
          };
          removeButton.Click += (s, e) => RemoveSelected();
-         Grid.SetColumn(removeButton, 2);
+         Grid.SetColumn(removeButton, 3);
          bottom.Children.Add(removeButton);
 
          Grid.SetRow(bottom, 1);
@@ -157,6 +163,62 @@ namespace hMailServer.ControlPanel.Views
 
          addBox_.Text = "";
          Reload();
+      }
+
+      private void ImportFromActiveDirectory()
+      {
+         var picker = new ActiveDirectoryPickerDialog(this, multiSelect: true);
+         if (picker.ShowDialog() != true || picker.SelectedUsers.Count == 0)
+            return;
+
+         var emails = new List<string>();
+         int skipped = 0;
+         foreach (AdUser u in picker.SelectedUsers)
+         {
+            if (!string.IsNullOrWhiteSpace(u.Email))
+               emails.Add(u.Email.Trim());
+            else
+               skipped++;
+         }
+
+         if (emails.Count == 0)
+         {
+            MessageBox.Show("None of the selected accounts have an e-mail address.", "Control Panel");
+            return;
+         }
+
+         int added = 0;
+         dynamic domains = ServerSession.Current.Application.Domains;
+         try
+         {
+            dynamic list = OpenList(domains);
+            if (list != null)
+            {
+               dynamic recipients = list.Recipients;
+               foreach (string address in emails)
+               {
+                  dynamic recipient = recipients.Add();
+                  recipient.RecipientAddress = address;
+                  recipient.Save();
+                  ServerSession.Release(recipient);
+                  added++;
+               }
+               ServerSession.Release(recipients);
+               ServerSession.Release(list);
+            }
+         }
+         catch (Exception ex)
+         {
+            MessageBox.Show("Could not add all recipients: " + ServerSession.DescribeComError(ex), "Control Panel");
+         }
+         finally
+         {
+            ServerSession.Release(domains);
+         }
+
+         Reload();
+         if (skipped > 0)
+            MessageBox.Show(added + " recipient(s) added. " + skipped + " account(s) had no e-mail address and were skipped.", "Control Panel");
       }
 
       private void RemoveSelected()
