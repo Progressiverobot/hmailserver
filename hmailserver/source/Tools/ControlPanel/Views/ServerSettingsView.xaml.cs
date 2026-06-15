@@ -634,6 +634,8 @@ namespace hMailServer.ControlPanel.Views
          log.Settings.Add(new ComBool { Path = "Logging.LogDebug", Label = "Debug messages" });
          log.Settings.Add(new ComBool { Path = "Logging.AWStatsEnabled", Label = "AWStats-compatible log" });
          log.Settings.Add(new ComBool { Path = "Logging.KeepFilesOpen", Label = "Keep log files open (performance)" });
+         log.Settings.Add(new ComCombo { Path = "Logging.Device", Label = "Log destination", Options = new (int, string)[] { (2, "Files on disk"), (1, "Database (SQL)") } });
+         log.Settings.Add(new ComCombo { Path = "Logging.LogFormat", Label = "Log line format", Options = new (int, string)[] { (1, "Default"), (2, "NCSA / combined (AWStats)") } });
          Tab("Logging").Cards.Add(log);
       }
 
@@ -655,6 +657,10 @@ namespace hMailServer.ControlPanel.Views
          cache.Settings.Add(new ComText { Path = "Cache.AccountCacheTTL", Label = "Account cache TTL (seconds)", Numeric = true });
          cache.Settings.Add(new ComText { Path = "Cache.AliasCacheTTL", Label = "Alias cache TTL (seconds)", Numeric = true });
          cache.Settings.Add(new ComText { Path = "Cache.DistributionListCacheTTL", Label = "Distribution-list cache TTL (seconds)", Numeric = true });
+         cache.Settings.Add(new ComText { Path = "Cache.DomainCacheMaxSizeKb", Label = "Domain cache max size (KB)", Numeric = true });
+         cache.Settings.Add(new ComText { Path = "Cache.AccountCacheMaxSizeKb", Label = "Account cache max size (KB)", Numeric = true });
+         cache.Settings.Add(new ComText { Path = "Cache.AliasCacheMaxSizeKb", Label = "Alias cache max size (KB)", Numeric = true });
+         cache.Settings.Add(new ComText { Path = "Cache.DistributionListCacheMaxSizeKb", Label = "Distribution-list cache max size (KB)", Numeric = true });
          Tab("Cache").Cards.Add(cache);
 
          var index = Card("Message indexing", "Builds a search index so IMAP SEARCH and the web client are faster.");

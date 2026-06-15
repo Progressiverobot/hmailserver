@@ -490,11 +490,87 @@ namespace hMailServer.ControlPanel.Views
                });
                cards_.Add(new CardDef
                {
-                  Title = "Stored secret protection",
-                  Blurb = "When enabled, sensitive values in hMailServer.INI (database password, OAuth/SRS/BATV secrets) are encrypted with Windows DPAPI on the next service start.",
+                  Title = "Connection timeouts",
+                  Blurb = "Idle timeouts (seconds) per protocol. 'Server' = hMailServer accepting connections; 'client' = hMailServer connecting out for delivery / external fetch.",
                   Settings =
                   {
-                     new BoolSetting { Key = "ProtectStoredSecretsWithDPAPI", Default = true, Label = "Protect stored secrets with Windows DPAPI" }
+                     new TextSetting { Key = "SMTPDMinTimeout", Default = "10", Label = "SMTP server minimum timeout (s)" },
+                     new TextSetting { Key = "SMTPDMaxTimeout", Default = "1800", Label = "SMTP server maximum timeout (s)" },
+                     new TextSetting { Key = "SMTPCMinTimeout", Default = "30", Label = "SMTP client minimum timeout (s)" },
+                     new TextSetting { Key = "SMTPCMaxTimeout", Default = "600", Label = "SMTP client maximum timeout (s)" },
+                     new TextSetting { Key = "POP3DMinTimeout", Default = "10", Label = "POP3 server minimum timeout (s)" },
+                     new TextSetting { Key = "POP3DMaxTimeout", Default = "600", Label = "POP3 server maximum timeout (s)" },
+                     new TextSetting { Key = "POP3CMinTimeout", Default = "30", Label = "POP3 client minimum timeout (s)" },
+                     new TextSetting { Key = "POP3CMaxTimeout", Default = "900", Label = "POP3 client maximum timeout (s)" }
+                  }
+               });
+               cards_.Add(new CardDef
+               {
+                  Title = "Delivery & queue tuning",
+                  Blurb = "Early-retry behaviour, queue jitter and the external (POP3) fetch worker pool.",
+                  Settings =
+                  {
+                     new TextSetting { Key = "QuickRetries", Default = "0", Label = "Quick early retries before the normal retry schedule (0 = off)" },
+                     new TextSetting { Key = "QuickRetriesMinutes", Default = "6", Label = "Minutes between quick retries" },
+                     new TextSetting { Key = "QueueRandomnessMinutes", Default = "0", Label = "Random jitter added to retry times (minutes, 0 = off)" },
+                     new TextSetting { Key = "MXTriesFactor", Default = "0", Label = "Extra delivery attempts per additional MX host (0 = default)" },
+                     new TextSetting { Key = "MaxNumberOfExternalFetchThreads", Default = "15", Label = "Max parallel external POP3 fetch threads" }
+                  }
+               });
+               cards_.Add(new CardDef
+               {
+                  Title = "Logging detail",
+                  Blurb = "Low-level logging knobs. The log categories and destination are on the Logging page.",
+                  Settings =
+                  {
+                     new TextSetting { Key = "LogLevel", Default = "9", Label = "Log level / verbosity" },
+                     new TextSetting { Key = "MaxLogLineLen", Default = "500", Label = "Maximum characters per log line (minimum 100)" },
+                     new BoolSetting { Key = "SepSvcLogs", Default = false, Label = "Write a separate log file per service component" }
+                  }
+               });
+               cards_.Add(new CardDef
+               {
+                  Title = "Search indexing",
+                  Blurb = "Background full-text indexer cadence and batch sizes (used by IMAP SEARCH).",
+                  Settings =
+                  {
+                     new TextSetting { Key = "IndexerFullMinutes", Default = "720", Label = "Full re-index interval (minutes)" },
+                     new TextSetting { Key = "IndexerFullLimit", Default = "25000", Label = "Messages per full-index pass" },
+                     new TextSetting { Key = "IndexerQuickLimit", Default = "1000", Label = "Messages per quick-index pass" }
+                  }
+               });
+               cards_.Add(new CardDef
+               {
+                  Title = "Message archiving",
+                  Blurb = "Optionally keep a copy of every message passing through the server.",
+                  Settings =
+                  {
+                     new TextSetting { Key = "ArchiveDir", Label = "Archive folder (empty = archiving off)", Placeholder = @"D:\MailArchive" },
+                     new BoolSetting { Key = "ArchiveHardLinks", Default = false, Label = "Hard-link archived files instead of copying (same volume only)" }
+                  }
+               });
+               cards_.Add(new CardDef
+               {
+                  Title = "Low-level tuning",
+                  Blurb = "Specialist knobs — leave at the defaults unless you have a specific reason.",
+                  Settings =
+                  {
+                     new TextSetting { Key = "DaemonAddressDomain", Label = "Domain for system / daemon (postmaster) addresses (empty = first local domain)" },
+                     new TextSetting { Key = "SMTPDMaxSizeDrop", Default = "0", Label = "Drop oversized inbound messages above N bytes mid-transfer (0 = off)" },
+                     new BoolSetting { Key = "SAMoveVsCopy", Default = false, Label = "Move (not copy) the message when handing it to SpamAssassin" },
+                     new BoolSetting { Key = "BackupMessagesDBOnly", Default = false, Label = "Back up message metadata only, not the message files" },
+                     new TextSetting { Key = "LoadHeaderReadSize", Default = "4000", Label = "Header read chunk size (bytes)" },
+                     new TextSetting { Key = "LoadBodyReadSize", Default = "4000", Label = "Body read chunk size (bytes)" }
+                  }
+               });
+               cards_.Add(new CardDef
+               {
+                  Title = "Stored secret protection",
+                  Blurb = "When enabled, sensitive values in hMailServer.INI (database password, OAuth/SRS/BATV secrets, password pepper) are encrypted with Windows DPAPI on the next service start.",
+                  Settings =
+                  {
+                     new BoolSetting { Key = "ProtectStoredSecretsWithDPAPI", Default = true, Label = "Protect stored secrets with Windows DPAPI" },
+                     new SecretSetting { Key = "PasswordPepper", Label = "Password pepper — WARNING: set before creating accounts; changing it later invalidates ALL existing passwords", Note = "Server-wide secret mixed into password hashes" }
                   }
                });
                break;
