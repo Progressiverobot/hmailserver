@@ -17,10 +17,10 @@ struct hm_st_mysql_field {
    char *def;                  /* Default value (set by mysql_list_fields) */
 };
 
-// Subset of MySQL's "enum mysql_option" values. These are stable in the bundled
-// Oracle libmysql client (added in MySQL 5.5.x) and are used to steer the
-// authentication handshake so a connection never fails because the server asked
-// for an auth plugin (e.g. auth_gssapi_client) the bundled client does not carry.
+// Subset of the "enum mysql_option" values. These values are identical across the
+// Oracle libmysql client and MariaDB Connector/C (the client hMailServer now bundles),
+// and are used to point the client at the auth-plugin directory so it can authenticate
+// against any MySQL/MariaDB account type (caching_sha2_password, ed25519, gssapi, ...).
 #define HM_MYSQL_PLUGIN_DIR    22
 #define HM_MYSQL_DEFAULT_AUTH  23
 

@@ -20,5 +20,10 @@ Source: ISC.dll; Flags: dontcopy
 Source: ".\Extras\tlds.txt"; DestDir: "{app}\Bin";  Flags: ignoreversion; Components: server;
 Source: ".\Extras\dh2048.pem"; DestDir: "{app}\Bin";  Flags: ignoreversion; Components: server;
 
-; MySQL client library (x64) - loaded at runtime when the database type is MySQL/MariaDB
+; MySQL/MariaDB client library (x64) - MariaDB Connector/C, loaded at runtime as libmysql.dll
+; when the database type is MySQL/MariaDB. Talks to both MySQL and MariaDB servers.
 Source: ".\Extras\libmysql.dll"; DestDir: "{app}\Bin"; Flags: ignoreversion; Components: server;
+; Client authentication plugins, found via MYSQL_PLUGIN_DIR = {app}\Bin\plugin. These let the
+; single bundled client authenticate every common account type: caching_sha2_password (MySQL 8.0+
+; default), sha256_password, client_ed25519 / auth_gssapi_client / parsec (MariaDB), dialog, etc.
+Source: ".\Extras\plugin\*.dll"; DestDir: "{app}\Bin\plugin"; Flags: ignoreversion; Components: server;

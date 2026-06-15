@@ -47,7 +47,7 @@ namespace VMTestRunner.Console
       {
          string currentDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
          var librariesDir = Path.Combine(currentDir, @"..\..\..\..\..\..\libraries");
-         var libMySqlDir = Path.Combine(librariesDir, "libmysql-5.7.38");
+         var libMySqlDir = Path.Combine(librariesDir, "mariadb-connector-c-3.4.9");
 
          string name = Path.Combine(libMySqlDir, "libmySQL.dll");
 
