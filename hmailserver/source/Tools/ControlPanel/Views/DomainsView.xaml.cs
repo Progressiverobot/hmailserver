@@ -397,6 +397,14 @@ namespace hMailServer.ControlPanel.Views
          ReloadDomains();
       }
 
+      private void GenerateAccountPassword_Click(object sender, RoutedEventArgs e)
+      {
+         string pw = Services.PasswordGenerator.Generate(16);
+         NewAccountPassword.Password = pw;
+         try { Clipboard.SetText(pw); } catch (Exception) { }
+         Services.Toast.Info("Generated password copied to clipboard \u2014 reveal it with the eye icon.", "Password");
+      }
+
       private void AddAccount_Click(object sender, RoutedEventArgs e)
       {
          string domainName = DomainList.SelectedItem as string;
