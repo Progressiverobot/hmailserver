@@ -451,7 +451,7 @@ MTA-STS, TLS-RPT, auto-ban, correct dot-stuffing, parameterized SQL.*
   `hmailserver_database_up` (1/0) and `hmailserver_db_connections{state="busy|available"}`
   gauges sourced from the `DatabaseConnectionManager` pool, giving DB connectivity
   and pool-saturation visibility. Asserted by the `HealthProbes` test.
-- **Done — database query latency metrics + slow-query log.** Every statement is
+- **Done (v6.2.3) — database query latency metrics + slow-query log.** Every statement is
   timed at the single backend-agnostic chokepoint (`DatabaseConnectionManager`'s
   `Execute`/`OpenRecordset`), so the instrumentation covers MySQL/PostgreSQL/MSSQL/
   SQLCE uniformly. `/metrics` exposes the Prometheus summary
@@ -595,6 +595,19 @@ MTA-STS, TLS-RPT, auto-ban, correct dot-stuffing, parameterized SQL.*
 6. **Track A Phase 1 — functional parity.** ✅ 9/10 (item 7 deferred — Part 1).
 7. **B4 — deliverability & SMTP standards.** ✅ Done (v6.2.1) — SMTPUTF8/EAI,
    PIPELINING, ENHANCEDSTATUSCODES, DSN, SRS, per-IP/per-destination rate shaping.
+8. **B6 — Sieve + ManageSieve; B7 — operability & observability; B8 — supply
+   chain; Track A Phase 0 — installer; B4 — BATV + CHUNKING/BDAT.** ✅ Done
+   (v6.2.3). The first server-focused release since v6.2.2 (which was Control-Panel
+   only): the complete Sieve (RFC 5228) + ManageSieve (RFC 5804) filtering
+   subsystem, the full B7 operability/observability suite (health/readiness/liveness
+   probes; DB connectivity/pool, DB query latency + slow-query log, TLS-handshake,
+   delivery-queue-depth, auth, delivery-outcome and per-command-latency metrics; log
+   retention; connection-pool condition variable; graceful shutdown drain;
+   message-store fsync; consistency check + recovery report; message-to-session
+   correlation IDs; HA runbook), the GitHub-native SBOM + Dependabot +
+   dependency-review supply-chain gates, dropping the classic Administrator from the
+   installer (Phase 0), and the B4 BATV (`prvs`) + CHUNKING/BDAT (RFC 3030)
+   additions. Server builds 0/0; full regression suite green.
 
 ---
 
