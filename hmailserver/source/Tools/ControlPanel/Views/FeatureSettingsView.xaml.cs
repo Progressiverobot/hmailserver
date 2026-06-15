@@ -132,6 +132,47 @@ namespace hMailServer.ControlPanel.Views
          }
       }
 
+      /// <summary>
+      /// A write-only secret field. The current value is never shown (it may be a
+      /// DPAPI-protected blob); a placeholder indicates whether one is already set,
+      /// and the value is only written when the admin types a new one — so leaving
+      /// the field blank keeps the existing secret untouched.
+      /// </summary>
+      private class SecretSetting : Setting
+      {
+         public string Note = "";
+         private Wpf.Ui.Controls.PasswordBox box_;
+
+         public override FrameworkElement CreateEditor(IniFeatureStore store)
+         {
+            var panel = new StackPanel();
+            panel.Children.Add(new TextBlock { Text = Label, FontSize = 13, Margin = new Thickness(0, 0, 0, 4) });
+
+            bool hasExisting = !string.IsNullOrEmpty(store.Read(Key, "").Trim());
+            box_ = new Wpf.Ui.Controls.PasswordBox
+            {
+               PlaceholderText = hasExisting
+                  ? "A secret is configured — leave blank to keep it"
+                  : (string.IsNullOrEmpty(Note) ? "Enter a secret" : Note),
+               FontSize = 13,
+               MaxWidth = 520,
+               MinWidth = 320,
+               HorizontalAlignment = HorizontalAlignment.Left
+            };
+            SetAid(box_, Key);
+            panel.Children.Add(box_);
+            return panel;
+         }
+
+         public override void Save(IniFeatureStore store)
+         {
+            string entered = box_.Password;
+            if (!string.IsNullOrEmpty(entered))
+               store.Write(Key, entered);
+            // Blank = keep the existing secret.
+         }
+      }
+
       private class CardDef
       {
          public string Title;
@@ -276,12 +317,31 @@ namespace hMailServer.ControlPanel.Views
                cards_.Add(new CardDef
                {
                   Title = "Monitoring",
-                  Blurb = "Prometheus metrics endpoint (/metrics) and JSON-structured log output for log aggregators.",
+                  Blurb = "Prometheus metrics (/metrics), OpenTelemetry traces/metrics export, a slow-query log and JSON-structured log output for log aggregators.",
                   Settings =
                   {
                      new TextSetting { Key = "MetricsServerPort", Default = "0", Label = "Metrics port (0 = disabled)", Placeholder = "9090" },
                      new TextSetting { Key = "MetricsServerBindAddress", Default = "127.0.0.1", Label = "Metrics bind address" },
-                     new BoolSetting { Key = "JsonLogging", Default = false, Label = "Write logs as JSON lines" }
+                     new BoolSetting { Key = "JsonLogging", Default = false, Label = "Write logs as JSON lines" },
+                     new TextSetting { Key = "OtelEndpoint", Label = "OpenTelemetry OTLP endpoint (empty = disabled)", Placeholder = "http://localhost:4318" },
+                     new TextSetting { Key = "OtelServiceName", Default = "hmailserver", Label = "OpenTelemetry service name" },
+                     new TextSetting { Key = "SlowQueryLogMilliseconds", Default = "0", Label = "Log database queries slower than N ms (0 = off)", Placeholder = "250" }
+                  }
+               });
+               cards_.Add(new CardDef
+               {
+                  Title = "OAuth2 / external token authentication",
+                  Blurb = "Accept OAuth2 / OpenID Connect bearer tokens (XOAUTH2) from an external identity provider for IMAP, POP3 and SMTP submission, validated against the issuer's signing key.",
+                  Settings =
+                  {
+                     new BoolSetting { Key = "OAuth2Enabled", Default = false, Label = "Accept OAuth2 bearer tokens (XOAUTH2)" },
+                     new BoolSetting { Key = "OAuth2RequireTLS", Default = true, Label = "Require TLS for token authentication" },
+                     new TextSetting { Key = "OAuth2Issuer", Label = "Expected token issuer (iss)", Placeholder = "https://login.microsoftonline.com/<tenant>/v2.0" },
+                     new TextSetting { Key = "OAuth2Audience", Label = "Expected audience (aud)", Placeholder = "your application / client id" },
+                     new TextSetting { Key = "OAuth2AllowedAlgorithms", Default = "RS256", Label = "Allowed signing algorithms (comma separated)", Placeholder = "RS256, ES256" },
+                     new TextSetting { Key = "OAuth2UsernameClaim", Default = "email", Label = "Claim that holds the mailbox address", Placeholder = "email" },
+                     new TextSetting { Key = "OAuth2PublicKeyFile", Label = "RSA/EC public key file (PEM, for RS*/ES* tokens)", Placeholder = "Path to the issuer's public key" },
+                     new SecretSetting { Key = "OAuth2HmacSecret", Label = "Shared HMAC secret (only for HS256/384/512 tokens)", Note = "Only needed for HS* algorithms" }
                   }
                });
                cards_.Add(new CardDef
@@ -379,6 +439,19 @@ namespace hMailServer.ControlPanel.Views
                            (2, "MD5 (legacy)"),
                            (1, "Blowfish (legacy)")
                         }
+                     },
+                     new ChoiceSetting
+                     {
+                        Key = "MinimumAcceptedHashAlgorithm",
+                        Default = 0,
+                        Label = "Reject logins using a weaker stored hash than",
+                        Options = new (int, string)[]
+                        {
+                           (0, "Accept any stored hash"),
+                           (3, "SHA-256 or stronger"),
+                           (4, "PBKDF2 or stronger"),
+                           (5, "Argon2id only")
+                        }
                      }
                   }
                });
@@ -391,6 +464,37 @@ namespace hMailServer.ControlPanel.Views
                   {
                      new BoolSetting { Key = "MessageStoreFsync", Default = false, Label = "Flush each received message to disk before it is acknowledged (durable, slower)" },
                      new BoolSetting { Key = "MessageStoreConsistencyCheck", Default = false, Label = "Periodically cross-check message rows against files on disk (read-only; writes a report on divergence)" }
+                  }
+               });
+               cards_.Add(new CardDef
+               {
+                  Title = "Sender rewriting & bounce protection (SRS / BATV)",
+                  Blurb = "SRS rewrites the envelope sender when forwarding so SPF still passes at the next hop; BATV tags outbound envelope senders so forged bounces can be rejected. Both use a server-wide secret.",
+                  Settings =
+                  {
+                     new BoolSetting { Key = "SRSEnabled", Default = false, Label = "Enable Sender Rewriting Scheme (SRS) on forwarded mail" },
+                     new SecretSetting { Key = "SRSSecret", Label = "SRS signing secret", Note = "A random server-wide secret" },
+                     new BoolSetting { Key = "BATVEnabled", Default = false, Label = "Tag outbound envelope senders with BATV and validate returning bounces" },
+                     new SecretSetting { Key = "BATVSecret", Label = "BATV signing secret", Note = "A random server-wide secret" }
+                  }
+               });
+               cards_.Add(new CardDef
+               {
+                  Title = "Submission & delivery rate limits",
+                  Blurb = "Throttle abusive senders. Limits are per minute; 0 disables the limit.",
+                  Settings =
+                  {
+                     new TextSetting { Key = "MaxSubmissionsPerIPPerMinute", Default = "0", Label = "Max authenticated submissions per client IP per minute (0 = unlimited)", Placeholder = "60" },
+                     new TextSetting { Key = "MaxOutboundPerDestinationPerMinute", Default = "0", Label = "Max outbound messages per destination domain per minute (0 = unlimited)", Placeholder = "100" }
+                  }
+               });
+               cards_.Add(new CardDef
+               {
+                  Title = "Stored secret protection",
+                  Blurb = "When enabled, sensitive values in hMailServer.INI (database password, OAuth/SRS/BATV secrets) are encrypted with Windows DPAPI on the next service start.",
+                  Settings =
+                  {
+                     new BoolSetting { Key = "ProtectStoredSecretsWithDPAPI", Default = true, Label = "Protect stored secrets with Windows DPAPI" }
                   }
                });
                break;
