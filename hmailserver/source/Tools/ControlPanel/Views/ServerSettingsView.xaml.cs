@@ -711,7 +711,10 @@ namespace hMailServer.ControlPanel.Views
 
          foreach (TabDef tab in tabs_)
          {
-            var panel = new StackPanel { Margin = new Thickness(2, 4, 14, 4) };
+            // Cap the settings form to a readable column instead of letting cards
+            // stretch the full window width (which left short, left-aligned inputs
+            // floating in empty space).
+            var panel = new StackPanel { Margin = new Thickness(2, 4, 14, 4), MaxWidth = 760, HorizontalAlignment = HorizontalAlignment.Left };
 
             foreach (CardDef card in tab.Cards)
             {

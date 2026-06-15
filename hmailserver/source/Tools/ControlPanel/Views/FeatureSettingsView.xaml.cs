@@ -77,7 +77,10 @@ namespace hMailServer.ControlPanel.Views
             {
                Text = store.Read(Key, Default),
                PlaceholderText = Placeholder,
-               FontSize = 13
+               FontSize = 13,
+               MaxWidth = 520,
+               MinWidth = 320,
+               HorizontalAlignment = HorizontalAlignment.Left
             };
             SetAid(box_, Key);
             panel.Children.Add(box_);
