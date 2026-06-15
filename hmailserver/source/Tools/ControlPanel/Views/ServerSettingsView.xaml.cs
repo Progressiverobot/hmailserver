@@ -676,6 +676,7 @@ namespace hMailServer.ControlPanel.Views
          var general = Card("General");
          general.Settings.Add(new ComText { Path = "DefaultDomain", Label = "Default domain (for unqualified logons)" });
          general.Settings.Add(new ComBool { Path = "IPv6PreferredEnabled", Label = "Prefer IPv6 when delivering" });
+         general.Settings.Add(new ComText { Path = "UserInterfaceLanguage", Label = "Administrator UI language (legacy COM admin tools)" });
          general.Settings.Add(new ComPassword { Path = "SetAdministratorPassword", MethodName = "SetAdministratorPassword", Label = "New main administration password (leave empty to keep current)" });
          Tab("General").Cards.Add(general);
 

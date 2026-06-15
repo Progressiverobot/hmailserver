@@ -16,6 +16,7 @@ namespace hMailServer.ControlPanel.Views
       // General
       private readonly CheckBox active_ = new() { Content = "Domain enabled", FontSize = 13 };
       private readonly TextBox postmaster_ = NewInput();
+      private readonly TextBox adDomain_ = NewInput();
 
       private readonly TextBlock status_ = new()
       {
@@ -124,7 +125,42 @@ namespace hMailServer.ControlPanel.Views
          panel.Children.Add(active_);
          panel.Children.Add(Label("Postmaster address (mail to unknown recipients is redirected here)"));
          panel.Children.Add(Input(postmaster_));
+         panel.Children.Add(Label("Active Directory domain (for AD-synchronised domains; optional)"));
+         var adRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 12) };
+         adDomain_.MinWidth = 320;
+         adRow.Children.Add(adDomain_);
+         var adBrowse = new Wpf.Ui.Controls.Button { Content = "Browse…", Margin = new Thickness(8, 0, 0, 0) };
+         adBrowse.Click += BrowseAdDomain;
+         adRow.Children.Add(adBrowse);
+         panel.Children.Add(adRow);
          return Scroll(panel);
+      }
+
+      private void BrowseAdDomain(object sender, RoutedEventArgs e)
+      {
+         if (!ActiveDirectoryService.IsAvailable(out string reason))
+         {
+            MessageBox.Show("Active Directory is not available on this machine: " + reason, "Control Panel");
+            return;
+         }
+
+         System.Collections.Generic.List<string> domains = ActiveDirectoryService.ListDomains();
+         if (domains == null || domains.Count == 0)
+         {
+            MessageBox.Show("No Active Directory domains were found.", "Control Panel");
+            return;
+         }
+
+         var menu = new ContextMenu();
+         foreach (string dom in domains)
+         {
+            string captured = dom;
+            var item = new MenuItem { Header = captured };
+            item.Click += (s2, e2) => adDomain_.Text = captured;
+            menu.Items.Add(item);
+         }
+         menu.PlacementTarget = (UIElement) sender;
+         menu.IsOpen = true;
       }
 
       private FrameworkElement BuildNames()
@@ -214,6 +250,7 @@ namespace hMailServer.ControlPanel.Views
             dynamic d = domains.ItemByName[domainName_];
             active_.IsChecked = (bool) d.Active;
             postmaster_.Text = (string) d.Postmaster ?? "";
+            adDomain_.Text = (string) d.ADDomainName ?? "";
 
             maxSize_.Text = ((int) d.MaxSize).ToString();
             maxMessageSize_.Text = ((int) d.MaxMessageSize).ToString();
@@ -276,6 +313,7 @@ namespace hMailServer.ControlPanel.Views
             dynamic d = domains.ItemByName[domainName_];
             d.Active = active_.IsChecked == true;
             d.Postmaster = postmaster_.Text.Trim();
+            d.ADDomainName = adDomain_.Text.Trim();
 
             if (hasMs) d.MaxSize = msV;
             if (hasMms) d.MaxMessageSize = mmsV;
