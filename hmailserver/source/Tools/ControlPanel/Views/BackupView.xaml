@@ -14,7 +14,15 @@
                 <StackPanel>
                     <TextBlock Text="Backup" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,14" />
                     <TextBlock Text="Destination folder (on the server)" FontSize="13" Margin="0,0,0,4" />
-                    <ui:TextBox x:Name="DestinationBox" MaxWidth="520" MinWidth="320" HorizontalAlignment="Left" Margin="0,0,0,12" />
+                    <Grid Width="520" HorizontalAlignment="Left" Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <ui:TextBox x:Name="DestinationBox" Grid.Column="0" />
+                        <ui:Button x:Name="BrowseDestination" Grid.Column="1" Content="…" MinWidth="40" Margin="8,0,0,0"
+                                   VerticalAlignment="Bottom" ToolTip="Browse for a folder" Click="BrowseDestination_Click" />
+                    </Grid>
                     <CheckBox x:Name="CheckDomains" Content="Back up domains (accounts, aliases, lists)" FontSize="13.5" Margin="0,0,0,12" />
                     <CheckBox x:Name="CheckMessages" Content="Back up messages" FontSize="13.5" Margin="0,0,0,12" />
                     <CheckBox x:Name="CheckSettings" Content="Back up settings" FontSize="13.5" Margin="0,0,0,12" />
@@ -32,7 +40,15 @@
                     <TextBlock Text="Select the backup XML file created by a previous backup (in the destination folder). The contents replace the current data for the selected categories."
                                FontSize="12" Opacity="0.65" TextWrapping="Wrap" Margin="0,0,0,14" />
                     <TextBlock Text="Backup file (HMBackup*.xml on the server)" FontSize="13" Margin="0,0,0,4" />
-                    <ui:TextBox x:Name="BackupFileBox" MaxWidth="520" MinWidth="320" HorizontalAlignment="Left" Margin="0,0,0,12" />
+                    <Grid Width="520" HorizontalAlignment="Left" Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <ui:TextBox x:Name="BackupFileBox" Grid.Column="0" />
+                        <ui:Button x:Name="BrowseBackupFile" Grid.Column="1" Content="…" MinWidth="40" Margin="8,0,0,0"
+                                   VerticalAlignment="Bottom" ToolTip="Browse for a file" Click="BrowseBackupFile_Click" />
+                    </Grid>
                     <CheckBox x:Name="RestoreDomains" Content="Restore domains" FontSize="13.5" Margin="0,0,0,12" />
                     <CheckBox x:Name="RestoreMessages" Content="Restore messages" FontSize="13.5" Margin="0,0,0,12" />
                     <CheckBox x:Name="RestoreSettings" Content="Restore settings" FontSize="13.5" Margin="0,0,0,14" />

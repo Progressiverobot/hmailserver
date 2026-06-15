@@ -55,6 +55,20 @@ namespace hMailServer.ControlPanel.Views
          }
       }
 
+      private void BrowseDestination_Click(object sender, RoutedEventArgs e)
+      {
+         string folder = PathPicker.PickFolder(DestinationBox.Text);
+         if (folder != null)
+            DestinationBox.Text = folder;
+      }
+
+      private void BrowseBackupFile_Click(object sender, RoutedEventArgs e)
+      {
+         string file = PathPicker.PickFile(BackupFileBox.Text, "Backup files (*.xml)|*.xml|All files (*.*)|*.*");
+         if (file != null)
+            BackupFileBox.Text = file;
+      }
+
       private void SaveSettings_Click(object sender, RoutedEventArgs e)
       {
          if (SaveBackupSettings())

@@ -232,7 +232,21 @@ namespace hMailServer.ControlPanel.Views
          panel.Children.Add(Label("Selector"));
          panel.Children.Add(Input(dkimSelector_));
          panel.Children.Add(Label("Private key file"));
-         panel.Children.Add(Input(dkimKeyFile_));
+         var dkimKeyRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
+         Input(dkimKeyFile_);
+         dkimKeyFile_.MinWidth = 320;
+         dkimKeyFile_.Margin = new Thickness(0);
+         dkimKeyRow.Children.Add(dkimKeyFile_);
+         var dkimBrowse = new Wpf.Ui.Controls.Button { Content = "Browse…", Margin = new Thickness(8, 0, 0, 0) };
+         System.Windows.Automation.AutomationProperties.SetAutomationId(dkimBrowse, "DkimKeyBrowse");
+         dkimBrowse.Click += (s, e) =>
+         {
+            string file = PathPicker.PickFile(dkimKeyFile_.Text, "PEM/key files (*.pem;*.key)|*.pem;*.key|All files (*.*)|*.*");
+            if (file != null)
+               dkimKeyFile_.Text = file;
+         };
+         dkimKeyRow.Children.Add(dkimBrowse);
+         panel.Children.Add(dkimKeyRow);
          panel.Children.Add(Label("Header canonicalization"));
          panel.Children.Add(dkimHeaderCanon_);
          panel.Children.Add(Label("Body canonicalization"));

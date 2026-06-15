@@ -91,6 +91,71 @@ namespace hMailServer.ControlPanel.Views
             => store.Write(Key, box_.Text.Trim());
       }
 
+      /// <summary>
+      /// A path field: a text box plus a "..." button that opens a file or folder
+      /// picker (<see cref="PickFolder"/>) and writes the chosen path back into the box.
+      /// </summary>
+      private class PathSetting : Setting
+      {
+         public string Default = "";
+         public string Placeholder = "";
+         public bool PickFolder;
+         public string FileFilter = "All files (*.*)|*.*";
+         private Wpf.Ui.Controls.TextBox box_;
+
+         public override FrameworkElement CreateEditor(IniFeatureStore store)
+         {
+            var panel = new StackPanel();
+            panel.Children.Add(new TextBlock
+            {
+               Text = Label,
+               FontSize = 13,
+               Margin = new Thickness(0, 0, 0, 4)
+            });
+
+            var row = new Grid { Width = 520, HorizontalAlignment = HorizontalAlignment.Left };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            box_ = new Wpf.Ui.Controls.TextBox
+            {
+               Text = store.Read(Key, Default),
+               PlaceholderText = Placeholder,
+               FontSize = 13,
+               HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+            SetAid(box_, Key);
+            Grid.SetColumn(box_, 0);
+            row.Children.Add(box_);
+
+            var browse = new Wpf.Ui.Controls.Button
+            {
+               Content = "\u2026",
+               MinWidth = 40,
+               Margin = new Thickness(8, 0, 0, 0),
+               VerticalAlignment = VerticalAlignment.Bottom,
+               ToolTip = PickFolder ? "Browse for a folder" : "Browse for a file"
+            };
+            SetAid(browse, Key + "Browse");
+            browse.Click += (s, e) =>
+            {
+               string picked = PickFolder
+                  ? PathPicker.PickFolder(box_.Text)
+                  : PathPicker.PickFile(box_.Text, FileFilter);
+               if (picked != null)
+                  box_.Text = picked;
+            };
+            Grid.SetColumn(browse, 1);
+            row.Children.Add(browse);
+
+            panel.Children.Add(row);
+            return panel;
+         }
+
+         public override void Save(IniFeatureStore store)
+            => store.Write(Key, box_.Text.Trim());
+      }
+
       private class ChoiceSetting : Setting
       {
          public int Default;
@@ -273,7 +338,7 @@ namespace hMailServer.ControlPanel.Views
                      new TextSetting { Key = "AcmeDomains", Label = "Host names for the certificate (comma separated)", Placeholder = "mail.yourdomain.com, mta-sts.yourdomain.com" },
                      new TextSetting { Key = "AcmeDirectoryUrl", Default = "https://acme-v02.api.letsencrypt.org/directory", Label = "ACME directory URL" },
                      new TextSetting { Key = "AcmeHttpPort", Default = "80", Label = "Port for http-01 challenges" },
-                     new TextSetting { Key = "AcmeCertificateDirectory", Label = "Certificate output folder (empty = Data\\ACME)", Placeholder = "Falls back to Data\\ACME" },
+                     new PathSetting { Key = "AcmeCertificateDirectory", PickFolder = true, Label = "Certificate output folder (empty = Data\\ACME)", Placeholder = "Falls back to Data\\ACME" },
                      new BoolSetting { Key = "AcmeReuseKey", Default = true, Label = "Reuse the private key across renewals (keeps DANE TLSA records valid)" }
                   }
                });
@@ -291,8 +356,8 @@ namespace hMailServer.ControlPanel.Views
                   {
                      new TextSetting { Key = "RestApiPort", Default = "0", Label = "Port (0 = disabled)", Placeholder = "8045" },
                      new TextSetting { Key = "RestApiBindAddress", Default = "127.0.0.1", Label = "Bind address" },
-                     new TextSetting { Key = "RestApiCertificateFile", Label = "TLS certificate file (PEM, optional)", Placeholder = "Falls back to the ACME certificate" },
-                     new TextSetting { Key = "RestApiPrivateKeyFile", Label = "TLS private key file (PEM, optional)" }
+                     new PathSetting { Key = "RestApiCertificateFile", FileFilter = "PEM/certificate files (*.pem;*.crt;*.cer)|*.pem;*.crt;*.cer|All files (*.*)|*.*", Label = "TLS certificate file (PEM, optional)", Placeholder = "Falls back to the ACME certificate" },
+                     new PathSetting { Key = "RestApiPrivateKeyFile", FileFilter = "PEM/key files (*.pem;*.key)|*.pem;*.key|All files (*.*)|*.*", Label = "TLS private key file (PEM, optional)" }
                   }
                });
                cards_.Add(new CardDef
@@ -304,8 +369,8 @@ namespace hMailServer.ControlPanel.Views
                      new TextSetting { Key = "WebServicesHttpPort", Default = "0", Label = "HTTP port (80 to enable, 0 = disabled)" },
                      new TextSetting { Key = "WebServicesHttpsPort", Default = "0", Label = "HTTPS port (443 to enable, 0 = disabled)" },
                      new TextSetting { Key = "WebServicesBindAddress", Default = "0.0.0.0", Label = "Bind address" },
-                     new TextSetting { Key = "WebServicesCertificateFile", Label = "TLS certificate file (PEM, optional)", Placeholder = "Falls back to the ACME certificate" },
-                     new TextSetting { Key = "WebServicesPrivateKeyFile", Label = "TLS private key file (PEM, optional)" },
+                     new PathSetting { Key = "WebServicesCertificateFile", FileFilter = "PEM/certificate files (*.pem;*.crt;*.cer)|*.pem;*.crt;*.cer|All files (*.*)|*.*", Label = "TLS certificate file (PEM, optional)", Placeholder = "Falls back to the ACME certificate" },
+                     new PathSetting { Key = "WebServicesPrivateKeyFile", FileFilter = "PEM/key files (*.pem;*.key)|*.pem;*.key|All files (*.*)|*.*", Label = "TLS private key file (PEM, optional)" },
                      new BoolSetting { Key = "MtaStsHostingEnabled", Default = true, Label = "Serve MTA-STS policies for local domains" },
                      new TextSetting { Key = "MtaStsPolicyMode", Default = "enforce", Label = "MTA-STS policy mode (enforce / testing / none)" },
                      new TextSetting { Key = "MtaStsPolicyMaxAge", Default = "604800", Label = "Policy max age (seconds; default 604800 = 7 days)" },
@@ -340,7 +405,7 @@ namespace hMailServer.ControlPanel.Views
                      new TextSetting { Key = "OAuth2Audience", Label = "Expected audience (aud)", Placeholder = "your application / client id" },
                      new TextSetting { Key = "OAuth2AllowedAlgorithms", Default = "RS256", Label = "Allowed signing algorithms (comma separated)", Placeholder = "RS256, ES256" },
                      new TextSetting { Key = "OAuth2UsernameClaim", Default = "email", Label = "Claim that holds the mailbox address", Placeholder = "email" },
-                     new TextSetting { Key = "OAuth2PublicKeyFile", Label = "RSA/EC public key file (PEM, for RS*/ES* tokens)", Placeholder = "Path to the issuer's public key" },
+                     new PathSetting { Key = "OAuth2PublicKeyFile", FileFilter = "PEM/key files (*.pem;*.crt;*.cer;*.key;*.pub)|*.pem;*.crt;*.cer;*.key;*.pub|All files (*.*)|*.*", Label = "RSA/EC public key file (PEM, for RS*/ES* tokens)", Placeholder = "Path to the issuer's public key" },
                      new SecretSetting { Key = "OAuth2HmacSecret", Label = "Shared HMAC secret (only for HS256/384/512 tokens)", Note = "Only needed for HS* algorithms" }
                   }
                });
@@ -545,7 +610,7 @@ namespace hMailServer.ControlPanel.Views
                   Blurb = "Optionally keep a copy of every message passing through the server.",
                   Settings =
                   {
-                     new TextSetting { Key = "ArchiveDir", Label = "Archive folder (empty = archiving off)", Placeholder = @"D:\MailArchive" },
+                     new PathSetting { Key = "ArchiveDir", PickFolder = true, Label = "Archive folder (empty = archiving off)", Placeholder = @"D:\MailArchive" },
                      new BoolSetting { Key = "ArchiveHardLinks", Default = false, Label = "Hard-link archived files instead of copying (same volume only)" }
                   }
                });

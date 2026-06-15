@@ -87,6 +87,9 @@ namespace hMailServer.ControlPanel.Views
       {
          public bool Numeric;
          public int Divisor = 1;   // numeric display scaling (e.g. hours stored, days shown)
+         public bool BrowseFile;   // show a "..." file picker next to the box
+         public bool BrowseFolder; // show a "..." folder picker next to the box
+         public string FileFilter = "All files (*.*)|*.*";
          private TextBox box_;
 
          /// <summary>Current text in the editor (for live test buttons).</summary>
@@ -116,7 +119,43 @@ namespace hMailServer.ControlPanel.Views
                MinWidth = Numeric ? 120 : 320
             };
             SetAid(box_, Path);
-            panel.Children.Add(box_);
+
+            if (BrowseFile || BrowseFolder)
+            {
+               var row = new Grid { Width = 520, HorizontalAlignment = HorizontalAlignment.Left };
+               row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+               row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+               box_.HorizontalAlignment = HorizontalAlignment.Stretch;
+               box_.MaxWidth = double.PositiveInfinity;
+               box_.MinWidth = 0;
+               Grid.SetColumn(box_, 0);
+               row.Children.Add(box_);
+
+               var browse = new Wpf.Ui.Controls.Button
+               {
+                  Content = "\u2026",
+                  MinWidth = 40,
+                  Margin = new Thickness(8, 0, 0, 0),
+                  VerticalAlignment = VerticalAlignment.Bottom,
+                  ToolTip = BrowseFolder ? "Browse for a folder" : "Browse for a file"
+               };
+               SetAid(browse, Path + "Browse");
+               browse.Click += (s, e) =>
+               {
+                  string picked = BrowseFolder
+                     ? Services.PathPicker.PickFolder(box_.Text)
+                     : Services.PathPicker.PickFile(box_.Text, FileFilter);
+                  if (picked != null)
+                     box_.Text = picked;
+               };
+               Grid.SetColumn(browse, 1);
+               row.Children.Add(browse);
+               panel.Children.Add(row);
+            }
+            else
+            {
+               panel.Children.Add(box_);
+            }
             return panel;
          }
 
@@ -533,8 +572,8 @@ namespace hMailServer.ControlPanel.Views
 
          var clamwin = Card("ClamWin (local executable)");
          clamwin.Settings.Add(new ComBool { Path = "AntiVirus.ClamWinEnabled", Label = "Scan with ClamWin" });
-         var clamWinExe = new ComText { Path = "AntiVirus.ClamWinExecutable", Label = "clamscan.exe path" };
-         var clamWinDb = new ComText { Path = "AntiVirus.ClamWinDBFolder", Label = "Database folder" };
+         var clamWinExe = new ComText { Path = "AntiVirus.ClamWinExecutable", Label = "clamscan.exe path", BrowseFile = true, FileFilter = "Programs (*.exe)|*.exe|All files (*.*)|*.*" };
+         var clamWinDb = new ComText { Path = "AntiVirus.ClamWinDBFolder", Label = "Database folder", BrowseFolder = true };
          clamwin.Settings.Add(clamWinExe);
          clamwin.Settings.Add(clamWinDb);
          clamwin.Settings.Add(new ComAction
