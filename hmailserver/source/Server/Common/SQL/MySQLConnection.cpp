@@ -70,14 +70,17 @@ namespace HM
 
          dbconn_ = MySQLInterface::Instance()->p_mysql_init(NULL);
 
-         // Steer the authentication handshake so installs are seamless against
-         // modern MySQL/MariaDB servers. Without this the bundled libmysql client
-         // can fail with "Authentication plugin '<x>' cannot be loaded" (e.g.
-         // auth_gssapi_client) when the server advertises an auth plugin the client
-         // does not carry. Advertising mysql_native_password as the client's default
-         // makes native-password accounts (what hMailServer uses) negotiate without
-         // demanding an external plugin, and pointing the plugin directory at the
-         // Bin folder lets any optionally-shipped plugin be found there.
+         // Advertise mysql_native_password as the client's default auth plugin and
+         // point the plugin directory at the Bin folder. This avoids an unnecessary
+         // auth-switch round-trip for the native-password accounts hMailServer
+         // normally uses, and lets any optionally-shipped plugin be found locally.
+         // NOTE: this does NOT rescue an account whose *server-side* plugin is one
+         // the bundled client cannot load (e.g. an account created with
+         // "IDENTIFIED VIA gssapi" - Windows/SSPI authentication): the server demands
+         // that plugin during the handshake regardless of the client's default, and
+         // the connect then fails with "Authentication plugin 'auth_gssapi_client'
+         // cannot be loaded". Such accounts must authenticate with
+         // mysql_native_password instead (see the connect-failure handler below).
          if (MySQLInterface::Instance()->p_mysql_options != 0)
          {
             AnsiString sPluginDir = Unicode::ToANSI(MySQLInterface::Instance()->GetLibraryDirectory());
@@ -105,6 +108,29 @@ namespace HM
 
             const char *pError = MySQLInterface::Instance()->p_mysql_error(dbconn_);
             sErrorMessage = pError;
+
+            // When the server asks for an authentication plugin the bundled client
+            // cannot load (most commonly auth_gssapi_client - i.e. the account uses
+            // GSSAPI/SSPI "Windows authentication") the raw client error is just
+            // "Authentication plugin '...' cannot be loaded: The specified module
+            // could not be found", which dead-ends the setup wizard. hMailServer's
+            // bundled MySQL/MariaDB client cannot perform GSSAPI/Windows
+            // authentication (and the service runs under a different Windows identity
+            // than the interactive installer in any case), so translate the failure
+            // into actionable guidance.
+            String sLowerError = pError;
+            sLowerError.MakeLower();
+            if (sLowerError.Find(_T("plugin")) >= 0 &&
+                (sLowerError.Find(_T("cannot be loaded")) >= 0 || sLowerError.Find(_T("gssapi")) >= 0))
+            {
+               sErrorMessage += _T("\r\n\r\n"
+                  "hMailServer's bundled MySQL/MariaDB client cannot use this authentication method "
+                  "(for example GSSAPI/SSPI \"Windows authentication\"). Connect using a database account "
+                  "that authenticates with mysql_native_password: in the database setup wizard enter an "
+                  "explicit user name and password instead of choosing Windows authentication. "
+                  "If the account already exists you can convert it on the server with:\r\n"
+                  "    ALTER USER 'user'@'host' IDENTIFIED WITH mysql_native_password BY 'password';");
+            }
 
             return TemporaryFailure;
          }
