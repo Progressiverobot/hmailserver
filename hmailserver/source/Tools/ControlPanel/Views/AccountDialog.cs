@@ -83,6 +83,8 @@ namespace hMailServer.ControlPanel.Views
          Title = "Account - " + address;
          Width = 640;
          Height = 680;
+         MinWidth = 560;
+         MinHeight = 520;
          WindowStartupLocation = WindowStartupLocation.CenterOwner;
          SetResourceReference(BackgroundProperty, "ApplicationBackgroundBrush");
 

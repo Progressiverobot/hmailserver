@@ -195,6 +195,23 @@ namespace hMailServer.ControlPanel
          }
       }
 
+      /// <summary>Selects the navigation leaf with the given key, expanding its
+      /// parent groups. Used by the Welcome page quick-action tiles.</summary>
+      public void NavigateTo(string key)
+      {
+         foreach (TreeViewItem leaf in AllLeaves(NavTree.Items))
+         {
+            if ((leaf.Tag as string) == key)
+            {
+               for (var parent = leaf.Parent as TreeViewItem; parent != null; parent = parent.Parent as TreeViewItem)
+                  parent.IsExpanded = true;
+               leaf.IsSelected = true;
+               leaf.BringIntoView();
+               return;
+            }
+         }
+      }
+
       private void ShowPalette()
       {
          var entries = AllLeaves(NavTree.Items)
