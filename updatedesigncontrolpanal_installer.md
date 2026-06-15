@@ -42,6 +42,34 @@ colour-token system, fix the five defects above, and modernise the installer wiz
 
 ---
 
+## Implementation status (2026-06-15)
+
+The P0 and P1 roadmap below has been **implemented and validated** (built 0/0, screenshot-checked
+in light + dark), and the P2 installer items shipped (ISCC compiles clean):
+
+- **P0 (done):** central token system [ThemeTokens.cs](hmailserver/source/Tools/ControlPanel/Services/ThemeTokens.cs)
+  (success/warning/danger/info + log palette, recomputed per theme incl. high-contrast); themed
+  `TreeViewItem` template — the system-blue nav block is gone (rounded fill + brand pill + chevrons);
+  Live-logs colours tokenised (DEBUG now legible on light) + tighter line spacing; all theme-blind
+  named brushes (`IndianRed`/`MediumSeaGreen`/`Goldenrod`) replaced with tokens.
+- **P1 (done):** global DataGrid styling (hairline row dividers, hover/selection, low-key headers)
+  + balanced TCP/IP-port columns with right-aligned Port; numeric setting inputs constrained
+  (180 px); KPI values neutral (no misleading red "0 viruses"), queue turns amber only when backing
+  up; destructive list/action-bar buttons softened to secondary + danger-tinted text; dashboard
+  charts show "no activity" placeholders; Welcome/About widened to a consistent 880 px.
+- **P2 (done):** custom "database type" wizard page DPI-scaled (`ScaleX`/`ScaleY`), missing-semicolon
+  bug fixed, copy modernised (built-in marked recommended, no EOL "SQL Compact" framing), and the
+  dead legacy dependency `[Run]` entries (MSI/IE6/MDAC/JET/.NET 2.0) removed.
+- **P3 (partial):** high-contrast is handled structurally by the token layer (maps to `SystemColors`);
+  the existing shared text styles already form a type ramp. A deeper inline-literal/type-ramp refactor
+  is deferred as low-value (remaining literals are benign — `Transparent`, saturated severity chips).
+- **Inno 6 / `WizardStyle=modern`** remains a recommendation only (the repo builds with Inno Setup 5,
+  where that directive does not exist); not applied to avoid breaking the current installer build.
+
+The detailed analysis below is retained as the rationale and reference.
+
+---
+
 # Part A — Control Panel
 
 ## A1. Architecture & technology (context)
