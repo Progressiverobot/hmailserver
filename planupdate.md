@@ -221,8 +221,8 @@ server capability in the Control Panel remains a standing principle.)*
 Linux/container port (OS-abstraction layer first; today hard-wired to
 Win32/ATL/registry/service), JMAP (RFC 8620/8621), CalDAV/CardDAV, native webmail,
 true clustering/HA, rspamd integration, BIMI + VMC, OCSP stapling, ARF feedback-loop
-processing. Also: **IMAP4rev2 (RFC 9051)** as its own milestone (assessed and
-deferred — see Part 2, B5).
+processing. *(**IMAP4rev2 (RFC 9051)** has since been delivered as its own milestone —
+see Part 2, B5.)*
 
 ## Verification (per phase)
 
@@ -995,13 +995,20 @@ resync in Thunderbird/Apple Mail.
   `FETCH`/`STORE`/`COPY`/`MOVE`/`UID EXPUNGE`. Covered by `TestSearchResSaveAndFetch`,
   `TestSearchResSaveAndStore`, `TestSearchResCapability`. Follow-up: `$` inside `SEARCH` criteria not yet
   supported.
-- ⏸ **IMAP4rev2 (RFC 9051) — assessed and deferred to its own milestone** (see Part 1, Future track).
-  hMailServer already implements the individual extensions IMAP4rev2 folds in (UIDPLUS, ENABLE, IDLE,
-  NAMESPACE, MOVE, SPECIAL-USE, UNSELECT, ESEARCH, SEARCHRES, STATUS=SIZE, LIST-EXTENDED, SASL-IR,
-  CONDSTORE). Full conformance is not a single safe increment: advertising `IMAP4rev2` obliges UTF-8
-  mailbox names (session-scoped encode/decode switch across every mailbox-name command, currently all via
-  `ModifiedUTF7`), ESEARCH-by-default, dropping `\Recent`/`RECENT`, deprecating `LSUB`, and a
-  response-code audit. The `ENABLE` handler and `CAPABILITY` are the entry points when scheduled.
+- ✅ **IMAP4rev2 (RFC 9051) — delivered as a session mode** (commit `9bcbbe6`). `CAPABILITY` now
+  advertises `IMAP4rev2`, and `ENABLE IMAP4rev2` switches the session to RFC 9051 semantics (echoing
+  `* ENABLED IMAP4rev2`). When enabled: SEARCH/UID SEARCH without an explicit `RETURN` clause respond with
+  `ESEARCH (ALL)` instead of the legacy `* SEARCH` line; the obsolete `\Recent`/`RECENT` counters are
+  dropped from `SELECT`, `EXAMINE` and `STATUS`; the deprecated `[UNSEEN]` response code is suppressed in
+  `SELECT`/`EXAMINE`; and UTF-8 acceptance is implied (per sect. 5.1). rev1 behaviour is unchanged until
+  the client enables rev2. hMailServer already implemented the other extensions IMAP4rev2 folds in
+  (UIDPLUS, ENABLE, IDLE, NAMESPACE, MOVE, SPECIAL-USE, UNSELECT, ESEARCH, SEARCHRES, STATUS=SIZE,
+  LIST-EXTENDED, SASL-IR, CONDSTORE). Covered by `TestEnableImap4Rev2EchoesEnabled`,
+  `TestImap4Rev2SelectOmitsRecentAndUnseen`, `TestImap4Rev2SearchReturnsEsearchByDefault`,
+  `TestImap4Rev2StatusOmitsRecent` (4/4). **Limitation:** non-ASCII mailbox names are not transcoded
+  between rev1 modified-UTF-7 and rev2 UTF-8 — the shared command-line byte conversion uses `CP_ACP`, so
+  full bidirectional non-ASCII mailbox-name UTF-8 support is deferred; ASCII mailbox names (every
+  real-world folder) are fully correct.
 
 ### B8 — Quality gates & supply chain (core) ✅ DELIVERED
 
