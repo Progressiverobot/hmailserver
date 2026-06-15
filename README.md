@@ -5,7 +5,7 @@ hMailServer is an open source email server for Microsoft Windows, implementing S
 
 This repository is a modernized fork of the original project (which is no longer maintained upstream). It has been brought up to date with a current toolchain, current cryptography, and the transport-security standards expected of a mail server in 2026. It is maintained by Christopher Holloway / [Progressive Robot Ltd](https://www.progressiverobot.com).
 
-**Production status:** version **6.2.5** is released - [download the installer](https://github.com/Progressiverobot/hmailserver/releases/latest) (`hMailServer-6.2.5-x64.exe`). **6.2.5 is a critical fix release** for anyone running a default fresh install of 6.2.4 (internal database with secret protection): two defects that prevented the server from connecting to its own database on a clean install are fixed - see *6.2.5* below. The server core is validated by the full regression suite: **898 of 898 tests passing, zero failures, zero inconclusive**, including live SpamAssassin, ClamAV (real EICAR detection), DMARC evaluation against live DNS, and TLS 1.2/1.3 handshakes end to end. The bundled administration GUI is the modern .NET 8 **Control Panel** (the classic Administrator has been retired).
+**Production status:** version **6.2.6** is released - [download the installer](https://github.com/Progressiverobot/hmailserver/releases/latest) (`hMailServer-6.2.6-x64.exe`). **6.2.6 is a Control Panel and installer polish release**: a theme-aware visual redesign of the Control Panel, complete GUI coverage of every server setting (see `settings.md`), a redesigned two-factor-auth setup with a real QR code, a modernised installer, and opt-in **IMAP4rev2 (RFC 9051)** - see *6.2.6* below. (If you are on a default 6.2.4 install, 6.2.5 was the critical database-connectivity fix - see *6.2.5*.) The server core is validated by the full regression suite: **898 of 898 tests passing, zero failures, zero inconclusive**, including live SpamAssassin, ClamAV (real EICAR detection), DMARC evaluation against live DNS, and TLS 1.2/1.3 handshakes end to end. The bundled administration GUI is the modern .NET 8 **Control Panel** (the classic Administrator has been retired).
 
 What's new in 6.0
 =================
@@ -82,6 +82,40 @@ change until the new settings are turned on.
 **Supply chain & quality gates**
 
    * SPDX + CycloneDX SBOMs (Syft) attached to every release, Dependabot CVE alerts + grouped update PRs, and a dependency-review PR gate.
+
+6.2.6
+=====
+
+A Control Panel and installer polish release. The server core is unchanged in
+behaviour apart from one new opt-in protocol mode; everything else refines the
+administration experience.
+
+   * **IMAP4rev2 (RFC 9051)** as an opt-in session mode. The server advertises
+     `IMAP4rev2` and `ENABLE IMAP4rev2` switches the connection to RFC 9051
+     semantics (ESEARCH responses by default, `\Recent`/`RECENT` dropped from
+     SELECT/EXAMINE/STATUS, the obsolete `[UNSEEN]` response code suppressed, and
+     UTF-8 acceptance). IMAP4rev1 behaviour is unchanged until a client opts in.
+   * **Control Panel visual redesign.** A central, theme-aware colour-token system
+     replaces scattered hardcoded colours (success/warning/danger/info and the log
+     palette now adapt to light/dark/high-contrast); the sidebar navigation gains a
+     proper Fluent selection style and a brand keyboard-focus ring; live-log colours
+     are legible on light theme; data grids get readable row dividers and balanced
+     columns; settings forms use a readable column width with right-sized inputs;
+     KPI colours encode state rather than category; destructive buttons are softened;
+     dashboard charts show clear "no activity" placeholders; and the Welcome page is a
+     grid of clickable quick-action tiles.
+   * **Complete settings coverage.** Every configurable server setting now has a GUI
+     control. New in the Control Panel: OAuth2 / external-token authentication, SRS
+     and BATV, submission/outbound rate limits, OpenTelemetry + slow-query log,
+     connection timeouts, delivery/queue tuning, search-indexing, message-archiving
+     and other INI knobs, `Logging.Device`/`LogFormat`, the cache size caps, the
+     domain-level Active Directory link, and a write-only editor for secrets. See
+     `settings.md` for the full coverage map.
+   * **Two-factor authentication setup** now renders a real scannable QR code (plus a
+     grouped manual key with a copy button) and a larger, clearer verification field.
+   * **Installer.** The custom database-type wizard page is DPI-scaled, the dead
+     legacy dependency installers (MSI/IE6/MDAC/JET/.NET 2.0) are removed, the copy is
+     modernised, and the wizard imagery is refreshed to the current brand.
 
 6.2.5
 =====
