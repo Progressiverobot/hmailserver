@@ -5,7 +5,7 @@ hMailServer is an open source email server for Microsoft Windows, implementing S
 
 This repository is a modernized fork of the original project (which is no longer maintained upstream). It has been brought up to date with a current toolchain, current cryptography, and the transport-security standards expected of a mail server in 2026. It is maintained by Christopher Holloway / [Progressive Robot Ltd](https://www.progressiverobot.com).
 
-**Production status:** version **6.2.4** is released - [download the installer](https://github.com/Progressiverobot/hmailserver/releases/latest) (`hMailServer-6.2.4-x64.exe`). The server core is validated by the full regression suite: **898 of 898 tests passing, zero failures, zero inconclusive**, including live SpamAssassin, ClamAV (real EICAR detection), DMARC evaluation against live DNS, and TLS 1.2/1.3 handshakes end to end. The bundled administration GUI is the modern .NET 8 **Control Panel** (the classic Administrator has been retired).
+**Production status:** version **6.2.5** is released - [download the installer](https://github.com/Progressiverobot/hmailserver/releases/latest) (`hMailServer-6.2.5-x64.exe`). **6.2.5 is a critical fix release** for anyone running a default fresh install of 6.2.4 (internal database with secret protection): two defects that prevented the server from connecting to its own database on a clean install are fixed - see *6.2.5* below. The server core is validated by the full regression suite: **898 of 898 tests passing, zero failures, zero inconclusive**, including live SpamAssassin, ClamAV (real EICAR detection), DMARC evaluation against live DNS, and TLS 1.2/1.3 handshakes end to end. The bundled administration GUI is the modern .NET 8 **Control Panel** (the classic Administrator has been retired).
 
 What's new in 6.0
 =================
@@ -82,6 +82,32 @@ change until the new settings are turned on.
 **Supply chain & quality gates**
 
    * SPDX + CycloneDX SBOMs (Syft) attached to every release, Dependabot CVE alerts + grouped update PRs, and a dependency-review PR gate.
+
+6.2.5
+=====
+
+A critical fix release for default fresh installs. The 6.2.4 installer's default
+configuration (built-in SQL Server Compact database with DPAPI secret protection,
+both shipped defaults) could not connect to its own database after a clean install.
+Two independent defects were responsible; both are fixed and the default install
+is now validated end-to-end on a clean Windows Server 2025 machine:
+
+   * **DPAPI database-password truncation.** Protected INI secrets (the database
+     password, and likewise long OAuth2 HMAC secrets / the password pepper) are
+     stored as a DPAPI base64 envelope that exceeds 255 characters. The INI reader
+     used a fixed 255-character buffer, silently truncating the value; the truncated
+     blob failed to decrypt and yielded an empty password, so the server reported
+     SQL CE "Authentication failed" (error 25028). The buffer was enlarged to 4096.
+   * **Fresh-install database version.** The create-table scripts still stamped the
+     new database as schema 6004 while the server required 6005, so a clean install
+     reported "database too old". The create scripts now stamp 6005 (the required
+     column was already present).
+
+Active Directory authentication was also validated end-to-end against a live domain
+controller (COM `ValidatePassword` for DNS and NetBIOS domain forms, plus real IMAP
+login), and the Control Panel reached full settings parity with the classic
+Administrator (the Server-status page and the per-account rule criteria/action
+editor were the last items confirmed).
 
 Building hMailServer
 ====================
