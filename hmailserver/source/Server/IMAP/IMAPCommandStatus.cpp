@@ -89,8 +89,9 @@ namespace HM
          sResponse +=sTemp;
       }
 
-      if (sFlags.FindNoCase(_T("RECENT")) >= 0)
+      if (sFlags.FindNoCase(_T("RECENT")) >= 0 && !pConnection->GetImap4Rev2Enabled())
       {
+         // RFC 9051 (IMAP4rev2): RECENT was removed as a STATUS data item.
          String sTemp;
          long lNoOfRecent = (int) pConnection->GetRecentMessages().size();
          sTemp.Format(_T("RECENT %d"), lNoOfRecent);

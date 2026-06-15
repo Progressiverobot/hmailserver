@@ -115,6 +115,15 @@ namespace HM
          }
       }
 
+      // RFC 9051 (IMAP4rev2): once the client has enabled IMAP4rev2, a SEARCH (or UID
+      // SEARCH) without an explicit RETURN clause still returns its results in an
+      // ESEARCH response (with the ALL result option), not the legacy "* SEARCH" line.
+      if (!is_sort_ && !is_esearch_ && pConnection->GetImap4Rev2Enabled())
+      {
+         is_esearch_ = true;
+         esearch_all_ = true;
+      }
+
       std::shared_ptr<IMAPSearchParser> pParser = std::shared_ptr<IMAPSearchParser>(new IMAPSearchParser());
       IMAPResult result = pParser->ParseCommand(pArgument, is_sort_);
       if (result.GetResult() != IMAPResult::ResultOK)

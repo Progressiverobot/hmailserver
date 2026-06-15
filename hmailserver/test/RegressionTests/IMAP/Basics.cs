@@ -359,6 +359,141 @@ namespace RegressionTests.IMAP
       }
 
       [Test]
+      [Description("RFC 9051 (IMAP4rev2): the IMAP4rev2 capability is advertised in CAPABILITY and " +
+                   "ENABLE IMAP4rev2 echoes an * ENABLED IMAP4rev2 response.")]
+      public void TestEnableImap4Rev2EchoesEnabled()
+      {
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "rev2enable@example.test", "test");
+
+         var simulator = new ImapClientSimulator();
+         simulator.Connect();
+         simulator.LogonWithLiteral("rev2enable@example.test", "test");
+
+         var caps = simulator.GetCapabilities();
+         Assert.IsTrue(caps.Contains("IMAP4rev2"), "CAPABILITY should advertise IMAP4rev2. " + caps);
+
+         string result = simulator.SendSingleCommand("A01 ENABLE IMAP4rev2");
+         Assert.IsTrue(result.Contains("* ENABLED IMAP4rev2"),
+            "ENABLE IMAP4rev2 should echo an ENABLED response. " + result);
+         Assert.IsTrue(result.Contains("A01 OK"), result);
+
+         simulator.Disconnect();
+      }
+
+      [Test]
+      [Description("RFC 9051 (IMAP4rev2): once IMAP4rev2 is enabled, SELECT must not emit the RECENT " +
+                   "untagged response nor the obsolete [UNSEEN] response code. In IMAP4rev1 mode both are present.")]
+      public void TestImap4Rev2SelectOmitsRecentAndUnseen()
+      {
+         var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "rev2select@example.test", "test");
+
+         // Deliver one (unseen, recent) message so that IMAP4rev1 SELECT would emit
+         // both a "* n RECENT" line and an "* OK [UNSEEN ...]" response code.
+         var smtp = new SmtpClientSimulator();
+         smtp.Send(account.Address, account.Address, "Rev2 select", "Body");
+         ImapClientSimulator.AssertMessageCount(account.Address, "test", "INBOX", 1);
+
+         // IMAP4rev1 (no ENABLE) — both RECENT and UNSEEN must be present.
+         var rev1 = new ImapClientSimulator();
+         Assert.IsTrue(rev1.ConnectAndLogon(account.Address, "test"));
+         string rev1Select = rev1.SendSingleCommand("A01 SELECT INBOX");
+         Assert.IsTrue(rev1Select.Contains("RECENT"),
+            "IMAP4rev1 SELECT should still emit the RECENT response. " + rev1Select);
+         Assert.IsTrue(rev1Select.Contains("[UNSEEN"),
+            "IMAP4rev1 SELECT should still emit the [UNSEEN] response code. " + rev1Select);
+         rev1.Disconnect();
+
+         // IMAP4rev2 — neither RECENT nor [UNSEEN] may appear.
+         var rev2 = new ImapClientSimulator();
+         Assert.IsTrue(rev2.ConnectAndLogon(account.Address, "test"));
+         Assert.IsTrue(rev2.SendSingleCommand("A01 ENABLE IMAP4rev2").Contains("* ENABLED IMAP4rev2"));
+         string rev2Select = rev2.SendSingleCommand("A02 SELECT INBOX");
+         Assert.IsFalse(rev2Select.Contains("RECENT"),
+            "IMAP4rev2 SELECT must not emit the RECENT response. " + rev2Select);
+         Assert.IsFalse(rev2Select.Contains("UNSEEN"),
+            "IMAP4rev2 SELECT must not emit the [UNSEEN] response code. " + rev2Select);
+         Assert.IsTrue(rev2Select.Contains("A02 OK"),
+            "IMAP4rev2 SELECT should still complete with a tagged OK. " + rev2Select);
+         rev2.Disconnect();
+      }
+
+      [Test]
+      [Description("RFC 9051 (IMAP4rev2): once IMAP4rev2 is enabled, a plain SEARCH (no RETURN clause) " +
+                   "returns its results in an ESEARCH response by default; UID SEARCH adds the UID marker.")]
+      public void TestImap4Rev2SearchReturnsEsearchByDefault()
+      {
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "rev2search@example.test", "test");
+
+         var simulator = new ImapClientSimulator();
+         simulator.Connect();
+         simulator.LogonWithLiteral("rev2search@example.test", "test");
+
+         simulator.SendSingleCommandWithLiteral("A01 APPEND INBOX {4}", "AAAA");
+         simulator.SendSingleCommandWithLiteral("A02 APPEND INBOX {4}", "BBBB");
+
+         // IMAP4rev1 (no ENABLE): a plain SEARCH yields the legacy "* SEARCH" line.
+         simulator.SelectFolder("INBOX");
+         string rev1Search = simulator.SendSingleCommand("A03 SEARCH ALL");
+         Assert.IsTrue(rev1Search.Contains("* SEARCH"),
+            "IMAP4rev1 SEARCH should produce a legacy * SEARCH response. " + rev1Search);
+         Assert.IsFalse(rev1Search.Contains("* ESEARCH"),
+            "IMAP4rev1 SEARCH should not produce an ESEARCH response. " + rev1Search);
+
+         // Enable IMAP4rev2: the same plain SEARCH now returns an ESEARCH response.
+         Assert.IsTrue(simulator.SendSingleCommand("A04 ENABLE IMAP4rev2").Contains("* ENABLED IMAP4rev2"));
+
+         string rev2Search = simulator.SendSingleCommand("A05 SEARCH ALL");
+         Assert.IsTrue(rev2Search.Contains("* ESEARCH"),
+            "IMAP4rev2 SEARCH must default to an ESEARCH response. " + rev2Search);
+         Assert.IsTrue(rev2Search.Contains("(TAG \"A05\")"),
+            "The ESEARCH response must echo the command tag. " + rev2Search);
+         Assert.IsTrue(rev2Search.Contains("ALL "),
+            "IMAP4rev2 SEARCH should carry the ALL result option. " + rev2Search);
+         Assert.IsFalse(rev2Search.Contains("* SEARCH"),
+            "IMAP4rev2 SEARCH must not emit the legacy * SEARCH line. " + rev2Search);
+
+         string rev2UidSearch = simulator.SendSingleCommand("A06 UID SEARCH ALL");
+         Assert.IsTrue(rev2UidSearch.Contains("* ESEARCH"),
+            "IMAP4rev2 UID SEARCH must default to an ESEARCH response. " + rev2UidSearch);
+         Assert.IsTrue(rev2UidSearch.Contains(" UID "),
+            "IMAP4rev2 UID SEARCH must include the UID marker. " + rev2UidSearch);
+
+         simulator.Disconnect();
+      }
+
+      [Test]
+      [Description("RFC 9051 (IMAP4rev2): RECENT was removed as a STATUS data item, so once IMAP4rev2 is " +
+                   "enabled it must not be returned even if requested; the rest of the STATUS items are unaffected.")]
+      public void TestImap4Rev2StatusOmitsRecent()
+      {
+         var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "rev2status@example.test", "test");
+
+         var smtp = new SmtpClientSimulator();
+         smtp.Send(account.Address, account.Address, "Rev2 status", "Body");
+         ImapClientSimulator.AssertMessageCount(account.Address, "test", "INBOX", 1);
+
+         var simulator = new ImapClientSimulator();
+         Assert.IsTrue(simulator.ConnectAndLogon(account.Address, "test"));
+
+         // IMAP4rev1: RECENT is a valid STATUS item.
+         string rev1Status = simulator.SendSingleCommand("A01 STATUS INBOX (MESSAGES RECENT)");
+         Assert.IsTrue(rev1Status.Contains("RECENT"),
+            "IMAP4rev1 STATUS should still return the RECENT item. " + rev1Status);
+
+         // IMAP4rev2: RECENT must be suppressed even though it was requested.
+         Assert.IsTrue(simulator.SendSingleCommand("A02 ENABLE IMAP4rev2").Contains("* ENABLED IMAP4rev2"));
+         string rev2Status = simulator.SendSingleCommand("A03 STATUS INBOX (MESSAGES RECENT)");
+         Assert.IsFalse(rev2Status.Contains("RECENT"),
+            "IMAP4rev2 STATUS must not return the RECENT item. " + rev2Status);
+         Assert.IsTrue(rev2Status.Contains("MESSAGES"),
+            "IMAP4rev2 STATUS should still return the other requested items. " + rev2Status);
+         Assert.IsTrue(rev2Status.Contains("A03 OK"),
+            "IMAP4rev2 STATUS should complete with a tagged OK. " + rev2Status);
+
+         simulator.Disconnect();
+      }
+
+      [Test]
       [Description("RFC 7162: after ENABLE CONDSTORE, SELECT reports the mailbox HIGHESTMODSEQ; " +
                    "STATUS reports the HIGHESTMODSEQ attribute.")]
       public void TestSelectAndStatusReportHighestModSeq()

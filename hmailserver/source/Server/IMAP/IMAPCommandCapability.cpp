@@ -18,7 +18,7 @@ namespace HM
    IMAPResult
    IMAPCommandCapability::ExecuteCommand(std::shared_ptr<IMAPConnection> pConnection, std::shared_ptr<IMAPCommandArgument> pArgument)
    {
-      String sResponse = "* CAPABILITY IMAP4 IMAP4rev1 CHILDREN";
+      String sResponse = "* CAPABILITY IMAP4 IMAP4rev1 IMAP4rev2 CHILDREN";
       
       std::shared_ptr<IMAPConfiguration> pConfig = Configuration::Instance()->GetIMAPConfiguration();
 

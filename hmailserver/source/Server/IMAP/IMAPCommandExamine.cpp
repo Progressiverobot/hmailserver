@@ -98,16 +98,21 @@ namespace HM
       sRespTemp.Format(_T("* %d EXISTS\r\n"), lCount);
       String sResponse = sRespTemp; // EXISTS
 
-      sRespTemp.Format(_T("* %d RECENT\r\n"), lRecentCount);
-      sResponse += sRespTemp;
+      // RFC 9051 (IMAP4rev2): the RECENT response and the \Recent flag were removed.
+      if (!pConnection->GetImap4Rev2Enabled())
+      {
+         sRespTemp.Format(_T("* %d RECENT\r\n"), lRecentCount);
+         sResponse += sRespTemp;
+      }
 
       sResponse += _T("* FLAGS (\\Deleted \\Seen \\Draft \\Answered \\Flagged)\r\n");
    
       sRespTemp.Format(_T("* OK [UIDVALIDITY %d] current uidvalidity\r\n"), pSelectedFolder->GetCreationTime().ToInt());   
       sResponse += sRespTemp;
 
-      if (lFirstUnseenID > 0)
+      if (lFirstUnseenID > 0 && !pConnection->GetImap4Rev2Enabled())
       {
+         // RFC 9051 (IMAP4rev2): the [UNSEEN] response code on EXAMINE was removed.
          sRespTemp.Format(_T("* OK [UNSEEN %d] unseen messages\r\n"), lFirstUnseenID);
          sResponse += sRespTemp;
       }

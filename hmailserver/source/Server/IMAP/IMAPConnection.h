@@ -127,6 +127,13 @@ namespace HM
       bool GetUtf8AcceptEnabled() const { return utf8_accept_enabled_; }
       void SetUtf8AcceptEnabled(bool bNewVal) { utf8_accept_enabled_ = bNewVal; }
 
+      // RFC 9051 (IMAP4rev2): whether the client has switched the session to
+      // IMAP4rev2 semantics via "ENABLE IMAP4rev2" (ESEARCH responses by default,
+      // no RECENT / \Recent, the obsolete [UNSEEN] response code suppressed, and
+      // UTF-8 acceptance).
+      bool GetImap4Rev2Enabled() const { return imap4rev2_enabled_; }
+      void SetImap4Rev2Enabled(bool bNewVal) { imap4rev2_enabled_ = bNewVal; }
+
       // RFC 5182 (SEARCHRES): the most recent "SEARCH RETURN (SAVE)" result for this
       // session, stored as UIDs so the "$" marker stays stable across expunges. An
       // empty vector means the saved result is the empty set.
@@ -224,6 +231,7 @@ namespace HM
       bool condstore_enabled_;
       bool qresync_enabled_;
       bool utf8_accept_enabled_;
+      bool imap4rev2_enabled_;
 
       // RFC 5182 (SEARCHRES): UIDs saved by the last "SEARCH RETURN (SAVE)".
       std::vector<__int64> saved_search_result_;

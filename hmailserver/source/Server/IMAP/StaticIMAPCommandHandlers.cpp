@@ -170,6 +170,17 @@ namespace HM
          sEnabled += _T(" UTF8=ACCEPT");
       }
 
+      // RFC 9051: switch the session to IMAP4rev2 semantics. A server that offers
+      // both IMAP4rev1 and IMAP4rev2 stays in rev1 behaviour until the client opts
+      // in with "ENABLE IMAP4rev2". Enabling it also implies UTF-8 acceptance
+      // (RFC 9051 sect. 5.1), so message data / responses may carry UTF-8.
+      if (sUpper.Find(_T("IMAP4REV2")) >= 0)
+      {
+         pConnection->SetImap4Rev2Enabled(true);
+         pConnection->SetUtf8AcceptEnabled(true);
+         sEnabled += _T(" IMAP4rev2");
+      }
+
       // RFC 5161: only emit the untagged ENABLED response when at least one
       // recognised extension was actually switched on.
       if (!sEnabled.IsEmpty())

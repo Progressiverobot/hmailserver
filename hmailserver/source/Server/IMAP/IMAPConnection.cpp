@@ -57,6 +57,7 @@ namespace HM
       condstore_enabled_(false),
       qresync_enabled_(false),
       utf8_accept_enabled_(false),
+      imap4rev2_enabled_(false),
       literal_data_to_receive_(0),
       pending_disconnect_(false),
       current_folder_read_only_(false),
