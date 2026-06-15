@@ -103,6 +103,10 @@ namespace hMailServer.ControlPanel.Views
 
             KpiProcessed.Text = snap.ProcessedMessages.ToString("N0");
             KpiQueue.Text = snap.QueueLength.ToString("N0");
+            // Colour encodes state, not category: the queue only turns amber when
+            // messages are visibly backing up, otherwise it stays neutral.
+            KpiQueue.SetResourceReference(ForegroundProperty,
+               snap.QueueLength > 100 ? "AppWarningBrush" : "TextFillColorPrimaryBrush");
             KpiSpam.Text = snap.SpamBlocked.ToString("N0");
             KpiViruses.Text = snap.VirusesRemoved.ToString("N0");
             KpiUptime.Text = FormatUptime(snap.StartTime);
@@ -121,6 +125,13 @@ namespace hMailServer.ControlPanel.Views
             lastProcessed_ = snap.ProcessedMessages;
             lastSample_ = now;
 
+            // Show a quiet placeholder over each chart until there is real
+            // activity, instead of a "broken-looking" flat line on the axis.
+            ThroughputEmpty.Visibility = HasActivity(throughput_)
+               ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
+            SessionsEmpty.Visibility = (HasActivity(smtp_) || HasActivity(imap_) || HasActivity(pop3_))
+               ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
+
             SubtitleText.Text = "Live server statistics - last update " + DateTime.Now.ToLongTimeString();
          }
          catch (Exception)
@@ -135,6 +146,14 @@ namespace hMailServer.ControlPanel.Views
          series.Add(new ObservableValue(value));
          while (series.Count > HistoryLength)
             series.RemoveAt(0);
+      }
+
+      private static bool HasActivity(ObservableCollection<ObservableValue> series)
+      {
+         foreach (ObservableValue v in series)
+            if (v.Value.GetValueOrDefault() > 0)
+               return true;
+         return false;
       }
 
       private static string FormatUptime(string startTime)

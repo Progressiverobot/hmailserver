@@ -14,7 +14,7 @@ namespace hMailServer.ControlPanel.Views
 
       public AboutView()
       {
-         var panel = new StackPanel { Margin = new Thickness(26, 20, 26, 20), MaxWidth = 680, HorizontalAlignment = HorizontalAlignment.Left };
+         var panel = new StackPanel { Margin = new Thickness(26, 20, 26, 20), MaxWidth = 880, HorizontalAlignment = HorizontalAlignment.Left };
 
          var title = new TextBlock { Text = "About" };
          title.SetResourceReference(StyleProperty, "PageTitle");

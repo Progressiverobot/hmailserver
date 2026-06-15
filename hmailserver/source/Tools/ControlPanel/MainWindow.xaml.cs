@@ -325,6 +325,9 @@ namespace hMailServer.ControlPanel
             {
             }
          }
+
+         // Make sure the semantic tokens match whatever theme we just applied.
+         Services.ThemeTokens.Refresh();
       }
 
       private void Theme_Click(object sender, RoutedEventArgs e)
@@ -340,6 +343,9 @@ namespace hMailServer.ControlPanel
 
          bool toLight = ApplicationThemeManager.GetAppTheme() == ApplicationTheme.Dark;
          ApplicationThemeManager.Apply(toLight ? ApplicationTheme.Light : ApplicationTheme.Dark);
+
+         // Recompute semantic tokens for the newly applied theme.
+         Services.ThemeTokens.Refresh();
 
          try
          {

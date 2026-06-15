@@ -147,7 +147,11 @@ namespace hMailServer.ControlPanel.Views
             actions.Children.Add(MakeButton("Add", ControlAppearance.Primary, SymbolRegular.Add24, (_, _) => OpenDialog(null)));
          actions.Children.Add(MakeButton("Edit", ControlAppearance.Secondary, SymbolRegular.Edit24, (_, _) => EditSelected()));
          if (spec_.CanDelete)
-            actions.Children.Add(MakeButton("Delete", ControlAppearance.Danger, SymbolRegular.Delete24, (_, _) => DeleteSelected()));
+         {
+            var del = MakeButton("Delete", ControlAppearance.Secondary, SymbolRegular.Delete24, (_, _) => DeleteSelected());
+            del.Foreground = Services.ThemeTokens.Danger;
+            actions.Children.Add(del);
+         }
          actions.Children.Add(MakeButton("Refresh", ControlAppearance.Secondary, SymbolRegular.ArrowSync24, (_, _) => Reload()));
          toolbar.Children.Add(actions);
          Grid.SetRow(toolbar, 1);

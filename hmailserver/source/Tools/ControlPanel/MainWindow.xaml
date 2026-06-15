@@ -57,13 +57,60 @@
                           ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                     <TreeView.ItemContainerStyle>
                         <Style TargetType="TreeViewItem">
-                            <Setter Property="Padding" Value="4,5" />
+                            <Setter Property="Padding" Value="6,6" />
                             <Setter Property="Margin" Value="0,1" />
                             <Setter Property="FontSize" Value="13" />
                             <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                            <Setter Property="Background" Value="Transparent" />
+                            <Setter Property="HorizontalContentAlignment" Value="Left" />
+                            <Setter Property="VerticalContentAlignment" Value="Center" />
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="TreeViewItem">
+                                        <StackPanel>
+                                            <Border x:Name="Bd" CornerRadius="6" Cursor="Hand"
+                                                    Background="{TemplateBinding Background}" SnapsToDevicePixels="True">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="18" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Rectangle x:Name="Pill" Grid.Column="0" Width="3" Height="15"
+                                                               RadiusX="1.5" RadiusY="1.5" HorizontalAlignment="Left"
+                                                               Margin="1,0,0,0" Fill="{StaticResource BrandBrush}" Opacity="0" />
+                                                    <ToggleButton x:Name="Expander" Grid.Column="0" ClickMode="Press"
+                                                                  Style="{StaticResource NavExpanderToggle}"
+                                                                  IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}}" />
+                                                    <ContentPresenter x:Name="PART_Header" Grid.Column="1" ContentSource="Header"
+                                                                      HorizontalAlignment="Left" VerticalAlignment="Center"
+                                                                      Margin="{TemplateBinding Padding}" />
+                                                </Grid>
+                                            </Border>
+                                            <ItemsPresenter x:Name="ItemsHost" Margin="10,0,0,0" />
+                                        </StackPanel>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsExpanded" Value="False">
+                                                <Setter TargetName="ItemsHost" Property="Visibility" Value="Collapsed" />
+                                            </Trigger>
+                                            <Trigger Property="HasItems" Value="False">
+                                                <Setter TargetName="Expander" Property="Visibility" Value="Collapsed" />
+                                            </Trigger>
+                                            <Trigger SourceName="Bd" Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                                                <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                                            </Trigger>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                                                <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                <Setter TargetName="Pill" Property="Opacity" Value="1" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
                             <Style.Triggers>
-                                <Trigger Property="IsSelected" Value="True">
-                                    <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                                <Trigger Property="HasItems" Value="True">
+                                    <Setter Property="FontWeight" Value="SemiBold" />
                                 </Trigger>
                             </Style.Triggers>
                         </Style>

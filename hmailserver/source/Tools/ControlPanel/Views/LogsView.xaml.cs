@@ -26,12 +26,15 @@ namespace hMailServer.ControlPanel.Views
       private long position_;
       private bool paused_;
 
-      private static readonly Brush DefaultBrush = new SolidColorBrush(Color.FromRgb(0xC9, 0xD1, 0xD9));
-      private static readonly Brush SmtpBrush = new SolidColorBrush(Color.FromRgb(0x3F, 0xB9, 0x50));
-      private static readonly Brush ImapBrush = new SolidColorBrush(Color.FromRgb(0xA3, 0x71, 0xF7));
-      private static readonly Brush Pop3Brush = new SolidColorBrush(Color.FromRgb(0xD2, 0x99, 0x22));
-      private static readonly Brush ErrorBrush = new SolidColorBrush(Color.FromRgb(0xF8, 0x51, 0x49));
-      private static readonly Brush AppBrush = new SolidColorBrush(Color.FromRgb(0x2F, 0x81, 0xF7));
+      // Theme-aware, shared brush instances. Because each line holds a reference
+      // to one of these, recolouring on a theme switch updates every visible
+      // line live (see Services.ThemeTokens).
+      private static Brush DefaultBrush => Services.ThemeTokens.LogDefault;
+      private static Brush SmtpBrush => Services.ThemeTokens.LogSmtp;
+      private static Brush ImapBrush => Services.ThemeTokens.LogImap;
+      private static Brush Pop3Brush => Services.ThemeTokens.LogPop3;
+      private static Brush ErrorBrush => Services.ThemeTokens.LogError;
+      private static Brush AppBrush => Services.ThemeTokens.LogApp;
 
       public LogsView()
       {

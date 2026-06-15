@@ -16,7 +16,7 @@ namespace hMailServer.ControlPanel.Views
 
       private readonly TextBlock status_ = new()
       {
-         Foreground = System.Windows.Media.Brushes.IndianRed,
+         Foreground = Services.ThemeTokens.Danger,
          TextWrapping = TextWrapping.Wrap,
          VerticalAlignment = VerticalAlignment.Center,
          Margin = new Thickness(2, 0, 8, 0)
@@ -551,9 +551,9 @@ namespace hMailServer.ControlPanel.Views
          pwStrength_.Text = summary;
          pwStrength_.Foreground = level switch
          {
-            PasswordStrength.Level.Strong => System.Windows.Media.Brushes.MediumSeaGreen,
-            PasswordStrength.Level.Fair => System.Windows.Media.Brushes.Goldenrod,
-            PasswordStrength.Level.Weak => System.Windows.Media.Brushes.IndianRed,
+            PasswordStrength.Level.Strong => Services.ThemeTokens.Success,
+            PasswordStrength.Level.Fair => Services.ThemeTokens.Warning,
+            PasswordStrength.Level.Weak => Services.ThemeTokens.Danger,
             _ => System.Windows.Media.Brushes.Gray,
          };
       }

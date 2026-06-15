@@ -63,7 +63,8 @@
                 <StackPanel Orientation="Horizontal">
                     <ui:Button x:Name="SavePermsButton" Content="Save permissions" Appearance="Primary" Click="SavePerms_Click" IsEnabled="False" Margin="0,0,8,0" />
                     <ui:Button Content="Properties…" Click="Edit_Click" Margin="0,0,8,0" />
-                    <ui:Button Content="Delete selected range" Appearance="Danger" Click="Delete_Click" />
+                    <ui:Button Content="Delete selected range" Appearance="Secondary"
+                               Foreground="{DynamicResource AppDangerBrush}" Click="Delete_Click" />
                 </StackPanel>
             </StackPanel>
         </Border>

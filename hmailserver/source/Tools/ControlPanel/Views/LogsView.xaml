@@ -31,9 +31,18 @@
                      FontFamily="Cascadia Mono, Consolas" FontSize="12"
                      ScrollViewer.HorizontalScrollBarVisibility="Auto"
                      VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling">
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="Padding" Value="6,0" />
+                        <Setter Property="MinHeight" Value="0" />
+                        <Setter Property="Margin" Value="0" />
+                        <Setter Property="BorderThickness" Value="0" />
+                    </Style>
+                </ListBox.ItemContainerStyle>
                 <ListBox.ItemTemplate>
                     <DataTemplate>
-                        <TextBlock Text="{Binding Text}" Foreground="{Binding Brush}" TextWrapping="NoWrap" />
+                        <TextBlock Text="{Binding Text}" Foreground="{Binding Brush}" TextWrapping="NoWrap"
+                                   LineHeight="17" LineStackingStrategy="BlockLineHeight" />
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>

@@ -111,9 +111,9 @@ namespace hMailServer.ControlPanel.Views
             {
                Text = Convert.ToString(shown) ?? "",
                FontSize = 13,
-               MaxWidth = 520,
+               MaxWidth = Numeric ? 180 : 520,
                HorizontalAlignment = HorizontalAlignment.Left,
-               MinWidth = 320
+               MinWidth = Numeric ? 120 : 320
             };
             SetAid(box_, Path);
             panel.Children.Add(box_);
@@ -224,13 +224,13 @@ namespace hMailServer.ControlPanel.Views
                   (bool ok, string text) r = Action();
                   result_.Text = r.text;
                   result_.Foreground = r.ok
-                     ? System.Windows.Media.Brushes.MediumSeaGreen
-                     : System.Windows.Media.Brushes.IndianRed;
+                     ? Services.ThemeTokens.Success
+                     : Services.ThemeTokens.Danger;
                }
                catch (Exception ex)
                {
                   result_.Text = "Test failed: " + ex.Message;
-                  result_.Foreground = System.Windows.Media.Brushes.IndianRed;
+                  result_.Foreground = Services.ThemeTokens.Danger;
                }
             };
             panel.Children.Add(btn);

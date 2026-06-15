@@ -33,7 +33,7 @@
                 <ui:Button x:Name="ConnectButton" Content="Connect" Appearance="Primary"
                            HorizontalAlignment="Stretch" Height="38" Click="Connect_Click" />
 
-                <TextBlock x:Name="ErrorText" Foreground="#F85149" FontSize="12" Margin="0,12,0,0"
+                <TextBlock x:Name="ErrorText" Foreground="{DynamicResource AppDangerBrush}" FontSize="12" Margin="0,12,0,0"
                            TextWrapping="Wrap" Visibility="Collapsed" />
 
                 <ui:HyperlinkButton Content="Set up two-factor authentication…" Click="Totp_Click"

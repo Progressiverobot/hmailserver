@@ -14,6 +14,10 @@ namespace hMailServer.ControlPanel
 
          DispatcherUnhandledException += OnDispatcherUnhandledException;
          AppDomain.CurrentDomain.UnhandledException += OnDomainUnhandledException;
+
+         // Register the semantic colour tokens before any window loads so that
+         // every page resolves on-brand, theme-aware state colours.
+         Services.ThemeTokens.Initialize();
       }
 
       private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs args)

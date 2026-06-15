@@ -27,6 +27,40 @@
                 <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
             </Style>
 
+            <!-- Chevron expander used by the sidebar TreeViewItem template. -->
+            <Style x:Key="NavExpanderToggle" TargetType="ToggleButton">
+                <Setter Property="Focusable" Value="False" />
+                <Setter Property="Width" Value="16" />
+                <Setter Property="Height" Value="16" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ToggleButton">
+                            <Border Background="Transparent" Width="16" Height="16">
+                                <Path x:Name="Chevron" Data="M 4 2 L 8 6 L 4 10"
+                                      Stroke="{DynamicResource TextFillColorTertiaryBrush}"
+                                      StrokeThickness="1.4" StrokeEndLineCap="Round" StrokeStartLineCap="Round"
+                                      HorizontalAlignment="Center" VerticalAlignment="Center"
+                                      RenderTransformOrigin="0.5,0.5">
+                                    <Path.RenderTransform>
+                                        <RotateTransform Angle="0" />
+                                    </Path.RenderTransform>
+                                </Path>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsChecked" Value="True">
+                                    <Setter TargetName="Chevron" Property="RenderTransform">
+                                        <Setter.Value>
+                                            <RotateTransform Angle="90" />
+                                        </Setter.Value>
+                                    </Setter>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
             <!-- Sidebar navigation item -->
             <Style x:Key="NavItem" TargetType="RadioButton">
                 <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
@@ -194,6 +228,55 @@
                                                       ContentSource="SelectedContent" />
                                 </Border>
                             </Grid>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- ============================================================
+                 Data grids. Replace the flat, hard-to-scan default rows with
+                 readable rows: a single-row hairline divider, a hover/selection
+                 fill, semibold low-key column headers on a 1px rule, and no
+                 cell focus rectangle. Applied implicitly so every DataGrid
+                 (ports, IP ranges, certificates, relays, list editors) matches. -->
+            <Style TargetType="DataGridColumnHeader">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                <Setter Property="FontSize" Value="12" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="Padding" Value="10,8" />
+                <Setter Property="BorderThickness" Value="0,0,0,1" />
+                <Setter Property="BorderBrush" Value="{DynamicResource ControlElevationBorderBrush}" />
+                <Setter Property="HorizontalContentAlignment" Value="Left" />
+                <Setter Property="SeparatorVisibility" Value="Collapsed" />
+            </Style>
+
+            <Style TargetType="DataGridRow">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                <Style.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True">
+                        <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                    </Trigger>
+                    <Trigger Property="IsSelected" Value="True">
+                        <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+
+            <Style TargetType="DataGridCell">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                <Setter Property="FontSize" Value="13" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="DataGridCell">
+                            <Border Background="{TemplateBinding Background}" Padding="10,0"
+                                    BorderThickness="0,0,0,1"
+                                    BorderBrush="{DynamicResource ControlElevationBorderBrush}">
+                                <ContentPresenter VerticalAlignment="Center" />
+                            </Border>
                         </ControlTemplate>
                     </Setter.Value>
                 </Setter>
