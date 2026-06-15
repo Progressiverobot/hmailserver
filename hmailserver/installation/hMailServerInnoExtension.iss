@@ -373,63 +373,68 @@ end;
 
 procedure CreateWizardPages();
 var
-   moreInfoLink : TLabel;
-   moreInfoFont : TFont;
+   moreInfoLink : TNewStaticText;
+   intro : TNewStaticText;
 
 begin
-   g_pageDBType := CreateCustomPage(wpSelectComponents, 'Select database server type', 'Database type');
+   g_pageDBType := CreateCustomPage(wpSelectComponents, 'Select database server type', 'Choose where hMailServer stores its data');
 
-    { useMySQL }
+   intro := TNewStaticText.Create(g_pageDBType);
+   with intro do
+   begin
+     Parent := g_pageDBType.Surface;
+     AutoSize := False;
+     WordWrap := True;
+     Left := ScaleX(0);
+     Top := ScaleY(6);
+     Width := g_pageDBType.SurfaceWidth;
+     Height := ScaleY(30);
+     Caption := 'hMailServer can use its own built-in database, or connect to an external database server you already run.';
+   end;
+
+    { built-in database }
    rdoUseInternal := TRadioButton.Create(g_pageDBType);
    with rdoUseInternal do
    begin
      Parent := g_pageDBType.Surface;
-     Left := 32;
-     Top := 40;
-     Width := g_pageDBType.Surface.Width;
-     Height := 40;
-     Caption := 'Use built-in database engine (Microsoft SQL Compact)';
+     Left := ScaleX(8);
+     Top := ScaleY(48);
+     Width := g_pageDBType.SurfaceWidth - ScaleX(16);
+     Height := ScaleY(20);
+     Caption := 'Use the built-in database engine (no separate database server required - recommended)';
      TabOrder := 0;
-     if (g_bUseInternal) then
-        Checked := True
-     else
-        Checked := False;
+     Checked := g_bUseInternal;
      OnClick := @rdoUseInternal_Click;
    end;
 
-   { useExternalDB }
+   { external database }
    rdoUseExternal := TRadioButton.Create(g_pageDBType);
    with rdoUseExternal do
    begin
      Parent := g_pageDBType.Surface;
-     Left := 32;
-     Top := 90;
-     Width := g_pageDBType.Surface.Width
-	 Height := 40;
-     Caption := 'Use external database engine (MSSQL, MySQL or PostgreSQL)';
+     Left := ScaleX(8);
+     Top := ScaleY(84);
+     Width := g_pageDBType.SurfaceWidth - ScaleX(16);
+     Height := ScaleY(20);
+     Caption := 'Use an external database engine (Microsoft SQL Server, MySQL/MariaDB or PostgreSQL)';
      TabOrder := 1;
-     if (g_bUseInternal) then
-        Checked := False
-     else
-        Checked := True;
+     Checked := not g_bUseInternal;
      OnClick := @rdoUseExternal_Click;
    end;
 
-   moreInfoFont := TFont.Create();
-   moreInfoFont.Style := [fsUnderline];
-   moreInfoFont.Color := clBlue;
-
-   moreInfoLink := TLabel.Create(g_pageDBType);
+   moreInfoLink := TNewStaticText.Create(g_pageDBType);
    with moreInfoLink do
    begin
      Parent := g_pageDBType.Surface;
-     Left := 32;
-     Top := 140;
-     Width := 329;
-     Height := 40;
-     Caption := 'More information...';
+     Left := ScaleX(8);
+     Top := ScaleY(120);
+     Width := ScaleX(360);
+     Height := ScaleY(20);
+     Cursor := crHand;
+     Font.Style := [fsUnderline];
+     Font.Color := clBlue;
+     Caption := 'More information about choosing a database engine...';
      OnClick := @moreInfoLink_Click;
-     Font := moreInfoFont;
    end;
 
  	 // Create key page
