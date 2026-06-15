@@ -21,6 +21,7 @@
 #include "SQLScriptRunner.h"
 
 #include "../Util/ServerStatus.h"
+#include "../Util/OtelTracer.h"
 
 #include <boost/chrono.hpp>
 
@@ -228,6 +229,32 @@ namespace HM
          logLine.Format(_T("Slow database query (%I64u ms): %s"),
             microseconds / 1000, RedactSqlLiterals_(command.GetQueryString()).c_str());
          LOG_APPLICATION(logLine);
+      }
+
+      // Emit an OpenTelemetry span for the statement (redacted) when tracing is on.
+      // Parents to the active protocol-command span on this thread when present.
+      if (OtelTracer::Instance()->IsEnabled())
+      {
+         std::vector<OtelAttribute> attributes;
+
+         OtelAttribute system;
+         system.key = "db.system";
+         switch (IniFileSettings::Instance()->GetDatabaseType())
+         {
+         case HM::DatabaseSettings::TypeMYSQLServer: system.value = "mysql"; break;
+         case HM::DatabaseSettings::TypeMSSQLServer: system.value = "mssql"; break;
+         case HM::DatabaseSettings::TypePGServer: system.value = "postgresql"; break;
+         case HM::DatabaseSettings::TypeMSSQLCompactEdition: system.value = "sqlce"; break;
+         default: system.value = "unknown"; break;
+         }
+         attributes.push_back(system);
+
+         OtelAttribute statement;
+         statement.key = "db.statement";
+         statement.value = RedactSqlLiterals_(command.GetQueryString());
+         attributes.push_back(statement);
+
+         OtelTracer::Instance()->RecordCompletedSpan("db.query", OtelSpanKindClient, microseconds, attributes);
       }
    }
 

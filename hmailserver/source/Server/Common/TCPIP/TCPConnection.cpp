@@ -14,6 +14,7 @@
 
 #include "../Util/ByteBuffer.h"
 #include "../Util/ServerStatus.h"
+#include "../Util/OtelTracer.h"
 #include "../BO/TCPIPPorts.h"
 #include "../Persistence/PersistentSecurityRange.h"
 
@@ -660,6 +661,15 @@ namespace HM
             try
             {
                boost::chrono::steady_clock::time_point commandStart = boost::chrono::steady_clock::now();
+
+               // OpenTelemetry: span the processing of this command line. The RAII
+               // scope ends the span on every exit path (incl. DisconnectedException)
+               // and, while active, parents any DB-query spans run during ParseData.
+               // No-op unless OtelEndpoint is configured.
+               if (OtelTracer::Instance()->IsEnabled() && otel_trace_id_.IsEmpty())
+                  otel_trace_id_ = OtelTracer::NewTraceId();
+
+               OtelSpanScope otelSpan("command", OtelSpanKindServer, otel_trace_id_);
 
                ParseData(s);
 

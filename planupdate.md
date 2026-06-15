@@ -41,8 +41,10 @@ moved to **Part 2 — Completed work**.*
    auto-test coverage are already done.)*
 4. **B4 — verify only** — confirm SPF passes on forwarded mail (SRS) + DSN interop.
    *(CHUNKING/BDAT is done — see Part 2.)*
-5. **B7 — observability remaining** — OpenTelemetry tracing (SMTP/IMAP/POP/DB
-   spans + OTLP export). *(DB query latency metrics + slow-query log are done — see
+5. **B7 — observability remaining** — broaden OpenTelemetry span coverage (the
+   dependency-free OTLP/HTTP exporter with command + DB spans is done — see Part 2;
+   per-protocol child spans for individual IMAP/POP/SMTP verbs are a future
+   refinement). *(DB query latency metrics + slow-query log are also done — see
    Part 2. A dedicated DB executor + prepared-statement caches were assessed and
    deferred: MySQL/PG inline all statement parameters into SQL text, so a
    text-keyed prepared-statement cache is ineffective and a dedicated executor adds
@@ -119,13 +121,17 @@ SRS for forwarding (SPF alignment), per-IP / per-destination rate shaping, and
 delivery-queue, auth, delivery-outcome and per-command-latency metrics; log
 retention/rotation; message-to-session correlation IDs; the connection-pool
 condition variable; graceful shutdown drain; configurable message-store fsync;
-the message-store consistency check + recovery report; and the HA active/passive
-runbook.*
+the message-store consistency check + recovery report; the HA active/passive
+runbook; and the dependency-free OpenTelemetry OTLP/HTTP trace exporter (command
++ DB spans).*
 
 Remaining:
 
-- **OpenTelemetry** tracing (SMTP/IMAP/POP/DB spans + OTLP export). Message-to-
-  session correlation IDs already ship; full span/OTLP export is future work.
+- **OpenTelemetry — broaden span coverage.** The dependency-free OTLP/HTTP
+  exporter ships (see Part 2): every protocol command is a server span and every
+  database statement a redacted client span nested under it. A future refinement
+  could add per-verb child spans (individual IMAP/POP/SMTP commands) and span
+  events for delivery milestones.
 - Async/DB isolation: dedicated DB executor; prepared-statement caches
   (MySQL/PG). **Assessed and deferred** — MySQL and PostgreSQL both report
   `GetSupportsCommandParameters() == false`, so the DAL flattens every statement's
@@ -463,8 +469,9 @@ MTA-STS, TLS-RPT, auto-ban, correct dot-stuffing, parameterized SQL.*
   (`RedactSqlLiterals_`) so inlined secrets never reach the log. Additive and
   default-off: zero change to query semantics. Asserted by the `DatabaseMetrics`
   test (the query count advances after real account-create + SMTP-deliver +
-  POP3-retrieve activity; the slow-query counter is present and numeric). Full
-  OpenTelemetry DB spans remain future work.
+  POP3-retrieve activity; the slow-query counter is present and numeric). The
+  OpenTelemetry `db.query` spans (see below) reuse the same `RedactSqlLiterals_`
+  redaction on `db.statement`.
 - **Done — log retention/rotation.** A scheduled `LogRetentionTask` (runs once at
   startup, then every 6h) deletes hMailServer's own date-stamped log files older
   than `[Settings] LogDeleteDays` (0 = disabled, the default, so historical
@@ -492,8 +499,30 @@ MTA-STS, TLS-RPT, auto-ban, correct dot-stuffing, parameterized SQL.*
   The same session id prefixes every line of that connection's SMTP session log, so
   a delivered message can be traced back to the exact session that received it
   without any external trace system. Asserted by the `ReceivedHeaders`
-  `TestReceivedHeaderContainsCorrelationId` test (6/6 green). Full OpenTelemetry
-  spans / OTLP export across SMTP/IMAP/POP/DB remain future work.
+  `TestReceivedHeaderContainsCorrelationId` test (6/6 green). Distributed
+  OpenTelemetry spans build on this (see the next item).
+- **Done (post-v6.2.3) — OpenTelemetry OTLP/HTTP trace export.** A dependency-free
+  tracer (`OtelTracer`, `Common/Util/OtelTracer.{h,cpp}`) exports spans over
+  OTLP/HTTP+JSON to any collector — no protobuf/gRPC/opentelemetry-cpp dependency
+  is pulled into the MSVC/ATL build; it uses raw WinSock + a background batching
+  worker, matching the codebase's existing self-contained-listener pattern.
+  Enabled per `[Settings] OtelEndpoint` (default empty = off, so existing installs
+  are unaffected); `[Settings] OtelServiceName` (default `hmailserver`) labels the
+  `service.name` resource attribute. Each protocol line-command is a `Server` span
+  named `command`, and every database statement run during that command is a
+  `Client` span named `db.query` nested under it (a thread-local active-span stack
+  parents the synchronous DB work to the command, since both run on the same
+  io_service worker thread). DB spans carry `db.system` (mysql/mssql/postgresql/
+  sqlce) and `db.statement`, the latter passed through the same `RedactSqlLiterals_`
+  redaction as the slow-query log so SQL literals never leave the process. The
+  exporter batches (≤512 spans), flushes ~1×/s, bounds its queue to 4096 (drops
+  oldest under backpressure), uses 3s socket timeouts and suppresses repeated
+  export-failure log spam. Asserted by the `OpenTelemetryTracing` regression test:
+  a throwaway in-process HTTP collector captures the OTLP POST after real
+  account-create + SMTP-deliver + POP3-retrieve activity and verifies a `db.query`
+  span, the `service.name`/configured service name, `command` spans, the
+  `db.system` attribute, and that the account address was redacted out of every
+  `db.statement` (1/1 green; server + tests build 0/0; SMTP+POP3 sweep green).
 - **Done — delivery-outcome metrics.** `/metrics` exposes
   `hmailserver_messages_delivered_total`, `hmailserver_messages_deferred_total`
   and `hmailserver_messages_bounced_total` counters, incremented from the SMTP

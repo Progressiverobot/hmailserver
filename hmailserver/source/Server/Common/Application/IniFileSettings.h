@@ -152,6 +152,10 @@ namespace HM
       bool GetMessageStoreConsistencyCheck() const { return message_store_consistency_check_; }
       int GetMetricsServerPort() const { return metrics_server_port_; }
       String GetMetricsServerBindAddress() const { return metrics_server_bind_address_; }
+      // OTLP/HTTP collector endpoint for OpenTelemetry trace export (e.g.
+      // http://127.0.0.1:4318/v1/traces). Empty disables tracing.
+      String GetOtelEndpoint() const { return otel_endpoint_; }
+      String GetOtelServiceName() const { return otel_service_name_; }
       int GetManageSieveServerPort() const { return manage_sieve_server_port_; }
       String GetManageSieveServerBindAddress() const { return manage_sieve_server_bind_address_; }
       bool GetArcSealingEnabled() const { return arc_sealing_enabled_; }
@@ -296,6 +300,8 @@ namespace HM
       bool message_store_consistency_check_ = false;
       int metrics_server_port_ = 0;
       String metrics_server_bind_address_;
+      String otel_endpoint_;
+      String otel_service_name_;
       int manage_sieve_server_port_ = 0;
       String manage_sieve_server_bind_address_;
       bool arc_sealing_enabled_ = false;

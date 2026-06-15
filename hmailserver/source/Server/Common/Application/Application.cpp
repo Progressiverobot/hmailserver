@@ -30,6 +30,7 @@
 #include "../Util/Languages.h"
 #include "../Util/Utilities.h"
 #include "../Util/MetricsServer.h"
+#include "../Util/OtelTracer.h"
 #include "../Mime/MimeCode.h"
 
 #include "Property.h"
@@ -357,6 +358,9 @@ namespace HM
          metrics_server_->Start(IniFileSettings::Instance()->GetMetricsServerBindAddress(), metricsPort);
       }
 
+      // Start the OpenTelemetry trace exporter if an OTLP endpoint is configured.
+      OtelTracer::Instance()->Start();
+
       // Start the REST administration API if enabled in hMailServer.ini.
       int restApiPort = IniFileSettings::Instance()->GetRestApiPort();
       if (restApiPort > 0)
@@ -559,6 +563,9 @@ namespace HM
          metrics_server_->Stop();
          metrics_server_.reset();
       }
+
+      // Stop the OpenTelemetry trace exporter (flushes any queued spans).
+      OtelTracer::Instance()->Stop();
 
       if (rest_api_server_)
       {

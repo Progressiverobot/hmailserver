@@ -179,6 +179,10 @@ namespace HM
       int session_id_;
       int timeout_;
 
+      // Lazily-generated per-session OpenTelemetry trace id (32 hex), so every
+      // command span from one connection shares a trace. Empty until first used.
+      AnsiString otel_trace_id_;
+
       AnsiString expected_remote_hostname_;
       std::shared_ptr<Event> disconnected_;
       bool is_ssl_;

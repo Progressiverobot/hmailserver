@@ -262,6 +262,8 @@ namespace HM
       message_store_consistency_check_ = ReadIniSettingInteger_("Settings", "MessageStoreConsistencyCheck", 0) == 1;
       metrics_server_port_ = ReadIniSettingInteger_("Settings", "MetricsServerPort", 0);
       metrics_server_bind_address_ = ReadIniSettingString_("Settings", "MetricsServerBindAddress", "127.0.0.1");
+      otel_endpoint_ = ReadIniSettingString_("Settings", "OtelEndpoint", "");
+      otel_service_name_ = ReadIniSettingString_("Settings", "OtelServiceName", "hmailserver");
       manage_sieve_server_port_ = ReadIniSettingInteger_("Settings", "ManageSieveServerPort", 0);
       manage_sieve_server_bind_address_ = ReadIniSettingString_("Settings", "ManageSieveServerBindAddress", "127.0.0.1");
       arc_sealing_enabled_ = ReadIniSettingInteger_("Settings", "ArcSealingEnabled", 0) == 1;
