@@ -17,9 +17,17 @@ struct hm_st_mysql_field {
    char *def;                  /* Default value (set by mysql_list_fields) */
 };
 
+// Subset of MySQL's "enum mysql_option" values. These are stable in the bundled
+// Oracle libmysql client (added in MySQL 5.5.x) and are used to steer the
+// authentication handshake so a connection never fails because the server asked
+// for an auth plugin (e.g. auth_gssapi_client) the bundled client does not carry.
+#define HM_MYSQL_PLUGIN_DIR    22
+#define HM_MYSQL_DEFAULT_AUTH  23
+
 typedef hm_MYSQL* STDCALL hm_mysql_real_connect(hm_MYSQL *,const char *,const char *,const char *,const char *, unsigned int,const char *,unsigned long);
 typedef void STDCALL hm_mysql_close(hm_MYSQL *);
 typedef hm_MYSQL* STDCALL hm_mysql_init(hm_MYSQL *);
+typedef int STDCALL hm_mysql_options(hm_MYSQL *mysql, int option, const void *arg);
 typedef const char * STDCALL hm_mysql_error(hm_MYSQL *);
 typedef int STDCALL hm_mysql_query(hm_MYSQL *mysql, const char *q);
 typedef hm_MYSQL_RES * STDCALL hm_mysql_store_result(hm_MYSQL *mysql);
@@ -42,10 +50,14 @@ namespace HM
 
       bool Load(String &sErrorMessage);
       bool IsLoaded();
+
+      // Directory that libmysql.dll was loaded from (the hMailServer Bin folder).
+      String GetLibraryDirectory();
    
       hm_mysql_real_connect *p_mysql_real_connect;
       hm_mysql_close *p_mysql_close;
       hm_mysql_init *p_mysql_init;
+      hm_mysql_options *p_mysql_options;
       hm_mysql_error *p_mysql_error;
       hm_mysql_query *p_mysql_query;
       hm_mysql_store_result *p_mysql_store_result;

@@ -70,6 +70,21 @@ namespace HM
 
          dbconn_ = MySQLInterface::Instance()->p_mysql_init(NULL);
 
+         // Steer the authentication handshake so installs are seamless against
+         // modern MySQL/MariaDB servers. Without this the bundled libmysql client
+         // can fail with "Authentication plugin '<x>' cannot be loaded" (e.g.
+         // auth_gssapi_client) when the server advertises an auth plugin the client
+         // does not carry. Advertising mysql_native_password as the client's default
+         // makes native-password accounts (what hMailServer uses) negotiate without
+         // demanding an external plugin, and pointing the plugin directory at the
+         // Bin folder lets any optionally-shipped plugin be found there.
+         if (MySQLInterface::Instance()->p_mysql_options != 0)
+         {
+            AnsiString sPluginDir = Unicode::ToANSI(MySQLInterface::Instance()->GetLibraryDirectory());
+            MySQLInterface::Instance()->p_mysql_options(dbconn_, HM_MYSQL_PLUGIN_DIR, sPluginDir.c_str());
+            MySQLInterface::Instance()->p_mysql_options(dbconn_, HM_MYSQL_DEFAULT_AUTH, "mysql_native_password");
+         }
+
          //MYSQL *pResult = mysql_real_connect(
          hm_MYSQL *pResult = MySQLInterface::Instance()->p_mysql_real_connect(
                      dbconn_, 

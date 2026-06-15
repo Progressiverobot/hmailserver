@@ -19,6 +19,7 @@ namespace HM
       p_mysql_real_connect(0),
       p_mysql_close(0),
       p_mysql_init(0),
+      p_mysql_options(0),
       p_mysql_error(0),
       p_mysql_query(0),
       p_mysql_store_result(0),
@@ -67,6 +68,21 @@ namespace HM
       return sRetVal;
    }
 
+   String
+   MySQLInterface::GetLibraryDirectory()
+   {
+      LPTSTR szPath = (LPTSTR)alloca( 2048 );
+      DWORD  dwPathLength;
+
+      dwPathLength = GetModuleFileName(NULL, szPath, 2048 );
+      szPath[ dwPathLength ] = 0; // --- nullterminated.
+
+      String sPath(szPath);
+
+      int iLastSlash = std::max(sPath.ReverseFind(_T("\\")), sPath.ReverseFind(_T("/")));
+      return sPath.Mid(0, iLastSlash);
+   }
+
    bool
    MySQLInterface::Load(String &sErrorMessage)
    {
@@ -92,6 +108,7 @@ namespace HM
       p_mysql_real_connect = (hm_mysql_real_connect*)GetProcAddress( (HMODULE)library_instance_, "mysql_real_connect" );
       p_mysql_close = (hm_mysql_close*) GetProcAddress( (HMODULE)library_instance_, "mysql_close" );
       p_mysql_init = (hm_mysql_init*) GetProcAddress( (HMODULE)library_instance_, "mysql_init" );
+      p_mysql_options = (hm_mysql_options*) GetProcAddress( (HMODULE)library_instance_, "mysql_options" );
       p_mysql_error = (hm_mysql_error*) GetProcAddress( (HMODULE)library_instance_, "mysql_error" );
       p_mysql_query = (hm_mysql_query*) GetProcAddress( (HMODULE)library_instance_, "mysql_query" );
       p_mysql_store_result = (hm_mysql_store_result*) GetProcAddress( (HMODULE)library_instance_, "mysql_store_result" );
