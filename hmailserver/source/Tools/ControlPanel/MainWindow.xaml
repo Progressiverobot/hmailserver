@@ -64,12 +64,14 @@
                             <Setter Property="Background" Value="Transparent" />
                             <Setter Property="HorizontalContentAlignment" Value="Left" />
                             <Setter Property="VerticalContentAlignment" Value="Center" />
+                            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
                             <Setter Property="Template">
                                 <Setter.Value>
                                     <ControlTemplate TargetType="TreeViewItem">
                                         <StackPanel>
                                             <Border x:Name="Bd" CornerRadius="6" Cursor="Hand"
-                                                    Background="{TemplateBinding Background}" SnapsToDevicePixels="True">
+                                                    Background="{TemplateBinding Background}" SnapsToDevicePixels="True"
+                                                    BorderThickness="1.5" BorderBrush="Transparent">
                                                 <Grid>
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="18" />
@@ -103,6 +105,9 @@
                                                 <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
                                                 <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
                                                 <Setter TargetName="Pill" Property="Opacity" Value="1" />
+                                            </Trigger>
+                                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AppBrandBrush}" />
                                             </Trigger>
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>

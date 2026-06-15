@@ -63,6 +63,10 @@ in light + dark), and the P2 installer items shipped (ISCC compiles clean):
 - **P3 (partial):** high-contrast is handled structurally by the token layer (maps to `SystemColors`);
   the existing shared text styles already form a type ramp. A deeper inline-literal/type-ramp refactor
   is deferred as low-value (remaining literals are benign — `Transparent`, saturated severity chips).
+- **Polish:** the Welcome page is now a grid of clickable, icon-led quick-action tiles (navigating via a
+  new `MainWindow.NavigateTo`); the Account/Domain tabbed editors gained `MinWidth`/`MinHeight`; and the
+  sidebar now draws a distinct **brand keyboard-focus ring** (the dotted default focus is suppressed),
+  closing the A7 focus-visual gap.
 - **Inno 6 / `WizardStyle=modern`** remains a recommendation only (the repo builds with Inno Setup 5,
   where that directive does not exist); not applied to avoid breaking the current installer build.
 
@@ -290,7 +294,7 @@ Observed from the screenshots:
 | **Log text contrast (light)** | ❌ | DEBUG `#C9D1D9` on white ≈ **1.3:1** (needs ≥4.5:1) — fix via tokens (A2.3) |
 | **Colour-only meaning** | ❌ | Password strength, KPI semantics — add text/icons |
 | **High-contrast theme** | ❌ | Only a `Dark` themes dictionary is loaded; literals won't map to `SystemColors` |
-| Focus visuals | ⚠️ | Default WPF dotted focus; nav has no clear keyboard-focus ring distinct from selection |
+| Focus visuals | ✅ | Nav now draws a distinct brand keyboard-focus ring (the dotted default is suppressed); WPF-UI controls keep their own focus visuals |
 | Keyboard nav | ✅ | Tree + `Ctrl+K` palette; tab order mostly sound |
 | AutomationProperties | ✅ | Nav items/host have names + automation IDs (good) |
 
