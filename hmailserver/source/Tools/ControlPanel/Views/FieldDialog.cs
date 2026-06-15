@@ -51,7 +51,7 @@ namespace hMailServer.ControlPanel.Views
             HorizontalAlignment = HorizontalAlignment.Right,
             Margin = new Thickness(0, 8, 0, 0)
          };
-         var ok = new Button { Content = "Save", Appearance = ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), MinWidth = 88 };
+         var ok = new Button { Content = "Save", Appearance = ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), MinWidth = 88, IsDefault = true };
          ok.Click += (_, _) =>
          {
             foreach (Func<bool> commit in committers_)
@@ -60,7 +60,7 @@ namespace hMailServer.ControlPanel.Views
             DialogResult = true;
             Close();
          };
-         var cancel = new Button { Content = "Cancel", MinWidth = 88 };
+         var cancel = new Button { Content = "Cancel", MinWidth = 88, IsCancel = true };
          cancel.Click += (_, _) => Close();
          buttons.Children.Add(ok);
          buttons.Children.Add(cancel);
@@ -127,21 +127,35 @@ namespace hMailServer.ControlPanel.Views
                committers_.Add(() => { Result[prop] = box.Text; return true; });
                break;
             }
+            case CollectionEditorView.FieldKind.Password:
+            {
+               host.Children.Add(Label(f.Label));
+               var box = new Wpf.Ui.Controls.PasswordBox
+               {
+                  Password = Convert.ToString(current) ?? "",
+                  FontSize = 13,
+                  Margin = new Thickness(0, 0, 0, 10)
+               };
+               host.Children.Add(box);
+               committers_.Add(() => { Result[prop] = box.Password; return true; });
+               break;
+            }
             case CollectionEditorView.FieldKind.Number:
             {
                host.Children.Add(Label(f.Label));
-               var box = new TextBox { Text = Convert.ToString(current ?? 0), FontSize = 13, Margin = new Thickness(0, 0, 0, 10) };
-               host.Children.Add(box);
-               committers_.Add(() =>
+               double cur = 0;
+               try { cur = Convert.ToDouble(current ?? 0); } catch (Exception) { cur = 0; }
+               var box = new Wpf.Ui.Controls.NumberBox
                {
-                  if (!int.TryParse(box.Text.Trim(), out int n))
-                  {
-                     MessageBox.Show(f.Label + " must be a number.", "Control Panel");
-                     return false;
-                  }
-                  Result[prop] = n;
-                  return true;
-               });
+                  Value = cur,
+                  MaxDecimalPlaces = 0,
+                  SmallChange = 1,
+                  LargeChange = 10,
+                  FontSize = 13,
+                  Margin = new Thickness(0, 0, 0, 10)
+               };
+               host.Children.Add(box);
+               committers_.Add(() => { Result[prop] = (int) (box.Value ?? 0); return true; });
                break;
             }
             default:

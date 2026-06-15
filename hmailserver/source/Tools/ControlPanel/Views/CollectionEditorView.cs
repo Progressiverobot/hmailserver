@@ -27,7 +27,7 @@ namespace hMailServer.ControlPanel.Views
    /// </summary>
    public class CollectionEditorView : UserControl, IPageLifecycle
    {
-      public enum FieldKind { Text, Multiline, Number, Bool, Combo }
+      public enum FieldKind { Text, Multiline, Number, Bool, Combo, Password }
 
       public class FieldSpec
       {

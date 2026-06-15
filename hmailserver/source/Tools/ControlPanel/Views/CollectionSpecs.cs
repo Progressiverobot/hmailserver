@@ -170,7 +170,7 @@ namespace hMailServer.ControlPanel.Views
             new FieldSpec { Prop = "ServerAddress", Label = "POP3 server", Default = "" },
             new FieldSpec { Prop = "Port", Label = "Port", Kind = FieldKind.Number, GridWidth = 70, Default = 110 },
             new FieldSpec { Prop = "Username", Label = "User name", ShowInGrid = false, Default = "" },
-            new FieldSpec { Prop = "Password", Label = "Password", ShowInGrid = false, Default = "" },
+            new FieldSpec { Prop = "Password", Label = "Password", Kind = FieldKind.Password, ShowInGrid = false, Default = "" },
             new FieldSpec { Prop = "MinutesBetweenFetch", Label = "Minutes between downloads", Kind = FieldKind.Number, ShowInGrid = false, Default = 15 },
             new FieldSpec { Prop = "DaysToKeepMessages", Label = "Days to keep on server (0 = delete after download)", Kind = FieldKind.Number, ShowInGrid = false, Default = 0 },
             new FieldSpec { Prop = "UseSSL", Label = "Use SSL/TLS", Kind = FieldKind.Bool, ShowInGrid = false, Default = false },

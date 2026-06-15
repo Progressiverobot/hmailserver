@@ -209,10 +209,15 @@ namespace hMailServer.ControlPanel.Views
          inputRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
          inputRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
          inputRow.Children.Add(domain_);
+         var actions = new StackPanel { Orientation = Orientation.Horizontal };
          var run = new Wpf.Ui.Controls.Button { Content = "Query", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary };
          run.Click += async (s, e) => await RunQuery();
-         Grid.SetColumn(run, 1);
-         inputRow.Children.Add(run);
+         actions.Children.Add(run);
+         var copy = new Wpf.Ui.Controls.Button { Content = "Copy", Margin = new Thickness(8, 0, 0, 0) };
+         copy.Click += (s, e) => { try { if (output_.Text.Length > 0) Clipboard.SetText(output_.Text); } catch (Exception) { } };
+         actions.Children.Add(copy);
+         Grid.SetColumn(actions, 1);
+         inputRow.Children.Add(actions);
          Grid.SetRow(inputRow, 1);
          grid.Children.Add(inputRow);
 
@@ -407,10 +412,15 @@ namespace hMailServer.ControlPanel.Views
          testDomain_.Margin = new Thickness(0, 0, 8, 0);
          Grid.SetColumn(testDomain_, 1);
          inputRow.Children.Add(testDomain_);
+         var actions = new StackPanel { Orientation = Orientation.Horizontal };
          var run = new Wpf.Ui.Controls.Button { Content = "Run diagnostics", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary };
          run.Click += async (s, e) => await Run();
-         Grid.SetColumn(run, 2);
-         inputRow.Children.Add(run);
+         actions.Children.Add(run);
+         var copy = new Wpf.Ui.Controls.Button { Content = "Copy", Margin = new Thickness(8, 0, 0, 0) };
+         copy.Click += (s, e) => { try { if (output_.Text.Length > 0) Clipboard.SetText(output_.Text); } catch (Exception) { } };
+         actions.Children.Add(copy);
+         Grid.SetColumn(actions, 2);
+         inputRow.Children.Add(actions);
          Grid.SetRow(inputRow, 1);
          grid.Children.Add(inputRow);
 
