@@ -41,9 +41,11 @@ moved to **Part 2 — Completed work**.*
    full parity reached (no outstanding gaps). *Remaining for this item is packaging
    only (publish CP + rebuild installer + move tag), folded into the final 6.2.5
    release per the hold-release directive.*
-3. **B2 — authentication follow-ups** — live JWKS / token introspection +
-   O365 / Gmail XOAUTH2 + Thunderbird SCRAM interop. *(Offline OAuth2 and RS256
-   auto-test coverage are already done.)*
+3. **B2 — authentication follow-ups** — ⚠️ **BLOCKED / flagged (2026-06-15)** —
+   live JWKS / token introspection + O365 / Gmail XOAUTH2 + Thunderbird SCRAM
+   interop. These are interop *attestations* needing live third-party endpoints/
+   clients not available in the build environment; the protocol code is complete
+   and covered offline (XOAUTH2/OAUTHBEARER + RS256 auto-tests already done).
 4. **B4 — verified ✅** — SPF passes on forwarded mail (SRS) + DSN interop confirmed
    by regression (`RegressionTests.SMTP.Srs` + `.Deliverability`, 14/14). *(CHUNKING/BDAT
    is done — see Part 2.)*
@@ -55,9 +57,12 @@ moved to **Part 2 — Completed work**.*
    assessed and deferred: MySQL/PG inline all statement parameters into SQL text, so a
    text-keyed prepared-statement cache is ineffective and a dedicated executor adds
    value only with async call sites the synchronous BO/Persistence layer lacks.)*
-6. **B8 — quality gates remaining** — CI build+test matrix (Windows ×
-   MySQL/MSSQL/PostgreSQL); clang-tidy / ASAN / UBSAN / libFuzzer; signed release
-   artifacts.
+6. **B8 — quality gates remaining** — ⚠️ **BLOCKED / flagged (2026-06-15)** — CI
+   build+test matrix (Windows × MySQL/MSSQL/PostgreSQL); clang-tidy / ASAN / UBSAN /
+   libFuzzer; signed release artifacts. The automatable subset is already live (CP
+   build, C# CodeQL, SBOM, dependency review, self-hosted server build + 898-test
+   regression); the remainder is infrastructure-gated (3-DB runner, clang/fuzzer
+   toolchain port, code-signing certificate) — see the B8 disposition below.
 7. **Future track (Tier 3)** — documented, not scheduled (see end of Part 1).
 
 ---
@@ -122,6 +127,14 @@ Remaining:
   regression tests; live-IdP JWKS/introspection still needs a running provider.
 - **Interop verification** — O365/Gmail XOAUTH2 + Thunderbird SCRAM.
 
+**Disposition (2026-06-15): BLOCKED — external resources required.** Both items
+need live third-party services unavailable in the build environment (a reachable
+OAuth2 identity provider exposing JWKS/introspection; live Office 365 / Gmail
+mailboxes; a Thunderbird client). The protocol implementations themselves are
+complete and covered offline (XOAUTH2/OAUTHBEARER, RS256 auto-tests, SCRAM across
+all three protocols). These are interop *attestations*, not code work; deferred
+as flagged until those external endpoints/credentials are provided.
+
 ### B4 — Deliverability & SMTP standards
 
 *Delivered already (see Part 2): SMTPUTF8/EAI, PIPELINING, ENHANCEDSTATUSCODES, DSN (RFC 3461/3464),
@@ -180,6 +193,18 @@ Remaining:
   MSVC/ATL environment, where the live over-the-wire fuzzer is the substitute).
 - Signed release artifacts (needs a code-signing certificate / CI secret).
 - Verify: green-gates-required-to-merge; nightly fuzz.
+
+**Disposition (2026-06-15): BLOCKED — external resources required.** The
+automatable supply-chain + analysis subset is delivered and active (`ci.yml` CP
+build, `codeql.yml` C# analysis, `sbom.yml`, `dependency-review.yml` on hosted
+runners; `server-build.yml` native build + 898-test regression on a self-hosted
+runner). The outstanding items are each gated on infrastructure the environment
+cannot provide: the 3-DB matrix needs a self-hosted runner provisioned with
+MySQL+MSSQL+PostgreSQL and per-backend reconfiguration; clang-tidy/ASAN/UBSAN/
+libFuzzer need a clang+fuzzer toolchain port of an MSVC/ATL/COM codebase (the
+live over-the-wire protocol fuzzer is the in-environment substitute); signed
+artifacts need a code-signing certificate; required-status-gates/nightly-fuzz are
+GitHub repo-admin settings. Deferred as flagged until those resources exist.
 
 ---
 
