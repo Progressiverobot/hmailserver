@@ -725,7 +725,7 @@ namespace hMailServer.ControlPanel.Views
                inner.Children.Add(new TextBlock
                {
                   Text = card.Title,
-                  FontSize = 15,
+                  FontSize = Typography.SectionHeading,
                   FontWeight = FontWeights.SemiBold,
                   Margin = new Thickness(0, 0, 0, string.IsNullOrEmpty(card.Blurb) ? 12 : 4)
                });
@@ -734,7 +734,7 @@ namespace hMailServer.ControlPanel.Views
                   inner.Children.Add(new TextBlock
                   {
                      Text = card.Blurb,
-                     FontSize = 12,
+                     FontSize = Typography.Caption,
                      TextWrapping = TextWrapping.Wrap,
                      Opacity = 0.65,
                      Margin = new Thickness(0, 0, 0, 14)
