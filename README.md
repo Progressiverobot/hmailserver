@@ -5,7 +5,7 @@ hMailServer is an open source email server for Microsoft Windows, implementing S
 
 This repository is a modernized fork of the original project (which is no longer maintained upstream). It has been brought up to date with a current toolchain, current cryptography, and the transport-security standards expected of a mail server in 2026. It is maintained by Christopher Holloway / [Progressive Robot Ltd](https://www.progressiverobot.com).
 
-**Production status:** version **6.2.6** is released - [download the installer](https://github.com/Progressiverobot/hmailserver/releases/latest) (`hMailServer-6.2.6-x64.exe`). **6.2.6 is a Control Panel and installer polish release**: a theme-aware visual redesign of the Control Panel, complete GUI coverage of every server setting (see `settings.md`), a redesigned two-factor-auth setup with a real QR code, a modernised installer, and opt-in **IMAP4rev2 (RFC 9051)** - see *6.2.6* below. (If you are on a default 6.2.4 install, 6.2.5 was the critical database-connectivity fix - see *6.2.5*.) The server core is validated by the full regression suite: **898 of 898 tests passing, zero failures, zero inconclusive**, including live SpamAssassin, ClamAV (real EICAR detection), DMARC evaluation against live DNS, and TLS 1.2/1.3 handshakes end to end. The bundled administration GUI is the modern .NET 8 **Control Panel** (the classic Administrator has been retired).
+**Production status:** version **6.2.7** is released - [download the installer](https://github.com/Progressiverobot/hmailserver/releases/latest) (`hMailServer-6.2.7-x64.exe`). **6.2.7 is a Control Panel usability release**: file/folder pickers on every path field, one-click **DKIM key generation** (with the ready-to-paste DNS record), password reveal toggles and strong-password generators, a date picker, numeric steppers, masked secrets, Enter/Esc on every dialog, copy buttons, and the window now remembers its size and position - see *6.2.7* below. The server core is unchanged since 6.2.6 (opt-in IMAP4rev2, the Control Panel redesign and complete settings coverage). It is validated by the full regression suite: **898 of 898 tests passing, zero failures, zero inconclusive**, including live SpamAssassin, ClamAV (real EICAR detection), DMARC evaluation against live DNS, and TLS 1.2/1.3 handshakes end to end. The bundled administration GUI is the modern .NET 8 **Control Panel** (the classic Administrator has been retired).
 
 What's new in 6.0
 =================
@@ -82,6 +82,33 @@ change until the new settings are turned on.
 **Supply chain & quality gates**
 
    * SPDX + CycloneDX SBOMs (Syft) attached to every release, Dependabot CVE alerts + grouped update PRs, and a dependency-review PR gate.
+
+6.2.7
+=====
+
+A Control Panel usability release. No server-core changes; every improvement is
+in the administration GUI, closing the remaining "standard desktop app" gaps so
+common tasks no longer need hand-typed paths, external tools or guesswork.
+
+   * **File/folder pickers everywhere.** Every field that holds a file-system path
+     now has a `...` browse button: the backup destination and restore file, the
+     archive folder, the ACME certificate folder, the OAuth2 public key, the REST
+     API / Web Services TLS certificate and key files, the ClamWin executable and
+     database folder, and the DKIM private key.
+   * **One-click DKIM.** Domain &rarr; DKIM gains "Generate key pair", which creates an
+     RSA-2048 key, saves the private key, fills the path, and shows the exact
+     `selector._domainkey` **DNS TXT record** (`v=DKIM1; k=rsa; p=...`) with a Copy
+     button - no more running OpenSSL by hand.
+   * **Passwords.** All password boxes get a reveal (eye) toggle; the account editor
+     and the quick-create form get a "Generate strong password" button (cryptographic
+     RNG, copied to the clipboard); and the external POP3 fetch-account password is
+     now masked instead of shown in clear text.
+   * **Inputs.** The auto-reply expiry is a date picker; numeric server settings and
+     the collection editors use up/down number boxes; every editor dialog now obeys
+     **Enter** (save) and **Esc** (cancel); and MX query / Diagnostics output has a Copy
+     button.
+   * **Window state.** The main window remembers its size, position and maximized
+     state between sessions, and a save confirmation toast appears after saving.
 
 6.2.6
 =====
