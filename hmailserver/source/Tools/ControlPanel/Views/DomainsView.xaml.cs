@@ -96,7 +96,7 @@ namespace hMailServer.ControlPanel.Views
             }
             catch (Exception ex)
             {
-               error = ex.Message;
+               error = ServerSession.DescribeComError(ex);
             }
             finally
             {
@@ -132,7 +132,7 @@ namespace hMailServer.ControlPanel.Views
             }
             catch (Exception ex)
             {
-               error = ex.Message;
+               error = ServerSession.DescribeComError(ex);
             }
             finally
             {

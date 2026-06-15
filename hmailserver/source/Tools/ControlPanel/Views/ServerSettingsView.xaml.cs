@@ -752,7 +752,7 @@ namespace hMailServer.ControlPanel.Views
                      catch (Exception ex)
                      {
                         failedReads_++;
-                        diag_ ??= ex.Message;
+                        diag_ ??= ServerSession.DescribeComError(ex);
                         continue;   // value could not be read; skip this editor
                      }
                   }
@@ -783,7 +783,7 @@ namespace hMailServer.ControlPanel.Views
 
          StatusText.Text = failedReads_ == 0
             ? "Values read from the server."
-            : failedReads_ + " setting(s) could not be read: " + diag_;
+            : failedReads_ + " setting(s) could not be read — " + diag_;
 
          afterBuildUi_?.Invoke();
       }

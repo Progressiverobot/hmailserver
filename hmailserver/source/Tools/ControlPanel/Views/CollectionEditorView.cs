@@ -237,7 +237,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex)
          {
-            status_.Text = "Could not load: " + ex.Message;
+            status_.Text = "Could not load — " + ServerSession.DescribeComError(ex);
          }
          finally
          {

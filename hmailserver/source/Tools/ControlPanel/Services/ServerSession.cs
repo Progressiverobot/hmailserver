@@ -140,5 +140,26 @@ namespace hMailServer.ControlPanel.Services
          if (comObject != null && Marshal.IsComObject(comObject))
             Marshal.ReleaseComObject(comObject);
       }
+
+      /// <summary>
+      /// Unwraps a COM/reflection exception (e.g. the opaque "Exception has been
+      /// thrown by the target of invocation" wrapper) to its most informative inner
+      /// message, and turns the two server-side conditions that block essentially
+      /// every read - no database connection, or not connected as the server
+      /// administrator - into clear, actionable guidance.
+      /// </summary>
+      public static string DescribeComError(Exception ex)
+      {
+         Exception real = ex;
+         while (real.InnerException != null)
+            real = real.InnerException;
+         string msg = string.IsNullOrEmpty(real.Message) ? (ex.Message ?? "Unknown error.") : real.Message;
+
+         if (msg.IndexOf("connection to the database", StringComparison.OrdinalIgnoreCase) >= 0)
+            return "the server cannot reach its database. Check the database connection and the hMailServer error log, then press Reload. (" + msg + ")";
+         if (msg.IndexOf("do not have access", StringComparison.OrdinalIgnoreCase) >= 0)
+            return "you must connect with the hMailServer server-administrator account to view or change these settings. (" + msg + ")";
+         return msg;
+      }
    }
 }
