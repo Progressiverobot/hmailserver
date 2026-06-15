@@ -303,6 +303,19 @@ namespace HM
       line.Format("hmailserver_command_processing_seconds_count %I64u\n", status->GetCommandsProcessedCount());
       body += line;
 
+      body += "# HELP hmailserver_db_query_seconds Aggregate execution time of database statements run through the connection manager (all backends).\n";
+      body += "# TYPE hmailserver_db_query_seconds summary\n";
+      line.Format("hmailserver_db_query_seconds_sum %.6f\n",
+         static_cast<double>(status->GetDatabaseQueryMicrosecondsTotal()) / 1000000.0);
+      body += line;
+      line.Format("hmailserver_db_query_seconds_count %I64u\n", status->GetDatabaseQueriesCount());
+      body += line;
+
+      body += "# HELP hmailserver_db_slow_queries_total Database statements whose execution time exceeded SlowQueryLogMilliseconds (0 when the threshold is disabled).\n";
+      body += "# TYPE hmailserver_db_slow_queries_total counter\n";
+      line.Format("hmailserver_db_slow_queries_total %I64u\n", status->GetDatabaseSlowQueriesCount());
+      body += line;
+
       return body;
    }
 

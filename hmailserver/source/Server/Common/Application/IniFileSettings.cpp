@@ -257,6 +257,7 @@ namespace HM
       json_logging_ = ReadIniSettingInteger_("Settings", "JsonLogging", 0) == 1;
       log_delete_days_ = ReadIniSettingInteger_("Settings", "LogDeleteDays", 0);
       shutdown_drain_seconds_ = ReadIniSettingInteger_("Settings", "ShutdownDrainSeconds", 0);
+      slow_query_log_ms_ = ReadIniSettingInteger_("Settings", "SlowQueryLogMilliseconds", 0);
       message_store_fsync_ = ReadIniSettingInteger_("Settings", "MessageStoreFsync", 0) == 1;
       message_store_consistency_check_ = ReadIniSettingInteger_("Settings", "MessageStoreConsistencyCheck", 0) == 1;
       metrics_server_port_ = ReadIniSettingInteger_("Settings", "MetricsServerPort", 0);

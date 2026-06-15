@@ -50,6 +50,17 @@ namespace HM
 
       std::shared_ptr<DALConnection> GetConnection_();
       void ReleaseConnection_(std::shared_ptr<DALConnection> pConn);
+
+      // Records a statement's execution latency into the observability metrics and,
+      // when it exceeds [Settings] SlowQueryLogMilliseconds, logs it (literals
+      // redacted). Backend-agnostic: called from the single Execute/OpenRecordset
+      // chokepoint so every query is measured regardless of database engine.
+      void MeasureQuery_(const SQLCommand &command, unsigned __int64 microseconds);
+
+      // Returns the statement text with the contents of every single-quoted string
+      // literal replaced by '?', so any value inlined into the SQL is never written
+      // to the slow-query log.
+      static String RedactSqlLiterals_(const String &sql);
  
       boost::recursive_mutex mutex_;
       

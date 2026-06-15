@@ -81,6 +81,7 @@
     <Compile Include="Infrastructure\DnsResolution.cs" />
     <Compile Include="Infrastructure\HealthProbes.cs" />
     <Compile Include="Infrastructure\DeliveryMetrics.cs" />
+    <Compile Include="Infrastructure\DatabaseMetrics.cs" />
     <Compile Include="Infrastructure\LogRetention.cs" />
     <Compile Include="Infrastructure\MessageStoreConsistency.cs" />
     <Compile Include="Infrastructure\MessageStoreDurability.cs" />

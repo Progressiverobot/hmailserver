@@ -42,8 +42,11 @@ moved to **Part 2 — Completed work**.*
 4. **B4 — verify only** — confirm SPF passes on forwarded mail (SRS) + DSN interop.
    *(CHUNKING/BDAT is done — see Part 2.)*
 5. **B7 — observability remaining** — OpenTelemetry tracing (SMTP/IMAP/POP/DB
-   spans + OTLP export); dedicated DB executor + prepared-statement caches
-   (MySQL/PG).
+   spans + OTLP export). *(DB query latency metrics + slow-query log are done — see
+   Part 2. A dedicated DB executor + prepared-statement caches were assessed and
+   deferred: MySQL/PG inline all statement parameters into SQL text, so a
+   text-keyed prepared-statement cache is ineffective and a dedicated executor adds
+   value only with async call sites the synchronous BO/Persistence layer lacks.)*
 6. **B8 — quality gates remaining** — CI build+test matrix (Windows ×
    MySQL/MSSQL/PostgreSQL); clang-tidy / ASAN / UBSAN / libFuzzer; signed release
    artifacts.
@@ -124,7 +127,15 @@ Remaining:
 - **OpenTelemetry** tracing (SMTP/IMAP/POP/DB spans + OTLP export). Message-to-
   session correlation IDs already ship; full span/OTLP export is future work.
 - Async/DB isolation: dedicated DB executor; prepared-statement caches
-  (MySQL/PG).
+  (MySQL/PG). **Assessed and deferred** — MySQL and PostgreSQL both report
+  `GetSupportsCommandParameters() == false`, so the DAL flattens every statement's
+  parameters into the SQL literal text before execution; a text-keyed
+  prepared-statement cache would therefore see a ~0% hit rate (even pollers inline
+  timestamps), and a dedicated executor only pays off with async callers that the
+  synchronous business-object/persistence layer does not have. A real cache needs
+  the `mysql_stmt_*` / `PQexecParams` binding APIs (a large, higher-risk result-set
+  rewrite). *(Backend-agnostic DB query latency metrics + a redacted slow-query log
+  shipped instead — see Part 2.)*
 
 ### B8 — Quality gates & supply chain (remaining)
 
@@ -440,6 +451,20 @@ MTA-STS, TLS-RPT, auto-ban, correct dot-stuffing, parameterized SQL.*
   `hmailserver_database_up` (1/0) and `hmailserver_db_connections{state="busy|available"}`
   gauges sourced from the `DatabaseConnectionManager` pool, giving DB connectivity
   and pool-saturation visibility. Asserted by the `HealthProbes` test.
+- **Done — database query latency metrics + slow-query log.** Every statement is
+  timed at the single backend-agnostic chokepoint (`DatabaseConnectionManager`'s
+  `Execute`/`OpenRecordset`), so the instrumentation covers MySQL/PostgreSQL/MSSQL/
+  SQLCE uniformly. `/metrics` exposes the Prometheus summary
+  `hmailserver_db_query_seconds` (`_sum` + `_count`) — average query latency without
+  per-query histograms — and the counter `hmailserver_db_slow_queries_total`. A new
+  `[Settings] SlowQueryLogMilliseconds` (default 0 = log off, metrics still run)
+  counts any statement at/over the threshold as slow and logs it via
+  `LOG_APPLICATION` with all single-quoted string literals redacted to `'?'`
+  (`RedactSqlLiterals_`) so inlined secrets never reach the log. Additive and
+  default-off: zero change to query semantics. Asserted by the `DatabaseMetrics`
+  test (the query count advances after real account-create + SMTP-deliver +
+  POP3-retrieve activity; the slow-query counter is present and numeric). Full
+  OpenTelemetry DB spans remain future work.
 - **Done — log retention/rotation.** A scheduled `LogRetentionTask` (runs once at
   startup, then every 6h) deletes hMailServer's own date-stamped log files older
   than `[Settings] LogDeleteDays` (0 = disabled, the default, so historical

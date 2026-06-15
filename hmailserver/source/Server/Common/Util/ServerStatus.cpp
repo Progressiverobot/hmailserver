@@ -30,6 +30,9 @@ namespace HM
       number_of_messages_bounced_ = 0;
       command_processing_micros_total_ = 0;
       commands_processed_count_ = 0;
+      database_query_micros_total_ = 0;
+      database_queries_count_ = 0;
+      database_slow_queries_count_ = 0;
       state_ = StateUnknown ;
 
    }
@@ -240,6 +243,36 @@ namespace HM
       boost::lock_guard<boost::recursive_mutex> guard(command_latency_mutex_);
       command_processing_micros_total_ += microseconds;
       commands_processed_count_++;
+   }
+   
+   unsigned __int64
+   ServerStatus::GetDatabaseQueriesCount() const
+   {
+      return database_queries_count_;
+   }
+
+   unsigned __int64
+   ServerStatus::GetDatabaseQueryMicrosecondsTotal() const
+   {
+      return database_query_micros_total_;
+   }
+
+   unsigned __int64
+   ServerStatus::GetDatabaseSlowQueriesCount() const
+   {
+      return database_slow_queries_count_;
+   }
+
+   void
+   ServerStatus::OnDatabaseQuery(unsigned __int64 microseconds, bool wasSlow)
+   {
+      // Called from whichever thread ran the statement through the connection
+      // manager (TCP workers, delivery threads, scheduled maintenance tasks).
+      boost::lock_guard<boost::recursive_mutex> guard(database_query_mutex_);
+      database_query_micros_total_ += microseconds;
+      database_queries_count_++;
+      if (wasSlow)
+         database_slow_queries_count_++;
    }
    
    int

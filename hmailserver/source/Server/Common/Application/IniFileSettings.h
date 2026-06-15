@@ -145,6 +145,9 @@ namespace HM
       bool GetJsonLogging() const { return json_logging_; }
       int GetLogDeleteDays() const { return log_delete_days_; }
       int GetShutdownDrainSeconds() const { return shutdown_drain_seconds_; }
+      // Statements that take at least this many milliseconds are counted as slow and
+      // logged (redacted). 0 disables the slow-query log (latency metrics still run).
+      int GetSlowQueryLogMilliseconds() const { return slow_query_log_ms_; }
       bool GetMessageStoreFsync() const { return message_store_fsync_; }
       bool GetMessageStoreConsistencyCheck() const { return message_store_consistency_check_; }
       int GetMetricsServerPort() const { return metrics_server_port_; }
@@ -288,6 +291,7 @@ namespace HM
       bool json_logging_ = false;
       int log_delete_days_ = 0;
       int shutdown_drain_seconds_ = 0;
+      int slow_query_log_ms_ = 0;
       bool message_store_fsync_ = false;
       bool message_store_consistency_check_ = false;
       int metrics_server_port_ = 0;

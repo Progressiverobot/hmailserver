@@ -63,6 +63,16 @@ namespace HM
       unsigned __int64 GetCommandProcessingMicrosecondsTotal() const;
       unsigned __int64 GetCommandsProcessedCount() const;
 
+      // Aggregate execution latency of every database statement run through the
+      // DatabaseConnectionManager chokepoint, recorded as a Prometheus-style
+      // summary (running microsecond sum + count), plus a count of statements that
+      // exceeded the configured slow-query threshold. Backend-agnostic (MySQL/
+      // PostgreSQL/MSSQL/SQL CE all route through the same chokepoint).
+      void OnDatabaseQuery(unsigned __int64 microseconds, bool wasSlow);
+      unsigned __int64 GetDatabaseQueryMicrosecondsTotal() const;
+      unsigned __int64 GetDatabaseQueriesCount() const;
+      unsigned __int64 GetDatabaseSlowQueriesCount() const;
+
       // Last result of the message-store consistency check: the number of message
       // rows whose backing file was missing on disk. Updated by the scheduled
       // MessageStoreConsistencyTask; 0 when the store is consistent (or the check
@@ -92,6 +102,9 @@ namespace HM
       int number_of_messages_bounced_;
       unsigned __int64 command_processing_micros_total_;
       unsigned __int64 commands_processed_count_;
+      unsigned __int64 database_query_micros_total_;
+      unsigned __int64 database_queries_count_;
+      unsigned __int64 database_slow_queries_count_;
 
       boost::recursive_mutex spam_message_dropped_mutex_;
       boost::recursive_mutex virus_removed_mutex_;
@@ -100,6 +113,7 @@ namespace HM
       boost::recursive_mutex message_store_consistency_mutex_;
       boost::recursive_mutex command_latency_mutex_;
       boost::recursive_mutex delivery_outcome_mutex_;
+      boost::recursive_mutex database_query_mutex_;
 
       ServerState state_;
    };

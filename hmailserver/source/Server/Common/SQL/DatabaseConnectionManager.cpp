@@ -20,6 +20,10 @@
 #include "Prerequisites/PrerequisiteList.h"
 #include "SQLScriptRunner.h"
 
+#include "../Util/ServerStatus.h"
+
+#include <boost/chrono.hpp>
+
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
 #define new DEBUG_NEW
@@ -158,7 +162,13 @@ namespace HM
          return false;
       }
 
+      boost::chrono::steady_clock::time_point queryStart = boost::chrono::steady_clock::now();
+
       bool bResult = pDALConn->Execute(command, sErrorMessage, iInsertID, iIgnoreErrors);
+
+      unsigned __int64 elapsedMicros = (unsigned __int64) boost::chrono::duration_cast<boost::chrono::microseconds>(
+         boost::chrono::steady_clock::now() - queryStart).count();
+      MeasureQuery_(command, elapsedMicros);
 
       ReleaseConnection_(pDALConn);
 
@@ -186,7 +196,15 @@ namespace HM
 
       pRecordset = pDALConn->CreateRecordset();
 
-      if (!pRecordset->Open(pDALConn, command))
+      boost::chrono::steady_clock::time_point queryStart = boost::chrono::steady_clock::now();
+
+      bool bOpened = pRecordset->Open(pDALConn, command);
+
+      unsigned __int64 elapsedMicros = (unsigned __int64) boost::chrono::duration_cast<boost::chrono::microseconds>(
+         boost::chrono::steady_clock::now() - queryStart).count();
+      MeasureQuery_(command, elapsedMicros);
+
+      if (!bOpened)
          pRecordset.reset();
 
       ReleaseConnection_(pDALConn);
@@ -194,6 +212,85 @@ namespace HM
       return pRecordset;
 
 
+   }
+
+   void
+   DatabaseConnectionManager::MeasureQuery_(const SQLCommand &command, unsigned __int64 microseconds)
+   {
+      int slowThresholdMs = IniFileSettings::Instance()->GetSlowQueryLogMilliseconds();
+      bool wasSlow = slowThresholdMs > 0 && (microseconds / 1000) >= (unsigned __int64) slowThresholdMs;
+
+      ServerStatus::Instance()->OnDatabaseQuery(microseconds, wasSlow);
+
+      if (wasSlow)
+      {
+         String logLine;
+         logLine.Format(_T("Slow database query (%I64u ms): %s"),
+            microseconds / 1000, RedactSqlLiterals_(command.GetQueryString()).c_str());
+         LOG_APPLICATION(logLine);
+      }
+   }
+
+   String
+   DatabaseConnectionManager::RedactSqlLiterals_(const String &sql)
+   {
+      // Replace the contents of every single-quoted string literal with a single
+      // '?' so any secret inlined into the statement text is never logged. Handles
+      // the SQL '' escaped quote and the MySQL \' backslash escape so a literal is
+      // not closed prematurely. Over-masking on a malformed/unbalanced quote is
+      // acceptable (it only ever removes more, never less).
+      String result;
+      int len = sql.GetLength();
+      bool inString = false;
+      bool maskedCurrent = false;
+
+      for (int i = 0; i < len; i++)
+      {
+         TCHAR c = sql[i];
+
+         if (!inString)
+         {
+            result += c;
+            if (c == _T('\''))
+            {
+               inString = true;
+               maskedCurrent = false;
+            }
+            continue;
+         }
+
+         // Inside a string literal.
+         if (c == _T('\\') && i + 1 < len)
+         {
+            // Backslash escape (MySQL default): consume the escaped character too.
+            i++;
+            if (!maskedCurrent) { result += _T('?'); maskedCurrent = true; }
+            continue;
+         }
+
+         if (c == _T('\''))
+         {
+            if (i + 1 < len && sql[i + 1] == _T('\''))
+            {
+               // Doubled '' escaped quote: still inside the literal.
+               i++;
+               if (!maskedCurrent) { result += _T('?'); maskedCurrent = true; }
+               continue;
+            }
+
+            // Closing quote.
+            if (!maskedCurrent)
+               result += _T('?');
+            result += _T('\'');
+            inString = false;
+            continue;
+         }
+
+         // Ordinary character inside the literal: emit one '?' for the whole run.
+         if (!maskedCurrent) { result += _T('?'); maskedCurrent = true; }
+      }
+
+      return result;
    }
 
    void
