@@ -1,6 +1,6 @@
 # hMailServer — Codebase Guide for Agents
 
-hMailServer is a free, open-source email server for Microsoft Windows, licensed under AGPLv3. It implements SMTP, IMAP, and POP3, and runs as a Windows service. The codebase is written primarily in C++ (server core) and C# (admin tools), targeting Visual Studio 2026 (platform toolset v145) with 64-bit Windows builds. Current version: **6.0.0, released** (build 2, database version 6001), validated by the full regression suite (898/898 passing). External libraries: OpenSSL 4.0.x, Boost 1.91, PostgreSQL 18 libpq; the C# tools target .NET Framework 4.8.1.
+hMailServer is a free, open-source email server for Microsoft Windows, licensed under AGPLv3. It implements SMTP, IMAP, and POP3, and runs as a Windows service. The codebase is written primarily in C++ (server core) and C# (admin tools), targeting Visual Studio 2026 (platform toolset v145) with 64-bit Windows builds. Current version: **6.0.0, released** (build 2, database version 6001), validated by the full regression suite (898/898 passing). External libraries: OpenSSL 4.0.x, Boost 1.91, PostgreSQL 18 libpq; the MySQL/MariaDB client is MariaDB Connector/C 3.4.x (vendored in-repo, shipped as `libmysql.dll`); the C# tools target .NET Framework 4.8.1.
 
 ## Repository Layout
 
@@ -195,7 +195,7 @@ Vendored third-party C++ libraries checked directly into the repository. Large e
 | Admin tools | `source/Tools/hMailServer Tools.sln` |
 | Installer | `installation/hMailServer.iss` (InnoSetup) |
 
-**External dependencies** (not in repo): OpenSSL 4.0.x, Boost 1.91, PostgreSQL 18 libpq. Set `%hMailServerLibs%` to the parent directory where these are built. See `README.md` for step-by-step build instructions.
+**External dependencies** (not in repo): OpenSSL 4.0.x, Boost 1.91, PostgreSQL 18 libpq. Set `%hMailServerLibs%` to the parent directory where these are built. See `README.md` for step-by-step build instructions. The MySQL/MariaDB client (MariaDB Connector/C, `libmysql.dll` + `plugin/`) is **vendored in-repo** at `libraries/mariadb-connector-c-3.4.9/` and staged into the build output by `post-build.bat` (and shipped to `{app}\Bin` + `{app}\Bin\plugin` by the installer).
 
 **Branches:** `master` is the development branch for new features. Version branches (e.g., `5.6.2`) are used for bug fixes only.
 

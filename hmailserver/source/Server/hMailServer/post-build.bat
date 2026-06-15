@@ -17,5 +17,16 @@ if errorlevel 1 exit /b 1
 xcopy /F /Y "%HMS_LIBS%\postgresql-18.3\builddir\src\interfaces\libpq\*.dll" "%OUT_DIR%"
 if errorlevel 1 exit /b 1
 
+rem MySQL/MariaDB client (MariaDB Connector/C, shipped as libmysql.dll) + its auth
+rem plugins, vendored in the repo. Copied here so MySQL/MariaDB regression tests can
+rem load the same client the installer ships.
+set MARIADB_CONNECTOR=%SCRIPT_DIR%..\..\..\..\libraries\mariadb-connector-c-3.4.9
+xcopy /F /Y "%MARIADB_CONNECTOR%\libmysql.dll" "%OUT_DIR%"
+if errorlevel 1 exit /b 1
+
+if not exist "%OUT_DIR%plugin\" mkdir "%OUT_DIR%plugin"
+xcopy /F /Y "%MARIADB_CONNECTOR%\plugin\*.dll" "%OUT_DIR%plugin\"
+if errorlevel 1 exit /b 1
+
 "%TARGET%" /Register
 if errorlevel 1 exit /b 1

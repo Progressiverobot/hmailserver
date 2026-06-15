@@ -54,6 +54,17 @@ and configuration instructions live in [README.md](README.md).
   → `meson compile -C builddir src/interfaces/libpq/libpq:shared_library`.
   Artifacts: `builddir\src\interfaces\libpq\{libpq.lib,libpq.dll}`.
 - Linked runtime DLLs: `libcrypto-4-x64.dll`, `libssl-4-x64.dll`, `libpq.dll` (Boost static).
+- MySQL/MariaDB client: **MariaDB Connector/C 3.4.9**, vendored in
+  `libraries/mariadb-connector-c-3.4.9/` and shipped as `libmysql.dll` (ABI-compatible
+  with Oracle libmysql) plus the client auth plugins in `plugin/`. Replaces the old
+  Oracle libmysql 5.x client, which only did `mysql_native_password` and failed with
+  "Authentication plugin '<x>' cannot be loaded" on anything else. Connector/C handles
+  every common account type across both servers — `caching_sha2_password` (MySQL 8.0+
+  default), `sha256_password`, `client_ed25519` / `auth_gssapi_client` / `parsec`
+  (MariaDB) — and uses Windows-native crypto (CRYPT32/bcrypt/Secur32), so it has **no
+  OpenSSL dependency**. `MySQLConnection` sets `MYSQL_PLUGIN_DIR` to `Bin\plugin`;
+  `post-build.bat` stages `libmysql.dll` + `plugin\*.dll` into the build output and the
+  installer ships them to `{app}\Bin` + `{app}\Bin\plugin`.
 - `stdafx.h`: WINVER/_WIN32_WINNT/_WIN32_WINDOWS and `BOOST_USE_WINAPI_VERSION`
   are 0x0601 (Boost 1.91 dropped XP).
 - Compiler runs with `/WX` — zero warnings required.

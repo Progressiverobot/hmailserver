@@ -357,6 +357,31 @@ MTA-STS, TLS-RPT, auto-ban, correct dot-stuffing, parameterized SQL.*
 
 ### Track B — delivered (continued)
 
+#### DB — universal MySQL/MariaDB client (MariaDB Connector/C) ✅ Done
+
+- ✅ **Bundled client switched to MariaDB Connector/C 3.4.9** so one install works
+  with **both MySQL and MariaDB across every common auth method**. The old Oracle
+  libmysql 5.x client could only authenticate `mysql_native_password` accounts and
+  dead-ended with "Authentication plugin '<x>' cannot be loaded" on anything else.
+  Reproduced head-to-head against a live **MariaDB 12.3**: an `ed25519` account →
+  Oracle FAIL / Connector/C OK; `gssapi` → Oracle "cannot be loaded" / Connector/C
+  loads the plugin and authenticates via SSPI. Connector/C also handles **MySQL
+  8.0's default `caching_sha2_password`**, which the Oracle client cannot. It is
+  vendored in `libraries/mariadb-connector-c-3.4.9/` (shipped as `libmysql.dll`,
+  ABI-compatible) with its client auth plugins (`caching_sha2_password`,
+  `sha256_password`, `client_ed25519`, `auth_gssapi_client`, `parsec`, `dialog`, ...);
+  the installer ships them to `{app}\Bin\plugin`, `MySQLConnection` points
+  `MYSQL_PLUGIN_DIR` there, and `post-build.bat` stages them into the build output for
+  the regression tests. Uses Windows-native crypto (CRYPT32/bcrypt/Secur32) — no
+  OpenSSL dependency, ships self-contained. Validated: server builds 0/0; installer
+  rebuilt; **41/41** DB-intensive regression tests (DatabaseMetrics + SMTP
+  Deliverability + POP3 Fetching) pass against the live MariaDB 12.3 through the new
+  client. *(MySQL 8.0 `caching_sha2_password` relies on the bundled plugin +
+  Connector/C capability; not live-tested here — no MySQL 8 server on the dev box.)*
+  The connect-failure handler turns any residual plugin/GSSAPI failure into actionable
+  guidance (use a password account; GSSAPI needs the service's Windows identity to
+  match the account). Shipped in the `v6.2.3` installer.
+
 #### B4 — BATV (prvs) backscatter protection ✅ Done
 
 - ✅ **BATV** (Bounce Address Tag Validation, `prvs` scheme) — backscatter
