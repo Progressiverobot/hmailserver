@@ -327,8 +327,16 @@ namespace HM
    String 
    IniFileSettings::ReadIniSettingString_(const String &sSection, const String &sKey, const String &sDefault)
    {
-      TCHAR Value[255];
-      GetPrivateProfileString( sSection, sKey, sDefault, Value, 255, GetInitializationFile() );
+      // The buffer must be large enough for the longest value we may store. Most
+      // settings are short, but a DPAPI-protected secret (e.g. the database
+      // password, OAuth2 HMAC secret or password pepper) is a base64 envelope that
+      // easily exceeds 255 characters. A buffer that is too small silently
+      // truncates the value, which corrupts the secret on read (a truncated DPAPI
+      // blob fails to decrypt and yields an empty password, so the server can no
+      // longer connect to its own database). Use a generous buffer to be safe.
+      const DWORD nBufferSize = 4096;
+      TCHAR Value[nBufferSize];
+      GetPrivateProfileString( sSection, sKey, sDefault, Value, nBufferSize, GetInitializationFile() );
       return Value;
    }
 
