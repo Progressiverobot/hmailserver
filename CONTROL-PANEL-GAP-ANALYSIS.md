@@ -186,7 +186,7 @@ Signature / External / Rules / Folders / Directory).
 | **VacationMessageExpires + ExpiresDate** | ✅ |
 | **VacationMessageAbortSpamFlagged** | ✅ |
 | **SignatureEnabled / SignaturePlainText / SignatureHTML** | ✅ |
-| **IsAD / ADDomain / ADUsername** (Active Directory account) | ✅ |
+| **IsAD / ADDomain / ADUsername** (Active Directory account) | ✅ + **Browse Active Directory** picker (6.2.4) — browses the forest's domains/users and fills the fields |
 | **AdminLevel** (user / domain admin / server admin) | ✅ |
 | **LastLogonTime** (read-only display) | ✅ |
 | **External (download) accounts** (`Account.FetchAccounts`) | ✅ External tab |

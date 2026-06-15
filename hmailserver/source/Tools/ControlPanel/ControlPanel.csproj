@@ -12,10 +12,10 @@
     <RootNamespace>hMailServer.ControlPanel</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>app.ico</ApplicationIcon>
-    <Version>6.2.0</Version>
+    <Version>6.2.4</Version>
     <Product>hMailServer Control Panel</Product>
-    <Company>hMailServer</Company>
-    <Copyright>Copyright (c) 2026</Copyright>
+    <Company>Progressive Robot Ltd</Company>
+    <Copyright>Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd</Copyright>
   </PropertyGroup>
 
   <ItemGroup>

@@ -1,11 +1,11 @@
-hMailServer 6.0
+hMailServer 6.2
 ===============
 
 hMailServer is an open source email server for Microsoft Windows, implementing SMTP, IMAP and POP3.
 
-This repository is a modernized fork of the original project (which is no longer maintained upstream). It has been brought up to date with a current toolchain, current cryptography, and the transport-security standards expected of a mail server in 2026.
+This repository is a modernized fork of the original project (which is no longer maintained upstream). It has been brought up to date with a current toolchain, current cryptography, and the transport-security standards expected of a mail server in 2026. It is maintained by Christopher Holloway / [Progressive Robot Ltd](https://www.progressiverobot.com).
 
-**Production status:** version **6.0.0** is released - [download the installer](https://github.com/Progressiverobot/hmailserver/releases/latest) (`hMailServer-6.0.0-B4-x64.exe`). The release is validated by the full regression suite: **898 of 898 tests passing, zero failures, zero inconclusive**, including live SpamAssassin, ClamAV (real EICAR detection), DMARC evaluation against live DNS, and TLS 1.2/1.3 handshakes end to end.
+**Production status:** version **6.2.4** is released - [download the installer](https://github.com/Progressiverobot/hmailserver/releases/latest) (`hMailServer-6.2.4-x64.exe`). The server core is validated by the full regression suite: **898 of 898 tests passing, zero failures, zero inconclusive**, including live SpamAssassin, ClamAV (real EICAR detection), DMARC evaluation against live DNS, and TLS 1.2/1.3 handshakes end to end. The bundled administration GUI is the modern .NET 8 **Control Panel** (the classic Administrator has been retired).
 
 What's new in 6.0
 =================
@@ -43,6 +43,45 @@ What's new in 6.0
    * IMAP MOVE (RFC 6851), ID (RFC 2971) and SPECIAL-USE (RFC 6154)
    * SMTP 8BITMIME
    * hMailServer Administrator: live dashboard, optional TOTP two-factor authentication, and a "Server features" dialog for all of the settings above
+
+What's new in 6.2
+=================
+
+The 6.2.x line adds a modern administration experience plus a wave of
+authentication, filtering, deliverability and observability work. Everything is
+**additive and default-off** — an existing installation upgrades with no functional
+change until the new settings are turned on.
+
+**hMailServer Control Panel (the new GUI)**
+
+   * A modern .NET 8 (WPF, Fluent design) administration application, `hMailCP.exe`, is now the **sole bundled GUI** — the classic Administrator has been retired. It talks to the server purely through the COM API and reaches functional parity with the classic tool (domains, accounts, aliases, distribution lists, routes, rules, IP ranges, TCP/IP ports + SSL bindings, server settings, live dashboard, queue, logs, status, backup, SSL certificates, scripts and public folders).
+   * Optional TOTP two-factor authentication for the GUI logon (shares the same secret as the classic Administrator).
+   * **Active Directory account pickers (new in 6.2.4):** a read-only AD browser lists the forest's domains and searches their users. **"Browse Active Directory…"** on an account's Directory tab fills the AD domain / user name and links the account; **"Add from AD…"** bulk-imports the selected accounts' e-mail addresses into a distribution list. Built on `System.DirectoryServices` and validated end-to-end against a live domain controller.
+   * Requires the .NET 8 Desktop Runtime, which the installer bundles and installs silently when missing.
+
+**Authentication modernization**
+
+   * SCRAM-SHA-256 SASL across IMAP, SMTP submission and POP3, plus SCRAM-SHA-256-**PLUS** channel binding on all three; deterministic anti-enumeration salts.
+   * Argon2id password KDF option, a hash-policy engine (`MinimumAcceptedHashAlgorithm`) with SCRAM minimum-hash enforcement, and an optional server-side password pepper.
+   * OAuth2 bearer authentication — SASL XOAUTH2 + OAUTHBEARER (RFC 7628).
+   * Full RFC 4013 SASLprep of non-ASCII credentials.
+
+**Mail filtering — Sieve (RFC 5228) + ManageSieve (RFC 5804)**
+
+   * A standards-based Sieve interpreter runs each account's active script during local delivery (`keep`/`fileinto`/`discard`/`redirect` + implicit keep), alongside the existing proprietary rules engine. Per-account scripts are stored on disk and exposed through the COM API; an optional ManageSieve listener manages named scripts over TCP. The Control Panel account dialog has a Sieve editor tab.
+
+**Deliverability & SMTP standards**
+
+   * SMTPUTF8/EAI, PIPELINING, ENHANCEDSTATUSCODES, DSN (RFC 3461/3464), SRS for forwarded mail, CHUNKING/BDAT (RFC 3030), and optional BATV (`prvs`) backscatter protection.
+
+**Operability & observability**
+
+   * Prometheus `/metrics` (database pool, TLS handshakes, delivery queue, auth success/failure, delivery outcomes, command + DB query latency) and Kubernetes-style `/livez` `/readyz` `/healthz` probes on the metrics listener.
+   * Optional slow-query log (with every SQL string literal redacted), graceful-shutdown drain, configurable message-store fsync, a read-only message-store consistency check + recovery report, log retention, message-to-session correlation IDs, and a documented active/passive HA runbook.
+
+**Supply chain & quality gates**
+
+   * SPDX + CycloneDX SBOMs (Syft) attached to every release, Dependabot CVE alerts + grouped update PRs, and a dependency-review PR gate.
 
 Building hMailServer
 ====================

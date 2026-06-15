@@ -31,8 +31,9 @@ the release asset.
 *Only outstanding work lives in Part 1. Everything already delivered has been
 moved to **Part 2 — Completed work**.*
 
-1. **Track A Phase 1 — item 7: Active Directory pickers** — ⏸ deferred (needs a
-   domain-joined runner; the dev/test box is in a WORKGROUP).
+1. **Track A Phase 1 — item 7: Active Directory pickers** — ✅ **DONE (v6.2.4)** —
+   delivered and validated end-to-end against a live domain controller
+   (`progressiverobot.local`); full details in Part 2.
 2. **Track A Phase 4 — finalize** — screenshot-validate every page/dialog, rewrite
    `CONTROL-PANEL-GAP-ANALYSIS.md`, then publish the CP + rebuild the installer +
    move the release tag.
@@ -61,20 +62,32 @@ moved to **Part 2 — Completed work**.*
 
 ### Phase 1 (remaining) — item 7: Active Directory pickers + Import members
 
-⏸ **Deferred — needs a domain-joined runner.** Port `formActiveDirectoryAccounts`,
-`formSelectUsers`, `formUserAccounts`, `formImportMembers`: browse/import AD
-accounts into the Account Directory tab; import members for groups/dist-lists. The
-dev/test machine is in a WORKGROUP and the `System.DirectoryServices`/
-`AccountManagement` packages are not available offline, so the AD-query path cannot
-be built or validated here. The Directory tab already supports manual AD linkage
-(ADDomain/ADUsername); only the *browse* picker convenience is outstanding.
+✅ **Delivered (v6.2.4) — validated against a live domain controller.** The Control
+Panel gained a read-only Active Directory browser used by two entry points:
+
+- **`Services/ActiveDirectoryService.cs`** — enumerates every domain in the current
+  forest (RootDSE `defaultNamingContext` + the Partitions container's domain
+  crossRefs, so no dependency on `System.DirectoryServices.ActiveDirectory`) and
+  searches a domain's users with a single LDAP-escaped `DirectorySearcher`
+  (`sAMAccountName` / `displayName` / `mail` / `userPrincipalName`). Built on
+  `System.DirectoryServices` (8.0.0), which `net8.0-windows` resolves from the
+  Windows Desktop shared framework the installer already bundles. Every call is
+  defensive: on a non-domain-joined machine it reports a friendly reason instead of
+  throwing.
+- **`Views/ActiveDirectoryPickerDialog.cs`** — a modal browser (domain combo +
+  search box + results list) supporting single- or multi-select.
+- **Account → Directory tab** gained a **“Browse Active Directory…”** button that
+  fills `ADDomain` / `ADUsername` and ticks *linked to AD* from the picked account.
+- **Distribution-list recipients** gained **“Add from AD…”** — a multi-select
+  import that adds the chosen accounts' e-mail addresses to the list.
+
+Validated headlessly against a live DC by compiling the shipping
+`ActiveDirectoryService` into a throwaway harness run on the domain controller:
+`ListDomains()` returned `progressiverobot.local`, the all-users query returned every
+account, and the name / e-mail filters returned the expected subsets.
 
 *Also intentionally left out of Phase 1:* the destructive IP-range bulk
 `SetDefault` admin action (item 10) — deferred by design.
-
-Item 7 stays deferred, but it is not a blocker: **Phase 0** has already dropped the
-classic Administrator from the installer (the Directory tab's manual AD linkage
-covers the non-picker path).
 
 ### Phase 4 — Finalize
 
@@ -978,7 +991,7 @@ fuzzer is the validated substitute. *(Remaining B8 items in Part 1.)*
 
 ## Track A — delivered
 
-### Phase 1 — Functional parity (so the classic can be retired) ✅ 9/10
+### Phase 1 — Functional parity (so the classic can be retired) ✅ 10/10
 
 | # | Item | COM / source | Notes |
 |---|---|---|---|
@@ -988,7 +1001,7 @@ fuzzer is the validated substitute. *(Remaining B8 items in Part 1.)*
 | 4 | ✅ **Route Addresses tab** (commit 88ae5bf) | `Route.Addresses` | AllAddresses toggle + per-address list editor (Add/Remove, persists via `Addresses.Add()/Save()/DeleteByDBID`). Live-validated. |
 | 5 | ✅ **Status page** (commit 9aff58c) | `Application.Status/Version/ServerState/Database` | New `StatusView`: server (version+arch, state, started, uptime), database, statistics (processed/spam/virus + SMTP/IMAP/POP3 sessions), and the ucStatus configuration **warnings**. Live-validated incl. warning badges. |
 | 6 | ✅ **TOTP 2FA login** (commit e9e5051) | `Services/Totp.cs`, `TotpSetupDialog`, `TotpPromptDialog` | RFC 6238 setup + login prompt gate in `OnConnected`. Reads the same HKLM `AdminTotpSecret` (machine-scope DPAPI via crypt32) as Administrator, so existing 2FA carries over. Live-validated end-to-end. |
-| 7 | ⏸ **Active Directory pickers + Import members** (deferred — see Part 1) | port `formActiveDirectoryAccounts`, `formSelectUsers`, `formUserAccounts`, `formImportMembers` | Deferred: the dev/test machine is in a WORKGROUP and the AD packages are unavailable offline. Manual AD linkage (ADDomain/ADUsername) already works; only the *browse* picker is outstanding. |
+| 7 | ✅ **Active Directory pickers + Import members** (v6.2.4) | `Services/ActiveDirectoryService.cs`, `Views/ActiveDirectoryPickerDialog.cs` | Forest/domain enumeration (RootDSE + Partitions crossRefs) + LDAP-escaped `DirectorySearcher`. “Browse Active Directory…” on the account Directory tab fills `ADDomain`/`ADUsername`; “Add from AD…” multi-select import adds AD users' e-mail to distribution lists. Validated end-to-end against a live DC (`progressiverobot.local`). |
 | 8 | ✅ **Message viewer** (commit 4cf4bac) | `MessageViewerDialog` | "View source" / double-click on a queued message shows the raw `.eml` read from disk, with Copy. Friendly message if the file is gone. Live-validated. |
 | 9 | ✅ **DMARC failure score** (commit 9743096) | `AntiSpam.DMARCFailureScore` | Field added to the AntiSpam section. |
 | 10 | ◑ **Admin actions** (greylisting + logon-failure clear done, commit 9743096; IP-range bulk SetDefault deferred — destructive) | `ClearGreyListingTriplets`, `ClearLogonFailureList`, IP-range `SetDefault` | Surfaced as buttons. |
