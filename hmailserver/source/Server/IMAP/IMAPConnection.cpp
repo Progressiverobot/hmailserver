@@ -146,6 +146,13 @@ namespace HM
       return "\r\n";
    }
 
+   AnsiString
+   IMAPConnection::GetOtelOperationName_(const AnsiString &sData) const
+   {
+      // IMAP lines are "<tag> <COMMAND> [args]"; the verb is the second token.
+      return ExtractOtelVerb_(sData, 1);
+   }
+
    void
    IMAPConnection::Initialize()
    //---------------------------------------------------------------------------()

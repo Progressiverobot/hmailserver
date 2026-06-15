@@ -119,7 +119,17 @@ namespace HM
       /* PARSING METHODS */
       virtual void ParseData(const AnsiString &sAnsiString) = 0;
       virtual void ParseData(std::shared_ptr<ByteBuffer> pByteBuffer) = 0;
-   
+
+      // Low-cardinality OpenTelemetry span name for a single command line (the
+      // protocol verb, e.g. "MAIL"/"RETR"/"LOGIN"). The default takes the first
+      // whitespace-delimited token; IMAP overrides this to skip the leading tag.
+      // Never includes command arguments, so no credentials/data leak into traces.
+      virtual AnsiString GetOtelOperationName_(const AnsiString &sData) const;
+
+      // Shared helper: returns the uppercased token at tokenIndex when it is a
+      // clean verb (letters only, <= 16 chars), else "command".
+      static AnsiString ExtractOtelVerb_(const AnsiString &sData, int tokenIndex);
+
       AnsiString GetSslTlsCipher();
 
    private:

@@ -24,6 +24,7 @@
 #include "../common/Util/Utilities.h"
 #include "../common/Util/MessageAttachmentStripper.h"
 #include "../common/Util/MessageUtilities.h"
+#include "../common/Util/OtelTracer.h"
 
 #include "../common/Scripting/Events.h"
 
@@ -107,19 +108,40 @@ namespace HM
       auto sSendersIP = MessageUtilities::GetSendersIP(pMessage);
       String preprocessingFailureReason;
       RuleResult globalRuleResult;
+
+      // OpenTelemetry: one root span per delivery attempt, with milestone events at
+      // each stage and the terminal outcome. Parents any DB-query spans run during
+      // delivery. No-op unless OtelEndpoint is configured; the trace-id generation
+      // and attribute formatting are skipped entirely when tracing is disabled.
+      const bool otelEnabled = OtelTracer::Instance()->IsEnabled();
+      OtelSpanScope otelDelivery("delivery", OtelSpanKindInternal,
+                                 otelEnabled ? OtelTracer::NewTraceId() : AnsiString());
+      if (otelEnabled)
+      {
+         AnsiString otelMessageId;
+         otelMessageId.Format("%I64d", messageID);
+         otelDelivery.AddAttribute("hmailserver.message.id", otelMessageId);
+      }
+      otelDelivery.AddEvent("delivery.start");
+
       if (!PreprocessMessage_(pMessage, globalRuleResult, preprocessingFailureReason))
       {
          // Message delivery was aborted during preprocessing.
+         otelDelivery.AddEvent("delivery.aborted");
+         otelDelivery.SetOk(false);
          LogAwstatsMessageRejected_(sSendersIP, pMessage, preprocessingFailureReason);
          PersistentMessage::DeleteObject(pMessage);
          return;
       }
+
+      otelDelivery.AddEvent("delivery.preprocessed");
 
       std::vector<String> saErrorMessages;
 
       // Perform deliver to local recipients.
       LocalDelivery localDeliverer(sSendersIP, pMessage, globalRuleResult);
       bool messageReused = localDeliverer.Perform(saErrorMessages);
+      otelDelivery.AddEvent("delivery.local");
 
       bool messageRescheduled = false;
       if (pMessage->GetRecipients()->GetCount() > 0)
@@ -127,6 +149,7 @@ namespace HM
          // Perform deliveries to external recipients.
          ExternalDelivery externalDeliverer(sSendersIP, pMessage, globalRuleResult);
          messageRescheduled = externalDeliverer.Perform(saErrorMessages);
+         otelDelivery.AddEvent("delivery.external");
       }
 
       // If an error has occurred, now is the time to send an error
@@ -138,9 +161,20 @@ namespace HM
       // bounce (permanent failure) is counted separately inside SubmitErrorLog_;
       // here we count the terminal delivered/deferred outcomes.
       if (messageRescheduled)
+      {
          ServerStatus::Instance()->OnMessageDeferred();
+         otelDelivery.AddEvent("delivery.deferred");
+      }
       else if (saErrorMessages.empty())
+      {
          ServerStatus::Instance()->OnMessageDelivered();
+         otelDelivery.AddEvent("delivery.delivered");
+      }
+      else
+      {
+         otelDelivery.AddEvent("delivery.failed");
+         otelDelivery.SetOk(false);
+      }
 
       // Unless the message has been re-used, or has been rescheduled for
       // later delivery, we should delete it now.

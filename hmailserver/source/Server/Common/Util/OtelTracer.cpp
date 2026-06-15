@@ -181,6 +181,12 @@ namespace HM
       return t * 100ULL;          // 100ns ticks -> nanoseconds
    }
 
+   unsigned __int64
+   OtelTracer::UnixNanoNow()
+   {
+      return NowUnixNano_();
+   }
+
    OtelSpanHandle
    OtelTracer::StartSpan(const AnsiString &name, int kind, const AnsiString &trace_id)
    {
@@ -217,7 +223,8 @@ namespace HM
    }
 
    void
-   OtelTracer::EndSpan(const OtelSpanHandle &handle, bool ok, const std::vector<OtelAttribute> &attributes)
+   OtelTracer::EndSpan(const OtelSpanHandle &handle, bool ok, const std::vector<OtelAttribute> &attributes,
+                       const std::vector<OtelEvent> &events)
    {
       if (!handle.active)
          return;
@@ -242,6 +249,7 @@ namespace HM
       cs.start_unix_nano = handle.start_unix_nano;
       cs.end_unix_nano = NowUnixNano_();
       cs.attributes = attributes;
+      cs.events = events;
       cs.ok = ok;
 
       Enqueue_(cs);
@@ -401,6 +409,19 @@ namespace HM
          }
          json += "],";
 
+         json += "\"events\":[";
+         for (size_t e = 0; e < s.events.size(); e++)
+         {
+            if (e > 0)
+               json += ",";
+            AnsiString ev;
+            ev.Format("{\"timeUnixNano\":\"%I64u\",\"name\":\"", s.events[e].time_unix_nano);
+            json += ev;
+            json += JsonEscape_(s.events[e].name);
+            json += "\"}";
+         }
+         json += "],";
+
          AnsiString status;
          status.Format("\"status\":{\"code\":%d}", s.ok ? 1 : 2);
          json += status;
@@ -514,7 +535,7 @@ namespace HM
    OtelSpanScope::~OtelSpanScope()
    {
       if (active_)
-         OtelTracer::Instance()->EndSpan(handle_, ok_, attributes_);
+         OtelTracer::Instance()->EndSpan(handle_, ok_, attributes_, events_);
    }
 
    void
@@ -527,5 +548,17 @@ namespace HM
       attribute.key = key;
       attribute.value = value;
       attributes_.push_back(attribute);
+   }
+
+   void
+   OtelSpanScope::AddEvent(const AnsiString &name)
+   {
+      if (!active_)
+         return;
+
+      OtelEvent event;
+      event.name = name;
+      event.time_unix_nano = OtelTracer::UnixNanoNow();
+      events_.push_back(event);
    }
 }

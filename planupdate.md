@@ -39,14 +39,15 @@ moved to **Part 2 — Completed work**.*
 3. **B2 — authentication follow-ups** — live JWKS / token introspection +
    O365 / Gmail XOAUTH2 + Thunderbird SCRAM interop. *(Offline OAuth2 and RS256
    auto-test coverage are already done.)*
-4. **B4 — verify only** — confirm SPF passes on forwarded mail (SRS) + DSN interop.
-   *(CHUNKING/BDAT is done — see Part 2.)*
-5. **B7 — observability remaining** — broaden OpenTelemetry span coverage (the
-   dependency-free OTLP/HTTP exporter with command + DB spans is done — see Part 2;
-   per-protocol child spans for individual IMAP/POP/SMTP verbs are a future
-   refinement). *(DB query latency metrics + slow-query log are also done — see
-   Part 2. A dedicated DB executor + prepared-statement caches were assessed and
-   deferred: MySQL/PG inline all statement parameters into SQL text, so a
+4. **B4 — verified ✅** — SPF passes on forwarded mail (SRS) + DSN interop confirmed
+   by regression (`RegressionTests.SMTP.Srs` + `.Deliverability`, 14/14). *(CHUNKING/BDAT
+   is done — see Part 2.)*
+5. **B7 — observability ✅** — OpenTelemetry span coverage broadened (see Part 2):
+   per-verb command spans (named by protocol verb, tagged with the session id) and a
+   per-message `delivery` span with milestone events. *(The dependency-free OTLP/HTTP
+   exporter with command + DB spans, DB query latency metrics + slow-query log are
+   also done — see Part 2. A dedicated DB executor + prepared-statement caches were
+   assessed and deferred: MySQL/PG inline all statement parameters into SQL text, so a
    text-keyed prepared-statement cache is ineffective and a dedicated executor adds
    value only with async call sites the synchronous BO/Persistence layer lacks.)*
 6. **B8 — quality gates remaining** — CI build+test matrix (Windows ×
@@ -110,7 +111,8 @@ Remaining:
 SRS for forwarding (SPF alignment), per-IP / per-destination rate shaping, and
 **CHUNKING/BDAT** (RFC 3030).*
 
-- Verify: SPF passes on forwarded mail (SRS); DSN interop.
+- ✅ **Verified:** SPF passes on forwarded mail (SRS) and DSN interop, confirmed by
+  `RegressionTests.SMTP.Srs` + `RegressionTests.SMTP.Deliverability` (14/14 passing).
 
 *(Delivered B4 work — incl. the shipped **BATV** `prvs` backscatter protection and
 **CHUNKING/BDAT** — is recorded in Part 2.)*
@@ -122,16 +124,18 @@ delivery-queue, auth, delivery-outcome and per-command-latency metrics; log
 retention/rotation; message-to-session correlation IDs; the connection-pool
 condition variable; graceful shutdown drain; configurable message-store fsync;
 the message-store consistency check + recovery report; the HA active/passive
-runbook; and the dependency-free OpenTelemetry OTLP/HTTP trace exporter (command
-+ DB spans).*
+runbook; and the dependency-free OpenTelemetry OTLP/HTTP trace exporter (per-verb
+command spans + nested DB spans + per-message delivery spans with milestone events).*
 
 Remaining:
 
-- **OpenTelemetry — broaden span coverage.** The dependency-free OTLP/HTTP
-  exporter ships (see Part 2): every protocol command is a server span and every
-  database statement a redacted client span nested under it. A future refinement
-  could add per-verb child spans (individual IMAP/POP/SMTP commands) and span
-  events for delivery milestones.
+- ✅ **OpenTelemetry — span coverage broadened (done — see Part 2).** Command spans
+  are now named after the protocol verb (e.g. `MAIL`/`RETR`/`LOGIN`, with a bounded
+  `command` fallback) and carry an `hmailserver.session.id` attribute, and each
+  delivery attempt emits a per-message `delivery` span with milestone span events
+  (`delivery.start`/`preprocessed`/`local`/`external`/`delivered`/`deferred`/`failed`).
+  All verb/attribute work is skipped when `OtelEndpoint` is unset, keeping the hot
+  path free of overhead.
 - Async/DB isolation: dedicated DB executor; prepared-statement caches
   (MySQL/PG). **Assessed and deferred** — MySQL and PostgreSQL both report
   `GetSupportsCommandParameters() == false`, so the DAL flattens every statement's
@@ -509,10 +513,19 @@ MTA-STS, TLS-RPT, auto-ban, correct dot-stuffing, parameterized SQL.*
   Enabled per `[Settings] OtelEndpoint` (default empty = off, so existing installs
   are unaffected); `[Settings] OtelServiceName` (default `hmailserver`) labels the
   `service.name` resource attribute. Each protocol line-command is a `Server` span
-  named `command`, and every database statement run during that command is a
-  `Client` span named `db.query` nested under it (a thread-local active-span stack
-  parents the synchronous DB work to the command, since both run on the same
-  io_service worker thread). DB spans carry `db.system` (mysql/mssql/postgresql/
+  named after the protocol verb (e.g. `MAIL`/`RETR`/`LOGIN`; an alpha-only, length-
+  capped extractor falls back to a bounded `command` name so junk input can't blow
+  up trace cardinality, and command arguments are never used in span names so no
+  credentials/payloads leak), tagged with an `hmailserver.session.id` attribute for
+  correlation with the session log. Every database statement run during that command
+  is a `Client` span named `db.query` nested under it (a thread-local active-span
+  stack parents the synchronous DB work to the command, since both run on the same
+  io_service worker thread). Each delivery attempt opens a per-message `delivery`
+  span (tagged `hmailserver.message.id`) carrying milestone span events
+  (`delivery.start`, `delivery.preprocessed`, `delivery.local`, `delivery.external`,
+  and the terminal `delivery.delivered`/`delivery.deferred`/`delivery.failed`/
+  `delivery.aborted`, with the span marked not-ok on failure paths). DB spans carry
+  `db.system` (mysql/mssql/postgresql/
   sqlce) and `db.statement`, the latter passed through the same `RedactSqlLiterals_`
   redaction as the slow-query log so SQL literals never leave the process. The
   exporter batches (≤512 spans), flushes ~1×/s, bounds its queue to 4096 (drops
@@ -520,9 +533,13 @@ MTA-STS, TLS-RPT, auto-ban, correct dot-stuffing, parameterized SQL.*
   export-failure log spam. Asserted by the `OpenTelemetryTracing` regression test:
   a throwaway in-process HTTP collector captures the OTLP POST after real
   account-create + SMTP-deliver + POP3-retrieve activity and verifies a `db.query`
-  span, the `service.name`/configured service name, `command` spans, the
-  `db.system` attribute, and that the account address was redacted out of every
-  `db.statement` (1/1 green; server + tests build 0/0; SMTP+POP3 sweep green).
+  span, the `service.name`/configured service name, per-verb `MAIL`/`RETR` spans,
+  the `hmailserver.session.id` attribute, the per-message `delivery` span with its
+  `delivery.start`/`delivery.delivered` milestone events, the `db.system` attribute,
+  and that the account address was redacted out of every `db.statement` (1/1 green;
+  server + tests build 0/0; SMTP+POP3 sweep green). All verb extraction, attribute
+  formatting and trace-id generation are skipped when `OtelEndpoint` is unset, so the
+  hot path carries no overhead with tracing off.
 - **Done — delivery-outcome metrics.** `/metrics` exposes
   `hmailserver_messages_delivered_total`, `hmailserver_messages_deferred_total`
   and `hmailserver_messages_bounced_total` counters, incremented from the SMTP

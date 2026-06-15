@@ -36,6 +36,13 @@ namespace HM
       AnsiString value;
    };
 
+   // A timestamped span event (a milestone recorded within a span's lifetime).
+   struct OtelEvent
+   {
+      AnsiString name;
+      unsigned __int64 time_unix_nano = 0;
+   };
+
    // An in-flight span: its trace/span ids plus enough to emit it on completion.
    struct OtelSpanHandle
    {
@@ -64,14 +71,18 @@ namespace HM
       // A fresh 128-bit trace id (32 lowercase hex) identifying one session/trace.
       static AnsiString NewTraceId();
 
+      // Current wall-clock time as Unix nanoseconds (for stamping span events).
+      static unsigned __int64 UnixNanoNow();
+
       // Starts a span as a child of the current thread-local active span. Pass a
       // trace_id to begin a new root span (e.g. the first command of a session).
       // Pushes the span onto the thread-local stack; pair with EndSpan.
       OtelSpanHandle StartSpan(const AnsiString &name, int kind, const AnsiString &trace_id);
 
       // Ends a span started with StartSpan: pops the thread-local stack and queues
-      // the completed span for export.
-      void EndSpan(const OtelSpanHandle &handle, bool ok, const std::vector<OtelAttribute> &attributes);
+      // the completed span for export, along with any attributes and span events.
+      void EndSpan(const OtelSpanHandle &handle, bool ok, const std::vector<OtelAttribute> &attributes,
+                   const std::vector<OtelEvent> &events = std::vector<OtelEvent>());
 
       // Records an already-timed span, parented to the current thread-local active
       // span if one exists (else a new root trace). Used at the DB chokepoint where
@@ -90,6 +101,7 @@ namespace HM
          unsigned __int64 start_unix_nano = 0;
          unsigned __int64 end_unix_nano = 0;
          std::vector<OtelAttribute> attributes;
+         std::vector<OtelEvent> events;
          bool ok = true;
       };
 
@@ -127,6 +139,9 @@ namespace HM
       void SetOk(bool ok) { ok_ = ok; }
       void AddAttribute(const AnsiString &key, const AnsiString &value);
 
+      // Records a milestone event on the span (no-op when tracing is disabled).
+      void AddEvent(const AnsiString &name);
+
    private:
       OtelSpanScope(const OtelSpanScope &);
       OtelSpanScope &operator=(const OtelSpanScope &);
@@ -135,5 +150,6 @@ namespace HM
       bool active_;
       bool ok_;
       std::vector<OtelAttribute> attributes_;
+      std::vector<OtelEvent> events_;
    };
 }

@@ -210,7 +210,7 @@ namespace RegressionTests.Infrastructure
 
             // The exporter batches and flushes about once a second; poll the collector.
             string combined = "";
-            bool sawDbSpan = false;
+            bool sawSpans = false;
             for (int attempt = 0; attempt < 60; attempt++)
             {
                var bodies = collector.SnapshotBodies();
@@ -219,23 +219,40 @@ namespace RegressionTests.Infrastructure
                   sb.Append(b);
                combined = sb.ToString();
 
-               if (combined.Contains("resourceSpans") && combined.Contains("db.query"))
+               // Wait until the DB span, a per-verb command span and the delivery
+               // span (with its terminal milestone event) have all been exported.
+               if (combined.Contains("resourceSpans") && combined.Contains("db.query") &&
+                   combined.Contains("\"name\":\"RETR\"") && combined.Contains("delivery.delivered"))
                {
-                  sawDbSpan = true;
+                  sawSpans = true;
                   break;
                }
 
                Thread.Sleep(500);
             }
 
-            Assert.IsTrue(sawDbSpan,
-               "Expected an OTLP export containing a db.query span. Captured: " + Truncate(combined));
+            Assert.IsTrue(sawSpans,
+               "Expected an OTLP export containing a db.query span, per-verb command spans and a delivery span. Captured: " + Truncate(combined));
             Assert.IsTrue(combined.Contains("\"service.name\""),
                "Export should carry the service.name resource attribute. Captured: " + Truncate(combined));
             Assert.IsTrue(combined.Contains("hmailserver-test"),
                "Export should carry the configured service name. Captured: " + Truncate(combined));
-            Assert.IsTrue(combined.Contains("\"name\":\"command\""),
-               "Export should contain protocol command spans. Captured: " + Truncate(combined));
+
+            // Command spans are now named after the protocol verb (low-cardinality):
+            // the SMTP MAIL command and the POP3 RETR command must both appear.
+            Assert.IsTrue(combined.Contains("\"name\":\"MAIL\""),
+               "Export should contain a per-verb SMTP MAIL command span. Captured: " + Truncate(combined));
+            Assert.IsTrue(combined.Contains("\"name\":\"RETR\""),
+               "Export should contain a per-verb POP3 RETR command span. Captured: " + Truncate(combined));
+            Assert.IsTrue(combined.Contains("hmailserver.session.id"),
+               "Command spans should carry the session-id correlation attribute. Captured: " + Truncate(combined));
+
+            // The delivery span carries milestone events for the message lifecycle.
+            Assert.IsTrue(combined.Contains("\"name\":\"delivery\""),
+               "Export should contain the per-message delivery span. Captured: " + Truncate(combined));
+            Assert.IsTrue(combined.Contains("delivery.start") && combined.Contains("delivery.delivered"),
+               "The delivery span should record start and delivered milestone events. Captured: " + Truncate(combined));
+
             Assert.IsTrue(combined.Contains("\"db.system\""),
                "DB spans should carry the db.system attribute. Captured: " + Truncate(combined));
 

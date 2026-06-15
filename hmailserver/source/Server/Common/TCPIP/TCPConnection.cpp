@@ -666,10 +666,23 @@ namespace HM
                // scope ends the span on every exit path (incl. DisconnectedException)
                // and, while active, parents any DB-query spans run during ParseData.
                // No-op unless OtelEndpoint is configured.
-               if (OtelTracer::Instance()->IsEnabled() && otel_trace_id_.IsEmpty())
+               const bool otelEnabled = OtelTracer::Instance()->IsEnabled();
+               if (otelEnabled && otel_trace_id_.IsEmpty())
                   otel_trace_id_ = OtelTracer::NewTraceId();
 
-               OtelSpanScope otelSpan("command", OtelSpanKindServer, otel_trace_id_);
+               // Name the span after the protocol verb (e.g. "MAIL"/"RETR"/"LOGIN")
+               // so individual commands are distinguishable in the trace, and tag it
+               // with the session id for correlation with the session log. The verb
+               // extraction and attribute formatting are skipped entirely when
+               // tracing is disabled to keep the hot path free of extra work.
+               OtelSpanScope otelSpan(otelEnabled ? GetOtelOperationName_(s) : AnsiString("command"),
+                                      OtelSpanKindServer, otel_trace_id_);
+               if (otelEnabled)
+               {
+                  AnsiString otelSessionId;
+                  otelSessionId.Format("%d", session_id_);
+                  otelSpan.AddAttribute("hmailserver.session.id", otelSessionId);
+               }
 
                ParseData(s);
 
@@ -856,6 +869,52 @@ namespace HM
    TCPConnection::GetIPAddressString()
    {
       return GetRemoteEndpointAddress().ToString();
+   }
+
+   AnsiString
+   TCPConnection::GetOtelOperationName_(const AnsiString &sData) const
+   {
+      // Default: the first token is the verb (SMTP/POP3 have no command tag).
+      return ExtractOtelVerb_(sData, 0);
+   }
+
+   AnsiString
+   TCPConnection::ExtractOtelVerb_(const AnsiString &sData, int tokenIndex)
+   {
+      // Walk to the requested whitespace-delimited token without copying the args.
+      int len = sData.GetLength();
+      int pos = 0;
+      for (int t = 0; t < tokenIndex; t++)
+      {
+         while (pos < len && sData.GetAt(pos) != ' ' && sData.GetAt(pos) != '\t')
+            pos++;
+         while (pos < len && (sData.GetAt(pos) == ' ' || sData.GetAt(pos) == '\t'))
+            pos++;
+      }
+
+      AnsiString verb;
+      while (pos < len && sData.GetAt(pos) != ' ' && sData.GetAt(pos) != '\t' &&
+             sData.GetAt(pos) != '\r' && sData.GetAt(pos) != '\n')
+      {
+         verb += sData.GetAt(pos);
+         pos++;
+      }
+
+      // Only accept a clean, low-cardinality verb as a span name; otherwise fall
+      // back to the generic "command" so junk input cannot explode trace cardinality.
+      int verbLen = verb.GetLength();
+      if (verbLen == 0 || verbLen > 16)
+         return "command";
+
+      for (int i = 0; i < verbLen; i++)
+      {
+         char c = verb.GetAt(i);
+         if (!((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')))
+            return "command";
+      }
+
+      verb.MakeUpper();
+      return verb;
    }
 
    CipherInfo
