@@ -7,13 +7,14 @@ namespace hMailServer.ControlPanel.Views
    /// <summary>Prompts for a 6-digit two-factor verification code at login.</summary>
    public class TotpPromptDialog : Window
    {
-      private readonly TextBox code_ = new()
+      private readonly Wpf.Ui.Controls.TextBox code_ = new()
       {
-         FontSize = 18,
+         FontSize = 28,
          FontFamily = new System.Windows.Media.FontFamily("Cascadia Mono, Consolas"),
          MaxLength = 6,
-         Width = 140,
-         Padding = new Thickness(8, 6, 8, 6),
+         Width = 200,
+         PlaceholderText = "000000",
+         HorizontalAlignment = HorizontalAlignment.Left,
          HorizontalContentAlignment = HorizontalAlignment.Center
       };
 
@@ -23,8 +24,8 @@ namespace hMailServer.ControlPanel.Views
       {
          Owner = owner;
          Title = "Two-factor authentication";
-         Width = 380;
-         Height = 200;
+         Width = 400;
+         Height = 230;
          ResizeMode = ResizeMode.NoResize;
          WindowStartupLocation = WindowStartupLocation.CenterOwner;
          SetResourceReference(BackgroundProperty, "ApplicationBackgroundBrush");
