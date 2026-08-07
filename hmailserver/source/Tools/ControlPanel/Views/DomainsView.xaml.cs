@@ -61,6 +61,13 @@ namespace hMailServer.ControlPanel.Views
       {
          public string Name { get; set; }
          public string Display { get; set; }
+
+         // The alias list is a ListView with an ItemTemplate, so the visible text
+         // comes from the Display binding - but a ListViewItem's accessible name
+         // falls back to ToString() on the bound object. Without this a screen
+         // reader announces the type name for every alias. The domain, account and
+         // distribution lists are bound to plain strings and never had the problem.
+         public override string ToString() => Display;
       }
 
       private dynamic OpenSelectedDomain(dynamic domains)

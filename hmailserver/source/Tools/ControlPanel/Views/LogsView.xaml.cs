@@ -18,6 +18,13 @@ namespace hMailServer.ControlPanel.Views
       {
          public string Text { get; set; }
          public Brush Brush { get; set; }
+
+         // The log is a ListBox with an ItemTemplate, so a ListBoxItem's accessible
+         // name falls back to ToString() on the bound object rather than the text
+         // shown. Without this a screen reader announces the type name for every
+         // line of the live log, which is the page an administrator is most likely
+         // to be reading aloud when something is wrong.
+         public override string ToString() => Text;
       }
 
       private readonly ObservableCollection<LogLine> lines_ = new();
