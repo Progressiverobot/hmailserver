@@ -3,7 +3,9 @@
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 
 using System;
+using System.Net.Sockets;
 using System.ServiceProcess;
+using System.Threading;
 using hMailServer;
 using NUnit.Framework;
 using RegressionTests.Infrastructure;
@@ -202,7 +204,13 @@ namespace RegressionTests.AntiSpam
 
          Assert.IsFalse(sMessageContents.Contains("X-Spam-Status"));
 
-         CustomAsserts.AssertReportedError("There was a communication error with SpamAssassin.",
+         // Only error 5508 belongs to this scenario. The "communication error with
+         // SpamAssassin" that used to be asserted alongside it is error 5157, which
+         // SpamAssassinClient::OnReadError reports when a connection was
+         // established and then lost mid-read. With spamd stopped there is nothing
+         // to connect to, so Connect() fails outright and that error never fires -
+         // asserting it demanded a different failure mode from the one under test.
+         CustomAsserts.AssertReportedError(
             "The SpamAssassin tests did not complete. Please confirm that the configuration (host name and port) is valid and that SpamAssassin is running.");
       }
 
@@ -307,17 +315,57 @@ namespace RegressionTests.AntiSpam
       }
 
 
+      /// <summary>
+      /// Stops SpamAssassin and does not return until it has actually stopped
+      /// serving. ServiceController.Stop() only asks: it returns as soon as the
+      /// request is accepted, while spamd is still up and still answering on 783.
+      /// The caller then sent a message straight into a live spamd and got the
+      /// X-Spam-Status header it was asserting could not be there.
+      ///
+      /// The service reaching Stopped is necessary but not sufficient - a wrapped
+      /// spamd can outlive its own service by a moment - so this waits on the port
+      /// refusing connections, which is the condition the test actually depends on.
+      /// </summary>
       private static void StopSpamAssassin()
       {
-         // Check if we can launch it...
          try
          {
             var serviceController = new ServiceController("SpamAssassinJAM");
-            serviceController.Stop();
+            if (serviceController.Status != ServiceControllerStatus.Stopped)
+            {
+               serviceController.Stop();
+               serviceController.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(60));
+            }
          }
          catch (Exception)
          {
             Assert.Inconclusive("Unable to stop SpamAssassin process. Is SpamAssassin installed?");
+         }
+
+         for (var i = 0; i < 120; i++)
+         {
+            if (!IsSpamAssassinAcceptingConnections())
+               return;
+
+            Thread.Sleep(250);
+         }
+
+         Assert.Inconclusive("SpamAssassin is still accepting connections on port 783 after being stopped.");
+      }
+
+      private static bool IsSpamAssassinAcceptingConnections()
+      {
+         try
+         {
+            using (var client = new TcpClient())
+            {
+               var result = client.BeginConnect("127.0.0.1", 783, null, null);
+               return result.AsyncWaitHandle.WaitOne(500) && client.Connected;
+            }
+         }
+         catch
+         {
+            return false;
          }
       }
    }

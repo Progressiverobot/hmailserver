@@ -547,10 +547,11 @@ If you want to run hMailServer in debug mode in Visual Studio, add the command a
 Running tests
 -------------
 
-hMailServer ships with a full regression suite (1026 NUnit tests) which exercises the server end to end over SMTP, IMAP and POP3  -  including anti-spam, anti-virus, TLS, DKIM/DMARC, rules, backup and the COM API. 6.2.10 passes the complete suite with zero failures. Tests reporting *inconclusive* are the ones whose optional integration is absent from the machine running them; see the list below.
+hMailServer ships with a full regression suite (1026 NUnit tests) which exercises the server end to end over SMTP, IMAP and POP3  -  including anti-spam, anti-virus, TLS, DKIM/DMARC, rules, backup and the COM API. 6.2.10 passes **all 1026 with zero failures and zero inconclusive**, with live SpamAssassin and ClamAV. Without those two integrations installed the 27 tests that depend on them report *inconclusive* rather than failing; the setup that makes them run is below.
 
 NOTE: When running tests, your local hMailServer installation will be updated with test accounts. Existing domains and accounts are deleted. Each tests prepares the server configuration in different ways. In other words, do not run the automated tests in an environment where you need to preserve hMailServer data.
 
+0. **Run the tests elevated.** The suite starts and stops Windows services - hMailServer itself, and the SpamAssassin service that the outage-handling test takes down on purpose - which a standard user cannot do. Unelevated, those tests report *inconclusive*.
 1. Make sure hMailServer.exe is built and can be run. The tests will launch the service.
 2. Open the test solution, `\hmailserver\test\hMailServer Tests.sln`
 3. In Visual Studio, select Test Explorer from the View-menu. 
@@ -561,8 +562,29 @@ You can also navigate to the source code for a test, right-click anywhere and se
 
 For 100% coverage the suite expects three optional integrations (tests degrade to *inconclusive* without them):
 
-   * **SpamAssassin**  -  the JAM Software Windows build (`https://downloads.jam-software.de/spamassassin/SpamAssassinForWindows-x64.zip`), extracted to `C:\SpamAssassin`, with `spamd.exe -i 127.0.0.1 -A 127.0.0.1 -p 783` running  -  ideally wrapped as a Windows service named `SpamAssassinJAM` so outage-handling tests can stop and start it.
-   * **ClamAV**  -  installed to `C:\clamav` with `clamd` listening on TCP 3310 and current freshclam definitions. Let the daemon finish loading signatures before the first run.
+   * **SpamAssassin**  -  the JAM Software Windows build the suite was originally written against
+     is long gone, so build it from CPAN instead. Install Strawberry Perl, then
+     `cpanm --notest Mail::SpamAssassin`. That skips `spamd` on Windows by default; rebuild it
+     from the unpacked distribution with `perl Makefile.PL BUILD_SPAMD=yes BUILD_SPAMC=no` and
+     `gmake install`, then fetch rules with `sa-update`.
+
+     Two details matter. The suite looks for a *process* named `spamd` before it falls back to
+     starting the service, and `spamd` is a Perl script - so copy `perl.exe` to `spamd.exe`
+     **inside `C:\Strawberry\perl\bin`**: Perl derives `@INC` from the location of its
+     executable, and a copy anywhere else finds no core modules at all. Run it as
+     `spamd.exe -T <path-to>\spamd --port 783 --listen 127.0.0.1 --round-robin --nouser-config`
+     (`-T` is required because it is on the script's `#!` line), wrapped as a Windows service
+     named `SpamAssassinJAM` so the outage-handling test can stop and start it.
+   * **ClamAV**  -  the official Windows build, extracted to `C:\clamav` (the suite launches
+     `C:\clamav\clamd.exe` by that exact path), with a `clamd.conf` setting `TCPSocket 3310`.
+     Bind both `127.0.0.1` and `::1`: hMailServer connects to it as `localhost`, which resolves
+     to either. Run `freshclam` first and let the daemon finish loading signatures before the
+     first run - it takes a while.
+
+     Note the virus test sends EICAR as a base64 **attachment**, not as the message body.
+     ClamAV's EICAR signatures match a whole file, so the string with anything around it is not
+     detected; as an attachment ClamAV decodes it back to exactly the EICAR file and matches,
+     which is also how a virus would really arrive.
    * **`AddXOriginalRcptTo=1`** in `hMailServer.INI` for the X-Original-Rcpt-To header tests.
 
 The complete dev-tree provisioning recipe (directories, certificates, DB scripts, runtime files) is kept with the maintainer's internal notes; open an issue if you need it to reproduce a build.
