@@ -38,6 +38,7 @@ jobs:
         with:
           languages: csharp
           build-mode: manual
+          config-file: ./.github/codeql/codeql-config.yml
 
       - name: Build Control Panel
         run: dotnet build hmailserver/source/Tools/ControlPanel/ControlPanel.csproj -c Release
