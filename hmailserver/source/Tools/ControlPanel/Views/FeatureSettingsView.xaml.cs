@@ -98,7 +98,7 @@ namespace hMailServer.ControlPanel.Views
       /// </summary>
       private class PathSetting : Setting
       {
-         public string Default = "";
+         public readonly string Default = "";
          public string Placeholder = "";
          public bool PickFolder;
          public string FileFilter = "All files (*.*)|*.*";

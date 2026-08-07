@@ -15,6 +15,7 @@ using DataGrid = System.Windows.Controls.DataGrid;
 using MessageBox = System.Windows.MessageBox;
 using MessageBoxButton = System.Windows.MessageBoxButton;
 using MessageBoxResult = System.Windows.MessageBoxResult;
+using System.Linq;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -176,10 +177,8 @@ namespace hMailServer.ControlPanel.Views
          grid_.ItemsSource = rows_;
          grid_.MouseDoubleClick += (_, _) => EditSelected();
 
-         foreach (FieldSpec f in spec_.Fields)
+         foreach (FieldSpec f in spec_.Fields.Where(f => f.ShowInGrid))
          {
-            if (!f.ShowInGrid)
-               continue;
             string prop = f.Prop;
             var col = new DataGridTextColumn
             {

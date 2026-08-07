@@ -24,7 +24,10 @@ namespace RegressionTests.Infrastructure
    [TestFixture]
    public class OpenTelemetryTracing : TestFixtureBase
    {
-      private const int CollectorPort = 9099;
+      // Must not be the metrics listener port (9099): DeliveryMetrics, HealthProbes
+      // and DatabaseMetrics point the server's own metrics server at that port, and
+      // with NUnit running tests in parallel this collector would fail to bind.
+      private const int CollectorPort = 9096;
 
       [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
       private static extern bool WritePrivateProfileString(string section, string key, string value, string filePath);

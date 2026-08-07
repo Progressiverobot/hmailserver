@@ -36,8 +36,8 @@ namespace DBSetup.Pages
       {
          _state = state;
 
-         if (_state.ContainsKey("ServiceDependency"))
-            comboServices.Text = _state["ServiceDependency"];
+         if (_state.TryGetValue("ServiceDependency", out string serviceDependency))
+            comboServices.Text = serviceDependency;
       }
 
       public bool OnLeavePage(bool next)

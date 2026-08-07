@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.DirectoryServices;
 using System.Text;
+using System.Linq;
 
 namespace hMailServer.ControlPanel.Services
 {
@@ -184,13 +185,11 @@ namespace hMailServer.ControlPanel.Services
       /// <summary>Converts e.g. "DC=progressiverobot,DC=local" to "progressiverobot.local".</summary>
       private static string DistinguishedNameToDns(string dn)
       {
-         var parts = new List<string>();
-         foreach (string token in dn.Split(','))
-         {
-            string t = token.Trim();
-            if (t.StartsWith("DC=", StringComparison.OrdinalIgnoreCase))
-               parts.Add(t.Substring(3));
-         }
+         var parts = dn.Split(',')
+                       .Select(token => token.Trim())
+                       .Where(t => t.StartsWith("DC=", StringComparison.OrdinalIgnoreCase))
+                       .Select(t => t.Substring(3))
+                       .ToList();
          return string.Join(".", parts);
       }
 

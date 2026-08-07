@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Reflection;
 using System.Windows.Controls;
 using System.Windows.Data;
+using System.Linq;
 
 namespace hMailServer.ControlPanel.Services
 {
@@ -44,10 +45,9 @@ namespace hMailServer.ControlPanel.Services
          if (t.IsPrimitive || item is DateTime)
             return item.ToString().IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0;
 
-         foreach (PropertyInfo p in t.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+         foreach (PropertyInfo p in t.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                                     .Where(p => p.GetIndexParameters().Length == 0))
          {
-            if (p.GetIndexParameters().Length != 0)
-               continue;
 
             object value;
             try

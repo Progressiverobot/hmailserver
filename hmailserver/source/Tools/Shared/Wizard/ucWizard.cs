@@ -68,8 +68,8 @@ namespace hMailServer.Shared
       {
          if (panelMiddle.Controls.Count > 0)
          {
-            UserControl currentPage = panelMiddle.Controls[0] as UserControl;
-            IWizardPage currentWizPage = currentPage as IWizardPage;
+            UserControl currentPage = (UserControl) panelMiddle.Controls[0];
+            IWizardPage currentWizPage = (IWizardPage) currentPage;
 
             bool nextEnabled = buttonNext.Enabled;
             bool previousEnabled = buttonPrevious.Enabled;
@@ -100,7 +100,7 @@ namespace hMailServer.Shared
          _currentPage = pageNo;
 
          UserControl page = _pages[_currentPage];
-         IWizardPage wizPage = page as IWizardPage;
+         IWizardPage wizPage = (IWizardPage) page;
 
          new TabOrderManager(page).SetTabOrder(TabOrderManager.TabScheme.AcrossFirst);
 

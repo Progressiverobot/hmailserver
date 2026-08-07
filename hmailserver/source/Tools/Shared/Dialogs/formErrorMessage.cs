@@ -76,31 +76,36 @@ namespace hMailServer.Shared
             if (!string.IsNullOrEmpty(_title))
                 this.Text = _title;
 
-            string details = _exception.Message + Environment.NewLine + Environment.NewLine;
+            var details = new StringBuilder();
+            details.Append(_exception.Message).Append(Environment.NewLine).Append(Environment.NewLine);
 
-            details += string.Format("ExceptionType: {0}" + Environment.NewLine, _exception.GetType().Name);
-            details += string.Format("HelpLine: {0}" + Environment.NewLine, _exception.HelpLink);
-            details += string.Format("Message: {0}" + Environment.NewLine, _exception.Message);
-            details += string.Format("Source: {0}" + Environment.NewLine, _exception.Source);
-            details += string.Format("StackTrace: {0}" + Environment.NewLine, _exception.StackTrace);
-            details += string.Format("TargetSite: {0}" + Environment.NewLine, _exception.TargetSite);
-            
-            string indent = "\t";
+            AppendException(details, _exception, string.Empty);
+
+            string indent = "	";
             Exception ie = _exception;
-            while (!((ie.InnerException == null)))
+            while (ie.InnerException != null)
             {
                 ie = ie.InnerException;
-                details += string.Format(indent + "****** Inner Exception ******" + Environment.NewLine);
-                details += string.Format(indent + "ExceptionType: {0}" + Environment.NewLine, ie.GetType().Name);
-                details += string.Format(indent + "HelpLine: {0}" + Environment.NewLine, ie.HelpLink);
-                details += string.Format(indent + "Message: {0}" + Environment.NewLine, ie.Message);
-                details += string.Format(indent + "Source: {0}" + Environment.NewLine, ie.Source);
-                details += string.Format(indent + "StackTrace: {0}  + Environment.NewLine", ie.StackTrace);
-                details += string.Format(indent + "TargetSite: {0}  + Environment.NewLine", ie.TargetSite);
-                indent += "\t";
+                details.Append(indent).Append("****** Inner Exception ******").Append(Environment.NewLine);
+                AppendException(details, ie, indent);
+                indent += "	";
             }
 
-            textErrorDetails.Text = details;
+            textErrorDetails.Text = details.ToString();
+        }
+
+        // Built with a StringBuilder rather than repeated string concatenation, and
+        // shared between the outer exception and each inner one - the inner-exception
+        // copy of this block had "+ Environment.NewLine" inside the format string, so
+        // the StackTrace and TargetSite lines printed that text instead of a newline.
+        private static void AppendException(StringBuilder details, Exception exception, string indent)
+        {
+            details.Append(indent).Append("ExceptionType: ").Append(exception.GetType().Name).Append(Environment.NewLine);
+            details.Append(indent).Append("HelpLine: ").Append(exception.HelpLink).Append(Environment.NewLine);
+            details.Append(indent).Append("Message: ").Append(exception.Message).Append(Environment.NewLine);
+            details.Append(indent).Append("Source: ").Append(exception.Source).Append(Environment.NewLine);
+            details.Append(indent).Append("StackTrace: ").Append(exception.StackTrace).Append(Environment.NewLine);
+            details.Append(indent).Append("TargetSite: ").Append(exception.TargetSite).Append(Environment.NewLine);
         }
     }
 }

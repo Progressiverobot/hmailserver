@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
 using TextBox = Wpf.Ui.Controls.TextBox;
+using System.Linq;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -359,13 +360,13 @@ namespace hMailServer.ControlPanel.Views
       {
          public string Title;
          public string Blurb;
-         public List<ComSetting> Settings = new();
+         public readonly List<ComSetting> Settings = new();
       }
 
       private class TabDef
       {
          public string Header;
-         public List<CardDef> Cards = new();
+         public readonly List<CardDef> Cards = new();
       }
 
       // ---- enum option tables ------------------------------------------------
@@ -1019,11 +1020,7 @@ namespace hMailServer.ControlPanel.Views
             @"C:\ProgramData\ClamWin\db",
          };
 
-         foreach (string candidate in candidates)
-            if (System.IO.Directory.Exists(candidate))
-               return candidate;
-
-         return "";
+         return candidates.FirstOrDefault(System.IO.Directory.Exists) ?? "";
       }
 
 

@@ -345,7 +345,7 @@ namespace DBUpdater
 
             foreach (ListViewItem item in listRequiredUpgrades.Items)
             {
-               UpgradeScript script = item.Tag as UpgradeScript;
+               UpgradeScript script = (UpgradeScript) item.Tag;
 
                string scriptToExecute = GetScriptFileName(script);
 

@@ -7,6 +7,7 @@ using Button = Wpf.Ui.Controls.Button;
 using TextBox = Wpf.Ui.Controls.TextBox;
 using TextBlock = System.Windows.Controls.TextBlock;
 using MessageBox = System.Windows.MessageBox;
+using System.Linq;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -33,10 +34,8 @@ namespace hMailServer.ControlPanel.Views
 
          var panel = new StackPanel { Margin = new Thickness(22) };
 
-         foreach (CollectionEditorView.FieldSpec f in spec.Fields)
+         foreach (CollectionEditorView.FieldSpec f in spec.Fields.Where(f => f.Prop != "ID"))
          {
-            if (f.Prop == "ID")
-               continue;
 
             object current = existing != null && existing.Values.TryGetValue(f.Prop, out object v)
                ? v

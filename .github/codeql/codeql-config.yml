@@ -1,22 +1,41 @@
 name: "hMailServer CodeQL config"
 
-# Scope the analysis to code that actually ships.
+# Scope the analysis to code that ships, and to rules that mean something here.
 #
-# Measured with CodeQL's own csharp-code-quality suite across every C# solution
-# in the tree, the 958 quality findings broke down like this:
-#
-#     333  Administrator      - retired GUI, since removed from the repository
-#     297  test harnesses     - never shipped
-#     227  Control Panel      - shipped, and none of them real defects
-#     101  legacy setup tools - shipped (DBSetup, DBUpdater, ...)
-#
-# Narrowing to the rules that indicate a genuine defect rather than style or
-# deliberate design left 132, of which none were in the Control Panel.
-#
-# The Administrator is gone, so only the test harnesses need excluding here:
-# they are fixtures, not shipped code, and grading the project's reliability on
-# its own test scaffolding buries the signal from the code users actually run.
-#
-# Everything that ships stays in scope - the Control Panel and the setup tools.
+# The test harnesses are fixtures rather than shipped code; grading the
+# project's reliability on its own test scaffolding buries the signal from the
+# code users actually run. Everything that ships stays in scope.
 paths-ignore:
   - hmailserver/test
+
+# Three rules fire in bulk on deliberate design rather than on defects. They are
+# excluded here with the reasoning recorded, rather than silenced by scattering
+# suppression comments through the source or - worse - "fixed" by changes that
+# would make the product less robust.
+query-filters:
+  # 160 hits, essentially all in the Control Panel. It is a COM-interop desktop
+  # application: almost every call crosses into the hMailServer service and can
+  # fail with COMException, InvalidComObjectException, a reflection wrapper
+  # around either, or a server-side error surfaced as a plain Exception.
+  # Catching the base type is the deliberate policy - a settings page that
+  # cannot read one value must show a message, not take the window down with
+  # it. Enumerating specific types would guarantee that the one unlisted type
+  # crashes the GUI, which is the outcome this rule exists to prevent.
+  - exclude:
+      id: cs/catch-of-all-exceptions
+
+  # 30 hits, the same design seen from the other side: handlers that
+  # intentionally do nothing, such as a failed UI confirmation that must not
+  # turn a successful save into an error. The blocks carry comments explaining
+  # each case; the rule counts statements, so the only way to satisfy it would
+  # be to add a no-op purely to appease the analyser.
+  - exclude:
+      id: cs/empty-catch-block
+
+  # Informational rather than a defect: these simply report that the code calls
+  # into unmanaged code. It has to - the Control Panel talks to the COM API and
+  # uses the Windows APIs for DPAPI, service control and UI automation.
+  - exclude:
+      id: cs/call-to-unmanaged-code
+  - exclude:
+      id: cs/unmanaged-code

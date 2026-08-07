@@ -34,26 +34,26 @@ namespace DBSetup.Pages
       {
          _state = state;
 
-         if (_state.ContainsKey("ServerAddress"))
-            textServerAddress.Text = _state["ServerAddress"];
-         if (_state.ContainsKey("ServerPort"))
-            textServerPort.Text = _state["ServerPort"];
-         if (_state.ContainsKey("DatabaseName"))
-            textDatabaseName.Text = _state["DatabaseName"];
+         if (_state.TryGetValue("ServerAddress", out string serverAddress))
+            textServerAddress.Text = serverAddress;
+         if (_state.TryGetValue("ServerPort", out string serverPort))
+            textServerPort.Text = serverPort;
+         if (_state.TryGetValue("DatabaseName", out string databaseName))
+            textDatabaseName.Text = databaseName;
 
-         if (_state.ContainsKey("Authentication"))
+         if (_state.TryGetValue("Authentication", out string authentication))
          {
-            if (_state["Authentication"] == "Server")
+            if (authentication == "Server")
                radioUseServerAuthentication.Checked = true;
-            else if (_state["Authentication"] == "Windows")
+            else if (authentication == "Windows")
                radioUseWindowsAuthentication.Checked = true;
          }
 
-         if (_state.ContainsKey("Username"))
-            textUsername.Text = _state["Username"];
+         if (_state.TryGetValue("Username", out string username))
+            textUsername.Text = username;
 
-         if (_state.ContainsKey("Password"))
-            textPassword.Text = _state["Password"];
+         if (_state.TryGetValue("Password", out string password))
+            textPassword.Text = password;
 
          hMailServer.eDBtype dbType = Globals.GetDatabaseType(_state["ServerType"]);
          switch (dbType)

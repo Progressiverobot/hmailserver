@@ -8,6 +8,7 @@ using LiveChartsCore.SkiaSharpView;
 using LiveChartsCore.SkiaSharpView.Painting;
 using SkiaSharp;
 using hMailServer.ControlPanel.Services;
+using System.Linq;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -150,10 +151,7 @@ namespace hMailServer.ControlPanel.Views
 
       private static bool HasActivity(ObservableCollection<ObservableValue> series)
       {
-         foreach (ObservableValue v in series)
-            if (v.Value.GetValueOrDefault() > 0)
-               return true;
-         return false;
+         return series.Any(v => v.Value.GetValueOrDefault() > 0);
       }
 
       private static string FormatUptime(string startTime)

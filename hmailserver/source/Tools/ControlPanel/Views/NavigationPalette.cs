@@ -85,11 +85,8 @@ namespace hMailServer.ControlPanel.Views
          string query = searchBox_.Text.Trim();
          resultsList_.Items.Clear();
 
-         foreach (string name in names_)
-         {
-            if (query.Length == 0 || IsSubsequence(query, name))
-               resultsList_.Items.Add(name);
-         }
+         foreach (string name in names_.Where(n => query.Length == 0 || IsSubsequence(query, n)))
+            resultsList_.Items.Add(name);
 
          if (resultsList_.Items.Count > 0)
             resultsList_.SelectedIndex = 0;

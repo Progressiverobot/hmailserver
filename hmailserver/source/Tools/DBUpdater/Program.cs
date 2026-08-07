@@ -35,7 +35,7 @@ namespace DBUpdater
              catch (Exception ex)
              {
                  if (!ex.Message.Contains(databaseOldErrorMessage))
-                     throw ex;
+                     throw;
 
              }
             
