@@ -83,6 +83,17 @@ change until the new settings are turned on.
 
    * SPDX + CycloneDX SBOMs (Syft) attached to every release, Dependabot CVE alerts + grouped update PRs, and a dependency-review PR gate.
 
+Unreleased
+==========
+
+   * **LiveCharts upgraded to 2.0.5** ([#11](https://github.com/Progressiverobot/hmailserver/issues/11)).
+     The upgrade had been held back because the dashboard charts rendered as an
+     opaque white block over the dark theme, taking the "No delivery activity
+     yet" / "No active sessions" labels down with them. `CartesianChart` derives
+     from `Control`, and 2.0.x gives it a solid default background where the
+     release candidate left it unset; the charts now set it explicitly.
+     Verified in both light and dark themes.
+
 6.2.8
 =====
 
@@ -128,9 +139,9 @@ was not.
    * CI: `actions/checkout` v4 &rarr; v7, `actions/setup-dotnet` v4 &rarr; v5,
      `github/codeql-action` v3 &rarr; v4, `actions/dependency-review-action`
      v4 &rarr; v5, `actions/upload-artifact` v4 &rarr; v7.
-   * LiveCharts is **held at 2.0.0-rc2**. The proposed 2.0.5 upgrade renders the
-     dashboard chart area opaque white over the dark theme and hides the
-     empty-state labels, so it is deferred until that is resolved upstream.
+   * LiveCharts shipped as **2.0.0-rc2** in this release; the 2.0.5 upgrade was
+     held back because it rendered the dashboard chart area opaque white over
+     the dark theme. That is resolved on master - see *Unreleased* above.
 
 6.2.7
 =====

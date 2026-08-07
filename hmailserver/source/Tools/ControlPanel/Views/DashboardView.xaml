@@ -79,7 +79,10 @@
                         </Grid.RowDefinitions>
                         <TextBlock Text="Delivery throughput (messages / minute)" FontWeight="SemiBold" FontSize="13"
                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,8" />
-                        <lvc:CartesianChart x:Name="ThroughputChart" Grid.Row="1" />
+                        <!-- Background must stay explicit: CartesianChart is a Control, and
+                             LiveCharts 2.0.x defaults it to opaque white, which blocks out
+                             the dark card and leaves the empty-state label below unreadable. -->
+                        <lvc:CartesianChart x:Name="ThroughputChart" Grid.Row="1" Background="Transparent" />
                         <TextBlock x:Name="ThroughputEmpty" Grid.Row="1" Text="No delivery activity yet"
                                    HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="13"
                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
@@ -94,7 +97,10 @@
                         </Grid.RowDefinitions>
                         <TextBlock Text="Active sessions" FontWeight="SemiBold" FontSize="13"
                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,8" />
-                        <lvc:CartesianChart x:Name="SessionsChart" Grid.Row="1" />
+                        <!-- Background must stay explicit: CartesianChart is a Control, and
+                             LiveCharts 2.0.x defaults it to opaque white, which blocks out
+                             the dark card and leaves the empty-state label below unreadable. -->
+                        <lvc:CartesianChart x:Name="SessionsChart" Grid.Row="1" Background="Transparent" />
                         <TextBlock x:Name="SessionsEmpty" Grid.Row="1" Text="No active sessions"
                                    HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="13"
                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}" />

@@ -16,11 +16,18 @@
     <Product>hMailServer Control Panel</Product>
     <Company>Progressive Robot Ltd</Company>
     <Copyright>Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd</Copyright>
+    <!-- LiveCharts renders through SkiaSharp.Views.WPF, which ships only .NET
+         Framework assets (and with them OpenTK / OpenTK.GLWpfControl). They are
+         plain WPF, GPU rendering is off by default, and the dashboard charts are
+         exercised on every release - but NuGet still reports NU1701 for the
+         framework mismatch and CI builds with -warnaserror. Scoped to this one
+         diagnostic rather than a blanket suppression. -->
+    <NoWarn>$(NoWarn);NU1701</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="WPF-UI" Version="4.3.0" />
-    <PackageReference Include="LiveChartsCore.SkiaSharpView.WPF" Version="2.0.0-rc2" />
+    <PackageReference Include="LiveChartsCore.SkiaSharpView.WPF" Version="2.0.5" />
     <PackageReference Include="QRCoder" Version="1.8.0" />
     <PackageReference Include="System.Management" Version="10.0.10" />
     <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.10" />
