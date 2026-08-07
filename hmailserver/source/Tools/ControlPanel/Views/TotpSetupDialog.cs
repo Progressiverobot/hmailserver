@@ -179,7 +179,8 @@ namespace hMailServer.ControlPanel.Views
          {
             using var generator = new QRCodeGenerator();
             QRCodeData data = generator.CreateQrCode(uri, QRCodeGenerator.ECCLevel.Q);
-            byte[] png = new PngByteQRCode(data).GetGraphic(8);
+            using var qr = new PngByteQRCode(data);
+            byte[] png = qr.GetGraphic(8);
 
             var bmp = new BitmapImage();
             using (var ms = new MemoryStream(png))
