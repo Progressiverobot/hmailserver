@@ -5,7 +5,7 @@ hMailServer is an open source email server for Microsoft Windows, implementing S
 
 This repository is a modernized fork of the original project (which is no longer maintained upstream). It has been brought up to date with a current toolchain, current cryptography, and the transport-security standards expected of a mail server in 2026. It is maintained by Christopher Holloway / [Progressive Robot Ltd](https://www.progressiverobot.com).
 
-**Production status:** version **6.2.8** is released - [download the installer](https://github.com/Progressiverobot/hmailserver/releases/latest) (`hMailServer-6.2.8-x64.exe`). **6.2.8 is a Control Panel bug-fix release**: list editors were rendering every row blank, and the Control Panel stopped working entirely after an hMailServer service restart until it was closed and reopened - both are fixed, together with a refresh of the GUI's dependencies - see *6.2.8* below. The server core is unchanged since 6.2.6 (opt-in IMAP4rev2, the Control Panel redesign and complete settings coverage). It is validated by the full regression suite: **898 of 898 tests passing, zero failures, zero inconclusive**, including live SpamAssassin, ClamAV (real EICAR detection), DMARC evaluation against live DNS, and TLS 1.2/1.3 handshakes end to end. The bundled administration GUI is the modern .NET 8 **Control Panel** (the classic Administrator has been retired).
+**Production status:** version **6.2.9** is released - [download the installer](https://github.com/Progressiverobot/hmailserver/releases/latest) (`hMailServer-6.2.9-x64.exe`). **6.2.9 completes the 6.2.8 bug-fix line**: the LiveCharts upgrade that 6.2.8 held back is in, and the Control Panel has its first automated tests - see *6.2.9* below. 6.2.8 before it fixed two Control Panel defects: list editors were rendering every row blank, and the Control Panel stopped working entirely after an hMailServer service restart until it was closed and reopened - both are fixed, together with a refresh of the GUI's dependencies - see *6.2.8* below. The server core is unchanged since 6.2.6 (opt-in IMAP4rev2, the Control Panel redesign and complete settings coverage). It is validated by the full regression suite: **898 of 898 tests passing, zero failures, zero inconclusive**, including live SpamAssassin, ClamAV (real EICAR detection), DMARC evaluation against live DNS, and TLS 1.2/1.3 handshakes end to end. The bundled administration GUI is the modern .NET 8 **Control Panel** (the classic Administrator has been retired).
 
 What's new in 6.0
 =================
@@ -83,8 +83,11 @@ change until the new settings are turned on.
 
    * SPDX + CycloneDX SBOMs (Syft) attached to every release, Dependabot CVE alerts + grouped update PRs, and a dependency-review PR gate.
 
-Unreleased
-==========
+6.2.9
+=====
+
+A follow-up to 6.2.8: the dependency upgrade that release held back, plus the
+first automated tests for the Control Panel.
 
    * **LiveCharts upgraded to 2.0.5** ([#11](https://github.com/Progressiverobot/hmailserver/issues/11)).
      The upgrade had been held back because the dashboard charts rendered as an
@@ -93,6 +96,13 @@ Unreleased
      from `Control`, and 2.0.x gives it a solid default background where the
      release candidate left it unset; the charts now set it explicitly.
      Verified in both light and dark themes.
+
+   * **First automated tests for the Control Panel** ([#12](https://github.com/Progressiverobot/hmailserver/pull/12)).
+     The GUI had no test coverage at all - CI compiled it and stopped there. A
+     `ControlPanel.Core` library now exposes the side-effect-free services
+     (`PasswordStrength`, `NumericField`, `PasswordGenerator`) to a `ControlPanel.Tests`
+     xUnit project, and CI runs them with Cobertura coverage on every push. The
+     three .NET 8 projects also gained a solution, `ControlPanel.sln`.
 
 6.2.8
 =====
@@ -141,7 +151,7 @@ was not.
      v4 &rarr; v5, `actions/upload-artifact` v4 &rarr; v7.
    * LiveCharts shipped as **2.0.0-rc2** in this release; the 2.0.5 upgrade was
      held back because it rendered the dashboard chart area opaque white over
-     the dark theme. That is resolved on master - see *Unreleased* above.
+     the dark theme. That is resolved in 6.2.9 above.
 
 6.2.7
 =====
