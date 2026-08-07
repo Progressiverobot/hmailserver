@@ -5,7 +5,7 @@ hMailServer is an open source email server for Microsoft Windows, implementing S
 
 This repository is a modernized fork of the original project (which is no longer maintained upstream). It has been brought up to date with a current toolchain, current cryptography, and the transport-security standards expected of a mail server in 2026. It is maintained by Christopher Holloway / [Progressive Robot Ltd](https://www.progressiverobot.com).
 
-**Production status:** version **6.2.9** is released - [download the installer](https://github.com/Progressiverobot/hmailserver/releases/latest) (`hMailServer-6.2.9-x64.exe`). **6.2.9 completes the 6.2.8 bug-fix line**: the LiveCharts upgrade that 6.2.8 held back is in, and the Control Panel has its first automated tests - see *6.2.9* below. 6.2.8 before it fixed two Control Panel defects: list editors were rendering every row blank, and the Control Panel stopped working entirely after an hMailServer service restart until it was closed and reopened - both are fixed, together with a refresh of the GUI's dependencies - see *6.2.8* below. The server core is unchanged since 6.2.6 (opt-in IMAP4rev2, the Control Panel redesign and complete settings coverage). It is validated by the full regression suite: **898 of 898 tests passing, zero failures, zero inconclusive**, including live SpamAssassin, ClamAV (real EICAR detection), DMARC evaluation against live DNS, and TLS 1.2/1.3 handshakes end to end. The bundled administration GUI is the modern .NET 8 **Control Panel** (the classic Administrator has been retired).
+**Production status:** version **6.2.10** is released - [download the installer](https://github.com/Progressiverobot/hmailserver/releases/latest) (`hMailServer-6.2.10-x64.exe`). **6.2.10 is a security and housekeeping release**: fifteen COM methods returned `S_OK` on calls they had just refused - five of them handing an unauthorized caller an uninitialized out-parameter - and the two unmaintained administration front-ends (the PHP WebAdmin, which kept the administrator password in plaintext in a PHP session, and the retired Administrator) are gone from the repository. Code-quality findings on shipped, hand-written code are down to zero. See *6.2.10* below. The server core is otherwise unchanged since 6.2.6 (opt-in IMAP4rev2, the Control Panel redesign and complete settings coverage). It is validated by the full regression suite: **1026 tests, 999 passing, zero failures**, covering SpamAssassin, ClamAV (real EICAR detection), DMARC evaluation against live DNS, and TLS 1.2/1.3 handshakes end to end - the 27 tests that report *inconclusive* are the SpamAssassin and ClamAV cases, inconclusive only because neither optional integration is installed on the machine that ran them. The bundled administration GUI is the modern .NET 8 **Control Panel**.
 
 What's new in 6.0
 =================
@@ -82,6 +82,77 @@ change until the new settings are turned on.
 **Supply chain & quality gates**
 
    * SPDX + CycloneDX SBOMs (Syft) attached to every release, Dependabot CVE alerts + grouped update PRs, and a dependency-review PR gate.
+
+6.2.10
+======
+
+A security and housekeeping release. It fixes a real authorization defect in the
+COM API, removes two unmaintained administration front-ends that no longer had a
+reason to ship, and takes the repository's code-quality findings to zero.
+
+   * **The COM API reported success on calls it had refused.** Fifteen methods
+     rejected an unauthorized caller with `return false`. These functions return
+     `HRESULT`, where `false` is `0` - which is `S_OK`. `InterfaceCache`'s five
+     getters return before writing `*pVal`, so a caller without server-admin
+     rights received `S_OK` and read whatever happened to be in the
+     out-parameter; `InterfaceSettings::SetAdministratorPassword` and five
+     siblings skipped the write and reported success, so a caller was told the
+     administrator password had changed when it had not;
+     `InterfaceMessageIndexing`'s four methods behaved the same way. They now
+     return `authentication_->GetAccessDenied()`, which is what the same files
+     already did in twelve other places.
+
+     Found by running CodeQL's C++ suite by hand: the workflow analysed C# only,
+     so 4.65 MB of network-facing code - the largest language in the repository
+     and the entire protocol surface - had never been scanned. 16 high-severity
+     findings, 15 of them these; the sixteenth is a verified false positive.
+
+   * **The PHP WebAdmin is removed.** It shipped by default under "Administrative
+     tools" and stored the administrator password in plaintext in a PHP session,
+     replaying it to `Authenticate()` on every request. It also required DCOM
+     permissions to be opened up for the web server account, and it was
+     unmaintained 2008-era code. The Control Panel replaces it and already
+     connects to a remote host, so nothing is lost - 145 files.
+
+   * **The retired Administrator is gone from the tree.** `hMailAdmin.exe` was
+     retired in 6.2 and the installer has not shipped it since, but the project
+     still built and was the single largest source of code-quality findings: 333
+     of 958. The one thing still taken from it, `Interop.hMailServer.dll`, is a
+     `tlbimp` wrapper every tool generates for itself; the installer now takes it
+     from `Shared`, so the packaged output is unchanged.
+
+   * **"Administrative tools" says what it actually does.** With both front-ends
+     gone the component delivered libraries and no application. What it does, and
+     always did, is register the type library on a machine that is not the server
+     so scripts and COM clients can administer a remote instance; it is now called
+     *Remote administration support (registers the COM API for scripts)*. A
+     `dnsapi.dll` line gated `OnlyBelowVersion: 0,6` also went - the installer's
+     `MinVersion` has been `6.1sp1` since the move to Inno Setup 6, so it could
+     never install.
+
+   * **Code-quality findings on shipped, hand-written code: 958 to zero.** Real
+     defects among them: `DBUpdater` rethrew with `throw ex`, resetting the stack
+     trace on the database-upgrade failure path; three `as` casts were
+     dereferenced without a null check; the error dialog's inner-exception branch
+     had `+ Environment.NewLine` *inside* the format string, so it printed that
+     text instead of a line break; the two-factor dialog built a `PngByteQRCode`
+     per render and never disposed it. The rest were style, and the exclusions
+     (generated designer files, `cs/path-combine` false positives, and the
+     catch-all pair across a COM-interop GUI that must not crash on one failed
+     call) carry their reasoning in `.github/codeql/codeql-config.yml`.
+
+   * **A real defect in the regression suite.** `OpenTelemetryTracing` bound its
+     OTLP collector to port 9099 - the same port the server's own metrics listener
+     uses - so with NUnit running 32 workers in parallel it could not bind. Now
+     9096, and the fixture passes.
+
+   * **One build path, one output folder.** Building `ControlPanel.sln` (x64) and
+     running `dotnet build ControlPanel.csproj` (AnyCPU) wrote to two different
+     `bin` folders while CI and the installer both read one fixed path, so a
+     solution build followed by an installer build would have shipped a stale GUI.
+     The output path and the `win-x64` runtime identifier are now pinned in the
+     project, which also stops the publish shipping macOS and arm64 native
+     binaries this installer can never load.
 
 6.2.9
 =====
@@ -476,7 +547,7 @@ If you want to run hMailServer in debug mode in Visual Studio, add the command a
 Running tests
 -------------
 
-hMailServer ships with a full regression suite (898 NUnit tests) which exercises the server end to end over SMTP, IMAP and POP3  -  including anti-spam, anti-virus, TLS, DKIM/DMARC, rules, backup and the COM API. Release 6.0.0 passes the complete suite with zero failures and zero inconclusive results.
+hMailServer ships with a full regression suite (1026 NUnit tests) which exercises the server end to end over SMTP, IMAP and POP3  -  including anti-spam, anti-virus, TLS, DKIM/DMARC, rules, backup and the COM API. 6.2.10 passes the complete suite with zero failures. Tests reporting *inconclusive* are the ones whose optional integration is absent from the machine running them; see the list below.
 
 NOTE: When running tests, your local hMailServer installation will be updated with test accounts. Existing domains and accounts are deleted. Each tests prepares the server configuration in different ways. In other words, do not run the automated tests in an environment where you need to preserve hMailServer data.
 

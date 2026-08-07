@@ -12,7 +12,26 @@
     <RootNamespace>hMailServer.ControlPanel</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>app.ico</ApplicationIcon>
-    <Version>6.2.9</Version>
+    <Version>6.2.10</Version>
+    <!-- MSBuild inserts the platform name into the output path for any
+         platform other than AnyCPU, so building ControlPanel.sln (x64) and
+         running `dotnet build ControlPanel.csproj` (AnyCPU) produce two
+         different bin folders. CI and the installer both read one fixed
+         path, so a solution build followed by an installer build would ship
+         whatever binary the last csproj-level build happened to leave there.
+         Pin the path so every route writes to the same place. -->
+    <OutputPath>bin\$(Configuration)\</OutputPath>
+    <!-- Windows-only GUI for a Windows-only server. Without a runtime
+         identifier the publish is RID-agnostic and ships every native
+         SkiaSharp/HarfBuzz binary the package carries - including macOS
+         .dylib files and arm64/x86 DLLs this installer can never load. Naming
+         the RID here rather than on one command line keeps the solution
+         build, `dotnet build`, `dotnet publish` and CI producing the same
+         output; SelfContained stays false because the installer already
+         bundles the .NET 8 Desktop Runtime. -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>false</SelfContained>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
     <Product>hMailServer Control Panel</Product>
     <Company>Progressive Robot Ltd</Company>
     <Copyright>Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd</Copyright>
