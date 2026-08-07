@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>hMailCP.Core</AssemblyName>
+    <RootNamespace>hMailServer.ControlPanel</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\ControlPanel\Services\PasswordStrength.cs" />
+    <Compile Include="..\ControlPanel\Services\NumericField.cs" />
+    <Compile Include="..\ControlPanel\Services\PasswordGenerator.cs" />
+  </ItemGroup>
+
+</Project>
