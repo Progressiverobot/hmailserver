@@ -106,7 +106,7 @@ EXIT 0
     </Link>
     <PostBuildEvent>
       <Message>Performing registration</Message>
-      <Command>call "$(ProjectDir)post-build.bat" "$(hMailServerLibs)" "$(OutDir)" "$(TargetPath)"</Command>
+      <Command>call "$(ProjectDir)post-build.bat" "$(hMailServerLibs)" "$(OutDir)" "$(TargetPath)" "$(IntDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -157,7 +157,7 @@ EXIT 0
     </Link>
     <PostBuildEvent>
       <Message>Performing registration</Message>
-      <Command>call "$(ProjectDir)post-build.bat" "$(hMailServerLibs)" "$(OutDir)" "$(TargetPath)"</Command>
+      <Command>call "$(ProjectDir)post-build.bat" "$(hMailServerLibs)" "$(OutDir)" "$(TargetPath)" "$(IntDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>

@@ -1,6 +1,6 @@
 # hMailServer — Codebase Guide for Agents
 
-hMailServer is a free, open-source email server for Microsoft Windows, licensed under AGPLv3. It implements SMTP, IMAP, and POP3, and runs as a Windows service. The codebase is written primarily in C++ (server core) and C# (admin tools), targeting Visual Studio 2026 (platform toolset v145) with 64-bit Windows builds. Current version: **6.2.8, released** (build 10, database version 6001), validated by the full regression suite (898/898 passing). External libraries: OpenSSL 4.0.x, Boost 1.91, PostgreSQL 18 libpq; the MySQL/MariaDB client is MariaDB Connector/C 3.4.x (vendored in-repo, shipped as `libmysql.dll`). The Control Panel (`hMailCP.exe`) targets .NET 8; the remaining C# test and setup tools still target .NET Framework 4.8.1.
+hMailServer is a free, open-source email server for Microsoft Windows, licensed under AGPLv3. It implements SMTP, IMAP, and POP3, and runs as a Windows service. The codebase is written primarily in C++ (server core) and C# (admin tools), targeting Visual Studio 2026 (platform toolset v145) with 64-bit Windows builds. Current version: **6.2.8, released** (build 10, database version 6005), validated by the full regression suite (898/898 passing). External libraries: OpenSSL 4.0.x, Boost 1.91, PostgreSQL 18 libpq; the MySQL/MariaDB client is MariaDB Connector/C 3.4.x (vendored in-repo, shipped as `libmysql.dll`). The Control Panel (`hMailCP.exe`) targets .NET 8; the remaining C# test and setup tools still target .NET Framework 4.8.1.
 
 ## Repository Layout
 
@@ -30,7 +30,7 @@ hmailserver/
 
 ### `installation/`
 
-Contains InnoSetup 5 scripts (`.iss`) and third-party components bundled with the installer. The installer is built as the final step of the release pipeline. Do not add business logic here; this directory is purely packaging.
+Contains Inno Setup 6 scripts (`.iss`) and third-party components bundled with the installer. The installer is built as the final step of the release pipeline. Do not add business logic here; this directory is purely packaging.
 
 ---
 
@@ -143,7 +143,7 @@ Various scripts, for example, default event scripts
 
 ## `source/DBScripts/`
 
-SQL scripts for creating the hMailServer database schema from scratch, and incremental upgrade scripts for migrating from one version to the next. These cover MySQL, MS SQL Server, and PostgreSQL. When adding a new persistent field, add the corresponding `ALTER TABLE` statement here. The current database version is 6001 (`Upgrade5708to6001*.sql` migrates from 5.7).
+SQL scripts for creating the hMailServer database schema from scratch, and incremental upgrade scripts for migrating from one version to the next. These cover MySQL, MS SQL Server, and PostgreSQL. When adding a new persistent field, add the corresponding `ALTER TABLE` statement here. The current database version is 6005 (`REQUIRED_DB_VERSION` in `Server/Common/Application/Constants.h`). The upgrade chain is continuous from database version 0 (hMailServer 1.0) to 6005: `Upgrade5708to6001*.sql` brings a 5.7 database onto the 6.x line, and `Upgrade6001to6002` .. `Upgrade6004to6005` follow. Every step must also be registered in `Tools/DBUpdater/formMain.cs` (`LoadScripts`), otherwise DBUpdater cannot find a path and the upgrade silently has nothing to do.
 
 ---
 

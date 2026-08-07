@@ -47,6 +47,7 @@ hmailserver/source/Server/hMailServer.Minidump/x64/*
 /TestResult.xml
 /.claude/*
 **/.vs/*
+.vscode/
 /hmailserver/.claude/*
 
 /logs/

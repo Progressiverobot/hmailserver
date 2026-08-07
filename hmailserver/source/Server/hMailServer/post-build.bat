@@ -4,6 +4,7 @@ setlocal
 set HMS_LIBS=%~1
 set OUT_DIR=%~2
 set TARGET=%~3
+set INT_DIR=%~4
 set SCRIPT_DIR=%~dp0
 
 NET STOP hMailServer
@@ -27,6 +28,14 @@ if errorlevel 1 exit /b 1
 if not exist "%OUT_DIR%plugin\" mkdir "%OUT_DIR%plugin"
 xcopy /F /Y "%MARIADB_CONNECTOR%\plugin\*.dll" "%OUT_DIR%plugin\"
 if errorlevel 1 exit /b 1
+
+rem MIDL generates the type library into the intermediate directory, but the
+rem installer ships it from the output directory. Without this copy the
+rem installer cannot be built from a clean checkout.
+if not "%INT_DIR%"=="" (
+   xcopy /F /Y "%INT_DIR%hMailServer.tlb" "%OUT_DIR%"
+   if errorlevel 1 exit /b 1
+)
 
 "%TARGET%" /Register
 if errorlevel 1 exit /b 1

@@ -16,7 +16,7 @@ What's new in 6.0
    * OpenSSL 4.0.x, Boost 1.91, PostgreSQL 18 (libpq), .NET Framework 4.8.1 for the tools
    * MySQL/MariaDB client: MariaDB Connector/C, bundled as `libmysql.dll` + auth plugins - works with both MySQL and MariaDB out of the box, including MySQL 8 `caching_sha2_password` and MariaDB `ed25519`/`gssapi`
    * PBKDF2-HMAC-SHA256 password hashing (transparent upgrade on login), TLS 1.2/1.3 defaults
-   * Database version 6001; upgrade scripts from 5.7 included (MySQL, MS SQL, PostgreSQL)
+   * Database version 6005; the upgrade chain is continuous from every earlier hMailServer release (MySQL, MS SQL, PostgreSQL, SQL CE)
 
 **Outbound transport security**
 
@@ -236,7 +236,7 @@ Environment set up
 
    * An installed version of hMailServer 5.7 or later (configured with a database)
    * Visual Studio 2026 (Community edition or Build Tools)
-   * InnoSetup 5.5.4a (non-unicode version)  -  only needed to build the installer
+   * Inno Setup 6  -  only needed to build the installer (`winget install JRSoftware.InnoSetup`)
    * Perl 5 (https://strawberryperl.com/)  -  only needed to build OpenSSL
    * Python 3 (https://www.python.org/)  -  only needed to build libpq
    

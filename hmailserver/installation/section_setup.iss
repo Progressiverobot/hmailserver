@@ -12,4 +12,7 @@ AllowNoIcons=yes
 Uninstallable=true
 DirExistsWarning=no
 CreateAppDir=true
-MinVersion=6.0.6001
+; Windows 7 SP1. Inno Setup 6 refuses anything below 6.1, and the old Vista SP1
+; floor was fiction anyway: this is an x64-only build whose Control Panel needs
+; the .NET 8 Desktop Runtime and whose binaries link the VC++ v145 runtime.
+MinVersion=6.1sp1

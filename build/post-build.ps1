@@ -12,6 +12,8 @@ $repoRoot = Resolve-Path (Join-Path $scriptRoot '..')
 
 $outDir = Join-Path $repoRoot "hmailserver\source\Server\hMailServer\x64\$Configuration\"
 $targetPath = Join-Path $outDir "hMailServer.exe"
+# MIDL writes hMailServer.tlb here; post-build.bat stages it into $outDir.
+$intDir = Join-Path $repoRoot "hmailserver\source\Server\hMailServer\hMailServer\x64\$Configuration\"
 
 $hmsLibs = $env:hMailServerLibs
 if (-not $hmsLibs) {
@@ -24,7 +26,7 @@ $batchScript = Join-Path $repoRoot "hmailserver\source\Server\hMailServer\post-b
 Write-Host "Running post-build for configuration: $Configuration"
 Write-Host "Output directory: $outDir"
 
-& $batchScript $hmsLibs $outDir $targetPath
+& $batchScript $hmsLibs $outDir $targetPath $intDir
 
 $exitCode = $LASTEXITCODE
 if ($exitCode -ne 0) {
