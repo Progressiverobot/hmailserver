@@ -37,3 +37,48 @@ jobs:
 
       - name: Publish (smoke check)
         run: dotnet publish hmailserver/source/Tools/ControlPanel/ControlPanel.csproj -c Release -o publish --no-build
+
+      - name: Restore tests
+        shell: bash
+        run: dotnet restore hmailserver/source/Tools/ControlPanel.Tests/ControlPanel.Tests.csproj
+
+      - name: Test with coverage
+        shell: bash
+        run: >
+          dotnet test hmailserver/source/Tools/ControlPanel.Tests/ControlPanel.Tests.csproj
+          --configuration Release
+          --collect:"XPlat Code Coverage"
+          --results-directory coverage
+          --
+          DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura
+
+      - name: Locate coverage report
+        shell: pwsh
+        run: |
+          $f = Get-ChildItem -Path coverage -Recurse -Filter "*.xml" | Select-Object -First 1
+          Copy-Item $f.FullName coverage\coverage.cobertura.xml
+
+      - name: Upload coverage artifact
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-report-csharp
+          path: coverage/coverage.cobertura.xml
+
+  upload-coverage-csharp:
+    needs: control-panel
+    if: ${{ !cancelled() && needs.control-panel.result == 'success' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      code-quality: write
+    steps:
+      - name: Download coverage artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: coverage-report-csharp
+      - uses: actions/upload-code-coverage@v1
+        with:
+          file: coverage.cobertura.xml
+          language: C#
+          label: code-coverage-agent
