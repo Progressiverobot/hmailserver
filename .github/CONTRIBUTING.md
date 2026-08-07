@@ -2,6 +2,9 @@
 
 Thanks for your interest in contributing!
 
+This project ships a [Code of Conduct](CODE_OF_CONDUCT.md) — by taking part you
+agree to abide by it.
+
 ## Building
 
 See [README.md](../README.md) for full build instructions. In short:

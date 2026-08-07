@@ -3,3 +3,9 @@ contact_links:
   - name: Security vulnerability
     url: https://github.com/Progressiverobot/hmailserver/security/advisories/new
     about: Please report security issues privately via a security advisory, not a public issue.
+  - name: Question or help with a setup
+    url: https://github.com/Progressiverobot/hmailserver/discussions
+    about: Upgrade paths, configuration and "how do I..." questions are best asked in Discussions.
+  - name: Code of Conduct
+    url: https://github.com/Progressiverobot/hmailserver/blob/master/.github/CODE_OF_CONDUCT.md
+    about: How we expect people to behave here, and how to report a problem.

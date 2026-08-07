@@ -6,7 +6,7 @@ body:
     id: version
     attributes:
       label: hMailServer version
-      placeholder: "6.0.0 build 4"
+      placeholder: "6.2.8 build 10"
     validations:
       required: true
   - type: input
