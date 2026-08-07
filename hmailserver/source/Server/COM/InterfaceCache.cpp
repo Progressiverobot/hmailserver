@@ -114,7 +114,7 @@ InterfaceCache::get_DomainHitRate(long *pVal)
          return GetAccessDenied();
 
       if (!GetIsServerAdmin())
-         return false;
+         return GetAccessDenied();
    
       *pVal = HM::Cache<HM::Domain>::Instance()->GetHitRate();
    
@@ -223,7 +223,7 @@ InterfaceCache::get_AccountHitRate(long *pVal)
          return GetAccessDenied();
 
       if (!GetIsServerAdmin())
-         return false;
+         return GetAccessDenied();
    
       *pVal = HM::Cache<HM::Account>::Instance()->GetHitRate();
       return S_OK;
@@ -331,7 +331,7 @@ InterfaceCache::get_AliasHitRate(long *pVal)
          return GetAccessDenied();
 
       if (!GetIsServerAdmin())
-         return false;
+         return GetAccessDenied();
    
       *pVal = HM::Cache<HM::Alias>::Instance()->GetHitRate();
       return S_OK;
@@ -438,7 +438,7 @@ InterfaceCache::get_DistributionListHitRate(long *pVal)
          return GetAccessDenied();
 
       if (!GetIsServerAdmin())
-         return false;
+         return GetAccessDenied();
    
       *pVal = HM::Cache<HM::DistributionList>::Instance()->GetHitRate();
       return S_OK;
@@ -510,7 +510,7 @@ InterfaceCache::Clear()
          return GetAccessDenied();
 
       if (!GetIsServerAdmin())
-         return false;
+         return GetAccessDenied();
    
       HM::Cache<HM::Account>::Instance()->Clear();
       HM::Cache<HM::Domain>::Instance()->Clear();

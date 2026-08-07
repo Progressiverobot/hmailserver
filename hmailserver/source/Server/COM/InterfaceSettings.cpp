@@ -1020,7 +1020,7 @@ STDMETHODIMP InterfaceSettings::SetAdministratorPassword(BSTR newVal)
          return GetAccessDenied();
 
       if (!GetIsServerAdmin())
-         return false;
+         return GetAccessDenied();
       
    
       ini_file_settings_->SetAdministratorPassword(newVal);
@@ -1218,7 +1218,7 @@ STDMETHODIMP InterfaceSettings::get_SSLCertificates(IInterfaceSSLCertificates **
          return GetAccessDenied();
 
       if (!GetIsServerAdmin())
-         return false;
+         return GetAccessDenied();
    
       std::shared_ptr<HM::SSLCertificates> pSSLCertificates = HM::Configuration::Instance()->GetSSLCertificates();
    
@@ -1871,7 +1871,7 @@ STDMETHODIMP InterfaceSettings::get_PublicFolders(IInterfaceIMAPFolders **pVal)
          return GetAccessDenied();
 
       if (!GetIsServerAdmin())
-         return false;
+         return GetAccessDenied();
    
       std::shared_ptr<HM::IMAPFolders> pIMAPFolders = HM::Configuration::Instance()->GetIMAPConfiguration()->GetPublicFolders();
    
@@ -1898,7 +1898,7 @@ STDMETHODIMP InterfaceSettings::get_PublicFolderDiskName(BSTR *pVal)
          return GetAccessDenied();
 
       if (!GetIsServerAdmin())
-         return false;
+         return GetAccessDenied();
    
       *pVal = config_->GetIMAPConfiguration()->GetPublicFolderDiskName().AllocSysString();
       return S_OK;
@@ -1917,7 +1917,7 @@ STDMETHODIMP InterfaceSettings::get_Groups(IInterfaceGroups **pVal)
          return GetAccessDenied();
 
       if (!GetIsServerAdmin())
-         return false;
+         return GetAccessDenied();
    
       CComObject<InterfaceGroups>* pItem = new CComObject<InterfaceGroups>();
       pItem->SetAuthentication(authentication_);
@@ -2141,7 +2141,7 @@ STDMETHODIMP InterfaceSettings::ClearLogonFailureList()
          return GetAccessDenied();
 
       if (!GetIsServerAdmin())
-         return false;
+         return GetAccessDenied();
    
       config_->ClearOldLogonFailures();
    

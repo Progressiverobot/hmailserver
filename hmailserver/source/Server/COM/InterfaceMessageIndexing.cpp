@@ -70,7 +70,7 @@ STDMETHODIMP InterfaceMessageIndexing::get_TotalMessageCount(long *pVal)
          return GetAccessDenied();
 
       if (!GetIsServerAdmin())
-         return false;
+         return GetAccessDenied();
    
       *pVal = HM::PersistentMessage::GetTotalMessageCountDelivered();
    
@@ -87,7 +87,7 @@ STDMETHODIMP InterfaceMessageIndexing::get_TotalIndexedCount(long *pVal)
    try
    {
       if (!GetIsServerAdmin())
-         return false;
+         return GetAccessDenied();
    
       HM::PersistentMessageMetaData md;
       *pVal = md.GetTotalMessageCount();
@@ -105,7 +105,7 @@ STDMETHODIMP InterfaceMessageIndexing::Clear()
    try
    {
       if (!GetIsServerAdmin())
-         return false;
+         return GetAccessDenied();
    
       HM::PersistentMessageMetaData md;
       
@@ -124,7 +124,7 @@ STDMETHODIMP InterfaceMessageIndexing::Index()
    try
    {
       if (!GetIsServerAdmin())
-         return false;
+         return GetAccessDenied();
    
       HM::MessageIndexer::Instance()->IndexNow();
    
