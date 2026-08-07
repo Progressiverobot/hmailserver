@@ -54,7 +54,7 @@ change until the new settings are turned on.
 
 **hMailServer Control Panel (the new GUI)**
 
-   * A modern .NET 8 (WPF, Fluent design) administration application, `hMailCP.exe`, is now the **sole bundled GUI** — the classic Administrator has been retired. It talks to the server purely through the COM API and reaches functional parity with the classic tool (domains, accounts, aliases, distribution lists, routes, rules, IP ranges, TCP/IP ports + SSL bindings, server settings, live dashboard, queue, logs, status, backup, SSL certificates, scripts and public folders).
+   * A modern .NET 8 (WPF, Fluent design) administration application, `hMailCP.exe`, is now the **sole bundled GUI** — the classic Administrator was retired in 6.2 and removed from the repository in 6.2.10. It talks to the server purely through the COM API and reaches functional parity with the classic tool (domains, accounts, aliases, distribution lists, routes, rules, IP ranges, TCP/IP ports + SSL bindings, server settings, live dashboard, queue, logs, status, backup, SSL certificates, scripts and public folders).
    * Optional TOTP two-factor authentication for the GUI logon (shares the same secret as the classic Administrator).
    * **Active Directory account pickers (new in 6.2.4):** a read-only AD browser lists the forest's domains and searches their users. **"Browse Active Directory…"** on an account's Directory tab fills the AD domain / user name and links the account; **"Add from AD…"** bulk-imports the selected accounts' e-mail addresses into a distribution list. Built on `System.DirectoryServices` and validated end-to-end against a live domain controller.
    * Requires the .NET 8 Desktop Runtime, which the installer bundles and installs silently when missing.
@@ -363,8 +363,9 @@ Alternatively, build from Visual Studio (started with _Run as Administrator_) or
 2. Compile the solution hmailserver\source\Server\hMailServer\hMailServer.sln.
    This will build the hMailServer server-part (hMailServer.exe)
 3. Compile the solution hmailserver\source\Tools\hMailServer Tools.sln.
-   This will build hMailServer related tools, such as hMailServer Administrator and hMailServer DB Setup.
-4. Compile hmailserver\installation\hMailServer.iss (using InnoSetup)
+   This will build the setup tools: DB Setup, DB Updater and the Data Directory Synchronizer.
+   The Control Panel is a separate .NET 8 solution, hmailserver\source\Tools\ControlPanel.sln.
+4. Compile hmailserver\installation\hMailServer64.iss (using Inno Setup 6)
    This will build the hMailServer installation program.
 
 **NOTE:** On a machine running a production hMailServer service, pass `/p:PreBuildEventUseInBuild=false /p:PostBuildEventUseInBuild=false` to MSBuild. The build events stop and re-register the Windows service, which would otherwise disrupt the production installation.
@@ -372,7 +373,7 @@ Alternatively, build from Visual Studio (started with _Run as Administrator_) or
 Configuring the 6.0 features
 ============================
 
-Most new features are configured in `Bin\hMailServer.INI` under `[Settings]`, or interactively in hMailServer Administrator under **File -> Server features...** (which edits the same settings and offers to restart the service). All settings below show their default values.
+Most new features are configured in `Bin\hMailServer.INI` under `[Settings]`, or interactively in the Control Panel under **Settings** (which edits the same settings and offers to restart the service). All settings below show their default values.
 
 Transport security and authentication:
 
