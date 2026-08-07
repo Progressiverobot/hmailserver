@@ -5,7 +5,7 @@ hMailServer is an open source email server for Microsoft Windows, implementing S
 
 This repository is a modernized fork of the original project (which is no longer maintained upstream). It has been brought up to date with a current toolchain, current cryptography, and the transport-security standards expected of a mail server in 2026. It is maintained by Christopher Holloway / [Progressive Robot Ltd](https://www.progressiverobot.com).
 
-**Production status:** version **6.2.10** is released - [download the installer](https://github.com/Progressiverobot/hmailserver/releases/latest) (`hMailServer-6.2.10-x64.exe`). **6.2.10 is a security and housekeeping release**: fifteen COM methods returned `S_OK` on calls they had just refused - five of them handing an unauthorized caller an uninitialized out-parameter - and the two unmaintained administration front-ends (the PHP WebAdmin, which kept the administrator password in plaintext in a PHP session, and the retired Administrator) are gone from the repository. Code-quality findings on shipped, hand-written code are down to zero. See *6.2.10* below. The server core is otherwise unchanged since 6.2.6 (opt-in IMAP4rev2, the Control Panel redesign and complete settings coverage). It is validated by the full regression suite: **1026 of 1026 tests passing, zero failures, zero inconclusive** - the complete suite, with live SpamAssassin and ClamAV (real EICAR detection), DMARC evaluation against live DNS, and TLS 1.2/1.3 handshakes end to end. Every test runs; nothing is skipped. The bundled administration GUI is the modern .NET 8 **Control Panel**.
+**Production status:** version **6.2.11** is released - [download the installer](https://github.com/Progressiverobot/hmailserver/releases/latest) (`hMailServer-6.2.11-x64.exe`). **6.2.11 fixes a Control Panel accessibility defect** - the alias list and the live log announced their CLR type name to screen readers instead of their content - and lands the work that made the regression suite run in full for the first time. 6.2.10 before it was a security release: fifteen COM methods returned `S_OK` on calls they had just refused, five of them handing an unauthorized caller an uninitialized out-parameter, and the two unmaintained administration front-ends (the PHP WebAdmin, which kept the administrator password in plaintext in a PHP session, and the retired Administrator) were removed. See *6.2.11* and *6.2.10* below. The server core is unchanged since 6.2.6 (opt-in IMAP4rev2, the Control Panel redesign and complete settings coverage). It is validated by the full regression suite: **1026 of 1026 tests passing, zero failures, zero inconclusive** - the complete suite, with live SpamAssassin and ClamAV (real EICAR detection), DMARC evaluation against live DNS, and TLS 1.2/1.3 handshakes end to end. Every test runs; nothing is skipped. The bundled administration GUI is the modern .NET 8 **Control Panel**.
 
 What's new in 6.0
 =================
@@ -82,6 +82,52 @@ change until the new settings are turned on.
 **Supply chain & quality gates**
 
    * SPDX + CycloneDX SBOMs (Syft) attached to every release, Dependabot CVE alerts + grouped update PRs, and a dependency-review PR gate.
+
+6.2.11
+======
+
+An accessibility fix for the Control Panel, plus the work that made the
+regression suite run in full for the first time. No server-core changes.
+
+   * **Two lists announced their type name to screen readers.** The alias list on
+     the Domains page exposed `hMailServer.ControlPanel.Views.DomainsView+AliasRow`
+     as its accessible name for every row, and Live logs exposed `LogsView+LogLine`
+     for every line. Both lists use an `ItemTemplate`, so the text a sighted user
+     sees comes from a binding while a `ListViewItem`'s accessible name falls back
+     to `ToString()` on the bound object - which neither class overrode. The live
+     log is the worse of the two: it is the page an administrator is most likely to
+     be reading with a screen reader at exactly the moment something has gone wrong.
+     The other lists on that page bind plain strings and were always correct, and
+     every other list in the application is a `DataGrid`, which builds a row's name
+     from its cells.
+
+   * **The regression suite now runs in full: 1026 of 1026, zero inconclusive.**
+     27 tests had never actually executed here - they reported *inconclusive*
+     because SpamAssassin and ClamAV were not installed. Installing both ran them
+     for the first time and two failed, in the tests rather than in the server.
+
+     `ClamAV.TestWithVirus` put EICAR in the plain body of a non-MIME message.
+     ClamAV's EICAR signatures match a whole file, not a substring: the bare string
+     is detected, the string with any content around it is not. Older ClamAV
+     extracted a plain body as a scannable part; current ClamAV does not, so the
+     message scanned clean and was delivered. hMailServer was never at fault - it
+     connected, streamed the file and parsed the FOUND reply correctly. The test now
+     sends EICAR as a base64 attachment, which is how a virus actually arrives.
+
+     `SpamAssassin.TestSANotRunning` called `ServiceController.Stop()` and returned
+     immediately. Stop() only asks - it returns while spamd is still answering on
+     783 - so the test sent a message into a live spamd and got the header it was
+     asserting could not be there. It now waits for the port to close. It also
+     asserted a "communication error" that only fires when a connection is
+     established and then lost, which is a different failure mode from the one
+     under test.
+
+   * **The test setup is documented.** The README pointed at a JAM Software
+     SpamAssassin download that no longer exists. It now describes what works -
+     Strawberry Perl plus CPAN, with spamd rebuilt via `BUILD_SPAMD=yes` because the
+     Windows build skips it by default, and `perl.exe` copied to `spamd.exe` inside
+     Perl's own bin so `@INC` still resolves - and states the elevation requirement
+     the suite has always had but never documented.
 
 6.2.10
 ======

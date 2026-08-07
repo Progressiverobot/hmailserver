@@ -12,7 +12,7 @@
     <RootNamespace>hMailServer.ControlPanel</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>app.ico</ApplicationIcon>
-    <Version>6.2.10</Version>
+    <Version>6.2.11</Version>
     <!-- MSBuild inserts the platform name into the output path for any
          platform other than AnyCPU, so building ControlPanel.sln (x64) and
          running `dotnet build ControlPanel.csproj` (AnyCPU) produce two
