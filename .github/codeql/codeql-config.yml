@@ -5,21 +5,18 @@ name: "hMailServer CodeQL config"
 # Measured with CodeQL's own csharp-code-quality suite across every C# solution
 # in the tree, the 958 quality findings broke down like this:
 #
-#     333  Administrator      - retired, no longer shipped
+#     333  Administrator      - retired GUI, since removed from the repository
 #     297  test harnesses     - never shipped
 #     227  Control Panel      - shipped, and none of them real defects
 #     101  legacy setup tools - shipped (DBSetup, DBUpdater, ...)
 #
-# Two thirds of the findings, and 113 of the 132 that indicate a genuine defect
-# rather than style, sit in code no user ever runs. Grading the project's
-# reliability on a retired GUI and its own test fixtures is noise: it buries the
-# signal from the code that does ship.
+# Narrowing to the rules that indicate a genuine defect rather than style or
+# deliberate design left 132, of which none were in the Control Panel.
 #
-# The classic Administrator was replaced by the Control Panel and is not in the
-# installer (only its generated Interop.hMailServer.dll is, which is not
-# analysed source). The test harnesses are fixtures. Both are excluded here.
+# The Administrator is gone, so only the test harnesses need excluding here:
+# they are fixtures, not shipped code, and grading the project's reliability on
+# its own test scaffolding buries the signal from the code users actually run.
 #
 # Everything that ships stays in scope - the Control Panel and the setup tools.
 paths-ignore:
-  - hmailserver/source/Tools/Administrator
   - hmailserver/test
