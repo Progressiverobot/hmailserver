@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ControlPanel", "ControlPanel\ControlPanel.csproj", "{7841DC04-7C6B-4276-9F9D-853FCCCA864A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ControlPanel.Core", "ControlPanel.Core\ControlPanel.Core.csproj", "{46222114-B2FB-4376-BB37-30D18EC971F1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ControlPanel.Tests", "ControlPanel.Tests\ControlPanel.Tests.csproj", "{B0A9B2F0-35CB-4179-944F-0EE34C032C23}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7841DC04-7C6B-4276-9F9D-853FCCCA864A}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{7841DC04-7C6B-4276-9F9D-853FCCCA864A}.Debug|Any CPU.Build.0 = Debug|x64
+		{7841DC04-7C6B-4276-9F9D-853FCCCA864A}.Release|Any CPU.ActiveCfg = Release|x64
+		{7841DC04-7C6B-4276-9F9D-853FCCCA864A}.Release|Any CPU.Build.0 = Release|x64
+		{46222114-B2FB-4376-BB37-30D18EC971F1}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{46222114-B2FB-4376-BB37-30D18EC971F1}.Debug|Any CPU.Build.0 = Debug|x64
+		{46222114-B2FB-4376-BB37-30D18EC971F1}.Release|Any CPU.ActiveCfg = Release|x64
+		{46222114-B2FB-4376-BB37-30D18EC971F1}.Release|Any CPU.Build.0 = Release|x64
+		{B0A9B2F0-35CB-4179-944F-0EE34C032C23}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{B0A9B2F0-35CB-4179-944F-0EE34C032C23}.Debug|Any CPU.Build.0 = Debug|x64
+		{B0A9B2F0-35CB-4179-944F-0EE34C032C23}.Release|Any CPU.ActiveCfg = Release|x64
+		{B0A9B2F0-35CB-4179-944F-0EE34C032C23}.Release|Any CPU.Build.0 = Release|x64
+	EndGlobalSection
+EndGlobal
