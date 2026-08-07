@@ -5,7 +5,7 @@ hMailServer is an open source email server for Microsoft Windows, implementing S
 
 This repository is a modernized fork of the original project (which is no longer maintained upstream). It has been brought up to date with a current toolchain, current cryptography, and the transport-security standards expected of a mail server in 2026. It is maintained by Christopher Holloway / [Progressive Robot Ltd](https://www.progressiverobot.com).
 
-**Production status:** version **6.2.7** is released - [download the installer](https://github.com/Progressiverobot/hmailserver/releases/latest) (`hMailServer-6.2.7-x64.exe`). **6.2.7 is a Control Panel usability release**: file/folder pickers on every path field, one-click **DKIM key generation** (with the ready-to-paste DNS record), password reveal toggles and strong-password generators, a date picker, numeric steppers, masked secrets, Enter/Esc on every dialog, copy buttons, and the window now remembers its size and position - see *6.2.7* below. The server core is unchanged since 6.2.6 (opt-in IMAP4rev2, the Control Panel redesign and complete settings coverage). It is validated by the full regression suite: **898 of 898 tests passing, zero failures, zero inconclusive**, including live SpamAssassin, ClamAV (real EICAR detection), DMARC evaluation against live DNS, and TLS 1.2/1.3 handshakes end to end. The bundled administration GUI is the modern .NET 8 **Control Panel** (the classic Administrator has been retired).
+**Production status:** version **6.2.8** is released - [download the installer](https://github.com/Progressiverobot/hmailserver/releases/latest) (`hMailServer-6.2.8-x64.exe`). **6.2.8 is a Control Panel bug-fix release**: list editors were rendering every row blank, and the Control Panel stopped working entirely after an hMailServer service restart until it was closed and reopened - both are fixed, together with a refresh of the GUI's dependencies - see *6.2.8* below. The server core is unchanged since 6.2.6 (opt-in IMAP4rev2, the Control Panel redesign and complete settings coverage). It is validated by the full regression suite: **898 of 898 tests passing, zero failures, zero inconclusive**, including live SpamAssassin, ClamAV (real EICAR detection), DMARC evaluation against live DNS, and TLS 1.2/1.3 handshakes end to end. The bundled administration GUI is the modern .NET 8 **Control Panel** (the classic Administrator has been retired).
 
 What's new in 6.0
 =================
@@ -82,6 +82,55 @@ change until the new settings are turned on.
 **Supply chain & quality gates**
 
    * SPDX + CycloneDX SBOMs (Syft) attached to every release, Dependabot CVE alerts + grouped update PRs, and a dependency-review PR gate.
+
+6.2.8
+=====
+
+A Control Panel bug-fix release. No server-core changes - the two defects below
+were both in the GUI, and both made it look like the server was broken when it
+was not.
+
+   * **List editors showed blank rows** ([#6](https://github.com/Progressiverobot/hmailserver/issues/6)).
+     Every data-driven list pane rendered the right *number* of rows with nothing
+     in them: domain aliases, SURBL servers, DNS blacklists, the anti-spam and
+     greylisting white lists, blocked attachments, groups, server messages,
+     external POP3 accounts and account rules. Adding an entry appeared to create
+     an empty row, and only the Edit dialog showed the value you had typed. The
+     row model exposed its data as a *field*, and WPF data binding resolves
+     properties only - so every generated column silently bound to nothing.
+     Reported against domain aliases; the fix restores all of the affected panes.
+   * **The Control Panel died after a service restart** ([#7](https://github.com/Progressiverobot/hmailserver/issues/7)).
+     The COM server lives inside the hMailServer service process, so restarting
+     the service invalidated every interface pointer the GUI held. Afterwards
+     each page failed with *"The RPC server is unavailable"* - including restarts
+     the Control Panel performed itself after saving a setting - and the only
+     cure was to close and reopen it. The session now verifies the link before
+     use and re-authenticates transparently when the service has gone.
+   * **Restarting from the Control Panel reconnects immediately** and waits for
+     the server to finish starting, rather than latching onto a service that has
+     registered with Windows but is still opening its database - which produced a
+     misleading "no connection to the database" error.
+   * **A restart performed by anyone else is detected and healed** on the next
+     thing you do, with a "Connection restored" notification and a refresh of the
+     page on screen. No action is needed.
+   * **A server that really is unreachable now reports it readably** instead of
+     raising the unhandled-exception dialog, and the Control Panel no longer
+     starts an hMailServer service that the administrator deliberately stopped.
+
+   Both fixes were verified end to end against a live hMailServer: reproduced on
+   the previous build, then confirmed fixed on this one.
+
+**Dependencies**
+
+   * Control Panel: WPF-UI 3.0.5 &rarr; 4.3.0, QRCoder 1.6.0 &rarr; 1.8.0 and the
+     `System.Management` / `System.ServiceProcess.ServiceController` /
+     `System.DirectoryServices` packages 8.0.0 &rarr; 10.0.10.
+   * CI: `actions/checkout` v4 &rarr; v7, `actions/setup-dotnet` v4 &rarr; v5,
+     `github/codeql-action` v3 &rarr; v4, `actions/dependency-review-action`
+     v4 &rarr; v5, `actions/upload-artifact` v4 &rarr; v7.
+   * LiveCharts is **held at 2.0.0-rc2**. The proposed 2.0.5 upgrade renders the
+     dashboard chart area opaque white over the dark theme and hides the
+     empty-state labels, so it is deferred until that is resolved upstream.
 
 6.2.7
 =====

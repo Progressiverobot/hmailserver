@@ -1,6 +1,6 @@
 # hMailServer — Codebase Guide for Agents
 
-hMailServer is a free, open-source email server for Microsoft Windows, licensed under AGPLv3. It implements SMTP, IMAP, and POP3, and runs as a Windows service. The codebase is written primarily in C++ (server core) and C# (admin tools), targeting Visual Studio 2026 (platform toolset v145) with 64-bit Windows builds. Current version: **6.0.0, released** (build 2, database version 6001), validated by the full regression suite (898/898 passing). External libraries: OpenSSL 4.0.x, Boost 1.91, PostgreSQL 18 libpq; the MySQL/MariaDB client is MariaDB Connector/C 3.4.x (vendored in-repo, shipped as `libmysql.dll`); the C# tools target .NET Framework 4.8.1.
+hMailServer is a free, open-source email server for Microsoft Windows, licensed under AGPLv3. It implements SMTP, IMAP, and POP3, and runs as a Windows service. The codebase is written primarily in C++ (server core) and C# (admin tools), targeting Visual Studio 2026 (platform toolset v145) with 64-bit Windows builds. Current version: **6.2.8, released** (build 10, database version 6001), validated by the full regression suite (898/898 passing). External libraries: OpenSSL 4.0.x, Boost 1.91, PostgreSQL 18 libpq; the MySQL/MariaDB client is MariaDB Connector/C 3.4.x (vendored in-repo, shipped as `libmysql.dll`). The Control Panel (`hMailCP.exe`) targets .NET 8; the remaining C# test and setup tools still target .NET Framework 4.8.1.
 
 ## Repository Layout
 

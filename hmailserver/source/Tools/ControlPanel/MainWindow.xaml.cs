@@ -34,6 +34,9 @@ namespace hMailServer.ControlPanel
 
          Closing += (s, e) => SaveWindowBounds();
 
+         ServerSession.Reconnected += OnSessionReconnected;
+         Closing += (s, e) => ServerSession.Reconnected -= OnSessionReconnected;
+
          // Ctrl+K command palette.
          PreviewKeyDown += (s, e) =>
          {
@@ -268,6 +271,25 @@ namespace hMailServer.ControlPanel
          ((TreeViewItem) NavTree.Items[1]).IsSelected = true; // Dashboard
       }
 
+      /// <summary>
+      /// The session healed itself after the service went away (a restart, most
+      /// often one the Control Panel triggered itself). Say so, and put fresh
+      /// data on the page the user is looking at. Deferred to the message loop
+      /// because the reconnect happens in the middle of somebody else's COM
+      /// call, possibly on a background thread.
+      /// </summary>
+      private void OnSessionReconnected(ServerSession session)
+      {
+         Dispatcher.BeginInvoke(new Action(() =>
+         {
+            if (!connected_)
+               return;
+
+            Services.Toast.Info("Reconnected to " + session.Host + " after the service restarted.", "Connection restored");
+            EnterPage(ContentHost.Content);
+         }));
+      }
+
       private bool VerifyTwoFactor()
       {
          if (!TotpManager.IsConfigured())
@@ -305,12 +327,42 @@ namespace hMailServer.ControlPanel
          }
 
          if (ContentHost.Content is IPageLifecycle oldPage)
-            oldPage.OnLeave();
+         {
+            try
+            {
+               oldPage.OnLeave();
+            }
+            catch (Exception)
+            {
+               // Leaving a page must never block navigating away from it.
+            }
+         }
 
          ContentHost.Content = page;
+         EnterPage(page);
+      }
 
-         if (page is IPageLifecycle newPage)
-            newPage.OnEnter();
+      /// <summary>
+      /// Activates a page, reporting a server that has gone away as a message
+      /// instead of an unhandled exception. Several pages load their data
+      /// straight from the COM API in OnEnter, so before this the first click
+      /// after the hMailServer service stopped threw the application-level
+      /// error dialog.
+      /// </summary>
+      private void EnterPage(object page)
+      {
+         if (page is not IPageLifecycle lifecycle)
+            return;
+
+         try
+         {
+            lifecycle.OnEnter();
+         }
+         catch (Exception ex)
+         {
+            Services.Toast.Info("Could not load this page: " + ServerSession.DescribeComError(ex),
+               "Server unavailable");
+         }
       }
 
       private void RestoreWindowBounds()

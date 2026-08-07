@@ -53,8 +53,11 @@ namespace hMailServer.ControlPanel.Views
 
       internal sealed class Row
       {
-         public int Id;
-         public Dictionary<string, object> Values = new();
+         // These must stay properties: the generated grid columns bind to
+         // "Values[<prop>]", and WPF data binding resolves properties only -
+         // a public field silently binds to nothing and every cell renders blank.
+         public int Id { get; set; }
+         public Dictionary<string, object> Values { get; } = new();
          public string Display(string prop) =>
             Values.TryGetValue(prop, out object v) ? FormatCell(v) : "";
       }

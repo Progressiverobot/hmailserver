@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ServiceProcess;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using hMailServer.ControlPanel.Services;
 
 namespace hMailServer.ControlPanel.Views
@@ -738,12 +739,47 @@ namespace hMailServer.ControlPanel.Views
             }
             controller.Start();
             controller.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(60));
-            StatusText.Text = "Service restarted - settings are live.";
          }
          catch (Exception ex)
          {
             MessageBox.Show("Could not restart the service (try an elevated session): " + ex.Message,
                "Control Panel", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+         }
+
+         StatusText.Text = "Service restarted - settings are live.";
+         Reattach();
+      }
+
+      /// <summary>
+      /// The COM server lives inside the service process, so restarting it
+      /// invalidates every interface pointer the Control Panel holds. Rebuild
+      /// the session straight away rather than letting the next page fail with
+      /// "The RPC server is unavailable". The service registers its COM class
+      /// factory a moment before it can serve calls, hence the retries.
+      /// </summary>
+      private void Reattach()
+      {
+         ServerSession session = ServerSession.Current;
+         if (session == null)
+            return;
+
+         Mouse.OverrideCursor = Cursors.Wait;
+         try
+         {
+            if (session.Reconnect(20, TimeSpan.FromMilliseconds(500), out string error))
+               return;
+
+            session.Invalidate();
+            StatusText.Text = "Service restarted, but the Control Panel could not reconnect.";
+            MessageBox.Show(
+               "The service was restarted but the Control Panel could not reconnect to it: " + error +
+               "\n\nIt will keep trying as you use the application.",
+               "Control Panel", MessageBoxButton.OK, MessageBoxImage.Warning);
+         }
+         finally
+         {
+            Mouse.OverrideCursor = null;
          }
       }
    }
