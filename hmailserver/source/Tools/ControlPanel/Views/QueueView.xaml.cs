@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
+using System.Linq;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -99,12 +100,11 @@ namespace hMailServer.ControlPanel.Views
             var snap = ServerSession.Current.ReadStatus(includeQueueRows: true);
 
             var rows = new List<QueueRow>();
-            foreach (string line in snap.QueueRows)
+            // Tab-separated: id, created, from, recipients, next try, file, locked, tries
+            foreach (string[] columns in snap.QueueRows
+                                            .Select(line => line.Split('\t'))
+                                            .Where(c => c.Length >= 8))
             {
-               // Tab-separated: id, created, from, recipients, next try, file, locked, tries
-               string[] columns = line.Split('\t');
-               if (columns.Length < 8)
-                  continue;
 
                rows.Add(new QueueRow
                {

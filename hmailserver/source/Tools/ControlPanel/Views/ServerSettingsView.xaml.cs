@@ -996,17 +996,14 @@ namespace hMailServer.ControlPanel.Views
             @"C:\Program Files (x86)\ClamWin\bin\clamscan.exe",
          };
 
-         foreach (string candidate in exeCandidates)
+         foreach (string candidate in exeCandidates.Where(System.IO.File.Exists))
          {
-            if (System.IO.File.Exists(candidate))
-            {
-               exeField.SetText(candidate);
-               string db = FindClamWinDatabase();
-               if (!string.IsNullOrEmpty(db))
-                  dbField.SetText(db);
-               return (true, "Found ClamWin at " + candidate +
-                  (string.IsNullOrEmpty(db) ? "" : "; database folder " + db));
-            }
+            exeField.SetText(candidate);
+            string db = FindClamWinDatabase();
+            if (!string.IsNullOrEmpty(db))
+               dbField.SetText(db);
+            return (true, "Found ClamWin at " + candidate +
+               (string.IsNullOrEmpty(db) ? "" : "; database folder " + db));
          }
 
          return (false, "ClamWin was not found in the standard install locations.");

@@ -111,10 +111,7 @@ namespace DBSetup.Pages
          _state["ServerPort"] = textServerPort.Text;
          _state["DatabaseName"] = textDatabaseName.Text;
          
-         if (radioUseServerAuthentication.Checked)
-            _state["Authentication"] = "Server";
-         else
-            _state["Authentication"] = "Windows";
+         _state["Authentication"] = radioUseServerAuthentication.Checked ? "Server" : "Windows";
 
          _state["Username"] = textUsername.Text;
          _state["Password"] = textPassword.Text;

@@ -4,6 +4,7 @@
 
 using System;
 using System.Windows.Forms;
+using System.Linq;
 
 namespace hMailServer.Shared
 {
@@ -27,11 +28,8 @@ namespace hMailServer.Shared
          
          // Try to authenticate using password on command line...
          string [] args = Environment.GetCommandLineArgs();
-         foreach (string password in args)
-         {
-            if (AuthenticateUser(application, password))
-               return true;
-         }
+         if (args.Any(password => AuthenticateUser(application, password)))
+            return true;
 
          while (true)
          {

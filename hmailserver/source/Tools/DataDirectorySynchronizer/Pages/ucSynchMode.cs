@@ -23,10 +23,7 @@ namespace DataDirectorySynchronizer.Pages
 
         public bool OnLeavePage(bool next)
         {
-           if (radioImport.Checked)
-              Globals.Mode = Globals.ModeType.Import;
-           else
-              Globals.Mode = Globals.ModeType.Delete;
+           Globals.Mode = radioImport.Checked ? Globals.ModeType.Import : Globals.ModeType.Delete;
 
            return true;
         }

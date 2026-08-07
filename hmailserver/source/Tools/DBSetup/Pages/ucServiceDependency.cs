@@ -10,6 +10,7 @@ using System.Text;
 using System.Windows.Forms;
 using System.ServiceProcess;
 using hMailServer.Shared;
+using System.Linq;
 
 namespace DBSetup.Pages
 {
@@ -22,10 +23,9 @@ namespace DBSetup.Pages
 
          ServiceController[] services = ServiceController.GetServices();
 
-         foreach (ServiceController controller in services)
+         foreach (ServiceController controller in services
+                     .Where(c => c.ServiceName.ToLower() != "hmailserver"))
          {
-            if (controller.ServiceName.ToLower() == "hmailserver")
-               continue;
 
             comboServices.Items.Add(controller.DisplayName + " (" + controller.ServiceName + ")");
          }

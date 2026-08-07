@@ -16,7 +16,7 @@ namespace DBUpdater
 {
    public partial class formMain : Form
    {
-      private hMailServer.Application _application;
+      private readonly hMailServer.Application _application;
       private UpgradeScripts _upgradeScripts;
       private UpgradeScripts _upgradePath;
       private string _databaseType;
@@ -298,7 +298,7 @@ namespace DBUpdater
 
       private string GetScriptFileName(UpgradeScript script)
       {
-         string fileName = "Upgrade" + script.From.ToString() + "to" + script.To.ToString() + _databaseType + ".sql";
+         string fileName = "Upgrade" + script.From + "to" + script.To + _databaseType + ".sql";
          string fullPath = Path.Combine(_scriptPath, fileName);
 
          return fullPath;

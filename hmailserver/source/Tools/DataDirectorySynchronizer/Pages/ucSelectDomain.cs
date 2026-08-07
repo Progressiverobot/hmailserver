@@ -36,10 +36,7 @@ namespace DataDirectorySynchronizer.Pages
       {
          foreach (ListViewItem item in listViewDomains.Items)
          {
-            if (Globals.SelectedDomains.Contains(item.Text))
-               item.Checked = true;
-            else
-               item.Checked = false;
+            item.Checked = Globals.SelectedDomains.Contains(item.Text);
          }
       }
 

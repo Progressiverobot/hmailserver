@@ -15,11 +15,11 @@ namespace hMailServer.Shared
     public partial class formErrorMessage : Form
     {
         private Exception _exception;
-        private UnhandledExceptionEventArgs _args;
-        private ThreadExceptionEventArgs _threadArgs;
+        private readonly UnhandledExceptionEventArgs _args;
+        private readonly ThreadExceptionEventArgs _threadArgs;
 
-        private string _title;
-        private string _errorMessage;
+        private readonly string _title;
+        private readonly string _errorMessage;
 
         public formErrorMessage(UnhandledExceptionEventArgs args)
         {
@@ -61,17 +61,13 @@ namespace hMailServer.Shared
         {
 
             if (_exception == null)
-            {
-                if (_args == null)
-                    _exception = ((Exception)(_threadArgs.Exception));
-                else
-                    _exception = ((Exception)(_args.ExceptionObject));
-            }
+                _exception = _args == null
+                    ? _threadArgs.Exception
+                    : (Exception)_args.ExceptionObject;
 
-            if (string.IsNullOrEmpty(_errorMessage))
-                textErrorMessage.Text = _exception.Message;
-            else
-                textErrorMessage.Text = _errorMessage;
+            textErrorMessage.Text = string.IsNullOrEmpty(_errorMessage)
+                ? _exception.Message
+                : _errorMessage;
 
             if (!string.IsNullOrEmpty(_title))
                 this.Text = _title;
@@ -81,14 +77,13 @@ namespace hMailServer.Shared
 
             AppendException(details, _exception, string.Empty);
 
-            string indent = "	";
             Exception ie = _exception;
-            while (ie.InnerException != null)
+            for (int depth = 1; ie.InnerException != null; depth++)
             {
                 ie = ie.InnerException;
+                string indent = new string('	', depth);
                 details.Append(indent).Append("****** Inner Exception ******").Append(Environment.NewLine);
                 AppendException(details, ie, indent);
-                indent += "	";
             }
 
             textErrorDetails.Text = details.ToString();

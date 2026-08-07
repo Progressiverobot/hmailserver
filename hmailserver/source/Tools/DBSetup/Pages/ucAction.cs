@@ -45,10 +45,7 @@ namespace DBSetup.Pages
 
       public bool OnLeavePage(bool next)
       {
-         if (radioCreateNew.Checked)
-            _state["CreateNew"] = "Yes";
-         else
-            _state["CreateNew"] = "No";
+         _state["CreateNew"] = radioCreateNew.Checked ? "Yes" : "No";
 
          return true;
       }

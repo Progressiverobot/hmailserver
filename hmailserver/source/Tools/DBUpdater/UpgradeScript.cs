@@ -10,8 +10,8 @@ namespace DBUpdater
 {
    class UpgradeScript
    {
-      private int _from = 0;
-      private int _to = 0;
+      private readonly int _from = 0;
+      private readonly int _to = 0;
       private bool _dummy = false;
 
 

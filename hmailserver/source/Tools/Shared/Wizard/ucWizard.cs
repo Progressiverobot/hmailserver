@@ -14,8 +14,8 @@ namespace hMailServer.Shared
 {
    public partial class ucWizard : UserControl
    {
-      private List<UserControl> _pages;
-      private Dictionary<string, string> _state;
+      private readonly List<UserControl> _pages;
+      private readonly Dictionary<string, string> _state;
       private int _currentPage;
 
       public delegate void PageChangedEventHandler (int currentPage, int lastPage);
@@ -174,10 +174,7 @@ namespace hMailServer.Shared
 
       private void SetButtonTexts()
       {
-         if (_currentPage != _pages.Count - 1)
-            buttonNext.Text = "Next >";
-         else
-            buttonNext.Text = "Close";
+         buttonNext.Text = _currentPage != _pages.Count - 1 ? "Next >" : "Close";
       }
 
       

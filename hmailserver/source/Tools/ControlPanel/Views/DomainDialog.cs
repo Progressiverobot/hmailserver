@@ -215,9 +215,8 @@ namespace hMailServer.ControlPanel.Views
          var menu = new ContextMenu();
          foreach (string dom in domains)
          {
-            string captured = dom;
-            var item = new MenuItem { Header = captured };
-            item.Click += (s2, e2) => adDomain_.Text = captured;
+            var item = new MenuItem { Header = dom };
+            item.Click += (s2, e2) => adDomain_.Text = dom;
             menu.Items.Add(item);
          }
          menu.PlacementTarget = (UIElement) sender;

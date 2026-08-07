@@ -30,7 +30,7 @@ namespace hMailServer.Shared
 		/// </summary>
 		private class TabSchemeComparer : IComparer
 		{
-			private TabScheme comparisonScheme;
+			private readonly TabScheme comparisonScheme;
 
 			#region IComparer Members
 
@@ -102,13 +102,13 @@ namespace hMailServer.Shared
 		/// <summary>
 		/// The container whose tab order we manage.
 		/// </summary>
-		private Control container;
+		private readonly Control container;
 
 		/// <summary>
 		/// Hash of controls to schemes so that individual containers can have different ordering
 		/// strategies than their parents.
 		/// </summary>
-		private Hashtable schemeOverrides;
+		private readonly Hashtable schemeOverrides;
 
 		/// <summary>
 		/// The tab index we start numbering from when the tab order is applied.

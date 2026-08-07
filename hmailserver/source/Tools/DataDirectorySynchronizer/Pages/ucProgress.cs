@@ -17,9 +17,9 @@ namespace DataDirectorySynchronizer.Pages
    public partial class ucProgress : UserControl, IWizardPage
    {
 
-      hMailServer.Application _application;
-      hMailServer.Domains _domains;
-      hMailServer.Utilities _utilities;
+      readonly hMailServer.Application _application;
+      readonly hMailServer.Domains _domains;
+      readonly hMailServer.Utilities _utilities;
 
       private DateTime _startTime;
       private int _counter;
@@ -37,10 +37,8 @@ namespace DataDirectorySynchronizer.Pages
 
       private void AddProcessedFile(string file, bool processed)
       {
-         if (processed == false)
-         {
+         if (!processed)
             listProcess.Items.Add(file);
-         }
 
          _counter++;
 

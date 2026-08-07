@@ -53,9 +53,8 @@ namespace hMailServer.ControlPanel.Views
          var ok = new Button { Content = "Save", Appearance = ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), MinWidth = 88, IsDefault = true };
          ok.Click += (_, _) =>
          {
-            foreach (Func<bool> commit in committers_)
-               if (!commit())
-                  return;
+            if (committers_.Any(commit => !commit()))
+               return;
             DialogResult = true;
             Close();
          };

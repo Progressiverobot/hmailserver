@@ -40,17 +40,14 @@ namespace hMailServer.Shared
       {
          get
          {
-            if (_numeric == false)
-               return 0;
-
-            if (Text == "")
+            if (!_numeric || Text == "")
                return 0;
 
             return Convert.ToInt32(Text);
          }
          set
          {
-            if (_numeric == false)
+            if (!_numeric)
                return;
 
             Text = value.ToString();
@@ -61,17 +58,14 @@ namespace hMailServer.Shared
       {
          get
          {
-            if (_numeric == false)
-               return 0;
-
-            if (Text == "")
+            if (!_numeric || Text == "")
                return 0;
 
             return Convert.ToInt64(Text);
          }
          set
          {
-            if (_numeric == false)
+            if (!_numeric)
                return;
 
             Text = value.ToString();
@@ -82,10 +76,7 @@ namespace hMailServer.Shared
       {
          get
          {
-            if (base.Text != internalText)
-               return true;
-            else
-               return false;
+            return base.Text != internalText;
 
          }
       }
@@ -109,13 +100,8 @@ namespace hMailServer.Shared
 
       protected override void OnKeyPress(KeyPressEventArgs e)
       {
-         if (_numeric)
-         {
-            if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar))
-            {
-               e.Handled = true;
-            }
-         }
+         if (_numeric && !char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar))
+            e.Handled = true;
 
          base.OnKeyPress(e);
       }

@@ -48,7 +48,7 @@ namespace DBSetup.Pages
 
       public bool OnLeavePage(bool next)
       {
-         if (next == false)
+         if (!next)
             return true;
          try
          {

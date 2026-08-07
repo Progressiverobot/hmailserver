@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using hMailServer.ControlPanel.Services;
+using System.Linq;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -678,9 +679,8 @@ namespace hMailServer.ControlPanel.Views
             });
 
             FrameworkElement lastEditor = null;
-            foreach (Setting setting in card.Settings)
+            foreach (FrameworkElement editor in card.Settings.Select(s => s.CreateEditor(store_)))
             {
-               FrameworkElement editor = setting.CreateEditor(store_);
                editor.Margin = new Thickness(0, 0, 0, 12);
                panel.Children.Add(editor);
                lastEditor = editor;

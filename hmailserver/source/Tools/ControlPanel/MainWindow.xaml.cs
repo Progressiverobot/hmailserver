@@ -206,16 +206,13 @@ namespace hMailServer.ControlPanel
       /// parent groups. Used by the Welcome page quick-action tiles.</summary>
       public void NavigateTo(string key)
       {
-         foreach (TreeViewItem leaf in AllLeaves(NavTree.Items))
+         foreach (TreeViewItem leaf in AllLeaves(NavTree.Items).Where(l => (l.Tag as string) == key))
          {
-            if ((leaf.Tag as string) == key)
-            {
-               for (var parent = leaf.Parent as TreeViewItem; parent != null; parent = parent.Parent as TreeViewItem)
-                  parent.IsExpanded = true;
-               leaf.IsSelected = true;
-               leaf.BringIntoView();
-               return;
-            }
+            for (var parent = leaf.Parent as TreeViewItem; parent != null; parent = parent.Parent as TreeViewItem)
+               parent.IsExpanded = true;
+            leaf.IsSelected = true;
+            leaf.BringIntoView();
+            return;
          }
       }
 

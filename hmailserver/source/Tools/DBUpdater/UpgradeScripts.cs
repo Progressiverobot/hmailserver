@@ -5,12 +5,13 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Linq;
 
 namespace DBUpdater
 {
    class UpgradeScripts
    {
-      List<UpgradeScript> _upgradeScripts;
+      readonly List<UpgradeScript> _upgradeScripts;
 
       public UpgradeScripts()
       {
@@ -29,13 +30,7 @@ namespace DBUpdater
 
       public UpgradeScript GetScriptUpgradingFrom(int from)
       {
-         foreach (UpgradeScript script in _upgradeScripts)
-         {
-            if (script.From == from)
-               return script;
-         }
-
-         return null;
+         return _upgradeScripts.FirstOrDefault(script => script.From == from);
       }
    }
 }

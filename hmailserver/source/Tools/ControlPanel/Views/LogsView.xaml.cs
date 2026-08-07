@@ -96,12 +96,10 @@ namespace hMailServer.ControlPanel.Views
             position_ = stream.Length;
 
             bool added = false;
-            foreach (string raw in chunk.Split('\n'))
+            foreach (string line in chunk.Split('\n')
+                                        .Select(raw => raw.TrimEnd('\r'))
+                                        .Where(l => l.Length != 0))
             {
-               string line = raw.TrimEnd('\r');
-               if (line.Length == 0)
-                  continue;
-
                lines_.Add(new LogLine { Text = line, Brush = Classify(line) });
                added = true;
             }
