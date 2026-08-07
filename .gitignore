@@ -46,6 +46,16 @@ hmailserver/source/Server/hMailServer.Minidump/x64/*
 /hmailserver/test/RegressionTests/packages/*
 /TestResult.xml
 /.claude/*
+CLAUDE.md
+# Working notes and internal design docs - kept locally, not published.
+/AGENTS.md
+/CONTROL-PANEL-GAP-ANALYSIS.md
+/CONTROL-PANEL-PLAN.md
+/IMPLEMENTATION-NOTES.md
+/REDESIGN.md
+/planupdate.md
+/settings.md
+/updatedesigncontrolpanal_installer.md
 **/.vs/*
 .vscode/
 /hmailserver/.claude/*

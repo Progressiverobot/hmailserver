@@ -18,9 +18,9 @@ The compiler runs with `/WX` — code must build warning-free.
 ## Testing
 
 All changes must keep the regression suite green (898 tests). The suite
-runs against a live local server instance over SMTP/IMAP/POP3 — see
-[IMPLEMENTATION-NOTES.md](../IMPLEMENTATION-NOTES.md) for the full test
-environment recipe (SQLCE, ClamAV, SpamAssassin, INI settings).
+runs against a live local server instance over SMTP/IMAP/POP3. The full
+environment recipe (SQL CE, ClamAV, SpamAssassin, INI settings) is not
+published — open an issue and we will walk you through it.
 
 ## Pull Requests
 
@@ -28,15 +28,15 @@ environment recipe (SQLCE, ClamAV, SpamAssassin, INI settings).
 - Keep changes focused; one logical change per PR.
 - Add or update regression tests for behavior changes.
 - Use parameterised SQL exclusively — never build SQL strings manually.
-- New server-wide optional features should follow the INI-settings pattern
-  (`IniFileSettings` getter + Server features dialog) described in
-  [AGENTS.md](../AGENTS.md).
+- New server-wide optional features should follow the INI-settings pattern:
+  an `IniFileSettings` getter plus a control in the Server features dialog.
 
 ## Architecture
 
-Read [AGENTS.md](../AGENTS.md) for the codebase guide: layering
-(BO → Persistence → SQL, Cache in front), the COM API seam, Boost.Asio
-networking, and the directory map.
+The layering is BO → Persistence → SQL, with Cache in front of the hot reads.
+All configuration and management goes through the COM API in `Server/COM/` —
+that is the seam the GUI, the test suite and external scripts all use.
+Networking is Boost.Asio, wrapped by `Server/Common/TCPIP/`.
 
 ## License
 

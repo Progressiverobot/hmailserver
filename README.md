@@ -185,8 +185,8 @@ administration experience.
      and BATV, submission/outbound rate limits, OpenTelemetry + slow-query log,
      connection timeouts, delivery/queue tuning, search-indexing, message-archiving
      and other INI knobs, `Logging.Device`/`LogFormat`, the cache size caps, the
-     domain-level Active Directory link, and a write-only editor for secrets. See
-     `settings.md` for the full coverage map.
+     domain-level Active Directory link, and a write-only editor for secrets. See the
+     Control Panel's own pages for the full coverage map.
    * **Two-factor authentication setup** now renders a real scannable QR code (plus a
      grouped manual key with a copy button) and a larger, clearer verification field.
    * **Installer.** The custom database-type wizard page is DPI-scaled, the dead
@@ -472,7 +472,7 @@ For 100% coverage the suite expects three optional integrations (tests degrade t
    * **ClamAV**  -  installed to `C:\clamav` with `clamd` listening on TCP 3310 and current freshclam definitions. Let the daemon finish loading signatures before the first run.
    * **`AddXOriginalRcptTo=1`** in `hMailServer.INI` for the X-Original-Rcpt-To header tests.
 
-The complete dev-tree provisioning recipe (directories, certificates, DB scripts, runtime files) is documented in [IMPLEMENTATION-NOTES.md](IMPLEMENTATION-NOTES.md).
+The complete dev-tree provisioning recipe (directories, certificates, DB scripts, runtime files) is kept with the maintainer's internal notes; open an issue if you need it to reproduce a build.
 
 Releasing hMailServer
 =====================
@@ -498,4 +498,4 @@ Please report security vulnerabilities privately - see [SECURITY.md](.github/SEC
 Contributing
 ============
 
-See [CONTRIBUTING.md](.github/CONTRIBUTING.md) and the codebase guide in [AGENTS.md](AGENTS.md).
+See [CONTRIBUTING.md](.github/CONTRIBUTING.md).

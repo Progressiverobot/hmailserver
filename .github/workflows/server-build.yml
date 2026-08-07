@@ -9,7 +9,7 @@ name: Server build & regression tests
 #   * the prebuilt native dependencies (boost_1_91_0, openssl-4.0.1,
 #     postgresql-18.3) pointed to by the machine environment variable
 #     hMailServerLibs (see libraries/build-dependencies.ps1 and
-#     IMPLEMENTATION-NOTES.md).
+#     the maintainer's environment notes).
 #
 # Set up a self-hosted runner with the labels [self-hosted, windows] on a machine
 # that has the build prerequisites above. The "Build server" job only needs the
@@ -20,8 +20,8 @@ name: Server build & regression tests
 #     and the steps control the Windows service);
 #   * the hMailServer Windows service installed on the runner, with its image path
 #     pointing at this checkout's build output; and
-#   * a reachable database plus the test-environment integrations (see AGENTS.md /
-#     IMPLEMENTATION-NOTES.md for the recipe behind the full 898/898 result).
+#   * a reachable database plus the test-environment integrations that the full
+#     898/898 result depends on (ClamAV, SpamAssassin, AddXOriginalRcptTo).
 
 on:
   workflow_dispatch:
