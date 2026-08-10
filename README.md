@@ -5,7 +5,7 @@ hMailServer is an open source email server for Microsoft Windows, implementing S
 
 This repository is a modernized fork of the original project (which is no longer maintained upstream). It has been brought up to date with a current toolchain, current cryptography, and the transport-security standards expected of a mail server in 2026. It is maintained by Christopher Holloway / [Progressive Robot Ltd](https://www.progressiverobot.com).
 
-**Production status:** version **6.2.11** is released - [download the installer](https://github.com/Progressiverobot/hmailserver/releases/latest) (`hMailServer-6.2.11-x64.exe`). **6.2.11 fixes a Control Panel accessibility defect** - the alias list and the live log announced their CLR type name to screen readers instead of their content - and lands the work that made the regression suite run in full for the first time. 6.2.10 before it was a security release: fifteen COM methods returned `S_OK` on calls they had just refused, five of them handing an unauthorized caller an uninitialized out-parameter, and the two unmaintained administration front-ends (the PHP WebAdmin, which kept the administrator password in plaintext in a PHP session, and the retired Administrator) were removed. See *6.2.11* and *6.2.10* below. The server core is unchanged since 6.2.6 (opt-in IMAP4rev2, the Control Panel redesign and complete settings coverage). It is validated by the full regression suite: **1026 of 1026 tests passing, zero failures, zero inconclusive** - the complete suite, with live SpamAssassin and ClamAV (real EICAR detection), DMARC evaluation against live DNS, and TLS 1.2/1.3 handshakes end to end. Every test runs; nothing is skipped. The bundled administration GUI is the modern .NET 8 **Control Panel**.
+**Production status:** version **6.2.12** is released - [download the installer](https://github.com/Progressiverobot/hmailserver/releases/latest) (`hMailServer-6.2.12-x64.exe`). **6.2.12 completes the .NET modernization of the tooling**: every C# tool now targets .NET 8 - the last .NET Framework setup tools (DBSetup, DBSetupQuick, DBUpdater, DataDirectorySynchronizer) are ported, the VB6-era migration tools are replaced by a supported **Import Tool** (accounts from text files, messages from mbox files), the installer makes the .NET 8 runtime a server prerequisite installed before the database tools run, and CI now builds every C# project on every PR. The test suite moved to NUnit 4. See *6.2.12* below. The server core is unchanged since 6.2.6 (opt-in IMAP4rev2, the Control Panel redesign and complete settings coverage). It is validated by the full regression suite: **1026 of 1026 tests passing, zero failures, zero inconclusive** - the complete suite, with live SpamAssassin and ClamAV (real EICAR detection), DMARC evaluation against live DNS, and TLS 1.2/1.3 handshakes end to end. Every test runs; nothing is skipped. The bundled administration GUI is the modern .NET 8 **Control Panel**.
 
 What's new in 6.0
 =================
@@ -82,6 +82,61 @@ change until the new settings are turned on.
 **Supply chain & quality gates**
 
    * SPDX + CycloneDX SBOMs (Syft) attached to every release, Dependabot CVE alerts + grouped update PRs, and a dependency-review PR gate.
+
+6.2.12
+======
+
+The .NET modernization of the tooling is complete: every C# component in the
+product now targets .NET 8. No server-core changes; no database change
+(schema version 6005).
+
+   * **The setup tools are .NET 8.** DBSetup, DBSetupQuick, DBUpdater,
+     DataDirectorySynchronizer and the Shared library move from
+     .NET Framework 4.8.1 to SDK-style net8.0-windows. The COM API is consumed
+     through a checked-in tlbimp wrapper (`source/Tools/Interop/`), so the
+     tools build with plain `dotnet build` on any machine - no registered
+     typelib needed. Dialog metrics are pinned to the fonts the forms were
+     designed against, so nothing shifts visually. The silent command-line
+     contract the installer and the VM test runner depend on is unchanged.
+
+   * **The VB6 migration tools are replaced by a supported Import Tool.** The
+     `source/Migration` folder held five wizards, none of which could be built
+     (their shared VB6 sources were never in the repository) and three of
+     which migrated from products dead for two decades (ArgoSoft, IMail,
+     Mercury). The two with lasting value return as one .NET 8 tool, shipped
+     under Addons: account import from comma-separated text files (now with
+     per-line validation instead of a crash) and mbox import into per-file
+     IMAP folders. The mbox importer streams files of any size, goes through
+     the supported COM API instead of the old tool's raw MySQL INSERTs, and
+     fixes every defect documented in the VB6 version - the silently dropped
+     last message, CRLF mailboxes parsing as one giant message, mboxrd
+     quoting, and SMTP dot-stuffing corrupting stored messages. Verified end
+     to end against a live server with both Unix (LF) and Windows (CRLF)
+     mailboxes.
+
+   * **The installer treats the .NET 8 Desktop Runtime as a server
+     prerequisite.** It is installed - with its exit code actually checked -
+     before the database tools run, not only when the Control Panel component
+     is selected; the obsolete .NET Framework 4.5 gate is gone, and the
+     supported-OS floor is now Windows 10 1607, the .NET 8 runtime's own
+     minimum. The database tools ship as dotnet publish folders staged by the
+     new `build/build-tools.ps1`.
+
+   * **CI now builds every C# project on every push and PR.** A new tools job
+     builds the tools solution with warnings-as-errors against the checked-in
+     interop wrapper. Previously only the Control Panel was built, which let
+     a dependency update break the test and tool projects invisibly.
+
+   * **The test suite runs on NUnit 4** (4.6.1, adapter 6.2, console runner
+     3.22) via Dependabot's grouped update, with the 2,200+ classic assert
+     call sites kept compiling through NUnit 4.6's C# 14 extension members.
+     The regression suite's local-address selection now probes for an address
+     the server actually answers on instead of trusting interface enumeration
+     order, which broke under a connected VPN.
+
+   * The changes were shaken down by an adversarial multi-agent review (12
+     findings raised, 9 confirmed, all fixed before merge), and the release
+     is validated by the full regression suite: 1026 of 1026 passing.
 
 6.2.11
 ======
