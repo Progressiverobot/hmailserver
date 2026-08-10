@@ -2,6 +2,7 @@
 Name: "{group}\hMailServer Database Setup"; Filename: "{app}\Bin\DBSetup.exe"; Components: server;
 Name: "{group}\hMailServer Control Panel"; Filename: "{app}\ControlPanel\hMailCP.exe"; Components: controlpanel;
 Name: "{group}\Addons\Data Directory Synchronizer"; Filename: "{app}\Addons\DataDirectorySynchronizer\DataDirectorySynchronizer.exe"; Components: server;
+Name: "{group}\Addons\Import Tool"; Filename: "{app}\Addons\ImportTool\ImportTool.exe"; Components: server;
 Name: "{group}\Installation\Uninstall hMailServer"; Filename: "{app}\unins000.exe"; Components: admintools server;
 Name: "{group}\Service\Start service"; Filename: "{sys}\net.exe"; Parameters: "START hMailServer"; Components: server;
 Name: "{group}\Service\Stop service"; Filename: "{sys}\net.exe"; Parameters: "STOP hMailServer"; Components: server;

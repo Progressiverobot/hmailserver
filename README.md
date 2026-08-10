@@ -13,7 +13,7 @@ What's new in 6.0
 **Toolchain and platform**
 
    * Visual Studio 2026 build tools (platform toolset v145), 64-bit only
-   * OpenSSL 4.0.x, Boost 1.91, PostgreSQL 18 (libpq), .NET Framework 4.8.1 for the tools
+   * OpenSSL 4.0.x, Boost 1.91, PostgreSQL 18 (libpq), .NET 8 SDK for the tools and Control Panel
    * MySQL/MariaDB client: MariaDB Connector/C, bundled as `libmysql.dll` + auth plugins - works with both MySQL and MariaDB out of the box, including MySQL 8 `caching_sha2_password` and MariaDB `ed25519`/`gssapi`
    * PBKDF2-HMAC-SHA256 password hashing (transparent upgrade on login), TLS 1.2/1.3 defaults
    * Database version 6005; the upgrade chain is continuous from every earlier hMailServer release (MySQL, MS SQL, PostgreSQL, SQL CE)
@@ -479,8 +479,10 @@ Alternatively, build from Visual Studio (started with _Run as Administrator_) or
 1. Download the source code from this Git repository.
 2. Compile the solution hmailserver\source\Server\hMailServer\hMailServer.sln.
    This will build the hMailServer server-part (hMailServer.exe)
-3. Compile the solution hmailserver\source\Tools\hMailServer Tools.sln.
-   This will build the setup tools: DB Setup, DB Updater and the Data Directory Synchronizer.
+3. Build and publish the .NET 8 setup tools with build\build-tools.ps1 (or
+   "dotnet build" on hmailserver\source\Tools\hMailServer Tools.sln).
+   This covers DB Setup, DB Setup Quick, DB Updater, the Data Directory
+   Synchronizer and the Import Tool.
    The Control Panel is a separate .NET 8 solution, hmailserver\source\Tools\ControlPanel.sln.
 4. Compile hmailserver\installation\hMailServer64.iss (using Inno Setup 6)
    This will build the hMailServer installation program.

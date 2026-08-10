@@ -1,7 +1,9 @@
 name: CI
 
-# Builds the .NET 8 Control Panel (hMailCP) on every push / PR. This catches C#
-# regressions cheaply. The C++ server build + the 898-test regression suite need
+# Builds the .NET 8 Control Panel (hMailCP) and the .NET tools solution on
+# every push / PR. This catches C# regressions cheaply. The tools build against
+# the checked-in COM interop wrapper (source/Tools/Interop), so no registered
+# typelib is needed. The C++ server build + the 898-test regression suite need
 # the prebuilt native libraries (OpenSSL 4.0.x, Boost 1.91, PostgreSQL 18 libpq —
 # see libraries/build-dependencies.ps1) and a database service, so they run in the
 # separate, manually-triggered server-build workflow.
@@ -64,6 +66,25 @@ jobs:
         with:
           name: coverage-report-csharp
           path: coverage/coverage.cobertura.xml
+
+  tools:
+    name: Build .NET tools
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build tools solution (Release)
+        run: dotnet build "hmailserver/source/Tools/hMailServer Tools.sln" -c Release -warnaserror
+
+      - name: Publish smoke check
+        shell: pwsh
+        run: ./build/build-tools.ps1
 
   upload-coverage-csharp:
     needs: control-panel

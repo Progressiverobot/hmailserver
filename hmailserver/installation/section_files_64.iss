@@ -13,27 +13,32 @@ Source: "WebAdmin\index.html"; DestDir: "{app}\WebAdmin"; Flags: ignoreversion; 
 
 ; hMailServer Control Panel (modern .NET 8 WPF admin app)
 Source: "..\source\Tools\ControlPanel\publish\*"; DestDir: "{app}\ControlPanel"; Flags: ignoreversion recursesubdirs; Components: controlpanel;
-; .NET 8 Desktop Runtime, installed silently when missing
+; .NET 8 Desktop Runtime, installed silently when missing. The server
+; component needs it too: DBSetup/DBSetupQuick/DBUpdater are .NET 8 apps
+; that run during installation (from [Code], before [Run] executes - see
+; InstallDotNetRuntime in hMailServerInnoExtension.iss).
 ; (file is downloaded by build\get-dotnet-runtime.ps1; not in the repository)
-Source: "DotNet\windowsdesktop-runtime-8.0-win-x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall; Components: controlpanel;
+Source: "DotNet\windowsdesktop-runtime-8.0-win-x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall; Components: server controlpanel;
 
 Source: "SQLCE\SSCERuntime_x64-ENU.msi"; Flags: deleteafterinstall ; Excludes: ".svn"; DestDir: "{tmp}"; Components: server;
 
-; Common tools
+; Common tools (.NET 8, framework-dependent dotnet publish output; built by
+; build\build-tools.ps1). The three database tools share {app}\Bin - their
+; publish folders carry identical copies of Shared.dll and the checked-in
+; Interop.hMailServer.dll tlbimp wrapper (source\Tools\Interop), which
+; external .NET scripts may also reference from {app}\Bin.
 ; The classic hMailServer Administrator GUI has been removed - the Control
-; Panel is the sole bundled GUI. Interop.hMailServer.dll is the tlbimp wrapper
-; for the COM API; every tool generates an equivalent one, and it is taken
-; from Shared, which the installer already ships alongside.
-Source: "..\source\tools\DBUpdater\Bin\x64\Release\DBUpdater.exe"; DestDir: "{app}\Bin";  Flags: ignoreversion; Components: server;
-Source: "..\source\tools\DBSetup\Bin\x64\Release\DBSetup.exe"; DestDir: "{app}\Bin";Flags: ignoreversion;Components: server;
-Source: "..\Source\tools\DBSetupQuick\bin\x64\release\DBSetupQuick.exe"; DestDir: "{app}\Bin"; Flags: ignoreversion; Components: server;
-Source: "..\source\tools\shared\bin\x64\Release\Interop.hMailServer.dll"; DestDir: "{app}\Bin"; Flags: ignoreversion; Components: server;
-Source: "..\source\tools\shared\bin\x64\Release\Shared.dll"; DestDir: "{app}\Bin"; Flags: ignoreversion; Components: server admintools;
+; Panel is the sole bundled GUI.
+Source: "..\source\Tools\DBUpdater\publish\*"; DestDir: "{app}\Bin"; Flags: ignoreversion recursesubdirs; Components: server;
+Source: "..\source\Tools\DBSetup\publish\*"; DestDir: "{app}\Bin"; Flags: ignoreversion recursesubdirs; Components: server;
+Source: "..\source\Tools\DBSetupQuick\publish\*"; DestDir: "{app}\Bin"; Flags: ignoreversion recursesubdirs; Components: server;
+Source: "..\source\Tools\Interop\Interop.hMailServer.dll"; DestDir: "{app}\Bin"; Flags: ignoreversion; Components: server admintools;
 
 ; Data directory synchronizer
-Source: "..\source\Tools\DataDirectorySynchronizer\Bin\x64\Release\*.exe"; DestDir: "{app}\Addons\DataDirectorySynchronizer"; Flags: ignoreversion recursesubdirs;Components: server;
-Source: "..\source\tools\shared\bin\x64\Release\Interop.hMailServer.dll"; DestDir: "{app}\Addons\DataDirectorySynchronizer"; Flags: ignoreversion; Components: server;
-Source: "..\source\Tools\Shared\Bin\x64\Release\*.dll"; DestDir: "{app}\Addons\DataDirectorySynchronizer"; Flags: ignoreversion recursesubdirs;Components: server;
+Source: "..\source\Tools\DataDirectorySynchronizer\publish\*"; DestDir: "{app}\Addons\DataDirectorySynchronizer"; Flags: ignoreversion recursesubdirs; Components: server;
+
+; Import tool (accounts from text files, messages from mbox files)
+Source: "..\source\Tools\ImportTool\publish\*"; DestDir: "{app}\Addons\ImportTool"; Flags: ignoreversion recursesubdirs; Components: server;
 
 ; OpenSSL
 Source: "{#OPENSSL_LIBS_PATH}\libcrypto-4-x64.dll"; DestDir: "{app}\Bin"; Flags: ignoreversion; Components: server admintools;
