@@ -193,12 +193,10 @@ namespace RegressionTests.Shared
 
          if (_numberOfConnectedClients < _maxNumberOfConnections)
             Assert.Fail(
-               "At {0} - Client did not connect to simulated server. Expected connection count: {1}, Actual: {2}\r\nLog:\r\n{3}",
-               DateTime.Now, _maxNumberOfConnections, _numberOfConnectedClients, log);
+               $"At {DateTime.Now} - Client did not connect to simulated server. Expected connection count: {_maxNumberOfConnections}, Actual: {_numberOfConnectedClients}\r\nLog:\r\n{log}");
          else
             Assert.Fail(
-               "At {0} - Client did not disconnect from simulated server. Expected connection count: {1}, Actual: {2}\r\nLog:\r\n{3}",
-               DateTime.Now, _maxNumberOfConnections, _numberOfConnectedClients, log);
+               $"At {DateTime.Now} - Client did not disconnect from simulated server. Expected connection count: {_maxNumberOfConnections}, Actual: {_numberOfConnectedClients}\r\nLog:\r\n{log}");
       }
 
       public void Disconnect()

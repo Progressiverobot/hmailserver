@@ -10,6 +10,7 @@ using System.Threading;
 using hMailServer;
 using Microsoft.VisualBasic;
 using NUnit.Framework;
+using NUnit.Framework.Legacy;
 using RegressionTests.Infrastructure;
 using RegressionTests.Shared;
 

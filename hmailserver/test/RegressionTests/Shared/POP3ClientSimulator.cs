@@ -346,8 +346,8 @@ namespace RegressionTests.Shared
                return;
 
             if (actualCount > expectedCount)
-               Assert.Fail("Actual count exceeds expected count. Account name: {2}, Actual: {0}, Expected: {1}.",
-                  actualCount, expectedCount, accountName);
+               Assert.Fail(
+                  $"Actual count exceeds expected count. Account name: {accountName}, Actual: {actualCount}, Expected: {expectedCount}.");
 
             if (DateTime.UtcNow - lastDebugEntryTimestamp > TimeSpan.FromSeconds(10))
             {
@@ -360,8 +360,7 @@ namespace RegressionTests.Shared
             Thread.Sleep(50);
          }
 
-         Assert.Fail("Wrong number of messages in inbox for {0}. Actual: {1}, Expected: {2}", accountName, actualCount,
-            expectedCount);
+         Assert.Fail($"Wrong number of messages in inbox for {accountName}. Actual: {actualCount}, Expected: {expectedCount}");
       }
 
       public static string AssertGetFirstMessageText(string accountName, string accountPassword)

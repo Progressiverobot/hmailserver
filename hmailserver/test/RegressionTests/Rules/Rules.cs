@@ -9,6 +9,7 @@ using System.IO;
 using System.Text.RegularExpressions;
 using hMailServer;
 using NUnit.Framework;
+using NUnit.Framework.Legacy;
 using RegressionTests.Infrastructure;
 using RegressionTests.Shared;
 

@@ -7,6 +7,7 @@ using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Text;
 using NUnit.Framework;
+using NUnit.Framework.Legacy;
 using RegressionTests.Shared;
 
 namespace RegressionTests.Infrastructure

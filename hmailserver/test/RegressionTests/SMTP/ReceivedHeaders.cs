@@ -6,6 +6,7 @@ using System;
 using System.Threading;
 using hMailServer;
 using NUnit.Framework;
+using NUnit.Framework.Legacy;
 using RegressionTests.Shared;
 using RegressionTests.SSL;
 

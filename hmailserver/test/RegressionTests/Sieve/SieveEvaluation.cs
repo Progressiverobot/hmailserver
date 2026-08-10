@@ -3,6 +3,7 @@
 
 using System.Reflection;
 using NUnit.Framework;
+using NUnit.Framework.Legacy;
 using RegressionTests.Shared;
 
 namespace RegressionTests.Sieve

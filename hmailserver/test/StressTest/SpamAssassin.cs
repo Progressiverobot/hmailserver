@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Text;
 using hMailServer;
 using NUnit.Framework;
+using NUnit.Framework.Legacy;
 using System.Threading;
 using RegressionTests.Infrastructure;
 using RegressionTests.Shared;

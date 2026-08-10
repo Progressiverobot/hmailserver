@@ -5,6 +5,7 @@
 using System.Collections.Generic;
 using hMailServer;
 using NUnit.Framework;
+using NUnit.Framework.Legacy;
 using RegressionTests.POP3.Fetching;
 using RegressionTests.Shared;
 
