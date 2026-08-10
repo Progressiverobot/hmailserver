@@ -17,8 +17,7 @@ namespace DataDirectorySynchronizer
       [STAThread]
       static void Main()
       {
-         Application.EnableVisualStyles();
-         Application.SetCompatibleTextRenderingDefault(false);
+         ToolApplication.Initialize();
 
          CommandLineParser.Parse();
 
