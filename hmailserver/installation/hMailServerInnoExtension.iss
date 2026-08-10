@@ -297,6 +297,17 @@ begin
 	begin
 		MsgBox('The .NET 8 Desktop Runtime could not be installed. The database setup tools will not work until it is installed.' + #13#10 +
 		       SysErrorMessage(ResultCode), mbError, MB_OK);
+		Exit;
+	end;
+
+	// Exec returns True whenever the process launched; the actual install
+	// result is the exit code. 0 = success, 3010 = success, reboot required.
+	if (ResultCode <> 0) and (ResultCode <> 3010) then
+	begin
+		MsgBox('The .NET 8 Desktop Runtime installation failed with exit code ' + IntToStr(ResultCode) + '.' + #13#10 +
+		       'The database setup tools will not work until the runtime is installed. ' +
+		       'Install it manually from https://dotnet.microsoft.com/download/dotnet/8.0 and then run ' +
+		       'DBSetupQuick.exe from the hMailServer Bin folder.', mbError, MB_OK);
 	end;
 end;
 

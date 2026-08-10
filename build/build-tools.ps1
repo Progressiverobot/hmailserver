@@ -18,6 +18,10 @@ foreach ($project in $publishProjects) {
     $csproj = Join-Path $toolsDir "$project\$project.csproj"
     $output = Join-Path $toolsDir "$project\publish"
 
+    # Start from a clean folder: the installer wildcards its entire contents,
+    # and dotnet publish never removes files a previous publish left behind.
+    if (Test-Path $output) { Remove-Item -Recurse -Force $output }
+
     Write-Host "Publishing $project -> $output"
     dotnet publish $csproj -c $Configuration -o $output
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
