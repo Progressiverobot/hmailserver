@@ -55,6 +55,13 @@ namespace ImportTool.MboxImport
             listFiles.Items.Clear();
             foreach (var file in Directory.GetFiles(dialog.SelectedPath))
             {
+               // Skip mail-client index files that live next to the mboxes
+               // (e.g. Thunderbird's Inbox.msf next to Inbox).
+               var extension = Path.GetExtension(file);
+               if (string.Equals(extension, ".msf", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(extension, ".dat", StringComparison.OrdinalIgnoreCase))
+                  continue;
+
                var item = listFiles.Items.Add(file);
                item.SubItems.Add(ucMboxProgress.GetFolderNameForFile(file));
             }

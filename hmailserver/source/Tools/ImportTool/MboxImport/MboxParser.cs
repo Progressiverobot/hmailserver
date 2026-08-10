@@ -14,8 +14,10 @@ namespace ImportTool.MboxImport
    /// the start of the file or directly after a blank line, which covers the
    /// classic mbox variants as well as Thunderbird's "From - <date>" form. Both
    /// LF and CRLF line endings are handled, the final message is emitted, and
-   /// mboxrd-style ">From " quoting is reversed. Message bytes are otherwise
-   /// preserved exactly; no dot-stuffing or trailing separators are added.
+   /// mboxrd-style ">From " quoting is reversed. Line endings are normalized
+   /// to CRLF - the server's message pipeline requires it - but message bytes
+   /// are otherwise preserved; no dot-stuffing or trailing separators are
+   /// added.
    /// </summary>
    internal static class MboxParser
    {
@@ -129,11 +131,31 @@ namespace ImportTool.MboxImport
 
          if (quoteCount > 0 && StartsWithFromMarkerAt(line, quoteCount))
          {
-            message.Write(line, 1, line.Length - 1);
+            WriteNormalizedLine(message, line, 1);
             return;
          }
 
-         message.Write(line, 0, line.Length);
+         WriteNormalizedLine(message, line, 0);
+      }
+
+      /// <summary>
+      /// Writes the line starting at <paramref name="offset"/>, rewriting a
+      /// bare LF terminator to CRLF.
+      /// </summary>
+      private static void WriteNormalizedLine(MemoryStream message, byte[] line, int offset)
+      {
+         int length = line.Length - offset;
+
+         if (length >= 1 && line[line.Length - 1] == '\n' &&
+             (length < 2 || line[line.Length - 2] != '\r'))
+         {
+            message.Write(line, offset, length - 1);
+            message.WriteByte((byte)'\r');
+            message.WriteByte((byte)'\n');
+            return;
+         }
+
+         message.Write(line, offset, length);
       }
 
       private static bool StartsWithFromMarkerAt(byte[] line, int offset)

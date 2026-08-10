@@ -91,9 +91,13 @@ namespace hMailServer.Shared
             }
             finally
             {
-               buttonNext.Enabled = true;
-               buttonPrevious.Enabled = true;
-               buttonCancel.Enabled = true;
+               // Restore the states from before OnLeavePage; enabling all
+               // three unconditionally would enable Previous on the first
+               // page after a failed validation, and clicking it would call
+               // ShowPage(-1).
+               buttonNext.Enabled = nextEnabled;
+               buttonPrevious.Enabled = previousEnabled;
+               buttonCancel.Enabled = cancelEnabled;
             }
          }
 

@@ -12,8 +12,8 @@ AllowNoIcons=yes
 Uninstallable=true
 DirExistsWarning=no
 CreateAppDir=true
-; Windows 7 SP1. Inno Setup 6 refuses anything below 6.1, and the old Vista SP1
-; floor was fiction anyway: this is an x64-only build whose Control Panel and
-; setup tools need the .NET 8 Desktop Runtime (bundled, installed when
-; missing) and whose binaries link the VC++ v145 runtime.
-MinVersion=6.1sp1
+; Windows 10 1607 (build 14393): the floor of the .NET 8 Desktop Runtime,
+; which the Control Panel and the setup tools require (bundled, installed
+; when missing - its installer refuses anything older, which would leave the
+; server without a database). The binaries link the VC++ v145 runtime.
+MinVersion=10.0.14393

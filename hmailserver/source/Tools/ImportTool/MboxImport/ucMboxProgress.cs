@@ -115,7 +115,15 @@ namespace ImportTool.MboxImport
 
       private bool ImportMessage(hMailServer.Utilities utilities, string destinationDirectory, string folderName, byte[] messageBytes)
       {
-         var fileName = Path.Combine(destinationDirectory, "{" + Guid.NewGuid().ToString().ToUpperInvariant() + "}.eml");
+         // Use the server's on-disk convention, {account}\XY\{GUID}.eml where
+         // XY is the GUID's first two characters. A file placed anywhere else
+         // is moved (and renamed) by the import, after which a failure would
+         // leave it orphaned at a path we no longer know.
+         var guid = Guid.NewGuid().ToString().ToUpperInvariant();
+         var subDirectory = Path.Combine(destinationDirectory, guid.Substring(0, 2));
+         Directory.CreateDirectory(subDirectory);
+
+         var fileName = Path.Combine(subDirectory, "{" + guid + "}.eml");
 
          File.WriteAllBytes(fileName, messageBytes);
 
@@ -129,12 +137,13 @@ namespace ImportTool.MboxImport
             AddToLog("A message failed to import: " + ex.Message);
          }
 
-         // The server did not take ownership of the file; do not leave it behind.
+         // The server did not take ownership of the file; do not leave it
+         // behind. Cleanup failure must not abort the remaining import.
          try
          {
             File.Delete(fileName);
          }
-         catch (IOException)
+         catch (Exception)
          {
          }
 
