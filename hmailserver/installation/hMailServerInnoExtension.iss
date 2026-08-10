@@ -281,31 +281,23 @@ begin
 	Result := sKey;
 end;
 
-function IsNetFrameworkInstalled() : boolean;
-	var release: cardinal;
+// Installs the bundled .NET 8 Desktop Runtime when it is missing. Called
+// from RunPostInstallTasks before the database tools are executed - they
+// are .NET 8 apps and run from [Code] at ssPostInstall, which is earlier
+// than the [Run] section where the runtime is otherwise installed for the
+// Control Panel component.
+procedure InstallDotNetRuntime();
+	var
+		ResultCode: Integer;
 begin
-	Result := True;
-	if (not RegKeyExists(HKLM, 'SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full')) then begin
-		// No 4.x-version is installed.
-		Result := false;
+	if not DotNetDesktopMissing() then
 		Exit;
+
+	if (Exec(ExpandConstant('{tmp}\windowsdesktop-runtime-8.0-win-x64.exe'), '/install /quiet /norestart', '', SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode) = False) then
+	begin
+		MsgBox('The .NET 8 Desktop Runtime could not be installed. The database setup tools will not work until it is installed.' + #13#10 +
+		       SysErrorMessage(ResultCode), mbError, MB_OK);
 	end;
-	
-	// Check for at least 4.5:
-	if (not RegQueryDWordValue(HKLM, 'SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full', 'Release', release)) then begin
-		// Unable to determine 4.5-version
-		Result := false;
-		Exit;
-	end;
-	
-	// https://docs.microsoft.com/en-us/dotnet/framework/migration-guide/how-to-determine-which-versions-are-installed
-	// 378389 = .NET Framework 4.5
-	if (release < 378389) then begin
-		// Only .NET 4.0 installed
-		Result := false;
-		Exit;
-	end;
-	
 end;
 
 function ShouldSkipPage(PageID: Integer): Boolean;
@@ -487,14 +479,12 @@ function InitializeSetup(): Boolean;
 		SoftwareVersion: AnsiString;
 begin
 	Result := true;
-			
-	if not IsNetFrameworkInstalled() then begin
-        MsgBox('hMailServer requires .NET Framework 4.5'#13#13
-            'Please install this version and then re-run the hMailServer setup program.', mbInformation, MB_OK);
-        result := false;
-		Exit;
-	end;
-	
+
+	// The .NET tools require the .NET 8 Desktop Runtime; it is bundled and
+	// installed automatically when missing, so no up-front framework check
+	// is needed (the old .NET Framework 4.5 gate died with the last
+	// .NET Framework tools).
+
 	if (FindWindowByWindowName('hMailServer Control Panel') > 0) then
 	begin
 		MsgBox('hMailServer Control Panel is started. You must close down this application before starting the installation.',mbInformation, MB_OK);	
@@ -647,8 +637,13 @@ begin
       ProgressPage := CreateOutputProgressPage('Finalizing installation','Please wait while the setup performs post-installation tasks');
       ProgressPage.Show();
 
-      ProgressPage.SetText('Starting...', '');
+      ProgressPage.SetText('Installing the .NET 8 Desktop Runtime...', '');
       ProgressPage.SetProgress(1,6);
+
+      // The database tools below are .NET 8 apps; make sure the runtime is
+      // in place before they are executed. ([Run] would install it too, but
+      // that section runs after this code.)
+      InstallDotNetRuntime();
 
       ProgressPage.SetText('Initializing database backend...', '');
       ProgressPage.SetProgress(2,6);
