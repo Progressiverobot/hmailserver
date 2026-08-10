@@ -643,8 +643,13 @@ namespace RegressionTests.Shared
          return "";
       }
 
+      private static IPAddress _localIpAddress;
+
       internal static IPAddress GetLocalIpAddress()
       {
+         if (_localIpAddress != null)
+            return _localIpAddress;
+
          var allAddresses = new StringBuilder();
 
          foreach (NetworkInterface ni in NetworkInterface.GetAllNetworkInterfaces())
@@ -659,15 +664,35 @@ namespace RegressionTests.Shared
 
                if (ip.AddressFamily == AddressFamily.InterNetwork)
                {
-                  // Example: Only private networks
-                  if (IsPrivateIp(ip))
+                  // Only private networks. The machine may have several private addresses
+                  // (LAN, VPN tunnels, virtual switches); the server does not listen on all
+                  // of them, so probe SMTP to find one where it is actually reachable.
+                  if (IsPrivateIp(ip) && CanConnectToLocalServer(ip))
+                  {
+                     _localIpAddress = ip;
                      return ip;
+                  }
                }
             }
          }
 
-         Assert.Fail($"No local internet address found. Addresses: {allAddresses}");
+         Assert.Fail($"No local internet address found on which hMailServer is reachable. Addresses: {allAddresses}");
          return null;
+      }
+
+      private static bool CanConnectToLocalServer(IPAddress ip)
+      {
+         using (var client = new TcpClient())
+         {
+            try
+            {
+               return client.ConnectAsync(ip, 25).Wait(2000) && client.Connected;
+            }
+            catch (AggregateException)
+            {
+               return false;
+            }
+         }
       }
 
       private static bool IsPrivateIp(IPAddress ip)

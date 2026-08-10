@@ -250,7 +250,7 @@ namespace RegressionTests.Shared
          if (result.Contains("A14 OK"))
             return true;
 
-         Assert.Fail("IMAPClientSimulator.Close() - Expected BAD/OK, received: \"{0}\"", result);
+         Assert.Fail($"IMAPClientSimulator.Close() - Expected BAD/OK, received: \"{result}\"");
          return false;
       }
 

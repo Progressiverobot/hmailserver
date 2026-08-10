@@ -9,6 +9,7 @@ using System.Net.Mail;
 using System.Reflection;
 using System.Text;
 using NUnit.Framework;
+using NUnit.Framework.Legacy;
 using RegressionTests.Infrastructure;
 using RegressionTests.Shared;
 

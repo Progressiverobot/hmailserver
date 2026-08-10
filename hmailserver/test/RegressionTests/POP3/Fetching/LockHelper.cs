@@ -21,7 +21,7 @@ namespace RegressionTests.POP3.Fetching
          }
 
          var defaultLog = LogHandler.ReadCurrentDefaultLog();
-         Assert.Fail("At {0}, fetch account was not unlocked.", DateTime.Now);
+         Assert.Fail($"At {DateTime.Now}, fetch account was not unlocked.");
       }
    }
 }

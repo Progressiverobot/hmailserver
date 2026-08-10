@@ -2,7 +2,7 @@
 $repoRoot = (Get-Item $PSScriptRoot).Parent.FullName
 
 # Path to the NUnit console runner installed under the test packages folder
-$nunitExe = Join-Path $repoRoot 'hmailserver\test\packages\NUnit.ConsoleRunner.3.16.3\tools\nunit3-console.exe'
+$nunitExe = Join-Path $repoRoot 'hmailserver\test\packages\NUnit.ConsoleRunner.3.22.0\tools\nunit3-console.exe'
 
 # Path to the test assembly to run (Debug x64 as requested)
 $testAssembly = Join-Path $repoRoot 'hmailserver\test\RegressionTests\bin\x64\Debug\RegressionTests.dll'
