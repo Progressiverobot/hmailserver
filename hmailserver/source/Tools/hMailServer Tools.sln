@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DBUpdater", "DBUpdater\DBUp
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataDirectorySynchronizer", "DataDirectorySynchronizer\DataDirectorySynchronizer.csproj", "{AC6B4794-4637-42D0-B62A-D68D7108D8B9}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImportTool", "ImportTool\ImportTool.csproj", "{4145971B-CB2C-4F1E-B856-82C31E80119C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -42,5 +44,9 @@ Global
 		{AC6B4794-4637-42D0-B62A-D68D7108D8B9}.Debug|Any CPU.Build.0 = Debug|x64
 		{AC6B4794-4637-42D0-B62A-D68D7108D8B9}.Release|Any CPU.ActiveCfg = Release|x64
 		{AC6B4794-4637-42D0-B62A-D68D7108D8B9}.Release|Any CPU.Build.0 = Release|x64
+		{4145971B-CB2C-4F1E-B856-82C31E80119C}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{4145971B-CB2C-4F1E-B856-82C31E80119C}.Debug|Any CPU.Build.0 = Debug|x64
+		{4145971B-CB2C-4F1E-B856-82C31E80119C}.Release|Any CPU.ActiveCfg = Release|x64
+		{4145971B-CB2C-4F1E-B856-82C31E80119C}.Release|Any CPU.Build.0 = Release|x64
 	EndGlobalSection
 EndGlobal
