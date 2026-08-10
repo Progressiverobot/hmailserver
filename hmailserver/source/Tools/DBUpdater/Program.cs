@@ -17,8 +17,7 @@ namespace DBUpdater
       [STAThread]
       static void Main()
       {
-         Application.EnableVisualStyles();
-         Application.SetCompatibleTextRenderingDefault(false);
+         ToolApplication.Initialize();
 
          string databaseOldErrorMessage = "The database is too old for this version of hMailServer.";
 

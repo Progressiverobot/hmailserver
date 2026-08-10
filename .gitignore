@@ -64,7 +64,7 @@ CLAUDE.md
 
 /hmailserver/source/Tools/ControlPanel/bin/
 /hmailserver/source/Tools/ControlPanel/obj/
-/hmailserver/source/Tools/ControlPanel/publish/
+/hmailserver/source/Tools/*/publish/
 /hmailserver/installation/DotNet/
 
 # Code coverage output

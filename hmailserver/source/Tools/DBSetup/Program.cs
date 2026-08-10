@@ -17,8 +17,7 @@ namespace DBSetup
       [STAThread]
       static void Main()
       {
-         Application.EnableVisualStyles();
-         Application.SetCompatibleTextRenderingDefault(false);
+         ToolApplication.Initialize();
 
          CommandLineParser.Parse();
          
