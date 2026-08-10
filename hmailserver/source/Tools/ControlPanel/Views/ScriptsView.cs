@@ -178,14 +178,18 @@ End Sub
          }
 
          pathText_.Text = scriptPath_;
-         editor_.IsEnabled = true;
          try
          {
             editor_.Text = File.Exists(scriptPath_) ? File.ReadAllText(scriptPath_) : "";
             status_.Text = File.Exists(scriptPath_) ? "Loaded from disk." : "File does not exist yet; saving will create it.";
+            editor_.IsEnabled = true;
          }
          catch (Exception ex)
          {
+            // Keep the editor disabled: enabling it after a failed load would let a
+            // save overwrite the file on disk with the empty text shown here.
+            editor_.Text = "";
+            editor_.IsEnabled = false;
             status_.Text = "Could not read the file: " + ex.Message;
          }
       }
@@ -217,10 +221,15 @@ End Sub
 
       private void SaveScript()
       {
-         if (scriptPath_ == null)
+         if (scriptPath_ == null || !editor_.IsEnabled)
             return;
          try
          {
+            // Keep the previous version next to the file: event handlers are
+            // hand-written administrator code with no other undo.
+            if (File.Exists(scriptPath_))
+               File.Copy(scriptPath_, scriptPath_ + ".bak", true);
+
             File.WriteAllText(scriptPath_, editor_.Text);
          }
          catch (Exception ex)

@@ -11,11 +11,18 @@ namespace DBUpdater
 {
    static class Program
    {
+      // Exit codes consumed by DBSetupQuick and the installer: a failed or cancelled
+      // upgrade must not look like a successful install.
+      private const int ExitSuccess = 0;
+      private const int ExitUpgradeFailed = 1;
+      private const int ExitConfigurationError = 2;
+      private const int ExitAuthenticationCancelled = 3;
+
       /// <summary>
       /// The main entry point for the application.
       /// </summary>
       [STAThread]
-      static void Main()
+      static int Main()
       {
          ToolApplication.Initialize();
 
@@ -37,7 +44,7 @@ namespace DBUpdater
                      throw;
 
              }
-            
+
 
             int from = application.Database.CurrentVersion;
             int to = application.Database.RequiredVersion;
@@ -47,33 +54,42 @@ namespace DBUpdater
                if (!CommandLineParser.ContainsArgument("/SilentIfOk") && !CommandLineParser.IsSilent())
                   MessageBox.Show("Your hMailServer database is already up to date.", "hMailServer Administrator");
 
-               return;
+               return ExitSuccess;
             }
 
             if (!Authenticator.AuthenticateUser(application))
-               return;
+               return ExitAuthenticationCancelled;
 
             formMain main = new formMain(application);
 
             if (!main.LoadSettings())
-               return;
+               return ExitConfigurationError;
 
             if (!main.CreateUpgradePath())
-               return;
+               return ExitConfigurationError;
 
             if (CommandLineParser.IsSilent())
             {
                // Silently perform the upgrade
                main.DoUpgrade();
-               return;
+               return main.UpgradeSucceeded ? ExitSuccess : ExitUpgradeFailed;
             }
 
             // Do it the default way.
             Application.Run(main);
+
+            // Closing the window without a completed upgrade leaves the database on
+            // the old schema; report that as a failure so callers do not carry on.
+            return main.UpgradeSucceeded ? ExitSuccess : ExitUpgradeFailed;
          }
          catch (Exception ex)
          {
-             MessageBox.Show(ex.Message + Environment.NewLine + Environment.NewLine + "Please check the hMailServer error log for further details.", "hMailServer Administrator", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            Console.Error.WriteLine("hMailServer database upgrade failed: " + ex.Message);
+
+            if (!CommandLineParser.IsSilent())
+               MessageBox.Show(ex.Message + Environment.NewLine + Environment.NewLine + "Please check the hMailServer error log for further details.", "hMailServer Administrator", MessageBoxButtons.OK, MessageBoxIcon.Error);
+
+            return ExitUpgradeFailed;
          }
       }
    }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ServiceProcess;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -727,28 +728,80 @@ namespace hMailServer.ControlPanel.Views
          }
       }
 
-      private void RestartService()
+      private async void RestartService()
       {
-         try
+         StatusText.Text = "Restarting the hMailServer service...";
+
+         string error = await Task.Run(() => TryRestartService());
+         if (error != null)
          {
-            using var controller = new ServiceController("hMailServer");
-            if (controller.Status == ServiceControllerStatus.Running)
-            {
-               controller.Stop();
-               controller.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(60));
-            }
-            controller.Start();
-            controller.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(60));
-         }
-         catch (Exception ex)
-         {
-            MessageBox.Show("Could not restart the service (try an elevated session): " + ex.Message,
+            StatusText.Text = "The service could not be restarted.";
+            MessageBox.Show("Could not restart the service: " + error,
                "Control Panel", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
          }
 
          StatusText.Text = "Service restarted - settings are live.";
          Reattach();
+      }
+
+      /// <summary>
+      /// Stops and starts the service, returning null on success or a message
+      /// describing the failure. Stopping a service needs administrator rights
+      /// and the Control Panel runs asInvoker, so a non-elevated session hands
+      /// the work to net.exe behind a single UAC prompt instead of failing
+      /// with an opaque "Cannot open hMailServer service" error.
+      /// </summary>
+      private static string TryRestartService()
+      {
+         try
+         {
+            bool elevated;
+            using (var identity = System.Security.Principal.WindowsIdentity.GetCurrent())
+               elevated = new System.Security.Principal.WindowsPrincipal(identity)
+                  .IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
+
+            if (elevated)
+            {
+               using var controller = new ServiceController("hMailServer");
+               if (controller.Status != ServiceControllerStatus.Stopped)
+               {
+                  if (controller.Status == ServiceControllerStatus.Running ||
+                      controller.Status == ServiceControllerStatus.Paused)
+                     controller.Stop();
+                  controller.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(60));
+               }
+               controller.Start();
+               controller.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(60));
+               return null;
+            }
+
+            // "net stop" fails harmlessly when the service is already stopped,
+            // so chain with "&" rather than "&&".
+            var startInfo = new System.Diagnostics.ProcessStartInfo
+            {
+               FileName = "cmd.exe",
+               Arguments = "/c net stop hMailServer & net start hMailServer",
+               UseShellExecute = true,
+               Verb = "runas",
+               WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden
+            };
+
+            using (var process = System.Diagnostics.Process.Start(startInfo))
+               process?.WaitForExit();
+
+            using (var controller = new ServiceController("hMailServer"))
+               controller.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(60));
+            return null;
+         }
+         catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
+         {
+            return "the elevation prompt was cancelled.";
+         }
+         catch (Exception ex)
+         {
+            return ex.GetBaseException().Message;
+         }
       }
 
       /// <summary>

@@ -5,7 +5,7 @@ hMailServer is an open source email server for Microsoft Windows, implementing S
 
 This repository is a modernized fork of the original project (which is no longer maintained upstream). It has been brought up to date with a current toolchain, current cryptography, and the transport-security standards expected of a mail server in 2026. It is maintained by Christopher Holloway / [Progressive Robot Ltd](https://www.progressiverobot.com).
 
-**Production status:** version **6.2.12** is released - [download the installer](https://github.com/Progressiverobot/hmailserver/releases/latest) (`hMailServer-6.2.12-x64.exe`). **6.2.12 completes the .NET modernization of the tooling**: every C# tool now targets .NET 8 - the last .NET Framework setup tools (DBSetup, DBSetupQuick, DBUpdater, DataDirectorySynchronizer) are ported, the VB6-era migration tools are replaced by a supported **Import Tool** (accounts from text files, messages from mbox files), the installer makes the .NET 8 runtime a server prerequisite installed before the database tools run, and CI now builds every C# project on every PR. The test suite moved to NUnit 4. See *6.2.12* below. The server core is unchanged since 6.2.6 (opt-in IMAP4rev2, the Control Panel redesign and complete settings coverage). It is validated by the full regression suite: **1026 of 1026 tests passing, zero failures, zero inconclusive** - the complete suite, with live SpamAssassin and ClamAV (real EICAR detection), DMARC evaluation against live DNS, and TLS 1.2/1.3 handshakes end to end. Every test runs; nothing is skipped. The bundled administration GUI is the modern .NET 8 **Control Panel**.
+**Production status:** version **6.2.13** is released - [download the installer](https://github.com/Progressiverobot/hmailserver/releases/latest) (`hMailServer-6.2.13-x64.exe`). **6.2.13 is a community-feedback bug-fix release**: it fixes the issues testers reported on the forum against 6.2.11/6.2.12 - a SMTP DATA stall when relaying from Postfix/Proxmox Mail Gateway (a reverse-DNS lookup that blocked the network thread mid-message), the DBUpdater version labels, the Control Panel Diagnostics and service-restart, in-place upgrade settings/EventHandlers preservation, and a consistent Windows 10/2016 build target - and hardens the SMTP, IMAP FETCH and SpamAssassin paths against malformed input found while investigating. See *6.2.13* below. It is validated by the full regression suite: **1026 of 1026 tests passing, zero failures, zero inconclusive** - the complete suite, with live SpamAssassin and ClamAV (real EICAR detection), DMARC evaluation against live DNS, and TLS 1.2/1.3 handshakes end to end. Every test runs; nothing is skipped. The bundled administration GUI is the modern .NET 8 **Control Panel**.
 
 What's new in 6.0
 =================
@@ -82,6 +82,86 @@ change until the new settings are turned on.
 **Supply chain & quality gates**
 
    * SPDX + CycloneDX SBOMs (Syft) attached to every release, Dependabot CVE alerts + grouped update PRs, and a dependency-review PR gate.
+
+6.2.13
+======
+
+A community-feedback bug-fix release. It resolves the issues testers reported
+on the forum against 6.2.11/6.2.12 and hardens the SMTP, IMAP and SpamAssassin
+paths against malformed input found while investigating them. No database
+change (schema version 6005).
+
+   * **SMTP: fixed a DATA stall when relaying from Postfix / Proxmox Mail
+     Gateway.** After `354 OK, send.` the connection could hang until the
+     sending MTA timed out ("timed out while sending end of data"), leaving a
+     zero-byte spool file. The cause was a reverse-DNS (PTR) lookup performed on
+     the network I/O thread while generating the `Received` header at the first
+     flush: an internal relay whose address has no reverse zone stalled the
+     whole session through DNS retries. The PTR lookup now runs on a worker
+     thread started at connection time and the header generation never waits on
+     it. Direct sending was unaffected, which is why only relayed mail hung.
+
+   * **SMTP robustness.** A parse exception can no longer leave a connection
+     permanently wedged (it retires the read and disconnects); message data
+     pipelined in the same segment as `DATA` is consumed correctly; a rejected
+     `BDAT`/CHUNKING command drains or cleanly terminates its in-flight payload
+     instead of desyncing the session (matters for Exchange, which uses BDAT
+     whenever CHUNKING is advertised); the `EHLO SIZE` keyword no longer
+     overflows for very large limits; and `TCP_NODELAY` is set on every
+     connection so short command/response exchanges are not delayed by Nagle.
+
+   * **IMAP FETCH: fixed an authenticated-user crash and an out-of-bounds
+     read.** A malformed partial-fetch range (for example `BODY[]<0.-1>` or
+     `BODY[TEXT]<-5.10>`) could drive a near-`SIZE_MAX` allocation (crash and a
+     server-wide cache flush) or read heap memory from before the buffer and
+     send it to the client. The octet range is now clamped in the byte math and
+     normalized in the parser, and a couple of response-format defects were
+     fixed alongside. The `OnClientLogon` script event now fires from every IMAP
+     `AUTHENTICATE` mechanism (PLAIN, SCRAM-SHA-256, XOAUTH2/OAUTHBEARER), the
+     same as `LOGIN`, POP3 and SMTP.
+
+   * **SpamAssassin: fixed a hang, header corruption and message loss.** A
+     malformed or truncated `spamd` response could spin a core and hang the
+     session indefinitely (a length that wrapped to a huge unsigned value drove
+     an endless read loop with the timeout suppressed) and could write the raw
+     `SPAMD/…` response header into the message. An empty response
+     (`Content-length: 0`) could overwrite the message with a zero-byte file,
+     and a mismatch between the anti-spam scan ceiling (256 MB) and the MIME
+     parser limit (80 MB) could truncate very large messages to a couple of
+     bytes. The client now parses the response header defensively, treats an
+     early close as end-of-response, requires a positive length before replacing
+     the message, and the scan ceiling is clamped to the parser limit. The
+     original message is preserved on any SpamAssassin failure. A temp-file leak
+     on the SpamAssassin connection-test path was also fixed.
+
+   * **Upgrade & installer.** DBUpdater now labels database versions 6002-6005
+     (they showed as "Unknown version") and prints the raw version rather than
+     "Unknown" for any future gap. A failed or cancelled database
+     create/upgrade now propagates a real exit code up to a visible installer
+     error instead of reporting success against a broken schema, and the tools
+     no longer show modal dialogs under `/silent`. Missing `hm_settings` rows
+     now self-heal on write instead of silently discarding the value, and the
+     6001 upgrade insert is idempotent so a re-run is safe. The installer keeps
+     a user-customized `EventHandlers.vbs` across uninstall/reinstall
+     (`uninsneveruninstall`), and the Control Panel script editor no longer
+     saves empty text over the file after a failed load (and keeps a `.bak`).
+     The "Windows version too low" message now names the real requirement
+     (Windows 10 1607 / Server 2016) instead of "Windows XP Service Pack 3".
+
+   * **Control Panel.** Diagnostics no longer reports every test as FAILED (it
+     read two COM result properties by the wrong names and swallowed the error),
+     and restarting the service from the UI is now elevation-aware (a single UAC
+     prompt when the session is not elevated), runs off the UI thread, and
+     reports the actual error instead of an opaque COM message.
+
+   * **Build target.** The server core and minidump helper, and the OpenSSL
+     build recipe, now target Windows 10 1607 (`_WIN32_WINNT 0x0A00`)
+     consistently, matching the installer's minimum-OS gate and the bundled
+     libpq 18. OpenSSL stays on the 4.0 line (supported into 2028); the plan is
+     to adopt 4.2 LTS when it ships.
+
+   * Validated by the full regression suite: 1026 of 1026 passing, zero
+     failures, against the rebuilt 6.2.13 service.
 
 6.2.12
 ======
@@ -470,7 +550,7 @@ Building OpenSSL
 3. Run the following commands:
 
    <pre>
-   Perl Configure no-asm VC-WIN64A --prefix=%cd%\out64 --openssldir=%cd%\out64 -D_WIN32_WINNT=0x600
+   Perl Configure no-asm VC-WIN64A --prefix=%cd%\out64 --openssldir=%cd%\out64 -D_WIN32_WINNT=0x0A00
    nmake clean
    nmake build_libs
    nmake install_dev install_runtime_libs

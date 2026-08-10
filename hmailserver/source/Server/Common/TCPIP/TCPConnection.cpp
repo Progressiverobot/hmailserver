@@ -184,10 +184,16 @@ namespace HM
       Start();
    }
 
-   void 
+   void
    TCPConnection::Start()
    {
       LOG_DEBUG(Formatter::Format("TCP connection started for session {0}", session_id_));
+
+      // Mail protocols are short command/response exchanges; with Nagle's algorithm
+      // enabled every small reply can end up waiting on the peer's delayed ACK.
+      // Failure to set the option is harmless, so any error is ignored.
+      boost::system::error_code nodelay_error;
+      socket_.set_option(boost::asio::ip::tcp::no_delay(true), nodelay_error);
 
       connection_state_ = StateConnected;
 
@@ -393,7 +399,9 @@ namespace HM
             String error_message = Formatter::Format(_T("Failed to configure OpenSSL SNI. Expected remote host name: {0}."), expected_remote_hostname_);
             ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5604, "TCPConnection::AsyncHandshake", error_message, sni_error_code);
 
-            HandshakeFailed_(error_code);
+            // Pass the SNI failure itself, not the stale (success) error_code from
+            // the verify-mode setup above.
+            HandshakeFailed_(sni_error_code);
             return;
          }
       }
@@ -526,6 +534,20 @@ namespace HM
          return;
       }
 
+      if (receive_binary_ && delimitor.GetLength() == 0 && receive_buffer_.size() > 0)
+      {
+         // Bytes are already buffered (e.g. a client that sent the DATA payload in
+         // the same segment as the command). transfer_at_least(1) would ignore them
+         // and wait for new socket data, stranding the buffered bytes until the
+         // client sends more; complete immediately and let the handler consume them.
+         if (is_ssl_)
+            boost::asio::async_read(ssl_socket_, receive_buffer_, boost::asio::transfer_exactly(0), AsyncReadCompletedFunction);
+         else
+            boost::asio::async_read(socket_, receive_buffer_, boost::asio::transfer_exactly(0), AsyncReadCompletedFunction);
+
+         return;
+      }
+
       if (is_ssl_)
       {
          if (delimitor.GetLength() == 0)
@@ -550,8 +572,10 @@ namespace HM
 
       auto saEnabled = Configuration::Instance()->GetAntiSpamConfiguration().GetSpamAssassinEnabled();
       auto saPort = Configuration::Instance()->GetAntiSpamConfiguration().GetSpamAssassinPort();
-      // Catch SpamAssassin WinSock error code is 2 (boost boost::asio::error::eof)
-      if ((error.value() == 0 || error.value() == boost::asio::error::eof) && receive_binary_ && saEnabled && remote_port_ == saPort)
+      // Catch SpamAssassin WinSock error code is 2 (boost boost::asio::error::eof).
+      // IsClient() keeps inbound server sessions (remote_port_ == 0) out of this
+      // branch even when the configured SpamAssassin port is 0/unset.
+      if ((error.value() == 0 || error.value() == boost::asio::error::eof) && receive_binary_ && saEnabled && IsClient() && remote_port_ == saPort)
       {
          // https://www.boost.org/doc/libs/1_72_0/doc/html/boost_asio/overview/core/streams.html
          // Why EOF is an Error
@@ -578,6 +602,14 @@ namespace HM
             message.Format(_T("An error occured while parsing data. Data size: %d"), pBuffer->GetSize());
 
             ReportError(ErrorManager::Medium, 5136, "TCPConnection::AsyncReadCompleted", message);
+
+            // Retire the read operation and close the session before the exception
+            // propagates to the worker's SEH handler (which writes the minidump).
+            // Without this, the skipped retirement below left the connection
+            // permanently wedged - no reads, no disconnect - with the client
+            // hanging until its own timeout.
+            operation_queue_.Pop(IOOperation::BCTRead);
+            EnqueueDisconnect();
 
             throw;
          }
@@ -639,6 +671,11 @@ namespace HM
                message.Format(_T("An error occured while parsing data. Data size: %d"), pBuffer->GetSize());
 
                ReportError(ErrorManager::Medium, 5136, "TCPConnection::AsyncReadCompleted", message);
+
+               // See above: retire the read and close the session, then let the
+               // exception propagate so the worker writes a minidump.
+               operation_queue_.Pop(IOOperation::BCTRead);
+               EnqueueDisconnect();
 
                throw;
             }
@@ -702,6 +739,11 @@ namespace HM
                message.Format(_T("An error occured while parsing data. Data length: %d, Data: %s."), s.size(), String(s).c_str());
 
                ReportError(ErrorManager::Medium, 5136, "TCPConnection::AsyncReadCompleted", message);
+
+               // See above: retire the read and close the session, then let the
+               // exception propagate so the worker writes a minidump.
+               operation_queue_.Pop(IOOperation::BCTRead);
+               EnqueueDisconnect();
 
                throw;
             }

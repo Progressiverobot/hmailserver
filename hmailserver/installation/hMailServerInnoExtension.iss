@@ -682,16 +682,24 @@ begin
       if (Length(g_szAdminPassword) > 0) then
          szParameters := szParameters + ' password:' + g_szAdminPassword;
 		 
+      // Check both that the tool could be launched AND its exit code: a failed or
+      // cancelled database create/upgrade must not masquerade as a successful
+      // install (the service would run against a missing or outdated schema).
       if ((GetCurrentDatabaseType() <> '') or g_bUseInternal) then
       begin
          if (Exec(ExpandConstant('{app}\Bin\DBSetupQuick.exe'), szParameters, '', SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode) = False) then
-            MsgBox(SysErrorMessage(ResultCode), mbError, MB_OK);
+            MsgBox(SysErrorMessage(ResultCode), mbError, MB_OK)
+         else if (ResultCode <> 0) then
+            MsgBox('The hMailServer database could not be created or upgraded (exit code ' + IntToStr(ResultCode) + ').' #13#13
+                   'The hMailServer service may not work until the database has been upgraded. Run DBSetupQuick.exe from the hMailServer Bin folder to retry.', mbError, MB_OK);
       end
       else
       begin
          if (Exec(ExpandConstant('{app}\Bin\DBSetup.exe'), szParameters, '', SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode) = False) then
-            MsgBox(SysErrorMessage(ResultCode), mbError, MB_OK);
-
+            MsgBox(SysErrorMessage(ResultCode), mbError, MB_OK)
+         else if (ResultCode <> 0) then
+            MsgBox('The hMailServer database setup did not complete (exit code ' + IntToStr(ResultCode) + ').' #13#13
+                   'The hMailServer service may not work until the database has been set up. Run DBSetup.exe from the hMailServer Bin folder to retry.', mbError, MB_OK);
       end;
 
       ProgressPage.SetText('Starting the hMailServer service...', '');

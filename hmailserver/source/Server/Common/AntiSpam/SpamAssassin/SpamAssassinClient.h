@@ -41,17 +41,18 @@ namespace HM
 
       void Cleanup_();
       void FinishTesting_();
+      void AbortResponse_();
       int ParseFirstBuffer_(std::shared_ptr<ByteBuffer> pBuffer) const;
       bool SendFileContents_(const String &sFilename);
 
       String command_buffer_;
 
       String message_file_;
-	   size_t spam_dsize_;
-	   int message_size_;
+	   __int64 spam_dsize_;      // Content-length spamd reported; < 0 until a valid header is parsed
+	   __int64 message_size_;
       std::shared_ptr<File> result_;
       bool &test_completed_;
 
-      size_t total_result_bytes_written_;
+      __int64 total_result_bytes_written_;
   };
 }

@@ -22,12 +22,12 @@
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 
 
-// Modify the following defines if you have to target a platform prior to the ones specified below.
-// Refer to MSDN for the latest info on corresponding values for different platforms.
+// Minimum supported platform: Windows 10 1607 / Server 2016, matching the
+// installer's MinVersion gate and the .NET 8 tools' own floor.
 
-#define WINVER 0x0601
-#define _WIN32_WINNT 0x0601
-#define _WIN32_WINDOWS 0x0601
+#define WINVER 0x0A00
+#define _WIN32_WINNT 0x0A00
+#define NTDDI_VERSION 0x0A000002 // NTDDI_WIN10_RS1 (1607 / 14393)
 
 // START: ATL settings
 	#define _ATL_FREE_THREADEDLPCWSTR

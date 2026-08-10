@@ -56,21 +56,39 @@ namespace HM
    }
 
    bool
-   Property::WriteBoolSetting_(bool bValue)
+   Property::SettingRowExists_() const
    {
-      int iValue = bValue ? 1 : 0;
-
-      SQLCommand command("update hm_settings set settinginteger = @SETTINGINTEGER where settingname = @SETTINGNAME");
-      command.AddParameter("@SETTINGINTEGER", iValue);
+      SQLCommand command("select count(*) as settingcount from hm_settings where settingname = @SETTINGNAME");
       command.AddParameter("@SETTINGNAME", name_);
 
-      return Application::Instance()->GetDBManager()->Execute(command);
+      std::shared_ptr<DALRecordset> pRS = Application::Instance()->GetDBManager()->OpenRecordset(command);
+      if (!pRS)
+         return false;
+
+      return pRS->GetLongValue("settingcount") > 0;
    }
 
+   bool
+   Property::WriteBoolSetting_(bool bValue)
+   {
+      return WriteLongSetting_(bValue ? 1 : 0);
+   }
 
    bool
    Property::WriteLongSetting_(long lValue)
    {
+      // The row can be missing on a database that skipped an upgrade step (for
+      // example after a partially-committed upgrade). A bare UPDATE would then
+      // affect zero rows and silently drop the setting, so insert it instead.
+      if (!SettingRowExists_())
+      {
+         SQLCommand command("insert into hm_settings (settingname, settingstring, settinginteger) values (@SETTINGNAME, '', @SETTINGINTEGER)");
+         command.AddParameter("@SETTINGNAME", name_);
+         command.AddParameter("@SETTINGINTEGER", lValue);
+
+         return Application::Instance()->GetDBManager()->Execute(command);
+      }
+
       SQLCommand command("update hm_settings set settinginteger = @SETTINGINTEGER where settingname = @SETTINGNAME");
       command.AddParameter("@SETTINGINTEGER", lValue);
       command.AddParameter("@SETTINGNAME", name_);
@@ -81,14 +99,22 @@ namespace HM
    bool
    Property::WriteStringSetting_(const String & sValue)
    {
-      String sSQL;
-
-
       String sTemp;
       if (save_crypted_)
          sTemp = Crypt::Instance()->ProtectSecret(sValue);
       else
          sTemp = sValue;
+
+      // See WriteLongSetting_: insert the row when it is missing.
+      if (!SettingRowExists_())
+      {
+         SQLStatement statement(SQLStatement::STInsert, "hm_settings");
+         statement.AddColumn("settingname", name_);
+         statement.AddColumn("settingstring", sTemp);
+         statement.AddColumn("settinginteger", (long) 0);
+
+         return Application::Instance()->GetDBManager()->Execute(statement);
+      }
 
       SQLStatement statement(SQLStatement::STUpdate, "hm_settings");
       statement.AddColumn("settingstring", sTemp);

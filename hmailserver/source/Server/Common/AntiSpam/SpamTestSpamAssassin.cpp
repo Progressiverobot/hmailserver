@@ -123,11 +123,22 @@ namespace HM
       // Check if the message is tagged as spam.
       std::shared_ptr<MessageData> pMessageData = pTestData->GetMessageData();
 
-      pMessageData->RefreshFromMessage();
-      // The Return-Path header was added above to help SpamAssassin with its SPF checks.
-      // We should remove it again to restore the headers to original state (except for any added by SA).
-      pMessageData->DeleteField("Return-Path");
-      pMessageData->Write(sFilename);
+      // Only rewrite the message if it reloaded successfully. If RefreshFromMessage
+      // fails (message too large for the MIME parser, or unparseable), the in-memory
+      // body is empty and writing it back would truncate the message to a couple of
+      // bytes - so leave the file exactly as SpamAssassin left it.
+      if (pMessageData->RefreshFromMessage())
+      {
+         // The Return-Path header was added above to help SpamAssassin with its SPF checks.
+         // We should remove it again to restore the headers to original state (except for any added by SA).
+         pMessageData->DeleteField("Return-Path");
+         pMessageData->Write(sFilename);
+      }
+      else
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5509, "SpamTestSpamAssassin::RunTest",
+            "The message could not be reloaded after SpamAssassin processing; leaving it unchanged. It may be too large for the MIME parser (80 MB) or malformed.");
+      }
 
       bool bIsSpam = false;
       AnsiString sSpamStatus = pMessageData->GetFieldValue("X-Spam-Status");

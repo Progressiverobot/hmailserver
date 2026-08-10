@@ -148,6 +148,8 @@ namespace HM
 				}
 			}
 
+			pConnection->FireOnClientLogon(sLoginName, pAccount != nullptr);
+
 			if (!pAccount)
 			{
 				// Feed the per-IP auto-ban accounting, then the per-connection cap.
@@ -247,6 +249,8 @@ namespace HM
 
 			return IMAPResult(IMAPResult::ResultOKSupressRead, "");
 		}
+
+		pConnection->FireOnClientLogon(authcid, pAccount != nullptr);
 
 		if (!pAccount)
 		{
@@ -406,8 +410,11 @@ namespace HM
    {
       std::shared_ptr<ScramSha256> session = pConnection->GetScramSession();
       std::shared_ptr<const Account> pAccount = session->GetAccount();
+      String sUsername = session->GetUsername();
 
       pConnection->SetScramSession(nullptr);
+
+      pConnection->FireOnClientLogon(sUsername, pAccount != nullptr);
 
       if (!pAccount)
          return IMAPResult(IMAPResult::ResultNo, "Invalid user name or password.");
@@ -430,6 +437,8 @@ namespace HM
    IMAPCommandAUTHENTICATE::ScramAuthFailed_(std::shared_ptr<IMAPConnection> pConnection, std::shared_ptr<IMAPCommandArgument> pArgument, const String &sUsername)
    {
       pConnection->SetScramSession(nullptr);
+
+      pConnection->FireOnClientLogon(sUsername, false);
 
       // Feed the per-IP auto-ban accounting (parity with the LOGIN/PLAIN path)...
       AccountLogon accountLogon;

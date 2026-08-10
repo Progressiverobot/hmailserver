@@ -355,6 +355,14 @@ namespace HM
          oPart.octet_start_ = _ttoi(sPartial.Mid(0, iDotPos));
          oPart.octet_count_ = _ttoi(sPartial.Mid(iDotPos+1));
 
+         // A malformed range (negative start/size, e.g. "<-5.10>" or "<0.-1>")
+         // must not reach the byte math as a negative int. Normalize to 0 here;
+         // GetBytesToSend_ clamps the rest.
+         if (oPart.octet_start_ < 0)
+            oPart.octet_start_ = 0;
+         if (oPart.octet_count_ < 0)
+            oPart.octet_count_ = 0;
+
          // Remove the octets part from the description.
          String sBefore = sNewName.Mid(0, iStart - 1);
          String sAfter = sNewName.Mid(iEnd + 1);

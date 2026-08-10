@@ -96,11 +96,14 @@ namespace HM
 
       AntiSpamConfiguration &config = Configuration::Instance()->GetAntiSpamConfiguration();
 
-      // If the user has configured a maximum message size to scan, use that size if it is below 256 MB.
-      // If not, limit scanning to messages smaller than 256 MB. Messages larger than
-      // this is very unlikely to be spam.
+      // Limit scanning by message size. The hard ceiling is the MIME parser's own
+      // limit (MessageData::LoadFromMessage ignores messages over 80 MB): scanning
+      // above it cannot load the message, and the post-scan rewrite would then
+      // write an empty MIME body over the original - i.e. destroy the message.
+      // Messages this large are very unlikely to be spam anyway.
 
-      int maxSizeToScanKB = 1024 * 256;
+      const int maxParserSizeKB = 1024 * 80;
+      int maxSizeToScanKB = maxParserSizeKB;
 
       if (config.GetAntiSpamMaxSizeKB() > 0)
          maxSizeToScanKB = std::min(config.GetAntiSpamMaxSizeKB(), maxSizeToScanKB);

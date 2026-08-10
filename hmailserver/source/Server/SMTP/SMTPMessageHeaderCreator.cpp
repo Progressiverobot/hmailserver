@@ -11,7 +11,6 @@
 #include "../Common/BO/MessageRecipient.h"
 
 #include "../Common/TCPIP/CipherInfo.h"
-#include "../Common/TCPIP/DNSResolver.h"
 
 #include "../Common/Util/Utilities.h"
 #include "../Common/Util/Time.h"
@@ -30,6 +29,7 @@ namespace HM
       is_authenticated_(is_authenticated),
       original_headers_(original_headers),
       helo_host_(helo_host),
+      ptr_host_("Unknown"),
       is_tls_(false),
       message_(message),
       session_id_(session_id)
@@ -42,6 +42,12 @@ namespace HM
    {
       cipher_info_ = cipher_info;
       is_tls_ = true;
+   }
+
+   void
+   SMTPMessageHeaderCreator::SetPtrHost(const String &ptr_host)
+   {
+      ptr_host_ = ptr_host.IsEmpty() ? String("Unknown") : ptr_host;
    }
 
 
@@ -133,20 +139,11 @@ namespace HM
    {
       String local_computer_name = Utilities::ComputerName();
 
-      std::vector<String> results;
-      // do a PTR lookup, solves an issue with some spam filerting programs such as SA
-      // not having a PTR in the Received header.
-      String ptr_record_host;
-      DNSResolver dns_resolver;
-      if (!dns_resolver.GetPTRRecords(remote_ip_address_, results) || results.size() == 0)
-      {
-         LOG_DEBUG("Could not retrieve PTR record for IP (false)! " + remote_ip_address_);
-         ptr_record_host = "Unknown";
-      }
-      else
-      {
-         ptr_record_host = results[0];
-      }
+      // The PTR host gives spam filters such as SpamAssassin reverse-DNS context in
+      // the Received header. It is resolved ahead of time on a worker thread and
+      // injected via SetPtrHost - never looked up here, because this code runs on
+      // the network I/O thread where a slow DNS query stalls the whole session.
+      String ptr_record_host = ptr_host_;
 
       String remote_hostname = helo_host_.IsEmpty() ? remote_ip_address_ : helo_host_;
 

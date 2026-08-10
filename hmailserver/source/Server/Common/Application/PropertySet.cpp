@@ -87,9 +87,15 @@ namespace HM
       sErrorMessage.Format(_T("The property %s could not be found."), sPropertyName.c_str());
       ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5015, "PropertySet::GetProperty_()", sErrorMessage);
 
-      // Property was not found. Create one temporary in memory 
-      // to avoid further problems.
-      std::shared_ptr<Property> oProperty = std::shared_ptr<Property>(new Property());
+      // The property row is missing from the database. Return a NAMED in-memory
+      // property: reads get the default value, and a write persists the row via
+      // the insert fallback in Property, self-healing the database. (A nameless
+      // property here used to make writes silently update zero rows.)
+      std::shared_ptr<Property> oProperty = std::shared_ptr<Property>(new Property(sPropertyName, 0, ""));
+
+      if (IsCryptedProperty_(sPropertyName))
+         oProperty->SetIsCrypted();
+
       return oProperty;
    }
 

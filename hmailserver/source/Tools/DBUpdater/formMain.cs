@@ -25,13 +25,30 @@ namespace DBUpdater
       private const string DatabaseTypeMSSQL = "MSSQL";
       private const string DatabaseTypePGSQL = "PGSQL";
 
+      /// <summary>
+      /// True once DoUpgrade has committed successfully. Program.Main turns this
+      /// into the process exit code so the installer can detect a failed upgrade.
+      /// </summary>
+      public bool UpgradeSucceeded { get; private set; }
 
       public formMain(hMailServer.Application application)
       {
          InitializeComponent();
-         
+
          _application = application;
          _databaseType = null;
+      }
+
+      /// <summary>
+      /// Reports an error without blocking a silent run: the installer executes this
+      /// tool with /silent, where a modal dialog would hang the installation.
+      /// </summary>
+      private static void ShowError(string message, string caption)
+      {
+         Console.Error.WriteLine(caption + ": " + message);
+
+         if (!CommandLineParser.IsSilent())
+            MessageBox.Show(message, caption);
       }
 
       public bool CreateUpgradePath()
@@ -49,7 +66,7 @@ namespace DBUpdater
 
             if (script == null)
             {
-               MessageBox.Show("Upgrade path not found.", "hMailServer");
+               ShowError(string.Format("Upgrade path not found. No upgrade script is registered for database version {0} (target version {1}).", from, to), "hMailServer");
                return false;
             }
 
@@ -57,7 +74,7 @@ namespace DBUpdater
 
             if (!File.Exists(fileName))
             {
-               MessageBox.Show("Required file for upgrade not found:" + Environment.NewLine + fileName, "hMailServer");
+               ShowError("Required file for upgrade not found:" + Environment.NewLine + fileName, "hMailServer");
                return false;
             }
 
@@ -90,7 +107,7 @@ namespace DBUpdater
                _databaseType = DatabaseTypePGSQL;
                break;
             default:
-               MessageBox.Show("Unknown database type");
+               ShowError("Unknown database type", "hMailServer");
                return false;
          }
 
@@ -99,7 +116,7 @@ namespace DBUpdater
          _scriptPath = _application.Settings.Directories.DBScriptDirectory;
          if (_scriptPath == null || _scriptPath.Length == 0)
          {
-            MessageBox.Show("Database script directory could not be found." + Environment.NewLine + "Please check the hMailServer error log.", "hMailServer");
+            ShowError("Database script directory could not be found." + Environment.NewLine + "Please check the hMailServer error log.", "hMailServer");
             return false;
          }
 
@@ -291,8 +308,16 @@ namespace DBUpdater
                return "hMailServer 5.7 (5708)";
             case 6001:
                return "hMailServer 6.0";
+            case 6002:
+               return "hMailServer 6.2 (6002)";
+            case 6003:
+               return "hMailServer 6.2 (6003)";
+            case 6004:
+               return "hMailServer 6.2 (6004)";
+            case 6005:
+               return "hMailServer 6.2 (6005)";
             default:
-               return "Unknown version";
+               return "hMailServer (database version " + version + ")";
          }
       }
 
@@ -387,6 +412,8 @@ namespace DBUpdater
 
             RemoveErrorLog();
 
+            UpgradeSucceeded = true;
+
             buttonClose.Enabled = true;
          }
 
@@ -409,9 +436,9 @@ namespace DBUpdater
          }
          finally
          {
-            MessageBox.Show(error.Message, scriptToExecute);
+            ShowError(error.Message, scriptToExecute);
          }
-        
+
          buttonClose.Enabled = true;
          return;
       }

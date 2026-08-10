@@ -34,6 +34,7 @@ namespace HM
       bool WriteBoolSetting_(bool bValue);
       bool WriteLongSetting_(long lValue);
       bool WriteStringSetting_(const String &sValue);
+      bool SettingRowExists_() const;
 
       long long_value_;
       String string_value_;

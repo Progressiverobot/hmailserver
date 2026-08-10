@@ -163,6 +163,10 @@ namespace HM
       // is reached, regardless of whether the per-IP auto-ban is enabled.
       bool RegisterAuthenticationFailure();
 
+      // Fires the OnClientLogon script event (shared by the LOGIN command and
+      // every AUTHENTICATE mechanism: PLAIN, SCRAM-SHA-256, XOAUTH2/OAUTHBEARER).
+      void FireOnClientLogon(const String &sUsername, bool isAuthenticated);
+
       bool IsAuthenticated();
       bool GetCurrentFolderReadOnly() {return current_folder_read_only_; }
 

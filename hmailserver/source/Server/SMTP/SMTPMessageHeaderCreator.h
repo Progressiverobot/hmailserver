@@ -22,6 +22,11 @@ namespace HM
 
       void SetCipherInfo(const CipherInfo &cipher_info);
 
+      // The client's PTR (reverse DNS) host for the Received header. Resolved by the
+      // caller on a worker thread (see SMTPConnection::PrefetchPtrRecord_); this class
+      // must not perform DNS lookups itself, since Create() runs on the I/O thread.
+      void SetPtrHost(const String &ptr_host);
+
    private:
 
       String GenerateReceivedHeader_(const String &overriden_received_ip);
@@ -30,12 +35,13 @@ namespace HM
       String username_;
       AnsiString remote_ip_address_;
       AnsiString helo_host_;
+      String ptr_host_;
       std::shared_ptr<MimeHeader> original_headers_;
       std::shared_ptr<Message> message_;
       CipherInfo cipher_info_;
       bool is_tls_;
       bool is_authenticated_;
       int session_id_;
-      
+
    };
 }

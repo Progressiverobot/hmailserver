@@ -47,6 +47,8 @@
 #include "../common/Threading/AsynchronousTask.h"
 #include "../common/Threading/WorkQueue.h"
 
+#include "../Common/TCPIP/DNSResolver.h"
+
 #include "../Common/AntiSpam/AntiSpamConfiguration.h"
 #include "../Common/AntiSpam/SpamProtection.h"
 
@@ -95,8 +97,10 @@ namespace HM
       smtputf8_requested_(false),
       bdat_active_(false),
       bdat_last_(false),
+      bdat_discard_(false),
       bdat_chunk_size_(0),
       bdat_chunk_remaining_(0),
+      ptr_lookup_completed_(false),
       start_tls_used_(false)
    {
       smtpconf_ = Configuration::Instance()->GetSMTPConfiguration();
@@ -138,6 +142,15 @@ namespace HM
    void
    SMTPConnection::OnConnected()
    {
+      // Start resolving the client's PTR record on a worker thread now, so the
+      // result is (normally) ready by the time the Received header is generated.
+      // See PrefetchPtrRecord_ for why this must not run on the I/O thread.
+      std::shared_ptr<AsynchronousTask<TCPConnection> > ptrTask =
+         std::shared_ptr<AsynchronousTask<TCPConnection> >(new AsynchronousTask<TCPConnection>
+            (std::bind(&SMTPConnection::PrefetchPtrRecord_, this), shared_from_this()));
+
+      Application::Instance()->GetAsyncWorkQueue()->AddTask(ptrTask);
+
       if (GetConnectionSecurity() == CSNone ||
           GetConnectionSecurity() == CSSTARTTLSOptional ||
           GetConnectionSecurity() == CSSTARTTLSRequired)
@@ -145,6 +158,45 @@ namespace HM
          SendBanner_();
       }
 
+   }
+
+   void
+   SMTPConnection::PrefetchPtrRecord_()
+   {
+      // Runs on a worker thread: DnsQuery blocks without a timeout parameter, and an
+      // address without a reverse zone (e.g. an internal relay on an RFC 1918 IP)
+      // fails only after seconds of retries. On the I/O thread that stall wedged the
+      // session between "354 OK" and the first spool write, until the sending MTA -
+      // Postfix in the reported case - timed out and abandoned the message.
+      String ptr_host = "Unknown";
+
+      std::vector<String> results;
+      DNSResolver dns_resolver;
+      if (dns_resolver.GetPTRRecords(GetIPAddressString(), results) && results.size() > 0)
+      {
+         ptr_host = results[0];
+      }
+      else
+      {
+         LOG_DEBUG("Could not retrieve PTR record for IP (false)! " + GetIPAddressString());
+      }
+
+      boost::lock_guard<boost::mutex> guard(ptr_result_mutex_);
+      ptr_record_host_ = ptr_host;
+      ptr_lookup_completed_ = true;
+   }
+
+   String
+   SMTPConnection::GetPtrRecordHost_()
+   {
+      boost::lock_guard<boost::mutex> guard(ptr_result_mutex_);
+
+      // If the lookup is still in flight, fall back to "Unknown" rather than wait:
+      // the Received header is being generated on the I/O thread.
+      if (!ptr_lookup_completed_)
+         return "Unknown";
+
+      return ptr_record_host_;
    }
 
    void
@@ -511,6 +563,7 @@ namespace HM
       // previously completed message (the finalization path does not reset it).
       bdat_active_ = false;
       bdat_last_ = false;
+      bdat_discard_ = false;
       bdat_chunk_size_ = 0;
       bdat_chunk_remaining_ = 0;
      
@@ -1031,7 +1084,9 @@ namespace HM
          std::shared_ptr<MimeHeader> original_headers = Utilities::GetMimeHeader(transmission_buffer_->GetBuffer()->GetBuffer(), transmission_buffer_->GetBuffer()->GetSize());
 
          SMTPMessageHeaderCreator header_creator(username_, GetIPAddressString(), isAuthenticated_, helo_host_, original_headers, current_message_, GetSessionID());
-         
+
+         header_creator.SetPtrHost(GetPtrRecordHost_());
+
          if (IsSSLConnection())
             header_creator.SetCipherInfo(GetCipherInfo());
 
@@ -1638,6 +1693,7 @@ namespace HM
       // Reset per-transaction RFC 3030 (CHUNKING/BDAT) state.
       bdat_active_ = false;
       bdat_last_ = false;
+      bdat_discard_ = false;
       bdat_chunk_size_ = 0;
       bdat_chunk_remaining_ = 0;
 
@@ -1657,9 +1713,9 @@ namespace HM
       // Append size keyword
       {
          String sSizeKeyword;
-         int iMaxSize = smtpconf_->GetMaxMessageSize() * 1024;
+         __int64 iMaxSize = (__int64) smtpconf_->GetMaxMessageSize() * 1024;
          if (iMaxSize > 0)
-            sSizeKeyword.Format(_T("\r\n250-SIZE %d"), iMaxSize);
+            sSizeKeyword.Format(_T("\r\n250-SIZE %I64d"), iMaxSize);
          else
             sSizeKeyword.Format(_T("\r\n250-SIZE"));
          sData += sSizeKeyword;
@@ -2036,17 +2092,19 @@ namespace HM
          }
       }      
 
-      current_state_ = DATA;
-
       transmission_buffer_ = std::shared_ptr<TransparentTransmissionBuffer>(new TransparentTransmissionBuffer(false));
       if (!transmission_buffer_->Initialize(PersistentMessage::GetFileName(current_message_)))
       {
+         // Stay in command mode: the client gets the 451 instead of a 354, so no
+         // message payload follows. Entering DATA state here would make the next
+         // line read misparse the never-sent body as SMTP commands.
          HandleUnableToSaveMessageDataFile_(PersistentMessage::GetFileName(current_message_));
          return;
       }
 
       transmission_buffer_->SetMaxSizeKB(max_message_size_kb_);
 
+      current_state_ = DATA;
       SetReceiveBinary(true);
       trace_headers_written_ = true;
       message_start_tc_ = GetTickCount();
@@ -2064,23 +2122,17 @@ namespace HM
    // spool file across all chunks of the transaction. "LAST" finalizes the message.
    //---------------------------------------------------------------------------()
    {
-      // 530 Must issue STARTTLS first
-      // to every command other than NOOP, EHLO, STARTTLS, or QUIT.
-      if (!CheckStartTlsRequired_())
-         return;
-
-      if (!current_message_ || current_message_->GetRecipients()->GetCount() == 0)
-      {
-         // BDAT issued without a sender and at least one recipient.
-         EnqueueWrite_("503 Must have sender and recipient first.");
-         return;
-      }
-
-      // Parse "BDAT <chunk-size> [LAST]".
+      // Parse "BDAT <chunk-size> [LAST]" before any rejection check: the client sends
+      // the chunk payload without waiting for our reply (RFC 3030), so a rejected
+      // command with a parseable size must still consume the payload to stay
+      // synchronized, and a command whose size cannot be determined leaves the
+      // session unrecoverable (the only safe action is to close it).
       std::vector<String> tokens = StringParser::SplitString(sRequest, " ");
       if (tokens.size() < 2 || tokens.size() > 3)
       {
          EnqueueWrite_("501 Syntax: BDAT chunk-size [LAST]");
+         pending_disconnect_ = true;
+         EnqueueDisconnect();
          return;
       }
 
@@ -2089,6 +2141,8 @@ namespace HM
       {
          // Empty or implausibly large (> 10^18) chunk size.
          EnqueueWrite_("501 Syntax error: invalid BDAT chunk-size.");
+         pending_disconnect_ = true;
+         EnqueueDisconnect();
          return;
       }
 
@@ -2099,6 +2153,8 @@ namespace HM
          if (c < '0' || c > '9')
          {
             EnqueueWrite_("501 Syntax error: BDAT chunk-size must be a non-negative integer.");
+            pending_disconnect_ = true;
+            EnqueueDisconnect();
             return;
          }
          chunkSize = chunkSize * 10 + (unsigned __int64)(c - '0');
@@ -2112,9 +2168,30 @@ namespace HM
          if (lastToken != _T("LAST"))
          {
             EnqueueWrite_("501 Syntax: BDAT chunk-size [LAST]");
+            pending_disconnect_ = true;
+            EnqueueDisconnect();
             return;
          }
          isLast = true;
+      }
+
+      // From here on the chunk size is known, so every rejection discards the
+      // in-flight payload instead of letting it be parsed as SMTP commands.
+
+      // 530 Must issue STARTTLS first
+      // to every command other than NOOP, EHLO, STARTTLS, or QUIT.
+      if (!CheckStartTlsRequired_())
+      {
+         StartBdatDiscard_((size_t)chunkSize);
+         return;
+      }
+
+      if (!current_message_ || current_message_->GetRecipients()->GetCount() == 0)
+      {
+         // BDAT issued without a sender and at least one recipient.
+         EnqueueWrite_("503 Must have sender and recipient first.");
+         StartBdatDiscard_((size_t)chunkSize);
+         return;
       }
 
       // On the first BDAT of the transaction, open the spool file in byte-transparent
@@ -2127,6 +2204,7 @@ namespace HM
          if (!transmission_buffer_->Initialize(PersistentMessage::GetFileName(current_message_)))
          {
             HandleUnableToSaveMessageDataFile_(PersistentMessage::GetFileName(current_message_));
+            StartBdatDiscard_((size_t)chunkSize);
             return;
          }
 
@@ -2165,6 +2243,32 @@ namespace HM
    }
 
    void
+   SMTPConnection::StartBdatDiscard_(size_t chunkSize)
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // The BDAT command was rejected (its response is already enqueued), but the
+   // client is streaming the announced chunk regardless (RFC 3030). Consume and
+   // discard exactly that many octets so the payload is never parsed as SMTP
+   // commands, then return to command mode.
+   //---------------------------------------------------------------------------()
+   {
+      if (chunkSize == 0)
+      {
+         // Zero-length chunk: no payload follows; stay in command mode.
+         return;
+      }
+
+      bdat_discard_ = true;
+      bdat_chunk_remaining_ = chunkSize;
+
+      current_state_ = BDATDATA;
+      SetReceiveBinary(true);
+
+      size_t toRead = chunkSize < BDAT_READ_PIECE ? chunkSize : BDAT_READ_PIECE;
+      EnqueueReadExact(toRead);
+   }
+
+   void
    SMTPConnection::HandleBdatChunkData_(std::shared_ptr<ByteBuffer> pBuf)
    //---------------------------------------------------------------------------()
    // DESCRIPTION:
@@ -2174,6 +2278,31 @@ namespace HM
    //---------------------------------------------------------------------------()
    {
       size_t received = pBuf->GetSize();
+
+      if (bdat_discard_)
+      {
+         // Chunk of a rejected BDAT command: throw the octets away. The command's
+         // error response has already been sent.
+         pBuf->Empty();
+
+         if (received >= bdat_chunk_remaining_)
+            bdat_chunk_remaining_ = 0;
+         else
+            bdat_chunk_remaining_ -= received;
+
+         if (bdat_chunk_remaining_ > 0)
+         {
+            size_t toRead = bdat_chunk_remaining_ < BDAT_READ_PIECE ? bdat_chunk_remaining_ : BDAT_READ_PIECE;
+            EnqueueReadExact(toRead);
+            return;
+         }
+
+         bdat_discard_ = false;
+         SetReceiveBinary(false);
+         current_state_ = HEADER;
+         EnqueueRead();
+         return;
+      }
 
       transmission_buffer_->Append(pBuf->GetBuffer(), received);
       pBuf->Empty();

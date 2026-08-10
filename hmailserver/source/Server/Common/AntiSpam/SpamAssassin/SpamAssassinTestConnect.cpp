@@ -52,6 +52,7 @@ namespace HM
       {
          message = "The IP address for SpamAssassin could not be resolved. Aborting tests.";
          ErrorManager::Instance()->ReportError(ErrorManager::High, 5507, "SpamAssassinTestConnect::TestConnect", message);
+         FileUtilities::DeleteFile(tempFile);
          return false;
       }
 

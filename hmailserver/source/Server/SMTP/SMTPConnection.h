@@ -144,6 +144,17 @@ namespace HM
       void ProtocolBDAT_(const String &sRequest);
       void HandleBdatChunkData_(std::shared_ptr<ByteBuffer> pBuf);
       void CompleteBdatMessage_();
+      // Resolves the client's PTR record on a worker thread (started at connection
+      // time) and reads the result when the Received header is generated. The
+      // blocking DnsQuery must never run on the network I/O thread: an unresolvable
+      // PTR (internal relay, no reverse zone) can take many seconds of retries,
+      // during which the whole session - and its I/O thread - would stall mid-DATA.
+      void PrefetchPtrRecord_();
+      String GetPtrRecordHost_();
+      // Consumes and throws away the payload of a rejected BDAT command. The client
+      // sends the chunk without waiting for our reply (RFC 3030), so the octets must
+      // be read off the wire to keep the session synchronized.
+      void StartBdatDiscard_(size_t chunkSize);
 
       void ReportUnsupportedEsmtpExtension_(const String &parameter);
 
@@ -285,8 +296,13 @@ namespace HM
       // RFC 3030 (CHUNKING/BDAT) per-transaction state.
       bool bdat_active_;            // a BDAT chunk has been received in this transaction
       bool bdat_last_;              // the chunk currently being received carries LAST
+      bool bdat_discard_;           // the chunk being received belongs to a rejected BDAT: consume, don't store
       size_t bdat_chunk_size_;      // declared octet count of the current chunk
       size_t bdat_chunk_remaining_; // octets of the current chunk still to be received
+
+      boost::mutex ptr_result_mutex_;
+      bool ptr_lookup_completed_;   // PrefetchPtrRecord_ has stored a result
+      String ptr_record_host_;      // PTR host for the Received header ("Unknown" when unresolvable)
 
       RecipientParser recipientParser_;
       bool start_tls_used_;

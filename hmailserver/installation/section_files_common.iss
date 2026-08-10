@@ -9,8 +9,12 @@ Source: ".\Extras\7za.exe"; DestDir: "{app}\Bin"; Flags: ignoreversion; Componen
 ; Database scripts
 Source: "..\source\DBScripts\*.sql"; DestDir: "{app}\DBScripts";Flags: ignoreversion recursesubdirs; Components: server;
 
-Source: "..\source\Addons\*.*"; DestDir: "{app}\Addons"; Flags: onlyifdoesntexist recursesubdirs; Excludes: "Events";  Components: server;
-Source: "..\source\Addons\Events\*.*"; DestDir: "{app}\Events"; Flags: onlyifdoesntexist;Components: server;
+; onlyifdoesntexist keeps an upgrade from touching user-modified files, and
+; uninsneveruninstall keeps the uninstaller from deleting them: without it the
+; uninstall log entry recorded on first install removes the administrator's
+; customized EventHandlers.vbs (and addon scripts) on uninstall/reinstall.
+Source: "..\source\Addons\*.*"; DestDir: "{app}\Addons"; Flags: onlyifdoesntexist recursesubdirs uninsneveruninstall; Excludes: "Events";  Components: server;
+Source: "..\source\Addons\Events\*.*"; DestDir: "{app}\Events"; Flags: onlyifdoesntexist uninsneveruninstall; Components: server;
 
 Source: "..\source\Translations\*"; Excludes: "CVS,.cvsignore,.#*"; DestDir: "{app}\Languages"; Components: server admintools;
 

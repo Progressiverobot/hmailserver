@@ -11,12 +11,6 @@
 #include "../common/BO/Account.h"
 #include "../common/BO/SecurityRange.h"
 
-#include "../common/Scripting/ClientInfo.h"
-#include "../Common/Scripting/ScriptServer.h"
-#include "../Common/Scripting/ScriptObjectContainer.h"
-
-#include "../Common/TCPIP/CipherInfo.h"
-
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
 #define new DEBUG_NEW
@@ -68,30 +62,7 @@ namespace HM
 
       const bool isAuthenticated = pAccount != nullptr;
 
-      if (Configuration::Instance()->GetUseScriptServer())
-      {
-         std::shared_ptr<ScriptObjectContainer> pContainer = std::shared_ptr<ScriptObjectContainer>(new ScriptObjectContainer);
-         std::shared_ptr<ClientInfo> pClientInfo = std::shared_ptr<ClientInfo>(new ClientInfo);
-
-         pClientInfo->SetUsername(sUsername);
-         pClientInfo->SetIPAddress(pConnection->GetRemoteEndpointAddress().ToString());
-         pClientInfo->SetPort(pConnection->GetLocalEndpointPort());
-         pClientInfo->SetSessionID(pConnection->GetSessionID());
-         pClientInfo->SetIsAuthenticated(isAuthenticated);
-         pClientInfo->SetIsEncryptedConnection(pConnection->IsSSLConnection());
-         if (pConnection->IsSSLConnection())
-         {
-            auto cipher_info = pConnection->GetCipherInfo();
-            pClientInfo->SetCipherVersion(cipher_info.GetVersion().c_str());
-            pClientInfo->SetCipherName(cipher_info.GetName().c_str());
-            pClientInfo->SetCipherBits(cipher_info.GetBits());
-         }
-
-         pContainer->AddObject("HMAILSERVER_CLIENT", pClientInfo, ScriptObject::OTClient);
-
-         String sEventCaller = "OnClientLogon(HMAILSERVER_CLIENT)";
-         ScriptServer::Instance()->FireEvent(ScriptServer::EventOnClientLogon, sEventCaller, pContainer);
-      }
+      pConnection->FireOnClientLogon(sUsername, isAuthenticated);
 
       if (!pAccount)
       {

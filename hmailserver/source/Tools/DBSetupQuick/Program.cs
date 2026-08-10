@@ -15,7 +15,7 @@ namespace DBSetupQuick
       private static hMailServer.Application _application;
 
       [STAThread]
-      static void Main()
+      static int Main()
       {
          ToolApplication.Initialize();
 
@@ -23,13 +23,15 @@ namespace DBSetupQuick
 
          _application = new hMailServer.Application();
 
+         // Propagate the outcome to the installer: a failed database create/upgrade
+         // must fail the install rather than silently produce a broken server.
          if (_application.Database.DatabaseExists)
-            UpgradeDatabase();
+            return UpgradeDatabase();
          else
-            CreateDatabase();
+            return CreateDatabase();
       }
 
-      private static void UpgradeDatabase()
+      private static int UpgradeDatabase()
       {
          try
          {
@@ -51,14 +53,21 @@ namespace DBSetupQuick
             // Launch upgrader and wait for it to complete.
             Process p = Process.Start(upgradeProcess);
             p.WaitForExit();
+
+            return p.ExitCode;
          }
          catch (Exception ex)
          {
-            MessageBox.Show("Failed to start DBUpdater.exe" + Environment.NewLine + ex.Message, "hMailServer");
+            Console.Error.WriteLine("Failed to start DBUpdater.exe: " + ex.Message);
+
+            if (!CommandLineParser.IsSilent())
+               MessageBox.Show("Failed to start DBUpdater.exe" + Environment.NewLine + ex.Message, "hMailServer");
+
+            return 1;
          }
       }
 
-      private static void CreateDatabase()
+      private static int CreateDatabase()
       {
          string adminPassword = string.Empty;
 
@@ -66,16 +75,18 @@ namespace DBSetupQuick
             adminPassword = CommandLineParser.GetArgument("password");
 
          if (!Authenticator.AuthenticateUser(_application, adminPassword))
-            return;
+            return 3;
 
          if (_application.Database.DatabaseType == hMailServer.eDBtype.hDBTypeMSSQLCE ||
              _application.Database.DatabaseType == hMailServer.eDBtype.hDBTypeUnknown)
          {
-            InitializeInternalDatabase();
+            return InitializeInternalDatabase();
          }
+
+         return 0;
       }
 
-      private static void InitializeInternalDatabase()
+      private static int InitializeInternalDatabase()
       {
           try
           {
@@ -88,10 +99,17 @@ namespace DBSetupQuick
 
               // Re-initialize to connect to the newly created database.
               _application.Reinitialize();
+
+              return 0;
           }
           catch (Exception ex)
           {
-              MessageBox.Show(ex.Message, "hMailServer", MessageBoxButtons.OK, MessageBoxIcon.Error);
+              Console.Error.WriteLine("Failed to create the hMailServer database: " + ex.Message);
+
+              if (!CommandLineParser.IsSilent())
+                  MessageBox.Show(ex.Message, "hMailServer", MessageBoxButtons.OK, MessageBoxIcon.Error);
+
+              return 1;
           }
       }
 

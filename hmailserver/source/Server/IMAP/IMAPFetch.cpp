@@ -214,13 +214,14 @@ namespace HM
             if (iOctetStart == -1 && iOctetCount == -1)
                sPartIdentifier.Format(_T("%s"), oPart.GetDescription().c_str());
             else
-               sPartIdentifier.Format(_T("%s<%d>"), oPart.GetDescription().c_str(), iOctetStart, iOctetCount);
+               // RFC 3501: a partial response echoes only the origin octet.
+               sPartIdentifier.Format(_T("%s<%d>"), oPart.GetDescription().c_str(), iOctetStart);
 
             if (pBuffer->GetSize() > 0)
             {
                // Send part size information
                String sTemp;
-               sTemp.Format(_T("%s {%d}\r\n"), sPartIdentifier.c_str(), pBuffer->GetSize()); // Add 2 for trailing newline.
+               sTemp.Format(_T("%s {%Iu}\r\n"), sPartIdentifier.c_str(), pBuffer->GetSize()); // Add 2 for trailing newline.
                
                AppendOutput_(sOutput, sTemp);
                SendAndReset_(pConnection, sOutput);
@@ -273,31 +274,24 @@ namespace HM
 
       if (iOctetStart == -1 && iOctetCount == -1)
       {
+         iOutStart = 0;
+         iOutCount = iBufferSize;
+         return;
+      }
+
+      // A client-supplied "<start.size>" partial range. Clamp it defensively:
+      // a negative start would read before the buffer (heap disclosure) and a
+      // negative or overlarge size would ask for a near-SIZE_MAX allocation
+      // (crash / OutOfMemoryHandler). A start at or past the end yields empty.
+      if (iOctetStart < 0)
          iOctetStart = 0;
-         iOctetCount = iBufferSize;
-      }
-      else
-      {
-         // Jump forward to the start of the buffer.
-         iBufferSize -= iOctetStart;
+      if (iOctetStart > iBufferSize)
+         iOctetStart = iBufferSize;
 
-         if (iBufferSize <= 0)
-         {
-            iOutStart = 0;
-            iOutCount = 0;
-            return;
-         }
+      int iRemaining = iBufferSize - iOctetStart;
 
-         // Check if block size is within buffer.
-         if (iOctetCount > iBufferSize)
-         {
-            // The requested total goes beyond the
-            // end of the buffer. We need to truncate
-            // the requested length so that it fits
-            // within the buffer.
-            iOctetCount = iBufferSize;
-         }
-      }
+      if (iOctetCount < 0 || iOctetCount > iRemaining)
+         iOctetCount = iRemaining;
 
       iOutStart = iOctetStart;
       iOutCount = iOctetCount;

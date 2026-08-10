@@ -42,6 +42,11 @@
 
 #include "../Common/Application/IniFileSettings.h"
 
+#include "../Common/Scripting/ClientInfo.h"
+#include "../Common/Scripting/ScriptServer.h"
+#include "../Common/Scripting/ScriptObjectContainer.h"
+#include "../Common/TCPIP/CipherInfo.h"
+
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
 #define new DEBUG_NEW
@@ -479,12 +484,41 @@ namespace HM
       SendAsciiData(sMessage);
    }
 
-   void 
+   void
    IMAPConnection::Login(std::shared_ptr<const Account> account)
    {
       account_ = account;
 
       RefreshIMAPFolders();
+   }
+
+   void
+   IMAPConnection::FireOnClientLogon(const String &sUsername, bool isAuthenticated)
+   {
+      if (!Configuration::Instance()->GetUseScriptServer())
+         return;
+
+      std::shared_ptr<ScriptObjectContainer> pContainer = std::shared_ptr<ScriptObjectContainer>(new ScriptObjectContainer);
+      std::shared_ptr<ClientInfo> pClientInfo = std::shared_ptr<ClientInfo>(new ClientInfo);
+
+      pClientInfo->SetUsername(sUsername);
+      pClientInfo->SetIPAddress(GetIPAddressString());
+      pClientInfo->SetPort(GetLocalEndpointPort());
+      pClientInfo->SetSessionID(GetSessionID());
+      pClientInfo->SetIsAuthenticated(isAuthenticated);
+      pClientInfo->SetIsEncryptedConnection(IsSSLConnection());
+      if (IsSSLConnection())
+      {
+         auto cipher_info = GetCipherInfo();
+         pClientInfo->SetCipherVersion(cipher_info.GetVersion().c_str());
+         pClientInfo->SetCipherName(cipher_info.GetName().c_str());
+         pClientInfo->SetCipherBits(cipher_info.GetBits());
+      }
+
+      pContainer->AddObject("HMAILSERVER_CLIENT", pClientInfo, ScriptObject::OTClient);
+
+      String sEventCaller = "OnClientLogon(HMAILSERVER_CLIENT)";
+      ScriptServer::Instance()->FireEvent(ScriptServer::EventOnClientLogon, sEventCaller, pContainer);
    }
 
    void 

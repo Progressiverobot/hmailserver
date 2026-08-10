@@ -140,6 +140,10 @@ namespace HM
    void
    SpamAssassinClient::ParseData(std::shared_ptr<ByteBuffer> pBuf)
    {
+      // Captured before ParseFirstBuffer_ strips the header: a completed read that
+      // delivered no bytes means spamd closed the connection (EOF).
+      size_t incoming_bytes = pBuf ? pBuf->GetSize() : 0;
+
       if (!result_)
       {
          String logMessage;
@@ -147,21 +151,59 @@ namespace HM
          LOG_DEBUG(logMessage);
 
          result_ = std::shared_ptr<File>(new File);
-         result_->Open(FileUtilities::GetTempFileName(), File::OTAppend);
+         if (!result_->Open(FileUtilities::GetTempFileName(), File::OTAppend))
+         {
+            LOG_DEBUG("SA: could not open a temp file for the SpamAssassin response; keeping the original message.");
+            AbortResponse_();
+            return;
+         }
 
          spam_dsize_ = ParseFirstBuffer_(pBuf);
+
+         if (spam_dsize_ < 0)
+         {
+            // Malformed or incomplete response header. Abort without writing:
+            // the original message is preserved and the failure is reported by
+            // the caller. (A negative length used to wrap to a huge size_t,
+            // writing the raw SPAMD header into the message and looping forever.)
+            LOG_DEBUG("SA: invalid SpamAssassin response header; keeping the original message.");
+            AbortResponse_();
+            return;
+         }
       }
 
       // Append output to the file
       size_t written_bytes = 0;
-         result_->Write(pBuf, written_bytes);
+      result_->Write(pBuf, written_bytes);
 
       total_result_bytes_written_ += written_bytes;
 
-      if (total_result_bytes_written_ < spam_dsize_)
-         EnqueueRead();
-      else
+      if (total_result_bytes_written_ >= spam_dsize_)
+      {
          FinishTesting_();
+         return;
+      }
+
+      // More of the body is expected. If this read delivered nothing, spamd closed
+      // the connection early: stop rather than spinning on a dead socket (the old
+      // code re-armed the read forever, pinning a core and never timing out).
+      if (incoming_bytes == 0)
+      {
+         LOG_DEBUG("SA: connection closed before the full response arrived; keeping the original message.");
+         AbortResponse_();
+         return;
+      }
+
+      EnqueueRead("");
+   }
+
+   void
+   SpamAssassinClient::AbortResponse_()
+   {
+      // Discard the partial response (leaving the original message file untouched)
+      // and do not set test_completed_, so SpamTestSpamAssassin::RunTest logs the
+      // failure. Not enqueuing another read lets the connection wind down.
+      Cleanup_();
    }
 
    void
@@ -176,9 +218,11 @@ namespace HM
       bool bTestsRun = true;
 
       String sTempFile = result_->GetName();
-	  
-      // new way: check the result from spamd.
-      if (bTestsRun && (FileUtilities::FileSize(sTempFile) == spam_dsize_))
+
+      // new way: check the result from spamd. Require a positive length so an
+      // empty response (Content-length: 0, or a lookup that returned 0) can never
+      // overwrite the live message with a zero-byte file.
+      if (bTestsRun && spam_dsize_ > 0 && (FileUtilities::FileSize(sTempFile) == spam_dsize_))
       {
          if (IniFileSettings::Instance()->GetSAMoveVsCopy())
          {
@@ -218,15 +262,22 @@ namespace HM
       AnsiString spamAssassinHeader(pBuffer->GetCharBuffer(), headerLength);
 
       std::vector<AnsiString> headerLines = StringParser::SplitString(spamAssassinHeader, "\r\n");
+
+      // An error reply (e.g. "SPAMD/1.1 76 Bad header") is a single line with no
+      // Content-length, so guard both indices before reading them.
+      if (headerLines.size() < 2)
+      {
+         LOG_DEBUG(Formatter::Format("The response from SpamAssasin was not valid. Aborting. Incomplete header: {0}\r\n", spamAssassinHeader));
+         return -1;
+      }
+
       AnsiString firstLine = headerLines[0];
       AnsiString secondLine = headerLines[1];
 
-      if (firstLine.Compare("SPAMD/1.1 0 EX_OK") != 0)
+      // Accept any SPAMD protocol version, not just 1.1, as long as it is EX_OK.
+      if (!firstLine.StartsWith("SPAMD/") || firstLine.FindNoCase("EX_OK") < 0)
       {
-         // We should never get here, since we should always have
-         // a header in the result
-
-         LOG_DEBUG(Formatter::Format("The response from SpamAssasin was not valid. Aborting. Expected: SPAMD/1.1 0 EX_OK, Got: {0}\r\n", firstLine));
+         LOG_DEBUG(Formatter::Format("The response from SpamAssasin was not valid. Aborting. Expected: SPAMD/<version> 0 EX_OK, Got: {0}\r\n", firstLine));
          return -1;
       }
 
@@ -253,6 +304,13 @@ namespace HM
       {
         LOG_DEBUG(Formatter::Format("The response from SpamAssasin was not valid. Aborting. Content-Length header not properly formatted. Expected: Content-Length:<value>, Got: {0}\r\n", secondLine));
 	     return -1;
+      }
+
+      if (contentLength < 0)
+      {
+         // A negative length would wrap when driving the read loop / size check.
+         LOG_DEBUG(Formatter::Format("The response from SpamAssasin was not valid. Aborting. Negative Content-Length: {0}\r\n", secondLine));
+         return -1;
       }
 
       // Remove the SA header lines from the result.

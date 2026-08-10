@@ -478,12 +478,13 @@ namespace hMailServer.ControlPanel.Views
                {
                   dynamic result = results.Item[i];
                   string name = "", details = "";
-                  bool success = false;
+                  bool? success = null;
                   try { name = (string) result.Name; } catch (Exception) { }
-                  try { success = (bool) result.Success; } catch (Exception) { }
-                  try { details = (string) result.Details; } catch (Exception) { }
+                  try { success = (bool) result.Result; } catch (Exception) { }
+                  try { details = (string) result.ExecutionDetails; } catch (Exception) { }
 
-                  text.AppendLine((success ? "[ OK ]   " : "[FAIL]   ") + name);
+                  string state = success == null ? "[ ?? ]   " : success.Value ? "[ OK ]   " : "[FAIL]   ";
+                  text.AppendLine(state + name);
                   if (!string.IsNullOrWhiteSpace(details))
                      text.AppendLine("         " + details.Replace("\r\n", "\r\n         "));
                   text.AppendLine();
