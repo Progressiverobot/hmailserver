@@ -5,7 +5,9 @@ hMailServer is an open source email server for Microsoft Windows, implementing S
 
 This repository is a modernized fork of the original project (which is no longer maintained upstream). It has been brought up to date with a current toolchain, current cryptography, and the transport-security standards expected of a mail server in 2026. It is maintained by Christopher Holloway / [Progressive Robot Ltd](https://www.progressiverobot.com).
 
-**Production status:** version **6.2.15** is released - [download the installer](https://github.com/Progressiverobot/hmailserver/releases/latest) (`hMailServer-6.2.15-x64.exe`). **6.2.15 is a correctness release** built around two themes. First, **IMAP sequence sets now behave the way RFC 3501 defines them**: `*` was only recognised as the *end* of a range and read as zero anywhere else, so `FETCH *` silently returned nothing while `UID STORE *:* +FLAGS (\Deleted)` flagged the entire mailbox and `UID EXPUNGE *` deleted every `\Deleted` message. Second, **every file the server writes now has an owner** - a message whose spool file could not be read stalled each outbound attempt for ten minutes before retrying, a failed restore emptied the live data directory and then abandoned the only remaining copy of the mail in a temporary folder, and four separate paths could leave a file on disk that no database row referred to. Everything raised on the forum by RvdH is incorporated, and the Control Panel gained homes for a group of settings that had no GUI at all. See *6.2.15* below. It is validated by the full regression suite: **1040 of 1040 tests passing, zero failures, zero inconclusive** - the complete suite, with live SpamAssassin and ClamAV (real EICAR detection), DMARC evaluation against live DNS, and TLS 1.2/1.3 handshakes end to end. Every test runs; nothing is skipped. The bundled administration GUI is the modern .NET 8 **Control Panel**.
+**Production status:** version **6.2.16** is released - [download the installer](https://github.com/Progressiverobot/hmailserver/releases/latest) (`hMailServer-6.2.16-x64.exe`). **6.2.16 is a single-fix patch** over 6.2.15: dismissing the Ctrl+K settings palette raised an error dialog on almost every search ([#21](https://github.com/Progressiverobot/hmailserver/issues/21)). Everything below describes 6.2.15, which it otherwise matches.
+
+**6.2.15 is a correctness release** built around two themes. First, **IMAP sequence sets now behave the way RFC 3501 defines them**: `*` was only recognised as the *end* of a range and read as zero anywhere else, so `FETCH *` silently returned nothing while `UID STORE *:* +FLAGS (\Deleted)` flagged the entire mailbox and `UID EXPUNGE *` deleted every `\Deleted` message. Second, **every file the server writes now has an owner** - a message whose spool file could not be read stalled each outbound attempt for ten minutes before retrying, a failed restore emptied the live data directory and then abandoned the only remaining copy of the mail in a temporary folder, and four separate paths could leave a file on disk that no database row referred to. Everything raised on the forum by RvdH is incorporated, and the Control Panel gained homes for a group of settings that had no GUI at all. See *6.2.15* below. It is validated by the full regression suite: **1040 of 1040 tests passing, zero failures, zero inconclusive** - the complete suite, with live SpamAssassin and ClamAV (real EICAR detection), DMARC evaluation against live DNS, and TLS 1.2/1.3 handshakes end to end. Every test runs; nothing is skipped. The bundled administration GUI is the modern .NET 8 **Control Panel**.
 
 What's new in 6.0
 =================
@@ -82,6 +84,13 @@ change until the new settings are turned on.
 **Supply chain & quality gates**
 
    * SPDX + CycloneDX SBOMs (Syft) attached to every release, Dependabot CVE alerts + grouped update PRs, and a dependency-review PR gate.
+
+6.2.16
+======
+
+A patch release fixing one defect reported against the Control Panel. No server change, and no database change (schema version 6005).
+
+- **Dismissing the Ctrl+K settings palette raised an error dialog** ([#21](https://github.com/Progressiverobot/hmailserver/issues/21)). Choosing a result and pressing Esc both close the palette, and closing it moved the focus away, which raised the deactivation handler *while the close was still running* — and that handler closed it a second time. WPF refuses that, so almost every search ended with `Cannot set Visibility to Visible or call Show, ShowDialog, Close, or WindowInteropHelper.EnsureHandle while a Window is closing`. The navigation itself had already happened, so nothing was lost; it was noise, but in the one feature meant to make settings easier to find. Present in 6.2.14 and 6.2.15. Reported by grumpymojo.
 
 6.2.15
 ======
