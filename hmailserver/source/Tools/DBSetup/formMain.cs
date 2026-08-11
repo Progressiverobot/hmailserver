@@ -14,6 +14,14 @@ namespace DBSetup
 {
    public partial class formMain : Form
    {
+      /// <summary>
+      /// True once the wizard reached its final page. A page only advances when
+      /// IWizardPage.OnLeavePage succeeds, so reaching the last page means the
+      /// create/update task actually completed. Program.Main turns this into the
+      /// process exit code the installer checks.
+      /// </summary>
+      public bool SetupCompleted { get; private set; }
+
       public formMain()
       {
          InitializeComponent();
@@ -42,6 +50,9 @@ namespace DBSetup
       private void wizard_PageChanged(int currentPage, int lastPage)
       {
          this.Text = "hMailServer Database Setup - Step " + currentPage + " of " + lastPage;
+
+         if (currentPage == lastPage)
+            SetupCompleted = true;
       }
    }
 }

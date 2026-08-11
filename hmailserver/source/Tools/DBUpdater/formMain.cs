@@ -405,14 +405,17 @@ namespace DBUpdater
                return;
             }
 
+            // The schema is committed from here on, so record success before the
+            // cleanup below: a COM/RPC failure while reinitializing must not report
+            // an upgrade that did happen as a failure.
+            UpgradeSucceeded = true;
+
             Marshal.ReleaseComObject(database);
 
             // Database has been upgraded. Reinitialize the connections.
             _application.Reinitialize();
 
             RemoveErrorLog();
-
-            UpgradeSucceeded = true;
 
             buttonClose.Enabled = true;
          }

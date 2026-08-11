@@ -59,7 +59,7 @@ namespace HM
       EnqueueWrite("PROCESS SPAMC/1.2\r\n");
 	  //LOG_DEBUG("SENT: PROCESS SPAMC/1.2");
 	  String sConLen;
-	  sConLen.Format(_T("Content-length: %d\r\n"), message_size_);
+	  sConLen.Format(_T("Content-length: %I64d\r\n"), message_size_);
 	  EnqueueWrite(sConLen);
 	  EnqueueWrite("\r\n");
      SendFileContents_(message_file_);
@@ -240,7 +240,7 @@ namespace HM
      else 
      {
 		 String logMessage;
-		 logMessage.Format(_T("SA: Temp file size did not match what Spamd reported! (temp: %d, spamd: %d). Reverting to original message file."),FileUtilities::FileSize(sTempFile),spam_dsize_);
+		 logMessage.Format(_T("SA: Temp file size did not match what Spamd reported! (temp: %d, spamd: %I64d). Reverting to original message file."),FileUtilities::FileSize(sTempFile),spam_dsize_);
          LOG_DEBUG(logMessage);
 	  }
      
