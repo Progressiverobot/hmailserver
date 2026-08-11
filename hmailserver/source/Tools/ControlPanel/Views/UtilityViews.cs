@@ -351,10 +351,14 @@ namespace hMailServer.ControlPanel.Views
          try
          {
             dynamic utilities = ServerSession.Current.Application.Utilities;
-            utilities.EmailAllAccounts(wildcard_.Text, fromAddress_.Text.Trim(), fromName_.Text.Trim(),
+            bool queued = (bool) utilities.EmailAllAccounts(wildcard_.Text, fromAddress_.Text.Trim(), fromName_.Text.Trim(),
                subject_.Text, body_.Text);
             ServerSession.Release(utilities);
-            status_.Text = "Sendout queued " + DateTime.Now.ToLongTimeString() + ".";
+            // The server reports failure through the return value rather than an
+            // error, so don't claim success when it declined the sendout.
+            status_.Text = queued
+               ? "Sendout queued " + DateTime.Now.ToLongTimeString() + "."
+               : "The server did not queue the sendout. Check the address wildcard and the hMailServer error log.";
          }
          catch (Exception ex)
          {

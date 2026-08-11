@@ -55,7 +55,9 @@ namespace hMailServer.ControlPanel.Views
          try
          {
             dynamic queue = ServerSession.Current.Application.GlobalObjects.DeliveryQueue;
-            queue.ResetDeliveryTime(Convert.ToInt32(row.Id));
+            // Message ids are 64-bit on the server; narrowing to Int32 threw
+            // OverflowException on long-lived installations (Remove already used Int64).
+            queue.ResetDeliveryTime(Convert.ToInt64(row.Id));
             queue.StartDelivery();
             ServerSession.Release(queue);
             SubtitleText.Text = "Delivery retriggered for message " + row.Id + ".";

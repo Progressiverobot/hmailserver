@@ -39,12 +39,14 @@ namespace hMailServer.ControlPanel.Views
          try
          {
             dynamic backup = ServerSession.Current.Application.Settings.Backup;
+            // IInterfaceBackupSettings has no Save method: each property setter
+            // writes straight through to the server's settings store, so the
+            // assignments above are already persisted.
             backup.Destination = DestinationBox.Text.Trim();
             backup.BackupDomains = CheckDomains.IsChecked == true;
             backup.BackupMessages = CheckMessages.IsChecked == true;
             backup.BackupSettings = CheckSettings.IsChecked == true;
             backup.CompressDestinationFiles = CheckCompress.IsChecked == true;
-            backup.Save();
             ServerSession.Release(backup);
             return true;
          }
