@@ -13,8 +13,9 @@ namespace hMailServer.ControlPanel.Views
    /// <summary>
    /// Data-driven settings pages for the hMailServer.INI feature switches:
    /// transport security (DANE, DNSSEC, MTA-STS, ARC, TLS-RPT), automatic
-   /// certificates (ACME) and integrations (REST API, web services,
-   /// Prometheus metrics, JSON logging).
+   /// certificates (ACME), integrations (REST API, Prometheus metrics,
+   /// ManageSieve), authentication (OAuth2, password storage), the DNS
+   /// resolver and the public web services listener.
    /// </summary>
    public partial class FeatureSettingsView : UserControl, IPageLifecycle
    {
@@ -23,7 +24,10 @@ namespace hMailServer.ControlPanel.Views
          Security,
          Automation,
          Integration,
-         Hardening
+         Hardening,
+         Authentication,
+         Dns,
+         WebServices
       }
 
       private abstract class Setting
@@ -299,7 +303,7 @@ namespace hMailServer.ControlPanel.Views
                {
                   Title = "MTA-STS",
                   Blurb = "Discovers and enforces recipient MTA-STS policies before delivering over TLS (RFC 8461). " +
-                          "To publish a policy for your own domains, see Web services on the API & monitoring page.",
+                          "To publish a policy for your own domains, see the Web services & autoconfiguration page.",
                   Settings =
                   {
                      new BoolSetting { Key = "MtaStsEnabled", Default = true, Label = "Honor recipient MTA-STS policies when sending" }
@@ -350,7 +354,10 @@ namespace hMailServer.ControlPanel.Views
 
             case Section.Integration:
                TitleText.Text = "API & monitoring";
-               SubtitleText.Text = "REST administration API, web services hosting, Prometheus metrics and structured logging.";
+               SubtitleText.Text = "REST administration API, Prometheus metrics and remote script management. " +
+                                   "The public web services listener (autoconfiguration, MTA-STS hosting) is on the " +
+                                   "Web services & autoconfiguration page; OAuth2 token authentication is on the " +
+                                   "Authentication page.";
                cards_.Add(new CardDef
                {
                   Title = "REST administration API + Web Control Deck",
@@ -366,25 +373,6 @@ namespace hMailServer.ControlPanel.Views
                });
                cards_.Add(new CardDef
                {
-                  Title = "Web services (MTA-STS hosting & client autoconfig)",
-                  Blurb = "Hosts https://mta-sts.<domain>/.well-known/mta-sts.txt, Thunderbird autoconfig and Outlook autodiscover for all local domains.",
-                  Settings =
-                  {
-                     new TextSetting { Key = "WebServicesHttpPort", Default = "0", Label = "HTTP port (80 to enable, 0 = disabled)" },
-                     new TextSetting { Key = "WebServicesHttpsPort", Default = "0", Label = "HTTPS port (443 to enable, 0 = disabled)" },
-                     new TextSetting { Key = "WebServicesBindAddress", Default = "0.0.0.0", Label = "Bind address" },
-                     new PathSetting { Key = "WebServicesCertificateFile", FileFilter = "PEM/certificate files (*.pem;*.crt;*.cer)|*.pem;*.crt;*.cer|All files (*.*)|*.*", Label = "TLS certificate file (PEM, optional)", Placeholder = "Falls back to the ACME certificate" },
-                     new PathSetting { Key = "WebServicesPrivateKeyFile", FileFilter = "PEM/key files (*.pem;*.key)|*.pem;*.key|All files (*.*)|*.*", Label = "TLS private key file (PEM, optional)" },
-                     new BoolSetting { Key = "MtaStsHostingEnabled", Default = true, Label = "Serve MTA-STS policies for local domains" },
-                     new TextSetting { Key = "MtaStsPolicyMode", Default = "enforce", Label = "MTA-STS policy mode (enforce / testing / none)" },
-                     new TextSetting { Key = "MtaStsPolicyMaxAge", Default = "604800", Label = "Policy max age (seconds; default 604800 = 7 days)" },
-                     new TextSetting { Key = "MtaStsPolicyMx", Label = "Policy MX host patterns (empty = derive from each domain's MX)", Placeholder = "mail.yourdomain.com, *.yourdomain.com" },
-                     new BoolSetting { Key = "AutoconfigEnabled", Default = true, Label = "Thunderbird autoconfig + Outlook autodiscover" },
-                     new TextSetting { Key = "AutoconfigClientHost", Label = "Host name clients connect to (empty = server host name)" }
-                  }
-               });
-               cards_.Add(new CardDef
-               {
                   Title = "Monitoring",
                   Blurb = "Prometheus metrics (/metrics), OpenTelemetry traces/metrics export, a slow-query log and JSON-structured log output for log aggregators.",
                   Settings =
@@ -395,22 +383,6 @@ namespace hMailServer.ControlPanel.Views
                      new TextSetting { Key = "OtelEndpoint", Label = "OpenTelemetry OTLP endpoint (empty = disabled)", Placeholder = "http://localhost:4318" },
                      new TextSetting { Key = "OtelServiceName", Default = "hmailserver", Label = "OpenTelemetry service name" },
                      new TextSetting { Key = "SlowQueryLogMilliseconds", Default = "0", Label = "Log database queries slower than N ms (0 = off)", Placeholder = "250" }
-                  }
-               });
-               cards_.Add(new CardDef
-               {
-                  Title = "OAuth2 / external token authentication",
-                  Blurb = "Accept OAuth2 / OpenID Connect bearer tokens (XOAUTH2) from an external identity provider for IMAP, POP3 and SMTP submission, validated against the issuer's signing key.",
-                  Settings =
-                  {
-                     new BoolSetting { Key = "OAuth2Enabled", Default = false, Label = "Accept OAuth2 bearer tokens (XOAUTH2)" },
-                     new BoolSetting { Key = "OAuth2RequireTLS", Default = true, Label = "Require TLS for token authentication" },
-                     new TextSetting { Key = "OAuth2Issuer", Label = "Expected token issuer (iss)", Placeholder = "https://login.microsoftonline.com/<tenant>/v2.0" },
-                     new TextSetting { Key = "OAuth2Audience", Label = "Expected audience (aud)", Placeholder = "your application / client id" },
-                     new TextSetting { Key = "OAuth2AllowedAlgorithms", Default = "RS256", Label = "Allowed signing algorithms (comma separated)", Placeholder = "RS256, ES256" },
-                     new TextSetting { Key = "OAuth2UsernameClaim", Default = "email", Label = "Claim that holds the mailbox address", Placeholder = "email" },
-                     new PathSetting { Key = "OAuth2PublicKeyFile", FileFilter = "PEM/key files (*.pem;*.crt;*.cer;*.key;*.pub)|*.pem;*.crt;*.cer;*.key;*.pub|All files (*.*)|*.*", Label = "RSA/EC public key file (PEM, for RS*/ES* tokens)", Placeholder = "Path to the issuer's public key" },
-                     new SecretSetting { Key = "OAuth2HmacSecret", Label = "Shared HMAC secret (only for HS256/384/512 tokens)", Note = "Only needed for HS* algorithms" }
                   }
                });
                cards_.Add(new CardDef
@@ -453,26 +425,16 @@ namespace hMailServer.ControlPanel.Views
                   }
                });
                // Scanner timeouts moved to the scanner they configure: SpamAssassin
-               // on the Anti-spam page and ClamAV on the Anti-virus page.
+               // on the Anti-spam page and ClamAV on the Anti-virus page. The
+               // resolver settings moved to Network > DNS resolver.
                cards_.Add(new CardDef
                {
-                  Title = "DNS",
-                  Blurb = "Resolver behaviour for MX / SPF / DNSBL lookups.",
-                  Settings =
-                  {
-                     new BoolSetting { Key = "UseDNSCache", Default = true, Label = "Cache DNS lookups in-process" },
-                     new TextSetting { Key = "DNSServer", Label = "Override DNS server (empty = system resolvers)", Placeholder = "1.1.1.1" },
-                     new BoolSetting { Key = "DNSBLChecksAfterMailFrom", Default = true, Label = "Run DNSBL checks after MAIL FROM (rather than at connect)" }
-                  }
-               });
-               cards_.Add(new CardDef
-               {
-                  Title = "Authentication & received headers",
-                  Blurb = "Submission identity handling and the diagnostic headers added to received mail.",
+                  Title = "Received headers",
+                  Blurb = "Submission identity handling and the diagnostic headers added to received mail. " +
+                          "(Where SMTP AUTH is offered is on the Authentication page.)",
                   Settings =
                   {
                      new TextSetting { Key = "AuthUserReplacementIP", Label = "Replace the client IP for authenticated users (empty = keep the real IP)", Placeholder = "e.g. 127.0.0.1" },
-                     new TextSetting { Key = "DisableAUTHList", Label = "Disable AUTH for these IPs / ranges (semicolon separated)", Placeholder = "203.0.113.0/24; 198.51.100.7" },
                      new BoolSetting { Key = "AddXAuthUserHeader", Default = false, Label = "Add an X-AuthUser header with the authenticated account" },
                      new BoolSetting { Key = "AddXAuthUserIP", Default = true, Label = "Include the client IP in the X-AuthUser header" },
                      new BoolSetting { Key = "AddXOriginalRcptTo", Default = false, Label = "Add an X-OriginalRcptTo header" }
@@ -485,34 +447,7 @@ namespace hMailServer.ControlPanel.Views
                   Settings =
                   {
                      new TextSetting { Key = "BlockedIPHoldSeconds", Default = "0", Label = "Hold a blocked connection open before dropping it (seconds, 0 = drop immediately)" },
-                     new BoolSetting { Key = "RewriteEnvelopeFromWhenForwarding", Default = false, Label = "Rewrite the envelope sender when forwarding (helps SPF; see also SRS)" },
-                     new ChoiceSetting
-                     {
-                        Key = "PreferredHashAlgorithm",
-                        Default = 4,
-                        Label = "Password hash for new or changed account passwords",
-                        Options = new (int, string)[]
-                        {
-                           (5, "Argon2id (strongest)"),
-                           (4, "PBKDF2 (default)"),
-                           (3, "SHA-256"),
-                           (2, "MD5 (legacy)"),
-                           (1, "Blowfish (legacy)")
-                        }
-                     },
-                     new ChoiceSetting
-                     {
-                        Key = "MinimumAcceptedHashAlgorithm",
-                        Default = 0,
-                        Label = "Reject logins using a weaker stored hash than",
-                        Options = new (int, string)[]
-                        {
-                           (0, "Accept any stored hash"),
-                           (3, "SHA-256 or stronger"),
-                           (4, "PBKDF2 or stronger"),
-                           (5, "Argon2id only")
-                        }
-                     }
+                     new BoolSetting { Key = "RewriteEnvelopeFromWhenForwarding", Default = false, Label = "Rewrite the envelope sender when forwarding (helps SPF; see also SRS)" }
                   }
                });
                cards_.Add(new CardDef
@@ -576,17 +511,23 @@ namespace hMailServer.ControlPanel.Views
                      new TextSetting { Key = "MaxNumberOfExternalFetchThreads", Default = "15", Label = "Max parallel external POP3 fetch threads" }
                   }
                });
-               // Logging detail moved to the Logging page and indexer cadence to
-               // Performance > Indexing, so each setting sits with the feature it
-               // configures rather than on this catch-all page.
+               // Logging detail moved to the Logging page, indexer cadence to
+               // Performance > Indexing and message archiving to Advanced &
+               // scripting (next to the mirroring address), so each setting sits
+               // with the feature it configures rather than on this catch-all page.
                cards_.Add(new CardDef
                {
-                  Title = "Message archiving",
-                  Blurb = "Optionally keep a copy of every message passing through the server.",
+                  Title = "Server-generated mail",
+                  // The server builds mailer-daemon@<domain> from this and puts it
+                  // in the From: header of bounces and virus notices; it has no
+                  // effect on how or where mail is delivered.
+                  Blurb = "Bounces and virus notifications are sent from mailer-daemon@<domain>. This overrides the " +
+                          "<domain> part. Left empty, the server uses its own host name, then the local domain the " +
+                          "message involves, then this computer's name. It is not a delivery setting and does not " +
+                          "change where mail is routed.",
                   Settings =
                   {
-                     new PathSetting { Key = "ArchiveDir", PickFolder = true, Label = "Archive folder (empty = archiving off)", Placeholder = @"D:\MailArchive" },
-                     new BoolSetting { Key = "ArchiveHardLinks", Default = false, Label = "Hard-link archived files instead of copying (same volume only)" }
+                     new TextSetting { Key = "DaemonAddressDomain", Label = "Domain for the mailer-daemon sender address (empty = server host name)", Placeholder = "yourdomain.com" }
                   }
                });
                cards_.Add(new CardDef
@@ -595,10 +536,8 @@ namespace hMailServer.ControlPanel.Views
                   Blurb = "Specialist knobs — leave at the defaults unless you have a specific reason.",
                   Settings =
                   {
-                     new TextSetting { Key = "DaemonAddressDomain", Label = "Domain for system / daemon (postmaster) addresses (empty = first local domain)" },
                      new TextSetting { Key = "SMTPDMaxSizeDrop", Default = "0", Label = "Drop oversized inbound messages above N bytes mid-transfer (0 = off)" },
                      new BoolSetting { Key = "SAMoveVsCopy", Default = false, Label = "Move (not copy) the message when handing it to SpamAssassin" },
-                     new BoolSetting { Key = "BackupMessagesDBOnly", Default = false, Label = "Back up message metadata only, not the message files" },
                      new TextSetting { Key = "LoadHeaderReadSize", Default = "4000", Label = "Header read chunk size (bytes)" },
                      new TextSetting { Key = "LoadBodyReadSize", Default = "4000", Label = "Body read chunk size (bytes)" }
                   }
@@ -606,11 +545,167 @@ namespace hMailServer.ControlPanel.Views
                cards_.Add(new CardDef
                {
                   Title = "Stored secret protection",
-                  Blurb = "When enabled, sensitive values in hMailServer.INI (database password, OAuth/SRS/BATV secrets, password pepper) are encrypted with Windows DPAPI on the next service start.",
+                  Blurb = "When enabled, sensitive values in hMailServer.INI (database password, OAuth/SRS/BATV secrets, password pepper) are encrypted with Windows DPAPI on the next service start. " +
+                          "(The password pepper itself is on the Authentication page.)",
                   Settings =
                   {
-                     new BoolSetting { Key = "ProtectStoredSecretsWithDPAPI", Default = true, Label = "Protect stored secrets with Windows DPAPI" },
+                     new BoolSetting { Key = "ProtectStoredSecretsWithDPAPI", Default = true, Label = "Protect stored secrets with Windows DPAPI" }
+                  }
+               });
+               break;
+
+            case Section.Authentication:
+               TitleText.Text = "Authentication";
+               SubtitleText.Text = "How mailbox users prove who they are: external identity providers, how " +
+                                   "passwords are stored, and where SMTP AUTH is offered (hMailServer.INI). " +
+                                   "Changes take effect after a service restart.";
+               cards_.Add(new CardDef
+               {
+                  Title = "OAuth2 / external identity provider",
+                  Blurb = "Accept OAuth2 / OpenID Connect bearer tokens (XOAUTH2) from an external identity provider for IMAP, POP3 and SMTP submission, validated against the issuer's signing key. " +
+                          "The mailbox named by the token still has to exist as a local account.",
+                  Settings =
+                  {
+                     new BoolSetting { Key = "OAuth2Enabled", Default = false, Label = "Accept OAuth2 bearer tokens (XOAUTH2)" },
+                     new BoolSetting { Key = "OAuth2RequireTLS", Default = true, Label = "Require TLS for token authentication" },
+                     new TextSetting { Key = "OAuth2Issuer", Label = "Expected token issuer (iss)", Placeholder = "https://login.microsoftonline.com/<tenant>/v2.0" },
+                     new TextSetting { Key = "OAuth2Audience", Label = "Expected audience (aud)", Placeholder = "your application / client id" },
+                     new TextSetting { Key = "OAuth2AllowedAlgorithms", Default = "RS256", Label = "Allowed signing algorithms (comma separated)", Placeholder = "RS256, ES256" },
+                     new TextSetting { Key = "OAuth2UsernameClaim", Default = "email", Label = "Claim that holds the mailbox address", Placeholder = "email" },
+                     new PathSetting { Key = "OAuth2PublicKeyFile", FileFilter = "PEM/key files (*.pem;*.crt;*.cer;*.key;*.pub)|*.pem;*.crt;*.cer;*.key;*.pub|All files (*.*)|*.*", Label = "RSA/EC public key file (PEM, for RS*/ES* tokens)", Placeholder = "Path to the issuer's public key" },
+                     new SecretSetting { Key = "OAuth2HmacSecret", Label = "Shared HMAC secret (only for HS256/384/512 tokens)", Note = "Only needed for HS* algorithms" }
+                  }
+               });
+               cards_.Add(new CardDef
+               {
+                  Title = "Password storage",
+                  Blurb = "How account passwords are hashed, and the weakest stored hash still allowed to log on. " +
+                          "Existing passwords keep their current hash until they are next changed.",
+                  Settings =
+                  {
+                     new ChoiceSetting
+                     {
+                        Key = "PreferredHashAlgorithm",
+                        Default = 4,
+                        Label = "Password hash for new or changed account passwords",
+                        Options = new (int, string)[]
+                        {
+                           (5, "Argon2id (strongest)"),
+                           (4, "PBKDF2 (default)"),
+                           (3, "SHA-256"),
+                           (2, "MD5 (legacy)"),
+                           (1, "Blowfish (legacy)")
+                        }
+                     },
+                     new ChoiceSetting
+                     {
+                        Key = "MinimumAcceptedHashAlgorithm",
+                        Default = 0,
+                        Label = "Reject logins using a weaker stored hash than",
+                        Options = new (int, string)[]
+                        {
+                           (0, "Accept any stored hash"),
+                           (3, "SHA-256 or stronger"),
+                           (4, "PBKDF2 or stronger"),
+                           (5, "Argon2id only")
+                        }
+                     },
                      new SecretSetting { Key = "PasswordPepper", Label = "Password pepper — WARNING: set before creating accounts; changing it later invalidates ALL existing passwords", Note = "Server-wide secret mixed into password hashes" }
+                  }
+               });
+               cards_.Add(new CardDef
+               {
+                  Title = "SMTP authentication",
+                  Blurb = "AUTH is normally offered on every SMTP port. List the local TCP ports where it should not be, " +
+                          "for example a port 25 that only accepts inbound mail from other servers.",
+                  Settings =
+                  {
+                     new TextSetting { Key = "DisableAUTHList", Label = "Do not offer AUTH on these local TCP ports (comma separated)", Placeholder = "25" }
+                  }
+               });
+               break;
+
+            case Section.Dns:
+               TitleText.Text = "DNS resolver";
+               SubtitleText.Text = "How this server resolves MX, PTR, SPF, DKIM, DMARC and blacklist lookups " +
+                                   "(hMailServer.INI). Changes take effect after a service restart.";
+               cards_.Add(new CardDef
+               {
+                  Title = "Name servers",
+                  Blurb = "Which resolver hMailServer queries. Leave empty to use the name servers Windows is configured with. " +
+                          "The override takes a single IPv4 address and is used on port 53; DNSSEC validation and its trust " +
+                          "anchors are on the Transport security page.",
+                  Settings =
+                  {
+                     new TextSetting { Key = "DNSServer", Label = "Override DNS server (empty = the name servers Windows uses)", Placeholder = "1.1.1.1" }
+                  }
+               });
+               cards_.Add(new CardDef
+               {
+                  Title = "DNS cache",
+                  Blurb = "Keeps DNS answers in memory for their TTL so repeated lookups for the same host do not go out to " +
+                          "the network again. It only reduces the number of lookups — it is not a substitute for a local " +
+                          "caching resolver on a busy server. Setting an override DNS server above always bypasses the cache.",
+                  Settings =
+                  {
+                     new BoolSetting { Key = "UseDNSCache", Default = true, Label = "Cache DNS lookup results in memory" }
+                  }
+               });
+               cards_.Add(new CardDef
+               {
+                  Title = "DNS blacklist checks",
+                  Blurb = "When during the SMTP conversation blacklist lookups happen. Which blacklists are queried is on the " +
+                          "DNS blacklists page.",
+                  Settings =
+                  {
+                     new BoolSetting { Key = "DNSBLChecksAfterMailFrom", Default = true, Label = "Run DNSBL checks after MAIL FROM (rather than at connect)" }
+                  }
+               });
+               break;
+
+            case Section.WebServices:
+               TitleText.Text = "Web services & client autoconfiguration";
+               SubtitleText.Text = "The built-in HTTP listener that serves mail-client autoconfiguration and MTA-STS " +
+                                   "policies for your local domains (hMailServer.INI). Changes take effect after a " +
+                                   "service restart.";
+               cards_.Add(new CardDef
+               {
+                  Title = "Listener",
+                  Blurb = "Nothing below is served until a port is set here. The server answers on either port, but an " +
+                          "MTA-STS policy is only valid over HTTPS and Outlook only accepts autodiscover over HTTPS — " +
+                          "so in practice set the HTTPS port and a certificate covering the host names clients use.",
+                  Settings =
+                  {
+                     new TextSetting { Key = "WebServicesHttpPort", Default = "0", Label = "HTTP port (80 to enable, 0 = disabled)" },
+                     new TextSetting { Key = "WebServicesHttpsPort", Default = "0", Label = "HTTPS port (443 to enable, 0 = disabled)" },
+                     new TextSetting { Key = "WebServicesBindAddress", Default = "0.0.0.0", Label = "Bind address" },
+                     new PathSetting { Key = "WebServicesCertificateFile", FileFilter = "PEM/certificate files (*.pem;*.crt;*.cer)|*.pem;*.crt;*.cer|All files (*.*)|*.*", Label = "TLS certificate file (PEM, optional)", Placeholder = "Falls back to the ACME certificate" },
+                     new PathSetting { Key = "WebServicesPrivateKeyFile", FileFilter = "PEM/key files (*.pem;*.key)|*.pem;*.key|All files (*.*)|*.*", Label = "TLS private key file (PEM, optional)" }
+                  }
+               });
+               cards_.Add(new CardDef
+               {
+                  Title = "Client autoconfiguration (autoconfig & autodiscover)",
+                  Blurb = "Hands mail clients the right host names, ports and security settings automatically: Thunderbird-style " +
+                          "autoconfig and Outlook autodiscover, for every local domain. Point autoconfig.<domain> and " +
+                          "autodiscover.<domain> at this server in DNS.",
+                  Settings =
+                  {
+                     new BoolSetting { Key = "AutoconfigEnabled", Default = true, Label = "Thunderbird autoconfig + Outlook autodiscover" },
+                     new TextSetting { Key = "AutoconfigClientHost", Label = "Host name clients connect to (empty = server host name)" }
+                  }
+               });
+               cards_.Add(new CardDef
+               {
+                  Title = "MTA-STS policy hosting",
+                  Blurb = "Publishes https://mta-sts.<domain>/.well-known/mta-sts.txt so other servers require TLS when they " +
+                          "deliver to you. Honouring other domains' policies is on the Transport security page.",
+                  Settings =
+                  {
+                     new BoolSetting { Key = "MtaStsHostingEnabled", Default = true, Label = "Serve MTA-STS policies for local domains" },
+                     new TextSetting { Key = "MtaStsPolicyMode", Default = "enforce", Label = "MTA-STS policy mode (enforce / testing / none)" },
+                     new TextSetting { Key = "MtaStsPolicyMaxAge", Default = "604800", Label = "Policy max age (seconds; default 604800 = 7 days)" },
+                     new TextSetting { Key = "MtaStsPolicyMx", Label = "Policy MX host patterns (empty = derive from each domain's MX)", Placeholder = "mail.yourdomain.com, *.yourdomain.com" }
                   }
                });
                break;

@@ -1126,13 +1126,29 @@ namespace HM
       // Move the data from the incoming buffer to the transparent transmission buffer.
       // If we've received more data than the max message size, don't save it.
 
-      transmission_buffer_->Append(pBuf->GetBuffer(), pBuf->GetSize());
+      const size_t incoming_bytes = pBuf->GetSize();
+
+      transmission_buffer_->Append(pBuf->GetBuffer(), incoming_bytes);
 
       // We need current message size in KB
       size_t iBufSizeKB = transmission_buffer_->GetSize() / 1024;
 
       // Clear the old buffer
       pBuf->Empty();
+
+      // Message reception is otherwise silent between "354" and the final reply,
+      // so a session that stalls mid-transfer leaves nothing in the log to say
+      // whether data was still arriving, whether end-of-data was recognised, or
+      // whether the delay was in the accept/save stage that follows.
+      if (Logger::Instance()->GetLogDebug())
+      {
+         String debug_message;
+         debug_message.Format(_T("SMTPConnection - DATA: received %Iu bytes, %Iu buffered, end-of-data %s."),
+            incoming_bytes, transmission_buffer_->GetSize(),
+            transmission_buffer_->GetTransmissionEnded() ? _T("detected") : _T("not yet seen"));
+
+         LOG_DEBUG(debug_message);
+      }
 
       // Check if it's time to flush.
       if (transmission_buffer_->GetRequiresFlush())
@@ -1186,6 +1202,11 @@ namespace HM
    void
    SMTPConnection::HandleSMTPFinalizationTaskCompleted_()
    {
+      // Marks the boundary between "still receiving" and "accepting the message"
+      // (spam/virus scanning, rules, saving). Without it a stalled session cannot
+      // be told apart from one that is simply waiting for more data.
+      LOG_DEBUG("SMTPConnection - Message received; running accept/save processing.");
+
       if (!DoPreAcceptSpamProtection_())
       {
          // This message was stopped by spam protection. The user either needs

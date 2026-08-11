@@ -88,6 +88,7 @@ namespace hMailServer.ControlPanel
          pageFactories_["tls"] = () => new ServerSettingsView(ServerSettingsView.Section.Tls);
          pageFactories_["performance"] = () => new ServerSettingsView(ServerSettingsView.Section.Performance);
          pageFactories_["advanced"] = () => new ServerSettingsView(ServerSettingsView.Section.Advanced);
+         pageFactories_["adminaccess"] = () => new ServerSettingsView(ServerSettingsView.Section.AdminAccess);
          pageFactories_["groups"] = () => CollectionSpecs.Groups();
          pageFactories_["servermessages"] = () => CollectionSpecs.ServerMessages();
          pageFactories_["scripts"] = () => new ScriptsView();
@@ -99,6 +100,9 @@ namespace hMailServer.ControlPanel
          pageFactories_["acme"] = () => new FeatureSettingsView(FeatureSettingsView.Section.Automation);
          pageFactories_["api"] = () => new FeatureSettingsView(FeatureSettingsView.Section.Integration);
          pageFactories_["hardening"] = () => new FeatureSettingsView(FeatureSettingsView.Section.Hardening);
+         pageFactories_["authentication"] = () => new FeatureSettingsView(FeatureSettingsView.Section.Authentication);
+         pageFactories_["dns"] = () => new FeatureSettingsView(FeatureSettingsView.Section.Dns);
+         pageFactories_["webservices"] = () => new FeatureSettingsView(FeatureSettingsView.Section.WebServices);
          pageFactories_["backup"] = () => new BackupView();
          pageFactories_["mxquery"] = () => new MxQueryView();
          pageFactories_["sendout"] = () => new SendoutView();
@@ -165,6 +169,8 @@ namespace hMailServer.ControlPanel
                Item("Blocked attachments", "blockedattachments")),
             Item("Logging", "logging"),
             Group("Security",
+               Item("Authentication", "authentication"),
+               Item("Administrative access", "adminaccess"),
                Item("Auto-ban & SSL/TLS", "tls"),
                Item("IP ranges", "ipranges"),
                Item("SSL certificates", "certs"),
@@ -173,6 +179,8 @@ namespace hMailServer.ControlPanel
             Group("Network",
                Item("TCP/IP ports", "ports"),
                Item("Incoming relays", "relays"),
+               Item("DNS resolver", "dns"),
+               Item("Web services & autoconfiguration", "webservices"),
                Item("API & monitoring", "api")),
             Group("Maintenance",
                Item("Performance", "performance"),

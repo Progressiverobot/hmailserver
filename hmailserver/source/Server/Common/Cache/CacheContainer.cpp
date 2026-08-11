@@ -39,7 +39,9 @@ namespace HM
    {
       // Limit the cache of each entity to 10MB each.
       Cache<Domain>::Instance()->SetMaxSize(10 * 1024 * 1024);
-      Cache<Domain>::Instance()->SetMaxSize(10 * 1024 * 1024);
+      // Was a duplicated Cache<Domain>: the account cache had no size limit at
+      // all, so it grew without bound until the server was restarted.
+      Cache<Account>::Instance()->SetMaxSize(10 * 1024 * 1024);
       Cache<Alias>::Instance()->SetMaxSize(10 * 1024 * 1024);
       Cache<DistributionList>::Instance()->SetMaxSize(10 * 1024 * 1024);
 

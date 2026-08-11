@@ -460,6 +460,8 @@
     <Compile Include="IMAP\Append.cs" />
     <Compile Include="IMAP\Examine.cs" />
     <Compile Include="IMAP\Fetch.cs" />
+    <Compile Include="IMAP\SequenceSets.cs" />
+    <Compile Include="SMTP\AbortedTransfers.cs" />
     <Compile Include="Infrastructure\ExceptionHandlerTests.cs" />
     <Compile Include="Infrastructure\Persistence\TCPIPPortTests.cs" />
     <Compile Include="Infrastructure\RetryHelper.cs" />

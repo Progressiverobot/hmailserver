@@ -24,7 +24,12 @@
                                    VerticalAlignment="Bottom" ToolTip="Browse for a folder" Click="BrowseDestination_Click" />
                     </Grid>
                     <CheckBox x:Name="CheckDomains" Content="Back up domains (accounts, aliases, lists)" FontSize="13.5" Margin="0,0,0,12" />
-                    <CheckBox x:Name="CheckMessages" Content="Back up messages" FontSize="13.5" Margin="0,0,0,12" />
+                    <CheckBox x:Name="CheckMessages" Content="Back up messages" FontSize="13.5" Margin="0,0,0,8" />
+                    <CheckBox x:Name="CheckMessagesDbOnly" Content="Message metadata only — do not copy the message files"
+                              FontSize="13.5" Margin="22,0,0,4" />
+                    <TextBlock x:Name="MessagesDbOnlyNote" MaxWidth="520" HorizontalAlignment="Left"
+                               Text="hMailServer.ini setting BackupMessagesDBOnly. The backup then records which messages exist but not their contents, and a restore expects the files to still be in the data folder. Applies to backup and restore, after a service restart."
+                               FontSize="12" Opacity="0.65" TextWrapping="Wrap" Margin="22,0,0,12" />
                     <CheckBox x:Name="CheckSettings" Content="Back up settings" FontSize="13.5" Margin="0,0,0,12" />
                     <CheckBox x:Name="CheckCompress" Content="Compress destination files (zip)" FontSize="13.5" Margin="0,0,0,14" />
                     <StackPanel Orientation="Horizontal">

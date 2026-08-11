@@ -7,6 +7,11 @@ namespace hMailServer.ControlPanel.Views
 {
    public partial class BackupView : UserControl, IPageLifecycle
    {
+      // BackupMessagesDBOnly changes what a backup and a restore do, but it lives
+      // in hMailServer.ini rather than in the COM backup settings, so it needs its
+      // own store alongside the COM properties on this page.
+      private readonly IniFeatureStore iniStore_ = new IniFeatureStore();
+
       public BackupView()
       {
          InitializeComponent();
@@ -14,6 +19,17 @@ namespace hMailServer.ControlPanel.Views
 
       public void OnEnter()
       {
+         if (iniStore_.IsAvailable)
+         {
+            CheckMessagesDbOnly.IsChecked = iniStore_.ReadBool("BackupMessagesDBOnly", false);
+         }
+         else
+         {
+            CheckMessagesDbOnly.IsEnabled = false;
+            MessagesDbOnlyNote.Text = "hMailServer.ini was not found on this machine, so BackupMessagesDBOnly " +
+                                      "can only be changed on the server itself.";
+         }
+
          try
          {
             dynamic backup = ServerSession.Current.Application.Settings.Backup;
@@ -38,6 +54,9 @@ namespace hMailServer.ControlPanel.Views
       {
          try
          {
+            if (iniStore_.IsAvailable)
+               iniStore_.WriteBool("BackupMessagesDBOnly", CheckMessagesDbOnly.IsChecked == true);
+
             dynamic backup = ServerSession.Current.Application.Settings.Backup;
             // IInterfaceBackupSettings has no Save method: each property setter
             // writes straight through to the server's settings store, so the
@@ -75,7 +94,11 @@ namespace hMailServer.ControlPanel.Views
       {
          if (SaveBackupSettings())
          {
-            SubtitleText.Text = "Backup settings saved.";
+            // The COM properties are live immediately; the INI one is read when
+            // the service starts, so don't claim both took effect.
+            SubtitleText.Text = iniStore_.IsAvailable
+               ? "Backup settings saved - the message-metadata-only switch applies after a service restart."
+               : "Backup settings saved.";
             Services.Toast.Success("Backup settings saved.");
          }
       }

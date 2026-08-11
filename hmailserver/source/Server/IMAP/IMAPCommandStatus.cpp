@@ -93,7 +93,20 @@ namespace HM
       {
          // RFC 9051 (IMAP4rev2): RECENT was removed as a STATUS data item.
          String sTemp;
-         long lNoOfRecent = (int) pConnection->GetRecentMessages().size();
+
+         // Count \Recent in the folder being asked about. Using the connection's
+         // set reported the SELECTED folder's count for every folder queried, so
+         // clients polling all folders lit up new-mail indicators on folders that
+         // had received nothing. For the selected folder the session's set is
+         // still the right answer, because its recent flags have already been
+         // consumed from the database by SELECT.
+         std::shared_ptr<IMAPFolder> pCurrentFolder = pConnection->GetCurrentFolder();
+         bool queryingSelectedFolder = pCurrentFolder && pCurrentFolder->GetID() == pTheFolder->GetID();
+
+         long lNoOfRecent = queryingSelectedFolder
+            ? (long) pConnection->GetRecentMessages().size()
+            : (long) pMessages->GetRecentMessageIDs().size();
+
          sTemp.Format(_T("RECENT %d"), lNoOfRecent);
 
          if (bAddSpace)

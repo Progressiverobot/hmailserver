@@ -30,7 +30,8 @@ namespace HM
       bool BackupDomains_(XNode *pNode);
       bool BackupDataDirectory_(const String &sDataBackupDir);
 
-      void RestoreDataDirectory_(std::shared_ptr<Backup> pBackup, XNode *pBackupNode);
+      bool RestoreDataDirectory_(std::shared_ptr<Backup> pBackup, XNode *pBackupNode);
+      void ReportRestoreFailure_(const String &message);
       
       int backup_mode_;
       

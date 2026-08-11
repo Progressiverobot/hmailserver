@@ -69,5 +69,10 @@ namespace HM
       // response can report the highest mod-sequence among the matched messages.
       bool modseq_search_;
       __int64 highest_modseq_;
+
+      // What "*" stands for in a search key that carries a sequence set. Captured once
+      // for the mailbox being searched, before the per-message matching starts.
+      int max_uid_;
+      int message_count_;
    };
 }

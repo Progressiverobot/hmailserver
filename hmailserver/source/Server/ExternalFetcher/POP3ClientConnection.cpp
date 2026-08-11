@@ -53,7 +53,8 @@ namespace HM
                                               AnsiString remote_hostname) :
       TCPConnection(connectionSecurity, io_context, context, disconnected, remote_hostname),
       account_(pAccount),
-      current_state_(StateConnected)
+      current_state_(StateConnected),
+      retr_failed_(false)
    {
 
       /*
@@ -445,6 +446,7 @@ namespace HM
             EnqueueWrite_(sResponse);
 
             current_state_ = StateRETRSent;
+            retr_failed_ = false;
 
             // Reset the transmission buffer. It will be
             // recreated when we receive binary the next time.
@@ -568,8 +570,10 @@ namespace HM
          return;
       }
 
+      retr_failed_ = true;
+
       SetReceiveBinary(false);
-      
+
       // Do a mailbox cleanup and disconnect after that.
       StartMailboxCleanup_();
    }
@@ -714,6 +718,18 @@ namespace HM
          pBuf->Add(_firstRetrResponseBuffer);
          _firstRetrResponseBuffer->Empty();
 
+         if (retr_failed_)
+         {
+            // The remote server rejected the RETR, so no message data follows and
+            // ParseRETRResponse_ has already moved the session on to the cleanup.
+            // Creating a message file here would leave a file behind in the data
+            // directory which no database row ever refers to.
+            pBuf->Empty();
+
+            EnqueueRead("");
+            return;
+         }
+
          String fileName = PersistentMessage::GetFileName(current_message_);
 
          // Create a binary buffer for this message. 
@@ -762,6 +778,19 @@ namespace HM
       {
          // Error handling.
          LOG_DEBUG("POP3 External Account: Message is 0 bytes.");
+
+         // The file was created before the transfer was abandoned, and the message
+         // is never saved, so remove the file rather than leaving it behind in the
+         // data directory with no database row referring to it. The buffer is
+         // released first since it may still hold the file open.
+         transmission_buffer_.reset();
+
+         if (!FileUtilities::DeleteFile(fileName))
+         {
+            ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5703, "POP3ClientConnection::HandlePOP3FinalizationTaskCompleted_",
+               "Could not delete the incomplete downloaded message file: " + fileName);
+         }
+
          QuitNow_();
          return;
       }
@@ -915,9 +944,27 @@ namespace HM
          current_message_->SetState(Message::Delivering);
 
          PersistentMessage::SaveObject(current_message_);
+
+         return;
       }
 
+      // Nothing in the message resolved to a local account, so it is never saved.
+      // The downloaded file has already been written though, and without this it
+      // would stay in the data directory forever with no database row referring to
+      // it - one file per such message, every time the account is checked.
+      String fileName = PersistentMessage::GetFileName(current_message_);
 
+      if (!FileUtilities::DeleteFile(fileName))
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5704, "POP3ClientConnection::SaveMessage_",
+            "Could not delete the message file for a downloaded message with no local recipients: " + fileName);
+         return;
+      }
+
+      String sMessage;
+      sMessage.Format(_T("POP3 External Account: A message downloaded from %s was discarded because none of its recipients belong to this server."),
+         account_->GetName().c_str());
+      LOG_APPLICATION(sMessage);
    }
 
    void 

@@ -391,19 +391,51 @@ namespace hMailServer.ControlPanel.Views
          VerticalScrollBarVisibility = ScrollBarVisibility.Auto
       };
 
+      // Message-store consistency. The server has no COM surface for this scan -
+      // it is a background task gated on hMailServer.INI MessageStoreConsistencyCheck
+      // that rewrites a recovery report in the log folder on every run - so the
+      // Control Panel shows the result by reading that report.
+      private readonly TextBlock consistencyStatus_ = new()
+      {
+         FontSize = 12.5,
+         TextWrapping = TextWrapping.Wrap,
+         Margin = new Thickness(0, 0, 0, 10)
+      };
+      private readonly ListView consistencyList_ = new()
+      {
+         BorderThickness = new Thickness(0),
+         Background = System.Windows.Media.Brushes.Transparent,
+         // A badly damaged store can list thousands of messages; cap the section
+         // so it scrolls internally instead of pushing the page around.
+         MaxHeight = 260,
+         Visibility = Visibility.Collapsed
+      };
+      private readonly Wpf.Ui.Controls.Button consistencyRefresh_ = new() { Content = "Refresh" };
+      private readonly Wpf.Ui.Controls.Button consistencyOpen_ = new()
+      {
+         Content = "Open report",
+         Margin = new Thickness(8, 0, 0, 0),
+         IsEnabled = false
+      };
+      private string reportPath_;
+      private bool loadingReport_;
+
       public DiagnosticsView()
       {
          var grid = new Grid { Margin = new Thickness(26, 20, 26, 20) };
          grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
          grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
          grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+         // Auto so the consistency card is only as tall as what it has to say -
+         // a clean scan is one line, and the connectivity output keeps the rest.
+         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
          var header = new StackPanel();
          var title = new TextBlock { Text = "Diagnostics" };
          title.SetResourceReference(StyleProperty, "PageTitle");
          header.Children.Add(title);
          var sub = new TextBlock { Text = "Runs the server's built-in connectivity and configuration checks (outbound port 25, MX resolution, backup directory, IP configuration). " +
-            "The periodic message-store consistency scan is separate: enable it on the Advanced INI settings page; it writes hMailServer_messagestore_consistency.report to the log folder." };
+            "The message-store consistency scan below is a separate read-only background task - the server runs it at start-up and hourly and records what it found in a recovery report." };
          sub.SetResourceReference(StyleProperty, "PageSubtitle");
          header.Children.Add(sub);
          grid.Children.Add(header);
@@ -429,17 +461,83 @@ namespace hMailServer.ControlPanel.Views
          Grid.SetRow(inputRow, 1);
          grid.Children.Add(inputRow);
 
-         var card = new Border { Padding = new Thickness(12) };
+         var card = new Border { Padding = new Thickness(12), Margin = new Thickness(0, 0, 0, 12) };
          card.SetResourceReference(StyleProperty, "Card");
          card.Child = output_;
          Grid.SetRow(card, 2);
          grid.Children.Add(card);
 
+         var consistencyCard = new Border();
+         consistencyCard.SetResourceReference(StyleProperty, "Card");
+         consistencyCard.Child = BuildConsistencySection();
+         Grid.SetRow(consistencyCard, 3);
+         grid.Children.Add(consistencyCard);
+
          Content = grid;
+      }
+
+      private FrameworkElement BuildConsistencySection()
+      {
+         var section = new Grid();
+         section.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+         section.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+         section.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+
+         var titleRow = new Grid { Margin = new Thickness(0, 0, 0, 12) };
+         titleRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+         titleRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+         titleRow.Children.Add(new TextBlock
+         {
+            Text = "Message-store consistency",
+            FontSize = 15,
+            FontWeight = FontWeights.SemiBold,
+            VerticalAlignment = VerticalAlignment.Center
+         });
+
+         var consistencyActions = new StackPanel { Orientation = Orientation.Horizontal };
+         consistencyRefresh_.Click += async (s, e) => await LoadConsistencyReport();
+         consistencyActions.Children.Add(consistencyRefresh_);
+         consistencyOpen_.Click += (s, e) => OpenReport();
+         consistencyActions.Children.Add(consistencyOpen_);
+         Grid.SetColumn(consistencyActions, 1);
+         titleRow.Children.Add(consistencyActions);
+         section.Children.Add(titleRow);
+
+         Grid.SetRow(consistencyStatus_, 1);
+         section.Children.Add(consistencyStatus_);
+
+         var columns = new GridView();
+         columns.Columns.Add(new GridViewColumn
+         {
+            Header = "Message ID",
+            DisplayMemberBinding = new System.Windows.Data.Binding(nameof(Services.MessageStoreConsistencyEntry.MessageId)),
+            Width = 110
+         });
+         columns.Columns.Add(new GridViewColumn
+         {
+            Header = "Account",
+            DisplayMemberBinding = new System.Windows.Data.Binding(nameof(Services.MessageStoreConsistencyEntry.Account)),
+            Width = 220
+         });
+         columns.Columns.Add(new GridViewColumn
+         {
+            Header = "Expected file",
+            DisplayMemberBinding = new System.Windows.Data.Binding(nameof(Services.MessageStoreConsistencyEntry.ExpectedPath)),
+            Width = 480
+         });
+         consistencyList_.View = columns;
+         Grid.SetRow(consistencyList_, 2);
+         section.Children.Add(consistencyList_);
+
+         return section;
       }
 
       public void OnEnter()
       {
+         // The report is a local file, so read it off the UI thread the same way
+         // the diagnostics run does; nothing else on the page depends on it.
+         _ = LoadConsistencyReport();
+
          // Suggest the first hosted domain as the local domain.
          if (localDomain_.Text.Length > 0)
             return;
@@ -507,6 +605,196 @@ namespace hMailServer.ControlPanel.Views
          });
 
          output_.Text = report;
+      }
+
+      /// <summary>
+      /// What the last consistency scan found, ready for the UI thread. The
+      /// server never returns this over COM, so everything here comes from
+      /// hMailServer.INI and the recovery report the scan writes.
+      /// </summary>
+      private sealed class ConsistencyResult
+      {
+         public string Message;
+         public Severity Level;
+         public string ReportPath;
+         public IReadOnlyList<Services.MessageStoreConsistencyEntry> Entries;
+      }
+
+      private enum Severity
+      {
+         Neutral,
+         Good,
+         Bad
+      }
+
+      private async Task LoadConsistencyReport()
+      {
+         // OnEnter starts a load without awaiting it, so guard against a second
+         // one overlapping when the page is re-entered while the first is
+         // running.
+         if (loadingReport_)
+            return;
+         loadingReport_ = true;
+
+         consistencyRefresh_.IsEnabled = false;
+         consistencyOpen_.IsEnabled = false;
+         consistencyList_.ItemsSource = null;
+         consistencyList_.Visibility = Visibility.Collapsed;
+         consistencyStatus_.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
+         consistencyStatus_.Text = "Reading the recovery report...";
+         reportPath_ = null;
+
+         try
+         {
+            ConsistencyResult result = await Task.Run(ReadConsistencyReport);
+
+            reportPath_ = result.ReportPath;
+            consistencyStatus_.Text = result.Message;
+            switch (result.Level)
+            {
+               case Severity.Good:
+                  consistencyStatus_.Foreground = Services.ThemeTokens.Success;
+                  break;
+               case Severity.Bad:
+                  consistencyStatus_.Foreground = Services.ThemeTokens.Danger;
+                  break;
+               default:
+                  consistencyStatus_.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
+                  break;
+            }
+
+            if (result.Entries != null && result.Entries.Count > 0)
+            {
+               consistencyList_.ItemsSource = result.Entries;
+               consistencyList_.Visibility = Visibility.Visible;
+            }
+         }
+         catch (Exception ex)
+         {
+            // Nothing awaits the load started from OnEnter, so report the failure
+            // on the page rather than losing it in an unobserved task.
+            consistencyStatus_.Text = "Could not read the consistency report: " + ex.Message;
+            consistencyStatus_.Foreground = Services.ThemeTokens.Danger;
+         }
+         finally
+         {
+            consistencyOpen_.IsEnabled = reportPath_ != null;
+            consistencyRefresh_.IsEnabled = true;
+            loadingReport_ = false;
+         }
+      }
+
+      private static ConsistencyResult ReadConsistencyReport()
+      {
+         var store = new IniFeatureStore();
+         if (!store.IsAvailable)
+         {
+            return new ConsistencyResult
+            {
+               Level = Severity.Neutral,
+               Message = "The scan result is only readable on the server machine - hMailServer.INI was not found here. " +
+                         "The server publishes the same number as the hmailserver_messagestore_missing_files metric."
+            };
+         }
+
+         bool enabled = store.ReadBool("MessageStoreConsistencyCheck", false);
+         string logFolder = store.GetLogFolder();
+
+         if (string.IsNullOrWhiteSpace(logFolder))
+         {
+            return new ConsistencyResult
+            {
+               Level = Severity.Neutral,
+               Message = "No log folder is configured in hMailServer.INI, so the server has nowhere to write the recovery report."
+            };
+         }
+
+         string path = System.IO.Path.Combine(logFolder, Services.MessageStoreConsistencyReport.FileName);
+         string enabledNote = enabled
+            ? ""
+            : " The periodic check is currently switched off (MessageStoreConsistencyCheck on the Advanced INI settings page), so this will not be refreshed.";
+
+         string text;
+         try
+         {
+            if (!System.IO.File.Exists(path))
+            {
+               return new ConsistencyResult
+               {
+                  Level = Severity.Neutral,
+                  Message = enabled
+                     ? "The consistency check is enabled but has not written a report yet. The server scans at start-up and then hourly, and writes " + path + "."
+                     : "The consistency check is switched off, so no scan has run. Enable MessageStoreConsistencyCheck on the Advanced INI settings page; " +
+                       "the server then scans at start-up and hourly and writes " + path + "."
+               };
+            }
+
+            using var stream = new System.IO.FileStream(path, System.IO.FileMode.Open, System.IO.FileAccess.Read,
+               System.IO.FileShare.ReadWrite | System.IO.FileShare.Delete);
+            using var reader = new System.IO.StreamReader(stream);
+            text = reader.ReadToEnd();
+         }
+         catch (Exception ex)
+         {
+            return new ConsistencyResult
+            {
+               Level = Severity.Neutral,
+               ReportPath = path,
+               Message = "Could not read " + path + ": " + ex.Message
+            };
+         }
+
+         Services.MessageStoreConsistencyReport report = Services.MessageStoreConsistencyReport.Parse(text);
+         string when = string.IsNullOrEmpty(report.Generated) ? "" : " Last scan: " + report.Generated + ".";
+         string truncated = report.IsTruncated
+            ? " The report header says " + report.ReportedMissingCount.Value + " but lists " + report.Entries.Count +
+              " - it was probably read while the server was rewriting it, so refresh."
+            : "";
+
+         if (report.MissingCount == 0)
+         {
+            return new ConsistencyResult
+            {
+               Level = Severity.Good,
+               ReportPath = path,
+               Message = "No problems found - every message row has its file on disk." + when + truncated + enabledNote
+            };
+         }
+
+         return new ConsistencyResult
+         {
+            Level = Severity.Bad,
+            ReportPath = path,
+            Entries = report.Entries,
+            Message = report.MissingCount + (report.MissingCount == 1 ? " message references a file" : " messages reference a file") +
+                      " that is missing on disk." + when + truncated + enabledNote +
+                      " The check is read-only: the server does not delete or repair anything."
+         };
+      }
+
+      private void OpenReport()
+      {
+         if (reportPath_ == null)
+            return;
+
+         try
+         {
+            // .report has no shell association on a stock Windows install, so
+            // fall back to revealing the file in Explorer instead of leaving the
+            // administrator with an "Open with" dialog and no report.
+            Process.Start(new ProcessStartInfo(reportPath_) { UseShellExecute = true });
+         }
+         catch (Exception)
+         {
+            try
+            {
+               Process.Start(new ProcessStartInfo("explorer.exe", "/select,\"" + reportPath_ + "\"") { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+               MessageBox.Show("Could not open " + reportPath_ + ": " + ex.Message, "Control Panel");
+            }
+         }
       }
    }
 }

@@ -46,20 +46,31 @@ namespace HM
          prependString += field.first + ": " + field.second + "\r\n";
       }
       
-      if (!temporaryFile.Write(prependString))
-         return false;
+      bool written = temporaryFile.Write(prependString);
 
-      File messageFile;
-      if (!messageFile.Open(messageFileName, File::OTReadOnly))
-         return false;
+      if (written)
+      {
+         File messageFile;
 
-      if (!temporaryFile.Write(messageFile))
-         return false;
+         written = messageFile.Open(messageFileName, File::OTReadOnly) &&
+                   temporaryFile.Write(messageFile);
+      }
 
       temporaryFile.Close();
-      messageFile.Close();
 
-      return FileUtilities::Move(tempFile, messageFileName, true);
+      // Every failure here leaves a rewritten copy of the message on disk that
+      // nothing refers to. This runs for every DKIM signature, ARC seal, local
+      // delivery and SpamAssassin result, so a full disk or a message file locked
+      // by a scanner would otherwise drop one orphan per message into the
+      // account's folder, where the consistency check would never notice it (it
+      // looks for database rows with no file, not files with no row).
+      if (!written || !FileUtilities::Move(tempFile, messageFileName, true))
+      {
+         FileUtilities::DeleteFile(tempFile);
+         return false;
+      }
+
+      return true;
    }
 
 }

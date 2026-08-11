@@ -112,7 +112,7 @@ namespace HM
 
       if (FileUtilities::FileSize(fileName) > MaxFileSize)
       {
-         LOG_DEBUG("Message was not signed using DKIM since the size of the message exceeded the max DKIM size of 10MB.");
+         LOG_DEBUG("Message was not signed using DKIM since the size of the message exceeded the max DKIM size of 50MB.");
          return true;
       }
 
@@ -150,7 +150,11 @@ namespace HM
 
       String headerValue = BuildSignatureHeader_(tagA, tagDomain, tagSelector, tagC, tagQ, fieldList, bodyHash, "");
       
-      canonicalizedHeader += headerCanonicalization->CanonicalizeHeaderLine("dkim-signature", headerValue);
+      // The header name must be hashed exactly as it is written to the message:
+      // "simple" header canonicalization preserves the case, so signing over
+      // "dkim-signature" while emitting "DKIM-Signature" produced a signature
+      // that could not verify. (Fix from upstream hMailServer, PR #530.)
+      canonicalizedHeader += headerCanonicalization->CanonicalizeHeaderLine("DKIM-Signature", headerValue);
 
       AnsiString signatureString = SignHash_(privateKeyContent, canonicalizedHeader, algorithm);
       if (signatureString == "")
@@ -163,7 +167,7 @@ namespace HM
 
       // output to file.
       std::vector<std::pair<AnsiString, AnsiString> > fieldsToWrite;
-      fieldsToWrite.push_back(std::make_pair("dkim-signature", headerValue));
+      fieldsToWrite.push_back(std::make_pair("DKIM-Signature", headerValue));
 
       TraceHeaderWriter writer;
       bool result = writer.Write(fileName, message, fieldsToWrite);

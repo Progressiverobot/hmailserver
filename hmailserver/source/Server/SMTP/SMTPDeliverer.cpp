@@ -365,8 +365,21 @@ namespace HM
          // A bounce/NDR was actually generated and queued for the sender.
          ServerStatus::Instance()->OnMessageBounced();
       }
+      else
+      {
+         // Nobody to send the bounce to (a null sender, or an address that no
+         // longer resolves). The file was already written, so remove it rather
+         // than leaving an orphan in the queue directory with no database row.
+         const String orphanedFile = PersistentMessage::GetFileName(pMsg);
 
-      LOG_DEBUG("SD::~SubmitErrorLog_"); 
+         if (!FileUtilities::DeleteFile(orphanedFile))
+         {
+            ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5212, "SMTPDeliverer::SubmitErrorLog_",
+               "Could not delete the unsent bounce message file: " + orphanedFile);
+         }
+      }
+
+      LOG_DEBUG("SD::~SubmitErrorLog_");
 
    }
 

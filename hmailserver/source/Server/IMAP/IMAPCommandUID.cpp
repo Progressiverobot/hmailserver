@@ -34,8 +34,9 @@ namespace HM
    namespace
    {
       // Parses an IMAP UID sequence-set (e.g. "1,3:5,8:*") into inclusive [first,last]
-      // ranges. "*" is represented as the maximum UID value.
-      std::vector<std::pair<unsigned int, unsigned int>> ParseUidSet_(const String &sUidSet)
+      // ranges. starValue is what "*" stands for: normally the largest UID in the
+      // mailbox, but see the VANISHED call site for why it is sometimes unbounded.
+      std::vector<std::pair<unsigned int, unsigned int>> ParseUidSet_(const String &sUidSet, unsigned int starValue)
       {
          std::vector<std::pair<unsigned int, unsigned int>> ranges;
 
@@ -51,8 +52,10 @@ namespace HM
                String first = part.Mid(0, colonPos);
                String second = part.Mid(colonPos + 1);
 
-               unsigned int start = (unsigned int) _ttoi(first);
-               unsigned int end = (second == _T("*")) ? (unsigned int) 0xFFFFFFFF : (unsigned int) _ttoi(second);
+               // RFC 3501: "*" is valid on either side of the colon, and a range is
+               // valid in either order.
+               unsigned int start = (first == _T("*")) ? starValue : (unsigned int) _ttoi(first);
+               unsigned int end = (second == _T("*")) ? starValue : (unsigned int) _ttoi(second);
 
                if (end < start)
                {
@@ -65,7 +68,7 @@ namespace HM
             }
             else if (part == _T("*"))
             {
-               ranges.push_back(std::pair<unsigned int, unsigned int>((unsigned int) 0, (unsigned int) 0xFFFFFFFF));
+               ranges.push_back(std::pair<unsigned int, unsigned int>(starValue, starValue));
             }
             else
             {
@@ -75,6 +78,19 @@ namespace HM
          }
 
          return ranges;
+      }
+
+      unsigned int GetLargestUid_(const std::vector<std::shared_ptr<Message>> &messages)
+      {
+         unsigned int maxUid = 0;
+
+         for (const std::shared_ptr<Message> &message : messages)
+         {
+            if (message->GetUID() > maxUid)
+               maxUid = message->GetUID();
+         }
+
+         return maxUid;
       }
    }
 
@@ -233,7 +249,8 @@ namespace HM
          if (sUidSet.IsEmpty() || !StringParser::ValidateString(sUidSet, "01234567890,.:*"))
             return IMAPResult(IMAPResult::ResultBad, "Incorrect mail number");
 
-         std::vector<std::pair<unsigned int, unsigned int>> ranges = ParseUidSet_(sUidSet);
+         std::vector<std::pair<unsigned int, unsigned int>> ranges =
+            ParseUidSet_(sUidSet, GetLargestUid_(pCurFolder->GetMessages()->GetCopy()));
 
          std::vector<__int64> expunged_messages_index;
          std::vector<__int64> expunged_messages_uid;
@@ -352,7 +369,11 @@ namespace HM
                std::vector<__int64> expunged = PersistentIMAPFolder::GetExpungedUIDsSince(pCurFolder->GetID(), fetchVanishedSince);
                if (!expunged.empty())
                {
-                  std::vector<std::pair<unsigned int, unsigned int>> vanishedRanges = ParseUidSet_(sMailNo);
+                  // "*" stays unbounded here: an expunged UID can be higher than
+                  // any UID still in the mailbox, so resolving it to the largest
+                  // surviving UID would hide the very messages this reports.
+                  std::vector<std::pair<unsigned int, unsigned int>> vanishedRanges =
+                     ParseUidSet_(sMailNo, (unsigned int) 0xFFFFFFFF);
                   std::vector<__int64> reported;
                   for (__int64 uid : expunged)
                   {

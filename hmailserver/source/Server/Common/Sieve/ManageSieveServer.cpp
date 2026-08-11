@@ -10,7 +10,9 @@
 
 #include "../BO/Account.h"
 #include "../Util/PasswordValidator.h"
+#include "../Util/AccountLogon.h"
 #include "../Util/Parsing/StringParser.h"
+#include "../TCPIP/IPAddress.h"
 
 #include <ws2tcpip.h>
 
@@ -199,7 +201,12 @@ namespace HM
    {
       for (;;)
       {
-         SOCKET clientSocket = accept(listen_socket_, nullptr, nullptr);
+         // Keep the peer address: failed authentications have to be reported to
+         // the same per-IP auto-ban accounting the other protocols use.
+         sockaddr_in6 clientAddress = {};
+         int addressLength = sizeof(clientAddress);
+
+         SOCKET clientSocket = accept(listen_socket_, (sockaddr*) &clientAddress, &addressLength);
 
          if (clientSocket == INVALID_SOCKET)
          {
@@ -209,8 +216,34 @@ namespace HM
             continue;
          }
 
-         HandleClient_(clientSocket);
+         HandleClient_(clientSocket, GetClientAddress_((sockaddr*) &clientAddress));
       }
+   }
+
+   IPAddress
+   ManageSieveServer::GetClientAddress_(const sockaddr *address)
+   {
+      IPAddress result;
+
+      if (address == nullptr)
+         return result;
+
+      wchar_t buffer[INET6_ADDRSTRLEN] = {};
+
+      if (address->sa_family == AF_INET6)
+      {
+         const sockaddr_in6 *v6 = reinterpret_cast<const sockaddr_in6*>(address);
+         if (InetNtopW(AF_INET6, (PVOID) &v6->sin6_addr, buffer, INET6_ADDRSTRLEN) != nullptr)
+            result.TryParse(String(buffer), true);
+      }
+      else if (address->sa_family == AF_INET)
+      {
+         const sockaddr_in *v4 = reinterpret_cast<const sockaddr_in*>(address);
+         if (InetNtopW(AF_INET, (PVOID) &v4->sin_addr, buffer, INET6_ADDRSTRLEN) != nullptr)
+            result.TryParse(String(buffer), true);
+      }
+
+      return result;
    }
 
    void
@@ -276,7 +309,7 @@ namespace HM
    }
 
    void
-   ManageSieveServer::HandleClient_(SOCKET client_socket)
+   ManageSieveServer::HandleClient_(SOCKET client_socket, const IPAddress &client_address)
    {
       DWORD timeout = 30000;
       setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*) &timeout, sizeof(timeout));
@@ -285,6 +318,7 @@ namespace HM
       std::string buffer;
       bool authenticated = false;
       String accountAddress;
+      int authentication_failures = 0;
 
       // Greeting: advertise capabilities then an OK.
       SendCapabilities_(client_socket);
@@ -365,10 +399,27 @@ namespace HM
             {
                authenticated = true;
                accountAddress = account->GetAddress();
+               authentication_failures = 0;
                Send_(client_socket, "OK \"Authentication successful.\"\r\n");
             }
             else
             {
+               // Feed the per-IP auto-ban accounting, then apply a per-connection
+               // cap. Without either, this listener allowed unlimited password
+               // guessing against real accounts, while every other protocol
+               // stopped it.
+               AccountLogon accountLogon;
+               bool disconnect = false;
+               accountLogon.RegisterFailedLogin(client_address, username, disconnect);
+
+               authentication_failures++;
+
+               if (disconnect || authentication_failures >= MaxAuthenticationFailures)
+               {
+                  Send_(client_socket, "NO \"Too many invalid logon attempts.\"\r\n");
+                  break;
+               }
+
                Send_(client_socket, "NO \"Authentication failed.\"\r\n");
             }
             continue;

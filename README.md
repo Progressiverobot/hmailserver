@@ -5,7 +5,7 @@ hMailServer is an open source email server for Microsoft Windows, implementing S
 
 This repository is a modernized fork of the original project (which is no longer maintained upstream). It has been brought up to date with a current toolchain, current cryptography, and the transport-security standards expected of a mail server in 2026. It is maintained by Christopher Holloway / [Progressive Robot Ltd](https://www.progressiverobot.com).
 
-**Production status:** version **6.2.14** is released - [download the installer](https://github.com/Progressiverobot/hmailserver/releases/latest) (`hMailServer-6.2.14-x64.exe`). **6.2.14 is a correctness and usability release**: an adversarial audit of the server found and fixed **21 defects** - including failed message copies crashing delivery, IMAP APPEND reporting success for messages that were never written, string SQL parameters bound from freed memory on the default backend, a DKIM test-mode flag that turned a failed signature into a DMARC-aligned pass, and IMAP SASL passwords written to the log - plus the two issues reported by the community. The Control Panel's Ctrl+K palette now searches all 227 settings by label and INI key, and settings that were filed by how they are stored moved to the pages where they are used. See *6.2.14* below. It is validated by the full regression suite: **1026 of 1026 tests passing, zero failures, zero inconclusive** - the complete suite, with live SpamAssassin and ClamAV (real EICAR detection), DMARC evaluation against live DNS, and TLS 1.2/1.3 handshakes end to end. Every test runs; nothing is skipped. The bundled administration GUI is the modern .NET 8 **Control Panel**.
+**Production status:** version **6.2.15** is released - [download the installer](https://github.com/Progressiverobot/hmailserver/releases/latest) (`hMailServer-6.2.15-x64.exe`). **6.2.15 is a correctness release** built around two themes. First, **IMAP sequence sets now behave the way RFC 3501 defines them**: `*` was only recognised as the *end* of a range and read as zero anywhere else, so `FETCH *` silently returned nothing while `UID STORE *:* +FLAGS (\Deleted)` flagged the entire mailbox and `UID EXPUNGE *` deleted every `\Deleted` message. Second, **every file the server writes now has an owner** - a message whose spool file could not be read stalled each outbound attempt for ten minutes before retrying, a failed restore emptied the live data directory and then abandoned the only remaining copy of the mail in a temporary folder, and four separate paths could leave a file on disk that no database row referred to. Everything raised on the forum by RvdH is incorporated, and the Control Panel gained homes for a group of settings that had no GUI at all. See *6.2.15* below. It is validated by the full regression suite: **1040 of 1040 tests passing, zero failures, zero inconclusive** - the complete suite, with live SpamAssassin and ClamAV (real EICAR detection), DMARC evaluation against live DNS, and TLS 1.2/1.3 handshakes end to end. Every test runs; nothing is skipped. The bundled administration GUI is the modern .NET 8 **Control Panel**.
 
 What's new in 6.0
 =================
@@ -82,6 +82,75 @@ change until the new settings are turned on.
 **Supply chain & quality gates**
 
    * SPDX + CycloneDX SBOMs (Syft) attached to every release, Dependabot CVE alerts + grouped update PRs, and a dependency-review PR gate.
+
+6.2.15
+======
+
+A correctness release built around two themes: **IMAP sequence sets are now handled the way RFC 3501 defines them**, and **every file the server writes now has an owner** — several paths could leave a file on disk that no database row referred to, or leave a delivery retrying forever against a file it could never send. Everything raised on the forum by RvdH is incorporated, and the Control Panel gained homes for a group of settings that had no GUI at all. No database change (schema version 6005).
+
+Validated by the full regression suite: **1040 of 1040 passing, zero failures**, against the rebuilt 6.2.15 service.
+
+## IMAP sequence sets
+
+`*` means "the largest message number or UID in the mailbox". hMailServer only recognised it as the *end* of a range; anywhere else it was parsed as the number zero. Separately, RFC 3501 states that a range is valid in either order — `3:1` is the same set as `1:3` — and that was not implemented at all. Together these produced results that were wrong in both directions, silently:
+
+- `FETCH *` and `UID FETCH *` did nothing at all and answered `OK`. A client asking for the newest message got an empty response and showed an empty mailbox.
+- `UID STORE *:* +FLAGS (\Deleted)` flagged **every message in the mailbox** rather than the newest one, because both ends collapsed to "unbounded". The same applied to `COPY`, `MOVE` and `FETCH`.
+- `UID EXPUNGE *` permanently deleted **every** `\Deleted` message instead of the one addressed.
+- `*:1` — a perfectly legal way to write "the whole mailbox" — matched only message 1.
+- `3:1` matched nothing.
+
+All four sequence-set parsers in the server (the `FETCH`/`STORE`/`COPY`/`MOVE` path, `SEARCH`, `UID EXPUNGE`, and the QRESYNC `VANISHED` path) now resolve `*` on either side of a colon and normalise descending ranges. `*` in an empty mailbox matches nothing, and the command still succeeds. Twelve regression tests cover the behaviour; all twelve fail against 6.2.14.
+
+## A failed restore could destroy the data directory
+
+Restoring messages deleted everything in the live data directory *first* and only then copied the backup's message store into place — and the copy throws when its source is not there. That is exactly what a settings-only backup restored with the messages option ticked looks like, and what a failed extraction produces (the result of unpacking the archive was never checked). The exception unwound into a handler that logged an error and swallowed it, so the temporary folder holding the extracted mail was never cleaned up either. The administrator was left with an empty data directory and the only surviving copy of their mail inside a folder named after a GUID, which nothing would ever clean and nobody would think to look in.
+
+The restore now confirms the replacement message store actually exists *before* it deletes anything, and checks that the archive extracted successfully. If the copy fails after that point — when the data directory has legitimately already been emptied — the extracted copy is deliberately kept rather than deleted, and the log says where it is and not to remove it.
+
+## Files with no owner, and deliveries that could never succeed
+
+- **A message whose file could not be read hung the outbound connection.** After the remote server answered `354`, nothing was sent. The session sat idle until the SMTP client timeout — up to ten minutes — before the message was re-queued and the whole attempt repeated. It now fails immediately with a logged error, and the connection is dropped rather than sent `QUIT`, because after `354` a `QUIT` would be read as message content. Only a file that has genuinely disappeared fails the delivery permanently: a file that merely could not be opened or read right now — held by an on-access virus scanner or a backup, say — stays in the queue for the next attempt, because a permanent failure deletes the recipients and bounces the message to the sender.
+- **A rejected `RETR` on an external POP3 account created an empty message file every time.** When the remote server answered `-ERR`, the download path still generated a file name and opened the file before noticing there was no message coming. Each occurrence left one more file in the data directory with no database row referring to it.
+- **A downloaded message with no local recipients left its file behind too.** If nothing in the message resolved to an account on this server, it was never saved — but the downloaded file had already been written, and the UID was recorded so it would never be fetched again. The file is now removed and the discard is logged, so a misconfigured external account is visible instead of silently accumulating.
+- **A bounce that could not be sent left its file in the queue directory.** Where there is no one to send a delivery failure to (a null sender, or an address that no longer resolves), the generated message was abandoned without being deleted.
+- **Rewriting a message's headers left a `.eml.tmp` behind whenever it failed.** This runs for every DKIM signature, every ARC seal, every local delivery and every SpamAssassin result, so a full disk or a message file locked by a scanner dropped one orphan per message into the account's folder — and the consistency check would never report them, because it looks for database rows with no file rather than files with no row.
+- **The account cache had no size limit.** A duplicated line meant the domain cache got its 10 MB cap twice and the account cache got none, so it grew without bound until the service was restarted.
+
+## From the forum
+
+Raised by RvdH, and all correct:
+
+- **`BOOST_USE_WINAPI_VERSION` was left at `0x0601`**, holding Boost to the Windows 7 API surface on a build that targets Windows 10 1607 everywhere else. It now matches `_WIN32_WINNT`, and the README's Boost build line was corrected to pass the same value.
+- **Our `AsyncReadCompleted` rework predated upstream's replacement of the same code.** Upstream's version is the better one: it replaced the SpamAssassin-port check with a general rule for when an EOF is a legitimate end of input. That rule is now in place, with this fork's additions (BDAT exact-length reads, the wedged-connection fix, TCP_NODELAY, the SNI error-code fix) kept on top of it.
+
+  Adopting that rule exposed a defect in *our* exact-length reads, found by an adversarial review of this release and fixed before it shipped. `transfer_exactly` guarantees the requested octet count only while any error ends the session; once an end-of-stream is tolerated it does not, and the BDAT path still extracted the number of octets it had *asked* for rather than the number that arrived. A sender that announced `BDAT 100000 LAST` and then vanished after 40,000 octets had the remainder padded with NUL bytes, the chunk counted as complete, and the truncated message **delivered**. Reads now take only what actually arrived, and a read is never re-armed after an end-of-stream, since nothing further can arrive on a closed connection. A regression test covers the truncated chunk; it fails against the intermediate build.
+- **DKIM signing hashed the header name in lower case while writing it capitalised** (upstream PR #530). Under `simple` header canonicalization the two must match exactly, so every signature produced this way was unverifiable by a strict verifier. The same PR's integer-overflow fix in MIME encoding selection is included.
+- The DKIM size-limit log line said 10 MB when the limit is 50 MB.
+
+An audit answering the recurring question of what this fork changed relative to official master: of the 980 server source files present in both, **936 are byte-identical** once the fork's copyright line is discounted. 44 differ and 30 are new — and they are the extensions this fork exists for.
+
+## Also fixed
+
+- **ManageSieve had no limit on authentication attempts.** Unlike SMTP, IMAP and POP3, a client could try passwords indefinitely and never be disconnected or auto-banned. It now disconnects after three failures and registers them with auto-ban like every other protocol.
+- **`STATUS ... (RECENT)` reported the selected folder's count for every folder asked about**, so clients that poll all folders lit up new-mail indicators on folders that had received nothing.
+- The SMTP `DATA` path now logs, under debug logging, how many bytes arrived, how many are buffered, and whether the end-of-data marker has been seen — so a stalled reception can be told apart from a stall in the accept/save stage that follows it. This is diagnostic groundwork for [#18](https://github.com/Progressiverobot/hmailserver/discussions/18), which is **not fixed** and remains open; see [#20](https://github.com/Progressiverobot/hmailserver/issues/20).
+
+## Control Panel
+
+The 6.2.14 work moved settings that were on the wrong page. This release covers the settings that were on **no** page at all — configurable in `hMailServer.ini` but invisible in the GUI.
+
+- **Security ▸ Authentication** (new): the OAuth2 settings (moved off *API & monitoring*), password hash algorithm and minimum accepted algorithm, the password pepper, and the AUTH exemption list.
+- **Security ▸ Administrative access** (new): changing the administrator password, and an entry point for two-factor authentication setup — which previously existed only on the pre-logon Connect screen, so once you were signed in there was no way to reach it.
+- **Network ▸ DNS resolver** (new): DNS server override, the DNS cache switch, and whether DNSBL checks run after `MAIL FROM`.
+- **Network ▸ Web services & autoconfiguration** (new): the HTTP/HTTPS listener, client autoconfiguration, and MTA-STS policy hosting. The listener settings moved with autoconfig deliberately — autoconfig is served only by that listener, so enabling one without the other does nothing.
+- **Advanced & scripting ▸ Copies of mail**: message archiving (`ArchiveDir`, `ArchiveHardLinks`), beside mirroring.
+- **Backup & restore**: `BackupMessagesDBOnly`, which changes what both a backup *and* a restore contain.
+- **Diagnostics** now shows what the message-store consistency scan found — how many message rows have no file on disk, when the scan last ran, the affected messages with their expected paths, and a button to open the full recovery report. The scan is a background task with no COM interface, so its result previously existed only in a report file in the log folder, a Prometheus gauge and a single log line.
+
+Three labels described the wrong thing and were corrected: `UseDNSCache` is the Windows DNS client cache and is not a substitute for a local caching resolver; `DaemonAddressDomain` sets the `From:` header of server-generated mail, not a delivery route; and `LogLevel` has exactly one threshold, at 2. A fourth, `DisableAUTHList`, was labelled as a semicolon-separated list of IP addresses — it is in fact a comma-separated list of local TCP ports.
+
+Two Control Panel bugs were fixed along the way: the Anti-virus page always reported "N settings could not be written" (it was counting its own buttons), and the Logging page rendered three tabs all headed "Logging".
 
 6.2.14
 ======
@@ -650,7 +719,7 @@ Building Boost
 
    <pre>
    bootstrap
-   b2 debug release threading=multi link=static --with-thread --with-filesystem --with-regex --with-chrono --with-atomic address-model=64 stage --build-dir=out64 -j 4
+   b2 debug release threading=multi link=static --with-thread --with-filesystem --with-regex --with-chrono --with-atomic address-model=64 stage --build-dir=out64 -j 4 define=BOOST_USE_WINAPI_VERSION=0x0A00
    </pre>
 
    NOTE: Boost.System is header-only in recent Boost versions and no longer needs to be built.

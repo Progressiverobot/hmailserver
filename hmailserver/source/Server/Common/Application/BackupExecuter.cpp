@@ -293,7 +293,9 @@ namespace HM
          if (iRestoreOptions & Backup::BOMessages && !bMessagesDBOnly)
          {
             Logger::Instance()->LogBackup("Restoring data directory...");
-            RestoreDataDirectory_(pBackup, pBackupNode);
+
+            if (!RestoreDataDirectory_(pBackup, pBackupNode))
+               return false;
          }
 
          Logger::Instance()->LogBackup("Restoring domains...");
@@ -336,28 +338,37 @@ namespace HM
       return true;
    }
 
-   void
+   bool
    BackupExecuter::RestoreDataDirectory_(std::shared_ptr<Backup> pBackup, XNode *pBackupNode)
    {
       XNode *pBackupInfoNode = pBackupNode->GetChild(_T("BackupInformation"));
-      
+
       // Create the path to the zip file.
       String sBackupFile = pBackup->GetBackupFile();
       String sPath = sBackupFile.Mid(0, sBackupFile.ReverseFind(_T("\\")));
 
       String sDirContainingDataFiles;
       String sDataFileFormat = pBackupInfoNode->GetChildAttr(_T("DataFiles"), _T("Format"))->value;
-      
+
+      bool extractedToTempDirectory = sDataFileFormat.CompareNoCase(_T("7Z")) == 0;
+
       String sExtractedFilesDirectory;
-      if (sDataFileFormat.CompareNoCase(_T("7Z")) == 0)
+      if (extractedToTempDirectory)
       {
-         // Create the path to the directory that will contain the extracted files. 
+         // Create the path to the directory that will contain the extracted files.
          //  This directory is temporary and will be removed when we're done.
          sExtractedFilesDirectory = Utilities::GetUniqueTempDirectory();
 
          // Extract the files to this directory.
          Compression oComp;
-         oComp.Uncompress(sBackupFile, sExtractedFilesDirectory);
+         if (!oComp.Uncompress(sBackupFile, sExtractedFilesDirectory))
+         {
+            FileUtilities::DeleteDirectory(sExtractedFilesDirectory, true);
+
+            ReportRestoreFailure_("Restore failed: the messages could not be extracted from " + sBackupFile +
+                                  ". The existing data directory has not been touched.");
+            return false;
+         }
 
          // The data files in the zip file are stored in
          // a directory called DataBackup.
@@ -370,21 +381,57 @@ namespace HM
          sDirContainingDataFiles = sPath + "\\" + sFolderName;
       }
 
+      // Confirm the replacement exists before deleting what is there now. The copy
+      // below throws when its source is missing - which is what a settings-only
+      // backup restored with the messages option set looks like - and by then the
+      // deletion had already run, so the live data directory was emptied and the
+      // only remaining copy of the mail was in a temporary folder that nothing
+      // cleans up and nobody would think to look in.
+      if (!FileUtilities::DirectoryExists(sDirContainingDataFiles))
+      {
+         if (extractedToTempDirectory)
+            FileUtilities::DeleteDirectory(sExtractedFilesDirectory, true);
+
+         ReportRestoreFailure_("Restore failed: the backup does not contain a message store (" + sDirContainingDataFiles +
+                               " does not exist). The existing data directory has not been touched.");
+         return false;
+      }
+
       // Delete all directories from the data directory
       // so that we're sure that we're doing a clean restore
       String sDataDirectory = IniFileSettings::Instance()->GetDataDirectory();
-      
+
       FileUtilities::DeleteFilesInDirectory(sDataDirectory);
       FileUtilities::DeleteDirectoriesInDirectory(sDataDirectory);
 
       String errorMessage;
-      FileUtilities::CopyDirectory(sDirContainingDataFiles, sDataDirectory, errorMessage);
+      bool copied = FileUtilities::CopyDirectory(sDirContainingDataFiles, sDataDirectory, errorMessage);
 
-      if (sDataFileFormat.CompareNoCase(_T("7z")) == 0)
+      if (!copied)
+      {
+         // From here on the data directory has already been emptied, so the
+         // extracted copy is deliberately left in place: it is the only copy of
+         // the messages that still exists, and the administrator is told where.
+         ReportRestoreFailure_("Restore failed while copying messages into " + sDataDirectory + ". " + errorMessage +
+                               " The messages from the backup have been left in " + sDirContainingDataFiles +
+                               " - do not delete that folder until they have been recovered.");
+         return false;
+      }
+
+      if (extractedToTempDirectory)
       {
          // The temporary directory we created while
          // unzipping should be deleted now.
          FileUtilities::DeleteDirectory(sExtractedFilesDirectory, true);
       }
+
+      return true;
+   }
+
+   void
+   BackupExecuter::ReportRestoreFailure_(const String &message)
+   {
+      Logger::Instance()->LogBackup(message);
+      Application::Instance()->GetBackupManager()->OnBackupFailed(message);
    }
 }

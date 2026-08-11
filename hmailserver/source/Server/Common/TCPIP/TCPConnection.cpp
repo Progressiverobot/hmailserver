@@ -570,51 +570,17 @@ namespace HM
    {
       UpdateAutoLogoutTimer();
 
-      auto saEnabled = Configuration::Instance()->GetAntiSpamConfiguration().GetSpamAssassinEnabled();
-      auto saPort = Configuration::Instance()->GetAntiSpamConfiguration().GetSpamAssassinPort();
-      // Catch SpamAssassin WinSock error code is 2 (boost boost::asio::error::eof).
-      // IsClient() keeps inbound server sessions (remote_port_ == 0) out of this
-      // branch even when the configured SpamAssassin port is 0/unset.
-      if ((error.value() == 0 || error.value() == boost::asio::error::eof) && receive_binary_ && saEnabled && IsClient() && remote_port_ == saPort)
-      {
-         // https://www.boost.org/doc/libs/1_72_0/doc/html/boost_asio/overview/core/streams.html
-         // Why EOF is an Error
-         // The end of a stream can cause read, async_read, read_until or async_read_until functions to violate their contract.E.g.a read of N bytes may finish early due to EOF.
-         // An EOF error may be used to distinguish the end of a stream from a successful read of size 0.
+      const bool endOfStream = error == boost::asio::error::eof;
 
-         std::shared_ptr<ByteBuffer> pBuffer = std::shared_ptr<ByteBuffer>(new ByteBuffer());
-         pBuffer->Allocate(receive_buffer_.size());
-
-         std::istream is(&receive_buffer_);
-         is.read((char*)pBuffer->GetBuffer(), receive_buffer_.size());
-
-         try
-         {
-            ParseData(pBuffer);
-         }
-         catch (DisconnectedException&)
-         {
-            throw;
-         }
-         catch (...)
-         {
-            String message;
-            message.Format(_T("An error occured while parsing data. Data size: %d"), pBuffer->GetSize());
-
-            ReportError(ErrorManager::Medium, 5136, "TCPConnection::AsyncReadCompleted", message);
-
-            // Retire the read operation and close the session before the exception
-            // propagates to the worker's SEH handler (which writes the minidump).
-            // Without this, the skipped retirement below left the connection
-            // permanently wedged - no reads, no disconnect - with the client
-            // hanging until its own timeout.
-            operation_queue_.Pop(IOOperation::BCTRead);
-            EnqueueDisconnect();
-
-            throw;
-         }
-      }
-      else if (error.value() != 0)
+      // End-of-stream is not a failure while a binary transfer is in progress:
+      // the peer closing its side (SpamAssassin's spamd does exactly this after
+      // its response) can still leave data in the receive buffer that has to be
+      // processed. Any other error, and any error at all in line mode, is real.
+      //
+      // This replaces an earlier special case that recognised the SpamAssassin
+      // connection by matching the configured spamd port, which also misfired on
+      // inbound sessions when that port was left at 0.
+      if ((error && !receive_binary_) || (error && !endOfStream && receive_binary_))
       {
          if (connection_state_ != StateConnected)
          {
@@ -629,7 +595,7 @@ namespace HM
          message.Format(_T("The read operation failed. Bytes transferred: %d"), bytes_transferred);
          ReportDebugMessage(message, error);
 
-         if (error.value() == boost::asio::error::not_found)
+         if (error == boost::asio::error::not_found)
          {
             // read buffer is full...
             OnExcessiveDataReceived();
@@ -647,7 +613,15 @@ namespace HM
             size_t bytes_to_extract = receive_buffer_.size();
             if (exact_read_target_ > 0)
             {
+               // Never claim more than actually arrived. transfer_exactly normally
+               // guarantees the full count, but not when the peer closed the
+               // connection first: allocating for the request would hand the
+               // consumer a zero-filled tail, which for BDAT means padding the
+               // message with NUL bytes and counting a truncated chunk as complete.
                bytes_to_extract = exact_read_target_;
+               if (bytes_to_extract > receive_buffer_.size())
+                  bytes_to_extract = receive_buffer_.size();
+
                exact_read_target_ = 0;
             }
 
@@ -751,10 +725,22 @@ namespace HM
       }
 
       operation_queue_.Pop(IOOperation::BCTRead);
+
+      // Nothing further can arrive once the peer has closed its side, so a read
+      // the consumer enqueued while handling the data above would complete
+      // immediately with the same end-of-stream, and again, and again: an
+      // unbreakable loop pinning a worker thread, with the auto-logout timer
+      // re-armed on every pass. Close the session instead of re-arming the read.
+      // This matters for every incomplete binary transfer - an SMTP DATA or BDAT
+      // that never sent its terminator, an IMAP APPEND literal cut short - not
+      // just for the SpamAssassin case the branch above exists to allow.
+      if (endOfStream && connection_state_ == StateConnected)
+         EnqueueDisconnect();
+
       ProcessOperationQueue_(0);
    }
 
-   void 
+   void
    TCPConnection::EnqueueWrite(const AnsiString &sData)
    {
       AnsiString sTemp = sData;

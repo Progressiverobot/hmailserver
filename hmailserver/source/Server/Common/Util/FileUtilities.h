@@ -37,6 +37,10 @@ namespace HM
       static String GetTempFileName();
       static bool CreateDirectory(const String &sName);
 
+      // Matches the precondition CopyDirectory enforces by throwing, so a caller
+      // can check first rather than catch.
+      static bool DirectoryExists(const String &sDirName);
+
       static bool CopyDirectory(String sFrom, String sTo, String &errorMessage);
       static bool DeleteDirectory(const String &sDirName, bool force);
       static bool DeleteFilesInDirectory(const String &sDirName);

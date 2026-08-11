@@ -37,6 +37,8 @@ namespace HM
    {
       modseq_search_ = false;
       highest_modseq_ = 0;
+      max_uid_ = 0;
+      message_count_ = 0;
    }
 
    IMAPCommandSEARCH::~IMAPCommandSEARCH()
@@ -139,6 +141,16 @@ namespace HM
          return IMAPResult(IMAPResult::ResultBad, "No selected folder");
 
       std::vector<std::shared_ptr<Message>> messages = pCurFolder->GetMessages()->GetCopy();
+
+      message_count_ = (int) messages.size();
+      max_uid_ = 0;
+      for(std::shared_ptr<Message> pMessage : messages)
+      {
+         // Scanned rather than read off the last message: the collection is not
+         // guaranteed to be ordered by UID.
+         if ((int) pMessage->GetUID() > max_uid_)
+            max_uid_ = (int) pMessage->GetUID();
+      }
 
       std::vector<String> sMatchingVec;
       // RFC 5182 (SEARCHRES): UIDs of the matched messages in ascending order, used when SAVE
@@ -782,7 +794,7 @@ namespace HM
    {
       std::vector<String> split = pCriteria->GetSequenceSet();
 
-      bool found = IMAPListLookup::IsItemInList(split, (int) pMessage->GetUID());
+      bool found = IMAPListLookup::IsItemInList(split, (int) pMessage->GetUID(), max_uid_);
       
       if (pCriteria->GetPositive())
          return found;
@@ -795,7 +807,7 @@ namespace HM
    {
       std::vector<String> split = pCriteria->GetSequenceSet();
 
-      bool found = IMAPListLookup::IsItemInList(split, index);
+      bool found = IMAPListLookup::IsItemInList(split, index, message_count_);
 
       if (pCriteria->GetPositive())
          return found;

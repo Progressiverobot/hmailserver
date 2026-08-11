@@ -163,6 +163,12 @@ namespace HM
       return boost::filesystem::exists(sFilename);
    }
 
+   bool
+   FileUtilities::DirectoryExists(const String &sDirName)
+   {
+      return boost::filesystem::exists(sDirName) && boost::filesystem::is_directory(sDirName);
+   }
+
    String
    FileUtilities::GetFilePath(const String & FileName)
    //---------------------------------------------------------------------------()

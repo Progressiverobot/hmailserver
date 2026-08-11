@@ -67,6 +67,7 @@ namespace HM
 
       void LogSentCommand_(const String &sData);
       void StartSendFile_(const String &sFilename);
+      void FailDeliveryDueToUnreadableFile_(const String &sFilename, const String &sReason, bool permanent);
 
       void SendQUIT_();
 

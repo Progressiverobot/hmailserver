@@ -686,17 +686,31 @@ namespace HM
    void
    SMTPClientConnection::StartSendFile_(const String &sFilename)
    {
+      bool file_opened = false;
+
       try
       {
-         current_file_.Open(sFilename, File::OTReadOnly);
+         // File::Open reports a missing file by returning false rather than by
+         // throwing, so the return value must be checked.
+         file_opened = current_file_.Open(sFilename, File::OTReadOnly);
       }
       catch (...)
       {
-         String sErrorMsg;
-         sErrorMsg.Format(_T("Could not send file %s via socket since it does not exist."), sFilename.c_str());
+         file_opened = false;
+      }
 
-         ErrorManager::Instance()->ReportError(ErrorManager::High, 5019, "SMTPClientConnection::_SendFileContents", sErrorMsg);
+      if (!file_opened)
+      {
+         // File::Open reports every failure the same way, so a file held open by
+         // an on-access virus scanner or a backup, and a process that has run out
+         // of file handles, look identical to a file that is gone. Only the last
+         // of those is hopeless - and SMTPDeliverer has already confirmed the file
+         // existed when this attempt started, so it is also the least likely. Any
+         // failure other than the file having disappeared is left retryable.
+         bool missing = !FileUtilities::Exists(sFilename);
 
+         FailDeliveryDueToUnreadableFile_(sFilename,
+            missing ? _T("does not exist") : _T("could not be opened"), missing);
          return;
       }
 
@@ -705,7 +719,13 @@ namespace HM
       std::shared_ptr<ByteBuffer> pBuf = current_file_.ReadChunk(GetBufferSize());
 
       if (pBuf->GetSize() == 0)
+      {
+         // An empty message file is more likely to be one still being written, or
+         // one whose contents another process is holding back, than one that will
+         // never be readable - so this is retried rather than bounced.
+         FailDeliveryDueToUnreadableFile_(sFilename, _T("is empty"), false);
          return;
+      }
 
       BYTE *pSendBuffer = (BYTE*) pBuf->GetBuffer();
       size_t iSendBufferSize = pBuf->GetSize();
@@ -716,7 +736,58 @@ namespace HM
 	  ReadAndSend_();
    }
 
-   void 
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // Called when the message file cannot be transmitted during the DATA phase.
+   // Without this, nothing at all would be sent after the DATA command and the
+   // session would sit idle until the connection timed out - up to ten minutes -
+   // before the message was re-queued and the whole attempt repeated.
+   //
+   // permanent says whether a later attempt could ever succeed. A file that has
+   // gone is hopeless; one that could not be opened or read right now is not, and
+   // must stay in the queue, because a fatal result here deletes the recipients
+   // and bounces the message to the sender.
+   //---------------------------------------------------------------------------()
+   void
+   SMTPClientConnection::FailDeliveryDueToUnreadableFile_(const String &sFilename, const String &sReason, bool permanent)
+   {
+      current_file_.Close();
+
+      String sErrorMsg;
+      sErrorMsg.Format(_T("Could not send file %s via socket since it %s."), sFilename.c_str(), sReason.c_str());
+
+      ErrorManager::Instance()->ReportError(ErrorManager::High, 5019, "SMTPClientConnection::StartSendFile_", sErrorMsg);
+
+      // The file name is deliberately kept out of this text. It ends up in the
+      // delivery-failure notification, which for relayed or forwarded mail is sent
+      // to a sender outside this server - and it would tell them the installation
+      // path and the spool naming scheme. The error reported above is where the
+      // path belongs.
+      String sBounceMessage;
+      sBounceMessage.Format(_T("   Error Type: SMTP\r\n")
+         _T("   Error Description: The message file %s on the sending server, so the message could not be transmitted.\r\n\r\n"),
+         sReason.c_str());
+
+      for(std::shared_ptr<MessageRecipient> recipient : recipients_)
+      {
+         if (recipient->GetDeliveryResult() == MessageRecipient::ResultFatalError)
+            continue;
+
+         recipient->SetDeliveryResult(permanent ? MessageRecipient::ResultFatalError : MessageRecipient::ResultNonFatalError);
+         recipient->SetErrorMessage(sBounceMessage);
+      }
+
+      // The remote server has answered 354 and is reading message data, so a QUIT
+      // sent now would be taken as message content rather than a command and no
+      // reply would ever come. RFC 5321 4.1.1.4: closing the connection before the
+      // terminating "." is how a sender abandons a message in progress, and the
+      // receiver discards what it has. session_ended_ keeps the resulting read
+      // error from overwriting the delivery results set above.
+      session_ended_ = true;
+      EnqueueDisconnect();
+   }
+
+   void
    SMTPClientConnection::ReadAndSend_()
    {
       // Continue sending the file..

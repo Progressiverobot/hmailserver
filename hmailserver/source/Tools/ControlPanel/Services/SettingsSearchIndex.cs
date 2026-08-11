@@ -50,10 +50,14 @@ namespace hMailServer.ControlPanel.Services
          ["logging"] = "Logging",
          ["performance"] = "Performance",
          ["advanced"] = "Advanced & scripting",
+         ["adminaccess"] = "Administrative access",
          ["security"] = "Transport security",
          ["acme"] = "Certificates (ACME)",
          ["api"] = "API & monitoring",
          ["hardening"] = "Advanced INI settings",
+         ["authentication"] = "Authentication",
+         ["dns"] = "DNS resolver",
+         ["webservices"] = "Web services & autoconfiguration",
       };
 
       /// <summary>

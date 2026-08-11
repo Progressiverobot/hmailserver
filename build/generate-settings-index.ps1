@@ -19,9 +19,11 @@ $serverPath = Join-Path $cpRoot 'Views\ServerSettingsView.xaml.cs'
 $outputPath = Join-Path $cpRoot 'Services\SettingsSearchIndex.g.cs'
 
 # Section -> nav page key, matching MainWindow's page factories.
-$featurePages = @{ 'Security' = 'security'; 'Automation' = 'acme'; 'Integration' = 'api'; 'Hardening' = 'hardening' }
+$featurePages = @{ 'Security' = 'security'; 'Automation' = 'acme'; 'Integration' = 'api'; 'Hardening' = 'hardening';
+                   'Authentication' = 'authentication'; 'Dns' = 'dns'; 'WebServices' = 'webservices' }
 $serverPages = @{ 'Protocols' = 'protocols'; 'Delivery' = 'delivery'; 'AntiSpam' = 'antispam'; 'AntiVirus' = 'antivirus';
-                  'Tls' = 'tls'; 'Logging' = 'logging'; 'Performance' = 'performance'; 'Advanced' = 'advanced' }
+                  'Tls' = 'tls'; 'Logging' = 'logging'; 'Performance' = 'performance'; 'Advanced' = 'advanced';
+                  'AdminAccess' = 'adminaccess' }
 
 function Add-Entry($list, $label, $key, $page) {
    $label = $label.Trim()

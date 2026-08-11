@@ -39,6 +39,8 @@ namespace HM
 
       String JoinUids_(const std::vector<unsigned int> &uids);
 
+      static unsigned int GetMaxUid_(const std::vector<std::shared_ptr<Message>> &messages);
+
       bool is_uid_;
 
       std::vector<unsigned int> uidplus_source_uids_;

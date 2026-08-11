@@ -131,6 +131,18 @@ namespace RegressionTests.Shared
             _tcpClient.Close();
       }
 
+      /// <summary>
+      /// Closes only this end's sending half, so the server sees a clean
+      /// end-of-stream. Closing the socket outright while data is unread makes
+      /// Windows send RST instead, which the server sees as a different error -
+      /// so a test that needs the end-of-stream path must use this.
+      /// </summary>
+      public void HalfCloseSend()
+      {
+         if (_tcpClient != null)
+            _tcpClient.Client.Shutdown(SocketShutdown.Send);
+      }
+
       public void HandshakeAsClient()
       {
          // Create an SSL stream that will close the client's stream.

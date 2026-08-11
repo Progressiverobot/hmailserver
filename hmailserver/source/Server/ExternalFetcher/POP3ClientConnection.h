@@ -147,6 +147,10 @@ namespace HM
 
       std::shared_ptr<Message> current_message_;
 
+      // Set when the remote server rejected the RETR command. No message data
+      // follows such a response, so no message file must be created for it.
+      bool retr_failed_;
+
       String receiving_account_address_;
 
       std::shared_ptr<TransparentTransmissionBuffer> transmission_buffer_;

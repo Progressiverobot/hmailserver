@@ -13,7 +13,9 @@ namespace HM
       IMAPListLookup();
       virtual ~IMAPListLookup();
 
-      static bool IsItemInList(std::vector<String> vecItems, int item);
+      // maxItem is the value "*" stands for: the largest UID in the mailbox for a
+      // UID set, or the number of messages for a message-sequence set.
+      static bool IsItemInList(const std::vector<String> &vecItems, int item, int maxItem);
 
    private:
 

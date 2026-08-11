@@ -25,8 +25,14 @@ namespace HM
       void Stop();
 
    private:
+      // Failed AUTHENTICATE attempts allowed on one connection before it is
+      // dropped, matching the other protocol servers.
+      enum { MaxAuthenticationFailures = 3 };
+
       void Run_();
-      void HandleClient_(SOCKET client_socket);
+      void HandleClient_(SOCKET client_socket, const IPAddress &client_address);
+
+      static IPAddress GetClientAddress_(const sockaddr *address);
 
       void SendCapabilities_(SOCKET client_socket);
 

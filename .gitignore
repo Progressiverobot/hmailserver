@@ -45,6 +45,10 @@ hmailserver/source/Server/hMailServer.Minidump/x64/*
 /hmailserver/test/packages/*
 /hmailserver/test/RegressionTests/packages/*
 /TestResult.xml
+# nunit3-console writes its result file into whatever directory it was started
+# from, which is not always the repository root.
+TestResult.xml
+/FullRun.xml
 /.claude/*
 CLAUDE.md
 # Working notes and internal design docs - kept locally, not published.

@@ -291,7 +291,9 @@ namespace HM
 	   void UnfoldField(string& strField) const;
 	   int SelectEncoding(size_t nLength, int nNonAsciiChars) const
 	   {
-         size_t nQEncodeSize = nLength + nNonAsciiChars * 2;
+         // Widen before multiplying: the int product overflowed for very long
+         // header values. (From upstream hMailServer, PR #530.)
+         size_t nQEncodeSize = nLength + ((size_t) nNonAsciiChars) * 2;
          size_t nBEncodeSize = (nLength + 2) / 3 * 4;
 		   return (nQEncodeSize <= nBEncodeSize || ((size_t) nNonAsciiChars)*5 <= nLength) ? 'Q' : 'B';
 	   }

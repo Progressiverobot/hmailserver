@@ -41,6 +41,25 @@ namespace HM
       return is_uid_;
    }
 
+   unsigned int
+   IMAPCommandRangeAction::GetMaxUid_(const std::vector<std::shared_ptr<Message>> &messages)
+   {
+      // Scanned rather than read off the last element: the collection is not
+      // guaranteed to be ordered by UID, and a COPY can introduce a message
+      // whose UID is lower than its predecessor's.
+      unsigned int maxUid = 0;
+
+      for (const std::shared_ptr<Message> &message : messages)
+      {
+         unsigned int uid = message->GetUID();
+
+         if (uid > maxUid)
+            maxUid = uid;
+      }
+
+      return maxUid;
+   }
+
    IMAPResult
    IMAPCommandRangeAction::DoForMails(std::shared_ptr<IMAPConnection> pConnection, const String &sMailNos, std::shared_ptr<IMAPCommandArgument> pArgument)
    {
@@ -99,12 +118,24 @@ namespace HM
                String sFirstPart = sCur.Mid(0, lColonPos);
                String sSecondPart = sCur.Mid(lColonPos + 1);
 
-               unsigned int lStartDBID = _ttoi(sFirstPart);
-               unsigned int lEndDBID = -1;
-               if (sSecondPart != _T("*"))
-                  lEndDBID = _ttoi(sSecondPart);
-
                std::vector<std::shared_ptr<Message>> messages = pConnection->GetCurrentFolder()->GetMessages()->GetCopy();
+
+               // RFC 3501: "*" is the largest UID in use - on EITHER side of the
+               // colon - and a range is valid in either order, so "*:1" means the
+               // whole mailbox. Resolving "*" only as the range end left it as 0
+               // everywhere else, which made "UID FETCH *" a silent no-op and
+               // "UID STORE *:* +FLAGS (\Deleted)" flag the entire mailbox.
+               const unsigned int maxUid = GetMaxUid_(messages);
+
+               unsigned int lStartDBID = sFirstPart == _T("*") ? maxUid : (unsigned int) _ttoi(sFirstPart);
+               unsigned int lEndDBID = sSecondPart == _T("*") ? maxUid : (unsigned int) _ttoi(sSecondPart);
+
+               if (lEndDBID < lStartDBID)
+                  std::swap(lStartDBID, lEndDBID);
+
+               // An empty mailbox has no largest UID, so "*" must match nothing.
+               if (maxUid == 0 && (sFirstPart == _T("*") || sSecondPart == _T("*")))
+                  continue;
 
                int index = 0;
                for(std::shared_ptr<Message> pMessage: messages)
@@ -114,7 +145,7 @@ namespace HM
 
                   if (uid >= lStartDBID)
                   {
-                     if (lEndDBID == -1 || uid <= lEndDBID)
+                     if (uid <= lEndDBID)
                      {
                         // UID doesn't fail just because the message is missing.
                         // This is why we don't check the return value.
@@ -130,10 +161,17 @@ namespace HM
             }
             else 
             {
-               unsigned int uid = _ttoi(sCur);
+               std::shared_ptr<Messages> messages = pConnection->GetCurrentFolder()->GetMessages();
+
+               // A bare "*" addresses the message with the largest UID.
+               unsigned int uid = sCur == _T("*")
+                  ? GetMaxUid_(messages->GetCopy())
+                  : (unsigned int) _ttoi(sCur);
+
+               if (uid == 0)
+                  continue;
 
                unsigned int foundIndex = 0;
-               std::shared_ptr<Messages> messages = pConnection->GetCurrentFolder()->GetMessages();
                std::shared_ptr<Message> message = messages->GetItemByUID(uid, foundIndex);
                if (!message)
                   continue;
@@ -158,13 +196,19 @@ namespace HM
                String sFirstPart = sCur.Mid(0, lColonPos);
                String sSecondPart = sCur.Mid(lColonPos + 1);
 
-               int lStartIndex = _ttoi(sFirstPart);
-               int lEndIndex = -1;
-               if (sSecondPart != _T("*"))
-                  lEndIndex = _ttoi(sSecondPart);
-
                auto vecMessages = pConnection->GetCurrentFolder()->GetMessages()->GetCopy();
-               
+
+               // See the UID branch above: "*" is the highest message sequence
+               // number on either side of the colon, and ranges are valid in
+               // either order.
+               const int maxSequenceNumber = (int) vecMessages.size();
+
+               int lStartIndex = sFirstPart == _T("*") ? maxSequenceNumber : _ttoi(sFirstPart);
+               int lEndIndex = sSecondPart == _T("*") ? maxSequenceNumber : _ttoi(sSecondPart);
+
+               if (lEndIndex < lStartIndex)
+                  std::swap(lStartIndex, lEndIndex);
+
                int index = 0;
                for(std::shared_ptr<Message> message : vecMessages)
                {
@@ -172,7 +216,7 @@ namespace HM
 
                   if (index >= lStartIndex)
                   {
-                     if (lEndIndex == -1 || index <= lEndIndex)
+                     if (index <= lEndIndex)
                      {
                         IMAPResult result = DoAction(pConnection, index, message, pArgument);
                         if (result.GetResult() != IMAPResult::ResultOK)
@@ -186,8 +230,15 @@ namespace HM
             }
             else 
             {
-               int messageIndex = _ttoi(sCur);
-               std::shared_ptr<Message> pMessage = pConnection->GetCurrentFolder()->GetMessages()->GetItem(messageIndex-1);
+               std::shared_ptr<Messages> messages = pConnection->GetCurrentFolder()->GetMessages();
+
+               // A bare "*" addresses the last message in the mailbox.
+               int messageIndex = sCur == _T("*") ? messages->GetCount() : _ttoi(sCur);
+
+               if (messageIndex <= 0)
+                  continue;
+
+               std::shared_ptr<Message> pMessage = messages->GetItem(messageIndex-1);
 
                if (!pMessage)
                   continue;

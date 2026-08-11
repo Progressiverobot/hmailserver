@@ -72,7 +72,11 @@
 //
 // BOOST INCLUDES
 //
-#define BOOST_USE_WINAPI_VERSION 0x0601
+// Keep Boost's Windows API gate in step with _WIN32_WINNT above; leaving it at
+// 0x0601 held Boost to the Windows 7 API surface on a build that targets
+// Windows 10 1607 everywhere else. Boost itself should be built with the same
+// value (see README): define=BOOST_USE_WINAPI_VERSION=0x0A00
+#define BOOST_USE_WINAPI_VERSION 0x0A00
 #include <boost/winapi/config.hpp>
 #include <boost/bind/bind.hpp>
 #include <boost/thread.hpp>

@@ -26,7 +26,8 @@ namespace hMailServer.ControlPanel.Views
          Tls,
          Logging,
          Performance,
-         Advanced
+         Advanced,
+         AdminAccess
       }
 
       // ---- editor model ------------------------------------------------------
@@ -336,6 +337,88 @@ namespace hMailServer.ControlPanel.Views
          public IniFeatureStore IniStore;
       }
 
+      /// <summary>
+      /// A free-text setting stored in hMailServer.ini. Same purpose as IniBool
+      /// and IniNumber: it puts an INI-backed value on the page that owns the
+      /// feature it configures (the archive folder belongs next to the mirroring
+      /// address, not on a catch-all page). Path is the INI key name.
+      /// </summary>
+      private class IniText : ComSetting, IIniSetting
+      {
+         public string Placeholder = "";
+         public bool BrowseFolder;
+         public IniFeatureStore IniStore;
+         private TextBox box_;
+
+         public override bool WantsInitialValue => false;
+
+         public override FrameworkElement CreateEditor(object value)
+         {
+            string current = "";
+            if (IniStore != null && IniStore.IsAvailable)
+               current = IniStore.Read(Path, "");
+
+            var panel = new StackPanel();
+            panel.Children.Add(new TextBlock { Text = Label, FontSize = 13, Margin = new Thickness(0, 0, 0, 4) });
+
+            box_ = new TextBox
+            {
+               Text = current,
+               PlaceholderText = Placeholder,
+               FontSize = 13,
+               HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+            SetAid(box_, Path);
+
+            if (BrowseFolder)
+            {
+               var row = new Grid { Width = 520, HorizontalAlignment = HorizontalAlignment.Left };
+               row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+               row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+               Grid.SetColumn(box_, 0);
+               row.Children.Add(box_);
+
+               var browse = new Wpf.Ui.Controls.Button
+               {
+                  Content = "\u2026",
+                  MinWidth = 40,
+                  Margin = new Thickness(8, 0, 0, 0),
+                  VerticalAlignment = VerticalAlignment.Bottom,
+                  ToolTip = "Browse for a folder"
+               };
+               SetAid(browse, Path + "Browse");
+               browse.Click += (s, e) =>
+               {
+                  string picked = Services.PathPicker.PickFolder(box_.Text);
+                  if (picked != null)
+                     box_.Text = picked;
+               };
+               Grid.SetColumn(browse, 1);
+               row.Children.Add(browse);
+               panel.Children.Add(row);
+            }
+            else
+            {
+               box_.HorizontalAlignment = HorizontalAlignment.Left;
+               box_.MinWidth = 320;
+               box_.MaxWidth = 520;
+               panel.Children.Add(box_);
+            }
+
+            return panel;
+         }
+
+         public override object ReadEditor() => box_?.Text?.Trim() ?? "";
+
+         public void SaveToIni()
+         {
+            if (IniStore == null || !IniStore.IsAvailable || box_ == null)
+               return;
+
+            IniStore.Write(Path, box_.Text.Trim());
+         }
+      }
+
       private class ComCombo : ComSetting
       {
          public (int Value, string Label)[] Options;
@@ -566,6 +649,7 @@ namespace hMailServer.ControlPanel.Views
             case Section.Logging: BuildLogging(); break;
             case Section.Performance: BuildPerformance(); break;
             case Section.Advanced: BuildAdvanced(); break;
+            case Section.AdminAccess: BuildAdminAccess(); break;
          }
       }
 
@@ -576,7 +660,8 @@ namespace hMailServer.ControlPanel.Views
 
          var services = Card("Services",
             "Enable or disable the protocol servers. Changes apply after pressing Save. " +
-            "ManageSieve (for managing Sieve scripts) and OAuth2 token authentication are enabled on the API & monitoring page.");
+            "ManageSieve (for managing Sieve scripts) is enabled on the API & monitoring page; " +
+            "OAuth2 token authentication is on the Authentication page.");
          services.Settings.Add(new ComBool { Path = "ServiceSMTP", Label = "SMTP server" });
          services.Settings.Add(new ComBool { Path = "ServiceIMAP", Label = "IMAP server" });
          services.Settings.Add(new ComBool { Path = "ServicePOP3", Label = "POP3 server" });
@@ -876,6 +961,10 @@ namespace hMailServer.ControlPanel.Views
          TitleText.Text = "Logging";
          SubtitleText.Text = "What the server writes to its log files (viewable on the Live logs page).";
 
+         // One tab holding the three cards: calling Tab() again would add a second
+         // tab with the same header rather than reuse this one.
+         TabDef logging = Tab("Logging");
+
          var log = Card("Log categories");
          log.Settings.Add(new ComBool { Path = "Logging.Enabled", Label = "Logging enabled" });
          log.Settings.Add(new ComBool { Path = "Logging.LogApplication", Label = "Application events" });
@@ -896,7 +985,7 @@ namespace hMailServer.ControlPanel.Views
             Blurb = "Machine-readable output for log shippers. Applies after a service restart.",
             IniStore = iniStore_
          });
-         Tab("Logging").Cards.Add(log);
+         logging.Cards.Add(log);
 
          // How much is written, next to what is written and how long it is kept -
          // an admin dealing with log volume should not have to find three pages.
@@ -905,8 +994,12 @@ namespace hMailServer.ControlPanel.Views
          detail.Settings.Add(new IniNumber
          {
             Path = "LogLevel",
-            Label = "Log level (9 = everything; 2 or lower suppresses routine IMAP chatter and truncates long lines)",
+            Label = "Log level (3 or above = full detail; 2 or lower = quieter)",
             Default = 9,
+            Blurb = "There is only one step, at 2. From 3 upwards (the default is 9) every enabled category is logged " +
+                    "in full. At 2 or lower the server drops IMAP FETCH and STATUS responses from the log and shortens " +
+                    "lines longer than the limit below to their first and last characters. Turning on Debug messages " +
+                    "above restores full detail whatever the level.",
             IniStore = iniStore_
          });
          detail.Settings.Add(new IniNumber
@@ -923,7 +1016,7 @@ namespace hMailServer.ControlPanel.Views
             Default = false,
             IniStore = iniStore_
          });
-         Tab("Logging").Cards.Add(detail);
+         logging.Cards.Add(detail);
 
          var retention = Card("Log retention",
             "Housekeeping for the log folder, so logs do not accumulate indefinitely.");
@@ -937,7 +1030,7 @@ namespace hMailServer.ControlPanel.Views
                     "are removed; nothing else in the log folder is touched.",
             IniStore = iniStore_
          });
-         Tab("Logging").Cards.Add(retention);
+         logging.Cards.Add(retention);
       }
 
       private void BuildPerformance()
@@ -977,23 +1070,94 @@ namespace hMailServer.ControlPanel.Views
       private void BuildAdvanced()
       {
          TitleText.Text = "Advanced";
-         SubtitleText.Text = "Server-wide defaults, archiving mirror and the scripting engine.";
+         SubtitleText.Text = "Server-wide defaults, keeping copies of mail and the scripting engine.";
 
-         var general = Card("General");
+         var general = Card("General",
+            "The administrator password and two-factor authentication are on the Administrative access page.");
          general.Settings.Add(new ComText { Path = "DefaultDomain", Label = "Default domain (for unqualified logons)" });
          general.Settings.Add(new ComBool { Path = "IPv6PreferredEnabled", Label = "Prefer IPv6 when delivering" });
          general.Settings.Add(new ComText { Path = "UserInterfaceLanguage", Label = "Administrator UI language (legacy COM admin tools)" });
-         general.Settings.Add(new ComPassword { Path = "SetAdministratorPassword", MethodName = "SetAdministratorPassword", Label = "New main administration password (leave empty to keep current)" });
          Tab("General").Cards.Add(general);
+
+         // Mirroring and archiving are the two ways of keeping a copy of every
+         // message, so they belong on one tab. Archiving lived on the catch-all
+         // INI page, where an admin looking for "keep a copy" never found it.
+         TabDef copies = Tab("Copies of mail");
 
          var mirror = Card("Mirroring", "Sends a copy of every message passing through the server to one address (compliance archiving).");
          mirror.Settings.Add(new ComText { Path = "MirrorEMailAddress", Label = "Mirror address (empty = disabled)" });
-         Tab("Mirroring").Cards.Add(mirror);
+         copies.Cards.Add(mirror);
+
+         var archive = Card("Message archiving",
+            "Keeps a copy of every message received over SMTP in a folder tree, in addition to delivering it as " +
+            "normal - it does not divert or hold back mail. Mail from a local sender is filed under " +
+            "<domain>\\<mailbox>, mail from elsewhere under Inbound, and messages with no envelope sender " +
+            "(bounces and delivery reports) under Error, plus a copy in the folder of each local recipient.");
+         archive.Settings.Add(new IniText
+         {
+            Path = "ArchiveDir",
+            Label = "Archive folder (empty = archiving off)",
+            Placeholder = @"D:\MailArchive",
+            BrowseFolder = true,
+            IniStore = iniStore_
+         });
+         archive.Settings.Add(new IniBool
+         {
+            Path = "ArchiveHardLinks",
+            Label = "Hard-link each recipient's copy instead of copying it",
+            Default = false,
+            Blurb = "Every local recipient's copy becomes another name for the same file inside the archive folder, " +
+                    "so a message to ten mailboxes costs one copy rather than ten. Needs an NTFS archive folder; " +
+                    "if the link cannot be created the server copies the file and says so in the SMTP log.",
+            IniStore = iniStore_
+         });
+         copies.Cards.Add(archive);
 
          var script = Card("Scripting", "Runs event scripts (OnAcceptMessage, OnDeliveryStart...) from the Events folder. The script engine reloads when you save.");
          script.Settings.Add(new ComBool { Path = "Scripting.Enabled", Label = "Enable server-side event scripts" });
          script.Settings.Add(new ComText { Path = "Scripting.Language", Label = "Language (VBScript or JScript)" });
          Tab("Scripting").Cards.Add(script);
+      }
+
+      /// <summary>
+      /// Who may administer this server. Both settings existed but had no
+      /// reachable home: the password was buried at the bottom of the Advanced
+      /// page, and two-factor setup could only be opened from the logon screen,
+      /// so nobody already signed in could find either.
+      /// </summary>
+      private void BuildAdminAccess()
+      {
+         TitleText.Text = "Administrative access";
+         SubtitleText.Text = "The credentials used to administer this server.";
+
+         var password = Card("Administrator password",
+            "The main hMailServer administration password. It is used by this Control Panel, the REST API and any " +
+            "script that connects through the COM API, and is stored hashed in hMailServer.ini. Changing it does not " +
+            "affect mailbox passwords.");
+         password.Settings.Add(new ComPassword
+         {
+            Path = "SetAdministratorPassword",
+            Label = "New administrator password (leave empty to keep the current one)",
+            MethodName = "SetAdministratorPassword"
+         });
+         Tab("Password").Cards.Add(password);
+
+         var twoFactor = Card("Two-factor authentication",
+            "An optional one-time code, asked for after the password when signing in to this Control Panel. The secret " +
+            "is stored per machine under HKLM, so enabling or disabling it needs local administrator rights. It does " +
+            "not apply to the REST API or to scripts using the COM API.");
+         twoFactor.Settings.Add(new ComAction
+         {
+            ButtonText = "Set up or turn off two-factor authentication\u2026",
+            Action = () =>
+            {
+               new TotpSetupDialog(Application.Current?.MainWindow).ShowDialog();
+               return TotpManager.IsConfigured()
+                  ? (true, "Two-factor authentication is on for this Control Panel.")
+                  : (false, "Two-factor authentication is off — only the password is required.");
+            }
+         });
+         Tab("Two-factor").Cards.Add(twoFactor);
       }
 
       // ---- COM resolution ----------------------------------------------------
@@ -1304,6 +1468,11 @@ namespace hMailServer.ControlPanel.Views
                   saved++;
                   continue;
                }
+
+               // Buttons and preset pickers persist nothing and name no property;
+               // resolving one would fail and be counted as a save error.
+               if (string.IsNullOrEmpty(setting.Path))
+                  continue;
 
                object owner = ResolveOwner(setting.Path, out string property);
                setting.Write(owner, property);
