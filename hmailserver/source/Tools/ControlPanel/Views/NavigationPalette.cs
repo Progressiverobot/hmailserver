@@ -23,6 +23,13 @@ namespace hMailServer.ControlPanel.Views
       // Display text -> nav page tag, for results that are settings rather than pages.
       private readonly Dictionary<string, string> settingResults_ = new Dictionary<string, string>();
 
+      // Closing the palette takes the focus off it, which raises Deactivated while
+      // the close is still running - and a second Close() from that handler throws
+      // "Cannot set Visibility ... while a Window is closing". Both ordinary ways
+      // of dismissing the palette (choosing a result, pressing Esc) go through
+      // Close(), so without this the error dialog appeared almost every time.
+      private bool closing_;
+
       /// <summary>The chosen page NAME, when the user picked a page.</summary>
       public string Selected { get; private set; }
 
@@ -85,7 +92,11 @@ namespace hMailServer.ControlPanel.Views
          Content = root;
 
          PreviewKeyDown += OnKey;
-         Deactivated += (s, e) => Close();
+         Deactivated += (s, e) =>
+         {
+            if (!closing_)
+               Close();
+         };
          Loaded += (s, e) => { Filter(); searchBox_.Focus(); };
       }
 
@@ -169,6 +180,20 @@ namespace hMailServer.ControlPanel.Views
          SelectedPageTag = chosen != null && settingResults_.TryGetValue(chosen, out string tag) ? tag : null;
 
          Close();
+      }
+
+      protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+      {
+         // Set before the base call, which is where the window starts tearing down
+         // and the focus change that raises Deactivated happens.
+         closing_ = true;
+
+         base.OnClosing(e);
+
+         // Nothing cancels the close today, but if anything ever does the palette
+         // has to stay dismissable.
+         if (e.Cancel)
+            closing_ = false;
       }
    }
 }
