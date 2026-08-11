@@ -57,7 +57,8 @@ namespace HM
       authentication_failure_count_(0),
       sasl_plain_pending_(false),
       sasl_bearer_pending_(false),
-      utf8_enabled_(false)
+      utf8_enabled_(false),
+      mailbox_locked_(false)
    {
 
       /*
@@ -613,13 +614,21 @@ namespace HM
       // Try to lock mailbox.
       if (!POP3Sessions::Instance()->Lock(account_->GetID()))
       {
+         // Another session owns the lock. Drop our account reference so the
+         // disconnect path cannot release a lock this session never held.
+         account_.reset();
+
          EnqueueWrite_("-ERR Your mailbox is already locked");
-         return ResultNormalResponse; 
+         return ResultNormalResponse;
       }
-  
+
+      mailbox_locked_ = true;
+
       if (!Application::Instance()->GetFolderManager()->GetInboxMessages((int) account_->GetID(), messages_))
       {
-         EnqueueWrite_("+ERR Server error: Failed to fetch messages in Inbox.");
+         // "-ERR" is the only failure indicator in POP3; "+ERR" was read as
+         // success by clients that only test the leading character.
+         EnqueueWrite_("-ERR Server error: Failed to fetch messages in Inbox.");
          return ResultNormalResponse;
       }
 
@@ -1203,28 +1212,44 @@ namespace HM
 
       PersistentMessage::EnsureFileExistance(account_, pMessage);
 
-      StartSendFile_(pMessage);
+      if (!StartSendFile_(pMessage))
+      {
+         // The file could not be opened. Answer with an error rather than
+         // starting a transfer the client will never receive - previously the
+         // session was left with no response at all.
+         EnqueueWrite_("-ERR Unable to read the message file");
+         return ResultNormalResponse;
+      }
 
       return ResultStartSendMessage;
    }
 
-   void 
+   bool
    POP3Connection::StartSendFile_(std::shared_ptr<Message> message)
-   {  
+   {
       String fileName = PersistentMessage::GetFileName(account_, message);
 
       transmission_buffer_.Initialize(shared_from_this());
-      
+
+      bool opened = false;
       try
       {
-         current_file_.Open(fileName, File::OTReadOnly);
+         // Open returns false for a missing or locked file; it only throws when
+         // the File object is already open. Both have to be handled, or the
+         // code below streams a file that was never opened.
+         opened = current_file_.Open(fileName, File::OTReadOnly);
       }
       catch (...)
       {
+         opened = false;
+      }
+
+      if (!opened)
+      {
          String sErrorMessage;
-         sErrorMessage.Format(_T("Could not send file %s via socket since it does not exist."), fileName.c_str());
+         sErrorMessage.Format(_T("Could not send file %s via socket since it could not be opened."), fileName.c_str());
          ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5063, "POP3Connection::_SendFile", sErrorMessage);
-         return;
+         return false;
       }
 
       String responseTemp;
@@ -1232,8 +1257,10 @@ namespace HM
       AnsiString responseString = responseTemp;
 
       transmission_buffer_.Append((BYTE*) responseString.GetBuffer(), responseString.GetLength());
-      
+
 	  ReadAndSend_();
+
+      return true;
    }
 
    void 
@@ -1328,15 +1355,23 @@ namespace HM
       }
       else
       {
+         // Recreate a missing file the same way RETR does, so a database that is
+         // out of step with the message store answers with an error rather than
+         // an empty body.
+         PersistentMessage::EnsureFileExistance(account_, pMessage);
+
          String fileName = PersistentMessage::GetFileName(account_, pMessage);
 
          String sResponse;
          sResponse.Format(_T("+OK %d octets"), pMessage->GetSize());
-         EnqueueWrite_(sResponse);
 
-         // --- Send the file to the recipient.
-         SendFileHeader_(fileName, iNoOfLines);
-         EnqueueWrite_("\r\n.");  
+         if (!SendFileHeader_(fileName, iNoOfLines, sResponse))
+         {
+            EnqueueWrite_("-ERR Unable to read the message file");
+            return true;
+         }
+
+         EnqueueWrite_("\r\n.");
       }
         
 
@@ -1356,22 +1391,39 @@ namespace HM
       if (!account_)
          return;
 
-      POP3Sessions::Instance()->Unlock(account_->GetID());
+      // Only release the lock if this session actually acquired it.
+      if (mailbox_locked_)
+      {
+         POP3Sessions::Instance()->Unlock(account_->GetID());
+         mailbox_locked_ = false;
+      }
+
       account_.reset();
    }
 
    bool
-   POP3Connection::SendFileHeader_(const String &sFilename, int iNoOfLines)
+   POP3Connection::SendFileHeader_(const String &sFilename, int iNoOfLines, const String &responseOnceOpen)
    {
       File file;
+      bool opened = false;
       try
       {
-         file.Open(sFilename, File::OTReadOnly);
+         // Open returns false for a missing or unreadable file and only throws
+         // when the File object is already open; handle both.
+         opened = file.Open(sFilename, File::OTReadOnly);
       }
       catch (...)
       {
-         return false;
+         opened = false;
       }
+
+      if (!opened)
+         return false;
+
+      // The success response is sent from here so that it is only sent once the
+      // file is known to be readable.
+      if (!responseOnceOpen.IsEmpty())
+         EnqueueWrite_(responseOnceOpen);
 
       int current_body_line_count = 0;
       bool header_sent = false;

@@ -91,6 +91,40 @@ namespace HM
       return 0;
    }
 
+   __int64
+   Messages::GetFirstUnseenSequenceNumber() const
+   {
+      boost::lock_guard<boost::recursive_mutex> guard(_mutex);
+
+      __int64 sequence_number = 0;
+
+      for(std::shared_ptr<Message> message : vecObjects)
+      {
+         sequence_number++;
+
+         if (!message->GetFlagSeen())
+            return sequence_number;
+      }
+
+      return 0;
+   }
+
+   std::set<__int64>
+   Messages::GetRecentMessageIDs() const
+   {
+      boost::lock_guard<boost::recursive_mutex> guard(_mutex);
+
+      std::set<__int64> recent_message_ids;
+
+      for(std::shared_ptr<Message> message : vecObjects)
+      {
+         if (message->GetFlagRecent())
+            recent_message_ids.insert(message->GetID());
+      }
+
+      return recent_message_ids;
+   }
+
 
    void
    Messages::Save()

@@ -10,6 +10,10 @@
 
 #include "../Common/BO/ACLPermission.h"
 #include "../Common/BO/IMAPFolder.h"
+
+#include "../Common/Tracking/ChangeNotification.h"
+#include "../Common/Tracking/NotificationServer.h"
+
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
 #define new DEBUG_NEW
@@ -33,15 +37,34 @@ namespace HM
       if (!pConnection->GetCurrentFolderReadOnly() &&
           pConnection->CheckPermission(pConnection->GetCurrentFolder(), ACLPermission::PermissionExpunge))
       {
-         std::function<bool(int, std::shared_ptr<Message>)> filter = [](int index, std::shared_ptr<Message> message)
+         std::vector<__int64> expunged_messages_index;
+
+         std::function<bool(int, std::shared_ptr<Message>)> filter = [&expunged_messages_index](int index, std::shared_ptr<Message> message)
             {
-               return message->GetFlagDeleted();
+               if (message->GetFlagDeleted())
+               {
+                  expunged_messages_index.push_back(index);
+                  return true;
+               }
+
+               return false;
             };
 
          auto messages = MessagesContainer::Instance()->GetMessages(pCurFolder->GetAccountID(), pCurFolder->GetID());
          messages->DeleteMessages(filter);
+
+         if (!expunged_messages_index.empty())
+         {
+            // CLOSE expunges silently for the closing client (RFC 3501), but the
+            // other sessions on this mailbox still have to be told, or their
+            // sequence numbers silently drift and they act on the wrong message.
+            std::shared_ptr<ChangeNotification> pNotification =
+               std::shared_ptr<ChangeNotification>(new ChangeNotification(pCurFolder->GetAccountID(), pCurFolder->GetID(), ChangeNotification::NotificationMessageDeleted, expunged_messages_index));
+
+            Application::Instance()->GetNotificationServer()->SendNotification(pConnection->GetNotificationClient(), pNotification);
+         }
       }
-      
+
       pConnection->CloseCurrentFolder();
 
       String sResponse = pArgument->Tag() + " OK CLOSE completed\r\n";

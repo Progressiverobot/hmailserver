@@ -297,9 +297,12 @@ namespace HM
       String sSQL;
       if (DBType == DatabaseSettings::TypeMSSQLServer || DBType == DatabaseSettings::TypeMSSQLCompactEdition || DBType == DatabaseSettings::TypePGServer)
       {
+         // The subquery must project the account id being matched against
+         // messageaccountid; projecting accountdomainid compared message owners
+         // against a domain id and reported a nonsense domain size.
          sSQL = "select sum(messagesize) as size from hm_messages "
                 "where messageaccountid in "
-                "(select accountdomainid from hm_accounts where accountdomainid = @DOMAINID) ";
+                "(select accountid from hm_accounts where accountdomainid = @DOMAINID) ";
       }
       else if (DBType == DatabaseSettings::TypeMYSQLServer)
       {

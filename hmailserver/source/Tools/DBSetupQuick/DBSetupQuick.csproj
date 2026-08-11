@@ -15,7 +15,7 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <RootNamespace>DBSetupQuick</RootNamespace>
     <AssemblyName>DBSetupQuick</AssemblyName>
-    <Version>6.2.13</Version>
+    <Version>6.2.14</Version>
     <Product>hMailServer Database Setup (quick)</Product>
     <Company>Progressive Robot Ltd</Company>
     <Copyright>Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd</Copyright>

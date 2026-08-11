@@ -39,6 +39,11 @@ namespace HM
 
       String message_file_name_;
 
+      // Set when any part of the literal could not be written to disk. The
+      // literal is still consumed to keep the parser in step, but the command
+      // must then fail instead of reporting OK for a message that was lost.
+      bool write_failed_ = false;
+
       ByteBuffer append_buffer_;
       std::shared_ptr<IMAPFolder> destination_folder_;
       std::shared_ptr<Message> current_message_;

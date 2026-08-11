@@ -90,7 +90,9 @@ namespace HM
       pConnection->SetRecentMessages(recent_messages);
 
       long lCount = messages->GetCount();
-      __int64 lFirstUnseenID = messages->GetFirstUnseenUID();
+      // RFC 3501: [UNSEEN] carries a message sequence number, not a UID
+      // (see IMAPCommandSelect).
+      __int64 lFirstUnseenID = messages->GetFirstUnseenSequenceNumber();
       long lRecentCount = (int) recent_messages.size();
 
       String sRespTemp;

@@ -91,11 +91,20 @@ namespace HM
             if (batch.size() >= iMaxRecipientsInBatch ||
                iterRecipient + 1 == vecRecipientsOnDomain.end())
             {
+               // Each batch gets its own copy: DeliverToSingleDomain_ overwrites the
+               // host name with the MX host it selects and can clear the connection
+               // security. Reusing one object meant every batch after the first
+               // looked up the MTA-STS policy of an MX host rather than of the
+               // recipient domain (so enforcement silently stopped applying), lost
+               // MX failover, and could inherit a STARTTLS downgrade from the
+               // previous batch.
+               std::shared_ptr<ServerInfo> batchServerInfo = std::shared_ptr<ServerInfo>(new ServerInfo(*serverInfo));
+
                // Deliver the message to the remote server.
-               DeliverToSingleDomain_(batch, serverInfo);
+               DeliverToSingleDomain_(batch, batchServerInfo);
 
                // Check what status we got on the external deliveries.
-               CollectDeliveryResult_(serverInfo->GetHostName(), batch, saErrorMessages, mapFailedDueToNonFatalError, suppressFailureDsnAddresses);    
+               CollectDeliveryResult_(batchServerInfo->GetHostName(), batch, saErrorMessages, mapFailedDueToNonFatalError, suppressFailureDsnAddresses);
 
                batch.clear();
             }

@@ -14,11 +14,20 @@ namespace hMailServer.ControlPanel.Views
    /// </summary>
    public class NavigationPalette : Window
    {
+      private const int MaxSettingResults = 12;
+
       private readonly TextBox searchBox_;
       private readonly ListBox resultsList_;
       private readonly List<string> names_;
 
+      // Display text -> nav page tag, for results that are settings rather than pages.
+      private readonly Dictionary<string, string> settingResults_ = new Dictionary<string, string>();
+
+      /// <summary>The chosen page NAME, when the user picked a page.</summary>
       public string Selected { get; private set; }
+
+      /// <summary>The nav TAG of the page to open, when the user picked a setting.</summary>
+      public string SelectedPageTag { get; private set; }
 
       public NavigationPalette(Window owner, IEnumerable<string> pageNames)
       {
@@ -84,9 +93,25 @@ namespace hMailServer.ControlPanel.Views
       {
          string query = searchBox_.Text.Trim();
          resultsList_.Items.Clear();
+         settingResults_.Clear();
 
          foreach (string name in names_.Where(n => query.Length == 0 || IsSubsequence(query, n)))
             resultsList_.Items.Add(name);
+
+         // Individual settings, so an administrator can search for what they want
+         // to change ("delete logs", "LogLevel") rather than having to guess which
+         // page it was filed under.
+         if (query.Length > 1)
+         {
+            foreach ((string display, string page) in Services.SettingsSearchIndex.Search(query).Take(MaxSettingResults))
+            {
+               if (resultsList_.Items.Contains(display))
+                  continue;
+
+               settingResults_[display] = page;
+               resultsList_.Items.Add(display);
+            }
+         }
 
          if (resultsList_.Items.Count > 0)
             resultsList_.SelectedIndex = 0;
@@ -133,7 +158,16 @@ namespace hMailServer.ControlPanel.Views
 
       private void Accept()
       {
-         Selected = resultsList_.SelectedItem as string;
+         string chosen = resultsList_.SelectedItem as string;
+
+         // A setting result navigates to the page that hosts it; a page result
+         // is already the page name the caller expects.
+         Selected = chosen != null && settingResults_.TryGetValue(chosen, out string page)
+            ? null
+            : chosen;
+
+         SelectedPageTag = chosen != null && settingResults_.TryGetValue(chosen, out string tag) ? tag : null;
+
          Close();
       }
    }

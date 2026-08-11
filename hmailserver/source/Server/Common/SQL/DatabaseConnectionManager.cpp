@@ -396,9 +396,21 @@ namespace HM
    DatabaseConnectionManager::BeginTransaction(String &sErrorMessage)
    {
       std::shared_ptr<DALConnection> pDALConnection = GetConnection_();
+
+      // GetConnection_ returns empty when the pool could not hand one out.
+      if (!pDALConnection)
+      {
+         sErrorMessage = "No database connection is available.";
+         return pDALConnection;
+      }
+
       if (!pDALConnection->BeginTransaction(sErrorMessage))
       {
-         // Could not start database transaction.
+         // Could not start the transaction. The connection must go back to the
+         // pool - leaking it here permanently shrank the pool, and once it was
+         // exhausted every SMTP, IMAP and POP3 operation blocked forever.
+         ReleaseConnection_(pDALConnection);
+
          std::shared_ptr<DALConnection> pEmpty;
          return pEmpty;
       }

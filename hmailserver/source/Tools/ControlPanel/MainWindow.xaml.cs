@@ -169,8 +169,7 @@ namespace hMailServer.ControlPanel
                Item("IP ranges", "ipranges"),
                Item("SSL certificates", "certs"),
                Item("Transport security", "security"),
-               Item("Certificates (ACME)", "acme"),
-               Item("Advanced hardening", "hardening")),
+               Item("Certificates (ACME)", "acme")),
             Group("Network",
                Item("TCP/IP ports", "ports"),
                Item("Incoming relays", "relays"),
@@ -178,6 +177,11 @@ namespace hMailServer.ControlPanel
             Group("Maintenance",
                Item("Performance", "performance"),
                Item("Advanced & scripting", "advanced"),
+               // Renamed from "Advanced hardening" and moved out of Security: the
+               // page is a catch-all for INI knobs, most of which are operational
+               // rather than security-related, and admins were not finding them
+               // under a heading that told them not to touch anything.
+               Item("Advanced INI settings", "hardening"),
                Item("Event scripts", "scripts"),
                Item("Server messages", "servermessages"),
                Item("Groups", "groups"))));
@@ -224,7 +228,20 @@ namespace hMailServer.ControlPanel
          var palette = new NavigationPalette(this, entries.Keys);
          palette.ShowDialog();
 
-         if (palette.Selected != null && entries.TryGetValue(palette.Selected, out TreeViewItem target))
+         TreeViewItem target = null;
+
+         if (palette.Selected != null)
+         {
+            entries.TryGetValue(palette.Selected, out target);
+         }
+         else if (palette.SelectedPageTag != null)
+         {
+            // The user picked an individual setting; open the page that hosts it.
+            target = AllLeaves(NavTree.Items)
+               .FirstOrDefault(item => string.Equals(item.Tag as string, palette.SelectedPageTag, StringComparison.OrdinalIgnoreCase));
+         }
+
+         if (target != null)
          {
             var parent = target.Parent as TreeViewItem;
             while (parent != null)

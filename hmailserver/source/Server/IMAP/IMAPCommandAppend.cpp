@@ -241,16 +241,27 @@ namespace HM
          FileUtilities::CreateDirectory(destinationPath);
 
       File oFile;
-      
+
       try
       {
-         oFile.Open(message_file_name_, File::OTAppend);
+         // Both calls report failure by return value (a full or read-only volume,
+         // a file locked by AV/backup); ignoring them meant APPEND answered OK
+         // for a message that was never stored.
+         if (!oFile.Open(message_file_name_, File::OTAppend))
+         {
+            write_failed_ = true;
+            return false;
+         }
 
-
-         oFile.Write(pBuf, WriteLen);
+         if (!oFile.Write(pBuf, WriteLen))
+         {
+            write_failed_ = true;
+            return false;
+         }
       }
       catch (...)
       {
+         write_failed_ = true;
          return false;
       }
 
@@ -276,6 +287,27 @@ namespace HM
    {
       if (!current_message_)
          return;
+
+      if (write_failed_)
+      {
+         // The message data never reached disk. Discard the partial file and
+         // fail the command: reporting OK here silently lost Sent Items copies,
+         // drafts and migration uploads while the client believed they were saved.
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 5211, "IMAPCommandAppend::Finish_",
+            "APPEND failed because the message file could not be written: " + message_file_name_);
+
+         KillCurrentMessage_();
+
+         write_failed_ = false;
+
+         String sFailure = current_tag_ + " NO [SERVERBUG] APPEND failed - the message could not be stored on the server.\r\n";
+         pConnection->SendAsciiData(sFailure);
+
+         // No database row was created yet, so dropping the handles is enough.
+         destination_folder_.reset();
+         current_message_.reset();
+         return;
+      }
 
       // Add this message to the folder.
       current_message_->SetSize(FileUtilities::FileSize(message_file_name_));

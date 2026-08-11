@@ -149,6 +149,9 @@ namespace HM
       objects_.clear();
       no_of_misses_ = 0;
       no_of_hits_ = 0;
+
+      // The accumulated size belongs to the objects that were just discarded.
+      current_estimated_size_ = 0;
    }
 
    template <class T> 
@@ -299,7 +302,13 @@ namespace HM
                break;
 
             auto item = (*item_iter);
-            
+
+            // An entry that reports no size cannot bring the total down, so
+            // evicting further entries would empty the whole cache without ever
+            // reaching the target. Stop instead of purging everything.
+            if (item.GetEstimatedSize() == 0)
+               break;
+
             if (current_estimated_size_ >= item.GetEstimatedSize())
                current_estimated_size_ -= item.GetEstimatedSize();
 
@@ -350,10 +359,14 @@ namespace HM
       }
       else
       {
+         // The two branches were inverted: an oversized decrease underflowed the
+         // unsigned total to an enormous value, while every ordinary decrease
+         // reset it to zero - so the accounting never reflected reality and the
+         // size cap could not do its job.
          if (size_change > current_estimated_size_)
-            current_estimated_size_ -= size_change;
-         else
             current_estimated_size_ = 0;
+         else
+            current_estimated_size_ -= size_change;
       }
 
    }

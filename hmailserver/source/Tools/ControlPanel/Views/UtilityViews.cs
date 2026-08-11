@@ -402,7 +402,8 @@ namespace hMailServer.ControlPanel.Views
          var title = new TextBlock { Text = "Diagnostics" };
          title.SetResourceReference(StyleProperty, "PageTitle");
          header.Children.Add(title);
-         var sub = new TextBlock { Text = "Runs the server's built-in connectivity and configuration checks (outbound port 25, MX resolution, backup directory, IP configuration)." };
+         var sub = new TextBlock { Text = "Runs the server's built-in connectivity and configuration checks (outbound port 25, MX resolution, backup directory, IP configuration). " +
+            "The periodic message-store consistency scan is separate: enable it on the Advanced INI settings page; it writes hMailServer_messagestore_consistency.report to the log folder." };
          sub.SetResourceReference(StyleProperty, "PageSubtitle");
          header.Children.Add(sub);
          grid.Children.Add(header);

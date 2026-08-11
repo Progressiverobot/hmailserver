@@ -149,7 +149,11 @@ namespace HM
          std::shared_ptr<AsynchronousTask<TCPConnection> >(new AsynchronousTask<TCPConnection>
             (std::bind(&SMTPConnection::PrefetchPtrRecord_, this), shared_from_this()));
 
-      Application::Instance()->GetAsyncWorkQueue()->AddTask(ptrTask);
+      // Dedicated queue: a slow or unanswered reverse lookup must never occupy a
+      // thread that message finalization (the final "250 OK") needs.
+      std::shared_ptr<WorkQueue> lookupQueue = Application::Instance()->GetNameLookupWorkQueue();
+      if (lookupQueue)
+         lookupQueue->AddTask(ptrTask);
 
       if (GetConnectionSecurity() == CSNone ||
           GetConnectionSecurity() == CSSTARTTLSOptional ||

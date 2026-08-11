@@ -212,8 +212,17 @@ namespace HM
       bool signatureValid = false;
       if (algUpper == "HS256")
          signatureValid = VerifyHs256_(signingInput, signature, config.hmac_secret);
-      else if (algUpper == "RS256" || algUpper == "ES256")
+      else if (algUpper == "RS256")
          signatureValid = VerifyWithPublicKey_(signingInput, signature, config.rsa_public_key_file);
+      else if (algUpper == "ES256")
+      {
+         // JWS carries an ECDSA signature as the raw R||S pair, while OpenSSL
+         // expects X9.62 DER, so this never verified - it only ever produced a
+         // misleading "signature verification failed". Reject it explicitly
+         // until the transcode is implemented and tested, so the cause is clear.
+         out_error = "JWT algorithm ES256 is not supported by this server; use RS256 or HS256.";
+         return false;
+      }
       else
       {
          out_error = "JWT algorithm is not supported.";

@@ -382,6 +382,37 @@ namespace HM
          
       }
 
+      // SASL (AUTHENTICATE) carries credentials the LOGIN masking above does not
+      // cover: PLAIN sends the password base64-encoded and XOAUTH2/OAUTHBEARER
+      // send a bearer token, either as an initial response on the AUTHENTICATE
+      // line or as the continuation line that follows the server's "+".
+      {
+         String pending_command = command_buffer_;
+         pending_command.MakeUpper();
+
+         if (pending_command.Find(_T("AUTHENTICATE")) >= 0)
+         {
+            // Continuation of an exchange in progress: the whole line is the token.
+            sLogData = "***";
+         }
+         else
+         {
+            String upper_line = sLogData;
+            upper_line.MakeUpper();
+
+            int authenticate_position = upper_line.Find(_T(" AUTHENTICATE "));
+            if (authenticate_position >= 0)
+            {
+               // Keep "<tag> AUTHENTICATE <mechanism>"; mask any initial response.
+               int mechanism_start = authenticate_position + (int) _tcslen(_T(" AUTHENTICATE "));
+               int mechanism_end = sLogData.Find(_T(" "), mechanism_start);
+
+               if (mechanism_end > 0)
+                  sLogData = sLogData.Mid(0, mechanism_end) + " ***";
+            }
+         }
+      }
+
       // Remove any password from the log.
       PasswordRemover::Remove(PasswordRemover::PRIMAP, sLogData);
 

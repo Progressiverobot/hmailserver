@@ -427,7 +427,12 @@ namespace HM
       if (!ValidateBodyHash_(fileName, signatureParams, bodyCanonicalization))
       {
          LOG_DEBUG("DKIM: Validation of body hash failed.");
-         return testMode ? Pass : PermFail;
+
+         // RFC 6376 3.6.1: t=y means the verifier must not treat a failure as a
+         // failure - it does NOT mean the signature verified. Returning Pass here
+         // granted DMARC alignment to mail whose signature was invalid, so a
+         // domain that left the test flag in its key record could be spoofed.
+         return testMode ? Neutral : PermFail;
       }
 
       AnsiString tagH = signatureParams.GetValue("h");
@@ -452,7 +457,12 @@ namespace HM
 
       Result result = VerifyHeaderHash_(canonicalizedHeader, tagA, tagB, publicKeyString);
 
-      return testMode ? Pass : result;
+      // In test mode a failure is downgraded to "no assertion" rather than being
+      // reported as a successful verification (see the body-hash case above).
+      if (testMode && result != Pass)
+         return Neutral;
+
+      return result;
    }
 
    DKIM::Result
@@ -717,12 +727,31 @@ namespace HM
                        JyM2IRZ8qSOCeQscnre5iVjwIDAQAB;
       */
       
-      AnsiString result = results[0];
-
+      // A selector can legitimately hold more than one TXT record - most often
+      // while a sender rotates its key. Inspecting only the first meant roughly
+      // half of that sender's mail failed verification (and lost DMARC
+      // alignment) until the rotation completed, so try each record and use the
+      // first one that is usable for this signature.
       DKIMParameters dnsKeyParams;
-      dnsKeyParams.Load(result);
+      bool foundUsableKey = false;
 
-      if (!ValidateDNSEntry_(dnsKeyParams, signatureParams))
+      for (const AnsiString &result : results)
+      {
+         // A fresh instance per record: Load merges into the existing values
+         // rather than replacing them, so reusing one object would blend the
+         // tags of several records together.
+         DKIMParameters candidateParams;
+         candidateParams.Load(result);
+
+         if (!ValidateDNSEntry_(candidateParams, signatureParams))
+            continue;
+
+         dnsKeyParams = candidateParams;
+         foundUsableKey = true;
+         break;
+      }
+
+      if (!foundUsableKey)
       {
          LOG_DEBUG("DKIM: Error when retrieving public key. Validation of DNS entry failed.");
          return PermFail;

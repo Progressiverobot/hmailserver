@@ -298,7 +298,8 @@ namespace hMailServer.ControlPanel.Views
                cards_.Add(new CardDef
                {
                   Title = "MTA-STS",
-                  Blurb = "Discovers and enforces recipient MTA-STS policies before delivering over TLS (RFC 8461).",
+                  Blurb = "Discovers and enforces recipient MTA-STS policies before delivering over TLS (RFC 8461). " +
+                          "To publish a policy for your own domains, see Web services on the API & monitoring page.",
                   Settings =
                   {
                      new BoolSetting { Key = "MtaStsEnabled", Default = true, Label = "Honor recipient MTA-STS policies when sending" }
@@ -390,7 +391,7 @@ namespace hMailServer.ControlPanel.Views
                   {
                      new TextSetting { Key = "MetricsServerPort", Default = "0", Label = "Metrics port (0 = disabled)", Placeholder = "9090" },
                      new TextSetting { Key = "MetricsServerBindAddress", Default = "127.0.0.1", Label = "Metrics bind address" },
-                     new BoolSetting { Key = "JsonLogging", Default = false, Label = "Write logs as JSON lines" },
+                     // JsonLogging moved to the Logging page, with the other log settings.
                      new TextSetting { Key = "OtelEndpoint", Label = "OpenTelemetry OTLP endpoint (empty = disabled)", Placeholder = "http://localhost:4318" },
                      new TextSetting { Key = "OtelServiceName", Default = "hmailserver", Label = "OpenTelemetry service name" },
                      new TextSetting { Key = "SlowQueryLogMilliseconds", Default = "0", Label = "Log database queries slower than N ms (0 = off)", Placeholder = "250" }
@@ -426,17 +427,18 @@ namespace hMailServer.ControlPanel.Views
                cards_.Add(new CardDef
                {
                   Title = "Operability",
-                  Blurb = "Log retention and graceful shutdown behaviour for unattended / clustered operation.",
+                  // Log retention lives on the Logging page, next to the other
+                  // logging settings, so there is exactly one editor per key.
+                  Blurb = "Graceful shutdown behaviour for unattended / clustered operation. (Log retention is on the Logging page.)",
                   Settings =
                   {
-                     new TextSetting { Key = "LogDeleteDays", Default = "0", Label = "Delete own logs older than N days (0 = keep all)", Placeholder = "30" },
                      new TextSetting { Key = "ShutdownDrainSeconds", Default = "0", Label = "On stop, wait up to N seconds for active sessions to finish (0 = stop immediately)", Placeholder = "30" }
                   }
                });
                break;
 
             case Section.Hardening:
-               TitleText.Text = "Advanced hardening";
+               TitleText.Text = "Advanced INI settings";
                SubtitleText.Text = "Lower-level hMailServer.INI [Settings] knobs that are not exposed on the other " +
                                    "pages. The defaults are safe; change these only with a specific reason. " +
                                    "Changes take effect after a service restart.";
@@ -450,18 +452,8 @@ namespace hMailServer.ControlPanel.Views
                      new TextSetting { Key = "GreylistingRecordExpirationInterval", Default = "240", Label = "Record expiration interval (minutes, default 240)" }
                   }
                });
-               cards_.Add(new CardDef
-               {
-                  Title = "Scanner timeouts",
-                  Blurb = "Per-message minimum and maximum wait for the external SpamAssassin and ClamAV scanners (seconds).",
-                  Settings =
-                  {
-                     new TextSetting { Key = "SAMinTimeout", Default = "30", Label = "SpamAssassin minimum timeout (s)" },
-                     new TextSetting { Key = "SAMaxTimeout", Default = "90", Label = "SpamAssassin maximum timeout (s)" },
-                     new TextSetting { Key = "ClamMinTimeout", Default = "15", Label = "ClamAV minimum timeout (s)" },
-                     new TextSetting { Key = "ClamMaxTimeout", Default = "90", Label = "ClamAV maximum timeout (s)" }
-                  }
-               });
+               // Scanner timeouts moved to the scanner they configure: SpamAssassin
+               // on the Anti-spam page and ClamAV on the Anti-virus page.
                cards_.Add(new CardDef
                {
                   Title = "DNS",
@@ -548,12 +540,12 @@ namespace hMailServer.ControlPanel.Views
                });
                cards_.Add(new CardDef
                {
-                  Title = "Submission & delivery rate limits",
-                  Blurb = "Throttle abusive senders. Limits are per minute; 0 disables the limit.",
+                  Title = "Submission rate limits",
+                  Blurb = "Throttle abusive senders submitting to this server. Limits are per minute; 0 disables the limit. " +
+                          "(Throttling your own outbound rate to a destination is on the Delivery of e-mail page.)",
                   Settings =
                   {
-                     new TextSetting { Key = "MaxSubmissionsPerIPPerMinute", Default = "0", Label = "Max authenticated submissions per client IP per minute (0 = unlimited)", Placeholder = "60" },
-                     new TextSetting { Key = "MaxOutboundPerDestinationPerMinute", Default = "0", Label = "Max outbound messages per destination domain per minute (0 = unlimited)", Placeholder = "100" }
+                     new TextSetting { Key = "MaxSubmissionsPerIPPerMinute", Default = "0", Label = "Max authenticated submissions per client IP per minute (0 = unlimited)", Placeholder = "60" }
                   }
                });
                cards_.Add(new CardDef
@@ -574,39 +566,19 @@ namespace hMailServer.ControlPanel.Views
                });
                cards_.Add(new CardDef
                {
-                  Title = "Delivery & queue tuning",
-                  Blurb = "Early-retry behaviour, queue jitter and the external (POP3) fetch worker pool.",
+                  Title = "External fetch & MX attempts",
+                  // Retry cadence, jitter and the outbound throttle moved to the
+                  // Delivery of e-mail page, next to the retry schedule they modify.
+                  Blurb = "Retry cadence and per-destination throttling are on the Delivery of e-mail page.",
                   Settings =
                   {
-                     new TextSetting { Key = "QuickRetries", Default = "0", Label = "Quick early retries before the normal retry schedule (0 = off)" },
-                     new TextSetting { Key = "QuickRetriesMinutes", Default = "6", Label = "Minutes between quick retries" },
-                     new TextSetting { Key = "QueueRandomnessMinutes", Default = "0", Label = "Random jitter added to retry times (minutes, 0 = off)" },
                      new TextSetting { Key = "MXTriesFactor", Default = "0", Label = "Extra delivery attempts per additional MX host (0 = default)" },
                      new TextSetting { Key = "MaxNumberOfExternalFetchThreads", Default = "15", Label = "Max parallel external POP3 fetch threads" }
                   }
                });
-               cards_.Add(new CardDef
-               {
-                  Title = "Logging detail",
-                  Blurb = "Low-level logging knobs. The log categories and destination are on the Logging page.",
-                  Settings =
-                  {
-                     new TextSetting { Key = "LogLevel", Default = "9", Label = "Log level / verbosity" },
-                     new TextSetting { Key = "MaxLogLineLen", Default = "500", Label = "Maximum characters per log line (minimum 100)" },
-                     new BoolSetting { Key = "SepSvcLogs", Default = false, Label = "Write a separate log file per service component" }
-                  }
-               });
-               cards_.Add(new CardDef
-               {
-                  Title = "Search indexing",
-                  Blurb = "Background full-text indexer cadence and batch sizes (used by IMAP SEARCH).",
-                  Settings =
-                  {
-                     new TextSetting { Key = "IndexerFullMinutes", Default = "720", Label = "Full re-index interval (minutes)" },
-                     new TextSetting { Key = "IndexerFullLimit", Default = "25000", Label = "Messages per full-index pass" },
-                     new TextSetting { Key = "IndexerQuickLimit", Default = "1000", Label = "Messages per quick-index pass" }
-                  }
-               });
+               // Logging detail moved to the Logging page and indexer cadence to
+               // Performance > Indexing, so each setting sits with the feature it
+               // configures rather than on this catch-all page.
                cards_.Add(new CardDef
                {
                   Title = "Message archiving",

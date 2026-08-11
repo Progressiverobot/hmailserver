@@ -200,6 +200,142 @@ namespace hMailServer.ControlPanel.Views
          }
       }
 
+      /// <summary>
+      /// Marker for settings stored in hMailServer.ini rather than in the COM
+      /// settings tree, so the save path can route them to the INI store.
+      /// </summary>
+      private interface IIniSetting
+      {
+         void SaveToIni();
+      }
+
+      /// <summary>
+      /// A yes/no setting stored in hMailServer.ini. Same purpose as IniNumber:
+      /// it lets an INI-backed switch sit on the page where admins look for it.
+      /// </summary>
+      private class IniBool : ComSetting, IIniSetting
+      {
+         public string Blurb;
+         public bool Default;
+         public IniFeatureStore IniStore;
+         private CheckBox box_;
+
+         public override bool WantsInitialValue => false;
+
+         public override FrameworkElement CreateEditor(object value)
+         {
+            bool current = Default;
+            if (IniStore != null && IniStore.IsAvailable)
+               current = IniStore.ReadBool(Path, Default);
+
+            var panel = new StackPanel();
+
+            box_ = new CheckBox { Content = Label, IsChecked = current, FontSize = 13.5 };
+            SetAid(box_, Path);
+            panel.Children.Add(box_);
+
+            if (!string.IsNullOrEmpty(Blurb))
+            {
+               panel.Children.Add(new TextBlock
+               {
+                  Text = Blurb,
+                  FontSize = Typography.Caption,
+                  TextWrapping = TextWrapping.Wrap,
+                  Opacity = 0.65,
+                  Margin = new Thickness(0, 4, 0, 0)
+               });
+            }
+
+            return panel;
+         }
+
+         public override object ReadEditor() => box_?.IsChecked == true;
+
+         public void SaveToIni()
+         {
+            if (IniStore == null || !IniStore.IsAvailable || box_ == null)
+               return;
+
+            IniStore.WriteBool(Path, box_.IsChecked == true);
+         }
+      }
+
+      /// <summary>
+      /// A numeric setting stored in hMailServer.ini rather than in the COM
+      /// settings tree. It exists so an INI-backed knob can sit on the page
+      /// where users look for it (log retention belongs with the other logging
+      /// settings, not on an unrelated page). Path is the INI key name.
+      /// </summary>
+      private class IniNumber : ComSetting, IIniSetting
+      {
+         public string Blurb;
+         public int Default;
+         private Wpf.Ui.Controls.NumberBox number_;
+
+         // The value comes from the INI file, not from a COM property.
+         public override bool WantsInitialValue => false;
+
+         public override FrameworkElement CreateEditor(object value)
+         {
+            var store = IniStore;
+            int current = Default;
+            if (store != null && store.IsAvailable)
+            {
+               string raw = store.Read(Path, Default.ToString());
+               if (!int.TryParse(raw, out current))
+                  current = Default;
+            }
+
+            var panel = new StackPanel();
+            panel.Children.Add(new TextBlock { Text = Label, FontSize = 13, Margin = new Thickness(0, 0, 0, 4) });
+
+            number_ = new Wpf.Ui.Controls.NumberBox
+            {
+               Value = current,
+               Minimum = 0,
+               MaxDecimalPlaces = 0,
+               SmallChange = 1,
+               LargeChange = 10,
+               FontSize = 13,
+               MaxWidth = 180,
+               MinWidth = 120,
+               HorizontalAlignment = HorizontalAlignment.Left
+            };
+            SetAid(number_, Path);
+            panel.Children.Add(number_);
+
+            if (!string.IsNullOrEmpty(Blurb))
+            {
+               panel.Children.Add(new TextBlock
+               {
+                  Text = Blurb,
+                  FontSize = Typography.Caption,
+                  TextWrapping = TextWrapping.Wrap,
+                  Opacity = 0.65,
+                  Margin = new Thickness(0, 4, 0, 0)
+               });
+            }
+
+            return panel;
+         }
+
+         public override object ReadEditor() => (long) (number_?.Value ?? Default);
+
+         /// <summary>Persists to hMailServer.ini. Save_Click calls this instead
+         /// of the COM write path.</summary>
+         public void SaveToIni()
+         {
+            var store = IniStore;
+            if (store == null || !store.IsAvailable || number_ == null)
+               return;
+
+            store.Write(Path, ((long) (number_.Value ?? Default)).ToString());
+         }
+
+         /// <summary>Shared store, assigned by the view when the page is built.</summary>
+         public IniFeatureStore IniStore;
+      }
+
       private class ComCombo : ComSetting
       {
          public (int Value, string Label)[] Options;
@@ -386,6 +522,11 @@ namespace hMailServer.ControlPanel.Views
       private string diag_;
       private int failedReads_;
       private Action afterBuildUi_;
+
+      // Most settings on these pages live in the COM settings tree, but a few
+      // (log retention) live in hMailServer.ini; IniNumber rows use this store.
+      private readonly IniFeatureStore iniStore_ = new IniFeatureStore();
+
       public ServerSettingsView(Section section)
       {
          InitializeComponent();
@@ -433,7 +574,9 @@ namespace hMailServer.ControlPanel.Views
          TitleText.Text = "Protocols";
          SubtitleText.Text = "Which services this server runs, connection limits and greetings.";
 
-         var services = Card("Services", "Enable or disable the protocol servers. Changes apply after pressing Save.");
+         var services = Card("Services",
+            "Enable or disable the protocol servers. Changes apply after pressing Save. " +
+            "ManageSieve (for managing Sieve scripts) and OAuth2 token authentication are enabled on the API & monitoring page.");
          services.Settings.Add(new ComBool { Path = "ServiceSMTP", Label = "SMTP server" });
          services.Settings.Add(new ComBool { Path = "ServiceIMAP", Label = "IMAP server" });
          services.Settings.Add(new ComBool { Path = "ServicePOP3", Label = "POP3 server" });
@@ -477,17 +620,35 @@ namespace hMailServer.ControlPanel.Views
          TitleText.Text = "Delivery of e-mail";
          SubtitleText.Text = "Outbound delivery behavior, retries and smart-host relaying.";
 
-         var del = Card("Delivery of e-mail");
+         var del = Card("Delivery of e-mail",
+            "Outbound delivery, retries and throttling. Keeping forwarded mail SPF-aligned (SRS) and " +
+            "bounce tagging (BATV) are on the Advanced INI settings page.");
          del.Settings.Add(new ComText { Path = "SMTPNoOfTries", Label = "Number of delivery retries", Numeric = true });
          del.Settings.Add(new ComText { Path = "SMTPMinutesBetweenTry", Label = "Minutes between retries", Numeric = true });
          del.Settings.Add(new ComText { Path = "MaxNumberOfMXHosts", Label = "Max MX hosts to try (0 = all)", Numeric = true });
          del.Settings.Add(new ComText { Path = "SMTPDeliveryBindToIP", Label = "Bind outbound connections to IP (empty = any)" });
          del.Settings.Add(new ComCombo { Path = "SMTPConnectionSecurity", Label = "Outbound delivery security (after MX lookup)", Options = ConnSecurity });
          del.Settings.Add(new ComBool { Path = "AddDeliveredToHeader", Label = "Add Delivered-To header" });
+         // Quick retries override "Minutes between retries" above for the first N
+         // attempts, so the two have to be visible together to make sense.
+         del.Settings.Add(new IniNumber { Path = "QuickRetries", Label = "Quick early retries before the normal schedule (0 = off)", Default = 0, IniStore = iniStore_ });
+         del.Settings.Add(new IniNumber { Path = "QuickRetriesMinutes", Label = "Minutes between quick retries", Default = 6, IniStore = iniStore_ });
+         del.Settings.Add(new IniNumber { Path = "QueueRandomnessMinutes", Label = "Random jitter added to retry times (minutes, 0 = off)", Default = 0, IniStore = iniStore_ });
+         del.Settings.Add(new IniNumber
+         {
+            Path = "MaxOutboundPerDestinationPerMinute",
+            Label = "Max outbound messages per destination domain per minute (0 = unlimited)",
+            Default = 0,
+            Blurb = "Throttling your own outbound rate to a domain that rate-limits you. Deferred messages consume the retry budget above.",
+            IniStore = iniStore_
+         });
          Tab("Delivery").Cards.Add(del);
 
-         var relay = Card("SMTP relayer (smart host)", "Route all outbound mail through another SMTP server instead of delivering directly.");
-         relay.Settings.Add(new ComText { Path = "SMTPRelayer", Label = "Relay host name (empty = direct delivery)" });
+         var relay = Card("SMTP relayer (smart host)",
+            "Route all outbound mail through another SMTP server instead of delivering directly. " +
+            "For failover, separate several hosts with a vertical bar: the next host is tried when one " +
+            "cannot be reached (all hosts share the port, security and credentials below).");
+         relay.Settings.Add(new ComText { Path = "SMTPRelayer", Label = "Relay host name (empty = direct delivery; use host1|host2 for failover)" });
          relay.Settings.Add(new ComText { Path = "SMTPRelayerPort", Label = "Port", Numeric = true });
          relay.Settings.Add(new ComCombo { Path = "SMTPRelayerConnectionSecurity", Label = "Connection security", Options = ConnSecurity });
          relay.Settings.Add(new ComBool { Path = "SMTPRelayerRequiresAuthentication", Label = "Relay requires authentication" });
@@ -572,6 +733,17 @@ namespace hMailServer.ControlPanel.Views
                return TestSpamAssassin(host, port);
             }
          });
+         // Timeouts belong with the scanner they apply to: an admin whose mail is
+         // backing up looks at the SpamAssassin tab, not at a hardening page.
+         sa.Settings.Add(new IniNumber { Path = "SAMinTimeout", Label = "Minimum timeout (seconds)", Default = 30, IniStore = iniStore_ });
+         sa.Settings.Add(new IniNumber
+         {
+            Path = "SAMaxTimeout",
+            Label = "Maximum timeout (seconds)",
+            Default = 90,
+            Blurb = "The effective timeout moves between these values with server load.",
+            IniStore = iniStore_
+         });
          Tab("SpamAssassin").Cards.Add(sa);
       }
 
@@ -598,6 +770,16 @@ namespace hMailServer.ControlPanel.Views
          {
             ButtonText = "Test ClamAV connection",
             Action = () => TestClamAv(clamHost.CurrentText, ParsePort(clamPort.CurrentText))
+         });
+         // See the SpamAssassin tab: scanner timeouts live with their scanner.
+         clamav.Settings.Add(new IniNumber { Path = "ClamMinTimeout", Label = "Minimum timeout (seconds)", Default = 15, IniStore = iniStore_ });
+         clamav.Settings.Add(new IniNumber
+         {
+            Path = "ClamMaxTimeout",
+            Label = "Maximum timeout (seconds)",
+            Default = 90,
+            Blurb = "The effective timeout moves between these values with server load.",
+            IniStore = iniStore_
          });
          Tab("ClamAV").Cards.Add(clamav);
 
@@ -706,7 +888,56 @@ namespace hMailServer.ControlPanel.Views
          log.Settings.Add(new ComBool { Path = "Logging.KeepFilesOpen", Label = "Keep log files open (performance)" });
          log.Settings.Add(new ComCombo { Path = "Logging.Device", Label = "Log destination", Options = new (int, string)[] { (2, "Files on disk"), (1, "Database (SQL)") } });
          log.Settings.Add(new ComCombo { Path = "Logging.LogFormat", Label = "Log line format", Options = new (int, string)[] { (1, "Default"), (2, "NCSA / combined (AWStats)") } });
+         log.Settings.Add(new IniBool
+         {
+            Path = "JsonLogging",
+            Label = "Write logs as JSON lines",
+            Default = false,
+            Blurb = "Machine-readable output for log shippers. Applies after a service restart.",
+            IniStore = iniStore_
+         });
          Tab("Logging").Cards.Add(log);
+
+         // How much is written, next to what is written and how long it is kept -
+         // an admin dealing with log volume should not have to find three pages.
+         var detail = Card("Log detail",
+            "How much detail each entry carries. Lowering the level is the other half of controlling log volume.");
+         detail.Settings.Add(new IniNumber
+         {
+            Path = "LogLevel",
+            Label = "Log level (9 = everything; 2 or lower suppresses routine IMAP chatter and truncates long lines)",
+            Default = 9,
+            IniStore = iniStore_
+         });
+         detail.Settings.Add(new IniNumber
+         {
+            Path = "MaxLogLineLen",
+            Label = "Maximum characters per log line (minimum 100; only applied at log level 2 or lower)",
+            Default = 500,
+            IniStore = iniStore_
+         });
+         detail.Settings.Add(new IniBool
+         {
+            Path = "SepSvcLogs",
+            Label = "Write a separate log file per service component",
+            Default = false,
+            IniStore = iniStore_
+         });
+         Tab("Logging").Cards.Add(detail);
+
+         var retention = Card("Log retention",
+            "Housekeeping for the log folder, so logs do not accumulate indefinitely.");
+         retention.Settings.Add(new IniNumber
+         {
+            Path = "LogDeleteDays",
+            Label = "Delete logs older than N days (0 = keep everything)",
+            Default = 0,
+            Blurb = "Checked shortly after the service starts and every six hours after that. " +
+                    "Only hMailServer's own dated log files (hmailserver_*.log and ERROR_hmailserver_*.log) " +
+                    "are removed; nothing else in the log folder is touched.",
+            IniStore = iniStore_
+         });
+         Tab("Logging").Cards.Add(retention);
       }
 
       private void BuildPerformance()
@@ -735,6 +966,11 @@ namespace hMailServer.ControlPanel.Views
 
          var index = Card("Message indexing", "Builds a search index so IMAP SEARCH and the web client are faster.");
          index.Settings.Add(new ComBool { Path = "MessageIndexing.Enabled", Label = "Enable message indexing" });
+         // Tuning lives with the feature it tunes: a tab holding a single on/off
+         // switch reads as "there is nothing to adjust here".
+         index.Settings.Add(new IniNumber { Path = "IndexerFullMinutes", Label = "Full re-index interval (minutes)", Default = 720, IniStore = iniStore_ });
+         index.Settings.Add(new IniNumber { Path = "IndexerFullLimit", Label = "Messages per full-index pass", Default = 25000, IniStore = iniStore_ });
+         index.Settings.Add(new IniNumber { Path = "IndexerQuickLimit", Label = "Messages per quick-index pass", Default = 1000, IniStore = iniStore_ });
          Tab("Indexing").Cards.Add(index);
       }
 
@@ -1052,12 +1288,23 @@ namespace hMailServer.ControlPanel.Views
       {
          int saved = 0, failed = 0;
 
+         bool iniWritten = false;
+
          foreach (TabDef tab in tabs_)
          foreach (CardDef card in tab.Cards)
          foreach (ComSetting setting in card.Settings)
          {
             try
             {
+               // INI-backed rows are not in the COM settings tree.
+               if (setting is IIniSetting ini)
+               {
+                  ini.SaveToIni();
+                  iniWritten = true;
+                  saved++;
+                  continue;
+               }
+
                object owner = ResolveOwner(setting.Path, out string property);
                setting.Write(owner, property);
                saved++;
@@ -1068,12 +1315,18 @@ namespace hMailServer.ControlPanel.Views
             }
          }
 
+         // hMailServer.ini is read when the service starts, so an INI-backed row
+         // does not take effect until it is restarted - don't claim otherwise.
+         string appliedNote = iniWritten
+            ? " - server settings applied immediately; hMailServer.ini settings apply after a service restart."
+            : " - applied immediately.";
+
          StatusText.Text = failed == 0
-            ? "Saved " + saved + " settings at " + DateTime.Now.ToLongTimeString() + " - applied immediately."
+            ? "Saved " + saved + " settings at " + DateTime.Now.ToLongTimeString() + appliedNote
             : "Saved " + saved + " settings, " + failed + " could not be written.";
 
          if (failed == 0)
-            Services.Toast.Success("Saved " + saved + " settings \u2014 applied immediately.");
+            Services.Toast.Success("Saved " + saved + " settings" + (iniWritten ? " \u2014 INI settings need a service restart." : " \u2014 applied immediately."));
          else
             Services.Toast.Info(failed + " setting(s) could not be written.", "Partly saved");
 

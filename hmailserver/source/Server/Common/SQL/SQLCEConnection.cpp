@@ -573,9 +573,10 @@ namespace HM
          {
             const String &value = parameter.GetStringValue();
 
-            VARIANT stringType;
-            stringType.vt = VT_BSTR;
-            stringType.bstrVal  = _bstr_t(value);
+            // _variant_t owns its BSTR for the lifetime of this scope; the previous
+            // _bstr_t temporary was destroyed at the end of the assignment, leaving
+            // the parameter bound to freed memory.
+            _variant_t stringType(value.c_str());
 
             // The length must be higher than 0. Also, we set a fixed length on most queries
             // to prevent execution plan cache spamming. In the case where the data length is higher

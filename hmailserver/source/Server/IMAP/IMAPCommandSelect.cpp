@@ -97,7 +97,10 @@ namespace HM
       pConnection->SetRecentMessages(recent_messages);
 
       long lCount = messages->GetCount();
-      __int64 lFirstUnseenID = messages->GetFirstUnseenUID();
+      // RFC 3501: [UNSEEN] carries a message SEQUENCE NUMBER, not a UID. Sending
+      // a UID sent clients that jump to the first unseen message to a message
+      // that does not exist.
+      __int64 lFirstUnseenID = messages->GetFirstUnseenSequenceNumber();
       long lRecentCount = (int) recent_messages.size();
 
       String sRespTemp;

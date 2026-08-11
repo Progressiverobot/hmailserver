@@ -85,7 +85,10 @@ namespace HM
 
       if (!expunged_messages_uid.empty())
       {
-         auto recent_messages = pConnection->GetRecentMessages();
+         // Reference, not a copy: erasing from a copy left the expunged messages
+         // in the session's \Recent set, so RECENT kept reporting new mail that
+         // no longer exists (and could exceed EXISTS).
+         auto &recent_messages = pConnection->GetRecentMessages();
 
          for (__int64 messageUid : expunged_messages_uid)
          {

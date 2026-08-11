@@ -396,6 +396,13 @@ namespace HM
       {
          pNewMessage = PersistentMessage::CopyFromQueueToInbox(pOriginalMessage, pRecipientAccount);
 
+         // The copy fails when the data volume is full or the file is locked by
+         // another process. Returning empty lets the caller's existing handling
+         // report the failure; dereferencing it here crashed the delivery task
+         // and left the queued message locked forever.
+         if (!pNewMessage)
+            return pNewMessage;
+
          for (std::shared_ptr<MessageRecipient> recipient : pOriginalMessage->GetRecipients()->GetVector())
          {
             if (recipient->GetAddress().CompareNoCase(pRecipientAccount->GetAddress()) == 0)

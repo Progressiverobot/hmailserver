@@ -138,7 +138,9 @@ namespace HM
 
       if (!expunged_messages_uid.empty())
       {
-         auto recent_messages = pConnection->GetRecentMessages();
+         // Reference, not a copy - see IMAPCommandExpunge: erasing from a copy
+         // leaves moved messages in the session's \Recent set.
+         auto &recent_messages = pConnection->GetRecentMessages();
 
          for (__int64 messageUid : expunged_messages_uid)
          {

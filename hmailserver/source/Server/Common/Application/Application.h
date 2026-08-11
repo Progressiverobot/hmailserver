@@ -63,6 +63,13 @@ namespace HM
 
       std::shared_ptr<WorkQueue> GetMaintenanceWorkQueue();
       std::shared_ptr<WorkQueue> GetAsyncWorkQueue();
+
+      // Queue for blocking name lookups performed on behalf of a live session
+      // (currently the SMTP reverse-DNS prefetch). Kept separate from the
+      // asynchronous task queue so a burst of slow or unanswered DNS queries
+      // can never delay message finalization - the work that sends the final
+      // "250 OK" - or POP3 external fetching.
+      std::shared_ptr<WorkQueue> GetNameLookupWorkQueue();
       std::shared_ptr<IOService> GetIOService() {return io_service_; }
       // The random work queue can run any task.
 
@@ -112,6 +119,8 @@ namespace HM
       // The main server queue, that contains one task per server.
 
       const String asynchronous_tasks_queue_;
+
+      const String name_lookup_queue_;
 
       long unique_id_;
    };

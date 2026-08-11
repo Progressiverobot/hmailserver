@@ -5,7 +5,7 @@ hMailServer is an open source email server for Microsoft Windows, implementing S
 
 This repository is a modernized fork of the original project (which is no longer maintained upstream). It has been brought up to date with a current toolchain, current cryptography, and the transport-security standards expected of a mail server in 2026. It is maintained by Christopher Holloway / [Progressive Robot Ltd](https://www.progressiverobot.com).
 
-**Production status:** version **6.2.13** is released - [download the installer](https://github.com/Progressiverobot/hmailserver/releases/latest) (`hMailServer-6.2.13-x64.exe`). **6.2.13 is a community-feedback bug-fix release**: it fixes the issues testers reported on the forum against 6.2.11/6.2.12 - a SMTP DATA stall when relaying from Postfix/Proxmox Mail Gateway (a reverse-DNS lookup that blocked the network thread mid-message), the DBUpdater version labels, the Control Panel Diagnostics and service-restart, in-place upgrade settings/EventHandlers preservation, and a consistent Windows 10/2016 build target - and hardens the SMTP, IMAP FETCH and SpamAssassin paths against malformed input found while investigating. See *6.2.13* below. It is validated by the full regression suite: **1026 of 1026 tests passing, zero failures, zero inconclusive** - the complete suite, with live SpamAssassin and ClamAV (real EICAR detection), DMARC evaluation against live DNS, and TLS 1.2/1.3 handshakes end to end. Every test runs; nothing is skipped. The bundled administration GUI is the modern .NET 8 **Control Panel**.
+**Production status:** version **6.2.14** is released - [download the installer](https://github.com/Progressiverobot/hmailserver/releases/latest) (`hMailServer-6.2.14-x64.exe`). **6.2.14 is a correctness and usability release**: an adversarial audit of the server found and fixed **21 defects** - including failed message copies crashing delivery, IMAP APPEND reporting success for messages that were never written, string SQL parameters bound from freed memory on the default backend, a DKIM test-mode flag that turned a failed signature into a DMARC-aligned pass, and IMAP SASL passwords written to the log - plus the two issues reported by the community. The Control Panel's Ctrl+K palette now searches all 227 settings by label and INI key, and settings that were filed by how they are stored moved to the pages where they are used. See *6.2.14* below. It is validated by the full regression suite: **1026 of 1026 tests passing, zero failures, zero inconclusive** - the complete suite, with live SpamAssassin and ClamAV (real EICAR detection), DMARC evaluation against live DNS, and TLS 1.2/1.3 handshakes end to end. Every test runs; nothing is skipped. The bundled administration GUI is the modern .NET 8 **Control Panel**.
 
 What's new in 6.0
 =================
@@ -82,6 +82,64 @@ change until the new settings are turned on.
 **Supply chain & quality gates**
 
    * SPDX + CycloneDX SBOMs (Syft) attached to every release, Dependabot CVE alerts + grouped update PRs, and a dependency-review PR gate.
+
+6.2.14
+======
+
+A correctness and usability release. Two community reports are fixed, an adversarial audit of the server found and fixed **21 defects** — several of which could lose or corrupt mail — and the Control Panel now lets you search for a setting instead of guessing which page it is on. No database change (schema version 6005).
+
+Validated by the full regression suite: **1026 of 1026 passing, zero failures**, against the rebuilt 6.2.14 service.
+
+## Reported by the community
+
+- **Backup would not start** (#19). The Control Panel called a method that does not exist on the backup settings interface, so *Save settings* and *Start backup now* both failed with `'System.__ComObject' does not contain a definition for 'Save'`. The settings were in fact being saved; only the start was blocked. Every other late-bound call in the Control Panel was audited against the server's interface definitions at the same time.
+- **"Setting for days to keep logs"** (#16) already existed but was effectively unfindable. It — and the rest of the logging settings — now live together on the **Logging** page (see *Finding settings* below).
+
+## Mail loss, corruption and crashes
+
+- **Failed message copies crashed delivery.** When a message file could not be copied (full volume, file locked by antivirus or backup), local delivery, forwarding, Sieve redirect and mirroring dereferenced a null handle. The delivery task died and left the message locked in the queue, where it failed again on every restart.
+- **IMAP APPEND reported success for messages that were never written.** A full disk or a locked file produced `OK [APPENDUID …]`, so Sent Items copies, drafts and migration uploads were lost while the client showed them as saved. APPEND now fails cleanly and removes the partial file.
+- **Every string SQL parameter on MS SQL and SQL CE was bound from freed memory.** The value was built from a temporary that was destroyed before the parameter was used — undefined behaviour on the default database backend, on every query carrying a string.
+- **A failed database transaction start leaked its pooled connection.** After a few occurrences the pool was exhausted and every SMTP, IMAP and POP3 operation blocked until the service was restarted.
+- **A failed IMAP folder insert was reported as success**, caching a folder with no database row; messages filed into it were written to disk with nothing to find them by.
+- **IMAP CLOSE expunged without telling other sessions**, so a phone and a desktop on the same mailbox drifted out of step and the second client could act on the wrong message.
+- **A POP3 session that was refused the mailbox lock still released it on disconnect**, handing away the owning session's lock and letting two clients download concurrently.
+- **POP3 RETR and TOP ignored the result of opening the message file**, so an unreadable message dropped the connection with no response and wrote a minidump. Both now answer `-ERR`, and TOP recreates a missing file the way RETR already did.
+- **The message cache size accounting was inverted**, so the 512 MB cap never applied as intended; the accumulated size is also reset when the cache is cleared.
+
+## Security
+
+- **DKIM test mode (`t=y`) turned a failed signature into a pass**, which then satisfied DMARC alignment — so mail forging a domain whose key record still carried the rollout flag was accepted rather than rejected. A failure in test mode is now reported as *neutral*, per RFC 6376.
+- **IMAP SASL credentials were written to the log.** With IMAP logging enabled, `AUTHENTICATE PLAIN` passwords and XOAUTH2/OAUTHBEARER tokens were recorded verbatim; POP3 and SMTP already masked them.
+- **Only the first DKIM key record at a selector was examined**, so while a sender rotated its key roughly half of its mail failed verification and lost DMARC alignment — rejecting legitimate mail.
+- **MTA-STS enforcement and MX failover were lost for large recipient sets.** Recipients past the first batch reused mutated delivery state, so the policy of an MX host was looked up instead of the recipient domain's, and a STARTTLS fallback on one host could carry to the next.
+- The REST administration API now bounds how long one request may take to arrive, so a slow client cannot occupy the worker thread (or delay shutdown), and a rejected administrator credential is logged.
+- `ES256` OAuth2 tokens are now rejected with a clear message. The implementation fed a raw JWS signature to a verifier expecting DER, so it could never succeed; saying so beats a phantom "signature verification failed". `RS256` and `HS256` are unaffected.
+
+## Protocol correctness
+
+- IMAP `RENAME` no longer lets a folder become its own parent when the hierarchy delimiter is not `.` — which made the folder and its mail disappear from `LIST`.
+- `SELECT`/`EXAMINE` report a message sequence number in `[UNSEEN]`, as RFC 3501 requires, instead of a UID; clients that jump to the first unseen message no longer land on nothing.
+- Expunged and moved messages are removed from the session's `\Recent` set, so `RECENT` no longer claims new mail that no longer exists.
+- A `BODY.PEEK` item no longer cancels the `\Seen` update requested by another item in the same `FETCH`.
+- POP3 answers `-ERR` (not the invalid `+ERR`) when the mailbox cannot be opened, which some clients read as success.
+- Reverse-DNS lookups for the `Received` header now run on their own thread pool, so a burst of connections from addresses with unresponsive reverse DNS cannot delay message acknowledgements. This completes the fix that landed in 6.2.13.
+
+## Finding settings
+
+Settings had accumulated on whichever page matched how they were *stored* rather than what they *do*, so several real features looked missing. That is fixed in two ways.
+
+- **The command palette (Ctrl+K) now searches settings, not just pages.** Type `delete logs`, `log level` or an INI key such as `LogDeleteDays` and you get the setting and the page that owns it. All 227 settings are indexed by label and key; the index is generated from the pages themselves and a test fails the build if it ever falls behind.
+- **Settings moved to where they are used.** Log level, maximum line length, per-service log files and JSON logging joined retention on **Logging**. SpamAssassin and ClamAV timeouts moved onto their own scanner tabs. Search-indexer cadence moved to **Performance → Indexing**. Retry cadence, queue jitter and the per-destination outbound throttle moved to **Delivery of e-mail** — the quick-retry setting silently overrides the retry interval shown there, so the two now sit together.
+- **"Advanced hardening" is now "Advanced INI settings"** and sits under Maintenance. Only four of its cards were security-related; the rest were operational settings that admins were not opening a page marked "change these only with a specific reason" to find.
+- Signposts were added where a setting correctly stays put but is easy to miss: ManageSieve and OAuth2 from the Protocols page, MTA-STS *publishing* from the MTA-STS card, SRS/BATV from Delivery, and the message-store consistency scan from Diagnostics.
+
+## Also
+
+- Multiple smart hosts are documented at last: put several hosts in the relayer field separated by `|` and delivery fails over to the next when one cannot be reached. This has always worked; nothing said so.
+- A domain's size was calculated from the wrong column on MS SQL, SQL CE and PostgreSQL.
+- The account cache is now cleared when the server stops, so edits made to the database while it is stopped are no longer ignored.
+- `TCP_NODELAY` is set on every connection, and an SNI failure now reports the SNI error rather than a stale success code.
 
 6.2.13
 ======

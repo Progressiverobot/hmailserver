@@ -538,8 +538,14 @@ namespace HM
    IMAPFetchParser::BodyPart
    IMAPFetchParser::ParseBODY_PEEK(const String &sString)
    {
+      // set_seen_ is parser-wide, so a PEEK item must not clear a request for
+      // \Seen made by a non-peek body item earlier in the same FETCH: the
+      // message would stay unread after the client had actually read it.
+      bool set_seen_before = set_seen_;
+
       BodyPart oPart = ParseBODY_(sString);
-      set_seen_ = false;
+
+      set_seen_ = set_seen_before;
 
       return oPart;
    }

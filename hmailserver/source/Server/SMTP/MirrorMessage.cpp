@@ -108,6 +108,15 @@ namespace HM
       std::shared_ptr<Account> emptyAccount;
       std::shared_ptr<Message> pMsg = PersistentMessage::CopyToQueue(emptyAccount, message_);
 
+      // A failed spool copy must not crash the delivery task; mirroring is a
+      // side effect and the original delivery has to continue regardless.
+      if (!pMsg)
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 5210, "MirrorMessage::Send",
+            "Could not mirror the message because a copy of it could not be created.");
+         return;
+      }
+
       pMsg->SetState(Message::Delivering);
 
       // Add new recipients

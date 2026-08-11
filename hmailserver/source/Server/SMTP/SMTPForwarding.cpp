@@ -97,6 +97,15 @@ namespace HM
       // Create a copy of the message
       std::shared_ptr<Message> pNewMessage = PersistentMessage::CopyToQueue(pRecipientAccount, pOriginalMessage);
 
+      // A failed spool copy (full disk, locked file) must not crash the delivery
+      // task - that leaves the original message locked in the queue forever.
+      if (!pNewMessage)
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 5210, "SMTPForwarding::PerformForwarding",
+            "Could not forward the message because a copy of it could not be created.");
+         return false;
+      }
+
       String envelopeFrom = pNewMessage->GetFromAddress();
       if (!envelopeFrom.IsEmpty())
       {
@@ -201,6 +210,14 @@ namespace HM
       }
 
       std::shared_ptr<Message> pNewMessage = PersistentMessage::CopyToQueue(pRecipientAccount, pOriginalMessage);
+
+      // See PerformForwarding: a failed copy must be reported, not dereferenced.
+      if (!pNewMessage)
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 5210, "SMTPForwarding::RedirectToAddress",
+            "Could not redirect the message because a copy of it could not be created.");
+         return false;
+      }
 
       String envelopeFrom = pNewMessage->GetFromAddress();
       if (!envelopeFrom.IsEmpty())

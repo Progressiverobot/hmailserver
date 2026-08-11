@@ -49,8 +49,11 @@ namespace HM
          (
          [this]() 
             { 
-               Cache<Domain>::Instance()->Clear(); 
                Cache<Domain>::Instance()->Clear();
+               // Was a duplicated Cache<Domain>: the account cache was never
+               // cleared on stop, so edits made to hm_accounts while the server
+               // was stopped were ignored after it started again.
+               Cache<Account>::Instance()->Clear();
                Cache<Alias>::Instance()->Clear();
                Cache<DistributionList>::Instance()->Clear();
             }

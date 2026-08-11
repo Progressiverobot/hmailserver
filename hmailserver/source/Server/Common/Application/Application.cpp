@@ -74,6 +74,7 @@ namespace HM
       server_work_queue_("Server queue"),
       maintenance_queue_("Maintenance queue"),
       asynchronous_tasks_queue_("Asynchronous task queue"),
+      name_lookup_queue_("Name lookup queue"),
       unique_id_(0)
    {
       version_ = Formatter::Format("{0}-B{1}", HMAILSERVER_VERSION, HMAILSERVER_BUILD);
@@ -154,8 +155,16 @@ namespace HM
       LOG_DEBUG("Application::InitInstance - Configuration loaded.");
 
       // Start an asynch workqueue which processes asynchronous tasks from clients.
-      WorkQueueManager::Instance()->CreateWorkQueue(Configuration::Instance()->GetAsynchronousThreads(), 
+      WorkQueueManager::Instance()->CreateWorkQueue(Configuration::Instance()->GetAsynchronousThreads(),
                                                     asynchronous_tasks_queue_);
+
+      // Separate queue for blocking name lookups made on behalf of a live
+      // session. These can stall for seconds on an address whose reverse zone
+      // is unreachable, so they are kept off the asynchronous task queue that
+      // finalizes (and acknowledges) received messages. Saturating this queue
+      // only delays the lookups themselves, which degrade to "Unknown".
+      WorkQueueManager::Instance()->CreateWorkQueue(Configuration::Instance()->GetAsynchronousThreads(),
+                                                    name_lookup_queue_);
 
       return true;
    }
@@ -240,6 +249,8 @@ namespace HM
       WorkQueueManager::Instance()->RemoveQueue(maintenance_queue_);
 
       WorkQueueManager::Instance()->RemoveQueue(asynchronous_tasks_queue_);
+
+      WorkQueueManager::Instance()->RemoveQueue(name_lookup_queue_);
 
       // Backup manager is created by initinstance so should be destroyed here.
       if (backup_manager_) 
@@ -664,6 +675,17 @@ namespace HM
          ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5118, "Application::GetAsyncWorkQueue()", "Async work queue not available.");
 
       return pAsynchQueue;
+   }
+
+   std::shared_ptr<WorkQueue>
+   Application::GetNameLookupWorkQueue()
+   {
+      std::shared_ptr<WorkQueue> pQueue = WorkQueueManager::Instance()->GetQueue(name_lookup_queue_);
+
+      if (!pQueue)
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5118, "Application::GetNameLookupWorkQueue()", "Name lookup work queue not available.");
+
+      return pQueue;
    }
 
    int 

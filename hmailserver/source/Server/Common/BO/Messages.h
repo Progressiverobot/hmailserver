@@ -22,6 +22,17 @@ namespace HM
 
       long GetSize() const;
       __int64 GetFirstUnseenUID() const;
+
+      // 1-based sequence number of the first message without the \Seen flag, or
+      // 0 when there is none. RFC 3501 requires a sequence number (not a UID) in
+      // the [UNSEEN] response code of SELECT/EXAMINE.
+      __int64 GetFirstUnseenSequenceNumber() const;
+
+      // The ids of the messages currently carrying \Recent, collected under the
+      // collection lock. Callers must not walk GetVector() themselves: another
+      // session can erase from the shared vector while it is being iterated.
+      std::set<__int64> GetRecentMessageIDs() const;
+
       long GetNoOfSeen() const;
       
       std::vector<std::shared_ptr<Message>> GetCopy();

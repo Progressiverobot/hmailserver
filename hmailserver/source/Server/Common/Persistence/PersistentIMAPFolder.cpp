@@ -151,12 +151,14 @@ namespace HM
 
       
       __int64 iDBID = 0;
-      bool bRetVal = Application::Instance()->GetDBManager()->Execute(oStatement, bNewObject ? &iDBID : 0);      
+      bool bRetVal = Application::Instance()->GetDBManager()->Execute(oStatement, bNewObject ? &iDBID : 0);
       if (bRetVal && bNewObject)
          pFolder->SetID((int) iDBID);
 
-
-      return true;
+      // Report the database result. Returning true unconditionally cached a
+      // folder with id 0 after a failed insert, and every message filed into it
+      // was then written to disk with no row to find it by.
+      return bRetVal;
    }
 
    __int64 

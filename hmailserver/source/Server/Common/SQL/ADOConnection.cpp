@@ -479,9 +479,10 @@ namespace HM
          {
             const String &value = parameter.GetStringValue();
 
-            VARIANT stringType;
-            stringType.vt = VT_BSTR;
-            stringType.bstrVal  = _bstr_t(value);
+            // _variant_t owns its BSTR for the lifetime of this scope. Building the
+            // VARIANT from a _bstr_t temporary instead freed the string at the end of
+            // the assignment, so the parameter was bound from released memory.
+            _variant_t stringType(value.c_str());
 
             int length = 0;
 

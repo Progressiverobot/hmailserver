@@ -206,7 +206,10 @@ namespace HM
        // would happen to Folder.Sub1?
        String sOldFolderName = StringParser::JoinVector(vecOldPath, hierarchyDelimiter);
 
-       if (sNewFolderName.FindNoCase(sOldFolderName + ".") == 0)
+       // Compare using the configured hierarchy delimiter; hard-coding "." let a
+       // folder become its own parent on a server using a different delimiter,
+       // which loses the folder and its mail from LIST.
+       if (sNewFolderName.FindNoCase(sOldFolderName + hierarchyDelimiter) == 0)
        {
           // The new path starts with the entire old path. The user is trying to move an existing
           // folder into its own sub folder. This is not allowed, for reason stated above.

@@ -123,12 +123,16 @@ namespace HM
       // RFC 6856: switch the session to UTF-8 mode (AUTHORIZATION state only).
       void ProtocolUTF8_();
 
-      bool SendFileHeader_(const String &sFilename, int iNoOfLines = 0);
+      // responseOnceOpen, when set, is sent only after the file has been opened
+      // successfully, so a failure can still be answered with "-ERR".
+      bool SendFileHeader_(const String &sFilename, int iNoOfLines = 0, const String &responseOnceOpen = String());
 
       void SaveMailboxChanges_();
       void UnlockMailbox_();
 
-      void StartSendFile_(std::shared_ptr<Message> message);
+      // Returns false when the message file could not be opened; the caller must
+      // then send an error response instead of starting a message transfer.
+      bool StartSendFile_(std::shared_ptr<Message> message);
 	  void ReadAndSend_();
       void ResetMailbox_();
       std::shared_ptr<Message> GetMessage_(unsigned int index);
@@ -152,6 +156,11 @@ namespace HM
 
       // RFC 6856 UTF8 mode: set by the UTF8 command, advertised via CAPA.
       bool utf8_enabled_;
+
+      // True only when THIS session acquired the mailbox lock. A session that was
+      // refused the lock must not release it on disconnect - doing so handed the
+      // owning session's lock away and let two clients download concurrently.
+      bool mailbox_locked_;
 
       File current_file_;
    };

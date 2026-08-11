@@ -75,13 +75,10 @@ namespace HM
       
       messages_cache_.AdjustEstimatedSize(increased_size, size_change);
 
-      recent_messages.clear();
-            
-      for (std::shared_ptr<Message> message : messages->GetVector())
-      {
-         if (message->GetFlagRecent())
-            recent_messages.insert(message->GetID());
-      }
+      // Collected under the collection's own lock. Iterating GetVector() here
+      // raced with another session erasing from the same shared vector, which
+      // showed up as intermittent IMAP crashes under concurrent access.
+      recent_messages = messages->GetRecentMessageIDs();
 
       if (update_recent_messages)
          messages->RemoveRecentFlags();

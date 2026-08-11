@@ -38,6 +38,9 @@ namespace HM
       const int MaxRequestSize = 64 * 1024;
       const DWORD SocketTimeoutMilliseconds = 10000;
 
+      // Total time allowed to read one request, across all reads.
+      const ULONGLONG RequestReadTimeoutMilliseconds = 30000;
+
       SSL_CTX *tls_context = nullptr;
 
       // Parses a strictly numeric message id.
@@ -66,8 +69,18 @@ namespace HM
 
          size_t headerEnd = std::string::npos;
 
+         // Absolute wall-clock ceiling for reading one request. The per-socket
+         // SO_RCVTIMEO only bounds a single read; without a total deadline a
+         // client that dribbles a byte at a time just under that timeout can
+         // occupy the (single) REST worker thread indefinitely and also stall
+         // shutdown, since Stop() waits for the handler to return.
+         const ULONGLONG deadline = GetTickCount64() + RequestReadTimeoutMilliseconds;
+
          while (data.size() < MaxRequestSize)
          {
+            if (GetTickCount64() >= deadline)
+               return false;
+
             int bytesRead = readSome(buffer, sizeof(buffer));
             if (bytesRead <= 0)
                break;
@@ -353,7 +366,18 @@ namespace HM
 
       Crypt::EncryptionType hashType = Crypt::Instance()->GetHashType(correctPassword);
 
-      return Crypt::Instance()->Validate(password, correctPassword, hashType);
+      bool authenticated = Crypt::Instance()->Validate(password, correctPassword, hashType);
+
+      if (!authenticated)
+      {
+         // A rejected credential leaves a trace, so repeated guessing against an
+         // exposed management port is at least visible to the administrator.
+         // (Presenting no credential at all is normal for the login page and is
+         // deliberately not logged here.)
+         LOG_APPLICATION("REST API: administrator authentication failed.");
+      }
+
+      return authenticated;
    }
 
    AnsiString
