@@ -163,12 +163,20 @@ namespace HM
          return false;
       }
 
-      // Compress the XML file
+      // Compress the XML file. The result is checked before the source is deleted:
+      // an archive that could not be written must fail the backup, not be reported
+      // as complete and then have the only other copy removed.
       Compression oComp;
-      oComp.AddFile(sZipFile, sXMLFile);
+      bool xmlCompressed = oComp.AddFile(sZipFile, sXMLFile);
 
       // Delete the XML file
       FileUtilities::DeleteFile(sXMLFile);
+
+      if (!xmlCompressed)
+      {
+         Application::Instance()->GetBackupManager()->OnBackupFailed("Could not add the backup settings to the archive. The backup is incomplete.");
+         return false;
+      }
 
       // Should we compress the message files?
       if (backup_mode_ & Backup::BOMessages && 
@@ -176,8 +184,18 @@ namespace HM
       {
          Logger::Instance()->LogBackup("Compressing message files...");
          
+         // Same again, and it matters more here: the staged copy below is deleted
+         // straight afterwards, so a compression failure that went unnoticed would
+         // leave a truncated archive and no message files at all, announced as a
+         // successful backup.
          if (backup_mode_ & Backup::BOMessages)
-            oComp.AddDirectory(sZipFile, sDataBackupDir + "\\");
+         {
+            if (!oComp.AddDirectory(sZipFile, sDataBackupDir + "\\"))
+            {
+               Application::Instance()->GetBackupManager()->OnBackupFailed("Could not add the message files to the archive. The backup is incomplete; the staged message files have been left in " + sDataBackupDir + ".");
+               return false;
+            }
+         }
 
          // Since the files are now compressed, we can deleted
          // the data backup directory

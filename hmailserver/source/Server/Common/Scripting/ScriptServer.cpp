@@ -20,6 +20,93 @@
 
 namespace HM
 {
+   namespace
+   {
+      // Aborts a runaway script by interrupting the engine from a timer queue
+      // thread.
+      //
+      // The watchdog holds its own reference to the engine, so the engine object
+      // stays alive for as long as the watchdog exists - even after Terminate has
+      // released the script site's reference. Disarm blocks until a callback which
+      // has already started has returned and guarantees that no further callback
+      // will start, and it always runs before the reference is dropped. A callback
+      // therefore always executes while the engine is still alive; interrupting an
+      // engine which has already been closed simply fails with an HRESULT.
+      //
+      // InterruptScriptThread is the only IActiveScript method documented as
+      // callable from a thread other than the one which created the engine, so it
+      // is the only thing the callback is allowed to touch. In particular the
+      // callback must not report errors: reporting fires the OnError script event,
+      // which would run a script engine on a pool thread that has not initialized
+      // COM. The calling thread reports instead, once Disarm has returned.
+      class ScriptWatchdog
+      {
+      public:
+         ScriptWatchdog(const CComPtr<IActiveScript> &engine, int timeout_seconds) :
+            engine_(engine),
+            timer_(0),
+            fired_(0)
+         {
+            // Zero means the administrator has turned the limit off.
+            if (timeout_seconds <= 0 || !engine_)
+               return;
+
+            DWORD due_time = static_cast<DWORD>(timeout_seconds) * 1000UL;
+
+            if (!CreateTimerQueueTimer(&timer_, NULL, OnTimeout_, this, due_time, 0, WT_EXECUTEONLYONCE | WT_EXECUTELONGFUNCTION))
+            {
+               DWORD last_error = ::GetLastError();
+
+               timer_ = 0;
+
+               // Logged rather than reported, since reporting fires the OnError
+               // event which would arm another watchdog and fail again.
+               String sMessage;
+               sMessage.Format(_T("ScriptServer: Failed to create the script execution watchdog timer. Windows error code: %d"), last_error);
+               Logger::Instance()->LogError(sMessage);
+            }
+         }
+
+         ~ScriptWatchdog()
+         {
+            Disarm();
+         }
+
+         void Disarm()
+         {
+            if (timer_ == 0)
+               return;
+
+            HANDLE timer = timer_;
+            timer_ = 0;
+
+            // INVALID_HANDLE_VALUE makes this wait for a callback which is already
+            // running. It must never be called from the callback itself.
+            DeleteTimerQueueTimer(NULL, timer, INVALID_HANDLE_VALUE);
+         }
+
+         bool Fired()
+         {
+            return InterlockedCompareExchange(&fired_, 0, 0) != 0;
+         }
+
+      private:
+
+         static VOID CALLBACK OnTimeout_(PVOID parameter, BOOLEAN /*timer_or_wait_fired*/)
+         {
+            ScriptWatchdog *watchdog = reinterpret_cast<ScriptWatchdog*>(parameter);
+
+            InterlockedExchange(&watchdog->fired_, 1);
+
+            watchdog->engine_->InterruptScriptThread(SCRIPTTHREADID_ALL, NULL, 0);
+         }
+
+         CComPtr<IActiveScript> engine_;
+         HANDLE timer_;
+         volatile LONG fired_;
+      };
+   }
+
    ScriptServer::ScriptServer(void) :
       has_on_client_connect_(false),
       has_on_accept_message_(false),
@@ -140,7 +227,42 @@ namespace HM
       return String("");
    }
 
-   bool 
+   bool
+   ScriptServer::RunInterruptible_(CComObject<CScriptSiteBasic> *pBasic)
+   {
+      ScriptWatchdog watchdog(pBasic->GetEngine(), IniFileSettings::Instance()->GetScriptTimeout());
+
+      pBasic->Run();
+
+      // Disarm before reading the flag, so that the callback cannot still be in
+      // flight while the caller decides what to do, and so that it can never run
+      // concurrently with the Terminate which follows.
+      watchdog.Disarm();
+
+      return watchdog.Fired();
+   }
+
+   void
+   ScriptServer::ReportInterruption_(const String &sContext, bool bReportError)
+   {
+      String sMessage;
+      sMessage.Format(_T("The script %s did not complete within %d seconds and was interrupted. An interrupt aborts script execution, but cannot release a handler which is blocked inside a COM call."),
+         sContext.c_str(), IniFileSettings::Instance()->GetScriptTimeout());
+
+      if (bReportError)
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 5019, "ScriptServer::ReportInterruption_", sMessage);
+      }
+      else
+      {
+         // Reporting an error fires the OnError event. When it is the OnError
+         // handler itself which had to be killed, firing it again would recurse
+         // until the stack is exhausted.
+         Logger::Instance()->LogError(sMessage);
+      }
+   }
+
+   bool
    ScriptServer::DoesFunctionExist_(const String &sProcedure)
    {
       // Create an instance of the script engine and execute the script.
@@ -158,10 +280,15 @@ namespace HM
       spUnk = pBasic; 
       pBasic->Initiate(script_language_, NULL);
       pBasic->AddScript(script_contents_);
-      pBasic->Run();
+      bool interrupted = RunInterruptible_(pBasic);
       bool bExists = pBasic->ProcedureExists(sProcedure);
       pBasic->Terminate();
-      
+
+      if (interrupted)
+      {
+         ReportInterruption_("EventHandlers (function detection)", true);
+      }
+
       return bExists;
    }
 
@@ -187,10 +314,32 @@ namespace HM
       pBasic->Initiate(sLanguage, NULL);
       // pBasic->SetObjectContainer(pObjects);
       pBasic->AddScript(sContents);
-      pBasic->Run();
+      bool interrupted = RunInterruptible_(pBasic);
       pBasic->Terminate();
 
       String sErrorMessage = pBasic->GetLastError();
+
+      if (interrupted)
+      {
+         // Reported separately, and with the consequence spelled out. This is not a
+         // syntax error, but the caller treats any message the same way - it stops
+         // loading, so every event handler stays unregistered until the scripts are
+         // reloaded. That includes OnClientLogon and OnClientValidatePassword, so an
+         // administrator has to be told plainly rather than left reading "compile
+         // error". Loading deliberately does not continue: discovering the handlers
+         // runs the top-level script once per handler, so a script that hangs here
+         // would hang another fifteen times.
+         String sTimeoutMessage;
+         sTimeoutMessage.Format(_T("The script file %s did not finish executing within %d seconds and was interrupted. Code outside a function runs when the file is loaded, so it must return promptly. No event handlers are registered until this is fixed and the scripts are reloaded."),
+            sFilename.c_str(), IniFileSettings::Instance()->GetScriptTimeout());
+
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 5021, "ScriptServer::Compile_", sTimeoutMessage);
+
+         if (!sErrorMessage.IsEmpty())
+            sErrorMessage += "\r\n";
+
+         sErrorMessage += sTimeoutMessage;
+      }
 
       if (!sErrorMessage.IsEmpty())
          sErrorMessage = "File: " + sFilename + "\r\n" + sErrorMessage;
@@ -317,8 +466,13 @@ namespace HM
       pBasic->Initiate(script_language_, NULL);
       pBasic->SetObjectContainer(pObjects);
       pBasic->AddScript(sScript);
-      pBasic->Run();
+      bool interrupted = RunInterruptible_(pBasic);
       pBasic->Terminate();
+
+      if (interrupted)
+      {
+         ReportInterruption_(event_name, e != EventOnError);
+      }
 
       LOG_DEBUG("Event completed");
    }

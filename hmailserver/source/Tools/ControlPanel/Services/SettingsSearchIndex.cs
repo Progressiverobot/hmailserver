@@ -58,6 +58,17 @@ namespace hMailServer.ControlPanel.Services
          ["authentication"] = "Authentication",
          ["dns"] = "DNS resolver",
          ["webservices"] = "Web services & autoconfiguration",
+
+         // Hand-written pages that own settings of their own. These titles
+         // cover every page the generator scans for them, so a page that gains
+         // its first setting is named properly the moment it is indexed.
+         ["backup"] = "Backup & restore",
+         ["ipranges"] = "IP ranges",
+         ["ports"] = "TCP/IP ports",
+         ["routes"] = "Routes",
+         ["domains"] = "Domains",
+         ["rules"] = "Rules",
+         ["certs"] = "SSL certificates",
       };
 
       /// <summary>

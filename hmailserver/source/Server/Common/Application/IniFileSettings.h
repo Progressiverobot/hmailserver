@@ -114,6 +114,14 @@ namespace HM
       int GetFinalizationTimeout () {return finalization_timeout_; }
       int GetClamMinTimeout () {return clam_min_timeout_; }
       int GetClamMaxTimeout () {return clam_max_timeout_; }
+
+      // Seconds; 0 disables the bound. See the comment at the read site.
+      int GetDNSQueryTimeout () {return dns_query_timeout_; }
+      int GetDBConnectionAcquireTimeout () {return db_connection_acquire_timeout_; }
+      int GetScriptTimeout () {return script_timeout_; }
+      int GetExternalProcessTimeout () {return external_process_timeout_; }
+      int GetAsyncQueueStallThreshold () {return async_queue_stall_threshold_; }
+      int GetAsyncQueueReservedThreads () {return async_queue_reserved_threads_; }
       bool GetSAMoveVsCopy() const { return samove_vs_copy_; }
       String GetAuthUserReplacementIP() const { return auth_user_replacement_ip_; }
       int GetIndexerFullMinutes () {return indexer_full_minutes_; }
@@ -269,6 +277,12 @@ namespace HM
       int finalization_timeout_;
       int clam_min_timeout_;
       int clam_max_timeout_;
+      int dns_query_timeout_;
+      int db_connection_acquire_timeout_;
+      int script_timeout_;
+      int external_process_timeout_;
+      int async_queue_stall_threshold_;
+      int async_queue_reserved_threads_;
       bool samove_vs_copy_;
       String auth_user_replacement_ip_;
       int indexer_full_minutes_;

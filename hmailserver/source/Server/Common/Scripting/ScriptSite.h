@@ -260,9 +260,19 @@ public:
       return NOERROR;
    }
 
+   // Returns an owning reference to the script engine. The caller's reference
+   // keeps the engine object alive regardless of Terminate, which releases the
+   // site's own reference. This is what allows an execution watchdog running on
+   // another thread to call InterruptScriptThread without any possibility of
+   // touching an engine which has already been freed.
+   CComPtr<IActiveScript> GetEngine()
+   {
+      return engine_;
+   }
+
    STDMETHOD(Terminate)()
    {
-      if(init_) 
+      if(init_)
       {
          // Disconnect the host application from the engine. This will prevent
          // the further firing of events. Event sinks that are in progress will
@@ -294,7 +304,13 @@ public:
 
       IDispatch *ScriptDispatch = NULL;
 
-      engine_->GetScriptDispatch(NULL, &ScriptDispatch);
+      // An engine whose script was interrupted may not hand back a dispatch at
+      // all, so the result is checked rather than dereferenced blind. The
+      // reference is owned by this function and must be released either way.
+      HRESULT dispatchResult = engine_->GetScriptDispatch(NULL, &ScriptDispatch);
+
+      if (FAILED(dispatchResult) || ScriptDispatch == NULL)
+         return false;
 
       DISPID dispid;
       BSTR names[1];
@@ -302,6 +318,7 @@ public:
       HRESULT hr = ScriptDispatch->GetIDsOfNames( IID_NULL, names, 1, 0, &dispid );
 
       SysFreeString(names[0]);
+      ScriptDispatch->Release();
 
       if ( SUCCEEDED( hr ) )
          return true;

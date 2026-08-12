@@ -242,6 +242,34 @@ namespace HM
       finalization_timeout_ =  ReadIniSettingInteger_("Settings", "FinalizationTimeout", 240);
       clam_min_timeout_ =  ReadIniSettingInteger_("Settings", "ClamMinTimeout", 15);
       clam_max_timeout_ =  ReadIniSettingInteger_("Settings", "ClamMaxTimeout",90);
+
+      // Bounds on operations that would otherwise wait forever and, because they
+      // run on bounded thread pools, take the whole server down with them when
+      // enough of them pile up. Each is in seconds and 0 disables that bound.
+      //
+      // A DNS query the OS resolver never answers; a database connection that
+      // never becomes free; an administrator's event script that loops or blocks
+      // in a COM call; an external virus scanner that hangs. All four were
+      // unbounded, and all four sit on a path that a remote sender can drive.
+      dns_query_timeout_ =  ReadIniSettingInteger_("Settings", "DNSQueryTimeout", 10);
+
+      // Off by default, unlike its siblings. Bounding the wait is only half the
+      // job: a caller has to be able to tell "the database was busy" from the
+      // answer it would otherwise have got, and not every caller can yet. In
+      // particular the recipient lookup behind RCPT TO reports a failed lookup as
+      // "no such user", so a bounded wait that expired during a backup would
+      // reject a valid recipient with a permanent 550. Until those callers
+      // distinguish the two, blocking is the safer failure.
+      db_connection_acquire_timeout_ =  ReadIniSettingInteger_("Settings", "DBConnectionAcquireTimeout", 0);
+      script_timeout_ =  ReadIniSettingInteger_("Settings", "ScriptTimeout", 60);
+      external_process_timeout_ =  ReadIniSettingInteger_("Settings", "ExternalProcessTimeout", 300);
+
+      // Async work-queue health. The stall threshold is how long every worker may
+      // be busy before the server reports which tasks are holding them; the
+      // reserved count keeps that many threads out of the reach of scanning and
+      // scripting so short work (saving an accepted message) always has one.
+      async_queue_stall_threshold_ =  ReadIniSettingInteger_("Settings", "AsyncQueueStallThreshold", 120);
+      async_queue_reserved_threads_ =  ReadIniSettingInteger_("Settings", "AsyncQueueReservedThreads", 2);
       samove_vs_copy_ = ReadIniSettingInteger_("Settings", "SAMoveVsCopy", 0) == 1;
       auth_user_replacement_ip_ = ReadIniSettingString_("Settings", "AuthUserReplacementIP", "");
       indexer_full_minutes_ =  ReadIniSettingInteger_("Settings", "IndexerFullMinutes",720);

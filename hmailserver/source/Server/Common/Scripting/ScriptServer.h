@@ -55,7 +55,18 @@ namespace HM
    private:
 
       bool DoesFunctionExist_(const String &sProcedure);
- 
+
+      bool RunInterruptible_(CComObject<CScriptSiteBasic> *pBasic);
+      // Runs the script which has been added to pBasic, under a watchdog which
+      // aborts execution once the configured script timeout has elapsed. A
+      // timeout of zero means the administrator has disabled the limit.
+      // Returns true if the watchdog had to interrupt the script.
+
+      void ReportInterruption_(const String &sContext, bool bReportError);
+      // Reports that the script named by sContext was killed by the watchdog.
+      // bReportError must be false when the killed script is the OnError
+      // handler itself, since reporting an error fires OnError again.
+
       String Compile_(const String &sLanguage, const String &sFilename);
       // Compiels the script in sFileName and returns the result. If
       // no compilation errors exists, the function returns an emtpy string.

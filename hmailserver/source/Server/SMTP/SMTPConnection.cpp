@@ -1425,7 +1425,13 @@ namespace HM
             // The delivery of the message failed. This may happen if tables are
             // corrupt in the database. We now return an error message to the sender. 
             // Hopefully, the sending server will retry later. 
-            EnqueueWrite_("554 Your message was received but it could not be saved. Please retry later.");
+            // 451, not 554. The text has always said "retry later", but 554 is a
+            // permanent failure: the sending server bounces the message to its
+            // originator and does not try again, while the local copy is deleted
+            // just below. Everything that reaches here - a database that is down,
+            // locked by a backup, or out of pooled connections - is transient, so
+            // the sender must be told to come back.
+            EnqueueWrite_("451 4.3.0 Your message was received but it could not be saved. Please retry later.");
 
             // Delete the file now since we could not save it in the database.
             ResetCurrentMessage_();

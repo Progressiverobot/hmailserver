@@ -78,9 +78,36 @@ namespace HM
       command_line_.ReleaseBuffer();
       working_directory_.ReleaseBuffer();
 
+      // A value of zero means the administrator has asked for an unbounded wait.
+      //
+      // The bound applies only to callers that set an error-log timeout, which is
+      // how the virus scanners mark themselves as running on a thread something
+      // else is waiting behind. Compression deliberately does not: it is used to
+      // build the backup archive, where 7za legitimately runs for far longer than
+      // any per-message bound on a large message store, and killing it would
+      // truncate the archive.
+      int processTimeoutSeconds = error_log_timeout_ > 0
+         ? IniFileSettings::Instance()->GetExternalProcessTimeout()
+         : 0;
+
+      DWORD remainingTimeout = INFINITE;
+
+      if (processTimeoutSeconds > 0)
+      {
+         // INFINITE is reserved as the "no bound" marker for WaitForSingleObject, so a
+         // configured value is clamped below it rather than being allowed to wrap.
+         const DWORD maxTimeoutSeconds = (INFINITE - 1) / 1000;
+
+         remainingTimeout = ((DWORD) processTimeoutSeconds >= maxTimeoutSeconds) ?
+            (INFINITE - 1) : ((DWORD) processTimeoutSeconds * 1000);
+      }
+
       DWORD waitResult = 0;
 
-      if (error_log_timeout_ > 0)
+      // Only warn about a slow process if there is time left to keep waiting for it
+      // afterwards. If the bound expires first, the wait below reports it instead, so
+      // that a single hung process does not produce two errors.
+      if (error_log_timeout_ > 0 && (remainingTimeout == INFINITE || error_log_timeout_ < remainingTimeout))
       {
          // If it takes too long time, we should report an error. After that, we
          // should continue to wait.
@@ -103,10 +130,15 @@ namespace HM
                break;
             }
          }
+
+         if (remainingTimeout != INFINITE)
+         {
+            remainingTimeout -= error_log_timeout_;
+         }
       }
 
       // Wait until child process exits.
-      waitResult = WaitForSingleObject( pi.hProcess, INFINITE);
+      waitResult = WaitForSingleObject( pi.hProcess, remainingTimeout);
 
       switch (waitResult)
       {
@@ -114,6 +146,27 @@ namespace HM
          {
             ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5404, "ProcessLauncher::Launch", "Wait abandoned (infinite wait)."); 
             break;
+         }
+      case WAIT_TIMEOUT:
+         {
+            const UINT TerminatedProcessExitCode = 0xFFFFFFFF;
+            const DWORD TerminationGraceMilliseconds = 5000;
+
+            // Holding the calling thread for the lifetime of a hung child costs a
+            // delivery thread permanently, so the child is killed instead.
+            String errorMessage = Formatter::Format("A launched process did not exit within the maximum allowed time and has been terminated. The command line is {0}. The maximum time is {1} seconds, configured using ExternalProcessTimeout in hMailServer.ini.", command_line_, processTimeoutSeconds);
+            ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5416, "ProcessLauncher::Launch", errorMessage);
+
+            TerminateProcess(pi.hProcess, TerminatedProcessExitCode);
+
+            // Termination is asynchronous. This wait is bounded so that a process which
+            // cannot be killed at all still releases the thread.
+            WaitForSingleObject(pi.hProcess, TerminationGraceMilliseconds);
+
+            CloseHandle( pi.hProcess );
+            CloseHandle( pi.hThread );
+
+            return false;
          }
       case WAIT_FAILED:
          {

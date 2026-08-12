@@ -158,8 +158,9 @@ namespace HM
 
       if (!pDALConn)
       {
-
-         assert(0);
+         // Acquisition can legitimately fail (pool exhausted past its deadline).
+         // GetConnection_ has already reported it.
+         LOG_DEBUG("Aborting statement since no database connection could be acquired.");
          return false;
       }
 
@@ -191,7 +192,9 @@ namespace HM
 
       if (!pDALConn)
       {
-         assert(0);
+         // Acquisition can legitimately fail (pool exhausted past its deadline).
+         // GetConnection_ has already reported it.
+         LOG_DEBUG("Aborting statement since no database connection could be acquired.");
          return pRecordset;
       }
 
@@ -359,6 +362,20 @@ namespace HM
    {
       boost::unique_lock<boost::recursive_mutex> guard(mutex_);
 
+      // The deadline bounds the whole acquisition, not each individual wait.
+      // Without it, a pool exhausted by one stalled subsystem blocks every
+      // unrelated caller - message saving, greylisting, authentication - for as
+      // long as the stall lasts. 0 keeps the unbounded wait for anyone who wants
+      // it.
+      const int acquire_timeout_seconds = IniFileSettings::Instance()->GetDBConnectionAcquireTimeout();
+      const bool bounded_wait = acquire_timeout_seconds > 0;
+
+      boost::chrono::steady_clock::time_point deadline;
+      if (bounded_wait)
+      {
+         deadline = boost::chrono::steady_clock::now() + boost::chrono::seconds(acquire_timeout_seconds);
+      }
+
       // Loop until we find a free connection (re-checking after each wakeup).
       while (1)
       {
@@ -388,7 +405,44 @@ namespace HM
          // All connections are busy. Wait until one is released instead of
          // polling. A timeout bounds the wait as a defensive backstop so a lost
          // notification can never wedge the caller indefinitely.
-         connection_released_.wait_for(guard, boost::chrono::milliseconds(100));
+         boost::chrono::milliseconds wait_time(100);
+
+         if (bounded_wait)
+         {
+            boost::chrono::steady_clock::time_point now = boost::chrono::steady_clock::now();
+
+            if (now >= deadline)
+            {
+               // Hand back the same empty result the pool produces when it has no
+               // connections at all, so callers take their existing failure path.
+               String message;
+               message.Format(_T("Timed out after %d seconds while waiting for a database connection. All %d pooled connections are in use. Increase [Database] NumberOfConnections, or investigate what is holding connections open."),
+                  acquire_timeout_seconds, (int) busy_connections_.size());
+
+               // Released before reporting. ErrorManager::ReportError writes to the
+               // error log and, when an OnError event script is installed, runs it
+               // synchronously with full COM access - and those COM objects read the
+               // database, re-entering this function on this thread. The mutex is
+               // recursive so the re-entry is admitted, but the pool is empty (that
+               // is why we are here), so the inner call would wait for a connection
+               // while still holding the outer lock, blocking every thread trying to
+               // return one.
+               guard.unlock();
+
+               ErrorManager::Instance()->ReportError(ErrorManager::High, 5180, "DatabaseConnectionManager::GetConnection_", message);
+
+               std::shared_ptr<DALConnection> pEmpty;
+               return pEmpty;
+            }
+
+            boost::chrono::milliseconds remaining =
+               boost::chrono::duration_cast<boost::chrono::milliseconds>(deadline - now);
+
+            if (remaining < wait_time)
+               wait_time = remaining;
+         }
+
+         connection_released_.wait_for(guard, wait_time);
       }
    }
 
@@ -467,6 +521,13 @@ namespace HM
    {
       std::shared_ptr<DALConnection> pConnection = GetConnection_();
 
+      // GetConnection_ returns empty when the pool could not hand one out.
+      if (!pConnection)
+      {
+         sErrorMessage = "No database connection is available.";
+         return false;
+      }
+
       SQLScriptRunner scriptRunner;
       bool result = scriptRunner.ExecuteScript(pConnection, sFile, sErrorMessage);
 
@@ -481,6 +542,13 @@ namespace HM
       PrerequisiteList prerequisites;
 
       std::shared_ptr<DALConnection> pConnection = GetConnection_();
+
+      // GetConnection_ returns empty when the pool could not hand one out.
+      if (!pConnection)
+      {
+         sErrorMessage = "No database connection is available.";
+         return false;
+      }
 
       bool result = prerequisites.Ensure(pConnection, DBVersion, sErrorMessage);
 

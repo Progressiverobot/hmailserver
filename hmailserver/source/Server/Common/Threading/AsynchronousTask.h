@@ -12,8 +12,12 @@ namespace HM
    class AsynchronousTask : public Task
    {
    public:
-      AsynchronousTask(std::function<void()> functionToRun, std::shared_ptr<T> parentHolder) :
-         Task("AsynchronousTask"),
+      // The name appears in the work queue diagnostics and in the stall report,
+      // so pass something that identifies the originating session where one is
+      // available. Callers with nothing to identify fall back to the shared
+      // default and are then only distinguishable by thread id.
+      AsynchronousTask(std::function<void()> functionToRun, std::shared_ptr<T> parentHolder, const String &name = "AsynchronousTask") :
+         Task(name),
          asynchronousFunction_(functionToRun),
          parentHolder_(parentHolder)
       {

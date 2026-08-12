@@ -54,7 +54,8 @@ namespace HM
       TCPConnection(connectionSecurity, io_context, context, disconnected, remote_hostname),
       account_(pAccount),
       current_state_(StateConnected),
-      retr_failed_(false)
+      retr_failed_(false),
+      finalization_enqueued_tick_(0)
    {
 
       /*
@@ -758,7 +759,8 @@ namespace HM
       }
 
       // Since this may be a time-consuming task, do it asynchronously
-      std::shared_ptr<AsynchronousTask<TCPConnection> > finalizationTask = 
+      finalization_enqueued_tick_ = GetTickCount64();
+      std::shared_ptr<AsynchronousTask<TCPConnection> > finalizationTask =
          std::shared_ptr<AsynchronousTask<TCPConnection> >(new AsynchronousTask<TCPConnection>
          (std::bind(&POP3ClientConnection::HandlePOP3FinalizationTaskCompleted_, this), shared_from_this()));
 
@@ -768,6 +770,23 @@ namespace HM
    void
    POP3ClientConnection::HandlePOP3FinalizationTaskCompleted_()
    {
+      // The spam battery, the download event script and the save below all run on
+      // the async work queue that inbound SMTP also uses to acknowledge received
+      // mail, so a single slow stage here holds a thread that a sender is waiting
+      // on. Time it in stages: a "start" line with no matching "done" line names
+      // the stage that stalled, and the queue-wait line shows when the queue itself
+      // rather than any one stage is the problem.
+      const ULONGLONG queueWaitMs = finalization_enqueued_tick_ > 0
+         ? GetTickCount64() - finalization_enqueued_tick_ : 0;
+
+      if (queueWaitMs >= 5000)
+      {
+         String queueMessage;
+         queueMessage.Format(_T("POP3ClientConnection - fetch: waited %I64u ms in the async queue before starting (session %d, external account %s). The async task queue may be saturated."),
+            queueWaitMs, (int) GetSessionID(), account_->GetName().c_str());
+         LOG_APPLICATION(queueMessage);
+      }
+
       // The entire message has now been downloaded from the
       // remote POP3 server. Save it in the database and deliver
       // it to the account.
@@ -795,10 +814,28 @@ namespace HM
          return;
       }
 
+      LOG_DEBUG("POP3ClientConnection - fetch: start header-parsing.");
+      ULONGLONG stageTick = GetTickCount64();
       ParseMessageHeaders_();
+      LogFinalizationStage_("header-parsing", stageTick);
 
-      if (DoSpamProtection_())
+      LOG_DEBUG("POP3ClientConnection - fetch: start spam-protection.");
+      stageTick = GetTickCount64();
+      bool messageAccepted = DoSpamProtection_();
+      LogFinalizationStage_("spam-protection", stageTick);
+
+      if (messageAccepted)
       {
+         // Deliberately no deadline here. A message downloaded over POP3 exists
+         // only in this process: the RETR has already completed, so the remote
+         // server has committed its download state and many providers (Gmail
+         // among them) will not serve it again. Abandoning it to free a worker
+         // would destroy the only copy, and by this point the expensive work has
+         // already been paid for anyway. Slow fetches are reported by the stage
+         // timings above rather than being cut short.
+         LOG_DEBUG("POP3ClientConnection - fetch: start script/save.");
+         stageTick = GetTickCount64();
+
          // should we scan this message for virus later on?
          current_message_->SetFlagVirusScan(account_->GetUseAntiVirus());
 
@@ -809,6 +846,8 @@ namespace HM
 
          // Notify the SMTP deliverer that there is a new message.
          Application::Instance()->SubmitPendingEmail();
+
+         LogFinalizationStage_("script/save", stageTick);
       }
 
       MarkCurrentMessageAsRead_();
@@ -820,9 +859,31 @@ namespace HM
       cur_message_++;
 
       RequestNextMessage_();
-   
+
       EnqueueRead("");
    }
+
+   void
+   POP3ClientConnection::LogFinalizationStage_(const AnsiString &stage, ULONGLONG startTick)
+   {
+      const ULONGLONG elapsed = GetTickCount64() - startTick;
+
+      String msg;
+      msg.Format(_T("POP3ClientConnection - fetch: done %s in %I64u ms (session %d)."),
+         String(stage).c_str(), elapsed, (int) GetSessionID());
+
+      // A stage that runs long is occupying a thread that inbound SMTP needs, so
+      // surface a slow one in the normal log rather than only under debug.
+      if (elapsed >= 10000)
+      {
+         LOG_APPLICATION(msg);
+      }
+      else
+      {
+         LOG_DEBUG(msg);
+      }
+   }
+
 
    /*
       Run spam proteciton on this message. If it's classified as spam, we will either

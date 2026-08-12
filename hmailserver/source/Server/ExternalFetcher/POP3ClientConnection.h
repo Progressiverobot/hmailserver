@@ -57,6 +57,8 @@ namespace HM
 
       void HandlePOP3FinalizationTaskCompleted_();
 
+      void LogFinalizationStage_(const AnsiString &stage, ULONGLONG startTick);
+
       bool InternalParseData(const String &sRequest);
 
       void CreateRecipentList_(std::shared_ptr<MimeHeader> pHeader);
@@ -150,6 +152,11 @@ namespace HM
       // Set when the remote server rejected the RETR command. No message data
       // follows such a response, so no message file must be created for it.
       bool retr_failed_;
+
+      // Tick at which the per-message finalization was handed to the async work
+      // queue. The queue is shared with the SMTP acknowledgement path, so the
+      // wait before the task starts is as interesting as the work itself.
+      ULONGLONG finalization_enqueued_tick_;
 
       String receiving_account_address_;
 

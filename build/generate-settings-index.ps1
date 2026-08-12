@@ -6,6 +6,10 @@
 # the page definitions themselves so it cannot drift; ControlPanel.Tests fails
 # if the checked-in file no longer matches the sources.
 #
+# Three kinds of page are scanned: the two table-driven settings views, and the
+# hand-written pages listed in $handWrittenPages, whose settings are plain XAML
+# controls wired up in the code-behind.
+#
 # Usage:  ./build/generate-settings-index.ps1
 #
 # Run it after adding, removing or relabelling any setting.
@@ -25,10 +29,102 @@ $serverPages = @{ 'Protocols' = 'protocols'; 'Delivery' = 'delivery'; 'AntiSpam'
                   'Tls' = 'tls'; 'Logging' = 'logging'; 'Performance' = 'performance'; 'Advanced' = 'advanced';
                   'AdminAccess' = 'adminaccess' }
 
+# Hand-written pages carry settings too - they just declare them as ordinary
+# XAML controls instead of a table, so the two scans above cannot see them.
+# View file (without extension) -> nav page key. Pages that only display data
+# (status, queue, logs, dashboard) are deliberately absent: they own no setting,
+# and scanning them would only turn read-outs into search noise.
+$handWrittenPages = @{ 'BackupView' = 'backup'; 'IPRangesView' = 'ipranges'; 'TcpIpPortsView' = 'ports';
+                       'RoutesView' = 'routes'; 'DomainsView' = 'domains'; 'RulesView' = 'rules';
+                       'SslCertificatesView' = 'certs' }
+
 function Add-Entry($list, $label, $key, $page) {
+   # $label must already be escaped the way a C# string literal escapes it.
    $label = $label.Trim()
    if ([string]::IsNullOrWhiteSpace($label)) { return }
    $list.Add([PSCustomObject]@{ Label = $label; Key = $key; Page = $page }) | Out-Null
+}
+
+# On a hand-written page the on-screen wording lives in the XAML and the setting
+# it writes lives in the code-behind; the x:Name of the control is what ties the
+# two together, so that is what these two helpers key on.
+function Get-XamlLabels($xamlText) {
+   $labels = @{}
+   $pending = $null
+
+   foreach ($el in [regex]::Matches($xamlText, '<([A-Za-z_][\w:.\-]*)([^<>]*)>')) {
+      $tag = $el.Groups[1].Value
+      $attrs = $el.Groups[2].Value
+
+      $nameMatch = [regex]::Match($attrs, 'x:Name="([^"]+)"')
+      $contentMatch = [regex]::Match($attrs, '\bContent="([^"]*)"')
+      $textMatch = [regex]::Match($attrs, '\bText="([^"]*)"')
+
+      # A text box is labelled by the TextBlock above it rather than by an
+      # attribute of its own, so remember the last short caption seen. Long
+      # blocks are explanatory notes and bindings are not captions.
+      if ($tag -like '*TextBlock') {
+         if ($textMatch.Success) {
+            $caption = [System.Net.WebUtility]::HtmlDecode($textMatch.Groups[1].Value).Trim()
+            if ($caption.Length -gt 0 -and $caption.Length -le 60 -and -not $caption.StartsWith('{')) {
+               $pending = $caption
+            }
+         }
+         continue
+      }
+
+      if (-not $nameMatch.Success) { continue }
+      $name = $nameMatch.Groups[1].Value
+
+      if ($contentMatch.Success -and -not $contentMatch.Groups[1].Value.StartsWith('{')) {
+         $labels[$name] = [System.Net.WebUtility]::HtmlDecode($contentMatch.Groups[1].Value).Trim()
+      }
+      elseif ($pending -and $tag -match '(TextBox|PasswordBox|ComboBox|NumberBox)$' -and $attrs -notmatch 'PlaceholderText=') {
+         # A placeholder means the box is a "create a new one" field on a list
+         # page, not a setting; those boxes describe themselves and the caption
+         # above them is the heading of the whole add row.
+         $labels[$name] = $pending
+         $pending = $null
+      }
+   }
+
+   return $labels
+}
+
+function Get-CodeKeys($codeText) {
+   $keys = @{}
+
+   # COM properties are reached through dynamic locals; requiring the object to
+   # be one keeps control-to-control assignments out of the results.
+   $dynamicLocals = @{}
+   foreach ($m in [regex]::Matches($codeText, '\bdynamic\s+(\w+)\s*=')) {
+      $dynamicLocals[$m.Groups[1].Value] = $true
+   }
+
+   foreach ($m in [regex]::Matches($codeText, '(\w+)\.(?:IsChecked|Text)\s*=\s*\w+\.Read(?:Bool|String|Int|Number)\(\s*"([^"]+)"')) {
+      $keys[$m.Groups[1].Value] = $m.Groups[2].Value
+   }
+   foreach ($m in [regex]::Matches($codeText, '\w+\.Write(?:Bool|String|Int|Number)\(\s*"([^"]+)"\s*,\s*(\w+)\.(?:IsChecked|Text)')) {
+      $keys[$m.Groups[2].Value] = $m.Groups[1].Value
+   }
+   foreach ($m in [regex]::Matches($codeText, '(\w+)\.(?:IsChecked|Text)\s*=\s*\((?:bool|string|int)\)\s*(\w+)\.(\w+)')) {
+      if ($dynamicLocals.ContainsKey($m.Groups[2].Value) -and -not $keys.ContainsKey($m.Groups[1].Value)) {
+         $keys[$m.Groups[1].Value] = $m.Groups[3].Value
+      }
+   }
+   foreach ($m in [regex]::Matches($codeText, '(\w+)\.(\w+)\s*=\s*(\w+)\.(?:IsChecked\s*==\s*true|Text\b)')) {
+      if ($dynamicLocals.ContainsKey($m.Groups[1].Value) -and -not $keys.ContainsKey($m.Groups[3].Value)) {
+         $keys[$m.Groups[3].Value] = $m.Groups[2].Value
+      }
+   }
+
+   return $keys
+}
+
+# XAML text is not a C# literal, so it has to be escaped before it is written
+# into one - unlike the labels lifted straight out of the two sources above.
+function ConvertTo-CSharpLiteral($text) {
+   return $text.Replace('\', '\\').Replace('"', '\"')
 }
 
 $entries = New-Object System.Collections.ArrayList
@@ -60,6 +156,27 @@ foreach ($m in [regex]::Matches($serverText, '(?s)private void Build(\w+)\(\)\s*
    }
    foreach ($s in [regex]::Matches($body, 'Label = "([^"]*)",\s*Path = "([^"]+)"')) {
       Add-Entry $entries $s.Groups[1].Value $s.Groups[2].Value $page
+   }
+}
+
+# --- Hand-written pages: XAML for the wording, code-behind for the setting ---
+foreach ($view in ($handWrittenPages.Keys | Sort-Object)) {
+   $page = $handWrittenPages[$view]
+   $xamlPath = Join-Path $cpRoot "Views\$view.xaml"
+   $codePath = Join-Path $cpRoot "Views\$view.xaml.cs"
+
+   if (-not (Test-Path $xamlPath) -or -not (Test-Path $codePath)) {
+      throw "$view is listed in `$handWrittenPages but $xamlPath or $codePath is missing."
+   }
+
+   $labels = Get-XamlLabels (Get-Content $xamlPath -Raw)
+   $keys = Get-CodeKeys (Get-Content $codePath -Raw)
+
+   # A control the page reads or writes but never labels cannot be searched for
+   # by name, so there is nothing useful to index.
+   foreach ($control in ($keys.Keys | Sort-Object)) {
+      if (-not $labels.ContainsKey($control)) { continue }
+      Add-Entry $entries (ConvertTo-CSharpLiteral $labels[$control]) $keys[$control] $page
    }
 }
 

@@ -17,6 +17,12 @@ namespace HM
 
       String GetName() const {return name_;  }
 
+      // The name is what identifies this task in the work queue diagnostics, so
+      // callers are expected to make it specific ("SMTP-finalization session=42")
+      // before handing the task over. The queue copies it at enqueue time and
+      // never reads it again, so it must not be changed after that point.
+      void SetName(const String &name) {name_ = name;}
+
       Event& GetIsStartedEvent() {return is_started_;}
 
    protected:
