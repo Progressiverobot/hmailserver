@@ -15,9 +15,24 @@ namespace hMailServer.ControlPanel
    {
       private const string RegistryPath = @"Software\hMailServer\ControlPanel";
 
+      /// <summary>
+      /// Where the palette's recently-visited and most-used history is kept.
+      /// Beside the window bounds, under the same key, because it is the same
+      /// kind of thing: a per-user convenience that is worth nothing on another
+      /// machine and must never be required for the application to work.
+      /// </summary>
+      private const string PaletteUsageValue = "PaletteUsage";
+
       private readonly Dictionary<string, UserControl> pageCache_ = new();
       private readonly Dictionary<string, Func<UserControl>> pageFactories_ = new();
+      private PaletteUsage paletteUsage_ = new();
+      private string currentPage_;
+      private bool arrivedFromSearch_;
       private bool connected_;
+
+      // Set while the application navigates on the user's behalf rather than at their
+      // request, so that "Most used" counts choices and not startup.
+      private bool automaticNavigation_;
 
       public MainWindow()
       {
@@ -26,13 +41,16 @@ namespace hMailServer.ControlPanel
          Services.Toast.Init(RootSnackbar);
          ApplySavedTheme();
          RestoreWindowBounds();
+         LoadPaletteUsage();
          RegisterPages();
          BuildNavTree();
 
          NavTree.IsEnabled = false;
+         SearchButton.IsEnabled = false;
          ContentHost.Content = new ConnectView(OnConnected);
 
          Closing += (s, e) => SaveWindowBounds();
+         Closing += (s, e) => SavePaletteUsage();
 
          ServerSession.Reconnected += OnSessionReconnected;
          Closing += (s, e) => ServerSession.Reconnected -= OnSessionReconnected;
@@ -110,97 +128,64 @@ namespace hMailServer.ControlPanel
          pageFactories_["about"] = () => new AboutView();
       }
 
-      private TreeViewItem Item(string title, string key)
-      {
-         var item = new TreeViewItem { Header = title, Tag = key };
-         System.Windows.Automation.AutomationProperties.SetAutomationId(item, "nav-" + key);
-         System.Windows.Automation.AutomationProperties.SetName(item, title);
-         return item;
-      }
-
-      private TreeViewItem Group(string title, params TreeViewItem[] children)
-      {
-         var group = new TreeViewItem
-         {
-            Header = title,
-            IsExpanded = true,
-            FontWeight = FontWeights.SemiBold
-         };
-         System.Windows.Automation.AutomationProperties.SetAutomationId(group, "navgroup-" + Slug(title));
-         System.Windows.Automation.AutomationProperties.SetName(group, title);
-         foreach (TreeViewItem child in children)
-         {
-            child.FontWeight = FontWeights.Normal;
-            group.Items.Add(child);
-         }
-         return group;
-      }
-
-      private static string Slug(string text)
-         => new string((text ?? "").ToLowerInvariant().Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray());
-
-      /// <summary>Mirrors the classic Administrator tree layout.</summary>
+      /// <summary>
+      /// Builds the sidebar from <see cref="NavigationMap"/>.
+      ///
+      /// The tree used to be written out here as nested Item/Group calls, and its
+      /// comment said as much: it reproduced the classic Administrator layout,
+      /// organised around where the product keeps things rather than around what
+      /// an administrator is trying to do, with thirty of the forty-two pages
+      /// buried under a single catch-all group three levels deep. The structure
+      /// now lives in a WPF-free data file for two reasons: it can be tested
+      /// (every registered page must appear exactly once, no page title may
+      /// change), and the palette can search the same structure the sidebar
+      /// draws instead of reverse-engineering it from TreeViewItem headers.
+      ///
+      /// This method deliberately contains no page names. If a name appears here
+      /// again, the tree and the palette have two sources of truth.
+      /// </summary>
       private void BuildNavTree()
       {
          NavTree.Items.Clear();
 
-         NavTree.Items.Add(Item("Welcome", "welcome"));
-         NavTree.Items.Add(Item("Dashboard", "dashboard"));
-         NavTree.Items.Add(Group("Status",
-            Item("Server status", "status"),
-            Item("Delivery queue", "queue"),
-            Item("Live logs", "logs")));
-         NavTree.Items.Add(Item("Domains", "domains"));
-         NavTree.Items.Add(Item("Rules", "rules"));
+         foreach (NavNode node in NavigationMap.Roots)
+            NavTree.Items.Add(BuildNavItem(node));
+      }
 
-         NavTree.Items.Add(Group("Settings",
-            Item("Protocols", "protocols"),
-            Item("Delivery of e-mail", "delivery"),
-            Item("Routes", "routes"),
-            Item("Public folders", "publicfolders"),
-            Group("Anti-spam",
-               Item("Anti-spam settings", "antispam"),
-               Item("SURBL servers", "surbl"),
-               Item("DNS blacklists", "dnsbl"),
-               Item("White list", "spamwhitelist"),
-               Item("Greylisting white list", "greylistwhitelist")),
-            Group("Anti-virus",
-               Item("Anti-virus settings", "antivirus"),
-               Item("Blocked attachments", "blockedattachments")),
-            Item("Logging", "logging"),
-            Group("Security",
-               Item("Authentication", "authentication"),
-               Item("Administrative access", "adminaccess"),
-               Item("Auto-ban & SSL/TLS", "tls"),
-               Item("IP ranges", "ipranges"),
-               Item("SSL certificates", "certs"),
-               Item("Transport security", "security"),
-               Item("Certificates (ACME)", "acme")),
-            Group("Network",
-               Item("TCP/IP ports", "ports"),
-               Item("Incoming relays", "relays"),
-               Item("DNS resolver", "dns"),
-               Item("Web services & autoconfiguration", "webservices"),
-               Item("API & monitoring", "api")),
-            Group("Maintenance",
-               Item("Performance", "performance"),
-               Item("Advanced & scripting", "advanced"),
-               // Renamed from "Advanced hardening" and moved out of Security: the
-               // page is a catch-all for INI knobs, most of which are operational
-               // rather than security-related, and admins were not finding them
-               // under a heading that told them not to touch anything.
-               Item("Advanced INI settings", "hardening"),
-               Item("Event scripts", "scripts"),
-               Item("Server messages", "servermessages"),
-               Item("Groups", "groups"))));
+      private TreeViewItem BuildNavItem(NavNode node)
+      {
+         var item = new TreeViewItem { Header = node.Title };
 
-         NavTree.Items.Add(Group("Utilities",
-            Item("Backup & restore", "backup"),
-            Item("MX query", "mxquery"),
-            Item("Server sendout", "sendout"),
-            Item("Diagnostics", "diagnostics")));
+         // The purpose statement as the tool tip and as the accessible help text.
+         // A page whose title needs the manual has failed; this is the cheapest
+         // possible fix, and it reaches a screen reader as well as a mouse.
+         if (!string.IsNullOrEmpty(node.Purpose))
+         {
+            item.ToolTip = node.Purpose;
+            System.Windows.Automation.AutomationProperties.SetHelpText(item, node.Purpose);
+         }
 
-         NavTree.Items.Add(Item("About", "about"));
+         System.Windows.Automation.AutomationProperties.SetName(item, node.Title);
+
+         if (node.IsPage)
+         {
+            item.Tag = node.Key;
+            item.FontWeight = FontWeights.Normal;
+            System.Windows.Automation.AutomationProperties.SetAutomationId(item, "nav-" + node.Key);
+            return item;
+         }
+
+         // Groups keep the automation id they had, derived from the title, so
+         // that anything driving this interface by id keeps working for the
+         // groups that kept their names.
+         item.IsExpanded = true;
+         item.FontWeight = FontWeights.SemiBold;
+         System.Windows.Automation.AutomationProperties.SetAutomationId(item, "navgroup-" + NavigationMap.Slug(node.Title));
+
+         foreach (NavNode child in node.Children)
+            item.Items.Add(BuildNavItem(child));
+
+         return item;
       }
 
       private IEnumerable<TreeViewItem> AllLeaves(ItemCollection items)
@@ -215,50 +200,287 @@ namespace hMailServer.ControlPanel
       }
 
       /// <summary>Selects the navigation leaf with the given key, expanding its
-      /// parent groups. Used by the Welcome page quick-action tiles.</summary>
-      public void NavigateTo(string key)
+      /// parent groups. Used by the Welcome page quick-action tiles, the palette
+      /// and the breadcrumb's related-page links.</summary>
+      public void NavigateTo(string key) => NavigateTo(key, false);
+
+      /// <summary>
+      /// <paramref name="fromSearch"/> marks the arrival as a palette jump, which
+      /// the breadcrumb says out loud once. Landing on a page with no idea how
+      /// you got there is the specific way a command palette stops teaching the
+      /// structure and starts replacing it.
+      /// </summary>
+      private void NavigateTo(string key, bool fromSearch)
       {
-         foreach (TreeViewItem leaf in AllLeaves(NavTree.Items).Where(l => (l.Tag as string) == key))
+         foreach (TreeViewItem leaf in AllLeaves(NavTree.Items)
+            .Where(l => string.Equals(l.Tag as string, key, StringComparison.OrdinalIgnoreCase)))
          {
+            arrivedFromSearch_ = fromSearch;
+
             for (var parent = leaf.Parent as TreeViewItem; parent != null; parent = parent.Parent as TreeViewItem)
                parent.IsExpanded = true;
-            leaf.IsSelected = true;
+
+            // Re-selecting the page that is already selected raises no
+            // SelectedItemChanged, so the breadcrumb would keep saying whatever
+            // it said before - including a stale "from search" marker.
+            if (leaf.IsSelected)
+               UpdateBreadcrumb(key);
+            else
+               leaf.IsSelected = true;
+
             leaf.BringIntoView();
             return;
          }
       }
 
+      private void Search_Click(object sender, RoutedEventArgs e) => ShowPalette();
+
       private void ShowPalette()
       {
-         var entries = AllLeaves(NavTree.Items)
-            .ToDictionary(item => item.Header.ToString(), item => item);
+         if (!connected_)
+            return;
 
-         var palette = new NavigationPalette(this, entries.Keys);
+         var palette = new NavigationPalette(this, paletteUsage_, currentPage_);
          palette.ShowDialog();
 
-         TreeViewItem target = null;
+         if (palette.SelectedPage != null)
+            NavigateTo(palette.SelectedPage, true);
+      }
 
-         if (palette.Selected != null)
+      /// <summary>
+      /// Rebuilds the breadcrumb bar for the page just opened: an optional
+      /// "found by search" marker, the trail down to the page, and links to the
+      /// neighbouring subjects.
+      /// </summary>
+      private void UpdateBreadcrumb(string key)
+      {
+         if (BreadcrumbHost == null)
+            return;
+
+         BreadcrumbHost.Children.Clear();
+         RelatedHost.Children.Clear();
+
+         IReadOnlyList<NavNode> trail = NavigationMap.PathTo(key);
+         if (trail.Count == 0)
          {
-            entries.TryGetValue(palette.Selected, out target);
-         }
-         else if (palette.SelectedPageTag != null)
-         {
-            // The user picked an individual setting; open the page that hosts it.
-            target = AllLeaves(NavTree.Items)
-               .FirstOrDefault(item => string.Equals(item.Tag as string, palette.SelectedPageTag, StringComparison.OrdinalIgnoreCase));
+            // An unknown key means the page is reachable but not in the map,
+            // which NavigationMapTests fails on. Hide the bar rather than draw an
+            // empty one.
+            BreadcrumbBar.Visibility = Visibility.Collapsed;
+            return;
          }
 
-         if (target != null)
+         BreadcrumbBar.Visibility = Visibility.Visible;
+
+         if (arrivedFromSearch_)
          {
-            var parent = target.Parent as TreeViewItem;
-            while (parent != null)
+            BreadcrumbHost.Children.Add(SearchMarker());
+            arrivedFromSearch_ = false;
+         }
+
+         for (int index = 0; index < trail.Count; index++)
+         {
+            if (index > 0)
+               BreadcrumbHost.Children.Add(BreadcrumbSeparator());
+
+            NavNode node = trail[index];
+
+            if (index == trail.Count - 1)
             {
-               parent.IsExpanded = true;
-               parent = parent.Parent as TreeViewItem;
+               var here = new TextBlock
+               {
+                  Text = node.Title,
+                  FontSize = Typography.Label,
+                  FontWeight = FontWeights.SemiBold,
+                  VerticalAlignment = VerticalAlignment.Center
+               };
+               here.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorPrimaryBrush");
+               System.Windows.Automation.AutomationProperties.SetAutomationId(here, "breadcrumb-page");
+               BreadcrumbHost.Children.Add(here);
             }
-            target.IsSelected = true;
-            target.BringIntoView();
+            else
+            {
+               BreadcrumbHost.Children.Add(GroupSegment(node));
+            }
+         }
+
+         // Three is the most that fits beside a long page title on a narrow
+         // window without the bar wrapping into two lines; the map may list more.
+         foreach (string related in NavigationMap.Find(key).SeeAlso)
+         {
+            if (RelatedHost.Children.Count >= 3)
+               break;
+
+            NavNode target = NavigationMap.Find(related);
+            if (target != null)
+               RelatedHost.Children.Add(RelatedLink(target));
+         }
+
+         if (RelatedHost.Children.Count > 0)
+         {
+            var caption = new TextBlock
+            {
+               Text = "Related:",
+               FontSize = Typography.Caption,
+               Margin = new Thickness(0, 0, 2, 0),
+               VerticalAlignment = VerticalAlignment.Center
+            };
+            caption.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorTertiaryBrush");
+            RelatedHost.Children.Insert(0, caption);
+         }
+      }
+
+      /// <summary>
+      /// A group in the trail. A button rather than a label because a group has
+      /// no page of its own: activating it reveals the group in the sidebar, so
+      /// the user can see what else is in the same place. Keyboard reachable like
+      /// any other button, which a plain text breadcrumb would not be.
+      /// </summary>
+      private FrameworkElement GroupSegment(NavNode group)
+      {
+         var button = new Wpf.Ui.Controls.Button
+         {
+            Content = group.Title,
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Transparent,
+            FontSize = Typography.Label,
+            Padding = new Thickness(4, 2, 4, 2),
+            Cursor = System.Windows.Input.Cursors.Hand,
+            ToolTip = string.IsNullOrEmpty(group.Purpose)
+               ? "Show " + group.Title + " in the navigation"
+               : group.Purpose
+         };
+         System.Windows.Automation.AutomationProperties.SetAutomationId(button, "breadcrumb-group-" + NavigationMap.Slug(group.Title));
+         System.Windows.Automation.AutomationProperties.SetName(button, "Show the group " + group.Title + " in the navigation");
+         button.Click += (s, e) => RevealGroup(group.Title);
+         return button;
+      }
+
+      private FrameworkElement RelatedLink(NavNode page)
+      {
+         var button = new Wpf.Ui.Controls.Button
+         {
+            Content = page.Title,
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Transparent,
+            FontSize = Typography.Caption,
+            Padding = new Thickness(6, 2, 6, 2),
+            Cursor = System.Windows.Input.Cursors.Hand,
+            ToolTip = page.Purpose
+         };
+         System.Windows.Automation.AutomationProperties.SetAutomationId(button, "breadcrumb-related-" + page.Key);
+         System.Windows.Automation.AutomationProperties.SetName(button, "Go to the related page " + page.Title);
+         button.Click += (s, e) => NavigateTo(page.Key);
+         return button;
+      }
+
+      private static FrameworkElement BreadcrumbSeparator()
+      {
+         var separator = new TextBlock
+         {
+            Text = ">",
+            FontSize = Typography.Caption,
+            Margin = new Thickness(3, 0, 3, 0),
+            VerticalAlignment = VerticalAlignment.Center
+         };
+         separator.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorTertiaryBrush");
+         return separator;
+      }
+
+      private static FrameworkElement SearchMarker()
+      {
+         var marker = new Border
+         {
+            CornerRadius = new CornerRadius(4),
+            Padding = new Thickness(6, 1, 6, 1),
+            Margin = new Thickness(0, 0, 8, 0),
+            VerticalAlignment = VerticalAlignment.Center
+         };
+         marker.SetResourceReference(Border.BackgroundProperty, "SubtleFillColorSecondaryBrush");
+
+         var text = new TextBlock { Text = "Found by search", FontSize = Typography.Caption };
+         text.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
+         marker.Child = text;
+
+         System.Windows.Automation.AutomationProperties.SetAutomationId(marker, "breadcrumb-from-search");
+         System.Windows.Automation.AutomationProperties.SetName(marker, "You arrived here from the search palette");
+         return marker;
+      }
+
+      /// <summary>
+      ///    Expands a group in the sidebar and scrolls it into view, without disturbing
+      ///    which page is selected.
+      ///
+      ///    Deliberately does NOT call group.Focus(). A TreeView's selection follows
+      ///    keyboard focus, so focusing the group heading selected it and deselected the
+      ///    page the user is actually looking at: the content stayed put - because
+      ///    NavTree_SelectedItemChanged early-returns for a heading, which has no Tag -
+      ///    while the sidebar highlight and the brand pill jumped to the heading. The
+      ///    sidebar then disagreed with the content, which is precisely the "where am I"
+      ///    problem this navigation work exists to remove.
+      ///
+      ///    Expanding and bringing into view is the whole job here. Whoever wants the
+      ///    keyboard in the sidebar can Tab to it, and arrowing from the selected page
+      ///    still works because the selection was never moved.
+      /// </summary>
+      private void RevealGroup(string title)
+      {
+         foreach (TreeViewItem group in AllGroups(NavTree.Items)
+            .Where(g => string.Equals(g.Header as string, title, StringComparison.Ordinal)))
+         {
+            for (var parent = group.Parent as TreeViewItem; parent != null; parent = parent.Parent as TreeViewItem)
+               parent.IsExpanded = true;
+
+            group.IsExpanded = true;
+            group.BringIntoView();
+            return;
+         }
+      }
+
+      private IEnumerable<TreeViewItem> AllGroups(ItemCollection items)
+      {
+         foreach (TreeViewItem item in items)
+         {
+            if (item.Tag is not string)
+               yield return item;
+            foreach (TreeViewItem child in AllGroups(item.Items))
+               yield return child;
+         }
+      }
+
+      /// <summary>
+      /// Reads the palette history. Anything at all can be in a registry value,
+      /// so a damaged one costs the history and nothing else - an error dialog on
+      /// start-up because the list of recently visited pages was corrupt would be
+      /// absurd.
+      /// </summary>
+      private void LoadPaletteUsage()
+      {
+         try
+         {
+            using RegistryKey key = Registry.CurrentUser.OpenSubKey(RegistryPath);
+            paletteUsage_ = PaletteUsage.Deserialize(key?.GetValue(PaletteUsageValue) as string);
+         }
+         catch (Exception)
+         {
+            paletteUsage_ = new PaletteUsage();
+         }
+      }
+
+      /// <summary>
+      /// Written after every visit rather than once on close. The window bounds
+      /// can afford to be saved on close because losing them costs one resize;
+      /// losing a session's worth of history makes the feature look like it does
+      /// not work, and the process does not always get to close cleanly. One
+      /// short SetValue at user-navigation rate is not worth optimising.
+      /// </summary>
+      private void SavePaletteUsage()
+      {
+         try
+         {
+            using RegistryKey key = Registry.CurrentUser.CreateSubKey(RegistryPath);
+            key?.SetValue(PaletteUsageValue, paletteUsage_.Serialize());
+         }
+         catch (Exception)
+         {
          }
       }
 
@@ -270,13 +492,17 @@ namespace hMailServer.ControlPanel
             // and return to the connect screen instead of revealing the UI.
             connected_ = false;
             NavTree.IsEnabled = false;
+            SearchButton.IsEnabled = false;
+            BreadcrumbBar.Visibility = Visibility.Collapsed;
             ConnBadge.Visibility = Visibility.Collapsed;
+            currentPage_ = null;
             ContentHost.Content = new ConnectView(OnConnected);
             return;
          }
 
          connected_ = true;
          NavTree.IsEnabled = true;
+         SearchButton.IsEnabled = true;
 
          ConnBadge.Visibility = Visibility.Visible;
          ConnText.Text = ServerSession.Current.UserName + " @ " + ServerSession.Current.Host;
@@ -290,7 +516,34 @@ namespace hMailServer.ControlPanel
             VersionText.Text = "";
          }
 
-         ((TreeViewItem) NavTree.Items[1]).IsSelected = true; // Dashboard
+         // Drop any selection left over from an earlier session on this window.
+         // Selecting the item that is already selected raises no
+         // SelectedItemChanged, so without this a reconnect after a cancelled
+         // two-factor prompt left the connect screen on display with the
+         // navigation enabled beside it and nothing to click that would replace
+         // it. Deselecting raises the event with a null item, which the handler
+         // ignores.
+         foreach (TreeViewItem selected in AllLeaves(NavTree.Items).Where(l => l.IsSelected).ToList())
+            selected.IsSelected = false;
+
+         // By key rather than by position in the tree: the first release that
+         // reordered the sidebar would otherwise have opened whatever page
+         // happened to land at index 1.
+         //
+         // Flagged as automatic so it is not counted in "Most used" - see the guard in
+         // NavigateTo. try/finally because a page's OnEnter can throw, and leaving the
+         // flag set would then stop counting every genuine visit for the rest of the
+         // session.
+         automaticNavigation_ = true;
+
+         try
+         {
+            NavigateTo("dashboard");
+         }
+         finally
+         {
+            automaticNavigation_ = false;
+         }
       }
 
       /// <summary>
@@ -343,7 +596,13 @@ namespace hMailServer.ControlPanel
          if (!pageCache_.TryGetValue(key, out UserControl page))
          {
             if (!pageFactories_.TryGetValue(key, out Func<UserControl> factory))
+            {
+               // Nothing was navigated to, so the "from search" marker must not
+               // be left armed for whatever page is opened next.
+               arrivedFromSearch_ = false;
                return;
+            }
+
             page = factory();
             pageCache_[key] = page;
          }
@@ -361,6 +620,24 @@ namespace hMailServer.ControlPanel
          }
 
          ContentHost.Content = page;
+         currentPage_ = key;
+
+         // Before the page is entered, so that a page whose OnEnter throws still
+         // leaves the user able to see where they are and get back out.
+         UpdateBreadcrumb(key);
+
+         // Only pages the user chose. OnConnected navigates to the dashboard on every
+         // launch, so counting that visit made "Most used" report the dashboard at the
+         // top for ever - one count per launch, against single digits for the pages the
+         // installation actually lives in. A section whose entire purpose is to surface
+         // what this operator uses must not be dominated by what the application does to
+         // itself before the operator has touched anything.
+         if (!automaticNavigation_)
+         {
+            paletteUsage_.RecordVisit(key);
+            SavePaletteUsage();
+         }
+
          EnterPage(page);
       }
 

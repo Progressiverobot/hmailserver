@@ -21,6 +21,17 @@
          tests can verify it still matches the settings pages. -->
     <Compile Include="..\ControlPanel\Services\SettingsSearchIndex.cs" />
     <Compile Include="..\ControlPanel\Services\SettingsSearchIndex.g.cs" />
+    <!-- Navigation and command palette. The information architecture, the outcome
+         phrases and the ranking are all plain data plus pure functions, kept out
+         of MainWindow and the palette window precisely so that the structure can
+         be tested: every registered page must have exactly one home, no page title
+         may change under the documentation, and every outcome phrase must actually
+         reach its page. -->
+    <Compile Include="..\ControlPanel\Services\SearchTerms.cs" />
+    <Compile Include="..\ControlPanel\Services\NavigationMap.cs" />
+    <Compile Include="..\ControlPanel\Services\IntentIndex.cs" />
+    <Compile Include="..\ControlPanel\Services\PaletteUsage.cs" />
+    <Compile Include="..\ControlPanel\Services\PaletteSearch.cs" />
   </ItemGroup>
 
 </Project>

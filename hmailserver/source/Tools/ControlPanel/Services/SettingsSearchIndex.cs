@@ -24,6 +24,38 @@ namespace hMailServer.ControlPanel.Services
    }
 
    /// <summary>
+   /// A setting that matched a search, with everything a caller needs to rank it
+   /// against results from other sources and to tell the user where it lives.
+   /// </summary>
+   public sealed class SettingMatch
+   {
+      internal SettingMatch(SettingEntry entry, int rank)
+      {
+         Entry = entry;
+         Rank = rank;
+      }
+
+      /// <summary>The indexed setting.</summary>
+      public SettingEntry Entry { get; }
+
+      /// <summary>Match score, lower being better. See <see cref="SearchTerms"/>.</summary>
+      public int Rank { get; }
+
+      public string Label => Entry.Label;
+      public string Key => Entry.Key;
+      public string Page => Entry.Page;
+
+      /// <summary>
+      /// The full navigation trail to the page hosting the setting, so that a
+      /// result can say where it will take the reader before they go there.
+      /// Resolved through <see cref="NavigationMap"/> rather than stored, so a
+      /// page that moves in the navigation cannot leave stale trails behind in
+      /// the generated index.
+      /// </summary>
+      public string Location => NavigationMap.LocationOf(Page);
+   }
+
+   /// <summary>
    /// Lets the command palette find an individual setting rather than only a
    /// page name. Settings are spread across pages by topic, and a setting whose
    /// page an administrator does not guess is effectively invisible - searching
@@ -33,82 +65,64 @@ namespace hMailServer.ControlPanel.Services
    /// The entries are generated from the page definitions by
    /// build/generate-settings-index.ps1 (see SettingsSearchIndex.g.cs), so the
    /// index cannot drift away from what the pages actually show.
+   ///
+   /// Ranking is delegated to <see cref="SearchQuery"/> rather than done here.
+   /// It used to be a private prefix/substring ladder, which meant the palette
+   /// scored settings by one rule and page names by another; a single list whose
+   /// rows were ranked by two incomparable scales put results in an order that
+   /// could not be reasoned about. Page titles for results come from
+   /// <see cref="NavigationMap"/> for the same reason - a second hand-maintained
+   /// table of page titles drifts from the navigation the moment either changes.
    /// </summary>
    public static partial class SettingsSearchIndex
    {
       /// <summary>
-      /// Human-readable page titles, keyed by the navigation tag, so a result
-      /// can say which page it will open.
+      /// Added to a match found only in the INI key or COM path, so that a
+      /// setting matched by the words on screen outranks one matched by an
+      /// identifier. Somebody typing "delete logs" means the label; somebody
+      /// typing "LogDeleteDays" gets an exact key match, which still wins.
       /// </summary>
-      private static readonly Dictionary<string, string> PageTitles = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-      {
-         ["protocols"] = "Protocols",
-         ["delivery"] = "Delivery of e-mail",
-         ["antispam"] = "Anti-spam settings",
-         ["antivirus"] = "Anti-virus settings",
-         ["tls"] = "Auto-ban & SSL/TLS",
-         ["logging"] = "Logging",
-         ["performance"] = "Performance",
-         ["advanced"] = "Advanced & scripting",
-         ["adminaccess"] = "Administrative access",
-         ["security"] = "Transport security",
-         ["acme"] = "Certificates (ACME)",
-         ["api"] = "API & monitoring",
-         ["hardening"] = "Advanced INI settings",
-         ["authentication"] = "Authentication",
-         ["dns"] = "DNS resolver",
-         ["webservices"] = "Web services & autoconfiguration",
-
-         // Hand-written pages that own settings of their own. These titles
-         // cover every page the generator scans for them, so a page that gains
-         // its first setting is named properly the moment it is indexed.
-         ["backup"] = "Backup & restore",
-         ["ipranges"] = "IP ranges",
-         ["ports"] = "TCP/IP ports",
-         ["routes"] = "Routes",
-         ["domains"] = "Domains",
-         ["rules"] = "Rules",
-         ["certs"] = "SSL certificates",
-      };
+      private const int KeyPenalty = 20;
 
       /// <summary>
-      /// Search results, most relevant first. Each result carries the page tag
-      /// the caller should navigate to.
+      /// Search results, most relevant first. Each result carries the page the
+      /// caller should navigate to.
       /// </summary>
-      public static IEnumerable<(string Display, string Page)> Search(string query)
+      public static IEnumerable<SettingMatch> Search(string query) => Search(new SearchQuery(query));
+
+      /// <summary>
+      /// Overload for a caller that is already searching several sources with
+      /// one query and should not pay to normalise it again per source.
+      /// </summary>
+      public static IEnumerable<SettingMatch> Search(SearchQuery query)
       {
-         if (string.IsNullOrWhiteSpace(query))
-            yield break;
+         if (query == null || query.IsEmpty)
+            return Array.Empty<SettingMatch>();
 
-         string needle = query.Trim();
+         var matches = new List<SettingMatch>();
 
-         // Rank: label prefix, then label substring, then INI key/COM path.
-         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-         foreach (var ranked in Entries
-            .Select(e => new
-            {
-               Entry = e,
-               Rank = e.Label.StartsWith(needle, StringComparison.OrdinalIgnoreCase) ? 0
-                    : e.Label.IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0 ? 1
-                    : e.Key.IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0 ? 2
-                    : -1
-            })
-            .Where(x => x.Rank >= 0)
-            .OrderBy(x => x.Rank)
-            .ThenBy(x => x.Entry.Label, StringComparer.OrdinalIgnoreCase))
+         foreach (SettingEntry entry in Entries)
          {
-            SettingEntry entry = ranked.Entry;
+            int byLabel = query.Score(entry.Label);
+            int byKey = query.Score(entry.Key);
+            if (byKey != SearchTerms.NoMatch)
+               byKey += KeyPenalty;
 
-            string pageTitle = PageTitles.TryGetValue(entry.Page, out string title) ? title : entry.Page;
-            string display = entry.Label + "  —  " + pageTitle;
-
-            // The same label can appear once per page; don't list it twice.
-            if (!seen.Add(display))
+            int rank = Math.Min(byLabel, byKey);
+            if (rank == SearchTerms.NoMatch)
                continue;
 
-            yield return (display, entry.Page);
+            matches.Add(new SettingMatch(entry, rank));
          }
+
+         // Label as the tie-break rather than the key: two settings that score
+         // the same are told apart by the reader on their wording, so listing
+         // them in wording order is what makes the list scannable.
+         return matches
+            .OrderBy(m => m.Rank)
+            .ThenBy(m => m.Label, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(m => m.Key, StringComparer.OrdinalIgnoreCase)
+            .ToList();
       }
    }
 }

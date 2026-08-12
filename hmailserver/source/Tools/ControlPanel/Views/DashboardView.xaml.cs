@@ -1,87 +1,60 @@
 using System;
-using System.Collections.ObjectModel;
+using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Threading;
-using LiveChartsCore;
-using LiveChartsCore.Defaults;
-using LiveChartsCore.SkiaSharpView;
-using LiveChartsCore.SkiaSharpView.Painting;
-using SkiaSharp;
 using hMailServer.ControlPanel.Services;
-using System.Linq;
 
 namespace hMailServer.ControlPanel.Views
 {
+   /// <summary>
+   /// Live server statistics: five KPI cards and two charts.
+   ///
+   /// The charts are <see cref="AccessibleChartCard"/> instances built from
+   /// <see cref="ChartCatalog"/> rather than LiveCharts controls declared in the
+   /// XAML. That is what gives them a High Contrast palette, a table view of the
+   /// samples, and a legend that identifies each series by dash pattern and shape;
+   /// this page's remaining job is to read the status snapshot and push one sample
+   /// per series into each card.
+   /// </summary>
    public partial class DashboardView : UserControl, IPageLifecycle
    {
       private const int HistoryLength = 90;
 
       private readonly DispatcherTimer timer_;
-      private readonly ObservableCollection<ObservableValue> throughput_ = new();
-      private readonly ObservableCollection<ObservableValue> smtp_ = new();
-      private readonly ObservableCollection<ObservableValue> imap_ = new();
-      private readonly ObservableCollection<ObservableValue> pop3_ = new();
+      private readonly AccessibleChartCard throughputCard_;
+      private readonly AccessibleChartCard sessionsCard_;
 
       private long lastProcessed_ = -1;
-      private DateTime lastSample_ = DateTime.MinValue;
-
-      private static readonly SKColor Accent = new(0x2F, 0x81, 0xF7);
-      private static readonly SKColor Green = new(0x3F, 0xB9, 0x50);
-      private static readonly SKColor Purple = new(0xA3, 0x71, 0xF7);
-      private static readonly SKColor Amber = new(0xD2, 0x99, 0x22);
-      private static readonly SKColor Muted = new(0x8B, 0x94, 0x9E);
+      private DateTime lastSampleUtc_ = DateTime.MinValue;
 
       public DashboardView()
       {
          InitializeComponent();
 
-         var axisPaint = new SolidColorPaint(Muted) { SKTypeface = SKTypeface.FromFamilyName("Segoe UI") };
-         var gridPaint = new SolidColorPaint(new SKColor(0x8B, 0x94, 0x9E, 40)) { StrokeThickness = 1 };
-
-         ThroughputChart.Series = new ISeries[]
+         throughputCard_ = new AccessibleChartCard(ChartCatalog.DashboardThroughput, HistoryLength)
          {
-            new LineSeries<ObservableValue>
-            {
-               Values = throughput_,
-               GeometrySize = 0,
-               LineSmoothness = 0.8,
-               Stroke = new SolidColorPaint(Accent) { StrokeThickness = 2.5f },
-               Fill = new LinearGradientPaint(
-                  new[] { Accent.WithAlpha(70), Accent.WithAlpha(0) },
-                  new SKPoint(0.5f, 0), new SKPoint(0.5f, 1)),
-               Name = "msgs/min"
-            }
+            EmptyText = "No delivery activity yet",
+            // Taller than the 300 the bare chart used: the card now carries a
+            // legend and a summary line under the plot, and squeezing the plot to
+            // keep the old height is how you end up with a chart too short to read.
+            Height = 340,
+            Margin = new Thickness(0, 0, 12, 0)
          };
-         ThroughputChart.XAxes = new[] { new Axis { IsVisible = false } };
-         ThroughputChart.YAxes = new[] { new Axis { LabelsPaint = axisPaint, SeparatorsPaint = gridPaint, MinLimit = 0 } };
-         ThroughputChart.AnimationsSpeed = TimeSpan.FromMilliseconds(400);
 
-         SessionsChart.Series = new ISeries[]
+         sessionsCard_ = new AccessibleChartCard(ChartCatalog.DashboardSessions, HistoryLength)
          {
-            MakeSessionSeries("SMTP", smtp_, Green),
-            MakeSessionSeries("IMAP", imap_, Purple),
-            MakeSessionSeries("POP3", pop3_, Amber)
+            EmptyText = "No active sessions",
+            Height = 340
          };
-         SessionsChart.XAxes = new[] { new Axis { IsVisible = false } };
-         SessionsChart.YAxes = new[] { new Axis { LabelsPaint = axisPaint, SeparatorsPaint = gridPaint, MinLimit = 0 } };
-         SessionsChart.AnimationsSpeed = TimeSpan.FromMilliseconds(400);
+
+         Grid.SetColumn(throughputCard_, 0);
+         Grid.SetColumn(sessionsCard_, 1);
+         ChartsGrid.Children.Add(throughputCard_);
+         ChartsGrid.Children.Add(sessionsCard_);
 
          timer_ = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
          timer_.Tick += (s, e) => Refresh();
-      }
-
-      private static LineSeries<ObservableValue> MakeSessionSeries(
-         string name, ObservableCollection<ObservableValue> values, SKColor color)
-      {
-         return new LineSeries<ObservableValue>
-         {
-            Name = name,
-            Values = values,
-            GeometrySize = 0,
-            LineSmoothness = 0.8,
-            Stroke = new SolidColorPaint(color) { StrokeThickness = 2f },
-            Fill = null
-         };
       }
 
       public void OnEnter()
@@ -102,38 +75,36 @@ namespace hMailServer.ControlPanel.Views
          {
             var snap = session.ReadStatus();
 
-            KpiProcessed.Text = snap.ProcessedMessages.ToString("N0");
-            KpiQueue.Text = snap.QueueLength.ToString("N0");
-            // Colour encodes state, not category: the queue only turns amber when
-            // messages are visibly backing up, otherwise it stays neutral.
-            KpiQueue.SetResourceReference(ForegroundProperty,
-               snap.QueueLength > 100 ? "AppWarningBrush" : "TextFillColorPrimaryBrush");
-            KpiSpam.Text = snap.SpamBlocked.ToString("N0");
-            KpiViruses.Text = snap.VirusesRemoved.ToString("N0");
-            KpiUptime.Text = FormatUptime(snap.StartTime);
+            SetKpi_(KpiProcessed, "Messages processed", snap.ProcessedMessages.ToString("N0"));
+            SetKpi_(KpiSpam, "Spam blocked", snap.SpamBlocked.ToString("N0"));
+            SetKpi_(KpiViruses, "Viruses removed", snap.VirusesRemoved.ToString("N0"));
+            SetKpi_(KpiUptime, "Uptime", FormatUptime(snap.StartTime));
+            ShowQueue_(snap.QueueLength);
 
-            Push(smtp_, snap.SmtpSessions);
-            Push(imap_, snap.ImapSessions);
-            Push(pop3_, snap.Pop3Sessions);
+            // Two clocks on purpose. The table's Time column has to be local time
+            // to mean anything to the reader, but the throughput rate is a division
+            // by an elapsed interval, and a daylight-saving change or a clock
+            // correction on local time would turn one sample into a spike of
+            // thousands of messages a minute.
+            DateTime nowLocal = DateTime.Now;
+            DateTime nowUtc = DateTime.UtcNow;
 
-            DateTime now = DateTime.UtcNow;
-            if (lastProcessed_ >= 0 && lastSample_ != DateTime.MinValue)
+            sessionsCard_.Push(nowLocal, snap.SmtpSessions, snap.ImapSessions, snap.Pop3Sessions);
+
+            if (lastProcessed_ >= 0 && lastSampleUtc_ != DateTime.MinValue)
             {
-               double seconds = (now - lastSample_).TotalSeconds;
+               double seconds = (nowUtc - lastSampleUtc_).TotalSeconds;
                if (seconds > 0.5)
-                  Push(throughput_, Math.Max(0, snap.ProcessedMessages - lastProcessed_) * 60.0 / seconds);
+               {
+                  throughputCard_.Push(nowLocal,
+                     Math.Max(0, snap.ProcessedMessages - lastProcessed_) * 60.0 / seconds);
+               }
             }
+
             lastProcessed_ = snap.ProcessedMessages;
-            lastSample_ = now;
+            lastSampleUtc_ = nowUtc;
 
-            // Show a quiet placeholder over each chart until there is real
-            // activity, instead of a "broken-looking" flat line on the axis.
-            ThroughputEmpty.Visibility = HasActivity(throughput_)
-               ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
-            SessionsEmpty.Visibility = (HasActivity(smtp_) || HasActivity(imap_) || HasActivity(pop3_))
-               ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
-
-            SubtitleText.Text = "Live server statistics - last update " + DateTime.Now.ToLongTimeString();
+            SubtitleText.Text = "Live server statistics - last update " + nowLocal.ToLongTimeString();
          }
          catch (Exception)
          {
@@ -142,16 +113,54 @@ namespace hMailServer.ControlPanel.Views
          }
       }
 
-      private static void Push(ObservableCollection<ObservableValue> series, double value)
+      /// <summary>
+      /// Sets a KPI value and the accessible name that goes with it. The name has
+      /// to carry the label as well as the number, because the five cards are five
+      /// unlabelled numbers to anything reading the automation tree - "312" on its
+      /// own could be the queue, the spam count or the uptime in minutes.
+      /// </summary>
+      private static void SetKpi_(TextBlock value, string label, string text)
       {
-         series.Add(new ObservableValue(value));
-         while (series.Count > HistoryLength)
-            series.RemoveAt(0);
+         value.Text = text;
+         AutomationProperties.SetName(value, label + ", " + text);
       }
 
-      private static bool HasActivity(ObservableCollection<ObservableValue> series)
+      /// <summary>
+      /// Shows the queue length, and says whether it is a backlog in three
+      /// independent channels: the colour of the number, a shape plus the word
+      /// "Backlog" underneath it, and the value's accessible name.
+      ///
+      /// Colour used to be the only channel. That made the one piece of judgement
+      /// on the dashboard - "this queue is not draining" - invisible to anyone who
+      /// cannot distinguish amber from the body text, which includes every user of
+      /// a High Contrast theme, where the amber is replaced by a system colour that
+      /// may well be the same one the number would have had anyway.
+      /// </summary>
+      private void ShowQueue_(int queueLength)
       {
-         return series.Any(v => v.Value.GetValueOrDefault() > 0);
+         string text = queueLength.ToString("N0");
+         StatusLevel level = StatusSemantics.ForQueueLength(queueLength);
+         StatusPresentation status = StatusSemantics.For(level);
+
+         KpiQueue.Text = text;
+         KpiQueue.SetResourceReference(TextBlock.ForegroundProperty, status.BrushKey);
+
+         if (level == StatusLevel.Normal)
+         {
+            KpiQueueBadge.Visibility = Visibility.Collapsed;
+            AutomationProperties.SetName(KpiQueue, "In queue, " + text);
+            return;
+         }
+
+         ShapeMarkVisuals.ApplyMark(KpiQueueShape, status.Shape, status.BrushKey);
+         KpiQueueBadgeText.Text = "Backlog";
+         KpiQueueBadgeText.SetResourceReference(TextBlock.ForegroundProperty, status.BrushKey);
+         KpiQueueBadge.Visibility = Visibility.Visible;
+         KpiQueueBadge.ToolTip = "More than " + StatusSemantics.QueueBacklogThreshold.ToString("N0")
+            + " messages are waiting to be delivered.";
+
+         AutomationProperties.SetName(KpiQueue,
+            "In queue, " + text + ". " + status.SeverityWord + ": backlog.");
       }
 
       private static string FormatUptime(string startTime)

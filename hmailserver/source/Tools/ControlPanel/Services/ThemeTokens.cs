@@ -35,6 +35,37 @@ namespace hMailServer.ControlPanel.Services
       public static readonly SolidColorBrush LogApp = new();
       public static readonly SolidColorBrush LogError = new();
 
+      /// <summary>
+      /// Raised after every recomputation, so consumers that cannot express
+      /// themselves as a brush reference can rebuild.
+      ///
+      /// The charts are the reason this exists. A LiveCharts series holds Skia
+      /// paints, not WPF brushes, so it can neither take a DynamicResource nor
+      /// benefit from the in-place brush mutation the rest of the app relies on:
+      /// the only way a chart follows a theme change is to be told about it and
+      /// rebuild its paints. Subscribers should hook this on Loaded and unhook on
+      /// Unloaded rather than in a constructor - the pages are cached and swapped
+      /// in and out of the content host, and a static event is exactly the kind of
+      /// root that keeps a dead page alive forever.
+      /// </summary>
+      public static event EventHandler Changed;
+
+      /// <summary>
+      /// Which palette the charts must use, recomputed with the tokens.
+      ///
+      /// High Contrast wins over the light/dark preference: the user asked the
+      /// operating system for it, and the Control Panel's own theme toggle is not
+      /// a licence to override that.
+      /// </summary>
+      public static ChartTheme CurrentChartTheme { get; private set; } = ChartTheme.Dark;
+
+      /// <summary>
+      /// The system colours the High Contrast palette is built from, snapshotted
+      /// on each refresh so the WPF-free palette code never has to touch
+      /// SystemColors itself.
+      /// </summary>
+      public static ChartSystemColors CurrentSystemColors { get; private set; } = ChartSystemColors.Fallback;
+
       private static bool initialised_;
 
       /// <summary>
@@ -46,6 +77,11 @@ namespace hMailServer.ControlPanel.Services
          if (initialised_)
             return;
          initialised_ = true;
+
+         // A focus ring that is visible on every theme is part of the same job as
+         // the colour tokens, and it is registered here rather than in App.xaml so
+         // that the whole of it lives in one file.
+         AccessibleFocus.Register();
 
          Refresh();
 
@@ -65,6 +101,13 @@ namespace hMailServer.ControlPanel.Services
       {
          Color brand, success, warning, danger, info;
          Color logDefault, logSmtp, logImap, logPop3, logApp, logError;
+
+         // Snapshot what the charts need before we start branching, so there is
+         // exactly one decision about which theme is in force.
+         CurrentSystemColors = ReadSystemColors();
+         CurrentChartTheme = SystemParameters.HighContrast
+            ? ChartTheme.HighContrast
+            : IsLight() ? ChartTheme.Light : ChartTheme.Dark;
 
          if (SystemParameters.HighContrast)
          {
@@ -130,6 +173,47 @@ namespace hMailServer.ControlPanel.Services
          Publish("LogPop3Brush", logPop3);
          Publish("LogAppBrush", logApp);
          Publish("LogErrorBrush", logError);
+
+         // Channel 3: tell the consumers that cannot be expressed as a brush.
+         // Wrapped because a handler that throws here would otherwise surface as a
+         // crash dialog from the theme toggle, and a chart that failed to restyle
+         // is not worth taking the window down for.
+         try
+         {
+            Changed?.Invoke(null, EventArgs.Empty);
+         }
+         catch (Exception)
+         {
+         }
+      }
+
+      /// <summary>
+      /// Snapshots the system colours the High Contrast chart palette is built
+      /// from. SystemColors is safe to read at any time, but it is only meaningful
+      /// once a WPF application exists, so fall back to the classic High Contrast
+      /// White values rather than to zeroes (which would be transparent black -
+      /// invisible on every surface).
+      /// </summary>
+      private static ChartSystemColors ReadSystemColors()
+      {
+         try
+         {
+            return new ChartSystemColors(
+               ToArgb(SystemColors.WindowTextColor),
+               ToArgb(SystemColors.WindowColor),
+               ToArgb(SystemColors.HighlightColor),
+               ToArgb(SystemColors.HotTrackColor),
+               ToArgb(SystemColors.GrayTextColor));
+         }
+         catch (Exception)
+         {
+            return ChartSystemColors.Fallback;
+         }
+      }
+
+      private static uint ToArgb(Color color)
+      {
+         return ((uint) color.A << 24) | ((uint) color.R << 16) | ((uint) color.G << 8) | color.B;
       }
 
       private static bool IsLight()

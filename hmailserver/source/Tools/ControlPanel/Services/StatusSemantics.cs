@@ -1,0 +1,119 @@
+using System.Collections.Generic;
+
+namespace hMailServer.ControlPanel.Services
+{
+   /// <summary>How much attention a value is asking for.</summary>
+   public enum StatusLevel
+   {
+      /// <summary>Nothing to say. Renders with no badge at all.</summary>
+      Normal,
+      Good,
+      Information,
+      Warning,
+      Critical
+   }
+
+   /// <summary>
+   /// The three things a status has to carry so that none of them is load-bearing
+   /// on its own: a colour token, a shape, and a word.
+   /// </summary>
+   public sealed class StatusPresentation
+   {
+      internal StatusPresentation(StatusLevel level, string severityWord, ShapeMark shape, string brushKey)
+      {
+         Level = level;
+         SeverityWord = severityWord;
+         Shape = shape;
+         BrushKey = brushKey;
+      }
+
+      public StatusLevel Level { get; }
+
+      /// <summary>
+      /// "Warning", "Critical", ... - prefixed to the caller's own text in the
+      /// accessible name, so a screen reader hears the severity even though the
+      /// visible badge only shows the shape and the caller's wording.
+      /// </summary>
+      public string SeverityWord { get; }
+
+      /// <summary>
+      /// The shape drawn beside the value. This is the channel that survives when
+      /// the colour does not: printed in greyscale, viewed by a reader with
+      /// deuteranopia, or squashed onto the two or three colours a High Contrast
+      /// theme allows.
+      /// </summary>
+      public ShapeMark Shape { get; }
+
+      /// <summary>
+      /// Application resource key of the brush, e.g. "AppWarningBrush". A key
+      /// rather than a brush because ThemeTokens republishes these on every theme
+      /// change, so anything holding a resolved brush would keep the old colour.
+      /// </summary>
+      public string BrushKey { get; }
+   }
+
+   /// <summary>
+   /// Maps a status level onto the colour token, the shape and the word that
+   /// present it.
+   ///
+   /// The dashboard used to turn the queue counter amber above a hundred messages
+   /// and leave it at that: the entire message was the colour, so it did not exist
+   /// for anyone who could not see the colour, and the threshold was a bare
+   /// literal in the middle of a refresh method. Both problems are fixed by having
+   /// exactly one place that decides what a level looks like and what counts as
+   /// which level.
+   ///
+   /// Every level gets a distinct shape - that invariant is what a test can hold
+   /// on to, and it is the whole reason the shape is worth having.
+   /// </summary>
+   public static class StatusSemantics
+   {
+      /// <summary>
+      /// Queue length at which the dashboard starts calling the queue a backlog.
+      /// The number is the one the dashboard has always used; naming it here is
+      /// what makes it testable and what stops the next reader guessing whether
+      /// the comparison was inclusive.
+      /// </summary>
+      public const int QueueBacklogThreshold = 100;
+
+      private static readonly Dictionary<StatusLevel, StatusPresentation> Map = new()
+      {
+         [StatusLevel.Normal] =
+            new StatusPresentation(StatusLevel.Normal, "Normal", ShapeMark.Circle, "TextFillColorPrimaryBrush"),
+         [StatusLevel.Good] =
+            new StatusPresentation(StatusLevel.Good, "OK", ShapeMark.Square, "AppSuccessBrush"),
+         [StatusLevel.Information] =
+            new StatusPresentation(StatusLevel.Information, "Information", ShapeMark.Diamond, "AppInfoBrush"),
+         [StatusLevel.Warning] =
+            new StatusPresentation(StatusLevel.Warning, "Warning", ShapeMark.Triangle, "AppWarningBrush"),
+         [StatusLevel.Critical] =
+            new StatusPresentation(StatusLevel.Critical, "Critical", ShapeMark.Cross, "AppDangerBrush")
+      };
+
+      /// <summary>Never returns null; an unknown level is treated as Normal.</summary>
+      public static StatusPresentation For(StatusLevel level)
+      {
+         return Map.TryGetValue(level, out StatusPresentation presentation) ? presentation : Map[StatusLevel.Normal];
+      }
+
+      /// <summary>Every level, in increasing severity. Only used by the tests today.</summary>
+      public static IReadOnlyList<StatusLevel> AllLevels { get; } = new[]
+      {
+         StatusLevel.Normal,
+         StatusLevel.Good,
+         StatusLevel.Information,
+         StatusLevel.Warning,
+         StatusLevel.Critical
+      };
+
+      /// <summary>
+      /// Whether a queue of this length is a backlog. Strictly greater than the
+      /// threshold, matching the behaviour the dashboard has always had: a queue
+      /// sitting on exactly a hundred messages is busy, not broken.
+      /// </summary>
+      public static StatusLevel ForQueueLength(int queueLength, int threshold = QueueBacklogThreshold)
+      {
+         return queueLength > threshold ? StatusLevel.Warning : StatusLevel.Normal;
+      }
+   }
+}

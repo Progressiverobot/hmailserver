@@ -14,6 +14,22 @@
     <ProjectReference Include="..\ControlPanel.Core\ControlPanel.Core.csproj" />
   </ItemGroup>
 
+  <!-- Chart accessibility: the palette, the catalogue, the table view and the
+       status vocabulary. These are compiled straight into the test assembly rather
+       than routed through ControlPanel.Core, because the app compiles them too (they
+       live under ControlPanel\Services) and adding them to Core as well would give
+       this project two copies of every type and a CS0436 for each. They carry no WPF
+       references for exactly this reason: the theme decisions and the table
+       construction are the parts worth testing, and they must be testable without a
+       dispatcher, without an Application, and without the build agent having to be
+       running a High Contrast theme. -->
+  <ItemGroup>
+    <Compile Include="..\ControlPanel\Services\ChartPalette.cs" />
+    <Compile Include="..\ControlPanel\Services\ChartCatalog.cs" />
+    <Compile Include="..\ControlPanel\Services\ChartDataTable.cs" />
+    <Compile Include="..\ControlPanel\Services\StatusSemantics.cs" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
     <PackageReference Include="xunit" Version="2.9.3" />

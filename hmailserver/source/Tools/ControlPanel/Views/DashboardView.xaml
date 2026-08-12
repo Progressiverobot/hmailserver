@@ -1,8 +1,7 @@
 <UserControl
     x:Class="hMailServer.ControlPanel.Views.DashboardView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF">
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="26,20">
         <StackPanel>
@@ -10,7 +9,12 @@
             <TextBlock x:Name="SubtitleText" Text="Live server statistics, refreshed every 2 seconds."
                        Style="{StaticResource PageSubtitle}" />
 
-            <!-- KPI row: fixed-height cards, value top-aligned, label bottom-anchored -->
+            <!-- KPI row: fixed-height cards, value top-aligned, label bottom-anchored.
+                 The accessible name of each value is set in code to "label, value"
+                 on every refresh. AutomationProperties.LabeledBy looks like the
+                 right tool and is not: on a TextBlock it *replaces* the announced
+                 name, so a screen reader would read "IN QUEUE" and never say the
+                 number. -->
             <UniformGrid Columns="5" Margin="0,0,0,12">
                 <Border Style="{StaticResource Card}" MinHeight="96" Margin="0,0,12,0">
                     <Grid>
@@ -38,7 +42,21 @@
                             <RowDefinition Height="*" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
-                        <TextBlock x:Name="KpiQueue" Text="0" Style="{StaticResource KpiValue}" />
+                        <!-- The queue is the one KPI that changes colour to say
+                             something. The colour is never the only carrier of it:
+                             the badge underneath adds a shape and the word
+                             "Backlog", and the value's accessible name says it in
+                             words as well. -->
+                        <StackPanel>
+                            <TextBlock x:Name="KpiQueue" Text="0" Style="{StaticResource KpiValue}" />
+                            <StackPanel x:Name="KpiQueueBadge" Orientation="Horizontal" Visibility="Collapsed"
+                                        Margin="0,4,0,0">
+                                <Path x:Name="KpiQueueShape" Width="10" Height="10" Stretch="Fill"
+                                      VerticalAlignment="Center" Margin="0,0,5,0" />
+                                <TextBlock x:Name="KpiQueueBadgeText" FontSize="11" FontWeight="SemiBold"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+                        </StackPanel>
                         <TextBlock Grid.Row="1" Text="IN QUEUE" Style="{StaticResource KpiLabel}" />
                     </Grid>
                 </Border>
@@ -64,48 +82,16 @@
                 </Border>
             </UniformGrid>
 
-            <!-- Charts -->
-            <Grid>
+            <!-- Charts. Both cards are built in code from ChartCatalog: an
+                 AccessibleChartCard cannot exist without a chart definition, and it
+                 builds its table view, legend, accessible description and clipboard
+                 export from that same definition, which is what keeps "every chart
+                 has a table view" true by construction rather than by review. -->
+            <Grid x:Name="ChartsGrid">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="3*" />
                     <ColumnDefinition Width="2*" />
                 </Grid.ColumnDefinitions>
-
-                <Border Grid.Column="0" Style="{StaticResource Card}" Margin="0,0,12,0" Height="300">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                        </Grid.RowDefinitions>
-                        <TextBlock Text="Delivery throughput (messages / minute)" FontWeight="SemiBold" FontSize="13"
-                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,8" />
-                        <!-- Background must stay explicit: CartesianChart is a Control, and
-                             LiveCharts 2.0.x defaults it to opaque white, which blocks out
-                             the dark card and leaves the empty-state label below unreadable. -->
-                        <lvc:CartesianChart x:Name="ThroughputChart" Grid.Row="1" Background="Transparent" />
-                        <TextBlock x:Name="ThroughputEmpty" Grid.Row="1" Text="No delivery activity yet"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="13"
-                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
-                    </Grid>
-                </Border>
-
-                <Border Grid.Column="1" Style="{StaticResource Card}" Height="300">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                        </Grid.RowDefinitions>
-                        <TextBlock Text="Active sessions" FontWeight="SemiBold" FontSize="13"
-                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,8" />
-                        <!-- Background must stay explicit: CartesianChart is a Control, and
-                             LiveCharts 2.0.x defaults it to opaque white, which blocks out
-                             the dark card and leaves the empty-state label below unreadable. -->
-                        <lvc:CartesianChart x:Name="SessionsChart" Grid.Row="1" Background="Transparent" />
-                        <TextBlock x:Name="SessionsEmpty" Grid.Row="1" Text="No active sessions"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="13"
-                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
-                    </Grid>
-                </Border>
             </Grid>
         </StackPanel>
     </ScrollViewer>

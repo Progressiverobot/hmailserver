@@ -33,6 +33,7 @@
             <Grid Grid.Column="0">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
@@ -50,8 +51,35 @@
                     </StackPanel>
                 </StackPanel>
 
-                <!-- Navigation tree (structure mirrors the classic Administrator) -->
-                <TreeView x:Name="NavTree" Grid.Row="1" Background="Transparent" BorderThickness="0"
+                <!-- Search entry point. The palette was previously reachable only
+                     by knowing that Ctrl+K exists, which is not a discoverable
+                     interface; this is a normal tab stop that opens the same
+                     palette and names the shortcut while it does so. -->
+                <ui:Button x:Name="SearchButton" Grid.Row="1" Margin="14,0,14,10"
+                           HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                           Padding="10,7" Click="Search_Click"
+                           AutomationProperties.AutomationId="nav-search"
+                           AutomationProperties.Name="Search pages, settings and tasks. Keyboard shortcut Control K."
+                           ToolTip="Search pages, settings and tasks (Ctrl+K)">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <ui:SymbolIcon Symbol="Search24" FontSize="15" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1" Text="Search" FontSize="13" Margin="8,0,0,0"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <TextBlock Grid.Column="2" Text="Ctrl+K" FontSize="10.5" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                    </Grid>
+                </ui:Button>
+
+                <!-- Navigation tree. Built from Services/NavigationMap, which is
+                     grouped by what an administrator is trying to achieve; the
+                     structure is data so that it can be tested. -->
+                <TreeView x:Name="NavTree" Grid.Row="2" Background="Transparent" BorderThickness="0"
                           Margin="8,0" SelectedItemChanged="NavTree_SelectedItemChanged"
                           AutomationProperties.Name="Main navigation"
                           ScrollViewer.HorizontalScrollBarVisibility="Disabled">
@@ -123,7 +151,7 @@
                 </TreeView>
 
                 <!-- Footer -->
-                <StackPanel Grid.Row="2" Margin="18,0,18,14">
+                <StackPanel Grid.Row="3" Margin="18,0,18,14">
                     <StackPanel x:Name="ConnBadge" Orientation="Horizontal" Visibility="Collapsed">
                         <Ellipse Width="8" Height="8" Fill="#3FB950" VerticalAlignment="Center" />
                         <TextBlock x:Name="ConnText" Margin="7,0,0,0" FontSize="11.5"
@@ -143,7 +171,41 @@
             <!-- Content -->
             <Border Grid.Column="1" Background="{DynamicResource ApplicationBackgroundBrush}"
                     CornerRadius="8,0,0,0" Margin="0,4,0,0">
-                <ContentControl x:Name="ContentHost" AutomationProperties.Name="Page content" />
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Breadcrumb and signposts. A palette jump used to replace
+                         the page with no indication of where the user had landed,
+                         so the palette taught nothing and had to be used again
+                         next time. The trail names the group, the group segment
+                         reveals it in the tree, and the "Related" links carry the
+                         subjects that genuinely span several pages (transport
+                         security is one question to the user and five pages to
+                         us) without duplicating a page into two branches. -->
+                    <Border x:Name="BreadcrumbBar" Grid.Row="0" Visibility="Collapsed"
+                            Padding="26,9,20,8" BorderThickness="0,0,0,1"
+                            BorderBrush="{DynamicResource ControlElevationBorderBrush}"
+                            AutomationProperties.AutomationId="breadcrumb-bar"
+                            AutomationProperties.Name="Location">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <WrapPanel x:Name="BreadcrumbHost" Orientation="Horizontal"
+                                       VerticalAlignment="Center"
+                                       AutomationProperties.AutomationId="breadcrumb" />
+                            <WrapPanel x:Name="RelatedHost" Grid.Column="1" Orientation="Horizontal"
+                                       VerticalAlignment="Center" HorizontalAlignment="Right"
+                                       AutomationProperties.AutomationId="breadcrumb-related" />
+                        </Grid>
+                    </Border>
+
+                    <ContentControl x:Name="ContentHost" Grid.Row="1" AutomationProperties.Name="Page content" />
+                </Grid>
             </Border>
         </Grid>
 
