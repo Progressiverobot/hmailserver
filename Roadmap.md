@@ -1,13 +1,100 @@
 Roadmap
 =======
 
-What is planned for this fork, what is deliberately not, and why. It is kept
-honest rather than aspirational: work appears here when there is a concrete
+What this fork has, what is planned, what is deliberately not, and why. It is
+kept honest rather than aspirational: work appears here when there is a concrete
 reason for it, and anything already shipped moves to the
 [Releases page](https://github.com/Progressiverobot/hmailserver/releases).
 
-No dates are promised. This is a maintained fork, not a funded product, and the
-order below is the order things will be looked at rather than a schedule.
+No dates are promised for the work. This is a maintained fork, not a funded
+product, and the order below is the order things will be looked at rather than a
+schedule. Dates that *are* given belong to the outside world — runtime
+end-of-life, regulatory deadlines, a provider switching something off — and
+those are not negotiable.
+
+How to read this
+----------------
+
+Every item carries a status:
+
+| | Meaning |
+|:-:|---|
+| ✅ | **Shipped** — working in the current release |
+| 🔄 | **Underway** — being worked on now |
+| ⬜ | **Not started** — identified, nothing done |
+| ⏸️ | **Deferred** — consciously postponed, reason given |
+
+A ✅ with a caveat in the Detail column is the most useful row type here, and
+there are a lot of them: the capability is real and works, but it has a limit
+worth knowing before you rely on it. Those caveats are the honest content of
+this document.
+
+The capability matrix below was built by auditing the source tree in August 2026
+and then having every "shipped" claim adversarially re-checked against the code.
+That second pass changed 69 rows and caught 15 outright overclaims, several of
+which turned out to be defects rather than wording problems. They are listed
+under [Defects found by the audit](#defects-found-by-the-audit) and are counted
+as ⬜, not ✅.
+
+### Contents and totals
+
+711 items. The counts are the point of this table — they say where the fork is
+strong and where it is thin far more honestly than any prose summary.
+
+| Section | ✅ | 🔄 | ⬜ | ⏸️ |
+|---|--:|--:|--:|--:|
+| [Dated items — the forcing functions](#dated-items--the-forcing-functions) | – | – | 6 | 1 |
+| [Defects found by the audit](#defects-found-by-the-audit) | – | – | 16 | – |
+| **The capability matrix** | | | | |
+| [SMTP and ESMTP](#smtp-and-esmtp) | 23 | – | 4 | – |
+| [Transport security and deliverability](#transport-security-and-deliverability) | 28 | – | 16 | 1 |
+| [IMAP](#imap) | 55 | – | 19 | 3 |
+| [POP3](#pop3) | 17 | – | 9 | – |
+| [Sieve, ManageSieve and rules](#sieve-managesieve-and-rules) | 38 | – | 21 | – |
+| [Authentication and cryptography](#authentication-and-cryptography) | 55 | – | 19 | – |
+| [Anti-spam, anti-virus and content control](#anti-spam-anti-virus-and-content-control) | 52 | – | 13 | – |
+| [Storage, accounts and data model](#storage-accounts-and-data-model) | 79 | – | 11 | – |
+| [Routing, queue and delivery](#routing-queue-and-delivery) | 19 | – | 4 | 1 |
+| [Administration, API and Control Panel](#administration-api-and-control-panel) | 52 | – | 8 | – |
+| [Observability and diagnostics](#observability-and-diagnostics) | 26 | – | 11 | 1 |
+| [Extensibility and scripting](#extensibility-and-scripting) | 37 | – | 3 | – |
+| [Build, testing and supply chain](#build-testing-and-supply-chain) | 4 | – | 1 | – |
+| [Cross-cutting and platform](#cross-cutting-and-platform) | 9 | – | 2 | 1 |
+| **Forward-looking** | | | | |
+| [Planned work](#planned-work) | – | 2 | 16 | 2 |
+| [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | – | – | 6 | 2 |
+| [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | – | – | 6 | 2 |
+| [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | – | – | 9 | – |
+| **Total** | **495** | **2** | **200** | **14** |
+
+Three things stand out and are worth naming rather than leaving to be inferred.
+**Storage and the administration surface are the best-covered areas**, and the
+core protocol layer is in good shape. **Sieve is the thinnest** — 21 not-started
+against 38 shipped, and most of what is missing is one standard extension set.
+And **transport security has the widest gap between reputation and reality**:
+it is the area this fork is best known for, yet 16 items are outstanding and
+four of the audit defects live there. Nothing forward-looking is marked ✅,
+which is what a roadmap should look like.
+
+Dated items — the forcing functions
+-----------------------------------
+
+Nothing else on this page has a deadline. These do, and none of them were on the
+previous version of this roadmap. Ordered by when they bite.
+
+| | Date | Item | What happens |
+|:-:|---|---|---|
+| ⬜ | **10 Nov 2026** | **.NET 8 end of support** | The Control Panel and all six command-line tools target .NET 8. .NET 9 dies the same day, so the only target is **.NET 10 LTS** (EOL 14 Nov 2028). After this date the installer ships an unsupported runtime that will show up as an EOL component in our own SBOM, and a runtime CVE becomes unpatchable. **This is the hardest date on the board.** |
+| ⬜ | **End Dec 2026** | **Microsoft 365 turns off Basic auth for SMTP AUTH** | The outbound client offers exactly one mechanism — `AUTH LOGIN`. Anyone relaying through `smtp.office365.com` stops working. Needs a token cache plus XOAUTH2 encoding; note Exchange Online implements **XOAUTH2 only**, not RFC 7628 OAUTHBEARER. Collecting *from* M365 over POP/IMAP has already been broken since 2022. |
+| ⬜ | **9 Dec 2026** | **EU Product Liability Directive (2024/2853)** | Software is unambiguously a "product"; a product can be defective *because of a vulnerability or a failure to ship security updates*, and liability **cannot be disclaimed by licence** — AGPLv3's warranty disclaimer does not help. FOSS supplied outside a commercial activity is exempt. Documentation, not code, but it should drive a business decision. |
+| ⬜ | **12 Jan 2027** | **Windows Server 2016 end of support** | The moment to declare a supported floor. Recommendation: **Server 2019 / Windows 10 21H2**, which costs zero code — Server 2019 is still `_WIN32_WINNT=0x0A00`. Do not raise the macro past that; self-hosted mail skews old and Server 2019 has support into 2029. |
+| ⬜ | **10 Feb 2027** | **Let's Encrypt default lifetime drops to 64 days** | With 10-day authorisation reuse. The ACME client must handle renewal and reload without human intervention, and ARI (renewal-info) becomes worth implementing. The CA/Browser Forum ceiling then falls to 100 days (15 Mar 2027) and **47 days with 10-day DCV reuse (15 Mar 2029)**. Manual renewal is over. |
+| ⬜ | **14 May 2027** | **OpenSSL 4.0.x end of life** | 4.0.x is not an LTS branch. The LTS options are 3.5 (EOL 8 Apr 2030) and whatever the next LTS is. This needs a deliberate decision by Q1 2027, not a surprise. |
+| ⏸️ | **11 Dec 2027** | **EU Cyber Resilience Act, full application** | Currently **out of scope**: AGPLv3, no paid tier, an individual maintainer — "making available in the course of a commercial activity" is the test, and donations, sponsorship and paid consulting do not by themselves trigger it. Deferred rather than ignored because *the moment a paid tier, hosted edition or commercial licence exception exists, the whole product is in scope* and, being a substantial modification of upstream, this fork is the manufacturer of record. Reporting obligations start 11 Sep 2026. |
+
+**The single cheapest action on this list is a dated, one-page CRA/PLD scope
+determination committed to the repo**, reviewed whenever the funding model
+changes. It is pure documentation and it settles two of the rows above.
 
 How work is prioritised
 -----------------------
@@ -32,450 +119,918 @@ The process is in [RELEASE.md](RELEASE.md).
 Where this fork stands
 ----------------------
 
-Worth stating plainly, because the rest of this document is a list of gaps and
-that gives a misleading impression on its own. Measured against the mainstream
-self-hosted alternatives — Postfix + Dovecot, iRedMail, Mail-in-a-Box, Stalwart —
-this fork is **ahead of the field on transport security, authentication and
-observability**, and behind on mailbox features and the administrative surface.
+The matrix below is mostly a list of limits, and a list of limits misleads on its
+own. Measured against Postfix + Dovecot, iRedMail, Mail-in-a-Box and Stalwart,
+this fork is **ahead on transport security, authentication and observability**,
+and behind on mailbox features and the administrative surface.
 
-Specifically ahead:
+Genuinely ahead:
 
-* **MTA-STS is implemented in-process.** Postfix still does not implement RFC 8461
-  natively; it needs an external resolver feeding `smtp_tls_policy_maps`.
-* **DANE with in-process DNSSEC validation**, TLS-RPT, ACME, SRS, BATV, Ed25519
-  DKIM, and **ARC sealing** — Stalwart's own comparison page describes its ARC
-  support as inbound verification only.
-* **IMAP4rev2 (RFC 9051) advertised by default.** In Dovecot this is still a
-  compile-time experimental option that is off by default.
-* **SCRAM-SHA-256-PLUS with channel binding**, Argon2id, and OAuth2/OIDC bearer.
+* **MTA-STS is implemented in-process.** Postfix still does not implement
+  RFC 8461 natively; it needs an external resolver feeding
+  `smtp_tls_policy_maps`.
+* **DANE with in-process DNSSEC validation** of the TLSA lookup, plus TLS-RPT,
+  ACME, SRS, BATV and Ed25519 DKIM.
+* **IMAP4rev2 (RFC 9051) advertised by default.** In Dovecot this is still
+  compile-time experimental, off by default, and only partially implemented.
+* **SCRAM-SHA-256-PLUS with channel binding**, Argon2id, OAuth2/OIDC bearer.
 * **Prometheus, OpenTelemetry, JSON logs and health probes in the open tier.**
-  Stalwart gates metric alerts, live telemetry, the real-time dashboard and
-  historical retention behind its Enterprise edition.
+  Stalwart gates metric alerts, live telemetry, the dashboard *and historical
+  retention* behind its Enterprise edition.
 * **Four SQL backends behind one portable abstraction**, plus the COM API and
   event scripting, which nothing else in this class offers.
 
-The gaps below are almost all *above* the protocol layer. That is the honest
-shape of the thing.
+One correction to a claim made in earlier release notes, because it was
+overstated: **ARC sealing is real but is reachable only through the DKIM signing
+path.** `Arc::Seal` has a single caller, sitting after every early return in
+`DKIMSigner::Sign`, so a message is sealed only when the sender's domain is
+hosted here *and* has DKIM enabled *and* signing succeeds. Relayed third-party
+mail — the case ARC exists for — is never sealed. Fixing that is ⬜ below, and
+until it is fixed this should not be described as an advantage over
+verify-only implementations.
 
-Recently shipped
-----------------
+Defects found by the audit
+--------------------------
 
-The 2026 work through 6.2.18 was overwhelmingly about bounding waits and making
-the server say what it is doing. Every wait that could block a shared thread pool
-now has a ceiling: `FinalizationTimeout`, `ClientSessionCeiling`,
-`DNSQueryTimeout`, `ScriptTimeout`, `ExternalProcessTimeout`,
-`DBConnectionAcquireTimeout`, `AsyncQueueStallThreshold`. Acceptance is timed per
-stage, the work queue reports saturation and names the task holding each thread,
-and a recipient lookup that fails because the database did not answer now
-returns `451` rather than `550`, so a database locked by a backup defers mail
-instead of bouncing it.
+The adversarial verification pass over the capability matrix found these. None
+were known before August 2026; none are fixed yet. They are ordered by how much
+they matter, and the security-relevant ones are at the top.
 
-The troubleshooting guide that work was written for is
-[DiagnosingStalledMail.md](hmailserver/docs/DiagnosingStalledMail.md).
+| | Defect | Why it matters |
+|:-:|---|---|
+| ⬜ | **POP3 credential logging** | `PasswordRemover` redacts only lines beginning `PASS`. A SASL initial response — `AUTH PLAIN <base64>` — is written to the POP3 log verbatim, so credentials land in plaintext on disk. |
+| ⬜ | **ManageSieve brute force is unbounded in practice** | The 3-attempt per-connection cap and `RegisterFailedLogin` both work, but the auto-ban they create is enforced at accept time by the Boost listener — and the ManageSieve listener does not consult it. An attacker reconnects indefinitely. |
+| ⬜ | **ETRN has no authentication, security-range or TLS gate** | `ProtocolETRN_` performs no checks at all, and the STARTTLS-required guard is not applied to it. On a STARTTLS-required port a remote party can trigger a queue flush before TLS. TURN and VRFY likewise bypass the TLS gate (they answer 502, so the impact is limited to ETRN). |
+| ⬜ | **ARC sealing never applies to relayed mail** | As above — reachable only via the DKIM signing path, so it does nothing for the forwarding case ARC was designed for. |
+| ⬜ | **DANE validates the TLSA record but not the MX RRset** | The TLSA lookup is DNSSEC-validated; the MX lookup that chooses *which host to contact* is not. An attacker able to forge the MX response redirects delivery to a host whose own TLSA record then validates. |
+| ⬜ | **Password hashes never actually upgrade** | The upgrade-on-read path re-hashes into the in-memory `Account` object and returns without saving. No caller persists it, so a legacy hash stays a legacy hash forever. |
+| ⬜ | **Script reload is not fail-closed** | On a hot reload, the new file text is assigned *before* the syntax check and the `has_on_*` flags are never cleared, so a script that fails to compile leaves the previous handlers registered. Fail-closed holds only on a cold start. |
+| ⬜ | **POP3 `LIST n` and `UIDL n` return deleted messages** | The scan-listing forms correctly skip messages flagged for deletion; the single-message forms go straight to the message and do not check. RFC 1939 requires both to treat them as absent. |
+| ⬜ | **POP3 `AUTH PLAIN =` is mishandled** | A bare `=` means "empty initial response"; the parser treats it as "no initial response" and issues a continuation the client is not expecting. |
+| ⬜ | **REST queue endpoints do not validate the id** | `POST /queue/<id>/retry` and `DELETE /queue/<id>` report success for an id that does not exist. |
+| ⬜ | **Virus-scanner concurrency counter leaks** | On the give-up paths `WaitForFreeScanner_` returns without incrementing, but the matching decrement still runs, so the running-scanner count drifts below zero and the cap stops meaning anything. |
+| ⬜ | **MTA-STS and ACME http-01 hosting are silently inert by default** | Both are served by `WebServicesServer`, which is gated behind `WebServicesHttpPort`/`WebServicesHttpsPort` — both defaulting to 0. The features are enabled by default and unreachable by default. |
+| ⬜ | **TLS-RPT reporting is gated on an unset value** | `TlsRptReporterTask` reads `TlsRptFromAddress` and does nothing if it is empty, which it is by default. Reports are collected and never sent. |
+| ⬜ | **SCRAM failures on POP3 fire no `OnClientLogon`** | The password and bearer paths fire the event on both success and failure; the SCRAM failure path does not, so script-based lockout misses SCRAM brute force entirely. |
+| ⬜ | **`ENHANCEDSTATUSCODES` is advertised but mostly unused** | The code table is consulted from exactly one function; 36 reply sites write their status line directly and emit no enhanced code. |
+| ⬜ | **The settings-index generator is not wired into the build** | `build/generate-settings-index.ps1` is referenced by nothing, so the Ctrl+K palette index is hand-maintained and can silently drift from the settings it indexes. |
 
-Near term
----------
+Two of these — credential logging and the ManageSieve ban gap — are the ones
+that would be fixed first.
 
-**Decide the virus-scanner timeout policy explicitly.** A scanner that is killed
-for exceeding its bound currently fails open — the message is delivered unscanned,
-which is what already happens when the scanner refuses a connection. That is
-consistent, but it is a security posture that should be a deliberate, documented,
-configurable choice rather than an inherited default.
+A sixteenth finding is filed under
+[future-proofing](#future-proofing-standards-and-protocols) rather than here
+because nothing is broken by today's standards, but it belongs in the same
+breath: **post-quantum key exchange is linked and switched off.** A single
+unconditional `SSL_CTX_set1_curves_list` call replaces OpenSSL's default group
+list — which already contains `X25519MLKEM768` — so every TLS listener
+negotiates classical-only key exchange despite linking a PQC-capable library.
+It is a one-line fix with no interop risk and it is the best value-per-line
+change on this page.
 
-**Finish the static-analysis backlog.** The first `/analyze` pass found a buffer
-overrun in three path helpers, a data race on the virus-scanner counter, ignored
-`ReadFile` results, several unchecked NULL dereferences and a shadowed variable
-that silently corrupted log rotation. Those are fixed. The remainder needs triage
-rather than blanket suppression.
+The capability matrix
+---------------------
 
-**Publish the architecture guide.** There is a detailed map of the codebase, but
-it is kept local and unpublished, so anyone arriving at the repository has
-`CONTRIBUTING.md` and nothing else to orient them. A fork that invites
-contributions should publish the map.
+Everything the server does today, and the notable things it does not. Built from
+the source, not from documentation.
 
-**Remaining documentation gaps**: an upgrade/migration note covering the database
-upgrade chain, and an index for `hmailserver/docs/`.
+### SMTP and ESMTP
 
-Security
---------
+24 shipped · 0 underway · 3 not started · 0 deferred
 
-Listed before features because of the priority order above, and ordered by
-how cheap the fix is relative to what it prevents.
+| | Capability | Detail |
+|:-:|---|---|
+| ✅ | 8BITMIME (RFC 6152) | Advertised unconditionally; BODY=7BIT and BODY=8BITMIME on MAIL FROM are accepted as no-ops because the transmission path is 8-bit clean. No 8BITMIME->7bit downgrade on outbound relay. |
+| ✅ | AUTH LOGIN and PLAIN | LOGIN always offered when AUTH is enabled; PLAIN only when AuthAllowPlainText is set. AUTH is suppressed entirely on a STARTTLSRequired port before TLS. |
+| ✅ | Bare LF / bare CR message rejection | After DATA the whole spool file is scanned chunk-wise; any \r not followed by \n, any \n not preceded by \r, or a trailing \r causes "554 Rejected - Message containing bare LF's." Disableable via AllowIncorrectLineEndings… |
+| ✅ | BDAT desynchronisation hardening | A rejected BDAT still consumes exactly the announced octet count (StartBdatDiscard_) so chunk payload can never be re-parsed as SMTP commands; a BDAT whose size cannot be parsed closes the connection rather than guessing. |
+| ✅ | CHUNKING / BDAT (RFC 3030) | Full BDAT implementation: "BDAT <n> [LAST]", byte-transparent spooling in 40 KB pieces, zero-length chunk handling, spool reused across chunks, DATA-after-BDAT rejected 503, unparseable chunk-size closes the session. |
+| ✅ | CRLF.CRLF-only end-of-data | End-of-data is detected only as \r\n.\r\n (or a lone .\r\n at buffer start). A bare LF.LF or CR.CR sequence is never treated as terminator, which is the CVE-2023-51764 smuggling primitive. |
+| ✅ | DSN (RFC 3461) | Advertised. MAIL FROM RET= (FULL/HDRS, validated) and ENVID= (xtext, <=100 chars) accepted; RCPT TO NOTIFY= (NEVER/SUCCESS/FAILURE/DELAY) and ORCPT= (addr-type;xtext) validated. NOTIFY is persisted per recipient… |
+| ✅ | EHLO response builder | Single builder emits, in order: <hostname>, SIZE, 8BITMIME, PIPELINING, CHUNKING, SMTPUTF8, ENHANCEDSTATUSCODES, DSN, STARTTLS (conditional), AUTH (conditional), HELP. ETRN is implemented but deliberately not advertised. |
+| ✅ | EHLO/HELO negotiation and capability sniffing | Sends EHLO, falls back to HELO on a negative reply unless STARTTLS-required or SMTP AUTH is in use; the only capabilities parsed from the remote EHLO banner are STARTTLS and SMTPUTF8 (substring match on the whole response… |
+| ✅ | ENHANCEDSTATUSCODES (RFC 2034 / 3463) | Advertised; enhanced codes are emitted only when the client greeted with EHLO (esmtp_session_). A per-code table maps 235/250/251/252/421/450/451/452/454/500/501/502/503/504/530/535/550/551/552/553/554, with class-based x.0.0 fallback. **Caveat: the table is consulted from one function only; 36 reply sites write their status line directly and emit no enhanced code.** |
+| ⬜ | ETRN (RFC 1985) | Implemented for route domains — releases held messages by flipping messagetype/nexttrytime for the route ID, with 250/458/500 replies — but **unauthenticated and ungated**: no security-range check and no STARTTLS-required guard, so it is reachable pre-TLS. Also not advertised in EHLO. [Listed as a defect](#defects-found-by-the-audit). |
+| ✅ | Outbound AUTH mechanism support | The client offers exactly one mechanism: AUTH LOGIN. There is no PLAIN, no SCRAM and no OAuth2/XOAUTH2 outbound, which matters for the Microsoft 365 basic-auth cutover called out in the roadmap. |
+| ✅ | Oversized-line and invalid-command limits | A line over MAX_LINE_LENGTH with no newline aborts the transmission ("Too long line was received"); more than MaximumIncorrectCommands 5xx replies disconnects the client when DisconnectInvalidClients is set. |
+| ✅ | Per-port AUTH disable | [Settings] DisableAUTHList is a comma-separated port list; AUTH is neither advertised nor accepted on those local ports (typical use: port 25 submission lock-down). |
+| ✅ | PIPELINING (RFC 2920) | Advertised; the command reader processes batched command lines and enqueues replies in order so clients need not wait per command. |
+| ✅ | Received header content | Emits "Received: from <HELO> (<PTR> [<ip>]) by <host> with ESMTP[S][A] id <session>" plus a (version= cipher= bits=) line for TLS sessions and an RFC-format date. Optional X-AuthUser, X-AuthUserIP, X-Original-Rcpt-To… |
+| ✅ | Return-Path and Delivered-To on local delivery | Return-Path is always written at local delivery; Delivered-To is written with the original recipient address when AddDeliveredToHeader is enabled. |
+| ✅ | SCRAM-SHA-256 (RFC 7677) and SCRAM-SHA-256-PLUS | SCRAM-SHA-256 offered whenever AUTH is enabled (independent of the plain-text setting); the -PLUS channel-binding variant (tls-server-end-point, RFC 5929) only on a TLS connection. Full 334-continuation state machine on the connection. |
+| ✅ | SIZE (RFC 1870) | Advertises "250-SIZE <bytes>" from MaxMessageSize*1024, or bare "250-SIZE" when unlimited; MAIL FROM SIZE= is parsed and oversized transactions get 552 before DATA, with a second hard check after DATA (554). |
+| ✅ | SMTPUTF8 (RFC 6531) | Advertised; parameter detected before sender validation so UTF-8 envelope addresses pass IsValidEmailAddress; propagated outbound only when the remote EHLO advertises SMTPUTF8 and the envelope actually contains non-ASCII… |
+| ✅ | STARTTLS (RFC 3207) | Advertised only on non-TLS sockets when the port is STARTTLSOptional/Required; rejects any parameter with 501; on Required, every command other than NOOP/EHLO/STARTTLS/QUIT gets 530. |
+| ✅ | STARTTLS plaintext-injection defence | On handshake completion the receive buffer is discarded and SMTP state is reset: HELO name cleared, credentials cleared, in-progress message dropped. This is the CVE-2011-0411 class of bug. |
+| ✅ | VRFY / TURN deliberately refused | Both commands are recognised and answered 502 rather than left unimplemented, so address enumeration via VRFY is closed. The HELP text still lists SAML/TURN/VRFY. |
+| ✅ | XOAUTH2 / OAUTHBEARER (RFC 7628) | Both advertised when OAuth2TokenValidator is enabled, and by default only over TLS (OAuth2RequireTLS=1). Bearer response handling and account lookup are implemented. |
+| ⬜ | BINARYMIME (RFC 3030) | Not advertised and not accepted. Only BODY=7BIT / BODY=8BITMIME are recognised; BODY=BINARYMIME falls through to the unsupported-extension path and is rejected 550. |
+| ⬜ | CRAM-MD5 / DIGEST-MD5 / GSSAPI-NTLM | No implementation anywhere in the server; a repo-wide grep finds these names only in an unrelated MySQL connector comment. SCRAM is the intended replacement. |
+| ⬜ | Outbound SIZE / PIPELINING / CHUNKING use | The client never advertises or uses SIZE on MAIL FROM, does not pipeline, and always uses DATA rather than BDAT even when the remote advertises CHUNKING. |
 
-**API keys for the REST API.** `RestApiServer.cpp:407-415` accepts **HTTP Basic
-only** — the administrator password, replayed on every request, with no tokens,
-no scoping, no expiry and no IP restriction. Bearer tokens or API keys with
-labels, expiry and an address restriction are a small change and should land
-before the API surface grows. This is the cheapest security win available.
+### Transport security and deliverability
 
-**Per-account outbound sending limits.** `RateLimiter` is a sliding window keyed
-by IP or destination domain, per minute only. There is no per-*account* message
-quota, no daily cap, no recipient-count cap. A single compromised account is the
-most common route to a blacklisted IP, and the blast radius is currently
-unbounded. iRedMail ships this in its free edition. Treat it as a security
-control, not a feature.
+30 shipped · 0 underway · 14 not started · 1 deferred
 
-**App passwords.** TOTP exists, but only for the Control Panel logon. The
-structural problem is that per-account 2FA and IMAP/SMTP are incompatible without
-app passwords — an IMAP client cannot present a TOTP code, so account-level 2FA
-only works for clients that speak OAUTHBEARER or XOAUTH2. App passwords are the
-mechanism that makes it deployable at all, and they are the prerequisite for
-per-account TOTP later. Dovecot has no built-in equivalent; every control panel
-that offers it built it themselves.
+| | Capability | Detail |
+|:-:|---|---|
+| ✅ | ACME / Let's Encrypt certificate automation (RFC 8555) | Full ACME v2 client: account key create/load, JWS RS256, newOrder, http-01 challenge served either by a transient listener or the always-on WebServicesServer, finalize, fullchain.pem/privkey.pem output, scheduled renewal task… |
+| ✅ | ARC chain validation (cv=) | Existing sets are parsed, completeness and contiguity from i=1 enforced, a previous cv=fail is honoured as sticky, and the most recent ARC-Seal is cryptographically verified against its DNS key to produce cv=pass/fail/none… |
+| ⬜ | ARC sealing (RFC 8617) | **Only reachable via the DKIM signing path** — `Arc::Seal` has one caller, after every early return in `DKIMSigner::Sign`, so relayed third-party mail is never sealed. [See the defects list](#defects-found-by-the-audit). Otherwise: Adds a full ARC set (ARC-Authentication-Results, ARC-Message-Signature over relaxed/relaxed with a t= timestamp, ARC-Seal covering the whole chain) using the domain's DKIM key, with instance numbering and a max-instance cap… |
+| ✅ | BATV (prvs) backscatter protection | Signs the wire envelope MAIL FROM of locally-originated outbound mail as prvs=<K><DDD><SSSSSS>=local@domain (HMAC-SHA256, day-number expiry), leaving the stored message untouched and the envelope domain intact for SPF… |
+| ✅ | Configurable cipher suite list | Admin-settable `SslCipherList` pushed through `SSL_CTX_set_cipher_list`, applied to both server and client contexts, with OpenSSL errors logged. Caveat: this API governs TLS ≤1.2 only… |
+| ✅ | DANE TLSA (RFC 6698 / 7672) | TLSA lookup per MX host and port; DANE-EE(3) usage only, selectors 0/1, matching types 0/1/2, max 8 records. Bogus DNSSEC skips the host entirely; if every host is bogus the message is deferred rather than delivered insecurely. **Caveat: the TLSA lookup is DNSSEC-validated but the MX RRset that selects the host is not**… |
+| ✅ | Diffie-Hellman parameters | 2048-bit DH loaded from `Bin\dh2048.pem` with `SSL_OP_SINGLE_DH_USE`; a missing file is a logged Critical error (5603) rather than a startup failure, and the server then runs without finite-field DH. |
+| ✅ | DKIM canonicalization - simple and relaxed | Both simple and relaxed are implemented for header and body independently, including the upstream PR #530 fix that hashes the header name with the exact case emitted ("DKIM-Signature") under simple canonicalization. |
+| ✅ | DKIM Ed25519 (RFC 8463) - sign and verify | Key type is auto-detected from the PEM; ed25519-sha256 signing goes through EVP_DigestSign one-shot, and verification loads a 32-byte raw public key from the DNS p= tag. Both directions implemented. |
+| ✅ | DKIM signing - RSA (rsa-sha256 / rsa-sha1) | Per-domain signing keyed off the RFC 5322 From: domain (not MAIL FROM) so d= aligns for DMARC, with optional alias signing, 50 MB size ceiling, and a duplicate-signature guard. Algorithm… |
+| ✅ | DKIM verification - multi-signature, l=, DNS key flags | Verifies every DKIM-Signature in the header, honours the l= body-length tag, checks v/a/q/h/d/b/bh presence, i= vs d= subdomain relationship, the DNS record g= and h= restrictions and t= key flags… |
+| ✅ | DMARC organizational domain lookup | Works, but from a hard-coded 60-odd entry subset of multi-label public suffixes rather than the real Public Suffix List, so relaxed alignment is wrong for any registry outside that list (e.g. .co.th, .com.pe… |
+| ✅ | DMARC verification (RFC 7489) | Policy discovery at _dmarc.<from-domain> with organizational-domain fallback, aspf/adkim strict-or-relaxed alignment against SPF and every passing DKIM d=, sp= for subdomain policies… |
+| ✅ | ECDH curve list (inbound) | Hard-coded to `secp384r1:x25519:secp256r1` on the server context — not configurable, and it is applied only in `InitServer`, not `InitClient`, so outbound connections keep OpenSSL's default group list. |
+| ✅ | In-process DNSSEC validation | Own validating resolver: RRSIG verification for algorithms 8 (RSA/SHA-256), 10 (RSA/SHA-512), 13 (ECDSA P-256), 14 (ECDSA P-384) and 15 (Ed25519); chain walked to IANA root KSK-2017/KSK-2024 anchors… |
+| ✅ | MTA-STS consumption (RFC 8461) | _mta-sts TXT lookup, HTTPS policy fetch from mta-sts.<domain>/.well-known/mta-sts.txt with certificate validation, full policy parse, wildcard mx matching (one leftmost label)… |
+| ✅ | MTA-STS policy hosting for own domains | The built-in WebServicesServer serves /.well-known/mta-sts.txt for mta-sts.<hosted-domain>, deriving mx: lines from live MX records (or MtaStsPolicyMx override), with mode/max_age from ini and max_age clamped to 1 day..1 year. |
+| ✅ | Negotiated cipher/version logging and metrics | Every completed handshake logs session id, remote IP, protocol version, cipher name and bit count, and increments a Prometheus TLS-handshake counter. |
+| ✅ | Opportunistic STARTTLS with downgrade retry | Outbound STARTTLS is attempted when configured; a failed optional handshake marks recipients ResultOptionalHandshakeFailed and the delivery is retried in cleartext - but only when neither MTA-STS enforce nor DANE set RequireTls… |
+| ✅ | Outbound peer certificate verification + SNI | Client connections verify the peer with `verify_peer \| verify_fail_if_no_peer_cert` when globally enabled (DB default on), MTA-STS requires it, or DANE TLSA records are present… |
+| ✅ | Per-IP-range "require TLS for authentication" | `IPRANGE_REQUIRE_TLS_FOR_AUTH` (131072) is enforced on IMAP LOGIN, IMAP AUTHENTICATE, POP3 USER and POP3 AUTH, and SMTP AUTH — a cleartext auth attempt from such a range is refused. |
+| ✅ | Per-route / per-domain TLS policy | Each Route carries its own ConnectionSecurity (none / STARTTLS optional / STARTTLS required / implicit SSL), as does the global SMTP relayer; the resolver hands it to the client connection… |
+| ✅ | Server cipher preference and ChaCha prioritisation | `TlsOptions` bitmask maps to `SSL_OP_CIPHER_SERVER_PREFERENCE` and `SSL_OP_PRIORITIZE_CHACHA` (the latter only takes effect together with server preference and TLS 1.2/1.3). Ships as 0, i.e. both off. |
+| ✅ | SPF checking | libspf2-derived in-process evaluator (RMSPF.cpp, ~113 KB) covering IPv4 and IPv6, invoked with IP, envelope-from and HELO. Caveat: only Pass and Fail are distinguished - SoftFail, Neutral, None… |
+| ✅ | SRS (Sender Rewriting Scheme) - SRS0 | HMAC-signed SRS0=<hash>=<tt>=<domain>=<local>@forwarder rewriting when forwarding external mail onward, plus reverse-at-RCPT so signed bounces are decoded and relayed to the original sender without opening a relay… |
+| ✅ | TLS 1.2 and TLS 1.3 enabled by default | `SslVersions` bitmask ships as 24 (= TlsVersion12 8 \| TlsVersion13 16), so TLS 1.0 and 1.1 are off unless explicitly re-enabled. SSLv2 and SSLv3 are hard-disabled in code and cannot be turned on. |
+| ✅ | TLS on the auxiliary HTTP listeners | REST API and web-services listeners build their own `SSL_CTX` with `TLS_server_method` and a TLS 1.2 floor, separate from the Asio stack — so they do not honour `SslVersions`, `SslCipherList`, `TlsOptions` or the curve list. |
+| ✅ | TLS version, cipher and curve control | SSLv2/SSLv3 always off; TLS 1.0/1.1/1.2/1.3 individually disableable via SSL_OP_NO_TLSv1*; administrator-supplied cipher list applied with SSL_CTX_set_cipher_list; curve list pinned to secp384r1:x25519:secp256r1. |
+| ⬜ | TLS-RPT (RFC 8460) report generation and submission | **Inert by default**: the reporter task returns immediately when `TlsRptFromAddress` is empty, which it is out of the box, so reports are aggregated and never sent. Otherwise: Per-UTC-day, per-domain success/failure aggregation; scheduled task reads _smtp._tls TXT, extracts rua= mailto: targets, builds the RFC 8460 JSON report and mails it as multipart/report with application/tlsrpt+json… |
+| ✅ | TLSA record generation for own certificate | AcmeClient::GetCertificateTlsa computes the DANE "3 1 1" payload (SHA-256 over SubjectPublicKeyInfo) from the issued PEM, so the operator can publish a matching TLSA record. Publishing itself is manual. |
+| ⏸️ | OCSP stapling | Not implemented — no OCSP callback, no `SSL_CTX_set_tlsext_status_cb`, no must-staple handling. Consciously postponed to the documented-but-unscheduled tier. |
+| ⬜ | AEAD-only cipher policy | Achievable today by hand-editing `SslCipherList` (the mechanism exists), but not shipped as a default or as a preset, and explicitly listed as future work pending a compatibility measurement. |
+| ⬜ | ARC results used for inbound filtering | ARC is only produced (sealing) and validated as an input to the cv= tag of a new seal. There is no ARC spam test, no ARC result in the score set, and no way for a trusted ARC chain to rescue a message that fails DMARC. |
+| ⬜ | Authentication-Results / Received-SPF header (RFC 8601) | No RFC 8601 Authentication-Results header and no Received-SPF header are written on inbound mail. Results only surface as X-hMailServer-Reason-* scoring headers, or inside ARC-Authentication-Results when ARC sealing is on. |
+| ⬜ | Client certificates (mutual TLS) for inbound sessions | Never requested. Peer verification is gated on `IsClient()`, so inbound SMTP/IMAP/POP3 always use `verify_none`; there is no per-port or per-IP-range client-certificate requirement. |
+| ⬜ | DKIM dual-selector rotation | Domain holds a single selector and a single private key file, so key rotation requires an edit-and-cutover rather than publishing two selectors. Called out as a gap in the roadmap. |
+| ⬜ | DKIM oversigning | No oversigning. A fixed 30-entry recommended-header list is used and each header name appears at most once in h= (found headers are erased from the pool after matching)… |
+| ⬜ | DKIM t= / x= signature timestamps | The emitted DKIM-Signature contains only v, a, d, s, c, q, h, bh, b. No signing timestamp (t=) and no expiry (x=), and no x= expiry check on the verify side either. |
+| ⬜ | DMARC aggregate (rua) and forensic (ruf) reporting | The server consumes DMARC policy but never generates reports for the domains it receives mail from - no rua/ruf parsing, no per-day DMARC aggregation, no report mail. (TLS-RPT reporting exists; DMARC reporting does not.) |
+| ⬜ | DNSSEC authenticated denial of existence (NSEC/NSEC3) | A missing DS record is treated as an unsigned (Insecure) delegation without validating the NSEC/NSEC3 proof, so a stripped-DS downgrade is not detected. No NSEC or NSEC3 handling exists in the resolver. |
+| ⬜ | Encrypted private keys for TLS certificates | Explicitly unsupported: the password callback logs error 5143 ("The private key file has a password. hMailServer does not support this.") and returns an empty string. |
+| ⬜ | Per-account outbound sending limits | RateLimiter is per-IP and per-destination-domain, per minute only. There is no per-account message quota, no daily cap and no recipient-count cap… |
+| ⬜ | Post-quantum key exchange (X25519MLKEM768) | Not available on inbound TLS: the hard-coded three-curve list overrides whatever hybrid groups OpenSSL 4.0.1 would offer, and no group list is configurable. Outbound client contexts do not override the group list… |
+| ⬜ | Session resumption / ticket management | No configuration or code at all: no session-ID context, no cache sizing, no ticket-key rotation, no `SSL_OP_NO_TICKET`. Behaviour is whatever Boost.Asio/OpenSSL default to… |
+| ⬜ | TLS 1.3 ciphersuite configuration | Not exposed. `SSL_CTX_set_ciphersuites` is never called, so the TLS 1.3 suite set is whatever OpenSSL defaults to and the admin's cipher list cannot restrict it. |
 
-**Over-quota rejection at RCPT TO.** `LocalDelivery::CheckAccountQuotas_` runs
-during delivery, so an over-quota recipient produces a DSN rather than an
-SMTP-time rejection — which means generating backscatter, often to a forged
-sender. Dovecot's `quota-status` service exists precisely to let Postfix reject
-at RCPT. Also missing: quota warning thresholds and notifications.
+### IMAP
 
-Operability
+55 shipped · 0 underway · 19 not started · 3 deferred
+
+| | Capability | Detail |
+|:-:|---|---|
+| ✅ | ACL (RFC 4314) commands | Config-gated. SETACL, DELETEACL, GETACL, LISTRIGHTS and MYRIGHTS are all registered and implemented, and permission checks are enforced across SELECT, STATUS, LIST, APPEND, COPY, MOVE, STORE, EXPUNGE and CREATE. |
+| ✅ | ACL is public-folder-only | SETACL refuses any folder whose AccountID is non-zero with "It is not possible to set permission for account folders", so sharing is confined to the #Public tree. Cross-account mailbox sharing is the roadmap's top mailbox feature. |
+| ✅ | ACL rights letters | The permission model implements the full RFC 4314 set l r s w i p k x t e a as bit flags, and parses each letter with +/- delta support. RIGHTS=texk is advertised, matching the four rights that RFC 4314 split out of the legacy c/d. |
+| ✅ | APPEND | Single message per command, with optional flag list and internaldate. Literal size is digit-validated, must be > 0, and is hard-capped at 2 GB independent of the configured max message size… |
+| ✅ | AUTH=PLAIN (RFC 4616) with SASLprep | Advertised only when SASL is enabled and the connection is either TLS or not STARTTLS-required. Username is SASLprep-normalised (RFC 4013) before lookup, and the default domain is applied to bare usernames. |
+| ✅ | AUTH=SCRAM-SHA-256 (RFC 7677) | Full challenge/response exchange with per-connection state; only servable for accounts stored with a PBKDF2 hash, and honours the MinimumAcceptedHashAlgorithm policy. Failures feed the same per-IP auto-ban accounting as LOGIN. |
+| ✅ | AUTH=SCRAM-SHA-256-PLUS (RFC 5802/5929) channel binding | Advertised only on TLS connections and refused off-TLS; binds the exchange to the TLS channel via the server certificate. |
+| ✅ | AUTH=XOAUTH2 and AUTH=OAUTHBEARER (RFC 7628) | Advertised only when the OAuth2 token validator is enabled and, by default, only over TLS. |
+| ✅ | CAPABILITY base string | Unconditional prefix is "* CAPABILITY IMAP4 IMAP4rev1 IMAP4rev2 CHILDREN"; the unconditional trailer adds NAMESPACE RIGHTS=texk MOVE ID SPECIAL-USE UNSELECT UIDPLUS ENABLE STATUS=SIZE ESEARCH CONDSTORE QRESYNC LIST-EXTENDED SEARCHRES U… |
+| ✅ | CHILDREN (RFC 3348) | Advertised unconditionally, and every LIST/LSUB line carries \HasChildren or \HasNoChildren computed from the folder's subfolder count. |
+| ✅ | CLOSE with silent expunge | Expunges \Deleted messages without sending EXPUNGE to the closing client, but does raise a ChangeNotification so other sessions on the same mailbox do not silently drift out of sequence. |
+| ✅ | Command dispatch table | 39 command types are recognised: CAPABILITY, LOGIN, LIST, LSUB, SELECT, FETCH, UID, LOGOUT, NOOP, SUBSCRIBE, CREATE, EXPUNGE, DELETE, UNSUBSCRIBE, STATUS, CLOSE, APPEND, STORE, RENAME, COPY, EXAMINE, SEARCH, AUTHENTICATE, CHECK… |
+| ✅ | Command-buffer and literal DoS caps | An 11 MB cap on the accumulating command buffer disconnects clients that never complete a command (reachable pre-auth via LOGIN literals, and quadratic without the cap)… |
+| ✅ | CONDSTORE (RFC 7162) | Advertised unconditionally. HIGHESTMODSEQ reported on SELECT and in STATUS, MODSEQ available as a FETCH data item and SEARCH key, STORE (UNCHANGEDSINCE n) implemented with a [MODIFIED set] tagged response code… |
+| ✅ | Configurable hierarchy delimiter | Stored as a setting; changing it is refused if any existing folder or rule action contains the new character, and existing rule actions are rewritten atomically. |
+| ✅ | ENABLE (RFC 5161) | Recognises exactly four capability names: QRESYNC (implies CONDSTORE), CONDSTORE, UTF8=ACCEPT, IMAP4rev2 (implies UTF8=ACCEPT). Emits the untagged * ENABLED only when at least one was recognised… |
+| ✅ | ENVELOPE and recursive BODYSTRUCTURE | Generated from the parsed MIME tree, including nested message/rfc822 encapsulation which recurses to build a child ENVELOPE. |
+| ✅ | ESEARCH (RFC 4731) | SEARCH RETURN (...) is parsed for MIN, MAX, COUNT, ALL and SAVE; an empty option list defaults to ALL. Response is "* ESEARCH (TAG \"tag\") [UID] ..."… |
+| ✅ | EXPUNGE suppression during unsafe commands | Untagged EXPUNGE is withheld while responding to FETCH, STORE, SEARCH or SORT, per RFC 3501 and RFC 2177. |
+| ✅ | FETCH data items | Supports BODY, BODY.PEEK, BODYSTRUCTURE, ENVELOPE, RFC822, RFC822.SIZE, RFC822.HEADER, RFC822.TEXT, UID, FLAGS, MODSEQ, INTERNALDATE, and the ALL/FAST/FULL macros. Section specifiers cover HEADER, HEADER.FIELDS, HEADER.FIELDS.NOT… |
+| ✅ | IDLE (RFC 2177) | Config-gated. Enters idle with "+ idling" and pushes untagged EXISTS, RECENT, EXPUNGE and FLAGS as changes arrive. Caveat: idle is terminated by ANY subsequent client line, not specifically the literal "DONE" token. |
+| ✅ | IMAP master user (SASL authzid) | A configured master user may authenticate as itself and act as another account by supplying an authzid in the PLAIN token; mismatched authcid is rejected. No other-users namespace is exposed… |
+| ✅ | IMAP regression suite | 14 NUnit fixtures covering ACL, Append, Basics, CommandSequences, ConcurrentConnections, Examine, Fetch, Folders, HierarchyDelimiter, MessageIndexing, MessageUids, Search, SequenceSets and Sort… |
+| ✅ | IMAP4rev2 (RFC 9051) advertised — behavioural deltas implemented | IMAP4rev2 is advertised unconditionally and ENABLE IMAP4rev2 switches four documented behaviours: RECENT is suppressed in SELECT and EXAMINE, the [UNSEEN] response code is suppressed, RECENT is dropped as a STATUS item… |
+| ✅ | IMAP4rev2 gaps — the advertisement overstates the implementation | RFC 9051 folds several extensions into the base protocol that this fork does not implement: LIST-STATUS (RETURN (STATUS ...)) is absent, LITERAL- non-synchronising literals are absent, the BINARY FETCH items are absent… |
+| ✅ | LIST-EXTENDED (RFC 5258) | Partial. Supports the (SUBSCRIBED) selection option, a parenthesised multi-pattern mailbox list with de-duplication, and RETURN (SUBSCRIBED) annotation. REMOTE and RECURSIVEMATCH are parsed and ignored… |
+| ✅ | LISTRIGHTS returns a fixed list | Real but degenerate: LISTRIGHTS always replies "l r s w i k x t e a" regardless of folder or identifier, omits 'p' even though the model supports it… |
+| ✅ | LSUB | Separate code path emitting "* LSUB" lines filtered to subscribed folders, sharing the same wildcard matcher and attribute generator as LIST. |
+| ✅ | Mailbox-name encoding: modified UTF-7 (RFC 3501 §5.1.3) | Folder names are stored and carried on the wire as modified UTF-7 and decoded only at the COM/Control Panel boundary. With UTF8=ACCEPT inert there is no UTF-8 mailbox-name path… |
+| ✅ | Message flags: system flags only, no keywords | Only \Deleted \Seen \Draft \Answered \Flagged are stored or matched. STORE detects them by case-insensitive substring scan of the raw command; custom keywords ($Forwarded, $MDNSent, user keywords) are silently dropped… |
+| ✅ | MOVE / UID MOVE (RFC 6851) | Both implemented, gated on Expunge permission in the source folder and Insert in the destination, with a quota check. Caveat: the COPYUID response code is placed in the TAGGED OK after the EXPUNGE lines… |
+| ✅ | NAMESPACE (RFC 2342) | Returns personal namespace ("" + delimiter) and one shared namespace (the configured public-folder name). The other-users namespace is hard-coded to NIL… |
+| ✅ | Partial fetch <origin.size> | BODY[...]<p.n> is parsed and the range is clamped defensively; the response echoes only the origin octet as RFC 3501 requires. |
+| ✅ | Password masking in logs | LOGIN arguments are masked even when the password arrives as literal data, tracked by a dedicated IsReceivingLiteralDataForLoginCommand_ check. |
+| ✅ | Per-message and per-folder MODSEQ persistence | Mod-sequences are stored, not synthesised: Message carries message_modseq_, folders carry a current mod-seq, and expunged UIDs are queryable by mod-sequence for VANISHED replay. |
+| ✅ | Public folders (#Public) | A single shared folder tree exposed under the configured public folder name, listed alongside personal folders in LIST/LSUB and gated by ACL lookup per folder. |
+| ✅ | QRESYNC (RFC 7162) | SELECT mailbox (QRESYNC (uidvalidity modseq ...)) replays "* VANISHED (EARLIER)" plus changed-flag FETCHes; EXPUNGE and UID EXPUNGE emit a single compacted "* VANISHED" set when enabled; UID FETCH… |
+| ✅ | QUOTA (RFC 2087) — read-only STORAGE | Config-gated. GETQUOTA and GETQUOTAROOT return a single unnamed quota root with a STORAGE resource in kilobytes derived from the account max size; an account with no limit gets an empty "()" resource list… |
+| ✅ | RENAME / DELETE / CREATE / SUBSCRIBE / UNSUBSCRIBE | All present. INBOX is protected from both RENAME and DELETE; RENAME rejects renaming a folder into its own subtree using the configured hierarchy delimiter (not a hard-coded "."). CREATE creates intermediate path components. |
+| ✅ | SASL-IR (RFC 4959) | Advertised behind its own config toggle; AUTHENTICATE accepts an initial response as the second parameter. Caveat: the initial-response path is accepted whether or not the advertising toggle is on. |
+| ✅ | SEARCH CHARSET handling | Only UTF-8, US-ASCII and ISO-8859-1 are accepted; anything else is rejected with a "NO [BADCHARSET]" response. |
+| ✅ | SEARCH criteria set | Supports CHARSET, ALL, ON, HEADER, TEXT, BODY, SUBJECT, FROM, CC, TO, SENTON, SENTBEFORE, SENTSINCE, SINCE, BEFORE, DELETED, UNDELETED, RECENT, SEEN, UNSEEN, ANSWERED, UNANSWERED, DRAFT, UNDRAFT, FLAGGED, UNFLAGGED, NEW, OLD, LARGER… |
+| ✅ | SEARCH is a linear full-message scan | BODY and TEXT are resolved by loading each message from disk and substring-scanning it; there is no full-text index. The roadmap calls this the largest single quality gap. |
+| ✅ | SEARCHRES (RFC 5182) "$" marker | SEARCH RETURN (SAVE) stores matched UIDs on the connection; "$" is then expanded in FETCH, STORE, COPY, MOVE, UID FETCH/STORE/COPY/MOVE and UID EXPUNGE… |
+| ✅ | SELECT / EXAMINE | SELECT emits EXISTS, RECENT, FLAGS, [UIDVALIDITY], [UNSEEN], [UIDNEXT], [PERMANENTFLAGS] and READ-WRITE/READ-ONLY per ACL. EXAMINE is the same path forced read-only. [UNSEEN] correctly carries a sequence number, not a UID. |
+| ✅ | Session timeout and excessive-data handling | Idle-session timeout is load-scaled between 5 and 30 minutes via TimeoutCalculator, with a "* BYE" on both timeout and excessive data. |
+| ✅ | SORT (RFC 5256) | Config-gated. Sort keys: ARRIVAL, CC, DATE, FROM, SIZE, SUBJECT, TO, with REVERSE. Available as both SORT and UID SORT. DISPLAYFROM/DISPLAYTO (RFC 5957) are absent. |
+| ✅ | SPECIAL-USE (RFC 6154) — attribute annotation only | Advertised and emitted: \Sent, \Drafts, \Trash, \Junk, \Archive are attached by matching well-known top-level folder names (Sent/Sent Items/Sent Messages, Drafts, Trash/Deleted Items/Deleted Messages, Junk/Junk E-mail/Junk Email/Spam… |
+| ✅ | STARTTLS (RFC 2595) and implicit TLS | STARTTLS is advertised whenever connection security is STARTTLS-optional or -required, and the handshake is driven from the command. Implicit-TLS (IMAPS) sends its banner only after the handshake completes. With STARTTLS required… |
+| ✅ | STATUS data items | MESSAGES, UNSEEN, RECENT, UIDNEXT, UIDVALIDITY, SIZE and HIGHESTMODSEQ. RECENT is correctly counted per queried folder rather than reusing the selected folder's count. Items are matched by case-insensitive substring, not tokenised… |
+| ✅ | STATUS=SIZE (RFC 8438) | Advertised and implemented: SIZE sums RFC822.SIZE across the mailbox. Computed by iterating every message on each call, so it is O(n) per STATUS with no cached total. |
+| ✅ | UID sequence-set parsing | Handles comma lists, colon ranges, "*" on either side of a colon, and reversed ranges (swapped). For the QRESYNC VANISHED path "*" is deliberately left unbounded (0xFFFFFFFF) so expunged UIDs above the surviving maximum are still repor… |
+| ✅ | UIDPLUS (RFC 4315) | All three parts present: [APPENDUID validity uid] on APPEND, [COPYUID validity src dst] on COPY and MOVE, and UID EXPUNGE restricted to \Deleted messages inside the supplied set… |
+| ✅ | UNSELECT (RFC 3691) | Closes the selected mailbox without the implicit EXPUNGE that CLOSE performs, so \Deleted messages survive. |
+| ✅ | UTF8=ACCEPT (RFC 6855) — advertised but inert | Advertised unconditionally and settable via ENABLE UTF8=ACCEPT (and implicitly by ENABLE IMAP4rev2), but the resulting utf8_accept_enabled_ flag has a getter and setter and no reader anywhere in the codebase… |
+| ⏸️ | ESORT (RFC 5267) — SORT RETURN (...) | Explicitly not handled: the RETURN result-option parser is gated on !is_sort_, with an in-code comment stating ESORT is intentionally out of scope. |
+| ⏸️ | NOTIFY (RFC 5465) | Not implemented. Explicitly placed under the roadmap's "Not planned" heading, with the reasoning that iOS Mail does not do push for generic IMAP at all and IDLE is the portable answer. |
+| ⏸️ | SEARCH=FUZZY (RFC 6203) | Not implemented, not advertised, and explicitly declined in the roadmap on the grounds that Dovecot does not have it either. |
+| ⬜ | APPENDLIMIT (RFC 7889) | Not advertised, though the limit exists: APPEND enforces the SMTP max message size, the per-domain max size and a hard 2 GB ceiling. Clients cannot discover any of it, so oversized uploads fail only after the data is sent. |
+| ⬜ | BINARY (RFC 3516) | Not implemented. No BINARY[], BINARY.PEEK[] or BINARY.SIZE[] FETCH items, no APPEND with a binary literal, and BINARY is not advertised. Listed in the roadmap's IMAP-extension backlog. |
+| ⬜ | CATENATE (RFC 4469) | Not implemented and not advertised; APPEND accepts only a literal, with no CATENATE (TEXT/URL ...) part list. Requires URLAUTH-style URL resolution, which is also absent. |
+| ⬜ | COMPRESS=DEFLATE (RFC 4978) | Not implemented and not advertised; no COMPRESS command and no deflate stream layer in the IMAP connection. Listed in the roadmap's IMAP-extension backlog. |
+| ⬜ | I18NLEVEL (RFC 5255) | Not implemented and not advertised; no LANGUAGE command, no COMPARATOR support, no translated response text. |
+| ⬜ | LIST-STATUS (RFC 5819) | Not implemented and not advertised. The LIST RETURN parser handles only SUBSCRIBED, so clients must issue one STATUS per mailbox at startup. Roadmap ranks it second by value and notes it is expected alongside IMAP4rev2. |
+| ⬜ | LITERAL+ / LITERAL- (RFC 7888) | Neither is advertised. A trailing '+' in a literal count is tolerated and stripped in both the connection-level and APPEND parsers, but the server still sends a "+ Ready for literal data" continuation… |
+| ⬜ | LOGINDISABLED (RFC 3501) not advertised | When connection security is CSSTARTTLSRequired the LOGIN command is refused with "STARTTLS is required", but LOGINDISABLED never appears in the capability string, so a conformant client cannot tell in advance… |
+| ⬜ | METADATA (RFC 5464) / ANNOTATE | Not implemented and not advertised; no GETMETADATA or SETMETADATA commands and no annotation store. Roadmap flags it as a prerequisite for some Sieve extensions. |
+| ⬜ | MULTIAPPEND (RFC 3502) | Not implemented and not advertised. APPEND handles exactly one message literal per command and finishes the command as soon as that literal is complete. |
+| ⬜ | OBJECTID (RFC 8474) — EMAILID / THREADID / MAILBOXID | Not implemented and not advertised; no EMAILID or THREADID FETCH item and no MAILBOXID in the LIST/STATUS paths. Listed in the roadmap's IMAP-extension backlog. |
+| ⬜ | PREVIEW (RFC 8970) | Not implemented and not advertised; no PREVIEW FETCH item and no snippet generation. Listed in the roadmap's IMAP-extension backlog. |
+| ⬜ | REPLACE (RFC 8508) | Not implemented and not advertised; there is no REPLACE or UID REPLACE command, so clients must emulate draft updates with APPEND + STORE \Deleted + EXPUNGE. |
+| ⬜ | RFC 9208 QUOTA (QUOTA=RES-STORAGE / RES-MESSAGE, SETQUOTA) | Not implemented. The bare "QUOTA" capability atom is advertised rather than the RFC 9208 QUOTA=RES-* form, there is no SETQUOTA, no per-mailbox quota roots and no OVERQUOTA response code. Listed in the roadmap's IMAP-extension backlog. |
+| ⬜ | SAVEDATE (RFC 8514) | Not implemented. No SAVEDATE FETCH item and no SAVEDATE/SAVEDBEFORE/SAVEDSINCE/SAVEDATESUPPORTED search keys. Listed in the roadmap's IMAP-extension backlog. |
+| ⬜ | THREAD (RFC 5256) | Not implemented and not advertised. No THREAD command in the dispatch table and no reference anywhere in the source. SORT ships from the same RFC but THREAD does not… |
+| ⬜ | UNAUTHENTICATE (RFC 8437) | Not implemented and not advertised; there is no way to return an authenticated session to the not-authenticated state for connection reuse. |
+| ⬜ | URLAUTH (RFC 4467) / BURL | Not implemented and not advertised; no GENURLAUTH, URLFETCH or RESETKEY commands and no IMAP URL parser. |
+| ⬜ | WITHIN (RFC 5032) OLDER / YOUNGER search keys | Not implemented; the search keyword table has no OLDER or YOUNGER entry, so relative-age searches must be expressed as absolute BEFORE/SINCE dates. |
+
+### POP3
+
+19 shipped · 0 underway · 7 not started · 0 deferred
+
+| | Capability | Detail |
+|:-:|---|---|
+| ✅ | AUTH command with mechanism listing (RFC 5034) | Bare AUTH returns a dot-terminated mechanism list; the list is TLS-conditional (SCRAM-PLUS only on TLS) and OAuth-conditional |
+| ✅ | Brute-force containment | Ten failed attempts on one connection force a disconnect regardless of the auto-ban setting, and every failure path (PASS, SCRAM, bearer) also calls AccountLogon::RegisterFailedLogin to feed the per-IP auto-ban |
+| ✅ | CAPA (RFC 2449) | Advertises exactly: UIDL, TOP, USER, SASL <mechs>, STLS (only in STARTTLS modes), UTF8. USER/SASL are suppressed when STARTTLS is required and TLS is not yet active |
+| ✅ | Core command set | USER, PASS, QUIT, STAT, LIST (both forms), RETR, DELE, NOOP, RSET all implemented; STAT/LIST use __int64 totals so mailboxes over 2 GB report correctly |
+| ⬜ | Credential hygiene | Partial, and the gap is a defect. A pending SASL PLAIN/bearer *continuation* line is masked, and `RequireTLSForAuth` per security range refuses cleartext authentication — but `PasswordRemover` is not a general scrubber: its POP3 arm redacts only lines beginning `PASS`, so a SASL initial response (`AUTH PLAIN <base64>`) is logged verbatim. See [Defects found by the audit](#defects-found-by-the-audit). |
+| ⬜ | Deletion semantics and RSET | DELE only flags. **The scan-listing forms skip flagged messages but `LIST n` and `UIDL n` do not**, which RFC 1939 requires — [see the defects list](#defects-found-by-the-audit). Otherwise: STAT/RETR/TOP skip flagged messages; deletion is committed at QUIT via DeleteInboxMessages with an autologout-timer callback; RSET reloads the inbox and clears all flags |
+| ✅ | Exclusive mailbox lock | Per-account lock set held for the session; a session refused the lock drops its account reference so it cannot release another session's lock on disconnect, and the lock is released on idle timeout |
+| ✅ | OnClientLogon script event | Fires for every POP3 logon attempt (success and failure) with username, IP, port, session id and, on TLS, cipher version/name/bits |
+| ✅ | Resource limits | 500-byte command line cap, load-scaled idle autologout between POP3DMinTimeout(10s) and POP3DMaxTimeout(600s), excessive-data guard, and a MaxPOP3Connections session cap |
+| ✅ | SASL PLAIN (RFC 4616) with SASLprep | Both the initial-response and continuation forms; authcid is SASLprep-normalised (RFC 4013) and domain aliases are applied for parity with USER |
+| ✅ | SASL-IR (RFC 4959) | An initial response may be supplied on the AUTH line; a bare "=" is correctly treated as an empty initial response, and "*" cancels an in-progress exchange |
+| ✅ | SCRAM-SHA-256 (RFC 5802 / RFC 7677) | Full three-leg exchange with server-final acknowledgement. Only PBKDF2-hashed, non-AD accounts are eligible; ineligible or unknown accounts run a forced-failure exchange so existence is not disclosed… |
+| ✅ | SCRAM-SHA-256-PLUS with channel binding | tls-server-end-point channel binding (RFC 5929) offered only on TLS; the non-PLUS mechanism sets SetServerSupportsChannelBinding on TLS so a stripped-PLUS gs2 'y' downgrade is rejected (RFC 5802 §6) |
+| ✅ | STLS (RFC 2595) and implicit POP3S | STLS accepted only in CSSTARTTLSOptional/Required and refused once TLS is active; implicit TLS handled by banner-on-handshake-complete. Per-range RequireTLSForAuth blocks USER/AUTH on cleartext |
+| ✅ | Three-state session machine | AUTHORIZATION / TRANSACTION / UPDATE enforced per command; NOOP, HELP, QUIT and CAPA are allowed in any state, UPDATE rejects everything. HELP is a non-standard extra returning +OK |
+| ✅ | TOP | TOP <msg> <n> streams full headers plus n body lines with dot-stuffing; recreates a missing message file via EnsureFileExistance and answers -ERR if the file cannot be opened rather than sending an empty body |
+| ✅ | UIDL | Both the scan-listing and single-message forms; the UID is the persistent numeric message UID. Deleted-flagged messages are omitted from the scan listing but **not** from the single-message form |
+| ✅ | UTF8 command (RFC 6856) | Partial: the UTF8 command is accepted in AUTHORIZATION state and sets a session flag, and UTF8 is advertised in CAPA — but the flag changes no behaviour (message bytes were already passed through verbatim)… |
+| ✅ | XOAUTH2 / OAUTHBEARER (RFC 7628) | Bearer-token login gated on OAuth2TokenValidator::IsEnabled() and, by default, TLS; the token's username claim is the login identity and a client-asserted user= must match it. Feeds the same failure accounting as password login |
+| ⬜ | APOP | Not implemented; the string APOP does not occur anywhere in the server source. Deliberate in effect (it requires a cleartext-equivalent stored secret), but no comment says so |
+| ⬜ | AUTH-RESP-CODE (RFC 3206) | No [AUTH] / [SYS/TEMP] / [SYS/PERM] response codes on authentication failures; all failures are plain -ERR strings |
+| ⬜ | CRAM-MD5, DIGEST-MD5, EXTERNAL, GSSAPI, NTLM | None offered; any other mechanism gets "-ERR Unsupported authentication mechanism." CRAM-MD5/DIGEST-MD5 are omitted for the same reason as APOP (they need reversible secrets)… |
+| ⬜ | EXPIRE and LOGIN-DELAY (RFC 2449) | Neither capability is advertised and neither policy exists: no server-declared message retention period for POP3 clients and no minimum interval between logins |
+| ⬜ | IMPLEMENTATION (RFC 2449) and LANG (RFC 6856) | Neither advertised. Server identity is only carried in the freeform greeting banner (configurable welcome message), and there is no response-language negotiation |
+| ⬜ | PIPELINING (RFC 2449) | Not advertised. The connection issues one EnqueueRead per response, so batched commands are not a declared capability even if buffering sometimes tolerates them |
+| ⬜ | RESP-CODES (RFC 2449) | No extended response codes; failures are bare -ERR text. Notably a locked mailbox returns "-ERR Your mailbox is already locked" with no [IN-USE] code, so clients cannot distinguish it from a bad password |
+
+### Sieve, ManageSieve and rules
+
+38 shipped · 0 underway · 21 not started · 0 deferred
+
+| | Capability | Detail |
+|:-:|---|---|
+| ✅ | Account forwarding | Per-account forward address with keep-original and abort-if-spam-flagged switches; the target is validated through CheckDeliveryPossibility, self-forward is rejected, and the rule-loop counter guards against forward loops |
+| ✅ | Account vacation / out-of-office message | Per-account on/off, custom subject and body, with a %SUBJECT% macro substituted from the original message and an automatic "Re: <original subject>" when no subject is configured. Body is sent as text/plain; charset=utf-8 |
+| ✅ | Actions implemented | Exactly five: keep, discard, fileinto, redirect, stop — plus the implicit keep when a script produced no action. Result is a semicolon-joined action summary string, so an action carrying a colon in its argument is ambiguous |
+| ✅ | AUTHENTICATE (SASL PLAIN only) | Partial: PLAIN is the only mechanism, and only with an initial response on the command line — the challenge/continuation form is refused with NO "PLAIN requires an initial response." authcid is SASLprep-normalised and validated against… |
+| ✅ | Auto-reply dedupe durability | Caveat on the above: the sent-to set is an in-process multimap with no time window and no persistence. It is cleared only when vacation is switched off… |
+| ✅ | Auto-reply loop suppression | Three guards: never reply to yourself, never reply to a spam-flagged message when the per-account switch is set, and reply at most once per (account, recipient) pair… |
+| ✅ | Bounded authentication retries | Fixed: three failed AUTHENTICATE attempts on one connection drop it, and every failure also calls AccountLogon::RegisterFailedLogin so the per-IP auto-ban applies. Before this the listener allowed unlimited password guessing |
+| ✅ | Capability advertisement | Sent on connect and on CAPABILITY. Literally four lines: "IMPLEMENTATION" "hMailServer ManageSieve", "SIEVE" "fileinto", "SASL" "PLAIN", "VERSION" "1.0". The SIEVE line lists only fileinto… |
+| ✅ | COM and Control Panel surface | Account.SieveScript reads/writes the active script directly from storage (no Save() needed); Utilities.CheckSieveSyntax and Utilities.EvaluateSieveScript expose the parser and evaluator for testing… |
+| ✅ | Command set | Implemented: CAPABILITY, NOOP, LOGOUT, AUTHENTICATE, LISTSCRIPTS (with ACTIVE marker), PUTSCRIPT, GETSCRIPT, SETACTIVE (including deactivate with an empty name), DELETESCRIPT, CHECKSCRIPT, HAVESPACE… |
+| ✅ | Comparators | Partial: :comparator is parsed and only i;octet is honoured (as case-sensitive); anything else including an explicit i;ascii-numeric silently falls back to the case-insensitive i;ascii-casemap default |
+| ✅ | Connection concurrency | Real limitation: the accept loop calls HandleClient_ inline on the single worker thread, so exactly one ManageSieve client is served at a time and a slow client blocks all others until its 30-second socket timeout expires |
+| ✅ | Control flow | if / elsif / else chains with correct first-match-wins consumption of the whole chain, arbitrary nesting, and stop halting execution mid-block |
+| ✅ | Control Panel forwarding and auto-reply tabs | Account editor exposes forwarding (address, keep original, abort on spam) and auto-reply (on, subject, body, expiry checkbox, expiry date picker, abort on spam) as first-class tabs alongside the Sieve tab |
+| ✅ | Control Panel rules UI | Dedicated rules view with separate criteria and action editors, so the whole rule model is administrable without COM scripting |
+| ✅ | Criteria combination and chaining | Per-rule AND/OR over criteria (GetUseAND). Note the chaining semantics: ApplyRule_ always returns false, so a matching rule does NOT stop the chain — every active rule is evaluated unless a rule explicitly fires the StopRuleProcessing… |
+| ✅ | Criteria fields and match types | Predefined fields From, To, CC, Subject, Body (plain+HTML concatenated), MessageSize, RecipientList (semicolon-joined envelope recipients) and DeliveryAttempts; or any arbitrary header by name. Match types Equals, NotEquals, Contains… |
+| ✅ | Delivery integration | Runs per recipient during local delivery, after account rules and account forwarding. fileinto overrides the rule-selected IMAP folder; each redirect queues a copy through SMTPForwarding::RedirectToAddress (loop-counter guarded… |
+| ✅ | End-to-end regression coverage | One fixture drives the real listener over TCP: greeting, pre-auth refusal, bad/good AUTHENTICATE, CHECKSCRIPT accept and reject, PUTSCRIPT, LISTSCRIPTS ACTIVE marker, GETSCRIPT byte round-trip, active-script delete refusal… |
+| ✅ | Evaluation-cost and fidelity caveats | The whole raw message is read into a String for every script evaluation (ReadCompleteTextFile), and the size test compares that in-memory character length rather than the on-disk octet count… |
+| ✅ | Fail-open on script error | A script that fails to lex/parse is logged and skipped, and the message is delivered normally — a broken filter can never break delivery. Only one folder can be selected (last fileinto wins); there is no :copy semantics |
+| ✅ | HAVESPACE and quotas | HAVESPACE is a stub that always answers OK — there is no per-account script-size or script-count quota to check it against, and no MAXSCRIPTS/QUOTA capability. Comment says so explicitly |
+| ✅ | Input hardening | 1 MB cap on an unterminated line, 10 MB cap on literal accumulation, 30-second send/receive timeouts, and quoted-string output escaping for script names |
+| ✅ | Lexer | Hash and bracketed comments, quoted strings with backslash escaping, multi-line text: strings with dot-unstuffing, tags, numbers with K/M/G quantifiers, and all bracket/brace/paren/comma/semicolon punctuation |
+| ✅ | Literal handling | Both synchronising {NNN} and non-synchronising {NNN+} literals are accepted for PUTSCRIPT/CHECKSCRIPT; the size is taken from the last brace on the line and the trailing CRLF is consumed… |
+| ✅ | Loop and abuse guards | Forward, Reply and CreateCopy all check IsGeneratedResponseAllowed: a per-message rule-loop counter against SMTPConfiguration RuleLoopLimit, plus (for Reply only) suppression when the source carries an Auto-Submitted header… |
+| ✅ | Match types and address parts | :is (default), :contains and :matches (wildcard, case-insensitive) are supported. Address parts :all, :localpart and :domain are honoured with angle-bracket extraction and comma splitting… |
+| ✅ | Named-script store semantics | Script names limited to 128 chars of [A-Za-z0-9.-_+ ] with "."/".." rejected; PUTSCRIPT over the active script refreshes the live copy; the active script cannot be deleted (RFC 5804)… |
+| ✅ | Optional listener | Raw-socket + std::thread service outside the Boost.Asio stack, started from Application::StartServers only when [Settings] ManageSieveServerPort is non-zero (default 0 = disabled); bind address defaults to 127.0.0.1… |
+| ✅ | Parser and AST | Commands with tagged/numeric/string-list arguments, nested blocks, test lists in parentheses (flattened into the parent test), and the RFC rule that require must precede any other command |
+| ✅ | Per-account script storage | File-backed under {DataDir}\Sieve\{domain}\{localpart}\ — active.sieve is the live copy, scripts\{name}.sieve the named set, active.name the pointer… |
+| ✅ | Rule actions | Ten types: Delete, Forward, Reply, MoveToIMAPFolder, ScriptFunction, StopRuleProcessing, SetHeaderValue, SendUsingRoute, CreateCopy, BindToAddress. SetHeaderValue supports a %MACRO_ORIGINAL_HEADER% substitution… |
+| ✅ | Sieve (RFC 5228) as a second scripting surface | A real interpreter runs each account's active script during delivery, with ManageSieve (RFC 5804) for client management. It is a token subset - actions keep/discard/fileinto/redirect/stop and tests true/false/not/allof/anyof/header/add… |
+| ✅ | SRS on forwarded mail | When SRSEnabled is set, forwarding an externally-originated message rewrites MAIL FROM to a signed reversible address at the forwarding domain so SPF stays aligned; local senders are left alone… |
+| ✅ | Tests implemented | Exactly nine: true, false, not, allof, anyof, header, address, exists, size. exists requires ALL named headers to be present; size supports :over/:under against the raw message length |
+| ✅ | Two-level rule application | Global rules run once in SMTPDeliverer before recipient split; account rules run per recipient in LocalDelivery after the message file is in the account's folder. Results carry move-to-folder, delete… |
+| ✅ | Unimplemented constructs fail silently | Real hazard: the parser accepts reject, ereject, vacation, setflag, addflag, removeflag, notify, error, return, include, global and set as valid commands, and envelope, body, hasflag, string, date, currentdate… |
+| ✅ | Vacation expiry with auto-disable | Optional expiry date; on the first delivery after it passes the flag is switched off in the database rather than merely being ignored. An unparsable date fails open (vacation stays on) |
+| ⬜ | copy (RFC 3894) | Not implemented. There is no :copy tag on fileinto or redirect, so a redirect always cancels the implicit keep unless an explicit keep is also written |
+| ⬜ | date and index (RFC 5260) | Not implemented. date/currentdate parse as known tests and evaluate false; there is no :index/:last tagged argument for selecting among repeated header fields |
+| ⬜ | duplicate (RFC 7352) | Not implemented; no duplicate test and no tracking store for :handle/:uniqueid seen-values |
+| ⬜ | editheader (RFC 5293) | Not implemented. addheader/deleteheader are not even in the known-command list, so a script using them fails CHECKSCRIPT with "unknown command" |
+| ⬜ | enotify (RFC 5435) | Not implemented. `notify` parses as a known command and no-ops; there are no notification methods, no valid_notify_method test and no NOTIFY capability advertised over ManageSieve |
+| ⬜ | envelope (RFC 5228 §5.4) and body (RFC 5173) | Not implemented and this is the most user-visible gap: the SMTP envelope is never passed to the evaluator (SieveMessage is built from the raw file only)… |
+| ⬜ | ihave (RFC 5463) and environment (RFC 5183) | Not implemented. Both parse as known tests and evaluate false — which is actively wrong for ihave, whose whole purpose is capability probing, and means an ihave-guarded fallback script silently takes the wrong branch |
+| ⬜ | imap4flags (RFC 5232) | Not implemented. setflag/addflag/removeflag parse and no-op; the hasflag test parses and evaluates false; there is no :flags tagged argument on keep/fileinto |
+| ⬜ | include (RFC 6609) | Not implemented. include, return and global parse as known commands and no-op; there is no personal/global script namespace in SieveStorage to include from |
+| ⬜ | mailbox / mboxmetadata (RFC 5490) | Not implemented. No :create tag on fileinto and no mailboxexists test — a fileinto naming a folder that does not exist relies on whatever MoveToIMAPFolder does rather than declared Sieve semantics |
+| ⬜ | Out-of-office scheduling and scope | Only an end date exists — there is no start date, so a future absence cannot be scheduled and must be switched on manually. There is also no domain-level or server-level auto-reply, no separate internal/external message… |
+| ⬜ | regex (draft-ietf-sieve-regex) | Not implemented as a Sieve match type, even though the server already carries a regex engine used by the legacy rules engine (RuleCriteria::MatchesRegEx). Wiring it into MatchValue_ would be small |
+| ⬜ | reject / ereject (RFC 5429) | Not implemented. Both parse as known commands and silently no-op, which is the worst case for these two specifically: the author believes mail is being refused while it is in fact being kept |
+| ⬜ | relational (RFC 5231) | Not implemented. No :count or :value match types, and no i;ascii-numeric comparator to make them meaningful — SplitArguments recognises only is/contains/matches |
+| ⬜ | RENAMESCRIPT and UNAUTHENTICATE | Neither implemented; both fall through to NO "Unknown command." A client renaming a script must GETSCRIPT/PUTSCRIPT/DELETESCRIPT by hand |
+| ⬜ | spamtest / spamtestplus / virustest (RFC 5235) | Not implemented, and again the underlying data exists: messages already carry a spam flag and SpamAssassin/AV scores from the antispam pipeline, but no Sieve test can read them |
+| ⬜ | Structured response codes | Not implemented. Responses are bare OK / NO with a quoted human string — no (WARNINGS), (QUOTA/maxsize), (QUOTA/maxscripts), (NONEXISTENT), (ALREADYEXISTS), (TAG), (REFERRAL) or BYE codes… |
+| ⬜ | subaddress (RFC 5233) | Not implemented. Address parts stop at :all/:localpart/:domain; :user and :detail are not recognised, so plus-addressing cannot be filtered on |
+| ⬜ | TLS | None. STARTTLS is recognised but always answered NO "STARTTLS is not supported on this listener.", it is not advertised as a capability, and there is no implicit-TLS variant — so SASL PLAIN credentials cross the wire in the clear… |
+| ⬜ | vacation (RFC 5230) | Not implemented. The `vacation` keyword parses as a known command and is then discarded. The irony is that a full native auto-reply engine already exists (subject, body, expiry, spam guard… |
+| ⬜ | variables (RFC 5229) | Not implemented. `set` parses and no-ops; there is no ${name} expansion anywhere in the lexer or evaluator, and no match-variable capture from :matches |
+
+### Authentication and cryptography
+
+55 shipped · 0 underway · 19 not started · 0 deferred
+
+| | Capability | Detail |
+|:-:|---|---|
+| ✅ | Active Directory account authentication (SSPI) | Accounts flagged as AD bypass all local hashing and are validated by `LogonUser` with LOGON32_LOGON_NETWORK against the account's AD domain/username. They are exempt from the minimum-hash policy and ineligible for SCRAM. |
+| ✅ | Administrator password hashed with PBKDF2 | `SetAdministratorPassword` always writes a `$h1$` PBKDF2 hash into `[Security] AdministratorPassword` in hMailServer.INI; validation sniffs the hash type so older MD5/SHA-256 admin hashes keep working. |
+| ✅ | alg allow-list and alg:none rejection | `alg` is upper-cased, an empty or `none` value is rejected before the allow-list is even consulted, and the allow-list (`OAuth2AllowedAlgorithms`, default `RS256`) must contain the algorithm… |
+| ✅ | Argon2id (OpenSSL EVP_KDF) | Available and selectable (`PreferredHashAlgorithm=5`) but NOT the default. OWASP-minimum parameters: 19456 KiB memory, t=2, p=1 lane, 16-byte salt, 32-byte tag, format `$a2$m$t$p$salt$key`. Verification clamps memory ≤1 GiB, t ≤100… |
+| ✅ | AUTH LOGIN | Advertised on every SMTP port where AUTH is enabled, and NOT gated by the plain-text toggle — so a cleartext-equivalent mechanism is always offered when AUTH is on (subject only to STARTTLS-required / per-IP-range RequireTLSForAuth gat… |
+| ✅ | AUTH PLAIN (RFC 4616) | Advertised and accepted only when the `authallowplaintext` setting is on; DB default is 0 (off). Supports both the inline initial-response form and the 334-continuation form. |
+| ✅ | AUTH PLAIN / SCRAM-SHA-256 / SCRAM-SHA-256-PLUS (RFC 5034) | Advertised via `SASL PLAIN SCRAM-SHA-256` in CAPA and listed by a bare `AUTH`. Unlike IMAP there is no enable/disable setting — POP3 SASL is always on. PLUS only on TLS. |
+| ✅ | AUTH SCRAM-SHA-256 (RFC 7677) | Always advertised when SMTP AUTH is enabled, independent of the plain-text setting. Full server-side exchange with RFC 4954 SASL-IR handling (`=` treated as no initial response). |
+| ✅ | AUTH SCRAM-SHA-256-PLUS | Advertised only on a TLS connection; rejects with 504 if attempted in cleartext or if the channel-binding value cannot be derived. |
+| ✅ | AUTHENTICATE PLAIN | Advertised as `AUTH=PLAIN` and accepted, but the whole IMAP AUTHENTICATE command is gated behind `EnableImapSASLPlain`, whose shipped DB default is 0 — so IMAP SASL is OFF out of the box. |
+| ✅ | AUTHENTICATE SCRAM-SHA-256 / -PLUS | Advertised as `AUTH=SCRAM-SHA-256` and (TLS only) `AUTH=SCRAM-SHA-256-PLUS`. Caveat: both share the same `EnableImapSASLPlain` gate as PLAIN, so turning SASL PLAIN off also turns SCRAM off on IMAP. |
+| ✅ | Authentication outcome metrics | `hmailserver_auth_success_total` and `hmailserver_auth_failures_total` counters exposed on the Prometheus listener, incremented centrally in `AccountLogon::Logon`. |
+| ✅ | Auto-ban on repeated authentication failure | AutoBanLogonEnabled + MaxInvalidLogonAttempts + AutoBanMinutes create a temporary blocking IP range from every failed-login path (POP3 PASS, SCRAM, bearer, IMAP LOGIN, SMTP AUTH)… |
+| ✅ | Blowfish reversible account passwords accepted | Scheme 1 decrypts and compares case-insensitively. Reversible storage, retained only for legacy rows; not offered as a preferred choice in the Control Panel except as "Blowfish (legacy)". |
+| ✅ | Claim validation | `exp` is required and checked with a clock-skew allowance; `nbf` checked when present; `iss` and `aud` checked only when configured (aud supports array form); the login identity comes from `OAuth2UsernameClaim` (default `email`)… |
+| ✅ | Constant-time hash comparison throughout | PBKDF2, Argon2id, legacy SHA-256/MD5 and the SCRAM proof all compare with OpenSSL `CRYPTO_memcmp`, and derived keys are wiped with `OPENSSL_cleanse`. |
+| ✅ | Credential masking in protocol logs | IMAP `LOGIN`, POP3 `PASS` and SMTP `AUTH PLAIN` lines are rewritten before logging (SMTP logs the base64 username but never the password); the POP3 SASL continuation line is explicitly never logged. |
+| ✅ | DPAPI protection for reversible secrets | On by default (`ProtectStoredSecretsWithDPAPI=1`): the INI database password and DB-stored route/fetch/relayer passwords are written as a self-describing machine-scoped `DPAPI:<base64>` envelope. Machine-bound… |
+| ✅ | Empty administrator password means anonymous admin access | Upstream behaviour retained: if `AdministratorPassword` is blank, `AttempAnonymousAuthentication` hands out a ServerAdmin account with no credential at all. The REST API refuses to start in that state, but COM does not. |
+| ✅ | Failed-SCRAM and failed-bearer attempts feed auto-ban | The newer mechanisms were wired into the same `RegisterFailedLogin` accounting as the legacy paths, including ManageSieve, which previously allowed unlimited guessing (noted in the source comment). |
+| ✅ | Inbound bearer-token validation (offline) | JWT is verified entirely locally against an administrator-configured key: HS256 against `OAuth2HmacSecret`, RS256 against the PEM in `OAuth2PublicKeyFile`… |
+| ✅ | IP ranges with per-range protocol and relay policy | Priority-ordered ranges gate SMTP/POP3/IMAP access, the four relay quadrants, the four require-SMTP-auth quadrants, spam and virus protection, and require-TLS-for-auth. Auto-ban writes into the same table with an expiry timestamp. |
+| ✅ | Legacy salted SHA-256 accepted | Scheme 3: 6-hex-character salt prefix + SHA-256(salt+password), 70 chars total, detected by length. Accepted for login. The intended upgrade-on-login does not persist (see defects)… |
+| ✅ | Legacy unsalted MD5 accepted | Scheme 2: bare 32-char hex MD5, no salt, identified purely by string length. Still a valid login path unless MinimumAcceptedHashAlgorithm is raised. |
+| ✅ | ManageSieve AUTHENTICATE PLAIN (RFC 5804) | Only PLAIN is advertised and accepted; STARTTLS is explicitly refused on this listener, so credentials cross in cleartext unless the port is fronted or bound to loopback (the documented default bind is 127.0.0.1). |
+| ✅ | Master-user impersonation via SASL PLAIN authzid | An authzid in the PLAIN response is honoured only when `ImapMasterUser` is configured and the authcid equals that master user; otherwise BAD. RFC 4616 two-identity form. |
+| ✅ | Minimum-accepted-hash policy | `MinimumAcceptedHashAlgorithm` refuses a login whose stored hash is weaker than the configured floor even with the correct password, and logs why. Default 0 = policy disabled. AD accounts exempt. Also gates SCRAM eligibility. |
+| ✅ | OAuth2 provider configuration in the Control Panel | A dedicated card exposes enable, require-TLS, issuer, audience, allowed algorithms, username claim, public-key file picker and the HMAC secret as a masked field. |
+| ✅ | OAUTHBEARER (RFC 7628) | Advertised and handled alongside XOAUTH2 on all three protocols; both share one parser and one validator. When the client asserts an identity it must match the token's username claim. |
+| ✅ | Password hashing: Argon2id and PBKDF2 with pepper | Argon2id via OpenSSL EVP_KDF and PBKDF2-HMAC-SHA256 ($h1$iter$salt$key, 210k iterations), transparent rehash on login to PreferredHashAlgorithm, a MinimumAcceptedHashAlgorithm floor… |
+| ✅ | PBKDF2-HMAC-SHA256 — the default scheme | `PreferredHashAlgorithm` defaults to 4 (= ETPBKDF2). 16-byte random salt, 32-byte key, 210,000 iterations, self-describing `$h1$<iter>$<salt-hex>$<key-hex>`. Verification bounded at 10,000,000 iterations and constant-time compared. |
+| ✅ | Per-connection authentication-failure cap | Defence in depth that works even with auto-ban disabled: 10 failures on one connection forces a disconnect on IMAP, SMTP and POP3; ManageSieve uses a tighter cap of 3. All SASL paths (PLAIN, SCRAM, bearer) feed the same counters. |
+| ✅ | Per-IP auto-ban on repeated logon failure | Enabled by default; failures counted in the `hm_logon_failures` table, and on reaching `MaxInvalidLogonAttempts` (default 3) an expiring IP range named "Auto-ban: <user>" is created for `AutoBanMinutes` (default 60) and the connection… |
+| ✅ | Plain LOGIN command | Always available (no capability gate), blocked only when STARTTLS is required or the IP range sets RequireTLSForAuth. The CAPABILITY response never emits `LOGINDISABLED`, so a client cannot tell in advance that LOGIN will be refused. |
+| ✅ | Plaintext account passwords still accepted | Scheme 0 compares case-INSENSITIVELY (an explicit upstream backward-compatibility decision, documented in a comment). Rows are re-hashed to the preferred scheme when the account record is loaded… |
+| ✅ | REST API authentication | HTTP Basic only, username must literally be `administrator`, password checked against the INI hash with the normal Crypt dispatch; rejected credentials are logged. No tokens, no scoping, no expiry… |
+| ✅ | REST API transport safety rail | Refuses to start unless either bound to 127.0.0.1/localhost or given a certificate and key; the TLS context enforces a TLS 1.2 minimum. |
+| ✅ | SASL-IR (RFC 4959) | `SASL-IR` capability advertised only when `EnableImapSASLInitialResponse` is on (DB default 0), but the AUTHENTICATE handler accepts a second parameter (initial response) regardless of that setting. |
+| ✅ | SASLprep (RFC 4013) on the authentication identity | Full four-step SASLprep (map → NFKC → prohibit → bidi) applied to the authcid on SMTP PLAIN, IMAP PLAIN, POP3 PLAIN and ManageSieve PLAIN. Caveat: the SCRAM path only applies default-domain canonicalisation… |
+| ✅ | SCRAM anti-enumeration (forced-failure exchange) | Unknown or non-PBKDF2 accounts get a full-looking exchange with a deterministic per-installation fake salt derived by HMAC-SHA256 over the admin password + DB credentials, so probing cannot distinguish a real account… |
+| ✅ | SCRAM proof verification uses constant-time compare | Client proof is checked with `CRYPTO_memcmp`; nonces are 18 bytes from `RAND_bytes` base64-encoded to 24 chars. |
+| ✅ | SCRAM restricted to PBKDF2-stored accounts | Real limitation: SCRAM is served from the stored `$h1$` PBKDF2 key (which is the SaltedPassword). Accounts stored as Argon2id, SHA-256, MD5, Blowfish, plaintext… |
+| ✅ | SCRAM stripped-PLUS downgrade rejection | On a TLS connection where PLUS is advertised, a non-PLUS client sending the gs2 `y` flag is rejected per RFC 5802 §6. |
+| ✅ | SCRAM-SHA-256 channel binding (RFC 5929 tls-server-end-point) | Channel-binding data is the digest of the server's own end-entity certificate, using the hash from the cert's signature algorithm with MD5/SHA-1 substituted by SHA-256. Only `p=tls-server-end-point` is accepted… |
+| ✅ | Script-overridable password validation | `OnClientValidatePassword` fires before any hash comparison and can return 0 (accept) or 1 (reject), letting an operator plug in an external auth source. This bypasses the hash-policy checks when it returns 0. |
+| ✅ | Server-wide password pepper | Optional `PasswordPepper` INI secret; the password is HMAC-SHA256'd under it before Argon2id. Deliberately applied to Argon2id ONLY — PBKDF2 must stay un-peppered because it doubles as the SCRAM SaltedPassword… |
+| ✅ | Sliding failure window with background purge | `RemoveExpiredRecords` deletes expired security ranges and logon-failure rows older than `MaxLogonAttemptsWithin` minutes, so the counter is a rolling window rather than cumulative. |
+| ✅ | Startup crypto self-tests | HashCreator (SHA-256/PBKDF2/Argon2id round-trips, salt-uniqueness, cross-scheme confusion), the Crypt login-dispatch path, the HMAC-SHA256 pepper helper against a known-answer vector… |
+| ✅ | Stored-secret protection (DPAPI) and least-privilege service account | ProtectStoredSecretsWithDPAPI=1 wraps the INI database password and the DB-stored route/fetch-account/relayer passwords in machine-scoped DPAPI envelopes instead of reversible Blowfish (with Blowfish still read… |
+| ✅ | TOTP for the Control Panel logon | RFC 6238, HMAC-SHA1, 6 digits, 30-second period, ±1 step tolerance, fixed-time code comparison, 160-bit secret from `RandomNumberGenerator`, QR/otpauth enrolment. Applies to the admin GUI logon only. |
+| ✅ | TOTP secret storage | Stored as `AdminTotpSecret` under HKLM\SOFTWARE\hMailServer, machine-scope DPAPI via direct crypt32 P/Invoke so the .NET 8 Control Panel and the legacy .NET Framework Administrator share one blob format… |
+| ✅ | Transparent legacy Blowfish fallback for stored secrets | Any non-`DPAPI:`-prefixed value is decrypted with the legacy Blowfish key, and a DPAPI failure falls back to Blowfish on write so a secret is never lost. Set the INI key to 0 for portable (Blowfish) storage. |
+| ✅ | Transparent upgrade-on-login | On a successful login, if the stored scheme is weaker than the preferred one and the preferred one is PBKDF2 or Argon2id, the account is re-hashed and saved. Only ever upgrades (enum-ordered)… |
+| ✅ | USER / PASS | Advertised in CAPA and available whenever the connection is not STARTTLS-required-but-cleartext. |
+| ✅ | XOAUTH2 | Non-standard Google/Microsoft bearer mechanism, offered on SMTP, IMAP and POP3 when OAuth2 is enabled and (by default) only over TLS. Parsed from the 0x01-separated SASL blob. |
+| ⬜ | ANONYMOUS (RFC 4505) | Not implemented, and deliberately so — empty passwords are rejected outright by the password validator. |
+| ⬜ | App passwords and per-account 2FA | TOTP covers only the Control Panel logon. There is no app-password mechanism, so account-level 2FA is structurally impossible for IMAP/POP3/SMTP clients that cannot present a code — and app passwords are the stated prerequisite for per… |
+| ⬜ | bcrypt / scrypt | Not implemented; the strong-KDF menu is PBKDF2 and Argon2id only. |
+| ⬜ | Client-side OAuth2 for outbound relay | Not implemented. The outbound SMTP client only ever issues `AUTH LOGIN` — no PLAIN, no XOAUTH2, no token cache. Roadmap flags this as the most time-sensitive gap given Microsoft's Basic-auth deprecation for SMTP AUTH at end of 2026. |
+| ⬜ | Client-side OAuth2 for the external account fetcher | Not implemented. The POP3 fetcher authenticates with `USER`/`PASS` and can only upgrade the channel with `STLS`; there is no IMAP fetcher and no bearer path, so Microsoft 365 / Gmail mailboxes cannot be collected. |
+| ⬜ | CRAM-MD5 (RFC 2195) | Not implemented anywhere — not advertised, not accepted. Would in any case be impossible against the PBKDF2/Argon2id stores since it needs a reversible or MD5-equivalent secret. |
+| ⬜ | DIGEST-MD5 (RFC 2831) | Not implemented. Obsoleted by RFC 6331; SCRAM-SHA-256 is the replacement that is shipped. |
+| ⬜ | ES256 tokens | Recognised but explicitly refused with a clear diagnostic, because JWS carries ECDSA as raw R\|\|S while OpenSSL expects X9.62 DER and the transcode was never written. The Control Panel still offers "RS256… |
+| ⬜ | EXTERNAL (client-certificate SASL) | Not implemented, and could not work today: the inbound TLS contexts never request a client certificate (verify_none on the server side). |
+| ⬜ | GSSAPI / Kerberos | Not implemented as a SASL mechanism. Active Directory accounts authenticate by replaying the plaintext password to `LogonUser`, which is password-based, not Kerberos SSO. |
+| ⬜ | JWKS fetch with key rotation | Not implemented. The validator never contacts the identity provider; a static PEM or shared secret is the only key source, so provider key rotation requires manual re-configuration. |
+| ⬜ | LDAP / directory account backend | Not implemented. There is per-account AD linking but no LDAP account source, no directory sync and no bind-based authentication against a directory. |
+| ⬜ | NTLM | Not implemented on any protocol. |
+| ⬜ | Password complexity / expiry / history policy | No server-enforced policy. Only an advisory COM helper `Utilities.IsStrongPassword` with a hard-coded 7-entry deny-list and a >4-character rule; nothing calls it during account creation, and there is no expiry… |
+| ⬜ | Per-account 2FA and app passwords | Neither exists for mailbox accounts. Roadmap records the structural reason: IMAP/POP clients cannot present a TOTP code, so app passwords are the prerequisite before per-account TOTP is feasible. |
+| ⬜ | Per-account lockout and login tarpitting | Neither exists. Banning is keyed purely on source IP, so a distributed attack against one mailbox is never throttled per-account, and there is no progressive delay on failed authentication. |
+| ⬜ | SCRAM-SHA-1 / SCRAM-SHA-512 | Neither variant exists; SHA-256 is the only SCRAM family member. Some older clients that only speak SCRAM-SHA-1 will therefore fall back to PLAIN/LOGIN. |
+| ⬜ | Second factor on the COM API and REST API | Not enforced. TOTP is checked by the Control Panel client after it authenticates; the COM authentication path and the REST API's HTTP Basic check know nothing about it… |
+| ⬜ | Token introspection (RFC 7662) | Not implemented — no revocation awareness at all; a stolen token is valid until `exp`. |
+
+### Anti-spam, anti-virus and content control
+
+52 shipped · 0 underway · 13 not started · 0 deferred
+
+| | Capability | Detail |
+|:-:|---|---|
+| ✅ | Action on detection and notifications | Two actions only - delete the message, or strip all attachments and continue delivery (VIRUS_ATTACHMENT_REMOVED server message); optional notification to sender and/or to every recipient. No quarantine-and-release option |
+| ✅ | Anti-spam scope: inbound, unauthenticated only | All spam protection is skipped for authenticated sessions, for IP ranges with spam protection disabled, and for white-listed senders - so there is no outbound/authenticated-submission spam filtering at all |
+| ✅ | Attachment blocking by file-name wildcard | Independent of virus scanning and of the scan flag: every delivered message is checked when enabled, matching attachment file names against wildcard patterns… |
+| ✅ | Attachment blocking by name/extension | A configurable blocked-attachment list is applied after scanning; matching parts are stripped from the message rather than the message rejected. Independent of the virus scanner and available with scanning off. |
+| ✅ | Blocked-attachment list management | DB-backed list of wildcard + description rows (hm_blocked_attachments), editable through the COM API and the Control Panel "Blocked attachments" collection page. Matching is file-name only - no MIME type… |
+| ✅ | Bounded SpamAssassin session | Idle timeout scaled between SAMinTimeout (30s) and SAMaxTimeout (90s) plus an absolute session ceiling of SAMaxTimeout+30s, so a trickling spamd cannot pin the thread that acknowledges the message (discussion #18) |
+| ✅ | Built-in scanner test harness (EICAR + negative control) | TestClamAVConnect / TestCustomVirusScanner / TestClamWinVirusScanner each scan a plain file first (must not alarm) then an EICAR file (must alarm); exposed on the COM AntiVirus interface and wired to the Control Panel buttons |
+| ✅ | Built-in weighted test pipeline | Nine tests, each independently enabled and independently scored: DNSBL, HELO-host match, PTR, sender MX records, SPF, SURBL, DKIM, DMARC and SpamAssassin… |
+| ✅ | ClamAV connection timeout, load-scaled | Timeout computed by TimeoutCalculator between ClamMinTimeout (15s) and ClamMaxTimeout (90s), both settable in hMailServer.ini and surfaced on the Control Panel ClamAV tab |
+| ✅ | ClamAV integration (clamd TCP + clamscan) | Native clamd client (host/port, INI ClamMinTimeout/ClamMaxTimeout bounds) plus a clamscan/ClamWin command-line path; the whole spool file is scanned first, then every MIME attachment is written to a temp file and scanned individually… |
+| ✅ | ClamAV via clamd INSTREAM | TCP host+port only. Sends "nINSTREAM\n", then 4-byte big-endian length-prefixed 4096-byte chunks, then a zero-length terminator, and matches the reply against ^stream.*: (.*) FOUND$ |
+| ✅ | ClamWin (local clamscan.exe) scanner | Launches clamscan with --database and --tempdir; exit code 1 means infected, and the virus name is reported as "Unknown" because the CLI output is not parsed. Executable path is force-quoted against unquoted-path hijack |
+| ✅ | Concurrency cap of 10 parallel scans | Interlocked counter caps simultaneous scanners at MaxRunningScanners=10. Caveat: after waiting 60s (or 10 failed CAS attempts) it proceeds without reserving a slot — and because the matching decrement still runs, the counter drifts negative and the cap stops meaning anything — [see defects](#defects-found-by-the-audit) |
+| ✅ | Custom command-line virus scanner | Any external scanner can be wired in by executable path plus a 'virus found' return code, launched through ProcessLauncher and bounded by [Settings] ExternalProcessTimeout. |
+| ✅ | Custom external command-line scanner | Runs any executable; %FILE% is substituted anywhere in the command line, otherwise the quoted file path is appended. A configurable exit code means "infected"; virus name is again "Unknown" |
+| ✅ | Custom-scanner presets in the Control Panel | One-click command lines and exit codes for Microsoft Defender (MpCmdRun), Sophos savscan, ESET ecls, Bitdefender bdscan and Kaspersky avp.com, plus Test buttons for all three scanner types and ClamWin auto-detect |
+| ✅ | DKIM and DMARC as scored tests | DKIM permfail and DMARC reject/quarantine each contribute their configured failure score; a DMARC p=quarantine verdict is scored exactly like p=reject (there is no quarantine store to honour it), and p=none is logged only |
+| ✅ | DNSBL / RBL checking | Multiple configurable lists, each with its own DNS host, expected-result expression, score and rejection text. Expected results support pipe-separated alternatives, last-octet ranges (127.0.0.1-5) and wildcards… |
+| ✅ | DNSBL check timing | [Settings] DNSBLChecksAfterMailFrom (default 1) moves the pre-transmission checks from connect time to after MAIL FROM; hosts listed as incoming relays are switched to post-transmission scoring instead of pre-transmission rejection. |
+| ✅ | DNSBL check timing is configurable | DNSBLChecksAfterMailFrom (default 1) moves blacklist lookups from connect time to after MAIL FROM, so a blacklisted client is not paying DNS cost before it has identified itself |
+| ✅ | DNSBL lists with per-list score and reject text | Each configured blacklist has host, expected result, score and reject message, and is checked against the originating IP; list managed via COM/Control Panel collection editor |
+| ✅ | External scanner processes are bounded and killed | Scanner launches set a 20s "slow" warning and are then hard-bounded by ExternalProcessTimeout (default 300s), after which the child is TerminateProcess'd with a 5s grace so the delivery thread is never lost… |
+| ✅ | Fail-open on scanner failure | A scanner error (cannot connect, cannot launch, unparseable reply) is reported as HM5406 and then treated as NoVirusFound, so the message is delivered unscanned… |
+| ✅ | Fixed HTTP endpoint surface (no user-defined routes) | The built-in web-services listener serves only a fixed set of paths - ACME challenges, /.well-known/mta-sts.txt, Thunderbird autoconfig and Outlook autodiscover; there is no way to register a script- or plugin-backed route |
+| ✅ | Greylisting | Classic sender/recipient/IP triplet store with configurable initial delay, initial-delete and final-delete windows, per-domain opt-out, IP whitelist, bypass on SPF pass… |
+| ✅ | Greylisting with bypasses and per-domain opt-out | Triplet-based greylisting with initial delay and two expiry windows, a dedicated IP white list, bypass on SPF pass, bypass when the connecting IP is the sender domain's A or MX record, per-recipient-domain enable flag… |
+| ✅ | HELO host check | Resolves the HELO name and requires the connecting IP to appear among its A/AAAA records; accepts a bracketed literal [addr] or [IPv6:addr] that matches the peer; skips loopback; treats DNS failure as not-spam. Scored… |
+| ✅ | Mark / delete thresholds and message tagging | Score >= delete threshold rejects with 550/554 and the failing test's message; score >= mark threshold sets the spam flag and adds X-hMailServer-Spam, X-hMailServer-Reason-N per failed test, X-hMailServer-Reason-Score… |
+| ✅ | Maximum message size to scan | Messages larger than AntiVirus.MaximumMessageSize (KB) are skipped entirely and delivered unscanned; 0 means unlimited |
+| ✅ | Multiple engines chained per scan | ClamWin, then custom scanner, then ClamAV are each run if enabled, in that fixed order; the first VirusFound short-circuits the rest. Order is not configurable |
+| ✅ | Outbound webhooks | No configurable webhook feature; webhook delivery exists only as an admin-written event-script handler using MSXML2.ServerXMLHTTP, shipped as a Control Panel template. Synchronous by default… |
+| ✅ | Per-destination outbound rate shaping | [Settings] MaxOutboundPerDestinationPerMinute caps messages sent to one recipient domain per minute; over the cap the delivery is deferred non-fatally and retried. 0 = unlimited (default). |
+| ✅ | Per-fetch-account scanning of externally downloaded mail | The POP3 external fetcher sets the scan flag from the fetch account's UseAntiVirus property, so downloaded mail can be scanned independently of any IP range |
+| ✅ | Per-IP submission rate limiting | [Settings] MaxSubmissionsPerIPPerMinute caps transactions started per source IP per minute, answering 421 when exceeded. 0 = unlimited (default). |
+| ✅ | Per-test timing instrumentation | Each spam test is timed and logged by name with its score contribution; anything taking 10s or more is escalated from debug to the application log, so a sick DNS resolver or stalled spamd is identified by name (discussion #18) |
+| ✅ | Pre- vs post-transmission test split | DNSBL, HELO, PTR, MX and SPF run before the body is transferred (rejectable at RCPT/MAIL with 550); SURBL, DKIM, DMARC and SpamAssassin run after the body arrives and reject with 554 |
+| ✅ | PTR / reverse-DNS check | Requires a PTR record for the peer whose forward A/AAAA resolution includes the peer IP (full FCrDNS round trip); DNS failure is treated as not-spam. Separately… |
+| ✅ | Return-Path injected for SA then removed | A Return-Path built from the envelope sender is written as the topmost header before handing the file to spamd (so SA's SPF and stock rules work) and deleted afterwards; the rewrite is skipped if the message cannot be reloaded… |
+| ✅ | Safe degradation when spamd misbehaves | Truncated, short-read, EOF-early or zero-length responses abort the rewrite and keep the original message; the test-incomplete case is reported as HM5508 ("message was accepted without a SpamAssassin verdict"), i.e. fail-open by design |
+| ✅ | Scan applies to both directions, gated per IP range | Virus scanning is not inbound-only: the per-message scan flag is set when the connecting IP range has Virus protection enabled, and the scan itself runs at delivery time… |
+| ✅ | Scan concurrency cap and size ceiling | Messages over VirusScanMaxSize KB are skipped entirely, and a global running-scanner counter makes new scans wait (10 retries) before giving up, so a slow scanner cannot fan out across the thread pool. |
+| ✅ | Scan scope: whole message plus each attachment | The complete spool file is scanned first, then every MIME attachment is extracted to a GUID-named temp file and scanned individually; first detection wins and temp files are deleted either way… |
+| ✅ | Score merging or fixed score | If X-Spam-Status starts with YES the message scores either SpamAssassin's own score merged into the hMailServer total, or a flat configured score. Caveat: the merge parser takes only the integer part before the first '.' of score= |
+| ✅ | Scored test pipeline with early exit and per-test timing | Nine tests run in a fixed order (DNSBL, HELO, PTR, MX, SPF, SURBL, DKIM, DMARC, SpamAssassin), split pre/post transmission, aborting as soon as the mark/delete threshold is reached… |
+| ✅ | Sender-domain MX check | Scores mail whose envelope-from domain publishes no MX records; a failed DNS query is treated as having records. |
+| ✅ | Sender/IP white list with wildcard matching | Cached list of (IP range, sender-address wildcard) entries; a match bypasses all spam protection including greylisting. Cache is refreshed lazily under a shared mutex |
+| ✅ | Size ceiling on post-transmission scanning | Post-transmission tests are skipped above AntiSpam.MaximumMessageSize, hard-capped at the MIME parser's 80MB limit because scanning above it could not load the message and the post-scan rewrite would destroy it |
+| ✅ | SpamAssassin integration | Native spamd client speaking PROCESS SPAMC/1.2, with configurable host/port, score, merge-score mode and its own min/max timeouts. Runs as the last (post-transmission) test. |
+| ✅ | spamd integration over SPAMC/1.2 PROCESS | Connects to the configured host/port and sends "PROCESS SPAMC/1.2" with a Content-length header, streams the whole message in 20KB chunks, then replaces the spool file with spamd's rewritten message (move or copy, per SAMoveVsCopy) |
+| ✅ | SURBL (URI blacklists) | Extracts URLs from plain and HTML bodies with a regex, strips soft-line-break artefacts, de-duplicates, trims to the registrable domain via the TLD table, skips known boilerplate hosts (w3.org, schemas.microsoft.com… |
+| ✅ | SURBL URL-reputation checks | Extracts URLs from the plain and HTML bodies by regex, caps at 15 URLs per message, skips well-known boilerplate hosts (w3.org, schemas.microsoft.com, fonts.googleapis/gstatic)… |
+| ✅ | Version-tolerant SPAMD response parsing | Accepts any SPAMD/<version> banner as long as the status is EX_OK (upstream required 1.1 exactly), then requires a well-formed non-negative Content-length; malformed… |
+| ⬜ | Admin-reviewable quarantine | Messages are marked (X-hMailServer-Spam, subject prefix, reason headers) or deleted at threshold; nothing is held in a reviewable store for release. Explicitly identified as a gap in the roadmap. |
+| ⬜ | Admin-reviewable quarantine (hold and release) | Nothing is ever held for review: spam is scored, tagged or deleted, and virus hits are deleted or stripped. No quarantine store, no release workflow, no per-user or per-admin review queue. Explicitly identified as a gap |
+| ⬜ | Bayesian / statistical / ML classifier | No built-in learning filter, no per-user training, no autolearn feedback path; statistical filtering is only available by delegating to SpamAssassin |
+| ⬜ | Binary plugin / module loading API | No plugin loader, no DLL extension point, no registered filter chain. The only extension surfaces are the COM API and the Active Scripting event file |
+| ⬜ | Configurable fail-closed / defer on scanner outage | No setting exists to hold, defer (4xx) or reject a message when the scanner is unreachable - fail-open is hard-coded. No AVFailAction / fail-closed key anywhere in the source or INI |
+| ⬜ | Milter protocol support | Not implemented and explicitly ruled out in favour of an HTTP hook: "an HTTP filter hook modelled on Stalwart's MTA Hooks is much more idiomatic here than milter" |
+| ⬜ | Native HTTP filter hook (rspamd / MTA-hook style) | No way to put an external engine in the SMTP path natively; the roadmap names this as the intended mechanism and notes the HTTP client and listeners it would build on already exist |
+| ⬜ | Other clamd transports and commands | No Unix/named-socket support, no TLS to clamd, and no use of PING, VERSION, STATS, MULTISCAN or zINSTREAM - INSTREAM is the only command the codebase ever sends |
+| ⬜ | Per-account spam settings | Spam thresholds, scores and test enablement are global. The only sub-global controls are the per-domain greylisting toggle, the per-IP-range spam-protection switch… |
+| ⬜ | Per-user spamd preferences / other spamc features | No User: header is sent, so all mail is scanned under spamd's global preferences; no SYMBOLS/REPORT/CHECK commands, no TELL learning, no Unix-socket or TLS transport, no per-recipient SA profile |
+| ⬜ | Sender/domain blacklist object | There is a white list business object but no matching sender or domain blacklist; blocking a sender means an IP-range deny, a rule, or a DNSBL. No named blocklist collection in the BO layer or COM API |
+| ⬜ | Tarpitting | Not implemented. The COM properties TarpitDelay and TarpitCount survive only as stubs marked "OBSOLETE: To be removed in v6" that return 0 and ignore writes; there is no delay logic anywhere in the SMTP or Common code. |
+| ⬜ | Virus-scanner failure policy is fail-open and undocumented | A scan that errors, times out or cannot reach the scanner returns 'no virus' and the message is delivered unscanned. There is no configurable fail-closed/defer option and no admin-visible statement of the posture… |
+
+### Storage, accounts and data model
+
+80 shipped · 0 underway · 10 not started · 0 deferred
+
+| | Capability | Detail |
+|:-:|---|---|
+| ✅ | Account address validation is filesystem-constrained | Beyond normal address validation the local part additionally forbids \ / ? * \| and spaces/quotes, and the whole address is capped at 254 characters, because the address becomes a directory name in the message store… |
+| ✅ | Account and domain signatures with four combination modes | Plain-text and HTML signatures on both account and domain; the domain method is Set-if-not-specified / Overwrite-account / Append-to-account / none… |
+| ✅ | Account delete cascade | Deletes all folders and their messages, force-deletes the Inbox, deletes rules, fetch accounts, group memberships and owned ACL grants, deletes the hm_accounts row… |
+| ✅ | Account forwarding | Per-account forward address with keep-original and abort-if-spam-flagged flags, integrated with SRS rewriting and the rule loop counter. |
+| ✅ | Account rename rewrites dependent data | NameChanger renames the on-disk account/domain folder and rewrites account addresses, forward addresses, alias names and values, distribution-list addresses and list member addresses; a domain rename cascades through all of them. |
+| ✅ | Account size tracked by an in-memory delta cache | AccountSizeCache seeds from SUM(messagesize) on first read then applies +/- deltas on every save and delete; it is per-process and is reset on account save/delete… |
+| ✅ | Aliases, catch-all and plus-addressing | Per-domain aliases and domain aliases, a domain catch-all address, and per-domain plus-addressing with a configurable separator character. None of the address-resolution surface appears in the inventory. |
+| ✅ | Automatic reconnect and statement retry | Every Execute retries up to 6 times, reconnecting on attempts 2 and 4 and after any DALConnectionProblem result, with a 1-second pause between tries. |
+| ✅ | Background indexer thread with quick/full modes | Dedicated worker wakes every minute; a "quick" pass indexes only the newest IndexerQuickLimit (default 1000) messages, a "full" pass runs every IndexerFullMinutes (default 720) up to IndexerFullLimit (default 25000) rows. |
+| ✅ | Backup and restore | BackupManager/BackupExecuter with a scheduled BackupTask, selectable components (settings, domains, messages), 7za compression, an optional messages-database-only mode (BackupMessagesDBOnly), and COM/Control Panel surfaces… |
+| ✅ | Backup/restore of settings, domains and messages | Backup writes an XML document of business objects plus (optionally) the whole data directory, 7z-compressed; BackupMessagesDBOnly skips the files and keeps only the rows. Requires all message files to be inside the data folder. |
+| ✅ | Bound parameters on MSSQL/SQL CE only | ADO and SQL CE report GetSupportsCommandParameters()==true; MySQL and PostgreSQL report false, so their statements are rebuilt by literal interpolation with SQLStatement::Escape rather than server-side binding. |
+| ✅ | Bulk delete by account bypasses path reconstruction | DeleteByAccountID selects messagefilename and passes it straight to DeleteFile — which works only for rows still holding a full path, so partial-filename rows leave orphan files behind (logged as error 5024). |
+| ✅ | Catch-all is the domain postmaster field | There is one catch-all per domain (hm_domains.domainpostmaster). If no account, alias, list or route matches, delivery is redirected to it; if it is blank the recipient is rejected with "Unknown user". No server-wide catch-all exists. |
+| ✅ | Continuous upgrade chain 0 → 6005 | 57 registered upgrade steps from hMailServer 1.0 to 6.2; from step 5001 onward every step ships in four dialects (MSSQL, MSSQLCE, MySQL, PGSQL). Run by DBUpdater.exe, not by the service. |
+| ✅ | Data Directory Synchronizer (two-way reconcile tool) | Import mode adds .eml/.hma files found on disk into the database via Utilities.ImportMessageFromFile; Delete mode removes files that have no matching row. Domain-scoped or whole-directory. |
+| ✅ | Database-outage behaviour | A recipient lookup that fails because the database did not answer returns 451 rather than 550, so a database locked by a backup defers mail instead of bouncing it… |
+| ✅ | DBSetup wizard | Wizard flow (Welcome → select database type → connection info → action → service dependency → perform task → completed) supporting Microsoft SQL Server, MySQL/MariaDB and PostgreSQL… |
+| ✅ | DBSetupQuick — unattended installer path | Headless entry point used by the installer: creates the database if absent, otherwise shells DBUpdater.exe /SilentIfOk (forwarding /silent) and propagates the child exit code… |
+| ✅ | DBUpdater — chained schema upgrades | Registers a chain of upgrade steps from schema 0 through 6005 and applies them in sequence. Scripts exist for four backends (MSSQL, MySQL, PGSQL and MSSQLCE from 5001 onward); the older pre-5001 steps ship MSSQL and MySQL only. |
+| ✅ | Dead legacy tables left behind on upgraded databases | hm_serverlog, hm_filters, hm_deliverylog and hm_deliverylog_recipients are created by the 1.2→1.4 and 3.301→3.4 steps and never dropped on MySQL/PGSQL; no current code references them, and fresh installs never get them. |
+| ✅ | Delivery-queue poll query has no supporting index | The queue scan filters messagetype/messagelocked/messagenexttrytime and orders by messagesize, messagecurnooftries, messageid; the only relevant index is idx_hm_messages_type on messagetype alone… |
+| ✅ | Distribution lists | List modes (public/membership/announcement), require-SMTP-authentication, a require-from address restriction, and AD bulk-import of members from the Control Panel. No moderation, no self-subscribe… |
+| ✅ | Domain aliases | hm_domain_aliases rewrites the domain part of both sender and recipient addresses before any account/alias/list lookup, and is applied again when comparing list owners and members. |
+| ✅ | Domain delete cascade | Deletes all accounts, aliases, distribution lists and domain aliases, then the hm_domains row, then the {DataDir}\{domain} directory tree. |
+| ✅ | Domain limits enforced only at object save | Max accounts / aliases / distribution lists (individually toggleable), max per-account size and total domain size are all checked in PreSaveLimitationsCheck when the object is created or edited — never during mail flow… |
+| ✅ | Embedded SQL CE as the zero-config default | The installer's default choice is "Use the built-in database engine", which registers SQL Server Compact 4.0; the connection string caps the file at 4000 MB, and the create script used is CreateTablesMSSQL.sql. |
+| ✅ | Envelope recipient de-duplication | After alias, list and catch-all expansion, AddRecipient_ drops any address already present (case-insensitive), so overlapping lists do not produce duplicate copies. |
+| ✅ | Fixed-size connection pool with bounded acquisition | Pool size from [Database] NumberOfConnections; waiters block on a condition variable with a DBConnectionAcquireTimeout deadline, and a timeout marks the database unavailable so callers return 451 instead of 550. |
+| ✅ | Folder depth cap | Hard limit of 25 nesting levels enforced when validating folder paths. |
+| ✅ | Four SQL backends behind one abstraction, with a continuous upgrade chain | MySQL/MariaDB (vendored MariaDB Connector/C, caching_sha2/ed25519 capable), MS SQL via ADO, PostgreSQL via libpq, and embedded SQL CE for zero-configuration installs, all behind DALConnection/DALRecordset with parameterised queries… |
+| ✅ | Four SQL backends behind one DAL | MS SQL Server (ADO/OLE DB), MySQL/MariaDB (vendored MariaDB Connector/C as libmysql.dll), PostgreSQL (libpq) and SQL Server Compact Edition, selected by an enum and built by a factory; every persistence class is backend-agnostic. |
+| ✅ | Groups as ACL principals | hm_groups / hm_group_members give named account groups usable as an ACL principal type, with their own cache TTL setting. |
+| ✅ | GUID-named .eml files, hashed into 256 sub-folders | Filename is `{GUID}.eml`; account mail lives at {DataDir}\{domain}\{localpart}\{first 2 GUID chars}\{filename}. The 2-character level bounds directory width per account. |
+| ✅ | hm_imapfolders with per-folder UID and MODSEQ counters | Unique index on (accountid, parentid, name); foldercurrentuid and foldercurrentmodseq are monotonic counters bumped with UPDATE ... = x + 1 then re-read, mirrored into the in-memory folder container. |
+| ✅ | hm_message_metadata header index | Indexes exactly five fields per delivered message — date (UTC), from, subject, to, cc — keyed by account+folder+message with a unique index. Values are truncated to 100 characters on write even though the columns are varchar(255). |
+| ✅ | IMAP QUOTA extension | QUOTA is advertised and GETQUOTA/GETQUOTAROOT report a single unnamed root with STORAGE used/limit in KB; when the account has no quota the resource list is returned empty. Gated by the enableimapquota setting. |
+| ✅ | Index is consumed by IMAP SORT only | IMAPSort loads the metadata map for From/Subject/To/CC/Date; IMAP SEARCH does not touch it at all and calls PersistentMessage::LoadHeader per message, so header search is unindexed even when indexing is on. |
+| ✅ | Indexing is off by default | The MessageIndexing setting ships as 0; with it off nothing populates hm_message_metadata and IMAP SORT falls back to reading each message header from disk. |
+| ✅ | Max message size, global and per-domain | The effective limit is min(global maxmessagesize, domain maxmessagesize where non-zero) in KB. Enforced three times: against the MAIL FROM SIZE= estimate (552), against the actual buffer during DATA, and at IMAP APPEND… |
+| ✅ | Message archiving | [Settings] ArchiveDir writes a raw copy of every message into {ArchiveDir}\{senderDomain}\{senderUser}\ trees, with an optional hardlink mode. No retention, no per-domain scope, no index, no search, no immutability or legal hold. |
+| ✅ | Message delete order of operations | DELETE the hm_messages row → write a QRESYNC tombstone (if it was in a folder) → delete hm_messagerecipients rows (queue messages only) → adjust the account size cache → delete hm_message_metadata → zero the in-memory id → delete the f… |
+| ✅ | Message flags are a fixed 8-bit bitmask | messageflags is tinyint unsigned holding Seen/Deleted/Flagged/Answered/Draft/Recent/VirusScan/Spam. SELECT advertises those five system flags and no \* in PERMANENTFLAGS, so client-defined IMAP keywords cannot be stored. |
+| ✅ | Message metadata indexer | A background worker populates hm_message_metadata (date, from, subject, to, cc), which is what makes IMAP header SEARCH and SORT indexed rather than linear. Tunable via IndexerFullMinutes/IndexerFullLimit/IndexerQuickLimit… |
+| ✅ | Message rows carry DSN NOTIFY per recipient | hm_messagerecipients.recipientdsnnotify (added at DB version 6005) records the RFC 3461 NOTIFY setting, and LocalDelivery suppresses the failure DSN when the sender opted out. |
+| ✅ | Message-store consistency scan | Hourly task walks every hm_messages row, resolves the on-disk path and reports rows whose file is missing — as a Prometheus gauge and as a tab-separated recovery report in the log directory… |
+| ✅ | Message-store integrity: fsync and consistency check | MessageStoreFsync=1 forces each received message to physical storage (_commit/FlushFileBuffers) before it is acknowledged; MessageStoreConsistencyCheck=1 runs a read-only periodic cross-check of message rows against files on disk… |
+| ✅ | Missing-file placeholder generation | If a file referenced by a row is gone at retrieval time, the server synthesises a MESSAGE_FILE_MISSING notice in its place, resizes the row and logs error 5026, so the client gets a readable message instead of an error. |
+| ✅ | MSSQL failover partner and provider override | [Database] Provider and DatabaseServerFailoverPartner are honoured; with a failover partner set the provider defaults to SQLNCLI, otherwise MSOLEDBSQL, and FailoverPartner= is appended to the connection string. |
+| ✅ | Native vacation / auto-reply | Per-account vacation subject, body, on/off and an expiry date, with a spam-flag guard and per-sender dedupe. Cited in the roadmap as the irony behind the missing Sieve vacation extension… |
+| ✅ | Object caches with per-type TTLs | Domain, account, alias, distribution-list and group caches each have their own TTL setting (default 60) plus a master usecache flag; there is also an inbox-id cache and a short-lived message cache used to hand a just-accepted message t… |
+| ✅ | OpenTelemetry spans for database queries | Each statement emits a `db.query` client span with `db.system` (mysql/mssql/postgresql/sqlce) and a redacted `db.statement`, parented to the active protocol-command span; no-op unless OtelEndpoint is set. |
+| ✅ | Optional fsync before acknowledgement | MessageStoreFsync=1 flushes the message file to disk before the transmission buffer completes, trading throughput for durability across a power loss. Off by default. |
+| ✅ | Orphaned-metadata cleanup | DeleteOrphanedItems runs once, when the indexer thread starts; there is no scheduled sweep, so metadata for rows deleted while indexing was disabled lingers until the next service restart. |
+| ✅ | Partial filenames in the database | hm_messages.messagefilename normally stores only `{guid}.eml` and the path is reconstructed from account address + location; full absolute paths are still tolerated for pre-5.4 rows… |
+| ⬜ | Password hash upgrade on read | accountpwencryption records the algorithm (0 none, 1 Blowfish, 2 MD5, 3 SHA256, 4 PBKDF2, 5 Argon2id, 6 DPAPI); but **the upgrade never persists** — the re-hash writes to the in-memory Account object and no caller saves it, so a legacy hash stays legacy forever — [see defects](#defects-found-by-the-audit)… |
+| ✅ | Per-account forwarding | hm_accounts carries forwardenabled / forwardaddress / forwardkeeporiginal / forwardabortspamflagged; optional envelope-from rewriting on forward is controlled by RewriteEnvelopeFromWhenForwarding. |
+| ✅ | Per-account mailbox quota | accountmaxsize in MB; Account::SpaceAvailable compares AccountSizeCache + incoming size against it. Zero means unlimited. |
+| ✅ | Per-backend connection + recordset pair | ADOConnection/ADORecordset, MySQLConnection/MySQLRecordset, PGConnection/PGRecordset, SQLCEConnection/SQLCERecordset all implement DALConnection/DALRecordset; MySQL client is loaded dynamically through MySQLInterface. |
+| ✅ | Per-backend DDL macro expanders | Upgrade scripts embed `@@@macro@@@` directives (drop column, rename column, add index...) that each backend expands into its own dialect, so one logical upgrade step is written four ways only where it must be. |
+| ✅ | Per-domain aliases | hm_aliases maps a full address to any target address (local or external) with an active flag; resolution loops with a 25-level recursion cap and an inactive alias produces "Alias is not active." |
+| ✅ | Plus addressing (subaddressing) | Enabled per domain with a configurable separator character (validated as non-empty when enabled); everything from the separator to @ is stripped before account lookup. The tag is not preserved anywhere in the data model. |
+| ✅ | Pre-upgrade data prerequisites | A prerequisite registry runs data fixes before the step that needs them — currently PreReqNoDuplicateFolders, which renames duplicate IMAP folders before the 5200 unique index is applied. Only one prerequisite is registered. |
+| ✅ | Public folders are exempt from quota | APPEND checks account quota only when the destination is not a public folder, and public-folder messages carry accountid 0 so they never contribute to any account's size — public folder growth is entirely unbounded. |
+| ✅ | Public-folder message path | Public folder mail lives at {DataDir}\{PublicFolderDiskName}\{2 chars}\{filename}; the public folder disk name comes from the imappublicfoldername setting (default `#Public`). |
+| ✅ | QRESYNC expunge tombstones (hm_imapexpunged) | Every expunge writes account+folder+UID+modseq so VANISHED (EARLIER) can be replayed. Added at DB version 6003. |
+| ✅ | Queue files are flat in the data-directory root | Messages in the Delivering state get no fan-out folder at all — the file sits directly in {DataDir}. A large backed-up queue therefore produces one very wide directory. |
+| ✅ | Quota is enforced at delivery, not at RCPT TO | CheckAccountQuotas_ runs inside LocalDelivery, after the message has been accepted, so an over-quota recipient produces a bounce/DSN ("Inbox is full") rather than an SMTP-time 4xx/5xx — i.e. backscatter to a possibly forged sender… |
+| ✅ | Quota model: per-account and per-domain size limits only | Account and domain maximum sizes are enforced, but only during local delivery, so an over-quota recipient generates a DSN (backscatter) rather than a 5xx at RCPT TO. No warning threshold… |
+| ✅ | RFC 4314 ACLs with inheritance | hm_acl stores per-folder rights (l r s w i p k t e x a as a bitmask) for a user, a group, or "anyone"; ACLManager walks up to the nearest ancestor that has an ACL, and the folder owner always gets full rights. |
+| ✅ | Server configuration lives in hm_settings as a name/value property set | Single table of settingname / settingstring (varchar 4000) / settinginteger, loaded into a PropertySet; secret-valued properties are stored through Crypt::ProtectSecret. Everything not in hm_settings is in hMailServer.INI (paths… |
+| ✅ | Signatures only append to existing body parts | The signature is appended to the text/plain part and/or the text/html part if they already exist; no part is created, so a message with neither (or an unusual MIME structure) silently gets no signature… |
+| ✅ | Single #Public shared namespace | A folder is a public folder purely by having accountid 0; the namespace name is configurable via imappublicfoldername (default `#Public`) and is reported as the one shared namespace. |
+| ✅ | Single-recipient file reuse | When a queue message has exactly one local recipient the file is moved into the account folder and the same hm_messages row is repurposed (accountid/folderid set, state → Delivered) rather than copied. |
+| ✅ | Slow-query log with SQL literal redaction | Queries over SlowQueryLogMilliseconds are logged with every single-quoted literal collapsed to '?' (handles '' and backslash escapes) so credentials never reach the log; also feeds ServerStatus query counters. |
+| ✅ | SRS and BATV reverse resolution in the recipient parser | An SRS0 address at a local domain is HMAC-verified and rewritten to the original sender; a prvs= address is verified and stripped to the original local recipient. Both run before plus-addressing… |
+| ✅ | Transactions | BeginTransaction/Commit/Rollback exist on the connection manager but are only reachable from the COM API; the internal message-save path is not transactional — it inserts hm_messages with messagelocked=1, inserts recipients… |
+| ✅ | UID assignment serialised in-process only | FolderManipulationLock is a static std::set guarded by a process-wide mutex, so strictly-ascending UID assignment holds for one server instance but is not enforced by the database — a second node against the same schema could interleav… |
+| ✅ | Version pin enforced at startup | REQUIRED_DB_VERSION 6005 is compiled in; the service refuses to start and logs error 5011 if hm_dbversion is lower ("run DBUpdater") or higher ("upgrade hMailServer"). |
+| ✅ | Zero-byte and folderless messages are refused at save | AddObject aborts if the message size is 0, and reports error 5213 if a Delivered message has no folder id — the two ways a row could otherwise point at nothing. |
+| ⬜ | Cross-account (other-users) mailbox sharing | The other-users namespace is hard-coded to NIL, so no user can open another user's mailbox and there is no delegation or Send-As; sharing exists only through #Public. |
+| ⬜ | Deduplication / hardlinking of delivered mail | A message to N local recipients is written N times: CopyFromQueueToInbox does a full FileUtilities::Copy per recipient. Hardlinking exists only in the archiver, never in the live store, and there is no content-hash dedup. |
+| ⬜ | Disk-full behaviour | Nothing owns it. A repo-wide search finds no GetDiskFreeSpace/ENOSPC/ERROR_DISK_FULL handling anywhere, so there is no free-space precondition before accepting a message, no low-space alarm… |
+| ⬜ | Full-text / body index | BODY and TEXT search load and substring-scan each message body and HTML body in turn — a linear scan of the mailbox, with no attachment text extraction and no posting-list table. |
+| ⬜ | Message retention / auto-expiry policy | There is no "delete mail older than N days" anywhere — no such setting, no scheduled task. The scheduled-task list is greylisting cleanup, expired IP ranges, TLS-RPT, log retention, message-store consistency… |
+| ⬜ | Quota warning thresholds and per-account send quotas | No warning percentage, no notification to the user or admin as a mailbox fills, and no per-account outbound message/recipient cap — rate limiting is per-IP and per-destination-domain per minute only. |
+| ⬜ | Referential integrity in the schema | No FOREIGN KEY or ON DELETE CASCADE anywhere in any CreateTables script; all cascades are application-level loops in the Persistent* classes, so a crash mid-delete can leave orphans. |
+| ⬜ | TLS to the database server | The PostgreSQL conninfo is built from host/port/user/password/dbname only — no sslmode — and MySQLConnection sets no mysql_options TLS parameters. Only the MSSQL path can get encryption… |
+| ⬜ | Tombstone table is never pruned by age | hm_imapexpunged rows are only removed when the whole folder is deleted; there is no retention window and no scheduled cleanup, so the table grows for the life of a busy mailbox. It also has no primary key. |
+| ⬜ | Upgrade/migration documentation | docs/ contains only DiagnosingStalledMail.md and HighAvailabilityRunbook.md; the roadmap names an upgrade/migration note covering the database upgrade chain, and an index for docs/, as remaining documentation gaps. |
+
+### Routing, queue and delivery
+
+19 shipped · 0 underway · 4 not started · 1 deferred
+
+| | Capability | Detail |
+|:-:|---|---|
+| ✅ | AWStats journal as the only delivery event stream | A tab-separated file journal writing time, sender, recipient, sender IP, recipient IP, SMTP code and byte count, called from the SMTP rejection paths, LocalDelivery, ExternalDelivery and SMTPDeliverer… |
+| ✅ | Bounce / NDR generation | Generates a mailer-daemon message from the SEND_FAILED_NOTIFICATION template with %MACRO_SENT%/%MACRO_SUBJECT%/%MACRO_RECIPIENTS%/%MACRO_ORIGINAL_HEADER% substitution, marks it auto-generated, counts it in ServerStatus… |
+| ✅ | Bounce-loop and backscatter suppression | Never bounces a mailer-daemon sender or a null sender, honours the Auto-Submitted header and a rule-loop counter, and increments the loop count on the generated NDR. |
+| ✅ | Delivery worker pool and outbound source IP | Configurable delivery thread count, and SMTPDeliveryBindToIP pins the outbound socket to a chosen local address (needed for PTR/SPF-correct multi-IP hosts). Recipients per outbound transaction are capped by MaxSMTPRecipientsInBatch. |
+| ✅ | End-of-data finalization deadline | If the accept/save/queue work after the final dot (or last BDAT chunk) exceeds [Settings] FinalizationTimeout, the message is discarded and a temporary 451 is returned rather than letting the relaying MTA time out and duplicate - the f… |
+| ✅ | External POP3 account fetcher | Scheduled download from remote POP3 accounts on behalf of local accounts, with per-account UID tracking, a delete-after-days policy, MaxNumberOfExternalFetchThreads, and an OnExternalAccountDownload script hook… |
+| ✅ | Four list modes | Public (anyone may post), Membership (members only), Announcement (one nominated owner address only) and DomainMembers (any sender in the list's own domain). |
+| ✅ | Global SMTP relayer (smart host) | Fallback relayer with port, optional AUTH credentials and its own connection-security setting; deliveries to identical target/port/credentials are merged into a single connection. |
+| ✅ | Incoming relays (trusted forwarders) | Configured relay IPs get spam scoring deferred to post-transmission rather than pre-transmission rejection, so a trusted forwarder's connection is not judged on its own IP. |
+| ✅ | MX resolution and host-attempt limits | Manual MX resolution with preference ordering; MaxNumberOfMXHosts truncates the candidate list, and MXTriesFactor limits hosts attempted per retry to (retries+1)*factor. A fixed relay host may carry several pipe-separated hostnames. |
+| ✅ | Per-route address allow-list | A route either applies to all addresses in the domain (routealladdresses) or only to the explicit addresses in hm_routeaddresses; a non-listed address at a routed external domain is rejected with "Recipient not in route list." |
+| ✅ | Recursive member permission and expansion checks | Before accepting, the server recursively checks the sender may reach every member (lists inside lists included); expansion and permission recursion are both capped at 25 levels. |
+| ✅ | Relay controls by IP range | Per-range option bits for allow-SMTP, the four relay permissions (local/remote to local/remote), the four require-SMTP-AUTH permissions, spam-protection and virus-protection opt-out, require-TLS-for-AUTH… |
+| ✅ | Retry schedule | Fixed retry count and fixed minutes-between-tries (global, or per-route override taking the maximum across matching routes), plus optional QuickRetries/QuickRetriesMinutes for the first N attempts (greylisting recovery) and QueueRandom… |
+| ✅ | Route and fetch-account passwords stored DPAPI-protected | routeauthenticationpassword and fapassword are written through Crypt::ProtectSecret, producing a machine-bound `DPAPI:` envelope by default with a Blowfish fallback; legacy Blowfish values are still read transparently… |
+| ✅ | Route target selection order | A rule-forced route id wins outright; otherwise recipients are grouped per domain and each domain is resolved to a route, then to the global SMTP relayer, then to MX… |
+| ✅ | Routes (per-domain smart host) | Wildcard-matched per-domain route with target host, port, credentials, connection security, retry count, retry interval, to-all-addresses or an explicit address list, and treat-sender/recipient-as-local flags… |
+| ✅ | Routes with wildcard domain matching | hm_routes stores domain pattern, target host/port, retry count and interval, connection security, optional relay authentication, and two "treat as local" flags (recipient and sender)… |
+| ✅ | Sender restrictions enforced at RCPT TO | UserCanSendToList_ applies the require-SMTP-authentication flag first, then the mode check, with distinct rejection texts ("SMTP authentication required.", "Not authorized owner.", "Not authorized domain.", "Not authorized sender.")… |
+| ⏸️ | hm_message_events message-trace table | Designed in detail in the roadmap — append-only table with trace id plus RFC Message-ID, event type, sender, recipient, remote IP, subject prefix, size, SMTP code, duration… |
+| ⬜ | Moderation, self-subscribe, per-list bounce handling | hm_distributionlists stores only address, enabled, requireauth, requireaddress and mode; there is no moderator queue, no subscribe/unsubscribe workflow and no per-list VERP or bounce processing. |
+| ⬜ | No post-delivery history table at all | On successful delivery the queue row is simply deleted (or, for a single local recipient, repurposed into the mailbox row); nothing records that the delivery happened… |
+| ⬜ | RFC 2369 List-* headers and RFC 8058 one-click unsubscribe | No List-Id, List-Unsubscribe, List-Post, List-Help, List-Owner, List-Archive or List-Unsubscribe-Post is ever emitted. Those header names occur in exactly one place in the tree: the DKIM oversigning "recommended headers" list. |
+| ⬜ | RFC 3464 machine-readable DSN format | Bounces are human-readable text only. No message/delivery-status part, no Final-Recipient / Action / Status / Diagnostic-Code fields, no message/rfc822 attachment of the original honouring the RET=FULL\|HDRS the server accepts at MAIL… |
+
+### Administration, API and Control Panel
+
+52 shipped · 0 underway · 8 not started · 0 deferred
+
+| | Capability | Detail |
+|:-:|---|---|
+| ✅ | ACME http-01 challenge serving (/.well-known/acme-challenge/) | Serves key authorizations from the in-process AcmeChallengeStore; rejects tokens containing a slash or longer than 256 characters. Always enabled on the web-services listener (not gated behind a setting). |
+| ✅ | Admin helper services | Active Directory account picker, DKIM RSA key-pair generator producing PEM + the DNS TXT p= value, password generator and strength meter, protected-secret storage, message-store consistency report parser. |
+| ✅ | Advertised authentication method | Autoconfig hard-codes <authentication>password-cleartext</authentication> for every server block; there is no OAuth2 authentication element even though the server has an OAuth2 token validator… |
+| ✅ | Authentication: HTTP Basic, single account | Only username "administrator" against the hMailServer.ini administrator password hash. No bearer tokens, no API keys, no scopes, no expiry, no per-key IP restriction — the admin password is replayed on every request. |
+| ✅ | Browser admin SPA served from the REST listener | Single self-contained HTML/CSS/JS page served unauthenticated at / and /index.html (it is only the login shell); every data call underneath uses the authenticated /api/v1 routes. Installed to {app}\WebAdmin by the installer. |
+| ✅ | COM / IDispatch administration API | 87 Interface* COM classes covering every configuration object (accounts, domains, aliases, lists, rules, routes, IP ranges, ports, certificates, backup, status, utilities). It is the seam every tool and third-party script uses… |
+| ✅ | COM automation surface size | 86 dual/IDispatch interfaces with 86 matching coclasses (80 forward declarations at the head of the file). Entry point is IInterfaceApplication with 20 members including Start/Stop, Settings, Domains, Database, Utilities, Status… |
+| ✅ | Control Deck views | Four views only: Dashboard (animated KPI tiles + live session counts, 3 s poll), Domains (with account drill-down, create and delete), Delivery queue (retry / delete per message), DANE/TLSA (copy-all record block). |
+| ✅ | Control Panel (WPF, .NET 8) | The sole GUI since the classic Administrator was removed in 6.2.10: ~30 views covering domains, accounts, routes, rules, IP ranges, ports, SSL certificates, server and feature settings, queue, logs, status, backup… |
+| ✅ | Ctrl+K command palette over pages and individual settings | Fuzzy palette searches both navigation leaves and individual settings; picking a setting opens the page hosting it. The settings index is generated by `build/generate-settings-index.ps1` — but **that script is not wired into the build or CI**, so the committed index is effectively hand-maintained and can drift. |
+| ✅ | Data-directory diagnostic | A built-in diagnostic verifies the data directory is reachable and writable, alongside the backup-directory test, in the Control Panel "Run diagnostics" set. |
+| ✅ | DataDirectorySynchronizer | Wizard (Welcome → synchronisation mode → select domain → progress) that reconciles the on-disk data directory with the database, per-domain or wholesale. |
+| ✅ | DELETE /api/v1/accounts/<address> | Deletes an account by address; 404 when absent. No bulk delete, no soft delete. |
+| ✅ | DELETE /api/v1/queue/&lt;id&gt; | Removes a message from the delivery queue. Does not validate that the id exists — an unknown id still reports success — [see defects](#defects-found-by-the-audit). |
+| ✅ | Delivery queue management | Grid of id/created/from/recipients/next try/tries/file with view-raw-message, retry-now (ResetDeliveryTime + StartDelivery, 64-bit ids) and remove. |
+| ✅ | Endpoint selection from real configuration | Both autoconfig and Autodiscover pick the best advertised port per protocol from the configured TCPIPPorts by ranking implicit TLS above STARTTLS-required (with 587 preferred) above STARTTLS-optional above plain — so clients are told w… |
+| ✅ | Failed-auth visibility, but no lockout | A rejected credential writes "REST API: administrator authentication failed." to the application log. There is no rate limiter, no auto-ban and no delay on the REST path (RateLimiter is not referenced by this file)… |
+| ✅ | Folder UID recalculation maintenance operation | A single maintenance operation, RecalculateFolderUID, resets each folder's foldercurrentuid to MAX(messageuid) where it has fallen behind — the repair for the "message has no UID" condition the reader reports as error 5025. |
+| ✅ | GET /api/v1/domains | Array of {name, active} only — no id, quota, alias or account counts. |
+| ✅ | GET /api/v1/domains/<name>/accounts | Array of {address, active}. No paging, no quota/size, no forwarding data. |
+| ✅ | GET /api/v1/queue | Delivery-queue listing {id, created, from, recipients, next_try, locked, tries} reusing the same query behind COM Status.UndeliveredMessages. No filtering or paging; whole queue on every call. |
+| ✅ | GET /api/v1/status | JSON: version, numeric server state, processedMessages, spamMessages, virusesRemoved, and SMTP/IMAP/POP3 session counts. No uptime, no queue depth. |
+| ✅ | GET /api/v1/tlsa | Emits publish-ready DANE TLSA 3 1 1 (DANE-EE / SPKI / SHA-256) records for every configured SSL certificate, falling back to the ACME fullchain.pem. Hard-codes the _25._tcp prefix, so submission/IMAPS records are not generated. |
+| ✅ | Graceful fallback when the page is not installed | If WebAdmin\index.html is missing the listener serves a small built-in HTML notice pointing at /api/v1/ rather than 404ing. |
+| ✅ | HTTPS REST listener | Self-contained OpenSSL listener; refuses to start unless the administrator password is set, and refuses plaintext unless bound to 127.0.0.1; TLS 1.2 floor; falls back to the ACME cert when none configured… |
+| ✅ | IInterfaceCache — cache observability | Per-collection (domain / account / alias / distribution list) hit rate, TTL, max size and current size in KB, plus Clear(). This is the only per-subsystem statistics surface in COM. |
+| ✅ | IInterfaceDiagnostics / DiagnosticResults / DiagnosticResult | PerformTests() plus LocalDomainName/TestDomainName inputs; results expose Name, Description, ExecutionDetails and a boolean Result. Every accessor is gated on GetIsServerAdmin(). |
+| ✅ | IInterfaceLogging | 23 members: per-category toggles (SMTP/IMAP/POP3/TCPIP/application/debug), live-log enable + LiveLog read, log directory, resolved paths for the current event/error/awstats/default logs, AWStats toggle, KeepFilesOpen… |
+| ✅ | IInterfaceMessageIndexing | TotalMessageCount, TotalIndexedCount, Enabled, Clear() and Index() — lets an operator drive and observe the message index from script. |
+| ✅ | ImportTool — mbox and text import | Chooser offering two importers: an mbox importer with a streaming parser that handles classic and Thunderbird "From - <date>" envelopes, LF and CRLF, mboxrd >From unquoting and CRLF normalisation without dot-stuffing… |
+| ✅ | INI-backed feature settings pages | Seven FeatureSettingsView sections (Security, Automation/ACME, Integration/API & monitoring, Hardening/Advanced INI, Authentication, DNS, Web services) edit hMailServer.ini keys directly through IniFeatureStore, including RestApi*… |
+| ✅ | IStatus exposes seven members | UndeliveredMessages (tab-separated blob), StartTime, ProcessedMessages, RemovedViruses, RemovedSpamMessages, SessionCount(eSessionType) and ThreadID. The delivered/deferred/bounced, auth-success/failure, TLS-handshake… |
+| ✅ | Live dashboard with charts | Throughput (msgs/min, derived from the processed counter delta) and per-protocol session lines, plus KPI tiles for processed, queue length, spam, viruses, uptime. History is 90 samples at a 2 s poll — about three minutes, in RAM… |
+| ✅ | Live log viewer | Tails the current log file from disk on a 750 ms timer with per-category colouring (SMTP/IMAP/POP3/error/application), a 2000-line ring buffer and a pause control. Reads files directly rather than using the COM live-log stream. |
+| ✅ | MTA-STS policy hosting (/.well-known/mta-sts.txt) | Serves STSv1 policies only from a mta-sts.<domain> Host for domains hosted and active here. mx: lines come from an explicit MtaStsPolicyMx override or from the domain's live MX records (1 h cache, 512-entry cap)… |
+| ✅ | Navigation tree / feature areas | Welcome, Dashboard; Status group (Server status, Delivery queue, Live logs); Domains; Rules; Settings group with Protocols, Delivery, Routes, Public folders, Anti-spam (settings + SURBL + DNSBL + white list + greylist white list)… |
+| ✅ | Outlook Autodiscover — POX only | /autodiscover/autodiscover.xml answered for POST and GET, parsing <EMailAddress> out of the POX request and returning the outlook/responseschema/2006a Account block with IMAP/POP3/SMTP Protocol entries (SSL on/off, Encryption TLS/SSL… |
+| ✅ | POST /api/v1/domains/<name>/accounts | Creates an account from {address, password}; validates the address belongs to the domain, 409 on duplicate, hashes with PreferredHashAlgorithm, returns 201. No way to set quota, display name or active flag. |
+| ✅ | POST /api/v1/queue/<id>/retry | Resets the delivery time and kicks the delivery thread; ids parsed strictly numeric, max 18 digits. |
+| ✅ | Public web-services listener | Separate HTTP and HTTPS listeners (own threads) hosting ACME challenges, MTA-STS policy and autoconfiguration. Falls back to the ACME fullchain.pem/privkey.pem when no certificate is configured… |
+| ✅ | Remote (DCOM) administration | The Control Panel activates hMailServer.Application by ProgID against a named host, so a remote server can be administered over DCOM; authentication is Application.Authenticate(user, password). |
+| ✅ | Request handling limits | Single accept thread handling clients serially; HTTP/1.0 with Connection: close; 64 KB max request; 10 s per-socket and 30 s total read deadline to stop a slow-dribble client pinning the one worker. |
+| ✅ | REST admin API covers domains, accounts and the queue only | GET /api/v1/domains, GET\|POST /api/v1/domains/<name>/accounts, DELETE /api/v1/accounts/<address>, GET /api/v1/queue, POST /api/v1/queue/<id>/retry, DELETE /api/v1/queue/<id>, plus /status and /tlsa. No aliases, distribution lists… |
+| ✅ | REST administration API | Raw-socket HTTP(S) listener serving /api/v1/status, /domains, /domains/<name>/accounts, /accounts/<address>, /queue (+retry/delete) and /tlsa, with a body-size cap and receive deadline… |
+| ✅ | Self-healing COM session | Probes ServerState (not Version) to decide whether the link is alive, checks the Windows service state for local hosts, reconnects with bounded retries and toasts "Reconnected …" then re-enters the current page. |
+| ✅ | Session handling and theming | Basic credential kept in sessionStorage, 401 forces re-login, dark/light toggle persisted in localStorage. Server-supplied domain and account names are interpolated into innerHTML and inline onclick handlers… |
+| ✅ | Setup and migration tooling | DBSetup (interactive DB creation), DBSetupQuick (headless), DBUpdater (schema migration), DataDirectorySynchronizer (reconcile files against the database) and ImportTool (accounts from text files, messages from mbox)… |
+| ✅ | Thunderbird autoconfig (Mozilla clientConfig 1.1) | Served at both /mail/config-v1.1.xml and /.well-known/autoconfig/mail/config-v1.1.xml; derives the mail domain from an autoconfig.<domain> Host header, then the emailaddress query parameter (handles %40)… |
+| ✅ | TOTP two-factor on the admin logon | RFC 6238 HMAC-SHA1, 30 s, 6 digits, with QR enrolment; secret stored DPAPI machine-scope in HKLM\SOFTWARE\hMailServer\AdminTotpSecret so it is shared with the classic Administrator. Three attempts then the session is dropped… |
+| ✅ | Unattended launch and window/theme persistence | hMailCP.exe /connect <host> <user> <password> auto-connects; theme follows the OS until an explicit toggle, and window bounds/maximised state are persisted under HKCU\Software\hMailServer\ControlPanel with an off-screen guard. |
+| ✅ | Unit tests for Control Panel services | xUnit project covering the consistency-report parser (including mid-rewrite and comment-line cases), numeric field validation, password generation and strength. |
+| ✅ | WPF .NET 8 Control Panel (hMailCP) | 41 registered pages behind a cached page factory, WPF-UI/Fluent chrome, LiveCharts + SkiaSharp charting, QRCoder for TOTP enrolment. Replaces the classic Administrator (no MFC/Delphi admin remains in the tree). |
+| ⬜ | /.well-known/caldav and /.well-known/carddav redirects | Not served. ProcessRequest_ handles only acme-challenge, mta-sts.txt, autoconfig and autodiscover; a paired calendar/contacts server is therefore undiscoverable. |
+| ⬜ | Admin UI accessibility | Nobody owns it. The dashboard charts render unlabelled series distinguishable only by colour (no legend; Success/Warning separate by ΔE 5.1 under protanopia against a target of 8)… |
+| ⬜ | API coverage beyond status/domains/accounts/queue/TLSA | ProcessRequest_ routes exactly nine API operations. No endpoints for settings, aliases, distribution lists, rules, certificates, DKIM, logs, IP ranges or backup — everything else is COM-only. |
+| ⬜ | Apple .mobileconfig configuration profile | No profile generator anywhere in the tree. Named in the roadmap as one of the "smaller items" to sit alongside the existing Thunderbird autoconfig and Outlook Autodiscover. |
+| ⬜ | IPv6 for the management/observability listeners | REST, metrics and web-services listeners all create AF_INET sockets and parse the bind address with inet_pton(AF_INET), so none of them can bind an IPv6 address. |
+| ⬜ | OpenAPI / Swagger description | No machine-readable API description anywhere in the repo; the endpoint list exists only as prose in README.md:312. |
+| ⬜ | Settings, logs, certificates and rules in the browser | The Control Deck cannot edit any server setting, view logs, manage certificates or edit rules — those exist only in the desktop Control Panel and COM. |
+| ⬜ | SRV record generation or advice (_imaps/_submission/_autodiscover) | Nothing generates, checks or documents client-discovery SRV records — unlike DANE TLSA, which has a dedicated /api/v1/tlsa generator. Administrators must author SRV by hand. |
+
+### Observability and diagnostics
+
+26 shipped · 0 underway · 11 not started · 1 deferred
+
+| | Capability | Detail |
+|:-:|---|---|
+| ✅ | Archiving runs synchronously inside message acceptance | The archive copies happen between the anti-spam/modification stages and PersistentMessage::SaveObject, i.e. before the 250 is sent, so archive I/O latency is added to every accepted message and a slow archive volume slows acceptance. |
+| ✅ | AWStats delivery journal | Per-recipient tab-separated stream (time, sender, recipient, sender IP, recipient IP, SMTP, ?, code, bytes) written to hmailserver_awstats.log on delivery success and failure; toggled by Logging.AWStatsEnabled… |
+| ✅ | Backup and restore over COM | BackupManager.StartBackup() and LoadBackup(xmlFile) → Backup.StartRestore(); BackupSettings selects destination, whether to include settings/domains/messages and whether to compress… |
+| ✅ | Backup log | Backup progress is written to hmailserver_backup.log (UTF-16 with BOM) and the path is exposed through BackupSettings.LogFile. |
+| ✅ | Built-in diagnostic test suite (9 tests) | TestInformationGatherer, TestIPv6, TestOutboundPort (needs a test domain), TestBackupDirectory, TestMXRecords, TestConnectToSelf (both need a local domain), TestDataDirectory, TestIPRanges, TestErrorLogs — each returning name… |
+| ✅ | Delivery-queue depth caching | hmailserver_delivery_queue_messages is backed by a COUNT(*) against hm_messages, cached for 10 s so a fast scrape interval cannot hammer the database; safe without locking because clients are handled serially. |
+| ✅ | Filesystem archive on receipt | With ArchiveDir set, every accepted message is copied to {ArchiveDir}\{senderDomain}\{senderUser}\Sent-<file> for local senders, to {ArchiveDir}\Inbound\ for external senders… |
+| ✅ | Instrumented span points | Three: one server-kind span per client protocol command line (named after the verb, attributed with hmailserver.session.id, one trace per session), one client-kind db.query span at the database chokepoint… |
+| ✅ | JSON-lines structured logging | JsonLogging=1 switches every category to one JSON object per line with ts, category, thread, optional session, optional remoteip and message, with correct escaping including \u00XX for control characters. Off by default… |
+| ✅ | Kubernetes-style probes | Three probes on the metrics listener: /livez always 200 if the thread answers (deliberately no dependency checks, so a database outage does not get a healthy process killed)… |
+| ✅ | Live log streaming over COM | Logging.EnableLiveLogging + Logging.LiveLog drain an in-memory buffer; the buffer self-disables past LiveLogMaxSize so a listener that walks away cannot grow it without bound. |
+| ✅ | Log categories and files | Nine destinations: dated hmailserver_<date>.log, dated ERROR_hmailserver_<date>.log, hmailserver_awstats.log, hmailserver_backup.log, hmailserver_events.log… |
+| ✅ | Log retention | LogDeleteDays prunes by last-write time, run once shortly after start-up and then every six hours. Deliberately narrow: only files named hmailserver_*.log or error_hmailserver_*.log are ever deleted. Disabled by default (0). |
+| ✅ | Log rotation | Daily only, and implicit — rotation happens because the filename embeds the date and the writer reopens when the name changes. No size-based rollover, no numbered generations, no compression… |
+| ✅ | Log volume controls | LogLevel (>=3 full detail, <=2 quieter) plus MaxLogLineLen truncation that keeps the head and last 25 characters with " ... " between; debug logging overrides truncation. |
+| ✅ | Message-store consistency check | Background task cross-checks hm_messages against files on disk at start-up and hourly, publishes hmailserver_messagestore_missing_files, and rewrites hMailServer_messagestore_consistency.report in the log folder… |
+| ✅ | Metric catalogue (20 families) | Counters: hmailserver_processed_messages_total, _spam_messages_total, _viruses_removed_total, _tls_handshakes_total, _tls_handshake_failures_total, _auth_success_total, _auth_failures_total, _messages_delivered_total… |
+| ✅ | Metric labels | Only two label dimensions exist: hmailserver_sessions{protocol="smtp"\|"imap"\|"pop3"} and hmailserver_db_connections{state="busy"\|"available"}. Every other series is a single unlabelled global value — no per-domain… |
+| ✅ | OpenTelemetry trace export (OTLP/HTTP JSON) | Dependency-free exporter: batches completed spans onto a background thread and POSTs OTLP JSON to <OtelEndpoint>/v1/traces (default port 4318), tagged with a service.name resource attribute from OtelServiceName… |
+| ✅ | OpenTelemetry trace export and JSON logging | OtelTracer exports spans in batches to an OTLP/HTTP collector (OtelEndpoint/OtelServiceName; a cheap no-op when unset) with message-to-session correlation IDs; JsonLogging=1 switches the logger to JSON lines… |
+| ✅ | Operator runbooks | Two operator-facing documents ship in-tree: DiagnosingStalledMail.md and HighAvailabilityRunbook.md. |
+| ✅ | Optional hardlinking of per-recipient archive copies | ArchiveHardLinks=1 uses Win32 CreateHardLink for the per-recipient copy and falls back to a full copy (logging "HardLink failed.. Falling back to Copy.") when the link cannot be made — e.g. across volumes or on non-NTFS. |
+| ✅ | Prometheus /metrics endpoint | Text exposition format version 0.0.4 over plain HTTP/1.0, single accept thread, 5 s socket timeouts. Off by default (MetricsServerPort=0), default bind 127.0.0.1. |
+| ✅ | Prometheus metrics and Kubernetes-style health probes | /metrics plus /livez (liveness), /readyz (200 only when StateRunning and the DB pool is connected, 503 while draining) and /healthz (JSON status/state/database), covering processed/spam/virus counts, TLS handshakes, auth outcomes… |
+| ✅ | Slow-query log | SlowQueryLogMilliseconds logs database statements above the threshold and feeds the hmailserver_db_slow_queries_total counter; 0 disables (the default). |
+| ✅ | Work-queue stall reporting | A once-a-minute scheduled task names the tasks holding the message-acknowledgement threads when they are all busy with work queued behind them, running on a different queue than the one it measures… |
+| ⏸️ | OTLP over TLS / gRPC transport | Endpoint must be an http:// URL; https:// is rejected at startup with "OtelEndpoint must be an http:// URL; tracing disabled." Consciously postponed in a source comment: "Only plain HTTP is supported … TLS export is future work." |
+| ⬜ | Archive retention, index, search, immutability, per-domain scope | None of these exist. The archive is a raw directory tree with no database record, no retention sweep, no WORM/legal hold and no way to scope it to particular domains; only ArchiveDir and ArchiveHardLinks are configurable. |
+| ⬜ | Authentication on /metrics | The metrics listener performs no authentication or authorisation of any kind — protection is entirely the bind address (default 127.0.0.1). Exposing it on 0.0.0.0 publishes queue depth, session counts and auth-failure counts to anyone. |
+| ⬜ | Latency percentiles | hmailserver_command_processing_seconds and hmailserver_db_query_seconds are emitted as Prometheus summaries carrying only _sum and _count, so only the mean is derivable. No histogram buckets, no quantiles, so p95/p99 are unavailable. |
+| ⬜ | Metric history / persistence | /metrics is a stateless scrape and nothing stores samples server-side; the only history anywhere is the Control Panel's three-minute in-RAM buffer. No metrics-sample table, no retention setting, so no 24 h / 7 d / 30 d views. |
+| ⬜ | OTLP metrics and logs signals | Only the traces signal is implemented — the exporter path is hard-coded to /v1/traces and there is no metric or log record builder. The Control Panel blurb advertising "OpenTelemetry traces/metrics export" overstates what ships. |
+| ⬜ | Queryable message trace | No per-message event store. The AWStats journal is already a per-recipient delivery event stream called from every interesting site, but it has no correlation key and no home… |
+| ⬜ | Queryable message trace and metric history | Two named holes with no implementation: there is no per-message event record, so 'what happened to the message Jane sent at 14:20' means grepping logs… |
+| ⬜ | Scheduled / automatic backups | CreateScheduledTasks_ registers greylist cleaning, expired-record removal, TLS-RPT reporting, log retention, message-store consistency, work-queue health and ACME renewal — no backup task… |
+| ⬜ | SQL log device and NCSA log format | eLogDevice hLogDeviceSQL and eLogOutputFormat hLogFormatCSA are declared in the IDL, editable through COM and offered in the Control Panel's Logging page… |
+| ⬜ | W3C traceparent ingestion / context propagation | Trace ids are always minted locally; no inbound traceparent header is parsed and none is emitted on outbound SMTP or HTTP, so traces cannot be joined to an upstream caller. |
+| ⬜ | Windows Event Log integration | None. hMailServer's "event log" is hmailserver_events.log plus a COM EventLog.Write for scripts; there is no ReportEvent/RegisterEventSource call anywhere, so nothing surfaces in Windows Event Viewer. |
+
+### Extensibility and scripting
+
+37 shipped · 0 underway · 3 not started · 0 deferred
+
+| | Capability | Detail |
+|:-:|---|---|
+| ✅ | Client object exposes TLS session detail | IPAddress, Port, Username, HELO, SessionID, Authenticated, EncryptedConnection plus CipherVersion, CipherName and CipherBits - so a script can gate on TLS version/cipher strength |
+| ✅ | COM control of the script engine | hMailServer.Scripting exposes Enabled, Language, Directory, CurrentScriptFile, Reload() and CheckSyntax() - so an external tool can flip scripting on/off, swap language and hot-reload without restarting the service |
+| ✅ | Compile/syntax check before activation | LoadScripts compiles the file first and reports error HM5016 without registering anything if compilation fails; also exposed on demand via the COM API and Control Panel |
+| ✅ | Control Panel event-script editor | Dedicated Scripts page: loads the file named by Scripting.CurrentScriptFile, edits it, writes a .bak beside it on save, then calls Reload() and reports the CheckSyntax() result inline. Plain TextBox - no syntax highlighting… |
+| ✅ | Custom script function as a rule action | Rule action type ScriptFunction (5) invokes any named function in the script file with HMAILSERVER_MESSAGE; the message is reloaded afterwards so script edits to the file are picked up. Available to both global and per-account rules |
+| ✅ | Event invocation by source-text concatenation | The call is built as text and appended to the script before parsing; string arguments are escaped per language (VBScript doubles quotes, JScript escapes apostrophes) - except OnDeliveryFailed… |
+| ✅ | EventLog object always present | EventLog is added to every container by the constructor, so EventLog.Write is callable from any handler and writes to the server event log |
+| ✅ | Fail-closed on a hung script file | If the file's top-level code exceeds the timeout during load, loading is deliberately abandoned and no event handlers are registered at all (including OnClientLogon / OnClientValidatePassword) until the admin fixes it and reloads… |
+| ✅ | Fresh engine and full re-parse on every event | Each event creates a new CScriptSiteBasic, re-parses the whole script text with the call appended, runs it and terminates; no state persists between events and parse cost is paid per message/connection |
+| ✅ | Full COM API reachable from scripts | Scripts can CreateObject("hMailServer.Application") and authenticate to reach the whole administration object model (domains, accounts, rules, messages)… |
+| ✅ | Handler auto-registration by function probing | On load the server probes 15 named handler functions and only fires the ones that exist; each probe spins up a fresh engine and re-executes the file's top-level code… |
+| ✅ | Legacy rules engine (global and per-account) | Nine predefined criteria fields (From/To/CC/Subject/Body/Size/RecipientList/DeliveryAttempts) with eight match types including regex and wildcard, and ten action types (Delete, Forward, Reply, MoveToIMAPFolder, ScriptFunction… |
+| ✅ | Objects injected into the script namespace | Container maps names to COM wrappers for six types: Result, Message (hMailServer.Message), Client, EventLog, FetchAccount and Account; all are added as global members so handlers reference them by name |
+| ✅ | OnAcceptMessage(oClient, oMessage) | Fires after end-of-data, on the async accept task that holds the thread sending the 250, immediately before the message is saved and queued; script may rewrite the spool file. Same 554/453 reject mapping |
+| ✅ | OnBackupCompleted() / OnBackupFailed(sReason) | Fired by the backup manager at the end of a backup run; notification only |
+| ✅ | OnClientConnect(oClient) | Fires on every accepted TCP connection for all listeners (SMTP/IMAP/POP3) before the greeting; Result.Value=1 drops the socket immediately |
+| ✅ | OnClientLogon(oClient) | Fires after a successful authentication on all three protocols (SMTP AUTH, POP3 and IMAP LOGIN); notification only, no Result object, so it cannot veto the session |
+| ✅ | OnClientValidatePassword(oAccount, sPassword) | Can override password validation: Result 0 accepts the logon outright, 1 rejects it, any other value (default 2) falls through to normal validation… |
+| ✅ | OnDeliverMessage(oMessage) | Fires per delivery attempt after global rules; Result.Value=1 deletes the message. Because it runs on every retry, a script must be idempotent |
+| ✅ | OnDeliveryFailed(oMessage, sRecipient, sErrorMessage) | Fires once per failed recipient (so several times for one message); notification only - no Result object is added to the container |
+| ✅ | OnDeliveryStart(oMessage) | Fires once per message when delivery begins; Result.Value=1 deletes the message and logs "Action triggered by script subscribing to OnDeliveryStart" |
+| ✅ | OnError recursion guard | When the killed script is the OnError handler itself, the interruption is logged rather than reported, because reporting an error re-fires OnError and would recurse until the stack is exhausted |
+| ✅ | OnError(iSeverity, iCode, sSource, sDescription) | Fires for every ErrorManager::ReportError in the server, guarded so it is skipped before settings are loaded; this is the hook that makes SIEM/alert forwarding possible |
+| ✅ | OnExternalAccountDownload(oFetchAccount, oMessage, sRemoteUID) | Fires per message fetched by the POP3 external fetcher (with oMessage null/Nothing when the message was skipped); the Result overrides the remote delete policy - 1 deletes immediately, 2 keeps for Result.Parameter days |
+| ✅ | OnHELO(oClient) | Fires on both HELO and EHLO after the domain argument parses; Result 1 -> "554 Rejected", 2 -> "554 <message>", 3 -> "453 <message>". Client object carries IP, port, session, HELO name and TLS cipher details |
+| ✅ | OnRecipientUnknown(oClient, oMessage) | Fires when the server is about to answer 550 unknown user; notification only - the Result object is not passed and no return value is acted on. Suppressed once the invalid-command limit trips |
+| ✅ | OnSMTPData(oClient, oMessage) | Fires on the DATA command, before any body bytes are read, so a message can be refused without transferring it; same 554/554+msg/453+msg result mapping |
+| ✅ | OnTooManyInvalidCommands(oClient, oMessage) | Fires when DisconnectInvalidClients trips the MaxNumberOfInvalidCommands limit and the connection is being dropped; notification only, no Result object |
+| ✅ | Result object (Value / Message / Parameter) | Three writable properties; semantics are per-hook (reject codes for SMTP hooks, delete for delivery hooks, auth verdict for password validation, retention days for external download) and are not documented in one place in the code |
+| ✅ | Script error reporting with source position | Runtime and compile errors are captured through IActiveScriptSite::OnScriptError and logged as "Script Error: Source ... Description ... Line ... Column ... Code ..."; the last message is retrievable for the syntax-check API |
+| ✅ | Script execution watchdog | Each script invocation and each compile runs under a TimerQueue watchdog bounded by [Settings] ScriptTimeout; a script that overruns is interrupted, logged with the file name… |
+| ✅ | Script execution watchdog (bounded scripts) | Every script run is armed with a timer-queue watchdog that calls IActiveScript::InterruptScriptThread; ScriptTimeout in hMailServer.ini, default 60s, 0 disables the limit |
+| ✅ | Server-side event scripting (VBScript/JScript) | In-process Active Scripting host firing OnClientConnect/OnHELO/OnAcceptMessage/OnDeliverMessage/OnDeliveryStart/OnDeliveryFailed/OnClientLogon/OnClientValidatePassword/OnExternalAccountDownload/OnError… |
+| ✅ | Single global event-script file | Loads exactly one file, {EventFolder}\EventHandlers.vbs\|.js, set by the INI key Directories/EventFolder; no per-domain or per-account scripts, no include/import mechanism, no multi-file support |
+| ✅ | Starter templates for external integrations | Three insertable VBScript OnAcceptMessage templates: external AV/DLP command-line scanner, fire-and-forget webhook POST (SIEM/Slack/Teams), and an external HTTP verdict API… |
+| ✅ | VBScript and JScript event scripting | Windows Active Scripting (IActiveScript) engine created by CoCreateInstance on the language name; only the literal settings "VBScript" and "JScript" are recognised… |
+| ✅ | Watchdog limitation: blocked COM calls | An interrupt aborts script execution but cannot release a handler blocked inside a COM call (e.g. a synchronous ServerXMLHTTP to a dead host) - the limit is documented in the error text the admin receives |
+| ⬜ | External filter hook (rspamd / milter / MTA hooks) | In-process scripting events (OnHELO, OnAcceptMessage, OnDeliverMessage, OnDeliveryFailed) and the rules engine cover a lot, but there is no way to put an external scanner in the SMTP path… |
+| ⬜ | Script sandboxing / capability restriction | None: scripts run in-process under the service account with unrestricted CreateObject (the shipped Control Panel templates use WScript.Shell and MSXML2.ServerXMLHTTP); the only bound is the wall-clock watchdog. No allow-list… |
+| ⬜ | XCLIENT / PROXY protocol | No support for either, so a TCP load balancer or front-end proxy in front of the SMTP listener will hide the real client IP from DNSBL, SPF, greylisting and the Received header. |
+
+### Build, testing and supply chain
+
+4 shipped · 0 underway · 1 not started · 0 deferred
+
+| | Capability | Detail |
+|:-:|---|---|
+| ✅ | CI, supply-chain and installer verification | Seven GitHub workflows: server build, CodeQL, SBOM (SPDX + CycloneDX via Syft), dependency review, installer smoke test on a clean machine, general CI and a monthly upstream-comparison job with a checked-in baseline… |
+| ✅ | Installer and in-place upgrade path | A single Inno Setup x64 installer that preserves configuration and mail on upgrade, bundles and silently installs the .NET 8 Desktop Runtime, ships SQL CE for zero-config installs and stages the MariaDB connector plus plugins… |
+| ✅ | Regression coverage for hooks and scanners | 24 event tests covering every hook in both VBScript and JScript, 5 ClamAV tests including live EICAR detection plus unreachable-scanner fail-open, and 14 SpamAssassin tests including a deliberate spamd outage |
+| ✅ | Regression coverage for the authentication surface | Dedicated NUnit suites exist for SCRAM-PLUS on IMAP/POP3/SMTP, TLS version and TLS option negotiation, OAuth2 bearer, hash policy, password pepper, secret protection, auto-ban, password masking and protocol fuzzing. |
+| ⬜ | Architecture guide and docs index | The detailed codebase map is kept local and unpublished, so a first-time contributor has CONTRIBUTING.md and nothing else; hmailserver/docs/ has two guides and no index. Both are named as outstanding in the roadmap's near-term list… |
+
+### Cross-cutting and platform
+
+9 shipped · 0 underway · 2 not started · 1 deferred
+
+| | Capability | Detail |
+|:-:|---|---|
+| ✅ | Active/passive HA topology | A documented, tested warm-standby runbook: exactly one node running, shared SQL plus shared message store, floating VIP driven by the /readyz probe, no clustering code and explicit split-brain avoidance… |
+| ✅ | Built-in diagnostics suite | A 'run diagnostics' set exposed through COM and the Control Panel: outbound port connectivity, connect-to-self, MX record checks, IP range sanity, data and backup directory checks, error-log inspection and an explicit IPv6 test… |
+| ✅ | Certificate lifecycle outside ACME | ACME issues, renews at <30 days, auto-assigns and hot-reloads without a restart. For manually provisioned certificates there is no expiry check, no warning… |
+| ✅ | Graceful shutdown drain | [Settings] ShutdownDrainSeconds makes the service wait up to N seconds for active sessions to finish before stopping (0, the default, stops immediately), and /readyz returns 503 for the duration so a load balancer sheds the node first. |
+| ✅ | IPv6 support end to end | Real but uneven, and never stated as a whole: IPAddress models IPV6, security ranges and DNSBL reverse-nibble lookups handle it, AAAA is used in HELO/PTR checks and there is a dedicated IPv6 diagnostic — but the ManageSieve listener ca… |
+| ✅ | Localisation of server, Control Panel and installer | Server UI strings ship in exactly two languages (english.ini, swedish.ini) selected by UserInterfaceLanguage; the Inno Setup installer declares only English; the WPF Control Panel has no resx localisation at all… |
+| ✅ | Scheduler and background task set | A minute-polled scheduler running ScheduledTask objects — TLS-RPT reporter, ACME renewal, backup, log retention, message-store consistency, greylist/expired-record cleanup, external fetch… |
+| ✅ | Scripts and scanners cannot starve the accept path | Script and scanner work runs on the shared async queue with AsyncQueueReservedThreads held back for short work, per-stage timings logged around the script/save stage… |
+| ✅ | Work queue saturation reporting and session caps | WorkQueue exposes queue depth, blocked-task count and per-task name/thread/wait/run time; WorkQueueHealthTask reports saturation and names the task holding each thread; AsyncQueueStallThreshold and AsyncQueueReservedThreads bound it… |
+| ⏸️ | LMTP, JMAP, CalDAV/CardDAV, EAS/EWS, webmail | Five whole protocol surfaces an evaluator will ask about inside ten minutes, all deliberately declined with reasoning: LMTP (only matters behind another MTA), JMAP (no mainstream client), CalDAV/CardDAV (pair with SOGo/Nextcloud… |
+| ⬜ | End-user self-service portal | There is no web surface for users at all — no password self-service, no vacation toggle, no quota view, no quarantine release. Every user-initiated change goes through an administrator… |
+| ⬜ | LDAP / Active Directory as a directory backend | Accounts can be linked to an AD domain and the Control Panel has a read-only AD picker, but there is no LDAP account source — the account database is always the SQL store. On Windows this is the deployment case that matters most. |
+
+Planned work
+------------
+
+The gaps that cost users, ordered by value per unit of effort. Each notes what is
+already in the tree that a fix would reuse, because that is what makes some of
+these much cheaper than they look.
+
+| | Item | Detail |
+|:-:|---|---|
+| ⬜ | **API keys for the REST API** | HTTP Basic only today — the admin password replayed on every request, no scoping, no expiry, no address restriction. Bearer tokens with labels and expiry. Small, and the cheapest security win available. |
+| ⬜ | **Per-account outbound send limits** | The rate limiter is keyed by IP or destination domain, per minute. There is no per-*account* quota, so one compromised account can blacklist the IP with no ceiling. iRedMail ships this free. A security control, not a feature. |
+| ⬜ | **Sieve extension set** | Only `keep`/`discard`/`fileinto`/`redirect`/`stop` and nine tests exist, and ManageSieve advertises exactly `"SIEVE" "fileinto"` — so Roundcube's filter UI renders almost nothing. `vacation` is the glaring one, and account-level auto-reply *already exists*; it is simply unreachable from Sieve. The lexer, parser and evaluator are already there. |
+| ⬜ | **Shared and delegated mailboxes** | The other-users namespace is hard-coded to `NIL`, so no user can open another's mailbox. `info@`/`sales@`/`support@` is *the* small-business requirement and the current answer is to share a password. Full RFC 4314 ACL machinery, folder containers, public folders and a master user already exist — this is namespace plumbing plus cross-account ACL lookups. |
+| ⬜ | **App passwords** | 2FA is unenforceable against IMAP/POP clients that cannot present a TOTP code. App passwords are what make account-level 2FA deployable, and the prerequisite for extending TOTP beyond the Control Panel. |
+| ⬜ | **Message trace / delivery history** | No queryable per-message record — "what happened to Jane's 14:20 message" means grepping logs. `AWStats.cpp` is already a per-recipient delivery event stream called from every interesting site; it needs a correlation key and a home. Carry two ids like Exchange does: the RFC `Message-ID` and a per-*instance* id that survives forking. Off by default — it stores subjects and addresses. |
+| ⬜ | **Full-text search** | No index at all: `BODY`/`TEXT` load each message and substring-scan, and attachment text is never searched. Also a cheap CPU-exhaustion vector for an authenticated user. Four-backend portability rules out native FTS; the route is a portable posting table on the existing `MessageIndexer` worker. The largest single quality gap and the largest single piece of work. |
+| ⬜ | **RCPT-time over-quota rejection** | Quotas are checked during delivery, so an over-quota recipient produces a DSN — backscatter, often to a forged sender. Also missing: warning thresholds and notifications. |
+| ⬜ | **`List-*` headers and one-click unsubscribe** | Distribution lists emit neither. Those header names appear in the source *only* in the DKIM oversigning list. Gmail and Yahoo bulk-sender rules require RFC 8058 one-click. Small: the headers plus an endpoint on the existing `WebServicesServer`. |
+| ⬜ | **HTTP filter hook** | No way to put an external engine — above all rspamd — in the path. An HTTP/JSON hook modelled on Stalwart's MTA Hooks is far more idiomatic here than milter: HTTP listeners and clients already exist and no binary protocol is needed. |
+| ⬜ | **Admin-reviewable quarantine** | Spam is scored, marked or deleted; nothing is held for review and release. |
+| ⬜ | **End-user self-service portal** | No web surface for users at all. Password self-service alone is a permanent support burden. |
+| ⬜ | **Retention and per-domain archiving** | Archiving is a raw filesystem copy — no retention, no per-domain scope, no index, no immutability, no hold. Searchable eDiscovery depends on full-text search. |
+| ⬜ | **THREAD (RFC 5256)** | SORT is implemented from the same RFC but not THREAD, which is what drives conversation view in Roundcube and Thunderbird. |
+| ⬜ | **LDAP/Active Directory as a directory backend** | AD-domain linking on accounts exists, but no directory as an account source. On Windows this is the case that matters. |
+| ⬜ | **Publish the architecture guide** | A detailed map of the codebase exists but is unpublished, so a new contributor has `CONTRIBUTING.md` and nothing else. |
+| 🔄 | **Static-analysis backlog** | First `/analyze` pass done — three buffer overruns, a data race, NULL dereferences and a log-corrupting shadowed variable fixed. The remainder needs triage rather than blanket suppression. |
+| 🔄 | **Virus-scanner timeout policy** | A scanner killed for exceeding its bound currently fails open, consistent with a scanner that refuses a connection. That is a defensible posture but it should be a documented, configurable choice rather than an inherited default. |
+| ⏸️ | **Backup scheduling in the GUI** | Frequently wanted. Needs a real scheduler with persistence and failure handling — more than a point release should absorb, which is exactly why it keeps being deferred. |
+| ⏸️ | **IMAP FETCH byte fidelity** | `FETCH` reconstructs parts rather than returning original octets. Semantically correct, no client known to be affected; a rework would be a large change to a heavily used path, so it waits for a real reported problem. |
+
+Future-proofing: standards and protocols
+----------------------------------------
+
+| | Item | Detail |
+|:-:|---|---|
+| ⬜ | **Post-quantum key exchange is linked but switched off** | `SslContextInitializer` calls `SSL_CTX_set1_curves_list(ssl, "secp384r1:x25519:secp256r1")` unconditionally at context init. That **replaces** OpenSSL's default group list, which in 3.5+/4.x already contains `X25519MLKEM768`. So every SMTP, IMAP, POP3, ManageSieve and metrics listener negotiates classical-only key exchange despite linking a PQC-capable library. Prepending the hybrid groups is a one-line change with zero interop risk — hybrids are negotiated, not required. **Highest value-per-line item in this document.** |
+| ⬜ | **DMARCbis: replace PSL lookups with the tree walk** | DMARCbis changes organisational-domain discovery from the Public Suffix List to a DNS tree walk, and adds a 2.0 report namespace. A PSL-based evaluator produces *wrong policy decisions*, not soft failures, on domains relying on tree-walk semantics. No hard date, but receivers publish tree-walk-shaped records through 2026-27. The highest-value pure-protocol item here. |
+| ⬜ | **ACME renewal robustness and ARI** | Certificate lifetimes fall to 100 days (Mar 2027) and 47 days with 10-day validation reuse (Mar 2029); Let's Encrypt defaults to 64 days from Feb 2027. Renewal and reload must be unattended and bulletproof, and ARI (renewal-info) becomes worth implementing. Treat 2027 as the real deadline. |
+| ⬜ | **Legacy algorithm audit (RFC 9905)** | Audit for SHA-1, RSA-1024 and other deprecated primitives. No external deadline. TLS 1.2 has no sunset date and is not going anywhere soon — do not pre-emptively drop it. |
+| ⬜ | **SPF void lookup limit** | Cheap correctness item, already biting in the field. |
+| ⬜ | **Certificate expiry and queue-age metrics** | Both are things mail operators actually alert on, and the data is already there. Queue *depth* alone does not distinguish a burst from a stuck relay. |
+| ⏸️ | **DKIM2** | Real momentum and the right backers, but the working group has already slipped its milestone by a year and there is no publication date. Track; hedge only by keeping the signing path abstracted. |
+| ⏸️ | **PQC signatures (ML-DSA) and PQC for DNSSEC/DANE** | 2028 at the earliest, and they arrive through OpenSSL and the ACME client rather than as code written here. No allocated DNSSEC algorithm and an unsolved packet-size problem. Track only. |
+
+Future-proofing: platform and supply chain
+------------------------------------------
+
+| | Item | Detail |
+|:-:|---|---|
+| ⬜ | **Migrate to .NET 10 LTS** | See the dated table — 10 Nov 2026, and the hardest deadline here. |
+| ⬜ | **Decide the OpenSSL branch** | 4.0.x is not LTS and dies 14 May 2027. Decide by Q1 2027 whether to follow to the next LTS or move back to 3.5. |
+| ⬜ | **Declare a supported Windows floor** | Server 2019 / Windows 10 21H2, effective with the first release after 12 Jan 2027. Zero code cost — Server 2019 is still `_WIN32_WINNT=0x0A00`, and that macro should *not* be raised. |
+| ⬜ | **Artifact signing** | SBOMs are already attached to every release in both SPDX and CycloneDX. The gap is signing: Authenticode on the installer and binaries, and ideally Sigstore for the release artefacts. This is the supply-chain item that is actually missing, and the CRA makes update integrity a formal requirement if scope ever changes. |
+| ⬜ | **security.txt (RFC 9116) and a documented VDP** | Cheap, expected, and a prerequisite for being taken seriously on disclosure. `SECURITY.md` exists; the machine-readable half does not. |
+| ⬜ | **OpenSSF Scorecard / OSPS Baseline** | Run it, publish the score, fix what is cheap. Buyers increasingly ask. |
+| ⏸️ | **SQL Server Compact** | Long dead upstream and the one real dependency liability. Migration targets are SQLite or LocalDB. Deferred because it is a data-migration project for existing installs, not a swap, and no date forces it. |
+| ⏸️ | **Boost and C++ standard upgrades** | No forcing function. Move when there is a reason. |
+
+Future-proofing: deployment and operations
+------------------------------------------
+
+| | Item | Detail |
+|:-:|---|---|
+| ⬜ | **Document the silent-install contract** | The Inno script *already* branches on `WizardSilent()` and forwards credentials to `DBSetupQuick`, and already checks both `Exec` success and the child exit code so a failed schema upgrade cannot masquerade as success. None of that is documented, so an admin automating a hundred installs has to read the Pascal. Publish the switches and exit codes. Cheapest high-value win on this list. |
+| ⬜ | **Migration *into* the server** | The biggest genuine opportunity here and currently unexploited: with Microsoft turning off Basic auth and EWS, people are moving. There is no documented import path. Competitors have imapsync, `doveadm import`, PST and Maildir/mbox routes. |
+| ⬜ | **Configuration as code** | The highest-value discretionary item. Config lives in a database plus an INI file, which is the right architecture; the missing piece is a dump/diff/apply CLI so config is reviewable and reproducible. Note the Unix competitors offer less here than the "declarative config" framing suggests. |
+| ⬜ | **Prometheus naming fixes** | The bulk is idiomatic — `hmailserver_` prefix, `_total` on counters, `_seconds` base units, protocol as a label. Five cheap deviations: `hmailserver_state` is a numeric enum where OpenMetrics defines StateSet; `uptime_seconds` should be `start_time_seconds` as a Unix timestamp; no `build_info`; the two latency metrics are summaries with no quantiles, so only a mean is computable — histograms with buckets would give p95/p99; `database_up` collides conceptually with Prometheus's synthetic `up`. |
+| ⬜ | **Per-domain and per-account metric labels** | Every counter is global, which is what stops metrics becoming reporting. |
+| ⬜ | **Ship Grafana dashboard JSON in the repo** | Skip the mixin machinery; a committed dashboard is enough. |
+| ⬜ | **GDPR-shaped features** | Not because the project is a controller or processor — it is neither — but because operators are. Per-account export, erasure that reaches the message store *and* the logs, and log retention limits are the concrete asks. |
+| ⬜ | **Warm-standby topology, documented and tested** | State already lives in shared SQL, so this is largely achievable today and merely unwritten. Include the reasons *not* to put the message store on SMB/CSV. |
+| ⬜ | **Backup verification** | The expectation has hardened from 3-2-1 to 3-2-1-1-0 — the trailing zero being "verified restores". Backup and restore exist; verification does not. |
+
+Not planned
 -----------
 
-**Message trace.** The logging is much better than it was, but there is still no
-*queryable* per-message record: answering "what happened to the message Jane sent
-at 14:20" means grepping logs. This is the single feature that would have turned
-#18 from a three-release investigation into a ten-minute one, and it is the
-natural continuation of the per-stage timing work.
+Saying no is part of a roadmap, and these are reasoned rather than reflexive.
 
-The reference implementation is Exchange's Message Trace, and its design is worth
-copying closely — including the part most people get wrong. It carries **two**
-identifiers: the RFC `Message-ID:`, constant for the life of the message, and a
-per-*instance* id that survives bifurcation and distribution-list expansion. You
-need both, because one inbound message becomes many delivery attempts.
-
-The shape here would be an append-only `hm_message_events` table — time, trace
-id, RFC message id, direction, event type (receive / deliver / defer / fail /
-expand / reject), sender, recipient, remote IP, first 256 characters of subject,
-size, SMTP code, response text, duration. Notes on doing it properly:
-
-* `AWStats.cpp` is **already** a per-recipient delivery event stream, already
-  called from every interesting site — the SMTP rejection paths, `LocalDelivery`,
-  `ExternalDelivery` and `SMTPDeliverer`. It is missing only a correlation key
-  and a home. Those are the right seams.
-* `session_id_` is process-lifetime monotonic and therefore **collides across
-  restarts**; pair it with the server start epoch before using it as a key.
-* Retention must be a first-class setting alongside `LogDeleteDays`, and the
-  feature should be **off by default**: it stores subjects and addresses, which
-  has privacy consequences that belong in front of the administrator, not in a
-  release note.
-
-A useful first step needs no server change at all: the Control Panel can parse
-the AWStats journal client-side, the way `LogsView` already tails the main log.
-That gets a searchable, filterable event table immediately. Its ceiling is
-correlation and subject, which is the argument for the table afterwards.
-
-**Metric history.** There is no history anywhere. `/metrics` is a stateless
-scrape, and the Control Panel dashboard keeps 90 samples at a 2-second poll —
-three minutes, in RAM, discarded on navigating away. Every graph ambition runs
-into this before it runs into anything else. The fix is a periodic metrics-sample
-table with a retention setting, which is exactly what Stalwart does — and
-charges for. Once it exists, 24-hour, 7-day and 30-day views follow, and "is this
-normal for a Tuesday" becomes answerable.
-
-**Counters that exist but are not exposed.** `ServerStatus` already tracks
-delivered/deferred/bounced, authentication success and failure, TLS handshakes
-and failures, command latency and database query latency. `WorkQueue` already has
-`GetQueueDepth()`, `GetWaitingBlockingTaskCount()` and `GetRunningTasks()`,
-returning task name, thread, queue wait and running time. **None of it reaches
-COM**, where `IStatus` exposes seven members. One additional COM property would
-surface all of it in a single round trip. This is the smallest server change with
-the largest payoff on this page.
-
-**Missing counters.** SPF, DKIM, DMARC, ARC and DANE are all implemented and none
-of them are counted. Stalwart has a metric subsystem per mechanism. Per-domain
-and per-account labels are also absent — every counter is global, which is what
-stops metrics becoming reporting.
-
-**Latency percentiles.** `hmailserver_command_processing_seconds` and
-`hmailserver_db_query_seconds` are Prometheus *summaries* carrying only `_sum`
-and `_count`, so only the mean is available. p95 and p99 need histogram buckets
-that do not exist.
-
-Mailbox features
-----------------
-
-These are the gaps that cost actual users, in rough value-per-effort order.
-
-**Shared and delegated mailboxes.** `IMAPCommandNamespace.cpp:37` hard-codes the
-other-users namespace to `NIL`. Sharing exists only through the single `#Public`
-namespace: there is no way for one user to open another's mailbox, and no
-Send-As authorisation. `info@`, `sales@` and `support@` handled by three people is
-*the* small-business mail requirement, and the current answer is to share a
-password, which defeats per-user authentication and 2FA entirely.
-
-This is the best value-per-effort feature on the list, because most of it is
-already built — full RFC 4314 ACL machinery (`ACLPermission.h` implements
-`l r s w i p k x t e a`, advertised as `RIGHTS=texk`), a folder container
-abstraction, public folders, and an IMAP master user. The work is namespace
-plumbing and cross-account ACL lookups in LIST and SELECT.
-
-**Sieve is a token subset, and ManageSieve advertises it.** `SieveEvaluator.cpp`
-implements the actions `keep`, `discard`, `fileinto`, `redirect`, `stop` and the
-tests `true`, `false`, `not`, `allof`, `anyof`, `header`, `address`, `exists`,
-`size`. `ManageSieveServer.cpp:306` advertises literally `"SIEVE" "fileinto"`.
-
-That last line matters more than it looks: every ManageSieve client — above all
-Roundcube's `managesieve` plugin, which is how most self-hosters expose filters —
-reads it and renders an almost-empty UI. And note the irony: **vacation
-auto-reply already exists** as a native account feature, complete with expiry
-dates and a spam-flag guard. It simply is not reachable through Sieve, so no
-standard client can see or set it.
-
-Worth adding, in value order: `vacation` (RFC 5230), `imap4flags` (5232),
-`envelope` and `body` (5173), `variables` (5229), `relational` (5231),
-`subaddress` (5233), `copy` (3894), `mailbox` (5490), `reject`/`ereject` (5429),
-`duplicate` (7352). The lexer, parser and evaluator structure is already there;
-this is filling in rather than architecting, and `vacation` is largely a mapping
-onto machinery that exists.
-
-**Full-text search.** There is no index. `IMAPCommandSearch.cpp` resolves `BODY`
-and `TEXT` by loading each message and substring-scanning it; `hm_message_metadata`
-indexes date, from, subject, to and cc, so header search and SORT are indexed but
-**body search is a linear scan of the whole mailbox**, and attachment text is
-never searched. It is also a cheap CPU-exhaustion vector for an authenticated
-user.
-
-This is the largest single quality gap and the largest single piece of work. The
-complication specific to this fork is the four-backend portability rule: native
-FTS fragments four ways across PostgreSQL `tsvector`, MSSQL FTS and MySQL
-`FULLTEXT`. The realistic route is a portable posting-list table populated by the
-existing `MessageIndexer` worker thread, which already exists and already runs
-asynchronously. Attachment text extraction is a later phase.
-
-**Bulk-sender compliance.** Distribution lists emit no RFC 2369 `List-*` headers
-and no RFC 8058 one-click unsubscribe. Those header names appear in the source
-**only** in the DKIM oversigning list. Gmail and Yahoo bulk-sender rules now
-require one-click unsubscribe. The headers plus an endpoint on the existing
-`WebServicesServer` is a small change with disproportionate value. List
-moderation and self-subscribe are larger and separate.
-
-**Admin-reviewable quarantine.** Spam is scored, marked or deleted; nothing is
-held for review and release. iRedMail quarantines to SQL with self-service
-release; Exchange has per-user release. Mail-in-a-Box deliberately does not, so
-this is not universal — but it is expected wherever an administrator is
-accountable for false positives.
-
-**End-user self-service portal.** There is no web surface for users at all.
-Password self-service alone is a permanent support burden.
-
-**Retention and archiving.** Archiving is a raw filesystem copy into
-`{ArchiveDir}\{senderDomain}\{senderUser}\` trees. No retention, no per-domain
-scope, no index, no search, no immutability, no legal hold. Retention and
-per-domain scope are tractable; searchable eDiscovery depends on full-text search.
-
-**External filter integration.** VBScript/JScript event hooks and the rules engine
-cover a lot in-process, but there is no way to put an *external* engine in the
-path — above all rspamd, which has effectively replaced the
-amavisd + SpamAssassin + opendkim + opendmarc stack across the ecosystem. Of the
-two mechanisms, an **HTTP filter hook** modelled on Stalwart's MTA Hooks is much
-more idiomatic here than milter: this server already runs HTTP listeners and an
-HTTP client, and it avoids implementing a binary protocol.
-
-**Smaller items**, each small on its own: an Apple `.mobileconfig` profile to sit
-alongside the existing Thunderbird autoconfig and Outlook Autodiscover; DKIM
-dual-selector rotation (`Domain.h` holds a single selector, and rotation is
-standard practice); `/.well-known/caldav` and `/.well-known/carddav` redirects so
-a paired calendar server is discoverable.
-
-**IMAP extensions** clients actually use, in value order: **THREAD** (RFC 5256 —
-SORT is implemented from the same RFC but not THREAD, and it is what drives
-conversation view in Roundcube and Thunderbird); **LIST-STATUS** (5819, a visible
-startup-latency win, and expected alongside IMAP4rev2 — the rev2 advertisement is
-worth auditing for completeness); **COMPRESS=DEFLATE** (4978); **MULTIAPPEND**
-(3502); **METADATA** (5464, a prerequisite for some Sieve extensions); then
-BINARY, SAVEDATE, PREVIEW, OBJECTID and RFC 9208 QUOTA. `SEARCH=FUZZY` is absent
-from Dovecot too and is not a gap.
-
-The Control Panel: graphs and visual data
------------------------------------------
-
-The dashboard currently answers "is the process alive", which the tray icon
-already answered. Making it answer real questions is mostly not a charting
-problem — see *Metric history* above, which is the actual blocker — but there is
-a useful amount to do before that lands, and some defects to fix first.
-
-### Defects in the current dashboard
-
-These are bugs, not enhancements, and they should be fixed before the charting
-surface is multiplied:
-
-* **The sessions chart is unreadable to a colour-blind administrator.** No
-  `LegendPosition` is set, and LiveCharts defaults to `Hidden`, so the chart
-  renders three unlabelled lines whose only distinguishing feature is colour —
-  and the dark-theme `Success #3FB950` and `Warning #D29922` separate by only
-  ΔE 5.1 under protanopia, against a target of 8. Light mode is marginal. The fix
-  is a legend plus a **chart series palette separate from the status tokens**:
-  status colours belong on badges, where they are always paired with an icon and
-  a label, and they are the wrong basis for series identity.
-* **Charts do not follow the theme.** `DashboardView.xaml.cs` bakes
-  `static readonly SKColor` values and never re-reads them, so the charts are the
-  one part of the application that ignores the theme toggle.
-* **`LineSmoothness = 0.8` on monitoring data.** Spline interpolation invents
-  values between samples and rounds off spikes — precisely the events being
-  watched for. Monitoring series should be `0`.
-* **`AnimationsSpeed = 400ms` against a 2-second poll** means the chart is
-  animating 20% of the time. Mail servers are administered over RDP, where WPF
-  historically falls back to software rasterisation; this is pure waste there.
-  (.NET 8 does add an opt-in
-  `Switch.System.Windows.Media.EnableHardwareAccelerationInRdp`, but assume
-  software rendering anyway.)
-* **The X axis is hidden**, so the reader cannot tell whether the window is three
-  minutes or three hours. It is three minutes.
-* Chart cards use a translucent Fluent fill over a Mica backdrop, so series land
-  on a non-deterministic composited surface and no contrast guarantee holds. Give
-  chart cards an opaque background.
-
-### The charting library question is already settled
-
-`LiveChartsCore.SkiaSharpView.WPF` 2.0.5 is already a `PackageReference`, it is
-MIT, it reached 2.0 stable in March 2026 and is the most actively maintained of
-the candidates, and its `ObservableCollection` binding model is the right shape
-for a polling dashboard. ScottPlot is a reasonable alternative; OxyPlot's last
-release was September 2024 and is best avoided on cadence grounds.
-
-**WebView2 plus a JavaScript charting library is ruled out on licensing.** The
-WebView2 SDK is under a proprietary Microsoft EULA which prohibits distributing
-the code in ways that would subject it to copyleft licensing — which is exactly
-what shipping the assemblies inside an AGPLv3 application does. The runtime being
-bundled with Windows does not rescue it; the redistributed SDK assemblies are the
-problem. Note also that the Windows Community Toolkit has no chart control at
-all — its only data-visualisation control is a radial gauge, and it targets
-WinUI rather than WPF.
-
-### What to build, and in what order
-
-**Without any server change**, from data the COM API already returns:
-
-* **Queue analytics.** `QueueView` already parses `Created`, `Recipients` and
-  `Tries`. Three groupings give a queue-*age* histogram, a retry-count
-  distribution and the top stuck recipient domains — which together answer "what
-  is queued and why", the question the current dashboard cannot touch. This is
-  the highest-value chart set available without writing any C++.
-* **Storage and quota.** `Domain.Size`/`MaxSize` and `Account.Size`/`MaxSize` are
-  all on COM today. Top accounts by size, and domains near quota — as **meters,
-  not gauges**.
-* **Stat tiles with sparklines** replacing the bare KPI numbers. When the number
-  is the point, a `label · value · delta · sparkline` tile beats a chart and
-  costs a fraction of the space.
-* **Log-derived message search** over the AWStats journal, per *Message trace*
-  above.
-
-**Then**, in order: widen the COM pipe to expose the `ServerStatus` and
-`WorkQueue` counters; add the metrics history table; build message trace; and
-finally the authentication and reputation panel, whose shape should follow Google
-Postmaster Tools — SPF/DKIM/DMARC pass rates against the ~95% benchmark, TLS
-delivery percentage, and bounces broken down by reason.
-
-### Design rules
-
-* A dashboard answers a question. If a panel does not correspond to a question an
-  administrator actually asks, it is decoration.
-* **No dual-axis charts.** Two y-scales manufacture a correlation that is not in
-  the data.
-* **Every chart needs a table twin.** That is also the High Contrast answer;
-  `ThemeTokens` already has a High Contrast palette that the charts ignore.
-* Stack delivery *outcomes*, which genuinely sum to a total. Do not stack
-  per-domain volumes.
-* One filter row scoping the whole page, never per-chart ranges. Sensible
-  defaults: 1 hour live, 24 hours everyday, then 7/30/90 days.
-* Solid hairline gridlines one step off the surface, never dashed; no value label
-  on every point.
-
-### Deliberately not built
-
-Geographic maps of connecting IPs — screenshot gold, actionable never; a ranked
-table with a country column wins on every real task. Radial gauges and
-speedometers, which spend a large card on one number (the line in
-`CONTROL-PANEL-PLAN.md` sanctioning LiveCharts gauge series should be removed).
-Pie charts of protocol mix. Sankey mail-flow diagrams. Animated KPI counters —
-an administrator watching a number tick up learns nothing the final value did not
-tell them.
-
-Protocols and interoperability
-------------------------------
-
-**OAuth 2.0 as a *client*, for Microsoft 365 and Gmail.** This is the most
-time-sensitive item in this document. The server supports OAuth2/OIDC for
-*inbound* authentication, but the external account fetcher and the outbound
-relayer can only present a username and password. Basic authentication for
-IMAP and POP against Exchange Online has been off since 2022, and Microsoft's
-published schedule turns off Basic for SMTP AUTH by default at the end of
-December 2026. Anyone relaying outbound through `smtp.office365.com` or
-collecting from a Microsoft 365 mailbox will stop working.
-
-The work is a token cache plus the XOAUTH2 SASL encoding, which is a short piece
-of code. One point of detail that matters: **Exchange Online implements XOAUTH2
-only** — the non-standard Microsoft/Google mechanism — and not RFC 7628
-OAUTHBEARER, so supporting the standard alone is not sufficient.
-
-**Server-side OAuth2 live validation.** Token validation is currently offline
-against a statically configured key. Live JWKS fetching with rotation, and token
-introspection, are the missing halves. Interop verification against Microsoft 365
-and Gmail XOAUTH2, and Thunderbird SCRAM, is blocked on access to those services
-rather than on the code.
-
-**Calendaring, if it is ever done, means iMIP and nothing else.** The research
-here produced a clear answer: **iMIP over SMTP (RFC 6047, carrying RFC 5546 iTIP
-and RFC 5545 iCalendar) is the only standards-based bidirectional interoperability
-path with Exchange that exists.** Free/busy, sharing, delegation and sync in
-Microsoft 365 are all proprietary and unreachable — Exchange asks EWS and nothing
-else, will not consume a published VFREEBUSY, and does not support CalDAV in
-either direction. Consuming a published `.ics` URL over HTTP is the one other
-standards-based bridge, and it is cheap.
-
-If iMIP is implemented, the constraints that will bite are documented in
-MS-OXCICAL: the `method` MIME parameter must match the `METHOD` property; a
-REQUEST, REPLY or CANCEL must contain **exactly one** event, so recurrence
-overrides go one per message; REPLY and COUNTER must carry exactly one attendee;
-and `ADD`, `REFRESH` and `DECLINECOUNTER` have no Exchange mapping at all, so a
-full REQUEST with an incremented SEQUENCE is the portable substitute. And a
-safety requirement, not an optional one: verify that the envelope sender matches
-the `ORGANIZER` on REQUEST and CANCEL and the `ATTENDEE` on REPLY, or the server
-will accept forged cancellations.
-
-**Ideas worth stealing from Exchange**, none of them requiring a Microsoft
-protocol:
-
-* **Moderated transport on distribution lists** — hold in an arbitration store,
-  send an approval request carrying the original as an attachment, three outcomes
-  (approve / reject with comment / expire), a bypass list, and a nested-moderation
-  flag. This is the most involved of these, and the most requested.
-* **Sender restrictions on lists** — accept-only-from and reject-from lists that
-  accept groups as well as individuals, and require-authentication as a default.
-  Some of this already exists on distribution lists and is worth completing.
-* **Two-stage quota enforcement** — separate prohibit-send and
-  prohibit-send-receive thresholds, plus a warning threshold, rather than one
-  cliff. Note Exchange's own rule that the warning is suppressed unless it is at
-  least half the prohibit-send value.
-* **`RemovePrivateProperty`-style hazards to avoid**: Exchange's resource
-  mailboxes strip subject, body, attachments and the private flag by default.
-  Worth knowing as a design anti-pattern if resource mailboxes are ever built.
-
-**LDAP/Active Directory as a directory backend.** There is AD-domain linking on
-accounts and an `ActiveDirectoryService` in the Control Panel, but no LDAP
-account source. On Windows the AD case is the one that matters, and iRedMail
-added exactly this as a headline paid feature — the demand is real.
-
-Testing and CI
---------------
-
-* **Abnormal-input coverage.** Aborted and malformed sessions are the class that
-  produced the worst bugs of the year. SMTP is now covered; IMAP and POP3 need
-  the same treatment.
-* **Static analysis in CI.** Currently a manual pass. It should run automatically
-  so new findings are caught where they are introduced. Note that it must not run
-  concurrently with the regression suite — build events stop the service, and
-  doing both at once has already cost one wasted run.
-* **clang-tidy, ASAN and UBSAN**, and libFuzzer over the protocol parsers. All
-  need a clang toolchain alongside MSVC, which is the gating work.
-* **Broader database coverage.** The suite runs against one backend. MySQL,
-  PostgreSQL and MS SQL are supported and should be exercised, at least
-  periodically.
-* **Installer verification on more Windows versions.** The smoke test installs
-  each release on a clean machine and checks the service comes up; it runs on one
-  image today.
-* **An AEAD-only cipher default**, once the compatibility cost is measured.
+| Item | Why not |
+|---|---|
+| **A rewrite**, in any language | This is upstream hMailServer with a current toolchain and a set of additions — 936 of 980 shared server source files are still byte-identical. That is the point of it. |
+| **Removing the COM API** | It is how the Control Panel and every third-party script talk to the server. |
+| **Matching upstream's dependency downgrades** | Deliberately ahead on OpenSSL, Boost and PostgreSQL. |
+| **32-bit builds** | 64-bit only. |
+| **JMAP (RFC 8620/8621)** | The better protocol, and Stalwart has the full stack. But client support is still essentially nil — Thunderbird, Outlook, Apple Mail and Roundcube are all IMAP, and Dovecot has no JMAP at all. It means a new HTTP API surface, a JSON object model with state strings and `/changes`, blob handling and push: effectively a second server. Revisit when a mainstream client ships it. |
+| **A CalDAV/CardDAV server** | Mail-in-a-Box bolts on Nextcloud; iRedMail bundles SOGo. Nobody in this position writes their own, because it means a WebDAV stack, an iCalendar parser, recurrence expansion, a scheduling state machine and a second object store — and it is not a mail server feature. The `.well-known` redirects plus a tested pairing recipe capture most of the benefit. |
+| **Webmail** | Even Stalwart does not ship one; it recommends Roundcube. A tested Roundcube-on-Windows recipe is the right deliverable — and a second argument for finishing Sieve first. |
+| **Active/active clustering** | The ground moved here: Dovecot 2.4 **removed** Director and the replicator outright and now documents CE as single-server, with HA moved to the commercial product. Multi-node is no longer part of the open-source baseline, so its absence is not a gap. Warm standby is the right deliverable. |
+| **Windows containers** | Base image sizes, the GUI tooling problem and thin adoption make this a poor fit, and no competitor does it on Windows. |
+| **ActiveSync and EWS** | Both proprietary; EAS is patent-encumbered; EWS has had no feature work since 2018 and Microsoft has published its retirement — phased disablement from October 2026, fully retired April 2027. |
+| **IMAP NOTIFY (RFC 5465)** | Dovecot *does* implement it, so this is a real gap rather than an imagined one — but a low-value one, because what people want it for does not work anyway. iOS Mail does no push for generic IMAP at all ("If Push isn't available as a setting, your account will default to Fetch"), and `XAPPLEPUSHSERVICE` needs an APNs certificate gated on owning discontinued macOS Server. IDLE is the portable answer and NOTIFY would not change what any mobile client does. |
+| **BIMI / VMC** | Never became an RFC after seven years. A sender-brand feature rendered by webmail UIs; the server's role is header pass-through, which already works. |
+| **REQUIRETLS (RFC 8689)** | Near-zero deployment, and it converts delivery failures into hard bounces. The `TLS-Required: No` header half is the only useful part. |
+| **LMTP (RFC 2033)** | Only matters when another MTA fronts this one, which is not a realistic Windows deployment. |
+| **Multi-tenancy** | The per-domain model already covers the realistic cases. |
+| **Embedded browser UI** | The WebView2 SDK is under a proprietary EULA that prohibits distribution "in ways that would subject it to copyleft licensing" — incompatible with AGPLv3. The runtime shipping in Windows does not help; the redistributed SDK assemblies are the problem. |
+| **"Quantum-safe email" as a claim** | With no PQ signature story for DKIM and no PQ DNSSEC, only the transport hop can be made quantum-safe. Claiming more than "PQ hybrid key exchange on all TLS listeners" would be dishonest. |
 
 Relationship with upstream
 --------------------------
@@ -487,64 +1042,6 @@ a tracking issue when anything new appears; the baseline it compares from is in
 the two upstream changes this fork deliberately does not take.
 
 As of the last review, nothing upstream is missing here.
-
-Not planned
------------
-
-Saying no is part of a roadmap, and these are reasoned rather than reflexive.
-
-* **A rewrite**, in any language. This is upstream hMailServer with a current
-  toolchain and a set of additions — 936 of the 980 shared server source files
-  are still byte-identical. That is the point of it.
-* **Removing the COM API.** It is how the Control Panel and every third-party
-  script talk to the server. It is not going anywhere.
-* **Matching upstream's dependency downgrades.** This fork is deliberately ahead
-  on OpenSSL, Boost and PostgreSQL.
-* **32-bit builds.** 64-bit only.
-* **JMAP (RFC 8620/8621).** It is the better protocol, and Stalwart has the
-  complete stack. It is also still without mainstream client support —
-  Thunderbird, Outlook, Apple Mail and Roundcube are all IMAP, and Dovecot has no
-  JMAP at all. Implementing it means a new HTTP API surface, a JSON object model
-  with state strings and `/changes` semantics, blob handling and push
-  infrastructure: effectively a second server. Genuinely the future, genuinely
-  not yet required. Revisit when a mainstream client ships it.
-* **A CalDAV/CardDAV server.** Note how the distributions solve this: Mail-in-a-Box
-  bolts on Nextcloud, iRedMail bundles SOGo. Nobody in this position writes their
-  own, because it means a WebDAV stack, an iCalendar parser, recurrence expansion,
-  a scheduling state machine and a second object store — and it is not a mail
-  server feature. The `.well-known` redirects listed above plus a tested pairing
-  recipe capture most of the benefit for a day's work.
-* **Webmail.** Even Stalwart does not ship one; it recommends Roundcube. A tested
-  Roundcube-on-Windows recipe is the right deliverable — and is a second argument
-  for finishing Sieve first, since `managesieve` is the UI those users would see.
-* **Active/active clustering.** The ground moved here, in this fork's favour:
-  Dovecot 2.4 **removed** Director and the replication plugin outright, and the
-  documentation now states that Dovecot CE is designed for a single server. HA
-  moved to Dovecot Pro. Multi-node HA is no longer part of the open-source
-  baseline at all. Since this server already keeps state in shared SQL, the useful
-  deliverable is a documented and tested **warm-standby topology**, which is
-  largely achievable today and merely unwritten. True active/active needs
-  distributed locking on the message store and folder state, and is not worth it.
-* **Exchange ActiveSync and EWS.** Both proprietary; EAS is patent-encumbered; EWS
-  has had no feature work since 2018 and Microsoft has published its retirement —
-  phased disablement from October 2026, fully retired April 2027. Building toward
-  a protocol its owner is switching off is a poor use of effort.
-* **IMAP NOTIFY (RFC 5465) and mobile push.** Dovecot does implement 5465 — it
-  has since 2.2 — so this is a real gap rather than an imagined one, but it is a
-  low-value one, because the thing people want it for does not work anyway. The
-  state of mobile push is worse than most assume: **iOS Mail does not do push for
-  generic IMAP at all**, only iCloud and ActiveSync, and Apple's own current
-  documentation says so plainly ("If Push isn't available as a setting, your
-  account will default to Fetch"). The single exception is the undocumented
-  `XAPPLEPUSHSERVICE` command, which needs an APNs certificate obtainable only
-  through a process gated on owning macOS Server — a discontinued product.
-  Android's IMAP clients hold an IDLE connection open. **IDLE, which is already
-  implemented, is the real and portable answer**, and NOTIFY would not change
-  what any mobile client does.
-* **LMTP (RFC 2033).** It only matters when another MTA fronts this one, which is
-  not a realistic Windows deployment.
-* **Multi-tenancy.** The per-domain model already covers the realistic cases.
-* **Embedded browser UI**, for the licensing reason given above.
 
 Influencing this list
 ---------------------
