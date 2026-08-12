@@ -1,0 +1,132 @@
+name: Installer smoke test
+
+# Installs the built installer on a fresh, throwaway GitHub-hosted Windows runner
+# and checks that it actually produces a working service - the one thing the
+# release process could not verify locally, because running the installer on the
+# maintainer's build machine hijacks the development service and COM registration
+# (see the release notes in RELEASE.md and the maintainer's environment memory).
+#
+# A GitHub-hosted runner is the right place for this precisely because it is
+# discarded after the job: a real silent install, a real service registration and
+# a real uninstall happen on a machine nobody else depends on.
+#
+# The installer is NOT built here - the server needs VS 2026 / v145 and the
+# prebuilt native dependencies, which only the self-hosted runner has. Instead this
+# takes an already-built installer: either an asset attached to a release, or an
+# artifact uploaded by a prior run. Point it at one with the inputs below.
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag whose installer asset to smoke-test (e.g. v6.2.16). Leave blank to use an uploaded artifact named "installer".'
+        type: string
+        required: false
+      run_id:
+        description: 'Run ID to download the "installer" artifact from (when not using a release tag).'
+        type: string
+        required: false
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  smoke:
+    name: Install on a throwaway runner and verify
+    runs-on: windows-latest
+    steps:
+      - name: Fetch the installer from the release
+        if: ${{ inputs.release_tag != '' }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          New-Item -ItemType Directory -Force installer | Out-Null
+          gh release download "${{ inputs.release_tag }}" `
+            --repo "${{ github.repository }}" `
+            --pattern "hMailServer-*-x64.exe" `
+            --dir installer
+          if (-not $LASTEXITCODE -eq 0) { throw "Could not download the installer asset from ${{ inputs.release_tag }}." }
+
+      - name: Fetch the installer from an uploaded artifact
+        if: ${{ inputs.release_tag == '' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: installer
+          path: installer
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Locate the installer
+        id: find
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem installer -Recurse -Filter 'hMailServer-*-x64.exe' | Select-Object -First 1
+          if (-not $exe) { throw "No hMailServer-*-x64.exe found to test." }
+          Write-Host "Installer: $($exe.FullName)  ($([math]::Round($exe.Length/1MB,1)) MB)"
+          "exe=$($exe.FullName)" >> $env:GITHUB_OUTPUT
+
+      - name: Silent install
+        shell: pwsh
+        run: |
+          $exe = '${{ steps.find.outputs.exe }}'
+          # /VERYSILENT drives the embedded SQL CE backend, which needs no external
+          # database - that is what makes the installer testable on a bare runner.
+          # /SUPPRESSMSGBOXES matters: the installer shows a MsgBox on a DB-setup
+          # error, and in silent mode that would otherwise pick the default button
+          # and mask the failure. The admin password comes from a wizard page that
+          # silent mode skips, so it is not set here and the checks below do not
+          # assume one.
+          $p = Start-Process -FilePath $exe `
+            -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/TYPE=full' `
+            -Wait -PassThru
+          Write-Host "Installer exit code: $($p.ExitCode)"
+          if ($p.ExitCode -ne 0) { throw "Installer returned a non-zero exit code." }
+
+      - name: The service is registered and points at the installed binary
+        shell: pwsh
+        run: |
+          $svc = Get-CimInstance Win32_Service -Filter "Name='hMailServer'" -ErrorAction SilentlyContinue
+          if (-not $svc) { throw "The installer did not register the hMailServer service." }
+          Write-Host "Service image path: $($svc.PathName)"
+          if ($svc.PathName -notmatch 'hMailServer\.exe') { throw "Service image path does not point at hMailServer.exe." }
+
+      - name: The service starts and listens on 25 / 110 / 143
+        shell: pwsh
+        run: |
+          Start-Service hMailServer
+          # The embedded database initialises on first start; give it a moment.
+          Start-Sleep -Seconds 10
+          $svc = Get-Service hMailServer
+          if ($svc.Status -ne 'Running') { throw "Service did not reach Running (state: $($svc.Status))." }
+          foreach ($port in 25, 110, 143) {
+            $listening = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
+            if (-not $listening) { throw "Service is running but not listening on $port." }
+            Write-Host "Listening on $port."
+          }
+
+      - name: COM server is registered and instantiable
+        shell: pwsh
+        run: |
+          # Creating the object proves the installer registered the out-of-process
+          # COM server (LocalServer32). The admin password is not known after a
+          # silent install, so authentication is deliberately not attempted; a
+          # working service that listens on all three ports (checked above) is the
+          # evidence that DBSetupQuick built the database.
+          $app = New-Object -ComObject hMailServer.Application
+          if ($null -eq $app) { throw "Could not instantiate the hMailServer.Application COM object." }
+          Write-Host "COM object created; server product string: $($app.Product)"
+
+      - name: Uninstall cleanly
+        if: ${{ always() }}
+        shell: pwsh
+        run: |
+          Stop-Service hMailServer -ErrorAction SilentlyContinue
+          $uninst = Get-ChildItem 'C:\Program Files*\hMailServer\unins*.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($uninst) {
+            $p = Start-Process -FilePath $uninst.FullName -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
+            Write-Host "Uninstaller exit code: $($p.ExitCode)"
+          } else {
+            Write-Warning "No uninstaller found - the runner is ephemeral, so this is not fatal."
+          }
