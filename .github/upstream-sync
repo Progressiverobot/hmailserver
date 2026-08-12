@@ -1,0 +1,14 @@
+# The upstream commit this fork has been reviewed against.
+#
+# The fork's git history is squashed and disjoint from upstream's, so comparing
+# by commit reports all ~730 upstream commits as "missing" - including "First
+# commit" - which is useless. Instead the upstream-watch workflow reports only
+# commits AFTER the SHA below, and the maintainer moves it forward as each batch
+# is triaged.
+#
+# The pre-existing history was reviewed in aggregate rather than commit by
+# commit: a file-level audit found 936 of the 980 server source files present in
+# both trees byte-identical once the fork's copyright line is discounted.
+#
+# Update this SHA (and only this SHA) when a batch has been triaged.
+5ce853685dec262b27676d45513eabf660eef933
