@@ -1,0 +1,68 @@
+name: OpenSSF Scorecard
+
+# Runs the OpenSSF Scorecard checks and publishes the result to GitHub's code
+# scanning view, so supply-chain posture is visible in the same place as CodeQL
+# findings rather than living in someone's head.
+#
+# Why this is here rather than aspirational: the roadmap records artefact signing
+# and a published Scorecard as the two outstanding supply-chain items. SBOMs
+# (SPDX + CycloneDX) already ship with every release; this closes the measurement
+# half. Several checks will fail on a single-maintainer repository by design -
+# Branch-Protection and Code-Review both effectively require a second pair of
+# eyes - and that is fine. The value is the trend and the checks that *are*
+# actionable: Pinned-Dependencies, Token-Permissions, Dangerous-Workflow.
+#
+# Runs weekly and on pushes to the default branch. Scorecard needs the default
+# branch to compute several checks, so it deliberately does not run on PRs.
+
+on:
+  schedule:
+    # Sunday 04:17 UTC. Offset from the hour because everything runs on the hour
+    # and the shared runner pool is busiest then.
+    - cron: '17 4 * * 0'
+  push:
+    branches: [ master ]
+  workflow_dispatch:
+
+permissions: read-all
+
+jobs:
+  analysis:
+    name: Scorecard analysis
+    runs-on: ubuntu-latest
+    permissions:
+      # Needed to upload the SARIF result to code scanning.
+      security-events: write
+      # Needed by the action to read the workflow run and repository metadata.
+      id-token: write
+      contents: read
+      actions: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Run analysis
+        uses: ossf/scorecard-action@v2
+        with:
+          results_file: scorecard-results.sarif
+          results_format: sarif
+          # publish_results uploads to the public OpenSSF API so the score can be
+          # shown as a badge. Left off deliberately: this is a mail server fork
+          # and there is no reason to publish repository telemetry to a third
+          # party to get a number we can read ourselves in code scanning.
+          publish_results: false
+
+      - name: Upload SARIF to code scanning
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: scorecard-results.sarif
+
+      - name: Keep the raw result as an artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: scorecard-results
+          path: scorecard-results.sarif
+          retention-days: 30

@@ -38,7 +38,14 @@ namespace RegressionTests.Sieve
          Assert.IsEmpty(CheckSyntax("require \"fileinto\";\r\nif header :contains \"Subject\" \"hello\" {\r\n  fileinto \"INBOX\";\r\n}"));
          Assert.IsEmpty(CheckSyntax("if size :over 100K {\r\n  discard;\r\n} else {\r\n  keep;\r\n}"));
          Assert.IsEmpty(CheckSyntax("if anyof (header :is \"From\" \"a@b.com\", exists \"X-Spam\") {\r\n  redirect \"x@y.com\";\r\n}"));
-         Assert.IsEmpty(CheckSyntax("# a comment\r\nrequire [\"fileinto\", \"reject\"];\r\nif not exists \"Date\" {\r\n  reject \"no date\";\r\n}"));
+
+         // A comment plus a multi-name require of extensions that ARE implemented.
+         // This line used to require "reject", which the parser accepted and then
+         // silently ignored - so the script was reported valid and the reject never
+         // happened. require now refuses unknown extensions at upload time, which is
+         // what RFC 5228 section 3.2 asks for, so the negative case moved to
+         // TestInvalidScripts below.
+         Assert.IsEmpty(CheckSyntax("# a comment\r\nrequire [\"fileinto\", \"imap4flags\"];\r\nif not exists \"Date\" {\r\n  fileinto :flags \"\\\\Seen\" \"INBOX\";\r\n}"));
       }
 
       [Test]
@@ -57,6 +64,12 @@ namespace RegressionTests.Sieve
          Assert.IsNotEmpty(CheckSyntax("keep;\r\nrequire \"fileinto\";"));
          // Unterminated quoted string.
          Assert.IsNotEmpty(CheckSyntax("redirect \"unterminated;"));
+         // An extension this server does not implement must be refused at upload,
+         // not accepted and then silently ignored at delivery. "reject" (RFC 5429)
+         // is the case that matters: a script requiring it used to be reported valid
+         // while the reject never happened, so mail the user believed was being
+         // refused was quietly kept instead.
+         Assert.IsNotEmpty(CheckSyntax("require [\"fileinto\", \"reject\"];\r\nif not exists \"Date\" {\r\n  reject \"no date\";\r\n}"));
       }
    }
 }

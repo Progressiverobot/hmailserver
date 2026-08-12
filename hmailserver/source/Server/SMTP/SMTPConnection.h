@@ -7,6 +7,7 @@
 
 
 #include "../common/TCPIP/TCPConnection.h"
+#include "../Common/Util/RateLimiter.h"
 
 #include "RecipientParser.h"
 
@@ -134,6 +135,20 @@ namespace HM
       void ProtocolRSET_();
 
       bool LookupRoute_(const String &sToAddress, bool &bDomainIsRemote);
+
+      // SECURITY: per-account outbound sending ceiling (RateLimiter). Establishes
+      // the account and its limits for the transaction about to start and consumes
+      // one message from the budget. Returns false when the transaction must be
+      // refused, having already answered the client.
+      bool CheckAccountSendingQuotaAtMailFrom_();
+      // Consumes one envelope recipient from the same budget. Returns false when
+      // the recipient must be refused, having already answered the client.
+      bool CheckAccountSendingQuotaAtRcptTo_();
+      // Answers a 4xx (never 5xx - a legitimate user who reaches a daily ceiling
+      // should have their client retry, not have the mail bounced back) and logs
+      // the refusal.
+      void RefuseForAccountSendingQuota_(AccountQuotaResult quotaResult);
+
       void ProtocolMAIL_(const String &Request);
       void ProtocolQUIT_();
       void ProtocolHELP_();
@@ -318,6 +333,14 @@ namespace HM
       boost::mutex ptr_result_mutex_;
       bool ptr_lookup_completed_;   // PrefetchPtrRecord_ has stored a result
       String ptr_record_host_;      // PTR host for the Received header ("Unknown" when unresolvable)
+
+      // SECURITY: the per-account outbound sending ceiling in force for the current
+      // transaction. Established at MAIL FROM: quota_account_ is the authenticated
+      // account (empty for an unauthenticated session, which is never limited -
+      // inbound mail must not be affected), and quota_limits_ is unlimited unless
+      // an administrator has configured [SendingLimits] in hMailServer.ini.
+      String quota_account_;
+      AccountSendingLimits quota_limits_;
 
       RecipientParser recipientParser_;
       bool start_tls_used_;

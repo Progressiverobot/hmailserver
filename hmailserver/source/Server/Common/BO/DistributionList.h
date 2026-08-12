@@ -43,6 +43,18 @@ namespace HM
       ListMode GetListMode() const {return list_mode_; }
       void SetListMode(ListMode m) {list_mode_ = m; }
 
+      // True when only the single authorized address is allowed to post. RFC 2369
+      // requires "List-Post: NO" for such a list rather than the list address,
+      // since telling a subscriber to reply to the list would be telling them to
+      // do something the server will refuse.
+      bool IsAnnouncementOnly() const {return list_mode_ == LMAnnouncement; }
+
+      // The RFC 2919 List-Id value, angle brackets included, derived from the list
+      // address: list@example.com becomes <list.example.com>. Returns an empty
+      // string when the list address has no local part or no domain, in which case
+      // no valid identifier can be formed.
+      String GetRfc2919ListId() const;
+
       bool XMLStore(XNode *pParentNode, int iOptions);
       bool XMLLoad(XNode *pParentNode, int iRestoreOptions);
       bool XMLLoadSubItems(XNode *pParentNode, int iRestoreOptions);

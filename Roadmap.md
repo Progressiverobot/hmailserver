@@ -38,13 +38,14 @@ as ⬜, not ✅.
 
 ### Contents and totals
 
-710 items. The counts are the point of this table — they say where the fork is
+720 items. The counts are the point of this table — they say where the fork is
 strong and where it is thin far more honestly than any prose summary.
 
 | Section | ✅ | 🔄 | ⬜ | ⏸️ |
 |---|--:|--:|--:|--:|
 | [Dated items — the forcing functions](#dated-items--the-forcing-functions) | 1 | – | 5 | 1 |
 | [Defects found by the audit](#defects-found-by-the-audit) | 13 | – | 3 | – |
+| [Structural prerequisites](#structural-prerequisites) | – | – | 5 | – |
 | **The capability matrix** | | | | |
 | [SMTP and ESMTP](#smtp-and-esmtp) | 23 | – | 4 | – |
 | [Transport security and deliverability](#transport-security-and-deliverability) | 28 | – | 16 | 1 |
@@ -65,7 +66,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 1 | – | 5 | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 2 | – | 4 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 2 | – | 7 | – |
-| **Total** | **513** | **2** | **181** | **14** |
+| **Total** | **518** | **4** | **184** | **14** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage and the administration surface are the best-covered areas**, and the
@@ -73,8 +74,9 @@ core protocol layer is in good shape. **Sieve is the thinnest** — 21 not-start
 against 38 shipped, and most of what is missing is one standard extension set.
 And **transport security has the widest gap between reputation and reality**:
 it is the area this fork is best known for, yet 16 items are outstanding and
-four of the audit defects live there. Nothing forward-looking is marked ✅,
-which is what a roadmap should look like.
+four of the audit defects live there. And the forward-looking sections are no longer all ⬜: post-quantum key exchange,
+the .NET 10 migration and the supply-chain work shipped this month, which is what
+progress on a roadmap is supposed to look like.
 
 Dated items — the forcing functions
 -----------------------------------
@@ -144,14 +146,26 @@ Genuinely ahead:
 * **Four SQL backends behind one portable abstraction**, plus the COM API and
   event scripting, which nothing else in this class offers.
 
-One correction to a claim made in earlier release notes, because it was
-overstated: **ARC sealing is real but is reachable only through the DKIM signing
-path.** `Arc::Seal` has a single caller, sitting after every early return in
-`DKIMSigner::Sign`, so a message is sealed only when the sender's domain is
-hosted here *and* has DKIM enabled *and* signing succeeds. Relayed third-party
-mail — the case ARC exists for — is never sealed. Fixing that is ⬜ below, and
-until it is fixed this should not be described as an advantage over
-verify-only implementations.
+**ARC sealing — corrected, then fixed.** Earlier release notes described it as a
+differentiator over verify-only implementations. That was overstated: `Arc::Seal`
+had a single caller sitting after every early return in `DKIMSigner::Sign`, so a
+message was sealed only when the sender's domain was hosted here *and* had DKIM
+enabled *and* signing succeeded — meaning relayed third-party mail, the case ARC
+exists for, was never sealed at all. Sealing is now reachable independently of
+author-domain signing. The correction is recorded rather than quietly dropped,
+because the claim went out in a release.
+
+And what the fork is behind on has now been *measured* rather than guessed. The
+capability matrix below is the result: 720 items, built by auditing the source and
+then having every "shipped" claim adversarially re-checked against the code. That
+second pass changed 69 rows and caught 15 overclaims — the failure shape, almost
+every time, was not "the feature is missing" but **"the feature exists, is
+advertised, and is inert in the configuration people actually run"**. Two features
+enabled by default were unreachable by default; one startup warning had never
+executed in any release; one auto-ban was registered and never enforced.
+
+That is the honest baseline the next generation is built from, and it is why the
+[structural prerequisites](#structural-prerequisites) come before any of it.
 
 Defects found by the audit
 --------------------------
@@ -927,9 +941,26 @@ the source, not from documentation.
 | ✅ | Scheduler and background task set | A minute-polled scheduler running ScheduledTask objects — TLS-RPT reporter, ACME renewal, backup, log retention, message-store consistency, greylist/expired-record cleanup, external fetch… |
 | ✅ | Scripts and scanners cannot starve the accept path | Script and scanner work runs on the shared async queue with AsyncQueueReservedThreads held back for short work, per-stage timings logged around the script/save stage… |
 | ✅ | Work queue saturation reporting and session caps | WorkQueue exposes queue depth, blocked-task count and per-task name/thread/wait/run time; WorkQueueHealthTask reports saturation and names the task holding each thread; AsyncQueueStallThreshold and AsyncQueueReservedThreads bound it… |
-| ⏸️ | LMTP, JMAP, CalDAV/CardDAV, EAS/EWS, webmail | Five whole protocol surfaces an evaluator will ask about inside ten minutes, all deliberately declined with reasoning: LMTP (only matters behind another MTA), JMAP (no mainstream client), CalDAV/CardDAV (pair with SOGo/Nextcloud… |
+| 🔄 | Client-facing surfaces | **Reopened, August 2026.** Three of the five surfaces previously declined here are now in the next-generation programme above: a **webmail of our own**, **JMAP**, and **CalDAV/CardDAV**. Two remain declined and the reasons still hold: LMTP only matters behind another MTA, which is not a realistic Windows deployment; and EAS/EWS are proprietary, patent-encumbered, and being retired by their own vendor. |
 | ⬜ | End-user self-service portal | There is no web surface for users at all — no password self-service, no vacation toggle, no quota view, no quarantine release. Every user-initiated change goes through an administrator… |
 | ⬜ | LDAP / Active Directory as a directory backend | Accounts can be linked to an AD domain and the Control Panel has a read-only AD picker, but there is no LDAP account source — the account database is always the SQL store. On Windows this is the deployment case that matters most. |
+
+Structural prerequisites
+-----------------------
+
+**These are not features, and they are not optional.** Every client-facing item in
+the next generation — a webmail of our own, a real REST API, JMAP, CalDAV/CardDAV —
+lands on top of the optional HTTP listeners, and those listeners are not currently
+built to carry it. Shipping a web application on the present foundation would be
+precisely the half-measure this programme exists to avoid.
+
+| | Prerequisite | Why it gates everything above it |
+|:-:|---|---|
+| ⬜ | **An exception barrier on every listener thread** | `MetricsServer`, `RestApiServer`, `WebServicesServer` and `ManageSieveServer` use raw sockets on `std::thread`, deliberately outside the Boost.Asio stack. An exception escaping the top of one of those threads is `std::terminate` — **the entire mail server dies**. Today those threads do almost nothing, so the exposure is small. A webmail is thousands of requests parsing hostile input, and one unhandled `std::bad_alloc` in an HTML parser would take SMTP down with it. One listener has just gained a barrier as part of the metrics work; all of them need it, structurally and by policy, before anything is built on them. |
+| ⬜ | **One TLS configuration path** | Those listeners each build their own `SSL_CTX` and never consult `SslContextInitializer`, so the hardening applied to SMTP/IMAP/POP3 does not reach them — including the post-quantum key-exchange groups just added. A user who reads "post-quantum key exchange" in the release notes and then serves their mail over the web listener is getting classical-only key exchange and has no way to know. Either the listeners go through the shared initialiser, or the setting is honestly scoped in the documentation. The first is correct. |
+| ⬜ | **A concurrency model that fits a web workload** | The listeners are serial accept loops: one request handled to completion before the next is read. That is adequate for a metrics scrape every 30 seconds and hopeless for a mail client issuing dozens of small requests per screen. A bounded worker pool with a connection cap, per-request deadlines and a request-size ceiling — and *bounded*, because this server's historical failure mode is thread-pool exhaustion, and the fix for that must not reintroduce it on a new port. |
+| ⬜ | **A single authorisation choke point** | Every existing access-control decision is made against "the logged-in account". Shared mailboxes and a REST API both introduce paths where the answer must instead be "the owner of the folder being touched". Scattering that decision across endpoints is how mail servers serve other people's mail; it needs one place that cannot be bypassed, and a test that proves every path goes through it. |
+| ⬜ | **Fuzzing the parsers we already have, before adding more** | MIME, and soon HTML, iCalendar and vCard. Every one is untrusted input in a C++ process that must not crash, and a crash here is a mail outage rather than a bad request. libFuzzer needs a clang toolchain alongside MSVC, which is the real work. This is on the list because the next generation adds parsers, not because the current ones are known bad. |
 
 Planned work
 ------------
@@ -942,7 +973,7 @@ these much cheaper than they look.
 |:-:|---|---|
 | ⬜ | **API keys for the REST API** | HTTP Basic only today — the admin password replayed on every request, no scoping, no expiry, no address restriction. Bearer tokens with labels and expiry. Small, and the cheapest security win available. |
 | ⬜ | **Per-account outbound send limits** | The rate limiter is keyed by IP or destination domain, per minute. There is no per-*account* quota, so one compromised account can blacklist the IP with no ceiling. iRedMail ships this free. A security control, not a feature. |
-| ⬜ | **Sieve extension set** | Only `keep`/`discard`/`fileinto`/`redirect`/`stop` and nine tests exist, and ManageSieve advertises exactly `"SIEVE" "fileinto"` — so Roundcube's filter UI renders almost nothing. `vacation` is the glaring one, and account-level auto-reply *already exists*; it is simply unreachable from Sieve. The lexer, parser and evaluator are already there. |
+| ⬜ | **Sieve extension set** | Only `keep`/`discard`/`fileinto`/`redirect`/`stop` and nine tests exist, and ManageSieve advertises exactly `"SIEVE" "fileinto"`, so any ManageSieve client sees an almost-empty capability set — and the filter UI in our own webmail will be built on it. `vacation` is the glaring one, and account-level auto-reply *already exists*; it is simply unreachable from Sieve. The lexer, parser and evaluator are already there. |
 | ⬜ | **Shared and delegated mailboxes** | The other-users namespace is hard-coded to `NIL`, so no user can open another's mailbox. `info@`/`sales@`/`support@` is *the* small-business requirement and the current answer is to share a password. Full RFC 4314 ACL machinery, folder containers, public folders and a master user already exist — this is namespace plumbing plus cross-account ACL lookups. |
 | ⬜ | **App passwords** | 2FA is unenforceable against IMAP/POP clients that cannot present a TOTP code. App passwords are what make account-level 2FA deployable, and the prerequisite for extending TOTP beyond the Control Panel. |
 | ⬜ | **Message trace / delivery history** | No queryable per-message record — "what happened to Jane's 14:20 message" means grepping logs. `AWStats.cpp` is already a per-recipient delivery event stream called from every interesting site; it needs a correlation key and a home. Carry two ids like Exchange does: the RFC `Message-ID` and a per-*instance* id that survives forking. Off by default — it stores subjects and addresses. |
@@ -953,7 +984,7 @@ these much cheaper than they look.
 | ⬜ | **Admin-reviewable quarantine** | Spam is scored, marked or deleted; nothing is held for review and release. |
 | ⬜ | **End-user self-service portal** | No web surface for users at all. Password self-service alone is a permanent support burden. |
 | ⬜ | **Retention and per-domain archiving** | Archiving is a raw filesystem copy — no retention, no per-domain scope, no index, no immutability, no hold. Searchable eDiscovery depends on full-text search. |
-| ⬜ | **THREAD (RFC 5256)** | SORT is implemented from the same RFC but not THREAD, which is what drives conversation view in Roundcube and Thunderbird. |
+| ⬜ | **THREAD (RFC 5256)** | SORT is implemented from the same RFC but not THREAD, which is what drives conversation view in Thunderbird — and in our own webmail, where a threaded message list is table stakes rather than a nicety. |
 | ⬜ | **LDAP/Active Directory as a directory backend** | AD-domain linking on accounts exists, but no directory as an account source. On Windows this is the case that matters. |
 | ✅ | **Publish the architecture guide** | [ARCHITECTURE.md](ARCHITECTURE.md) — the module map, the patterns that matter (the COM seam, layered persistence, four backends behind one abstraction, INI-vs-database settings, and why the optional listeners deliberately sit outside Boost.Asio *and therefore have no exception barrier and their own `SSL_CTX`*), a "where does this change go" table, and the constraints that cost real releases: every wait on a pooled thread needs a ceiling; an idle timeout is not a ceiling because it re-arms on every byte; distinguish "the answer is no" from "there was no answer"; `shared_from_this()` throws in a constructor; a diagnostic must not fire on the shipped default. |
 | 🔄 | **Static-analysis backlog** | First `/analyze` pass done — three buffer overruns, a data race, NULL dereferences and a log-corrupting shadowed variable fixed. The remainder needs triage rather than blanket suppression. |
@@ -981,7 +1012,7 @@ Future-proofing: platform and supply chain
 | | Item | Detail |
 |:-:|---|---|
 | ✅ | **Migrate to .NET 10 LTS** | Done 12 Aug 2026, ahead of the 10 Nov 2026 deadline. Nine projects to `net10.0-windows`; SDK 10.0.303 pinned in `global.json`; bundled Desktop Runtime, the installer's `Microsoft.WindowsDesktop.App\10.*` probe, the runtime-fetch script, the screenshot script and the docs all moved together. Two real findings on the way: .NET 9 added the **WFO1000** WinForms analyzer, which (correctly) rejected four properties on `ucText` whose designer-serialization intent was undeclared — the designer had been emitting meaningless `Number = 0` lines for years; and `System.DirectoryServices` is now in the Windows Desktop shared framework, so that `PackageReference` was redundant and is gone. **`MinVersion` stays at 10.0.14393** — .NET 10 still supports Windows 10 1607 and Server 2012, which was worth checking rather than assuming. |
-| ✅ | **.NET target policy, written down** | Audited every project in the tree, not just the shipping ones. **All six shipped artefacts and the Control Panel publish as `net10.0`** — verified from their `runtimeconfig.json`, so nothing reaching a user is on .NET 8. The rest is deliberate, and now recorded so it is a decision rather than drift: the **regression suite and its three companions stay on .NET Framework 4.8.1**, which has *no end date* (Component Lifecycle Policy — supported as long as its host Windows) and drives the server over COM interop, so moving it to .NET 10 would be a large, risky change to the release gate for no benefit. **Six projects still on .NET Framework 4.5 — support ended 13 January 2016 — were bumped to 4.8.1**; they are dormant upstream dev tools referenced by no script, and since the 4.5 targeting pack is absent from a modern VS install they could not build at all before. **Five projects remain on 3.5 SP1** (supported to 10 January 2029): dormant, buildable by nobody today, and a 3.5→4.8.1 jump on code nothing exercises is a decision to take deliberately rather than blind. |
+| ✅ | **.NET target policy, written down** | Audited every project in the tree, not just the shipping ones. **All six shipped artefacts and the Control Panel publish as `net10.0`** — verified from their `runtimeconfig.json`, so nothing reaching a user is on .NET 8. The rest is deliberate, and now recorded so it is a decision rather than drift: the **regression suite and its three companions stay on .NET Framework 4.8.1**, which has *no end date* (Component Lifecycle Policy — supported as long as its host Windows) and drives the server over COM interop, so moving it to .NET 10 would be a large, risky change to the release gate for no benefit. **Six projects still on .NET Framework 4.5 — support ended 13 January 2016 — were bumped to 4.8.1**; they are dormant upstream dev tools referenced by no script, and since the 4.5 targeting pack is absent from a modern VS install they could not build at all before. **Seven projects remain older still**: five on .NET Framework 3.5 SP1 (supported to 10 January 2029), and two — `MemoryTests` and `TestInvalidConnections` — that declare no `TargetFramework` at all and carry Visual Studio 2005 markers (`ProductVersion 8.0.50727`, `ToolsVersion 3.5`, `OldToolsVersion 2.0`). All seven are dormant, referenced by no solution the build touches, and buildable by nobody today. Modernising code nothing exercises is a decision to take deliberately rather than blind; retiring them is the more honest option and is worth a separate look. |
 | ⬜ | **Decide the OpenSSL branch** | 4.0.x is not LTS and dies 14 May 2027. Decide by Q1 2027 whether to follow to the next LTS or move back to 3.5. |
 | ⬜ | **Declare a supported Windows floor** | Server 2019 / Windows 10 21H2, effective with the first release after 12 Jan 2027. Zero code cost — Server 2019 is still `_WIN32_WINNT=0x0A00`, and that macro should *not* be raised. |
 | ⬜ | **Artifact signing** | SBOMs are already attached to every release in both SPDX and CycloneDX. The gap is signing: Authenticode on the installer and binaries, and ideally Sigstore for the release artefacts. This is the supply-chain item that is actually missing, and the CRA makes update integrity a formal requirement if scope ever changes. |
@@ -1016,9 +1047,6 @@ Saying no is part of a roadmap, and these are reasoned rather than reflexive.
 | **Removing the COM API** | It is how the Control Panel and every third-party script talk to the server. |
 | **Matching upstream's dependency downgrades** | Deliberately ahead on OpenSSL, Boost and PostgreSQL. |
 | **32-bit builds** | 64-bit only. |
-| **JMAP (RFC 8620/8621)** | The better protocol, and Stalwart has the full stack. But client support is still essentially nil — Thunderbird, Outlook, Apple Mail and Roundcube are all IMAP, and Dovecot has no JMAP at all. It means a new HTTP API surface, a JSON object model with state strings and `/changes`, blob handling and push: effectively a second server. Revisit when a mainstream client ships it. |
-| **A CalDAV/CardDAV server** | Mail-in-a-Box bolts on Nextcloud; iRedMail bundles SOGo. Nobody in this position writes their own, because it means a WebDAV stack, an iCalendar parser, recurrence expansion, a scheduling state machine and a second object store — and it is not a mail server feature. The `.well-known` redirects plus a tested pairing recipe capture most of the benefit. |
-| **Webmail** | Even Stalwart does not ship one; it recommends Roundcube. A tested Roundcube-on-Windows recipe is the right deliverable — and a second argument for finishing Sieve first. |
 | **Active/active clustering** | The ground moved here: Dovecot 2.4 **removed** Director and the replicator outright and now documents CE as single-server, with HA moved to the commercial product. Multi-node is no longer part of the open-source baseline, so its absence is not a gap. Warm standby is the right deliverable. |
 | **Windows containers** | Base image sizes, the GUI tooling problem and thin adoption make this a poor fit, and no competitor does it on Windows. |
 | **ActiveSync and EWS** | Both proprietary; EAS is patent-encumbered; EWS has had no feature work since 2018 and Microsoft has published its retirement — phased disablement from October 2026, fully retired April 2027. |

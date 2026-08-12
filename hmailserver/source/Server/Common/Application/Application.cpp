@@ -415,6 +415,22 @@ namespace HM
       int webServicesHttpPort = IniFileSettings::Instance()->GetWebServicesHttpPort();
       int webServicesHttpsPort = IniFileSettings::Instance()->GetWebServicesHttpsPort();
 
+      // Unconditionally, and deliberately *outside* the port check below.
+      //
+      // This report exists to say "these features are enabled but nothing is
+      // listening, so nothing answers those URLs" - which is only ever true when
+      // both ports are 0. Its only previous caller was WebServicesServer::Start(),
+      // reached solely from inside the same `if` below, so at the moment it ran
+      // both ports were guaranteed non-zero and its main branch could never
+      // execute. The report has therefore never been emitted, in this release or
+      // any earlier one, for exactly the configuration that needs it: the shipped
+      // default, where MtaStsHostingEnabled is 1 and both ports are 0.
+      //
+      // It only reads settings and writes to the application log - no sockets, no
+      // member state - so calling it before any listener exists is safe. Its
+      // once-per-process guard makes the call still inside Start() a no-op.
+      WebServicesServer::ReportUnreachableFeatures();
+
       if (webServicesHttpPort > 0 || webServicesHttpsPort > 0)
       {
          web_services_server_ = std::shared_ptr<WebServicesServer>(new WebServicesServer());

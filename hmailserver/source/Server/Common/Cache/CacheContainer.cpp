@@ -58,6 +58,11 @@ namespace HM
                Cache<Account>::Instance()->Clear();
                Cache<Alias>::Instance()->Clear();
                Cache<DistributionList>::Instance()->Clear();
+
+               // Same reasoning, for the same reason, on the set of accounts owed a
+               // password-hash upgrade: it holds account ids, and the database
+               // configured after a restart need not be the one those ids came from.
+               PersistentAccount::ClearAllPasswordUpgradePending();
             }
       );
    }

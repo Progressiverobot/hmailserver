@@ -152,25 +152,15 @@ namespace HM
 
       Crypt::EncryptionType iPasswordEncryption = (Crypt::EncryptionType) pAccount->GetPasswordEncryption();
 
-      // Hash-policy enforcement: an administrator can require that stored account
-      // passwords use at least a given hash scheme (the Crypt::EncryptionType values
-      // are ordered weakest-to-strongest). A login whose stored hash is weaker than
-      // the configured minimum is refused outright -- even with the correct password
-      // -- so legacy plaintext/MD5/SHA256 hashes must be reset to a strong scheme
-      // rather than continuing to be accepted (and exposed in any database leak).
-      // The default of 0 (ETNone) disables the policy and preserves prior behaviour.
-      // Active Directory accounts are exempt (handled above); they hold no local hash.
-      int minimumAcceptedHashAlgorithm = IniFileSettings::Instance()->GetMinimumAcceptedHashAlgorithm();
-      if (minimumAcceptedHashAlgorithm > 0 && (int) iPasswordEncryption < minimumAcceptedHashAlgorithm)
-      {
-         String sMessage;
-         sMessage.Format(_T("Authentication refused for account %s: the stored password hash type (%d) is weaker than the configured minimum (%d). The password must be reset."),
-            pAccount->GetAddress().c_str(), (int) iPasswordEncryption, minimumAcceptedHashAlgorithm);
-         LOG_APPLICATION(sMessage);
-         return false;
-      }
-
       String sComparePassword = pAccount->GetPassword();
+
+      // The clear text to re-hash if the stored password is upgraded below. It is the
+      // password the *account* holds, which is not always the one the client sent: the
+      // unencrypted and Blowfish comparisons below are case insensitive, so re-hashing
+      // what the client sent would silently make a differently-cased password the new
+      // correct one and lock out the user who types it the way they always have.
+      String sPasswordToStore = sPassword;
+      bool upgradeEligible = true;
 
       if (iPasswordEncryption == 0)
       {
@@ -180,13 +170,18 @@ namespace HM
          // Unencrypted passwords are not case sensitive so these changes WOULD fix that
          // but could cause problems for people who've been relying on them not being
          // case sensitive. Perhaps this needs to be optional before implementing.
-         // 
+         //
          // if (sPassword.Compare(sComparePassword) != 0)
          //   return false;
          //
          sComparePassword.MakeLower();
          if (sPassword.CompareNoCase(sComparePassword) != 0)
             return false;
+
+         // Hash the stored password rather than the supplied one, which is exactly what
+         // PersistentAccount::ReadObject already does when it re-hashes an unencrypted
+         // password in memory.
+         sPasswordToStore = pAccount->GetPassword();
       }
       else if (iPasswordEncryption == Crypt::ETMD5 ||
                iPasswordEncryption == Crypt::ETSHA256 ||
@@ -194,26 +189,8 @@ namespace HM
                iPasswordEncryption == Crypt::ETArgon2id)
       {
          // Compare hashs
-         bool result = Crypt::Instance()->Validate(sPassword, sComparePassword, iPasswordEncryption);
-
-         if (!result)
+         if (!Crypt::Instance()->Validate(sPassword, sComparePassword, iPasswordEncryption))
             return false;
-
-         // The password is correct. If the account hash uses an older, weaker scheme
-         // than the preferred one, transparently upgrade it now while we have the
-         // clear-text password available. Only ever upgrade to a stronger scheme,
-         // never downgrade: the strong KDFs are ordered PBKDF2 < Argon2id by enum
-         // value and both outrank the legacy MD5/SHA256 hashes.
-         int preferredHashAlgorithm = IniFileSettings::Instance()->GetPreferredHashAlgorithm();
-         bool preferredIsStrongKdf = (preferredHashAlgorithm == Crypt::ETPBKDF2 ||
-                                      preferredHashAlgorithm == Crypt::ETArgon2id);
-         if (preferredIsStrongKdf && preferredHashAlgorithm > iPasswordEncryption)
-         {
-            std::shared_ptr<Account> upgradedAccount = std::make_shared<Account>(*pAccount);
-            upgradedAccount->SetPassword(Crypt::Instance()->EnCrypt(sPassword, (Crypt::EncryptionType) preferredHashAlgorithm));
-            upgradedAccount->SetPasswordEncryption(preferredHashAlgorithm);
-            PersistentAccount::SaveObject(upgradedAccount);
-         }
       }
       else if (iPasswordEncryption == Crypt::ETBlowFish)
       {
@@ -221,11 +198,132 @@ namespace HM
 
          if (sPassword.CompareNoCase(decrypted) != 0)
             return false;
+
+         // Deliberately not upgraded. A Blowfish password is compared case
+         // insensitively, and unlike the unencrypted case that is still live
+         // behaviour - nothing re-hashes it on read. Moving it to a hash would make the
+         // comparison case sensitive and lock out anyone whose client sends the
+         // password in a different case than it was stored in. That is a worse outcome
+         // than leaving a reversibly-encrypted password in place, so these accounts
+         // keep their scheme until the password is reset.
+         upgradeEligible = false;
       }
       else
          return false;
 
+      // The password is correct. This is the only point at which the clear text is
+      // known to match the account, so it is the only point at which the stored hash
+      // can be re-derived - and the only point at which a database write is justified.
+      int effectiveEncryption = (int) iPasswordEncryption;
+      if (upgradeEligible)
+         effectiveEncryption = UpgradeStoredPasswordHash_(pAccount, sPasswordToStore, (int) iPasswordEncryption);
+
+      // Hash-policy enforcement: an administrator can require that stored account
+      // passwords use at least a given hash scheme (the Crypt::EncryptionType values
+      // are ordered weakest-to-strongest). A login whose stored hash is still weaker
+      // than the configured minimum after the upgrade attempt is refused -- even with
+      // the correct password -- so such a password must be reset rather than continuing
+      // to be accepted (and exposed in any database leak). The default of 0 (ETNone)
+      // disables the policy. Active Directory accounts are exempt (handled above);
+      // they hold no local hash.
+      //
+      // This check deliberately runs *after* verification and after the upgrade
+      // attempt. Running it first, on the stored type, made the setting a permanent
+      // lockout: the correct password was refused before it could be compared, and the
+      // upgrade that would satisfy the policy can only ever happen on a successful
+      // login.
+      int minimumAcceptedHashAlgorithm = IniFileSettings::Instance()->GetMinimumAcceptedHashAlgorithm();
+      if (minimumAcceptedHashAlgorithm > 0 && effectiveEncryption < minimumAcceptedHashAlgorithm)
+      {
+         String sMessage;
+         sMessage.Format(_T("Authentication refused for account %s: the stored password hash type (%d) is weaker than the configured minimum (%d). The password must be reset."),
+            pAccount->GetAddress().c_str(), effectiveEncryption, minimumAcceptedHashAlgorithm);
+         LOG_APPLICATION(sMessage);
+         return false;
+      }
+
       return true;
+   }
+
+   int
+   PasswordValidator::UpgradeStoredPasswordHash_(std::shared_ptr<const Account> pAccount, const String &sPassword, int currentEncryption)
+   {
+      int preferredHashAlgorithm = IniFileSettings::Instance()->GetPreferredHashAlgorithm();
+
+      // Only ever move to one of the real password-hashing schemes. ETNone and
+      // ETBlowFish are recoverable rather than hashed, and ETDPAPI protects
+      // machine-bound secrets (route and fetch account passwords), not account
+      // passwords, so none of them is a legitimate target here.
+      if (preferredHashAlgorithm < (int) Crypt::ETMD5 || preferredHashAlgorithm > (int) Crypt::ETArgon2id)
+         return currentEncryption;
+
+      // Never downgrade, checked before anything else and unconditionally.
+      //
+      // The pending-flag branch below deliberately bypasses the weaker-than test, so
+      // this has to be its own guard rather than part of that test: a stale flag would
+      // otherwise permit a downgrade. It can go stale because SaveObject can rewrite
+      // the row to a stronger scheme while the flag is still set - so a clear-text
+      // account whose password an administrator changes while PreferredHashAlgorithm
+      // is Argon2id, followed by the preference being lowered back to PBKDF2, would
+      // silently have its Argon2id hash rewritten as PBKDF2 on the next login, and log
+      // a false "from type 0" line while doing it. The flag is now cleared in
+      // SaveObject and DeleteObject too, but the invariant is cheap to state here and
+      // must not depend on that.
+      if (preferredHashAlgorithm < currentEncryption)
+         return currentEncryption;
+
+      // PersistentAccount::ReadObject re-hashes an unencrypted stored password into
+      // the in-memory object, so an account whose row is still clear text arrives here
+      // already claiming the preferred type. Those accounts are flagged as pending
+      // instead of being detected by their type.
+      bool storedIsUnencrypted = PersistentAccount::IsPasswordUpgradePending(pAccount->GetID());
+
+      bool storedIsWeaker = preferredHashAlgorithm > currentEncryption;
+
+      if (!storedIsUnencrypted && !storedIsWeaker)
+         return currentEncryption;
+
+      int storedEncryption = storedIsUnencrypted ? (int) Crypt::ETNone : currentEncryption;
+
+      try
+      {
+         String upgradedHash = Crypt::Instance()->EnCrypt(sPassword, (Crypt::EncryptionType) preferredHashAlgorithm);
+
+         if (upgradedHash.IsEmpty() ||
+             !PersistentAccount::PersistUpgradedPassword(pAccount, upgradedHash, preferredHashAlgorithm))
+         {
+            // Log it, but let the login through on the hash the account already has:
+            // refusing a correct password because we could not improve its storage
+            // would lock the user out of their mail over a housekeeping task.
+            //
+            // Application log rather than ErrorManager, deliberately. This is on the
+            // successful-authentication path, so an unwritable database would report
+            // it on *every* login by *every* affected account - and DALConnection has
+            // already reported the underlying SQL failure, so the ERROR log would
+            // carry two entries per login for one root cause. It is also the shape
+            // that breaks fixtures asserting a clean ERROR log.
+            String sMessage;
+            sMessage.Format(_T("Unable to save an upgraded password hash for account %s. The account keeps its existing password hash; authentication is unaffected and the upgrade is retried on the next logon."),
+               pAccount->GetAddress().c_str());
+            LOG_APPLICATION(sMessage);
+            return currentEncryption;
+         }
+      }
+      catch (...)
+      {
+         String sError;
+         sError.Format(_T("An unknown error occurred while upgrading the password hash for account %s. The account keeps its existing password hash; authentication is unaffected."),
+            pAccount->GetAddress().c_str());
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5741, "PasswordValidator::UpgradeStoredPasswordHash_", sError);
+         return currentEncryption;
+      }
+
+      String sMessage;
+      sMessage.Format(_T("Upgraded the stored password hash for account %s from type %d to type %d."),
+         pAccount->GetAddress().c_str(), storedEncryption, preferredHashAlgorithm);
+      LOG_APPLICATION(sMessage);
+
+      return preferredHashAlgorithm;
    }
 
 }

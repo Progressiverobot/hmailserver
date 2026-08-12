@@ -15,6 +15,78 @@
 
 namespace HM
 {
+   namespace
+   {
+      // The bucket bounds are held as function-local statics and handed out by
+      // reference on the observation path. OnCommandProcessed runs once per protocol
+      // command line on every connection, so rebuilding a vector there would be a
+      // heap allocation per command for no gain.
+
+      const std::vector<double> &CommandLatencyBounds()
+      {
+         // A protocol command line is normally handled in tens of microseconds, so
+         // the useful resolution is at the bottom; the 0.5s and 1s bounds exist so a
+         // command that blocked on something shows up as a distinct step rather than
+         // disappearing into +Inf.
+         static const std::vector<double> bounds
+         {
+            0.0001, 0.00025, 0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.5, 1.0
+         };
+
+         return bounds;
+      }
+
+      const std::vector<double> &DatabaseLatencyBounds()
+      {
+         // A database statement is normally a millisecond or two and the interesting
+         // tail runs out to seconds - a locked table, or a backup in progress - so
+         // these bounds start a decade above the command bounds and end a decade
+         // later.
+         static const std::vector<double> bounds
+         {
+            0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 5.0, 10.0
+         };
+
+         return bounds;
+      }
+
+      // Places one observation into a per-bucket count vector: the index of the
+      // lowest bound the value is still <= (Prometheus buckets are "le"), or the
+      // final +Inf slot when it exceeds every bound.
+      void RecordLatencyObservation(std::vector<unsigned __int64> &buckets, const std::vector<double> &bounds, double seconds)
+      {
+         size_t index = bounds.size();
+
+         for (size_t i = 0; i < bounds.size(); i++)
+         {
+            if (seconds <= bounds[i])
+            {
+               index = i;
+               break;
+            }
+         }
+
+         if (index < buckets.size())
+            buckets[index]++;
+      }
+
+      // Turns per-bucket counts into the cumulative counts the exposition format
+      // wants. The last entry is the +Inf bucket and therefore the total.
+      std::vector<unsigned __int64> AccumulateLatencyBuckets(const std::vector<unsigned __int64> &buckets)
+      {
+         std::vector<unsigned __int64> cumulative(buckets.size(), 0);
+
+         unsigned __int64 running = 0;
+         for (size_t i = 0; i < buckets.size(); i++)
+         {
+            running += buckets[i];
+            cumulative[i] = running;
+         }
+
+         return cumulative;
+      }
+   }
+
    ServerStatus::ServerStatus()
    {
       processed_messages_ = 0;
@@ -35,6 +107,22 @@ namespace HM
       database_slow_queries_count_ = 0;
       state_ = StateUnknown ;
 
+      // One slot per bound, plus the +Inf slot. Sized once here so the observation
+      // path never allocates and the snapshot getters can rely on the length.
+      command_latency_buckets_.assign(CommandLatencyBounds().size() + 1, 0);
+      database_latency_buckets_.assign(DatabaseLatencyBounds().size() + 1, 0);
+   }
+
+   std::vector<double>
+   ServerStatus::GetCommandLatencyBucketBounds()
+   {
+      return CommandLatencyBounds();
+   }
+
+   std::vector<double>
+   ServerStatus::GetDatabaseLatencyBucketBounds()
+   {
+      return DatabaseLatencyBounds();
    }
 
    ServerStatus::~ServerStatus()
@@ -240,11 +328,31 @@ namespace HM
    ServerStatus::OnCommandProcessed(unsigned __int64 microseconds)
    {
       // Called from TCP worker threads after each client command line is parsed.
+      // The histogram bucket is picked here, on the observation path, so the metric
+      // is a histogram from the very first scrape rather than a shape that changes
+      // once traffic arrives. A Prometheus metric family whose declared type changes
+      // at runtime is worse than no histogram at all.
+      double seconds = static_cast<double>(microseconds) / 1000000.0;
+
       boost::lock_guard<boost::recursive_mutex> guard(command_latency_mutex_);
       command_processing_micros_total_ += microseconds;
       commands_processed_count_++;
+      RecordLatencyObservation(command_latency_buckets_, CommandLatencyBounds(), seconds);
    }
-   
+
+   ServerStatus::LatencySnapshot
+   ServerStatus::GetCommandLatencySnapshot() const
+   {
+      LatencySnapshot snapshot;
+
+      boost::lock_guard<boost::recursive_mutex> guard(command_latency_mutex_);
+      snapshot.microseconds_total = command_processing_micros_total_;
+      snapshot.count = commands_processed_count_;
+      snapshot.cumulative_buckets = AccumulateLatencyBuckets(command_latency_buckets_);
+
+      return snapshot;
+   }
+
    unsigned __int64
    ServerStatus::GetDatabaseQueriesCount() const
    {
@@ -268,13 +376,30 @@ namespace HM
    {
       // Called from whichever thread ran the statement through the connection
       // manager (TCP workers, delivery threads, scheduled maintenance tasks).
+      double seconds = static_cast<double>(microseconds) / 1000000.0;
+
       boost::lock_guard<boost::recursive_mutex> guard(database_query_mutex_);
       database_query_micros_total_ += microseconds;
       database_queries_count_++;
+      RecordLatencyObservation(database_latency_buckets_, DatabaseLatencyBounds(), seconds);
+
       if (wasSlow)
          database_slow_queries_count_++;
    }
-   
+
+   ServerStatus::LatencySnapshot
+   ServerStatus::GetDatabaseLatencySnapshot() const
+   {
+      LatencySnapshot snapshot;
+
+      boost::lock_guard<boost::recursive_mutex> guard(database_query_mutex_);
+      snapshot.microseconds_total = database_query_micros_total_;
+      snapshot.count = database_queries_count_;
+      snapshot.cumulative_buckets = AccumulateLatencyBuckets(database_latency_buckets_);
+
+      return snapshot;
+   }
+
    int
    ServerStatus::GetNumberOfMessagesDelivered() const
    {

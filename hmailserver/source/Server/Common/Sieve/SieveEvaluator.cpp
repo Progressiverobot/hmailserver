@@ -16,90 +16,125 @@ namespace HM
 {
    namespace
    {
-      // Splits a test's argument list into the tags, positional string-lists and
-      // a single numeric argument that the core tests consume.
-      struct TestArguments
-      {
-         String matchType = _T("is");
-         String comparator = _T("i;ascii-casemap");
-         String addressPart = _T("all");
-         bool sizeOver = true;
-         bool hasNumber = false;
-         __int64 number = 0;
-         std::vector<std::vector<String>> stringLists;
-      };
+      // The sub-address separator for the subaddress extension (RFC 5233). The
+      // separator is site-defined; hMailServer's plus addressing uses a
+      // per-domain character, but a Sieve test runs against arbitrary headers
+      // whose domains are not ours, so a single conventional '+' is used here.
+      const wchar_t *SubAddressSeparator = L"+";
 
-      TestArguments SplitArguments(const std::vector<SieveArgument> &arguments)
-      {
-         TestArguments result;
+      // Saturation point for the numeric comparator, spelled out rather than
+      // taken from a macro so it cannot depend on include order.
+      const __int64 MaxNumericValue = 0x7FFFFFFFFFFFFFFF;
 
-         for (size_t i = 0; i < arguments.size(); i++)
+      // RFC 4790 9.1.1: i;ascii-numeric reads the leading digits of the string.
+      // A string that does not start with a digit is "positive infinity" - equal
+      // to every other such string and greater than every number.
+      __int64 ParseAsciiNumeric(const String &value, bool &infinite)
+      {
+         infinite = true;
+
+         __int64 result = 0;
+         for (int i = 0; i < value.GetLength(); i++)
          {
-            const SieveArgument &argument = arguments[i];
+            wchar_t ch = value[i];
+            if (ch < L'0' || ch > L'9')
+               break;
 
-            if (argument.kind == SieveArgument::Kind::Tag)
-            {
-               String tag = argument.tag;
-               tag.ToLower();
+            infinite = false;
 
-               if (tag == _T("comparator"))
-               {
-                  // The comparator value is the following string argument.
-                  if (i + 1 < arguments.size() && arguments[i + 1].kind == SieveArgument::Kind::StringList &&
-                      !arguments[i + 1].strings.empty())
-                  {
-                     result.comparator = arguments[i + 1].strings[0];
-                     i++;
-                  }
-               }
-               else if (tag == _T("is") || tag == _T("contains") || tag == _T("matches"))
-               {
-                  result.matchType = tag;
-               }
-               else if (tag == _T("all") || tag == _T("localpart") || tag == _T("domain"))
-               {
-                  result.addressPart = tag;
-               }
-               else if (tag == _T("over"))
-               {
-                  result.sizeOver = true;
-               }
-               else if (tag == _T("under"))
-               {
-                  result.sizeOver = false;
-               }
-            }
-            else if (argument.kind == SieveArgument::Kind::Number)
+            if (result > (MaxNumericValue - 9) / 10)
             {
-               result.number = argument.number;
-               result.hasNumber = true;
+               // Saturate rather than overflow. A header claiming a 19-digit
+               // number is not worth a wrapped comparison.
+               result = MaxNumericValue;
+               break;
             }
-            else
-            {
-               result.stringLists.push_back(argument.strings);
-            }
+
+            result = result * 10 + (ch - L'0');
          }
 
          return result;
       }
+
+      int SignOf(int value)
+      {
+         if (value < 0)
+            return -1;
+
+         return value > 0 ? 1 : 0;
+      }
+
+      bool ListContainsNoCase(const std::vector<String> &values, const String &candidate)
+      {
+         for (const String &value : values)
+         {
+            if (value.CompareNoCase(candidate) == 0)
+               return true;
+         }
+
+         return false;
+      }
    }
 
    SieveEvaluator::SieveEvaluator() :
-      stopped_(false)
+      stopped_(false),
+      localDecided_(false),
+      flagsTouched_(false),
+      pinnedFlagsGiven_(false),
+      vacationDecided_(false),
+      result_(nullptr)
    {
    }
 
    String
    SieveEvaluator::Evaluate(const std::vector<std::shared_ptr<SieveCommand>> &commands, const SieveMessage &message)
    {
+      SieveEnvelope envelope;
+      SieveResult result;
+
+      return Evaluate(commands, message, envelope, result);
+   }
+
+   String
+   SieveEvaluator::Evaluate(const std::vector<std::shared_ptr<SieveCommand>> &commands,
+                            const SieveMessage &message,
+                            const SieveEnvelope &envelope,
+                            SieveResult &result)
+   {
       actions_.clear();
       stopped_ = false;
+      localDecided_ = false;
+      flags_.clear();
+      flagsTouched_ = false;
+      pinnedFlags_.clear();
+      pinnedFlagsGiven_ = false;
+      vacationDecided_ = false;
+
+      envelope_ = envelope;
+      result_ = &result;
+      result = SieveResult();
 
       ExecuteCommands_(commands, message);
 
-      // Implicit keep when the script took no action.
-      if (actions_.empty())
+      // Implicit keep: the message stays unless an action settled its fate.
+      if (!localDecided_)
+      {
          actions_.push_back(_T("keep"));
+         result.keepLocal = true;
+      }
+
+      // The flags the local copy ends up with: an explicit ":flags" on the
+      // keep/fileinto that stored it wins over the internal flag variable.
+      if (pinnedFlagsGiven_)
+      {
+         result.flagsGiven = true;
+         result.flags = pinnedFlags_;
+      }
+      else if (flagsTouched_)
+      {
+         result.flagsGiven = true;
+         result.flags = flags_;
+      }
 
       String summary;
       for (size_t i = 0; i < actions_.size(); i++)
@@ -108,6 +143,20 @@ namespace HM
             summary += _T(";");
          summary += actions_[i];
       }
+
+      // Trailing side-effect tokens. They are appended rather than interleaved so
+      // that a caller which only understands keep/fileinto/discard/redirect reads
+      // exactly the same delivery decision it always did.
+      if (result.flagsGiven)
+      {
+         summary += _T(";flags:");
+         summary += StringParser::JoinVector(result.flags, _T(" "));
+      }
+
+      if (result.vacation.send)
+         summary += _T(";vacation");
+
+      result_ = nullptr;
 
       return summary;
    }
@@ -175,39 +224,412 @@ namespace HM
       String name = command->name;
       name.ToLower();
 
-      if (name == _T("keep"))
+      if (name == _T("keep") || name == _T("fileinto"))
       {
-         actions_.push_back(_T("keep"));
+         SieveArgumentSet set;
+         String ignored;
+         if (!SieveParser::SplitArguments(command->arguments, set, ignored))
+         {
+            // The parser validated this script before it could get here, so the
+            // two disagreeing is a defect in this file, not a bad script. Report
+            // it and fall back to keeping the message.
+            ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5800, _T("SieveEvaluator::ExecuteCommand_"),
+               _T("A Sieve action passed validation but could not be split into arguments: ") + ignored);
+            return;
+         }
+
+         if (set.flagsGiven)
+         {
+            pinnedFlags_ = set.flags;
+            pinnedFlagsGiven_ = true;
+         }
+
+         if (name == _T("keep"))
+         {
+            actions_.push_back(_T("keep"));
+            result_->keepLocal = true;
+         }
+         else
+         {
+            String mailbox = FirstString_(set);
+            actions_.push_back(_T("fileinto:") + mailbox);
+            result_->keepLocal = true;
+            result_->fileInto = mailbox;
+         }
+
+         localDecided_ = true;
+         return;
       }
-      else if (name == _T("discard"))
+
+      if (name == _T("discard"))
       {
          actions_.push_back(_T("discard"));
+         result_->keepLocal = false;
+         result_->fileInto = _T("");
+         localDecided_ = true;
+         return;
       }
-      else if (name == _T("fileinto"))
+
+      if (name == _T("redirect"))
       {
-         actions_.push_back(_T("fileinto:") + FirstPositionalString_(command));
+         SieveArgumentSet set;
+         String ignored;
+         if (!SieveParser::SplitArguments(command->arguments, set, ignored))
+         {
+            // As above: the validator already accepted this script, so a split
+            // failure is a defect here. Redirecting to whatever half-parsed
+            // address fell out would be worse than not redirecting at all, so
+            // give up on the action and let the implicit keep deliver locally.
+            ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5801, _T("SieveEvaluator::ExecuteCommand_"),
+               _T("A Sieve redirect passed validation but could not be split into arguments: ") + ignored);
+            return;
+         }
+
+         String target = FirstString_(set);
+         actions_.push_back(_T("redirect:") + target);
+         result_->redirects.push_back(target);
+
+         // RFC 3894: ":copy" means "in addition to", so it leaves the implicit
+         // keep alone. Without it a redirect cancels the local copy - but only
+         // the *implicit* one. RFC 5228 4.2 is explicit that redirect does not
+         // cancel a keep the script actually asked for, so an earlier keep or
+         // fileinto (which is what localDecided_ records) stands. Clearing
+         // keepLocal here unconditionally would throw away the local copy of
+         // every "keep; redirect ...;" script.
+         if (!set.copy && !localDecided_)
+         {
+            result_->keepLocal = false;
+            localDecided_ = true;
+         }
+
+         return;
       }
-      else if (name == _T("redirect"))
-      {
-         actions_.push_back(_T("redirect:") + FirstPositionalString_(command));
-      }
-      else if (name == _T("stop"))
+
+      if (name == _T("stop"))
       {
          stopped_ = true;
+         return;
       }
-      // require / setflag / other commands are no-ops for action evaluation.
+
+      if (name == _T("setflag") || name == _T("addflag") || name == _T("removeflag"))
+      {
+         ExecuteFlagCommand_(name, command);
+         return;
+      }
+
+      if (name == _T("vacation"))
+      {
+         ExecuteVacation_(command, message);
+         return;
+      }
+
+      // "require" carries no run-time behaviour.
+   }
+
+   void
+   SieveEvaluator::ExecuteFlagCommand_(const String &name, const std::shared_ptr<SieveCommand> &command)
+   {
+      SieveArgumentSet set;
+      String ignored;
+      if (!SieveParser::SplitArguments(command->arguments, set, ignored) || set.stringLists.empty())
+         return;
+
+      std::vector<String> given = SieveParser::SplitFlagList(set.stringLists[0]);
+
+      flagsTouched_ = true;
+
+      if (name == _T("setflag"))
+      {
+         flags_ = given;
+         return;
+      }
+
+      if (name == _T("addflag"))
+      {
+         for (const String &flag : given)
+         {
+            if (!ListContainsNoCase(flags_, flag))
+               flags_.push_back(flag);
+         }
+
+         return;
+      }
+
+      // removeflag
+      std::vector<String> remaining;
+      for (const String &flag : flags_)
+      {
+         if (!ListContainsNoCase(given, flag))
+            remaining.push_back(flag);
+      }
+
+      flags_ = remaining;
+   }
+
+   void
+   SieveEvaluator::ExecuteVacation_(const std::shared_ptr<SieveCommand> &command, const SieveMessage &message)
+   {
+      // RFC 5230 4.7: at most one vacation response per script evaluation. The
+      // flag is set before any of the checks below so that a second vacation
+      // command cannot re-decide a reply the first one suppressed.
+      if (vacationDecided_)
+         return;
+
+      vacationDecided_ = true;
+
+      SieveArgumentSet set;
+      String ignored;
+      if (!SieveParser::SplitArguments(command->arguments, set, ignored) ||
+          set.stringLists.empty() || set.stringLists[0].empty())
+         return;
+
+      String sender;
+      if (!GetEnvelopeSender_(message, sender))
+      {
+         LOG_DEBUG("Sieve vacation: no auto-reply, the envelope sender of this message is not known.");
+         return;
+      }
+
+      if (sender.IsEmpty())
+      {
+         // A null return path is how bounces and other automatic mail identify
+         // themselves. Replying to one is the classic way to build a mail loop.
+         LOG_DEBUG("Sieve vacation: no auto-reply, the message has a null return path.");
+         return;
+      }
+
+      String reason;
+      if (SuppressVacation_(message, sender, set, reason))
+      {
+         LOG_DEBUG(_T("Sieve vacation: no auto-reply, ") + reason);
+         return;
+      }
+
+      SieveVacationDecision &decision = result_->vacation;
+      decision.send = true;
+      decision.to = sender;
+      decision.reason = set.stringLists[0][0];
+      decision.mime = set.mime;
+
+      if (set.subjectGiven)
+         decision.subject = set.subject;
+
+      if (set.handleGiven)
+         decision.handle = set.handle;
+
+      if (set.daysGiven)
+         decision.days = set.days;
+
+      // No entry is added to actions_ and localDecided_ is left alone: a vacation
+      // reply says nothing about whether the message itself is kept.
+   }
+
+   bool
+   SieveEvaluator::SuppressVacation_(const SieveMessage &message,
+                                     const String &sender,
+                                     const SieveArgumentSet &set,
+                                     String &reason) const
+   {
+      // RFC 3834 2: an automatic response must not be sent to a message that is
+      // itself automatic.
+      std::vector<String> autoSubmitted = message.GetHeaderValues(_T("Auto-Submitted"));
+      if (!autoSubmitted.empty())
+      {
+         String value = autoSubmitted[0];
+         int semicolon = value.Find(_T(";"));
+         if (semicolon >= 0)
+            value = value.Mid(0, semicolon);
+         value.Trim();
+
+         if (value.CompareNoCase(_T("no")) != 0)
+         {
+            reason = _T("the message carries an Auto-Submitted header.");
+            return true;
+         }
+      }
+
+      std::vector<String> precedence = message.GetHeaderValues(_T("Precedence"));
+      if (!precedence.empty())
+      {
+         String value = precedence[0];
+         value.Trim();
+
+         if (value.CompareNoCase(_T("bulk")) == 0 ||
+             value.CompareNoCase(_T("list")) == 0 ||
+             value.CompareNoCase(_T("junk")) == 0)
+         {
+            reason = _T("the message has a bulk, list or junk Precedence.");
+            return true;
+         }
+      }
+
+      // RFC 5230 4.6: no reply to mailing-list traffic. Any of the RFC 2369 /
+      // RFC 2919 list headers is enough to identify it.
+      static const wchar_t *listHeaders[] =
+      {
+         L"List-Id", L"List-Help", L"List-Subscribe", L"List-Unsubscribe",
+         L"List-Post", L"List-Owner", L"List-Archive"
+      };
+
+      for (const wchar_t *listHeader : listHeaders)
+      {
+         if (message.HasHeader(listHeader))
+         {
+            reason = _T("the message came from a mailing list.");
+            return true;
+         }
+      }
+
+      // The Microsoft convention for "do not auto-reply to this".
+      std::vector<String> suppress = message.GetHeaderValues(_T("X-Auto-Response-Suppress"));
+      if (!suppress.empty())
+      {
+         String value = suppress[0];
+         value.ToLower();
+
+         if (value.Find(_T("all")) >= 0 || value.Find(_T("oof")) >= 0 || value.Find(_T("autoreply")) >= 0)
+         {
+            reason = _T("the message asks that auto-replies be suppressed.");
+            return true;
+         }
+      }
+
+      // The server's own spam verdict. This mirrors the account-level auto-reply's
+      // "abort when flagged as spam" guard: answering spam confirms the address is
+      // live and can feed a loop through a forged sender.
+      std::vector<String> spam = message.GetHeaderValues(_T("X-hMailServer-Spam"));
+      if (!spam.empty() && spam[0].CompareNoCase(_T("YES")) == 0)
+      {
+         reason = _T("the message is flagged as spam.");
+         return true;
+      }
+
+      // The set of addresses that belong to this user: the envelope recipient plus
+      // whatever ":addresses" listed.
+      std::vector<String> ownAddresses = set.addresses;
+
+      String recipient;
+      if (GetEnvelopeRecipient_(message, recipient) && !recipient.IsEmpty())
+         ownAddresses.push_back(recipient);
+
+      // Never reply to yourself, however the message got here.
+      if (ListContainsNoCase(ownAddresses, sender))
+      {
+         reason = _T("the message was sent from one of the user's own addresses.");
+         return true;
+      }
+
+      if (ownAddresses.empty())
+      {
+         // RFC 5230 4.5 wants the user's address to appear in a recipient header
+         // before replying. Without the envelope recipient and without :addresses
+         // there is nothing to look for, so the check is skipped rather than
+         // guessed at. The suppression above plus the per-sender rate limit still
+         // stand between this and a loop.
+         LOG_DEBUG("Sieve vacation: the recipient-header check was skipped, no envelope recipient and no :addresses.");
+         return false;
+      }
+
+      static const wchar_t *recipientHeaders[] =
+      {
+         L"To", L"Cc", L"Bcc", L"Resent-To", L"Resent-Cc"
+      };
+
+      for (const wchar_t *recipientHeader : recipientHeaders)
+      {
+         std::vector<String> values = message.GetHeaderValues(recipientHeader);
+         for (const String &value : values)
+         {
+            std::vector<String> addresses = SieveMessage::ExtractAddresses(value, _T("all"));
+            for (const String &address : addresses)
+            {
+               if (ListContainsNoCase(ownAddresses, address))
+                  return false;
+            }
+         }
+      }
+
+      reason = _T("none of the user's addresses appear in the message's recipient headers.");
+      return true;
+   }
+
+   bool
+   SieveEvaluator::GetEnvelopeSender_(const SieveMessage &message, String &sender) const
+   {
+      if (envelope_.available)
+      {
+         sender = StripAngleBrackets_(envelope_.from);
+         return true;
+      }
+
+      std::vector<String> values = message.GetHeaderValues(_T("Return-Path"));
+      if (values.empty())
+         return false;
+
+      sender = StripAngleBrackets_(values[0]);
+      return true;
+   }
+
+   bool
+   SieveEvaluator::GetEnvelopeRecipient_(const SieveMessage &message, String &recipient) const
+   {
+      if (envelope_.available)
+      {
+         recipient = StripAngleBrackets_(envelope_.to);
+         return true;
+      }
+
+      static const wchar_t *candidates[] = { L"Delivered-To", L"X-Original-To", L"X-Envelope-To" };
+
+      for (const wchar_t *candidate : candidates)
+      {
+         std::vector<String> values = message.GetHeaderValues(candidate);
+         if (values.empty())
+            continue;
+
+         recipient = StripAngleBrackets_(values[0]);
+         return true;
+      }
+
+      return false;
    }
 
    String
-   SieveEvaluator::FirstPositionalString_(const std::shared_ptr<SieveCommand> &command)
+   SieveEvaluator::StripAngleBrackets_(const String &value)
    {
-      for (const SieveArgument &argument : command->arguments)
+      String result = value;
+      result.Trim();
+
+      int lt = result.Find(_T("<"));
+      if (lt >= 0)
       {
-         if (argument.kind == SieveArgument::Kind::StringList && !argument.strings.empty())
-            return argument.strings[0];
+         int gt = result.Find(_T(">"), lt + 1);
+         if (gt > lt)
+         {
+            result = result.Mid(lt + 1, gt - lt - 1);
+            result.Trim();
+         }
       }
 
-      return _T("");
+      return result;
+   }
+
+   String
+   SieveEvaluator::FirstString_(const SieveArgumentSet &set)
+   {
+      // The mailbox name for fileinto, the address for redirect. Read out of the
+      // already-split argument set rather than re-walked from the raw argument
+      // list, because a tag's value is a string too: ":flags" swallows the string
+      // after it, and anything that walked the raw list would need its own copy
+      // of the "which tags take a value" table. Two copies of that table is one
+      // opportunity for them to disagree, and the way they would disagree is by
+      // returning a tag's value as the mailbox - filing mail into a folder named
+      // "\Seen". SieveParser::SplitArguments is the single answer to that
+      // question; this reads its output.
+      if (set.stringLists.empty() || set.stringLists[0].empty())
+         return _T("");
+
+      return set.stringLists[0][0];
    }
 
    bool
@@ -254,10 +676,16 @@ namespace HM
       }
 
       if (name == _T("header"))
-         return EvaluateHeaderLike_(test, message, false);
+         return EvaluateComparisonTest_(test, message, ValueSource::Header);
 
       if (name == _T("address"))
-         return EvaluateHeaderLike_(test, message, true);
+         return EvaluateComparisonTest_(test, message, ValueSource::Address);
+
+      if (name == _T("envelope"))
+         return EvaluateComparisonTest_(test, message, ValueSource::Envelope);
+
+      if (name == _T("hasflag"))
+         return EvaluateComparisonTest_(test, message, ValueSource::Flags);
 
       if (name == _T("exists"))
          return EvaluateExists_(test, message);
@@ -270,51 +698,181 @@ namespace HM
    }
 
    bool
-   SieveEvaluator::EvaluateHeaderLike_(const std::shared_ptr<SieveTest> &test, const SieveMessage &message, bool isAddress)
+   SieveEvaluator::EvaluateComparisonTest_(const std::shared_ptr<SieveTest> &test, const SieveMessage &message, ValueSource source)
    {
-      TestArguments args = SplitArguments(test->arguments);
-      if (args.stringLists.size() < 2)
+      SieveArgumentSet set;
+      String ignored;
+      if (!SieveParser::SplitArguments(test->arguments, set, ignored))
          return false;
 
-      bool caseSensitive = args.comparator.CompareNoCase(_T("i;octet")) == 0;
+      // "hasflag" takes only the key list; the others take a name list first.
+      size_t expected = (source == ValueSource::Flags) ? 1u : 2u;
+      if (set.stringLists.size() < expected)
+         return false;
 
-      const std::vector<String> &headerNames = args.stringLists[0];
-      const std::vector<String> &keys = args.stringLists[1];
+      std::vector<String> names;
+      if (expected == 2)
+         names = set.stringLists[0];
 
-      for (const String &headerName : headerNames)
+      const std::vector<String> &keys = set.stringLists[expected - 1];
+
+      std::vector<String> values;
+      CollectValues_(source, set, names, message, values);
+
+      if (set.matchType == _T("count"))
       {
-         std::vector<String> values = message.GetHeaderValues(headerName);
+         // RFC 5231 4.2: the count is compared numerically. The comparator is
+         // forced rather than taken from the script, which the validator has
+         // already restricted to i;ascii-numeric.
+         String count = StringParser::IntToString(static_cast<__int64>(values.size()));
 
-         for (const String &value : values)
+         for (const String &key : keys)
          {
-            std::vector<String> candidates;
-            if (isAddress)
-               candidates = SieveMessage::ExtractAddresses(value, args.addressPart);
-            else
-               candidates.push_back(value);
+            if (CompareRelational_(_T("i;ascii-numeric"), set.relation, count, key))
+               return true;
+         }
 
-            for (const String &candidate : candidates)
-            {
-               for (const String &key : keys)
-               {
-                  if (MatchValue_(args.matchType, caseSensitive, candidate, key))
-                     return true;
-               }
-            }
+         return false;
+      }
+
+      for (const String &value : values)
+      {
+         for (const String &key : keys)
+         {
+            if (MatchWithArguments_(set, value, key))
+               return true;
          }
       }
 
       return false;
    }
 
+   void
+   SieveEvaluator::CollectValues_(ValueSource source,
+                                  const SieveArgumentSet &set,
+                                  const std::vector<String> &names,
+                                  const SieveMessage &message,
+                                  std::vector<String> &values) const
+   {
+      if (source == ValueSource::Flags)
+      {
+         values = flags_;
+         return;
+      }
+
+      if (source == ValueSource::Header)
+      {
+         for (const String &name : names)
+         {
+            std::vector<String> headerValues = message.GetHeaderValues(name);
+            for (const String &headerValue : headerValues)
+               values.push_back(headerValue);
+         }
+
+         return;
+      }
+
+      if (source == ValueSource::Address)
+      {
+         for (const String &name : names)
+         {
+            std::vector<String> headerValues = message.GetHeaderValues(name);
+            for (const String &headerValue : headerValues)
+            {
+               std::vector<String> addresses = SieveMessage::ExtractAddresses(headerValue, _T("all"));
+               for (const String &address : addresses)
+               {
+                  String part;
+                  if (ApplyAddressPart_(address, set.addressPart, part))
+                     values.push_back(part);
+               }
+            }
+         }
+
+         return;
+      }
+
+      // ValueSource::Envelope. The envelope-part names the validator allows are
+      // "from" and "to"; an envelope value that is not known contributes nothing,
+      // which is not the same as contributing the empty string (a null return
+      // path legitimately compares equal to "").
+      for (const String &name : names)
+      {
+         String address;
+         bool known = false;
+
+         if (name.CompareNoCase(_T("from")) == 0)
+            known = GetEnvelopeSender_(message, address);
+         else if (name.CompareNoCase(_T("to")) == 0)
+            known = GetEnvelopeRecipient_(message, address);
+
+         if (!known)
+            continue;
+
+         String part;
+         if (ApplyAddressPart_(address, set.addressPart, part))
+            values.push_back(part);
+      }
+   }
+
+   bool
+   SieveEvaluator::ApplyAddressPart_(const String &address, const String &addressPart, String &part)
+   {
+      if (addressPart.CompareNoCase(_T("domain")) == 0)
+      {
+         int at = address.Find(_T("@"));
+         part = at >= 0 ? address.Mid(at + 1) : _T("");
+         return true;
+      }
+
+      if (addressPart.CompareNoCase(_T("all")) == 0)
+      {
+         part = address;
+         return true;
+      }
+
+      int at = address.Find(_T("@"));
+      String localPart = at >= 0 ? address.Mid(0, at) : address;
+
+      if (addressPart.CompareNoCase(_T("localpart")) == 0)
+      {
+         part = localPart;
+         return true;
+      }
+
+      int separator = localPart.Find(SubAddressSeparator);
+
+      if (addressPart.CompareNoCase(_T("user")) == 0)
+      {
+         // RFC 5233: the whole local part when there is no separator.
+         part = separator >= 0 ? localPart.Mid(0, separator) : localPart;
+         return true;
+      }
+
+      if (addressPart.CompareNoCase(_T("detail")) == 0)
+      {
+         // With no separator the detail is absent, and an absent detail matches
+         // nothing at all - not even the empty string.
+         if (separator < 0)
+            return false;
+
+         part = localPart.Mid(separator + 1);
+         return true;
+      }
+
+      part = address;
+      return true;
+   }
+
    bool
    SieveEvaluator::EvaluateExists_(const std::shared_ptr<SieveTest> &test, const SieveMessage &message)
    {
-      TestArguments args = SplitArguments(test->arguments);
-      if (args.stringLists.empty())
+      SieveArgumentSet set;
+      String ignored;
+      if (!SieveParser::SplitArguments(test->arguments, set, ignored) || set.stringLists.empty())
          return false;
 
-      const std::vector<String> &headerNames = args.stringLists[0];
+      const std::vector<String> &headerNames = set.stringLists[0];
       if (headerNames.empty())
          return false;
 
@@ -330,14 +888,85 @@ namespace HM
    bool
    SieveEvaluator::EvaluateSize_(const std::shared_ptr<SieveTest> &test, const SieveMessage &message)
    {
-      TestArguments args = SplitArguments(test->arguments);
-      if (!args.hasNumber)
+      SieveArgumentSet set;
+      String ignored;
+      if (!SieveParser::SplitArguments(test->arguments, set, ignored) || !set.hasNumber)
          return false;
 
-      if (args.sizeOver)
-         return message.GetSize() > args.number;
+      if (set.sizeOver)
+         return message.GetSize() > set.number;
 
-      return message.GetSize() < args.number;
+      return message.GetSize() < set.number;
+   }
+
+   bool
+   SieveEvaluator::MatchWithArguments_(const SieveArgumentSet &set, const String &value, const String &key)
+   {
+      if (set.matchType == _T("value"))
+         return CompareRelational_(set.comparator, set.relation, value, key);
+
+      if (set.comparator.Compare(_T("i;ascii-numeric")) == 0)
+      {
+         // The numeric comparator only defines equality (RFC 4790 9.1.1); the
+         // validator has already refused :contains and :matches with it.
+         return CompareRelational_(set.comparator, _T("eq"), value, key);
+      }
+
+      bool caseSensitive = set.comparator.CompareNoCase(_T("i;octet")) == 0;
+      return MatchValue_(set.matchType, caseSensitive, value, key);
+   }
+
+   bool
+   SieveEvaluator::CompareRelational_(const String &comparator, const String &relation, const String &value, const String &key)
+   {
+      int comparison;
+
+      if (comparator.Compare(_T("i;ascii-numeric")) == 0)
+      {
+         bool valueInfinite = false;
+         bool keyInfinite = false;
+         __int64 left = ParseAsciiNumeric(value, valueInfinite);
+         __int64 right = ParseAsciiNumeric(key, keyInfinite);
+
+         if (valueInfinite && keyInfinite)
+            comparison = 0;
+         else if (valueInfinite)
+            comparison = 1;
+         else if (keyInfinite)
+            comparison = -1;
+         else
+            comparison = left < right ? -1 : (left > right ? 1 : 0);
+      }
+      else if (comparator.Compare(_T("i;octet")) == 0)
+      {
+         comparison = SignOf(value.Compare(key));
+      }
+      else
+      {
+         String lowerValue = value;
+         String lowerKey = key;
+         lowerValue.ToLower();
+         lowerKey.ToLower();
+         comparison = SignOf(lowerValue.Compare(lowerKey));
+      }
+
+      if (relation.CompareNoCase(_T("gt")) == 0)
+         return comparison > 0;
+
+      if (relation.CompareNoCase(_T("ge")) == 0)
+         return comparison >= 0;
+
+      if (relation.CompareNoCase(_T("lt")) == 0)
+         return comparison < 0;
+
+      if (relation.CompareNoCase(_T("le")) == 0)
+         return comparison <= 0;
+
+      if (relation.CompareNoCase(_T("ne")) == 0)
+         return comparison != 0;
+
+      // "eq", and the safe default for anything the validator let through.
+      return comparison == 0;
    }
 
    bool

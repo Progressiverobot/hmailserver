@@ -40,8 +40,11 @@
 #define new DEBUG_NEW
 #endif
 
-namespace HM   
+namespace HM
 {
+   boost::recursive_mutex PersistentAccount::password_upgrade_mutex_;
+   std::set<__int64> PersistentAccount::password_upgrade_pending_;
+
    PersistentAccount::PersistentAccount()
    {
 
@@ -60,6 +63,12 @@ namespace HM
 
       if (iID <= 0)
          return false;
+
+      // Drop any pending-upgrade flag for this id. Account ids are not reused by the
+      // identity columns in practice, but a flag naming a deleted account is dead
+      // weight at best and, if an id ever were reused, would attribute one account's
+      // clear-text state to another.
+      ClearPasswordUpgradePending_(iID);
 
       // Delete messages connected to this account.
       DeleteMessages(pAccount);
@@ -190,7 +199,81 @@ namespace HM
          int preferredHashAlgorithm = IniFileSettings::Instance()->GetPreferredHashAlgorithm();
          pAccount->SetPassword(Crypt::Instance()->EnCrypt(pAccount->GetPassword(), (HM::Crypt::EncryptionType) preferredHashAlgorithm));
          pAccount->SetPasswordEncryption(preferredHashAlgorithm);
+
+         // The in-memory object now carries a hash but the row does not. Remember that,
+         // so that the next successful login can write the upgrade back. See the header
+         // for why the write does not happen here.
+         if (pAccount->GetID() > 0 && preferredHashAlgorithm != (int) Crypt::ETNone)
+            MarkPasswordUpgradePending_(pAccount->GetID());
       }
+
+      return true;
+   }
+
+   void
+   PersistentAccount::MarkPasswordUpgradePending_(__int64 accountID)
+   {
+      boost::lock_guard<boost::recursive_mutex> guard(password_upgrade_mutex_);
+      password_upgrade_pending_.insert(accountID);
+   }
+
+   void
+   PersistentAccount::ClearPasswordUpgradePending_(__int64 accountID)
+   {
+      boost::lock_guard<boost::recursive_mutex> guard(password_upgrade_mutex_);
+      password_upgrade_pending_.erase(accountID);
+   }
+
+   void
+   PersistentAccount::ClearAllPasswordUpgradePending()
+   {
+      boost::lock_guard<boost::recursive_mutex> guard(password_upgrade_mutex_);
+      password_upgrade_pending_.clear();
+   }
+
+   bool
+   PersistentAccount::IsPasswordUpgradePending(__int64 accountID)
+   {
+      if (accountID <= 0)
+         return false;
+
+      boost::lock_guard<boost::recursive_mutex> guard(password_upgrade_mutex_);
+      return password_upgrade_pending_.find(accountID) != password_upgrade_pending_.end();
+   }
+
+   bool
+   PersistentAccount::PersistUpgradedPassword(std::shared_ptr<const Account> pAccount, const String &passwordHash, int encryptionType)
+   {
+      if (!pAccount || pAccount->GetID() <= 0 || passwordHash.IsEmpty())
+         return false;
+
+      // Deliberately a narrow UPDATE of the two password columns rather than
+      // SaveObject: SaveObject writes every column from the in-memory object, and the
+      // object reaching here is a cached snapshot taken when the account was last
+      // read. Writing all of it back from the authentication path would overwrite
+      // anything changed since - accountlastlogontime in particular is updated by
+      // direct SQL (UpdateLastLogonTime) without refreshing the cached object, so a
+      // full save would silently roll it back - and PreSaveLimitationsCheck can refuse
+      // to save a pre-existing account for reasons that have nothing to do with the
+      // password.
+      SQLCommand command("update hm_accounts set accountpassword = @PASSWORD, accountpwencryption = @ENCRYPTION where accountid = @ACCOUNTID");
+      command.AddParameter("@PASSWORD", passwordHash);
+      command.AddParameter("@ENCRYPTION", encryptionType);
+      command.AddParameter("@ACCOUNTID", pAccount->GetID());
+
+      if (!Application::Instance()->GetDBManager()->Execute(command))
+         return false;
+
+      // Note the order: the pending flag is taken and released before the cache lock is
+      // touched, never nested inside it. ReadObject marks the flag while the account
+      // cache is being populated, so nesting the two the other way round here would be
+      // a lock-order inversion.
+      ClearPasswordUpgradePending_(pAccount->GetID());
+
+      // Drop the now-stale cached copy so that the next read picks up the persisted
+      // hash and type. Whoever is authenticating right now holds its own handle to the
+      // object, so the login in progress is unaffected.
+      Cache<Account>::Instance()->RemoveObject(pAccount->GetAddress());
 
       return true;
    }
@@ -334,6 +417,14 @@ namespace HM
 
 	   if (!bNewObject)
 		  Cache<Account>::Instance()->RemoveObject(pAccount);
+
+      // A full save writes accountpassword and accountpwencryption from the in-memory
+      // object, so whatever the row held before - clear text included - has just been
+      // replaced. Any "this row is still clear text" flag set by an earlier ReadObject
+      // is now false, and leaving it set would let the upgrade path treat a
+      // freshly-written strong hash as an unencrypted one.
+      if (bRetVal)
+         ClearPasswordUpgradePending_(pAccount->GetID());
 
       return bRetVal;
    }

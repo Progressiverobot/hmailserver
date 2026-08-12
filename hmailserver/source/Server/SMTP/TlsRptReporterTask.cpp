@@ -24,7 +24,32 @@ namespace HM
 {
    TlsRptReporterTask::TlsRptReporterTask()
    {
-
+      // TlsRptFromAddress is empty in the shipped configuration, and with no
+      // sender address DoWork pops every completed day bucket and discards it
+      // unsent. Not sending by default is the right default - a mail server
+      // should not start mailing third parties about its own TLS failures
+      // because someone enabled MTA-STS - but it is completely invisible:
+      // statistics accumulate, the task runs hourly, nothing is ever sent, and
+      // an administrator who has published a _smtp._tls record and is waiting
+      // for reports has nothing to look at.
+      //
+      // Said here rather than in DoWork, and that is the whole point: the task
+      // is constructed exactly once, by Application::CreateScheduledTasks_, so
+      // this is one line per service start. DoWork runs every hour, and a
+      // notice there would be a notice per scheduled run for the lifetime of
+      // the server.
+      //
+      // LOG_APPLICATION and deliberately not ErrorManager: this describes the
+      // default configuration, so an error entry would appear in the ERROR log
+      // of every stock install and report a correctly working server as broken.
+      // The same reasoning as WebServicesServer::ReportUnreachableFeatures.
+      if (IniFileSettings::Instance()->GetTlsRptFromAddress().IsEmpty())
+      {
+         // Kept short enough to survive the MaxLogLineLen truncation that the
+         // logger applies to long lines: a diagnostic that names a setting is
+         // useless if the setting's name is what gets cut off.
+         LOG_APPLICATION(_T("TLSRPT: SMTP TLS reporting (RFC 8460) is collecting statistics but will never send a report: TlsRptFromAddress is empty in [Settings] of hMailServer.ini, which is the default, so each completed day of data is discarded unsent. Set TlsRptFromAddress to a mailbox here to start sending reports to the domains that request them with a _smtp._tls rua= record."));
+      }
    }
 
    TlsRptReporterTask::~TlsRptReporterTask()

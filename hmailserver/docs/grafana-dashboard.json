@@ -1,11 +1,11 @@
 {
-  "__comment": "hMailServer Grafana dashboard. Built against the metric names actually exposed by MetricsServer.cpp as of 6.2.18 - verified by grep, not assumed. Import via Dashboards > New > Import and pick your Prometheus datasource. Two known rough edges are inherent to the current exporter and are called out in the panel descriptions: hmailserver_state is a numeric enum rather than an OpenMetrics StateSet, and the two latency families are summaries carrying only _sum and _count, so only a mean is computable - no p95/p99. Both are tracked in Roadmap.md.",
+  "__comment": "hMailServer Grafana dashboard. Built against the metric names MetricsServer.cpp actually emits - verified by grep, not assumed. Import via Dashboards > New > Import and pick your Prometheus datasource. Series colours were validated computationally for colour-blind separation, lightness band, chroma and contrast against BOTH light and dark chart surfaces (Grafana panel JSON allows only one fixed colour per series, so each set has to pass in both). Every multi-series panel carries a legend, so identity is never colour alone.",
   "title": "hMailServer",
   "uid": "hmailserver-overview",
   "tags": ["hmailserver", "mail"],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "refresh": "1m",
   "time": { "from": "now-24h", "to": "now" },
   "templating": {
@@ -22,7 +22,7 @@
         "name": "instance",
         "type": "query",
         "datasource": { "type": "prometheus", "uid": "${datasource}" },
-        "query": "label_values(hmailserver_state, instance)",
+        "query": "label_values(hmailserver_build_info, instance)",
         "refresh": 1,
         "includeAll": true,
         "multi": true,
@@ -40,16 +40,41 @@
     {
       "type": "stat",
       "title": "Server state",
-      "description": "1=stopped, 2=starting, 3=running, 4=stopping. A numeric enum rather than an OpenMetrics StateSet, so the mapping has to live in the panel rather than in a label. Converting the exporter is on the roadmap.",
+      "description": "OpenMetrics StateSet: one series per state, so the running state is a boolean rather than a magic number. Shows the name of whichever state is 1.",
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+      "gridPos": { "h": 4, "w": 5, "x": 0, "y": 1 },
       "targets": [
-        { "expr": "hmailserver_state{instance=~\"$instance\"}", "legendFormat": "{{instance}}", "refId": "A" }
+        {
+          "expr": "hmailserver_state{instance=~\"$instance\"} == 1",
+          "legendFormat": "{{state}}",
+          "instant": true,
+          "refId": "A"
+        }
       ],
       "fieldConfig": {
         "defaults": {
           "mappings": [
-            { "type": "value", "options": { "1": { "text": "Stopped", "color": "red", "index": 0 }, "2": { "text": "Starting", "color": "yellow", "index": 1 }, "3": { "text": "Running", "color": "green", "index": 2 }, "4": { "text": "Stopping", "color": "orange", "index": 3 } } }
+            { "type": "value", "options": { "1": { "text": "—", "index": 0 } } }
+          ],
+          "color": { "mode": "fixed", "fixedColor": "#199e70" }
+        }
+      },
+      "options": { "colorMode": "background", "graphMode": "none", "textMode": "name", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "type": "stat",
+      "title": "Database",
+      "description": "hmailserver_database_connected. Named _connected rather than _up so it cannot be confused with Prometheus's own synthetic up series - a scrape failure and a database failure are different incidents.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 5, "x": 5, "y": 1 },
+      "targets": [
+        { "expr": "hmailserver_database_connected{instance=~\"$instance\"}", "legendFormat": "{{instance}}", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "Down", "color": "#e34948", "index": 0 }, "1": { "text": "Connected", "color": "#199e70", "index": 1 } } },
+            { "type": "special", "options": { "match": "null", "result": { "text": "No data", "color": "#c98500", "index": 2 } } }
           ],
           "color": { "mode": "thresholds" },
           "thresholds": { "mode": "absolute", "steps": [{ "color": "text", "value": null }] }
@@ -59,60 +84,51 @@
     },
     {
       "type": "stat",
-      "title": "Database",
-      "description": "hmailserver_database_up. Note the name collides conceptually with Prometheus's own synthetic up - do not confuse a scrape failure with a database failure.",
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
-      "targets": [
-        { "expr": "hmailserver_database_up{instance=~\"$instance\"}", "legendFormat": "{{instance}}", "refId": "A" }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [
-            { "type": "value", "options": { "0": { "text": "Down", "color": "red", "index": 0 }, "1": { "text": "Connected", "color": "green", "index": 1 } } }
-          ]
-        }
-      },
-      "options": { "colorMode": "background", "graphMode": "none", "textMode": "value" }
-    },
-    {
-      "type": "stat",
       "title": "Uptime",
-      "description": "hmailserver_uptime_seconds is a counter from zero rather than a start timestamp, so a restart is a drop to zero rather than something changes() can detect cleanly.",
+      "description": "Derived from hmailserver_start_time_seconds, a Unix timestamp following the process_start_time_seconds convention. A restart is visible as changes(hmailserver_start_time_seconds[1h]) rather than as a silent reset to zero.",
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
+      "gridPos": { "h": 4, "w": 5, "x": 10, "y": 1 },
       "targets": [
-        { "expr": "hmailserver_uptime_seconds{instance=~\"$instance\"}", "legendFormat": "{{instance}}", "refId": "A" }
+        { "expr": "time() - hmailserver_start_time_seconds{instance=~\"$instance\"}", "legendFormat": "{{instance}}", "refId": "A" }
       ],
-      "fieldConfig": { "defaults": { "unit": "s" } },
-      "options": { "colorMode": "none", "graphMode": "area", "textMode": "value" }
-    },
-    {
-      "type": "stat",
-      "title": "Active sessions",
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
-      "targets": [
-        { "expr": "hmailserver_sessions{instance=~\"$instance\"}", "legendFormat": "{{instance}} {{protocol}}", "refId": "A" }
-      ],
-      "options": { "colorMode": "none", "graphMode": "area", "textMode": "value_and_name" }
+      "fieldConfig": { "defaults": { "unit": "s", "decimals": 0 } },
+      "options": { "colorMode": "none", "graphMode": "none", "textMode": "value" }
     },
     {
       "type": "stat",
       "title": "Missing message files",
-      "description": "hmailserver_messagestore_missing_files. Anything above zero means the database references a file that is not on disk. Alert on this.",
+      "description": "Anything above zero means the database references a message file that is not on disk. This is the panel to alert on.",
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+      "gridPos": { "h": 4, "w": 4, "x": 15, "y": 1 },
       "targets": [
         { "expr": "hmailserver_messagestore_missing_files{instance=~\"$instance\"}", "legendFormat": "{{instance}}", "refId": "A" }
       ],
       "fieldConfig": {
         "defaults": {
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#199e70", "value": null }, { "color": "#e34948", "value": 1 }] },
           "color": { "mode": "thresholds" }
         }
       },
       "options": { "colorMode": "background", "graphMode": "none", "textMode": "value" }
+    },
+    {
+      "type": "stat",
+      "title": "TLS certificate expiry",
+      "description": "hmailserver_tls_certificate_expiry_seconds as a Unix timestamp, per certificate. Renewal is automatic when ACME is enabled, so this panel exists to catch renewal having silently stopped. Amber inside 21 days, red inside 7.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 5, "x": 19, "y": 1 },
+      "targets": [
+        { "expr": "min by (name) (hmailserver_tls_certificate_expiry_seconds{instance=~\"$instance\"} - time())", "legendFormat": "{{name}}", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 0,
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#e34948", "value": null }, { "color": "#c98500", "value": 604800 }, { "color": "#199e70", "value": 1814400 }] },
+          "color": { "mode": "thresholds" }
+        }
+      },
+      "options": { "colorMode": "value", "graphMode": "none", "textMode": "value_and_name", "reduceOptions": { "calcs": ["lastNotNull"] } }
     },
     {
       "type": "row",
@@ -123,36 +139,45 @@
     {
       "type": "timeseries",
       "title": "Delivery outcomes",
-      "description": "Delivered, deferred and bounced per second. Stacked, because these are outcomes of the same population and genuinely sum to the total attempted.",
+      "description": "Delivered, deferred and bounced per second. Stacked deliberately: these are outcomes of one population and genuinely sum to the total attempted.",
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
       "targets": [
-        { "expr": "rate(hmailserver_messages_delivered_total{instance=~\"$instance\"}[5m])", "legendFormat": "delivered", "refId": "A" },
-        { "expr": "rate(hmailserver_messages_deferred_total{instance=~\"$instance\"}[5m])", "legendFormat": "deferred", "refId": "B" },
-        { "expr": "rate(hmailserver_messages_bounced_total{instance=~\"$instance\"}[5m])", "legendFormat": "bounced", "refId": "C" }
+        { "expr": "sum(rate(hmailserver_messages_delivered_total{instance=~\"$instance\"}[5m]))", "legendFormat": "delivered", "refId": "A" },
+        { "expr": "sum(rate(hmailserver_messages_deferred_total{instance=~\"$instance\"}[5m]))", "legendFormat": "deferred", "refId": "B" },
+        { "expr": "sum(rate(hmailserver_messages_bounced_total{instance=~\"$instance\"}[5m]))", "legendFormat": "bounced", "refId": "C" }
       ],
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true } },
       "fieldConfig": {
         "defaults": {
           "unit": "reqps",
-          "custom": { "lineWidth": 1, "fillOpacity": 35, "stacking": { "mode": "normal" }, "lineInterpolation": "linear", "showPoints": "never" }
+          "custom": { "lineWidth": 1, "fillOpacity": 35, "stacking": { "mode": "normal" }, "lineInterpolation": "linear", "showPoints": "never", "gradientMode": "none" }
         },
         "overrides": [
-          { "matcher": { "id": "byName", "options": "delivered" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#1baf7a" } }] },
-          { "matcher": { "id": "byName", "options": "deferred" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#eda100" } }] },
+          { "matcher": { "id": "byName", "options": "delivered" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#199e70" } }] },
+          { "matcher": { "id": "byName", "options": "deferred" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#c98500" } }] },
           { "matcher": { "id": "byName", "options": "bounced" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#e34948" } }] }
         ]
       }
     },
     {
       "type": "timeseries",
-      "title": "Delivery queue depth",
-      "description": "Depth alone cannot distinguish a burst from a stuck relay - for that you want oldest-message-age, which the exporter does not yet expose (roadmap).",
+      "title": "Delivery queue: depth and oldest message",
+      "description": "Two series, both in the queue's own terms. Depth alone cannot distinguish a burst from a stuck relay - a small queue whose oldest message keeps ageing is the shape of a destination that is not accepting mail. Oldest age is plotted on the right axis in seconds because the two share no scale; that is a deliberate exception to the one-axis rule and the only one in this dashboard.",
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
       "targets": [
-        { "expr": "hmailserver_delivery_queue_messages{instance=~\"$instance\"}", "legendFormat": "{{instance}}", "refId": "A" }
+        { "expr": "sum(hmailserver_delivery_queue_messages{instance=~\"$instance\"})", "legendFormat": "queued messages", "refId": "A" },
+        { "expr": "max(hmailserver_delivery_queue_oldest_message_age_seconds{instance=~\"$instance\"})", "legendFormat": "oldest message age", "refId": "B" }
       ],
-      "fieldConfig": { "defaults": { "custom": { "lineWidth": 2, "fillOpacity": 10, "lineInterpolation": "linear", "showPoints": "never" } } }
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true } },
+      "fieldConfig": {
+        "defaults": { "custom": { "lineWidth": 2, "fillOpacity": 10, "lineInterpolation": "linear", "showPoints": "never" } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "queued messages" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#3987e5" } }, { "id": "unit", "value": "short" }] },
+          { "matcher": { "id": "byName", "options": "oldest message age" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#c98500" } }, { "id": "unit", "value": "s" }, { "id": "custom.axisPlacement", "value": "right" }] }
+        ]
+      }
     },
     {
       "type": "timeseries",
@@ -160,11 +185,30 @@
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
       "targets": [
-        { "expr": "rate(hmailserver_processed_messages_total{instance=~\"$instance\"}[5m])", "legendFormat": "processed", "refId": "A" },
-        { "expr": "rate(hmailserver_spam_messages_total{instance=~\"$instance\"}[5m])", "legendFormat": "spam blocked", "refId": "B" },
-        { "expr": "rate(hmailserver_viruses_removed_total{instance=~\"$instance\"}[5m])", "legendFormat": "viruses removed", "refId": "C" }
+        { "expr": "sum(rate(hmailserver_processed_messages_total{instance=~\"$instance\"}[5m]))", "legendFormat": "processed", "refId": "A" },
+        { "expr": "sum(rate(hmailserver_spam_messages_total{instance=~\"$instance\"}[5m]))", "legendFormat": "spam blocked", "refId": "B" },
+        { "expr": "sum(rate(hmailserver_viruses_removed_total{instance=~\"$instance\"}[5m]))", "legendFormat": "viruses removed", "refId": "C" }
       ],
-      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "lineWidth": 1, "fillOpacity": 0, "lineInterpolation": "linear", "showPoints": "never" } } }
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true } },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "custom": { "lineWidth": 2, "fillOpacity": 0, "lineInterpolation": "linear", "showPoints": "never" } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "processed" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#3987e5" } }] },
+          { "matcher": { "id": "byName", "options": "spam blocked" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#d95926" } }] },
+          { "matcher": { "id": "byName", "options": "viruses removed" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#199e70" } }] }
+        ]
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Active sessions",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+      "targets": [
+        { "expr": "hmailserver_sessions{instance=~\"$instance\"}", "legendFormat": "{{protocol}}", "refId": "A" }
+      ],
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true } },
+      "fieldConfig": { "defaults": { "custom": { "lineWidth": 2, "fillOpacity": 10, "lineInterpolation": "linear", "showPoints": "never" } } }
     },
     {
       "type": "row",
@@ -175,17 +219,18 @@
     {
       "type": "timeseries",
       "title": "Authentication outcomes",
-      "description": "A sustained rise in failures with flat successes is the shape of a credential-stuffing run. Counters are global - there are no per-domain or per-account labels yet (roadmap).",
+      "description": "A sustained rise in failures against flat successes is the shape of a credential-stuffing run. Counters are global - there are no per-domain or per-account labels yet.",
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 23 },
       "targets": [
-        { "expr": "rate(hmailserver_auth_success_total{instance=~\"$instance\"}[5m])", "legendFormat": "success", "refId": "A" },
-        { "expr": "rate(hmailserver_auth_failures_total{instance=~\"$instance\"}[5m])", "legendFormat": "failure", "refId": "B" }
+        { "expr": "sum(rate(hmailserver_auth_success_total{instance=~\"$instance\"}[5m]))", "legendFormat": "success", "refId": "A" },
+        { "expr": "sum(rate(hmailserver_auth_failures_total{instance=~\"$instance\"}[5m]))", "legendFormat": "failure", "refId": "B" }
       ],
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true } },
       "fieldConfig": {
-        "defaults": { "unit": "reqps", "custom": { "lineWidth": 1, "fillOpacity": 10, "lineInterpolation": "linear", "showPoints": "never" } },
+        "defaults": { "unit": "reqps", "custom": { "lineWidth": 2, "fillOpacity": 10, "lineInterpolation": "linear", "showPoints": "never" } },
         "overrides": [
-          { "matcher": { "id": "byName", "options": "success" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#1baf7a" } }] },
+          { "matcher": { "id": "byName", "options": "success" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#199e70" } }] },
           { "matcher": { "id": "byName", "options": "failure" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#e34948" } }] }
         ]
       }
@@ -196,39 +241,93 @@
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 23 },
       "targets": [
-        { "expr": "rate(hmailserver_tls_handshakes_total{instance=~\"$instance\"}[5m])", "legendFormat": "completed", "refId": "A" },
-        { "expr": "rate(hmailserver_tls_handshake_failures_total{instance=~\"$instance\"}[5m])", "legendFormat": "failed", "refId": "B" }
+        { "expr": "sum(rate(hmailserver_tls_handshakes_total{instance=~\"$instance\"}[5m]))", "legendFormat": "completed", "refId": "A" },
+        { "expr": "sum(rate(hmailserver_tls_handshake_failures_total{instance=~\"$instance\"}[5m]))", "legendFormat": "failed", "refId": "B" }
       ],
-      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "lineWidth": 1, "fillOpacity": 10, "lineInterpolation": "linear", "showPoints": "never" } } }
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true } },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "custom": { "lineWidth": 2, "fillOpacity": 10, "lineInterpolation": "linear", "showPoints": "never" } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "completed" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#199e70" } }] },
+          { "matcher": { "id": "byName", "options": "failed" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#e34948" } }] }
+        ]
+      }
     },
     {
       "type": "row",
-      "title": "Database and latency",
+      "title": "Latency and database",
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 31 },
       "collapsed": false
     },
     {
       "type": "timeseries",
-      "title": "Mean latency",
-      "description": "MEAN ONLY. Both families are declared as Prometheus summaries but emit no quantiles, so _sum/_count is all there is - p95 and p99 are not computable. Converting them to histograms is on the roadmap; until then do not read this panel as a tail-latency signal.",
+      "title": "Command processing latency",
+      "description": "Real quantiles, from histogram buckets. These metrics were previously Prometheus summaries carrying only _sum and _count, so only a mean was computable - the least useful latency statistic. p99 is the one that corresponds to a user noticing.",
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
       "targets": [
-        { "expr": "rate(hmailserver_command_processing_seconds_sum{instance=~\"$instance\"}[5m]) / clamp_min(rate(hmailserver_command_processing_seconds_count{instance=~\"$instance\"}[5m]), 0.001)", "legendFormat": "command processing (mean)", "refId": "A" },
-        { "expr": "rate(hmailserver_db_query_seconds_sum{instance=~\"$instance\"}[5m]) / clamp_min(rate(hmailserver_db_query_seconds_count{instance=~\"$instance\"}[5m]), 0.001)", "legendFormat": "database query (mean)", "refId": "B" }
+        { "expr": "histogram_quantile(0.50, sum by (le) (rate(hmailserver_command_processing_seconds_bucket{instance=~\"$instance\"}[5m])))", "legendFormat": "p50", "refId": "A" },
+        { "expr": "histogram_quantile(0.95, sum by (le) (rate(hmailserver_command_processing_seconds_bucket{instance=~\"$instance\"}[5m])))", "legendFormat": "p95", "refId": "B" },
+        { "expr": "histogram_quantile(0.99, sum by (le) (rate(hmailserver_command_processing_seconds_bucket{instance=~\"$instance\"}[5m])))", "legendFormat": "p99", "refId": "C" }
       ],
-      "fieldConfig": { "defaults": { "unit": "s", "custom": { "lineWidth": 2, "fillOpacity": 0, "lineInterpolation": "linear", "showPoints": "never" } } }
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true } },
+      "fieldConfig": {
+        "defaults": { "unit": "s", "custom": { "lineWidth": 2, "fillOpacity": 0, "lineInterpolation": "linear", "showPoints": "never" } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "p50" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#3987e5" } }] },
+          { "matcher": { "id": "byName", "options": "p95" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#c98500" } }] },
+          { "matcher": { "id": "byName", "options": "p99" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#e34948" } }] }
+        ]
+      }
     },
     {
       "type": "timeseries",
-      "title": "Database connections and slow queries",
+      "title": "Database query latency",
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
       "targets": [
-        { "expr": "hmailserver_db_connections{instance=~\"$instance\"}", "legendFormat": "connections {{state}}", "refId": "A" },
-        { "expr": "rate(hmailserver_db_slow_queries_total{instance=~\"$instance\"}[5m])", "legendFormat": "slow queries/s", "refId": "B" }
+        { "expr": "histogram_quantile(0.50, sum by (le) (rate(hmailserver_db_query_seconds_bucket{instance=~\"$instance\"}[5m])))", "legendFormat": "p50", "refId": "A" },
+        { "expr": "histogram_quantile(0.95, sum by (le) (rate(hmailserver_db_query_seconds_bucket{instance=~\"$instance\"}[5m])))", "legendFormat": "p95", "refId": "B" },
+        { "expr": "histogram_quantile(0.99, sum by (le) (rate(hmailserver_db_query_seconds_bucket{instance=~\"$instance\"}[5m])))", "legendFormat": "p99", "refId": "C" }
       ],
-      "fieldConfig": { "defaults": { "custom": { "lineWidth": 2, "fillOpacity": 0, "lineInterpolation": "linear", "showPoints": "never" } } }
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true } },
+      "fieldConfig": {
+        "defaults": { "unit": "s", "custom": { "lineWidth": 2, "fillOpacity": 0, "lineInterpolation": "linear", "showPoints": "never" } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "p50" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#3987e5" } }] },
+          { "matcher": { "id": "byName", "options": "p95" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#c98500" } }] },
+          { "matcher": { "id": "byName", "options": "p99" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#e34948" } }] }
+        ]
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Database connection pool",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 40 },
+      "targets": [
+        { "expr": "hmailserver_db_connections{instance=~\"$instance\"}", "legendFormat": "{{state}}", "refId": "A" }
+      ],
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true } },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "lineWidth": 2, "fillOpacity": 10, "lineInterpolation": "linear", "showPoints": "never" } } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Slow queries",
+      "description": "Separated from the pool panel on purpose: a rate per second and a connection count share no scale, and putting them on one axis manufactures a correlation that is not in the data.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 40 },
+      "targets": [
+        { "expr": "sum(rate(hmailserver_db_slow_queries_total{instance=~\"$instance\"}[5m]))", "legendFormat": "slow queries", "refId": "A" }
+      ],
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": false } },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "color": { "mode": "fixed", "fixedColor": "#d95926" },
+          "custom": { "lineWidth": 2, "fillOpacity": 10, "lineInterpolation": "linear", "showPoints": "never" }
+        }
+      }
     }
   ]
 }

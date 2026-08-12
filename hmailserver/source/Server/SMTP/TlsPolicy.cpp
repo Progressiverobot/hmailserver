@@ -44,7 +44,50 @@ namespace HM
       const int HttpsTimeoutMilliseconds = 15000;
       const unsigned short DnsTypeTlsa = 52;
       const size_t MaxTlsaRecords = 8;
+
+      // Everything that is not one of the four enumerators - a cast from
+      // another enum, an uninitialized struct member, an out-of-range
+      // integer - is treated as Unknown, which means "behave exactly as we
+      // did before the section 2.2 check existed". The restrictive branches
+      // are then only reachable when a caller passed that exact value.
+      TlsPolicy::MxDnssecStatus NormalizeMxDnssecStatus(TlsPolicy::MxDnssecStatus status)
+      {
+         switch (status)
+         {
+         case TlsPolicy::MxDnssecStatus::Unknown:
+         case TlsPolicy::MxDnssecStatus::Insecure:
+         case TlsPolicy::MxDnssecStatus::Secure:
+         case TlsPolicy::MxDnssecStatus::Bogus:
+            return status;
+         }
+
+         return TlsPolicy::MxDnssecStatus::Unknown;
+      }
    }
+
+   // RFC 7672 section 2.2 status handling is fail-open by construction.
+   // These guards are here so that a later edit to the enum cannot quietly
+   // turn a mistyped or default-initialized status into held-up mail.
+   static_assert(static_cast<int>(TlsPolicy::MxDnssecStatus::Unknown) == 0,
+                 "The zero value of MxDnssecStatus must be the permissive one: a default- or "
+                 "zero-initialized status must proceed with delivery, never refuse a host.");
+   static_assert(static_cast<int>(TlsPolicy::MxDnssecStatus::Bogus) != 0,
+                 "Bogus is the only MxDnssecStatus that can hold up mail; it must never be the "
+                 "value a caller gets by accident.");
+   static_assert(static_cast<int>(TlsPolicy::MxDnssecStatus::Bogus) >
+                    static_cast<int>(TlsPolicy::MxDnssecStatus::Secure) &&
+                 static_cast<int>(TlsPolicy::MxDnssecStatus::Bogus) >
+                    static_cast<int>(TlsPolicy::MxDnssecStatus::Insecure),
+                 "Bogus must be the highest MxDnssecStatus so that no off-by-one or out-of-range "
+                 "value can land on the one branch that refuses a host.");
+   static_assert(static_cast<int>(DnssecResolver::ChainStatus::Secure) !=
+                    static_cast<int>(TlsPolicy::MxDnssecStatus::Bogus) &&
+                 static_cast<int>(DnssecResolver::ChainStatus::Insecure) !=
+                    static_cast<int>(TlsPolicy::MxDnssecStatus::Bogus) &&
+                 static_cast<int>(DnssecResolver::ChainStatus::Bogus) !=
+                    static_cast<int>(TlsPolicy::MxDnssecStatus::Bogus),
+                 "No DnssecResolver::ChainStatus value may cast onto MxDnssecStatus::Bogus: a "
+                 "caller that skips EvaluateMxDnssecStatus and casts must still fail open.");
 
    TlsPolicy::StsPolicy
    TlsPolicy::GetStsPolicy(const String &domain)
@@ -399,11 +442,131 @@ namespace HM
       }
    }
 
-   std::vector<TlsaRecord>
-   TlsPolicy::GetTlsaRecords(const String &host_name, int port, TlsaLookupStatus &status)
+   TlsPolicy::MxDnssecStatus
+   TlsPolicy::EvaluateMxDnssecStatus(const String &host_name, DnssecResolver::ChainStatus mx_chain_status,
+                                     const std::vector<String> &validated_mx_hosts)
    {
+      switch (mx_chain_status)
+      {
+      case DnssecResolver::ChainStatus::Bogus:
+         // The only status this function returns that can hold up mail.
+         // Note what cannot reach it: DnssecResolver reports a transport
+         // failure, a timeout, an unsigned delegation, an absent RRset and an
+         // unsupported DS digest as Insecure, not Bogus, so a resolver
+         // problem or a plain non-DNSSEC destination never gets here.
+         return MxDnssecStatus::Bogus;
+
+      case DnssecResolver::ChainStatus::Insecure:
+         // No usable DNSSEC chain over the MX RRset. This is the ordinary
+         // state of most destinations and must remain an ordinary delivery.
+         return MxDnssecStatus::Insecure;
+
+      case DnssecResolver::ChainStatus::Secure:
+         if (MxRrsetContainsHost_(host_name, validated_mx_hosts))
+            return MxDnssecStatus::Secure;
+
+         // The MX RRset validated, but the host we are about to contact is
+         // not one of the names it published, so this host name did not come
+         // from an authenticated source after all and its TLSA records mean
+         // nothing (RFC 7672 section 2.2). Treat the destination as non-DANE
+         // rather than refusing it: the mismatch can also arise from the
+         // implicit-MX (A record) fallback or a CNAME-followed lookup, and
+         // turning a resolver quirk into a stuck queue would be worse than
+         // delivering with opportunistic TLS as we did before.
+         //
+         // LOG_DEBUG, not LOG_APPLICATION: implicit MX is an ordinary,
+         // healthy configuration, so on a default install this would
+         // otherwise write a line per delivery attempt about a condition
+         // nobody needs to act on.
+         LOG_DEBUG("DANE: MX host " + host_name + " is not named by the DNSSEC-validated MX RRset of the recipient domain. Treating the destination as non-DANE (RFC 7672 section 2.2).");
+         return MxDnssecStatus::Insecure;
+      }
+
+      // Not reachable through the enumerators above, but a ChainStatus that
+      // came from a cast or from future code lands here: fail open.
+      return MxDnssecStatus::Insecure;
+   }
+
+   bool
+   TlsPolicy::MxRrsetContainsHost_(const String &host_name, const std::vector<String> &mx_host_names)
+   {
+      String candidate = host_name;
+      candidate.MakeLower();
+      candidate.TrimRight(_T('.'));
+
+      if (candidate.IsEmpty())
+         return false;
+
+      for (const String &publishedHost : mx_host_names)
+      {
+         String published = publishedHost;
+         published.MakeLower();
+         published.TrimRight(_T('.'));
+
+         if (!published.IsEmpty() && published == candidate)
+            return true;
+      }
+
+      return false;
+   }
+
+   std::vector<TlsaRecord>
+   TlsPolicy::GetTlsaRecords(const String &host_name, int port, TlsaLookupStatus &status, MxDnssecStatus mx_status)
+   {
+      // Normalize before anything looks at the value, so that only a
+      // deliberately supplied Bogus can reach the branch that refuses a host.
+      mx_status = NormalizeMxDnssecStatus(mx_status);
+
       if (IniFileSettings::Instance()->GetDnssecValidationEnabled())
       {
+         // RFC 7672 section 2.2: a TLSA record is only evidence about the
+         // intended server if the MX RRset that named that server was itself
+         // DNSSEC-validated. Otherwise an attacker who can forge the MX
+         // response simply names a host he controls, whose TLSA records
+         // validate perfectly, and DANE reports success.
+         //
+         // With DnssecValidationEnabled=0 the whole DANE path is
+         // unvalidated by definition, so the MX status is not consulted.
+         switch (mx_status)
+         {
+         case MxDnssecStatus::Insecure:
+            // The overwhelming majority of destinations publish no DNSSEC
+            // over their MX RRset. They are not DANE-capable: behave exactly
+            // as if no TLSA records existed, which means ordinary
+            // opportunistic TLS delivery - no deferral and no bounce. The
+            // TLSA lookup is not even attempted, so a bogus TLSA chain under
+            // an unsigned MX name cannot hold up mail either.
+            LOG_DEBUG("DANE: The MX RRset naming " + host_name + " is not DNSSEC-signed. Treating the destination as non-DANE (RFC 7672 section 2.2).");
+            status = TlsaLookupStatus::NoRecords;
+            return std::vector<TlsaRecord>();
+
+         case MxDnssecStatus::Bogus:
+            // DNSSEC is published over the MX RRset and failed to validate,
+            // so the host names themselves are forged or the zone is broken.
+            // Handled exactly like a bogus TLSA lookup: this host is not
+            // used, and if that leaves no usable host the caller defers the
+            // delivery rather than bouncing it. This is the only branch in
+            // this function that can hold up a message, which is why it is
+            // reachable only from an explicitly supplied MxDnssecStatus::Bogus.
+            LOG_APPLICATION("DANE: The MX RRset naming " + host_name + " failed DNSSEC validation. Not using this host (RFC 7672 section 2.2).");
+            status = TlsaLookupStatus::Bogus;
+            return std::vector<TlsaRecord>();
+
+         case MxDnssecStatus::Secure:
+            // The section 2.2 precondition is met. Fall through to the TLSA
+            // lookup, whose result now genuinely applies to this host.
+            break;
+
+         case MxDnssecStatus::Unknown:
+            // Deliberately kept out of the Secure branch above: "we never
+            // checked" must never be a synonym for "we checked and it
+            // passed", and a future edit that tightens the Secure branch
+            // must not silently tighten this one too. Fall through to the
+            // TLSA lookup, which is exactly what happened before the
+            // section 2.2 check existed.
+            break;
+         }
+
          DnssecResolver resolver;
 
          std::vector<TlsaRecord> rawRecords;
@@ -414,6 +577,16 @@ namespace HM
          case DnssecResolver::ChainStatus::Secure:
             {
                std::vector<TlsaRecord> usable = FilterUsableTlsaRecords_(rawRecords);
+
+               if (!usable.empty() && mx_status == MxDnssecStatus::Unknown)
+               {
+                  // The caller did not supply the MX RRset's DNSSEC status, so
+                  // the section 2.2 check could not be completed. Enforce the
+                  // TLSA records as before rather than silently dropping DANE,
+                  // and say why in the log.
+                  LOG_DEBUG("DANE: Enforcing TLSA records for " + host_name + " without knowing whether the MX RRset that named it was DNSSEC-validated (RFC 7672 section 2.2).");
+               }
+
                status = usable.empty() ? TlsaLookupStatus::NoRecords : TlsaLookupStatus::DnssecValidated;
                return usable;
             }

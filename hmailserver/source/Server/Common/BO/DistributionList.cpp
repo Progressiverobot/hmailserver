@@ -65,6 +65,57 @@ namespace HM
       return pDistListRecipients->XMLLoad(pNode, iRestoreOptions);
    }
 
+   String
+   DistributionList::GetRfc2919ListId() const
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // Builds the RFC 2919 List-Id value from the list address. The identifier is
+   // required to have the syntax of a domain name, so any character of the local
+   // part which is not legal in a DNS label is replaced with a hyphen. The result
+   // is never resolved - RFC 2919 identifiers are opaque - but it does have to
+   // parse, and hMailServer permits list addresses (underscores, quoted local
+   // parts) which would otherwise produce a syntactically invalid header.
+   //---------------------------------------------------------------------------()
+   {
+      // Both halves of the address have to exist before it can be split. This is
+      // checked here rather than left to ExtractAddress/ExtractDomain because those
+      // split on the last @ without validating: handed an address with no @ at all
+      // they return the whole string as the domain, which would turn a malformed
+      // list address into a plausible-looking but meaningless identifier.
+      const int atSignPosition = address_.ReverseFind(_T("@"));
+
+      if (atSignPosition < 1 || atSignPosition == address_.GetLength() - 1)
+         return "";
+
+      const String localPart = StringParser::ExtractAddress(address_);
+      const String domainPart = StringParser::ExtractDomain(address_);
+
+      if (localPart.IsEmpty() || domainPart.IsEmpty())
+         return "";
+
+      String sanitizedLocalPart;
+
+      for (const wchar_t character : localPart)
+      {
+         const bool legalInLabel =
+            (character >= L'a' && character <= L'z') ||
+            (character >= L'A' && character <= L'Z') ||
+            (character >= L'0' && character <= L'9') ||
+            character == L'-' || character == L'.';
+
+         sanitizedLocalPart += legalInLabel ? character : L'-';
+      }
+
+      String listId;
+      listId += "<";
+      listId += sanitizedLocalPart;
+      listId += ".";
+      listId += domainPart;
+      listId += ">";
+
+      return listId;
+   }
+
    std::shared_ptr<DistributionListRecipients>
    DistributionList::GetMembers() const
    {

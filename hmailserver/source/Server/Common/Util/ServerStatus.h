@@ -55,23 +55,55 @@ namespace HM
       void OnMessageBounced();
       int GetNumberOfMessagesBounced() const;
 
-      // Aggregate processing latency of client protocol command lines (SMTP/IMAP/
-      // POP3), recorded as a Prometheus-style summary (running microsecond sum +
-      // count) so average command latency can be derived without per-command
-      // histograms.
+      // A consistent snapshot of one latency family. All three parts are read under
+      // the same lock, so the +Inf bucket always equals the count and a scrape can
+      // never expose a histogram whose bucket total disagrees with its _count.
+      struct LatencySnapshot
+      {
+         LatencySnapshot() :
+            microseconds_total(0),
+            count(0)
+         {
+         }
+
+         unsigned __int64 microseconds_total;
+         unsigned __int64 count;
+
+         // Cumulative ("le") counts: one entry per bucket bound, in ascending order,
+         // plus a final entry for +Inf which equals count.
+         std::vector<unsigned __int64> cumulative_buckets;
+      };
+
+      // Fixed histogram bucket layout, in seconds, for the two latency families
+      // below. The bounds are compiled in rather than configurable on purpose: a
+      // Prometheus histogram's bucket bounds are part of the series identity, so a
+      // layout that varied between restarts would make histogram_quantile()
+      // interpolate across two incompatible sets of buckets. The two families get
+      // different bounds because they measure different scales - a protocol command
+      // line is normally tens of microseconds, a database statement normally
+      // milliseconds.
+      static std::vector<double> GetCommandLatencyBucketBounds();
+      static std::vector<double> GetDatabaseLatencyBucketBounds();
+
+      // Processing latency of client protocol command lines (SMTP/IMAP/POP3),
+      // recorded as a Prometheus histogram: a running microsecond sum, a count, and
+      // fixed cumulative buckets, so a p95/p99 is computable and not only a mean.
       void OnCommandProcessed(unsigned __int64 microseconds);
       unsigned __int64 GetCommandProcessingMicrosecondsTotal() const;
       unsigned __int64 GetCommandsProcessedCount() const;
+      LatencySnapshot GetCommandLatencySnapshot() const;
 
-      // Aggregate execution latency of every database statement run through the
-      // DatabaseConnectionManager chokepoint, recorded as a Prometheus-style
-      // summary (running microsecond sum + count), plus a count of statements that
-      // exceeded the configured slow-query threshold. Backend-agnostic (MySQL/
-      // PostgreSQL/MSSQL/SQL CE all route through the same chokepoint).
+      // Execution latency of every database statement run through the
+      // DatabaseConnectionManager chokepoint, recorded as a Prometheus histogram
+      // (microsecond sum + count + fixed cumulative buckets), plus a count of
+      // statements that exceeded the configured slow-query threshold.
+      // Backend-agnostic (MySQL/PostgreSQL/MSSQL/SQL CE all route through the same
+      // chokepoint).
       void OnDatabaseQuery(unsigned __int64 microseconds, bool wasSlow);
       unsigned __int64 GetDatabaseQueryMicrosecondsTotal() const;
       unsigned __int64 GetDatabaseQueriesCount() const;
       unsigned __int64 GetDatabaseSlowQueriesCount() const;
+      LatencySnapshot GetDatabaseLatencySnapshot() const;
 
       // Last result of the message-store consistency check: the number of message
       // rows whose backing file was missing on disk. Updated by the scheduled
@@ -106,14 +138,23 @@ namespace HM
       unsigned __int64 database_queries_count_;
       unsigned __int64 database_slow_queries_count_;
 
+      // Per-bucket (not cumulative) observation counts, sized to the bucket bounds
+      // plus one slot for +Inf. The snapshot getters accumulate them.
+      std::vector<unsigned __int64> command_latency_buckets_;
+      std::vector<unsigned __int64> database_latency_buckets_;
+
       boost::recursive_mutex spam_message_dropped_mutex_;
       boost::recursive_mutex virus_removed_mutex_;
       boost::recursive_mutex tls_handshake_mutex_;
       boost::recursive_mutex authentication_mutex_;
       boost::recursive_mutex message_store_consistency_mutex_;
-      boost::recursive_mutex command_latency_mutex_;
       boost::recursive_mutex delivery_outcome_mutex_;
-      boost::recursive_mutex database_query_mutex_;
+
+      // Mutable because the latency snapshot getters are logically const reads that
+      // still have to take the lock to avoid a torn read across sum, count and
+      // buckets.
+      mutable boost::recursive_mutex command_latency_mutex_;
+      mutable boost::recursive_mutex database_query_mutex_;
 
       ServerState state_;
    };

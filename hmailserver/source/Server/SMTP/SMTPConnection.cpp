@@ -66,6 +66,7 @@
 #include "SMTPConnection.h"
 #include "SMTPConfiguration.h"
 #include "SMTPMessageHeaderCreator.h"
+#include "DistributionListSender.h"
 
 #include "../Common/TCPIP/CipherInfo.h"
 
@@ -735,6 +736,12 @@ namespace HM
       // Next time we do a mail from, we should re-authenticate the login credentials
       re_authenticate_user_ = true;
 
+      // SECURITY: per-account outbound sending ceiling. Placed here, after the
+      // credentials have been re-validated and before the transaction exists, so a
+      // session whose password has just been revoked never consumes budget.
+      if (!CheckAccountSendingQuotaAtMailFrom_())
+         return;
+
          current_message_ = std::shared_ptr<Message> (new Message);
       current_message_->SetFromAddress(sFromAddress);
       current_message_->SetState(Message::Delivering);
@@ -765,7 +772,109 @@ namespace HM
       return false;
    }
 
-   bool 
+   bool
+   SMTPConnection::CheckAccountSendingQuotaAtMailFrom_()
+   {
+      // A fresh transaction: forget whatever the previous one was limited by.
+      quota_account_ = _T("");
+      quota_limits_ = AccountSendingLimits();
+
+      // Only an authenticated sender is subject to the ceiling. Inbound mail from
+      // other servers is not, and must not be: this is a control on what an account
+      // of ours can send, not on what we accept.
+      if (!isAuthenticated_ || username_.IsEmpty())
+         return true;
+
+      // Key on the authenticated account, not on MAIL FROM. A compromised account
+      // can put any address in MAIL FROM, but it cannot change whose credentials it
+      // presented, so that is the only identity worth counting against.
+      quota_account_ = DefaultDomain::ApplyDefaultDomain(username_);
+      quota_limits_ = RateLimiter::Instance()->GetAccountLimits(quota_account_);
+
+      if (!quota_limits_.IsEnabled())
+         return true;
+
+      AccountQuotaResult quotaResult = RateLimiter::Instance()->TryConsumeAccountMessage(quota_account_, quota_limits_);
+      if (quotaResult == AccountQuotaResult::QuotaAllowed)
+         return true;
+
+      RefuseForAccountSendingQuota_(quotaResult);
+      return false;
+   }
+
+   bool
+   SMTPConnection::CheckAccountSendingQuotaAtRcptTo_()
+   {
+      // quota_account_ is only non-empty for an authenticated session that reached
+      // MAIL FROM, and the limits were resolved there - do not re-read them per
+      // recipient, a message may carry thousands.
+      if (quota_account_.IsEmpty() || !quota_limits_.IsEnabled())
+         return true;
+
+      AccountQuotaResult quotaResult = RateLimiter::Instance()->TryConsumeAccountRecipients(quota_account_, quota_limits_, 1);
+      if (quotaResult == AccountQuotaResult::QuotaAllowed)
+         return true;
+
+      RefuseForAccountSendingQuota_(quotaResult);
+      return false;
+   }
+
+   void
+   SMTPConnection::RefuseForAccountSendingQuota_(AccountQuotaResult quotaResult)
+   {
+      String enhancedCode;
+      String text;
+      String reason;
+
+      switch (quotaResult)
+      {
+      case AccountQuotaResult::QuotaAllowed:
+         // Not a refusal; nothing to answer.
+         return;
+      case AccountQuotaResult::QuotaMessageLimitReached:
+         // 4.7.0 = "other or undefined security status" (RFC 3463). A sending
+         // ceiling is a policy control, and there is no more specific 4.7.x code
+         // for one.
+         enhancedCode = _T("4.7.0");
+         text = _T("Sending limit for this account has been reached. Please try again later.");
+         reason = _T("message limit");
+         break;
+      case AccountQuotaResult::QuotaRecipientLimitReached:
+         // 4.5.3 = "too many recipients" (RFC 3463), which is exactly this case.
+         enhancedCode = _T("4.5.3");
+         text = _T("Recipient sending limit for this account has been reached. Please try again later.");
+         reason = _T("recipient limit");
+         break;
+      }
+
+      // 452, deliberately not 5xx: a legitimate user who reaches a daily ceiling
+      // should have their client retry once the period rolls over, not have the
+      // message bounced back at them. 452 also leaves the session open, unlike the
+      // 421 used for the per-IP limit.
+      SendResponse_(452, enhancedCode, text);
+
+      int messages = 0;
+      int recipients = 0;
+      RateLimiter::Instance()->GetAccountUsage(quota_account_, messages, recipients);
+
+      String logMessage;
+      logMessage.Format(_T("hMailServer SendingLimit refused submission (Account: %s, IP: %s, Reason: per-account %s reached, ")
+                        _T("Usage: %d message(s) and %d recipient(s) this period, Limits: %d/%d)"),
+         quota_account_.c_str(),
+         String(GetIPAddressString()).c_str(),
+         reason.c_str(),
+         messages,
+         recipients,
+         quota_limits_.max_messages,
+         quota_limits_.max_recipients);
+
+      // LOG_APPLICATION, not ErrorManager: reaching a ceiling an administrator
+      // configured is an event, not a server fault, and a legitimate user hitting
+      // their daily cap must not fill the ERROR log.
+      LOG_APPLICATION(logMessage);
+   }
+
+   bool
    SMTPConnection::CheckIfValidSenderAddress(const String &sFromAddress)
    {
       if (sFromAddress.IsEmpty())
@@ -881,6 +990,13 @@ namespace HM
          return;
       }
 
+      // SECURITY: the per-account recipient ceiling is applied here, as recipients
+      // accumulate, and not only at MAIL FROM - otherwise one message addressed to
+      // thousands of recipients would cost a single message from the budget. Checked
+      // before the delivery-possibility lookups so a compromised account spraying
+      // addresses is stopped before it costs us database work.
+      if (!CheckAccountSendingQuotaAtRcptTo_())
+         return;
 
       String sErrMsg = "";
       bool localDelivery = false;
@@ -1577,6 +1693,16 @@ namespace HM
 
       if (pMsgData)
          pMsgData->Write(PersistentMessage::GetFileName(current_message_));
+
+      // RFC 2369 / RFC 2919 List-* headers for postings to local distribution lists.
+      //
+      // Position is load-bearing in both directions. It must come *after* the Write
+      // above, which re-serialises the whole file from a MessageData loaded earlier in
+      // this function - running before it would have that write discard the List-*
+      // headers. And it must stay *inside* this function, because the caller re-reads
+      // the file size from disk immediately afterwards, which is what makes the
+      // rewritten size authoritative.
+      DistributionListSender::AddListHeaders(current_message_);
    }
 
    void

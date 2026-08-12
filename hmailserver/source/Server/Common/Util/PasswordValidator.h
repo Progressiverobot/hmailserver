@@ -22,5 +22,16 @@ namespace HM
       static bool ValidatePassword(std::shared_ptr<const Account> pAccount, const String &sPassword);
 
       // Validates the user password. Return true if the password is correct.
+
+   private:
+
+      // Brings the account's stored password up to the configured preferred hash
+      // scheme. Must only ever be called with a password that has just been verified
+      // against the account: that is the one moment the clear text is available, and
+      // the only moment a write is justified.
+      //
+      // Returns the encryption type the stored password uses after the attempt - the
+      // type it already had if nothing needed doing or if the upgrade failed.
+      static int UpgradeStoredPasswordHash_(std::shared_ptr<const Account> pAccount, const String &sPassword, int currentEncryption);
    };
 }

@@ -5,6 +5,7 @@
 
 #include <vector>
 #include <memory>
+#include <set>
 
 #include "SieveLexer.h"
 
@@ -42,8 +43,71 @@ namespace HM
       int line = 0;
    };
 
+   // The tags, positional string lists and numeric argument of a single command
+   // or test, split apart once.
+   //
+   // Both the parser's validation pass and the evaluator read this, which is the
+   // point: a tag such as :comparator or :days swallows the argument that follows
+   // it, so if the two disagreed about which arguments are a tag's value and which
+   // are positional they would disagree about what the script says. One splitter
+   // means one answer.
+   struct SieveArgumentSet
+   {
+      // Every tag that appeared, lowercased and in order, with the line it was on.
+      // The validator checks these against the set the command/test allows.
+      std::vector<String> tags;
+      std::vector<int> tagLines;
+
+      // ":is" / ":contains" / ":matches", or ":value" / ":count" (relational).
+      String matchType = _T("is");
+      bool matchTypeGiven = false;
+
+      // The relational operator that :value / :count carries ("gt", "eq", ...).
+      String relation;
+
+      String comparator = _T("i;ascii-casemap");
+      bool comparatorGiven = false;
+
+      // "all" / "localpart" / "domain", or "user" / "detail" (subaddress).
+      String addressPart = _T("all");
+      bool addressPartGiven = false;
+
+      // size :over / :under. sizeOver keeps the historical default of :over so
+      // that evaluation of an already-stored script cannot change meaning.
+      bool sizeOver = true;
+      bool sizeGiven = false;
+
+      bool hasNumber = false;
+      __int64 number = 0;
+
+      // ":copy" (RFC 3894).
+      bool copy = false;
+
+      // ":flags" (RFC 5232), already split into individual flag names.
+      bool flagsGiven = false;
+      std::vector<String> flags;
+
+      // vacation (RFC 5230) tags.
+      bool daysGiven = false;
+      __int64 days = 0;
+      bool subjectGiven = false;
+      String subject;
+      bool handleGiven = false;
+      String handle;
+      bool fromGiven = false;
+      String fromAddress;
+      bool addressesGiven = false;
+      std::vector<String> addresses;
+      bool mime = false;
+
+      // Positional string-list arguments, in order.
+      std::vector<std::vector<String>> stringLists;
+   };
+
    // Recursive-descent parser that turns a Sieve token stream into an AST,
-   // validating the RFC 5228 grammar and the set of supported commands/tests.
+   // validating the RFC 5228 grammar, the set of supported commands/tests, and
+   // - in a second pass - that every extension the script uses was named in a
+   // "require" and is one this server can actually honour.
    class SieveParser
    {
    public:
@@ -52,6 +116,30 @@ namespace HM
       bool Parse(const std::vector<SieveToken> &tokens,
                  std::vector<std::shared_ptr<SieveCommand>> &commands,
                  String &errorMessage);
+
+      // True for the capability names this implementation can honour in a
+      // "require". Anything else is refused when the script is uploaded rather
+      // than quietly ignored at delivery time, because a script that asks for
+      // something we cannot do does not mean what its author thinks it means.
+      // Capability names are case-sensitive (RFC 5228 2.10.5).
+      static bool IsSupportedExtension(const String &name);
+
+      // Splits an argument vector. Returns false only when a tag that takes a
+      // value is missing it; the evaluator treats that as an internal error
+      // because the validation pass has already rejected such scripts.
+      static bool SplitArguments(const std::vector<SieveArgument> &arguments,
+                                 SieveArgumentSet &result,
+                                 String &errorMessage);
+
+      // Splits a list of flag strings into individual flag names. A single string
+      // may hold several space-separated flags (RFC 5232 2). System flags are
+      // canonicalised ("\\seen" -> "\\Seen") and duplicates removed, so that the
+      // set handed to the delivery path is directly usable as IMAP flags.
+      static std::vector<String> SplitFlagList(const std::vector<String> &values);
+
+      // True for a flag name that may be set on a message. \Recent is excluded:
+      // RFC 3501 does not allow a client to set it.
+      static bool IsValidFlagName(const String &flag);
 
    private:
       const SieveToken &Current_() const;
@@ -68,8 +156,25 @@ namespace HM
       static bool IsKnownCommand_(const String &name);
       static bool IsKnownTest_(const String &name);
 
+      bool CollectRequire_(const std::shared_ptr<SieveCommand> &command, String &errorMessage);
+
+      // Second pass: extension gating and per-command/per-test argument checking.
+      bool ValidateCommands_(const std::vector<std::shared_ptr<SieveCommand>> &commands, String &errorMessage);
+      bool ValidateCommand_(const std::shared_ptr<SieveCommand> &command, String &errorMessage);
+      bool ValidateTest_(const std::shared_ptr<SieveTest> &test, String &errorMessage);
+      bool ValidateMatchArguments_(const SieveArgumentSet &set, const String &context, int line, String &errorMessage);
+      bool ValidateFlagList_(const std::vector<String> &flags, int line, String &errorMessage);
+
+      bool HasExtension_(const String &extension) const;
+      bool NeedExtension_(const String &extension, const String &feature, int line, String &errorMessage) const;
+
+      static bool CheckTags_(const SieveArgumentSet &set, const String &allowed, const String &context, String &errorMessage);
+
       const std::vector<SieveToken> *tokens_;
       size_t index_;
       bool seenNonRequire_;
+
+      // Capability names named by the script's "require" statements.
+      std::set<String> required_;
    };
 }

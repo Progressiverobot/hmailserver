@@ -106,6 +106,33 @@ namespace HM
          return true;
       }
 
+      // The Sieve extensions named in the RFC 5804 "SIEVE" capability line.
+      //
+      // Every ManageSieve client builds its user interface from this line -
+      // Roundcube's managesieve plugin most of all, which is how most people ever
+      // see a Sieve filter. So the rule here is: a name belongs in this list only
+      // once using it end to end actually does something. Listing an extension we
+      // merely parse would put a control in front of the user that quietly has no
+      // effect, which is worse than not offering it at all.
+      //
+      // SieveParser::IsSupportedExtension deliberately accepts more than this: the
+      // engine also implements "vacation", "imap4flags" and "envelope", and each
+      // needs exactly one more step in the delivery path before it is real:
+      //
+      //   vacation    LocalDelivery::EvaluateSieveScript_ must act on the
+      //               "vacation" summary token (or better, on
+      //               SieveResult::vacation) by calling
+      //               SMTPVacationMessageCreator::CreateVacationMessage.
+      //   imap4flags  ... must act on the "flags:" summary token when it stores
+      //               the local copy of the message.
+      //   envelope    ... must pass the SMTP envelope into the evaluator, so that
+      //               envelope "to" works without the Delivered-To header, which
+      //               is off in the shipped configuration.
+      //
+      // Move a name in here in the same commit that lands its delivery-side step.
+      // Not before.
+      const char *AdvertisedSieveExtensions = "fileinto copy relational subaddress";
+
       AnsiString EscapeQuoted(const String &value)
       {
          String escaped;
@@ -353,7 +380,7 @@ namespace HM
    ManageSieveServer::SendCapabilities_(SOCKET client_socket)
    {
       Send_(client_socket, "\"IMPLEMENTATION\" \"hMailServer ManageSieve\"\r\n");
-      Send_(client_socket, "\"SIEVE\" \"fileinto\"\r\n");
+      Send_(client_socket, AnsiString("\"SIEVE\" \"") + AdvertisedSieveExtensions + "\"\r\n");
       Send_(client_socket, "\"SASL\" \"PLAIN\"\r\n");
       Send_(client_socket, "\"VERSION\" \"1.0\"\r\n");
    }

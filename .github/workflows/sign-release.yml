@@ -1,0 +1,137 @@
+name: Sign release artefacts
+
+# Signs every asset attached to a published release with Sigstore cosign, keyless,
+# and attaches the signature and certificate bundle alongside it.
+#
+# Why: the roadmap records signing as the one genuinely missing supply-chain item.
+# SBOMs (SPDX + CycloneDX) already ship with every release, CodeQL and dependency
+# review run in CI, and Dependabot is on - but an installer downloaded from the
+# releases page carries nothing a user can verify it against. That matters more for
+# a mail server than for most software: it runs as a service, with database
+# credentials, and it is the kind of thing an attacker would like to substitute.
+#
+# Keyless deliberately. The alternative is a long-lived signing key, which for a
+# single-maintainer project means a secret in GitHub Actions that is itself the
+# thing most worth stealing. Keyless signing binds the signature to this
+# repository's workflow identity via OIDC, records it in the public Rekor
+# transparency log, and leaves no key to leak or rotate.
+#
+# This does NOT replace Authenticode. Windows SmartScreen and the UAC prompt care
+# about Authenticode, not Sigstore, and that needs a certificate this project does
+# not currently have (Azure Trusted Signing is the realistic route). Cosign gives
+# verifiability today, for anyone who checks; Authenticode remains open on the
+# roadmap and the two are complementary, not alternatives.
+#
+# Verify a downloaded installer with:
+#
+#   cosign verify-blob \
+#     --bundle hMailServer-x.y.z-x64.exe.cosign.bundle \
+#     --certificate-identity-regexp '^https://github\.com/Progressiverobot/hmailserver/' \
+#     --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+#     hMailServer-x.y.z-x64.exe
+
+on:
+  release:
+    types: [ published ]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag whose assets to sign (e.g. v6.2.19).'
+        type: string
+        required: true
+
+permissions: {}
+
+jobs:
+  sign:
+    name: Sign and attach signatures
+    runs-on: ubuntu-latest
+    permissions:
+      # Keyless signing exchanges this for a short-lived Sigstore certificate.
+      id-token: write
+      # Needed to download the assets and upload the signatures back.
+      contents: write
+
+    steps:
+      - name: Resolve the tag
+        id: tag
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          TAG="${INPUT_TAG:-$RELEASE_TAG}"
+          if [ -z "$TAG" ]; then
+            echo "::error::No tag supplied and no release tag in the event payload."
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Download the release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          mkdir -p assets
+          # Signatures and bundles from an earlier run are excluded, so re-running
+          # this workflow does not sign its own output.
+          gh release download "$TAG" --dir assets --pattern '*' --clobber
+          rm -f assets/*.cosign.bundle assets/*.sig assets/*.pem
+          echo "Assets to sign:"
+          ls -la assets
+
+      - name: Sign each asset
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          signed=0
+          for file in assets/*; do
+            [ -f "$file" ] || continue
+            echo "::group::Signing $(basename "$file")"
+            # --yes accepts the transparency-log notice; the whole point here is
+            # that the signature IS publicly logged.
+            cosign sign-blob --yes \
+              --bundle "${file}.cosign.bundle" \
+              "$file"
+            signed=$((signed + 1))
+            echo "::endgroup::"
+          done
+          if [ "$signed" -eq 0 ]; then
+            echo "::error::No assets found on $TAG - nothing was signed."
+            exit 1
+          fi
+          echo "Signed $signed asset(s)."
+
+      - name: Verify what we just signed
+        env:
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          # Verifying in the same job is not circular: it proves the bundle is
+          # well-formed and the identity matches, which is exactly the failure
+          # mode of a mis-configured signing step. A user's own verification is
+          # the real check, but a broken bundle should never reach them.
+          for bundle in assets/*.cosign.bundle; do
+            file="${bundle%.cosign.bundle}"
+            echo "::group::Verifying $(basename "$file")"
+            cosign verify-blob \
+              --bundle "$bundle" \
+              --certificate-identity-regexp "^https://github\.com/${REPO}/" \
+              --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+              "$file"
+            echo "::endgroup::"
+          done
+
+      - name: Attach the signatures to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          gh release upload "$TAG" assets/*.cosign.bundle --clobber

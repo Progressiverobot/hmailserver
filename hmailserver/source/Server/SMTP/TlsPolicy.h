@@ -10,12 +10,43 @@
 //   secure   -> TLSA records are enforced
 //   insecure -> treated as if no TLSA records exist
 //   bogus    -> the MX host must not be used
+//
+// RFC 7672 section 2.2 requires more than a validated TLSA RRset: the
+// MX RRset that produced the host name must be DNSSEC-validated too.
+// A TLSA record found under a host name learned from a forged MX
+// response proves nothing, because the attacker chose the host - its
+// own TLSA record then validates perfectly and DANE reports success.
+// GetTlsaRecords therefore takes the MX RRset's validation status as
+// an input (MxDnssecStatus); EvaluateMxDnssecStatus derives it, and
+// also checks that the host about to be contacted is one of the names
+// the validated MX RRset actually published.
+//
+// This is a mail server, so the section 2.2 check is built to fail
+// open. Exactly one MxDnssecStatus value can stop a delivery (Bogus),
+// it is the value furthest from zero, and every other value - including
+// anything a caller produces by accident - lands on the ordinary
+// delivery path. See the invariant on MxDnssecStatus below.
+//
+// NOT YET PLUMBED (honest gap, for the integrator): nothing calls
+// EvaluateMxDnssecStatus yet, because DnssecResolver has no validated MX
+// lookup to feed it. QueryValidatedRrset_ hands back raw rdata blobs,
+// and an MX rdata's exchange field is a DNS name that may use
+// compression pointers into the rest of the packet, so the raw rdata
+// alone cannot be turned into a host name. Adding a validated MX query
+// needs DnssecResolver to expose the packet together with each RR's
+// rdata_offset (ParsedRr already records it - see the CNAME path) and to
+// run its existing ReadName decompression over it. Until that lands the
+// single call site in ExternalDelivery.cpp passes three arguments, the
+// status is always Unknown, and outbound delivery behaves exactly as it
+// did before this change.
+//
 // Setting DnssecValidationEnabled=0 reverts to opportunistic
 // (unvalidated) TLSA usage.
 
 #pragma once
 
 #include "../Common/TCPIP/DaneVerifier.h"
+#include "../Common/TCPIP/DnssecResolver.h"
 
 namespace HM
 {
@@ -53,10 +84,66 @@ namespace HM
          Bogus             // DNSSEC validation failed - do not use host
       };
 
+      // The DNSSEC status of the MX RRset that named the host now being
+      // considered for delivery (RFC 7672 section 2.2).
+      //
+      // The values are assigned deliberately and must not be reordered.
+      // Zero is the permissive value, because zero is what a caller
+      // produces by accident: a default- or zero-initialized variable, a
+      // value-initialized struct member, a memset() buffer. The one value
+      // that can stop a delivery is the highest, so no accident and no
+      // off-by-one lands on it. TlsPolicy.cpp static_asserts this.
+      //
+      // The numbering deliberately does NOT line up with
+      // DnssecResolver::ChainStatus (Secure=0, Insecure=1, Bogus=2), so a
+      // caller that takes the shortcut of static_cast-ing a ChainStatus
+      // into this type cannot produce Bogus: 0 becomes Unknown, 1 becomes
+      // Insecure, 2 becomes Secure. All three are fail-open.
+      // EvaluateMxDnssecStatus is the only sanctioned conversion.
+      enum class MxDnssecStatus
+      {
+         Unknown = 0,   // the caller did not determine the MX status, so the
+                        // section 2.2 check cannot be performed. Preserves the
+                        // earlier behaviour in which the TLSA lookup alone
+                        // decides. This is what a caller that has not been
+                        // taught to do a validated MX lookup gets, and it is
+                        // what every caller gets today.
+         Insecure = 1,  // the MX RRset is not covered by DNSSEC at all - which
+                        // is true of most of the internet. The destination is
+                        // not DANE-capable; delivery proceeds exactly as it
+                        // would with no TLSA records published. Never a
+                        // deferral and never a bounce.
+         Secure = 2,    // the MX RRset was DNSSEC-validated and named this host,
+                        // so DANE genuinely applies to it
+         Bogus = 3      // DNSSEC is published for the MX RRset and failed to
+                        // validate: the host names are not trustworthy. Handled
+                        // like a bogus TLSA lookup - the host is not used, which
+                        // defers the delivery if no host remains. The only
+                        // value here that can hold up mail, and reachable only
+                        // when a caller passes it explicitly.
+      };
+
+      // Derives the value above for one candidate MX host from the result of
+      // a DNSSEC-validated MX lookup for the recipient domain.
+      // validated_mx_hosts are the host names that lookup returned, and are
+      // only consulted when mx_chain_status is Secure: a validated MX RRset
+      // makes this particular host DANE-capable only if the RRset is where
+      // the host name came from.
+      static MxDnssecStatus EvaluateMxDnssecStatus(const String &host_name,
+                                                   DnssecResolver::ChainStatus mx_chain_status,
+                                                   const std::vector<String> &validated_mx_hosts);
+
       // Returns DANE-EE (usage 3) TLSA records published for the given
       // MX host and port. An empty result means no usable records exist;
-      // status describes the DNSSEC validation outcome.
-      static std::vector<TlsaRecord> GetTlsaRecords(const String &host_name, int port, TlsaLookupStatus &status);
+      // status describes the DNSSEC validation outcome. mx_status carries
+      // the RFC 7672 section 2.2 status of the MX RRset that named the host;
+      // it is trailing and defaulted so that a caller which cannot yet
+      // supply it keeps the previous behaviour rather than losing DANE.
+      // The default is both the permissive value and the zero value of the
+      // enum, so forgetting the argument, zero-initializing it or casting
+      // the wrong enum into it all give the same fail-open result.
+      static std::vector<TlsaRecord> GetTlsaRecords(const String &host_name, int port, TlsaLookupStatus &status,
+                                                    MxDnssecStatus mx_status = MxDnssecStatus::Unknown);
 
    private:
 
@@ -79,6 +166,7 @@ namespace HM
       static bool SkipDnsName_(const std::vector<unsigned char> &data, size_t &offset);
       static std::vector<TlsaRecord> LookupTlsaOpportunistic_(const String &host_name, int port);
       static std::vector<TlsaRecord> FilterUsableTlsaRecords_(const std::vector<TlsaRecord> &records);
+      static bool MxRrsetContainsHost_(const String &host_name, const std::vector<String> &mx_host_names);
 
       static boost::recursive_mutex sts_cache_mutex_;
       static std::map<String, CachedStsPolicy> sts_cache_;

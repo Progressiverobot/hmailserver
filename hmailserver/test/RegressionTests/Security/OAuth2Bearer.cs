@@ -497,6 +497,34 @@ namespace RegressionTests.Security
          _application.Reinitialize();
       }
 
+      /// <summary>
+      ///    Alters a JWT signature so that it provably no longer verifies.
+      ///
+      ///    Deliberately does not touch the last character. base64url carries 6 bits per
+      ///    character, so an encoding of a signature whose bit length is not a multiple of
+      ///    6 ends with unused padding bits - 4 of them for a 256-byte RS256 signature.
+      ///    A flip confined to those bits decodes to the identical byte sequence, the
+      ///    signature still verifies, and a test built on that is flaky rather than
+      ///    strict. Any interior character is all significant bits.
+      /// </summary>
+      private static string TamperSignature(string token)
+      {
+         int lastDot = token.LastIndexOf('.');
+         Assert.Greater(lastDot, 0, "A JWT must have a signature segment to tamper.");
+
+         string signature = token.Substring(lastDot + 1);
+         Assert.Greater(signature.Length, 2, "The signature segment is too short to tamper safely.");
+
+         // Middle of the signature: never the final character, never the segment boundary.
+         int index = signature.Length / 2;
+         char original = signature[index];
+         char replacement = original == 'A' ? 'B' : 'A';
+
+         string tamperedSignature = signature.Substring(0, index) + replacement + signature.Substring(index + 1);
+
+         return token.Substring(0, lastDot + 1) + tamperedSignature;
+      }
+
       /// <summary>Mints an RS256 (RSASSA-PKCS1-v1_5 / SHA-256) JWT for <paramref name="email"/>.</summary>
       private static string MintRs256(string email, long exp, RSA rsa)
       {
@@ -620,9 +648,22 @@ namespace RegressionTests.Security
                Assert.IsTrue(response.StartsWith("+OK"),
                   "A valid RS256 bearer token should authenticate over POP3. Got: " + response);
 
-               // Flip the final signature character: the signature no longer verifies.
-               char last = token[token.Length - 1];
-               string tampered = token.Substring(0, token.Length - 1) + (last == 'A' ? 'B' : 'A');
+               // Tamper the signature so that it genuinely no longer verifies.
+               //
+               // This used to flip the *final* character of the token, which is flaky and
+               // was failing roughly one run in five. An RS256 signature over a 2048-bit
+               // key is 256 bytes = 2048 bits, and its base64url encoding is 342
+               // characters carrying 2052 bits - so the last character has four unused
+               // padding bits. Flipping A to B there changes only padding for many
+               // signatures, the decoded bytes come out byte-identical, and the server
+               // then quite correctly accepts a token that was never actually modified.
+               // Measured: ineffective for 79 of 400 random signatures.
+               //
+               // Flipping a character in the middle of the signature only ever touches
+               // significant bits, so the decoded value always changes.
+               string tampered = TamperSignature(token);
+               Assert.AreNotEqual(token, tampered, "The fixture failed to tamper the token.");
+
                string tamperedResponse = Pop3AuthXOAuth2(address, tampered);
                Assert.IsTrue(tamperedResponse.StartsWith("-ERR"),
                   "An RS256 token with a tampered signature must be rejected. Got: " + tamperedResponse);

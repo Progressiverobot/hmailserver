@@ -651,6 +651,7 @@ EXIT 0
     <ClCompile Include="..\SMTP\LocalDelivery.cpp" />
     <ClCompile Include="..\SMTP\MirrorMessage.cpp" />
     <ClCompile Include="..\SMTP\PlusAddressing.cpp" />
+    <ClCompile Include="..\SMTP\DistributionListSender.cpp" />
     <ClCompile Include="..\Smtp\RecipientParser.cpp" />
     <ClCompile Include="..\Smtp\RuleApplier.cpp" />
     <ClCompile Include="..\SMTP\RuleResult.cpp" />
@@ -1186,6 +1187,7 @@ EXIT 0
     <ClInclude Include="..\SMTP\LocalDelivery.h" />
     <ClInclude Include="..\SMTP\MirrorMessage.h" />
     <ClInclude Include="..\SMTP\PlusAddressing.h" />
+    <ClInclude Include="..\SMTP\DistributionListSender.h" />
     <ClInclude Include="..\Smtp\RecipientParser.h" />
     <ClInclude Include="..\Smtp\RuleApplier.h" />
     <ClInclude Include="..\SMTP\RuleResult.h" />

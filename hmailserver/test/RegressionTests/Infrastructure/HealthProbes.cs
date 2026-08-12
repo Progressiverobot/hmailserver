@@ -156,8 +156,11 @@ namespace RegressionTests.Infrastructure
             // The existing metrics endpoint still works.
             (int status, string body) metrics = HttpGet("/metrics");
             Assert.AreEqual(200, metrics.status, "Metrics should be 200. Body: " + metrics.body);
-            Assert.IsTrue(metrics.body.Contains("hmailserver_uptime_seconds"), "Metrics body did not contain expected gauge.");
-            Assert.IsTrue(metrics.body.Contains("hmailserver_database_up 1"), "Metrics body should report database up. Body: " + metrics.body);
+            // Renamed to follow Prometheus convention: a start timestamp instead of an
+            // uptime counter, and "connected" instead of "up" (which collided with
+            // Prometheus's own synthetic up). See PrometheusConventions.cs.
+            Assert.IsTrue(metrics.body.Contains("hmailserver_start_time_seconds"), "Metrics body did not contain expected gauge.");
+            Assert.IsTrue(metrics.body.Contains("hmailserver_database_connected 1"), "Metrics body should report the database connected. Body: " + metrics.body);
             Assert.IsTrue(metrics.body.Contains("hmailserver_db_connections{state=\"busy\"}"), "Metrics body missing busy pool gauge. Body: " + metrics.body);
             Assert.IsTrue(metrics.body.Contains("hmailserver_db_connections{state=\"available\"}"), "Metrics body missing available pool gauge. Body: " + metrics.body);
             Assert.IsTrue(metrics.body.Contains("hmailserver_tls_handshakes_total"), "Metrics body missing TLS handshake counter. Body: " + metrics.body);
