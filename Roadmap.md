@@ -44,7 +44,7 @@ strong and where it is thin far more honestly than any prose summary.
 | Section | ✅ | 🔄 | ⬜ | ⏸️ |
 |---|--:|--:|--:|--:|
 | [Dated items — the forcing functions](#dated-items--the-forcing-functions) | 1 | – | 5 | 1 |
-| [Defects found by the audit](#defects-found-by-the-audit) | 13 | – | 3 | – |
+| [Defects found by the audit](#defects-found-by-the-audit) | 15 | 1 | – | – |
 | [Structural prerequisites](#structural-prerequisites) | – | – | 5 | – |
 | **The capability matrix** | | | | |
 | [SMTP and ESMTP](#smtp-and-esmtp) | 23 | – | 4 | – |
@@ -66,7 +66,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 1 | – | 5 | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 2 | – | 4 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 2 | – | 7 | – |
-| **Total** | **518** | **4** | **184** | **14** |
+| **Total** | **520** | **5** | **181** | **14** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage and the administration surface are the best-covered areas**, and the
@@ -171,9 +171,19 @@ Defects found by the audit
 --------------------------
 
 The adversarial verification pass over the capability matrix found sixteen
-defects, none of them known before August 2026. **Thirteen are now fixed**, each
-with a regression test that fails against the build before it; the suite went
-from 1049 to 1087 passing.
+defects, none of them known before August 2026. **All sixteen are now fixed**,
+each with a regression test that fails against the build before it. The suite
+went from 1049 to 1144 passing.
+
+Three took two attempts. The first attempt at each was written, reviewed, and
+**rejected** -- the password-hash upgrade would have broken SCRAM authentication
+with the correct password; the Prometheus rework added throwing database calls to
+a thread with no exception barrier, where an escaped exception is
+`std::terminate` and a dead mail server; and the `List-*` header work treated a
+failed message parse as success, and would have written a stub with no From,
+Subject or body on a default configuration for every list posting. Each is
+recorded below with what went wrong, because the reasoning is worth more than the
+outcome.
 
 Three are not fixed, and it is worth saying why, because in each case a fix was
 written and then rejected on review rather than never attempted. That is the
@@ -194,9 +204,9 @@ process working: all three would have been worse than the defect.
 | ✅ | **MTA-STS and ACME hosting were silently inert** | Both are served by `WebServicesServer`, whose ports default to 0 while `MtaStsHostingEnabled` defaults to 1 — features enabled by default and unreachable by default. Now stated at startup, naming the setting to change. Reported to the *application* log, not as an error: this is the shipped default configuration, and putting a Medium entry in every stock install's ERROR log would be its own defect. |
 | ✅ | **`ENHANCEDSTATUSCODES` was advertised but mostly unused** | The code table was consulted from one function while ~36 reply sites wrote their status line directly. Most now route through it. No numeric status code or reply text changed. |
 | ✅ | **The settings-index generator was not wired into the build** | `build/generate-settings-index.ps1` was referenced by nothing, so the committed Ctrl+K index was effectively hand-maintained. CI now regenerates it and fails if the tree moves. |
-| ⬜ | **Plaintext-stored passwords never upgrade** | **Corrected 12 Aug 2026 — the original framing of this defect was wrong and overstated.** Weak *hashed* schemes do upgrade correctly: `PasswordValidator.cpp` verifies the password, then re-hashes to the preferred KDF and **persists** it via `SaveObject`, upgrading only ever upward. So the README's "transparent upgrade on login" is accurate for MD5 and SHA256. The real gap is narrower: an account whose `accountpwencryption` is `0` takes the plaintext-comparison branch, which returns *before* reaching the upgrade block, so it stays plaintext forever. The only path that ever handled that case is the dead re-hash in `PersistentAccount::ReadObject`. Compounding it, the `MinimumAcceptedHashAlgorithm` check runs **before** any upgrade, so on a policy-enabled install a plaintext account is refused outright rather than upgraded — arguably deliberate (the log says "must be reset") but it means the policy can never heal an install. A first fix was **rejected** for removing the read-time re-hash before wiring a replacement, which would have broken SCRAM for those accounts *with the correct password*: SCRAM requires a PBKDF2 record, and the read-time re-hash was accidentally what satisfied that gate. |
-| ⬜ | **DANE validates the TLSA record but not the MX RRset** | The TLSA lookup is DNSSEC-validated; the MX lookup that chose the host is not, so an attacker able to forge the MX response can redirect delivery to a host whose own TLSA record then validates. Not attempted yet — it needs resolver-level changes. |
-| ⬜ | **TLS-RPT reporting is gated on an unset value** | The reporter returns immediately when `TlsRptFromAddress` is empty, which it is by default, so reports are aggregated and never sent. Should get the same startup warning treatment as MTA-STS above. |
+| ✅ | **Plaintext-stored passwords never upgrade** | **Corrected 12 Aug 2026 — the original framing of this defect was wrong and overstated.** Weak *hashed* schemes do upgrade correctly: `PasswordValidator.cpp` verifies the password, then re-hashes to the preferred KDF and **persists** it via `SaveObject`, upgrading only ever upward. So the README's "transparent upgrade on login" is accurate for MD5 and SHA256. The real gap is narrower: an account whose `accountpwencryption` is `0` takes the plaintext-comparison branch, which returns *before* reaching the upgrade block, so it stays plaintext forever. The only path that ever handled that case is the dead re-hash in `PersistentAccount::ReadObject`. Compounding it, the `MinimumAcceptedHashAlgorithm` check runs **before** any upgrade, so on a policy-enabled install a plaintext account is refused outright rather than upgraded — arguably deliberate (the log says "must be reset") but it means the policy can never heal an install. A first fix was **rejected** for removing the read-time re-hash before wiring a replacement, which would have broken SCRAM for those accounts *with the correct password*: SCRAM requires a PBKDF2 record, and the read-time re-hash was accidentally what satisfied that gate. |
+| 🔄 | **DANE validates the TLSA record but not the MX RRset** | The TLSA lookup is DNSSEC-validated; the MX lookup that chose the host is not, so an attacker able to forge the MX response can redirect delivery to a host whose own TLSA record then validates. Not attempted yet — it needs resolver-level changes. |
+| ✅ | **TLS-RPT reporting is gated on an unset value** | The reporter returns immediately when `TlsRptFromAddress` is empty, which it is by default, so reports are aggregated and never sent. Should get the same startup warning treatment as MTA-STS above. |
 
 
 The capability matrix
