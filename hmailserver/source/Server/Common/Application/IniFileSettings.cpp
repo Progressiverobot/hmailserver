@@ -274,6 +274,42 @@ namespace HM
       // scripting so short work (saving an accepted message) always has one.
       async_queue_stall_threshold_ =  ReadIniSettingInteger_("Settings", "AsyncQueueStallThreshold", 120);
       async_queue_reserved_threads_ =  ReadIniSettingInteger_("Settings", "AsyncQueueReservedThreads", 2);
+
+      // Absolute ceilings on a single IMAP SEARCH. SEARCH BODY and SEARCH TEXT are
+      // resolved by reading and MIME-parsing every message in the mailbox
+      // (hm_message_metadata indexes only date, from, subject, to and cc), so one
+      // authenticated command occupies a worker thread for as long as the mailbox
+      // takes to read, and can be repeated. Both ceilings are measured from the
+      // start of the search and neither re-arms; 0 disables that half. Full-text
+      // search will remove the motive; these remove the vector, with no index and
+      // no schema change.
+      //
+      // IMAPSearchTimeout, 60 seconds: this is the bound on the resource actually
+      // under attack, which is thread-seconds rather than bytes. 60s sits below
+      // Thunderbird's own 100-second socket timeout (mailnews.tcptimeout), so a
+      // search this cuts short is one the client had most likely already given up
+      // on, and it is well above what a mailbox of the size this server's own
+      // indexer is dimensioned for (IndexerFullLimit, 25000 messages) takes to
+      // read on server storage. The honest caveat: a genuinely huge mailbox - a
+      // few hundred thousand messages with attachments - can take minutes to body
+      // search on any hardware, and for those the setting has to be raised. That
+      // is the correct trade: the administrator who has such mailboxes knows it,
+      // whereas the default has to protect the server that does not.
+      //
+      // IMAPSearchMaxMegabytes, 2048 MB of message content examined: the
+      // deterministic half. A time bound alone makes the same mailbox succeed on
+      // fast storage and fail on slow storage, which is right for a DoS bound but
+      // leaves the behaviour unpredictable for an administrator and untestable; a
+      // byte bound behaves identically on every machine. Bytes rather than message
+      // count because the cost tracks bytes read and parsed - ten 40 MB messages
+      // cost far more than ten thousand 2 KB ones. 2 GB is more content than any
+      // interactive search legitimately reads and still a hard cap on the I/O a
+      // single command can demand.
+      imap_search_timeout_ = ReadIniSettingInteger_("Settings", "IMAPSearchTimeout", 60);
+      if (imap_search_timeout_ < 0) imap_search_timeout_ = 0;
+      imap_search_max_megabytes_ = ReadIniSettingInteger_("Settings", "IMAPSearchMaxMegabytes", 2048);
+      if (imap_search_max_megabytes_ < 0) imap_search_max_megabytes_ = 0;
+
       samove_vs_copy_ = ReadIniSettingInteger_("Settings", "SAMoveVsCopy", 0) == 1;
       auth_user_replacement_ip_ = ReadIniSettingString_("Settings", "AuthUserReplacementIP", "");
       indexer_full_minutes_ =  ReadIniSettingInteger_("Settings", "IndexerFullMinutes",720);
@@ -297,6 +333,7 @@ namespace HM
       shutdown_drain_seconds_ = ReadIniSettingInteger_("Settings", "ShutdownDrainSeconds", 0);
       slow_query_log_ms_ = ReadIniSettingInteger_("Settings", "SlowQueryLogMilliseconds", 0);
       message_store_fsync_ = ReadIniSettingInteger_("Settings", "MessageStoreFsync", 0) == 1;
+      simulate_spool_write_failure_ = ReadIniSettingInteger_("Settings", "SimulateSpoolWriteFailure", 0);
       message_store_consistency_check_ = ReadIniSettingInteger_("Settings", "MessageStoreConsistencyCheck", 0) == 1;
       metrics_server_port_ = ReadIniSettingInteger_("Settings", "MetricsServerPort", 0);
       metrics_server_bind_address_ = ReadIniSettingString_("Settings", "MetricsServerBindAddress", "127.0.0.1");

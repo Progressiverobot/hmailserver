@@ -48,6 +48,10 @@ namespace HM
       bool DoesMessageMatch_(std::shared_ptr<IMAPConnection> pConnection, std::shared_ptr<IMAPSearchCriteria> pParentCriteria, const String &fileName, std::shared_ptr<Message> pMessage, int index);
       bool IsMessageRecent_(std::shared_ptr<IMAPConnection> pConnection, __int64 message_uid);
 
+      void ResetSearchState_();
+      bool BoundExceeded_();
+      IMAPResult AbortSearch_(std::shared_ptr<IMAPConnection> pConnection, int messages_scanned);
+
       std::shared_ptr<MessageData> message_data_;
       std::shared_ptr<MimeHeader> mime_header_;
 
@@ -74,5 +78,17 @@ namespace HM
       // for the mailbox being searched, before the per-message matching starts.
       int max_uid_;
       int message_count_;
+
+      // Absolute ceiling on one search. search_start_tick_ is taken once at the top
+      // of ExecuteCommand and never moved, and the two limits are read once there
+      // too, so neither a configuration reload nor per-message progress can extend
+      // the budget mid-search. A zero limit disables that half.
+      unsigned __int64 search_start_tick_;
+      unsigned __int64 bytes_examined_;
+      unsigned __int64 max_bytes_examined_;
+      int search_timeout_seconds_;
+
+      // Which ceiling was passed, and by how much, for the application log entry.
+      String bound_reason_;
    };
 }

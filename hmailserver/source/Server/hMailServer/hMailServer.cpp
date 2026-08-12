@@ -16,6 +16,7 @@
 #include "../Common/Util/ServiceManager.h"
 #include "../Common/Util/ClassTester.h"
 #include "../Common/Util/SystemInformation.h"
+#include "../Common/Util/CrashOracle.h"
 
 // #define VLD_START_DISABLED
 // #include "C:\Temp\vld-10\vldapi.h"
@@ -175,6 +176,14 @@ HM::ChMailServerModule _AtlModule;
 extern "C" int WINAPI _tWinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, 
                                 LPTSTR lpCmdLine, int nShowCmd)
 {
+   // Arm the crash oracle before anything else runs. Both of its hooks are
+   // process-wide, so installing them here covers every thread the server creates
+   // later, including the ones the service control manager and boost::asio start on
+   // our behalf. It touches nothing but the ini file, so it is safe this early -
+   // and it has to be this early, because a fault during startup is exactly the kind
+   // that otherwise disappears.
+   HM::CrashOracle::Install();
+
    // Initailize some service variables.
    ServiceStatus.dwServiceType = SERVICE_WIN32; 
    ServiceStatus.dwWin32ExitCode = 0;
@@ -375,6 +384,13 @@ ServiceMain(DWORD /*dwArgc*/, LPTSTR* /*lpszArgv*/)
 void
 TerminateServer()
 {
+   // Tell the crash oracle that this is an orderly stop. An exception thrown by a
+   // thread being torn down is still recorded and still reported, but it no longer
+   // gets escalated to a hard process kill that would race the stop notification
+   // below and make Windows report a service failure. A memory-safety fault is
+   // treated as fatal either way - that is a defect whenever it happens.
+   HM::CrashOracle::NotifyShutdownStarted();
+
    ReportServiceStatus(SERVICE_STOP_PENDING, 0);
 
    HM::Application::Instance()->StopServers();
@@ -449,6 +465,11 @@ void InitializeApplication()
       HM::Application::Instance()->StartServers();
    }
 
+   // Now that the configuration has been loaded, the logger has a log mask and this
+   // line will actually reach the application log. Said once per process start, so
+   // that an operator reading a log can tell whether crash records are being kept
+   // and where they are.
+   HM::CrashOracle::LogInstallationStatus();
 }
 
 

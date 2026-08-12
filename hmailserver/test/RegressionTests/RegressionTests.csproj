@@ -508,6 +508,14 @@
     <Compile Include="Sieve\SieveExtensionActions.cs" />
     <Compile Include="Sieve\SieveExtensionRequire.cs" />
     <Compile Include="Sieve\SieveVacation.cs" />
+    <Compile Include="IMAP\SearchLimits.cs" />
+    <Compile Include="Infrastructure\CrashOracleAsserts.cs" />
+    <Compile Include="Infrastructure\CrashOracleTests.cs" />
+    <Compile Include="Sieve\ManageSieveTls.cs" />
+    <Compile Include="SSL\ListenerTlsConfiguration.cs" />
+    <Compile Include="Shared\IniFileSetting.cs" />
+    <Compile Include="SMTP\SpoolWriteFailure.cs" />
+    <Compile Include="Shared\TlsHandshakeProbe.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Messages\MultipartMessageWithNoMainBodyText.txt" />

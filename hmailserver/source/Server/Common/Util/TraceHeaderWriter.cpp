@@ -64,7 +64,7 @@ namespace HM
       // by a scanner would otherwise drop one orphan per message into the
       // account's folder, where the consistency check would never notice it (it
       // looks for database rows with no file, not files with no row).
-      if (!written || !FileUtilities::Move(tempFile, messageFileName, true))
+      if (!written || !FileUtilities::Move(tempFile, messageFileName))
       {
          FileUtilities::DeleteFile(tempFile);
          return false;

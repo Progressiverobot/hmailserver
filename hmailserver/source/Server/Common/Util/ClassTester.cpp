@@ -1,4 +1,4 @@
-// Copyright (c) 2010 Martin Knafve / hMailServer.com.  
+﻿// Copyright (c) 2010 Martin Knafve / hMailServer.com.  
 // http://www.hmailserver.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 
@@ -34,6 +34,7 @@
 #include "../Util/Hashing/HashCreator.h"
 #include "../Util/OAuth2TokenValidator.h"
 #include "../Util/EventTester.h"
+#include "../SQL/SQLStatement.h"
 #include <boost/pool/object_pool.hpp>
 
 #ifdef _DEBUG
@@ -86,6 +87,16 @@ namespace HM
       OutputDebugString(_T("hMailServer: Testing Formatter\n"));
       FormatterTester formatterTester;
       formatterTester.Test();
+
+      // Parameter substitution matters most on the two backends the bench does not
+      // usually run: MySQL and PostgreSQL report GetSupportsCommandParameters() as
+      // false, so they take the string-substitution path, while MSSQL and SQL CE use
+      // real parameters and never exercise it. That is why this is tested here in
+      // process rather than through a query - the defect is invisible on the backend
+      // the suite runs against.
+      OutputDebugString(_T("hMailServer: Testing SQLStatement parameter substitution\n"));
+      SQLStatementTester sqlStatementTester;
+      sqlStatementTester.Test();
 
       OutputDebugString(_T("hMailServer: Testing TimeoutCalculator\n"));
       TimeoutCalculatorTester timeoutCalculatortester;

@@ -10,6 +10,8 @@
 #include "IMAPConfiguration.h"
 #include "IMAPListLookup.h"
 
+#include "../Common/Application/IniFileSettings.h"
+#include "../Common/BO/Account.h"
 #include "../Common/BO/IMAPFolder.h"
 #include "../Common/Persistence/PersistentMessage.h"
 #include "../Common/BO/Message.h"
@@ -39,6 +41,10 @@ namespace HM
       highest_modseq_ = 0;
       max_uid_ = 0;
       message_count_ = 0;
+      search_start_tick_ = 0;
+      bytes_examined_ = 0;
+      max_bytes_examined_ = 0;
+      search_timeout_seconds_ = 0;
    }
 
    IMAPCommandSEARCH::~IMAPCommandSEARCH()
@@ -49,6 +55,12 @@ namespace HM
    IMAPResult
    IMAPCommandSEARCH::ExecuteCommand(std::shared_ptr<IMAPConnection> pConnection, std::shared_ptr<IMAPCommandArgument> pArgument)
    {
+      // First statement in the command: the ceiling is measured from here, so it
+      // covers parsing as well as scanning. The handler for a plain SEARCH is
+      // created once per connection and reused for every SEARCH on it, so the
+      // per-search state has to be cleared here rather than in the constructor.
+      ResetSearchState_();
+
       if (is_sort_ && !Configuration::Instance()->GetIMAPConfiguration()->GetUseIMAPSort())
          return IMAPResult(IMAPResult::ResultNo, "IMAP SORT is not enabled.");
 
@@ -164,6 +176,14 @@ namespace HM
          int index = 0;
          for(std::shared_ptr<Message> pMessage : messages)
          {
+            // Checked before this message is examined rather than after it, so the
+            // check only ever stops work that is still to come. A search whose last
+            // message happens to push it past a ceiling has already paid for all of
+            // it, and there is nothing left to protect by discarding a result that
+            // is complete and correct.
+            if (BoundExceeded_())
+               return AbortSearch_(pConnection, index);
+
             const String fileName = PersistentMessage::GetFileName(pConnection->GetAccount(), pMessage);
 
             index++;
@@ -183,6 +203,12 @@ namespace HM
             IMAPSort oSorter;
             oSorter.Sort(pConnection, vecMatchingMessages, pParser->GetCharsetName(), pParser->GetSortParser());
             // Sort the message vector
+
+            // Sorting reads a header per matching message and cannot be interrupted
+            // from here, so the ceiling is re-checked once it returns. Without this a
+            // SORT could report a result produced long past the ceiling it was given.
+            if (BoundExceeded_())
+               return AbortSearch_(pConnection, message_count_);
          }
 
          typedef std::pair<int, std::shared_ptr<Message> > MessagePair;
@@ -606,11 +632,166 @@ namespace HM
 
     }
 
+   void
+   IMAPCommandSEARCH::ResetSearchState_()
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // Clears everything that belongs to one execution of the command, and takes the
+   // absolute deadline. IMAPConnection creates one IMAPCommandSEARCH per connection
+   // for plain SEARCH and one for SORT, and reuses them, so without this the second
+   // search on a connection would inherit the first one's budget - and its ESEARCH
+   // result options.
+   //---------------------------------------------------------------------------()
+   {
+      search_start_tick_ = GetTickCount64();
+      bytes_examined_ = 0;
+      bound_reason_.Empty();
+
+      // Read once, here. If they were read per message a configuration reload
+      // during a long search could raise the ceiling out from under it.
+      search_timeout_seconds_ = IniFileSettings::Instance()->GetIMAPSearchTimeout();
+
+      const int max_megabytes = IniFileSettings::Instance()->GetIMAPSearchMaxMegabytes();
+      max_bytes_examined_ = (max_megabytes > 0) ? ((unsigned __int64) max_megabytes) * 1024 * 1024 : 0;
+
+      // Result state from a previous search on the same connection. is_esearch_ and
+      // the options below are set while parsing this command, so a leftover value
+      // would otherwise decide the response format for a command that never asked
+      // for it - and would make the abort path below clear "$" for a search that
+      // never requested SAVE.
+      is_esearch_ = false;
+      esearch_min_ = false;
+      esearch_max_ = false;
+      esearch_all_ = false;
+      esearch_count_ = false;
+      esearch_save_ = false;
+      modseq_search_ = false;
+      highest_modseq_ = 0;
+      max_uid_ = 0;
+      message_count_ = 0;
+   }
+
+   bool
+   IMAPCommandSEARCH::BoundExceeded_()
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // True once this search has passed either configured ceiling.
+   //
+   // Both are absolute and measured from the start of the search. Nothing here
+   // re-arms, and that is the whole point: every bug of this shape this codebase
+   // has had came from an idle timeout that a steady trickle of progress kept
+   // alive forever, so there is deliberately no "since the last message" notion
+   // anywhere in this function.
+   //---------------------------------------------------------------------------()
+   {
+      if (max_bytes_examined_ > 0 && bytes_examined_ >= max_bytes_examined_)
+      {
+         bound_reason_.Format(_T("examined %I64u KB of message content (IMAPSearchMaxMegabytes limit is %I64u KB)"),
+            bytes_examined_ / 1024, max_bytes_examined_ / 1024);
+         return true;
+      }
+
+      if (search_timeout_seconds_ > 0)
+      {
+         const unsigned __int64 elapsed = GetTickCount64() - search_start_tick_;
+
+         if (elapsed >= (unsigned __int64) search_timeout_seconds_ * 1000)
+         {
+            bound_reason_.Format(_T("ran for %I64u ms (IMAPSearchTimeout limit is %d seconds)"),
+               elapsed, search_timeout_seconds_);
+            return true;
+         }
+      }
+
+      return false;
+   }
+
+   IMAPResult
+   IMAPCommandSEARCH::AbortSearch_(std::shared_ptr<IMAPConnection> pConnection, int messages_scanned)
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // Ends an over-budget search: reports it at application level and returns NO,
+   // having sent no untagged response at all.
+   //
+   // Returning NO is the deliberate choice, over the two alternatives:
+   //
+   // Returning the matches found so far as though the search were complete is
+   // silently wrong and, worse, undetectably wrong. RFC 3501 has no concept of a
+   // partial SEARCH result, so a truncated "* SEARCH" line is indistinguishable
+   // from a complete one, and untagged data is meant to be processed whatever the
+   // tagged status turns out to be. Truncation only ever omits matches, never
+   // invents them - but a false negative loses mail just as effectively as a
+   // false positive does when the client acts on the set in bulk. Thunderbird's
+   // Search Messages window would offer Delete over a list quietly missing
+   // matches; any archiver or migration tool whose rule is "keep what the search
+   // returned and discard the rest" would discard messages it should have kept.
+   //
+   // Returning OK with an untagged "[ALERT]" is that same failure with a dialog
+   // box on top. The tagged OK still says the command succeeded and the result set
+   // the client has kept is still wrong, and most clients do not surface an alert
+   // attached to a successful command at all - our own future webmail would have
+   // to be written specifically to look for it, which is another way of saying
+   // every other client gets the silent-truncation behaviour.
+   //
+   // NO is the only answer the protocol lets a client detect. The command failed,
+   // there is no result set to act on, and the client's existing error path runs:
+   // Thunderbird reports the search as failed and the user still has every
+   // message; our webmail can turn it into "that search was too expensive, narrow
+   // it". The response code is RFC 9051's LIMIT ("the operation ran up against an
+   // implementation limit"), which older clients ignore harmlessly.
+   //---------------------------------------------------------------------------()
+   {
+      // RFC 5182 leaves "$" undefined after a failed SEARCH. Clear it rather than
+      // leave the previous search's result in place: a client that goes on to use
+      // "$" then acts on nothing, which is a no-op, instead of applying a bulk
+      // STORE or COPY to a stale and entirely unrelated set of messages.
+      if (esearch_save_)
+         pConnection->SetSavedSearchResult(std::vector<__int64>());
+
+      String account_address;
+      if (pConnection->GetAccount())
+         account_address = pConnection->GetAccount()->GetAddress();
+
+      String folder_name;
+      if (pConnection->GetCurrentFolder())
+         folder_name = pConnection->GetCurrentFolder()->GetName();
+
+      // Application level, never ErrorManager: a user searching a large mailbox is
+      // not a server fault, and putting it in the error log would make every such
+      // search look like one.
+      String sMessage;
+      sMessage.Format(_T("IMAPCommandSEARCH - %s abandoned for account %s in folder %s: %s after scanning %d of %d messages (session %d). ")
+                      _T("Raise IMAPSearchTimeout or IMAPSearchMaxMegabytes in hMailServer.ini if this is a legitimate search."),
+         is_sort_ ? _T("SORT") : _T("SEARCH"),
+         account_address.c_str(),
+         folder_name.c_str(),
+         bound_reason_.c_str(),
+         messages_scanned,
+         message_count_,
+         (int) pConnection->GetSessionID());
+
+      LOG_APPLICATION(sMessage);
+
+      if (is_sort_)
+         return IMAPResult(IMAPResult::ResultNo, "[LIMIT] Sort was too expensive to complete. Narrow the criteria or contact your administrator.");
+
+      return IMAPResult(IMAPResult::ResultNo, "[LIMIT] Search was too expensive to complete. Narrow the criteria or contact your administrator.");
+   }
+
    bool
    IMAPCommandSEARCH::MatchesBODYCriteria_(const String &fileName, std::shared_ptr<Message> pMessage, std::shared_ptr<IMAPSearchCriteria> pCriteria)
    {
       if (!message_data_)
       {
+         // Charged before the load, not after: the whole file is read and MIME
+         // parsed whether or not it turns out to match, and the recorded message
+         // size is what that costs. Charged here rather than in the caller because
+         // an OR/sub-criteria search can load the same message more than once, and
+         // each of those loads is real work.
+         const int message_size = pMessage->GetSize();
+         if (message_size > 0)
+            bytes_examined_ += (unsigned __int64) message_size;
+
          message_data_ = std::shared_ptr<MessageData>(new MessageData());
          message_data_->LoadFromMessage(fileName, pMessage);
       }
@@ -759,6 +940,11 @@ namespace HM
    {
       if (!message_data_)
       {
+         // See MatchesBODYCriteria_ - TEXT reads the same whole message.
+         const int message_size = pMessage->GetSize();
+         if (message_size > 0)
+            bytes_examined_ += (unsigned __int64) message_size;
+
          message_data_ = std::shared_ptr<MessageData>(new MessageData());
          message_data_->LoadFromMessage(fileName, pMessage);
       }
@@ -851,6 +1037,13 @@ namespace HM
       {
          // Load header
          AnsiString sHeader = PersistentMessage::LoadHeader(fileName);
+
+         // A HEADER search outside the five indexed fields (date, from, subject, to,
+         // cc) is a full scan of the mailbox as well, so it is charged too - but only
+         // for the header it actually read, not for the whole message. That is what
+         // keeps the byte ceiling from firing on a cheap header search over a large
+         // mailbox while still bounding one.
+         bytes_examined_ += (unsigned __int64) sHeader.GetLength();
 
          mime_header_ = std::shared_ptr<MimeHeader>(new MimeHeader);
          mime_header_->Load(sHeader, sHeader.GetLength(), true);

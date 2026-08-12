@@ -23,30 +23,35 @@ already cost a release cycle or nearly shipped a defect.
 4. **Pre-flight the bench**: `build\preflight-tests.ps1` (add `-Clean` to
    remove a stale ERROR log). Never skip this after an aborted run — an
    aborted run leaves a deliberate scanner error in the ERROR log and the
-   next run fails 100% of tests in fixture setup.
-5. **Version stamp**: `Version.h` (version, numeric, build),
+   next run fails 100% of tests in fixture setup, and it also leaves the
+   TLS fixtures' twelve extra ports behind, which the pre-flight checks.
+5. **Check the roadmap against itself**: `build\check-roadmap.ps1`. It
+   reconciles every tick box in `Roadmap.md` against the per-section counts
+   and the contents table, because three hand-edited restatements of the same
+   750 numbers drift — nine sections had drifted when the check was written.
+6. **Version stamp**: `Version.h` (version, numeric, build),
    `section_setup_64.iss`, all seven `.csproj` `<Version>` values. Verify
    nothing else still carries the old version: `git grep <old-version>`.
-6. **Build everything at the stamped version**: `build.ps1 -Configuration
+7. **Build everything at the stamped version**: `build.ps1 -Configuration
    Release`, `build-tools.ps1 -Configuration Release`, ControlPanel
    `dotnet publish` to its `publish\` folder (build-tools does not cover it),
    `build-tests.ps1`. Confirm the stamped `FileVersion` on
    `hMailServer.exe` and `publish\hMailCP.dll`.
-7. **Full regression suite on the stamped binary** — every test, nothing
+8. **Full regression suite on the stamped binary** — every test, nothing
    skipped. If *anything* changes after this run, the run is void: rebuild
    and re-run. Never abort a run; if one must be stopped, expect step 4 to
    fail and clean up before trusting any result.
-8. **README release notes** — every claim checked against the diff. "Fixed"
+9. **README release notes** — every claim checked against the diff. "Fixed"
    means reproduced-then-fixed or negative-control-tested; anything else is
    described as hardening or diagnostics. Unfixed known issues are named as
    unfixed.
-9. **Installer**: ISCC on `hMailServer64.iss`. Never run the installer on
+10. **Installer**: ISCC on `hMailServer64.iss`. Never run the installer on
    the dev machine — validation is the CI smoke-test workflow
    (`installer-smoke.yml`), which installs it on a throwaway runner.
-10. **Commit** (as chrisholloway5, no co-author trailers), **tag**
+11. **Commit** (as chrisholloway5, no co-author trailers), **tag**
     `vX.Y.Z`, push branch then tag, `gh release create` with the installer.
     The SBOM workflow attaches SPDX/CycloneDX automatically.
-11. **Close the loop**: answer every issue the release resolves (and close
+12. **Close the loop**: answer every issue the release resolves (and close
     them), update the ones it does not resolve saying so plainly.
 
 ## Standing rules

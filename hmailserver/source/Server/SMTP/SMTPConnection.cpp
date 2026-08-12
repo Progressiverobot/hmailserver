@@ -1729,6 +1729,19 @@ namespace HM
 
       const String fileName = PersistentMessage::GetFileName(current_message_);
 
+      // Before the Exists check below, because a failed write leaves the file very much
+      // in existence - just not holding the message that was sent. Until this was
+      // added, SaveToFile_ dropped the result of every write and returned true
+      // regardless, so a full disk during DATA produced a truncated spool file and a
+      // 250: the sender believed the message was delivered and there was nothing left
+      // to retry. 451 is deliberate - a disk that is full now may not be in ten
+      // minutes, and the existing handler already reports it as HM5019.
+      if (transmission_buffer_->GetWriteFailed())
+      {
+         HandleUnableToSaveMessageDataFile_(fileName);
+         return false;
+      }
+
       if (!FileUtilities::Exists(fileName))
       {
          HandleUnableToSaveMessageDataFile_(fileName);

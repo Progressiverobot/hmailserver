@@ -433,6 +433,7 @@ EXIT 0
     <ClCompile Include="..\Common\Util\Event.cpp" />
     <ClCompile Include="..\Common\Util\EventTester.cpp" />
     <ClCompile Include="..\Common\Util\ExceptionLogger.cpp" />
+    <ClCompile Include="..\Common\Util\CrashOracle.cpp" />
     <ClCompile Include="..\Common\Util\File.cpp" />
     <ClCompile Include="..\Common\Util\FileInfo.cpp" />
     <ClCompile Include="..\Common\Util\FileUtilities.cpp" />
@@ -966,6 +967,7 @@ EXIT 0
     <ClInclude Include="..\Common\Util\Event.h" />
     <ClInclude Include="..\Common\Util\EventTester.h" />
     <ClInclude Include="..\Common\Util\ExceptionLogger.h" />
+    <ClInclude Include="..\Common\Util\CrashOracle.h" />
     <ClInclude Include="..\Common\Util\File.h" />
     <ClInclude Include="..\Common\Util\FileInfo.h" />
     <ClInclude Include="..\Common\Util\FileUtilities.h" />

@@ -10,11 +10,18 @@
 
 #include "../BO/Account.h"
 #include "../BO/SecurityRange.h"
+#include "../BO/SSLCertificate.h"
+#include "../BO/SSLCertificates.h"
+#include "../BO/TCPIPPort.h"
+#include "../BO/TCPIPPorts.h"
 #include "../Persistence/PersistentSecurityRange.h"
 #include "../Util/PasswordValidator.h"
 #include "../Util/AccountLogon.h"
+#include "../Util/ServerStatus.h"
 #include "../Util/Parsing/StringParser.h"
 #include "../TCPIP/IPAddress.h"
+#include "../TCPIP/SocketConstants.h"
+#include "../TCPIP/SslContextInitializer.h"
 
 #include <ws2tcpip.h>
 
@@ -197,11 +204,17 @@ namespace HM
          return false;
       }
 
+      // Before the worker thread exists, so the thread only ever reads a context
+      // that is already fully built. A failure here is not a failure to start: the
+      // listener runs without STARTTLS, exactly as it always has.
+      bool tlsAvailable = InitializeTls_(bind_address, port);
+
       running_ = true;
       worker_ = std::thread(&ManageSieveServer::Run_, this);
 
       String message;
-      message.Format(_T("ManageSieveServer: Listening on %s:%d."), bind_address.c_str(), port);
+      message.Format(_T("ManageSieveServer: Listening on %s:%d (%s)."), bind_address.c_str(), port,
+         tlsAvailable ? _T("STARTTLS offered") : _T("plain text only, no TLS certificate available"));
       LOG_APPLICATION(message);
 
       return true;
@@ -223,6 +236,142 @@ namespace HM
 
       if (worker_.joinable())
          worker_.join();
+
+      // After the join: the worker reads the context for every STARTTLS, so
+      // releasing it while that thread was still alive would be a use-after-free.
+      // Dropped rather than kept, so that a Start() after a configuration change
+      // picks up the current certificate and TLS settings.
+      tls_context_.reset();
+   }
+
+   bool
+   ManageSieveServer::InitializeTls_(const String &bind_address, int port)
+   {
+      // Why this goes through SslContextInitializer rather than doing its own
+      // SSL_CTX_new: that function is the single place SMTP, POP3 and IMAP get
+      // their TLS configuration from - the cipher list, the enabled TLS versions,
+      // the server-preference and ChaCha options, the DH parameters and the
+      // key-exchange group list, which since this month carries the hybrid
+      // post-quantum KEMs from [Settings] TlsKeyExchangeGroups. Any listener that
+      // builds its own context re-implements that list and then diverges from it
+      // the next time it changes, silently, in the direction of weaker security -
+      // which is exactly what the optional listeners have done up to now.
+      //
+      // The bridge between the two stacks is deliberately as thin as it can be:
+      // SslContextInitializer takes a boost::asio::ssl::context, so one is built
+      // here and handed to it, and the raw SSL_CTX it wraps (native_handle) is
+      // what this listener's blocking sockets hand to SSL_new. Nothing about the
+      // configuration is restated locally, so nothing local can drift.
+      //
+      // This is the small correct thing, not the finished thing. The listener is
+      // still its own std::thread accept loop with blocking reads, so it does not
+      // get the shared listener's session accounting, its OnAccept scripting event
+      // or its asynchronous timeouts. Re-hosting it on the Boost.Asio stack as a
+      // proper TCPConnection - which would make this function disappear entirely -
+      // is Phase 1 of the next-generation programme.
+      try
+      {
+         std::shared_ptr<SSLCertificate> certificate = FindTlsCertificate_();
+
+         if (!certificate)
+         {
+            // Deliberately the application log and not a reported error. An install
+            // with no TLS-enabled mailbox port has no certificate for this listener
+            // to present, and that is the shipped configuration - a diagnostic here
+            // would fire on a default install, which is what every ERROR-log
+            // fixture in the suite (and every operator's alerting) would then have
+            // to learn to ignore.
+            LOG_APPLICATION("ManageSieveServer: No TLS certificate is configured on an IMAP, POP3 or SMTP port, so STARTTLS will not be offered. Bind the listener to 127.0.0.1, or put it behind a TLS terminator.");
+            return false;
+         }
+
+         std::shared_ptr<boost::asio::ssl::context> context =
+            std::shared_ptr<boost::asio::ssl::context>(new boost::asio::ssl::context(boost::asio::ssl::context::sslv23));
+
+         // Same method (sslv23 plus the option mask below), same settings, same
+         // function as TCPServer::Run uses for the mailbox protocols.
+         if (!SslContextInitializer::InitServer(*context, certificate, bind_address, port))
+         {
+            // InitServer has already reported the specific failure - a missing
+            // certificate file, an unreadable private key. Nothing is added to the
+            // ERROR log here; this line only records the consequence for this
+            // listener, and the same certificate failing for the mailbox ports is
+            // reported there too, so this cannot be a new class of error.
+            LOG_APPLICATION("ManageSieveServer: The shared TLS configuration could not be applied to this listener, so STARTTLS will not be offered.");
+            return false;
+         }
+
+         tls_context_ = context;
+
+         LOG_APPLICATION("ManageSieveServer: STARTTLS enabled using the certificate '" + certificate->GetName() + "' and the shared TLS configuration.");
+
+         return true;
+      }
+      catch (...)
+      {
+         // Constructing the context, or reading the configuration, can throw. This
+         // runs on the startup path, where an escape would take the whole service
+         // down before a single listener is up - so it is contained here and costs
+         // nothing but STARTTLS.
+         LOG_APPLICATION("ManageSieveServer: An exception was raised while preparing TLS for this listener. STARTTLS will not be offered.");
+         return false;
+      }
+   }
+
+   std::shared_ptr<SSLCertificate>
+   ManageSieveServer::FindTlsCertificate_()
+   {
+      // There is no ManageSieve-specific certificate setting, and adding one would
+      // mean an ini setting plus an administration-UI change for a listener that is
+      // off by default. So the certificate is borrowed from the TLS-capable mailbox
+      // ports, in the same preference order that IsConnectionAllowed_ reasons about
+      // access: IMAP, then POP3, then SMTP.
+      //
+      // That is the right default rather than a convenient one. The client editing
+      // Sieve filters is the same client reading the mailbox, from the same host
+      // name, so the certificate it already trusts is the one to present - and it is
+      // renewed by the same ACME run or the same manual replacement, so ManageSieve
+      // cannot end up serving a certificate that expired months ago.
+      std::shared_ptr<TCPIPPorts> ports = Configuration::Instance()->GetTCPIPPorts();
+      std::shared_ptr<SSLCertificates> certificates = Configuration::Instance()->GetSSLCertificates();
+
+      if (!ports || !certificates)
+         return std::shared_ptr<SSLCertificate>();
+
+      const SessionType preferenceOrder[] = { STIMAP, STPOP3, STSMTP };
+
+      std::vector<std::shared_ptr<TCPIPPort> > portVector = ports->GetVector();
+
+      for (SessionType sessionType : preferenceOrder)
+      {
+         for (std::shared_ptr<TCPIPPort> port : portVector)
+         {
+            if (!port || port->GetProtocol() != sessionType)
+               continue;
+
+            ConnectionSecurity connectionSecurity = port->GetConnectionSecurity();
+
+            if (connectionSecurity != CSSSL &&
+                connectionSecurity != CSSTARTTLSOptional &&
+                connectionSecurity != CSSTARTTLSRequired)
+               continue;
+
+            std::shared_ptr<SSLCertificate> certificate = certificates->GetItemByDBID(port->GetSSLCertificateID());
+
+            if (!certificate)
+               continue;
+
+            // A row with no files is worse than no row at all: SslContextInitializer
+            // would report a High error for a certificate the operator never asked
+            // this listener to use. Skip it and keep looking.
+            if (certificate->GetCertificateFile().IsEmpty() || certificate->GetPrivateKeyFile().IsEmpty())
+               continue;
+
+            return certificate;
+         }
+      }
+
+      return std::shared_ptr<SSLCertificate>();
    }
 
    void
@@ -246,24 +395,119 @@ namespace HM
             continue;
          }
 
-         IPAddress clientIPAddress = GetClientAddress_((sockaddr*) &clientAddress);
+         Connection connection(clientSocket);
 
-         if (!IsConnectionAllowed_(clientIPAddress))
+         // This function is the top of a std::thread. There is nothing above it to
+         // catch anything, so an exception that escaped here would be
+         // std::terminate() - the entire mail server, SMTP and IMAP and POP3
+         // included, killed because someone uploaded a Sieve script. Everything the
+         // handler touches is fenced off behind this barrier: the security-range
+         // lookup and the logon, which are database reads; the script storage, which
+         // is file I/O; the syntax checker; and all the string building. The socket
+         // is deliberately closed out here rather than inside the handler, so the
+         // barrier firing cannot leak a handle or an SSL object either.
+         //
+         // The catch blocks below only record what happened; they do not report it.
+         // Reporting has to wait until after the connection is closed and has to be
+         // fenced off in a barrier of its own, because ErrorManager::ReportError
+         // reaches ScriptServer::FireEvent and so runs operator-supplied
+         // VBScript/JScript. An exception out of that script would otherwise escape
+         // this function - the std::terminate() this barrier exists to prevent - and
+         // would skip the close below, leaking a socket per failed connection.
+         bool exceptionEscaped = false;
+         bool exceptionWasStandard = false;
+         AnsiString exceptionText;
+
+         try
          {
-            // Drop the connection before the greeting is sent and before a single
-            // command is read, the way the Boost.Asio listener does for the other
-            // protocols. Nothing is written back: a blocked client learns no more
-            // than that the port stopped answering.
-            String message;
-            message.Format(_T("ManageSieveServer: Connection from %s was not accepted. Blocked by IP range."),
-               String(clientIPAddress.ToString()).c_str());
-            LOG_DEBUG(message);
+            IPAddress clientIPAddress = GetClientAddress_((sockaddr*) &clientAddress);
 
-            closesocket(clientSocket);
-            continue;
+            if (IsConnectionAllowed_(clientIPAddress))
+            {
+               HandleClient_(connection, clientIPAddress);
+            }
+            else
+            {
+               // Drop the connection before the greeting is sent and before a single
+               // command is read, the way the Boost.Asio listener does for the other
+               // protocols. Nothing is written back: a blocked client learns no more
+               // than that the port stopped answering.
+               String message;
+               message.Format(_T("ManageSieveServer: Connection from %s was not accepted. Blocked by IP range."),
+                  String(clientIPAddress.ToString()).c_str());
+               LOG_DEBUG(message);
+            }
+         }
+         catch (const std::exception &error)
+         {
+            exceptionEscaped = true;
+            exceptionWasStandard = true;
+
+            // Copying the text allocates, and the exception in hand may well be the
+            // bad_alloc that says allocation is failing. A throw here would escape
+            // the catch block itself, so it gets its own fence; the message is then
+            // simply omitted.
+            try
+            {
+               exceptionText = error.what();
+            }
+            catch (...)
+            {
+            }
+         }
+         catch (...)
+         {
+            exceptionEscaped = true;
          }
 
-         HandleClient_(clientSocket, clientIPAddress);
+         CloseConnection_(connection);
+
+         if (exceptionEscaped)
+         {
+            try
+            {
+               if (exceptionWasStandard)
+               {
+                  String description = _T("An exception escaped while serving a ManageSieve connection. The connection was abandoned; the listener is still running.");
+
+                  if (!exceptionText.IsEmpty())
+                     description = Formatter::Format(_T("{0}, Message: {1}"), description, exceptionText);
+
+                  ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5830, "ManageSieveServer::Run_", description);
+               }
+               else
+               {
+                  ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5830, "ManageSieveServer::Run_",
+                     "A non-standard exception escaped while serving a ManageSieve connection. The connection was abandoned; the listener is still running.");
+               }
+            }
+            catch (...)
+            {
+               // Nothing left to do: reporting is what failed, and the alternative
+               // to swallowing this is std::terminate() on the mail server.
+            }
+         }
+      }
+   }
+
+   void
+   ManageSieveServer::CloseConnection_(Connection &connection)
+   {
+      if (connection.tls_session != nullptr)
+      {
+         // One attempt at close_notify, not a loop: this also runs on the path where
+         // the exception barrier has just fired, and a peer that is not reading must
+         // not be able to hold the accept loop here. The send timeout bounds it.
+         SSL_shutdown(connection.tls_session);
+         SSL_free(connection.tls_session);
+         connection.tls_session = nullptr;
+      }
+
+      if (connection.socket != INVALID_SOCKET)
+      {
+         shutdown(connection.socket, SD_BOTH);
+         closesocket(connection.socket);
+         connection.socket = INVALID_SOCKET;
       }
    }
 
@@ -323,85 +567,152 @@ namespace HM
       return result;
    }
 
-   void
-   ManageSieveServer::Send_(SOCKET client_socket, const AnsiString &data)
+   bool
+   ManageSieveServer::StartTls_(Connection &connection)
    {
-      send(client_socket, data.c_str(), static_cast<int>(data.GetLength()), 0);
+      if (!tls_context_)
+         return false;
+
+      // native_handle() is the SSL_CTX SslContextInitializer configured. Taking it
+      // rather than making one means the session below inherits the shared cipher
+      // list, TLS version floor and key-exchange groups without this file naming
+      // any of them.
+      SSL *session = SSL_new(tls_context_->native_handle());
+
+      if (session == nullptr)
+      {
+         ServerStatus::Instance()->OnTlsHandshakeFailed();
+         return false;
+      }
+
+      SSL_set_fd(session, static_cast<int>(connection.socket));
+
+      if (SSL_accept(session) != 1)
+      {
+         // A failed handshake is client-driven - an unsupported TLS version, a
+         // rejected certificate, a port scanner - so it is a debug note rather than
+         // a reported error. It is counted in the same handshake-failure metric the
+         // other listeners feed, which is where a real problem shows up as a rate.
+         ServerStatus::Instance()->OnTlsHandshakeFailed();
+
+         // Clear this thread's OpenSSL error queue. It is shared with every other
+         // OpenSSL call on this thread, so a failure left behind here would later be
+         // reported against something unrelated.
+         ERR_clear_error();
+
+         SSL_free(session);
+         return false;
+      }
+
+      ServerStatus::Instance()->OnTlsHandshakeCompleted();
+
+      connection.tls_session = session;
+
+      return true;
+   }
+
+   int
+   ManageSieveServer::Receive_(Connection &connection, char *buffer, int size)
+   {
+      if (connection.tls_session != nullptr)
+         return SSL_read(connection.tls_session, buffer, size);
+
+      return recv(connection.socket, buffer, size, 0);
+   }
+
+   void
+   ManageSieveServer::Send_(Connection &connection, const AnsiString &data)
+   {
+      if (connection.tls_session != nullptr)
+      {
+         SSL_write(connection.tls_session, data.c_str(), static_cast<int>(data.GetLength()));
+         return;
+      }
+
+      send(connection.socket, data.c_str(), static_cast<int>(data.GetLength()), 0);
    }
 
    bool
-   ManageSieveServer::ReadLine_(SOCKET client_socket, std::string &buffer, String &line)
+   ManageSieveServer::ReadLine_(Connection &connection, String &line)
    {
       for (;;)
       {
-         size_t pos = buffer.find("\r\n");
+         size_t pos = connection.buffer.find("\r\n");
          if (pos != std::string::npos)
          {
-            line = AnsiString(buffer.substr(0, pos).c_str());
-            buffer.erase(0, pos + 2);
+            line = AnsiString(connection.buffer.substr(0, pos).c_str());
+            connection.buffer.erase(0, pos + 2);
             return true;
          }
 
          // Guard against an unterminated, unbounded line.
-         if (buffer.size() > 1024 * 1024)
+         if (connection.buffer.size() > 1024 * 1024)
             return false;
 
          char temp[4096];
-         int received = recv(client_socket, temp, sizeof(temp), 0);
+         int received = Receive_(connection, temp, static_cast<int>(sizeof(temp)));
          if (received <= 0)
             return false;
 
-         buffer.append(temp, received);
+         connection.buffer.append(temp, received);
       }
    }
 
    bool
-   ManageSieveServer::ReadBytes_(SOCKET client_socket, std::string &buffer, int count, String &data)
+   ManageSieveServer::ReadBytes_(Connection &connection, int count, String &data)
    {
-      while (static_cast<int>(buffer.size()) < count)
+      while (static_cast<int>(connection.buffer.size()) < count)
       {
          char temp[4096];
-         int received = recv(client_socket, temp, sizeof(temp), 0);
+         int received = Receive_(connection, temp, static_cast<int>(sizeof(temp)));
          if (received <= 0)
             return false;
 
-         buffer.append(temp, received);
+         connection.buffer.append(temp, received);
 
-         if (buffer.size() > 10 * 1024 * 1024)
+         if (connection.buffer.size() > 10 * 1024 * 1024)
             return false;
       }
 
-      data = AnsiString(buffer.substr(0, count).c_str());
-      buffer.erase(0, count);
+      data = AnsiString(connection.buffer.substr(0, count).c_str());
+      connection.buffer.erase(0, count);
       return true;
    }
 
    void
-   ManageSieveServer::SendCapabilities_(SOCKET client_socket)
+   ManageSieveServer::SendCapabilities_(Connection &connection) const
    {
-      Send_(client_socket, "\"IMPLEMENTATION\" \"hMailServer ManageSieve\"\r\n");
-      Send_(client_socket, AnsiString("\"SIEVE\" \"") + AdvertisedSieveExtensions + "\"\r\n");
-      Send_(client_socket, "\"SASL\" \"PLAIN\"\r\n");
-      Send_(client_socket, "\"VERSION\" \"1.0\"\r\n");
+      Send_(connection, "\"IMPLEMENTATION\" \"hMailServer ManageSieve\"\r\n");
+      Send_(connection, AnsiString("\"SIEVE\" \"") + AdvertisedSieveExtensions + "\"\r\n");
+
+      // RFC 5804 2.2: STARTTLS is advertised only while it can actually be used -
+      // before the handshake, and only when a certificate is available. A client
+      // that sees it and cannot get it would have no way to tell a configuration
+      // problem from a downgrade attack.
+      if (tls_context_ && connection.tls_session == nullptr)
+         Send_(connection, "\"STARTTLS\"\r\n");
+
+      Send_(connection, "\"SASL\" \"PLAIN\"\r\n");
+      Send_(connection, "\"VERSION\" \"1.0\"\r\n");
    }
 
    bool
-   ManageSieveServer::ApplyAuthenticationFailure_(SOCKET client_socket, int &authentication_failures, bool disconnect, const AnsiString &failure_response)
+   ManageSieveServer::ApplyAuthenticationFailure_(Connection &connection, int &authentication_failures, bool disconnect, const AnsiString &failure_response)
    {
       authentication_failures++;
 
       if (disconnect || authentication_failures >= MaxAuthenticationFailures)
       {
-         Send_(client_socket, "NO \"Too many invalid logon attempts.\"\r\n");
+         Send_(connection, "NO \"Too many invalid logon attempts.\"\r\n");
          return true;
       }
 
-      Send_(client_socket, failure_response);
+      Send_(connection, failure_response);
       return false;
    }
 
    ManageSieveServer::AuthenticationOutcome
-   ManageSieveServer::HandleAuthenticate_(SOCKET client_socket, const IPAddress &client_address, const String &line, int pos, std::string &buffer, int &authentication_failures, String &account_address)
+   ManageSieveServer::HandleAuthenticate_(Connection &connection, const IPAddress &client_address, const String &line, int pos, int &authentication_failures, String &account_address)
    {
       String mechanism;
       ParseToken(line, pos, mechanism);
@@ -409,7 +720,7 @@ namespace HM
 
       if (mechanism != _T("PLAIN"))
       {
-         Send_(client_socket, "NO \"Unsupported SASL mechanism.\"\r\n");
+         Send_(connection, "NO \"Unsupported SASL mechanism.\"\r\n");
          return AuthenticationFailed;
       }
 
@@ -431,20 +742,20 @@ namespace HM
             // Refuse without reading it. Since the announced bytes are left unread
             // the command stream can no longer be trusted, so the connection goes
             // rather than being allowed to desynchronize.
-            Send_(client_socket, "NO \"SASL response too large.\"\r\n");
+            Send_(connection, "NO \"SASL response too large.\"\r\n");
             return AuthenticationAborted;
          }
 
-         if (!ReadBytes_(client_socket, buffer, literalSize, saslResponse))
+         if (!ReadBytes_(connection, literalSize, saslResponse))
             return AuthenticationAborted;
 
          // Consume the CRLF that terminates the command after the literal.
          String trailing;
-         ReadLine_(client_socket, buffer, trailing);
+         ReadLine_(connection, trailing);
       }
       else if (!ParseToken(line, pos, saslResponse))
       {
-         Send_(client_socket, "NO \"PLAIN requires an initial response.\"\r\n");
+         Send_(connection, "NO \"PLAIN requires an initial response.\"\r\n");
          return AuthenticationFailed;
       }
 
@@ -455,7 +766,7 @@ namespace HM
          // per-IP auto-ban: a response we cannot even decode carries no password
          // guess, and banning on it would let a broken client lock its own address
          // out of the server.
-         if (ApplyAuthenticationFailure_(client_socket, authentication_failures, false, "NO \"Invalid SASL response.\"\r\n"))
+         if (ApplyAuthenticationFailure_(connection, authentication_failures, false, "NO \"Invalid SASL response.\"\r\n"))
             return AuthenticationAborted;
 
          return AuthenticationFailed;
@@ -479,7 +790,7 @@ namespace HM
 
       if (!account)
       {
-         if (ApplyAuthenticationFailure_(client_socket, authentication_failures, disconnect, "NO \"Authentication failed.\"\r\n"))
+         if (ApplyAuthenticationFailure_(connection, authentication_failures, disconnect, "NO \"Authentication failed.\"\r\n"))
             return AuthenticationAborted;
 
          return AuthenticationFailed;
@@ -487,72 +798,123 @@ namespace HM
 
       account_address = account->GetAddress();
       authentication_failures = 0;
-      Send_(client_socket, "OK \"Authentication successful.\"\r\n");
+      Send_(connection, "OK \"Authentication successful.\"\r\n");
 
       return AuthenticationSucceeded;
    }
 
    void
-   ManageSieveServer::HandleClient_(SOCKET client_socket, const IPAddress &client_address)
+   ManageSieveServer::HandleClient_(Connection &connection, const IPAddress &client_address)
    {
       DWORD timeout = 30000;
-      setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*) &timeout, sizeof(timeout));
-      setsockopt(client_socket, SOL_SOCKET, SO_SNDTIMEO, (const char*) &timeout, sizeof(timeout));
+      setsockopt(connection.socket, SOL_SOCKET, SO_RCVTIMEO, (const char*) &timeout, sizeof(timeout));
+      setsockopt(connection.socket, SOL_SOCKET, SO_SNDTIMEO, (const char*) &timeout, sizeof(timeout));
 
-      std::string buffer;
       bool authenticated = false;
       String accountAddress;
       int authentication_failures = 0;
 
       // Greeting: advertise capabilities then an OK.
-      SendCapabilities_(client_socket);
-      Send_(client_socket, "OK \"hMailServer ManageSieve ready.\"\r\n");
+      SendCapabilities_(connection);
+      Send_(connection, "OK \"hMailServer ManageSieve ready.\"\r\n");
 
       for (;;)
       {
          String line;
-         if (!ReadLine_(client_socket, buffer, line))
+         if (!ReadLine_(connection, line))
             break;
 
          int pos = 0;
          String command;
          if (!ParseToken(line, pos, command))
          {
-            Send_(client_socket, "NO \"Empty command.\"\r\n");
+            Send_(connection, "NO \"Empty command.\"\r\n");
             continue;
          }
          command.ToUpper();
 
          if (command == _T("LOGOUT"))
          {
-            Send_(client_socket, "OK \"Bye.\"\r\n");
+            Send_(connection, "OK \"Bye.\"\r\n");
             break;
          }
 
          if (command == _T("CAPABILITY"))
          {
-            SendCapabilities_(client_socket);
-            Send_(client_socket, "OK\r\n");
+            SendCapabilities_(connection);
+            Send_(connection, "OK\r\n");
             continue;
          }
 
          if (command == _T("NOOP"))
          {
-            Send_(client_socket, "OK\r\n");
+            Send_(connection, "OK\r\n");
             continue;
          }
 
          if (command == _T("STARTTLS"))
          {
-            Send_(client_socket, "NO \"STARTTLS is not supported on this listener.\"\r\n");
+            if (!tls_context_)
+            {
+               Send_(connection, "NO \"STARTTLS is not available: no TLS certificate is configured.\"\r\n");
+               continue;
+            }
+
+            if (connection.tls_session != nullptr)
+            {
+               Send_(connection, "NO \"TLS is already active on this connection.\"\r\n");
+               continue;
+            }
+
+            if (authenticated)
+            {
+               // RFC 5804 2.2 has the client discard everything it knew about the
+               // session across the upgrade, which includes its authentication.
+               // Rather than silently dropping an authenticated session's identity,
+               // refuse: a client that wants TLS must ask for it before it logs on.
+               Send_(connection, "NO \"STARTTLS must be issued before authenticating.\"\r\n");
+               continue;
+            }
+
+            if (!connection.buffer.empty())
+            {
+               // Anything already buffered arrived in clear text before the handshake
+               // and would otherwise be executed afterwards as though it had been
+               // protected by it - the plaintext command injection that STARTTLS
+               // implementations get wrong. There is nothing to salvage: the stream
+               // is no longer trustworthy, so the connection ends.
+               Send_(connection, "NO \"Unexpected data was sent after STARTTLS.\"\r\n");
+               break;
+            }
+
+            Send_(connection, "OK \"Begin TLS negotiation now.\"\r\n");
+
+            if (!StartTls_(connection))
+            {
+               LOG_DEBUG("ManageSieveServer: The TLS handshake failed. Closing the connection.");
+               break;
+            }
+
+            // RFC 5804 2.2: the server sends a new capability response once the
+            // handshake completes, because what it can offer has changed (STARTTLS
+            // is gone from it, and a client that refuses to send credentials in
+            // clear text will only now look at "SASL").
+            //
+            // authentication_failures is deliberately *not* reset here. It is the
+            // per-connection attempt cap, and resetting it would hand a client a
+            // free extra round of password guesses for the price of one STARTTLS -
+            // exactly the sidestep IsConnectionAllowed_ exists to prevent.
+            SendCapabilities_(connection);
+            Send_(connection, "OK \"TLS negotiation successful.\"\r\n");
+
             continue;
          }
 
          if (command == _T("AUTHENTICATE"))
          {
             String authenticatedAddress;
-            AuthenticationOutcome outcome = HandleAuthenticate_(client_socket, client_address, line, pos,
-               buffer, authentication_failures, authenticatedAddress);
+            AuthenticationOutcome outcome = HandleAuthenticate_(connection, client_address, line, pos,
+               authentication_failures, authenticatedAddress);
 
             if (outcome == AuthenticationAborted)
                break;
@@ -569,7 +931,7 @@ namespace HM
          // All remaining commands require authentication.
          if (!authenticated)
          {
-            Send_(client_socket, "NO \"Authentication required.\"\r\n");
+            Send_(connection, "NO \"Authentication required.\"\r\n");
             continue;
          }
 
@@ -584,10 +946,10 @@ namespace HM
                if (name.CompareNoCase(activeName) == 0)
                   responseLine += " ACTIVE";
                responseLine += "\r\n";
-               Send_(client_socket, responseLine);
+               Send_(connection, responseLine);
             }
 
-            Send_(client_socket, "OK\r\n");
+            Send_(connection, "OK\r\n");
             continue;
          }
 
@@ -596,36 +958,36 @@ namespace HM
             String name;
             if (!ParseToken(line, pos, name) || !SieveStorage::IsValidScriptName(name))
             {
-               Send_(client_socket, "NO \"Invalid script name.\"\r\n");
+               Send_(connection, "NO \"Invalid script name.\"\r\n");
                continue;
             }
 
             int literalSize = 0;
             if (!ParseLiteralSize(line, literalSize))
             {
-               Send_(client_socket, "NO \"Expected a script literal.\"\r\n");
+               Send_(connection, "NO \"Expected a script literal.\"\r\n");
                continue;
             }
 
             String content;
-            if (!ReadBytes_(client_socket, buffer, literalSize, content))
+            if (!ReadBytes_(connection, literalSize, content))
                break;
 
             // Consume the CRLF that terminates the command after the literal.
             String trailing;
-            ReadLine_(client_socket, buffer, trailing);
+            ReadLine_(connection, trailing);
 
             String syntaxError = SieveScript::CheckSyntax(content);
             if (!syntaxError.IsEmpty())
             {
-               Send_(client_socket, "NO \"" + EscapeQuoted(syntaxError) + "\"\r\n");
+               Send_(connection, "NO \"" + EscapeQuoted(syntaxError) + "\"\r\n");
                continue;
             }
 
             if (SieveStorage::PutScript(accountAddress, name, content))
-               Send_(client_socket, "OK\r\n");
+               Send_(connection, "OK\r\n");
             else
-               Send_(client_socket, "NO \"Could not store the script.\"\r\n");
+               Send_(connection, "NO \"Could not store the script.\"\r\n");
             continue;
          }
 
@@ -634,7 +996,7 @@ namespace HM
             String name;
             if (!ParseToken(line, pos, name) || !SieveStorage::ScriptExists(accountAddress, name))
             {
-               Send_(client_socket, "NO \"There is no script by that name.\"\r\n");
+               Send_(connection, "NO \"There is no script by that name.\"\r\n");
                continue;
             }
 
@@ -642,9 +1004,9 @@ namespace HM
 
             AnsiString response;
             response.Format("{%d}\r\n", content.GetLength());
-            Send_(client_socket, response);
-            Send_(client_socket, content);
-            Send_(client_socket, "\r\nOK\r\n");
+            Send_(connection, response);
+            Send_(connection, content);
+            Send_(connection, "\r\nOK\r\n");
             continue;
          }
 
@@ -656,18 +1018,18 @@ namespace HM
             if (name.IsEmpty())
             {
                SieveStorage::SetActiveScriptName(accountAddress, _T(""));
-               Send_(client_socket, "OK\r\n");
+               Send_(connection, "OK\r\n");
                continue;
             }
 
             if (!SieveStorage::ScriptExists(accountAddress, name))
             {
-               Send_(client_socket, "NO \"There is no script by that name.\"\r\n");
+               Send_(connection, "NO \"There is no script by that name.\"\r\n");
                continue;
             }
 
             SieveStorage::SetActiveScriptName(accountAddress, name);
-            Send_(client_socket, "OK\r\n");
+            Send_(connection, "OK\r\n");
             continue;
          }
 
@@ -676,14 +1038,14 @@ namespace HM
             String name;
             if (!ParseToken(line, pos, name) || !SieveStorage::ScriptExists(accountAddress, name))
             {
-               Send_(client_socket, "NO \"There is no script by that name.\"\r\n");
+               Send_(connection, "NO \"There is no script by that name.\"\r\n");
                continue;
             }
 
             if (SieveStorage::DeleteScript(accountAddress, name))
-               Send_(client_socket, "OK\r\n");
+               Send_(connection, "OK\r\n");
             else
-               Send_(client_socket, "NO \"The active script cannot be deleted.\"\r\n");
+               Send_(connection, "NO \"The active script cannot be deleted.\"\r\n");
             continue;
          }
 
@@ -692,36 +1054,36 @@ namespace HM
             int literalSize = 0;
             if (!ParseLiteralSize(line, literalSize))
             {
-               Send_(client_socket, "NO \"Expected a script literal.\"\r\n");
+               Send_(connection, "NO \"Expected a script literal.\"\r\n");
                continue;
             }
 
             String content;
-            if (!ReadBytes_(client_socket, buffer, literalSize, content))
+            if (!ReadBytes_(connection, literalSize, content))
                break;
 
             String trailing;
-            ReadLine_(client_socket, buffer, trailing);
+            ReadLine_(connection, trailing);
 
             String syntaxError = SieveScript::CheckSyntax(content);
             if (syntaxError.IsEmpty())
-               Send_(client_socket, "OK\r\n");
+               Send_(connection, "OK\r\n");
             else
-               Send_(client_socket, "NO \"" + EscapeQuoted(syntaxError) + "\"\r\n");
+               Send_(connection, "NO \"" + EscapeQuoted(syntaxError) + "\"\r\n");
             continue;
          }
 
          if (command == _T("HAVESPACE"))
          {
             // No per-account script quota is enforced.
-            Send_(client_socket, "OK\r\n");
+            Send_(connection, "OK\r\n");
             continue;
          }
 
-         Send_(client_socket, "NO \"Unknown command.\"\r\n");
+         Send_(connection, "NO \"Unknown command.\"\r\n");
       }
 
-      shutdown(client_socket, SD_BOTH);
-      closesocket(client_socket);
+      // The socket and any TLS session are closed by the accept loop, in
+      // CloseConnection_, so that the exception barrier cannot leak either.
    }
 }

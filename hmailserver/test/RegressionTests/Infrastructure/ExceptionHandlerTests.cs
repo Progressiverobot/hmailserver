@@ -20,6 +20,14 @@ namespace RegressionTests.Infrastructure
       public new void TearDown()
       {
          _settings.CrashSimulationMode = 0;
+
+         // This is the one fixture that faults the server on purpose, so it is the one
+         // fixture responsible for clearing the crash oracle's marker file. The oracle
+         // deliberately does not clear it - a fault has to keep failing fixtures until
+         // somebody deals with it - and crash simulation mode 3 is an access violation,
+         // so without this every test that runs after this fixture fails on a fault
+         // that was the point of the test.
+         CrashOracleAsserts.Clear();
       }
 
       private void DeleteAllMinidumps()

@@ -231,17 +231,39 @@ namespace HM
       // overwrite the live message with a zero-byte file.
       if (bTestsRun && spam_dsize_ > 0 && (FileUtilities::FileSize(sTempFile) == spam_dsize_))
       {
+         // Both results are checked. The message has already been accepted, so the
+         // sender has been given a 250 and there is nobody left to tell - a failure
+         // here that went unreported would be a silently lost or unmodified message.
+         // Failing to apply the SpamAssassin result is recoverable: the original
+         // message is intact and gets delivered without the added headers, which is
+         // exactly what happens when spamd is unreachable. Losing the message is not
+         // recoverable, which is why FileUtilities::Move no longer deletes the
+         // destination before renaming over it.
          if (IniFileSettings::Instance()->GetSAMoveVsCopy())
          {
             // Move temp file overwriting message file
-            FileUtilities::Move(sTempFile, message_file_, true);
-            LOG_DEBUG("SA - Move used");
+            if (FileUtilities::Move(sTempFile, message_file_))
+            {
+               LOG_DEBUG("SA - Move used");
+            }
+            else
+            {
+               ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5860, "SpamAssassinClient::FinishTesting_",
+                  "Could not move the SpamAssassin result over the message file. The message is unchanged and is delivered without the SpamAssassin headers. FileUtilities::Move has already reported the underlying reason.");
+            }
          }
          else
          {
             // Copy temp file to message file
-            FileUtilities::Copy(sTempFile, message_file_, false);
-            LOG_DEBUG("SA - Copy+Delete used");
+            if (FileUtilities::Copy(sTempFile, message_file_, false))
+            {
+               LOG_DEBUG("SA - Copy+Delete used");
+            }
+            else
+            {
+               ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5861, "SpamAssassinClient::FinishTesting_",
+                  "Could not copy the SpamAssassin result over the message file. The message is unchanged and is delivered without the SpamAssassin headers.");
+            }
          }
 	  } 
      else 

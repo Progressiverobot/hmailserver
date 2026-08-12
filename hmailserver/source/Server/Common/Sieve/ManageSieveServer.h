@@ -8,13 +8,30 @@
 
 namespace HM
 {
+   class SSLCertificate;
+
    // Optional ManageSieve (RFC 5804) listener for uploading and managing
    // per-account Sieve scripts. Implemented as a raw-socket + std::thread service
    // (like MetricsServer / RestApiServer), enabled with
    // [Settings] ManageSieveServerPort in hMailServer.ini and disabled (port 0) by
-   // default. Authentication is SASL PLAIN against the regular account database;
-   // STARTTLS is not yet offered, so bind to 127.0.0.1 unless fronted by a TLS
-   // terminator.
+   // default. Authentication is SASL PLAIN against the regular account database.
+   //
+   // TLS: STARTTLS (RFC 5804 2.2) is offered when a TLS certificate is available,
+   // and the SSL context it uses is built by SslContextInitializer - the same
+   // function, reading the same settings, that configures TLS for SMTP, POP3 and
+   // IMAP. That is deliberate and load bearing: it is the only way the cipher
+   // list, the TLS version floor and the key-exchange groups (including the
+   // hybrid post-quantum KEMs in TlsKeyExchangeGroups) cannot silently diverge
+   // between this listener and the protocols people actually read the release
+   // notes about. The bridge is one cast: SslContextInitializer works on a
+   // boost::asio::ssl::context, and this listener's blocking sockets use the
+   // SSL_CTX underneath it (context::native_handle). Re-hosting the listener on
+   // the shared Boost.Asio stack, so that it stops being a separate accept loop
+   // at all, is Phase 1 work - see the comment above InitializeTls_.
+   //
+   // With no certificate available STARTTLS is not advertised and the listener
+   // behaves exactly as it did before: plain text only, so bind to 127.0.0.1
+   // unless fronted by a TLS terminator.
    //
    // Because it does not run on the shared Boost.Asio listener, this class has to
    // apply the security-range check itself when it accepts a connection - see
@@ -49,8 +66,37 @@ namespace HM
          AuthenticationAborted    // the connection must be closed
       };
 
+      // One accepted client connection: the socket, the bytes read from it but not
+      // yet consumed, and - only after a completed STARTTLS handshake - the
+      // OpenSSL session that every subsequent read and write has to go through.
+      // Grouping the three means no code path can read past the TLS upgrade and
+      // still be talking to the bare socket.
+      struct Connection
+      {
+         explicit Connection(SOCKET client_socket) :
+            socket(client_socket),
+            tls_session(nullptr)
+         {
+         }
+
+         // Owns a socket and an SSL object, so copying it would mean closing and
+         // freeing both twice. Nothing here needs a copy; say so rather than leave
+         // it to a future caller to find out.
+         Connection(const Connection &) = delete;
+         Connection &operator=(const Connection &) = delete;
+
+         SOCKET socket;
+         SSL *tls_session;
+         std::string buffer;
+      };
+
       void Run_();
-      void HandleClient_(SOCKET client_socket, const IPAddress &client_address);
+      void HandleClient_(Connection &connection, const IPAddress &client_address);
+
+      // Releases the TLS session, if any, and closes the socket. Called from the
+      // accept loop rather than from HandleClient_, so that the exception barrier
+      // firing cannot leak a socket or an SSL object.
+      static void CloseConnection_(Connection &connection);
 
       // Accept-time IP restriction check. This is the equivalent of what
       // TCPServer::HandleAccept does for SMTP/POP3/IMAP and is what makes an
@@ -59,33 +105,55 @@ namespace HM
 
       static IPAddress GetClientAddress_(const sockaddr *address);
 
-      void SendCapabilities_(SOCKET client_socket);
+      // Builds the shared server SSL context for STARTTLS. False - which is not an
+      // error - simply means STARTTLS is not advertised.
+      bool InitializeTls_(const String &bind_address, int port);
+
+      // The certificate this listener presents. There is no ManageSieve-specific
+      // certificate setting, so it is borrowed from the TLS-capable mailbox ports.
+      static std::shared_ptr<SSLCertificate> FindTlsCertificate_();
+
+      // Performs the server side of the TLS handshake on an accepted connection.
+      bool StartTls_(Connection &connection);
+
+      void SendCapabilities_(Connection &connection) const;
 
       // Handles one AUTHENTICATE command. All credential-carrying paths run
       // through here so that no failure can escape the auto-ban accounting or
       // the per-connection cap. On success, account_address holds the address of
       // the account that was logged on to.
-      AuthenticationOutcome HandleAuthenticate_(SOCKET client_socket,
+      AuthenticationOutcome HandleAuthenticate_(Connection &connection,
                                                 const IPAddress &client_address,
                                                 const String &line,
                                                 int pos,
-                                                std::string &buffer,
                                                 int &authentication_failures,
                                                 String &account_address);
 
       // Counts a failed attempt, sends the response and reports whether the
       // connection has run out of attempts and must be closed.
-      static bool ApplyAuthenticationFailure_(SOCKET client_socket,
+      static bool ApplyAuthenticationFailure_(Connection &connection,
                                               int &authentication_failures,
                                               bool disconnect,
                                               const AnsiString &failure_response);
 
-      bool ReadLine_(SOCKET client_socket, std::string &buffer, String &line);
-      bool ReadBytes_(SOCKET client_socket, std::string &buffer, int count, String &data);
-      static void Send_(SOCKET client_socket, const AnsiString &data);
+      static bool ReadLine_(Connection &connection, String &line);
+      static bool ReadBytes_(Connection &connection, int count, String &data);
+      static void Send_(Connection &connection, const AnsiString &data);
+
+      // Single point where bytes come off the wire, so that the plain-socket and
+      // TLS cases cannot get out of step.
+      static int Receive_(Connection &connection, char *buffer, int size);
 
       SOCKET listen_socket_;
       std::thread worker_;
       bool running_;
+
+      // Held as a Boost.Asio context only because that is what
+      // SslContextInitializer configures; the SSL_CTX inside it is what this
+      // listener uses. Null when no certificate is available, which is what
+      // "STARTTLS is not offered" means. Written by Start() before the worker
+      // thread exists and cleared by Stop() after it has been joined, so the
+      // worker never sees it change.
+      std::shared_ptr<boost::asio::ssl::context> tls_context_;
    };
 }

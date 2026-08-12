@@ -23,7 +23,9 @@ namespace HM
       last_send_ended_with_newline_(false),
       data_sent_(0),
       max_size_kb_(0),
-      cancel_transmission_(false)
+      cancel_transmission_(false),
+      write_failed_(false),
+      writes_completed_(0)
    {
       buffer_ = std::shared_ptr<ByteBuffer>(new ByteBuffer);
    }
@@ -166,8 +168,11 @@ namespace HM
 
          if (transmission_ended_ && file_.IsOpen())
          {
-            if (IniFileSettings::Instance()->GetMessageStoreFsync())
-               file_.FlushToDisk();
+            // Checked, for the reason the setting exists: it is bought specifically to
+            // make the spool file durable before the sender is told 250, so a failed
+            // fsync has to refuse the message rather than acknowledge it.
+            if (IniFileSettings::Instance()->GetMessageStoreFsync() && !file_.FlushToDisk())
+               ReportFlushFailure_();
 
             file_.Close();
          }
@@ -265,9 +270,11 @@ namespace HM
       {
          // Durability: when configured, force the fully-received message to physical
          // disk before we close it. This is the SMTP accept point, so the spool file
-         // is durable before the server acknowledges the message to the sender.
-         if (!is_sending_ && IniFileSettings::Instance()->GetMessageStoreFsync())
-            file_.FlushToDisk();
+         // is durable before the server acknowledges the message to the sender - and
+         // that promise is the whole reason the setting is turned on, so the result is
+         // checked. An unchecked fsync buys nothing but the appearance of durability.
+         if (!is_sending_ && IniFileSettings::Instance()->GetMessageStoreFsync() && !file_.FlushToDisk())
+            ReportFlushFailure_();
 
          file_.Close();
       }
@@ -275,7 +282,24 @@ namespace HM
       return dataProcessed;
    }
 
-   bool 
+   void
+   TransparentTransmissionBuffer::ReportFlushFailure_()
+   //---------------------------------------------------------------------------//
+   // A configured fsync of the received message failed. Treated exactly like a
+   // failed write: the message is not on disk in the way the operator asked for, so
+   // it is refused with a transient code rather than acknowledged.
+   //---------------------------------------------------------------------------//
+   {
+      if (!write_failed_)
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 5863, "TransparentTransmissionBuffer::ReportFlushFailure_",
+            "Failed to flush the received message to disk, with MessageStoreFsync enabled. The message is refused rather than acknowledged as durable.");
+      }
+
+      write_failed_ = true;
+   }
+
+   bool
    TransparentTransmissionBuffer::SaveToFile_(std::shared_ptr<ByteBuffer> pBuffer)
    {
       if (max_size_kb_ > 0 && (data_sent_ / 1024) > max_size_kb_)
@@ -287,9 +311,52 @@ namespace HM
       if (!cancel_transmission_)
       {
          size_t noOfBytesWritten = 0;
-         bool bResult = file_.Write(pBuffer, noOfBytesWritten);
+
+         // This used to be `bool bResult = file_.Write(pBuffer, noOfBytesWritten);`
+         // with bResult never read, and the function returned true unconditionally
+         // below. So a spool write that failed - a full disk, a quota, an I/O error -
+         // was invisible twice over: the result was dropped here, and every caller was
+         // told the data had been saved. On the receiving side that means the bytes
+         // are missing from the message and the sender is still given a 250.
+         //
+         // A short write counts as a failure for the same reason: the message on disk
+         // is not the message that was sent.
+         //
+         // MSVC does not warn about the unused variable at /W3 (C4189 is /W4), which
+         // is why it survived here for as long as it did.
+
+         // Fault injection, off unless [Settings] SimulateSpoolWriteFailure is set. Mode
+         // 1 fails every write and leaves the spool file empty; mode 2 lets the first
+         // write through and fails the rest, which is both the shape a disk filling up
+         // mid-message actually has and the only shape that used to be accepted, since a
+         // truncated file has content and a non-zero size and so passes everything
+         // downstream. Short-circuits the write rather than writing first, because the
+         // point is content that never reached the disk.
+         const int simulationMode = is_sending_ ? 0 : IniFileSettings::Instance()->GetSimulateSpoolWriteFailure();
+         const bool simulateFailure = simulationMode == 1 || (simulationMode == 2 && writes_completed_ > 0);
+
+         if (simulateFailure || !file_.Write(pBuffer, noOfBytesWritten) || noOfBytesWritten != pBuffer->GetSize())
+         {
+            if (!write_failed_)
+            {
+               // Once per transmission: a full disk fails every subsequent flush of
+               // the same message too, and one report per message is enough to
+               // diagnose it without turning a disk-full into a log flood.
+               String message;
+               message.Format(_T("Failed to write %Iu bytes of received message data to the spool file. Wrote %Iu. The message is refused rather than accepted incomplete."),
+                  pBuffer->GetSize(), noOfBytesWritten);
+
+               ErrorManager::Instance()->ReportError(ErrorManager::High, 5862, "TransparentTransmissionBuffer::SaveToFile_", message);
+            }
+
+            write_failed_ = true;
+
+            return false;
+         }
+
+         writes_completed_++;
       }
- 
+
       return true;
    }
 

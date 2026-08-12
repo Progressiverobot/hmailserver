@@ -430,19 +430,19 @@ namespace HM
    //    stage looks for, needing an operator to rename it back by hand.
    //
    // 3. The replacement is one rename with replace-existing semantics.
-   //    FileUtilities::Move(from, to, false) is boost::filesystem::rename, which on
-   //    Windows is MoveFileExW(from, to, MOVEFILE_REPLACE_EXISTING|MOVEFILE_COPY_ALLOWED);
+   //    FileUtilities::Move is boost::filesystem::rename, which on Windows is
+   //    MoveFileExW(from, to, MOVEFILE_REPLACE_EXISTING|MOVEFILE_COPY_ALLOWED);
    //    both files are in the same directory, hence the same volume, so COPY_ALLOWED
    //    never engages and the file system swaps the directory entry as one operation.
    //    message_file_name therefore always names a complete message: the accepted one
    //    if the rename failed, the rewritten one if it succeeded, and never a mixture.
    //
-   //    The overwrite flag must stay false. FileUtilities::Move(from, to, true)
-   //    deletes the destination first and then renames, so a rename that failed after
-   //    that delete - which is exactly what a scanner holding the temporary file open
-   //    causes - would leave no message on disk at all. That is what TraceHeaderWriter
-   //    does; it can afford to, because it runs at delivery time where the message
-   //    file is already the caller's to lose. Here it would destroy accepted mail.
+   //    This paragraph used to warn that Move's overwrite flag had to stay false,
+   //    because passing true deleted the destination before renaming and a failure
+   //    after that delete - a scanner holding the temporary file open is enough - left
+   //    no message on disk at all. That delete has since been removed from
+   //    FileUtilities::Move for exactly that reason, and the flag with it: there is now
+   //    one behaviour, and it is this one. Nothing here needs to opt into it.
    //---------------------------------------------------------------------------()
    {
       const String tempFileName = message_file_name + ".listheaders.tmp";
@@ -523,7 +523,7 @@ namespace HM
 
       // The one and only modification to the accepted message: replaced whole, or not
       // at all. See (3) above for why the flag is false.
-      if (!FileUtilities::Move(tempFileName, message_file_name, false))
+      if (!FileUtilities::Move(tempFileName, message_file_name))
       {
          FileUtilities::DeleteFile(tempFileName);
 

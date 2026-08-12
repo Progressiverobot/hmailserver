@@ -344,6 +344,10 @@ Administration and monitoring:
    MessageStoreFsync=0           ; force each received message to physical disk before it is acknowledged (1 = on)
    MessageStoreConsistencyCheck=0; periodically cross-check message rows against files on disk (1 = on, read-only)
                                  ; writes hMailServer_messagestore_consistency.report listing any affected messages
+   IMAPSearchTimeout=60          ; seconds one IMAP SEARCH may run before returning the matches found so far (0 = no limit)
+   IMAPSearchMaxMegabytes=2048   ; message content one IMAP SEARCH may read and parse (0 = no limit)
+                                 ; SEARCH BODY/TEXT reads every message in the mailbox, so these bound what a single
+                                 ; authenticated command can cost; raise them for mailboxes of several hundred thousand messages
    ManageSieveServerPort=0       ; ManageSieve (RFC 5804) script-management service (0 = disabled, standard port 4190)
    ManageSieveServerBindAddress=127.0.0.1  ; SASL PLAIN over plaintext; bind to localhost unless TLS-fronted
    JsonLogging=0                 ; write logs as JSON lines

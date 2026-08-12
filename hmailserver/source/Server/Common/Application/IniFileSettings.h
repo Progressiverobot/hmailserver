@@ -123,6 +123,13 @@ namespace HM
       int GetExternalProcessTimeout () {return external_process_timeout_; }
       int GetAsyncQueueStallThreshold () {return async_queue_stall_threshold_; }
       int GetAsyncQueueReservedThreads () {return async_queue_reserved_threads_; }
+
+      // Absolute ceilings on a single IMAP SEARCH / SORT, measured from the start
+      // of the search. Seconds and megabytes-of-message-content respectively; 0
+      // disables that half. See the comment at the read site for the defaults and
+      // for why there are two of them.
+      int GetIMAPSearchTimeout () {return imap_search_timeout_; }
+      int GetIMAPSearchMaxMegabytes () {return imap_search_max_megabytes_; }
       bool GetSAMoveVsCopy() const { return samove_vs_copy_; }
       String GetAuthUserReplacementIP() const { return auth_user_replacement_ip_; }
       int GetIndexerFullMinutes () {return indexer_full_minutes_; }
@@ -159,6 +166,30 @@ namespace HM
       // logged (redacted). 0 disables the slow-query log (latency metrics still run).
       int GetSlowQueryLogMilliseconds() const { return slow_query_log_ms_; }
       bool GetMessageStoreFsync() const { return message_store_fsync_; }
+
+      // Fault injection, for the regression suite only: makes writes of received message
+      // data to the spool file report failure without writing anything.
+      //
+      //   0  off.
+      //   1  every write fails, so the spool file stays empty.
+      //   2  the first write succeeds and every write after it fails, so the spool file
+      //      is left non-empty and truncated.
+      //
+      // Two modes because the two shapes are caught by different things, and only one of
+      // them was ever dangerous. An empty spool file was already refused before this
+      // work - not by any check that meant to catch it, but because the accept path
+      // failed downstream on a message with no content, with nothing reported. A
+      // *truncated* file is the shape a disk that fills up mid-message actually has, and
+      // it passes every downstream guard: it has content, it has headers, its size is
+      // non-zero. That one was accepted with a 250 and delivered short, which is the
+      // defect. Mode 2 is therefore the mode that matters, and the one whose test fails
+      // against the unfixed build.
+      //
+      // It exists because the alternative is filling a real disk, which is not a test.
+      // CrashSimulationMode is the existing precedent for a switch of this kind.
+      // Deliberately not exposed in the Control Panel, and read from the ini rather than
+      // over COM, so that turning it on takes a deliberate edit plus a reinitialize.
+      int GetSimulateSpoolWriteFailure() const { return simulate_spool_write_failure_; }
       bool GetMessageStoreConsistencyCheck() const { return message_store_consistency_check_; }
       int GetMetricsServerPort() const { return metrics_server_port_; }
       String GetMetricsServerBindAddress() const { return metrics_server_bind_address_; }
@@ -329,6 +360,7 @@ namespace HM
       int shutdown_drain_seconds_ = 0;
       int slow_query_log_ms_ = 0;
       bool message_store_fsync_ = false;
+      int simulate_spool_write_failure_ = 0;
       bool message_store_consistency_check_ = false;
       int metrics_server_port_ = 0;
       String metrics_server_bind_address_;
@@ -362,6 +394,8 @@ namespace HM
       String mta_sts_policy_mx_;
       bool autoconfig_enabled_ = true;
       String autoconfig_client_host_;
+      int imap_search_timeout_ = 60;
+      int imap_search_max_megabytes_ = 2048;
       String database_provider_;
 
       String m_sDisableAUTHList;

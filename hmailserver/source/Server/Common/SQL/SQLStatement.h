@@ -86,6 +86,8 @@ namespace HM
 
    private:
 
+      static bool IsParameterNameCharacter_(wchar_t character);
+
       eStatementType type_;
 
       String identity_column_;
@@ -97,5 +99,36 @@ namespace HM
 
       std::vector<Column> vecColumns;
       std::vector<Column> where_clause_columns_;
+   };
+
+   /*
+      Tests SQLStatement::GenerateFromCommand. GenerateFromCommand is only
+      *used* by MySQLConnection and PGConnection, but it is a plain
+      string-to-string function that does not look at the configured backend, so
+      it can be exercised whichever backend the bench is running. The one part
+      that does look at the backend is Escape(), so the values used here contain
+      no backslashes and the expectations hold on all four backends.
+
+      Called from ClassTester::DoTests, i.e. reachable from the regression suite
+      through Utilities.RunTestSuite. Signals failure with "throw 0" the way the
+      rest of the in-process testers do, which RunTestSuite turns into a COM
+      error - never into a terminate.
+   */
+   class SQLStatementTester
+   {
+   public:
+      void Test();
+
+   private:
+
+      void TestNumberedParameterCollision_();
+      void TestExistingPrefixCollisions_();
+      void TestParameterNameInsideValue_();
+      void TestTypeDispatch_();
+      void TestUnknownTokensAreLeftAlone_();
+      void TestRepeatedAndCaseSensitiveTokens_();
+      void TestGeneratedNamesDoNotCollide_();
+
+      static void AssertQuery_(const SQLCommand &command, const String &expected);
    };
 }

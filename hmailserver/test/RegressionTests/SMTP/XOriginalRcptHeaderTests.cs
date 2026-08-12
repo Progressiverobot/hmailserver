@@ -12,17 +12,30 @@ namespace RegressionTests.SMTP
    public class XOriginalRcptHeaderTests : TestFixtureBase
    {
       [SetUp]
-      public void VerifyFeatureEnabled()
+      public void EnableTheFeature()
       {
-         var programDirectory = SingletonProvider<TestSetup>.Instance.GetApp().Settings.Directories.ProgramDirectory;
-         var hMailServerFile = Path.Combine(programDirectory, "Bin", "hMailServer.ini");
+         // This used to read hMailServer.ini and declare itself inconclusive unless
+         // AddXOriginalRcptTo was already 1 - which on a default bench it never is, so
+         // all six tests reported "inconclusive" on every run and had done for as long
+         // as they had existed. Six tests that cannot fail are not coverage; they are a
+         // file that looks like coverage.
+         //
+         // The feature they test is a setting, so the fixture sets it, the same way
+         // ArcSealing does for this very setting when it needs the header present.
+         // Restored in TearDown, because it changes the headers of every accepted
+         // message and the rest of the suite asserts on message text.
+         IniFileSetting.Write("AddXOriginalRcptTo", "1");
 
-         var isEnabled =
-            (from line in File.ReadAllLines(hMailServerFile)
-               where line.StartsWith("AddXOriginalRcptTo") && line.EndsWith("1")
-               select line).Any();
+         // The setting is cached by IniFileSettings::InitInstance, and Reinitialize is
+         // what re-reads it. Stop()/Start() does not.
+         _application.Reinitialize();
+      }
 
-         if (!isEnabled) Assert.Inconclusive("Setting AddXOriginalRcptTo is not set to 1.");
+      [TearDown]
+      public void RestoreTheFeature()
+      {
+         IniFileSetting.Write("AddXOriginalRcptTo", "0");
+         _application.Reinitialize();
       }
 
       private const string Password = "test";

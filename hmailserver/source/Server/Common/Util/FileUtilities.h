@@ -23,7 +23,11 @@ namespace HM
 
       //static bool ReadLine(HANDLE hFile, String &sLine);
       static bool Copy(const String &sFrom, const String &sTo, bool bCreateMissingDirectories = false);
-      static bool Move(const String &sFrom, const String &sTo, bool overwrite = false);
+      // Renames sFrom onto sTo, replacing sTo if it exists. There is deliberately no
+      // overwrite flag: the rename replaces the destination as one operation and
+      // there is no variant that does not, so a flag could only mislead. See the
+      // definition for why the delete-then-rename version was removed.
+      static bool Move(const String &sFrom, const String &sTo);
       static bool Exists(const String &sFilename);
 
       static void ReadFileToBuf(const String &sFilename, BYTE *Buf, int iStart = -1, int iCount = -1);

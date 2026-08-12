@@ -67,39 +67,18 @@ namespace RegressionTests.API
       [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
       private static extern bool WritePrivateProfileString(string section, string key, string value, string filePath);
 
+      // Both of these moved to Shared/IniFileSetting once the listener TLS tests
+      // needed them too; the local names are kept so the call sites below read the
+      // same as they always did. The DllImport above stays, because the API key store
+      // is a different ini file with a section per key and is not a [Settings] value.
       private string[] CandidateDirectories()
       {
-         string programDirectory = _application.Settings.Directories.ProgramDirectory;
-
-         return new[]
-         {
-            programDirectory,
-            Path.Combine(programDirectory, "Bin"),
-         };
+         return IniFileSetting.CandidateDirectories();
       }
 
       private void WriteSetting(string key, string value)
       {
-         bool wroteAny = false;
-
-         foreach (string directory in CandidateDirectories())
-         {
-            string iniPath = Path.Combine(directory, "hMailServer.ini");
-            if (!File.Exists(iniPath))
-               continue;
-
-            Assert.IsTrue(
-               WritePrivateProfileString("Settings", key, value, iniPath),
-               "Failed to write " + key + " to " + iniPath + ".");
-
-            // Same reason as in EditStoredKey: the value has to be on disk
-            // before the service is reinitialized and reads it.
-            WritePrivateProfileString(null, null, null, iniPath);
-
-            wroteAny = true;
-         }
-
-         Assert.IsTrue(wroteAny, "Could not locate an existing hMailServer.ini to update.");
+         IniFileSetting.Write(key, value);
       }
 
       // The key store only exists once a key has been created, so this returns

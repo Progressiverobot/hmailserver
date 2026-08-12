@@ -123,12 +123,37 @@ namespace HM
    }
 
    bool
-   FileUtilities::Move(const String &sFrom, const String &sTo, bool overwrite)
+   FileUtilities::Move(const String &sFrom, const String &sTo)
    {
       const int iMaxNumberOfTries = 5;
 
-      if (overwrite)
-         DeleteFile(sTo);
+      // The overwrite is done by the rename itself, deliberately, and there is no
+      // DeleteFile here any more.
+      //
+      // This used to delete the destination first and then retry the rename up to
+      // five times. That opened a window in which the destination no longer existed
+      // and the replacement had not yet arrived - and if all five attempts failed
+      // (a scanner or a backup holding the source, a full disk) the destination was
+      // simply gone. On the SpamAssassin path, where sTo is the live message file
+      // and the caller ignored the return value, that lost the message silently:
+      // the sender had already been given a 250.
+      //
+      // It was also unnecessary. boost::filesystem::rename on Windows is
+      // MoveFileExW with MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED
+      // (verified in the pinned Boost 1.91: operations.cpp, BOOST_MOVE_FILE), so it
+      // already replaces an existing destination - and does it as one operation, so
+      // sTo always names either the old file or the new one and never nothing at
+      // all. Source and destination are in the same directory in every caller, so
+      // COPY_ALLOWED never engages and the swap stays atomic.
+      //
+      // There was an overwrite parameter here, which selected between the delete-then-
+      // rename above and a plain rename. It is gone rather than ignored: every value
+      // now produced identical behaviour, while the call sites read as though they had
+      // chosen something - Move(from, to, false) says "do not overwrite" and did - and
+      // one caller had already written a careful paragraph reasoning about which
+      // branch it wanted. A parameter that documents intent it cannot enforce is worse
+      // than no parameter. If a non-Windows path ever needs the distinction, it can be
+      // reintroduced by a change that also implements it.
 
       for (int i = 1; i <= iMaxNumberOfTries; i++)
       {

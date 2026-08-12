@@ -793,10 +793,24 @@ namespace HM
       String fileName = PersistentMessage::GetFileName(current_message_);
       current_message_->SetSize(FileUtilities::FileSize(fileName));
 
-      if (current_message_->GetSize() == 0)
+      // Read before the buffer is released below, which is also where the file handle
+      // goes. The zero-byte test underneath already covered a download that saved
+      // nothing at all; this covers the more dangerous shape, where some bytes did land
+      // and then a write failed - a full disk part-way through. Without it the
+      // truncated file passes the size test, gets saved, is delivered as though
+      // complete, and the DELE that follows removes the only intact copy from the
+      // remote server. Abandoning the fetch here sends no DELE, so the message is still
+      // there to be fetched again once there is room for it.
+      const bool spoolWriteFailed = transmission_buffer_ && transmission_buffer_->GetWriteFailed();
+
+      if (current_message_->GetSize() == 0 || spoolWriteFailed)
       {
          // Error handling.
-         LOG_DEBUG("POP3 External Account: Message is 0 bytes.");
+         if (spoolWriteFailed)
+            ErrorManager::Instance()->ReportError(ErrorManager::High, 5864, "POP3ClientConnection::HandlePOP3FinalizationTaskCompleted_",
+               "A write to the spool file failed while downloading a message from an external POP3 account, so it has not been delivered and has been left on the remote server to be fetched again. The preceding HM5862 or HM5863 gives the underlying reason.");
+         else
+            LOG_DEBUG("POP3 External Account: Message is 0 bytes.");
 
          // The file was created before the transfer was abandoned, and the message
          // is never saved, so remove the file rather than leaving it behind in the

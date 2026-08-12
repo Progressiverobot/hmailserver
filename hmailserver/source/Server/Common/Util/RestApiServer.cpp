@@ -24,6 +24,7 @@
 #include "../Persistence/PersistentAccount.h"
 #include "../Persistence/PersistentMessage.h"
 #include "../TCPIP/SocketConstants.h"
+#include "../TCPIP/SslContextInitializer.h"
 #include "../../SMTP/DeliveryQueue.h"
 
 #include <ws2tcpip.h>
@@ -58,6 +59,14 @@ namespace HM
       const int EtrnHeldMessageType = 3;
 
       SSL_CTX *tls_context = nullptr;
+
+      // Owns the context that tls_context points into. This listener speaks to
+      // OpenSSL directly - blocking sockets and SSL_new - but its configuration now
+      // comes from SslContextInitializer, which takes a boost::asio::ssl::context.
+      // The boost object owns the underlying SSL_CTX and frees it in its destructor,
+      // so it has to outlive every SSL session made from it, and Stop() must not
+      // call SSL_CTX_free.
+      std::shared_ptr<boost::asio::ssl::context> tls_context_owner;
 
       // API key store layout. One section per key; the section suffix is the
       // key id, which is what DELETE /api/v1/apikeys/<id> revokes.
@@ -452,22 +461,65 @@ namespace HM
 
       if (use_tls_)
       {
-         tls_context = SSL_CTX_new(TLS_server_method());
-         if (tls_context == nullptr)
-            return false;
-
-         SSL_CTX_set_min_proto_version(tls_context, TLS1_2_VERSION);
-
-         AnsiString narrowCertificateFile = certificate_file;
-         AnsiString narrowPrivateKeyFile = private_key_file;
-
-         if (SSL_CTX_use_certificate_chain_file(tls_context, narrowCertificateFile.c_str()) != 1 ||
-             SSL_CTX_use_PrivateKey_file(tls_context, narrowPrivateKeyFile.c_str(), SSL_FILETYPE_PEM) != 1 ||
-             SSL_CTX_check_private_key(tls_context) != 1)
+         // Why this goes through SslContextInitializer rather than building its own
+         // SSL_CTX: that function is the single place the mail protocols get their
+         // TLS configuration from - the cipher list, the enabled protocol versions,
+         // the server-preference and ChaCha options, the DH parameters and the
+         // key-exchange group list, which since August 2026 carries the hybrid
+         // post-quantum KEMs from [Settings] TlsKeyExchangeGroups.
+         //
+         // What this listener did instead is worth stating, because it is the shape
+         // the problem takes every time: it set a TLS 1.2 floor and loaded the
+         // certificate, and then took OpenSSL's defaults for everything else. So the
+         // configured cipher list did not apply to it, the option mask did not apply
+         // to it, and the post-quantum groups did not apply to it - an administrator
+         // who set TlsKeyExchangeGroups and then served the API over TLS got
+         // classical-only key exchange, with nothing anywhere saying so.
+         //
+         // The bridge is deliberately thin: SslContextInitializer wants an
+         // SSLCertificate, so one is built here from the two configured paths rather
+         // than looked up in the database - the REST listener's certificate is
+         // RestApiCertificateFile/RestApiPrivateKeyFile and is not one of the
+         // certificates bound to a mailbox port. Nothing about the TLS configuration
+         // is restated locally, so nothing local can drift from the mail protocols
+         // again.
+         try
          {
-            LOG_APPLICATION("RestApi: Failed to load the TLS certificate or private key.");
-            SSL_CTX_free(tls_context);
-            tls_context = nullptr;
+            auto certificate = std::shared_ptr<SSLCertificate>(new SSLCertificate());
+
+            certificate->SetName(_T("RestApi"));
+            certificate->SetCertificateFile(certificate_file);
+            certificate->SetPrivateKeyFile(private_key_file);
+
+            auto context = std::shared_ptr<boost::asio::ssl::context>(
+               new boost::asio::ssl::context(boost::asio::ssl::context::sslv23));
+
+            if (!SslContextInitializer::InitServer(*context, certificate, bind_address, port))
+            {
+               // InitServer has already reported the specific failure - an unreadable
+               // certificate file, a private key that does not match - as HM5113.
+               // This line records only the consequence for this listener.
+               LOG_APPLICATION("RestApi: Refusing to start - the shared TLS configuration could not be applied to the configured certificate.");
+               return false;
+            }
+
+            tls_context_owner = context;
+            tls_context = context->native_handle();
+
+            // The one thing that is deliberately *not* taken from the shared
+            // configuration. This listener enforced a TLS 1.2 floor before, and the
+            // shared option mask is driven by the [Settings] protocol toggles, which
+            // an administrator may well have opened up to TLS 1.0 for an ancient mail
+            // client. That argument does not extend to an HTTP API - there is no
+            // 2008-era REST client to keep working - so the floor stays, applied after
+            // InitServer so it can only tighten what the shared configuration allows.
+            SSL_CTX_set_min_proto_version(tls_context, TLS1_2_VERSION);
+         }
+         catch (...)
+         {
+            // Constructing the context can throw. This is the startup path, where an
+            // escape would take the whole service down before any listener is up.
+            LOG_APPLICATION("RestApi: Refusing to start - an exception was raised while preparing TLS.");
             return false;
          }
       }
@@ -535,11 +587,12 @@ namespace HM
       // than surviving into the next Start().
       ClearRefusedAddresses_();
 
-      if (tls_context != nullptr)
-      {
-         SSL_CTX_free(tls_context);
-         tls_context = nullptr;
-      }
+      // Deliberately no SSL_CTX_free: the boost context owns the SSL_CTX and frees it
+      // in its own destructor, so freeing it here as well would be a double free the
+      // next time the listener is stopped. Released after the join above, so no
+      // session is still using it.
+      tls_context = nullptr;
+      tls_context_owner.reset();
    }
 
    void

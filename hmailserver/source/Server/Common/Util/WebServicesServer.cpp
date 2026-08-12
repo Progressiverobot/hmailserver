@@ -14,8 +14,10 @@
 #include "../BO/Domain.h"
 #include "../BO/TCPIPPort.h"
 #include "../BO/TCPIPPorts.h"
+#include "../BO/SSLCertificate.h"
 #include "../TCPIP/DNSResolver.h"
 #include "../TCPIP/SocketConstants.h"
+#include "../TCPIP/SslContextInitializer.h"
 
 #include <ws2tcpip.h>
 
@@ -54,6 +56,11 @@ namespace HM
       const int DavRedirectCacheSeconds = 60;
 
       SSL_CTX *tls_context = nullptr;
+
+      // Owns the context tls_context points into; the boost object frees the SSL_CTX
+      // in its destructor, so it has to outlive every session made from it and
+      // nothing here may call SSL_CTX_free. Same arrangement as RestApiServer.
+      std::shared_ptr<boost::asio::ssl::context> tls_context_owner;
 
       // The configuration ReportUnreachableFeatures last reported on, empty
       // until the first report. Keyed on the configuration rather than being a
@@ -523,27 +530,50 @@ namespace HM
 
          if (!certificateFile.IsEmpty() && !privateKeyFile.IsEmpty())
          {
-            tls_context = SSL_CTX_new(TLS_server_method());
-
-            if (tls_context != nullptr)
+            // Through SslContextInitializer, for the reasons set out at the same point
+            // in RestApiServer::Start: it is the single place the TLS configuration
+            // lives - cipher list, protocol versions, option mask, DH parameters and
+            // the key-exchange groups that carry the hybrid post-quantum KEMs - and a
+            // listener that configures its own context silently misses every one of
+            // them. This one set a TLS 1.2 floor and loaded the certificate, and took
+            // OpenSSL's defaults for the rest.
+            //
+            // The certificate here may be the ACME one resolved just above rather than
+            // anything bound to a mailbox port, which is why an SSLCertificate is
+            // built from the two paths instead of being looked up.
+            try
             {
-               SSL_CTX_set_min_proto_version(tls_context, TLS1_2_VERSION);
+               auto certificate = std::shared_ptr<SSLCertificate>(new SSLCertificate());
 
-               AnsiString narrowCertificateFile = certificateFile;
-               AnsiString narrowPrivateKeyFile = privateKeyFile;
+               certificate->SetName(_T("WebServices"));
+               certificate->SetCertificateFile(certificateFile);
+               certificate->SetPrivateKeyFile(privateKeyFile);
 
-               if (SSL_CTX_use_certificate_chain_file(tls_context, narrowCertificateFile.c_str()) == 1 &&
-                   SSL_CTX_use_PrivateKey_file(tls_context, narrowPrivateKeyFile.c_str(), SSL_FILETYPE_PEM) == 1 &&
-                   SSL_CTX_check_private_key(tls_context) == 1)
+               auto context = std::shared_ptr<boost::asio::ssl::context>(
+                  new boost::asio::ssl::context(boost::asio::ssl::context::sslv23));
+
+               if (SslContextInitializer::InitServer(*context, certificate, bind_address, https_port))
                {
+                  tls_context_owner = context;
+                  tls_context = context->native_handle();
+
+                  // Kept from the previous implementation and applied after
+                  // InitServer, so it can only tighten: the shared option mask follows
+                  // the [Settings] protocol toggles, which may permit TLS 1.0 for a
+                  // legacy mail client, and an HTTPS listener should not inherit that.
+                  SSL_CTX_set_min_proto_version(tls_context, TLS1_2_VERSION);
+
                   tls_available_ = true;
                }
                else
                {
-                  LOG_APPLICATION("WebServices: Failed to load the TLS certificate or private key. The HTTPS listener is disabled.");
-                  SSL_CTX_free(tls_context);
-                  tls_context = nullptr;
+                  // InitServer has already reported the specific failure as HM5113.
+                  LOG_APPLICATION("WebServices: The shared TLS configuration could not be applied to the certificate. The HTTPS listener is disabled.");
                }
+            }
+            catch (...)
+            {
+               LOG_APPLICATION("WebServices: An exception was raised while preparing TLS. The HTTPS listener is disabled.");
             }
          }
          else
@@ -566,12 +596,10 @@ namespace HM
 
       if (!anyListener)
       {
-         if (tls_context != nullptr)
-         {
-            SSL_CTX_free(tls_context);
-            tls_context = nullptr;
-            tls_available_ = false;
-         }
+         // No SSL_CTX_free: the boost context owns it. See tls_context_owner.
+         tls_context = nullptr;
+         tls_context_owner.reset();
+         tls_available_ = false;
 
          return false;
       }
@@ -624,11 +652,10 @@ namespace HM
       if (https_worker_.joinable())
          https_worker_.join();
 
-      if (tls_context != nullptr)
-      {
-         SSL_CTX_free(tls_context);
-         tls_context = nullptr;
-      }
+      // No SSL_CTX_free: the boost context owns it. Released after both joins above,
+      // so no session is still using it.
+      tls_context = nullptr;
+      tls_context_owner.reset();
 
       tls_available_ = false;
    }

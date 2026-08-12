@@ -368,5 +368,82 @@ namespace RegressionTests.AntiSpam
             return false;
          }
       }
+
+      /// <summary>
+      ///    SAMoveVsCopy switches how the SpamAssassin result is written back over the
+      ///    message: rename the temporary file over it, rather than copy-then-delete. It
+      ///    had no test coverage at all, which mattered because that path used to delete
+      ///    the live message file and only then attempt the rename, retrying five times.
+      ///    If all five failed - a scanner or a backup holding either file, a full disk -
+      ///    the message was simply gone, and the caller ignored the return value, so
+      ///    nothing said so. The sender had already been given a 250.
+      ///
+      ///    FileUtilities::Move no longer deletes first: boost::filesystem::rename on
+      ///    Windows is MoveFileExW with MOVEFILE_REPLACE_EXISTING, so it replaces the
+      ///    destination as one operation and the message file always names either the old
+      ///    content or the new one. This test pins that the replace still works, because
+      ///    a change that made Move stop overwriting would be silent otherwise.
+      ///
+      ///    The failure path itself is not reachable from out here - provoking it needs
+      ///    the message or temporary file locked at the exact moment of the rename, and
+      ///    there is no hook for that. What is now guaranteed instead is that a failure
+      ///    is reported (HM5860/HM5861) rather than discarded.
+      /// </summary>
+      [Test]
+      [Description("With SAMoveVsCopy the SpamAssassin result replaces the message atomically, and the message survives")]
+      public void SpamAssassinResultIsWrittenBackWhenMoveIsUsed()
+      {
+         string iniPath = System.IO.Path.Combine(
+            _application.Settings.Directories.ProgramDirectory, "hMailServer.ini");
+         if (!System.IO.File.Exists(iniPath))
+            Assert.Ignore("hMailServer.ini is not next to the running executable in this layout.");
+
+         string original = NativeMethods.GetIniValue("Settings", "SAMoveVsCopy", "0", iniPath);
+
+         try
+         {
+            Assert.IsTrue(NativeMethods.SetIniValue("Settings", "SAMoveVsCopy", "1", iniPath),
+               "Failed to enable SAMoveVsCopy.");
+            _application.Reinitialize();
+
+            new SmtpClientSimulator().Send(account.Address, account.Address,
+               "SA move test", "This is a test message.");
+
+            string contents = Pop3ClientSimulator.AssertGetFirstMessageText(account.Address, "test");
+
+            // The message must still exist - that is the regression this guards - and it
+            // must carry the SpamAssassin headers, which is what proves the rename
+            // actually replaced the file rather than quietly failing.
+            Assert.IsTrue(contents.Contains("X-Spam-Status"),
+               "SpamAssassin did not run, or its result was not written back over the message.");
+            Assert.IsTrue(contents.Contains("This is a test message."),
+               "The message body did not survive the SpamAssassin write-back.");
+         }
+         finally
+         {
+            NativeMethods.SetIniValue("Settings", "SAMoveVsCopy", original, iniPath);
+            _application.Reinitialize();
+         }
+      }
+
+      private static class NativeMethods
+      {
+         [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+         private static extern bool WritePrivateProfileString(string section, string key, string value, string filePath);
+
+         [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+         private static extern uint GetPrivateProfileString(string section, string key, string defaultValue,
+            System.Text.StringBuilder returnValue, uint size, string filePath);
+
+         public static bool SetIniValue(string section, string key, string value, string filePath)
+            => WritePrivateProfileString(section, key, value, filePath);
+
+         public static string GetIniValue(string section, string key, string defaultValue, string filePath)
+         {
+            var buffer = new System.Text.StringBuilder(256);
+            GetPrivateProfileString(section, key, defaultValue, buffer, (uint) buffer.Capacity, filePath);
+            return buffer.ToString();
+         }
+      }
    }
 }

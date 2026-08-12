@@ -76,10 +76,23 @@ namespace HM
 
       bool GetCancelTransmission() {return cancel_transmission_;}
       String GetCancelMessage() {return cancel_message_;}
+
+      // True if any write of received data to the spool file failed, or if a
+      // configured fsync of it failed.
+      //
+      // Deliberately separate from cancel_transmission_, which produces a permanent
+      // 554: a full disk or an I/O error is transient, and a sender told 554 discards
+      // a message that would have been deliverable ten minutes later. The receiving
+      // side turns this into 451 4.3.0 through the handler that already exists for a
+      // spool file that could not be written at all.
+      bool GetWriteFailed() const {return write_failed_;}
+
    private:
 
       void InsertTransmissionPeriod_(std::shared_ptr<ByteBuffer> pIn);
       void RemoveTransmissionPeriod_(std::shared_ptr<ByteBuffer> pIn);
+
+      void ReportFlushFailure_();
 
       std::shared_ptr<ByteBuffer> buffer_;
       // The buffer containing the data to send/receive.
@@ -105,6 +118,13 @@ namespace HM
 
       bool cancel_transmission_;
       String cancel_message_;
+
+      bool write_failed_;
+
+      // Successful writes of received data so far. Used only by the fault injection in
+      // SaveToFile_, to tell "nothing reached the disk" from "some of it did" - the two
+      // shapes behave differently and only the second one ever lost mail.
+      int writes_completed_;
 
 
       enum Limits
