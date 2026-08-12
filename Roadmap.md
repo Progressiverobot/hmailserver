@@ -38,14 +38,17 @@ as ⬜, not ✅.
 
 ### Contents and totals
 
-741 items. The counts are the point of this table — they say where the fork is
+749 items. The counts are the point of this table — they say where the fork is
 strong and where it is thin far more honestly than any prose summary.
 
 | Section | ✅ | 🔄 | ⬜ | ⏸️ |
 |---|--:|--:|--:|--:|
 | [Dated items — the forcing functions](#dated-items--the-forcing-functions) | 1 | – | 5 | 1 |
 | [Defects found by the audit](#defects-found-by-the-audit) | 15 | 1 | – | – |
-| [Structural prerequisites](#structural-prerequisites) | – | – | 5 | – |
+| **The next generation** | | | | |
+| [The phases](#the-phases) | – | – | 7 | 1 |
+| [Structural prerequisites](#structural-prerequisites) | – | – | 9 | – |
+
 | **Control Panel findability and accessibility** | | | | |
 | [What is concretely wrong](#what-is-concretely-wrong) | – | – | 7 | – |
 | [What to do about it](#what-to-do-about-it) | – | – | 6 | – |
@@ -70,7 +73,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 1 | – | 5 | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 3 | 1 | 2 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 3 | – | 6 | – |
-| **Total** | **521** | **5** | **198** | **14** |
+| **Total** | **521** | **5** | **209** | **14** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage and the administration surface are the best-covered areas**, and the
@@ -959,22 +962,139 @@ the source, not from documentation.
 | ⬜ | End-user self-service portal | There is no web surface for users at all — no password self-service, no vacation toggle, no quota view, no quarantine release. Every user-initiated change goes through an administrator… |
 | ⬜ | LDAP / Active Directory as a directory backend | Accounts can be linked to an AD domain and the Control Panel has a read-only AD picker, but there is no LDAP account source — the account database is always the SQL store. On Windows this is the deployment case that matters most. |
 
+The next generation: engine to service
+--------------------------------------
+
+Everything above this line is a mail *engine*, and a good one — the protocol and
+transport-security work is ahead of the mainstream self-hosted field. What it has
+never had is the surfaces people actually touch. You cannot read your mail with it
+without installing something else, you cannot find a message without a linear scan,
+and two people cannot share `info@` without sharing a password.
+
+**The next generation is the same engine, with those surfaces built rather than
+delegated.** That is the whole of it.
+
+This section was designed in August 2026 by seven parallel designs against the real
+tree — webmail, full-text search, the API, sharing, JMAP, groupware, and an
+adversarial security review of all of it — then reconciled into one sequence. The
+calls below are decisions, not options.
+
+### The hard calls, and what they cost
+
+**Webmail talks to the store, not to IMAP over a loopback socket.** An IMAP client
+inside the server would reuse every existing access-control decision for free, which
+is genuinely attractive. It is rejected because it would create a second instance of
+the byte-fidelity defect already deferred in the 6.2.15 backlog, and because a
+loopback protocol hop is a permanent tax on every request. **The mitigating clause
+matters more than the decision:** each piece of logic extracted from `Server/IMAP/`
+lands first as an *IMAP-only* refactor, proven by the existing IMAP tests, before any
+web code is allowed to call it. That way the shared path is verified by the suite
+that already exists rather than by the new code that needs it.
+
+**REST first, JMAP-shaped, JMAP last — and droppable.** The JMAP-versus-REST framing
+turned out to be wrong: roughly ninety of the API's endpoints are server
+administration, which JMAP has nothing to say about, so a REST v2 is happening
+regardless of what we decide about JMAP. For the contested mail-client half, REST
+comes first but is deliberately built JMAP-shaped — the same entity names, opaque-id
+semantics, and a per-id `/set` envelope — so that adding JMAP later is a translation
+layer rather than a second server. JMAP itself goes last, and is the one phase that
+can be dropped without the rest being a failure. Its own design conceded it must be
+justified by what it does for our webmail; by the time we reach it the webmail
+already has threading, keywords and push, so that justification has expired.
+
+**A real HTTP server, on Boost.Asio.** Four of the seven designs proposed
+hand-rolling HTTP/1.1. Boost 1.91 is already on the include path, so that is
+rejected in favour of Beast: keep-alive, chunked encoding, `Range`, and multipart are
+all things a mail client needs and none of them are things worth writing twice. It
+also inherits TLS from `SslContextInitializer`, the security-range check at accept,
+and the existing exception discipline — which is three of the prerequisites above
+solved by construction rather than by remembering.
+
+**No new compression dependency.** Precompressed sibling assets instead of linking
+zlib. Cheaper, and it removes the BREACH question by absence rather than by
+discipline — there is no dynamic compressor to leak a CSRF token through.
+
+**Groupware before JMAP.** Contacts are what a webmail needs on day one for
+compose auto-completion, and a calendar is what makes the product a plausible
+Exchange alternative. Both serve users; JMAP serves an interoperability story that
+nobody is currently asking for.
+
+### Honest size
+
+**Roughly 148 person-weeks of implementation — about three person-years.** For one
+maintainer at realistic utilisation that is **four to five calendar years, and the
+webmail alone is two of them.** That number is not padding and it is not
+flinching; it is what the seven designs add up to when nobody is allowed to say
+"and then the client part".
+
+Two consequences, and they drive the ordering rather than being caveats to it:
+
+1. **Every phase ends somewhere shippable.** No phase is a down payment that only
+   pays off on completion, and each one can be abandoned at its boundary without
+   what came before becoming dead code. A phase that fails that test is drawn
+   wrong and gets redrawn.
+2. **Something outranks all of it.** The Microsoft 365 Basic auth cutover is
+   **four months away**, it is not part of this programme, and it breaks working
+   installations. Dated external deadlines beat architecture, every time. See
+   [Dated items](#dated-items--the-forcing-functions).
+
+### The phases
+
+| | Phase | What ships, and what a user can do afterwards that they cannot now |
+|:-:|---|---|
+| ⬜ | **0. Prerequisites** | The nine items in [Structural prerequisites](#structural-prerequisites), led by the crash oracle — because every gate after this assumes the suite can see a crash, and today it cannot. Nothing user-visible. This is the phase that is tempting to skip and must not be. |
+| ⬜ | **1. HTTP foundation** | A real HTTP/1.1 server on Boost.Asio, with `RestApiServer` and `WebServicesServer` re-hosted on it and their raw accept loops deleted. User-visible outcome: the existing admin API and web services get keep-alive, correct caching, ACME certificate hot-reload and the same TLS hardening as the mail protocols. Modest on its own, and it is what makes everything after it possible. |
+| ⬜ | **2. Full-text search** | A portable posting-list index maintained by the existing `MessageIndexer`, with a throttled resumable backfill for mail that already exists. Afterwards: IMAP `SEARCH BODY` over a large mailbox returns in a reasonable time instead of scanning every message — which is a real improvement for every existing client, with no webmail required. This is why it comes before the client and not with it. |
+| ⬜ | **3. REST v2 and the self-service portal** | The full API — mailboxes, folders, messages, submission, attachments, search, settings, filters — plus browser sessions, and the smallest possible web surface on top: password change, vacation, quota. Afterwards: a user can change their own password without an administrator. That alone retires a permanent support burden. |
+| ⬜ | **4. Shared and delegated mailboxes** | The IMAP other-users namespace, per-folder ACL evaluation through the single authorisation choke point, and Send-As. Afterwards: three people handle `info@` with their own credentials and their own 2FA, instead of sharing one password. The most-requested missing feature, and the one whose absence is actively insecure. |
+| ⬜ | **5. Webmail** | The flagship, and two calendar years of the estimate. An SPA over the REST API, with the message body rendered in a unique opaque origin so that no HTML is ever generated in C++. Afterwards: read and send mail from a browser, with nothing else installed. |
+| ⬜ | **6. Contacts, then calendaring** | CardDAV first because compose auto-completion needs it and users notice it immediately; then CalDAV with the WebDAV/ACL/sync-collection layer beneath it, and **iMIP**, which is the only standards-based bidirectional path to Exchange and Microsoft 365. |
+| ⏸️ | **7. JMAP** | Core plus Mail. Deferred, deliberately last, and explicitly droppable — see the hard calls above. |
+
+### What is still refused, under the higher bar
+
+"A third party already does it" is no longer a reason. These survive that:
+
+* **Exchange ActiveSync and EWS.** Proprietary, patent-encumbered, and being
+  retired by their own vendor — phased disablement from October 2026, fully gone
+  April 2027. Building toward something its owner is switching off is not a
+  judgement call.
+* **LMTP.** Only matters when another MTA fronts this one, which is not a
+  realistic Windows deployment.
+* **Active/active clustering.** Dovecot removed Director and its replicator
+  outright and now documents its community edition as single-server; HA moved to
+  the commercial product. Multi-node is no longer part of the open-source baseline,
+  so its absence is not a gap. Warm standby, documented and tested, is the honest
+  deliverable.
+* **An embedded browser control in the Control Panel.** The WebView2 SDK licence
+  prohibits distribution in a way that would subject it to copyleft, which is
+  exactly what shipping it inside an AGPLv3 application does.
+
 Structural prerequisites
 -----------------------
 
 **These are not features, and they are not optional.** Every client-facing item in
-the next generation — a webmail of our own, a real REST API, JMAP, CalDAV/CardDAV —
-lands on top of the optional HTTP listeners, and those listeners are not currently
-built to carry it. Shipping a web application on the present foundation would be
-precisely the half-measure this programme exists to avoid.
+the next generation lands on top of the optional HTTP listeners and the SQL layer,
+and neither is currently built to carry it. Shipping a web application on the
+present foundation would be precisely the half-measure this programme exists to
+avoid.
+
+*Corrected 12 August 2026.* An earlier version of this section claimed all four
+listeners lack an exception barrier. That was wrong, and checking it produced a
+worse finding.
 
 | | Prerequisite | Why it gates everything above it |
 |:-:|---|---|
-| ⬜ | **An exception barrier on every listener thread** | `MetricsServer`, `RestApiServer`, `WebServicesServer` and `ManageSieveServer` use raw sockets on `std::thread`, deliberately outside the Boost.Asio stack. An exception escaping the top of one of those threads is `std::terminate` — **the entire mail server dies**. Today those threads do almost nothing, so the exposure is small. A webmail is thousands of requests parsing hostile input, and one unhandled `std::bad_alloc` in an HTML parser would take SMTP down with it. One listener has just gained a barrier as part of the metrics work; all of them need it, structurally and by policy, before anything is built on them. |
-| ⬜ | **One TLS configuration path** | Those listeners each build their own `SSL_CTX` and never consult `SslContextInitializer`, so the hardening applied to SMTP/IMAP/POP3 does not reach them — including the post-quantum key-exchange groups just added. A user who reads "post-quantum key exchange" in the release notes and then serves their mail over the web listener is getting classical-only key exchange and has no way to know. Either the listeners go through the shared initialiser, or the setting is honestly scoped in the documentation. The first is correct. |
-| ⬜ | **A concurrency model that fits a web workload** | The listeners are serial accept loops: one request handled to completion before the next is read. That is adequate for a metrics scrape every 30 seconds and hopeless for a mail client issuing dozens of small requests per screen. A bounded worker pool with a connection cap, per-request deadlines and a request-size ceiling — and *bounded*, because this server's historical failure mode is thread-pool exhaustion, and the fix for that must not reintroduce it on a new port. |
-| ⬜ | **A single authorisation choke point** | Every existing access-control decision is made against "the logged-in account". Shared mailboxes and a REST API both introduce paths where the answer must instead be "the owner of the folder being touched". Scattering that decision across endpoints is how mail servers serve other people's mail; it needs one place that cannot be bypassed, and a test that proves every path goes through it. |
-| ⬜ | **Fuzzing the parsers we already have, before adding more** | MIME, and soon HTML, iCalendar and vCard. Every one is untrusted input in a C++ process that must not crash, and a crash here is a mail outage rather than a bad request. libFuzzer needs a clang toolchain alongside MSVC, which is the real work. This is on the list because the next generation adds parsers, not because the current ones are known bad. |
+| ⬜ | **The test suite cannot currently see a memory-safety bug** | This is the one that gates the gates. The project builds with `<ExceptionHandling>Async</ExceptionHandling>`, so `catch (...)` catches **structured** exceptions as well as C++ ones — an access violation inside a `try` is swallowed and reported as an ordinary failure. And there is no `set_terminate`, no `SetUnhandledExceptionFilter` and no `_set_se_translator` anywhere in the server. So a null dereference or a buffer overrun in a request handler can be caught, logged and shrugged off, and 1144 green tests will say nothing about it. Every other gate in this programme assumes the suite would notice a crash. Until a crash oracle exists — a filter that writes a minidump and fails loudly rather than letting a `catch (...)` absorb it — the suite is measuring the wrong thing. `hMailServer.Minidump.exe` already exists in the tree as a starting point. |
+| ⬜ | **`ManageSieveServer` has no exception barrier at all** | Verified by count: `MetricsServer` has 9 `catch` statements, `WebServicesServer` 5, `RestApiServer` 3 — and `ManageSieveServer` has **zero**. It is a raw `std::thread` accept loop, so an escaped exception is `std::terminate` and the whole mail server dies. It is off by default, which is the only reason this has not bitten. One listener, one barrier, and then the same discipline applied structurally rather than per-file. |
+| ⬜ | **One TLS configuration path for the listeners** | The optional listeners each build their own `SSL_CTX` and never consult `SslContextInitializer`, so the hardening applied to SMTP/IMAP/POP3 does not reach them — including the post-quantum key-exchange groups shipped this month. A user who reads "post-quantum key exchange" in the release notes and then serves mail over a web listener is getting classical-only key exchange with no way to know. Either the listeners go through the shared initialiser, or the setting is honestly scoped in the documentation. The first is correct, and it also gets them ACME certificate hot-reload for free. |
+| ⬜ | **A concurrency model that fits a web workload** | The listeners are serial accept loops: one request handled to completion before the next is read, HTTP/1.0 with `Connection: close`, no keep-alive, no streaming, the whole response built in memory. Adequate for a metrics scrape every 30 seconds; hopeless for a mail client issuing dozens of small requests per screen, and incapable of expressing either streaming shape a webmail needs (attachment download out, upload in). Needs a real HTTP server on the existing Boost.Asio stack — with a **bounded** worker pool, a connection cap, per-connection and per-request absolute ceilings rather than idle timeouts, and its own `io_context` so a webmail request storm cannot starve SMTP accept. |
+| ⬜ | **Fix the parameter-substitution fallback before anything writes a large query** | `SQLStatement::GenerateFromCommand` substitutes parameters by naive `String::Replace` in insertion order, and that path is taken whenever `GetSupportsCommandParameters()` is false — which is **MySQL and PostgreSQL**, while MSSQL and SQL CE use real parameters and never exercise it. So `@T1` replaced before `@T10` silently corrupts the query, on two of four backends, invisibly on the other two. Latent today: two real prefix collisions exist (`@UID` against `@UIDFAID` and `@UIDID`) but never appear in the same command. It stops being latent the moment anything uses ten-plus numbered parameters, which a full-text-index batch insert does by nature. Longest-name-first ordering, or word-boundary matching, and a test that pins it. |
+| ⬜ | **A single authorisation choke point** | Every existing access-control decision is made against "the logged-in account". Shared mailboxes and a REST API both introduce paths where the answer must instead be "the owner of the folder being touched". Scattering that across endpoints is how mail servers serve other people's mail. Note the `UseIMAPACL` bypass has **two** early-return sites, not one, which is exactly the kind of thing a single choke point prevents. |
+| ⬜ | **Bound `IMAP SEARCH` now, before any index exists** | `SEARCH BODY`/`TEXT` loads every message in the mailbox and substring-scans it. That is an authenticated CPU-exhaustion vector today, needs no new feature to exploit, and needs no index to fix — a time or bytes-examined ceiling that returns partial results or refuses is a small change. Full-text search removes the motive; a bound removes the vector. |
+| ⬜ | **Clear the ignored return values and NUL truncations** | Five write calls whose result is discarded and two places where a NUL truncates a value. Small, unglamorous, and exactly the class that turns into a silent-corruption bug once a web client is exercising these paths thousands of times a day rather than a protocol session doing it occasionally. |
+| ⬜ | **Fuzz the parsers we already have, before adding more** | MIME today; HTML, iCalendar and vCard next. Every one is untrusted input in a process that must not crash, and a crash here is a mail outage rather than a bad request. libFuzzer needs a clang toolchain alongside MSVC, which is the real work — and it is worth noting that this item is nearly useless until the crash oracle above exists, because a fuzzer needs to be able to tell that it found something. |
+
 
 Control Panel: findability, and the Ctrl+K problem
 --------------------------------------------------
