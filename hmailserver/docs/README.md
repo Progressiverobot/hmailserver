@@ -21,6 +21,7 @@ Elsewhere in the repository
 | | |
 |---|---|
 | [README.md](../../README.md) | What the server does, how to build it, how to install it |
+| [build/hmconfig.ps1](../../build/hmconfig.ps1) | Putting the server configuration in version control: export it as JSON, review a change as a diff, apply it to another machine. `apply` is a dry run unless you pass `-Force`, and deletions need `-AllowDelete` on top of that. |
 | [ARCHITECTURE.md](../../ARCHITECTURE.md) | Changing the code: the module map, where a given change belongs, and the constraints that have caused real bugs here |
 | [Roadmap.md](../../Roadmap.md) | The full capability matrix — what exists, what is planned, what is deliberately not, and every known defect |
 | [.github/SUPPORT.md](../../.github/SUPPORT.md) | Where to ask what: issues, discussions, or the hMailServer forum |
