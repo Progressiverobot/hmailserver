@@ -2,13 +2,36 @@
 #
 # The fork's git history is squashed and disjoint from upstream's, so comparing
 # by commit reports all ~730 upstream commits as "missing" - including "First
-# commit" - which is useless. Instead the upstream-watch workflow reports only
-# commits AFTER the SHA below, and the maintainer moves it forward as each batch
-# is triaged.
+# commit" - which is useless. The upstream-watch workflow therefore reports only
+# commits AFTER the SHA below, and this SHA is advanced as each batch is triaged.
 #
-# The pre-existing history was reviewed in aggregate rather than commit by
-# commit: a file-level audit found 936 of the 980 server source files present in
-# both trees byte-identical once the fork's copyright line is discounted.
+# Triaged 2026-08-12, content-first (reading our functions, not matching commit
+# hashes), covering the 22 commits from 4fb63e806758 to 5ce853685dec:
+#
+#   - 19 ALREADY PRESENT, several as supersets of upstream's fix. Our partial-FETCH
+#     clamp additionally handles negative start and negative count, which upstream
+#     still does not.
+#   - bc9e37750abe (TLSOptions #520) SUPERSEDED: the two UI files it changes do not
+#     exist here (the classic Administrator and the PHP WebAdmin were replaced),
+#     and we enforce the ChaCha constraint server-side in SslContextInitializer,
+#     which upstream does not do at all.
+#   - 5ce853685dec (libpq 15.18) NOT APPLICABLE: a downgrade. We are deliberately
+#     ahead on the dependency set (PostgreSQL 18.3, OpenSSL 4.0.x, Boost 1.91).
+#   - Nothing required porting.
+#
+# Two upstream hunks are deliberately NOT taken and should stay that way:
+#   - From 61c6e3cb3b7f (#528): "if (error == boost::asio::error::eof) return;"
+#     inside the read-error branch. It returns before popping the read operation
+#     and before EnqueueDisconnect, leaking the operation and leaving the session
+#     open, and it suppresses OnReadError - which is what marks recipients when a
+#     remote server hangs up mid-delivery. We handle the same case by disconnecting
+#     after an end-of-stream instead.
+#   - The libpq downgrade above.
+#
+# Known cosmetic-only divergence from 02b7f1e00278 (#530), tracked but not taken:
+# the Delimeter->Delimiter and has_on_too_many_invalid_comands_ renames, a
+# #define -> constexpr, and some comment typos. Semantically identical; taking
+# them would only reduce future textual merge friction.
 #
 # Update this SHA (and only this SHA) when a batch has been triaged.
 5ce853685dec262b27676d45513eabf660eef933
