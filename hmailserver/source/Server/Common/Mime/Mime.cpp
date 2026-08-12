@@ -108,7 +108,13 @@ namespace HM
    void MimeField::SetParameter(const char* pszAttr, const char* pszValue)
    {
       modified_ = true;
-      int nSize = pszValue ? (int)::strlen(pszValue) : 0;
+
+      // A null value is treated as an empty one; the parameter is still written,
+      // as attribute="". The rest of this function dereferences pszValue.
+      if (pszValue == NULL)
+         pszValue = "";
+
+      int nSize = (int)::strlen(pszValue);
       string strValue;
       strValue.reserve(nSize+3);
       

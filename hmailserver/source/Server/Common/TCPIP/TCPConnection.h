@@ -104,6 +104,14 @@ namespace HM
       int GetBufferSize() {return BufferSize; }
 
       void SetTimeout(int seconds);
+
+      // An absolute ceiling on the whole session, armed once and never re-armed.
+      // SetTimeout's deadline is an IDLE timeout: it is pushed forward on every
+      // read, so a peer that dribbles one byte before each expiry holds the
+      // connection - and anything waiting on its destruction - forever. Callers
+      // that block a pooled thread until this connection dies must set a ceiling.
+      // 0 leaves the session unbounded.
+      void SetSessionCeiling(int seconds);
       AnsiString GetIPAddressString();
 
       virtual void OnCouldNotConnect(const AnsiString &sErrorDescription) {};
@@ -139,6 +147,8 @@ namespace HM
       void StartAsyncConnect_(const String &ip_adress, int port);
 
       static void OnTimeout(std::weak_ptr<TCPConnection> connection, boost::system::error_code const& err);
+      static void OnSessionCeilingReached(std::weak_ptr<TCPConnection> connection, boost::system::error_code const& err);
+      void ArmSessionCeiling_();
 
       String SafeGetIPAddress();
 
@@ -168,6 +178,9 @@ namespace HM
 
       boost::asio::ip::tcp::resolver resolver_;
       boost::asio::steady_timer timer_;
+      boost::asio::steady_timer session_ceiling_timer_;
+      int session_ceiling_seconds_;
+      bool session_ceiling_armed_;
       boost::asio::streambuf receive_buffer_;
       boost::asio::ssl::context& context_;
 

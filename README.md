@@ -75,7 +75,7 @@ Operations and observability
 * **Prometheus** `/metrics` (database pool, TLS handshakes, delivery queue, authentication outcomes, delivery outcomes, command and query latency) with Kubernetes-style `/livez`, `/readyz` and `/healthz` probes.
 * **OpenTelemetry** traces and metrics export, and message-to-session correlation IDs.
 * Optional **JSON-structured logs**, log retention, per-service log files, and a slow-query log with every SQL string literal redacted.
-* Per-stage timing of message acceptance, so a slow scanner, DNS lookup or event script is identified by name in the log rather than appearing as an unexplained pause. Acceptance is also bounded: if it runs past its deadline the sender gets a temporary `451` and retries, instead of waiting for a reply that never comes.
+* Per-stage timing of message acceptance, so a slow scanner, DNS lookup or event script is identified by name in the log rather than appearing as an unexplained pause. Acceptance is also bounded: if it runs past its deadline the sender gets a temporary `451` and retries, instead of waiting for a reply that never comes. Every wait that can hold a pooled thread - scanners, DNS, event scripts, external processes, outbound sessions - has a ceiling, and the work queue reports which task is holding each thread when they are all busy. See [diagnosing slow or stalled mail](hmailserver/docs/DiagnosingStalledMail.md).
 * Backup and restore, a read-only **message-store consistency check** with a recovery report, configurable message-store fsync, graceful-shutdown drain, and a documented active/passive HA runbook.
 
 Technology

@@ -53,11 +53,18 @@ namespace HM
    String 
    MySQLInterface::GetLibraryFileName_()
    {
-      LPTSTR szPath = (LPTSTR)alloca( 2048 );
-      DWORD  dwPathLength;
+      // Characters, not bytes: the old alloca(2048) reserved 2048 bytes while
+      // GetModuleFileName was told it could write 2048 characters, which is twice
+      // that in a Unicode build.
+      TCHAR szPath[1024];
+      const DWORD characterCount = sizeof(szPath) / sizeof(TCHAR);
 
-      dwPathLength = GetModuleFileName(NULL, szPath, 2048 );
-      szPath[ dwPathLength ] = 0; // --- nullterminated.
+      DWORD dwPathLength = GetModuleFileName(NULL, szPath, characterCount);
+
+      if (dwPathLength >= characterCount)
+         dwPathLength = characterCount - 1;
+
+      szPath[dwPathLength] = 0;
 
       String sPath(szPath);
 
@@ -71,11 +78,18 @@ namespace HM
    String
    MySQLInterface::GetLibraryDirectory()
    {
-      LPTSTR szPath = (LPTSTR)alloca( 2048 );
-      DWORD  dwPathLength;
+      // Characters, not bytes: the old alloca(2048) reserved 2048 bytes while
+      // GetModuleFileName was told it could write 2048 characters, which is twice
+      // that in a Unicode build.
+      TCHAR szPath[1024];
+      const DWORD characterCount = sizeof(szPath) / sizeof(TCHAR);
 
-      dwPathLength = GetModuleFileName(NULL, szPath, 2048 );
-      szPath[ dwPathLength ] = 0; // --- nullterminated.
+      DWORD dwPathLength = GetModuleFileName(NULL, szPath, characterCount);
+
+      if (dwPathLength >= characterCount)
+         dwPathLength = characterCount - 1;
+
+      szPath[dwPathLength] = 0;
 
       String sPath(szPath);
 

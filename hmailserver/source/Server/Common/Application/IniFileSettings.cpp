@@ -253,14 +253,18 @@ namespace HM
       // unbounded, and all four sit on a path that a remote sender can drive.
       dns_query_timeout_ =  ReadIniSettingInteger_("Settings", "DNSQueryTimeout", 10);
 
-      // Off by default, unlike its siblings. Bounding the wait is only half the
-      // job: a caller has to be able to tell "the database was busy" from the
-      // answer it would otherwise have got, and not every caller can yet. In
-      // particular the recipient lookup behind RCPT TO reports a failed lookup as
-      // "no such user", so a bounded wait that expired during a backup would
-      // reject a valid recipient with a permanent 550. Until those callers
-      // distinguish the two, blocking is the safer failure.
-      db_connection_acquire_timeout_ =  ReadIniSettingInteger_("Settings", "DBConnectionAcquireTimeout", 0);
+      // Absolute ceiling on an outbound client session, as distinct from the idle
+      // timeouts above. 30 minutes is far longer than any healthy delivery needs
+      // and still bounds a remote server that answers slowly enough to keep the
+      // idle timer alive forever.
+      client_session_ceiling_ =  ReadIniSettingInteger_("Settings", "ClientSessionCeiling", 1800);
+
+      // Bounding this wait is only safe because the callers that act on a lookup
+      // can now tell "the database did not answer" from "the database answered
+      // with nothing" - see DatabaseUnavailableMarker. Without that, a wait that
+      // expired during a backup would have reported a valid recipient as unknown
+      // and the sender would have bounced the mail instead of retrying.
+      db_connection_acquire_timeout_ =  ReadIniSettingInteger_("Settings", "DBConnectionAcquireTimeout", 60);
       script_timeout_ =  ReadIniSettingInteger_("Settings", "ScriptTimeout", 60);
       external_process_timeout_ =  ReadIniSettingInteger_("Settings", "ExternalProcessTimeout", 300);
 

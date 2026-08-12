@@ -81,8 +81,20 @@ namespace HM
             timer_ = 0;
 
             // INVALID_HANDLE_VALUE makes this wait for a callback which is already
-            // running. It must never be called from the callback itself.
-            DeleteTimerQueueTimer(NULL, timer, INVALID_HANDLE_VALUE);
+            // running, so once this succeeds the callback can no longer reach this
+            // object. It must never be called from the callback itself.
+            //
+            // The result is checked because a failure is the one path that leaves a
+            // callback able to run against a watchdog that is about to be destroyed
+            // - a stack object here - so it must not pass silently.
+            if (!DeleteTimerQueueTimer(NULL, timer, INVALID_HANDLE_VALUE))
+            {
+               DWORD deleteError = GetLastError();
+
+               String message;
+               message.Format(_T("Could not cancel the script execution watchdog. Windows error code: %d."), (int) deleteError);
+               ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5022, "ScriptServer::ScriptWatchdog::Disarm", message);
+            }
          }
 
          bool Fired()

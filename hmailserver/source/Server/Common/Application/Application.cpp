@@ -60,6 +60,7 @@
 #include "RemoveExpiredRecords.h"
 #include "LogRetentionTask.h"
 #include "MessageStoreConsistencyTask.h"
+#include "WorkQueueHealthTask.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -296,14 +297,25 @@ namespace HM
    // Returns the name of the executable (h*.exe)
    //---------------------------------------------------------------------------()
    {
-      LPTSTR szPath = (LPTSTR)alloca( 2048 );
-      DWORD  dwPathLength;
-   
+      // A TCHAR array, not alloca(2048): the count passed to GetModuleFileName is
+      // in characters, so asking for 2048 characters of a 2048 BYTE allocation
+      // let it write twice the space that existed in a Unicode build.
+      TCHAR szPath[1024];
+      const DWORD characterCount = sizeof(szPath) / sizeof(TCHAR);
+
       HMODULE handle = GetModuleHandle(_T("hmailserver.exe"));
-      dwPathLength = GetModuleFileName(handle, szPath, 2048 );
- 
-      szPath[ dwPathLength ] = 0; // --- nullterminated.
-   
+      DWORD dwPathLength = GetModuleFileName(handle, szPath, characterCount);
+
+      if (dwPathLength == 0)
+         return String();
+
+      // On truncation the return value is the buffer size, and older Windows
+      // versions did not terminate in that case.
+      if (dwPathLength >= characterCount)
+         dwPathLength = characterCount - 1;
+
+      szPath[dwPathLength] = 0;
+
       String sPath(szPath);
       return sPath;
    }
@@ -502,6 +514,15 @@ namespace HM
       consistencyTask->SetReoccurance(ScheduledTask::RunInfinitely);
       consistencyTask->SetMinutesBetweenRun(60);
       scheduler_->ScheduleTask(consistencyTask);
+
+      // Names the tasks holding the message-acknowledgement threads if they are
+      // ever all busy at once with work queued behind them. Runs on the
+      // scheduler's own thread, which belongs to a different queue than the one
+      // it measures.
+      std::shared_ptr<WorkQueueHealthTask> workQueueHealthTask = std::shared_ptr<WorkQueueHealthTask>(new WorkQueueHealthTask);
+      workQueueHealthTask->SetReoccurance(ScheduledTask::RunInfinitely);
+      workQueueHealthTask->SetMinutesBetweenRun(1);
+      scheduler_->ScheduleTask(workQueueHealthTask);
 
       // Automatic certificate renewal via ACME (Let's Encrypt).
       if (IniFileSettings::Instance()->GetAcmeEnabled())

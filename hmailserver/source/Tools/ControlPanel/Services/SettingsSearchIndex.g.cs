@@ -237,7 +237,7 @@ namespace hMailServer.ControlPanel.Services
          new SettingEntry("Enable auto-ban", "AutoBanOnLogonFailure", "tls"),
          new SettingEntry("Max invalid logon attempts", "MaxInvalidLogonAttempts", "tls"),
          new SettingEntry("Prefer server cipher order", "TlsOptionPreferServerCiphersEnabled", "tls"),
-         new SettingEntry("Prioritize ChaCha20 on mobile clients", "TlsOptionPrioritizeChaChaEnabled", "tls"),
+         new SettingEntry("Prioritize ChaCha20-Poly1305 when the client prefers it (needs TLS 1.2 or 1.3)", "TlsOptionPrioritizeChaChaEnabled", "tls"),
          new SettingEntry("TLS 1.0 (legacy)", "TlsVersion10Enabled", "tls"),
          new SettingEntry("TLS 1.1 (legacy)", "TlsVersion11Enabled", "tls"),
          new SettingEntry("TLS 1.2", "TlsVersion12Enabled", "tls"),

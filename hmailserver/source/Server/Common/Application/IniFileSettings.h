@@ -117,6 +117,7 @@ namespace HM
 
       // Seconds; 0 disables the bound. See the comment at the read site.
       int GetDNSQueryTimeout () {return dns_query_timeout_; }
+      int GetClientSessionCeiling () {return client_session_ceiling_; }
       int GetDBConnectionAcquireTimeout () {return db_connection_acquire_timeout_; }
       int GetScriptTimeout () {return script_timeout_; }
       int GetExternalProcessTimeout () {return external_process_timeout_; }
@@ -278,6 +279,7 @@ namespace HM
       int clam_min_timeout_;
       int clam_max_timeout_;
       int dns_query_timeout_;
+      int client_session_ceiling_;
       int db_connection_acquire_timeout_;
       int script_timeout_;
       int external_process_timeout_;

@@ -215,6 +215,7 @@ EXIT 0
     <ClCompile Include="..\Common\Application\Reinitializator.cpp" />
     <ClCompile Include="..\Common\Application\LogRetentionTask.cpp" />
     <ClCompile Include="..\Common\Application\MessageStoreConsistencyTask.cpp" />
+    <ClCompile Include="..\Common\Application\WorkQueueHealthTask.cpp" />
     <ClCompile Include="..\Common\Sieve\SieveLexer.cpp" />
     <ClCompile Include="..\Common\Sieve\SieveMessage.cpp" />
     <ClCompile Include="..\Common\Sieve\SieveEvaluator.cpp" />
@@ -364,6 +365,7 @@ EXIT 0
     <ClCompile Include="..\Common\Sql\DALRecordsetFactory.cpp" />
     <ClCompile Include="..\Common\Sql\DatabaseConnectionManager.cpp" />
     <ClCompile Include="..\Common\SQL\DatabaseSettings.cpp" />
+    <ClCompile Include="..\Common\SQL\DatabaseUnavailableMarker.cpp" />
     <ClCompile Include="..\Common\SQL\IPAddressSQLHelper.cpp" />
     <ClCompile Include="..\Common\SQL\Macros\Macro.cpp" />
     <ClCompile Include="..\Common\SQL\Macros\MacroParser.cpp" />
@@ -735,6 +737,7 @@ EXIT 0
     <ClInclude Include="..\Common\Application\Reinitializator.h" />
     <ClInclude Include="..\Common\Application\LogRetentionTask.h" />
     <ClInclude Include="..\Common\Application\MessageStoreConsistencyTask.h" />
+    <ClInclude Include="..\Common\Application\WorkQueueHealthTask.h" />
     <ClInclude Include="..\Common\Sieve\SieveLexer.h" />
     <ClInclude Include="..\Common\Sieve\SieveMessage.h" />
     <ClInclude Include="..\Common\Sieve\SieveEvaluator.h" />
@@ -893,6 +896,7 @@ EXIT 0
     <ClInclude Include="..\Common\Sql\DALRecordsetFactory.h" />
     <ClInclude Include="..\Common\Sql\DatabaseConnectionManager.h" />
     <ClInclude Include="..\Common\SQL\DatabaseSettings.h" />
+    <ClInclude Include="..\Common\SQL\DatabaseUnavailableMarker.h" />
     <ClInclude Include="..\Common\SQL\IPAddressSQLHelper.h" />
     <ClInclude Include="..\Common\SQL\Macros\IMacroExpander.h" />
     <ClInclude Include="..\Common\SQL\Macros\Macro.h" />

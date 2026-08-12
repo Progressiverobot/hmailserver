@@ -19,7 +19,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: 'Release tag whose installer asset to smoke-test (e.g. v6.2.17). Leave blank to use an uploaded artifact named "installer".'
+        description: 'Release tag whose installer asset to smoke-test (e.g. v6.2.18). Leave blank to use an uploaded artifact named "installer".'
         type: string
         required: false
       run_id:

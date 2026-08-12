@@ -8,6 +8,7 @@
 #include "DALConnection.h"
 #include "DALConnectionFactory.h"
 #include "DatabaseSettings.h"
+#include "DatabaseUnavailableMarker.h"
 
 #include "ADORecordset.h"
 #include "MySQLRecordset.h"
@@ -209,7 +210,14 @@ namespace HM
       MeasureQuery_(command, elapsedMicros);
 
       if (!bOpened)
+      {
+         // A query that could not be run is also "the database did not answer",
+         // not "the database answered with nothing" - a dropped connection or a
+         // locked table reaches here rather than the acquisition failure above.
+         DatabaseUnavailableMarker::Mark();
+
          pRecordset.reset();
+      }
 
       ReleaseConnection_(pDALConn);
 
@@ -428,6 +436,14 @@ namespace HM
                // while still holding the outer lock, blocking every thread trying to
                // return one.
                guard.unlock();
+
+               // Marked before reporting, and before returning the empty result:
+               // callers see the same "nothing came back" they would see from a
+               // query that legitimately found nothing, and this is the only thing
+               // that lets them tell the two apart. Without it a recipient lookup
+               // that timed out would answer "no such user" and the sender would
+               // get a permanent rejection for a valid address.
+               DatabaseUnavailableMarker::Mark();
 
                ErrorManager::Instance()->ReportError(ErrorManager::High, 5180, "DatabaseConnectionManager::GetConnection_", message);
 

@@ -74,7 +74,10 @@ namespace HM
 
       for (int failedCount = 0; failedCount < 10; failedCount++)
       {
-         int currentCount = running_scanners_;
+         // Read through an interlocked operation like every other access to this
+         // counter. A plain read races with the increments and decrements below,
+         // and a stale value here lets more scanners run than the cap allows.
+         long currentCount = InterlockedCompareExchange(&running_scanners_, 0, 0);
 
          while (currentCount >= MaxRunningScanners)
          {
@@ -92,14 +95,14 @@ namespace HM
                return;
             }
 
-            currentCount = running_scanners_;
+            currentCount = InterlockedCompareExchange(&running_scanners_, 0, 0);
          }
 
          // make sure that no other thread is changing the value at the same time.
          // if that happens, we need to continue waiting for a new thread. unless
          // a compare was used here, this function could first wait and then call
          // InterlockedIncrement twice even though only one was allowed.
-         int result = InterlockedCompareExchange(&running_scanners_, running_scanners_+1, currentCount);
+         long result = InterlockedCompareExchange(&running_scanners_, currentCount + 1, currentCount);
          if (result == currentCount)
          {
             // woho.

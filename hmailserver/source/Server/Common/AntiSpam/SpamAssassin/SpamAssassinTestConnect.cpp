@@ -59,20 +59,11 @@ namespace HM
       // Here we handle of the ownership to the TCPIP-connection layer.
       if (pSAClient->Connect(ip_address, port, IPAddress()))
       {
-         std::weak_ptr<TCPConnection> weakClient = pSAClient;
          pSAClient.reset();
 
-         // Bounded so the admin's "test SpamAssassin" button cannot hang the
-         // Control Panel against an unresponsive host (same ceiling as the accept
-         // path uses).
-         const int ceilingSeconds = IniFileSettings::Instance()->GetSAMaxTimeout() + 30;
-         disconnectEvent->WaitFor(boost::chrono::seconds(ceilingSeconds));
-
-         if (!*testCompleted)
-         {
-            if (std::shared_ptr<TCPConnection> liveClient = weakClient.lock())
-               liveClient->EnqueueDisconnect();
-         }
+         // Bounded by the connection's own session ceiling, so the administrator's
+         // "test SpamAssassin" button cannot hang against an unresponsive host.
+         disconnectEvent->Wait();
       }
 
       if (*testCompleted)

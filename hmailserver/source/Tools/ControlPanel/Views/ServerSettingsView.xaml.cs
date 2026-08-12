@@ -925,7 +925,7 @@ namespace hMailServer.ControlPanel.Views
 
          var ciph = Card("Ciphers & verification");
          var preferServer = new ComBool { Path = "TlsOptionPreferServerCiphersEnabled", Label = "Prefer server cipher order" };
-         var chacha = new ComBool { Path = "TlsOptionPrioritizeChaChaEnabled", Label = "Prioritize ChaCha20 on mobile clients" };
+         var chacha = new ComBool { Path = "TlsOptionPrioritizeChaChaEnabled", Label = "Prioritize ChaCha20-Poly1305 when the client prefers it (needs TLS 1.2 or 1.3)" };
          ciph.Settings.Add(new ComText { Path = "SslCipherList", Label = "Cipher list (OpenSSL format)" });
          ciph.Settings.Add(preferServer);
          ciph.Settings.Add(chacha);

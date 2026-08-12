@@ -1045,8 +1045,9 @@ namespace HM
       int iHeaderReadSize = IniFileSettings::Instance()->GetLoadHeaderReadSize();
       const int iReadBufferSize = 50000;
 
-      // We need to take care not to overflow buffer
-      if (iHeaderReadSize > iReadBufferSize) iHeaderReadSize = iReadBufferSize;
+      // We need to take care not to overflow buffer. A non-positive size in the ini file
+      // would reach ReadFile as a huge DWORD, so it falls back to the buffer size as well.
+      if (iHeaderReadSize <= 0 || iHeaderReadSize > iReadBufferSize) iHeaderReadSize = iReadBufferSize;
 
       String sHeaderData; 
 
@@ -1082,9 +1083,27 @@ namespace HM
       while (bMoreData)
       {
          // We're using defined read size vs buffer size (read will always be <= buffer due to test above)
-         ReadFile(handleFile,buf,iHeaderReadSize, &nbytes, NULL);
+         if (!ReadFile(handleFile,buf,iHeaderReadSize, &nbytes, NULL))
+         {
+            // End of file is reported as a successful read of zero bytes, so a failure here is a
+            // real I/O error. The data collected so far may stop in the middle of the header, and
+            // returning it would give the caller a truncated header that looks complete.
+            int iLastError = ::GetLastError();
 
-         if (nbytes) 
+            CloseHandle(handleFile);
+
+            if (reportError)
+            {
+               String sErrorMessage;
+               sErrorMessage.Format(_T("Could not read the message header. Windows error code: %d. File: %s"), iLastError, fileName.c_str());
+
+               ErrorManager::Instance()->ReportError(ErrorManager::Medium, 4403, "PersistentMessage::LoadHeader", sErrorMessage);
+            }
+
+            return "";
+         }
+
+         if (nbytes)
          {
             sHeaderData += AnsiString((char*)buf, nbytes);
          }
@@ -1121,8 +1140,9 @@ namespace HM
       int iBodyReadSize = IniFileSettings::Instance()->GetLoadBodyReadSize();
       const int iReadBufferSize = 50000;
 
-      // We need to take care not to overflow buffer
-      if (iBodyReadSize > iReadBufferSize) iBodyReadSize = iReadBufferSize;
+      // We need to take care not to overflow buffer. A non-positive size in the ini file
+      // would reach ReadFile as a huge DWORD, so it falls back to the buffer size as well.
+      if (iBodyReadSize <= 0 || iBodyReadSize > iReadBufferSize) iBodyReadSize = iReadBufferSize;
 
       HANDLE handleFile = CreateFile(fileName, 
          GENERIC_READ, 
@@ -1152,9 +1172,24 @@ namespace HM
       while (true)
       {
          // We're using defined read size vs buffer size (read will always be <= buffer due to test above)
-         ReadFile(handleFile,buf,iBodyReadSize, &nbytes, NULL);
+         if (!ReadFile(handleFile,buf,iBodyReadSize, &nbytes, NULL))
+         {
+            // End of file is reported as a successful read of zero bytes, so a failure here is a
+            // real I/O error. Returning the part of the body read so far would silently hand the
+            // caller a truncated message.
+            int iLastError = ::GetLastError();
 
-         if (!nbytes) 
+            CloseHandle(handleFile);
+
+            String sErrorMessage;
+            sErrorMessage.Format(_T("Could not read the message body. Windows error code: %d. File: %s"), iLastError, fileName.c_str());
+
+            ErrorManager::Instance()->ReportError(ErrorManager::Medium, 4403, "PersistentMessage::LoadBody", sErrorMessage);
+
+            return "";
+         }
+
+         if (!nbytes)
             break;
 
          AnsiString readData = AnsiString((char*)buf, nbytes);

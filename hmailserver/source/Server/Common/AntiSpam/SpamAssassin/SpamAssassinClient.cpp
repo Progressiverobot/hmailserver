@@ -29,6 +29,13 @@ namespace HM
    {
       TimeoutCalculator calculator;
       SetTimeout(calculator.Calculate(IniFileSettings::Instance()->GetSAMinTimeout(), IniFileSettings::Instance()->GetSAMaxTimeout()));
+
+      // The timeout above is an idle deadline, re-armed on every byte received, so
+      // a spamd that trickles resets it indefinitely. The caller blocks a pooled
+      // thread - the one that acknowledges the message - until this connection is
+      // destroyed, so the session also needs an absolute ceiling. This is the
+      // relayed-mail stall in discussion #18.
+      SetSessionCeiling(IniFileSettings::Instance()->GetSAMaxTimeout() + 30);
             
       message_file_ = sFile;
 	   spam_dsize_ = -1;

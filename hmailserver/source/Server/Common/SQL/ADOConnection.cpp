@@ -245,26 +245,26 @@ namespace HM
          adoCommand->ActiveConnection = cADOConnection;
          adoCommand->Execute(NULL, NULL, adCmdText);
 
-         // Check what unique ID we got back (if we're interested).
-         _RecordsetPtr pIdentityRS;
-         BSTR bsIdentity;
-         if (iInsertID > 0)
+         // Check what unique ID we got back (if we're interested). Callers treat 0
+         // as "no identity available" - which is what an empty identity recordset
+         // or a NULL @@IDENTITY gives us - so it must be in place before we ask.
+         if (iInsertID != nullptr)
          {
+            *iInsertID = 0;
+
+            _RecordsetPtr pIdentityRS;
             pIdentityRS.CreateInstance(__uuidof(Recordset));
             pIdentityRS->PutCursorLocation(adUseClient);
-            pIdentityRS->PutRefActiveConnection(cADOConnection); 
-            String sIdentitySQL = "SELECT @@IDENTITY AS IDENT";
-            bsIdentity = sIdentitySQL.AllocSysString();
+            pIdentityRS->PutRefActiveConnection(cADOConnection);
 
-            HRESULT hr = pIdentityRS->Open( bsIdentity, vtMissing, adOpenKeyset, adLockOptimistic , adCmdText);
-            pIdentityRS->PutRefActiveConnection(NULL); 
-            
-         }
+            // The _variant_t owns its BSTR, so the query string is released even
+            // if Open throws.
+            _variant_t vtIdentitySQL(_T("SELECT @@IDENTITY AS IDENT"));
 
-         if (iInsertID)
-         {
+            pIdentityRS->Open( vtIdentitySQL, vtMissing, adOpenKeyset, adLockOptimistic , adCmdText);
+            pIdentityRS->PutRefActiveConnection(NULL);
+
             *iInsertID = GetIdentityFromRS_(pIdentityRS);
-            ::SysFreeString( bsIdentity );
          }
       }
       catch ( _com_error &err )

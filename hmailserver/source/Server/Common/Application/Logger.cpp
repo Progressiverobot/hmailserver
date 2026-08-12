@@ -435,15 +435,25 @@ namespace HM
          break;
       }
 
+      if (file == nullptr)
+      {
+         // Every LogType above maps to a member file. An out-of-range value has no
+         // destination, and dropping the line is preferable to crashing a caller
+         // which was only trying to log.
+         return nullptr;
+      }
+
+      // Sampled before Open(OTAppend), which creates the file if it is missing. This
+      // drives both the reopen-after-rotation check and whether a BOM is needed.
       bool fileExists = false;
 
       try
       {
-         bool fileExists = FileUtilities::Exists(fileName);
+         fileExists = FileUtilities::Exists(fileName);
       }
       catch (boost::system::system_error&)
       {
-         // If the log is not accessible for some reason, such as error code 5 - access is denied, 
+         // If the log is not accessible for some reason, such as error code 5 - access is denied,
          // then we can't open the log file. This will result in nothing being logged.
          return nullptr;
       }

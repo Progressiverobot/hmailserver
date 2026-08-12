@@ -47,6 +47,9 @@ namespace HM
       ssl_socket_(socket_, context),
       resolver_(io_context),
       timer_(io_context),
+      session_ceiling_timer_(io_context),
+      session_ceiling_seconds_(0),
+      session_ceiling_armed_(false),
       receive_binary_(false),
       remote_port_(0),
       receive_buffer_(250000),
@@ -196,6 +199,11 @@ namespace HM
       socket_.set_option(boost::asio::ip::tcp::no_delay(true), nodelay_error);
 
       connection_state_ = StateConnected;
+
+      // Armed here rather than where it is configured: callers set the ceiling in
+      // their constructor, and shared_from_this() is not usable until the object
+      // is owned by a shared_ptr.
+      ArmSessionCeiling_();
 
       OnConnected();
 
@@ -1012,7 +1020,53 @@ namespace HM
    }
 
 
-   void 
+   void
+   TCPConnection::SetSessionCeiling(int seconds)
+   {
+      // Only recorded here. Callers set the ceiling from their constructor, where
+      // shared_from_this() is not yet valid - arming the timer at that point
+      // throws bad_weak_ptr and takes the whole connection down with it.
+      session_ceiling_seconds_ = seconds;
+   }
+
+   void
+   TCPConnection::ArmSessionCeiling_()
+   {
+      if (session_ceiling_seconds_ <= 0 || session_ceiling_armed_)
+         return;
+
+      // Deliberately armed once and never re-armed - that is what makes it a
+      // ceiling rather than another idle timeout. Held by weak_ptr like the idle
+      // timer, so a connection that has already gone is not kept alive by it.
+      session_ceiling_armed_ = true;
+
+      session_ceiling_timer_.expires_after(std::chrono::seconds(session_ceiling_seconds_));
+
+      session_ceiling_timer_.async_wait(std::bind(&TCPConnection::OnSessionCeilingReached,
+         std::weak_ptr<TCPConnection>(shared_from_this()), std::placeholders::_1));
+   }
+
+   void
+   TCPConnection::OnSessionCeilingReached(std::weak_ptr<TCPConnection> connection, boost::system::error_code const& err)
+   {
+      if (err == boost::asio::error::operation_aborted)
+         return;
+
+      std::shared_ptr<TCPConnection> conn = connection.lock();
+      if (!conn)
+         return;
+
+      String message;
+      message.Format(_T("The session exceeded its maximum duration and is being closed. Session: %d"), conn->GetSessionID());
+      LOG_DEBUG(message);
+
+      // Straight to Disconnect rather than Timeout(): the point of the ceiling is
+      // that the peer has had long enough, so there is nothing to be gained by
+      // trying to write a polite notice to a connection that is already suspect.
+      conn->Disconnect();
+   }
+
+   void
    TCPConnection::UpdateAutoLogoutTimer()
    {
       /*

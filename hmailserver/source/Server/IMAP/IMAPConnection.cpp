@@ -210,6 +210,33 @@ namespace HM
 
       command_buffer_ += Request + "\r\n";
 
+      // The literal counter below advances by the length of the line with its
+      // terminator already stripped, so a client sending bare CRLF pairs adds
+      // nothing to it while this buffer keeps growing - the command is never
+      // considered complete and the buffer is never cleared. That is reachable
+      // before authentication (LOGIN takes a literal), and every line rescans the
+      // whole buffer, so the cost is quadratic as well as unbounded. The cap is
+      // well above the largest legitimate command literal, which GetLiteralSize_
+      // already limits to 10 MB.
+      const int iMaxCommandBuffer = 11 * 1024 * 1024;
+
+      if (command_buffer_.GetLength() > iMaxCommandBuffer)
+      {
+         String sMessage;
+         sMessage.Format(_T("IMAPConnection - Command buffer exceeded %d bytes without a complete command; disconnecting session %d (%s)."),
+            iMaxCommandBuffer, (int) GetSessionID(), GetIPAddressString().c_str());
+         LOG_APPLICATION(sMessage);
+
+         command_buffer_.Empty();
+         literal_buffer_.Empty();
+         literal_data_to_receive_ = 0;
+
+         SendAsciiData("* BYE Command too long.\r\n");
+         EnqueueDisconnect();
+
+         return false;
+      }
+
       int iLineEnd = command_buffer_.Find(_T("\r\n"));
       int iSpace = command_buffer_.Find(_T(" "));
       String sTag = command_buffer_.Mid(0, iSpace);

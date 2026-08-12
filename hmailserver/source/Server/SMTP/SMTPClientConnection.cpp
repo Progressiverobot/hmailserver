@@ -50,6 +50,14 @@ namespace HM
       
       TimeoutCalculator calculator;
       SetTimeout(calculator.Calculate(IniFileSettings::Instance()->GetSMTPCMinTimeout(), IniFileSettings::Instance()->GetSMTPCMaxTimeout()));
+
+      // That timeout is an idle deadline, pushed forward on every read. A remote
+      // MX that answers each command with a single byte just before it expires
+      // keeps this session alive indefinitely - and ExternalDelivery blocks one of
+      // a small pool of delivery threads until this connection is destroyed, so a
+      // handful of such hosts stops outbound mail entirely. The ceiling is
+      // generous enough for a large message over a genuinely slow link.
+      SetSessionCeiling(IniFileSettings::Instance()->GetClientSessionCeiling());
    }
 
    SMTPClientConnection::~SMTPClientConnection()

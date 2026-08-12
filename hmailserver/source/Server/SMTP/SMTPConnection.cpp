@@ -61,6 +61,7 @@
 
 #include "../Common/Util/CrashSimulation.h"
 #include "../Common/Util/RateLimiter.h"
+#include "../Common/SQL/DatabaseUnavailableMarker.h"
 
 #include "SMTPConnection.h"
 #include "SMTPConfiguration.h"
@@ -875,12 +876,30 @@ namespace HM
       String sErrMsg = "";
       bool localDelivery = false;
       
-      RecipientParser::DeliveryPossibility dp = recipientParser_.CheckDeliveryPossibility(isAuthenticated_, current_message_->GetFromAddress(), sRecipientAddress, sErrMsg, localDelivery, 0);
+      RecipientParser::DeliveryPossibility dp = RecipientParser::DP_Possible;
+
+      {
+         // This decides whether the address is deliverable at all, using the same
+         // domain and account lookups as below, so it needs the same protection: a
+         // database that cannot answer must not be reported as a permanently
+         // undeliverable address.
+         DatabaseUnavailableMarker::Scope databaseScope;
+
+         dp = recipientParser_.CheckDeliveryPossibility(isAuthenticated_, current_message_->GetFromAddress(), sRecipientAddress, sErrMsg, localDelivery, 0);
+
+         if (dp != RecipientParser::DP_Possible && DatabaseUnavailableMarker::IsMarked())
+         {
+            AWStats::LogDeliveryFailure(GetIPAddressString(), current_message_->GetFromAddress(), sRecipientAddress, 451);
+
+            SendErrorResponse_(451, _T("4.3.2 Unable to verify the recipient at the moment. Please retry later."));
+            return;
+         }
+      }
 
       if (dp != RecipientParser::DP_Possible)
       {
          AWStats::LogDeliveryFailure(GetIPAddressString(), current_message_->GetFromAddress(), sRecipientAddress, 550);
-         
+
          SendErrorResponse_(550, sErrMsg);
          return;
       }
@@ -974,7 +993,22 @@ namespace HM
       std::shared_ptr<MessageRecipients> pRecipients = current_message_->GetRecipients();
       size_t recipientCountBefore = pRecipients->GetVector().size();
       bool recipientOK = false;
-      recipientParser_.CreateMessageRecipientList(sRecipientAddress, pRecipients, recipientOK);
+
+      {
+         // The lookup below reports an address it could not resolve and an address
+         // that does not exist identically. Telling them apart matters: 550 is
+         // permanent, so answering it because the database was locked by a backup
+         // would bounce mail for a valid mailbox and the sender would never retry.
+         DatabaseUnavailableMarker::Scope databaseScope;
+
+         recipientParser_.CreateMessageRecipientList(sRecipientAddress, pRecipients, recipientOK);
+
+         if (!recipientOK && DatabaseUnavailableMarker::IsMarked())
+         {
+            SendErrorResponse_(451, _T("4.3.2 Unable to verify the recipient at the moment. Please retry later."));
+            return;
+         }
+      }
 
       if (!recipientOK)
       {
@@ -1195,7 +1229,8 @@ namespace HM
       finalization_enqueued_tick_ = GetTickCount64();
       std::shared_ptr<AsynchronousTask<TCPConnection> > finalizationTask =
          std::shared_ptr<AsynchronousTask<TCPConnection> >(new AsynchronousTask<TCPConnection>
-            (std::bind(&SMTPConnection::HandleSMTPFinalizationTaskCompleted_, this), shared_from_this()));
+            (std::bind(&SMTPConnection::HandleSMTPFinalizationTaskCompleted_, this), shared_from_this(),
+             Formatter::Format("SMTP-accept session={0} ip={1}", GetSessionID(), GetIPAddressString())));
 
       Application::Instance()->GetAsyncWorkQueue()->AddTask(finalizationTask);
    }
@@ -2503,7 +2538,8 @@ namespace HM
       finalization_enqueued_tick_ = GetTickCount64();
       std::shared_ptr<AsynchronousTask<TCPConnection> > finalizationTask =
          std::shared_ptr<AsynchronousTask<TCPConnection> >(new AsynchronousTask<TCPConnection>
-            (std::bind(&SMTPConnection::HandleSMTPFinalizationTaskCompleted_, this), shared_from_this()));
+            (std::bind(&SMTPConnection::HandleSMTPFinalizationTaskCompleted_, this), shared_from_this(),
+             Formatter::Format("SMTP-accept session={0} ip={1}", GetSessionID(), GetIPAddressString())));
 
       Application::Instance()->GetAsyncWorkQueue()->AddTask(finalizationTask);
    }

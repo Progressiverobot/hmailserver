@@ -107,28 +107,18 @@ namespace HM
       // Here we handle of the ownership to the TCPIP-connection layer.
       if (pSAClient->Connect(ip_address, iPort, IPAddress()))
       {
-         // Keep a weak handle so a stuck connection can be torn down after the
-         // wait below, without keeping it alive ourselves.
-         std::weak_ptr<TCPConnection> weakClient = pSAClient;
+         // Make sure we keep no references to the TCP connection so that it
+         // can be terminated whenever. We're longer own the connection.
          pSAClient.reset();
 
-         // A hard ceiling on the whole SpamAssassin exchange. The connection's own
-         // idle timeout (SAMaxTimeout) is re-armed on every byte, so a spamd that
-         // trickles or accepts-then-stalls could otherwise hold this thread - the
-         // one that sends the "250" for the message - indefinitely. That is the
-         // relayed-mail stall in discussion #18: a slow scanner made reception look
-         // complete while no reply was ever sent. Past the ceiling the message is
-         // accepted without a SpamAssassin verdict, exactly as when spamd is down.
-         const int ceilingSeconds = IniFileSettings::Instance()->GetSAMaxTimeout() + 30;
-         disconnectEvent->WaitFor(boost::chrono::seconds(ceilingSeconds));
-
-         if (!*testCompleted)
-         {
-            // The wait elapsed with the exchange unfinished. Tear the connection
-            // down so it cannot linger against a trickling spamd.
-            if (std::shared_ptr<TCPConnection> liveClient = weakClient.lock())
-               liveClient->EnqueueDisconnect();
-         }
+         // Deliberately unbounded. The connection carries an absolute session
+         // ceiling (set in its constructor), so this wait is guaranteed to be
+         // released: the event fires when the connection is destroyed, and the
+         // ceiling guarantees it is. Bounding the wait here instead would let this
+         // thread continue while the connection is still alive and still holding
+         // the message file open - and it moves its result over that file, which
+         // is the live spool file of the message being accepted.
+         disconnectEvent->Wait();
       }
 
       if (!*testCompleted)
