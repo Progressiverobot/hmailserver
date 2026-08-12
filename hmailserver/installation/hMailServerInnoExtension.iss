@@ -10,14 +10,14 @@ var
   rdoUseInternal : TRadioButton;
   rdoUseExternal : TRadioButton;
 
-// Returns true when the .NET 8 Desktop Runtime is not installed, in
+// Returns true when the .NET 10 Desktop Runtime is not installed, in
 // which case the bundled runtime installer is executed.
 function DotNetDesktopMissing(): Boolean;
 var
   findRec: TFindRec;
 begin
   Result := True;
-  if FindFirst(ExpandConstant('{pf64}\dotnet\shared\Microsoft.WindowsDesktop.App\8.*'), findRec) then
+  if FindFirst(ExpandConstant('{pf64}\dotnet\shared\Microsoft.WindowsDesktop.App.*'), findRec) then
   begin
     Result := False;
     FindClose(findRec);
@@ -281,9 +281,9 @@ begin
 	Result := sKey;
 end;
 
-// Installs the bundled .NET 8 Desktop Runtime when it is missing. Called
+// Installs the bundled .NET 10 Desktop Runtime when it is missing. Called
 // from RunPostInstallTasks before the database tools are executed - they
-// are .NET 8 apps and run from [Code] at ssPostInstall, which is earlier
+// are .NET 10 apps and run from [Code] at ssPostInstall, which is earlier
 // than the [Run] section where the runtime is otherwise installed for the
 // Control Panel component.
 procedure InstallDotNetRuntime();
@@ -293,9 +293,9 @@ begin
 	if not DotNetDesktopMissing() then
 		Exit;
 
-	if (Exec(ExpandConstant('{tmp}\windowsdesktop-runtime-8.0-win-x64.exe'), '/install /quiet /norestart', '', SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode) = False) then
+	if (Exec(ExpandConstant('{tmp}\windowsdesktop-runtime-10.0-win-x64.exe'), '/install /quiet /norestart', '', SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode) = False) then
 	begin
-		MsgBox('The .NET 8 Desktop Runtime could not be installed. The database setup tools will not work until it is installed.' + #13#10 +
+		MsgBox('The .NET 10 Desktop Runtime could not be installed. The database setup tools will not work until it is installed.' + #13#10 +
 		       SysErrorMessage(ResultCode), mbError, MB_OK);
 		Exit;
 	end;
@@ -304,7 +304,7 @@ begin
 	// result is the exit code. 0 = success, 3010 = success, reboot required.
 	if (ResultCode <> 0) and (ResultCode <> 3010) then
 	begin
-		MsgBox('The .NET 8 Desktop Runtime installation failed with exit code ' + IntToStr(ResultCode) + '.' + #13#10 +
+		MsgBox('The .NET 10 Desktop Runtime installation failed with exit code ' + IntToStr(ResultCode) + '.' + #13#10 +
 		       'The database setup tools will not work until the runtime is installed. ' +
 		       'Install it manually from https://dotnet.microsoft.com/download/dotnet/8.0 and then run ' +
 		       'DBSetupQuick.exe from the hMailServer Bin folder.', mbError, MB_OK);
@@ -491,7 +491,7 @@ function InitializeSetup(): Boolean;
 begin
 	Result := true;
 
-	// The .NET tools require the .NET 8 Desktop Runtime; it is bundled and
+	// The .NET tools require the .NET 10 Desktop Runtime; it is bundled and
 	// installed automatically when missing, so no up-front framework check
 	// is needed (the old .NET Framework 4.5 gate died with the last
 	// .NET Framework tools).
@@ -648,10 +648,10 @@ begin
       ProgressPage := CreateOutputProgressPage('Finalizing installation','Please wait while the setup performs post-installation tasks');
       ProgressPage.Show();
 
-      ProgressPage.SetText('Installing the .NET 8 Desktop Runtime...', '');
+      ProgressPage.SetText('Installing the .NET 10 Desktop Runtime...', '');
       ProgressPage.SetProgress(1,6);
 
-      // The database tools below are .NET 8 apps; make sure the runtime is
+      // The database tools below are .NET 10 apps; make sure the runtime is
       // in place before they are executed. ([Run] would install it too, but
       // that section runs after this code.)
       InstallDotNetRuntime();

@@ -43,7 +43,7 @@ strong and where it is thin far more honestly than any prose summary.
 
 | Section | ✅ | 🔄 | ⬜ | ⏸️ |
 |---|--:|--:|--:|--:|
-| [Dated items — the forcing functions](#dated-items--the-forcing-functions) | – | – | 6 | 1 |
+| [Dated items — the forcing functions](#dated-items--the-forcing-functions) | 1 | – | 5 | 1 |
 | [Defects found by the audit](#defects-found-by-the-audit) | – | – | 16 | – |
 | **The capability matrix** | | | | |
 | [SMTP and ESMTP](#smtp-and-esmtp) | 23 | – | 4 | – |
@@ -63,9 +63,9 @@ strong and where it is thin far more honestly than any prose summary.
 | **Forward-looking** | | | | |
 | [Planned work](#planned-work) | – | 2 | 16 | 2 |
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | – | – | 6 | 2 |
-| [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | – | – | 6 | 2 |
+| [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 1 | – | 5 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | – | – | 9 | – |
-| **Total** | **495** | **2** | **200** | **14** |
+| **Total** | **497** | **2** | **198** | **14** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage and the administration surface are the best-covered areas**, and the
@@ -84,7 +84,7 @@ previous version of this roadmap. Ordered by when they bite.
 
 | | Date | Item | What happens |
 |:-:|---|---|---|
-| ⬜ | **10 Nov 2026** | **.NET 8 end of support** | The Control Panel and all six command-line tools target .NET 8. .NET 9 dies the same day, so the only target is **.NET 10 LTS** (EOL 14 Nov 2028). After this date the installer ships an unsupported runtime that will show up as an EOL component in our own SBOM, and a runtime CVE becomes unpatchable. **This is the hardest date on the board.** |
+| ✅ | ~~10 Nov 2026~~ | **.NET 8 end of support — done, 12 Aug 2026** | Migrated to **.NET 10 LTS** (EOL 14 Nov 2028) with three months to spare. All nine projects retargeted to `net10.0-windows`, SDK pinned in `global.json` (`rollForward: latestFeature`, so a newer SDK on a build machine cannot silently change the toolchain), the bundled Desktop Runtime and the installer's version probe moved to 10.x, and packages taken to current. Everything builds with **0 warnings** and the Control Panel starts clean. |
 | ⬜ | **End Dec 2026** | **Microsoft 365 turns off Basic auth for SMTP AUTH** | The outbound client offers exactly one mechanism — `AUTH LOGIN`. Anyone relaying through `smtp.office365.com` stops working. Needs a token cache plus XOAUTH2 encoding; note Exchange Online implements **XOAUTH2 only**, not RFC 7628 OAUTHBEARER. Collecting *from* M365 over POP/IMAP has already been broken since 2022. |
 | ⬜ | **9 Dec 2026** | **EU Product Liability Directive (2024/2853)** | Software is unambiguously a "product"; a product can be defective *because of a vulnerability or a failure to ship security updates*, and liability **cannot be disclaimed by licence** — AGPLv3's warranty disclaimer does not help. FOSS supplied outside a commercial activity is exempt. Documentation, not code, but it should drive a business decision. |
 | ⬜ | **12 Jan 2027** | **Windows Server 2016 end of support** | The moment to declare a supported floor. Recommendation: **Server 2019 / Windows 10 21H2**, which costs zero code — Server 2019 is still `_WIN32_WINNT=0x0A00`. Do not raise the macro past that; self-hosted mail skews old and Server 2019 has support into 2029. |
@@ -983,7 +983,7 @@ Future-proofing: platform and supply chain
 
 | | Item | Detail |
 |:-:|---|---|
-| ⬜ | **Migrate to .NET 10 LTS** | See the dated table — 10 Nov 2026, and the hardest deadline here. |
+| ✅ | **Migrate to .NET 10 LTS** | Done 12 Aug 2026, ahead of the 10 Nov 2026 deadline. Nine projects to `net10.0-windows`; SDK 10.0.303 pinned in `global.json`; bundled Desktop Runtime, the installer's `Microsoft.WindowsDesktop.App\10.*` probe, the runtime-fetch script, the screenshot script and the docs all moved together. Two real findings on the way: .NET 9 added the **WFO1000** WinForms analyzer, which (correctly) rejected four properties on `ucText` whose designer-serialization intent was undeclared — the designer had been emitting meaningless `Number = 0` lines for years; and `System.DirectoryServices` is now in the Windows Desktop shared framework, so that `PackageReference` was redundant and is gone. **`MinVersion` stays at 10.0.14393** — .NET 10 still supports Windows 10 1607 and Server 2012, which was worth checking rather than assuming. |
 | ⬜ | **Decide the OpenSSL branch** | 4.0.x is not LTS and dies 14 May 2027. Decide by Q1 2027 whether to follow to the next LTS or move back to 3.5. |
 | ⬜ | **Declare a supported Windows floor** | Server 2019 / Windows 10 21H2, effective with the first release after 12 Jan 2027. Zero code cost — Server 2019 is still `_WIN32_WINNT=0x0A00`, and that macro should *not* be raised. |
 | ⬜ | **Artifact signing** | SBOMs are already attached to every release in both SPDX and CycloneDX. The gap is signing: Authenticode on the installer and binaries, and ideally Sigstore for the release artefacts. This is the supply-chain item that is actually missing, and the CRA makes update integrity a formal requirement if scope ever changes. |

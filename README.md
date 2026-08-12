@@ -88,7 +88,7 @@ Technology
 | Async I/O | Boost 1.91 (Asio) |
 | Databases | MySQL, MariaDB, MS SQL Server, PostgreSQL 18 (libpq), and the embedded SQL CE for zero-configuration installs |
 | MySQL/MariaDB client | MariaDB Connector/C, shipped as `libmysql.dll` with auth plugins — works with MySQL 8 `caching_sha2_password` and MariaDB `ed25519`/`gssapi` out of the box |
-| Administration GUI and tools | C# / .NET 8 (WPF, Fluent design) |
+| Administration GUI and tools | C# / .NET 10 (WPF, Fluent design) |
 | Extensibility | COM/IDispatch API, plus a REST administration API |
 | Schema | Database version 6005, upgradeable from every earlier hMailServer release |
 
@@ -97,12 +97,12 @@ Technology
 Administration
 ==============
 
-**hMailServer Control Panel** (`hMailCP.exe`) is the bundled administration GUI: a .NET 8 WPF application that talks to the server purely through the COM API. It covers domains, accounts, aliases, distribution lists, routes, rules, IP ranges, TCP/IP ports and SSL bindings, server settings, the live dashboard, the delivery queue, logs, status, backup, SSL certificates, scripts, Sieve scripts and public folders.
+**hMailServer Control Panel** (`hMailCP.exe`) is the bundled administration GUI: a .NET 10 WPF application that talks to the server purely through the COM API. It covers domains, accounts, aliases, distribution lists, routes, rules, IP ranges, TCP/IP ports and SSL bindings, server settings, the live dashboard, the delivery queue, logs, status, backup, SSL certificates, scripts, Sieve scripts and public folders.
 
 * **Ctrl+K** searches every setting by label or INI key — type `delete logs`, `log level` or `LogDeleteDays` and it takes you to the page that owns it.
 * **Active Directory pickers**: a read-only browser lists the forest's domains and searches their users, to link an account to an AD user or bulk-import addresses into a distribution list.
 * Optional TOTP two-factor authentication on logon.
-* Requires the .NET 8 Desktop Runtime, which the installer bundles and installs silently when missing.
+* Requires the .NET 10 Desktop Runtime, which the installer bundles and installs silently when missing.
 
 **REST administration API** for domains, accounts, the delivery queue, server status and TLSA records, with authenticated access and bounded request handling (a size cap and a receive deadline, so a slow or oversized request cannot occupy a worker).
 
@@ -230,11 +230,11 @@ Alternatively, build from Visual Studio (started with _Run as Administrator_) or
 1. Download the source code from this Git repository.
 2. Compile the solution hmailserver\source\Server\hMailServer\hMailServer.sln.
    This will build the hMailServer server-part (hMailServer.exe)
-3. Build and publish the .NET 8 setup tools with build\build-tools.ps1 (or
+3. Build and publish the .NET 10 setup tools with build\build-tools.ps1 (or
    "dotnet build" on hmailserver\source\Tools\hMailServer Tools.sln).
    This covers DB Setup, DB Setup Quick, DB Updater, the Data Directory
    Synchronizer and the Import Tool.
-   The Control Panel is a separate .NET 8 solution, hmailserver\source\Tools\ControlPanel.sln.
+   The Control Panel is a separate .NET 10 solution, hmailserver\source\Tools\ControlPanel.sln.
 4. Compile hmailserver\installation\hMailServer64.iss (using Inno Setup 6)
    This will build the hMailServer installation program.
 

@@ -5,4 +5,4 @@ Name: "server"; Description: "Server"; Types: full custom
 ; remote instance. The Control Panel does not need it: it binds late, through
 ; IDispatch, and connects to a remote host on its own.
 Name: "admintools"; Description: "Remote administration support (registers the COM API for scripts)"; Types: full custom
-Name: "controlpanel"; Description: "Control Panel (modern admin app, requires .NET 8 Desktop Runtime)"; Types: full custom
+Name: "controlpanel"; Description: "Control Panel (modern admin app, requires .NET 10 Desktop Runtime)"; Types: full custom

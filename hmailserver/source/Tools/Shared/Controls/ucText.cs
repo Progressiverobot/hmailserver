@@ -1,4 +1,4 @@
-// Copyright (c) 2010 Martin Knafve / hMailServer.com.  
+﻿// Copyright (c) 2010 Martin Knafve / hMailServer.com.  
 // http://www.hmailserver.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 
@@ -22,6 +22,14 @@ namespace hMailServer.Shared
 
       }
 
+      // The designer serialization visibility on the four public properties below
+      // is declared explicitly because .NET 9 added the WFO1000 analyzer, which
+      // (correctly) refuses to guess. Text and Numeric are real, designer-settable
+      // state and are serialized; Number and Number64 are derived views over Text
+      // and must not be, because the designer was previously emitting meaningless
+      // "Number = 0" / "Number64 = 0" lines into generated code. Existing generated
+      // lines still compile - this only changes what the designer writes from now on.
+      [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
       public new string Text
       {
          get
@@ -36,6 +44,8 @@ namespace hMailServer.Shared
          }
       }
 
+      [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+      [Browsable(false)]
       public int Number
       {
          get
@@ -54,6 +64,8 @@ namespace hMailServer.Shared
          }
       }
 
+      [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+      [Browsable(false)]
       public Int64 Number64
       {
          get
@@ -86,6 +98,8 @@ namespace hMailServer.Shared
          internalText = base.Text;
       }
 
+      [DesignerSerializationVisibility(DesignerSerializationVisibility.Visible)]
+      [DefaultValue(false)]
       public bool Numeric
       {
          get

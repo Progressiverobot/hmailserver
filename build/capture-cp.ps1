@@ -24,7 +24,7 @@ public static Bitmap Shoot(IntPtr h){RECT r;GetWindowRect(h,out r);int w=r.Right
 if ($Launch) {
     Stop-Process -Name hMailCP -Force -ErrorAction SilentlyContinue
     Start-Sleep 1
-    $exe = Join-Path $PSScriptRoot '..\hmailserver\source\Tools\ControlPanel\bin\Release\net8.0-windows\hMailCP.exe'
+    $exe = Join-Path $PSScriptRoot '..\hmailserver\source\Tools\ControlPanel\bin\Release\net10.0-windows\hMailCP.exe'
     Start-Process $exe -ArgumentList '/connect','localhost','Administrator','testar' | Out-Null
     Start-Sleep 10
 }

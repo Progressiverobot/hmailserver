@@ -11,18 +11,18 @@ Source: "Microsoft.VC145.CRT\*"; DestDir: "{app}\Bin"; Flags: ignoreversion; Com
 ; Web administration SPA (served by the REST API listener at GET /)
 Source: "WebAdmin\index.html"; DestDir: "{app}\WebAdmin"; Flags: ignoreversion; Components: server;
 
-; hMailServer Control Panel (modern .NET 8 WPF admin app)
+; hMailServer Control Panel (modern .NET 10 WPF admin app)
 Source: "..\source\Tools\ControlPanel\publish\*"; DestDir: "{app}\ControlPanel"; Flags: ignoreversion recursesubdirs; Components: controlpanel;
-; .NET 8 Desktop Runtime, installed silently when missing. The server
-; component needs it too: DBSetup/DBSetupQuick/DBUpdater are .NET 8 apps
+; .NET 10 Desktop Runtime, installed silently when missing. The server
+; component needs it too: DBSetup/DBSetupQuick/DBUpdater are .NET 10 apps
 ; that run during installation (from [Code], before [Run] executes - see
 ; InstallDotNetRuntime in hMailServerInnoExtension.iss).
 ; (file is downloaded by build\get-dotnet-runtime.ps1; not in the repository)
-Source: "DotNet\windowsdesktop-runtime-8.0-win-x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall; Components: server controlpanel;
+Source: "DotNet\windowsdesktop-runtime-10.0-win-x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall; Components: server controlpanel;
 
 Source: "SQLCE\SSCERuntime_x64-ENU.msi"; Flags: deleteafterinstall ; Excludes: ".svn"; DestDir: "{tmp}"; Components: server;
 
-; Common tools (.NET 8, framework-dependent dotnet publish output; built by
+; Common tools (.NET 10, framework-dependent dotnet publish output; built by
 ; build\build-tools.ps1). The three database tools share {app}\Bin - their
 ; publish folders carry identical copies of Shared.dll and the checked-in
 ; Interop.hMailServer.dll tlbimp wrapper (source\Tools\Interop), which

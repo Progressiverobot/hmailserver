@@ -1,8 +1,8 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net10.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
     <Platforms>x64</Platforms>
     <PlatformTarget>x64</PlatformTarget>
@@ -28,7 +28,7 @@
          the RID here rather than on one command line keeps the solution
          build, `dotnet build`, `dotnet publish` and CI producing the same
          output; SelfContained stays false because the installer already
-         bundles the .NET 8 Desktop Runtime. -->
+         bundles the .NET 10 Desktop Runtime. -->
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>false</SelfContained>
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
@@ -48,9 +48,8 @@
     <PackageReference Include="WPF-UI" Version="4.3.0" />
     <PackageReference Include="LiveChartsCore.SkiaSharpView.WPF" Version="2.0.5" />
     <PackageReference Include="QRCoder" Version="1.8.0" />
-    <PackageReference Include="System.Management" Version="10.0.10" />
-    <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.10" />
-    <PackageReference Include="System.DirectoryServices" Version="10.0.10" />
+    <PackageReference Include="System.Management" Version="10.0.11" />
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.11" />
   </ItemGroup>
 
 </Project>

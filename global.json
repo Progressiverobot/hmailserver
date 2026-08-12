@@ -1,0 +1,8 @@
+{
+  "//": "Pins the .NET SDK so builds are reproducible and installing a newer SDK on a build machine cannot silently change the toolchain. rollForward latestFeature accepts 10.0.3xx and later within .NET 10, but never rolls to .NET 11 - that has to be a deliberate edit here, alongside the TargetFramework values and the runtime the installer bundles.",
+  "sdk": {
+    "version": "10.0.303",
+    "rollForward": "latestFeature",
+    "allowPrerelease": false
+  }
+}
