@@ -24,7 +24,8 @@ namespace hMailServer.ControlPanel.Services
    /// <summary>
    /// Read-only Active Directory browsing used by the account / directory pickers.
    /// Implemented with <see cref="System.DirectoryServices"/> only (no dependency on
-   /// System.DirectoryServices.ActiveDirectory) so it restores cleanly on .NET 8.
+   /// System.DirectoryServices.ActiveDirectory). On .NET 10 the assembly comes from the
+   /// Windows Desktop shared framework, so no PackageReference is needed.
    /// All calls are defensive: on a non-domain-joined machine they report a friendly
    /// reason rather than throwing.
    /// </summary>

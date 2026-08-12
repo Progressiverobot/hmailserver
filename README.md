@@ -9,7 +9,7 @@ This repository is a maintained fork of the original project, which is no longer
 
 Every release is validated by the full regression suite before it ships — the complete suite, run against the exact binary being released, with live SpamAssassin and ClamAV (real EICAR detection), DMARC evaluated against live DNS, and TLS 1.2/1.3 handshakes end to end. Nothing is skipped or mocked.
 
-**What changed in each version** is on the [Releases page](https://github.com/Progressiverobot/hmailserver/releases). What is planned next, and what is deliberately not, is in [Roadmap.md](Roadmap.md). The release process itself is documented in [RELEASE.md](RELEASE.md).
+**What changed in each version** is on the [Releases page](https://github.com/Progressiverobot/hmailserver/releases). What is planned next, and what is deliberately not, is in [Roadmap.md](Roadmap.md). The release process itself is documented in [RELEASE.md](RELEASE.md), and the codebase map is in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 Contents
 --------

@@ -10,7 +10,7 @@ namespace hMailServer.Shared
       /// <summary>
       /// Standard WinForms bootstrap for the setup tools. The forms were designed
       /// against the .NET Framework defaults (Microsoft Sans Serif 8.25pt,
-      /// system-DPI aware) with absolute layouts, so the .NET 8 defaults are
+      /// system-DPI aware) with absolute layouts, so the modern .NET defaults are
       /// pinned back to those values to keep every dialog's metrics unchanged.
       /// </summary>
       public static void Initialize()

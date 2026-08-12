@@ -51,7 +51,7 @@ namespace hMailServer.Shared
 
       private void linkWhatIsThis_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
       {
-         // UseShellExecute is required to open a URL in the default browser on .NET 8.
+         // UseShellExecute is required to open a URL in the default browser on .NET Core and later.
          Process.Start(new ProcessStartInfo("https://www.hmailserver.com/documentation/latest/?page=reference_dialoghelp_hmailserver_password")
          {
             UseShellExecute = true

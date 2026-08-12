@@ -158,7 +158,7 @@ namespace hMailServer.ControlPanel.Services
    /// Stores and verifies the administrator two-factor secret. The secret is
    /// protected with machine-scope DPAPI and kept under HKLM\SOFTWARE\hMailServer,
    /// so changing two-factor settings requires local administrator rights.
-   /// DPAPI is called directly through crypt32.dll so the .NET 8 Control Panel
+   /// DPAPI is called directly through crypt32.dll so the .NET 10 Control Panel
    /// produces/consumes the exact same blobs as the .NET Framework Administrator.
    /// </summary>
    internal static class TotpManager

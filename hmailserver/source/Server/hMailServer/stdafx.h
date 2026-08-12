@@ -23,7 +23,7 @@
 
 
 // Minimum supported platform: Windows 10 1607 / Server 2016, matching the
-// installer's MinVersion gate and the .NET 8 tools' own floor.
+// installer's MinVersion gate and the .NET 10 tools' own floor.
 
 #define WINVER 0x0A00
 #define _WIN32_WINNT 0x0A00

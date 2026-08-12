@@ -76,7 +76,7 @@ namespace hMailServer.ControlPanel.Views
          inner.Children.Add(new TextBlock
          {
             Text = "hMailServer is free and open source software, licensed under the GNU AGPLv3. "
-                 + "This Control Panel is built with WPF-UI (Fluent design) and LiveCharts2 on .NET 8.",
+                 + "This Control Panel is built with WPF-UI (Fluent design) and LiveCharts2 on .NET 10.",
             FontSize = 11.5,
             Opacity = 0.5,
             TextWrapping = TextWrapping.Wrap,
@@ -127,7 +127,7 @@ namespace hMailServer.ControlPanel.Views
          {
             Text = "The hMailServer 6.x line is one such effort. The original open-source mail "
                  + "server has been rebuilt on a current toolchain (Visual Studio 2026 / MSVC v145 "
-                 + "and .NET 8), re-armed with modern cryptography (PBKDF2 / Argon2id, SCRAM-SHA-256, "
+                 + "and .NET 10), re-armed with modern cryptography (PBKDF2 / Argon2id, SCRAM-SHA-256, "
                  + "OAuth2) and the transport-security standards expected of a mail server today "
                  + "(DANE + DNSSEC, MTA-STS, ARC, Ed25519 DKIM, TLS-RPT and ACME / Let's Encrypt). "
                  + "It has been hardened against protocol and denial-of-service defects, given "
