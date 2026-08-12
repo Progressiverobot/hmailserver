@@ -307,6 +307,14 @@ namespace HM
       arc_sealing_enabled_ = ReadIniSettingInteger_("Settings", "ArcSealingEnabled", 0) == 1;
       tls_rpt_from_address_ = ReadIniSettingString_("Settings", "TlsRptFromAddress", "");
       tls_rpt_organization_name_ = ReadIniSettingString_("Settings", "TlsRptOrganizationName", "hMailServer");
+
+      // Hybrid post-quantum key exchange first, classical curves after it. The
+      // list is only a preference order - the group actually used is negotiated,
+      // so a peer that does not implement the ML-KEM hybrids picks X25519 or one
+      // of the NIST curves and nothing changes for it. See
+      // SslContextInitializer::SetKeyExchangeGroups_ for the fallback that keeps
+      // TLS working if OpenSSL rejects whatever is configured here.
+      tls_key_exchange_groups_ = ReadIniSettingString_("Settings", "TlsKeyExchangeGroups", "X25519MLKEM768:SecP256r1MLKEM768:X25519:secp384r1:secp256r1");
       rest_api_port_ = ReadIniSettingInteger_("Settings", "RestApiPort", 0);
       rest_api_bind_address_ = ReadIniSettingString_("Settings", "RestApiBindAddress", "127.0.0.1");
       rest_api_certificate_file_ = ReadIniSettingString_("Settings", "RestApiCertificateFile", "");

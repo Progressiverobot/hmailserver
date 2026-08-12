@@ -9,6 +9,8 @@
 #include "SieveScript.h"
 
 #include "../BO/Account.h"
+#include "../BO/SecurityRange.h"
+#include "../Persistence/PersistentSecurityRange.h"
 #include "../Util/PasswordValidator.h"
 #include "../Util/AccountLogon.h"
 #include "../Util/Parsing/StringParser.h"
@@ -202,7 +204,8 @@ namespace HM
       for (;;)
       {
          // Keep the peer address: failed authentications have to be reported to
-         // the same per-IP auto-ban accounting the other protocols use.
+         // the same per-IP auto-ban accounting the other protocols use, and the
+         // ban that accounting creates has to be enforced right here.
          sockaddr_in6 clientAddress = {};
          int addressLength = sizeof(clientAddress);
 
@@ -216,8 +219,55 @@ namespace HM
             continue;
          }
 
-         HandleClient_(clientSocket, GetClientAddress_((sockaddr*) &clientAddress));
+         IPAddress clientIPAddress = GetClientAddress_((sockaddr*) &clientAddress);
+
+         if (!IsConnectionAllowed_(clientIPAddress))
+         {
+            // Drop the connection before the greeting is sent and before a single
+            // command is read, the way the Boost.Asio listener does for the other
+            // protocols. Nothing is written back: a blocked client learns no more
+            // than that the port stopped answering.
+            String message;
+            message.Format(_T("ManageSieveServer: Connection from %s was not accepted. Blocked by IP range."),
+               String(clientIPAddress.ToString()).c_str());
+            LOG_DEBUG(message);
+
+            closesocket(clientSocket);
+            continue;
+         }
+
+         HandleClient_(clientSocket, clientIPAddress);
       }
+   }
+
+   bool
+   ManageSieveServer::IsConnectionAllowed_(const IPAddress &client_address)
+   {
+      // Parity with TCPServer::HandleAccept: look the peer up in the security
+      // ranges and only continue if a range matches and permits the connection.
+      // This is what gives AccountLogon::RegisterFailedLogin teeth on this
+      // listener - the auto-ban it creates is a security range with no protocols
+      // enabled, so until this check existed an attacker simply reconnected and
+      // carried on guessing passwords, making the per-connection cap pointless.
+      if (client_address.IsAny())
+      {
+         // The peer address could not be determined, so it cannot be matched
+         // against the ranges either. Fail closed.
+         return false;
+      }
+
+      std::shared_ptr<SecurityRange> securityRange = PersistentSecurityRange::ReadMatchingIP(client_address);
+
+      if (!securityRange)
+         return false;
+
+      // There is no ManageSieve-specific IP range option and adding one would mean
+      // a schema and administration-UI change. ManageSieve does nothing but
+      // manipulate the filters of a mailbox, so it is gated on the range allowing
+      // mailbox access at all. Every default and normal range that permits IMAP or
+      // POP3 keeps working; an auto-ban range permits neither, so it blocks
+      // ManageSieve as intended.
+      return securityRange->GetAllowIMAP() || securityRange->GetAllowPOP3();
    }
 
    IPAddress
@@ -308,6 +358,113 @@ namespace HM
       Send_(client_socket, "\"VERSION\" \"1.0\"\r\n");
    }
 
+   bool
+   ManageSieveServer::ApplyAuthenticationFailure_(SOCKET client_socket, int &authentication_failures, bool disconnect, const AnsiString &failure_response)
+   {
+      authentication_failures++;
+
+      if (disconnect || authentication_failures >= MaxAuthenticationFailures)
+      {
+         Send_(client_socket, "NO \"Too many invalid logon attempts.\"\r\n");
+         return true;
+      }
+
+      Send_(client_socket, failure_response);
+      return false;
+   }
+
+   ManageSieveServer::AuthenticationOutcome
+   ManageSieveServer::HandleAuthenticate_(SOCKET client_socket, const IPAddress &client_address, const String &line, int pos, std::string &buffer, int &authentication_failures, String &account_address)
+   {
+      String mechanism;
+      ParseToken(line, pos, mechanism);
+      mechanism.ToUpper();
+
+      if (mechanism != _T("PLAIN"))
+      {
+         Send_(client_socket, "NO \"Unsupported SASL mechanism.\"\r\n");
+         return AuthenticationFailed;
+      }
+
+      // RFC 5804 permits the SASL response either as a quoted string on the command
+      // line or as a literal whose bytes follow it. Both forms are handled here so
+      // that every path carrying credentials shares the failure accounting below.
+      // Previously the literal form was rejected as an invalid SASL response and,
+      // worse, its unread bytes were then parsed as commands.
+      String saslResponse;
+
+      int literalStart = pos;
+      SkipSpaces(line, literalStart);
+
+      int literalSize = 0;
+      if (literalStart < line.GetLength() && line[literalStart] == L'{' && ParseLiteralSize(line, literalSize))
+      {
+         if (literalSize > MaxSaslResponseSize)
+         {
+            // Refuse without reading it. Since the announced bytes are left unread
+            // the command stream can no longer be trusted, so the connection goes
+            // rather than being allowed to desynchronize.
+            Send_(client_socket, "NO \"SASL response too large.\"\r\n");
+            return AuthenticationAborted;
+         }
+
+         if (!ReadBytes_(client_socket, buffer, literalSize, saslResponse))
+            return AuthenticationAborted;
+
+         // Consume the CRLF that terminates the command after the literal.
+         String trailing;
+         ReadLine_(client_socket, buffer, trailing);
+      }
+      else if (!ParseToken(line, pos, saslResponse))
+      {
+         Send_(client_socket, "NO \"PLAIN requires an initial response.\"\r\n");
+         return AuthenticationFailed;
+      }
+
+      String authzid, authcid, password;
+      if (!StringParser::DecodeSaslPlain(saslResponse, authzid, authcid, password))
+      {
+         // Counted against this connection, but deliberately not reported to the
+         // per-IP auto-ban: a response we cannot even decode carries no password
+         // guess, and banning on it would let a broken client lock its own address
+         // out of the server.
+         if (ApplyAuthenticationFailure_(client_socket, authentication_failures, false, "NO \"Invalid SASL response.\"\r\n"))
+            return AuthenticationAborted;
+
+         return AuthenticationFailed;
+      }
+
+      String username;
+      if (!StringParser::SaslPrep(authcid, username))
+         username = authcid;
+
+      // The authzid is intentionally ignored rather than passed on as a masquerade
+      // name: honouring it would let anyone holding one valid account's password
+      // manage a different account's scripts.
+      //
+      // Going through AccountLogon rather than PasswordValidator directly is what
+      // keeps this listener in step with SMTP/POP3/IMAP: it maintains the logon
+      // statistics and, on failure, feeds the per-IP auto-ban accounting that the
+      // accept-time check in IsConnectionAllowed_ then enforces.
+      AccountLogon accountLogon;
+      bool disconnect = false;
+      std::shared_ptr<const Account> account = accountLogon.Logon(client_address, username, password, disconnect);
+
+      if (!account)
+      {
+         if (ApplyAuthenticationFailure_(client_socket, authentication_failures, disconnect, "NO \"Authentication failed.\"\r\n"))
+            return AuthenticationAborted;
+
+         return AuthenticationFailed;
+      }
+
+      account_address = account->GetAddress();
+      authentication_failures = 0;
+      Send_(client_socket, "OK \"Authentication successful.\"\r\n");
+
+      return AuthenticationSucceeded;
+   }
+
    void
    ManageSieveServer::HandleClient_(SOCKET client_socket, const IPAddress &client_address)
    {
@@ -366,62 +523,19 @@ namespace HM
 
          if (command == _T("AUTHENTICATE"))
          {
-            String mechanism;
-            ParseToken(line, pos, mechanism);
-            mechanism.ToUpper();
+            String authenticatedAddress;
+            AuthenticationOutcome outcome = HandleAuthenticate_(client_socket, client_address, line, pos,
+               buffer, authentication_failures, authenticatedAddress);
 
-            if (mechanism != _T("PLAIN"))
-            {
-               Send_(client_socket, "NO \"Unsupported SASL mechanism.\"\r\n");
-               continue;
-            }
+            if (outcome == AuthenticationAborted)
+               break;
 
-            String initialResponse;
-            if (!ParseToken(line, pos, initialResponse))
-            {
-               Send_(client_socket, "NO \"PLAIN requires an initial response.\"\r\n");
-               continue;
-            }
-
-            String authzid, authcid, password;
-            if (!StringParser::DecodeSaslPlain(initialResponse, authzid, authcid, password))
-            {
-               Send_(client_socket, "NO \"Invalid SASL response.\"\r\n");
-               continue;
-            }
-
-            String username;
-            if (!StringParser::SaslPrep(authcid, username))
-               username = authcid;
-
-            std::shared_ptr<const Account> account = PasswordValidator::ValidatePassword(username, password);
-            if (account)
+            if (outcome == AuthenticationSucceeded)
             {
                authenticated = true;
-               accountAddress = account->GetAddress();
-               authentication_failures = 0;
-               Send_(client_socket, "OK \"Authentication successful.\"\r\n");
+               accountAddress = authenticatedAddress;
             }
-            else
-            {
-               // Feed the per-IP auto-ban accounting, then apply a per-connection
-               // cap. Without either, this listener allowed unlimited password
-               // guessing against real accounts, while every other protocol
-               // stopped it.
-               AccountLogon accountLogon;
-               bool disconnect = false;
-               accountLogon.RegisterFailedLogin(client_address, username, disconnect);
 
-               authentication_failures++;
-
-               if (disconnect || authentication_failures >= MaxAuthenticationFailures)
-               {
-                  Send_(client_socket, "NO \"Too many invalid logon attempts.\"\r\n");
-                  break;
-               }
-
-               Send_(client_socket, "NO \"Authentication failed.\"\r\n");
-            }
             continue;
          }
 

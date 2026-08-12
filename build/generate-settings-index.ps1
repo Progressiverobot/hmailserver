@@ -2,9 +2,16 @@
 #
 # The Ctrl+K palette searches page names AND individual settings, so an
 # administrator can type "log level" or "LogDeleteDays" and be taken to the page
-# that owns it, wherever that page happens to live. The index is generated from
-# the page definitions themselves so it cannot drift; ControlPanel.Tests fails
-# if the checked-in file no longer matches the sources.
+# that owns it, wherever that page happens to live.
+#
+# The generated file is committed rather than produced at build time, so that
+# changes to the index show up in review diffs. Nothing regenerates it
+# automatically, so two things keep it honest:
+#   - the CI "Verify the committed settings index is up to date" step re-runs
+#     this script and fails if the working tree moves;
+#   - ControlPanel.Tests\Services\SettingsSearchIndexTests.cs fails if a setting
+#     or a whole settings page is missing from the committed index.
+# Neither replaces running this script yourself after changing a setting.
 #
 # Three kinds of page are scanned: the two table-driven settings views, and the
 # hand-written pages listed in $handWrittenPages, whose settings are plain XAML
@@ -15,6 +22,15 @@
 # Run it after adding, removing or relabelling any setting.
 
 $ErrorActionPreference = 'Stop'
+
+# The page sources are UTF-8 and several setting labels contain non-ASCII text
+# ("Password pepper - WARNING", "Deliver local -> local" with a real em dash and
+# arrow). Windows PowerShell 5.1 reads files as the ANSI code page unless told
+# otherwise, which turns those labels into mojibake and makes them unsearchable,
+# so every read below goes through this instead of a bare Get-Content.
+function Read-SourceText($path) {
+   return Get-Content -LiteralPath $path -Raw -Encoding UTF8
+}
 
 $repoRoot = (Get-Item $PSScriptRoot).Parent.FullName
 $cpRoot = Join-Path $repoRoot 'hmailserver\source\Tools\ControlPanel'
@@ -130,7 +146,7 @@ function ConvertTo-CSharpLiteral($text) {
 $entries = New-Object System.Collections.ArrayList
 
 # --- INI-backed pages (FeatureSettingsView): "case Section.X:" blocks ---
-$featureText = Get-Content $featurePath -Raw
+$featureText = Read-SourceText $featurePath
 $featureParts = [regex]::Split($featureText, 'case Section\.(\w+):')
 for ($i = 1; $i -lt $featureParts.Count; $i += 2) {
    $section = $featureParts[$i]
@@ -144,7 +160,7 @@ for ($i = 1; $i -lt $featureParts.Count; $i += 2) {
 }
 
 # --- COM-backed pages (ServerSettingsView): "private void Build<Section>()" ---
-$serverText = Get-Content $serverPath -Raw
+$serverText = Read-SourceText $serverPath
 foreach ($m in [regex]::Matches($serverText, '(?s)private void Build(\w+)\(\)\s*\{(.*?)\n      \}')) {
    $section = $m.Groups[1].Value
    $body = $m.Groups[2].Value
@@ -169,8 +185,8 @@ foreach ($view in ($handWrittenPages.Keys | Sort-Object)) {
       throw "$view is listed in `$handWrittenPages but $xamlPath or $codePath is missing."
    }
 
-   $labels = Get-XamlLabels (Get-Content $xamlPath -Raw)
-   $keys = Get-CodeKeys (Get-Content $codePath -Raw)
+   $labels = Get-XamlLabels (Read-SourceText $xamlPath)
+   $keys = Get-CodeKeys (Read-SourceText $codePath)
 
    # A control the page reads or writes but never labels cannot be searched for
    # by name, so there is nothing useful to index.
@@ -208,6 +224,11 @@ foreach ($e in $sorted) {
 [void]$sb.AppendLine('}')
 
 New-Item -ItemType Directory -Force -Path (Split-Path $outputPath) | Out-Null
-Set-Content -Path $outputPath -Value $sb.ToString() -Encoding UTF8 -NoNewline
+
+# UTF-8 with no BOM, written verbatim. Set-Content -Encoding UTF8 would do this
+# under PowerShell 7 but emit a BOM under Windows PowerShell 5.1, so which shell
+# happened to run the script would decide whether the CI up-to-date check passes.
+# $outputPath is absolute, so WriteAllText's own working directory does not matter.
+[System.IO.File]::WriteAllText($outputPath, $sb.ToString(), (New-Object System.Text.UTF8Encoding($false)))
 
 Write-Host "Wrote $($sorted.Count) settings to $outputPath"

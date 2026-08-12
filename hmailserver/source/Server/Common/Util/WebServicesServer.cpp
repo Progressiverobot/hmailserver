@@ -34,7 +34,20 @@ namespace HM
       const DWORD SocketTimeoutMilliseconds = 10000;
       const int MxCacheSeconds = 3600;
 
+      // How far ahead the mandatory RFC 9116 Expires field is set. Derived
+      // from the current time on every request rather than written as a
+      // literal, so the published file cannot silently go stale. 90 days is
+      // comfortably inside the "less than a year" the RFC recommends.
+      const int SecurityTxtExpirySeconds = 90 * 24 * 60 * 60;
+
+      // The human-readable policy the machine-readable file points at.
+      const char *SecurityTxtPolicyUrl =
+         "https://github.com/Progressiverobot/hmailserver/blob/master/.github/SECURITY.md";
+
       SSL_CTX *tls_context = nullptr;
+
+      // ReportUnreachableFeatures runs once per process.
+      bool unreachable_features_reported = false;
 
       // The plain-HTTP port a running instance listens on (0 = none).
       // Read by AcmeClient through IsListeningOnPort.
@@ -111,6 +124,88 @@ namespace HM
       return port > 0 && http_listen_port == port;
    }
 
+   void
+   WebServicesServer::ReportUnreachableFeatures()
+   {
+      if (unreachable_features_reported)
+         return;
+
+      unreachable_features_reported = true;
+
+      IniFileSettings *settings = IniFileSettings::Instance();
+
+      int httpPort = settings->GetWebServicesHttpPort();
+      int httpsPort = settings->GetWebServicesHttpsPort();
+
+      bool mtaStsHosting = settings->GetMtaStsHostingEnabled();
+      bool autoconfig = settings->GetAutoconfigEnabled();
+
+      // ACME http-01 is only a soft dependency: AcmeClient starts a
+      // transient listener of its own whenever this server does not already
+      // own the challenge port, so issuance works either way. Say which
+      // listener will be used, so a port conflict during a renewal that
+      // happens weeks after setup is not a surprise.
+      if (settings->GetAcmeEnabled())
+      {
+         int acmeHttpPort = settings->GetAcmeHttpPort();
+
+         if (httpPort != acmeHttpPort)
+         {
+            String message;
+            message.Format(_T("WebServices: ACME is enabled, so it will bind a temporary http-01 challenge listener on port %d for the duration of each issuance. Set WebServicesHttpPort to %d if the always-on web services listener should serve the challenges instead."),
+               acmeHttpPort, acmeHttpPort);
+            LOG_APPLICATION(message);
+         }
+      }
+
+      if (httpPort <= 0 && httpsPort <= 0)
+      {
+         // MtaStsHostingEnabled and AutoconfigEnabled both default to 1,
+         // while WebServicesHttpPort and WebServicesHttpsPort both default
+         // to 0. An administrator who publishes an MTA-STS DNS record and
+         // expects this server to host the policy therefore gets silence,
+         // with nothing in the log to explain it. The port defaults are
+         // deliberately left alone - binding port 80 by default on a box
+         // that may be running IIS would be a worse failure - but the
+         // combination has to be said out loud.
+         AnsiString features;
+
+         if (mtaStsHosting)
+            features += "MTA-STS policy hosting (/.well-known/mta-sts.txt)";
+
+         if (autoconfig)
+         {
+            if (!features.IsEmpty())
+               features += ", ";
+
+            features += "client autoconfiguration (/mail/config-v1.1.xml and /autodiscover/autodiscover.xml)";
+         }
+
+         if (!features.IsEmpty())
+            features += ", ";
+
+         features += "security.txt (/.well-known/security.txt)";
+
+         // Application log, not ErrorManager. This is the *default* shipped
+         // configuration - MtaStsHostingEnabled defaults to 1 and both ports
+         // default to 0 - so reporting it as an error would put a Medium entry
+         // in the ERROR log of every stock install, and alarm administrators who
+         // never intended to use these features. The ACME branch above already
+         // takes this approach for the same class of information. It stays a
+         // single line at startup, where someone diagnosing "why does nothing
+         // answer that URL" will find it.
+         LOG_APPLICATION(_T("WebServices: these features are enabled but unreachable, because no web services listener is configured: ") + String(features) +
+            _T(". Nothing answers those URLs until WebServicesHttpPort and/or WebServicesHttpsPort is set to a non-zero port in hMailServer.ini - both default to 0. MTA-STS policy hosting specifically needs WebServicesHttpsPort, because a policy is only ever fetched over HTTPS."));
+
+         return;
+      }
+
+      if (mtaStsHosting && httpsPort <= 0)
+      {
+         LOG_APPLICATION(_T("WebServices: MTA-STS policy hosting is enabled (MtaStsHostingEnabled) but WebServicesHttpsPort is 0. RFC 8461 section 3.3 requires the policy to be fetched over HTTPS, so the plain-HTTP listener cannot serve it and sending servers will treat the domain as having no policy. Set WebServicesHttpsPort in hMailServer.ini."));
+      }
+   }
+
    bool
    WebServicesServer::StartListener_(const String &bind_address, int port, SOCKET &listen_socket)
    {
@@ -154,6 +249,12 @@ namespace HM
    {
       if (running_)
          return true;
+
+      // Report anything that is switched on but cannot be reached with the
+      // configuration as it stands. Done here as well as from startup so a
+      // partial configuration - HTTP only, with MTA-STS hosting enabled -
+      // is reported too. The call is idempotent.
+      ReportUnreachableFeatures();
 
       if (http_port <= 0 && https_port <= 0)
          return false;
@@ -408,6 +509,12 @@ namespace HM
              IniFileSettings::Instance()->GetMtaStsHostingEnabled())
             return HandleMtaStsPolicy_(host);
 
+         // security.txt (RFC 9116). Section 3 puts the file under
+         // /.well-known/; /security.txt is the legacy location that the RFC
+         // still allows, and some scanners only look there.
+         if (method == "GET" && (path == "/.well-known/security.txt" || path == "/security.txt"))
+            return HandleSecurityTxt_(host);
+
          if (IniFileSettings::Instance()->GetAutoconfigEnabled())
          {
             // Thunderbird-style autoconfig.
@@ -628,6 +735,97 @@ namespace HM
       body += maxAgeLine;
 
       return BuildResponse_(200, "text/plain", body);
+   }
+
+   bool
+   WebServicesServer::GetSecurityContact_(const AnsiString &host, AnsiString &contact)
+   {
+      contact = "";
+
+      AnsiString candidate = host;
+      candidate.Trim();
+      candidate.MakeLower();
+
+      if (candidate.IsEmpty())
+         return false;
+
+      Domains domains;
+      domains.Refresh();
+
+      // The request can arrive either on the mail domain itself or on one of
+      // the service host names for it (mta-sts.<domain>, autoconfig.<domain>,
+      // mail.<domain>, www.<domain>). Try the host verbatim first, so a
+      // sub-domain that is itself hosted here wins over its parent, then
+      // drop one label and try again.
+      for (int attempt = 0; attempt < 2; attempt++)
+      {
+         std::shared_ptr<Domain> domain = domains.GetItemByName(String(candidate));
+
+         if (domain)
+         {
+            if (!domain->GetIsActive())
+               return false;
+
+            AnsiString postmaster = AnsiString(domain->GetPostmaster());
+            postmaster.Trim();
+
+            // Publish only something that is actually an address. An RFC 9116
+            // file carrying a placeholder is worse than no file at all: it
+            // tells a finder they have a reporting channel when they do not.
+            if (postmaster.Find("@") > 0 && postmaster.Find(" ") < 0)
+            {
+               contact = postmaster;
+               return true;
+            }
+
+            return false;
+         }
+
+         int labelEnd = candidate.Find(".");
+         if (labelEnd < 0)
+            break;
+
+         candidate = candidate.Mid(labelEnd + 1);
+      }
+
+      return false;
+   }
+
+   AnsiString
+   WebServicesServer::HandleSecurityTxt_(const AnsiString &host)
+   {
+      AnsiString contact;
+
+      if (!GetSecurityContact_(host, contact))
+      {
+         LOG_DEBUG("WebServices: No security.txt served - the requested domain is not hosted here, or has no postmaster address configured.");
+         return BuildResponse_(404, "text/plain", "not found");
+      }
+
+      // Expires is mandatory (RFC 9116 section 2.5.5) and must be in the
+      // future, so it is computed per request instead of being written as a
+      // literal that would quietly expire and invalidate the whole file.
+      time_t expires = time(nullptr) + SecurityTxtExpirySeconds;
+
+      struct tm expiresUtc = {};
+      if (gmtime_s(&expiresUtc, &expires) != 0)
+         return BuildResponse_(500, "text/plain", "internal error");
+
+      char expiresText[32] = {};
+      if (strftime(expiresText, sizeof(expiresText), "%Y-%m-%dT%H:%M:%SZ", &expiresUtc) == 0)
+         return BuildResponse_(500, "text/plain", "internal error");
+
+      // Canonical is deliberately omitted: the same file is reachable over
+      // both listeners and on whatever ports the administrator chose, and a
+      // Canonical value that does not match the fetch URL makes the file
+      // invalid rather than merely incomplete.
+      AnsiString body;
+      body += "Contact: mailto:" + contact + "\r\n";
+      body += AnsiString("Expires: ") + expiresText + "\r\n";
+      body += AnsiString("Policy: ") + SecurityTxtPolicyUrl + "\r\n";
+      body += "Preferred-Languages: en\r\n";
+
+      return BuildResponse_(200, "text/plain; charset=utf-8", body);
    }
 
    bool

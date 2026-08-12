@@ -676,13 +676,21 @@ namespace HM
       String mechanism = parts[0];
       mechanism.MakeUpper();
 
-      // RFC 4959 SASL-IR: a single "=" means an empty initial response.
-      bool hasInitialResponse = parts.size() >= 2 && parts[1] != _T("=");
+      // RFC 4959 SASL-IR: a second token is an initial response. A single "=" is the
+      // wire form of an initial response that is *empty* - it is still a response, so
+      // it must be processed (and fail as an empty credential) rather than be mistaken
+      // for "no initial response". Treating "=" as absent made the server send a "+"
+      // continuation the client was not waiting for, and the session then desynchronised:
+      // the client's next real command was consumed as SASL continuation data.
+      bool hasInitialResponse = parts.size() >= 2;
+      String initialResponse;
+      if (hasInitialResponse && parts[1] != _T("="))
+         initialResponse = parts[1];
 
       if (mechanism == _T("PLAIN"))
       {
          if (hasInitialResponse)
-            return ProcessAuthPlain_(parts[1]);
+            return ProcessAuthPlain_(initialResponse);
 
          sasl_plain_pending_ = true;
          EnqueueWrite_("+ ");
@@ -712,7 +720,7 @@ namespace HM
          scram_session_->SetChannelBinding(cbindData);
 
          if (hasInitialResponse)
-            return ProcessScramClientFirst_(parts[1]);
+            return ProcessScramClientFirst_(initialResponse);
 
          EnqueueWrite_("+ ");
          return ResultNormalResponse;
@@ -729,7 +737,7 @@ namespace HM
             scram_session_->SetServerSupportsChannelBinding();
 
          if (hasInitialResponse)
-            return ProcessScramClientFirst_(parts[1]);
+            return ProcessScramClientFirst_(initialResponse);
 
          EnqueueWrite_("+ ");
          return ResultNormalResponse;
@@ -750,7 +758,7 @@ namespace HM
          }
 
          if (hasInitialResponse)
-            return ProcessAuthBearer_(parts[1]);
+            return ProcessAuthBearer_(initialResponse);
 
          sasl_bearer_pending_ = true;
          EnqueueWrite_("+ ");
@@ -975,6 +983,12 @@ namespace HM
       String sUsername = scram_session_ ? String(scram_session_->GetUsername()) : username_;
       scram_session_.reset();
 
+      // Report the failed attempt to the script server with Client.Authenticated =
+      // False, exactly as the USER/PASS and bearer paths do. Without this, a SCRAM
+      // brute-force attempt was invisible to OnClientLogon, so script-based lockout
+      // and auditing saw nothing at all.
+      FireOnClientLogon_(sUsername, false);
+
       // Feed the per-IP auto-ban accounting (parity with the USER/PASS path).
       AccountLogon accountLogon;
       bool disconnect = false;
@@ -1123,7 +1137,12 @@ namespace HM
 
          std::shared_ptr<Message> pMessage = GetMessage_(messageIndex);
 
-         if (pMessage)
+         // RFC 1939: a message marked as deleted must be treated as if it no longer
+         // exists, so the single-message form has to answer "-ERR" for it just as the
+         // scan listing above leaves it out. Reporting a size for a message the client
+         // has already deleted made LIST and LIST n disagree within one session, and
+         // clients that trust LIST n went on to RETR a message RETR refuses.
+         if (pMessage && !pMessage->GetFlagDeleted())
             sResponse.Format(_T("+OK %d %d"), messageIndex, pMessage->GetSize());
          else
             sResponse = "-ERR No such message";
@@ -1179,7 +1198,10 @@ namespace HM
          long messageIndex = _ttol(Parameter);
          std::shared_ptr<Message> pMessage = GetMessage_(messageIndex);
 
-         if (pMessage)
+         // RFC 1939: a message marked as deleted is treated as absent, so the
+         // single-message form answers "-ERR" for it - the same rule the scan listing
+         // above already applies.
+         if (pMessage && !pMessage->GetFlagDeleted())
             sResponse.Format(_T("+OK %d %u"), messageIndex, pMessage->GetUID());
          else
             sResponse = "-ERR No such message";

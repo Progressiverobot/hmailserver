@@ -17,7 +17,9 @@
 #include "../BO/Account.h"
 #include "../BO/SSLCertificates.h"
 #include "../BO/SSLCertificate.h"
+#include "../BO/Message.h"
 #include "../Persistence/PersistentAccount.h"
+#include "../Persistence/PersistentMessage.h"
 #include "../TCPIP/SocketConstants.h"
 #include "../../SMTP/DeliveryQueue.h"
 
@@ -40,6 +42,12 @@ namespace HM
 
       // Total time allowed to read one request, across all reads.
       const ULONGLONG RequestReadTimeoutMilliseconds = 30000;
+
+      // hm_messages.messagetype for a message held for ETRN. There is no
+      // Message::State enumerator for it, but GET /api/v1/queue lists it
+      // alongside the ordinary Message::Delivering rows, so the retry and
+      // delete endpoints have to accept it too.
+      const int EtrnHeldMessageType = 3;
 
       SSL_CTX *tls_context = nullptr;
 
@@ -736,9 +744,38 @@ namespace HM
       return BuildResponse_(200, body);
    }
 
+   bool
+   RestApiServer::QueueMessageExists_(__int64 messageId)
+   {
+      // Both DeliveryQueue::ResetDeliveryTime and DeliveryQueue::Remove
+      // return void and do nothing at all for an id that is not there
+      // (PersistentMessage::SetNextTryTime reports success for an UPDATE
+      // that matched no rows), so without this check the retry and delete
+      // endpoints answered 200 {"retried":true} for any well-formed
+      // number - including one an administrator mistyped, which then read
+      // as "the message was requeued" when nothing had happened.
+      //
+      // Only delivery-queue rows count. A delivered message
+      // (Message::Delivered, messagetype 2) lives in a mailbox and is not
+      // what GET /api/v1/queue lists; accepting one here would let
+      // DELETE /api/v1/queue/<id> destroy delivered mail.
+      std::shared_ptr<Message> message = std::shared_ptr<Message>(new Message());
+
+      if (!PersistentMessage::ReadObject(message, messageId))
+         return false;
+
+      int messageType = static_cast<int>(message->GetState());
+
+      return messageType == static_cast<int>(Message::Delivering) ||
+             messageType == EtrnHeldMessageType;
+   }
+
    AnsiString
    RestApiServer::HandleQueueRetry_(__int64 messageId)
    {
+      if (!QueueMessageExists_(messageId))
+         return BuildResponse_(404, "{\"error\":\"queue message not found\"}");
+
       DeliveryQueue::ResetDeliveryTime(messageId);
       DeliveryQueue::StartDelivery();
 
@@ -750,6 +787,9 @@ namespace HM
    AnsiString
    RestApiServer::HandleQueueDelete_(__int64 messageId)
    {
+      if (!QueueMessageExists_(messageId))
+         return BuildResponse_(404, "{\"error\":\"queue message not found\"}");
+
       DeliveryQueue::Remove(messageId);
 
       LOG_APPLICATION("RestApi: Queue message " + StringParser::IntToString(messageId) + " removed from the delivery queue.");

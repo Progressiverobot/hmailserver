@@ -18,8 +18,11 @@ namespace HM
    public:
 
       // Adds one ARC set (ARC-Seal, ARC-Message-Signature,
-      // ARC-Authentication-Results) to the message, signed with the
-      // domain's DKIM key. Returns false on error.
+      // ARC-Authentication-Results) to the message, signed with the given
+      // identity's DKIM key. The identity is the domain that is sealing, which
+      // is the local domain handling the relay - it is not required to be, and
+      // for relayed mail is not, the author domain of the message. Returns
+      // false if no set was added; the caller must still deliver the message.
       bool Seal(std::shared_ptr<Message> message,
                 const AnsiString &domain,
                 const AnsiString &selector,

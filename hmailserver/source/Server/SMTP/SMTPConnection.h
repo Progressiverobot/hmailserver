@@ -139,6 +139,10 @@ namespace HM
       void ProtocolHELP_();
       void ProtocolRCPT_(const String &Request);
       void ProtocolETRN_(const String &sRequest);
+      // True when the client's security range permits relaying to a remote
+      // destination without authentication. ETRN asks the server to flush its queue
+      // towards a route, so it is gated on this (or on an authenticated session).
+      bool RelayToRemotePermittedWithoutAuth_();
       void ProtocolSTARTTLS_(const String &sRequest);
       void ProtocolUsername_(const String &sRequest);
       void ProtocolPassword_(const String &sRequest);

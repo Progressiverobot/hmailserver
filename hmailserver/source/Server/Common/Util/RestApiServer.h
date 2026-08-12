@@ -45,6 +45,9 @@ namespace HM
       static AnsiString HandleQueueDelete_(__int64 messageId);
       static AnsiString HandleTlsa_();
 
+      // True if the id names a message that is really in the delivery queue.
+      static bool QueueMessageExists_(__int64 messageId);
+
       static AnsiString GetRequestBody_(const AnsiString &request);
       static AnsiString GetJsonStringValue_(const AnsiString &json, const AnsiString &key);
       static AnsiString JsonEscape_(const AnsiString &value);

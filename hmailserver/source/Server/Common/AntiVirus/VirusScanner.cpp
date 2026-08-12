@@ -41,7 +41,29 @@ namespace HM
 {
    long VirusScanner::running_scanners_ = 0;
 
-   void 
+   VirusScanner::VirusScannerAutoCount::VirusScannerAutoCount() :
+      holds_slot_(VirusScanner::WaitForFreeScanner_())
+   {
+
+   }
+
+   VirusScanner::VirusScannerAutoCount::~VirusScannerAutoCount()
+   {
+      // Give back the slot only if we took one. If WaitForFreeScanner_ gave up, no
+      // slot was ever allocated and there is nothing to release.
+      if (holds_slot_)
+      {
+         VirusScanner::DecreaseCounter();
+      }
+   }
+
+   bool
+   VirusScanner::VirusScannerAutoCount::GetHoldsSlot() const
+   {
+      return holds_slot_;
+   }
+
+   void
    VirusScanner::ResetCounter()
    {
       InterlockedExchange(&running_scanners_, 0);
@@ -64,10 +86,20 @@ namespace HM
       This function will wait until there's a free virus scanner available.
       At most, hMailServer runs 10 virus scanners in parallel.
 
+      Returns true if a scanner slot was allocated. The caller then holds one of
+      the MaxRunningScanners slots and must give it back through DecreaseCounter().
 
+      Returns false if we gave up waiting - either the wait timed out or the
+      allocation lost the race too many times. No slot has been allocated in that
+      case, so the caller must NOT give one back.
 
+      Giving up means the scan runs anyway, over the cap. That is deliberate and
+      unchanged: the alternative is to fail the scan, and for a mail server it is
+      much worse to bounce or hold a message because the scanners are busy than it
+      is to run a few more scanners than the cap allows for a while. The bug that
+      was fixed here was the accounting, not the give-up policy.
    */
-   void
+   bool
    VirusScanner::WaitForFreeScanner_()
    {
       int waitTime = 0;
@@ -92,7 +124,7 @@ namespace HM
             if (waitTime > 60)
             {
                LOG_DEBUG("Waiting more than 60 seconds for an available virus scanner. Giving up waiting.");
-               return;
+               return false;
             }
 
             currentCount = InterlockedCompareExchange(&running_scanners_, 0, 0);
@@ -106,17 +138,42 @@ namespace HM
          if (result == currentCount)
          {
             // woho.
-            return;
+            return true;
          }
       }
 
       LOG_DEBUG("Waited for available virus scanner, tried to allocate, failed 10 times. Giving up waiting.");
+
+      return false;
    }
 
    void
    VirusScanner::DecreaseCounter()
    {
-      InterlockedDecrement(&running_scanners_);
+      // Never let the counter drop below zero. VirusScannerAutoCount makes the
+      // increment and the decrement symmetric, but ResetCounter() can still zero
+      // the counter while scans are in progress - it runs when the server is
+      // (re)initialized - and the guards for those scans will decrement afterwards.
+      // Without a floor, those decrements would leave the counter negative for the
+      // rest of the process lifetime and the cap would stop limiting anything.
+      //
+      // Read and write through interlocked operations only, like every other access
+      // to this counter.
+      for (;;)
+      {
+         long currentCount = InterlockedCompareExchange(&running_scanners_, 0, 0);
+
+         if (currentCount <= 0)
+         {
+            // Nothing to give back.
+            return;
+         }
+
+         if (InterlockedCompareExchange(&running_scanners_, currentCount - 1, currentCount) == currentCount)
+            return;
+
+         // Another thread changed the counter while we were looking at it. Try again.
+      }
    }
 
    bool
@@ -133,9 +190,19 @@ namespace HM
          return false;
       }
 
-      // Prevent too many scanners from running at once.
-      WaitForFreeScanner_();
+      // Prevent too many scanners from running at once. The guard waits for a free
+      // scanner slot, takes it, and gives it back when it goes out of scope - if and
+      // only if it managed to take one.
       VirusScannerAutoCount autoCounter;
+
+      if (!autoCounter.GetHoldsSlot())
+      {
+         // We gave up waiting and are scanning without a slot, so more than
+         // MaxRunningScanners scans may be running right now. The message is still
+         // scanned - see WaitForFreeScanner_ - but the scanners are clearly backed up
+         // and that is worth having in the log.
+         LOG_DEBUG("Scanning message without an available virus scanner slot.");
+      }
 
       // First scan the entire file.
       String sLongFilename = PersistentMessage::GetFileName(pMessage);

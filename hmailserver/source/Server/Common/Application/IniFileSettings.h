@@ -171,6 +171,20 @@ namespace HM
       bool GetArcSealingEnabled() const { return arc_sealing_enabled_; }
       String GetTlsRptFromAddress() const { return tls_rpt_from_address_; }
       String GetTlsRptOrganizationName() const { return tls_rpt_organization_name_; }
+      // TLS key-exchange groups, in OpenSSL group-list syntax, most preferred
+      // first. The default puts the hybrid post-quantum KEMs ahead of the
+      // classical curves: a PQC-capable peer then gets a quantum-resistant
+      // handshake, and a peer that does not know them simply negotiates one of
+      // the classical groups that follow. An empty value, or a value OpenSSL
+      // rejects, falls back to the classical list.
+      //
+      // Scope: this reaches the SMTP, POP3, IMAP and ManageSieve listeners, which
+      // all get their context from SslContextInitializer via TCPServer, plus
+      // outbound SMTP delivery. It does NOT reach the REST API listener or the
+      // Web Services HTTPS listener - both build their own SSL_CTX directly and
+      // never consult SslContextInitializer. Unifying that is worth doing, but it
+      // is a wider change than this setting.
+      String GetTlsKeyExchangeGroups() const { return tls_key_exchange_groups_; }
       int GetRestApiPort() const { return rest_api_port_; }
       String GetRestApiBindAddress() const { return rest_api_bind_address_; }
       String GetRestApiCertificateFile() const { return rest_api_certificate_file_; }
@@ -325,6 +339,7 @@ namespace HM
       bool arc_sealing_enabled_ = false;
       String tls_rpt_from_address_;
       String tls_rpt_organization_name_;
+      String tls_key_exchange_groups_;
       int rest_api_port_ = 0;
       String rest_api_bind_address_;
       String rest_api_certificate_file_;

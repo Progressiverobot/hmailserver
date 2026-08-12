@@ -13,10 +13,16 @@
 //   - ACME http-01 challenges (/.well-known/acme-challenge/<token>),
 //     served from AcmeChallengeStore so certificate issuance works
 //     while this server owns port 80.
+//   - security.txt (RFC 9116): serves /.well-known/security.txt for a
+//     local domain that has a postmaster address configured. Generated,
+//     so the mandatory Expires field is always in the future.
 //
 // Disabled by default. Enable with WebServicesHttpPort / WebServicesHttpsPort
 // in hMailServer.ini. The HTTPS listener uses WebServicesCertificateFile /
 // WebServicesPrivateKeyFile, falling back to the ACME certificate.
+//
+// Several of the features above are enabled by default while the listener
+// is not, so ReportUnreachableFeatures() exists to say so at startup.
 
 #pragma once
 
@@ -38,6 +44,14 @@ namespace HM
       // Used by the ACME client to decide whether a transient challenge
       // listener is needed.
       static bool IsListeningOnPort(int port);
+
+      // Reports every feature that is switched on but cannot be reached
+      // because no web-services listener is configured. Call this once at
+      // startup, unconditionally - including when both ports are 0, which
+      // is exactly the case that needs reporting. Start() calls it too, so
+      // a partial configuration (HTTP only, with MTA-STS enabled) is also
+      // reported. Repeat calls are ignored.
+      static void ReportUnreachableFeatures();
 
    private:
 
@@ -61,6 +75,12 @@ namespace HM
       static AnsiString HandleMtaStsPolicy_(const AnsiString &host);
       static AnsiString HandleAutoconfig_(const AnsiString &host, const AnsiString &query);
       static AnsiString HandleAutodiscover_(const AnsiString &body);
+      static AnsiString HandleSecurityTxt_(const AnsiString &host);
+
+      // Resolves the RFC 9116 Contact address for the requested host from
+      // the postmaster address of the matching local domain. False when
+      // there is nothing publishable, in which case no file is served.
+      static bool GetSecurityContact_(const AnsiString &host, AnsiString &contact);
 
       static bool GetClientAccessSettings_(AnsiString &client_host,
          ProtocolEndpoint &imap, ProtocolEndpoint &pop3, ProtocolEndpoint &smtp);

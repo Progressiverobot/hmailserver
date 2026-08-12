@@ -38,13 +38,13 @@ as ⬜, not ✅.
 
 ### Contents and totals
 
-711 items. The counts are the point of this table — they say where the fork is
+710 items. The counts are the point of this table — they say where the fork is
 strong and where it is thin far more honestly than any prose summary.
 
 | Section | ✅ | 🔄 | ⬜ | ⏸️ |
 |---|--:|--:|--:|--:|
 | [Dated items — the forcing functions](#dated-items--the-forcing-functions) | 1 | – | 5 | 1 |
-| [Defects found by the audit](#defects-found-by-the-audit) | – | – | 16 | – |
+| [Defects found by the audit](#defects-found-by-the-audit) | 13 | – | 3 | – |
 | **The capability matrix** | | | | |
 | [SMTP and ESMTP](#smtp-and-esmtp) | 23 | – | 4 | – |
 | [Transport security and deliverability](#transport-security-and-deliverability) | 28 | – | 16 | 1 |
@@ -62,10 +62,10 @@ strong and where it is thin far more honestly than any prose summary.
 | [Cross-cutting and platform](#cross-cutting-and-platform) | 9 | – | 2 | 1 |
 | **Forward-looking** | | | | |
 | [Planned work](#planned-work) | – | 2 | 16 | 2 |
-| [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | – | – | 6 | 2 |
-| [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 1 | – | 5 | 2 |
-| [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | – | – | 9 | – |
-| **Total** | **497** | **2** | **198** | **14** |
+| [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 1 | – | 5 | 2 |
+| [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 2 | – | 4 | 2 |
+| [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 2 | – | 7 | – |
+| **Total** | **513** | **2** | **181** | **14** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage and the administration surface are the best-covered areas**, and the
@@ -92,9 +92,13 @@ previous version of this roadmap. Ordered by when they bite.
 | ⬜ | **14 May 2027** | **OpenSSL 4.0.x end of life** | 4.0.x is not an LTS branch. The LTS options are 3.5 (EOL 8 Apr 2030) and whatever the next LTS is. This needs a deliberate decision by Q1 2027, not a surprise. |
 | ⏸️ | **11 Dec 2027** | **EU Cyber Resilience Act, full application** | Currently **out of scope**: AGPLv3, no paid tier, an individual maintainer — "making available in the course of a commercial activity" is the test, and donations, sponsorship and paid consulting do not by themselves trigger it. Deferred rather than ignored because *the moment a paid tier, hosted edition or commercial licence exception exists, the whole product is in scope* and, being a substantial modification of upstream, this fork is the manufacturer of record. Reporting obligations start 11 Sep 2026. |
 
-**The single cheapest action on this list is a dated, one-page CRA/PLD scope
-determination committed to the repo**, reviewed whenever the funding model
-changes. It is pure documentation and it settles two of the rows above.
+**Done, 12 August 2026:** the dated scope determination is at
+[`hmailserver/docs/RegulatoryScope.md`](hmailserver/docs/RegulatoryScope.md). It
+records the position (out of scope as manufacturer, ineligible as steward, on the
+commercial-activity test rather than the price), the five triggers that would
+change it, and the fact that a paid tier would make *this fork* the manufacturer
+of record rather than upstream. It settles two of the rows above and cost nothing
+but an afternoon.
 
 How work is prioritised
 -----------------------
@@ -152,41 +156,34 @@ verify-only implementations.
 Defects found by the audit
 --------------------------
 
-The adversarial verification pass over the capability matrix found these. None
-were known before August 2026; none are fixed yet. They are ordered by how much
-they matter, and the security-relevant ones are at the top.
+The adversarial verification pass over the capability matrix found sixteen
+defects, none of them known before August 2026. **Thirteen are now fixed**, each
+with a regression test that fails against the build before it; the suite went
+from 1049 to 1087 passing.
 
-| | Defect | Why it matters |
+Three are not fixed, and it is worth saying why, because in each case a fix was
+written and then rejected on review rather than never attempted. That is the
+process working: all three would have been worse than the defect.
+
+| | Defect | Status |
 |:-:|---|---|
-| ⬜ | **POP3 credential logging** | `PasswordRemover` redacts only lines beginning `PASS`. A SASL initial response — `AUTH PLAIN <base64>` — is written to the POP3 log verbatim, so credentials land in plaintext on disk. |
-| ⬜ | **ManageSieve brute force is unbounded in practice** | The 3-attempt per-connection cap and `RegisterFailedLogin` both work, but the auto-ban they create is enforced at accept time by the Boost listener — and the ManageSieve listener does not consult it. An attacker reconnects indefinitely. |
-| ⬜ | **ETRN has no authentication, security-range or TLS gate** | `ProtocolETRN_` performs no checks at all, and the STARTTLS-required guard is not applied to it. On a STARTTLS-required port a remote party can trigger a queue flush before TLS. TURN and VRFY likewise bypass the TLS gate (they answer 502, so the impact is limited to ETRN). |
-| ⬜ | **ARC sealing never applies to relayed mail** | As above — reachable only via the DKIM signing path, so it does nothing for the forwarding case ARC was designed for. |
-| ⬜ | **DANE validates the TLSA record but not the MX RRset** | The TLSA lookup is DNSSEC-validated; the MX lookup that chooses *which host to contact* is not. An attacker able to forge the MX response redirects delivery to a host whose own TLSA record then validates. |
-| ⬜ | **Password hashes never actually upgrade** | The upgrade-on-read path re-hashes into the in-memory `Account` object and returns without saving. No caller persists it, so a legacy hash stays a legacy hash forever. |
-| ⬜ | **Script reload is not fail-closed** | On a hot reload, the new file text is assigned *before* the syntax check and the `has_on_*` flags are never cleared, so a script that fails to compile leaves the previous handlers registered. Fail-closed holds only on a cold start. |
-| ⬜ | **POP3 `LIST n` and `UIDL n` return deleted messages** | The scan-listing forms correctly skip messages flagged for deletion; the single-message forms go straight to the message and do not check. RFC 1939 requires both to treat them as absent. |
-| ⬜ | **POP3 `AUTH PLAIN =` is mishandled** | A bare `=` means "empty initial response"; the parser treats it as "no initial response" and issues a continuation the client is not expecting. |
-| ⬜ | **REST queue endpoints do not validate the id** | `POST /queue/<id>/retry` and `DELETE /queue/<id>` report success for an id that does not exist. |
-| ⬜ | **Virus-scanner concurrency counter leaks** | On the give-up paths `WaitForFreeScanner_` returns without incrementing, but the matching decrement still runs, so the running-scanner count drifts below zero and the cap stops meaning anything. |
-| ⬜ | **MTA-STS and ACME http-01 hosting are silently inert by default** | Both are served by `WebServicesServer`, which is gated behind `WebServicesHttpPort`/`WebServicesHttpsPort` — both defaulting to 0. The features are enabled by default and unreachable by default. |
-| ⬜ | **TLS-RPT reporting is gated on an unset value** | `TlsRptReporterTask` reads `TlsRptFromAddress` and does nothing if it is empty, which it is by default. Reports are collected and never sent. |
-| ⬜ | **SCRAM failures on POP3 fire no `OnClientLogon`** | The password and bearer paths fire the event on both success and failure; the SCRAM failure path does not, so script-based lockout misses SCRAM brute force entirely. |
-| ⬜ | **`ENHANCEDSTATUSCODES` is advertised but mostly unused** | The code table is consulted from exactly one function; 36 reply sites write their status line directly and emit no enhanced code. |
-| ⬜ | **The settings-index generator is not wired into the build** | `build/generate-settings-index.ps1` is referenced by nothing, so the Ctrl+K palette index is hand-maintained and can silently drift from the settings it indexes. |
+| ✅ | **POP3 credential logging** | `PasswordRemover` masked only lines beginning `PASS`, so a SASL initial response (`AUTH PLAIN <base64>`) went to the log verbatim — and SCRAM continuation lines were never covered by the connection's own masking either. Now a real per-protocol scrubber across POP3, IMAP and SMTP, covering initial responses, `APOP`, quoted and literal `LOGIN` forms, and bare base64 continuations. Usernames stay readable deliberately: a protocol log with no identity in it cannot tell you which account is being attacked. |
+| ✅ | **ManageSieve brute force was unbounded** | The 3-attempt cap and `RegisterFailedLogin` both worked, but the auto-ban they create is enforced at accept time by the shared listener — which ManageSieve did not consult, so reconnecting reset everything. The ban is now checked in the accept loop, before the greeting. |
+| ✅ | **ETRN was unauthenticated and ungated** | No security-range check and no STARTTLS-required guard, so on a STARTTLS-required port a remote party could trigger a queue flush before TLS. Now gated on the same relay-permission pair `RCPT TO` uses. Loopback keeps working; anonymous remote gets `530`. |
+| ✅ | **ARC sealing never applied to relayed mail** | `Arc::Seal` had one caller, after every early return in `DKIMSigner::Sign`, so only mail we were already DKIM-signing as the author domain was sealed — never the forwarding case ARC exists for. Sealing is now reachable independently, still gated on `ArcSealingEnabled`, and an unsealable message is still delivered. |
+| ✅ | **Script reload was not fail-closed** | A hot reload assigned the new file text *before* the syntax check and never cleared the handler flags, so a script that failed to compile left the previous handlers advertised against broken contents. Contents, language and flags now commit together or not at all, and the last known-good script stays in force. |
+| ✅ | **POP3 `LIST n` and `UIDL n` returned deleted messages** | The scan-listing forms skipped flagged messages; the single-message forms did not. RFC 1939 requires both to treat them as absent. |
+| ✅ | **POP3 `AUTH PLAIN =` was mishandled** | A bare `=` is an empty initial response; it was treated as *no* initial response, so the server issued a continuation the client was not expecting. |
+| ✅ | **SCRAM failures on POP3 fired no `OnClientLogon`** | The password and bearer paths fired it on success and failure; SCRAM failure did not, so script-based lockout and auditing missed SCRAM brute force entirely. |
+| ✅ | **Virus-scanner concurrency counter leaked** | On the give-up paths the slot was never taken but the matching decrement still ran, so the counter drifted negative and the cap stopped meaning anything. Now RAII: the decrement cannot happen unless the increment did. The give-up policy is unchanged — mail still flows. |
+| ✅ | **REST queue endpoints did not validate the id** | `retry` and `DELETE` reported success for an id that never existed; both now 404. The same change also *removed* a mail-destruction path: the old `DELETE` could delete a mailbox message rather than a queued one. |
+| ✅ | **MTA-STS and ACME hosting were silently inert** | Both are served by `WebServicesServer`, whose ports default to 0 while `MtaStsHostingEnabled` defaults to 1 — features enabled by default and unreachable by default. Now stated at startup, naming the setting to change. Reported to the *application* log, not as an error: this is the shipped default configuration, and putting a Medium entry in every stock install's ERROR log would be its own defect. |
+| ✅ | **`ENHANCEDSTATUSCODES` was advertised but mostly unused** | The code table was consulted from one function while ~36 reply sites wrote their status line directly. Most now route through it. No numeric status code or reply text changed. |
+| ✅ | **The settings-index generator was not wired into the build** | `build/generate-settings-index.ps1` was referenced by nothing, so the committed Ctrl+K index was effectively hand-maintained. CI now regenerates it and fails if the tree moves. |
+| ⬜ | **Password hashes never actually upgrade** | The upgrade-on-read path re-hashes into the in-memory `Account` and nothing saves it. A fix was written and **rejected**: it removed the read-time re-hash before wiring the replacement, which would have broken SCRAM authentication for plain-text accounts *with the correct password*, unrecoverably, because SCRAM requires a PBKDF2 record and the upgrade only fires after a successful login. Doing this properly means upgrading at the point of successful password verification, and ordering the minimum-hash policy check *after* that upgrade rather than before it. |
+| ⬜ | **DANE validates the TLSA record but not the MX RRset** | The TLSA lookup is DNSSEC-validated; the MX lookup that chose the host is not, so an attacker able to forge the MX response can redirect delivery to a host whose own TLSA record then validates. Not attempted yet — it needs resolver-level changes. |
+| ⬜ | **TLS-RPT reporting is gated on an unset value** | The reporter returns immediately when `TlsRptFromAddress` is empty, which it is by default, so reports are aggregated and never sent. Should get the same startup warning treatment as MTA-STS above. |
 
-Two of these — credential logging and the ManageSieve ban gap — are the ones
-that would be fixed first.
-
-A sixteenth finding is filed under
-[future-proofing](#future-proofing-standards-and-protocols) rather than here
-because nothing is broken by today's standards, but it belongs in the same
-breath: **post-quantum key exchange is linked and switched off.** A single
-unconditional `SSL_CTX_set1_curves_list` call replaces OpenSSL's default group
-list — which already contains `X25519MLKEM768` — so every TLS listener
-negotiates classical-only key exchange despite linking a PQC-capable library.
-It is a one-line fix with no interop risk and it is the best value-per-line
-change on this page.
 
 The capability matrix
 ---------------------
@@ -711,7 +708,7 @@ the source, not from documentation.
 | ⬜ | Referential integrity in the schema | No FOREIGN KEY or ON DELETE CASCADE anywhere in any CreateTables script; all cascades are application-level loops in the Persistent* classes, so a crash mid-delete can leave orphans. |
 | ⬜ | TLS to the database server | The PostgreSQL conninfo is built from host/port/user/password/dbname only — no sslmode — and MySQLConnection sets no mysql_options TLS parameters. Only the MSSQL path can get encryption… |
 | ⬜ | Tombstone table is never pruned by age | hm_imapexpunged rows are only removed when the whole folder is deleted; there is no retention window and no scheduled cleanup, so the table grows for the life of a busy mailbox. It also has no primary key. |
-| ⬜ | Upgrade/migration documentation | docs/ contains only DiagnosingStalledMail.md and HighAvailabilityRunbook.md; the roadmap names an upgrade/migration note covering the database upgrade chain, and an index for docs/, as remaining documentation gaps. |
+| ⬜ | Upgrade/migration documentation | The docs index now exists ([`hmailserver/docs/README.md`](hmailserver/docs/README.md), covering the stall runbook, the HA runbook, the regulatory determination and the Grafana dashboard), and the installer contract is documented in the README. What is still missing is the upgrade/migration note covering the database upgrade chain. |
 
 ### Routing, queue and delivery
 
@@ -969,7 +966,7 @@ Future-proofing: standards and protocols
 
 | | Item | Detail |
 |:-:|---|---|
-| ⬜ | **Post-quantum key exchange is linked but switched off** | `SslContextInitializer` calls `SSL_CTX_set1_curves_list(ssl, "secp384r1:x25519:secp256r1")` unconditionally at context init. That **replaces** OpenSSL's default group list, which in 3.5+/4.x already contains `X25519MLKEM768`. So every SMTP, IMAP, POP3, ManageSieve and metrics listener negotiates classical-only key exchange despite linking a PQC-capable library. Prepending the hybrid groups is a one-line change with zero interop risk — hybrids are negotiated, not required. **Highest value-per-line item in this document.** |
+| ✅ | **Post-quantum key exchange — shipped 12 Aug 2026** | `SslContextInitializer` calls `SSL_CTX_set1_curves_list(ssl, "secp384r1:x25519:secp256r1")` unconditionally at context init. That **replaces** OpenSSL's default group list, which in 3.5+/4.x already contains `X25519MLKEM768`. So every SMTP, IMAP, POP3, ManageSieve and metrics listener negotiates classical-only key exchange despite linking a PQC-capable library. Fixed: the list is now the setting `TlsKeyExchangeGroups`, defaulting to `X25519MLKEM768:SecP256r1MLKEM768:X25519:secp384r1:secp256r1`, with a fallback to the classical list if OpenSSL rejects the configured value — getting *that* wrong was the one way this change could have taken TLS down everywhere, so it is the part the regression tests cover hardest. **Scope note:** this reaches SMTP, POP3, IMAP, ManageSieve and outbound delivery. The REST API and Web Services HTTPS listeners build their own `SSL_CTX` and do not consult it; unifying that is still open. |
 | ⬜ | **DMARCbis: replace PSL lookups with the tree walk** | DMARCbis changes organisational-domain discovery from the Public Suffix List to a DNS tree walk, and adds a 2.0 report namespace. A PSL-based evaluator produces *wrong policy decisions*, not soft failures, on domains relying on tree-walk semantics. No hard date, but receivers publish tree-walk-shaped records through 2026-27. The highest-value pure-protocol item here. |
 | ⬜ | **ACME renewal robustness and ARI** | Certificate lifetimes fall to 100 days (Mar 2027) and 47 days with 10-day validation reuse (Mar 2029); Let's Encrypt defaults to 64 days from Feb 2027. Renewal and reload must be unattended and bulletproof, and ARI (renewal-info) becomes worth implementing. Treat 2027 as the real deadline. |
 | ⬜ | **Legacy algorithm audit (RFC 9905)** | Audit for SHA-1, RSA-1024 and other deprecated primitives. No external deadline. TLS 1.2 has no sunset date and is not going anywhere soon — do not pre-emptively drop it. |
@@ -987,7 +984,7 @@ Future-proofing: platform and supply chain
 | ⬜ | **Decide the OpenSSL branch** | 4.0.x is not LTS and dies 14 May 2027. Decide by Q1 2027 whether to follow to the next LTS or move back to 3.5. |
 | ⬜ | **Declare a supported Windows floor** | Server 2019 / Windows 10 21H2, effective with the first release after 12 Jan 2027. Zero code cost — Server 2019 is still `_WIN32_WINNT=0x0A00`, and that macro should *not* be raised. |
 | ⬜ | **Artifact signing** | SBOMs are already attached to every release in both SPDX and CycloneDX. The gap is signing: Authenticode on the installer and binaries, and ideally Sigstore for the release artefacts. This is the supply-chain item that is actually missing, and the CRA makes update integrity a formal requirement if scope ever changes. |
-| ⬜ | **security.txt (RFC 9116) and a documented VDP** | Cheap, expected, and a prerequisite for being taken seriously on disclosure. `SECURITY.md` exists; the machine-readable half does not. |
+| ✅ | **security.txt (RFC 9116)** | Served at `/.well-known/security.txt` by the web services listener, with a derived (never hardcoded) `Expires`, a `Policy` pointing at `SECURITY.md`, and a deliberate refusal to serve anything at all when no contact is configured — a placeholder address is worse than no file. Note it inherits the listener caveat above: the web services ports default to 0, and the server now says so at startup. |
 | ⬜ | **OpenSSF Scorecard / OSPS Baseline** | Run it, publish the score, fix what is cheap. Buyers increasingly ask. |
 | ⏸️ | **SQL Server Compact** | Long dead upstream and the one real dependency liability. Migration targets are SQLite or LocalDB. Deferred because it is a data-migration project for existing installs, not a swap, and no date forces it. |
 | ⏸️ | **Boost and C++ standard upgrades** | No forcing function. Move when there is a reason. |
@@ -997,12 +994,12 @@ Future-proofing: deployment and operations
 
 | | Item | Detail |
 |:-:|---|---|
-| ⬜ | **Document the silent-install contract** | The Inno script *already* branches on `WizardSilent()` and forwards credentials to `DBSetupQuick`, and already checks both `Exec` success and the child exit code so a failed schema upgrade cannot masquerade as success. None of that is documented, so an admin automating a hundred installs has to read the Pascal. Publish the switches and exit codes. Cheapest high-value win on this list. |
+| ✅ | **Document the silent-install contract** | Done — see [README](README.md#unattended-install). Two limitations are now written down rather than discovered: the administrator password cannot be set on the command line at all, and a silent *upgrade* therefore cannot supply it either. Originally: The Inno script *already* branches on `WizardSilent()` and forwards credentials to `DBSetupQuick`, and already checks both `Exec` success and the child exit code so a failed schema upgrade cannot masquerade as success. None of that is documented, so an admin automating a hundred installs has to read the Pascal. Publish the switches and exit codes. Cheapest high-value win on this list. |
 | ⬜ | **Migration *into* the server** | The biggest genuine opportunity here and currently unexploited: with Microsoft turning off Basic auth and EWS, people are moving. There is no documented import path. Competitors have imapsync, `doveadm import`, PST and Maildir/mbox routes. |
 | ⬜ | **Configuration as code** | The highest-value discretionary item. Config lives in a database plus an INI file, which is the right architecture; the missing piece is a dump/diff/apply CLI so config is reviewable and reproducible. Note the Unix competitors offer less here than the "declarative config" framing suggests. |
 | ⬜ | **Prometheus naming fixes** | The bulk is idiomatic — `hmailserver_` prefix, `_total` on counters, `_seconds` base units, protocol as a label. Five cheap deviations: `hmailserver_state` is a numeric enum where OpenMetrics defines StateSet; `uptime_seconds` should be `start_time_seconds` as a Unix timestamp; no `build_info`; the two latency metrics are summaries with no quantiles, so only a mean is computable — histograms with buckets would give p95/p99; `database_up` collides conceptually with Prometheus's synthetic `up`. |
 | ⬜ | **Per-domain and per-account metric labels** | Every counter is global, which is what stops metrics becoming reporting. |
-| ⬜ | **Ship Grafana dashboard JSON in the repo** | Skip the mixin machinery; a committed dashboard is enough. |
+| ✅ | **Ship Grafana dashboard JSON in the repo** | [`hmailserver/docs/grafana-dashboard.json`](hmailserver/docs/grafana-dashboard.json) — 16 panels, built against the metric names the exporter actually publishes rather than the ones it should. The panel descriptions state where the exporter is weak, so the dashboard does not quietly imply a tail-latency signal that is not there. |
 | ⬜ | **GDPR-shaped features** | Not because the project is a controller or processor — it is neither — but because operators are. Per-account export, erasure that reaches the message store *and* the logs, and log retention limits are the concrete asks. |
 | ⬜ | **Warm-standby topology, documented and tested** | State already lives in shared SQL, so this is largely achievable today and merely unwritten. Include the reasons *not* to put the message store on SMB/CSV. |
 | ⬜ | **Backup verification** | The expectation has hardened from 3-2-1 to 3-2-1-1-0 — the trailing zero being "verified restores". Backup and restore exist; verification does not. |

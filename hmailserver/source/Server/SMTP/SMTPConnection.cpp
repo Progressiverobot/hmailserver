@@ -409,7 +409,7 @@ namespace HM
       if (sRequest.GetLength() > 510)
       {
          // This line is too long... is this an evil user?
-         EnqueueWrite_("500 Line too long.");
+         SendResponse_(500, _T("5.5.2"), _T("Line too long."));
          return;
       }
 
@@ -452,9 +452,18 @@ namespace HM
                   case SMTP_COMMAND_AUTH: ProtocolAUTH_(sRequest); break;
                   case SMTP_COMMAND_MAIL: ProtocolMAIL_(sRequest); break;
                   case SMTP_COMMAND_RCPT: ProtocolRCPT_(sRequest); break;
-                  case SMTP_COMMAND_TURN: EnqueueWrite_("502 TURN disallowed."); break;
+                  // TURN and VRFY are answered 502 in every case; the STARTTLS gate is
+                  // applied to them anyway so that no command other than NOOP, EHLO,
+                  // STARTTLS and QUIT is answered before TLS on a required port.
+                  case SMTP_COMMAND_TURN:
+                     if (CheckStartTlsRequired_())
+                        SendResponse_(502, _T("5.5.1"), _T("TURN disallowed."));
+                     break;
                   case SMTP_COMMAND_ETRN: ProtocolETRN_(sRequest); break;
-                  case SMTP_COMMAND_VRFY: EnqueueWrite_("502 VRFY disallowed."); break;
+                  case SMTP_COMMAND_VRFY:
+                     if (CheckStartTlsRequired_())
+                        SendResponse_(502, _T("5.5.1"), _T("VRFY disallowed."));
+                     break;
                   case SMTP_COMMAND_DATA: ProtocolDATA_(); break;
                   case SMTP_COMMAND_BDAT: ProtocolBDAT_(sRequest); break;
                   default:
@@ -560,7 +569,7 @@ namespace HM
 
       if (current_message_) 
       {
-         EnqueueWrite_("503 Issue a reset if you want to start over"); 
+         SendResponse_(503, _T("5.5.1"), _T("Issue a reset if you want to start over"));
          return;
       }
 
@@ -712,11 +721,11 @@ namespace HM
       if (max_message_size_kb_ > 0 && 
           iEstimatedMessageSize / 1024 > max_message_size_kb_)
       {
-         // Message too big. Reject it.
+         // Message too big. Reject it. 5.3.4 = message too big for system (RFC 3463).
          String sMessage;
-         sMessage.Format(_T("552 Message size exceeds fixed maximum message size. Size: %d KB, Max size: %d KB"), 
+         sMessage.Format(_T("Message size exceeds fixed maximum message size. Size: %d KB, Max size: %d KB"),
                iEstimatedMessageSize / 1024, max_message_size_kb_);
-         EnqueueWrite_(sMessage);
+         SendResponse_(552, _T("5.3.4"), sMessage);
          return ;
       }
       
@@ -796,7 +805,7 @@ namespace HM
 
       if (!current_message_) 
       {
-         EnqueueWrite_("503 Must have sender first."); 
+         SendResponse_(503, _T("5.5.1"), _T("Must have sender first."));
          return;
       }
 
@@ -891,7 +900,9 @@ namespace HM
          {
             AWStats::LogDeliveryFailure(GetIPAddressString(), current_message_->GetFromAddress(), sRecipientAddress, 451);
 
-            SendErrorResponse_(451, _T("4.3.2 Unable to verify the recipient at the moment. Please retry later."));
+            // The enhanced code belongs in its own field, not inside the text: passing
+            // it as text made an ESMTP session receive "451 4.3.0 4.3.2 Unable...".
+            SendResponse_(451, _T("4.3.2"), _T("Unable to verify the recipient at the moment. Please retry later."));
             return;
          }
       }
@@ -1005,7 +1016,7 @@ namespace HM
 
          if (!recipientOK && DatabaseUnavailableMarker::IsMarked())
          {
-            SendErrorResponse_(451, _T("4.3.2 Unable to verify the recipient at the moment. Please retry later."));
+            SendResponse_(451, _T("4.3.2"), _T("Unable to verify the recipient at the moment. Please retry later."));
             return;
          }
       }
@@ -1068,10 +1079,11 @@ namespace HM
          // Generate a text string to send to the client.
          String messageText = GetSpamTestResultMessage_(spam_test_results_);
 
+         // 5.7.1 = delivery not authorized, message refused (RFC 3463).
          if (spType == SPPreTransmission)
-            EnqueueWrite_("550 " + messageText);
+            SendResponse_(550, _T("5.7.1"), messageText);
          else
-            EnqueueWrite_("554 " + messageText);
+            SendResponse_(554, _T("5.7.1"), messageText);
 
          String sLogMessage;
          sLogMessage.Format(_T("hMailServer SpamProtection rejected RCPT (Sender: %s, IP:%s, Reason: %s)"), sFromAddress.c_str(), String(GetIPAddressString()).c_str(), messageText.c_str());
@@ -1206,9 +1218,9 @@ namespace HM
             iBufSizeKB, iMaxSizeDrop);
             LOG_SMTP(GetSessionID(), GetIPAddressString(), sLogData);      
             String sMessage;
-            sMessage.Format(_T("552 Message size exceeds the drop maximum message size. Size: %d KB, Max size: %d KB - DROP!"), 
+            sMessage.Format(_T("Message size exceeds the drop maximum message size. Size: %d KB, Max size: %d KB - DROP!"),
                 iBufSizeKB, iMaxSizeDrop);
-            EnqueueWrite_(sMessage);
+            SendResponse_(552, _T("5.3.4"), sMessage);
             LogAwstatsMessageRejected_();
             ResetCurrentMessage_();
             SetReceiveBinary(false);
@@ -1216,7 +1228,7 @@ namespace HM
             EnqueueDisconnect();
             return;
 
-         } 
+         }
          else 
          {
             // We need more data.
@@ -1466,7 +1478,7 @@ namespace HM
             // just below. Everything that reaches here - a database that is down,
             // locked by a backup, or out of pooled connections - is transient, so
             // the sender must be told to come back.
-            EnqueueWrite_("451 4.3.0 Your message was received but it could not be saved. Please retry later.");
+            SendResponse_(451, _T("4.3.0"), _T("Your message was received but it could not be saved. Please retry later."));
 
             // Delete the file now since we could not save it in the database.
             ResetCurrentMessage_();
@@ -1584,7 +1596,7 @@ namespace HM
    {
       if (transmission_buffer_->GetCancelTransmission())
       {
-         EnqueueWrite_("554 "  + transmission_buffer_->GetCancelMessage());
+         SendResponse_(554, _T("5.7.1"), transmission_buffer_->GetCancelMessage());
          LogAwstatsMessageRejected_();
          return false;
       }
@@ -1603,9 +1615,9 @@ namespace HM
       if (max_message_size_kb_ > 0 && (transmission_buffer_->GetSize() / 1024) > max_message_size_kb_)
       {
          String sMessage;
-         sMessage.Format(_T("554 Rejected - Message size exceeds fixed maximum message size. Size: %d KB, Max size: %d KB"), 
+         sMessage.Format(_T("Rejected - Message size exceeds fixed maximum message size. Size: %d KB, Max size: %d KB"),
             transmission_buffer_->GetSize() / 1024, max_message_size_kb_);
-         EnqueueWrite_(sMessage);
+         SendResponse_(554, _T("5.3.4"), sMessage);
          LogAwstatsMessageRejected_();
          return false;
       }
@@ -1615,10 +1627,8 @@ namespace HM
       {
          if (!CheckLineEndings_())
          {
-            String sMessage;
-            sMessage.Format(_T("554 Rejected - Message containing bare LF's."));
-            
-            EnqueueWrite_(sMessage);
+            // 5.6.0 = other or undefined media (message content) error (RFC 3463).
+            SendResponse_(554, _T("5.6.0"), _T("Rejected - Message containing bare LF's."));
             LogAwstatsMessageRejected_();
             return false;
          }
@@ -1657,22 +1667,21 @@ namespace HM
          {
          case 1:
             {
-               String sErrorMessage = "554 Rejected";
-               EnqueueWrite_(sErrorMessage);
+               // 5.7.1 / 4.7.0: rejected by local policy (a script), permanently or
+               // temporarily. The numeric codes are unchanged.
+               SendResponse_(554, _T("5.7.1"), _T("Rejected"));
                LogAwstatsMessageRejected_();
                return false;
             }
          case 2:
             {
-               String sErrorMessage = "554 " + pResult->GetMessage();
-               EnqueueWrite_(sErrorMessage);
+               SendResponse_(554, _T("5.7.1"), pResult->GetMessage());
                LogAwstatsMessageRejected_();
                return false;
             }
          case 3:
             {
-               String sErrorMessage = "453 " + pResult->GetMessage();
-               EnqueueWrite_(sErrorMessage);
+               SendResponse_(453, _T("4.7.0"), pResult->GetMessage());
                LogAwstatsMessageRejected_();
                return false;
             }
@@ -1693,7 +1702,7 @@ namespace HM
       String sErrorMsg = Formatter::Format("Rejected message because no mail data has been saved in file {0}", file_name);
       ErrorManager::Instance()->ReportError(ErrorManager::Critical, 5019, "SMTPConnectionSMTPConnection::HandleUnableToSaveMessage_", sErrorMsg);
 
-      EnqueueWrite_("451 Rejected - No data saved.");
+      SendResponse_(451, _T("4.3.0"), _T("Rejected - No data saved."));
       LogAwstatsMessageRejected_();
    }
 
@@ -1938,14 +1947,17 @@ namespace HM
    void
    SMTPConnection::OnConnectionTimeout()
    {
-      EnqueueWrite_("421 Connection timeout.");
+      // 4.4.2 = bad connection (RFC 3463).
+      SendResponse_(421, _T("4.4.2"), _T("Connection timeout."));
    }
-  
+
    void
    SMTPConnection::OnExcessiveDataReceived()
    {
       ResetCurrentMessage_();
-      EnqueueWrite_("421 Excessive amounts of data sent to server.");
+
+      // 4.7.0 = other or undefined security status (RFC 3463).
+      SendResponse_(421, _T("4.7.0"), _T("Excessive amounts of data sent to server."));
    }
 
    void 
@@ -2032,22 +2044,22 @@ namespace HM
          {
          case 1:
          {
-            String sErrorMessage = "554 Rejected";
-            EnqueueWrite_(sErrorMessage);
+            // 5.7.1 / 4.7.0: rejected by local policy (a script). Note that
+            // esmtp_session_ is not set until the EHLO reply has been sent, so a
+            // rejection here is still answered without an enhanced code.
+            SendResponse_(554, _T("5.7.1"), _T("Rejected"));
             LogAwstatsMessageRejected_();
             return;
          }
          case 2:
          {
-            String sErrorMessage = "554 " + pResult->GetMessage();
-            EnqueueWrite_(sErrorMessage);
+            SendResponse_(554, _T("5.7.1"), pResult->GetMessage());
             LogAwstatsMessageRejected_();
             return;
          }
          case 3:
          {
-            String sErrorMessage = "453 " + pResult->GetMessage();
-            EnqueueWrite_(sErrorMessage);
+            SendResponse_(453, _T("4.7.0"), pResult->GetMessage());
             LogAwstatsMessageRejected_();
             return;
          }
@@ -2108,22 +2120,20 @@ namespace HM
          {
          case 1:
          {
-            String sErrorMessage = "554 Rejected";
-            EnqueueWrite_(sErrorMessage);
+            // 5.7.1 / 4.7.0: rejected by local policy (a script).
+            SendResponse_(554, _T("5.7.1"), _T("Rejected"));
             LogAwstatsMessageRejected_();
             return;
          }
          case 2:
          {
-            String sErrorMessage = "554 " + pResult->GetMessage();
-            EnqueueWrite_(sErrorMessage);
+            SendResponse_(554, _T("5.7.1"), pResult->GetMessage());
             LogAwstatsMessageRejected_();
             return;
          }
          case 3:
          {
-            String sErrorMessage = "453 " + pResult->GetMessage();
-            EnqueueWrite_(sErrorMessage);
+            SendResponse_(453, _T("4.7.0"), pResult->GetMessage());
             LogAwstatsMessageRejected_();
             return;
          }
@@ -2170,24 +2180,24 @@ namespace HM
       // with BDAT; mixing in a DATA command is illegal.
       if (bdat_active_)
       {
-         EnqueueWrite_("503 Bad sequence of commands: BDAT already used in this transaction.");
+         SendResponse_(503, _T("5.5.1"), _T("Bad sequence of commands: BDAT already used in this transaction."));
          return;
       }
 
       if (!current_message_)
       {
          // User tried to send a mail without specifying a correct mail from or rcpt to.
-         EnqueueWrite_("503 Must have sender and recipient first.");
+         SendResponse_(503, _T("5.5.1"), _T("Must have sender and recipient first."));
 
          return;
-      }  
+      }
       else if ( current_message_->GetRecipients()->GetCount() == 0)
       {
          // User tried to send a mail without specifying a correct mail from or rcpt to.
-         EnqueueWrite_("503 Must have sender and recipient first.");
+         SendResponse_(503, _T("5.5.1"), _T("Must have sender and recipient first."));
 
          return;
-      }  
+      }
 
       // Let's add an event call on DATA so we can act on reception during SMTP conversation..
       if (Configuration::Instance()->GetUseScriptServer())
@@ -2222,22 +2232,20 @@ namespace HM
          {
          case 1:
             {
-               String sErrorMessage = "554 Rejected";
-               EnqueueWrite_(sErrorMessage);
+               // 5.7.1 / 4.7.0: rejected by local policy (a script).
+               SendResponse_(554, _T("5.7.1"), _T("Rejected"));
                LogAwstatsMessageRejected_();
                return;
             }
          case 2:
             {
-               String sErrorMessage = "554 " + pResult->GetMessage();
-               EnqueueWrite_(sErrorMessage);
+               SendResponse_(554, _T("5.7.1"), pResult->GetMessage());
                LogAwstatsMessageRejected_();
                return;
             }
          case 3:
             {
-               String sErrorMessage = "453 " + pResult->GetMessage();
-               EnqueueWrite_(sErrorMessage);
+               SendResponse_(453, _T("4.7.0"), pResult->GetMessage());
                LogAwstatsMessageRejected_();
                return;
             }
@@ -2282,7 +2290,7 @@ namespace HM
       std::vector<String> tokens = StringParser::SplitString(sRequest, " ");
       if (tokens.size() < 2 || tokens.size() > 3)
       {
-         EnqueueWrite_("501 Syntax: BDAT chunk-size [LAST]");
+         SendResponse_(501, _T("5.5.4"), _T("Syntax: BDAT chunk-size [LAST]"));
          pending_disconnect_ = true;
          EnqueueDisconnect();
          return;
@@ -2292,7 +2300,7 @@ namespace HM
       if (sizeToken.IsEmpty() || sizeToken.GetLength() > 18)
       {
          // Empty or implausibly large (> 10^18) chunk size.
-         EnqueueWrite_("501 Syntax error: invalid BDAT chunk-size.");
+         SendResponse_(501, _T("5.5.4"), _T("Syntax error: invalid BDAT chunk-size."));
          pending_disconnect_ = true;
          EnqueueDisconnect();
          return;
@@ -2304,7 +2312,7 @@ namespace HM
          TCHAR c = sizeToken[i];
          if (c < '0' || c > '9')
          {
-            EnqueueWrite_("501 Syntax error: BDAT chunk-size must be a non-negative integer.");
+            SendResponse_(501, _T("5.5.4"), _T("Syntax error: BDAT chunk-size must be a non-negative integer."));
             pending_disconnect_ = true;
             EnqueueDisconnect();
             return;
@@ -2319,7 +2327,7 @@ namespace HM
          lastToken.MakeUpper();
          if (lastToken != _T("LAST"))
          {
-            EnqueueWrite_("501 Syntax: BDAT chunk-size [LAST]");
+            SendResponse_(501, _T("5.5.4"), _T("Syntax: BDAT chunk-size [LAST]"));
             pending_disconnect_ = true;
             EnqueueDisconnect();
             return;
@@ -2341,7 +2349,7 @@ namespace HM
       if (!current_message_ || current_message_->GetRecipients()->GetCount() == 0)
       {
          // BDAT issued without a sender and at least one recipient.
-         EnqueueWrite_("503 Must have sender and recipient first.");
+         SendResponse_(503, _T("5.5.1"), _T("Must have sender and recipient first."));
          StartBdatDiscard_((size_t)chunkSize);
          return;
       }
@@ -2474,9 +2482,9 @@ namespace HM
          LOG_SMTP(GetSessionID(), GetIPAddressString(), sLogData);
 
          String sMessage;
-         sMessage.Format(_T("552 Message size exceeds the drop maximum message size. Size: %d KB, Max size: %d KB - DROP!"),
+         sMessage.Format(_T("Message size exceeds the drop maximum message size. Size: %d KB, Max size: %d KB - DROP!"),
             iBufSizeKB, iMaxSizeDrop);
-         EnqueueWrite_(sMessage);
+         SendResponse_(552, _T("5.3.4"), sMessage);
          LogAwstatsMessageRejected_();
          ResetCurrentMessage_();
          SetReceiveBinary(false);
@@ -2795,7 +2803,34 @@ namespace HM
       }
    }
 
-   void 
+   bool
+   SMTPConnection::RelayToRemotePermittedWithoutAuth_()
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // True when the connecting IP is in a security range which both permits relaying
+   // to a remote destination and does not require SMTP authentication for it. This
+   // is the same pair of decisions RCPT TO makes (GetAllowOption + the matching
+   // RequireSMTPAuth* flag), just without a concrete envelope to classify.
+   //---------------------------------------------------------------------------()
+   {
+      std::shared_ptr<SecurityRange> securityRange = GetSecurityRange();
+
+      // No matching range means nothing has granted this client anything: deny.
+      if (!securityRange)
+         return false;
+
+      if (securityRange->GetAllowOption(SecurityRange::IPRANGE_RELAY_REMOTE_TO_REMOTE) &&
+          !securityRange->GetRequireSMTPAuthExternalToExternal())
+         return true;
+
+      if (securityRange->GetAllowOption(SecurityRange::IPRANGE_RELAY_LOCAL_TO_REMOTE) &&
+          !securityRange->GetRequireSMTPAuthLocalToExternal())
+         return true;
+
+      return false;
+   }
+
+   void
    SMTPConnection::ProtocolETRN_(const String &sRequest)
    {
       // RFC ETRN Codes
@@ -2808,8 +2843,25 @@ namespace HM
       //   500 Syntax Error
       //   501 Syntax Error in Parameters
 
+      // 530 Must issue STARTTLS first
+      // to every command other than NOOP, EHLO, STARTTLS, or QUIT. ETRN used to be
+      // missing from this list, so on a STARTTLS-required port a remote party could
+      // trigger a queue flush before the session was encrypted.
+      if (!CheckStartTlsRequired_())
+         return;
 
-// WE SHOULD ADD SOME LOGGING HERE
+      // ETRN makes the server release queued mail towards a route, i.e. it asks for
+      // relaying to be performed on the client's behalf. Before anything happens the
+      // client must have earned that right: it has either authenticated, or it
+      // connects from a security range which is allowed to relay to a remote
+      // destination without authenticating. Previously ETRN performed no check at
+      // all, so any anonymous client could flush the queue at will.
+      if (!isAuthenticated_ && !RelayToRemotePermittedWithoutAuth_())
+      {
+         SendErrorResponse_(530, "SMTP authentication is required.");
+         LOG_SMTP(GetSessionID(), GetIPAddressString(), "SMTPDeliverer - ETRN - 530 Client is neither authenticated nor permitted to relay.");
+         return;
+      }
 
       std::vector<String> vecParams = StringParser::SplitString(sRequest,  " ");
 
@@ -2859,7 +2911,7 @@ namespace HM
             }
             else
             {
-               EnqueueWrite_("458 Unable to queue messages for " + sETRNDomain.ToLower());
+               SendResponse_(458, _T("4.3.0"), _T("Unable to queue messages for ") + sETRNDomain.ToLower());
                LOG_SMTP(GetSessionID(), GetIPAddressString(), "SMTPDeliverer - ETRN - 458 Unable to queue messages");      
             }
          return;
@@ -2868,7 +2920,7 @@ namespace HM
        else
        {
           // Send that we don't accept ETRN for that domain or invalid param
-          EnqueueWrite_("458 Error getting info for " + sETRNDomain.ToLower());
+          SendResponse_(458, _T("4.3.0"), _T("Error getting info for ") + sETRNDomain.ToLower());
           LOG_SMTP(GetSessionID(), GetIPAddressString(), "SMTPDeliverer - ETRN - Could not get Route values");      
           return;
        }
@@ -2876,7 +2928,7 @@ namespace HM
      else
      {
          // Send that we don't accept ETRN for that domain or invalid param
-         EnqueueWrite_("501 ETRN not supported for " + sETRNDomain.ToLower());
+         SendResponse_(501, _T("5.5.4"), _T("ETRN not supported for ") + sETRNDomain.ToLower());
          LOG_SMTP(GetSessionID(), GetIPAddressString(), "SMTPDeliverer - ETRN - Domain is not Route");      
          return;
      }

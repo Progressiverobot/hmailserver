@@ -119,6 +119,35 @@ $dll = Join-Path $repoRoot 'hmailserver\test\RegressionTests\bin\x64\Debug\Regre
 Report (Test-Path $nunit) 'NUnit console runner present' 'Restore packages via build\build-tests.ps1.'
 Report (Test-Path $dll) 'RegressionTests.dll built' 'Build via build\build-tests.ps1.'
 
+# 10. Orphan test files.
+#
+# RegressionTests.csproj is a legacy non-SDK project: it lists every source file
+# explicitly, with no glob. So a new test file that nobody adds to the csproj is
+# not merely unrun - it is invisible, and a green suite says nothing about it.
+# This is not hypothetical: SSL\TlsOptionsTests.cs sat committed and uncompiled
+# for months, six tests that had never executed once, and it was only found by
+# reading the csproj against the directory. Cheap check, so it runs every time.
+$testRoot = Join-Path $repoRoot 'hmailserver\test\RegressionTests'
+$csprojPath = Join-Path $testRoot 'RegressionTests.csproj'
+if (Test-Path $csprojPath) {
+    $csprojText = Get-Content -Raw -LiteralPath $csprojPath
+    $included = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($m in [regex]::Matches($csprojText, '<Compile\s+Include="([^"]+)"')) {
+        [void]$included.Add($m.Groups[1].Value.Replace('/', '\'))
+    }
+
+    $skip = @('\bin\', '\obj\', '\Properties\', '\packages\')
+    $orphans = @()
+    foreach ($file in Get-ChildItem -LiteralPath $testRoot -Recurse -Filter *.cs -File) {
+        $rel = $file.FullName.Substring($testRoot.Length).TrimStart('\')
+        if ($skip | Where-Object { ('\' + $rel) -like ("*" + $_ + "*") }) { continue }
+        if (-not $included.Contains($rel)) { $orphans += $rel }
+    }
+
+    Report ($orphans.Count -eq 0) 'No orphan test files' `
+        ("Not in RegressionTests.csproj, so never compiled or run: {0}" -f ($orphans -join ', '))
+}
+
 Write-Host ''
 if ($failures -eq 0) {
     Write-Host 'Pre-flight passed - safe to run the suite.' -ForegroundColor Green

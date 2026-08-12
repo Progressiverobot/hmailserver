@@ -1,9 +1,10 @@
 name: CI
 
-# Builds the .NET 8 Control Panel (hMailCP) and the .NET tools solution on
-# every push / PR. This catches C# regressions cheaply. The tools build against
+# Builds the .NET 10 Control Panel (hMailCP) and the .NET tools solution on
+# every push / PR, and verifies the committed generated code still matches its
+# sources. This catches C# regressions cheaply. The tools build against
 # the checked-in COM interop wrapper (source/Tools/Interop), so no registered
-# typelib is needed. The C++ server build + the 898-test regression suite need
+# typelib is needed. The C++ server build + the 1049-test regression suite need
 # the prebuilt native libraries (OpenSSL 4.0.x, Boost 1.91, PostgreSQL 18 libpq —
 # see libraries/build-dependencies.ps1) and a database service, so they run in the
 # separate, manually-triggered server-build workflow.
@@ -20,16 +21,39 @@ permissions:
 
 jobs:
   control-panel:
-    name: Build Control Panel (.NET 8)
+    name: Build Control Panel (.NET 10)
     runs-on: windows-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Set up .NET 8
+      # The Ctrl+K palette's settings index is generated code that is committed
+      # so it stays reviewable in diffs. Nothing regenerates it at build time,
+      # so verify it here instead: re-run the generator and fail if the working
+      # tree moves. This needs neither the SDK nor a build, so it runs first and
+      # costs a few seconds. The generator pins its own read and write encodings,
+      # so it produces the same bytes here as on a maintainer's machine, and
+      # .gitattributes (* text=auto eol=crlf) keeps line endings out of it.
+      - name: Regenerate the settings search index
+        shell: pwsh
+        run: ./build/generate-settings-index.ps1
+
+      - name: Verify the committed settings index is up to date
+        shell: pwsh
+        run: |
+          $index = 'hmailserver/source/Tools/ControlPanel/Services/SettingsSearchIndex.g.cs'
+          if (git status --porcelain -- $index)
+          {
+             git --no-pager diff -- $index
+             Write-Host "::error file=$index::Out of date. Run ./build/generate-settings-index.ps1 and commit the result."
+             exit 1
+          }
+          Write-Host "$index matches the settings page definitions."
+
+      - name: Set up .NET 10
         uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '10.0.x'
 
       - name: Restore
         run: dotnet restore hmailserver/source/Tools/ControlPanel/ControlPanel.csproj
@@ -74,10 +98,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Set up .NET 8
+      - name: Set up .NET 10
         uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '10.0.x'
 
       - name: Build tools solution (Release)
         run: dotnet build "hmailserver/source/Tools/hMailServer Tools.sln" -c Release -warnaserror

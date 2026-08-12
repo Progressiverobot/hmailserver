@@ -2,7 +2,7 @@ name: CodeQL
 
 # Static security analysis for the C# code (Control Panel). C++ CodeQL needs the
 # native server build (OpenSSL/Boost/libpq) and is deferred to the server-build
-# pipeline; this workflow scopes the build to the .NET 8 Control Panel.
+# pipeline; this workflow scopes the build to the .NET 10 Control Panel.
 
 on:
   push:
@@ -28,10 +28,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Set up .NET 8
+      - name: Set up .NET 10
         uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '10.0.x'
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4

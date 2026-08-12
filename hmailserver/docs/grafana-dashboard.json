@@ -1,0 +1,234 @@
+{
+  "__comment": "hMailServer Grafana dashboard. Built against the metric names actually exposed by MetricsServer.cpp as of 6.2.18 - verified by grep, not assumed. Import via Dashboards > New > Import and pick your Prometheus datasource. Two known rough edges are inherent to the current exporter and are called out in the panel descriptions: hmailserver_state is a numeric enum rather than an OpenMetrics StateSet, and the two latency families are summaries carrying only _sum and _count, so only a mean is computable - no p95/p99. Both are tracked in Roadmap.md.",
+  "title": "hMailServer",
+  "uid": "hmailserver-overview",
+  "tags": ["hmailserver", "mail"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "1m",
+  "time": { "from": "now-24h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {},
+        "hide": 0,
+        "label": "Datasource"
+      },
+      {
+        "name": "instance",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "query": "label_values(hmailserver_state, instance)",
+        "refresh": 1,
+        "includeAll": true,
+        "multi": true,
+        "label": "Instance"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Health",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false
+    },
+    {
+      "type": "stat",
+      "title": "Server state",
+      "description": "1=stopped, 2=starting, 3=running, 4=stopping. A numeric enum rather than an OpenMetrics StateSet, so the mapping has to live in the panel rather than in a label. Converting the exporter is on the roadmap.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+      "targets": [
+        { "expr": "hmailserver_state{instance=~\"$instance\"}", "legendFormat": "{{instance}}", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "1": { "text": "Stopped", "color": "red", "index": 0 }, "2": { "text": "Starting", "color": "yellow", "index": 1 }, "3": { "text": "Running", "color": "green", "index": 2 }, "4": { "text": "Stopping", "color": "orange", "index": 3 } } }
+          ],
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "text", "value": null }] }
+        }
+      },
+      "options": { "colorMode": "background", "graphMode": "none", "textMode": "value" }
+    },
+    {
+      "type": "stat",
+      "title": "Database",
+      "description": "hmailserver_database_up. Note the name collides conceptually with Prometheus's own synthetic up - do not confuse a scrape failure with a database failure.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+      "targets": [
+        { "expr": "hmailserver_database_up{instance=~\"$instance\"}", "legendFormat": "{{instance}}", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "Down", "color": "red", "index": 0 }, "1": { "text": "Connected", "color": "green", "index": 1 } } }
+          ]
+        }
+      },
+      "options": { "colorMode": "background", "graphMode": "none", "textMode": "value" }
+    },
+    {
+      "type": "stat",
+      "title": "Uptime",
+      "description": "hmailserver_uptime_seconds is a counter from zero rather than a start timestamp, so a restart is a drop to zero rather than something changes() can detect cleanly.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
+      "targets": [
+        { "expr": "hmailserver_uptime_seconds{instance=~\"$instance\"}", "legendFormat": "{{instance}}", "refId": "A" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "options": { "colorMode": "none", "graphMode": "area", "textMode": "value" }
+    },
+    {
+      "type": "stat",
+      "title": "Active sessions",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+      "targets": [
+        { "expr": "hmailserver_sessions{instance=~\"$instance\"}", "legendFormat": "{{instance}} {{protocol}}", "refId": "A" }
+      ],
+      "options": { "colorMode": "none", "graphMode": "area", "textMode": "value_and_name" }
+    },
+    {
+      "type": "stat",
+      "title": "Missing message files",
+      "description": "hmailserver_messagestore_missing_files. Anything above zero means the database references a file that is not on disk. Alert on this.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+      "targets": [
+        { "expr": "hmailserver_messagestore_missing_files{instance=~\"$instance\"}", "legendFormat": "{{instance}}", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] },
+          "color": { "mode": "thresholds" }
+        }
+      },
+      "options": { "colorMode": "background", "graphMode": "none", "textMode": "value" }
+    },
+    {
+      "type": "row",
+      "title": "Mail flow",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "Delivery outcomes",
+      "description": "Delivered, deferred and bounced per second. Stacked, because these are outcomes of the same population and genuinely sum to the total attempted.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "targets": [
+        { "expr": "rate(hmailserver_messages_delivered_total{instance=~\"$instance\"}[5m])", "legendFormat": "delivered", "refId": "A" },
+        { "expr": "rate(hmailserver_messages_deferred_total{instance=~\"$instance\"}[5m])", "legendFormat": "deferred", "refId": "B" },
+        { "expr": "rate(hmailserver_messages_bounced_total{instance=~\"$instance\"}[5m])", "legendFormat": "bounced", "refId": "C" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": { "lineWidth": 1, "fillOpacity": 35, "stacking": { "mode": "normal" }, "lineInterpolation": "linear", "showPoints": "never" }
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "delivered" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#1baf7a" } }] },
+          { "matcher": { "id": "byName", "options": "deferred" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#eda100" } }] },
+          { "matcher": { "id": "byName", "options": "bounced" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#e34948" } }] }
+        ]
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Delivery queue depth",
+      "description": "Depth alone cannot distinguish a burst from a stuck relay - for that you want oldest-message-age, which the exporter does not yet expose (roadmap).",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "targets": [
+        { "expr": "hmailserver_delivery_queue_messages{instance=~\"$instance\"}", "legendFormat": "{{instance}}", "refId": "A" }
+      ],
+      "fieldConfig": { "defaults": { "custom": { "lineWidth": 2, "fillOpacity": 10, "lineInterpolation": "linear", "showPoints": "never" } } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Messages processed, spam blocked, viruses removed",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+      "targets": [
+        { "expr": "rate(hmailserver_processed_messages_total{instance=~\"$instance\"}[5m])", "legendFormat": "processed", "refId": "A" },
+        { "expr": "rate(hmailserver_spam_messages_total{instance=~\"$instance\"}[5m])", "legendFormat": "spam blocked", "refId": "B" },
+        { "expr": "rate(hmailserver_viruses_removed_total{instance=~\"$instance\"}[5m])", "legendFormat": "viruses removed", "refId": "C" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "lineWidth": 1, "fillOpacity": 0, "lineInterpolation": "linear", "showPoints": "never" } } }
+    },
+    {
+      "type": "row",
+      "title": "Authentication and TLS",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 },
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "Authentication outcomes",
+      "description": "A sustained rise in failures with flat successes is the shape of a credential-stuffing run. Counters are global - there are no per-domain or per-account labels yet (roadmap).",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 23 },
+      "targets": [
+        { "expr": "rate(hmailserver_auth_success_total{instance=~\"$instance\"}[5m])", "legendFormat": "success", "refId": "A" },
+        { "expr": "rate(hmailserver_auth_failures_total{instance=~\"$instance\"}[5m])", "legendFormat": "failure", "refId": "B" }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "custom": { "lineWidth": 1, "fillOpacity": 10, "lineInterpolation": "linear", "showPoints": "never" } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "success" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#1baf7a" } }] },
+          { "matcher": { "id": "byName", "options": "failure" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#e34948" } }] }
+        ]
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "TLS handshakes",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 23 },
+      "targets": [
+        { "expr": "rate(hmailserver_tls_handshakes_total{instance=~\"$instance\"}[5m])", "legendFormat": "completed", "refId": "A" },
+        { "expr": "rate(hmailserver_tls_handshake_failures_total{instance=~\"$instance\"}[5m])", "legendFormat": "failed", "refId": "B" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "lineWidth": 1, "fillOpacity": 10, "lineInterpolation": "linear", "showPoints": "never" } } }
+    },
+    {
+      "type": "row",
+      "title": "Database and latency",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 31 },
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "Mean latency",
+      "description": "MEAN ONLY. Both families are declared as Prometheus summaries but emit no quantiles, so _sum/_count is all there is - p95 and p99 are not computable. Converting them to histograms is on the roadmap; until then do not read this panel as a tail-latency signal.",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+      "targets": [
+        { "expr": "rate(hmailserver_command_processing_seconds_sum{instance=~\"$instance\"}[5m]) / clamp_min(rate(hmailserver_command_processing_seconds_count{instance=~\"$instance\"}[5m]), 0.001)", "legendFormat": "command processing (mean)", "refId": "A" },
+        { "expr": "rate(hmailserver_db_query_seconds_sum{instance=~\"$instance\"}[5m]) / clamp_min(rate(hmailserver_db_query_seconds_count{instance=~\"$instance\"}[5m]), 0.001)", "legendFormat": "database query (mean)", "refId": "B" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "lineWidth": 2, "fillOpacity": 0, "lineInterpolation": "linear", "showPoints": "never" } } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Database connections and slow queries",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
+      "targets": [
+        { "expr": "hmailserver_db_connections{instance=~\"$instance\"}", "legendFormat": "connections {{state}}", "refId": "A" },
+        { "expr": "rate(hmailserver_db_slow_queries_total{instance=~\"$instance\"}[5m])", "legendFormat": "slow queries/s", "refId": "B" }
+      ],
+      "fieldConfig": { "defaults": { "custom": { "lineWidth": 2, "fillOpacity": 0, "lineInterpolation": "linear", "showPoints": "never" } } }
+    }
+  ]
+}

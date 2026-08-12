@@ -55,11 +55,23 @@ namespace HM
              const AnsiString &selector,
              const String &privateKeyFile)
    {
+      // The sealing identity is supplied by the caller and is not necessarily
+      // the author domain - see DKIMSigner::Sign. Without a complete identity
+      // there is nothing to seal with, so skip rather than emit a broken set.
+      if (domain.IsEmpty() || selector.IsEmpty() || privateKeyFile.IsEmpty())
+      {
+         LOG_DEBUG("ARC: No sealing domain, selector or private key was given. Not sealing.");
+         return false;
+      }
+
       const String fileName = PersistentMessage::GetFileName(message);
 
       AnsiString header = PersistentMessage::LoadHeader(fileName);
       if (header.IsEmpty())
+      {
+         LOG_DEBUG("ARC: The message header could not be loaded. Not sealing.");
          return false;
+      }
 
       // Locate any existing ARC sets in the message.
       std::map<int, ArcSet> existingSets;

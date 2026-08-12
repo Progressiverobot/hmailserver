@@ -1,4 +1,4 @@
-hMailServer
+﻿hMailServer
 ===========
 
 hMailServer is a free, open source email server for Microsoft Windows, implementing SMTP, IMAP and POP3.
@@ -17,6 +17,7 @@ Contents
 * [Capabilities](#capabilities) — what the server does
 * [Technology](#technology) — what it is built on
 * [Administration](#administration) — the Control Panel and the APIs
+* [Installing](#installing) — supported platforms and unattended install
 * [Building hMailServer](#building-hmailserver)
 * [Configuration reference](#configuration-reference)
 
@@ -107,6 +108,49 @@ Administration
 **REST administration API** for domains, accounts, the delivery queue, server status and TLSA records, with authenticated access and bounded request handling (a size cap and a receive deadline, so a slow or oversized request cannot occupy a worker).
 
 **Client autoconfiguration**: Thunderbird autoconfig and Outlook autodiscover are served for every local domain, so clients configure themselves from an address and password.
+
+Installing
+==========
+
+Run the installer from the [Releases page](https://github.com/Progressiverobot/hmailserver/releases). It creates the Windows service, initialises or upgrades the database, and installs the .NET 10 Desktop Runtime if it is missing.
+
+Supported platforms
+-------------------
+
+64-bit Windows only, from **Windows 10 1607 / Windows Server 2016** (build 14393) upward — the installer enforces this. That floor is set by the .NET 10 Desktop Runtime the Control Panel and setup tools need, and .NET 10 still supports Server 2012, so the floor here is deliberately conservative rather than as low as it could be.
+
+Planned, so it is not a surprise: the intention is to raise the *declared* floor to **Windows Server 2019 / Windows 10 21H2** with the first release after **12 January 2027**, when Server 2016 leaves support. That costs nothing technically — Server 2019 is the same Windows API level — and everything in support through 2029 stays covered. Anyone still on Server 2016 after that date should expect no testing rather than active removal.
+
+Unattended install
+------------------
+
+The installer is Inno Setup, so it takes the standard switches, plus one of its own. Documented here because otherwise the only way to find out is to read the Pascal.
+
+| Switch | Effect |
+|---|---|
+| `/SILENT` | No wizard; progress window only |
+| `/VERYSILENT` | No wizard and no progress window |
+| `/SUPPRESSMSGBOXES` | Suppress message boxes. Worth pairing with the silent switches — some failure paths still raise one |
+| `/LOG="<path>"` | Write an install log. Use it; it is the only record of what happened |
+| `/DIR="<path>"` | Installation directory |
+| `/COMPONENTS="server,admintools,controlpanel"` | Which components to install. `server` is the service itself; `admintools` registers the COM type library so scripts can administer a *remote* instance; `controlpanel` installs the admin GUI. The Control Panel does not need `admintools` — it binds late through IDispatch |
+| `/useinternaldbms=true\|false` | **Custom to this installer.** `true` (the default) uses the bundled SQL Server Compact database. Set `false` when pointing at an existing MySQL, MariaDB, PostgreSQL or MS SQL server |
+
+Example:
+
+```bat
+hMailServer-6.2.18-x64.exe /VERYSILENT /SUPPRESSMSGBOXES /LOG="C:\Temp\hmail-install.log" ^
+   /COMPONENTS="server,controlpanel" /useinternaldbms=true
+```
+
+Two things to know, because they are limitations rather than choices:
+
+* **The administrator password cannot be set on the command line.** It is only collected by the wizard page, so a silent install leaves it unset and the database tool runs without it. Set it afterwards — through the Control Panel, or via the COM API (`Application.Authenticate` then `Settings.SetAdministratorPassword`).
+* **A silent install of an existing installation still needs the password** for the database upgrade, and cannot prompt for it. Upgrade interactively, or set the password non-interactively first.
+
+The installer checks both that the database tool launched *and* its exit code, so a failed or cancelled database create/upgrade cannot report a successful install — the service would otherwise come up against a missing or outdated schema. Treat a non-zero installer exit code as a failed install and read the log.
+
+Do not run the installer on a machine you are also using to build the server: it takes over the service path, the COM `LocalServer32` registration and the 32-bit `InstallLocation` registry value, which is exactly the state a development checkout needs to control.
 
 Building hMailServer
 ====================

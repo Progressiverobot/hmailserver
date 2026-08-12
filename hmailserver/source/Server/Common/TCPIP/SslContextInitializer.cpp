@@ -29,7 +29,7 @@ namespace HM
       }
 
       SetContextOptions_(context);
-      EnableEllipticCurveCrypto_(context);
+      SetKeyExchangeGroups_(context);
 
       SetCipherList_(context);
 
@@ -162,14 +162,12 @@ namespace HM
 
       if (result == 0)
       {
-         // Unable to set the SSL cipher list. Collect the error code from OpenSSL so that 
-         // we can include that in the error message we log.
-         int errorCode = ERR_get_error();
-         const int bufferSize = 150;
-         AnsiString message;
-         ERR_error_string_n(errorCode, message.GetBuffer(bufferSize), bufferSize);
-
-         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5511, "SslContextInitializer::SetCipherList_", Formatter::Format("Failed to set SSL ciphers. Message: {0}", message));
+         // Unable to set the SSL cipher list. Collect the error from OpenSSL so that
+         // we can include it in the error message we log. GetOpenSslError_ also
+         // empties the error queue, which matters here: InitServer goes on to load
+         // the certificate and private key, and a leftover error from this call
+         // would otherwise surface as a bogus failure of one of those.
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5511, "SslContextInitializer::SetCipherList_", Formatter::Format("Failed to set SSL ciphers. Message: {0}", String(GetOpenSslError_())));
       }
 
    }
@@ -205,14 +203,109 @@ namespace HM
       SSL_CTX_set_options(ssl, options);
    }
 
-   void
-   SslContextInitializer::EnableEllipticCurveCrypto_(boost::asio::ssl::context& context)
+   AnsiString
+   SslContextInitializer::GetOpenSslError_()
    {
+      unsigned long firstError = ERR_get_error();
+
+      // Discard anything else this failure queued. The queue is per-thread and is
+      // shared with every other OpenSSL call, so errors we leave behind would be
+      // picked up and reported by an unrelated call later on in this same thread.
+      ERR_clear_error();
+
+      if (firstError == 0)
+         return AnsiString("no OpenSSL error was reported");
+
+      char buffer[256] = { 0 };
+      ERR_error_string_n(firstError, buffer, sizeof(buffer));
+
+      return AnsiString(buffer);
+   }
+
+   bool
+   SslContextInitializer::ContainsGroupToAdd_(const AnsiString& groupList)
+   {
+      // OpenSSL's group-list syntax uses ':' between groups, '/' between
+      // preference tuples, and the entry prefixes '?' (ignore this group if this
+      // build does not implement it), '*' (send a key share for it - client side
+      // only) and '-' (remove the group). A list built only from '-' removals is
+      // accepted by OpenSSL but leaves the context with no groups at all, and a
+      // context with no groups cannot complete a TLS 1.3 handshake. Require at
+      // least one entry that adds a group, so that such a list is treated as a
+      // configuration error instead of silently disabling TLS.
+      AnsiString flattenedList = groupList;
+      flattenedList.Replace("/", ":");
+
+      std::vector<AnsiString> entries = StringParser::SplitString(flattenedList, ":");
+
+      for (AnsiString entry : entries)
+      {
+         while (!entry.IsEmpty() && (entry.GetAt(0) == '?' || entry.GetAt(0) == '*'))
+            entry = entry.Mid(1);
+
+         if (!entry.IsEmpty() && entry.GetAt(0) != '-')
+            return true;
+      }
+
+      return false;
+   }
+
+   void
+   SslContextInitializer::SetKeyExchangeGroups_(boost::asio::ssl::context& context)
+   {
+      // The classical-only list hMailServer used before post-quantum groups
+      // existed. Every peer we have ever interoperated with supports one of these,
+      // so it is what we fall back to when the configured list is unusable. This
+      // function must never return without a list OpenSSL accepted: a context left
+      // with no usable group cannot complete a handshake at all, which would take
+      // TLS down on every listener at once.
+      const AnsiString classicalGroups = "secp384r1:x25519:secp256r1";
+
+      AnsiString configuredGroups = IniFileSettings::Instance()->GetTlsKeyExchangeGroups();
+
+      configuredGroups.Replace("\r", "");
+      configuredGroups.Replace("\n", "");
+      configuredGroups.Replace(" ", "");
+      configuredGroups = configuredGroups.Trim();
+
       SSL_CTX* ssl = context.native_handle();
 
-      if (1 != SSL_CTX_set1_curves_list(ssl, "secp384r1:x25519:secp256r1"))
+      if (!configuredGroups.IsEmpty())
       {
-         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5511, "SslContextInitializer::EnableEllipticCurveCrypto_", "Failed to enable TLS EC curves");
+         // Note that we must not hand an empty string to OpenSSL: it treats that
+         // as "no groups", *succeeds*, and leaves the context unable to negotiate
+         // a key exchange. Hence the check above rather than relying on the return
+         // value below.
+         if (!ContainsGroupToAdd_(configuredGroups))
+         {
+            ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5720, "SslContextInitializer::SetKeyExchangeGroups_",
+               Formatter::Format("The configured TLS key exchange groups '{0}' would leave no group enabled. Falling back to '{1}'.",
+                  String(configuredGroups), String(classicalGroups)));
+         }
+         else if (1 == SSL_CTX_set1_curves_list(ssl, configuredGroups.c_str()))
+         {
+            LOG_DEBUG("SslContextInitializer::SetKeyExchangeGroups_ - TLS key exchange groups set to " + String(configuredGroups));
+            return;
+         }
+         else
+         {
+            // OpenSSL did not accept the list: an unknown group name (a typo, or a
+            // group this OpenSSL build does not implement) or malformed syntax. A
+            // rejected list is not applied at all, so we still have to install one.
+            ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5720, "SslContextInitializer::SetKeyExchangeGroups_",
+               Formatter::Format("Failed to set the TLS key exchange groups '{0}'. Message: {1}. Falling back to '{2}'.",
+                  String(configuredGroups), String(GetOpenSslError_()), String(classicalGroups)));
+         }
+      }
+
+      if (1 != SSL_CTX_set1_curves_list(ssl, classicalGroups.c_str()))
+      {
+         // Should not happen - these three groups are present in every OpenSSL
+         // build we link against. Report it loudly, because TLS on this listener
+         // is now relying on whatever group list OpenSSL defaulted to.
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 5721, "SslContextInitializer::SetKeyExchangeGroups_",
+            Formatter::Format("Failed to set the fallback TLS key exchange groups '{0}'. Message: {1}. TLS will use the OpenSSL default groups.",
+               String(classicalGroups), String(GetOpenSslError_())));
       }
    }
 

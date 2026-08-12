@@ -174,6 +174,89 @@ namespace hMailServer.ControlPanel.Tests.Services
             string.Join(", ", missing.Distinct().OrderBy(k => k)));
       }
 
+      /// <summary>
+      /// The generator maps each settings page onto a nav key with a hard-coded
+      /// table of its own, so a page added to MainWindow without a matching
+      /// entry in that table produces no index entries at all - the page still
+      /// works, but none of its settings can be found from the palette. Assert
+      /// that every table-driven settings page contributes at least one entry,
+      /// which is a faster signal than waiting for CI to re-run the generator.
+      ///
+      /// Only the two table-driven views are checked. The other navigable pages
+      /// are deliberately not required to appear: status, queue, log and
+      /// dashboard pages own no setting, and the list pages (routes, domains,
+      /// rules, ports, certificates) edit properties of individual objects
+      /// rather than server settings, so indexing them would be search noise.
+      /// </summary>
+      [Fact]
+      public void EverySettingsPage_ContributesEntriesToTheIndex()
+      {
+         string mainWindow = ReadMainWindowSource();
+         if (mainWindow == null)
+            return;   // sources not available (e.g. running from a packaged drop)
+
+         var settingsPages = Regex.Matches(mainWindow,
+               "pageFactories_\\[\"([^\"]+)\"\\]\\s*=\\s*\\(\\)\\s*=>\\s*new (?:Feature|Server)SettingsView\\(")
+            .Select(m => m.Groups[1].Value)
+            .ToList();
+
+         // If the regex stops matching, the test would pass vacuously.
+         Assert.True(settingsPages.Count >= 10,
+            $"Only found {settingsPages.Count} settings pages in MainWindow; the page-factory scan needs updating.");
+
+         var indexedPages = new HashSet<string>(SettingsSearchIndex.Entries.Select(e => e.Page), StringComparer.OrdinalIgnoreCase);
+
+         List<string> unindexed = settingsPages.Where(p => !indexedPages.Contains(p)).OrderBy(p => p).ToList();
+
+         Assert.True(unindexed.Count == 0,
+            "These settings pages contribute nothing to the search index, so none of their settings " +
+            "can be found from the palette. Re-run build/generate-settings-index.ps1; if that does not " +
+            "help, the page is missing from the $featurePages / $serverPages tables in the generator: " +
+            string.Join(", ", unindexed));
+      }
+
+      /// <summary>
+      /// The reverse check: a page tag in the index that MainWindow cannot
+      /// navigate to sends the palette nowhere when the result is picked, and a
+      /// typo in the generator's nav-key tables is exactly how that happens.
+      /// </summary>
+      [Fact]
+      public void EveryIndexedPage_IsANavigablePage()
+      {
+         string mainWindow = ReadMainWindowSource();
+         if (mainWindow == null)
+            return;   // sources not available (e.g. running from a packaged drop)
+
+         var navigable = new HashSet<string>(
+            Regex.Matches(mainWindow, "pageFactories_\\[\"([^\"]+)\"\\]").Select(m => m.Groups[1].Value),
+            StringComparer.OrdinalIgnoreCase);
+
+         Assert.True(navigable.Count >= 20,
+            $"Only found {navigable.Count} pages in MainWindow; the page-factory scan needs updating.");
+
+         List<string> unreachable = SettingsSearchIndex.Entries
+            .Select(e => e.Page)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Where(p => !navigable.Contains(p))
+            .OrderBy(p => p)
+            .ToList();
+
+         Assert.True(unreachable.Count == 0,
+            "The index points settings at pages MainWindow cannot navigate to, so picking them in the " +
+            "palette does nothing: " + string.Join(", ", unreachable));
+      }
+
+      /// <summary>Reads MainWindow.xaml.cs, or null when the sources are not next to the binaries.</summary>
+      private static string ReadMainWindowSource()
+      {
+         string controlPanel = FindControlPanelDirectory();
+         if (controlPanel == null)
+            return null;
+
+         string path = Path.Combine(controlPanel, "MainWindow.xaml.cs");
+         return File.Exists(path) ? File.ReadAllText(path) : null;
+      }
+
       /// <summary>Walks up from the test binaries to the Control Panel sources.</summary>
       private static string FindControlPanelDirectory()
       {
