@@ -1,632 +1,112 @@
-hMailServer 6.2
-===============
+hMailServer
+===========
 
-hMailServer is an open source email server for Microsoft Windows, implementing SMTP, IMAP and POP3.
+hMailServer is a free, open source email server for Microsoft Windows, implementing SMTP, IMAP and POP3.
 
-This repository is a modernized fork of the original project (which is no longer maintained upstream). It has been brought up to date with a current toolchain, current cryptography, and the transport-security standards expected of a mail server in 2026. It is maintained by Christopher Holloway / [Progressive Robot Ltd](https://www.progressiverobot.com).
+This repository is a maintained fork of the original project, which is no longer developed upstream. It has been brought up to date with a current toolchain, current cryptography, and the transport-security and authentication standards expected of a mail server in 2026 — while remaining a drop-in upgrade for existing hMailServer installations. It is maintained by Christopher Holloway / [Progressive Robot Ltd](https://www.progressiverobot.com).
 
-**Production status:** version **6.2.16** is released - [download the installer](https://github.com/Progressiverobot/hmailserver/releases/latest) (`hMailServer-6.2.16-x64.exe`). **6.2.16 is a single-fix patch** over 6.2.15: dismissing the Ctrl+K settings palette raised an error dialog on almost every search ([#21](https://github.com/Progressiverobot/hmailserver/issues/21)). Everything below describes 6.2.15, which it otherwise matches.
+**[Download the latest release](https://github.com/Progressiverobot/hmailserver/releases/latest)** — a single `hMailServer-x.y.z-x64.exe` installer. Upgrading in place preserves your configuration and mail; the database upgrade chain is continuous from every earlier hMailServer version.
 
-**6.2.15 is a correctness release** built around two themes. First, **IMAP sequence sets now behave the way RFC 3501 defines them**: `*` was only recognised as the *end* of a range and read as zero anywhere else, so `FETCH *` silently returned nothing while `UID STORE *:* +FLAGS (\Deleted)` flagged the entire mailbox and `UID EXPUNGE *` deleted every `\Deleted` message. Second, **every file the server writes now has an owner** - a message whose spool file could not be read stalled each outbound attempt for ten minutes before retrying, a failed restore emptied the live data directory and then abandoned the only remaining copy of the mail in a temporary folder, and four separate paths could leave a file on disk that no database row referred to. Everything raised on the forum by RvdH is incorporated, and the Control Panel gained homes for a group of settings that had no GUI at all. See *6.2.15* below. It is validated by the full regression suite: **1040 of 1040 tests passing, zero failures, zero inconclusive** - the complete suite, with live SpamAssassin and ClamAV (real EICAR detection), DMARC evaluation against live DNS, and TLS 1.2/1.3 handshakes end to end. Every test runs; nothing is skipped. The bundled administration GUI is the modern .NET 8 **Control Panel**.
+Every release is validated by the full regression suite before it ships — the complete suite, run against the exact binary being released, with live SpamAssassin and ClamAV (real EICAR detection), DMARC evaluated against live DNS, and TLS 1.2/1.3 handshakes end to end. Nothing is skipped or mocked.
 
-What's new in 6.0
-=================
+**What changed in each version** is on the [Releases page](https://github.com/Progressiverobot/hmailserver/releases). The release process itself is documented in [RELEASE.md](RELEASE.md).
 
-**Toolchain and platform**
+Contents
+--------
 
-   * Visual Studio 2026 build tools (platform toolset v145), 64-bit only
-   * OpenSSL 4.0.x, Boost 1.91, PostgreSQL 18 (libpq), .NET 8 SDK for the tools and Control Panel
-   * MySQL/MariaDB client: MariaDB Connector/C, bundled as `libmysql.dll` + auth plugins - works with both MySQL and MariaDB out of the box, including MySQL 8 `caching_sha2_password` and MariaDB `ed25519`/`gssapi`
-   * PBKDF2-HMAC-SHA256 password hashing (transparent upgrade on login), TLS 1.2/1.3 defaults
-   * Database version 6005; the upgrade chain is continuous from every earlier hMailServer release (MySQL, MS SQL, PostgreSQL, SQL CE)
+* [Capabilities](#capabilities) — what the server does
+* [Technology](#technology) — what it is built on
+* [Administration](#administration) — the Control Panel and the APIs
+* [Building hMailServer](#building-hmailserver)
+* [Configuration reference](#configuration-reference)
 
-**Outbound transport security**
+Capabilities
+============
 
-   * MTA-STS (RFC 8461) policy discovery and enforcement
-   * DANE (RFC 7672) with full in-process DNSSEC validation (RFC 4033-4035)  -  bogus chains block delivery to that host
-   * DNSSEC validation also protects SPF/DKIM/DMARC TXT lookups
-   * TLS-RPT (RFC 8460): daily aggregate reports sent to recipient domains
+Mail protocols
+--------------
 
-**Sender authentication**
+* **SMTP** with PIPELINING, ENHANCEDSTATUSCODES, 8BITMIME, SIZE, CHUNKING/BDAT (RFC 3030), DSN delivery status notifications (RFC 3461/3464) and SMTPUTF8/EAI for internationalised addresses.
+* **IMAP4rev1 and IMAP4rev2**, with IDLE, MOVE (RFC 6851), UIDPLUS (RFC 4315), CONDSTORE/QRESYNC (RFC 7162), SEARCHRES (RFC 5182), ESEARCH (RFC 4731), SORT, ACL, NAMESPACE, ID (RFC 2971), SPECIAL-USE (RFC 6154) and QUOTA.
+* **POP3**, including retrieval from external POP3 accounts on a schedule.
+* **Public folders**, shared across accounts with per-user ACLs.
 
-   * DMARC evaluation as part of the anti-spam pipeline
-   * ARC sealing (RFC 8617) for forwarded mail
-   * Ed25519 DKIM signing and verification (RFC 8463)
+Transport security
+------------------
 
-**Automation and operations**
+* **TLS 1.2 and 1.3** by default, on implicit-TLS and STARTTLS ports, with SNI and configurable cipher suites.
+* **MTA-STS** (RFC 8461) policy discovery and enforcement for outbound mail, and optional hosting of your own policy at `mta-sts.<domain>`.
+* **DANE** (RFC 7672) with full in-process **DNSSEC validation** (RFC 4033–4035) — a bogus chain blocks delivery to that host rather than silently downgrading.
+* DNSSEC validation also protects SPF, DKIM and DMARC record lookups.
+* **TLS-RPT** (RFC 8460) daily aggregate reports to recipient domains.
+* **ACME v2 (Let's Encrypt)** built in: certificates are issued, renewed, assigned to TLS ports and hot-reloaded without a restart. The private key is reused across renewals, so published DANE TLSA records stay valid.
 
-   * ACME v2 (Let's Encrypt) built in: certificates are issued, renewed, assigned to TLS ports and hot-reloaded automatically; the private key is reused across renewals so published DANE TLSA records stay valid
-   * REST administration API (domains, accounts, delivery queue, server status, TLSA records)
-   * Prometheus metrics endpoint and optional JSON-formatted logs
-   * Web services server: hosts MTA-STS policies (`mta-sts.<domain>`), Thunderbird autoconfig and Outlook autodiscover for all local domains
+Sender authentication and anti-abuse
+------------------------------------
 
-**Protocol and client improvements**
+* **SPF**, **DKIM** signing and verification (including Ed25519, RFC 8463) and **DMARC** evaluation with alignment.
+* **ARC** sealing (RFC 8617) so forwarded mail keeps a verifiable authentication chain.
+* **SRS** sender rewriting for forwarded mail, and optional **BATV** (`prvs`) backscatter protection.
+* **SpamAssassin** integration, **DNSBL** and **SURBL** lookups, greylisting, HELO/PTR/MX sanity checks and a weighted scoring pipeline.
+* **Virus scanning** via ClamAV (clamd or clamscan) or any command-line scanner.
+* Attachment blocking, IP ranges with per-range policy, and connection auto-banning after repeated authentication failures.
 
-   * IMAP MOVE (RFC 6851), ID (RFC 2971) and SPECIAL-USE (RFC 6154)
-   * SMTP 8BITMIME
-   * hMailServer Administrator: live dashboard, optional TOTP two-factor authentication, and a "Server features" dialog for all of the settings above
+Account security and authentication
+-----------------------------------
 
-What's new in 6.2
-=================
+* **SCRAM-SHA-256** SASL across IMAP, SMTP submission and POP3, plus **SCRAM-SHA-256-PLUS** channel binding on all three, with deterministic anti-enumeration salts.
+* **OAuth2 / OpenID Connect** bearer tokens — SASL XOAUTH2 and OAUTHBEARER (RFC 7628) — validated against an external identity provider's signing key.
+* **Argon2id** and **PBKDF2-HMAC-SHA256** password hashing, with transparent upgrade on login, a minimum-accepted-hash policy, and an optional server-side pepper.
+* Full RFC 4013 SASLprep of non-ASCII credentials.
+* Optional **TOTP two-factor authentication** for administrative logon.
 
-The 6.2.x line adds a modern administration experience plus a wave of
-authentication, filtering, deliverability and observability work. Everything is
-**additive and default-off** — an existing installation upgrades with no functional
-change until the new settings are turned on.
+Mail filtering and routing
+--------------------------
 
-**hMailServer Control Panel (the new GUI)**
+* **Sieve** (RFC 5228) — a standards-based interpreter runs each account's active script during delivery (`keep`, `fileinto`, `discard`, `redirect`, implicit keep), with an optional **ManageSieve** (RFC 5804) listener so clients can manage scripts over TCP.
+* The original rules engine, with global and per-account rules, regular-expression criteria and scripted actions.
+* Server-side **event scripts** (VBScript/JScript) on connection, HELO, DATA, accept and delivery events.
+* Routes, aliases, distribution lists, catch-all addresses and plus-addressing.
+* Multiple smart hosts with automatic failover: separate several hosts with `|` in the relayer field and delivery moves to the next when one cannot be reached.
 
-   * A modern .NET 8 (WPF, Fluent design) administration application, `hMailCP.exe`, is now the **sole bundled GUI** — the classic Administrator was retired in 6.2 and removed from the repository in 6.2.10. It talks to the server purely through the COM API and reaches functional parity with the classic tool (domains, accounts, aliases, distribution lists, routes, rules, IP ranges, TCP/IP ports + SSL bindings, server settings, live dashboard, queue, logs, status, backup, SSL certificates, scripts and public folders).
-   * Optional TOTP two-factor authentication for the GUI logon (shares the same secret as the classic Administrator).
-   * **Active Directory account pickers (new in 6.2.4):** a read-only AD browser lists the forest's domains and searches their users. **"Browse Active Directory…"** on an account's Directory tab fills the AD domain / user name and links the account; **"Add from AD…"** bulk-imports the selected accounts' e-mail addresses into a distribution list. Built on `System.DirectoryServices` and validated end-to-end against a live domain controller.
-   * Requires the .NET 8 Desktop Runtime, which the installer bundles and installs silently when missing.
+Operations and observability
+----------------------------
 
-**Authentication modernization**
+* **Prometheus** `/metrics` (database pool, TLS handshakes, delivery queue, authentication outcomes, delivery outcomes, command and query latency) with Kubernetes-style `/livez`, `/readyz` and `/healthz` probes.
+* **OpenTelemetry** traces and metrics export, and message-to-session correlation IDs.
+* Optional **JSON-structured logs**, log retention, per-service log files, and a slow-query log with every SQL string literal redacted.
+* Per-stage timing of message acceptance, so a slow scanner, DNS lookup or event script is identified by name in the log rather than appearing as an unexplained pause.
+* Backup and restore, a read-only **message-store consistency check** with a recovery report, configurable message-store fsync, graceful-shutdown drain, and a documented active/passive HA runbook.
 
-   * SCRAM-SHA-256 SASL across IMAP, SMTP submission and POP3, plus SCRAM-SHA-256-**PLUS** channel binding on all three; deterministic anti-enumeration salts.
-   * Argon2id password KDF option, a hash-policy engine (`MinimumAcceptedHashAlgorithm`) with SCRAM minimum-hash enforcement, and an optional server-side password pepper.
-   * OAuth2 bearer authentication — SASL XOAUTH2 + OAUTHBEARER (RFC 7628).
-   * Full RFC 4013 SASLprep of non-ASCII credentials.
+Technology
+==========
 
-**Mail filtering — Sieve (RFC 5228) + ManageSieve (RFC 5804)**
+| Component | Detail |
+|---|---|
+| Server core | C++, built with Visual Studio 2026 (platform toolset v145), 64-bit only |
+| Cryptography | OpenSSL 4.0.x |
+| Async I/O | Boost 1.91 (Asio) |
+| Databases | MySQL, MariaDB, MS SQL Server, PostgreSQL 18 (libpq), and the embedded SQL CE for zero-configuration installs |
+| MySQL/MariaDB client | MariaDB Connector/C, shipped as `libmysql.dll` with auth plugins — works with MySQL 8 `caching_sha2_password` and MariaDB `ed25519`/`gssapi` out of the box |
+| Administration GUI and tools | C# / .NET 8 (WPF, Fluent design) |
+| Extensibility | COM/IDispatch API, plus a REST administration API |
+| Schema | Database version 6005, upgradeable from every earlier hMailServer release |
 
-   * A standards-based Sieve interpreter runs each account's active script during local delivery (`keep`/`fileinto`/`discard`/`redirect` + implicit keep), alongside the existing proprietary rules engine. Per-account scripts are stored on disk and exposed through the COM API; an optional ManageSieve listener manages named scripts over TCP. The Control Panel account dialog has a Sieve editor tab.
+**Quality gates.** Every release ships SPDX and CycloneDX SBOMs (Syft). The repository runs CodeQL analysis, Dependabot CVE alerts with grouped update pull requests, a dependency-review gate on pull requests, an installer smoke test that installs the built installer on a clean machine and verifies the service comes up, and a monthly comparison against the original upstream repository so nothing landing there is missed.
 
-**Deliverability & SMTP standards**
+Administration
+==============
 
-   * SMTPUTF8/EAI, PIPELINING, ENHANCEDSTATUSCODES, DSN (RFC 3461/3464), SRS for forwarded mail, CHUNKING/BDAT (RFC 3030), and optional BATV (`prvs`) backscatter protection.
+**hMailServer Control Panel** (`hMailCP.exe`) is the bundled administration GUI: a .NET 8 WPF application that talks to the server purely through the COM API. It covers domains, accounts, aliases, distribution lists, routes, rules, IP ranges, TCP/IP ports and SSL bindings, server settings, the live dashboard, the delivery queue, logs, status, backup, SSL certificates, scripts, Sieve scripts and public folders.
 
-**Operability & observability**
+* **Ctrl+K** searches every setting by label or INI key — type `delete logs`, `log level` or `LogDeleteDays` and it takes you to the page that owns it.
+* **Active Directory pickers**: a read-only browser lists the forest's domains and searches their users, to link an account to an AD user or bulk-import addresses into a distribution list.
+* Optional TOTP two-factor authentication on logon.
+* Requires the .NET 8 Desktop Runtime, which the installer bundles and installs silently when missing.
 
-   * Prometheus `/metrics` (database pool, TLS handshakes, delivery queue, auth success/failure, delivery outcomes, command + DB query latency) and Kubernetes-style `/livez` `/readyz` `/healthz` probes on the metrics listener.
-   * Optional slow-query log (with every SQL string literal redacted), graceful-shutdown drain, configurable message-store fsync, a read-only message-store consistency check + recovery report, log retention, message-to-session correlation IDs, and a documented active/passive HA runbook.
+**REST administration API** for domains, accounts, the delivery queue, server status and TLSA records, with authenticated access and bounded request handling (a size cap and a receive deadline, so a slow or oversized request cannot occupy a worker).
 
-**Supply chain & quality gates**
-
-   * SPDX + CycloneDX SBOMs (Syft) attached to every release, Dependabot CVE alerts + grouped update PRs, and a dependency-review PR gate.
-
-6.2.16
-======
-
-A patch release fixing one defect reported against the Control Panel. No server change, and no database change (schema version 6005).
-
-- **Dismissing the Ctrl+K settings palette raised an error dialog** ([#21](https://github.com/Progressiverobot/hmailserver/issues/21)). Choosing a result and pressing Esc both close the palette, and closing it moved the focus away, which raised the deactivation handler *while the close was still running* — and that handler closed it a second time. WPF refuses that, so almost every search ended with `Cannot set Visibility to Visible or call Show, ShowDialog, Close, or WindowInteropHelper.EnsureHandle while a Window is closing`. The navigation itself had already happened, so nothing was lost; it was noise, but in the one feature meant to make settings easier to find. Present in 6.2.14 and 6.2.15. Reported by grumpymojo.
-
-6.2.15
-======
-
-A correctness release built around two themes: **IMAP sequence sets are now handled the way RFC 3501 defines them**, and **every file the server writes now has an owner** — several paths could leave a file on disk that no database row referred to, or leave a delivery retrying forever against a file it could never send. Everything raised on the forum by RvdH is incorporated, and the Control Panel gained homes for a group of settings that had no GUI at all. No database change (schema version 6005).
-
-Validated by the full regression suite: **1040 of 1040 passing, zero failures**, against the rebuilt 6.2.15 service.
-
-## IMAP sequence sets
-
-`*` means "the largest message number or UID in the mailbox". hMailServer only recognised it as the *end* of a range; anywhere else it was parsed as the number zero. Separately, RFC 3501 states that a range is valid in either order — `3:1` is the same set as `1:3` — and that was not implemented at all. Together these produced results that were wrong in both directions, silently:
-
-- `FETCH *` and `UID FETCH *` did nothing at all and answered `OK`. A client asking for the newest message got an empty response and showed an empty mailbox.
-- `UID STORE *:* +FLAGS (\Deleted)` flagged **every message in the mailbox** rather than the newest one, because both ends collapsed to "unbounded". The same applied to `COPY`, `MOVE` and `FETCH`.
-- `UID EXPUNGE *` permanently deleted **every** `\Deleted` message instead of the one addressed.
-- `*:1` — a perfectly legal way to write "the whole mailbox" — matched only message 1.
-- `3:1` matched nothing.
-
-All four sequence-set parsers in the server (the `FETCH`/`STORE`/`COPY`/`MOVE` path, `SEARCH`, `UID EXPUNGE`, and the QRESYNC `VANISHED` path) now resolve `*` on either side of a colon and normalise descending ranges. `*` in an empty mailbox matches nothing, and the command still succeeds. Twelve regression tests cover the behaviour; all twelve fail against 6.2.14.
-
-## A failed restore could destroy the data directory
-
-Restoring messages deleted everything in the live data directory *first* and only then copied the backup's message store into place — and the copy throws when its source is not there. That is exactly what a settings-only backup restored with the messages option ticked looks like, and what a failed extraction produces (the result of unpacking the archive was never checked). The exception unwound into a handler that logged an error and swallowed it, so the temporary folder holding the extracted mail was never cleaned up either. The administrator was left with an empty data directory and the only surviving copy of their mail inside a folder named after a GUID, which nothing would ever clean and nobody would think to look in.
-
-The restore now confirms the replacement message store actually exists *before* it deletes anything, and checks that the archive extracted successfully. If the copy fails after that point — when the data directory has legitimately already been emptied — the extracted copy is deliberately kept rather than deleted, and the log says where it is and not to remove it.
-
-## Files with no owner, and deliveries that could never succeed
-
-- **A message whose file could not be read hung the outbound connection.** After the remote server answered `354`, nothing was sent. The session sat idle until the SMTP client timeout — up to ten minutes — before the message was re-queued and the whole attempt repeated. It now fails immediately with a logged error, and the connection is dropped rather than sent `QUIT`, because after `354` a `QUIT` would be read as message content. Only a file that has genuinely disappeared fails the delivery permanently: a file that merely could not be opened or read right now — held by an on-access virus scanner or a backup, say — stays in the queue for the next attempt, because a permanent failure deletes the recipients and bounces the message to the sender.
-- **A rejected `RETR` on an external POP3 account created an empty message file every time.** When the remote server answered `-ERR`, the download path still generated a file name and opened the file before noticing there was no message coming. Each occurrence left one more file in the data directory with no database row referring to it.
-- **A downloaded message with no local recipients left its file behind too.** If nothing in the message resolved to an account on this server, it was never saved — but the downloaded file had already been written, and the UID was recorded so it would never be fetched again. The file is now removed and the discard is logged, so a misconfigured external account is visible instead of silently accumulating.
-- **A bounce that could not be sent left its file in the queue directory.** Where there is no one to send a delivery failure to (a null sender, or an address that no longer resolves), the generated message was abandoned without being deleted.
-- **Rewriting a message's headers left a `.eml.tmp` behind whenever it failed.** This runs for every DKIM signature, every ARC seal, every local delivery and every SpamAssassin result, so a full disk or a message file locked by a scanner dropped one orphan per message into the account's folder — and the consistency check would never report them, because it looks for database rows with no file rather than files with no row.
-- **The account cache had no size limit.** A duplicated line meant the domain cache got its 10 MB cap twice and the account cache got none, so it grew without bound until the service was restarted.
-
-## From the forum
-
-Raised by RvdH, and all correct:
-
-- **`BOOST_USE_WINAPI_VERSION` was left at `0x0601`**, holding Boost to the Windows 7 API surface on a build that targets Windows 10 1607 everywhere else. It now matches `_WIN32_WINNT`, and the README's Boost build line was corrected to pass the same value.
-- **Our `AsyncReadCompleted` rework predated upstream's replacement of the same code.** Upstream's version is the better one: it replaced the SpamAssassin-port check with a general rule for when an EOF is a legitimate end of input. That rule is now in place, with this fork's additions (BDAT exact-length reads, the wedged-connection fix, TCP_NODELAY, the SNI error-code fix) kept on top of it.
-
-  Adopting that rule exposed a defect in *our* exact-length reads, found by an adversarial review of this release and fixed before it shipped. `transfer_exactly` guarantees the requested octet count only while any error ends the session; once an end-of-stream is tolerated it does not, and the BDAT path still extracted the number of octets it had *asked* for rather than the number that arrived. A sender that announced `BDAT 100000 LAST` and then vanished after 40,000 octets had the remainder padded with NUL bytes, the chunk counted as complete, and the truncated message **delivered**. Reads now take only what actually arrived, and a read is never re-armed after an end-of-stream, since nothing further can arrive on a closed connection. A regression test covers the truncated chunk; it fails against the intermediate build.
-- **DKIM signing hashed the header name in lower case while writing it capitalised** (upstream PR #530). Under `simple` header canonicalization the two must match exactly, so every signature produced this way was unverifiable by a strict verifier. The same PR's integer-overflow fix in MIME encoding selection is included.
-- The DKIM size-limit log line said 10 MB when the limit is 50 MB.
-
-An audit answering the recurring question of what this fork changed relative to official master: of the 980 server source files present in both, **936 are byte-identical** once the fork's copyright line is discounted. 44 differ and 30 are new — and they are the extensions this fork exists for.
-
-## Also fixed
-
-- **ManageSieve had no limit on authentication attempts.** Unlike SMTP, IMAP and POP3, a client could try passwords indefinitely and never be disconnected or auto-banned. It now disconnects after three failures and registers them with auto-ban like every other protocol.
-- **`STATUS ... (RECENT)` reported the selected folder's count for every folder asked about**, so clients that poll all folders lit up new-mail indicators on folders that had received nothing.
-- The SMTP `DATA` path now logs, under debug logging, how many bytes arrived, how many are buffered, and whether the end-of-data marker has been seen — so a stalled reception can be told apart from a stall in the accept/save stage that follows it. This is diagnostic groundwork for [#18](https://github.com/Progressiverobot/hmailserver/discussions/18), which is **not fixed** and remains open; see [#20](https://github.com/Progressiverobot/hmailserver/issues/20).
-
-## Control Panel
-
-The 6.2.14 work moved settings that were on the wrong page. This release covers the settings that were on **no** page at all — configurable in `hMailServer.ini` but invisible in the GUI.
-
-- **Security ▸ Authentication** (new): the OAuth2 settings (moved off *API & monitoring*), password hash algorithm and minimum accepted algorithm, the password pepper, and the AUTH exemption list.
-- **Security ▸ Administrative access** (new): changing the administrator password, and an entry point for two-factor authentication setup — which previously existed only on the pre-logon Connect screen, so once you were signed in there was no way to reach it.
-- **Network ▸ DNS resolver** (new): DNS server override, the DNS cache switch, and whether DNSBL checks run after `MAIL FROM`.
-- **Network ▸ Web services & autoconfiguration** (new): the HTTP/HTTPS listener, client autoconfiguration, and MTA-STS policy hosting. The listener settings moved with autoconfig deliberately — autoconfig is served only by that listener, so enabling one without the other does nothing.
-- **Advanced & scripting ▸ Copies of mail**: message archiving (`ArchiveDir`, `ArchiveHardLinks`), beside mirroring.
-- **Backup & restore**: `BackupMessagesDBOnly`, which changes what both a backup *and* a restore contain.
-- **Diagnostics** now shows what the message-store consistency scan found — how many message rows have no file on disk, when the scan last ran, the affected messages with their expected paths, and a button to open the full recovery report. The scan is a background task with no COM interface, so its result previously existed only in a report file in the log folder, a Prometheus gauge and a single log line.
-
-Three labels described the wrong thing and were corrected: `UseDNSCache` is the Windows DNS client cache and is not a substitute for a local caching resolver; `DaemonAddressDomain` sets the `From:` header of server-generated mail, not a delivery route; and `LogLevel` has exactly one threshold, at 2. A fourth, `DisableAUTHList`, was labelled as a semicolon-separated list of IP addresses — it is in fact a comma-separated list of local TCP ports.
-
-Two Control Panel bugs were fixed along the way: the Anti-virus page always reported "N settings could not be written" (it was counting its own buttons), and the Logging page rendered three tabs all headed "Logging".
-
-6.2.14
-======
-
-A correctness and usability release. Two community reports are fixed, an adversarial audit of the server found and fixed **21 defects** — several of which could lose or corrupt mail — and the Control Panel now lets you search for a setting instead of guessing which page it is on. No database change (schema version 6005).
-
-Validated by the full regression suite: **1026 of 1026 passing, zero failures**, against the rebuilt 6.2.14 service.
-
-## Reported by the community
-
-- **Backup would not start** (#19). The Control Panel called a method that does not exist on the backup settings interface, so *Save settings* and *Start backup now* both failed with `'System.__ComObject' does not contain a definition for 'Save'`. The settings were in fact being saved; only the start was blocked. Every other late-bound call in the Control Panel was audited against the server's interface definitions at the same time.
-- **"Setting for days to keep logs"** (#16) already existed but was effectively unfindable. It — and the rest of the logging settings — now live together on the **Logging** page (see *Finding settings* below).
-
-## Mail loss, corruption and crashes
-
-- **Failed message copies crashed delivery.** When a message file could not be copied (full volume, file locked by antivirus or backup), local delivery, forwarding, Sieve redirect and mirroring dereferenced a null handle. The delivery task died and left the message locked in the queue, where it failed again on every restart.
-- **IMAP APPEND reported success for messages that were never written.** A full disk or a locked file produced `OK [APPENDUID …]`, so Sent Items copies, drafts and migration uploads were lost while the client showed them as saved. APPEND now fails cleanly and removes the partial file.
-- **Every string SQL parameter on MS SQL and SQL CE was bound from freed memory.** The value was built from a temporary that was destroyed before the parameter was used — undefined behaviour on the default database backend, on every query carrying a string.
-- **A failed database transaction start leaked its pooled connection.** After a few occurrences the pool was exhausted and every SMTP, IMAP and POP3 operation blocked until the service was restarted.
-- **A failed IMAP folder insert was reported as success**, caching a folder with no database row; messages filed into it were written to disk with nothing to find them by.
-- **IMAP CLOSE expunged without telling other sessions**, so a phone and a desktop on the same mailbox drifted out of step and the second client could act on the wrong message.
-- **A POP3 session that was refused the mailbox lock still released it on disconnect**, handing away the owning session's lock and letting two clients download concurrently.
-- **POP3 RETR and TOP ignored the result of opening the message file**, so an unreadable message dropped the connection with no response and wrote a minidump. Both now answer `-ERR`, and TOP recreates a missing file the way RETR already did.
-- **The message cache size accounting was inverted**, so the 512 MB cap never applied as intended; the accumulated size is also reset when the cache is cleared.
-
-## Security
-
-- **DKIM test mode (`t=y`) turned a failed signature into a pass**, which then satisfied DMARC alignment — so mail forging a domain whose key record still carried the rollout flag was accepted rather than rejected. A failure in test mode is now reported as *neutral*, per RFC 6376.
-- **IMAP SASL credentials were written to the log.** With IMAP logging enabled, `AUTHENTICATE PLAIN` passwords and XOAUTH2/OAUTHBEARER tokens were recorded verbatim; POP3 and SMTP already masked them.
-- **Only the first DKIM key record at a selector was examined**, so while a sender rotated its key roughly half of its mail failed verification and lost DMARC alignment — rejecting legitimate mail.
-- **MTA-STS enforcement and MX failover were lost for large recipient sets.** Recipients past the first batch reused mutated delivery state, so the policy of an MX host was looked up instead of the recipient domain's, and a STARTTLS fallback on one host could carry to the next.
-- The REST administration API now bounds how long one request may take to arrive, so a slow client cannot occupy the worker thread (or delay shutdown), and a rejected administrator credential is logged.
-- `ES256` OAuth2 tokens are now rejected with a clear message. The implementation fed a raw JWS signature to a verifier expecting DER, so it could never succeed; saying so beats a phantom "signature verification failed". `RS256` and `HS256` are unaffected.
-
-## Protocol correctness
-
-- IMAP `RENAME` no longer lets a folder become its own parent when the hierarchy delimiter is not `.` — which made the folder and its mail disappear from `LIST`.
-- `SELECT`/`EXAMINE` report a message sequence number in `[UNSEEN]`, as RFC 3501 requires, instead of a UID; clients that jump to the first unseen message no longer land on nothing.
-- Expunged and moved messages are removed from the session's `\Recent` set, so `RECENT` no longer claims new mail that no longer exists.
-- A `BODY.PEEK` item no longer cancels the `\Seen` update requested by another item in the same `FETCH`.
-- POP3 answers `-ERR` (not the invalid `+ERR`) when the mailbox cannot be opened, which some clients read as success.
-- Reverse-DNS lookups for the `Received` header now run on their own thread pool, so a burst of connections from addresses with unresponsive reverse DNS cannot delay message acknowledgements. This completes the fix that landed in 6.2.13.
-
-## Finding settings
-
-Settings had accumulated on whichever page matched how they were *stored* rather than what they *do*, so several real features looked missing. That is fixed in two ways.
-
-- **The command palette (Ctrl+K) now searches settings, not just pages.** Type `delete logs`, `log level` or an INI key such as `LogDeleteDays` and you get the setting and the page that owns it. All 227 settings are indexed by label and key; the index is generated from the pages themselves and a test fails the build if it ever falls behind.
-- **Settings moved to where they are used.** Log level, maximum line length, per-service log files and JSON logging joined retention on **Logging**. SpamAssassin and ClamAV timeouts moved onto their own scanner tabs. Search-indexer cadence moved to **Performance → Indexing**. Retry cadence, queue jitter and the per-destination outbound throttle moved to **Delivery of e-mail** — the quick-retry setting silently overrides the retry interval shown there, so the two now sit together.
-- **"Advanced hardening" is now "Advanced INI settings"** and sits under Maintenance. Only four of its cards were security-related; the rest were operational settings that admins were not opening a page marked "change these only with a specific reason" to find.
-- Signposts were added where a setting correctly stays put but is easy to miss: ManageSieve and OAuth2 from the Protocols page, MTA-STS *publishing* from the MTA-STS card, SRS/BATV from Delivery, and the message-store consistency scan from Diagnostics.
-
-## Also
-
-- Multiple smart hosts are documented at last: put several hosts in the relayer field separated by `|` and delivery fails over to the next when one cannot be reached. This has always worked; nothing said so.
-- A domain's size was calculated from the wrong column on MS SQL, SQL CE and PostgreSQL.
-- The account cache is now cleared when the server stops, so edits made to the database while it is stopped are no longer ignored.
-- `TCP_NODELAY` is set on every connection, and an SNI failure now reports the SNI error rather than a stale success code.
-
-6.2.13
-======
-
-A community-feedback bug-fix release. It resolves the issues testers reported
-on the forum against 6.2.11/6.2.12 and hardens the SMTP, IMAP and SpamAssassin
-paths against malformed input found while investigating them. No database
-change (schema version 6005).
-
-   * **SMTP: fixed a DATA stall when relaying from Postfix / Proxmox Mail
-     Gateway.** After `354 OK, send.` the connection could hang until the
-     sending MTA timed out ("timed out while sending end of data"), leaving a
-     zero-byte spool file. The cause was a reverse-DNS (PTR) lookup performed on
-     the network I/O thread while generating the `Received` header at the first
-     flush: an internal relay whose address has no reverse zone stalled the
-     whole session through DNS retries. The PTR lookup now runs on a worker
-     thread started at connection time and the header generation never waits on
-     it. Direct sending was unaffected, which is why only relayed mail hung.
-
-   * **SMTP robustness.** A parse exception can no longer leave a connection
-     permanently wedged (it retires the read and disconnects); message data
-     pipelined in the same segment as `DATA` is consumed correctly; a rejected
-     `BDAT`/CHUNKING command drains or cleanly terminates its in-flight payload
-     instead of desyncing the session (matters for Exchange, which uses BDAT
-     whenever CHUNKING is advertised); the `EHLO SIZE` keyword no longer
-     overflows for very large limits; and `TCP_NODELAY` is set on every
-     connection so short command/response exchanges are not delayed by Nagle.
-
-   * **IMAP FETCH: fixed an authenticated-user crash and an out-of-bounds
-     read.** A malformed partial-fetch range (for example `BODY[]<0.-1>` or
-     `BODY[TEXT]<-5.10>`) could drive a near-`SIZE_MAX` allocation (crash and a
-     server-wide cache flush) or read heap memory from before the buffer and
-     send it to the client. The octet range is now clamped in the byte math and
-     normalized in the parser, and a couple of response-format defects were
-     fixed alongside. The `OnClientLogon` script event now fires from every IMAP
-     `AUTHENTICATE` mechanism (PLAIN, SCRAM-SHA-256, XOAUTH2/OAUTHBEARER), the
-     same as `LOGIN`, POP3 and SMTP.
-
-   * **SpamAssassin: fixed a hang, header corruption and message loss.** A
-     malformed or truncated `spamd` response could spin a core and hang the
-     session indefinitely (a length that wrapped to a huge unsigned value drove
-     an endless read loop with the timeout suppressed) and could write the raw
-     `SPAMD/…` response header into the message. An empty response
-     (`Content-length: 0`) could overwrite the message with a zero-byte file,
-     and a mismatch between the anti-spam scan ceiling (256 MB) and the MIME
-     parser limit (80 MB) could truncate very large messages to a couple of
-     bytes. The client now parses the response header defensively, treats an
-     early close as end-of-response, requires a positive length before replacing
-     the message, and the scan ceiling is clamped to the parser limit. The
-     original message is preserved on any SpamAssassin failure. A temp-file leak
-     on the SpamAssassin connection-test path was also fixed.
-
-   * **Upgrade & installer.** DBUpdater now labels database versions 6002-6005
-     (they showed as "Unknown version") and prints the raw version rather than
-     "Unknown" for any future gap. A failed or cancelled database
-     create/upgrade now propagates a real exit code up to a visible installer
-     error instead of reporting success against a broken schema, and the tools
-     no longer show modal dialogs under `/silent`. Missing `hm_settings` rows
-     now self-heal on write instead of silently discarding the value, and the
-     6001 upgrade insert is idempotent so a re-run is safe. The installer keeps
-     a user-customized `EventHandlers.vbs` across uninstall/reinstall
-     (`uninsneveruninstall`), and the Control Panel script editor no longer
-     saves empty text over the file after a failed load (and keeps a `.bak`).
-     The "Windows version too low" message now names the real requirement
-     (Windows 10 1607 / Server 2016) instead of "Windows XP Service Pack 3".
-
-   * **Control Panel.** Diagnostics no longer reports every test as FAILED (it
-     read two COM result properties by the wrong names and swallowed the error),
-     and restarting the service from the UI is now elevation-aware (a single UAC
-     prompt when the session is not elevated), runs off the UI thread, and
-     reports the actual error instead of an opaque COM message.
-
-   * **Build target.** The server core and minidump helper, and the OpenSSL
-     build recipe, now target Windows 10 1607 (`_WIN32_WINNT 0x0A00`)
-     consistently, matching the installer's minimum-OS gate and the bundled
-     libpq 18. OpenSSL stays on the 4.0 line (supported into 2028); the plan is
-     to adopt 4.2 LTS when it ships.
-
-   * Validated by the full regression suite: 1026 of 1026 passing, zero
-     failures, against the rebuilt 6.2.13 service.
-
-6.2.12
-======
-
-The .NET modernization of the tooling is complete: every C# component in the
-product now targets .NET 8. No server-core changes; no database change
-(schema version 6005).
-
-   * **The setup tools are .NET 8.** DBSetup, DBSetupQuick, DBUpdater,
-     DataDirectorySynchronizer and the Shared library move from
-     .NET Framework 4.8.1 to SDK-style net8.0-windows. The COM API is consumed
-     through a checked-in tlbimp wrapper (`source/Tools/Interop/`), so the
-     tools build with plain `dotnet build` on any machine - no registered
-     typelib needed. Dialog metrics are pinned to the fonts the forms were
-     designed against, so nothing shifts visually. The silent command-line
-     contract the installer and the VM test runner depend on is unchanged.
-
-   * **The VB6 migration tools are replaced by a supported Import Tool.** The
-     `source/Migration` folder held five wizards, none of which could be built
-     (their shared VB6 sources were never in the repository) and three of
-     which migrated from products dead for two decades (ArgoSoft, IMail,
-     Mercury). The two with lasting value return as one .NET 8 tool, shipped
-     under Addons: account import from comma-separated text files (now with
-     per-line validation instead of a crash) and mbox import into per-file
-     IMAP folders. The mbox importer streams files of any size, goes through
-     the supported COM API instead of the old tool's raw MySQL INSERTs, and
-     fixes every defect documented in the VB6 version - the silently dropped
-     last message, CRLF mailboxes parsing as one giant message, mboxrd
-     quoting, and SMTP dot-stuffing corrupting stored messages. Verified end
-     to end against a live server with both Unix (LF) and Windows (CRLF)
-     mailboxes.
-
-   * **The installer treats the .NET 8 Desktop Runtime as a server
-     prerequisite.** It is installed - with its exit code actually checked -
-     before the database tools run, not only when the Control Panel component
-     is selected; the obsolete .NET Framework 4.5 gate is gone, and the
-     supported-OS floor is now Windows 10 1607, the .NET 8 runtime's own
-     minimum. The database tools ship as dotnet publish folders staged by the
-     new `build/build-tools.ps1`.
-
-   * **CI now builds every C# project on every push and PR.** A new tools job
-     builds the tools solution with warnings-as-errors against the checked-in
-     interop wrapper. Previously only the Control Panel was built, which let
-     a dependency update break the test and tool projects invisibly.
-
-   * **The test suite runs on NUnit 4** (4.6.1, adapter 6.2, console runner
-     3.22) via Dependabot's grouped update, with the 2,200+ classic assert
-     call sites kept compiling through NUnit 4.6's C# 14 extension members.
-     The regression suite's local-address selection now probes for an address
-     the server actually answers on instead of trusting interface enumeration
-     order, which broke under a connected VPN.
-
-   * The changes were shaken down by an adversarial multi-agent review (12
-     findings raised, 9 confirmed, all fixed before merge), and the release
-     is validated by the full regression suite: 1026 of 1026 passing.
-
-6.2.11
-======
-
-An accessibility fix for the Control Panel, plus the work that made the
-regression suite run in full for the first time. No server-core changes.
-
-   * **Two lists announced their type name to screen readers.** The alias list on
-     the Domains page exposed `hMailServer.ControlPanel.Views.DomainsView+AliasRow`
-     as its accessible name for every row, and Live logs exposed `LogsView+LogLine`
-     for every line. Both lists use an `ItemTemplate`, so the text a sighted user
-     sees comes from a binding while a `ListViewItem`'s accessible name falls back
-     to `ToString()` on the bound object - which neither class overrode. The live
-     log is the worse of the two: it is the page an administrator is most likely to
-     be reading with a screen reader at exactly the moment something has gone wrong.
-     The other lists on that page bind plain strings and were always correct, and
-     every other list in the application is a `DataGrid`, which builds a row's name
-     from its cells.
-
-   * **The regression suite now runs in full: 1026 of 1026, zero inconclusive.**
-     27 tests had never actually executed here - they reported *inconclusive*
-     because SpamAssassin and ClamAV were not installed. Installing both ran them
-     for the first time and two failed, in the tests rather than in the server.
-
-     `ClamAV.TestWithVirus` put EICAR in the plain body of a non-MIME message.
-     ClamAV's EICAR signatures match a whole file, not a substring: the bare string
-     is detected, the string with any content around it is not. Older ClamAV
-     extracted a plain body as a scannable part; current ClamAV does not, so the
-     message scanned clean and was delivered. hMailServer was never at fault - it
-     connected, streamed the file and parsed the FOUND reply correctly. The test now
-     sends EICAR as a base64 attachment, which is how a virus actually arrives.
-
-     `SpamAssassin.TestSANotRunning` called `ServiceController.Stop()` and returned
-     immediately. Stop() only asks - it returns while spamd is still answering on
-     783 - so the test sent a message into a live spamd and got the header it was
-     asserting could not be there. It now waits for the port to close. It also
-     asserted a "communication error" that only fires when a connection is
-     established and then lost, which is a different failure mode from the one
-     under test.
-
-   * **The test setup is documented.** The README pointed at a JAM Software
-     SpamAssassin download that no longer exists. It now describes what works -
-     Strawberry Perl plus CPAN, with spamd rebuilt via `BUILD_SPAMD=yes` because the
-     Windows build skips it by default, and `perl.exe` copied to `spamd.exe` inside
-     Perl's own bin so `@INC` still resolves - and states the elevation requirement
-     the suite has always had but never documented.
-
-6.2.10
-======
-
-A security and housekeeping release. It fixes a real authorization defect in the
-COM API, removes two unmaintained administration front-ends that no longer had a
-reason to ship, and takes the repository's code-quality findings to zero.
-
-   * **The COM API reported success on calls it had refused.** Fifteen methods
-     rejected an unauthorized caller with `return false`. These functions return
-     `HRESULT`, where `false` is `0` - which is `S_OK`. `InterfaceCache`'s five
-     getters return before writing `*pVal`, so a caller without server-admin
-     rights received `S_OK` and read whatever happened to be in the
-     out-parameter; `InterfaceSettings::SetAdministratorPassword` and five
-     siblings skipped the write and reported success, so a caller was told the
-     administrator password had changed when it had not;
-     `InterfaceMessageIndexing`'s four methods behaved the same way. They now
-     return `authentication_->GetAccessDenied()`, which is what the same files
-     already did in twelve other places.
-
-     Found by running CodeQL's C++ suite by hand: the workflow analysed C# only,
-     so 4.65 MB of network-facing code - the largest language in the repository
-     and the entire protocol surface - had never been scanned. 16 high-severity
-     findings, 15 of them these; the sixteenth is a verified false positive.
-
-   * **The PHP WebAdmin is removed.** It shipped by default under "Administrative
-     tools" and stored the administrator password in plaintext in a PHP session,
-     replaying it to `Authenticate()` on every request. It also required DCOM
-     permissions to be opened up for the web server account, and it was
-     unmaintained 2008-era code. The Control Panel replaces it and already
-     connects to a remote host, so nothing is lost - 145 files.
-
-   * **The retired Administrator is gone from the tree.** `hMailAdmin.exe` was
-     retired in 6.2 and the installer has not shipped it since, but the project
-     still built and was the single largest source of code-quality findings: 333
-     of 958. The one thing still taken from it, `Interop.hMailServer.dll`, is a
-     `tlbimp` wrapper every tool generates for itself; the installer now takes it
-     from `Shared`, so the packaged output is unchanged.
-
-   * **"Administrative tools" says what it actually does.** With both front-ends
-     gone the component delivered libraries and no application. What it does, and
-     always did, is register the type library on a machine that is not the server
-     so scripts and COM clients can administer a remote instance; it is now called
-     *Remote administration support (registers the COM API for scripts)*. A
-     `dnsapi.dll` line gated `OnlyBelowVersion: 0,6` also went - the installer's
-     `MinVersion` has been `6.1sp1` since the move to Inno Setup 6, so it could
-     never install.
-
-   * **Code-quality findings on shipped, hand-written code: 958 to zero.** Real
-     defects among them: `DBUpdater` rethrew with `throw ex`, resetting the stack
-     trace on the database-upgrade failure path; three `as` casts were
-     dereferenced without a null check; the error dialog's inner-exception branch
-     had `+ Environment.NewLine` *inside* the format string, so it printed that
-     text instead of a line break; the two-factor dialog built a `PngByteQRCode`
-     per render and never disposed it. The rest were style, and the exclusions
-     (generated designer files, `cs/path-combine` false positives, and the
-     catch-all pair across a COM-interop GUI that must not crash on one failed
-     call) carry their reasoning in `.github/codeql/codeql-config.yml`.
-
-   * **A real defect in the regression suite.** `OpenTelemetryTracing` bound its
-     OTLP collector to port 9099 - the same port the server's own metrics listener
-     uses - so with NUnit running 32 workers in parallel it could not bind. Now
-     9096, and the fixture passes.
-
-   * **One build path, one output folder.** Building `ControlPanel.sln` (x64) and
-     running `dotnet build ControlPanel.csproj` (AnyCPU) wrote to two different
-     `bin` folders while CI and the installer both read one fixed path, so a
-     solution build followed by an installer build would have shipped a stale GUI.
-     The output path and the `win-x64` runtime identifier are now pinned in the
-     project, which also stops the publish shipping macOS and arm64 native
-     binaries this installer can never load.
-
-6.2.9
-=====
-
-A follow-up to 6.2.8: the dependency upgrade that release held back, plus the
-first automated tests for the Control Panel.
-
-   * **LiveCharts upgraded to 2.0.5** ([#11](https://github.com/Progressiverobot/hmailserver/issues/11)).
-     The upgrade had been held back because the dashboard charts rendered as an
-     opaque white block over the dark theme, taking the "No delivery activity
-     yet" / "No active sessions" labels down with them. `CartesianChart` derives
-     from `Control`, and 2.0.x gives it a solid default background where the
-     release candidate left it unset; the charts now set it explicitly.
-     Verified in both light and dark themes.
-
-   * **First automated tests for the Control Panel** ([#12](https://github.com/Progressiverobot/hmailserver/pull/12)).
-     The GUI had no test coverage at all - CI compiled it and stopped there. A
-     `ControlPanel.Core` library now exposes the side-effect-free services
-     (`PasswordStrength`, `NumericField`, `PasswordGenerator`) to a `ControlPanel.Tests`
-     xUnit project, and CI runs them with Cobertura coverage on every push. The
-     three .NET 8 projects also gained a solution, `ControlPanel.sln`.
-
-6.2.8
-=====
-
-A Control Panel bug-fix release. No server-core changes - the two defects below
-were both in the GUI, and both made it look like the server was broken when it
-was not.
-
-   * **List editors showed blank rows** ([#6](https://github.com/Progressiverobot/hmailserver/issues/6)).
-     Every data-driven list pane rendered the right *number* of rows with nothing
-     in them: domain aliases, SURBL servers, DNS blacklists, the anti-spam and
-     greylisting white lists, blocked attachments, groups, server messages,
-     external POP3 accounts and account rules. Adding an entry appeared to create
-     an empty row, and only the Edit dialog showed the value you had typed. The
-     row model exposed its data as a *field*, and WPF data binding resolves
-     properties only - so every generated column silently bound to nothing.
-     Reported against domain aliases; the fix restores all of the affected panes.
-   * **The Control Panel died after a service restart** ([#7](https://github.com/Progressiverobot/hmailserver/issues/7)).
-     The COM server lives inside the hMailServer service process, so restarting
-     the service invalidated every interface pointer the GUI held. Afterwards
-     each page failed with *"The RPC server is unavailable"* - including restarts
-     the Control Panel performed itself after saving a setting - and the only
-     cure was to close and reopen it. The session now verifies the link before
-     use and re-authenticates transparently when the service has gone.
-   * **Restarting from the Control Panel reconnects immediately** and waits for
-     the server to finish starting, rather than latching onto a service that has
-     registered with Windows but is still opening its database - which produced a
-     misleading "no connection to the database" error.
-   * **A restart performed by anyone else is detected and healed** on the next
-     thing you do, with a "Connection restored" notification and a refresh of the
-     page on screen. No action is needed.
-   * **A server that really is unreachable now reports it readably** instead of
-     raising the unhandled-exception dialog, and the Control Panel no longer
-     starts an hMailServer service that the administrator deliberately stopped.
-
-   Both fixes were verified end to end against a live hMailServer: reproduced on
-   the previous build, then confirmed fixed on this one.
-
-**Dependencies**
-
-   * Control Panel: WPF-UI 3.0.5 &rarr; 4.3.0, QRCoder 1.6.0 &rarr; 1.8.0 and the
-     `System.Management` / `System.ServiceProcess.ServiceController` /
-     `System.DirectoryServices` packages 8.0.0 &rarr; 10.0.10.
-   * CI: `actions/checkout` v4 &rarr; v7, `actions/setup-dotnet` v4 &rarr; v5,
-     `github/codeql-action` v3 &rarr; v4, `actions/dependency-review-action`
-     v4 &rarr; v5, `actions/upload-artifact` v4 &rarr; v7.
-   * LiveCharts shipped as **2.0.0-rc2** in this release; the 2.0.5 upgrade was
-     held back because it rendered the dashboard chart area opaque white over
-     the dark theme. That is resolved in 6.2.9 above.
-
-6.2.7
-=====
-
-A Control Panel usability release. No server-core changes; every improvement is
-in the administration GUI, closing the remaining "standard desktop app" gaps so
-common tasks no longer need hand-typed paths, external tools or guesswork.
-
-   * **File/folder pickers everywhere.** Every field that holds a file-system path
-     now has a `...` browse button: the backup destination and restore file, the
-     archive folder, the ACME certificate folder, the OAuth2 public key, the REST
-     API / Web Services TLS certificate and key files, the ClamWin executable and
-     database folder, and the DKIM private key.
-   * **One-click DKIM.** Domain &rarr; DKIM gains "Generate key pair", which creates an
-     RSA-2048 key, saves the private key, fills the path, and shows the exact
-     `selector._domainkey` **DNS TXT record** (`v=DKIM1; k=rsa; p=...`) with a Copy
-     button - no more running OpenSSL by hand.
-   * **Passwords.** All password boxes get a reveal (eye) toggle; the account editor
-     and the quick-create form get a "Generate strong password" button (cryptographic
-     RNG, copied to the clipboard); and the external POP3 fetch-account password is
-     now masked instead of shown in clear text.
-   * **Inputs.** The auto-reply expiry is a date picker; numeric server settings and
-     the collection editors use up/down number boxes; every editor dialog now obeys
-     **Enter** (save) and **Esc** (cancel); and MX query / Diagnostics output has a Copy
-     button.
-   * **Window state.** The main window remembers its size, position and maximized
-     state between sessions, and a save confirmation toast appears after saving.
-
-6.2.6
-=====
-
-A Control Panel and installer polish release. The server core is unchanged in
-behaviour apart from one new opt-in protocol mode; everything else refines the
-administration experience.
-
-   * **IMAP4rev2 (RFC 9051)** as an opt-in session mode. The server advertises
-     `IMAP4rev2` and `ENABLE IMAP4rev2` switches the connection to RFC 9051
-     semantics (ESEARCH responses by default, `\Recent`/`RECENT` dropped from
-     SELECT/EXAMINE/STATUS, the obsolete `[UNSEEN]` response code suppressed, and
-     UTF-8 acceptance). IMAP4rev1 behaviour is unchanged until a client opts in.
-   * **Control Panel visual redesign.** A central, theme-aware colour-token system
-     replaces scattered hardcoded colours (success/warning/danger/info and the log
-     palette now adapt to light/dark/high-contrast); the sidebar navigation gains a
-     proper Fluent selection style and a brand keyboard-focus ring; live-log colours
-     are legible on light theme; data grids get readable row dividers and balanced
-     columns; settings forms use a readable column width with right-sized inputs;
-     KPI colours encode state rather than category; destructive buttons are softened;
-     dashboard charts show clear "no activity" placeholders; and the Welcome page is a
-     grid of clickable quick-action tiles.
-   * **Complete settings coverage.** Every configurable server setting now has a GUI
-     control. New in the Control Panel: OAuth2 / external-token authentication, SRS
-     and BATV, submission/outbound rate limits, OpenTelemetry + slow-query log,
-     connection timeouts, delivery/queue tuning, search-indexing, message-archiving
-     and other INI knobs, `Logging.Device`/`LogFormat`, the cache size caps, the
-     domain-level Active Directory link, and a write-only editor for secrets. See the
-     Control Panel's own pages for the full coverage map.
-   * **Two-factor authentication setup** now renders a real scannable QR code (plus a
-     grouped manual key with a copy button) and a larger, clearer verification field.
-   * **Installer.** The custom database-type wizard page is DPI-scaled, the dead
-     legacy dependency installers (MSI/IE6/MDAC/JET/.NET 2.0) are removed, the copy is
-     modernised, and the wizard imagery is refreshed to the current brand.
-
-6.2.5
-=====
-
-A critical fix release for default fresh installs. The 6.2.4 installer's default
-configuration (built-in SQL Server Compact database with DPAPI secret protection,
-both shipped defaults) could not connect to its own database after a clean install.
-Two independent defects were responsible; both are fixed and the default install
-is now validated end-to-end on a clean Windows Server 2025 machine:
-
-   * **DPAPI database-password truncation.** Protected INI secrets (the database
-     password, and likewise long OAuth2 HMAC secrets / the password pepper) are
-     stored as a DPAPI base64 envelope that exceeds 255 characters. The INI reader
-     used a fixed 255-character buffer, silently truncating the value; the truncated
-     blob failed to decrypt and yielded an empty password, so the server reported
-     SQL CE "Authentication failed" (error 25028). The buffer was enlarged to 4096.
-   * **Fresh-install database version.** The create-table scripts still stamped the
-     new database as schema 6004 while the server required 6005, so a clean install
-     reported "database too old". The create scripts now stamp 6005 (the required
-     column was already present).
-
-Active Directory authentication was also validated end-to-end against a live domain
-controller (COM `ValidatePassword` for DNS and NetBIOS domain forms, plus real IMAP
-login), and the Control Panel reached full settings parity with the classic
-Administrator (the Server-status page and the per-account rule criteria/action
-editor were the last items confirmed).
+**Client autoconfiguration**: Thunderbird autoconfig and Outlook autodiscover are served for every local domain, so clients configure themselves from an address and password.
 
 Building hMailServer
 ====================
@@ -760,10 +240,10 @@ Alternatively, build from Visual Studio (started with _Run as Administrator_) or
 
 **NOTE:** On a machine running a production hMailServer service, pass `/p:PreBuildEventUseInBuild=false /p:PostBuildEventUseInBuild=false` to MSBuild. The build events stop and re-register the Windows service, which would otherwise disrupt the production installation.
 
-Configuring the 6.0 features
-============================
+Configuration reference
+=======================
 
-Most new features are configured in `Bin\hMailServer.INI` under `[Settings]`, or interactively in the Control Panel under **Settings** (which edits the same settings and offers to restart the service). All settings below show their default values.
+Most of the settings above are configured in `Bin\hMailServer.INI` under `[Settings]`, or interactively in the Control Panel under **Settings** (which edits the same settings and offers to restart the service). All settings below show their default values.
 
 Transport security and authentication:
 
@@ -866,7 +346,7 @@ If you want to run hMailServer in debug mode in Visual Studio, add the command a
 Running tests
 -------------
 
-hMailServer ships with a full regression suite (1026 NUnit tests) which exercises the server end to end over SMTP, IMAP and POP3  -  including anti-spam, anti-virus, TLS, DKIM/DMARC, rules, backup and the COM API. 6.2.10 passes **all 1026 with zero failures and zero inconclusive**, with live SpamAssassin and ClamAV. Without those two integrations installed the 27 tests that depend on them report *inconclusive* rather than failing; the setup that makes them run is below.
+hMailServer ships with a full NUnit regression suite which exercises the server end to end over SMTP, IMAP and POP3  -  including anti-spam, anti-virus, TLS, DKIM/DMARC, rules, backup and the COM API. Every release must pass it in full, with zero failures and zero inconclusive, against the exact binary being shipped (the per-release count is quoted on the [Releases page](https://github.com/Progressiverobot/hmailserver/releases)). Without live SpamAssassin and ClamAV installed, the tests that depend on them report *inconclusive* rather than failing; the setup that makes them run is below.
 
 NOTE: When running tests, your local hMailServer installation will be updated with test accounts. Existing domains and accounts are deleted. Each tests prepares the server configuration in different ways. In other words, do not run the automated tests in an environment where you need to preserve hMailServer data.
 
@@ -911,13 +391,8 @@ The complete dev-tree provisioning recipe (directories, certificates, DB scripts
 Releasing hMailServer
 =====================
 
-Without finding any serious issues:
-
-1. Run all integration tests on supported versions of Windows and the different supported databases. 
-2. Run all server stress tests
-3. Enable Gflags (gflags /p /enable hmailserver.exe) and run all integration tests to check for memory issues
-4. Run for at least 1 week in production for hMailServer.com
-5. Wait for at least 500 downloads of the beta version
+The release process — the order of operations, the gates that must pass, and why
+each one exists — is documented in [RELEASE.md](RELEASE.md).
 
 License
 =======

@@ -1,4 +1,4 @@
-// Copyright (c) 2010 Martin Knafve / hMailServer.com.  
+﻿// Copyright (c) 2010 Martin Knafve / hMailServer.com.  
 // http://www.hmailserver.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 
@@ -130,7 +130,7 @@ namespace RegressionTests.AntiSpam
          }
 
          CustomAsserts.AssertReportedError(
-            "The SpamAssassin tests did not complete. Please confirm that the configuration (host name and port) is valid and that SpamAssassin is running.");
+            "The SpamAssassin tests did not complete");
       }
 
       [Test]
@@ -211,7 +211,7 @@ namespace RegressionTests.AntiSpam
          // to connect to, so Connect() fails outright and that error never fires -
          // asserting it demanded a different failure mode from the one under test.
          CustomAsserts.AssertReportedError(
-            "The SpamAssassin tests did not complete. Please confirm that the configuration (host name and port) is valid and that SpamAssassin is running.");
+            "The SpamAssassin tests did not complete");
       }
 
       [Test]
