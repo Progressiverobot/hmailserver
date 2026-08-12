@@ -111,6 +111,7 @@ namespace HM
       int GetSMTPCMaxTimeout () {return smtpcmax_timeout_; }
       int GetSAMinTimeout () {return samin_timeout_; }
       int GetSAMaxTimeout () {return samax_timeout_; }
+      int GetFinalizationTimeout () {return finalization_timeout_; }
       int GetClamMinTimeout () {return clam_min_timeout_; }
       int GetClamMaxTimeout () {return clam_max_timeout_; }
       bool GetSAMoveVsCopy() const { return samove_vs_copy_; }
@@ -265,6 +266,7 @@ namespace HM
       int smtpcmax_timeout_;
       int samin_timeout_;
       int samax_timeout_;
+      int finalization_timeout_;
       int clam_min_timeout_;
       int clam_max_timeout_;
       bool samove_vs_copy_;

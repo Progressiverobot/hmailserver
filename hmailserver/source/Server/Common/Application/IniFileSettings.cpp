@@ -234,6 +234,12 @@ namespace HM
       smtpcmax_timeout_ =  ReadIniSettingInteger_("Settings", "SMTPCMaxTimeout",600);
       samin_timeout_ =  ReadIniSettingInteger_("Settings", "SAMinTimeout", 30);
       samax_timeout_ =  ReadIniSettingInteger_("Settings", "SAMaxTimeout",90);
+      // Upper bound, in seconds, on the accept/save work that runs after end-of-data
+      // and holds the thread that sends the "250". Past this the message is refused
+      // with a temporary 451 so the sending MTA retries, rather than the reply
+      // stalling past the sender's own timeout (discussion #18). 0 disables it.
+      // Default 240s: comfortably under Postfix's 600s data-done timeout.
+      finalization_timeout_ =  ReadIniSettingInteger_("Settings", "FinalizationTimeout", 240);
       clam_min_timeout_ =  ReadIniSettingInteger_("Settings", "ClamMinTimeout", 15);
       clam_max_timeout_ =  ReadIniSettingInteger_("Settings", "ClamMaxTimeout",90);
       samove_vs_copy_ = ReadIniSettingInteger_("Settings", "SAMoveVsCopy", 0) == 1;

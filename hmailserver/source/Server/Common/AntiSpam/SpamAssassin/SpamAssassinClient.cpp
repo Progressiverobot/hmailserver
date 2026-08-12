@@ -22,7 +22,7 @@ namespace HM
                                           boost::asio::io_context& io_context, 
                                           boost::asio::ssl::context& context,
                                           std::shared_ptr<Event> disconnected,
-                                          bool &testCompleted) :
+                                          std::shared_ptr<bool> testCompleted) :
                TCPConnection(CSNone, io_context, context, disconnected, ""),
                test_completed_(testCompleted),
                total_result_bytes_written_(0)
@@ -34,7 +34,7 @@ namespace HM
 	   spam_dsize_ = -1;
 	   message_size_ = -1;
 
-      test_completed_ = false;
+      *test_completed_ = false;
    }
 
 
@@ -244,7 +244,7 @@ namespace HM
          LOG_DEBUG(logMessage);
 	  }
      
-     test_completed_ = true;
+     *test_completed_ = true;
    }
 
    int

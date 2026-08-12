@@ -13,11 +13,11 @@ namespace HM
    class SpamAssassinClient : public TCPConnection
    {
    public:
-      SpamAssassinClient(const String &sFile, 
-         boost::asio::io_context& io_context, 
+      SpamAssassinClient(const String &sFile,
+         boost::asio::io_context& io_context,
          boost::asio::ssl::context& context,
          std::shared_ptr<Event> disconnected,
-         bool &testCompleted);
+         std::shared_ptr<bool> testCompleted);
       ~SpamAssassinClient(void);
 
       virtual void ParseData(const AnsiString &Request);
@@ -51,7 +51,12 @@ namespace HM
 	   __int64 spam_dsize_;      // Content-length spamd reported; < 0 until a valid header is parsed
 	   __int64 message_size_;
       std::shared_ptr<File> result_;
-      bool &test_completed_;
+
+      // Shared with SpamTestSpamAssassin::RunTest rather than a reference to its
+      // stack, so that if RunTest stops waiting (its bounded wait elapsed against
+      // a spamd that never answers) and returns, this still-live connection can
+      // set the flag without writing through a dangling reference.
+      std::shared_ptr<bool> test_completed_;
 
       __int64 total_result_bytes_written_;
   };

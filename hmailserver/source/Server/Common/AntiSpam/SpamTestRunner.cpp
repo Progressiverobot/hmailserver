@@ -74,7 +74,17 @@ namespace HM
          
          String sName = pSpamTest->GetName();
 
+         // Time each test. Post-transmission tests (and, for an incoming relay, all
+         // of them) run on the thread that will send the "250"; a single slow test
+         // - a DNS lookup against a sick resolver, a stalled SpamAssassin - is what
+         // makes a relayed message time out on the sender (discussion #18). The
+         // name plus elapsed here is what tells DNSBL from SURBL from SPF from
+         // SpamAssassin on a live report.
+         const ULONGLONG testStartTick = GetTickCount64();
+
          std::set<std::shared_ptr<SpamTestResult> > setResult = pSpamTest->RunTest(pInputData);
+
+         const ULONGLONG testElapsed = GetTickCount64() - testStartTick;
 
          auto iter = setResult.begin();
          auto iterEnd = setResult.end();
@@ -91,8 +101,15 @@ namespace HM
          int totalDiff = iTotalScore - totalScoreBefore;
 
          String sSpamTestResult;
-         sSpamTestResult.Format(_T("Spam test: %s, Score: %d"), sName.c_str(), totalDiff);
-         LOG_DEBUG(sSpamTestResult);
+         sSpamTestResult.Format(_T("Spam test: %s, Score: %d, Time: %I64u ms"), sName.c_str(), totalDiff, testElapsed);
+         if (testElapsed >= 10000)
+         {
+            LOG_APPLICATION(sSpamTestResult);
+         }
+         else
+         {
+            LOG_DEBUG(sSpamTestResult);
+         }
 
          if (iTotalScore >= iMaxScore)
          {

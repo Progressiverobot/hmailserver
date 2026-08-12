@@ -76,7 +76,9 @@ namespace HM
       
       std::shared_ptr<IOService> pIOService = Application::Instance()->GetIOService();
 
-      bool testCompleted;
+      // Shared with the client (not a reference to this stack frame) so the bounded
+      // wait below can return while the connection is still alive.
+      std::shared_ptr<bool> testCompleted = std::make_shared<bool>(false);
 
       std::shared_ptr<Event> disconnectEvent = std::shared_ptr<Event>(new Event());
       std::shared_ptr<SpamAssassinClient> pSAClient = std::shared_ptr<SpamAssassinClient>(new SpamAssassinClient(sFilename, pIOService->GetIOContext(), pIOService->GetClientContext(), disconnectEvent, testCompleted));
@@ -105,19 +107,36 @@ namespace HM
       // Here we handle of the ownership to the TCPIP-connection layer.
       if (pSAClient->Connect(ip_address, iPort, IPAddress()))
       {
-         // Make sure we keep no references to the TCP connection so that it
-         // can be terminated whenever. We're longer own the connection.
+         // Keep a weak handle so a stuck connection can be torn down after the
+         // wait below, without keeping it alive ourselves.
+         std::weak_ptr<TCPConnection> weakClient = pSAClient;
          pSAClient.reset();
 
-         disconnectEvent->Wait();
-      }
-      
-      if (!testCompleted)
-      {
-         ErrorManager::Instance()->ReportError(ErrorManager::High, 5508, "SpamTestSpamAssassin::RunTest", 
-            "The SpamAssassin tests did not complete. Please confirm that the configuration (host name and port) is valid and that SpamAssassin is running.");
+         // A hard ceiling on the whole SpamAssassin exchange. The connection's own
+         // idle timeout (SAMaxTimeout) is re-armed on every byte, so a spamd that
+         // trickles or accepts-then-stalls could otherwise hold this thread - the
+         // one that sends the "250" for the message - indefinitely. That is the
+         // relayed-mail stall in discussion #18: a slow scanner made reception look
+         // complete while no reply was ever sent. Past the ceiling the message is
+         // accepted without a SpamAssassin verdict, exactly as when spamd is down.
+         const int ceilingSeconds = IniFileSettings::Instance()->GetSAMaxTimeout() + 30;
+         disconnectEvent->WaitFor(boost::chrono::seconds(ceilingSeconds));
 
-         return setSpamTestResults;  
+         if (!*testCompleted)
+         {
+            // The wait elapsed with the exchange unfinished. Tear the connection
+            // down so it cannot linger against a trickling spamd.
+            if (std::shared_ptr<TCPConnection> liveClient = weakClient.lock())
+               liveClient->EnqueueDisconnect();
+         }
+      }
+
+      if (!*testCompleted)
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 5508, "SpamTestSpamAssassin::RunTest",
+            "The SpamAssassin tests did not complete within the time limit, or the configuration (host name and port) is invalid, or SpamAssassin is not running. The message was accepted without a SpamAssassin verdict.");
+
+         return setSpamTestResults;
       }
 
       // Check if the message is tagged as spam.

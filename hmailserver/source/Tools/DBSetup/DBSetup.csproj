@@ -18,7 +18,7 @@
     <RootNamespace>DBSetup</RootNamespace>
     <AssemblyName>DBSetup</AssemblyName>
     <ApplicationIcon>database_add.ico</ApplicationIcon>
-    <Version>6.2.16</Version>
+    <Version>6.2.17</Version>
     <Product>hMailServer Database Setup</Product>
     <Company>Progressive Robot Ltd</Company>
     <Copyright>Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd</Copyright>

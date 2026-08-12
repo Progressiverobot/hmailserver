@@ -72,6 +72,11 @@ namespace HM
 
       bool ParseAddressWithExtensions_(String mailFrom, String &address, String &parameters);
       void HandleSMTPFinalizationTaskCompleted_();
+      void LogFinalizationStage_(const AnsiString &stage, ULONGLONG startTick);
+      // Returns true (and sends a temporary 451, discarding the message) when the
+      // accept/save work has run longer than the configured deadline since
+      // end-of-data. See #18.
+      bool FinalizationDeadlineExceeded_(ULONGLONG elapsedMs);
 
       virtual void InternalParseData(const AnsiString &sRequest);
 
@@ -257,6 +262,12 @@ namespace HM
       std::shared_ptr<ScramSha256> scram_session_;
       
       DWORD message_start_tc_;
+
+      // When the final dot / last BDAT chunk was received and the accept/save work
+      // was handed to the async queue. The client (a relaying MTA) starts its
+      // data-done timeout at this instant, so this is the clock the accept path
+      // races - used for the queue-wait log and the finalization deadline.
+      ULONGLONG finalization_enqueued_tick_ = 0;
 
       size_t max_message_size_kb_;
       // Maximum message size in KB.

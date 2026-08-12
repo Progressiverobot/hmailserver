@@ -1192,20 +1192,44 @@ namespace HM
       }
 
       // Since this may be a time-consuming task, do it asynchronously
-      std::shared_ptr<AsynchronousTask<TCPConnection> > finalizationTask = 
+      finalization_enqueued_tick_ = GetTickCount64();
+      std::shared_ptr<AsynchronousTask<TCPConnection> > finalizationTask =
          std::shared_ptr<AsynchronousTask<TCPConnection> >(new AsynchronousTask<TCPConnection>
             (std::bind(&SMTPConnection::HandleSMTPFinalizationTaskCompleted_, this), shared_from_this()));
-      
+
       Application::Instance()->GetAsyncWorkQueue()->AddTask(finalizationTask);
    }
-   
+
    void
    SMTPConnection::HandleSMTPFinalizationTaskCompleted_()
    {
-      // Marks the boundary between "still receiving" and "accepting the message"
-      // (spam/virus scanning, rules, saving). Without it a stalled session cannot
-      // be told apart from one that is simply waiting for more data.
-      LOG_DEBUG("SMTPConnection - Message received; running accept/save processing.");
+      // The accept/save work below runs on the shared async queue and holds the
+      // thread that sends the "250" for this message. Time it in stages: a "start"
+      // line with no matching "done" line names the stage that stalled, and the
+      // queue-wait line shows when the queue itself (not any one stage) is the
+      // problem. See discussion #18. Timings are relative to end-of-data, the
+      // instant the sending MTA started its own data-done timeout.
+      const ULONGLONG queueWaitMs = finalization_enqueued_tick_ > 0
+         ? GetTickCount64() - finalization_enqueued_tick_ : 0;
+
+      if (queueWaitMs >= 5000)
+      {
+         String msg;
+         msg.Format(_T("SMTPConnection - Accept/save waited %I64u ms in the async queue before starting (session %d). The async task queue may be saturated."),
+            queueWaitMs, (int) GetSessionID());
+         LOG_APPLICATION(msg);
+      }
+
+      // A finalization that races past the sending MTA's data-done timeout produces
+      // discussion #18's exact symptom: reception looks complete but no reply is
+      // ever sent. Rather than let that happen silently, give up before the point
+      // of no return (nothing has been saved yet) with a temporary 451 so the MTA
+      // retries cleanly. Checked here (queue starvation) and again before the save.
+      if (FinalizationDeadlineExceeded_(queueWaitMs))
+         return;
+
+      LOG_DEBUG("SMTPConnection - accept: start spam-protection.");
+      ULONGLONG stageTick = GetTickCount64();
 
       if (!DoPreAcceptSpamProtection_())
       {
@@ -1219,7 +1243,11 @@ namespace HM
          return;
       }
 
+      LogFinalizationStage_("spam-protection", stageTick);
+
+      stageTick = GetTickCount64();
       DoPreAcceptMessageModifications_();
+      LogFinalizationStage_("message-modifications", stageTick);
 
       // Transmission has ended.
       current_message_->SetSize(FileUtilities::FileSize(PersistentMessage::GetFileName(current_message_)));
@@ -1345,6 +1373,15 @@ namespace HM
       float dTime = ((float) GetTickCount() - (float) message_start_tc_) / (float) 1000;
       double dTCDiff = Math::Round(dTime ,3);
 
+      // Last chance to bail before anything is delivered. Past OnPreAcceptTransfer_
+      // and SaveObject the message is queued for delivery, so a late 451 here would
+      // race a "250" and duplicate the mail; before it, a 451 is clean.
+      if (FinalizationDeadlineExceeded_(finalization_enqueued_tick_ > 0 ? GetTickCount64() - finalization_enqueued_tick_ : 0))
+         return;
+
+      LOG_DEBUG("SMTPConnection - accept: start script/save.");
+      ULONGLONG saveTick = GetTickCount64();
+
       if (OnPreAcceptTransfer_())
       {
          // Add the message to the database.
@@ -1403,8 +1440,57 @@ namespace HM
          ResetCurrentMessage_();
       }
 
+      LogFinalizationStage_("script/save", saveTick);
+
       SetReceiveBinary(false);
       EnqueueRead();
+   }
+
+   void
+   SMTPConnection::LogFinalizationStage_(const AnsiString &stage, ULONGLONG startTick)
+   {
+      const ULONGLONG elapsed = GetTickCount64() - startTick;
+
+      String msg;
+      msg.Format(_T("SMTPConnection - accept: done %s in %I64u ms (session %d)."),
+         String(stage).c_str(), elapsed, (int) GetSessionID());
+
+      // A stage that runs long is exactly what makes a relayed message time out on
+      // the sender, so surface a slow one in the normal log rather than only under
+      // debug. 10s is well short of any MTA's data-done timeout.
+      if (elapsed >= 10000)
+      {
+         LOG_APPLICATION(msg);
+      }
+      else
+      {
+         LOG_DEBUG(msg);
+      }
+   }
+
+   bool
+   SMTPConnection::FinalizationDeadlineExceeded_(ULONGLONG elapsedMs)
+   {
+      const int deadlineSeconds = IniFileSettings::Instance()->GetFinalizationTimeout();
+
+      // 0 disables the deadline (keeps the old unbounded behaviour for anyone who
+      // wants it).
+      if (deadlineSeconds <= 0 || elapsedMs < (ULONGLONG) deadlineSeconds * 1000)
+         return false;
+
+      String msg;
+      msg.Format(_T("SMTPConnection - Accept/save for session %d exceeded the finalization deadline of %d s (%I64u ms elapsed since end-of-data). Returning a temporary 451 so the sender retries; the message was not accepted. A scanner, DNS lookup, event script or the async queue itself is the likely cause - the per-stage timings above identify which."),
+         (int) GetSessionID(), deadlineSeconds, elapsedMs);
+      ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5525, "SMTPConnection::HandleSMTPFinalizationTaskCompleted_", msg);
+
+      SendResponse_(451, _T("4.3.1"), _T("Server temporarily overloaded while accepting the message; please retry."));
+
+      LogAwstatsMessageRejected_();
+      ResetCurrentMessage_();
+      SetReceiveBinary(false);
+      EnqueueRead();
+
+      return true;
    }
 
    void
@@ -2408,6 +2494,7 @@ namespace HM
       transmission_buffer_->Flush(true);
 
       // Run the (potentially time-consuming) accept/save/queue work asynchronously.
+      finalization_enqueued_tick_ = GetTickCount64();
       std::shared_ptr<AsynchronousTask<TCPConnection> > finalizationTask =
          std::shared_ptr<AsynchronousTask<TCPConnection> >(new AsynchronousTask<TCPConnection>
             (std::bind(&SMTPConnection::HandleSMTPFinalizationTaskCompleted_, this), shared_from_this()));
@@ -2415,7 +2502,7 @@ namespace HM
       Application::Instance()->GetAsyncWorkQueue()->AddTask(finalizationTask);
    }
 
-   bool 
+   bool
    SMTPConnection::CheckStartTlsRequired_()
    {
       if (GetConnectionSecurity() == CSSTARTTLSRequired &&

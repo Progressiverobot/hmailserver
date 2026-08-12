@@ -33,7 +33,7 @@ namespace HM
 
       std::shared_ptr<IOService> pIOService = Application::Instance()->GetIOService();
 
-      bool testCompleted;
+      std::shared_ptr<bool> testCompleted = std::make_shared<bool>(false);
 
       std::shared_ptr<Event> disconnectEvent = std::shared_ptr<Event>(new Event());
       std::shared_ptr<SpamAssassinClient> pSAClient = std::shared_ptr<SpamAssassinClient>(new SpamAssassinClient(tempFile, pIOService->GetIOContext(), pIOService->GetClientContext(), disconnectEvent, testCompleted));
@@ -59,23 +59,32 @@ namespace HM
       // Here we handle of the ownership to the TCPIP-connection layer.
       if (pSAClient->Connect(ip_address, port, IPAddress()))
       {
-         // Make sure we keep no references to the TCP connection so that it
-         // can be terminated whenever. We're longer own the connection.
+         std::weak_ptr<TCPConnection> weakClient = pSAClient;
          pSAClient.reset();
 
-         disconnectEvent->Wait();
+         // Bounded so the admin's "test SpamAssassin" button cannot hang the
+         // Control Panel against an unresponsive host (same ceiling as the accept
+         // path uses).
+         const int ceilingSeconds = IniFileSettings::Instance()->GetSAMaxTimeout() + 30;
+         disconnectEvent->WaitFor(boost::chrono::seconds(ceilingSeconds));
+
+         if (!*testCompleted)
+         {
+            if (std::shared_ptr<TCPConnection> liveClient = weakClient.lock())
+               liveClient->EnqueueDisconnect();
+         }
       }
 
-      if (testCompleted)
+      if (*testCompleted)
          message = FileUtilities::ReadCompleteTextFile(tempFile);
       else
       {
-         message = "Unable to connect to the specified SpamAssassin server.";
+         message = "Unable to connect to the specified SpamAssassin server, or it did not respond in time.";
       }
 
       FileUtilities::DeleteFile(tempFile);
 
-      return testCompleted;
+      return *testCompleted;
 
    }
 
