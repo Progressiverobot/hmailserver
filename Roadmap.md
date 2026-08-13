@@ -44,7 +44,7 @@ strong and where it is thin far more honestly than any prose summary.
 | Section | ✅ | 🔄 | ⬜ | ⏸️ |
 |---|--:|--:|--:|--:|
 | [Dated items — the forcing functions](#dated-items--the-forcing-functions) | 1 | – | 5 | 1 |
-| [Defects found by the audit](#defects-found-by-the-audit) | 21 | 1 | – | – |
+| [Defects found by the audit](#defects-found-by-the-audit) | 22 | 0 | – | – |
 | **The next generation** | | | | |
 | [The phases](#the-phases) | – | 1 | 6 | 1 |
 | [Structural prerequisites](#structural-prerequisites) | 7 | 0 | 2 | – |
@@ -72,7 +72,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 2 | – | 4 | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 4 | 1 | 2 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 4 | 1 | 4 | – |
-| **Total** | **578** | **14** | **167** | **14** |
+| **Total** | **579** | **13** | **167** | **14** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage and the administration surface are the best-covered areas**, and the
@@ -217,7 +217,7 @@ process working: all three would have been worse than the defect.
 | ✅ | **`ENHANCEDSTATUSCODES` was advertised but mostly unused** | The code table was consulted from one function while ~36 reply sites wrote their status line directly. Most now route through it. No numeric status code or reply text changed. |
 | ✅ | **The settings-index generator was not wired into the build** | `build/generate-settings-index.ps1` was referenced by nothing, so the committed Ctrl+K index was effectively hand-maintained. CI now regenerates it and fails if the tree moves. |
 | ✅ | **Plaintext-stored passwords never upgrade** | **Corrected 12 Aug 2026 — the original framing of this defect was wrong and overstated.** Weak *hashed* schemes do upgrade correctly: `PasswordValidator.cpp` verifies the password, then re-hashes to the preferred KDF and **persists** it via `SaveObject`, upgrading only ever upward. So the README's "transparent upgrade on login" is accurate for MD5 and SHA256. The real gap is narrower: an account whose `accountpwencryption` is `0` takes the plaintext-comparison branch, which returns *before* reaching the upgrade block, so it stays plaintext forever. The only path that ever handled that case is the dead re-hash in `PersistentAccount::ReadObject`. Compounding it, the `MinimumAcceptedHashAlgorithm` check runs **before** any upgrade, so on a policy-enabled install a plaintext account is refused outright rather than upgraded — arguably deliberate (the log says "must be reset") but it means the policy can never heal an install. A first fix was **rejected** for removing the read-time re-hash before wiring a replacement, which would have broken SCRAM for those accounts *with the correct password*: SCRAM requires a PBKDF2 record, and the read-time re-hash was accidentally what satisfied that gate. |
-| 🔄 | **DANE validates the TLSA record but not the MX RRset** | The TLSA lookup is DNSSEC-validated; the MX lookup that chose the host is not, so an attacker able to forge the MX response can redirect delivery to a host whose own TLSA record then validates. Not attempted yet — it needs resolver-level changes. |
+| ✅ | **DANE validates the MX RRset as well as the TLSA record** | Closed 13 August 2026, and it mattered because DANE enforcement is **on by default** (`DaneEnforcementEnabled=1`): the TLSA lookup was DNSSEC-validated and the MX lookup that chose the host was not, so an attacker able to forge the MX response could redirect delivery to a host of their choosing whose own TLSA record then validated perfectly - and the server reported a successfully authenticated DANE delivery. RFC 7672 section 2.2 requires the MX RRset itself to be validated, and now it is: `DnssecResolver::QueryMx` runs the same chain-of-trust validation used for TLSA, `ExternalDelivery` looks it up once per recipient domain, and `TlsPolicy::EvaluateMxDnssecStatus` decides per host - a validated RRset only makes a host DANE-capable if that host is one of the names the RRset published. A bogus chain over the MX RRset now skips the host and is recorded in TLS-RPT, matching what a bogus TLSA chain already did. **Every other outcome leaves delivery exactly as it was**, which is the property that matters in a mail server: an unsigned domain - most of them - is Insecure, and Insecure has always meant deliver without DANE. The one narrowing is declared at the code: `QueryMx` refuses a compression pointer in the exchange name rather than following one into a packet it does not hold, which can only ever cost DANE on that destination, never a delivery. |
 | ✅ | **TLS-RPT reporting is gated on an unset value** | The reporter returns immediately when `TlsRptFromAddress` is empty, which it is by default, so reports are aggregated and never sent. Should get the same startup warning treatment as MTA-STS above. |
 
 

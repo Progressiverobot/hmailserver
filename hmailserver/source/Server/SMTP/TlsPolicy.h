@@ -27,18 +27,19 @@
 // anything a caller produces by accident - lands on the ordinary
 // delivery path. See the invariant on MxDnssecStatus below.
 //
-// NOT YET PLUMBED (honest gap, for the integrator): nothing calls
-// EvaluateMxDnssecStatus yet, because DnssecResolver has no validated MX
-// lookup to feed it. QueryValidatedRrset_ hands back raw rdata blobs,
-// and an MX rdata's exchange field is a DNS name that may use
-// compression pointers into the rest of the packet, so the raw rdata
-// alone cannot be turned into a host name. Adding a validated MX query
-// needs DnssecResolver to expose the packet together with each RR's
-// rdata_offset (ParsedRr already records it - see the CNAME path) and to
-// run its existing ReadName decompression over it. Until that lands the
-// single call site in ExternalDelivery.cpp passes three arguments, the
-// status is always Unknown, and outbound delivery behaves exactly as it
-// did before this change.
+// PLUMBED 13 August 2026. DnssecResolver::QueryMx supplies the validated
+// MX RRset, ExternalDelivery looks it up once per recipient domain and
+// EvaluateMxDnssecStatus derives the per-host status from it.
+//
+// One deliberate narrowing, because it decides what happens to real mail:
+// QueryMx parses the exchange name out of the rdata and REFUSES a
+// compression pointer rather than following one, since it does not hold
+// the surrounding packet. That is not merely conservative - an MX RRset
+// can only have validated if the canonical, uncompressed form of its
+// rdata is what was signed (RFC 4034 section 6.2) - but where a resolver
+// does hand back compressed rdata, the effect is a name this code will
+// not parse, hence no validated MX host, hence Insecure, hence delivery
+// exactly as it was before. It cannot fail closed.
 //
 // Setting DnssecValidationEnabled=0 reverts to opportunistic
 // (unvalidated) TLSA usage.

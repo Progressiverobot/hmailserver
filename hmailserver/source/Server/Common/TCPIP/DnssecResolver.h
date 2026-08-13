@@ -35,6 +35,12 @@ namespace HM
       // records is only populated when the result is Secure.
       ChainStatus QueryTlsa(const String &host_name, int port, std::vector<TlsaRecord> &records);
 
+      // Looks up and validates the MX RRset for a domain. exchanges is populated
+      // only for a Secure result - a host name learned from an unvalidated answer
+      // is precisely what must not be trusted. Required by RFC 7672 section 2.2
+      // before DANE may be applied to any host in that RRset.
+      ChainStatus QueryMx(const String &domain, std::vector<AnsiString> &exchanges);
+
       // Looks up TXT records with DNSSEC validation. Unlike TLSA, the
       // records are returned for both Secure and Insecure results (an
       // unsigned zone is normal for TXT consumers such as SPF/DKIM/DMARC);

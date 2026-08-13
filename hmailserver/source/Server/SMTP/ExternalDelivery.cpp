@@ -207,6 +207,31 @@ namespace HM
 
       bool daneEnabled = !serverInfo->GetFixed() && IniFileSettings::Instance()->GetDaneEnabled();
 
+      // RFC 7672 section 2.2: DANE applies only to a host learned from a
+      // DNSSEC-validated MX RRset. Validating the TLSA record alone proves nothing
+      // when the attacker chose the host - a forged MX answer points at a name whose
+      // own TLSA record then validates perfectly, and DANE reports success.
+      //
+      // Looked up once per domain rather than per host, and only when DANE is on.
+      // Every outcome except Bogus leaves delivery exactly as it was: an unsigned
+      // domain - which is most of them - is Insecure, and Insecure means "deliver
+      // without DANE", which is what happened before this existed.
+      DnssecResolver::ChainStatus mxChainStatus = DnssecResolver::ChainStatus::Insecure;
+      std::vector<String> validatedMxHosts;
+
+      if (daneEnabled)
+      {
+         std::vector<AnsiString> exchanges;
+         DnssecResolver dnssecResolver;
+         mxChainStatus = dnssecResolver.QueryMx(recipientDomain, exchanges);
+
+         for (const AnsiString &exchange : exchanges)
+            validatedMxHosts.push_back(String(exchange));
+
+         if (mxChainStatus == DnssecResolver::ChainStatus::Secure)
+            LOG_DEBUG("DANE: the MX RRset for " + recipientDomain + " is DNSSEC-validated; DANE may be applied to the " + StringParser::IntToString((int) validatedMxHosts.size()) + " host(s) it names.");
+      }
+
       mxtries_factor_ = IniFileSettings::Instance()->GetMXTriesFactor();
 
       // Try to connect to one server at a time. If a fatal error
@@ -243,8 +268,22 @@ namespace HM
 
          if (daneEnabled && !hostAndIp.GetHostName().IsEmpty())
          {
+            // The RFC 7672 section 2.2 status of THIS host: the MX RRset validated,
+            // and this host is one of the names it published.
+            TlsPolicy::MxDnssecStatus mxStatus =
+               TlsPolicy::EvaluateMxDnssecStatus(hostAndIp.GetHostName(), mxChainStatus, validatedMxHosts);
+
+            if (mxStatus == TlsPolicy::MxDnssecStatus::Bogus)
+            {
+               // A forged or broken chain over the MX RRset itself. The host name is
+               // not trustworthy, so neither is anything published under it.
+               LOG_APPLICATION("SMTPDeliverer - Message " + StringParser::IntToString(original_message_->GetID()) + ": the MX RRset for " + recipientDomain + " failed DNSSEC validation. Skipping " + hostAndIp.GetHostName() + " (RFC 7672 section 2.2).");
+               TlsRptStore::Instance()->RecordFailure(recipientDomain, "tlsa", "mx rrset dnssec validation", "dnssec-invalid", hostAndIp.GetHostName());
+               continue;
+            }
+
             TlsPolicy::TlsaLookupStatus tlsaStatus = TlsPolicy::TlsaLookupStatus::NoRecords;
-            daneRecords = TlsPolicy::GetTlsaRecords(hostAndIp.GetHostName(), serverInfo->GetPort(), tlsaStatus);
+            daneRecords = TlsPolicy::GetTlsaRecords(hostAndIp.GetHostName(), serverInfo->GetPort(), tlsaStatus, mxStatus);
 
             if (tlsaStatus == TlsPolicy::TlsaLookupStatus::Bogus)
             {

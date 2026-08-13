@@ -39,6 +39,7 @@ namespace HM
    namespace
    {
       const unsigned short DnsTypeCname = 5;
+      const unsigned short DnsTypeMx = 15;
       const unsigned short DnsTypeTxt = 16;
       const unsigned short DnsTypeDs = 43;
       const unsigned short DnsTypeRrsig = 46;
@@ -1491,6 +1492,86 @@ namespace HM
       }
 
       return records.empty() ? ChainStatus::Insecure : ChainStatus::Secure;
+   }
+
+   DnssecResolver::ChainStatus
+   DnssecResolver::QueryMx(const String &domain, std::vector<AnsiString> &exchanges)
+   //---------------------------------------------------------------------------
+   // DESCRIPTION:
+   // Looks up and validates the MX RRset for a domain.
+   //
+   // RFC 7672 section 2.2: DANE may only be applied to an MX host that was
+   // itself learned from a DNSSEC-validated MX RRset. Without this, validating
+   // the TLSA record proves only that the attacker-chosen host has a TLSA record
+   // of its own - and an attacker able to forge the MX answer supplies both.
+   //
+   // exchanges is populated only for a Secure result, because a name from an
+   // unvalidated answer is exactly what must not be trusted.
+   //---------------------------------------------------------------------------
+   {
+      exchanges.clear();
+
+      AnsiString queryName = domain;
+      queryName.MakeLower();
+
+      std::vector<std::vector<unsigned char>> rdatas;
+      ChainStatus status = QueryValidatedRrset_(queryName, DnsTypeMx, rdatas);
+
+      if (status != ChainStatus::Secure)
+         return status;
+
+      for (const std::vector<unsigned char> &rdata : rdatas)
+      {
+         // 2 bytes of preference, then the exchange as an uncompressed wire-format
+         // name. Uncompressed is not an assumption: the RRset validated, and it
+         // could only validate if the signer's canonical form - which forbids
+         // compression - is what arrived. A pointer here would therefore mean the
+         // rdata is not what was signed, so it is refused rather than followed
+         // into a buffer this function does not have.
+         if (rdata.size() < 3)
+            continue;
+
+         AnsiString exchange;
+         size_t offset = 2;
+         bool malformed = false;
+
+         while (offset < rdata.size())
+         {
+            const unsigned char labelLength = rdata[offset];
+
+            if (labelLength == 0)
+               break;
+
+            if ((labelLength & 0xC0) != 0)
+            {
+               malformed = true;
+               break;
+            }
+
+            if (offset + 1 + labelLength > rdata.size())
+            {
+               malformed = true;
+               break;
+            }
+
+            if (!exchange.IsEmpty())
+               exchange += ".";
+
+            exchange.append(reinterpret_cast<const char*>(rdata.data() + offset + 1), labelLength);
+            offset += 1 + labelLength;
+         }
+
+         if (malformed || exchange.IsEmpty())
+            continue;
+
+         exchange.MakeLower();
+         exchanges.push_back(exchange);
+      }
+
+      // A validated but unusable RRset is not Secure for our purposes: with no
+      // name to compare against, the caller cannot establish that the host it is
+      // about to contact is the one the domain published.
+      return exchanges.empty() ? ChainStatus::Insecure : ChainStatus::Secure;
    }
 
    DnssecResolver::ChainStatus
