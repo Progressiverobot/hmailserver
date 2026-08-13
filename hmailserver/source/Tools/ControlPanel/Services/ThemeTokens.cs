@@ -94,6 +94,53 @@ namespace hMailServer.ControlPanel.Services
             // If the theme manager doesn't raise changes we still refresh
             // explicitly from the theme toggle (see MainWindow).
          }
+
+         // Windows' own accessibility switches, which the WPF-UI theme manager knows
+         // nothing about. Without this the High Contrast palette was only ever picked
+         // up at startup or when the user pressed the light/dark toggle - and pressing
+         // that toggle calls SystemThemeWatcher.UnWatch, so for anybody who had ever
+         // used it, turning High Contrast on in Windows did nothing at all until the
+         // application was restarted. That is the headline requirement of the
+         // accessibility work, and it was the one thing not wired up.
+         //
+         // UserPreferenceChanged rather than SystemParameters.StaticPropertyChanged:
+         // it is raised for the Accessibility, Color, VisualStyle and General
+         // categories, which between them cover turning High Contrast on and switching
+         // between High Contrast themes. It arrives on a background thread, so the
+         // refresh is marshalled to the dispatcher - the tokens are read by the UI and
+         // Changed subscribers touch WPF objects.
+         try
+         {
+            SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged_;
+         }
+         catch (Exception)
+         {
+            // A missing SystemEvents pump is not a reason to fail startup; the theme
+            // toggle still refreshes explicitly.
+         }
+      }
+
+      private static void OnUserPreferenceChanged_(object sender, UserPreferenceChangedEventArgs e)
+      {
+         if (e.Category != UserPreferenceCategory.Accessibility &&
+             e.Category != UserPreferenceCategory.Color &&
+             e.Category != UserPreferenceCategory.VisualStyle &&
+             e.Category != UserPreferenceCategory.General)
+            return;
+
+         try
+         {
+            Application current = Application.Current;
+
+            if (current?.Dispatcher != null && !current.Dispatcher.CheckAccess())
+               current.Dispatcher.BeginInvoke(new Action(Refresh));
+            else
+               Refresh();
+         }
+         catch (Exception)
+         {
+            // Never let a system notification take the application down.
+         }
       }
 
       /// <summary>Recomputes every token colour for the current theme.</summary>
@@ -175,15 +222,33 @@ namespace hMailServer.ControlPanel.Services
          Publish("LogErrorBrush", logError);
 
          // Channel 3: tell the consumers that cannot be expressed as a brush.
-         // Wrapped because a handler that throws here would otherwise surface as a
-         // crash dialog from the theme toggle, and a chart that failed to restyle
-         // is not worth taking the window down for.
-         try
+         //
+         // Invoked one handler at a time, deliberately. A single try/catch around
+         // Changed?.Invoke looks equivalent and is not: an exception from the first
+         // subscriber abandons the rest of the invocation list, so with two chart cards
+         // subscribed the second silently keeps the previous theme's paints - and in
+         // High Contrast that means a card still painted in colours the user has just
+         // told Windows they cannot see. Wrapping each handler means one broken
+         // consumer cannot cost the others their restyle.
+         //
+         // Still swallowed rather than propagated, for the original reason: a chart
+         // that failed to restyle is not worth taking the window down for. But it is
+         // reported now instead of vanishing.
+         EventHandler handlers = Changed;
+
+         if (handlers == null)
+            return;
+
+         foreach (Delegate handler in handlers.GetInvocationList())
          {
-            Changed?.Invoke(null, EventArgs.Empty);
-         }
-         catch (Exception)
-         {
+            try
+            {
+               ((EventHandler) handler)(null, EventArgs.Empty);
+            }
+            catch (Exception ex)
+            {
+               App.LogException(ex);
+            }
          }
       }
 

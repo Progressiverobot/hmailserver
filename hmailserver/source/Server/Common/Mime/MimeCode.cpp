@@ -551,10 +551,31 @@ namespace HM
 		   const char* pszHeaderEnd = pbData;
 		   const char* pszCodeEnd = pbEnd;
 		   int nCoding = 0, nCodeLen = (int)(pbEnd - pbData);
-		   if (pbData[0] == '=' && pbData[1] == '?')	// it might be an encoded-word
+		   // Three bounds problems lived in the next two lines, and AddressSanitizer
+		   // reported the first of them as a one-byte heap-buffer-overflow READ from a
+		   // 23-byte input:
+		   //
+		   //   1. pbData[1] was read when the loop only guarantees pbData < pbEnd, so a
+		   //      header whose final byte is '=' read one byte past the buffer.
+		   //   2. ::strchr scans to a NUL terminator, and this buffer has none - it is
+		   //      a length-delimited header field, not a C string. With no '?' in the
+		   //      remainder it runs off the end until it happens upon a zero byte.
+		   //      Worse, pbData+2 could itself already be past pbEnd.
+		   //   3. pszHeaderEnd[2] was dereferenced BEFORE the pszHeaderEnd+3 < pbEnd
+		   //      test that was meant to make it safe. C++ evaluates && left to right,
+		   //      so the read happened first.
+		   //
+		   // All three are the same mistake - trusting a pointer instead of the length
+		   // - and all three are reachable from any header on any received message,
+		   // which is why the check is now explicit about how many bytes it needs
+		   // before it looks at them. memchr is the bounded equivalent of strchr.
+		   if (pbEnd - pbData >= 2 && pbData[0] == '=' && pbData[1] == '?')
 		   {
-			   pszHeaderEnd = ::strchr(pbData+2, '?');
-			   if (pszHeaderEnd != NULL && pszHeaderEnd[2] == '?' && pszHeaderEnd+3 < pbEnd)
+			   const size_t charsetSearchLength = static_cast<size_t>(pbEnd - (pbData + 2));
+
+			   pszHeaderEnd = static_cast<const char*>(::memchr(pbData + 2, '?', charsetSearchLength));
+
+			   if (pszHeaderEnd != NULL && pszHeaderEnd+3 < pbEnd && pszHeaderEnd[2] == '?')
 			   {
 				   nCoding = tolower(pszHeaderEnd[1]);
 				   pszHeaderEnd += 3;

@@ -501,10 +501,23 @@ namespace hMailServer.ControlPanel.Views
                line.StrokeDashArray = dashes;
             swatch.Children.Add(line);
 
-            Path mark = ShapeMarkVisuals.MakeMark(style.Marker, brush, 8);
-            Canvas.SetLeft(mark, (SwatchWidth - 8) / 2);
-            Canvas.SetTop(mark, (SwatchHeight - 8) / 2);
-            swatch.Children.Add(mark);
+            // Deliberately no marker shape on the swatch. MakeSeries_ sets
+            // GeometrySize = 0, so Skia draws no markers in the plot at all - and a
+            // legend that shows a circle, square or triangle the chart never draws is
+            // worse than one that shows less: it tells a screen-reader user, in the
+            // accessible name below, to look for something that is not there, and it
+            // invites a sighted user to hunt for a shape among the lines.
+            //
+            // The swatch therefore shows exactly what the plot shows: the colour and
+            // the dash pattern. That is still two channels, so identity is never
+            // carried by colour alone, which is the requirement.
+            //
+            // Giving the series real per-series geometry is the better end state and is
+            // deliberately not done here: LiveCharts needs the geometry as a second
+            // generic argument (LineSeries<ObservableValue, CircleGeometry> and so on),
+            // so it is a shape-to-closed-type mapping rather than a property, and doing
+            // it badly would put a marker on every point of a three-minute series and
+            // bury the line. It is recorded as still open rather than half-done.
 
             var name = new TextBlock
             {
@@ -512,11 +525,12 @@ namespace hMailServer.ControlPanel.Views
                FontSize = Typography.Caption,
                VerticalAlignment = VerticalAlignment.Center
             };
-            // The dash pattern and marker shape are what identify the series when
-            // the colour cannot be relied on, so they are said in words to anyone
-            // listening rather than only drawn.
-            AutomationProperties.SetName(name, style.Name + ", " + style.PatternText
-               + " line with a " + style.MarkerText + " marker");
+            // The dash pattern is what identifies the series when the colour cannot be
+            // relied on, so it is said in words to anyone listening rather than only
+            // drawn. The marker shape is deliberately NOT announced: the plot draws no
+            // markers (GeometrySize = 0), and describing one would send a screen-reader
+            // user looking for something that does not exist.
+            AutomationProperties.SetName(name, style.Name + ", " + style.PatternText + " line");
 
             var value = new TextBlock
             {

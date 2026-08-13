@@ -78,24 +78,83 @@ regression test in the suite rather than only a corpus entry.
 Building it
 -----------
 
-The one-time prerequisite is a clang toolchain alongside MSVC. It is in the
-Visual Studio installer:
+The one-time prerequisite is a clang toolchain alongside MSVC, with libFuzzer's and
+AddressSanitizer's runtime libraries. Two routes; the second is the one in use on
+this bench, and it is here first because it is the one that has actually been made
+to work end to end.
+
+**Portable LLVM, user-local, no elevation.** This is what the build was verified
+against:
+
+```powershell
+# ~820 MB download, ~2.5 GB extracted. Windows' own tar handles .xz and .zst.
+$rel = Invoke-RestMethod 'https://api.github.com/repos/llvm/llvm-project/releases/tags/llvmorg-22.1.8' `
+   -Headers @{ 'User-Agent' = 'hmailserver-build' }
+$asset = $rel.assets | Where-Object name -eq 'clang+llvm-22.1.8-x86_64-pc-windows-msvc.tar.xz'
+Invoke-WebRequest $asset.browser_download_url -OutFile "$env:TEMP\llvm.tar.xz"
+
+$target = "$env:LOCALAPPDATA\Programs\LLVM-22.1.8"
+New-Item -ItemType Directory -Force $target | Out-Null
+tar -xf "$env:TEMP\llvm.tar.xz" -C $target --strip-components=1
+
+$env:PATH = "$target\bin;$env:PATH"      # before build-fuzz.ps1
+```
+
+Nothing goes into Program Files, nothing is written to the registry, and it is
+removed by deleting one folder. That matters more than it sounds: the alternative
+below needs administrator rights, and `winget install LLVM.LLVM` is not a substitute
+because it has **no user-scope installer at all** (`--scope user` fails with "No
+applicable installer found") and its machine scope needs elevation.
+
+**Or the Visual Studio component,** if you have administrator rights on the machine:
 
 > Visual Studio Installer → Modify → **Individual components** → **C++ Clang
 > tools for Windows** (component id
 > `Microsoft.VisualStudio.Component.VC.Llvm.Clang`)
-
-That component also ships the AddressSanitizer and libFuzzer runtime libraries,
-which is why it is the preferred route over a standalone LLVM from llvm.org.
-
-If Visual Studio is installed as Build Tools rather than the full IDE, the same
-component can be added from the command line:
 
 ```powershell
 & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\setup.exe" modify `
     --installPath "${env:ProgramFiles(x86)}\Microsoft Visual Studio\18\BuildTools" `
     --add Microsoft.VisualStudio.Component.VC.Llvm.Clang --passive
 ```
+
+That component ships the sanitizer runtimes too, and `Find-ClangCl.ps1` prefers it
+via `vswhere` when it is present. It is second in this list only because it was not
+available here.
+
+### Three things that are not optional, each of which costs a build to rediscover
+
+All three are already handled by `build-fuzz.ps1`; they are written down because the
+symptoms point somewhere unhelpful.
+
+1. **`/D_DISABLE_STRING_ANNOTATION=1` and `/D_DISABLE_VECTOR_ANNOTATION=1`.** Without
+   them the link fails with `lld-link: error: /failifmismatch: mismatch detected for
+   'annotate_string'`. The prebuilt `clang_rt.fuzzer` library is compiled with MSVC
+   STL's ASan container annotations **off**, and the STL stamps a `/failifmismatch`
+   directive into every object recording which way it was built, so any translation
+   unit that enables them refuses to link against libFuzzer. The cost is the
+   container-overflow checks on `std::string` and `std::vector`; the only way to keep
+   them is to rebuild compiler-rt from source to match.
+2. **The static CRT (`/MT`) is the default, because `/MD` cannot link at all** —
+   `/failifmismatch: mismatch detected for 'RuntimeLibrary'`, since that same library
+   is built against the static CRT. Consequence worth knowing when reading a finding:
+   the allocator under test is the static CRT's, not the DLL's that the shipped server
+   uses.
+3. **`clang_rt.asan_dynamic-x86_64.dll` must sit next to the executables even under
+   `/MT`.** A `/MT` target still imports it and still dies with `0xc0000135`
+   (`STATUS_DLL_NOT_FOUND`) before running a single input. `build-fuzz.ps1` copies it
+   for both CRT choices; it used to copy only for `/MD`, on the reasonable-sounding
+   but wrong assumption that a static CRT implies a static ASan.
+
+### And why the harness has its own `stdafx.h`
+
+`fuzz\harness\shim\stdafx.h` is first on the include path so that a server source
+file's `#include "stdafx.h"` finds it instead of the real one. The real header
+`#import`s the ADO type library, which clang rejects outright — *"#import of type
+library is an unsupported Microsoft feature"* — and pulls in ATL; a parser needs
+neither. The shim also has to include `Util/StdString.h`, because server sources use
+`String` and `AnsiString` without including it themselves, relying on the
+precompiled header.
 
 **Watch out for a clang that is not this one.** `clang-cl` turns up on PATH from
 all sorts of places — a Swift toolchain, an Android NDK, a Chocolatey LLVM — and

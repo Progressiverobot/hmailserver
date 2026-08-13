@@ -35,6 +35,23 @@ rediscovering under pressure.
 
 Fixed, and now replayed on every run from `fuzz\regression\`:
 
+* `mime_message_fuzzer/heap-buffer-overflow-findstring-boundary-scan` - a
+  **pointer/length desync** in `MimeBody::Load`. After copying a part's content it
+  did `pszData += nSize` without reducing `nDataSize`, so the later
+  `pszEnd = pszData + nDataSize` landed `nSize` bytes past the end of the buffer -
+  and that too-far pointer was handed to `GetBoundaryEnd` as the limit to search up
+  to. `FindString` honours its limit exactly, so it read a whole boundary's length
+  (27 bytes here) beyond the allocation. Fixing the arithmetic fixed it; a first
+  attempt that clamped the two `pszData - 2` step-backs was necessary but not
+  sufficient, and the replay said so.
+* `mime_decode_fuzzer/heap-buffer-overflow-mimeencodedword-decode` - **three**
+  unbounded reads in one `if` in `MimeEncodedWord::Decode`, from a 23-byte input:
+  `pbData[1]` read when the loop only guarantees `pbData < pbEnd`; `::strchr` used on
+  a length-delimited header field that has **no NUL terminator**; and
+  `pszHeaderEnd[2]` dereferenced *before* the `pszHeaderEnd+3 < pbEnd` test meant to
+  make it safe, because `&&` evaluates left to right. All three are reachable from
+  any header on any received message.
+
 * `mime_message_fuzzer/new-delete-type-mismatch-mimecodebase-nonvirtual-dtor` -
   `MimeCodeBase` had virtual `Encode`/`Decode` and no virtual destructor while six
   sites deleted derived coders through the base pointer. The reproducer is an

@@ -119,6 +119,20 @@ namespace hMailServer.ControlPanel.Tests.Services
       [Theory]
       [InlineData(ChartTheme.Light)]
       [InlineData(ChartTheme.Dark)]
+      [InlineData(ChartTheme.HighContrast)]
+      public void NoThemeSplinesMonitoringData(ChartTheme theme)
+      {
+         // Asserted for every theme deliberately. The only existing assertion was on
+         // High Contrast, and Light and Dark were both still 0.8 - so the one theme
+         // nobody runs was correct and the two everybody runs invented values between
+         // samples and rounded the peaks off, which on a queue-depth or session-count
+         // chart removes exactly the events being watched for.
+         Assert.Equal(0d, ChartPalette.ResolveChrome(theme, Sentinels).LineSmoothness);
+      }
+
+      [Theory]
+      [InlineData(ChartTheme.Light)]
+      [InlineData(ChartTheme.Dark)]
       public void OrdinaryPalette_FillsOnlyASingleSeriesChart(ChartTheme theme)
       {
          // The area fill is there to make a one-line sparkline readable. Keyed on the

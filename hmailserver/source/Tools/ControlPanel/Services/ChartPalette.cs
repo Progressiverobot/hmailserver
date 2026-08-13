@@ -315,7 +315,18 @@ namespace hMailServer.ControlPanel.Services
                TooltipBackgroundArgb = 0xFFFFFFFF,
                TooltipTextArgb = 0xFF1F2328,
                PlaceholderTextArgb = 0xFF57606A,
-               LineSmoothness = 0.8
+
+               // Zero in every theme, not just High Contrast. Spline interpolation
+               // invents values between samples and rounds the peaks off - and the
+               // peaks are the entire reason somebody is looking at a queue-depth or
+               // session-count chart. A curve through monitoring data is not a
+               // prettier truth, it is a different one.
+               //
+               // This was 0.8 here and in the dark theme while being 0 on the High
+               // Contrast branch, which meant the accessibility work fixed the
+               // rendering for the theme almost nobody runs and left it wrong in the
+               // two everybody does.
+               LineSmoothness = 0
             };
          }
 
@@ -326,7 +337,10 @@ namespace hMailServer.ControlPanel.Services
             TooltipBackgroundArgb = 0xFF2B2B2B,
             TooltipTextArgb = 0xFFF0F0F0,
             PlaceholderTextArgb = 0xFF9DA7B0,
-            LineSmoothness = 0.8
+
+            // Zero, for the reason given on the light branch above: monitoring data
+            // must not be splined.
+            LineSmoothness = 0
          };
       }
 

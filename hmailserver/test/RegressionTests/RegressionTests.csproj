@@ -516,6 +516,7 @@
     <Compile Include="Shared\IniFileSetting.cs" />
     <Compile Include="SMTP\SpoolWriteFailure.cs" />
     <Compile Include="Shared\TlsHandshakeProbe.cs" />
+    <Compile Include="MIME\FuzzHarness.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Messages\MultipartMessageWithNoMainBodyText.txt" />

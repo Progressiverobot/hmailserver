@@ -8,11 +8,17 @@ namespace hMailServer.ControlPanel.Services
    /// Draws a <see cref="ShapeMark"/> and a <see cref="ChartLinePattern"/> with WPF
    /// primitives.
    ///
-   /// Deliberately not Fluent icons. The shapes here have to line up pixel-for-pixel
-   /// with what Skia draws inside the chart - a legend whose swatch is a rounded
-   /// icon of a triangle does not tell the reader that the dash-dotted line is the
-   /// POP3 one. Geometry we control also scales cleanly at the 200-400% display
-   /// scaling a High Contrast user is often running.
+   /// Deliberately not Fluent icons: geometry we control scales cleanly at the
+   /// 200-400% display scaling a High Contrast user is often running, and a legend
+   /// whose swatch is a rounded icon does not read as the same thing the chart drew.
+   ///
+   /// This comment used to claim the shapes "line up pixel-for-pixel with what Skia
+   /// draws inside the chart", which was not true: the series are created with
+   /// GeometrySize = 0, so Skia draws no markers at all. The legend no longer draws a
+   /// marker either (see BuildLegend_ in AccessibleChartCard), so nothing here is
+   /// currently used for series identity - the dash patterns carry that. MakeMark is
+   /// kept because it is what a future change that gives the series real per-series
+   /// geometry would draw against, and because the status badges use the same shapes.
    ///
    /// All geometries are built once and frozen: they are shared by every legend
    /// swatch and every status badge in the app.

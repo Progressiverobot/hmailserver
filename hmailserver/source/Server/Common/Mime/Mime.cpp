@@ -1688,7 +1688,20 @@ namespace HM
          if (!strBoundary.empty())
          {
             strBoundary = "\r\n--" + strBoundary + "\r\n";
-            pszEnd = FindString(pszData-2, strBoundary.c_str(), pszEnd);
+
+            // Start the search two bytes early so that the CRLF belonging to the
+            // boundary is inside the searched range - but never earlier than the
+            // buffer actually given to us. This used to be a bare pszData-2, which
+            // reads outside the allocation whenever fewer than two bytes have been
+            // consumed from it, and that is reachable: the recursive call at the
+            // bottom of this function hands each part a pointer into the middle of
+            // its parent's buffer, but the top-level call gets the message buffer
+            // itself, where pszData can still be at or within two bytes of the
+            // start. AddressSanitizer reports it as a heap-buffer-overflow.
+            const size_t consumedSoFar = static_cast<size_t>(pszData - pszDataBegin);
+            const char* const searchFrom = consumedSoFar >= 2 ? pszData - 2 : pszDataBegin;
+
+            pszEnd = FindString(searchFrom, strBoundary.c_str(), pszEnd);
             if (!pszEnd)
                pszEnd = pszData + nDataSize;
             else
@@ -1708,6 +1721,21 @@ namespace HM
 
             if (nSize >= nDataSize)
                return (int)(pszData - pszDataBegin);
+
+            // nDataSize counts the bytes remaining FROM pszData, and pszData has just
+            // moved forward by nSize - so it has to come down by the same amount. It
+            // did not, and the desync is the whole of the heap-buffer-overflow the
+            // fuzzer found: a few lines below, `pszEnd = pszData + nDataSize` then
+            // lands nSize bytes past the real end of the buffer, and that too-far
+            // pointer is handed to GetBoundaryEnd as the limit to search up to.
+            // FindString honours the limit it is given exactly, so it read up to a
+            // whole boundary's length (27 bytes in the reported case) beyond the
+            // allocation.
+            //
+            // The early return above is deliberately left ahead of this, so that the
+            // "did the content consume everything" test still compares against the
+            // count as it was measured.
+            nDataSize -= nSize;
          }
          else
          {
@@ -1722,8 +1750,26 @@ namespace HM
       strBoundary = "\r\n--" + strBoundary;
 
       // look for the first boundary (case sensitive)
-      pszData -= 2;					// go back to CRLF
-      nDataSize += 2;
+      // Go back to the CRLF that precedes the first boundary, because the boundary
+      // string built above begins with it - but only by as many bytes as there
+      // actually are. A bare `pszData -= 2` walks off the front of the buffer when
+      // fewer than two bytes have been consumed, and GetBoundaryEnd then searches
+      // from outside the allocation: this is the read AddressSanitizer reported as
+      //
+      //   heap-buffer-overflow ... READ of size 27
+      //   FindString  Mime.cpp:82  <- GetBoundaryEnd  <- MimeBody::Load
+      //
+      // where 27 was the length of the boundary being compared. FindString itself is
+      // correctly bounded; it was handed a start pointer that was already invalid.
+      //
+      // nDataSize is adjusted by the same amount, so pszEnd is unchanged either way
+      // and the searched range still ends at the true end of the buffer.
+      const size_t stepBack = static_cast<size_t>(pszData - pszDataBegin) >= 2
+         ? 2
+         : static_cast<size_t>(pszData - pszDataBegin);
+
+      pszData -= stepBack;
+      nDataSize += stepBack;
       pszEnd = pszData + nDataSize;
 
       const char* pszBound1 = GetBoundaryEnd(pszData, pszEnd, strBoundary.c_str());
