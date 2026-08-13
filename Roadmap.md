@@ -38,7 +38,7 @@ as ⬜, not ✅.
 
 ### Contents and totals
 
-752 items. The counts are the point of this table — they say where the fork is
+755 items. The counts are the point of this table — they say where the fork is
 strong and where it is thin far more honestly than any prose summary.
 
 | Section | ✅ | 🔄 | ⬜ | ⏸️ |
@@ -56,9 +56,9 @@ strong and where it is thin far more honestly than any prose summary.
 | [SMTP and ESMTP](#smtp-and-esmtp) | 23 | – | 4 | – |
 | [Transport security and deliverability](#transport-security-and-deliverability) | 28 | – | 16 | 1 |
 | [IMAP](#imap) | 55 | – | 19 | 3 |
-| [POP3](#pop3) | 17 | – | 9 | – |
-| [Sieve, ManageSieve and rules](#sieve-managesieve-and-rules) | 43 | 0 | 16 | – |
-| [Authentication and cryptography](#authentication-and-cryptography) | 55 | – | 19 | – |
+| [POP3](#pop3) | 18 | – | 9 | – |
+| [Sieve, ManageSieve and rules](#sieve-managesieve-and-rules) | 44 | 0 | 16 | – |
+| [Authentication and cryptography](#authentication-and-cryptography) | 56 | – | 19 | – |
 | [Anti-spam, anti-virus and content control](#anti-spam-anti-virus-and-content-control) | 54 | – | 13 | – |
 | [Storage, accounts and data model](#storage-accounts-and-data-model) | 81 | – | 9 | – |
 | [Routing, queue and delivery](#routing-queue-and-delivery) | 19 | – | 4 | 1 |
@@ -72,7 +72,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 2 | – | 4 | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 4 | 1 | 2 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 3 | – | 6 | – |
-| **Total** | **552** | **11** | **175** | **14** |
+| **Total** | **555** | **11** | **175** | **14** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage and the administration surface are the best-covered areas**, and the
@@ -393,11 +393,12 @@ the source, not from documentation.
 
 ### POP3
 
-17 shipped · 0 underway · 9 not started · 0 deferred
+18 shipped · 0 underway · 9 not started · 0 deferred
 
 | | Capability | Detail |
 |:-:|---|---|
 | ✅ | AUTH command with mechanism listing (RFC 5034) | Bare AUTH returns a dot-terminated mechanism list; the list is TLS-conditional (SCRAM-PLUS only on TLS) and OAuth-conditional |
+| ✅ | POP3 conformance and pre-authentication hygiene | Seven defects closed on 13 August 2026, each with a test, after every row of this section was verified against `POP3Connection`. Two were more than conformance. `CAPA` advertised `USER` and `SASL` on a cleartext connection whose IP range sets `RequireTLSForAuth`, so a client taking up the SASL offer sent `AUTH PLAIN <base64 authcid NUL password>` and was refused only afterwards — the password had already crossed the wire in the clear. And `PASS` with no preceding `USER` ran a full logon against an empty user name: it fired `OnClientLogon` with a blank identity, registered a failed login against the client's IP (feeding auto-ban) and spent one of the ten per-connection attempts; it now answers `-ERR Send USER first.` with none of those side effects. The rest: `DELE` of an already-deleted message answered `+OK` twice and now refuses; `USER` with an empty or whitespace-only argument was answered `+OK Send your password`; `CAPA` advertised `STLS` after TLS was already active, on the very `CAPA` a client re-issues after the handshake; a locked maildrop now answers `-ERR [IN-USE]` with `RESP-CODES` declared, so clients stop reporting a lock collision as a wrong password; and `TOP` with a negative or non-numeric line count is refused before the maildrop is touched. Every response keeps its existing literal text where a shared test helper matches on it. AUTH-RESP-CODE (RFC 3206) is verified genuinely open and deliberately left, because emitting `-ERR [AUTH] ...` breaks that helper — a change to make deliberately rather than as a side effect. |
 | ✅ | Brute-force containment | Ten failed attempts on one connection force a disconnect regardless of the auto-ban setting, and every failure path (PASS, SCRAM, bearer) also calls AccountLogon::RegisterFailedLogin to feed the per-IP auto-ban |
 | ✅ | CAPA (RFC 2449) | Advertises exactly: UIDL, TOP, USER, SASL <mechs>, STLS (only in STARTTLS modes), UTF8. USER/SASL are suppressed when STARTTLS is required and TLS is not yet active |
 | ✅ | Core command set | USER, PASS, QUIT, STAT, LIST (both forms), RETR, DELE, NOOP, RSET all implemented; STAT/LIST use __int64 totals so mailboxes over 2 GB report correctly |
@@ -426,7 +427,7 @@ the source, not from documentation.
 
 ### Sieve, ManageSieve and rules
 
-43 shipped · 0 underway · 16 not started · 0 deferred
+44 shipped · 0 underway · 16 not started · 0 deferred
 
 | | Capability | Detail |
 |:-:|---|---|
@@ -458,6 +459,7 @@ the source, not from documentation.
 | ✅ | Loop and abuse guards | Forward, Reply and CreateCopy all check IsGeneratedResponseAllowed: a per-message rule-loop counter against SMTPConfiguration RuleLoopLimit, plus (for Reply only) suppression when the source carries an Auto-Submitted header… |
 | ✅ | Match types and address parts | :is (default), :contains and :matches (wildcard, case-insensitive) are supported. Address parts :all, :localpart and :domain are honoured with angle-bracket extraction and comma splitting… |
 | ✅ | Named-script store semantics | Script names limited to 128 chars of [A-Za-z0-9.-_+ ] with "."/".." rejected; PUTSCRIPT over the active script refreshes the live copy; the active script cannot be deleted (RFC 5804)… |
+| ✅ | ManageSieve limits and literal parsing | Hardened 13 August 2026, and the verification is the interesting half: the concern recorded when this was deferred — that failed `AUTHENTICATE` attempts are not counted, making ManageSieve a password-guessing oracle that bypasses the mail protocols' protections — **was stale**. `HandleAuthenticate_` already goes through `AccountLogon::Logon`, the same call SMTP, POP3 and IMAP make, which registers the failure and feeds the shared per-IP auto-ban. What was actually wrong was arithmetic: `ParseLiteralSize` used `_wtoi`, whose behaviour on overflow is undefined, so a client announcing `{99999999999}` got whatever `int` fell out of it and all three callers — the SASL response, `PUTSCRIPT` and `CHECKSCRIPT` — treated that as a length they could trust. It now accumulates into a 64-bit value, checks against `INT_MAX` on every digit so the accumulator cannot wrap however many digits arrive, and reports anything larger as a parse failure; `HAVESPACE`'s bare decimal argument saturates instead, which is correct for its one caller because a value too large to represent is still correctly "too large". Added: a script size limit of 1 MB (matching Dovecot's default, down from an effective 10 MB), a pre-authentication command budget of 25 (real clients use about four), and the connection dropped once it is spent. An over-limit `PUTSCRIPT` or `CHECKSCRIPT` closes the connection after answering, deliberately: the refusal happens on the **announced** size before any bytes are read, so the announced payload is left unread and the stream cannot be resynchronised — those bytes would otherwise be parsed as commands. `HAVESPACE` returns the same refusal without losing the session, which is what `HAVESPACE` is for. **Still open, reported rather than patched:** a password is accepted over an unencrypted connection and there is no setting to require TLS, so "does it require STARTTLS when configured to" has no configuration to answer. That is a design decision, not a patch. |
 | ✅ | Optional listener | Raw-socket + std::thread service outside the Boost.Asio stack, started from Application::StartServers only when [Settings] ManageSieveServerPort is non-zero (default 0 = disabled); bind address defaults to 127.0.0.1… |
 | ✅ | Parser and AST | Commands with tagged/numeric/string-list arguments, nested blocks, test lists in parentheses (flattened into the parent test), and the RFC rule that require must precede any other command |
 | ✅ | Per-account script storage | File-backed under {DataDir}\Sieve\{domain}\{localpart}\ — active.sieve is the live copy, scripts\{name}.sieve the named set, active.name the pointer… |
@@ -492,11 +494,12 @@ the source, not from documentation.
 
 ### Authentication and cryptography
 
-55 shipped · 0 underway · 19 not started · 0 deferred
+56 shipped · 0 underway · 19 not started · 0 deferred
 
 | | Capability | Detail |
 |:-:|---|---|
 | ✅ | Active Directory account authentication (SSPI) | Accounts flagged as AD bypass all local hashing and are validated by `LogonUser` with LOGON32_LOGON_NETWORK against the account's AD domain/username. They are exempt from the minimum-hash policy and ineligible for SCRAM. **Two defects fixed on 13 August 2026, both found the first time anyone tested this path - it had no test of any kind.** The first was undefined behaviour reachable from the internet: `CloseHandle` was called on an uninitialised `HANDLE` after every FAILED `LogonUser`, which Windows does not write on failure, so any wrong password on any AD-linked account over SMTP, POP3 or IMAP closed whatever stack value happened to be there - an unrelated socket, log file or database connection under another thread, or STATUS_INVALID_HANDLE and the process. The second was diagnostic: a wrong password and an unreachable directory both returned the same silent `false`. **A measurement while fixing it found something worse than either.** `LogonUser` was called on a workgroup machine with four domain values - an impossible name, a plausible but nonexistent one, the real name of a domain controller answering LDAP on the same subnet, and the machine's own name - and all four returned the identical ERROR_LOGON_FAILURE (1326). Windows will not tell an unjoined computer whether a domain exists. So on any mail server that is not domain-joined, AD accounts can NEVER authenticate and every attempt is indistinguishable from a mistyped password, forever. `NetGetJoinInformation` now answers that locally and HM5911 says it plainly, naming both the domain and the computer, throttled to one report per distinct problem per minute (keyed on error AND domain, so two broken domains do not hide each other). Covered by `Security/ActiveDirectoryAuthentication.cs`, which pins that ONE Windows error must stay silent for a local-machine account and explain itself for an unreachable domain. A successful AD logon is still uncovered: it needs a reachable domain controller the suite cannot assume. |
+| ✅ | LDAP directory authentication | **Shipped 13 August 2026 and verified against a live Windows Server 2025 domain controller, not a stub.** `Common/LDAP` holds `LdapClient` (connect, bind, search, unbind, every operation bounded by a timeout), `LdapDirectoryAuthenticator` (find the user's DN by a configurable filter, then bind as them) and `LdapSettings`. Simple bind and SASL Negotiate are both supported; LDAPS and StartTLS are both supported; certificate validation is on by default; and a password is not sent over an unprotected connection unless the administrator has explicitly permitted it — HM5921 refuses the logon rather than sending the password and refusing afterwards. Infrastructure failures are reported separately from credential rejections and throttled per (error, endpoint), following the SSPI pattern above. The whole `[LDAP]` ini section is absent by default and `Enabled` defaults to 0, so no existing installation changes behaviour; `LdapSettings` reads the section itself, which is why `IniFileSettings` needed no change. **Why this matters more than the feature list:** the existing SSPI path requires the mail server host to be domain-joined, and a mail server usually is not — see the measurement recorded against the row above. An LDAP bind is a network call to a directory, so it works from a DMZ host that is deliberately not joined, and against directories that are not Windows at all. Proven end to end through POP3 on a workgroup machine where `LogonUser` cannot succeed: the correct domain password returned `+OK Mailbox locked and ready` and a wrong one `-ERR`, with the server logging the bind and the rejection separately. Three facts about the lab DC shaped the design and were each established by testing rather than assumed: a cleartext simple bind on 389 is refused with `strongAuthRequired` (the Server 2025 default), a SASL Negotiate bind on 389 works and never transmits the password, and LDAPS was unavailable until a certificate was installed — so TLS is the default and recommended configuration in code without being assumed available. Authentication only: nothing creates, updates, disables or deletes an account from the directory, which is why the directory-backend rows elsewhere remain open. |
 | ✅ | Administrator password hashed with PBKDF2 | `SetAdministratorPassword` always writes a `$h1$` PBKDF2 hash into `[Security] AdministratorPassword` in hMailServer.INI; validation sniffs the hash type so older MD5/SHA-256 admin hashes keep working. |
 | ✅ | alg allow-list and alg:none rejection | `alg` is upper-cased, an empty or `none` value is rejected before the allow-list is even consulted, and the allow-list (`OAuth2AllowedAlgorithms`, default `RS256`) must contain the algorithm… |
 | ✅ | Argon2id (OpenSSL EVP_KDF) | Available and selectable (`PreferredHashAlgorithm=5`) but NOT the default. OWASP-minimum parameters: 19456 KiB memory, t=2, p=1 lane, 16-byte salt, 32-byte tag, format `$a2$m$t$p$salt$key`. Verification clamps memory ≤1 GiB, t ≤100… |
