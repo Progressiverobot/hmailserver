@@ -56,7 +56,14 @@ namespace HM
          }
 
          PGconn *pPG = pConn->GetConnection();
-        
+
+         // DALRecordset::Open calls TryOpen up to six times, reconnecting
+         // between attempts. Each attempt overwrote result_ with a fresh
+         // PGresult and leaked the one before it, because the first attempt's
+         // result is allocated before the error is even looked at.
+         Close_();
+         result_ = 0;
+
          result_ = PQexec(pPG, sQuery);
 
          DALConnection::ExecutionResult result = pConn->CheckError(result_, sSQL, sErrorMessage);
@@ -282,14 +289,17 @@ namespace HM
 
       unsigned int iFieldCount = PQnfields(result_);
 
-      for (unsigned int i = 0; i <= iFieldCount; i++)
+      // < rather than <=: PQfname returns NULL for a field number past the end,
+      // which built an empty column name and compared that against the one being
+      // looked for.
+      for (unsigned int i = 0; i < iFieldCount; i++)
       {
          AnsiString sColName = PQfname(result_, i);
 
          if (sColName == sColumnName)
             return i;
 
-      }      
+      }
 
       // Result set wasn't initialized. Shouldn't happen.
       ErrorManager::Instance()->ReportError(ErrorManager::High, 5092, "MySQLRecordset::GetColumnIndex_", "The requested column was not found. Column name: " + sColumnName);
@@ -302,15 +312,21 @@ namespace HM
    {
       std::vector<AnsiString> result;
 
+      if (!result_)
+         return result;
+
       unsigned int iFieldCount = PQnfields(result_);
 
-      for (unsigned int i = 0; i <= iFieldCount; i++)
+      // < rather than <=: the extra iteration appended an empty name built from
+      // the NULL that PQfname returns past the end of the field list, so every
+      // cached column-position table carried a phantom column.
+      for (unsigned int i = 0; i < iFieldCount; i++)
       {
          AnsiString sColName = PQfname(result_, i);
 
          result.push_back(sColName);
 
-      }      
+      }
 
       return result;
 

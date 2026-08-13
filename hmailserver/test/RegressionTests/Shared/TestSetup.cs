@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Net.NetworkInformation;
@@ -37,6 +38,88 @@ namespace RegressionTests.Shared
             Assert.Fail("hMailServer API authentication failed");
 
          _settings = application.Settings;
+      }
+
+      /// <summary>
+      ///    Restarts the Windows service and re-acquires the COM object, so that a test can
+      ///    change something the server only reads at process start.
+      ///
+      ///    Application.Stop()/Start() over COM - which is what every other fixture uses -
+      ///    stops and starts the protocol servers inside a process that keeps running, and
+      ///    IniFileSettings reads hMailServer.ini once at process start and caches it. So a
+      ///    COM restart leaves the old value in place and a test built on it silently proves
+      ///    nothing.
+      ///
+      ///    A real restart in turn kills the cached COM object: it is an out-of-process
+      ///    server, so every existing proxy is disconnected and the whole fixture base is
+      ///    built on one. Re-authenticating is therefore not optional tidying, it is the
+      ///    reason this has to live here rather than in a fixture - waiting for the OLD
+      ///    object to answer, which is the obvious way to write the wait, can never succeed.
+      ///
+      ///    Safe to call mid-suite because the suite is sequential: nothing declares
+      ///    [Parallelizable], so NUnit runs one fixture at a time whatever the worker count
+      ///    says. If that ever changes, this becomes unsafe and every caller with it.
+      /// </summary>
+      public void RestartServiceAndReacquire()
+      {
+         RunServiceCommand("stop");
+         RunServiceCommand("start");
+
+         // Wait for the thing actually needed - an authenticated COM object - rather than
+         // for the service state, which goes Running before the COM server will answer.
+         var deadline = DateTime.UtcNow.AddSeconds(60);
+         Exception last = null;
+
+         while (DateTime.UtcNow < deadline)
+         {
+            try
+            {
+               // Authenticate() builds a NEW Application; that is the whole point.
+               Authenticate();
+
+               // Re-baseline the crash detector. ServiceRestartDetector fails the next test
+               // in EVERY fixture when hMailServer.exe's process id changes, because
+               // normally that means the server crashed and restarted - which is exactly
+               // the check you want, and exactly wrong for a restart we asked for. Clearing
+               // it makes the next ValidateProcessId adopt the new process as the baseline.
+               // This is the second reason a restarting fixture used to have to be marked
+               // Explicit, and it is not in that fixture's comments: without this line the
+               // suite goes green here and fails in whatever fixture happens to run next.
+               ServiceRestartDetector.ExpectedProcessId = null;
+               return;
+            }
+            catch (Exception ex)
+            {
+               last = ex;
+               Thread.Sleep(500);
+            }
+         }
+
+         Assert.Fail("hMailServer did not become answerable over COM within 60 seconds of a service " +
+                     "restart. Last error: " + (last == null ? "(none)" : last.Message));
+      }
+
+      private static void RunServiceCommand(string verb)
+      {
+         var start = new ProcessStartInfo("net", verb + " hMailServer")
+         {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+         };
+
+         using (var process = Process.Start(start))
+         {
+            process.StandardOutput.ReadToEnd();
+            process.StandardError.ReadToEnd();
+
+            // "net stop" on a service that is already stopped returns non-zero, and so does
+            // "net start" on one already running. Neither is a failure for our purposes -
+            // the state afterwards is what matters, and the COM wait above is what checks
+            // it - so the exit code is deliberately not asserted on.
+            process.WaitForExit(60000);
+         }
       }
 
       public void RemoveAllRoutes()

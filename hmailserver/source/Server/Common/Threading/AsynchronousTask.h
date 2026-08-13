@@ -25,14 +25,54 @@ namespace HM
       }
 
       virtual void DoWork()
+      //---------------------------------------------------------------------------
+      // DESCRIPTION:
+      // Runs the function, and releases the parent TCP connection on every path out
+      // of here - it is that shared_ptr which keeps the connection and its socket
+      // alive, so a task that dies without dropping it leaks the connection for the
+      // life of the process.
+      //
+      // What is new is that the failure paths now say something. This was a bare
+      // catch (...) with an empty body, and the server builds with /EHa, so it took
+      // structured exceptions as readily as thrown ones: an access violation inside
+      // message finalization was caught here, the task was abandoned, the session
+      // was left unanswered, and not one line was written anywhere. That is the
+      // exact shape of defect this pass exists to remove.
+      //
+      // Reported to the application log rather than through ErrorManager on purpose.
+      // These tasks run the accept-and-save path for every received message, script
+      // events included, and an error record here would appear in the ERROR log of a
+      // correctly configured server. The application log is where an operator can
+      // see it without that cost.
+      //---------------------------------------------------------------------------
       {
          try
          {
             asynchronousFunction_();
          }
+         catch (const boost::thread_interrupted&)
+         {
+            // The server is shutting down. Passed on rather than eaten: swallowing
+            // it consumes the interruption request, and the work queue is then
+            // waiting on a thread that no longer knows it was asked to stop.
+            parentHolder_.reset();
+            throw;
+         }
+         catch (const std::exception &error)
+         {
+            parentHolder_.reset();
+
+            LOG_APPLICATION(Formatter::Format("Asynchronous task {0} did not finish: {1}",
+                                              GetName(), error.what()));
+            return;
+         }
          catch (...)
          {
-            // to be sure we release our pointer to the parent TCP connection below.
+            parentHolder_.reset();
+
+            LOG_APPLICATION(Formatter::Format("Asynchronous task {0} did not finish: unrecognized exception.",
+                                              GetName()));
+            return;
          }
 
          // Reset the shared_ptr to the parent object.

@@ -30,6 +30,25 @@ namespace HM
       virtual bool BeginTransaction(String &sErrorMessage);
       virtual bool CommitTransaction(String &sErrorMessage);
       virtual bool RollbackTransaction(String &sErrorMessage);
+      /*
+         Deliberately does nothing, which means PostgreSQL has no statement
+         timeout at all: a statement blocked on a lock holds its pooled
+         connection until the server or the network gives up, and since the pool
+         is fixed-size that is how the pool empties. MySQL is in the same
+         position; only the two ADO backends implement this.
+
+         It is not a one-line fix, which is why it is written down rather than
+         done. The only caller is SQLScriptRunner, which raises the limit to 30
+         minutes for a schema script and drops it to 30 seconds afterwards. The
+         natural implementation here - "SET statement_timeout" - is a *session*
+         setting on a pooled connection, so that 30 would then abort every
+         subsequent statement on this connection that ran longer, for the life of
+         the connection: a large delete during a domain removal, or a backup
+         sweep, would start failing on a server that had merely run an upgrade
+         script. Giving PostgreSQL and MySQL a real statement timeout means
+         deciding what the server-wide limit should be and applying it at
+         connect time, not borrowing SQLScriptRunner's.
+      */
       virtual void SetTimeout(int seconds) {}
 
       virtual bool CheckServerVersion(String &errorMessage);

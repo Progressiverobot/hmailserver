@@ -98,7 +98,15 @@ namespace HM
       void RemoveRunningTask_(unsigned __int64 task_id);
       void FinishTask_(unsigned __int64 task_id, bool may_block);
 
+      // The top of a worker thread, and the exception barrier for it. Nothing
+      // above these frames can catch anything, so nothing may escape them.
       void IoServiceRunWorker();
+      void RunWorker_();
+      void ReportWorkerException_(const String &detail);
+
+      // Bounded wait for every worker thread to leave. True when none remain.
+      bool JoinWorkers_(int max_wait_ms);
+
       void ExecuteTask(std::shared_ptr<Task> pTask, String name, unsigned __int64 enqueue_tick, bool may_block);
       void PostTask_(std::shared_ptr<Task> pTask, const String &name, unsigned __int64 enqueue_tick, bool may_block);
 
@@ -130,6 +138,18 @@ namespace HM
       // The number of threads Start() actually created, which is not the same as
       // max_simultaneous_ once that has been changed at runtime.
       std::atomic<unsigned int> worker_thread_count_;
+
+      // The number of threads that are still inside io_context::run() right now.
+      // Not the same as worker_thread_count_ the moment a worker leaves, and it is
+      // this one the stall detector compares against: a queue that has lost workers
+      // is precisely the queue a stall report exists for, and measured against the
+      // count Start() created it could never satisfy "every thread is busy" again.
+      std::atomic<unsigned int> live_worker_count_;
+
+      // Set by Stop() before the io_context is stopped. From that point a task
+      // handed to this queue can never run, so AddTask says so rather than
+      // accepting it and dropping it in silence.
+      std::atomic<bool> stopping_;
 
       unsigned int max_simultaneous_;
 

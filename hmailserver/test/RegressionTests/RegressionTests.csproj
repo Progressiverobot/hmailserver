@@ -296,6 +296,10 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="MIME\MalformedInput.cs" />
+    <Compile Include="Infrastructure\AcceptPathResilience.cs" />
+    <Compile Include="Infrastructure\SqlLayerErrorHandling.cs" />
+    <Compile Include="Infrastructure\WorkQueueLifecycle.cs" />
     <Compile Include="IMAP\AppendInternalDate.cs" />
     <Compile Include="Infrastructure\MetricsReadiness.cs" />
     <Compile Include="Installation\InstallerPackaging.cs" />

@@ -72,7 +72,103 @@ namespace HM
       return false;
    }
 
-   bool 
+   bool
+   DALConnection::HasIgnoreErrorsMarker(const String &sql)
+   {
+      // See the comment on the declaration in DALConnection.h for why this is a
+      // scan rather than a Find().
+      const String marker = _T("[IGNORE-ERRORS]");
+      const int markerLength = marker.GetLength();
+      const int length = sql.GetLength();
+
+      bool inLiteral = false;
+      bool inLineComment = false;
+      bool inBlockComment = false;
+
+      for (int i = 0; i < length; i++)
+      {
+         TCHAR c = sql[i];
+
+         if (inLiteral)
+         {
+            if (c == _T('\\') && i + 1 < length)
+            {
+               // Backslash escape (MySQL default sql_mode): the next character
+               // cannot close the literal.
+               i++;
+               continue;
+            }
+
+            if (c == _T('\''))
+            {
+               if (i + 1 < length && sql[i + 1] == _T('\''))
+               {
+                  // Doubled '' - still inside the literal.
+                  i++;
+                  continue;
+               }
+
+               inLiteral = false;
+            }
+
+            continue;
+         }
+
+         if (inLineComment)
+         {
+            if (c == _T('\n'))
+            {
+               inLineComment = false;
+               continue;
+            }
+         }
+         else if (inBlockComment)
+         {
+            if (c == _T('*') && i + 1 < length && sql[i + 1] == _T('/'))
+            {
+               inBlockComment = false;
+               i++;
+               continue;
+            }
+         }
+         else
+         {
+            if (c == _T('\''))
+            {
+               inLiteral = true;
+               continue;
+            }
+
+            if (c == _T('-') && i + 1 < length && sql[i + 1] == _T('-'))
+            {
+               inLineComment = true;
+               i++;
+               continue;
+            }
+
+            if (c == _T('/') && i + 1 < length && sql[i + 1] == _T('*'))
+            {
+               inBlockComment = true;
+               i++;
+               continue;
+            }
+
+            // Ordinary statement text. The marker does not count here: it is a
+            // directive to the DAL, not SQL, so it can only legitimately live in
+            // a comment.
+            continue;
+         }
+
+         // Inside a comment.
+         if (c == _T('[') && i + markerLength <= length &&
+             sql.Mid(i, markerLength).Compare(marker.c_str()) == 0)
+            return true;
+      }
+
+      return false;
+   }
+
+   bool
    DALConnection::Reconnect(String &sErrorMessage)
    {
 #ifndef _ERROR_LOGGING_IN_MESSAGE_BOXES

@@ -31,6 +31,10 @@ namespace HM
 
       boost::recursive_mutex mutex_;
       std::map<size_t, std::shared_ptr<WorkQueue> > work_queues_;
-     
+
+      // Never reused, never derived from the size of the map above. See
+      // CreateWorkQueue for what reissuing an id costs.
+      size_t next_queue_id_;
+
    };
 }

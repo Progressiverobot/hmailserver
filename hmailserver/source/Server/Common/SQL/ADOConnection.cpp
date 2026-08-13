@@ -273,7 +273,12 @@ namespace HM
          if (iIgnoreErrors > 0 && iIgnoreErrors & dbErr)
             return DALConnection::DALSuccess;
 
-         if (queryString.Find(_T("[IGNORE-ERRORS]")) >= 0)
+         // The marker means "this object may already exist". It must not also
+         // discard a lost connection - see DALConnection::HasIgnoreErrorsMarker.
+         // A connection problem is returned so DALConnection::Execute reconnects
+         // and tries again, and reports the statement as failed if it cannot.
+         if (dbErr != DALConnection::DALConnectionProblem &&
+             HasIgnoreErrorsMarker(queryString))
             return DALConnection::DALSuccess;
 
          _bstr_t bstrSource( err.Source() );

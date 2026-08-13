@@ -205,12 +205,29 @@ namespace HM
    
          if (MySQLInterface::Instance()->p_mysql_query(dbconn_, sQuery))
          {
-            bool bIgnoreErrors = SQL.Find(_T("[IGNORE-ERRORS]")) >= 0;
-            if (!bIgnoreErrors)
+            // Classified first, because whether the marker may discard this
+            // failure depends on what the failure is. CheckError is the only
+            // thing on this backend that recognises a dropped connection (2006
+            // "server has gone away" / 2013 "lost connection"); GetErrorType_
+            // does not, so it cannot be used for that test. Its own error text
+            // goes into a local so that a discarded failure does not leave a
+            // message behind in the caller's buffer.
+            String checkErrorMessage;
+            DALConnection::ExecutionResult result = CheckError(dbconn_, SQL, checkErrorMessage);
+
+            if (result != DALConnection::DALSuccess)
             {
-               if (iIgnoreErrors == 0 || !(GetErrorType_(dbconn_) & iIgnoreErrors))
+               // "This object may already exist" - never "the server did not
+               // hear the statement". See DALConnection::HasIgnoreErrorsMarker.
+               bool ignoreByMarker = result != DALConnection::DALConnectionProblem &&
+                                     HasIgnoreErrorsMarker(SQL);
+
+               bool ignoreByCaller = iIgnoreErrors != 0 &&
+                                     (GetErrorType_(dbconn_) & iIgnoreErrors) != 0;
+
+               if (!ignoreByMarker && !ignoreByCaller)
                {
-                  DALConnection::ExecutionResult result = CheckError(dbconn_, SQL, sErrorMessage);
+                  sErrorMessage = checkErrorMessage;
                   return result;
                }
             }

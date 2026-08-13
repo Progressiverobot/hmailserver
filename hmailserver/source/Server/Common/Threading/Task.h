@@ -11,7 +11,14 @@ namespace HM
    {
    public:
       Task(const String &name);
-      ~Task(void);
+
+      // Virtual because every task in the server is a derived type owned through a
+      // std::shared_ptr<Task>. shared_ptr carries the deleter of the type it was
+      // built from, so nothing is being destroyed through the wrong type today -
+      // but a class with virtual functions and a public non-virtual destructor is
+      // one raw delete away from undefined behaviour, and this one already has a
+      // vtable, so closing it costs nothing.
+      virtual ~Task(void);
 
       void Run();
 

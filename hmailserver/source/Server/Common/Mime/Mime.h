@@ -302,14 +302,18 @@ namespace HM
       return (int) fields_.size();
    }
 
-   inline MimeField* MimeHeader::GetField(unsigned int iIndex) 
+   inline MimeField* MimeHeader::GetField(unsigned int iIndex)
    {
-      if (iIndex <= fields_.size() -1)
-      {
-         HM::MimeField *pField = &fields_[iIndex];
-
-         return pField;
-      }
+      // `iIndex <= fields_.size() - 1` is the same test for every non-empty header
+      // and a catastrophically different one for an empty header: size() is size_t,
+      // so 0 - 1 is SIZE_MAX and every index passes, after which &fields_[iIndex]
+      // indexes an empty vector. InterfaceMessageHeaders bounds-checks before
+      // calling and says so in a comment, which is a guard in one caller rather
+      // than a function that cannot be misused; a header with no fields is
+      // ordinary - Clear() produces one, and so does a part whose header block
+      // failed to parse.
+      if (iIndex < fields_.size())
+         return &fields_[iIndex];
 
       return NULL;
    }
@@ -417,6 +421,29 @@ namespace HM
    inline const char* MimeHeader::GetDescription() const
    { return GetRawFieldValue(CMimeConst::ContentDescription()); }
 
+   // What MimeBody::LoadFromFile actually did, as opposed to what a bool could say
+   // about it.
+   //
+   // It used to return int: false when the file could not be opened, and true for
+   // everything else - including a parse that threw, which its own catch(...)
+   // swallowed after reporting 4228 and copying the file aside. So its one checking
+   // caller, MessageData::LoadFromMessage, read "I could not open the file" as "there
+   // is no file yet, this is a message being composed", and read "the parse threw
+   // half way through" as success. Both then went on to use, and in the second case
+   // to WRITE BACK, a MimeBody holding nothing or holding half a message.
+   //
+   // These are three different answers and the caller has to be able to tell them
+   // apart, so they are three values. Deliberately NOT a fourth value for "the file
+   // does not exist": whether a missing file means "compose a new message" or "the
+   // message has been lost" is the caller's question, not the parser's, and the
+   // parser has no way to answer it.
+   enum class MimeLoadResult
+   {
+      Loaded,       // the file was opened and parsed
+      OpenFailed,   // the file could not be opened - missing, locked, or denied
+      ParseFailed,  // the file was read, and parsing it threw
+   };
+
    //////////////////////////////////////////////////////////////////////
    // MimeBody class - Represents a body part in a MIME message
    //////////////////////////////////////////////////////////////////////
@@ -471,7 +498,7 @@ namespace HM
 	   int GetAttachmentList(std::shared_ptr<MimeBody> pThis, BodyList& rList) const;
       void ClearAttachments();
       void RemoveAttachment(std::shared_ptr<MimeBody> pAttachment);
-      int LoadFromFile(const AnsiString &pszFilename);
+      MimeLoadResult LoadFromFile(const AnsiString &pszFilename);
       bool SaveAllToFile(const AnsiString &pszFilename);
 
       String GetCleanContentType() const;
@@ -491,10 +518,40 @@ namespace HM
    
       virtual size_t Load(const char* pszData, size_t nDataSize, size_t &index, bool &part_loaded);
 
+      // The nesting depth at which Load stops splitting a multipart into child parts
+      // and keeps the rest of it as opaque content instead.
+      //
+      // Load recurses once per level of multipart nesting, and nothing bounded that:
+      // a message is untrusted input, each level costs one stack frame plus the
+      // frames of MimeHeader::Load and MimeField::Load beneath it, and a level can be
+      // spelled in about forty bytes - a Content-Type with a boundary, a blank line
+      // and an opening delimiter. A few hundred kilobytes of such a message, which is
+      // an ordinary size to accept over SMTP, is enough to exhaust a one-megabyte
+      // thread stack. That is EXCEPTION_STACK_OVERFLOW inside the delivery thread,
+      // which is a mail outage rather than a rejected message, and it is not
+      // something the catch(...) blocks around this code can be relied on to survive:
+      // the handler has to run on the stack that just ran out.
+      //
+      // 20 is far above anything real. mixed/alternative/related is three, and a
+      // forwarded chain adds a level at a time; message/rfc822 does not recurse here
+      // at all, because it has no boundary and is parsed on demand by
+      // LoadEncapsulatedMessage.
+      //
+      // Reaching it is not an error and nothing is discarded: the part keeps the
+      // whole of its body as content, exactly as a non-multipart part does, so the
+      // bytes survive both re-serialisation paths. What is lost is only the SPLIT -
+      // BODYSTRUCTURE shows fewer levels, and an attachment buried below the limit is
+      // not enumerated. For a message that could not previously be parsed without
+      // crashing the server, that is the better trade.
+      static const size_t MaxNestingDepth = 20;
+
    protected:
 
 	   AnsiString text_;		// content (text) of the body part
       size_t part_index_;
+      // Distance from the top-level body. Set by the parent immediately before it
+      // calls Load on a child; the top-level body keeps 0.
+      size_t parse_depth_ = 0;
 	   BodyList bodies_;			// list of all child body parts
 	   BodyList::iterator find_;
 

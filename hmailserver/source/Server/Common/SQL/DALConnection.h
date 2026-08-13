@@ -35,6 +35,40 @@ namespace HM
 
       bool Reconnect(String &sErrorMessage);
 
+      // True when the statement carries the DAL's [IGNORE-ERRORS] marker in a
+      // position where it means what it is meant to mean.
+      //
+      // (Line comments rather than a block comment on purpose: this text has to
+      // name the SQL comment forms the marker is written in, one of which ends a
+      // C block comment, so a /* */ block here closes itself twenty lines early
+      // and the rest of the prose is compiled as code.)
+      //
+      // The marker exists so that re-running an upgrade step whose column, table
+      // or index already exists is harmless on the three backends whose DDL has
+      // no IF NOT EXISTS form (MSSQL, SQL CE, MySQL; the PostgreSQL scripts use
+      // IF NOT EXISTS and carry no marker). Every use of it in the tree - six
+      // upgrade scripts and SqlLogDevice's create statements - writes it inside a
+      // trailing SQL comment, either a "---" line comment or a slash-star block.
+      //
+      // It used to be looked for with a plain substring search over the whole
+      // statement, which meant a *value* carrying that text switched error
+      // handling off for the statement it appeared in. hm_message_metadata and
+      // the SQL log device both write attacker-supplied text - a subject line, a
+      // logged protocol command - so that was reachable from outside, and what it
+      // bought the attacker was one silently discarded write.
+      //
+      // This scan therefore skips over single-quoted string literals (handling
+      // both the doubled '' and the MySQL backslash escape, so a literal is not
+      // closed early) and honours the marker only where it appears inside a
+      // comment. A value can reach neither.
+      //
+      // What it does NOT decide is which errors are then discarded; see the
+      // callers. A lost connection is never discarded, because "the statement was
+      // already applied" and "the statement never reached the server" are not the
+      // same thing, and it was the second one masquerading as the first that
+      // stamped schema version 6006 onto databases that had not got the column.
+      static bool HasIgnoreErrorsMarker(const String &sql);
+
       virtual ConnectionResult Connect(String &sErrorMessage) = 0;
       virtual bool Disconnect() = 0;
       virtual ExecutionResult TryExecute(const SQLCommand &command, String &sErrorMessage, __int64 *iInsertID = 0, int iIgnoreErrors = 0) = 0;
@@ -53,6 +87,13 @@ namespace HM
 
 	   virtual bool CheckServerVersion(String &errorMessage) = 0;
 
+      // Implemented by all four backends and called by none of them. The
+      // escaping that actually runs is the static SQLStatement::Escape, which
+      // decides what to double from IniFileSettings rather than from the
+      // connection - the same setting DALConnectionFactory used to pick the
+      // backend, so the two cannot disagree. Kept because removing a pure
+      // virtual touches every backend for no behaviour; do not reach for it
+      // thinking it is the escaping path.
       virtual void EscapeString(String &sInput) = 0;
 
       virtual std::shared_ptr<DALRecordset> CreateRecordset() = 0;

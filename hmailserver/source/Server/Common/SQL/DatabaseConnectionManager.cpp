@@ -406,6 +406,18 @@ namespace HM
             available_connections_.size() == 0)
          {
             // There's no available connections at all. Nothing to wait for.
+            //
+            // Marked for the same reason the timeout below is: this returns the
+            // empty result that a caller cannot tell from "the query found
+            // nothing", and a pool holding no connections whatsoever is about as
+            // unavailable as a database gets. Without the mark, a recipient
+            // lookup during the window between Disconnect() and the next
+            // successful Connect() answers "no such user" and the sender is told
+            // permanently that a valid mailbox does not exist. No error is
+            // reported here - the failure to connect has already been reported
+            // by whoever tried.
+            DatabaseUnavailableMarker::Mark();
+
             std::shared_ptr<DALConnection> pEmpty;
             return pEmpty;
          }
@@ -462,7 +474,55 @@ namespace HM
       }
    }
 
-   std::shared_ptr<DALConnection> 
+   /*
+      What a transaction opened here does and does not cover. Measured against
+      the code on 13 August 2026; every claim below is about this tree, not about
+      what the backends are capable of.
+
+      SCOPE. The connection is taken out of the pool and handed back to the
+      caller, and it stays checked out until Commit or Rollback returns it. Only
+      statements run *on that object* are inside the transaction. Execute() and
+      OpenRecordset() on this class take no connection: they borrow a different
+      pooled connection per statement, so anything routed through them during the
+      window is outside it. In practice the only caller that gets this right is
+      the COM API - InterfaceDatabase keeps the connection in conn_ and sends
+      ExecuteSQL / ExecuteSQLScript / EnsurePrerequisites straight to it. Nothing
+      inside the server uses transactions at all, which is why the message-save
+      and cascade-delete paths are not atomic and why "referential integrity in
+      the schema" is still an open roadmap row.
+
+      PER BACKEND:
+
+      MS SQL Server (ADOConnection) - real. BEGIN/COMMIT/ROLLBACK TRANSACTION are
+      issued as statements on the session, and MSSQL rolls back DDL as well as
+      DML. Note that Connect() puts the session at READ UNCOMMITTED, so the
+      transaction buys atomicity of its own writes and no read isolation
+      whatsoever; a concurrent reader on another pooled connection sees the
+      uncommitted rows.
+
+      PostgreSQL (PGConnection) - real, and the strongest of the four: DDL is
+      transactional, and the session is at the server default (READ COMMITTED)
+      because nothing overrides it.
+
+      MySQL/MariaDB (MySQLConnection) - conditional. BEGIN is issued only if
+      every table in the database reported InnoDB when the connection was opened
+      (LoadSupportsTransactions_); on a MyISAM database BeginTransaction returns
+      true having done nothing, and it is Rollback that finally says so, with
+      error 5104 telling the administrator to restore a backup. DDL is never
+      transactional on MySQL - it commits implicitly - so a multi-statement
+      upgrade step that fails half way leaves a half-changed schema whatever this
+      returns.
+
+      SQL Server Compact (SQLCEConnection) - DML only, and it is the installer
+      default. See the comment on SQLCEConnection::BeginTransaction.
+
+      So: a transaction here is worth having on MSSQL and PostgreSQL, is worth
+      having for DML on SQL CE, is worth having on MySQL only for an all-InnoDB
+      database, and is worth nothing at all for DDL on two of the four. Anything
+      that wraps a cascade in one has to keep working when it silently buys
+      nothing - and file deletions cannot be rolled back on any of them.
+   */
+   std::shared_ptr<DALConnection>
    DatabaseConnectionManager::BeginTransaction(String &sErrorMessage)
    {
       std::shared_ptr<DALConnection> pDALConnection = GetConnection_();

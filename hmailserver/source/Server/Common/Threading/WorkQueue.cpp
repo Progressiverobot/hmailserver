@@ -40,6 +40,8 @@ namespace HM
       queue_depth_(0),
       last_queue_wait_report_tick_(0),
       worker_thread_count_(0),
+      live_worker_count_(0),
+      stopping_(false),
       max_simultaneous_(0),
       queue_name_ (sQueueName)
    {
@@ -50,12 +52,53 @@ namespace HM
 
    void
    WorkQueue::SetMaxSimultaneous(int iMaxSimultaneous)
+   //---------------------------------------------------------------------------
+   // DESCRIPTION:
+   // Sets the size of the thread pool. Clamped at both ends.
+   //
+   // The upper clamp has always been here. The lower one is new and is the more
+   // important of the two: the pool size of the asynchronous queue comes from
+   // MaxNumberOfAsynchronousTasks, which is administrator-settable over COM and
+   // through the Control Panel with no validation anywhere on the way in, and this
+   // function's old body assigned a signed value straight into an unsigned member.
+   // Zero produced a queue with no threads at all - Start()'s loop ran zero times -
+   // which accepts every task handed to it and runs none of them. On the
+   // asynchronous queue that is every received message stopping at end-of-data,
+   // for ever, with nothing written anywhere; a negative value wrapped to a huge
+   // unsigned number and was then clamped to the maximum 100 threads. A pool of one
+   // is slow. A pool of none is a silent outage, and a pool of 100 because someone
+   // typed -1 is not what was asked for either.
+   //---------------------------------------------------------------------------
    {
-      max_simultaneous_ = iMaxSimultaneous;
+      unsigned int requested;
 
-      // Hard code limit to 100. Everything over this won't be good for stability.
-      if (max_simultaneous_ > 100)
-         max_simultaneous_ = 100;
+      if (iMaxSimultaneous < 1)
+         requested = 1;
+      else if (iMaxSimultaneous > 100)
+         // Everything over this won't be good for stability.
+         requested = 100;
+      else
+         requested = static_cast<unsigned int>(iMaxSimultaneous);
+
+      if (static_cast<int>(requested) != iMaxSimultaneous)
+      {
+         LOG_APPLICATION(Formatter::Format("Work queue {0} was configured for {1} thread(s), which is outside the supported range of 1 to 100. Using {2}.",
+                                           queue_name_, iMaxSimultaneous, requested));
+      }
+
+      unsigned int running = worker_thread_count_.load();
+
+      if (running != 0 && requested != max_simultaneous_)
+      {
+         // Start() is what turns this number into threads, and it has already run.
+         // Said out loud because an administrator has just changed a setting and
+         // would otherwise have no way of knowing that the pool did not move. The
+         // new value does take effect immediately on the blocking-task cap below.
+         LOG_APPLICATION(Formatter::Format("Work queue {0} is now configured for {1} thread(s) but is running {2}. The number of threads itself changes when the server is restarted.",
+                                           queue_name_, requested, running));
+      }
+
+      max_simultaneous_ = requested;
 
       // A larger pool may have made room for tasks that are waiting for a slot.
       DispatchBlockingTasks_();
@@ -63,7 +106,30 @@ namespace HM
 
    WorkQueue::~WorkQueue(void)
    {
+      try
+      {
+         if (workerThreads_.empty())
+            return;
 
+         // Stop() gave up on these, and they are still inside io_context_.run() -
+         // on an io_context that is a member of this object and is about to be
+         // destroyed underneath them. Returning here is not a leaked thread, it is
+         // a use-after-free on shutdown. One more bounded attempt costs a shutdown
+         // that is already stalled a few more seconds and is the difference between
+         // a slow stop and a faulting one.
+         stopping_ = true;
+         io_context_.stop();
+
+         if (JoinWorkers_(5000))
+            return;
+
+         LOG_APPLICATION(Formatter::Format("Work queue {0} is being destroyed with {1} worker thread(s) still running.",
+                                           queue_name_, workerThreads_.size()));
+      }
+      catch (...)
+      {
+         // A destructor is not a place to throw from.
+      }
    }
 
    unsigned __int64
@@ -86,6 +152,18 @@ namespace HM
       String task_name = pTask->GetName();
 
       LOG_DEBUG(Formatter::Format("Adding task {0} to work queue {1}", task_name, queue_name_));
+
+      if (stopping_.load())
+      {
+         // The io_context has been stopped, so a task posted from here on is
+         // accepted, held, and then destroyed without ever running. That was the
+         // behaviour before this check too - the difference is that it was silent,
+         // and what gets discarded at this point is work a live session has already
+         // been told would happen.
+         LOG_APPLICATION(Formatter::Format("Task {0} was not started because work queue {1} is shutting down.",
+                                           task_name, queue_name_));
+         return;
+      }
 
       unsigned __int64 enqueue_tick = GetTickCount64();
 
@@ -249,13 +327,34 @@ namespace HM
       {
          ExceptionHandler::Run(descriptive_name, func);
       }
-      catch (...)
+      catch (const boost::thread_interrupted&)
       {
          // A blocking slot that is never given back would permanently shrink the
          // pool, so the bookkeeping has to be undone on every exit path.
          FinishTask_(task_id, may_block);
 
+         // Passed on, unlike everything below: it means the server is shutting
+         // down, and swallowing it would consume the interruption request and
+         // leave Stop() waiting on a thread that no longer knows it was asked to
+         // stop. The barrier at the top of the worker turns it into a clean exit.
          throw;
+      }
+      catch (...)
+      {
+         FinishTask_(task_id, may_block);
+
+         // Not rethrown. Rethrowing was what made one failed task cost a worker
+         // thread for the life of the process: the exception left this handler,
+         // came out of io_context::run(), and the only catch above it matched one
+         // single error code and rethrew the rest - onto a boost::thread, which is
+         // std::terminate and a dead mail server. Even contained, the thread was
+         // gone while worker_thread_count_ still claimed it was there.
+         //
+         // ExceptionHandler::Run has already logged and dumped anything the task
+         // itself threw, so this path is reached only if that machinery failed.
+         LOG_APPLICATION(Formatter::Format("Task {0} in work queue {1} ended in an exception that its own handler did not contain. The worker thread has been kept.",
+                                           name, queue_name_));
+         return;
       }
 
       FinishTask_(task_id, may_block);
@@ -356,7 +455,13 @@ namespace HM
          return;
       }
 
-      unsigned int thread_count = worker_thread_count_.load();
+      // Counted as the threads still inside io_context::run(), not as the threads
+      // Start() once created. The two differ exactly when a worker has left, and a
+      // queue that has lost workers is the queue this report exists for: measured
+      // against the original count, "every thread has been busy for longer than the
+      // threshold" could never again be true for such a queue, so the one state
+      // most worth reporting was the one state that could not be reported.
+      unsigned int thread_count = live_worker_count_.load();
 
       if (thread_count == 0)
       {
@@ -373,6 +478,13 @@ namespace HM
       // What distinguishes a real stall is that work is piling up behind it.
       if (queue_depth_.load() == 0)
       {
+         // Re-armed on the way out, for the same reason the "not all stalled" path
+         // below does it: a stall that begins after this sample should be reported
+         // on the tick it is first seen, not held back because a previous stall
+         // left the one-report-per-stall latch set.
+         boost::lock_guard<boost::recursive_mutex> guard(runningTasksMutex_);
+         stall_reported_ = false;
+
          return;
       }
 
@@ -461,17 +573,42 @@ namespace HM
    {
       LOG_DEBUG(Formatter::Format("Starting work queue {0}", queue_name_));
 
+      stopping_ = false;
+
       io_context_.restart();
 
       for ( std::size_t i = 0; i < max_simultaneous_; ++i )
       {
-         std::shared_ptr<boost::thread> thread = std::shared_ptr<boost::thread>
-            (new boost::thread(std::bind( &WorkQueue::IoServiceRunWorker, this )));
+         try
+         {
+            std::shared_ptr<boost::thread> thread = std::shared_ptr<boost::thread>
+               (new boost::thread(std::bind( &WorkQueue::IoServiceRunWorker, this )));
 
-         workerThreads_.insert(thread);
+            workerThreads_.insert(thread);
+
+            live_worker_count_++;
+         }
+         catch (...)
+         {
+            // Out of threads, or out of memory. A pool smaller than asked for is
+            // reported below; the thing that must not happen silently is the queue
+            // coming up and then accepting work it can never run.
+            break;
+         }
       }
 
       worker_thread_count_ = static_cast<unsigned int>(workerThreads_.size());
+
+      if (workerThreads_.empty())
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::Critical, 6077, "WorkQueue::Start",
+            Formatter::Format("Work queue {0} started no worker threads at all. Every task given to this queue will be accepted and never run.", queue_name_));
+      }
+      else if (workerThreads_.size() < static_cast<size_t>(max_simultaneous_))
+      {
+         LOG_APPLICATION(Formatter::Format("Work queue {0} started {1} of the {2} threads it was configured for.",
+                                           queue_name_, workerThreads_.size(), max_simultaneous_));
+      }
 
       // Threads exist now, so the cap is known and anything accepted before this
       // point can be released.
@@ -482,62 +619,153 @@ namespace HM
 
    void
    WorkQueue::IoServiceRunWorker()
+   //---------------------------------------------------------------------------
+   // DESCRIPTION:
+   // The top of one worker thread. There is nothing above this frame to catch
+   // anything, so nothing may leave it: an exception that escaped here would be
+   // std::terminate and the whole mail server would be gone because one task threw.
+   // The reporting paths are all inside RunWorker_; this exists only to catch a
+   // failure in them, which is why it is deliberately silent.
+   //---------------------------------------------------------------------------
+   {
+      try
+      {
+         RunWorker_();
+      }
+      catch (...)
+      {
+      }
+
+      // Last, and cannot throw. The stall detector counts the threads that are
+      // still in here, and a count that never comes down describes a pool that no
+      // longer exists.
+      live_worker_count_--;
+   }
+
+   void
+   WorkQueue::RunWorker_()
+   //---------------------------------------------------------------------------
+   // DESCRIPTION:
+   // Runs this queue's io_context until the queue is stopped, containing anything
+   // a handler throws on the way.
+   //
+   // A handler that throws propagates out of io_context::run(), and asio documents
+   // the io_context as still usable afterwards - run() may simply be called again
+   // to pick up the next handler. Doing that is the whole difference between a
+   // worker that recovers and a pool that shrinks by one thread per incident and
+   // never grows back, with worker_thread_count_ still claiming the thread is
+   // there. Before this loop, run() was called once and every exception except one
+   // single error code was rethrown onto a boost::thread.
+   //---------------------------------------------------------------------------
    {
       LOG_DEBUG(Formatter::Format("Running worker in work queue {0}", queue_name_));
 
-      try
+      for (;;)
       {
-         io_context_.run();
-      }
-      catch (boost::system::system_error& error)
-      {
-         if (error.code().value() == ERROR_ABANDONED_WAIT_0)
-         {
-            // If a call to GetQueuedCompletionStatus fails because the completion port handle associated with it is
-            // closed while the call is outstanding, the function returns FALSE, *lpOverlapped will be NULL,
-            //and GetLastError will return ERROR_ABANDONED_WAIT_0.
+         bool resume = false;
 
-            return;
+         try
+         {
+            io_context_.run();
+
+            // Returned normally: the io_context was stopped. There is no "ran out
+            // of work" case here, because work_ holds the context open for life.
+         }
+         catch (const boost::thread_interrupted&)
+         {
+            // Shutting down.
+            boost::this_thread::disable_interruption disabled;
+         }
+         catch (const boost::system::system_error& error)
+         {
+            if (error.code().value() != ERROR_ABANDONED_WAIT_0)
+            {
+               // ERROR_ABANDONED_WAIT_0 is not a failure here: GetQueuedCompletionStatus
+               // returns it when the completion port handle is closed while a call is
+               // outstanding, which is what a shutdown looks like from inside.
+               ReportWorkerException_(String(error.what()));
+               resume = true;
+            }
+         }
+         catch (const std::exception& error)
+         {
+            ReportWorkerException_(String(error.what()));
+            resume = true;
+         }
+         catch (...)
+         {
+            ReportWorkerException_(_T("Unrecognized exception"));
+            resume = true;
          }
 
-         throw;
+         if (!resume)
+            break;
+
+         if (stopping_.load() || io_context_.stopped())
+         {
+            // Nothing left to go back for.
+            break;
+         }
       }
 
       LOG_DEBUG(Formatter::Format("Worker exited in work queue {0}", queue_name_));
    }
 
    void
-   WorkQueue::Stop()
+   WorkQueue::ReportWorkerException_(const String &detail)
+   //---------------------------------------------------------------------------
+   // DESCRIPTION:
+   // Records an exception that reached the top of a worker thread. Called from
+   // inside a catch block on a thread with nothing above it, so it may not throw
+   // under any circumstances - including one raised by the reporting itself.
+   //---------------------------------------------------------------------------
    {
-      LOG_DEBUG(Formatter::Format("Stopping working queue {0}.", queue_name_));
-
-      // Prevent new tasks from being started.
-      io_context_.stop();
-
-      worker_thread_count_ = 0;
-
+      try
       {
-         // Tasks still waiting for a blocking slot can never run now. Dropping
-         // them releases the objects they keep alive, such as the connection the
-         // task was going to answer on.
-         boost::lock_guard<boost::mutex> guard(blockingMutex_);
-         pending_blocking_tasks_.clear();
-      }
+         String message =
+            Formatter::Format("An exception reached the top of a worker thread in work queue {0}. It has been contained and the thread returned to the queue. Detail: {1}",
+                              queue_name_, detail);
 
-      LOG_DEBUG(Formatter::Format("Interupt and join threads in working queue {0}", queue_name_));
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 6075, "WorkQueue::RunWorker_", message);
+      }
+      catch (...)
+      {
+      }
+   }
+
+   bool
+   WorkQueue::JoinWorkers_(int max_wait_ms)
+   //---------------------------------------------------------------------------
+   // DESCRIPTION:
+   // Bounded wait for every worker thread to leave. Returns true when none remain.
+   //
+   // The running-task lock is taken around the diagnostic read and released again
+   // before the sleep. Held across it, as it was, this loop blocked the very
+   // threads it was waiting for: a worker finishing a task needs that same lock to
+   // deregister itself, and a worker starting one needs it to register. The lock
+   // was reacquired on every pass and released only after Sleep(250) returned, so
+   // for the whole ten seconds the pool was blocked roughly whenever it tried to
+   // make progress - which turned a shutdown that should take milliseconds into one
+   // that runs to the timeout and then abandons live threads on a dying object.
+   //---------------------------------------------------------------------------
+   {
+      const int interval_ms = 250;
+
+      int attempt_count = max_wait_ms / interval_ms;
+
+      if (attempt_count < 1)
+         attempt_count = 1;
 
       std::set<std::shared_ptr<boost::thread>> completedThreads;
 
-      int attemptCount = 10000 / 250; // 10 seconds, 250 ms between each
-
-      for (int i = 0; i < attemptCount; i++)
+      for (int i = 0; i < attempt_count; i++)
       {
          for (std::shared_ptr<boost::thread> thread : workerThreads_)
          {
             thread->interrupt();
          }
 
-         for(std::shared_ptr<boost::thread> thread : workerThreads_)
+         for (std::shared_ptr<boost::thread> thread : workerThreads_)
          {
             if (thread->timed_join(boost::posix_time::milliseconds(1)))
             {
@@ -545,38 +773,91 @@ namespace HM
             }
          }
 
-         for(std::shared_ptr<boost::thread> thread : completedThreads)
+         for (std::shared_ptr<boost::thread> thread : completedThreads)
          {
-            auto iter = workerThreads_.find(thread);
-
-            workerThreads_.erase(iter);
+            workerThreads_.erase(thread);
          }
 
          completedThreads.clear();
 
-         if (workerThreads_.size() == 0)
+         if (workerThreads_.empty())
+            return true;
+
+         String first_task;
+
          {
-            LOG_DEBUG(Formatter::Format("All threads are joined in queue {0}.", queue_name_));
-            return;
+            boost::lock_guard<boost::recursive_mutex> guard(runningTasksMutex_);
+
+            auto iter = runningTasks_.begin();
+
+            if (iter != runningTasks_.end())
+               first_task = (*iter).second.name;
          }
 
+         if (first_task.IsEmpty())
+            first_task = _T("<Unknown>");
 
-         boost::lock_guard<boost::recursive_mutex> guard(runningTasksMutex_);
-         auto iter = runningTasks_.begin();
-         if (iter != runningTasks_.end())
-         {
-            LOG_DEBUG(Formatter::Format("Still {0} remaining threads in queue {1}. First task: {2}", workerThreads_.size(), queue_name_, (*iter).second.name));
-         }
-         else
-         {
-            LOG_DEBUG(Formatter::Format("Still {0} remaining threads in queue {1}. First task: <Unknown>", workerThreads_.size(), queue_name_));
+         LOG_DEBUG(Formatter::Format("Still {0} remaining threads in queue {1}. First task: {2}",
+                                     workerThreads_.size(), queue_name_, first_task));
 
-         }
-
-         Sleep(250);
+         Sleep(interval_ms);
       }
 
-      LOG_DEBUG(Formatter::Format("Given up waiting for threads to join in queue {0}.", queue_name_));
+      return workerThreads_.empty();
+   }
+
+   void
+   WorkQueue::Stop()
+   {
+      LOG_DEBUG(Formatter::Format("Stopping working queue {0}.", queue_name_));
+
+      // Set before the io_context is stopped, so that a task handed over from this
+      // point on is reported by AddTask rather than accepted and quietly dropped.
+      stopping_ = true;
+
+      // Prevent new tasks from being started.
+      io_context_.stop();
+
+      worker_thread_count_ = 0;
+
+      int discarded = 0;
+
+      {
+         // Tasks still waiting for a blocking slot can never run now. Dropping
+         // them releases the objects they keep alive, such as the connection the
+         // task was going to answer on.
+         boost::lock_guard<boost::mutex> guard(blockingMutex_);
+
+         discarded = static_cast<int>(pending_blocking_tasks_.size());
+         pending_blocking_tasks_.clear();
+      }
+
+      if (discarded > 0)
+      {
+         // These were counted as queued when they were accepted, so the depth has
+         // to come back down with them or the queue reports a backlog for ever.
+         queue_depth_ -= discarded;
+
+         LOG_APPLICATION(Formatter::Format("{0} task(s) waiting for a thread in work queue {1} were discarded because the queue is shutting down.",
+                                           discarded, queue_name_));
+      }
+
+      LOG_DEBUG(Formatter::Format("Interupt and join threads in working queue {0}", queue_name_));
+
+      if (JoinWorkers_(10000))
+      {
+         LOG_DEBUG(Formatter::Format("All threads are joined in queue {0}.", queue_name_));
+         return;
+      }
+
+      // Application level rather than an error record: a worker still inside a
+      // wedged external dependency - a scanner, a script, a database that has
+      // stopped answering - is a state a correctly configured server can reach, and
+      // it is the operator who has to act on it. It was LOG_DEBUG, which on a
+      // default log level means the one line explaining a ten second stop, and the
+      // threads left running on this object, were both invisible.
+      LOG_APPLICATION(Formatter::Format("Gave up waiting for {0} thread(s) in work queue {1} to finish after 10 seconds. They are still running, so the queue cannot be freed until they stop.",
+                                        workerThreads_.size(), queue_name_));
    }
 
    const String&

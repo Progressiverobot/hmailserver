@@ -468,6 +468,25 @@ namespace HM
          result.append("\r\n");
 	}
 
+   // Decode a base64 stream.
+   //
+   // This used to stop at the first byte outside the base64 alphabet, having skipped
+   // only CR and LF explicitly. Everything else - a space, a tab, a stray '!' from a
+   // mangled transfer - ended the decode where it stood, and the caller was handed the
+   // prefix with no indication that anything had been dropped. MimeBody::WriteToFile
+   // then wrote that prefix out and returned true, so:
+   //
+   //   * an attachment written to a temp file for the virus scanner was truncated at
+   //     the stray byte, and the scanner reported the truncated file clean;
+   //   * an attachment saved through COM lost its tail silently;
+   //   * a message body decoded for a rule or a spam test stopped early, so a filter
+   //     written against text further down never saw it.
+   //
+   // One space, anywhere in a base64 part, was enough - and a leading space on a
+   // continuation line is something real senders and real relays produce. RFC 2045 6.8
+   // is unambiguous about it: "Any characters outside of the base64 alphabet are to be
+   // ignored in base64-encoded data." So they are ignored, and '=' - the padding, which
+   // genuinely does end the stream - stays the one byte that stops the decode.
    void MimeCodeBase64::Decode(AnsiString &result)
    {
 	   const unsigned char* pbData = input_;
@@ -479,11 +498,15 @@ namespace HM
 	   while (pbData < pbEnd)
 	   {
 		   unsigned char ch = *pbData++;
-		   if (ch == '\r' || ch == '\n')
-			   continue;
-		   ch = (unsigned char) DecodeBase64Char(ch);
-		   if (ch >= 64)				// invalid encoding, or trailing pad '='
+
+		   if (ch == '=')				// trailing pad: the stream really has ended
 			   break;
+
+		   const int nDecodedChar = DecodeBase64Char(ch);
+		   if (nDecodedChar >= 64)		// not in the alphabet - CR, LF, space, junk
+			   continue;
+
+		   ch = (unsigned char) nDecodedChar;
 
 		   switch ((nFrom++) % 4)
 		   {

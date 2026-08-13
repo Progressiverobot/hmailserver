@@ -35,9 +35,10 @@ namespace HM
 {
    IOService::IOService(void) :
        Task("IOService"),
+       work_guard_(boost::asio::make_work_guard(io_context_)),
        client_context_(boost::asio::ssl::context::sslv23)
    {
-      
+
    }
 
    IOService::~IOService(void)
@@ -123,8 +124,12 @@ namespace HM
             break;
 
          default:
+            // Skip the port entirely rather than falling through to construct a
+            // TCPServer around a null factory - StartAccept dereferences it on the
+            // very first accept, which is a null-pointer fault in the accept loop
+            // rather than the "unable to start server" this branch reports.
             ErrorManager::Instance()->ReportError(ErrorManager::Medium, 4325, "IOService::DoWork()", "Unable to start server- Unsupported session type.");
-            break;
+            continue;
          }
 
          pTCPServer = std::shared_ptr<TCPServer>(new TCPServer(io_context_, address, iPort, st, pSSLCertificate, pConnectionFactory, connection_security));
@@ -163,6 +168,11 @@ namespace HM
          boost::this_thread::disable_interruption disabled;
 
          LOG_DEBUG("IOService::Stop()");
+
+         // Release the keep-alive first, so that even if stop() were not called the
+         // context could still drain and the workers exit on their own.
+         work_guard_.reset();
+
          io_context_.stop();
 
          auto iterServer = tcp_servers_.begin();

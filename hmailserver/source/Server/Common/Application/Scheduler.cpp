@@ -56,27 +56,63 @@ namespace HM
 
    void
    Scheduler::RunTasks_()
+   //---------------------------------------------------------------------------
+   // DESCRIPTION:
+   // Runs every task that is due.
+   //
+   // The due list is taken under the lock and the tasks are run with it released.
+   // Held across the run, as it was, mutex_ was held for the whole of a backup or
+   // an ACME renewal, so ScheduleTask blocked behind them and so did the shutdown
+   // path that clears the list.
+   //
+   // Each task runs inside its own barrier. An exception out of any one of them
+   // used to leave this function, leave DoWork, and end the scheduler thread: the
+   // while (true) loop was abandoned and nothing scheduled ever ran again for the
+   // life of the process - no backup, no certificate renewal, no log retention, no
+   // greylist cleanup - with nothing logged to say so.
+   //---------------------------------------------------------------------------
    {
-      boost::lock_guard<boost::recursive_mutex> guard(mutex_);
+      std::vector<std::shared_ptr<ScheduledTask> > due;
 
-      for (auto iterTask = scheduled_tasks_.begin(); iterTask != scheduled_tasks_.end(); iterTask++)
       {
-         std::shared_ptr<ScheduledTask > pTask = (*iterTask);
+         boost::lock_guard<boost::recursive_mutex> guard(mutex_);
 
-         // Check if we should run this task now.
-         DateTime dtRunTime = pTask->GetNextRunTime();
          DateTime dtNow = DateTime::GetCurrentTime();
 
-         if (dtRunTime <= dtNow)
+         for (auto iterTask = scheduled_tasks_.begin(); iterTask != scheduled_tasks_.end(); iterTask++)
          {
-            // Yup, we should run this task now.
-            pTask->Run();
-            
-            // Update run time.
-            pTask->SetNextRunTime();
+            std::shared_ptr<ScheduledTask> pTask = (*iterTask);
+
+            if (pTask->GetNextRunTime() <= dtNow)
+               due.push_back(pTask);
          }
       }
-   }  
+
+      for (std::shared_ptr<ScheduledTask> pTask : due)
+      {
+         try
+         {
+            pTask->Run();
+         }
+         catch (const boost::thread_interrupted&)
+         {
+            // Shutting down. Passed on so DoWork clears the list and exits.
+            throw;
+         }
+         catch (...)
+         {
+            // Application log rather than an error record, deliberately: it could not
+            // be shown that no scheduled task throws on a stock configuration, and an
+            // ERROR entry that did fire there would break every fixture after it.
+            LOG_APPLICATION(Formatter::Format("Scheduled task {0} ended in an exception. It has been contained; the scheduler is still running.",
+                                              pTask->GetName()));
+         }
+
+         // Rescheduled whatever happened, so a task that fails once is retried on its
+         // own interval rather than run again on every tick.
+         pTask->SetNextRunTime();
+      }
+   }
 
    void
    Scheduler::ScheduleTask(std::shared_ptr<ScheduledTask> pTask)

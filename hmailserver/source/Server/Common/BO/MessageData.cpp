@@ -74,10 +74,41 @@ namespace HM
       bool bNewMessage = false;
       try
       {
-
-         if (!mime_mail_->LoadFromFile(message_file_name_))
+         // Three answers, not two. LoadFromFile used to return false for "I could not
+         // open the file" and true for everything else including a parse that threw,
+         // and this branch read the first as "there is no file yet, this is a message
+         // being composed". A message file briefly held open by a virus scanner or a
+         // backup therefore produced an empty MessageData reported as a successful
+         // load - which the rule engine then evaluated every criterion against, and
+         // which the forwarding and attachment-stripping paths then wrote back over
+         // the real message.
+         //
+         // Whether a missing file means "compose" or "the message has been lost" is
+         // this function's question and not the parser's, so the existence test lives
+         // here. It races, as any such test does; losing the race means treating a
+         // file that has just been deleted as a new message, which is exactly what
+         // happened before, so the race cannot make anything worse.
+         switch (mime_mail_->LoadFromFile(message_file_name_))
          {
+         case MimeLoadResult::Loaded:
+            break;
+
+         case MimeLoadResult::OpenFailed:
+            if (FileUtilities::Exists(message_file_name_))
+            {
+               ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6060, "MessageData::LoadFromMessage",
+                  "The message file " + message_file_name_ + " exists but could not be opened, so the message could not be loaded. It has not been treated as a new message - the caller is told the load failed, so that nothing is written over it.");
+               return false;
+            }
+
+            // No file at all: a message being composed from nothing.
             bNewMessage = true;
+            break;
+
+         case MimeLoadResult::ParseFailed:
+            // LoadFromFile has already reported 4228 and copied the file aside. It
+            // holds whatever was parsed before the throw, which must not be written.
+            return false;
          }
       }
       catch (...)

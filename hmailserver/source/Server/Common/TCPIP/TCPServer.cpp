@@ -6,8 +6,10 @@
 #include "TCPServer.h"
 #include "TCPConnection.h"
 
+#include <chrono>
 #include <ctime>
 #include <iostream>
+#include <memory>
 #include <string>
 
 #include "../Scripting/ScriptServer.h"
@@ -31,6 +33,64 @@ using boost::asio::ip::tcp;
 
 namespace HM
 {
+   namespace
+   {
+      /*
+         Owns the session slot that SessionManager::CreateSession has just taken,
+         for the short window before the TCPConnection takes over responsibility
+         for it.
+
+         That window used to be unguarded, and the slot was handed back on exactly
+         one path - the script refusing the connection. Anything else that left the
+         function in between kept the slot for good, and FireOnAcceptEvent runs
+         administrator-supplied script through the COM scripting host, which is the
+         one thing in the accept path that can raise something we did not write.
+         A leaked slot never comes back: it counts against MaxSMTPConnections (and
+         the POP3 and IMAP equivalents) with no connection open behind it, so enough
+         of them and every client is refused with "Blocked either by IP range or by
+         connection limit" until the service is restarted.
+      */
+      class SessionSlot
+      {
+      public:
+         explicit SessionSlot(SessionType session_type) :
+            session_type_(session_type),
+            held_(true)
+         {
+         }
+
+         ~SessionSlot()
+         {
+            if (!held_)
+               return;
+
+            try
+            {
+               SessionManager::Instance()->OnSessionEnded(session_type_);
+            }
+            catch (...)
+            {
+               // This can run while an exception is already in flight, and a second
+               // one leaving a destructor is std::terminate.
+            }
+         }
+
+         // Ownership has passed to the TCPConnection, whose destructor releases the
+         // slot for any connection that got past StatePendingConnect.
+         void Release()
+         {
+            held_ = false;
+         }
+
+         SessionSlot(const SessionSlot&) = delete;
+         SessionSlot& operator=(const SessionSlot&) = delete;
+
+      private:
+         SessionType session_type_;
+         bool held_;
+      };
+   }
+
    TCPServer::TCPServer(boost::asio::io_context& io_context, const IPAddress &ipaddress, int port, SessionType sessionType, std::shared_ptr<SSLCertificate> certificate, std::shared_ptr<TCPConnectionFactory> connectionFactory, ConnectionSecurity connection_security) :
       acceptor_(io_context),
       context_(boost::asio::ssl::context::sslv23),
@@ -179,8 +239,36 @@ namespace HM
 
       if (!error)
       {
-         boost::asio::ip::tcp::endpoint localEndpoint = connection->GetSocket().local_endpoint();
-         boost::asio::ip::tcp::endpoint remoteEndpoint = connection->GetSocket().remote_endpoint();
+         /*
+            Both endpoints are read through the error_code overloads, because the
+            peer can be gone before we ever look at the socket we just accepted -
+            a connect-scan that resets immediately is enough, and getpeername then
+            answers WSAENOTCONN. The throwing overloads used to be called here, and
+            this is a boost::asio completion handler: the exception unwinds out of
+            io_context::run() onto the IOCP worker, where the barrier reports HM4208
+            at High severity and the crash reporter writes a minidump. So one TCP
+            connection, repeated, could fill a stock server's error log and burn the
+            ten-dump / 100 MB budget that a genuine fault needs.
+         */
+         boost::system::error_code endpoint_error;
+
+         boost::asio::ip::tcp::endpoint localEndpoint = connection->GetSocket().local_endpoint(endpoint_error);
+
+         boost::asio::ip::tcp::endpoint remoteEndpoint;
+         if (!endpoint_error)
+            remoteEndpoint = connection->GetSocket().remote_endpoint(endpoint_error);
+
+         if (endpoint_error)
+         {
+            String sEndpointMessage;
+            sEndpointMessage.Format(_T("TCP - A connection on port %d was dropped before its address could be read. Code: %d, Message: %s"),
+               port_, endpoint_error.value(), String(endpoint_error.message()).c_str());
+            LOG_TCPIP(sEndpointMessage);
+
+            // No session was created, so there is nothing to give back. Letting the
+            // connection go closes the socket.
+            return;
+         }
 
          IPAddress localAddress (localEndpoint.address());
          IPAddress remoteAddress (remoteEndpoint.address());
@@ -205,26 +293,55 @@ namespace HM
 
             if (iBlockedIPHoldSeconds > 0)
             {
-               Sleep(iBlockedIPHoldSeconds * 1000);
-               message.Format(_T("Held connection from %s for %i seconds before dropping."), String(remoteAddress.ToString()).c_str(), iBlockedIPHoldSeconds);
-               LOG_DEBUG(message);
+               /*
+                  This was a Sleep() - on the I/O thread that had just accepted the
+                  connection. There are only GetTCPIPThreads() of those and SMTP,
+                  POP3 and IMAP all share them, so the setting handed the peer it was
+                  meant to punish a way to stop the entire server: open one more
+                  connection than there are threads, and every worker is asleep at
+                  once. No accept, no read and no write for any protocol is
+                  dispatched until they wake, and a peer that keeps reconnecting
+                  keeps them that way. The anti-pounding value is in holding the
+                  socket open, which a timer does just as well while holding nothing
+                  else. The connection is captured so it stays open for the duration
+                  and is closed when the handler releases the last reference to it.
+               */
+               std::shared_ptr<boost::asio::steady_timer> hold_timer =
+                  std::make_shared<boost::asio::steady_timer>(io_context_);
+
+               hold_timer->expires_after(std::chrono::seconds(iBlockedIPHoldSeconds));
+
+               String held_message;
+               held_message.Format(_T("Held connection from %s for %i seconds before dropping."), String(remoteAddress.ToString()).c_str(), iBlockedIPHoldSeconds);
+
+               hold_timer->async_wait([hold_timer, connection, held_message](const boost::system::error_code&)
+                  {
+                     LOG_DEBUG(held_message);
+                  });
             }
 
             return;
          }
 
+         // The slot taken above belongs to this function until the connection is
+         // started. See SessionSlot: the hand-back used to exist on one path only.
+         SessionSlot session_slot(sessionType_);
+
          if (!FireOnAcceptEvent(connection, remoteAddress, localEndpoint.port()))
          {
             // Session has been created, but is now terminated by a custom script. Since we haven't started the
-            // TCPConnection yet, we are still responsible for tracking connection count.
-            SessionManager::Instance()->OnSessionEnded(sessionType_);
+            // TCPConnection yet, we are still responsible for tracking connection count - session_slot gives it back.
             return;
          }
 
          connection->SetSecurityRange(securityRange);
-         connection->Start();
 
-         // Now TCPConnection is responsible for decreasing the session count when the connection ends.
+         // Now TCPConnection is responsible for decreasing the session count when the connection ends:
+         // its destructor releases a slot for every connection past StatePendingConnect, which Start()
+         // sets before it does anything that can fail.
+         session_slot.Release();
+
+         connection->Start();
       }
       else
       {

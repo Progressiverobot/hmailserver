@@ -37,20 +37,23 @@ namespace RegressionTests.Infrastructure
    ///    this purpose: a lookup that quietly found nothing used to be indistinguishable
    ///    from one that was never made, which is what hid this for a day.
    ///
-   ///    MARKED EXPLICIT, and the reason is a limitation of the bench rather than of the
-   ///    test. Changing DNSServer only takes effect on a service restart - IniFileSettings
-   ///    reads the ini once at process start, and Application.Stop()/Start() over COM does
-   ///    not re-read it because the process keeps running. A service restart in turn
-   ///    invalidates the COM object TestFixtureBase and TestSetup cache, so every later call
-   ///    in the fixture talks to a dead process. Making this run unattended means giving the
-   ///    harness a "restart and re-acquire" primitive, which is a change to shared test
-   ///    infrastructure and a separate piece of work.
+   ///    This ran as [Explicit] when it was written, because changing DNSServer only takes
+   ///    effect on a service restart - IniFileSettings reads the ini once at process start,
+   ///    and Application.Stop()/Start() over COM does not re-read it because the process
+   ///    keeps running - and a real restart broke the harness in two separate ways. It now
+   ///    runs in the ordinary suite, via TestFixtureBase.RestartServerAndReacquireCom().
    ///
-   ///    So it is here, runnable on demand, with the mechanism written down - rather than
-   ///    absent, or present and quietly skipped, or present and destabilising the suite. The
-   ///    fix it covers was verified by hand against a real DNS server: with the port set,
-   ///    all three record types return status 87 and no records; with it zero, the A query
-   ///    returns its record and the AAAA query returns DNS_INFO_NO_RECORDS.
+   ///    Both of those ways are worth knowing before writing another fixture like this one.
+   ///    The COM object is an out-of-process server, so a restart disconnects every proxy
+   ///    the fixture base holds - which also means the obvious way to wait for the server to
+   ///    come back, calling the cached object until it answers, can never succeed. And
+   ///    ServiceRestartDetector fails the next test in EVERY fixture when hMailServer.exe's
+   ///    process id changes, because normally that means the server crashed; a restart we
+   ///    asked for has to re-baseline it. The primitive does both.
+   ///
+   ///    The fix it covers was verified by hand against a real DNS server: with the port
+   ///    set, all three record types return status 87 and no records; with it zero, the A
+   ///    query returns its record and the AAAA query returns DNS_INFO_NO_RECORDS.
    /// </summary>
    [TestFixture]
    public class CustomDnsServer : TestFixtureBase
@@ -90,55 +93,6 @@ namespace RegressionTests.Infrastructure
          return null;
       }
 
-      // A full service restart, and it has to be: Application.Stop()/Start() over COM -
-      // which is what every other fixture uses - stops and starts the protocol servers
-      // inside a process that keeps running, and IniFileSettings reads the ini once at
-      // process start and caches it. So the COM restart leaves the old value in place and a
-      // test built on it silently proves nothing, which is exactly what the first version of
-      // this test did.
-      private static void RestartServiceToRereadTheIni()
-      {
-         RunNetCommand("stop");
-         RunNetCommand("start");
-
-         // The service reports started before the COM object is ready to answer, so wait
-         // for the thing actually needed rather than for the service state.
-         var deadline = DateTime.UtcNow.AddSeconds(30);
-
-         while (DateTime.UtcNow < deadline)
-         {
-            try
-            {
-               SingletonProvider<TestSetup>.Instance.GetApp().Settings.Logging.LogDebug.ToString();
-               return;
-            }
-            catch
-            {
-               System.Threading.Thread.Sleep(500);
-            }
-         }
-
-         Assert.Fail("hMailServer did not become answerable over COM within 30 seconds of restarting.");
-      }
-
-      private static void RunNetCommand(string verb)
-      {
-         var start = new System.Diagnostics.ProcessStartInfo("net", verb + " hMailServer")
-         {
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-         };
-
-         using (var process = System.Diagnostics.Process.Start(start))
-         {
-            process.StandardOutput.ReadToEnd();
-            process.StandardError.ReadToEnd();
-            process.WaitForExit(60000);
-         }
-      }
-
       // Writes a key into the FIRST [Settings] section, which is the only one that counts.
       // GetPrivateProfileString reads the first section with a given name and ignores any
       // later duplicate - so appending "[Settings]\nKey=Value" to the end of the file, the
@@ -162,9 +116,6 @@ namespace RegressionTests.Infrastructure
       }
 
       [Test]
-      [Explicit("Needs a service restart to reload the ini, which invalidates the cached COM " +
-                "object the whole fixture base is built on. Run it deliberately: " +
-                "nunit3-console RegressionTests.dll --where \"class =~ CustomDnsServer\"")]
       [Description("A configured DNS server is accepted by the resolver rather than rejected as a malformed request")]
       public void AConfiguredDnsServerProducesADnsAnswerRatherThanARejectedRequest()
       {
@@ -173,9 +124,15 @@ namespace RegressionTests.Infrastructure
          // negative control rather than a test that happens to pass.
          SetIniSetting("DNSServer", UnreachableButValidServer);
 
+         // Three query types are issued per lookup, and each waits the full DNSQueryTimeout
+         // because the nominated server is deliberately unreachable. At the 10-second
+         // default that is half a minute of test for nothing; two seconds proves the same
+         // thing. Restored with DNSServer in the finally block.
+         SetIniSetting("DNSQueryTimeout", "2");
+
          try
          {
-            RestartServiceToRereadTheIni();
+            RestartServerAndReacquireCom();
 
             LogHandler.DeleteCurrentDefaultLog();
 
@@ -186,8 +143,19 @@ namespace RegressionTests.Infrastructure
 
             var log = LogHandler.ReadCurrentDefaultLog();
 
-            StringAssert.Contains("DNS - Result.", log,
-               "The resolver produced no result line at all, so it cannot be shown that the lookup was attempted.");
+            // The request has to have been ACCEPTED and dispatched. There are two shapes
+            // that prove it and the test takes either: a result line, when the nominated
+            // server answers, and a timeout line, when it does not. 192.0.2.1 is TEST-NET-1
+            // and answers nothing, so in practice it is the timeout - and a timeout is the
+            // stronger evidence of the two. ERROR_INVALID_PARAMETER comes back in the same
+            // millisecond it was asked for, without a packet leaving the machine; waiting
+            // the whole DNSQueryTimeout means the query was genuinely sent and nothing came
+            // back.
+            var dispatched = log.Contains("DNS - Result.") || log.Contains("DNS - Query timed out.");
+
+            Assert.IsTrue(dispatched,
+               "The resolver produced neither a result line nor a timeout line, so it cannot be shown " +
+               "that the lookup was attempted at all. Log:\r\n" + log);
 
             // 87 is ERROR_INVALID_PARAMETER: the DNS client refused the request before
             // sending anything. That is the defect this fixture exists for.
@@ -196,14 +164,24 @@ namespace RegressionTests.Infrastructure
                "configured. Every lookup fails in this state - DNSBL, SPF, DKIM, DMARC and MX included - " +
                "and the most likely cause is a non-zero port in the DNS_ADDR server entry.");
 
-            StringAssert.Contains("custom server", log,
-               "The configured DNS server was not passed to the query, so this test proved nothing. " +
-               "Check that DNSServer landed in the FIRST [Settings] section of the ini the server reads.");
+            // And it has to have gone to the CONFIGURED server rather than the system one,
+            // or the test proves nothing about DNSServer. The system resolver answers a name
+            // in the reserved .invalid namespace with an immediate authoritative NXDOMAIN -
+            // it never times out - so a timeout for this name is itself the proof that the
+            // query went to 192.0.2.1. Where the query did complete, the result line says
+            // which server was used, and that is checked directly.
+            var usedConfiguredServer = log.Contains("DNS - Query timed out.") || log.Contains("custom server");
+
+            Assert.IsTrue(usedConfiguredServer,
+               "The lookup completed without using the configured DNS server, so this test proved nothing. " +
+               "Check that DNSServer landed in the FIRST [Settings] section of the ini the server reads. " +
+               "Log:\r\n" + log);
          }
          finally
          {
             SetIniSetting("DNSServer", null);
-            RestartServiceToRereadTheIni();
+            SetIniSetting("DNSQueryTimeout", null);
+            RestartServerAndReacquireCom();
 
             // This test deliberately asks for a name in the reserved .invalid namespace, so
             // SpamAssassinTestConnect reports HM5507 - correctly. Left behind, that entry

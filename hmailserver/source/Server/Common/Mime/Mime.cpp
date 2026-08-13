@@ -51,12 +51,20 @@ POSSIBILITY OF SUCH DAMAGE.
 namespace HM
 {
    // search for a character in the current line (before CRLF)
-   static const char* LineFind(const char* pszString, int ch)
+   //
+   // pszEnd is one past the last valid byte. It used to stop only at a NUL, which
+   // made this function correct only because every buffer that reaches the parser
+   // happens to carry one - File::ReadTextFile appends it, and a child part's buffer
+   // is a slice of a parent's that does. That is a property of the callers, not of
+   // this function, and it is the exact shape of the three reads AddressSanitizer
+   // found in MimeEncodedWord::Decode: a length-delimited buffer walked as if it were
+   // a C string.
+   static const char* LineFind(const char* pszString, int ch, const char* pszEnd)
    {
       ASSERT(pszString != NULL);
-      while (*pszString != 0 && *pszString != ch && *pszString != '\r' && *pszString != '\n')
+      while (pszString < pszEnd && *pszString != 0 && *pszString != ch && *pszString != '\r' && *pszString != '\n')
          pszString++;
-      return *pszString == ch ? pszString : NULL;
+      return (pszString < pszEnd && *pszString == ch) ? pszString : NULL;
    }
 
    // search for string2 in string1 (strstr)
@@ -326,14 +334,20 @@ namespace HM
          modified_ = true;
    }
 
+   // The length this field will occupy once stored: "name: value\r\n".
+   //
+   // It used to build a field coder, hand it the charset and the value, delete it
+   // again and then return a number that took no account of any of that - the value's
+   // length was simply left out. The coder was pure cost: an allocation and a free per
+   // field per call, on a function whose whole job is to size a buffer. The number was
+   // then used to reserve that buffer, so understating it by the entire value meant
+   // the reservation was always too small and the append reallocated anyway.
+   //
+   // An encoded value can still be longer than the raw one, so this remains a hint
+   // rather than a guarantee - which is all any caller uses it as.
    int MimeField::GetLength() const
    {
-      int nLength = (int) name_.size() + 4;
-      FieldCodeBase* pCoder = MimeEnvironment::CreateFieldCoder(GetName());
-      pCoder->SetCharset(charset_.c_str());
-      pCoder->SetInput(value_.c_str(), (int)value_.size(), true);
-      delete pCoder;
-      return nLength;
+      return (int) (name_.size() + value_.size() + 4);
    }
 
    // store a field to string buffer
@@ -363,23 +377,30 @@ namespace HM
    {
       Clear();
       ASSERT(pszData != NULL);
+      const char* const pszLimit = pszData + nDataSize;
       const char *pszEnd, *pszStart = pszData;
       // find the next field (e.g. "\r\nContent...")
-      while (CMimeChar::IsSpace((unsigned char)*pszStart))
+      // The pszStart < pszLimit test is not decoration: pszStart += 2 below can land
+      // exactly on the limit, and the next iteration then reads the byte after the
+      // buffer.
+      while (pszStart < pszLimit && CMimeChar::IsSpace((unsigned char)*pszStart))
       {
          if (*pszStart == '\r')		// end of header ?
             return 0;
-         pszStart = FindString(pszStart, "\r\n", pszData+nDataSize);
+         pszStart = FindString(pszStart, "\r\n", pszLimit);
          if (!pszStart)
             return 0;
          pszStart += 2;
       }
 
+      if (pszStart >= pszLimit)
+         return 0;
+
       // save start of field name for raw capture
       const char* pszFieldStart = pszStart;
 
       // get the field name
-      pszEnd = LineFind(pszStart, ':');
+      pszEnd = LineFind(pszStart, ':', pszLimit);
       if (pszEnd != NULL)				// if colon not found, Name would be empty
       {
          name_.assign(pszStart, (pszEnd-pszStart));
@@ -387,16 +408,18 @@ namespace HM
       }
 
       // find the end of the field
-      while (*pszStart == ' ' || *pszStart == '\t')
+      while (pszStart < pszLimit && (*pszStart == ' ' || *pszStart == '\t'))
          pszStart++;
       pszEnd = pszStart;
       do
       {
-         pszEnd = FindString(pszEnd, "\r\n", pszData+nDataSize);
+         pszEnd = FindString(pszEnd, "\r\n", pszLimit);
          if (!pszEnd)
             return 0;
          pszEnd += 2;
-      } while (*pszEnd == '\t' || *pszEnd == ' ');	// linear-white-space
+         // pszEnd can now be exactly pszLimit, and the continuation test below reads
+         // through it. A folded field is only continued by a byte that exists.
+      } while (pszEnd < pszLimit && (*pszEnd == '\t' || *pszEnd == ' '));	// linear-white-space
 
       // Capture the raw line before any processing (includes folding and trailing \r\n)
       raw_line_.assign(pszFieldStart, pszEnd - pszFieldStart);
@@ -404,12 +427,16 @@ namespace HM
       is_new_ = false;
 
       // BEGIN change for hMailServer
-      int lLength = (int)(pszEnd-pszStart)-2;
-      char *pValue = new char[lLength + 1];
-      memset(pValue, 0, lLength+1);
-      strncpy_s(pValue, lLength+1, pszStart, lLength);
-      value_ = pValue;
-      delete [] pValue;
+      //
+      // This was a heap allocation, a memset, a strncpy_s and a delete per header
+      // field per parse, to produce a std::string that assign makes directly. It also
+      // truncated: strncpy_s stops at the first NUL in the source, so a header field
+      // carrying an embedded NUL - which SMTP will accept, the transmission path being
+      // 8-bit clean - kept only the bytes before it, while raw_line_ above (assigned
+      // with a length) kept all of them. The two then disagreed about what the header
+      // said, and the value that everything downstream matches on was the shorter one.
+      const size_t valueLength = static_cast<size_t>(pszEnd - pszStart) - 2;
+      value_.assign(pszStart, valueLength);
 
       // We need to unfold the field value
       if (unfold)
@@ -1056,13 +1083,27 @@ namespace HM
       // try to generate a file name using the message subject.
       std::shared_ptr<MimeBody> pEncapsulatedMessage = std::shared_ptr<MimeBody>(new MimeBody);
 
-      size_t iLength = GetContentLength();
-      char *pData = new char[iLength+1];
-      strncpy_s(pData, iLength+1, (const char*) GetContent(), iLength);
+      // Parse the content in place.
+      //
+      // This used to copy it first, into an uninitialised new char[iLength+1], with
+      // strncpy_s - which stops at the first NUL in the source and does NOT pad the
+      // remainder the way strncpy does. A message/rfc822 part whose content contains a
+      // NUL byte therefore left the tail of that buffer uninitialised, and Load was
+      // then told to parse iLength bytes of it. What it parsed out of the uninitialised
+      // tail became the encapsulated message's Subject, and
+      // GenerateFileNameFromEncapsulatedSubject turns that Subject into the part's
+      // filename - which is shown to COM clients, matched against the blocked-attachment
+      // list, and used to name the temp file the virus scanner writes. Heap contents
+      // leaking into a filename, from a byte an attacker can put in a message.
+      //
+      // The copy bought nothing: text_ is an AnsiString, c_str() is NUL-terminated at
+      // exactly size(), which is the sentinel the header scanner wants, and it is the
+      // real length rather than a length the copy may not have reached.
+      const AnsiString &content = GetContent();
+
       size_t index = 0;
       bool part_loaded;
-      pEncapsulatedMessage->Load(pData, iLength, index, part_loaded);
-      delete [] pData;
+      pEncapsulatedMessage->Load(content.c_str(), content.size(), index, part_loaded);
 
       return pEncapsulatedMessage;
    }
@@ -1216,18 +1257,31 @@ namespace HM
       return true;
    }
 
-   int 
+   MimeLoadResult
       MimeBody::LoadFromFile(const AnsiString &pszFilename)
    {
       File oFile;
       if (!oFile.Open(pszFilename, File::OTReadOnly))
-         return false;
+         return MimeLoadResult::OpenFailed;
 
       // Read the file as a text file. This will cause a null
       // to be added by File, which is required by Load() below.
+      //
+      // Deliberately outside the try below. ReadTextFile throws rather than answering
+      // empty when the read fails, and three of this function's four callers do not
+      // look at what it returns at all - so catching that here would convert a loud
+      // failure into a silent one for them. The exception is left to propagate, which
+      // is the behaviour every caller already has.
       std::shared_ptr<ByteBuffer> pFileContents = oFile.ReadTextFile();
 
       FreeBuffer();
+
+      // Cannot happen today - ReadTextFile throws instead of answering null - but "no
+      // buffer" must never be allowed to read as "no content", which is precisely the
+      // confusion this function is being corrected for.
+      if (!pFileContents)
+         return MimeLoadResult::ParseFailed;
+
       if (pFileContents->GetSize() > 0)
       {
          try
@@ -1275,10 +1329,18 @@ namespace HM
             String sErrorMessage = Formatter::Format("An unknown error occurred while loading message. File: {0}. Backuped to: {1}", pszFilename, sMessageBackupPath);
 
             ErrorManager::Instance()->ReportError(ErrorManager::Medium, 4228, "MimeBody::LoadFromFile", sErrorMessage);
+
+            // This used to fall through and return true. The message had been copied
+            // aside and an error reported, and the caller was then told the load had
+            // succeeded - so it went on to use, and on the rule and forwarding paths to
+            // write back, a MimeBody holding whatever had been parsed before the throw.
+            // A partly-parsed message serialised over the real one is the whole of the
+            // damage.
+            return MimeLoadResult::ParseFailed;
          }
       }
 
-      return true;
+      return MimeLoadResult::Loaded;
    }
 
    // Returns true if any child body part has been modified (body text or headers).
@@ -1404,11 +1466,15 @@ namespace HM
          return false;
 
       // Encode the file, to base64 or likewise.
-      MimeCodeBase* pCoder = MimeEnvironment::CreateCoder(GetTransferEncoding());
-      ASSERT(pCoder != NULL);
+      //
+      // unique_ptr rather than a bare delete at the end, because there was no delete
+      // at the end: this coder was leaked on every call, and GetOutput below can throw
+      // on a large attachment, which would leak it even if there had been one.
+      std::unique_ptr<MimeCodeBase> pCoder(MimeEnvironment::CreateCoder(GetTransferEncoding()));
       pCoder->SetInput((const char*) pUnencodedBuffer->GetCharBuffer(), pUnencodedBuffer->GetSize(), true);
 
       // Copy the buffer
+      body_modified_ = true;
       pCoder->GetOutput(text_);
 
       AnsiString sCharset = "utf-8";
@@ -1427,19 +1493,27 @@ namespace HM
    }
 
    // write the content (attachment) to a file
+   //
+   // Two defects in five lines. The coder was never deleted, so every attachment ever
+   // written - one per attachment per virus scan, plus every COM Attachment.SaveAs -
+   // leaked one. And the result of the write was thrown away and true returned
+   // unconditionally, so "the attachment is now on disk" and "the disk is full, or the
+   // path is not writable, or the file is locked" were the same answer. Both callers
+   // ignore the return value today, which is why this went unnoticed; the one that
+   // matters is VirusScanner, which writes each attachment to a temp file and then has
+   // the scanner open that file by name. A failed write there means the scanner is
+   // handed a file that is missing or empty, finds nothing in it, and the message is
+   // delivered as clean.
    bool MimeBody::WriteToFile(const String &sFilename)
    {
       // First de-code the content.
-      MimeCodeBase* pCoder = MimeEnvironment::CreateCoder(GetTransferEncoding());
-      ASSERT(pCoder != NULL);
+      std::unique_ptr<MimeCodeBase> pCoder(MimeEnvironment::CreateCoder(GetTransferEncoding()));
       pCoder->SetInput(text_, text_.GetLength(), false);
 
       AnsiString decoded;
       pCoder->GetOutput(decoded);
 
-      FileUtilities::WriteToFile(sFilename, decoded);
-
-      return true;
+      return FileUtilities::WriteToFile(sFilename, decoded);
    }
 
    // delete all child body parts
@@ -1718,10 +1792,18 @@ namespace HM
       nDataSize -= nSize;
       FreeBuffer();
 
+      // Below the nesting limit this part is a leaf whatever its Content-Type says:
+      // the content is taken whole rather than cut at the first boundary, so the early
+      // return under "load content" fires and the recursive descent at the bottom of
+      // this function is never reached. Taking it whole is the point - nothing is
+      // dropped, the sub-tree survives in text_ and both serialisation paths round-trip
+      // it byte for byte. See MaxNestingDepth for why the limit exists.
+      const bool descend_into_child_parts = parse_depth_ < MaxNestingDepth;
+
       // determine the length of the content
       const char* pszEnd = pszData + nDataSize;
       int nMediaType = GetMediaType();
-      if (MEDIA_MULTIPART == nMediaType)
+      if (descend_into_child_parts && MEDIA_MULTIPART == nMediaType)
       {
          // find the begin boundary
          string strBoundary = GetBoundary();
@@ -1812,6 +1894,12 @@ namespace HM
       nDataSize += stepBack;
       pszEnd = pszData + nDataSize;
 
+      // The second half of the nesting guard. The whole-content path above already
+      // returns before this point for every part that has a body; this catches the one
+      // that does not, where nSize was zero and the early return did not fire.
+      if (!descend_into_child_parts)
+         return (int)(pszEnd - pszDataBegin);
+
       const char* pszBound1 = GetBoundaryEnd(pszData, pszEnd, strBoundary.c_str());
 
       int counter = 10000;
@@ -1871,6 +1959,11 @@ namespace HM
          int nEntitySize = (int) (pszBound2 - pszStart);
 
          std::shared_ptr<MimeBody> pBP = std::shared_ptr<MimeBody>(new MimeBody());
+
+         // The child is one level further from the top than this part is. This is the
+         // only place a MimeBody's depth is ever set, and it has to be set before Load
+         // rather than after, because Load is where the descent happens.
+         pBP->parse_depth_ = parse_depth_ + 1;
 
          bodies_.push_back(pBP);
 

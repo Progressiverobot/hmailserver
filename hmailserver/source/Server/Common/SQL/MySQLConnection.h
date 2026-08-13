@@ -38,6 +38,12 @@ namespace HM
       virtual bool BeginTransaction(String &sErrorMessage);
       virtual bool CommitTransaction(String &sErrorMessage);
       virtual bool RollbackTransaction(String &sErrorMessage);
+
+      // Deliberately does nothing: MySQL, like PostgreSQL, has no statement
+      // timeout in this server, so a statement blocked on a lock holds its
+      // pooled connection indefinitely. See the comment on
+      // PGConnection::SetTimeout for why borrowing SQLScriptRunner's 30 seconds
+      // as a session setting would be worse than having none.
       virtual void SetTimeout(int seconds) {}
 
       virtual bool GetSupportsCommandParameters() const {return false; }

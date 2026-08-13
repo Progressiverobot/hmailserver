@@ -159,8 +159,22 @@ namespace HM
    private:
 
       void ThrowIfNotConnected_();
-      void HandshakeFailed_(const boost::system::error_code& error);
-      void StartAsyncConnect_(const String &ip_adress, int port);
+
+      // Common handling for every way a TLS handshake can fail.
+      //
+      // retire_handshake_operation says who owns the queued BCTHandshake entry.
+      // AsyncHandshakeCompleted pops it itself the moment this returns, so it
+      // passes false; the paths in AsyncHandshake that give up before
+      // async_handshake was ever started have nobody else to do it and pass true.
+      // Getting this wrong in either direction is visible: popping twice reports
+      // Critical HM5131 against a healthy session, and never popping wedges the
+      // connection for good, because IOOperationQueue refuses to start any
+      // operation at all while a handshake is outstanding.
+      void HandshakeFailed_(const boost::system::error_code& error, bool retire_handshake_operation);
+
+      // False when no connection attempt was started, in which case the caller has
+      // already been told why through OnCouldNotConnect.
+      bool StartAsyncConnect_(const String &ip_adress, int port);
 
       static void OnTimeout(std::weak_ptr<TCPConnection> connection, boost::system::error_code const& err);
       static void OnSessionCeilingReached(std::weak_ptr<TCPConnection> connection, boost::system::error_code const& err);

@@ -24,6 +24,29 @@ namespace RegressionTests.Shared
          _settings = _application.Settings;
       }
 
+      /// <summary>
+      ///    Restarts the service and re-seats this fixture's cached COM objects, for a test
+      ///    that needs the server to re-read something it only reads at process start -
+      ///    hMailServer.ini, in practice, which IniFileSettings caches for the life of the
+      ///    process.
+      ///
+      ///    _application and _settings are proxies to an out-of-process COM server, so a
+      ///    restart disconnects them and every later call in the fixture would talk to a dead
+      ///    process. Re-assigning them here is what lets such a fixture run in the ordinary
+      ///    suite instead of being marked Explicit.
+      ///
+      ///    Whatever the test changed must be put back and the service restarted again
+      ///    before the fixture ends, or every fixture after it runs against the changed
+      ///    configuration.
+      /// </summary>
+      protected void RestartServerAndReacquireCom()
+      {
+         SingletonProvider<TestSetup>.Instance.RestartServiceAndReacquire();
+
+         _application = SingletonProvider<TestSetup>.Instance.GetApp();
+         _settings = _application.Settings;
+      }
+
       [SetUp]
       public void SetUp()
       {

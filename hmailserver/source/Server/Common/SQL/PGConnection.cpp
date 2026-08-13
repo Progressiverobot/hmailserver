@@ -90,6 +90,10 @@ namespace HM
          dbconn_ = 0;
       }
 
+      // Was left true, so IsConnected() went on claiming a connection that had
+      // been finished. Connect() resets it on the way back up.
+      is_connected_ = false;
+
       return true;
    }
 
@@ -110,15 +114,33 @@ namespace HM
             return DALConnection::DALUnknown;
          }
 
+         // Cleared before the statement runs, the way ADOConnection does it. A
+         // plain INSERT only comes back with a row when SQLStatement::GetCommand
+         // appended a RETURNING clause, so without this the caller kept whatever
+         // it happened to be holding - on the shared "insert then read the id"
+         // path that is another row's identity.
+         if (iInsertID != nullptr)
+            *iInsertID = 0;
+
          PGresult *pResult = PQexec(dbconn_, sQuery);
 
-         bool bIgnoreErrors = SQL.Find(_T("[IGNORE-ERRORS]")) >= 0;
+         // Classified before the marker is consulted, because a marked statement
+         // may discard "this object already exists" but never "the server never
+         // heard the statement" - see DALConnection::HasIgnoreErrorsMarker. The
+         // error text goes into a local so a discarded failure leaves nothing in
+         // the caller's buffer.
+         String checkErrorMessage;
+         DALConnection::ExecutionResult result = CheckError(pResult, SQL, checkErrorMessage);
 
-         if (!bIgnoreErrors)
+         if (result != DALSuccess)
          {
-            DALConnection::ExecutionResult result = CheckError(pResult, SQL, sErrorMessage);
-            if (result != DALSuccess)
+            bool ignoreByMarker = result != DALConnection::DALConnectionProblem &&
+                                  HasIgnoreErrorsMarker(SQL);
+
+            if (!ignoreByMarker)
             {
+               sErrorMessage = checkErrorMessage;
+
                if (pResult != 0)
                   PQclear(pResult);
 
@@ -127,10 +149,10 @@ namespace HM
          }
 
          ExecStatusType iExecResult = PQresultStatus(pResult);
-         
+
          // Check if a value has been returned. Will only occur if we've
          // inserted a value.
-         if (iInsertID > 0 && iExecResult == PGRES_TUPLES_OK)
+         if (iInsertID != nullptr && iExecResult == PGRES_TUPLES_OK)
          {
             // pick the ID from the first row.
             char *pRetVal = PQgetvalue(pResult, 0, 0);
@@ -187,6 +209,26 @@ namespace HM
 
             // Retrieve error message
             sErrorMsg  = PQresultErrorMessage(pResult);
+
+            /*
+               A connection that died while the statement was in flight does not
+               come back as a null result: libpq builds a PGRES_FATAL_ERROR
+               result ("server closed the connection unexpectedly") and marks the
+               connection bad. Classified on the result status alone that is
+               DALErrorInSQL, which DALConnection::Execute and DALRecordset::Open
+               both treat as final - so the statement was reported failed and
+               never retried, and it took a *second* statement (which libpq
+               refuses outright, giving the null result below) before anything
+               reconnected. On MySQL the same event is recognised, through error
+               codes 2006/2013, and the statement is retried; PostgreSQL was the
+               one backend that dropped it.
+
+               PQstatus is what separates the two: a statement the server
+               rejected leaves the connection CONNECTION_OK, a statement that
+               never got an answer does not.
+            */
+            if (result != DALConnection::DALSuccess && PQstatus(dbconn_) != CONNECTION_OK)
+               result = DALConnection::DALConnectionProblem;
          }
          else
          {

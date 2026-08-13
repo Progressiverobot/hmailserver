@@ -37,8 +37,44 @@ namespace HM
          return false;
       }
 
-      // 30 minute timeout per statement. Should hopefully never be needed.
-      connectionObject->SetTimeout(60 * 30);
+      /*
+         30 minute timeout per statement. Should hopefully never be needed.
+
+         Restored on the way out whatever happens. The connection this runs on is
+         usually one borrowed from the pool (DatabaseConnectionManager::
+         ExecuteScript), and every early return below used to hand it back still
+         carrying the half-hour timeout - so the next unrelated statement to be
+         given that connection, on a live server, would sit for up to thirty
+         minutes on a lock instead of thirty seconds. A script failing is exactly
+         when that happens.
+      */
+      class TimeoutScope
+      {
+      public:
+         TimeoutScope(std::shared_ptr<DALConnection> connection) :
+            connection_(connection)
+         {
+            connection_->SetTimeout(60 * 30);
+         }
+
+         ~TimeoutScope()
+         {
+            try
+            {
+               connection_->SetTimeout(30);
+            }
+            catch (...)
+            {
+               // SetTimeout reaches COM on two of the four backends. Never let
+               // it throw out of a destructor.
+            }
+         }
+
+      private:
+         std::shared_ptr<DALConnection> connection_;
+      };
+
+      TimeoutScope timeoutScope(connectionObject);
 
       for (int i = 0; i < oParser.GetNoOfCommands(); i++)
       {
@@ -73,8 +109,6 @@ namespace HM
             }
          }
       }
-
-      connectionObject->SetTimeout(30);
 
       return true;
    }

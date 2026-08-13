@@ -23,6 +23,35 @@ using namespace std;
 
 namespace HM
 {
+   namespace
+   {
+      // Source/description of a COM error as one line, for the transaction
+      // functions below. err.Source()/err.Description() hand back BSTRs owned by
+      // _bstr_t temporaries, so they are copied out before those go out of
+      // scope, and a null one becomes an empty string rather than a fault.
+      String DescribeComError(_com_error &err)
+      {
+         _bstr_t bstrSource(err.Source());
+         _bstr_t bstrDescription(err.Description());
+
+         LPCSTR lpcSource = bstrSource;
+         LPCSTR lpcDescription = bstrDescription;
+
+         String source;
+         if (lpcSource != nullptr)
+            source = lpcSource;
+
+         String description;
+         if (lpcDescription != nullptr)
+            description = lpcDescription;
+
+         String result;
+         result.Format(_T("Source: %s, Description: %s"), source.c_str(), description.c_str());
+
+         return result;
+      }
+   }
+
    SQLCEConnection::SQLCEConnection(std::shared_ptr<DatabaseSettings> pSettings) :
       DALConnection(pSettings)
    {
@@ -288,7 +317,13 @@ namespace HM
          if (iIgnoreErrors > 0 && iIgnoreErrors & dbErr)
             return DALConnection::DALSuccess;
 
-         if (queryString.Find(_T("[IGNORE-ERRORS]")) >= 0)
+         // The marker means "this object may already exist". It must not also
+         // discard a lost connection - see DALConnection::HasIgnoreErrorsMarker.
+         // GetErrorType_ never classifies anything as DALConnectionProblem on
+         // this backend today, so the test costs nothing here and stops the next
+         // person who adds a mapping from re-opening the hole.
+         if (dbErr != DALConnection::DALConnectionProblem &&
+             HasIgnoreErrorsMarker(queryString))
             return DALConnection::DALSuccess;
 
          _bstr_t bstrSource( err.Source() );
@@ -484,30 +519,102 @@ namespace HM
       return true;
    }
 
-   bool 
+   /*
+      What a transaction is worth on SQL Server Compact, which is the installer
+      default and therefore the case that matters most.
+
+      BeginTrans/CommitTrans/RollbackTrans are accepted by the provider and are
+      issued here, so DML inside a transaction is atomic in the ordinary sense.
+      What is not covered is DDL: SQL CE commits schema changes as they are
+      executed, so an upgrade step that ALTERs three tables and fails on the
+      third cannot be rolled back to the state before the first. That is what
+      the original comment on these three functions was reaching for, and it is
+      why DBUpdater's SchemaVerification proves each marked step before the
+      commit rather than trusting the commit to undo it.
+
+      Separately, and true on every backend: DatabaseConnectionManager::Execute
+      takes no connection, so it borrows a *different* pooled connection for each
+      statement. A transaction opened here therefore covers only the statements
+      routed onto this same connection object - which is exactly the COM API's
+      IInterfaceDatabase.ExecuteSQL / ExecuteSQLScript / EnsurePrerequisites
+      while a transaction is open, and nothing else. Server-internal work done
+      through the object model during that window is outside it.
+
+      What these three did *not* do was report failure. Each returned true
+      unconditionally, so a commit that threw - a lost session, a provider error,
+      a null connection object - was indistinguishable from one that had written
+      the data. DBUpdater turns CommitTransaction() == S_OK into "the upgrade
+      succeeded", so that lie became an installer exit code of 0.
+   */
+   bool
    SQLCEConnection::BeginTransaction(String &sErrorMessage)
    {
-      cSQLCEConnection->BeginTrans();
-      // SQL Server Compact does not support transactions, despite the fact that
-      // it's documented that they do.
-      return true;
+      try
+      {
+         cSQLCEConnection->BeginTrans();
+         return true;
+      }
+      catch (_com_error &err)
+      {
+         sErrorMessage = "Failed to start a SQL Server Compact transaction: " + DescribeComError(err);
+         LOG_APPLICATION(sErrorMessage);
+         return false;
+      }
+      catch (...)
+      {
+         sErrorMessage = "Failed to start a SQL Server Compact transaction.";
+         LOG_APPLICATION(sErrorMessage);
+         return false;
+      }
    }
 
-   bool 
+   bool
    SQLCEConnection::CommitTransaction(String &sErrorMessage)
    {
-      // SQL Server Compact does not support transactions, despite the fact that
-      // it's documented that they do.
-      cSQLCEConnection->CommitTrans();
-      return true;
+      try
+      {
+         cSQLCEConnection->CommitTrans();
+         return true;
+      }
+      catch (_com_error &err)
+      {
+         // The data is not committed. Saying so is the whole point: the caller
+         // decides whether to retry or to leave the ERROR log in place, and it
+         // cannot do either if this returns true.
+         sErrorMessage = "Failed to commit a SQL Server Compact transaction. The changes it contained have not been saved. " + DescribeComError(err);
+         LOG_APPLICATION(sErrorMessage);
+         return false;
+      }
+      catch (...)
+      {
+         sErrorMessage = "Failed to commit a SQL Server Compact transaction. The changes it contained have not been saved.";
+         LOG_APPLICATION(sErrorMessage);
+         return false;
+      }
    }
 
-   bool 
+   bool
    SQLCEConnection::RollbackTransaction(String &sErrorMessage)
    {
-      cSQLCEConnection->RollbackTrans();
-      return true;
+      try
+      {
+         cSQLCEConnection->RollbackTrans();
+         return true;
+      }
+      catch (_com_error &err)
+      {
+         sErrorMessage = "Failed to roll back a SQL Server Compact transaction. Data written inside it may still be present. " + DescribeComError(err);
+         LOG_APPLICATION(sErrorMessage);
+         return false;
+      }
+      catch (...)
+      {
+         sErrorMessage = "Failed to roll back a SQL Server Compact transaction. Data written inside it may still be present.";
+         LOG_APPLICATION(sErrorMessage);
+         return false;
+      }
    }
+
 
    void 
    SQLCEConnection::SetTimeout(int seconds)

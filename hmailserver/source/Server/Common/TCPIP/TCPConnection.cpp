@@ -135,15 +135,42 @@ namespace HM
 
       // Start an asynchronous resolve to translate the server and service names
       // into a list of endpoints.
-      StartAsyncConnect_(remote_ip_address, remotePort);
-      return true;
+      //
+      // The result is passed on rather than discarded: two of the paths below give
+      // up without starting anything at all, and a caller told the attempt had
+      // begun goes on to wait for a completion that is never coming. It survives
+      // today only because ~TCPConnection sets the disconnect event, so the wait
+      // ends by accident rather than by design.
+      return StartAsyncConnect_(remote_ip_address, remotePort);
    }
 
-   void
+   bool
    TCPConnection::StartAsyncConnect_(const String &ip_adress, int port)
    {
       IPAddress adress;
-      adress.TryParse(ip_adress, true);
+
+      // TryParse's result used to be dropped. A string that is not an IP address
+      // leaves 'adress' default-constructed, which is 0.0.0.0 - and on Windows a
+      // connect to 0.0.0.0 is a connect to this host. So handing this function
+      // anything that was not an address did not fail: it opened a connection to
+      // the local machine, on the port intended for someone else, and reported
+      // success. The debug-only check at the top of Connect() reported it in a
+      // debug build and nowhere else.
+      if (!adress.TryParse(ip_adress, true))
+      {
+         String sMessage;
+         sMessage.Format(_T("Could not connect to \"%s\" on port %d: this is not an IP address."), ip_adress.c_str(), port);
+
+         OnCouldNotConnect(sMessage);
+
+         // Application level rather than the error log: every caller resolves a
+         // name to an address before calling, so reaching this means a lookup
+         // produced something unusable or a route was configured with a host name.
+         // Both are for an administrator to see and neither is a server fault.
+         LOG_APPLICATION(_T("TCPConnection - ") + sMessage);
+
+         return false;
+      }
 
       tcp::endpoint ep;
       ep.address(adress.GetAddress());
@@ -155,14 +182,14 @@ namespace HM
 
       if (!allow_connect_to_self_ && LocalIPAddresses::Instance()->IsLocalPort(ep.address(), remote_port_))
       {
-         String sMessage; 
+         String sMessage;
             sMessage.Format(_T("Could not connect to %s on port %d since this would mean connecting to myself."), remote_ip_address_.c_str(), remote_port_);
 
          OnCouldNotConnect(sMessage);
 
          LOG_TCPIP(_T("TCPConnection - ") + sMessage);
 
-         return;
+         return false;
       }
 
       // Attempt a connection to the first endpoint in the list. Each endpoint
@@ -170,6 +197,7 @@ namespace HM
       socket_.async_connect(ep,
                std::bind(&TCPConnection::AsyncConnectCompleted, shared_from_this(), std::placeholders::_1));
 
+      return true;
    }
 
    void
@@ -359,7 +387,7 @@ namespace HM
             {
                String errorMessage = Formatter::Format(_T("Failed to set DANE verification callback for host {0}"), expected_remote_hostname_);
                ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5510, "TCPConnection::AsyncHandshake", errorMessage, error_code);
-               HandshakeFailed_(error_code);
+               HandshakeFailed_(error_code, true);
                return;
             }
          }
@@ -371,7 +399,7 @@ namespace HM
             {
                String errorMessage = Formatter::Format(_T("Failed to set verification callback for host {0}"), expected_remote_hostname_);
                ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5510, "TCPConnection::AsyncHandshake", errorMessage, error_code);
-               HandshakeFailed_(error_code);
+               HandshakeFailed_(error_code, true);
                return;
             }
          }
@@ -386,7 +414,7 @@ namespace HM
       {
          String error_message = Formatter::Format(_T("Failed to configure OpenSSL certificate verification: Mode: {0}"), verify_mode);
          ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5144, "TCPConnection::AsyncHandshake", error_message, error_code);
-         HandshakeFailed_(error_code);
+         HandshakeFailed_(error_code, true);
          return;
       }
 
@@ -409,7 +437,7 @@ namespace HM
 
             // Pass the SNI failure itself, not the stale (success) error_code from
             // the verify-mode setup above.
-            HandshakeFailed_(sni_error_code);
+            HandshakeFailed_(sni_error_code, true);
             return;
          }
       }
@@ -448,7 +476,8 @@ namespace HM
       }
       else
       {
-         HandshakeFailed_(error);
+         // This path owns the pop below, so HandshakeFailed_ must not do it too.
+         HandshakeFailed_(error, false);
       }
 
       operation_queue_.Pop(IOOperation::BCTHandshake);
@@ -457,10 +486,17 @@ namespace HM
    }
 
    void
-   TCPConnection::HandshakeFailed_(const boost::system::error_code& error)
+   TCPConnection::HandshakeFailed_(const boost::system::error_code& error, bool retire_handshake_operation)
    {
       // The SSL handshake failed. This may happen for example if the user who has connected
       // to the TCP/IP port disconnects immediately without sending any data.
+
+      // Cleared here rather than only in AsyncHandshakeCompleted: four of the five
+      // ways to get here never reach that function, and a connection left with the
+      // flag set takes the "can't send anything, just drop it" branch of Timeout()
+      // for the rest of its life.
+      handshake_in_progress_ = false;
+
       String sMessage;
       sMessage.Format(_T("TCPConnection - TLS/SSL handshake failed. Session Id: %d, Remote IP: %s, Error code: %d, Message: %s"), session_id_, SafeGetIPAddress().c_str(), error.value(), String(error.message()).c_str());
       LOG_TCPIP(sMessage);
@@ -468,6 +504,29 @@ namespace HM
       ServerStatus::Instance()->OnTlsHandshakeFailed();
 
       OnHandshakeFailed();
+
+      // The paths in AsyncHandshake that give up before async_handshake was started
+      // have to retire the queued handshake themselves - nothing else will. That is
+      // not bookkeeping: IOOperationQueue::Front refuses to start ANY operation
+      // while a handshake sits in the ongoing list, so such a session can never
+      // read, write or even disconnect again. The only thing that ends it is the
+      // idle timer, up to ten minutes later on SMTP and thirty on IMAP.
+      if (retire_handshake_operation)
+         operation_queue_.Pop(IOOperation::BCTHandshake);
+
+      // Nothing useful can be exchanged over a TLS session that never came up, so
+      // close it here rather than leaving that to whoever happens to drop the last
+      // reference to this object. Every deriving class except SMTPClientConnection
+      // implements OnHandshakeFailed as an empty body, so until now a failed
+      // handshake armed no read, sent nothing and closed nothing: the socket and
+      // its session slot were held for as long as anything still pointed at the
+      // connection - for inbound SMTP that is the reverse-DNS prefetch task, whose
+      // whole reason for existing is that the lookup can block for seconds - and
+      // otherwise until the idle timeout. Enqueued rather than closed outright so
+      // it goes through the same ordering as any other disconnect; on the
+      // AsyncHandshakeCompleted path it is processed by the ProcessOperationQueue_
+      // call that follows the pop.
+      EnqueueDisconnect();
    }
 
 
