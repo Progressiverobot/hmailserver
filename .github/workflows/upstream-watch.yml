@@ -36,7 +36,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout this fork (full history)
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
@@ -135,9 +135,35 @@ jobs:
             gh issue comment "${existing}" --body "${BODY}"
             echo "Updated tracking issue #${existing}."
           else
-            gh label create upstream --description "Upstream drift tracking" --color ededed 2>/dev/null || true
-            gh issue create --title "${title}" --label upstream --body "${BODY}"
-            echo "Opened a new tracking issue."
+            # The label is decoration; the list of un-triaged upstream commits is the
+            # entire point of this workflow. So the issue is created WITHOUT the label
+            # and labelled afterwards on a best-effort basis.
+            #
+            # It is written this way because the other way round lost a whole report.
+            # The first run of this workflow computed all 21 missing commits correctly
+            # and then died on its last line with "could not add label: 'upstream' not
+            # found": label creation was attempted as `... 2>/dev/null || true`, which
+            # discarded the reason it failed, and then `gh issue create --label upstream`
+            # was allowed to depend on it anyway. Under `set -e` that took the run to
+            # exit 1 with no issue and no comment - the fork silently stopped watching
+            # upstream, and the only evidence was a red tick on a scheduled workflow
+            # nobody was watching either.
+            #
+            # Two rules come out of that and both are load-bearing here. Never suppress
+            # the error from a command whose success you then rely on. And never let a
+            # cosmetic step fail a job that has already produced the valuable thing.
+            if ! gh label create upstream --description "Upstream drift tracking" --color ededed; then
+              echo "Note: could not create the 'upstream' label (it may already exist)."
+            fi
+
+            number=$(gh issue create --title "${title}" --body "${BODY}" \
+              | grep -oE '[0-9]+$' | tail -1)
+            echo "Opened tracking issue #${number:-(number not parsed)}."
+
+            if [ -n "${number}" ]; then
+              gh issue edit "${number}" --add-label upstream \
+                || echo "Note: issue #${number} was opened but could not be labelled."
+            fi
           fi
 
       - name: Report a clean result
