@@ -70,14 +70,30 @@ namespace HM
       long lNoOfLeftBrack = sString.NumberOf(_T("["));
       long lNoOfRightBrack = sString.NumberOf(_T("]"));
 
+      // The partial specifier "<start.size>" was checked nowhere at all. An item
+      // carrying an opening angle bracket and no closing one - "BODY[]<0.100 UID" -
+      // passed this function (the round and square bracket counts balance) and
+      // reached ParseString_, which could not find the ">", rewrote the string to
+      // itself and continued: the parse loop then spun on the same input forever.
+      // That pins an io_service worker thread at 100% CPU for the life of the
+      // process, one thread per command, and any authenticated user can send it.
+      // See the matching guard in ParseString_, which is what actually guarantees
+      // termination; this rejects the input before it gets that far, which is the
+      // answer RFC 3501 asks for (BAD for an unparseable data item).
+      long lNoOfLeftAngle = sString.NumberOf(_T("<"));
+      long lNoOfRightAngle = sString.NumberOf(_T(">"));
+
       if (lNoOfLeftBrack != lNoOfRightBrack)
          return IMAPResult(IMAPResult::ResultBad, "Brackets are mismatching.");
-         
+
       if (lNoOfLeftPar != lNoOfRightPar)
          return IMAPResult(IMAPResult::ResultBad, "Parenthesises are mismatching.");
 
+      if (lNoOfLeftAngle != lNoOfRightAngle)
+         return IMAPResult(IMAPResult::ResultBad, "Angle brackets are mismatching.");
+
       return IMAPResult();
-    
+
    }
 
    std::vector<String>
@@ -102,8 +118,36 @@ namespace HM
             if (sString.SafeGetAt(lFirstRightBracket + 1) == '<')
                lFirstRightBracket = sString.Find(_T(">"), lFirstRightBracket);
 
+            // THE LOOP HAD NO WAY TO END.
+            //
+            // Both Find calls above answer -1 when they fail, and the single test
+            // that followed was "lFirstRightBracket <= 0", which handled -1 with
+            // "sString = sString.Mid(-1 + 1)" - Mid(0), the same string back - and
+            // then "continue"d past the CleanFetchString_ at the bottom of the loop.
+            // Nothing had been consumed and nothing had changed, so the next pass
+            // computed the same indices and did the same thing, forever.
+            //
+            // Two inputs reach it, both from one authenticated FETCH:
+            //   1 (BODY[]<0.100 UID)   - the "<" is never closed, so the ">" search
+            //                            fails. ValidateSyntax_ now refuses this.
+            //   1 (]BODY[ UID)         - the "]" sits before the "[", so the "]"
+            //                            search from the "[" fails. The bracket
+            //                            counts balance, so this one is syntactically
+            //                            acceptable as far as validation goes and
+            //                            must be terminated here.
+            //
+            // -1 means there is no closing bracket anywhere in what remains, so
+            // there is no further item to extract: stop rather than spin. Position 0
+            // keeps its old handling - Mid(1) does consume a character, so that case
+            // always made progress.
+            if (lFirstRightBracket < 0)
+            {
+               sString.Empty();
+               break;
+            }
+
             // Parse out string between brackets.
-            if (lFirstRightBracket <= 0)
+            if (lFirstRightBracket == 0)
             {
                sString = sString.Mid(lFirstRightBracket + 1);
                continue;
@@ -349,27 +393,69 @@ namespace HM
          int iStart = lBodyEnd+3;
          int iEnd = sNewName.Find(_T(">"), iStart);
 
-         String sPartial = sNewName.Mid(iStart, iEnd - iStart);
-         int iDotPos = sPartial.Find(_T("."));
-         
-         oPart.octet_start_ = _ttoi(sPartial.Mid(0, iDotPos));
-         oPart.octet_count_ = _ttoi(sPartial.Mid(iDotPos+1));
+         if (iEnd < 0)
+         {
+            // No closing ">". Every calculation below used to go wrong at once for
+            // this: Mid(iStart, negative) gave an empty range string, the range
+            // silently became <0.0>, and the description was rebuilt as everything
+            // before the "<" plus Mid(0) - the WHOLE original item appended to
+            // itself, so the untagged FETCH response carried a part identifier with
+            // unbalanced brackets in it. A client parsing that is worse off than one
+            // given no data.
+            //
+            // ParseCommand refuses this input before it reaches here now, so this is
+            // a floor rather than a live path: drop the unterminated range, keep the
+            // section, and answer as an ordinary non-partial fetch.
+            oPart.SetDescription(sNewName.Mid(0, iStart - 1));
+         }
+         else
+         {
+            String sPartial = sNewName.Mid(iStart, iEnd - iStart);
+            int iDotPos = sPartial.Find(_T("."));
 
-         // A malformed range (negative start/size, e.g. "<-5.10>" or "<0.-1>")
-         // must not reach the byte math as a negative int. Normalize to 0 here;
-         // GetBytesToSend_ clamps the rest.
-         if (oPart.octet_start_ < 0)
-            oPart.octet_start_ = 0;
-         if (oPart.octet_count_ < 0)
-            oPart.octet_count_ = 0;
+            if (iDotPos >= 0)
+            {
+               oPart.octet_start_ = _ttoi(sPartial.Mid(0, iDotPos));
+               oPart.octet_count_ = _ttoi(sPartial.Mid(iDotPos+1));
+            }
+            else
+            {
+               // "<start>" with no ".size". RFC 3501 spells the REQUEST form
+               // "<" number "." nz-number ">", so this is not valid on the way in -
+               // but it is exactly the form the server uses in its own RESPONSE
+               // ("BODY[]<1024> {n}"), and clients do echo that back.
+               //
+               // It used to parse as start 0 with a count of the whole value,
+               // because iDotPos was -1: Mid(0, -1) is the empty string and
+               // Mid(-1 + 1) is the whole of it. So a client asking for the message
+               // from octet 1024 onwards was handed the FIRST 1024 octets, labelled
+               // "<0>" - the wrong region of the message, silently, which is the
+               // failure this file has now been reported for three times.
+               //
+               // Read it as the origin with no length limit. 0x7FFFFFFF rather than
+               // a negative sentinel because the normalization just below turns any
+               // negative count into 0; GetBytesToSend_ clamps this to whatever
+               // actually remains after the origin.
+               oPart.octet_start_ = _ttoi(sPartial);
+               oPart.octet_count_ = 0x7FFFFFFF;
+            }
 
-         // Remove the octets part from the description.
-         String sBefore = sNewName.Mid(0, iStart - 1);
-         String sAfter = sNewName.Mid(iEnd + 1);
+            // A malformed range (negative start/size, e.g. "<-5.10>" or "<0.-1>")
+            // must not reach the byte math as a negative int. Normalize to 0 here;
+            // GetBytesToSend_ clamps the rest.
+            if (oPart.octet_start_ < 0)
+               oPart.octet_start_ = 0;
+            if (oPart.octet_count_ < 0)
+               oPart.octet_count_ = 0;
 
-         String sDescWithoutOctets = sBefore + sAfter;
+            // Remove the octets part from the description.
+            String sBefore = sNewName.Mid(0, iStart - 1);
+            String sAfter = sNewName.Mid(iEnd + 1);
 
-         oPart.SetDescription(sDescWithoutOctets);
+            String sDescWithoutOctets = sBefore + sAfter;
+
+            oPart.SetDescription(sDescWithoutOctets);
+         }
       }
 
       // Extract the body  part.

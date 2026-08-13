@@ -52,7 +52,29 @@ namespace HM
       {
          parser_ = std::shared_ptr<IMAPFetchParser>(new IMAPFetchParser());
          String sTemp = pArgument->Command();
-         parser_->ParseCommand(sTemp);
+
+         // The result of this parse was discarded, and it is the only thing that
+         // reads the FETCH data items. So a command whose items do not parse -
+         // mismatched brackets, an unterminated "<start.size>" - was answered
+         // "* n FETCH ()" followed by "OK FETCH completed": the client is told its
+         // command succeeded and handed nothing, which is the worst of the three
+         // available answers, and it is the answer that makes ValidateSyntax_
+         // pointless. RFC 3501 asks for BAD here.
+         //
+         // DoForMails stops on a non-OK result, so this is reported once for the
+         // command rather than once per message in the range, and it is reported
+         // before any part of the untagged response has been written.
+         IMAPResult parseResult = parser_->ParseCommand(sTemp);
+
+         if (parseResult.GetResult() != IMAPResult::ResultOK)
+         {
+            // The parser is built for the first message only and reused for the
+            // rest of the range. Do not keep one built from input that did not
+            // parse.
+            parser_.reset();
+
+            return parseResult;
+         }
       }
 
       // RFC 7162 (CONDSTORE): with a CHANGEDSINCE modifier, only return messages whose
@@ -499,10 +521,25 @@ namespace HM
          int iSize = FileUtilities::FileSize(messageFileName);
          GetBytesToSend_(iSize, oPart, iByteStart, iByteCount);
 
-         BYTE *pBuf = new BYTE[iByteCount];
-         FileUtilities::ReadFileToBuf(messageFileName, pBuf, iByteStart, iByteCount);
-         pOutBuf->Add(pBuf, iByteCount);
-         delete [] pBuf;
+         // This is the path every chunked client takes: BODY[]<start.count> is what
+         // Apple Mail and Thunderbird use to pull a message down in pieces, and it
+         // is the only body form served from the file rather than from the parsed
+         // MIME tree.
+         //
+         // The buffer was a raw new[] with the delete[] after the call.
+         // ReadFileToBuf throws if the file cannot be opened, and since the seek
+         // result stopped being discarded it also throws if the seek to iByteStart
+         // fails - so either throw leaked the whole allocation, which for a
+         // non-partial BODY[] is the entire message.
+         if (iByteCount > 0)
+         {
+            const size_t bufferSize = (size_t) iByteCount;
+            std::vector<BYTE> buffer(bufferSize);
+
+            FileUtilities::ReadFileToBuf(messageFileName, &buffer[0], iByteStart, iByteCount);
+
+            pOutBuf->Add(&buffer[0], iByteCount);
+         }
       }
       else if (oPart.GetShowBodyHeaderFields())
       {
