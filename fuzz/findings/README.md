@@ -27,7 +27,23 @@ endings the way it does elsewhere in the repository.
 Current findings
 ----------------
 
-### mime_decode_fuzzer/out-of-memory-mimeunicodeencoder-encodevalue
+**None.** Both findings so far were fixed in the commit that recorded them, so both
+reproducers went straight to `fuzz\regression\`. The directory is kept because the
+next one will not necessarily be that quick, and because the rule about where an
+unfixed reproducer may and may not live is worth writing down once rather than
+rediscovering under pressure.
+
+Fixed, and now replayed on every run from `fuzz\regression\`:
+
+* `mime_message_fuzzer/new-delete-type-mismatch-mimecodebase-nonvirtual-dtor` -
+  `MimeCodeBase` had virtual `Encode`/`Decode` and no virtual destructor while six
+  sites deleted derived coders through the base pointer. The reproducer is an
+  unmodified seed, so it was live for ordinary mail.
+* `mime_decode_fuzzer/out-of-memory-mimeunicodeencoder-encodevalue` - the entry
+  below, kept for the record because the reachability question it raises is still
+  worth reading.
+
+### mime_decode_fuzzer/out-of-memory-mimeunicodeencoder-encodevalue  (FIXED)
 
 `libFuzzer: out-of-memory` reached through
 
@@ -53,3 +69,20 @@ of unknown severity, not a vulnerability.
 
 Do not "fix" this by raising the RSS limit in `run-fuzz.ps1`. The limit is what
 found it.
+
+**Fixed 13 August 2026, and the cause was not in the encoder's buffer handling at
+all - it was arithmetic.** `MAX_ENCODEDWORD_LEN` is 75, and both encoders computed
+their per-line budget as `75 - charset_length - 7`. A charset name of 69 characters
+or more makes that zero or negative, and then in `QEncode` the "line is full" test
+is true on every single byte, so each input byte emitted a complete `=?<charset>?Q?`
+header - output growing as input x charset, which is the six-hundred-thousand-to-one
+amplification. `BEncode` was worse: its block size went non-positive, so it encoded
+nothing per iteration while still appending a header, and never terminated at all.
+The only thing standing there was an `ASSERT`, which the shipped Release build
+compiles out - the reason this harness has a separate `-Asserts` mode.
+
+Both now fall back to the raw encoder when no legal encoded word is possible. That
+is not a workaround: no real charset name approaches 69 characters, and no encoded
+word built from one would be decodable by any client, so emitting the value as-is
+conveys strictly more than emitting a stream nothing can read. The reproducer that
+took 2 GB now runs in 1 ms.

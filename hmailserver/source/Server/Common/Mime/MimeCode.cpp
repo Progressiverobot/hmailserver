@@ -619,7 +619,25 @@ namespace HM
 	   int nCharsetLen = (int)charset_.size();
 	   int nMaxBlockSize = MAX_ENCODEDWORD_LEN - nCharsetLen - 7;	// a single encoded-word cannot exceed 75 bytes
 	   nMaxBlockSize = nMaxBlockSize / 4 * 3;
-	   ASSERT(nMaxBlockSize > 0);
+
+	   // The same over-long-charset case QEncode guards, and here it is worse than
+	   // amplification. MAX_ENCODEDWORD_LEN is 75, so a charset of 69 characters or
+	   // more makes nMaxBlockSize zero or negative; the loop below then encodes zero
+	   // bytes per iteration while appending a fresh encoded-word header each time,
+	   // so processedBytes never reaches input_size_ and it does not terminate at
+	   // all.
+	   //
+	   // The ASSERT that used to be the only thing standing here is compiled out of
+	   // the shipped Release build - which is precisely why the fuzz harness has a
+	   // separate -Asserts mode - so in production it was no protection whatsoever.
+	   // Fall back to the raw encoder for the same reasons set out in QEncode: no
+	   // legal encoded word can be built from such a charset, so the value is worth
+	   // more emitted as-is than as a stream no client can decode.
+	   if (nMaxBlockSize < 3)
+	   {
+		   MimeCodeBase::Encode(output);
+		   return;
+	   }
 
 	   size_t processedBytes = 0;
 
@@ -686,6 +704,34 @@ namespace HM
 
       int nCodeLen, nCharsetLen = (int)charset_.size();
 	   int nLineLen = 0, nMaxLine = MAX_ENCODEDWORD_LEN - nCharsetLen - 7;
+
+	   // A charset name long enough to leave no room is refused rather than
+	   // encoded, because the loop below has no bound of its own.
+	   //
+	   // MAX_ENCODEDWORD_LEN is 75, so a charset of 69 characters or more makes
+	   // nMaxLine zero or negative, and then `nLineLen + nCodeLen > nMaxLine` is
+	   // true on the very first byte and on every byte after it. Each iteration
+	   // therefore emits a complete encoded-word header - "=?" plus the whole
+	   // charset plus "?Q?" - for a single encoded character, so the output grows as
+	   // input_size x charset_length with nothing to stop it. The MIME fuzz harness
+	   // reached 2 GB of resident memory from a 3.4 KB input this way: an
+	   // amplification of roughly six hundred thousand to one.
+	   //
+	   // Falling back to MimeCodeBase::Encode is the honest answer, not a
+	   // workaround. No such charset exists - the longest real name is around
+	   // thirty characters - and no encoded word built from one could be legal
+	   // under RFC 2047 or decodable by any client, so emitting the value raw
+	   // conveys strictly more than emitting a stream of unusable headers. It is
+	   // also what FieldCodeBase::Encode already does when it has no charset to
+	   // work with, so the behaviour is not new.
+	   //
+	   // 3 is the minimum that guarantees progress: it is the width of one
+	   // "=XX" escape, so a byte can always be placed without re-opening a header.
+	   if (nMaxLine < 3)
+	   {
+		   MimeCodeBase::Encode(output);
+		   return;
+	   }
 
 	   while (pbData < pbEnd)
 	   {
