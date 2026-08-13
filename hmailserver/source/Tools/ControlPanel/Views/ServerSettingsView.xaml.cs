@@ -644,6 +644,15 @@ namespace hMailServer.ControlPanel.Views
             panel.Children.Add(btn);
             panel.Children.Add(result_);
             SetAid(btn, "action-" + Slug(ButtonText));
+
+            // Blurb was silently dropped on this row type too - the same omission that
+            // was found and fixed on the checkbox row. Every ComAction until now
+            // happened to have no Blurb, so nothing was visibly missing; the first one
+            // that needed a caption (the log folder path) would have set it and got
+            // nothing. Annotate also attaches the text to the button as accessible
+            // help, which is where a caption about what the button will do belongs.
+            Annotate(btn, panel);
+
             return panel;
          }
 
@@ -1318,6 +1327,62 @@ namespace hMailServer.ControlPanel.Views
             IniStore = iniStore_
          });
          logging.Cards.Add(retention);
+
+         // The classic Administrator's Logging pane showed the log directory and gave
+         // you a button to open it. The Control Panel had neither, so the first
+         // question anybody asks on this page - "where are these files?" - could only
+         // be answered by opening hMailServer.INI by hand, and the live-logs page
+         // shows contents rather than a location.
+         //
+         // The path is read rather than assumed, and the blurb says so when it cannot
+         // be: the Control Panel can be run from a different machine to the server, in
+         // which case there is no INI to read and a button that opened "the log folder"
+         // would open the wrong machine's idea of one.
+         string logFolder = iniStore_ != null && iniStore_.IsAvailable
+            ? iniStore_.GetLogFolder()
+            : null;
+
+         var logFiles = Card("Log files",
+            "Where the server writes the logs configured above.");
+
+         logFiles.Settings.Add(new ComAction
+         {
+            Label = "Log folder",
+            ButtonText = "Open log folder",
+            Blurb = string.IsNullOrWhiteSpace(logFolder)
+               ? "Read from [Directories] LogFolder in hMailServer.INI, which is not readable from this machine - " +
+                 "the Control Panel is running somewhere other than the server."
+               : logFolder,
+            Action = () => OpenLogFolder(logFolder)
+         });
+
+         logging.Cards.Add(logFiles);
+      }
+
+      /// <summary>
+      /// Opens the log folder in Explorer, and says why it could not rather than
+      /// failing silently - the two ordinary reasons are a Control Panel running away
+      /// from the server, and a LogFolder that names a directory which is not there.
+      /// </summary>
+      private static (bool ok, string text) OpenLogFolder(string path)
+      {
+         if (string.IsNullOrWhiteSpace(path))
+            return (false, "No log folder could be read from hMailServer.INI on this machine.");
+
+         if (!System.IO.Directory.Exists(path))
+            return (false, "The configured log folder does not exist on this machine: " + path);
+
+         try
+         {
+            using var process = System.Diagnostics.Process.Start(
+               new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
+
+            return (true, "Opened " + path);
+         }
+         catch (Exception ex)
+         {
+            return (false, "Could not open the folder: " + ex.Message);
+         }
       }
 
       private void BuildPerformance()
