@@ -58,7 +58,21 @@ namespace HM
          return IMAPResult(IMAPResult::ResultNo, "That mailbox does not exist.");
 
       pFolder->SetIsSubscribed(true);
-      PersistentIMAPFolder::SaveObject(pFolder);
+
+      // Unchecked, so a failed save still answered "OK Subscribe completed" and the
+      // client had every reason to believe the subscription would be there next time.
+      // The in-memory flag is put back as well, so LIST and LSUB in this same session
+      // report what is actually stored rather than what was attempted.
+      //
+      // No error record here: the DAL has already reported the underlying SQL failure,
+      // and unlike the delivery paths there is somebody to tell - the client asked for
+      // this and is getting an answer.
+      if (!PersistentIMAPFolder::SaveObject(pFolder))
+      {
+         pFolder->SetIsSubscribed(false);
+         return IMAPResult(IMAPResult::ResultNo, "The subscription could not be saved.");
+      }
+
       String sResponse = pArgument->Tag() + " OK Subscribe completed\r\n";
       pConnection->SendAsciiData(sResponse);   
 

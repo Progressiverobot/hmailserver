@@ -183,7 +183,24 @@ namespace HM
 
          if (filter(index, message))
          {
-            PersistentMessage::DeleteObject(message);
+            // This is what an IMAP EXPUNGE runs, and the delete was unchecked while
+            // the erase below happened regardless - so a message the database refused
+            // to delete was still removed from the collection, the client was sent an
+            // untagged EXPUNGE for it, and every message after it renumbered. It comes
+            // back at the next reconnect, in a mailbox whose numbering the client
+            // believes it already knows.
+            //
+            // Left in place on failure instead, so the sequence numbers the client is
+            // given match the mailbox that actually exists.
+            if (!PersistentMessage::DeleteObject(message))
+            {
+               ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6107, "Messages::DeleteMessages",
+                  Formatter::Format("Message {0} could not be deleted, so it has been kept rather than reported to the client as expunged.", message->GetID()));
+
+               iterMessage++;
+               continue;
+            }
+
             iterMessage = vecObjects.erase(iterMessage);
             index--;
          }

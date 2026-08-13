@@ -31,8 +31,21 @@ namespace HM
    // Remove old records from the greylist
    //---------------------------------------------------------------------------()
    {
-      PersistentSecurityRange::DeleteExpired();
-      
+      // This is what un-bans an address once its auto-ban expires, and its result was
+      // discarded - the mirror image of the auto-ban save that was also unchecked.
+      // A failure here does not fail open, it fails *closed* and stays that way: the
+      // expired range keeps matching, so the address is refused indefinitely, and
+      // "I can't connect and the server says nothing" is a support call nobody can
+      // answer from the logs. The task runs again on its own schedule, so one failure
+      // corrects itself; being told about it is what turns a permanent-looking ban
+      // into a transient one.
+      if (!PersistentSecurityRange::DeleteExpired())
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6112, "RemoveExpiredRecords::DoWork",
+            "Expired IP ranges could not be removed. Any auto-ban that has run out will keep blocking the address until this succeeds on a later run.");
+      }
+
+
       if (Configuration::Instance()->GetAutoBanLogonEnabled())
       {
          int logonFailureMinutes = Configuration::Instance()->GetMaxLogonAttemptsWithin();

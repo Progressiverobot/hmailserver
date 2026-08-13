@@ -128,7 +128,18 @@ namespace HM
       pSecurityRange->SetUpperIP(ipaddress);
       pSecurityRange->SetExpires(true);
       pSecurityRange->SetExpiresTime(dt);
-      PersistentSecurityRange::SaveObject(pSecurityRange);
+
+      // Auto-ban is a security control, and this is the line that applies it. Its
+      // result was discarded, so a failure here meant the range was never created,
+      // the address was never blocked, and nothing anywhere said so - the control
+      // failed open and silently, which is the combination that makes a control
+      // worth nothing. There is no caller to return to and nobody to tell but the
+      // administrator, so it is reported.
+      if (!PersistentSecurityRange::SaveObject(pSecurityRange))
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 6099, "AccountLogon::CreateIPRange",
+            "The auto-ban IP range '" + pSecurityRange->GetName() + "' could not be saved, so the address has NOT been blocked despite reaching the failed-logon limit.");
+      }
 
 
    }      

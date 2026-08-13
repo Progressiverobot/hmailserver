@@ -70,23 +70,48 @@ namespace HM
       // clear-text state to another.
       ClearPasswordUpgradePending_(iID);
 
+      // Everything from here to the delete of the account row itself is a cascade with
+      // no transaction around it, and every step of it discarded its result. It has to
+      // carry on after a failure - stopping half way leaves more behind, not less -
+      // but "carry on" and "say nothing" are different decisions, and only the first
+      // of them was ever made. What is collected instead is a list of what survived,
+      // reported once at the end, because an orphan row belonging to an account that
+      // no longer exists is something nothing else in the system will ever mention
+      // again.
+      std::vector<String> orphans;
+
       // Delete messages connected to this account.
-      DeleteMessages(pAccount);
+      if (!DeleteMessages(pAccount))
+         orphans.push_back(_T("its messages"));
 
       // Force delete the inbox as well. DeleteMessages above does not delete it.
       std::shared_ptr<IMAPFolder> inbox = pAccount->GetFolders()->GetFolderByName("Inbox");
       if (inbox)
-         PersistentIMAPFolder::DeleteObject(inbox, true);
+      {
+         if (!PersistentIMAPFolder::DeleteObject(inbox, true))
+            orphans.push_back(_T("its inbox"));
+      }
 
-      pAccount->GetRules()->DeleteAll();
+      if (!pAccount->GetRules()->DeleteAll())
+         orphans.push_back(_T("its rules"));
 
-      // Delete fetch accounts connected to this account.
+      // Delete fetch accounts connected to this account. This one returns void, so
+      // there is nothing to check - noted rather than silently skipped.
       PersistentFetchAccount::DeleteByAccountID(iID);
 
       // Delete references from groups...
-      PersistentGroupMember::DeleteByAccount(iID);
+      if (!PersistentGroupMember::DeleteByAccount(iID))
+         orphans.push_back(_T("its group memberships"));
 
-      PersistentACLPermission::DeleteOwnedByAccount(iID);
+      if (!PersistentACLPermission::DeleteOwnedByAccount(iID))
+         orphans.push_back(_T("the folder permissions it granted"));
+
+      if (!orphans.empty())
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6109, "PersistentAccount::DeleteObject",
+            Formatter::Format("Account {0} is being deleted but {1} could not be, and will be left behind referring to an account that no longer exists.",
+               iID, StringParser::JoinVector(orphans, _T(", "))));
+      }
 
       SQLCommand deleteCommand("delete from hm_accounts where accountid = @ACCOUNTID");
       deleteCommand.AddParameter("@ACCOUNTID", iID);
@@ -425,7 +450,21 @@ namespace HM
          {
             if (!CreateInbox(*pAccount))
             {
-               PersistentAccount::DeleteObject(pAccount);
+               // Two things were wrong here, and the smaller one is the unchecked
+               // delete. The larger is that bRetVal was left true: the account row had
+               // inserted successfully, so this function reported that the account was
+               // created even though the rollback below had just removed it - or, when
+               // the rollback failed too, even though what was left was an account with
+               // no inbox, which authenticates perfectly well and can never be
+               // delivered to.
+               if (!PersistentAccount::DeleteObject(pAccount))
+               {
+                  ErrorManager::Instance()->ReportError(ErrorManager::High, 6108, "PersistentAccount::SaveObject",
+                     Formatter::Format("The inbox for account {0} could not be created and the account could not be removed again, so an account now exists that cannot receive mail. It should be deleted by hand.",
+                        pAccount->GetAddress()));
+               }
+
+               bRetVal = false;
             }
          }
       }

@@ -43,7 +43,19 @@ namespace HM
 
          if (pRoute->GetAddress().CompareNoCase(sAddress) == 0)
          {
-            PersistentRouteAddress::DeleteObject(pRoute);
+            // Unchecked, while the erase happened regardless - so an address the
+            // database would not delete disappeared from the route in memory and came
+            // back at the next refresh. A route address decides which recipients a
+            // route accepts, so the two views disagreeing changes what the server does
+            // with mail. Kept in place on failure so they do not.
+            if (!PersistentRouteAddress::DeleteObject(pRoute))
+            {
+               ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6110, "RouteAddresses::DeleteByAddress",
+                  "The route address '" + sAddress + "' could not be deleted and is still in effect.");
+
+               return;
+            }
+
             vecObjects.erase(iterRoute);
             return;
          }

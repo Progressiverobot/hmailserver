@@ -220,7 +220,21 @@ namespace HM
          return;
       }
 
-      PersistentMessage::SaveObject(reportMessage);
+      // Unchecked, and the log line below ran either way - so a failed save wrote
+      // "Sent aggregate TLS report for <domain>" for a report that was never queued,
+      // and left its file behind. The report is the evidence a recipient domain uses
+      // to see that its own TLS policy is working, so silently not sending one while
+      // recording that it was sent is the wrong way round for a reporting feature.
+      if (!PersistentMessage::SaveObject(reportMessage))
+      {
+         FileUtilities::DeleteFile(fileName);
+
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6111, "TlsRptReporterTask::SendReportForDomain_",
+            "TLSRPT: the aggregate TLS report for " + domain + " could not be saved and has NOT been sent.");
+
+         return;
+      }
+
       Application::Instance()->SubmitPendingEmail();
 
       LOG_APPLICATION("TLSRPT: Sent aggregate TLS report for " + domain + " covering " + String(dayKey) + ".");

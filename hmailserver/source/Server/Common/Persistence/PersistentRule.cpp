@@ -111,23 +111,62 @@ namespace HM
       if (bRetVal && bNewObject)
          pRule->SetID((int) iDBID);
 
+      // This was not checked before the criteria and actions were saved beneath it,
+      // so a new rule whose own insert failed left GetID() at 0 and every criterion
+      // and action below was written against ruleid 0 - rows belonging to no rule,
+      // which nothing ever reads and nothing ever cleans up.
+      if (!bRetVal)
+         return false;
+
       // Save criterias.
+      //
+      // The whole function writes ruleactive = 0 above and sets it back at the end,
+      // which is the right shape: a rule is not live while it is half written. What
+      // it did not do was check any of the parts before reactivating, and the
+      // consequence is specific rather than general. Criteria are combined with AND
+      // or OR, and under AND every criterion is a *restriction* - so a rule that was
+      // meant to read "delete if from X and the subject contains Y" and lost the
+      // second criterion becomes "delete if from X", which is a strictly broader rule
+      // than the administrator wrote, applied to live mail, with the tool still
+      // displaying the criterion that is not there.
+      //
+      // A rule with no criteria at all is inert - ApplyRule_ leaves bDoActions false -
+      // so the empty case was never the danger. The partial case was.
+      bool allPartsSaved = true;
+
       __int64 iRuleID = pRule->GetID();
       std::shared_ptr<RuleCriterias> pRuleCriterias = pRule->GetCriterias();
       for (int i = 0; i < pRuleCriterias->GetCount(); i++)
       {
          std::shared_ptr<RuleCriteria> pRuleCriteria = pRuleCriterias->GetItem(i);
          pRuleCriteria->SetRuleID(iRuleID);
-         PersistentRuleCriteria::SaveObject(pRuleCriteria);
+
+         if (!PersistentRuleCriteria::SaveObject(pRuleCriteria))
+            allPartsSaved = false;
       }
-      
+
       // Save actions
       std::shared_ptr<RuleActions> pRuleActions = pRule->GetActions();
       for (int i = 0; i < pRuleActions->GetCount(); i++)
       {
          std::shared_ptr<RuleAction> pRuleAction = pRuleActions->GetItem(i);
          pRuleAction->SetRuleID(iRuleID);
-         PersistentRuleAction::SaveObject(pRuleAction);
+
+         if (!PersistentRuleAction::SaveObject(pRuleAction))
+            allPartsSaved = false;
+      }
+
+      // Leaving it inactive is the safe half of the choice, and it is not a silent
+      // one: the rule is still there to be looked at and saved again once the
+      // database is working. A rule that does not run is a nuisance; a rule that runs
+      // with half its conditions is a rule doing something nobody asked for.
+      if (!allPartsSaved)
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 6101, "PersistentRule::SaveObject",
+            Formatter::Format("Rule {0} was saved but some of its criteria or actions were not, so it has been left INACTIVE rather than run with conditions the administrator did not write. Correct the database problem and save the rule again.",
+               pRule->GetName()));
+
+         return false;
       }
 
       // Set the rule to active again.

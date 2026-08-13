@@ -398,7 +398,15 @@ namespace HM
       else
       {
          // Create the inbox...
-         PersistentAccount::CreateInbox(*this);
+         //
+         // Unchecked, under a function that then returned true - so an account
+         // restored from a backup that carried no folders could come back without an
+         // inbox and be reported as restored. It authenticates, it appears in the
+         // administration tool, and it can never be delivered to. The branch above
+         // fails the restore when the folders it does have cannot be loaded; this is
+         // the same thing for the account that has none.
+         if (!PersistentAccount::CreateInbox(*this))
+            return false;
       }
 
       return true;

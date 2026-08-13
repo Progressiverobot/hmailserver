@@ -58,9 +58,41 @@
 
 namespace HM
 {
+   namespace
+   {
+      // Every delete of the queue row in DeliverMessage went unchecked, and a queue
+      // row that survives is not a tidiness problem. The delivery manager selects
+      // rows out of hm_messages, so one that is still there is picked up on the next
+      // pass and delivered again - and again after that, for as long as the delete
+      // keeps failing.
+      //
+      // Which of the four it is decides how bad that is. The delete after a
+      // successful delivery turns into duplicate mail arriving repeatedly in every
+      // recipient's mailbox, and no amount of looking at the server explains it. The
+      // three on the abort paths mean a message that was rejected is reconsidered
+      // instead of dropped, which is milder but still an unbounded retry.
+      //
+      // Nothing here can undo the delivery that already happened, so the response is
+      // to say so, once, with enough detail to act on.
+      void DeleteQueuedMessageOrReport(std::shared_ptr<Message> message, const String &consequence)
+      {
+         // Read first. DeleteObject resets the id on the way out, and although it does
+         // so only after the statement has succeeded, an error message that depends on
+         // that ordering is one refactor away from reporting message 0.
+         const __int64 messageId = message->GetID();
+
+         if (PersistentMessage::DeleteObject(message))
+            return;
+
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 6104, "SMTPDeliverer::DeliverMessage",
+            Formatter::Format("Message {0} could not be removed from the delivery queue. {1}",
+               messageId, consequence));
+      }
+   }
+
    SMTPDeliverer::SMTPDeliverer()
    {
-      
+
    }
 
    SMTPDeliverer::~SMTPDeliverer()
@@ -92,7 +124,7 @@ namespace HM
       if (!FileUtilities::Exists(messageFileName))
       {
          ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5006, "SMTPDeliverer::DeliverMessage()", "Message " + StringParser::IntToString(pMessage->GetID()) + " could not be delivered since the data file does not exist.");
-         PersistentMessage::DeleteObject(pMessage);
+         DeleteQueuedMessageOrReport(pMessage, "Its data file is missing, so it will be reconsidered for delivery on every pass until the row is removed.");
          return;
       }
 
@@ -101,7 +133,7 @@ namespace HM
          // No remaining recipients.
          ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5007, "SMTPDeliverer::DeliverMessage()", "Message " + StringParser::IntToString(pMessage->GetID()) + " could not be delivered. No remaining recipients. File: " + messageFileName);
 
-         PersistentMessage::DeleteObject(pMessage);
+         DeleteQueuedMessageOrReport(pMessage, "It has no remaining recipients, so it will be reconsidered for delivery on every pass until the row is removed.");
          return;
       }
 
@@ -130,7 +162,7 @@ namespace HM
          otelDelivery.AddEvent("delivery.aborted");
          otelDelivery.SetOk(false);
          LogAwstatsMessageRejected_(sSendersIP, pMessage, preprocessingFailureReason);
-         PersistentMessage::DeleteObject(pMessage);
+         DeleteQueuedMessageOrReport(pMessage, "It was rejected during preprocessing, so it will be reconsidered on every pass until the row is removed.");
          return;
       }
 
@@ -190,7 +222,7 @@ namespace HM
             return;
          }
 
-         PersistentMessage::DeleteObject(pMessage);   
+         DeleteQueuedMessageOrReport(pMessage, "It has already been DELIVERED, so it will be delivered again on the next pass - recipients will receive duplicates until the row is removed.");
       }
 
       String logText;

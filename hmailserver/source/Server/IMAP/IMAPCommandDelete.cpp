@@ -48,7 +48,13 @@ namespace HM
       if (!pConnection->CheckPermission(pFolder, ACLPermission::PermissionDeleteMailbox))
          return IMAPResult(IMAPResult::ResultNo, "ACL: DeleteMailbox permission denied (required for DELETE).");
       
-      PersistentIMAPFolder::DeleteObject(pFolder);
+      // Unchecked, and RemoveFolder_ below then took the folder out of the session's
+      // view of the mailbox regardless - so a delete the database refused looked like
+      // a successful DELETE until the next reconnect brought the folder back, with the
+      // messages in it. Refused instead, before anything is removed in memory, so what
+      // the client sees and what is stored do not disagree.
+      if (!PersistentIMAPFolder::DeleteObject(pFolder))
+         return IMAPResult(IMAPResult::ResultNo, "The folder could not be deleted.");
 
       RemoveFolder_(pFolder, pConnection);
 

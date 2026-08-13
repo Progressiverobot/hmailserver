@@ -102,7 +102,25 @@ namespace HM
             if (UpdateDomainName_(address,oldDomainName, newDomainName))
             {
                recipient->SetAddress(address);
-               PersistentDistributionListRecipient::SaveObject(recipient);
+
+               // Unchecked, while the list itself below is checked and fails the whole
+               // rename - so the one asymmetry in this function was the one that leaves
+               // a distribution list pointing at members in a domain that no longer
+               // exists. Mail to the list then bounces for exactly those members, and
+               // the rename that caused it completed successfully hours earlier.
+               //
+               // Failing the rename is right here rather than reporting and carrying
+               // on: NameChanger's callers already treat false as "this rename did not
+               // happen", and a half-renamed domain is the state worth avoiding.
+               if (!PersistentDistributionListRecipient::SaveObject(recipient))
+               {
+                  // errorMessage is the out-parameter every other failure in this
+                  // function fills in, and it is what the caller shows.
+                  errorMessage = "The domain could not be renamed because the member '" + address +
+                     "' of distribution list '" + pList->GetAddress() + "' could not be updated.";
+
+                  return false;
+               }
             }
          }
 

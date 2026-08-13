@@ -106,7 +106,17 @@ namespace HM
          }
 
          // Delete this recipient from the database and memory.
-         PersistentMessageRecipient::DeleteObject(pRecipient);
+         //
+         // Unchecked, while the erase below happened either way - so the row could
+         // outlive the collection that knows about it. On its own that is an orphan
+         // row; combined with a queue delete that also fails it is the message coming
+         // back with this recipient still attached and being delivered to them twice.
+         if (!PersistentMessageRecipient::DeleteObject(pRecipient))
+         {
+            ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6106, "LocalDelivery::Perform",
+               Formatter::Format("Message {0} was delivered locally to {1} but that recipient could not be removed from the database.",
+                  original_message_->GetID(), pRecipient->GetAddress()));
+         }
 
          iterRecipient = vecRecipients.erase(iterRecipient);
       }

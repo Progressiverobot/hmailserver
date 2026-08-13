@@ -1218,7 +1218,20 @@ namespace HM
          port->SetSSLCertificateID((int) certificate->GetID());
 
          String errorMessage;
-         PersistentTCPIPPort::SaveObject(port, errorMessage, PersistenceModeNormal);
+
+         // The save was unchecked and the log line below ran either way, so a failure
+         // here wrote "Assigned the certificate to port N" into the application log for
+         // a port that still had no certificate - and the renewal that follows restarts
+         // the TCP servers, which is exactly when someone reads this log to confirm the
+         // new certificate went live. A port left without one accepts no TLS at all.
+         if (!PersistentTCPIPPort::SaveObject(port, errorMessage, PersistenceModeNormal))
+         {
+            ErrorManager::Instance()->ReportError(ErrorManager::High, 6100, "AcmeClient::ApplyCertificate_",
+               Formatter::Format("ACME: the certificate could NOT be assigned to port {0} - it has been left without one and will not accept TLS connections. {1}",
+                  port->GetPortNumber(), errorMessage));
+
+            continue;
+         }
 
          String message;
          message.Format(_T("ACME: Assigned the certificate to port %d (no certificate was configured)."), port->GetPortNumber());

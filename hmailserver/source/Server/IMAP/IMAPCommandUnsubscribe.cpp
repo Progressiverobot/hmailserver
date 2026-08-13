@@ -41,9 +41,17 @@ namespace HM
       if (pFolder)
       {
          pFolder->SetIsSubscribed(false);
-         PersistentIMAPFolder::SaveObject(pFolder);
+
+         // As in SUBSCRIBE: answering OK for a change that was not stored is the one
+         // thing a client cannot recover from, because it will not ask again.
+         if (!PersistentIMAPFolder::SaveObject(pFolder))
+         {
+            pFolder->SetIsSubscribed(true);
+            return IMAPResult(IMAPResult::ResultNo, "The unsubscription could not be saved.");
+         }
       }
-         
+
+
       String sResponse = pArgument->Tag() + " OK Unsubscribe completed\r\n";
       pConnection->SendAsciiData(sResponse);   
 

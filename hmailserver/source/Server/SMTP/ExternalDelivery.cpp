@@ -658,7 +658,18 @@ namespace HM
             AWStats::LogDeliverySuccess(_sendersIP, serverHostName, original_message_, recipient->GetAddress());
 
             // Delete this recipient from the database.
-            PersistentMessageRecipient::DeleteObject(recipient);
+            //
+            // Unchecked, and a recipient row that survives is what decides whether the
+            // message is rescheduled - so this address is delivered to again on the
+            // next pass, and again after that. Duplicate mail arriving repeatedly, to
+            // one recipient of a message that went out correctly to the others, is
+            // close to undiagnosable from the outside.
+            if (!PersistentMessageRecipient::DeleteObject(recipient))
+            {
+               ErrorManager::Instance()->ReportError(ErrorManager::High, 6105, "ExternalDelivery::Perform",
+                  Formatter::Format("Message {0} was delivered to {1} but that recipient could not be removed from the database, so it will be delivered to them again.",
+                     original_message_->GetID(), recipient->GetAddress()));
+            }
          }
          else if (recipient->GetDeliveryResult() == MessageRecipient::ResultNonFatalError)
          {
@@ -685,8 +696,14 @@ namespace HM
                saErrorMessages.push_back(sSingleErrorMsg);
             }
 
-            // Delete this recipient from the database.
-            PersistentMessageRecipient::DeleteObject(recipient);
+            // Delete this recipient from the database. As above: a row that survives
+            // is retried, so a permanent failure would be retried and bounced again.
+            if (!PersistentMessageRecipient::DeleteObject(recipient))
+            {
+               ErrorManager::Instance()->ReportError(ErrorManager::High, 6105, "ExternalDelivery::Perform",
+                  Formatter::Format("Delivery of message {0} to {1} failed permanently, but that recipient could not be removed from the database, so the attempt and its bounce will be repeated.",
+                     original_message_->GetID(), recipient->GetAddress()));
+            }
 
             AWStats::LogDeliveryFailure(_sendersIP, original_message_->GetFromAddress(), recipient->GetAddress(),  550);
             Events::FireOnDeliveryFailed(original_message_, _sendersIP, recipient->GetAddress(), recipient->GetErrorMessage());

@@ -123,7 +123,22 @@ namespace HM
          }
       }
 
-      PersistentIMAPFolder::SaveObject(pFolderToRename);
+      // Unchecked, so a failed save still answered "OK Rename completed" for a folder
+      // that still has its old name in the database.
+      //
+      // The in-memory re-parenting above is not unwound here, unlike the SUBSCRIBE and
+      // UNSUBSCRIBE cases where putting a single flag back is exact. Reversing a move
+      // between folder containers correctly is not, and getting it half right would
+      // leave the session's folder tree in a state no reconnect produces. Telling the
+      // client NO is the part that matters - it will not treat the rename as done -
+      // and the next refresh reads the tree back from the database.
+      if (!PersistentIMAPFolder::SaveObject(pFolderToRename))
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 6098, "IMAPCommandRENAME::ExecuteCommand",
+            "A folder rename could not be saved and has been refused. The folder tree held by this connection may show the new name until the client reconnects.");
+
+         return IMAPResult(IMAPResult::ResultNo, "The folder could not be renamed.");
+      }
 
       String sResponse = pArgument->Tag() + " OK Rename completed\r\n";
 
