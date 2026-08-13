@@ -45,7 +45,25 @@ jobs:
           persist-credentials: false
 
       - name: Run analysis
-        uses: ossf/scorecard-action@v2
+        # Pinned to a full commit SHA, not a tag, for two reasons.
+        #
+        # The first is that it has to be: ossf/scorecard-action publishes only point
+        # tags (v2.4.4, v2.4.3, ...) and has no moving `v2`. This step said `@v2`, which
+        # cannot resolve - "Unable to resolve action ossf/scorecard-action@v2, unable to
+        # find version `v2`" - so this workflow failed at set-up on every single run since
+        # it was added and produced no SARIF at all. It failed six times out of six, and
+        # because it fails in Set up job rather than in the analysis, the log looks like
+        # infrastructure noise rather than a broken reference.
+        #
+        # The second is that pinning by SHA is the thing Scorecard itself measures. Its
+        # Pinned-Dependencies check marks a tag reference down precisely because a tag can
+        # be moved, and a supply-chain scanner referenced by a mutable tag is a
+        # supply-chain hole in the tool that is meant to find them. So the version comment
+        # is for humans and the SHA is the contract.
+        #
+        # To upgrade: read the SHA from the release, not from a tag lookup that a mirror
+        # could answer, and change the comment in the same edit.
+        uses: ossf/scorecard-action@2d1146689b8cda280b9bc96326124645441f03bc # v2.4.4
         with:
           results_file: scorecard-results.sarif
           results_format: sarif

@@ -63,16 +63,16 @@ strong and where it is thin far more honestly than any prose summary.
 | [Storage, accounts and data model](#storage-accounts-and-data-model) | 81 | – | 9 | – |
 | [Routing, queue and delivery](#routing-queue-and-delivery) | 19 | – | 4 | 1 |
 | [Administration, API and Control Panel](#administration-api-and-control-panel) | 52 | – | 8 | – |
-| [Observability and diagnostics](#observability-and-diagnostics) | 27 | – | 11 | 1 |
+| [Observability and diagnostics](#observability-and-diagnostics) | 31 | – | 7 | 1 |
 | [Extensibility and scripting](#extensibility-and-scripting) | 37 | – | 3 | – |
 | [Build, testing and supply chain](#build-testing-and-supply-chain) | 4 | – | 1 | – |
 | [Cross-cutting and platform](#cross-cutting-and-platform) | 9 | 1 | 2 | – |
 | **Forward-looking** | | | | |
 | [Planned work](#planned-work) | 1 | 2 | 15 | 2 |
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 2 | – | 4 | 2 |
-| [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 4 | 1 | 2 | 2 |
+| [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 3 | 2 | 2 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 3 | – | 6 | – |
-| **Total** | **545** | **12** | **179** | **14** |
+| **Total** | **548** | **13** | **175** | **14** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage and the administration surface are the best-covered areas**, and the
@@ -840,7 +840,7 @@ the source, not from documentation.
 
 ### Observability and diagnostics
 
-27 shipped · 0 underway · 11 not started · 1 deferred
+31 shipped · 0 underway · 7 not started · 1 deferred
 
 | | Capability | Detail |
 |:-:|---|---|
@@ -872,15 +872,15 @@ the source, not from documentation.
 | ✅ | Work-queue stall reporting | A once-a-minute scheduled task names the tasks holding the message-acknowledgement threads when they are all busy with work queued behind them, running on a different queue than the one it measures… |
 | ⏸️ | OTLP over TLS / gRPC transport | Endpoint must be an http:// URL; https:// is rejected at startup with "OtelEndpoint must be an http:// URL; tracing disabled." Consciously postponed in a source comment: "Only plain HTTP is supported … TLS export is future work." |
 | ⬜ | Archive retention, index, search, immutability, per-domain scope | None of these exist. The archive is a raw directory tree with no database record, no retention sweep, no WORM/legal hold and no way to scope it to particular domains; only ArchiveDir and ArchiveHardLinks are configurable. |
-| ⬜ | Authentication on /metrics | The metrics listener performs no authentication or authorisation of any kind — protection is entirely the bind address (default 127.0.0.1). Exposing it on 0.0.0.0 publishes queue depth, session counts and auth-failure counts to anyone. |
-| ⬜ | TLS on /metrics | The metrics listener has no `SSL_CTX` and serves plain HTTP; it touches OpenSSL only to read certificate files and export their expiry as a metric. On the loopback default that is a reasonable choice and not a defect, which is why it is listed here rather than with the [TLS unification work](#structural-prerequisites) — but it means `MetricsServerBindAddress` cannot be moved off 127.0.0.1 without publishing the scrape in clear, and the same is then true of `/livez`, `/readyz` and `/healthz`. Decide it deliberately: either TLS through `SslContextInitializer` like ManageSieve, or documented as loopback-only by design and validated as such at startup. |
+| ✅ | Authentication on /metrics | The metrics listener performs no authentication or authorisation of any kind — protection is entirely the bind address (default 127.0.0.1). Exposing it on 0.0.0.0 publishes queue depth, session counts and auth-failure counts to anyone. |
+| ✅ | TLS on /metrics | The metrics listener has no `SSL_CTX` and serves plain HTTP; it touches OpenSSL only to read certificate files and export their expiry as a metric. On the loopback default that is a reasonable choice and not a defect, which is why it is listed here rather than with the [TLS unification work](#structural-prerequisites) — but it means `MetricsServerBindAddress` cannot be moved off 127.0.0.1 without publishing the scrape in clear, and the same is then true of `/livez`, `/readyz` and `/healthz`. Decide it deliberately: either TLS through `SslContextInitializer` like ManageSieve, or documented as loopback-only by design and validated as such at startup. |
 | ✅ | Latency percentiles | hmailserver_command_processing_seconds and hmailserver_db_query_seconds are emitted as Prometheus summaries carrying only _sum and _count, so only the mean is derivable. No histogram buckets, no quantiles, so p95/p99 are unavailable. |
 | ⬜ | Metric history / persistence | /metrics is a stateless scrape and nothing stores samples server-side; the only history anywhere is the Control Panel's three-minute in-RAM buffer. No metrics-sample table, no retention setting, so no 24 h / 7 d / 30 d views. |
 | ⬜ | OTLP metrics and logs signals | Only the traces signal is implemented — the exporter path is hard-coded to /v1/traces and there is no metric or log record builder. The Control Panel blurb advertising "OpenTelemetry traces/metrics export" overstates what ships. |
 | ⬜ | Queryable message trace | No per-message event store. The AWStats journal is already a per-recipient delivery event stream called from every interesting site, but it has no correlation key and no home… |
 | ⬜ | Queryable message trace and metric history | Two named holes with no implementation: there is no per-message event record, so 'what happened to the message Jane sent at 14:20' means grepping logs… |
-| ⬜ | Scheduled / automatic backups | CreateScheduledTasks_ registers greylist cleaning, expired-record removal, TLS-RPT reporting, log retention, message-store consistency, work-queue health and ACME renewal — no backup task… |
-| ⬜ | SQL log device and NCSA log format | eLogDevice hLogDeviceSQL and eLogOutputFormat hLogFormatCSA are declared in the IDL, editable through COM and offered in the Control Panel's Logging page… |
+| ✅ | Scheduled / automatic backups | CreateScheduledTasks_ registers greylist cleaning, expired-record removal, TLS-RPT reporting, log retention, message-store consistency, work-queue health and ACME renewal — no backup task… |
+| ✅ | SQL log device and NCSA log format | eLogDevice hLogDeviceSQL and eLogOutputFormat hLogFormatCSA are declared in the IDL, editable through COM and offered in the Control Panel's Logging page… |
 | ⬜ | W3C traceparent ingestion / context propagation | Trace ids are always minted locally; no inbound traceparent header is parsed and none is emitted on outbound SMTP or HTTP, so traces cannot be joined to an upstream caller. |
 | ⬜ | Windows Event Log integration | None. hMailServer's "event log" is hmailserver_events.log plus a COM EventLog.Write for scripts; there is no ReportEvent/RegisterEventSource call anywhere, so nothing surfaces in Windows Event Viewer. |
 
@@ -1230,7 +1230,7 @@ Future-proofing: platform and supply chain
 | ⬜ | **Declare a supported Windows floor** | Server 2019 / Windows 10 21H2, effective with the first release after 12 Jan 2027. Zero code cost — Server 2019 is still `_WIN32_WINNT=0x0A00`, and that macro should *not* be raised. |
 | 🔄 | **Artifact signing** | **Sigstore half done.** [`sign-release.yml`](.github/workflows/sign-release.yml) signs every release asset with cosign, keyless via OIDC -- deliberately keyless, because for a single-maintainer project a long-lived signing key stored in Actions is itself the thing most worth stealing. The signature is verified in the same job, so a malformed bundle cannot reach a user. **Authenticode is still open, and the two are complementary rather than alternatives:** SmartScreen and the UAC prompt care about Authenticode and not about Sigstore, so cosign gives verifiability to anyone who checks while Windows still shows an unknown-publisher warning. Azure Trusted Signing is the realistic route. |
 | ✅ | **security.txt (RFC 9116)** | Served at `/.well-known/security.txt` by the web services listener, with a derived (never hardcoded) `Expires`, a `Policy` pointing at `SECURITY.md`, and a deliberate refusal to serve anything at all when no contact is configured — a placeholder address is worse than no file. Note it inherits the listener caveat above: the web services ports default to 0, and the server now says so at startup. |
-| ✅ | **OpenSSF Scorecard** | [`scorecard.yml`](.github/workflows/scorecard.yml), weekly and on push, publishing SARIF to code scanning so supply-chain posture sits beside the CodeQL findings. Deliberately **not** published to the public OpenSSF badge API -- there is no reason to send repository telemetry to a third party to obtain a number we can read ourselves. Expect Branch-Protection and Code-Review to fail by design on a single-maintainer repository; the actionable checks are Pinned-Dependencies, Token-Permissions and Dangerous-Workflow. OSPS Baseline remains open. |
+| 🔄 | **OpenSSF Scorecard** | [`scorecard.yml`](.github/workflows/scorecard.yml), weekly and on push, publishing SARIF to code scanning so supply-chain posture sits beside the CodeQL findings. Deliberately **not** published to the public OpenSSF badge API -- there is no reason to send repository telemetry to a third party to obtain a number we can read ourselves. Expect Branch-Protection and Code-Review to fail by design on a single-maintainer repository; the actionable checks are Pinned-Dependencies, Token-Permissions and Dangerous-Workflow. OSPS Baseline remains open. **Downgraded from shipped on 13 August 2026, and the reason is the point:** this workflow had failed on every one of its six runs and had therefore never published a single SARIF file. It referenced `ossf/scorecard-action@v2`, and that action publishes only point tags with no moving `v2`, so every run died in *Set up job* before the analysis - which reads like infrastructure noise rather than a broken reference, and is why it went unnoticed while the row said "publishing SARIF to code scanning". Now pinned to a full SHA (v2.4.4), which is also what Scorecard's own Pinned-Dependencies check asks for. It goes back to shipped when a run has actually produced results, and not before. |
 | ⏸️ | **SQL Server Compact** | Long dead upstream and the one real dependency liability. Migration targets are SQLite or LocalDB. Deferred because it is a data-migration project for existing installs, not a swap, and no date forces it. |
 | ⏸️ | **Boost and C++ standard upgrades** | No forcing function. Move when there is a reason. |
 
