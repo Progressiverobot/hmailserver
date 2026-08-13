@@ -1,6 +1,7 @@
 using System;
 using System.Windows;
 using System.Windows.Media;
+using Microsoft.Win32;          // SystemEvents, for the High Contrast switch
 using Wpf.Ui.Appearance;
 
 namespace hMailServer.ControlPanel.Services

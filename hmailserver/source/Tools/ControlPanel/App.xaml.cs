@@ -46,7 +46,16 @@ namespace hMailServer.ControlPanel
             LogException(ex);
       }
 
-      private static string LogException(Exception ex)
+      /// <summary>
+      ///    Writes an exception to the Control Panel's own log and returns the path.
+      ///
+      ///    Internal rather than private because ThemeTokens needs it: it invokes theme
+      ///    subscribers one at a time so that a chart card which throws cannot cost the
+      ///    others their restyle, and a swallowed exception with nowhere to go is how a
+      ///    card silently keeps the wrong palette. This is the only log the Control
+      ///    Panel has, so widening it by one assembly is better than a second one.
+      /// </summary>
+      internal static string LogException(Exception ex)
       {
          try
          {

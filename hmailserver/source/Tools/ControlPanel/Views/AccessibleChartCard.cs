@@ -71,6 +71,10 @@ namespace hMailServer.ControlPanel.Views
       private readonly ObservableCollection<ObservableValue>[] plotted_;
       private readonly List<DateTime> times_ = new();
 
+      // Held so Push can keep the axis title honest as the window fills. Rebuilt on
+      // every theme change, which is why it is assigned rather than created once.
+      private Axis xAxis_;
+
       /// <summary>Legend value labels, in series order, updated in place on refresh.</summary>
       private readonly List<TextBlock> legendValues_ = new();
 
@@ -140,10 +144,40 @@ namespace hMailServer.ControlPanel.Views
          while (times_.Count > historyLength_)
             times_.RemoveAt(0);
 
+         // The window described on the X axis grows while the buffer fills and then
+         // stays put, so it is refreshed here rather than only when the theme changes -
+         // otherwise it would read "collecting" for the life of the window.
+         if (xAxis_ != null)
+            xAxis_.Name = WindowDescription_();
+
          UpdateSummary_();
 
          if (tableVisible_)
             PrependNewestRow_();
+      }
+
+      /// <summary>
+      ///    How much time the plot currently covers, in words, for the X axis title.
+      ///
+      ///    Derived from the timestamps that were actually pushed, so it cannot drift
+      ///    from the sampling interval the way a hardcoded "last 3 minutes" would. Says
+      ///    "collecting" rather than "last 0 minutes" while the buffer fills, because a
+      ///    chart with two samples in it is not showing a window yet.
+      /// </summary>
+      private string WindowDescription_()
+      {
+         if (times_.Count < 2)
+            return "collecting";
+
+         TimeSpan span = times_[times_.Count - 1] - times_[0];
+
+         if (span.TotalSeconds < 90)
+            return "last " + Math.Max(1, (int) Math.Round(span.TotalSeconds)) + " seconds";
+
+         if (span.TotalMinutes < 90)
+            return "last " + Math.Max(1, (int) Math.Round(span.TotalMinutes)) + " minutes";
+
+         return "last " + Math.Max(1, (int) Math.Round(span.TotalHours)) + " hours";
       }
 
       /// <summary>Switches between the chart and the table view.</summary>
@@ -361,7 +395,31 @@ namespace hMailServer.ControlPanel.Views
             series[i] = MakeSeries_(styles_[i], plotted_[i], chrome.LineSmoothness);
 
          chart_.Series = series;
-         chart_.XAxes = new[] { new Axis { IsVisible = false } };
+
+         // The X axis is visible, and it says how much time is on screen.
+         //
+         // It used to be IsVisible = false, which left the reader unable to tell
+         // whether they were looking at three minutes or three hours - and the answer
+         // changes what a flat line or a spike means entirely. Per-tick timestamps are
+         // deliberately not drawn: the samples are an index-based collection, so a tick
+         // label would be a computed guess at when each point was taken, and the table
+         // view already carries the exact times for anyone who needs them.
+         //
+         // The window is measured from the timestamps actually pushed rather than
+         // hardcoded, so it stays true if the sampling interval changes - and reads
+         // "collecting" until there is enough history to describe.
+         xAxis_ = new Axis
+         {
+            IsVisible = true,
+            Name = WindowDescription_(),
+            NamePaint = axisPaint,
+            NameTextSize = 11,
+            LabelsPaint = null,
+            SeparatorsPaint = gridPaint,
+            TicksPaint = null
+         };
+
+         chart_.XAxes = new[] { xAxis_ };
          chart_.YAxes = new[]
          {
             new Axis
