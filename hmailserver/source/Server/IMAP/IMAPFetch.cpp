@@ -1116,8 +1116,24 @@ namespace HM
       {
          pMimeBody = std::shared_ptr<MimeBody>(new MimeBody);
 
+         // A failed load leaves an EMPTY MimeBody and the fetch then answers the client
+         // from it: a message that renders as blank, with an OK response, which the
+         // client caches and stops asking for. The result was discarded, so that was
+         // entirely silent. Throwing routes it into the catch below, which reports
+         // HM5062 naming the file.
+         //
+         // Be clear about what this does NOT do: ReportCriticalError_ says in its own
+         // comment that it "reports an error to the ERROR log and then throws an
+         // exception", and it does not throw - so this function still returns the empty
+         // body afterwards and the client still gets the blank message. What changes is
+         // that it is now on the record instead of invisible. Making that function throw
+         // as documented changes the failure semantics of every FETCH and wants a test of
+         // its own; it is written up against the ignored-return-values row.
          if (bLoadFullMail)
-            pMimeBody->LoadFromFile(fileName);
+         {
+            if (pMimeBody->LoadFromFile(fileName) != MimeLoadResult::Loaded)
+               throw std::runtime_error(Formatter::FormatAsAnsi("The message file {0} could not be read.", fileName));
+         }
          else
          {
             // We should only load the header.

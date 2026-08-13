@@ -801,7 +801,16 @@ namespace HM
             _T(") --- [IGNORE-ERRORS]"));
 
          statements.push_back(
-            _T("ALTER TABLE hm_log ADD CONSTRAINT hm_log_pk PRIMARY KEY CLUSTERED (logid) --- [IGNORE-ERRORS]"));
+            // NONCLUSTERED, matching every constraint in CreateTablesMSSQL.sql - which is
+            // the script SQL CE actually runs, per DatabaseSettings::GetDefaultScript.
+            // This said CLUSTERED, which SQL CE does not accept. The one CLUSTERED form in
+            // that script is a CREATE CLUSTERED INDEX, and SQLScriptParser::PreprocessLine_
+            // strips the word out before SQL CE ever sees it; these statements do not go
+            // through that parser, so it reached the provider verbatim and the statement
+            // failed. It failed INVISIBLY, because the line carries [IGNORE-ERRORS] - so
+            // on the installer's default backend the SQL log device has been running
+            // without a primary key on hm_log for as long as this has been here.
+            _T("ALTER TABLE hm_log ADD CONSTRAINT hm_log_pk PRIMARY KEY NONCLUSTERED (logid) --- [IGNORE-ERRORS]"));
 
          statements.push_back(
             _T("CREATE INDEX idx_hm_log_logtime ON hm_log (logtime) --- [IGNORE-ERRORS]"));

@@ -179,9 +179,22 @@ namespace HM
          }
       }
 
-      // Append output to the file
+      // Append output to the file.
+      //
+      // The result was discarded, and this file becomes the message: a failed or short
+      // write left total_result_bytes_written_ counting bytes that are not on disk, so
+      // the length check below could be satisfied by a file that is truncated, and
+      // SpamAssassin's rewritten message would replace the original minus whatever did
+      // not get written. Aborting keeps the original message, which is what the two
+      // other failure paths in this function already do.
       size_t written_bytes = 0;
-      result_->Write(pBuf, written_bytes);
+
+      if (!result_->Write(pBuf, written_bytes))
+      {
+         LOG_DEBUG("SA: the response could not be written to disk; keeping the original message.");
+         AbortResponse_();
+         return;
+      }
 
       total_result_bytes_written_ += written_bytes;
 

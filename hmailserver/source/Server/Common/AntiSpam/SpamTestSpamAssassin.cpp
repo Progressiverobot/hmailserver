@@ -141,7 +141,7 @@ namespace HM
          // The Return-Path header was added above to help SpamAssassin with its SPF checks.
          // We should remove it again to restore the headers to original state (except for any added by SA).
          pMessageData->DeleteField("Return-Path");
-         pMessageData->Write(sFilename);
+         pMessageData->WriteReported(sFilename, "The removal of the Return-Path header added for SpamAssassin's SPF checks");
       }
       else
       {

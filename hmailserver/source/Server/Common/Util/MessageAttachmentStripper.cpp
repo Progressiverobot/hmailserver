@@ -32,9 +32,20 @@ namespace HM
    {
       const String fileName = PersistentMessage::GetFileName(pMessage);
 
-      // Read message, extract attachments, 
+      // Read message, extract attachments.
+      //
+      // The result was discarded, and this function goes on to REWRITE the message from
+      // what it read. A message it could not read parses as no parts, FindFirstPart
+      // returns nothing and it returns below without touching the file - so the outcome
+      // was accidentally safe rather than deliberately so, and it depended on
+      // FindFirstPart's behaviour rather than on the load having worked. Say so instead.
       MimeBody oMimeMessage;
-      oMimeMessage.LoadFromFile(fileName);
+
+      if (oMimeMessage.LoadFromFile(fileName) != MimeLoadResult::Loaded)
+      {
+         LOG_APPLICATION(Formatter::Format("The message {0} could not be read, so its attachments have not been stripped. The message has been left exactly as it was.", fileName));
+         return;
+      }
 
       // Assume first part is the text to keep.
       std::shared_ptr<MimeBody> pBody = oMimeMessage.FindFirstPart();

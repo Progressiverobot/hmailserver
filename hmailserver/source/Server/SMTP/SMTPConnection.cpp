@@ -1727,7 +1727,7 @@ namespace HM
       SetMessageSignature_(pMsgData);
 
       if (pMsgData)
-         pMsgData->Write(PersistentMessage::GetFileName(current_message_));
+         pMsgData->WriteReported(PersistentMessage::GetFileName(current_message_), "The message signature");
 
       // RFC 2369 / RFC 2919 List-* headers for postings to local distribution lists.
       //

@@ -15,7 +15,10 @@ namespace HM
    
       void Wait();
 
-      void WaitFor(boost::chrono::milliseconds milliseconds);
+      // True if the event was set, false if the wait timed out. Existing callers use
+      // this as a sleep with a wake-up and ignore the answer, which is why it was void;
+      // a caller bounding a wait needs to know which of the two happened.
+      bool WaitFor(boost::chrono::milliseconds milliseconds);
 
       void Set();
 

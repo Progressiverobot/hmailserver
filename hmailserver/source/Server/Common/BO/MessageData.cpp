@@ -832,7 +832,29 @@ namespace HM
       return true;
    }
 
-   bool 
+   bool
+   MessageData::WriteReported(const String &fileName, const String &description)
+   //---------------------------------------------------------------------------
+   // DESCRIPTION:
+   // Write, reporting the failure rather than discarding it. See the header.
+   //
+   // LOG_APPLICATION and not ReportError: Write has already reported the cause at
+   // High with the specific reason (6010 or 6011), and a second ERROR record for
+   // the same event would say nothing new while doubling the chance of tripping a
+   // fixture that asserts a clean error log. What is added here is the thing Write
+   // cannot know - which piece of work has silently not been done.
+   //---------------------------------------------------------------------------
+   {
+      if (Write(fileName))
+         return true;
+
+      LOG_APPLICATION(Formatter::Format("{0} could not be written to {1}. The message has been left as it was and delivery has continued, so that change is not present in it.",
+                                        description, fileName));
+
+      return false;
+   }
+
+   bool
    MessageData::GetHasBodyType(const String &sBodyType)
    {
       std::shared_ptr<MimeBody> pPart = FindPart(sBodyType);      
@@ -964,7 +986,7 @@ namespace HM
       String fileName = PersistentMessage::GetFileName(account, pMessage);
 
       // Write it
-      pMsgData->Write(fileName);
+      pMsgData->WriteReported(fileName, "The self-test message");
       
 
       // Save it

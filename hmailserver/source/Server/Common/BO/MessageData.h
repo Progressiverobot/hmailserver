@@ -71,6 +71,18 @@ namespace HM
 
       bool Write(const String &fileName);
 
+      // Write, and report it if it fails, naming what the caller was trying to write.
+      //
+      // Twelve call sites across rules, forwarding, vacation, virus notification, the
+      // SpamAssassin pass and the attachment stripper discarded Write's result. That was
+      // survivable while a failed Write still produced a file - it produced the WRONG
+      // file, a message with no body, which is the defect Write now refuses to commit.
+      // Refusing made those twelve quieter rather than correct: the header, the trace
+      // line, the vacation body simply does not get written and delivery carries on as
+      // though it had. None of them can do anything useful about the failure, so this
+      // exists to make sure none of them can hide it either.
+      bool WriteReported(const String &fileName, const String &description);
+
       int GetSize() const;
 
       std::shared_ptr<Attachments> GetAttachments();

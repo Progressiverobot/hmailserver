@@ -30,7 +30,16 @@ namespace HM
    void
    Attachment::SaveAs(const String &sSaveTo) const
    {
-      attachment_->WriteToFile(sSaveTo);
+      // Reached from COM (IInterfaceAttachment::SaveAs), where the caller is a script
+      // or an administration tool that has just been told the save worked. The result
+      // was discarded and the method is void, so a failed write - a full disk, a path
+      // that cannot be created, a body that could not be read back - looked exactly
+      // like a successful one and the script carried on to the next attachment.
+      if (!attachment_->WriteToFile(sSaveTo))
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6003, "Attachment::SaveAs",
+            Formatter::Format("The attachment could not be written to {0}. The caller has not been told, because this method cannot report it; the file is either missing or incomplete.", sSaveTo));
+      }
    }
 
    String 

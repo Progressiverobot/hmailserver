@@ -595,9 +595,14 @@ namespace HM
          break;
       }
 
+      // Both Write results below are checked through ReportWriteFailure_. They cannot be
+      // reported the ordinary way: LOG_APPLICATION and ErrorManager both end up back
+      // here, so a disk that has stopped accepting writes would recurse through the
+      // thing that just failed. See ReportWriteFailure_.
       if (writeUnicode)
       {
-         file->Write(sData);
+         if (!file->Write(sData))
+            ReportWriteFailure_(file->GetName());
       }
       else
       {
@@ -616,11 +621,50 @@ namespace HM
             sAnsiString = sData.Mid(0, max_log_line_len_ - 30) + " ... " + sData.Mid(iDataLenTmp - 25);
             // We keep 25 of end which includes crlf but need to account for middle ... too
 
-         file->Write(sAnsiString);
+         if (!file->Write(sAnsiString))
+            ReportWriteFailure_(file->GetName());
       }
 
       if (!keepFileOpen)
          file->Close();
+   }
+
+   void
+   Logger::ReportWriteFailure_(const String &fileName)
+   //---------------------------------------------------------------------------
+   // DESCRIPTION:
+   // A log line could not be written to disk.
+   //
+   // This is the one failure in the server that cannot be logged. LOG_APPLICATION
+   // comes straight back here, and ErrorManager::ReportError writes the error log
+   // through this same function - so on a full or failing disk, which is precisely
+   // when this fires, the report would re-enter the thing that just failed and do
+   // it once per line.
+   //
+   // So it goes to the debugger and the Windows event log, once per process. Once,
+   // because the condition is not transient and per-line reporting would itself be
+   // the flood; and to the event log because that is the one sink that is not this
+   // one. The result used to be discarded entirely, which meant a mail server whose
+   // audit trail had silently stopped looked exactly like a quiet one.
+   //---------------------------------------------------------------------------
+   {
+      static boost::once_flag reported = BOOST_ONCE_INIT;
+
+      boost::call_once(reported, [&fileName]()
+      {
+         String message = Formatter::Format("hMailServer could not write to its log file {0}. Logging has stopped, or is incomplete, from this point. This is reported once per run and cannot be written to the log itself.", fileName);
+
+         OutputDebugString(message);
+
+         HANDLE eventSource = RegisterEventSource(NULL, _T("hMailServer"));
+
+         if (eventSource != NULL)
+         {
+            LPCTSTR strings[1] = { message.c_str() };
+            ReportEvent(eventSource, EVENTLOG_ERROR_TYPE, 0, 0, NULL, 1, 0, strings, NULL);
+            DeregisterEventSource(eventSource);
+         }
+      });
    }
 
 

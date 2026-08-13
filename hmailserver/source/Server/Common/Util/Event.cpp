@@ -34,18 +34,30 @@ namespace HM
       is_set_ = false;
    }
 
-   void 
+   bool
    Event::WaitFor(boost::chrono::milliseconds milliseconds)
+   //---------------------------------------------------------------------------
+   // DESCRIPTION:
+   // Waits until the event is set or the time runs out. Answers true if it was
+   // set, false if it timed out.
+   //
+   // The answer used to be thrown away - the old comment here said "result will be
+   // false if there's a timeout" beside a call whose result nothing read - so a
+   // caller could not bound a wait and then find out whether the thing it was
+   // waiting for had actually happened. That is the whole value of a bounded wait.
+   //
+   // The predicate form also fixes a second, quieter bug: a bare wait_for returns
+   // on a spurious wakeup as well as on a signal, and the old code then set
+   // is_set_ = false and carried on as though the event had fired.
+   //---------------------------------------------------------------------------
    {
       boost::mutex::scoped_lock lock(mutex_);
 
-      if (!is_set_)
-      {
-         // result will be false if there's a timeout.
-         set_condition_.wait_for(lock, milliseconds);
-      }
-     
+      const bool signalled = set_condition_.wait_for(lock, milliseconds, [this] { return is_set_; });
+
       is_set_ = false;
+
+      return signalled;
    }
 
    void 

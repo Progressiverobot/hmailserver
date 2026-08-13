@@ -215,9 +215,26 @@ namespace HM
       }
 
 
-      // Read message, extract attachments, 
+      // Read message, extract attachments,
       std::shared_ptr<MimeBody> pMimeBody = std::shared_ptr<MimeBody>(new MimeBody);
-      pMimeBody->LoadFromFile(sLongFilename);
+
+      // The result used to be discarded, and a message that could not be parsed then
+      // produced an EMPTY attachment list - so this second pass silently scanned
+      // nothing and the message was reported clean by it. The whole file has already
+      // been scanned above, so this is not "delivered unscanned"; what is lost is the
+      // per-attachment pass, which is the one that matters for a scanner that does not
+      // decode MIME itself. Reported rather than made fatal: refusing the message on a
+      // transient file lock would turn a degraded scan into rejected mail.
+      const MimeLoadResult loadResult = pMimeBody->LoadFromFile(sLongFilename);
+
+      if (loadResult != MimeLoadResult::Loaded)
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6001, "VirusScanner::Scan",
+            Formatter::Format("The message {0} could not be parsed for per-attachment virus scanning, so only the whole message file was scanned. Any attachment the scanner cannot decode by itself has therefore not been examined separately.",
+               sLongFilename));
+
+         return false;
+      }
 
       std::list<std::shared_ptr<MimeBody> > oList;
       pMimeBody->GetAttachmentList(pMimeBody, oList);
@@ -230,7 +247,20 @@ namespace HM
          
          // Create a temporary filename.
          sLongFilename.Format(_T("%s\\%s.tmp"), IniFileSettings::Instance()->GetTempDirectory().c_str(), GUIDCreator::GetGUID().c_str());
-         pBody->WriteToFile(sLongFilename);
+
+         // Likewise discarded before this. A failed write leaves the temp file missing
+         // or empty and ScanFile_ then scans that - and reports it clean, which is the
+         // scanner agreeing that nothing is wrong with a file it never saw.
+         if (!pBody->WriteToFile(sLongFilename))
+         {
+            ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6002, "VirusScanner::Scan",
+               Formatter::Format("An attachment of {0} could not be written to {1} for scanning, so it has not been examined. The rest of the message has been.",
+                  PersistentMessage::GetFileName(pMessage), sLongFilename));
+
+            FileUtilities::DeleteFile(sLongFilename);
+            iter++;
+            continue;
+         }
 
          VirusScanningResult result = ScanFile_(sLongFilename);
          if (result.GetVirusFound())
@@ -305,8 +335,8 @@ namespace HM
 
       if (changes_made)
       {
-         message_data->Write(file_name);
-            
+         message_data->WriteReported(file_name, "The removal of virus-bearing attachments");
+
          // Update the size of the message.
          message->SetSize(FileUtilities::FileSize(file_name));
       }

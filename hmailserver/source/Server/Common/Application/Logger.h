@@ -199,6 +199,10 @@ namespace HM
 
       void LogLive_(String &sMessage);
       void WriteData_(const String &sData, LogType = Normal);
+
+      // A log line that could not be written cannot be reported through the log. Once
+      // per process, to the debugger and the Windows event log. See the definition.
+      void ReportWriteFailure_(const String &fileName);
    
       String log_dir_;
       String GetCurrentTime();

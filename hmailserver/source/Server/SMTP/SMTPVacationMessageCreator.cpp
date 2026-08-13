@@ -109,8 +109,11 @@ namespace HM
 	  pNewMsgData->SetAutoReplied();
       pNewMsgData->IncreaseRuleLoopCount();
       
-      // Write message data
-      pNewMsgData->Write(newFileName);
+      // Write message data. First write of a message built from nothing - see the
+      // equivalent in SMTPDeliverer. No out-of-office reply is better than one queued
+      // with no file behind it.
+      if (!pNewMsgData->WriteReported(newFileName, "An out-of-office reply"))
+         return;
 
       // Add recipients.
       bool recipientOK = false;

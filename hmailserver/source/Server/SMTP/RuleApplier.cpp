@@ -265,8 +265,8 @@ namespace HM
       std::shared_ptr<MessageData> pNewMsgData = std::shared_ptr<MessageData>(new MessageData());
       pNewMsgData->LoadFromMessage(emptyAccount, pMsg);
       pNewMsgData->IncreaseRuleLoopCount();
-      pNewMsgData->Write(newFileName);
-      
+      pNewMsgData->WriteReported(newFileName, "The rule-loop counter on a forwarded message");
+
       // We need to update the SMTP envelope from address, if this
       // message is forwarded by a user-level account.
       std::shared_ptr<CONST Account> pAccount = CacheContainer::Instance()->GetAccount(rule_account_id_);
@@ -347,7 +347,7 @@ namespace HM
       pNewMsgData->LoadFromMessage(newMessageFileName, pMsg);
       pNewMsgData->IncreaseRuleLoopCount();
       pNewMsgData->SetFieldValue("X-CopyRule", rule->GetName());
-      pNewMsgData->Write(newMessageFileName);
+      pNewMsgData->WriteReported(newMessageFileName, "The X-CopyRule header and rule-loop counter on a copied message");
 
       // Check that there are recipients of the letter. If not, we should skip delivery.
       if (pMsg->GetRecipients()->GetCount() == 0)
@@ -458,7 +458,16 @@ namespace HM
       // brand-new Message, so IncreaseRuleLoopCount() here always produced 1 whatever
       // the original carried, and the RuleLoopLimit bound restarted at every reply.
       RuleGuard::CarryLoopCountForward(pMsgData, pNewMsgData);
-      pNewMsgData->Write(newMessageFileName);
+
+      // Unlike the forward and copy actions, this is the FIRST write of a message built
+      // from nothing, so a failure here is not "a header is missing from an existing
+      // message" - there is no message. Queueing it anyway, which is what discarding the
+      // result did, puts a row in the queue whose file is not there and leaves the
+      // delivery to discover it. Abort instead: no reply is better than a reply the
+      // recipient will never be able to read, and the function already returns early on
+      // two other conditions.
+      if (!pNewMsgData->WriteReported(newMessageFileName, "A rule-generated reply message"))
+         return;
 
       // Add recipients.
       bool recipientOK = false;

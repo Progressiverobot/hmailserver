@@ -59,13 +59,40 @@ namespace HM
 
    void 
    ScheduledTask::SetNextRunTime()
+   //---------------------------------------------------------------------------
+   // DESCRIPTION:
+   // Moves the next run one interval on, measured from the run that was DUE rather
+   // than from now.
+   //
+   // This is called after the task has returned, so "now plus the interval" made the
+   // real period interval + however long the task took, and every pass drifted by its
+   // own duration. A six-hourly log retention pass taking two minutes lost an hour a
+   // fortnight; the message-store consistency check, which can run for a long time on
+   // a large store, drifted much faster. Nothing was ever skipped, so nothing ever
+   // looked wrong - the runs just wandered away from the times an administrator set.
+   //
+   // If the due time is already more than one interval in the past - the task
+   // overran its own interval, or the process was suspended - the next run is taken
+   // from now instead. Catching up by running back-to-back would be worse than
+   // resuming the cadence, and the alternative is a task that never stops running.
+   //---------------------------------------------------------------------------
    {
       DateTime dtNow = DateTime::GetCurrentTime();
-      
-      DateTimeSpan dts;
-      dts.SetDateTimeSpan(0,0, minutes_between_run_, 0);
 
-      next_run_time_ = dtNow + dts;
+      DateTimeSpan dts;
+      dts.SetDateTimeSpan(0, 0, minutes_between_run_, 0);
+
+      // GetStatus() rather than a comparison against a default-constructed DateTime:
+      // DateTime has no operator== and its default constructor leaves it invalid.
+      if (next_run_time_.GetStatus() != DateTime::valid)
+      {
+         next_run_time_ = dtNow + dts;
+         return;
+      }
+
+      const DateTime scheduled = next_run_time_ + dts;
+
+      next_run_time_ = (scheduled > dtNow) ? scheduled : (dtNow + dts);
    }
 
 }

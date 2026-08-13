@@ -138,7 +138,7 @@ namespace HM
       const String newFileName = PersistentMessage::GetFileName(pNewMessage);
       pNewMsgData->LoadFromMessage(newFileName, pNewMessage);
       pNewMsgData->IncreaseRuleLoopCount();
-      pNewMsgData->Write(newFileName);
+      pNewMsgData->WriteReported(newFileName, "The rule-loop counter on a forwarded message");
 
       // Add new recipients
       bool recipientOK = false;
@@ -246,7 +246,7 @@ namespace HM
       const String newFileName = PersistentMessage::GetFileName(pNewMessage);
       pNewMsgData->LoadFromMessage(newFileName, pNewMessage);
       pNewMsgData->IncreaseRuleLoopCount();
-      pNewMsgData->Write(newFileName);
+      pNewMsgData->WriteReported(newFileName, "The rule-loop counter on a forwarded message");
 
       bool recipientOK = false;
       recipientParser.CreateMessageRecipientList(targetAddress, pNewMessage->GetRecipients(), recipientOK);
