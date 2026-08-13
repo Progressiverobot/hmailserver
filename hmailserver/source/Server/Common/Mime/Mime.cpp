@@ -35,6 +35,8 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "../Util/ByteBuffer.h"
 #include "../Util/File.h"
 #include "../Util/Charset.h"
+#include "../Application/ErrorManager.h"
+#include "../Util/Strings/Formatter.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -1295,15 +1297,31 @@ namespace HM
    }
 
    // Read the body bytes from the original source file, from body_byte_offset_ to body_byte_end_.
-   AnsiString MimeBody::ReadBodyFromSourceFile() const
+   //
+   // Returns false when the bytes could not be read. This used to return an AnsiString and
+   // answered "" for four different situations, three of them failures and one of them - a
+   // message that legitimately has no body - entirely normal. Its one caller pastes the
+   // result onto the headers and writes the file, so "could not read the body" and "there
+   // is no body" produced the same message on disk: a message rewritten as headers only,
+   // reported as a success. See SaveAllToFile.
+   bool MimeBody::ReadBodyFromSourceFile(AnsiString &body) const
    {
+      body = "";
+
       File oFile;
       if (!oFile.Open(source_file_, File::OTReadOnly))
-         return "";
+         return false;
 
       std::shared_ptr<ByteBuffer> contents = oFile.ReadTextFile();
-      if (!contents || contents->GetSize() <= body_byte_offset_)
-         return "";
+      if (!contents)
+         return false;
+
+      // The file is shorter than the offset the parse recorded, so this is not the file
+      // that was parsed - it has been truncated or replaced underneath us. A header-only
+      // message does NOT arrive here: GetSize() counts the null terminator, so for one of
+      // those GetSize() is body_byte_offset_ + 1.
+      if (contents->GetSize() <= body_byte_offset_)
+         return false;
 
       // Use body_byte_end_ to copy only the bytes the MIME parser actually consumed,
       // which excludes any trailing garbage bytes beyond the parsed message.
@@ -1311,11 +1329,15 @@ namespace HM
                    ? body_byte_end_
                    : contents->GetSize() - 1;  // -1 to exclude null terminator
 
+      // A zero-length body. Legitimate, and the one case that must NOT be read as a
+      // failure - which is the whole reason this function no longer signals through an
+      // empty string.
       if (end <= body_byte_offset_)
-         return "";
+         return true;
 
-      return AnsiString(contents->GetCharBuffer() + body_byte_offset_,
+      body = AnsiString(contents->GetCharBuffer() + body_byte_offset_,
                         end - body_byte_offset_);
+      return true;
    }
 
    // write the entire header and content to file.
@@ -1329,7 +1351,25 @@ namespace HM
          AnsiString headerBuffer;
          MimeHeader::Store(headerBuffer);  // includes trailing blank line \r\n
 
-         AnsiString bodyFromDisk = ReadBodyFromSourceFile();
+         // The body is copied from source_file_, which is normally the very file about to
+         // be overwritten. If it cannot be read at this instant - a virus scanner, a
+         // backup or an IMAP reader holding it open is enough - then writing anyway
+         // replaces the message with its own headers and destroys the body, and the old
+         // code did exactly that and returned true. Refuse instead: the message on disk
+         // is left as it was, which is always better than a message with no body.
+         //
+         // The caller can act on this now. MessageData::Write already returns bool, and
+         // the two paths that reach here on ordinary traffic - a SetHeaderValue rule
+         // action, and TraceHeaderWriter on every local delivery - report it.
+         AnsiString bodyFromDisk;
+         if (!ReadBodyFromSourceFile(bodyFromDisk))
+         {
+            ErrorManager::Instance()->ReportError(ErrorManager::High, 6000, "MimeBody::SaveAllToFile",
+               Formatter::Format("The message body could not be read back from {0} while rewriting the message to {1}. The message has been left unchanged; had it been written it would have lost its body. The file is most likely held open by another process.",
+                  String(source_file_), String(pszFilename)));
+
+            return false;
+         }
 
          AnsiString fullMessage = headerBuffer + bodyFromDisk;
          bool result = FileUtilities::WriteToFile(pszFilename, fullMessage);

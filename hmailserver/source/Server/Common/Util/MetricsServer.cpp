@@ -30,8 +30,11 @@
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
 
+#include <algorithm>
+#include <chrono>
 #include <cstring>
 #include <ctime>
+#include <utility>
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -68,6 +71,56 @@ namespace HM
       // for as long as it liked, denying every other scrape AND every health probe
       // behind it on this single-threaded listener.
       const ULONGLONG ResponseWriteTimeoutMilliseconds = 15000;
+
+      // How long the accept loop pauses after accept() fails for a reason that is
+      // not shutdown. Without it the loop retried immediately, so a process out of
+      // socket descriptors (WSAEMFILE) or a stack out of buffers (WSAENOBUFS) span
+      // this thread at 100% of a core for as long as the shortage lasted - a
+      // monitoring thread making a resource shortage worse. It also bounds nothing
+      // else: Stop() closes the listen socket, so at most one of these is ever
+      // waited out during a service stop.
+      const DWORD AcceptRetryPauseMilliseconds = 100;
+
+      // The refresher's tick. Short, because most ticks do nothing at all - each one
+      // just asks whether any of the three refresh windows below has elapsed - and
+      // because it is also how quickly Stop() gets its thread back when the refresher
+      // is idle rather than mid-query.
+      const ULONGLONG RefresherTickMilliseconds = 1000;
+
+      // How often the database is asked to prove it can still answer, and the much
+      // longer interval used after a probe that failed. Backing off is not politeness:
+      // during an outage the failing statement occupies a pooled connection and a
+      // thread for as long as DBConnectionAcquireTimeout, so probing hard would take
+      // capacity away from the mail paths trying to recover, and the answer is already
+      // known - the flag is false and /readyz is already reporting 503.
+      const ULONGLONG DatabaseProbeIntervalMilliseconds = 5000;
+      const ULONGLONG DatabaseProbeFailureIntervalMilliseconds = 30000;
+
+      // How stale the newest SUCCESSFUL probe may be before readiness stops trusting
+      // it. This is the ceiling that covers a probe which neither succeeds nor fails
+      // but simply does not come back - GetConnection_ waits up to sixty seconds by
+      // default - so without it the last good answer would keep a node in rotation
+      // for a minute after the database stopped answering. Four probe intervals, so
+      // a single slow round trip cannot trip it.
+      const ULONGLONG DatabaseProbeStalenessMilliseconds = 20000;
+
+      // How often the configured certificates are re-read from disk. A notAfter only
+      // changes when a certificate is replaced.
+      const ULONGLONG CertificateRefreshIntervalMilliseconds = 300000;
+
+      // How often the delivery-queue aggregates are re-read.
+      const ULONGLONG DeliveryQueueRefreshIntervalMilliseconds = 10000;
+
+      // Ceiling on the number of hmailserver_tls_certificate_expiry_seconds series.
+      // Every other family on this endpoint is a fixed number of lines, so this is
+      // the only part of the response whose size is driven by data rather than by
+      // code - and the whole response is assembled in memory on the listener thread
+      // and then written under a deadline, so an operator with a very large
+      // certificate table should not be able to turn one scrape into a slow one. A
+      // ceiling well above any plausible configuration, taking the earliest expiries
+      // first so that if it ever does bite, what survives is what an operator would
+      // have wanted to alert on.
+      const size_t MaxCertificateExpirySeries = 128;
 
       // Strips leading and trailing HTTP optional whitespace (space and horizontal
       // tab, per RFC 7230's OWS rule). Not a general trim: CR and LF have already
@@ -144,9 +197,16 @@ namespace HM
       active_client_socket_(INVALID_SOCKET),
       start_tick_count_(0),
       start_unix_time_(0),
+      refresher_stop_(true),
+      database_reachable_(false),
+      database_probe_success_tick_(0),
+      database_probe_success_unix_time_(0),
+      database_probe_tick_(0),
+      queue_refresh_requested_(false),
       queue_cache_tick_(0),
       queue_depth_cache_value_(0),
       queue_oldest_age_cache_value_(0),
+      certificate_refresh_requested_(false),
       certificate_cache_tick_(0),
       metrics_availability_(MetricsAvailable)
    {
@@ -285,8 +345,15 @@ namespace HM
       BOOL reuseAddress = TRUE;
       setsockopt(listen_socket_, SOL_SOCKET, SO_REUSEADDR, (const char*) &reuseAddress, sizeof(reuseAddress));
 
+      // SOMAXCONN and not 5. The backlog is how many connections the kernel holds
+      // while this single-threaded loop is busy with one, and a connection that
+      // overflows it is REFUSED - which on a health-check port means a load balancer
+      // reading "node down" for a node that is fine. A pod is routinely probed by
+      // liveness, readiness and startup checks at once with a scrape alongside them,
+      // and a VIP with several members adds one probe per member; five is not a lot
+      // of headroom for that, and the backlog costs nothing until it is used.
       if (bind(listen_socket_, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) == SOCKET_ERROR ||
-          listen(listen_socket_, 5) == SOCKET_ERROR)
+          listen(listen_socket_, SOMAXCONN) == SOCKET_ERROR)
       {
          String message;
          message.Format(_T("MetricsServer: Failed to bind to %s:%d."), bind_address.c_str(), port);
@@ -323,9 +390,43 @@ namespace HM
 
       start_tick_count_ = GetTickCount64();
       start_unix_time_ = static_cast<__int64>(time(nullptr));
+
+      // The refresher's starting state, set before its thread exists.
+      //
+      // database_reachable_ starts TRUE and the success tick starts NOW, which is
+      // deliberately optimistic for exactly one staleness window. The alternative -
+      // starting unready until the first probe returns - would make /readyz answer
+      // 503 for the first moments after every service start, and a load balancer
+      // that has just been told the node is unready does not necessarily come back
+      // and ask again promptly. The optimism is also not blind: this function runs
+      // from Application::StartServers, which is reached only after the database is
+      // connected and the schema version verified, so at this instant a round trip
+      // has effectively just succeeded. The refresher's first tick issues a real one
+      // within a second, and from then on nothing is assumed.
+      //
+      // Both refresh flags start set so the queue depth, the queue age and the
+      // certificate expiries are correct on the FIRST scrape rather than one tick
+      // later. That is three statements and a handful of file reads once per service
+      // start; the on-demand rule below is about not repeating them forever on an
+      // installation nothing scrapes.
+      {
+         std::lock_guard<std::mutex> guard(refresh_mutex_);
+
+         refresher_stop_ = false;
+         database_reachable_ = true;
+         database_probe_tick_ = 0;
+         database_probe_success_tick_ = start_tick_count_;
+         database_probe_success_unix_time_ = start_unix_time_;
+         queue_refresh_requested_ = true;
+         queue_cache_tick_ = 0;
+         certificate_refresh_requested_ = true;
+         certificate_cache_tick_ = 0;
+      }
+
       running_ = true;
 
       worker_ = std::thread(&MetricsServer::Run_, this);
+      refresher_ = std::thread(&MetricsServer::Run_Refresher_, this);
 
       // The startup line states the access-control shape in full, because an
       // operator reading the log after an upgrade needs to be able to see at a
@@ -383,8 +484,31 @@ namespace HM
             shutdown(active_client_socket_, SD_BOTH);
       }
 
+      // The refresher is asked to stop before either thread is joined, so the two
+      // waits overlap instead of running one after the other.
+      //
+      // A refresher that is idle - which is what it is on all but one tick in five -
+      // returns immediately, because it is parked in a timed wait on this condition
+      // variable rather than in a Sleep. One that is mid-query does not, and cannot
+      // be made to: the statement is inside DatabaseConnectionManager and there is no
+      // way to cancel it, so this join is bounded by [Settings]
+      // DBConnectionAcquireTimeout plus whatever the statement itself takes. That is
+      // the same bound a scrape in flight already imposed on this Stop() before any
+      // of this moved off the listener thread, so nothing here made a service stop
+      // slower than it was; what changed is that the bound is now paid by a thread
+      // nobody is waiting on for an answer.
+      {
+         std::lock_guard<std::mutex> guard(refresh_mutex_);
+         refresher_stop_ = true;
+      }
+
+      refresher_wakeup_.notify_all();
+
       if (worker_.joinable())
          worker_.join();
+
+      if (refresher_.joinable())
+         refresher_.join();
 
       // After the join, never before: the worker reads the context for every
       // handshake and the credentials for every scrape, so releasing either while
@@ -539,6 +663,16 @@ namespace HM
             // The listen socket was closed (shutdown) or an error occurred.
             if (!running_)
                return;
+
+            // Anything else is a transient accept() failure that leaves the listen
+            // socket usable - the process is out of descriptors, the stack is out of
+            // buffers, or the peer reset between the SYN and the accept - so the loop
+            // retries. It pauses first, because without the pause it retried
+            // immediately: for as long as the condition lasted this thread span at
+            // 100% of a core, so a resource shortage anywhere in the process became a
+            // monitoring thread competing with the mail threads that were trying to
+            // recover from it.
+            Sleep(AcceptRetryPauseMilliseconds);
 
             continue;
          }
@@ -1356,12 +1490,48 @@ namespace HM
       // rather than _up: Prometheus synthesises its own "up" series per target, and
       // an operator reading "up" next to "hmailserver_database_up" on a dashboard has
       // no way to tell a scrape failure from a database failure.
-      std::shared_ptr<DatabaseConnectionManager> db_manager = Application::Instance()->GetDBManager();
-      bool database_up = db_manager && db_manager->GetIsConnected();
+      //
+      // The value now means "the database answered a statement recently", not "the
+      // pool holds connection objects". Those are not the same thing and the
+      // difference is not academic: the pool keeps its objects after the server on
+      // the other end has gone away, so the old value read 1 throughout an outage.
+      // An operator alerting on hmailserver_database_connected == 0 had an alert that
+      // could not fire. See rule 6 in the header.
+      AnsiString databaseReason;
+      bool database_answering = IsDatabaseAnswering_(databaseReason);
 
-      body += "# HELP hmailserver_database_connected Whether the database connection pool reports at least one live connection (1=connected, 0=not connected).\n";
+      std::shared_ptr<DatabaseConnectionManager> db_manager = Application::Instance()->GetDBManager();
+
+      body += "# HELP hmailserver_database_connected Whether the database answered this server's readiness probe recently (1=answering, 0=not answering). Proved by a round trip, not by the connection pool holding objects.\n";
       body += "# TYPE hmailserver_database_connected gauge\n";
-      line.Format("hmailserver_database_connected %d\n", database_up ? 1 : 0);
+      line.Format("hmailserver_database_connected %d\n", database_answering ? 1 : 0);
+      body += line;
+
+      // When the last round trip actually completed, both as a timestamp and as an
+      // age. Two series for one fact, on purpose: the timestamp is the conventional
+      // Prometheus form and is what an alert expression wants, while the age is
+      // computed entirely from this server's own monotonic clock and so is the only
+      // one of the two that stays meaningful when the scraper's clock and the mail
+      // server's clock disagree - and a signal whose whole resolution is a few
+      // seconds is exactly the size of a routine NTP correction.
+      ULONGLONG probeAgeSeconds = 0;
+      __int64 probeSuccessUnixTime = 0;
+
+      {
+         std::lock_guard<std::mutex> guard(refresh_mutex_);
+
+         probeSuccessUnixTime = database_probe_success_unix_time_;
+         probeAgeSeconds = (GetTickCount64() - database_probe_success_tick_) / 1000;
+      }
+
+      body += "# HELP hmailserver_database_probe_success_timestamp_seconds Unix timestamp at which the database last answered a readiness probe.\n";
+      body += "# TYPE hmailserver_database_probe_success_timestamp_seconds gauge\n";
+      line.Format("hmailserver_database_probe_success_timestamp_seconds %I64d\n", probeSuccessUnixTime);
+      body += line;
+
+      body += "# HELP hmailserver_database_probe_age_seconds Seconds since the database last answered a readiness probe, measured on this server's monotonic clock. /readyz reports 503 once this exceeds its staleness ceiling.\n";
+      body += "# TYPE hmailserver_database_probe_age_seconds gauge\n";
+      line.Format("hmailserver_database_probe_age_seconds %I64u\n", probeAgeSeconds);
       body += line;
 
       int db_busy = db_manager ? db_manager->GetBusyConnectionCount() : 0;
@@ -1374,11 +1544,25 @@ namespace HM
       line.Format("hmailserver_db_connections{state=\"available\"} %d\n", db_available);
       body += line;
 
-      UpdateDeliveryQueueCache_();
+      // Read out of the cache the refresher fills, and a request for the next refresh
+      // left behind for it. No query is issued from here: this used to run two
+      // aggregate queries against hm_messages on the listener thread, either of which
+      // could park it - and every health probe behind it - for the whole of
+      // DBConnectionAcquireTimeout. See rule 5 in the header.
+      int queueDepth = 0;
+      __int64 queueOldestAge = 0;
+
+      {
+         std::lock_guard<std::mutex> guard(refresh_mutex_);
+
+         queueDepth = queue_depth_cache_value_;
+         queueOldestAge = queue_oldest_age_cache_value_;
+         queue_refresh_requested_ = true;
+      }
 
       body += "# HELP hmailserver_delivery_queue_messages Number of messages currently in the SMTP delivery queue.\n";
       body += "# TYPE hmailserver_delivery_queue_messages gauge\n";
-      line.Format("hmailserver_delivery_queue_messages %d\n", queue_depth_cache_value_);
+      line.Format("hmailserver_delivery_queue_messages %d\n", queueDepth);
       body += line;
 
       // Depth on its own cannot tell a burst from a stuck relay: a deep queue whose
@@ -1387,7 +1571,7 @@ namespace HM
       // getting mail to. This is the second half of that pair.
       body += "# HELP hmailserver_delivery_queue_oldest_message_age_seconds Age of the oldest message in the SMTP delivery queue, 0 when the queue is empty or the age is unknown.\n";
       body += "# TYPE hmailserver_delivery_queue_oldest_message_age_seconds gauge\n";
-      line.Format("hmailserver_delivery_queue_oldest_message_age_seconds %I64d\n", queue_oldest_age_cache_value_);
+      line.Format("hmailserver_delivery_queue_oldest_message_age_seconds %I64d\n", queueOldestAge);
       body += line;
 
       body += "# HELP hmailserver_messagestore_missing_files Number of messages whose backing file was missing on disk at the last consistency check (0 when consistent or the check is disabled).\n";
@@ -1418,7 +1602,7 @@ namespace HM
       line.Format("hmailserver_db_slow_queries_total %I64u\n", status->GetDatabaseSlowQueriesCount());
       body += line;
 
-      body += BuildCertificateExpiryMetrics_();
+      body += GetCachedCertificateExpiryMetrics_();
 
       return body;
    }
@@ -1461,28 +1645,204 @@ namespace HM
    }
 
    void
-   MetricsServer::UpdateDeliveryQueueCache_()
+   MetricsServer::Run_Refresher_()
    {
-      // Cache the delivery-queue figures for a few seconds so frequent scrapes do
-      // not issue aggregate queries against hm_messages on every request. Clients are
-      // handled serially on the listener thread, so no extra locking is needed.
-      const ULONGLONG cacheWindowMs = 10000;
-      ULONGLONG now = GetTickCount64();
+      // The second of this class's two threads. It exists so that the first one - the
+      // accept loop - performs no database or file I/O at all, which is what stops a
+      // stalled database from silently taking the health probes down with it and, on
+      // an orchestrator, getting the process killed for it. See rule 5 in the header
+      // for the failure this replaces.
+      //
+      // The same exception-barrier argument as Run_ applies, and for the same reason:
+      // this is the top of a std::thread, so an exception that escaped here would be
+      // std::terminate() and the whole mail server would die because a monitoring
+      // refresh went wrong. Each refresh has its own barrier so one failing does not
+      // skip the other two, and this outer barrier catches anything they let past -
+      // including out of the reporting itself, which reaches operator-supplied script
+      // through ScriptServer::FireEvent.
+      for (;;)
+      {
+         {
+            std::unique_lock<std::mutex> guard(refresh_mutex_);
 
-      if (queue_cache_tick_ != 0 && (now - queue_cache_tick_) < cacheWindowMs)
-         return;
+            if (refresher_stop_)
+               return;
+         }
 
-      // Stamped before the reads, not after, so a database that cannot answer is
-      // retried on the same cadence rather than on every single scrape.
-      queue_cache_tick_ = now;
+         try
+         {
+            RefreshDatabaseProbe_();
+            RefreshDeliveryQueueCache_();
+            RefreshCertificateExpiryCache_();
+         }
+         catch (...)
+         {
+            try
+            {
+               ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6045, "MetricsServer::Run_Refresher_",
+                  "An exception escaped the metrics refresh thread. The cached figures behind /metrics and /readyz may be stale until the next refresh; the listener is still running.");
+            }
+            catch (...)
+            {
+               // Nothing left to do: reporting is what failed, and the alternative to
+               // swallowing this is std::terminate() on the mail server.
+            }
+         }
+
+         // A timed wait and not a Sleep, so a Stop() arriving while this thread is
+         // idle gets it back at once instead of after the rest of a tick. The
+         // predicate form is what makes that correct in the presence of a spurious
+         // wakeup, and its return value is the predicate's final answer - so it is
+         // also exactly "was this a stop rather than a timeout", which is why it is
+         // captured rather than discarded.
+         {
+            std::unique_lock<std::mutex> guard(refresh_mutex_);
+
+            if (refresher_stop_)
+               return;
+
+            const bool stopping = refresher_wakeup_.wait_for(guard,
+               std::chrono::milliseconds(static_cast<long long>(RefresherTickMilliseconds)),
+               [this] { return refresher_stop_; });
+
+            if (stopping)
+               return;
+         }
+      }
+   }
+
+   void
+   MetricsServer::RefreshDatabaseProbe_()
+   {
+      {
+         std::lock_guard<std::mutex> guard(refresh_mutex_);
+
+         const ULONGLONG interval = database_reachable_
+            ? DatabaseProbeIntervalMilliseconds
+            : DatabaseProbeFailureIntervalMilliseconds;
+
+         if (database_probe_tick_ != 0 && (GetTickCount64() - database_probe_tick_) < interval)
+            return;
+
+         // Stamped before the statement runs rather than after it returns. A probe
+         // against a database that has stopped answering can sit inside
+         // GetConnection_ for the whole of DBConnectionAcquireTimeout, and stamping
+         // afterwards would mean the next tick reissued it immediately - one more
+         // statement queued behind the first, holding one more pooled connection,
+         // against a database already in trouble.
+         database_probe_tick_ = GetTickCount64();
+      }
+
+      bool reachable = false;
+
+      try
+      {
+         std::shared_ptr<DatabaseConnectionManager> db_manager = Application::Instance()->GetDBManager();
+
+         if (db_manager)
+         {
+            // hm_dbversion, because it is one row, it exists on all four supported
+            // backends, and it is the table Application already reads at start-up to
+            // verify the schema version - so this depends on nothing that could
+            // differ between engines. "select 1" was rejected: SQL Server Compact
+            // Edition has no FROM-less select, so it would have made the probe pass
+            // on three backends and fail permanently on the fourth, which is a worse
+            // failure than no probe at all.
+            //
+            // The recordset has to come back AND have a row. A null recordset is what
+            // OpenRecordset returns both when the pool could not hand out a
+            // connection and when the statement itself failed, which are the two
+            // shapes a database outage takes.
+            SQLCommand command("select * from hm_dbversion");
+
+            std::shared_ptr<DALRecordset> recordset = db_manager->OpenRecordset(command);
+
+            reachable = recordset && !recordset->IsEOF();
+         }
+      }
+      catch (...)
+      {
+         reachable = false;
+      }
+
+      bool changed = false;
+
+      {
+         std::lock_guard<std::mutex> guard(refresh_mutex_);
+
+         changed = database_reachable_ != reachable;
+         database_reachable_ = reachable;
+
+         if (reachable)
+         {
+            database_probe_success_tick_ = GetTickCount64();
+            database_probe_success_unix_time_ = static_cast<__int64>(time(nullptr));
+         }
+      }
+
+      // One line per TRANSITION and never one per probe. This is the state a load
+      // balancer is about to act on, so it belongs in the log where an operator
+      // correlating "why did the VIP move at 03:12" can find it - but at one line
+      // every few seconds it would be noise nobody reads, and it would be the first
+      // thing to fill a log during the outage it is describing.
+      //
+      // LOG_APPLICATION and not a reported error, deliberately. A database that
+      // cannot be reached is an operational condition, it is already reported by
+      // whatever failed to read it, and an error report here would fire on every
+      // configuration where this is the first thing to notice - including, through
+      // ErrorManager's OnError event, operator script running on this thread.
+      //
+      // Braced, and it matters: LOG_APPLICATION expands to a bare "if (mask) log;",
+      // so an unbraced if/else around two of them binds the else to the macro's own
+      // if and logs the wrong line whenever application logging happens to be off.
+      if (changed)
+      {
+         if (reachable)
+         {
+            LOG_APPLICATION("MetricsServer: the database answered the readiness probe again. /readyz will report ready.");
+         }
+         else
+         {
+            LOG_APPLICATION("MetricsServer: the database did not answer the readiness probe. /readyz will report 503 until it does, so a load balancer sheds this node rather than routing mail it cannot deliver. /livez is deliberately unaffected - the process is healthy, and killing it would not fix a database.");
+         }
+      }
+   }
+
+   void
+   MetricsServer::RefreshDeliveryQueueCache_()
+   {
+      {
+         std::lock_guard<std::mutex> guard(refresh_mutex_);
+
+         // Nothing has scraped /metrics since the last refresh, so nothing needs
+         // these two values. This keeps the cost model the old code had - an
+         // installation with the port open and no Prometheus behind it pays nothing
+         // for two aggregate queries against hm_messages - while moving the work of
+         // an actual scrape off the request path.
+         if (!queue_refresh_requested_)
+            return;
+
+         if (queue_cache_tick_ != 0 && (GetTickCount64() - queue_cache_tick_) < DeliveryQueueRefreshIntervalMilliseconds)
+            return;
+
+         queue_cache_tick_ = GetTickCount64();
+         queue_refresh_requested_ = false;
+      }
 
       std::shared_ptr<DatabaseConnectionManager> db_manager = Application::Instance()->GetDBManager();
       if (!db_manager || !db_manager->GetIsConnected())
          return;
 
+      // Built into locals and published in one short critical section at the end. The
+      // mutex is not held across either statement, which is the invariant rule 5 rests
+      // on: holding it there would block the request thread for as long as the
+      // database took, which is precisely the coupling this thread exists to break.
+      int depth = 0;
+      __int64 oldestAge = 0;
+
       try
       {
-         queue_depth_cache_value_ = PersistentMessage::GetDeliveryQueueCount();
+         depth = PersistentMessage::GetDeliveryQueueCount();
 
          // min() over a "YYYY-MM-DD HH:MM:SS" column: the format sorts
          // lexicographically the same way it sorts chronologically, so this is one
@@ -1491,8 +1851,6 @@ namespace HM
          command.AddParameter("@MESSAGETYPE", Message::Delivering);
 
          std::shared_ptr<DALRecordset> recordset = db_manager->OpenRecordset(command);
-
-         queue_oldest_age_cache_value_ = 0;
 
          if (recordset && !recordset->IsEOF())
          {
@@ -1505,7 +1863,7 @@ namespace HM
                // Clamped at zero: a clock adjustment must not produce a negative age,
                // which would read as a message from the future and break any alert
                // expressed as a threshold.
-               queue_oldest_age_cache_value_ = age > 0 ? age : 0;
+               oldestAge = age > 0 ? age : 0;
             }
          }
       }
@@ -1517,22 +1875,42 @@ namespace HM
          // this is a debug note, not an error: it is not separately actionable and it
          // would repeat on every cache refresh for as long as the outage lasted.
          LOG_DEBUG("MetricsServer: Delivery-queue metrics could not be refreshed. Serving the previously cached values.");
+         return;
       }
+
+      std::lock_guard<std::mutex> guard(refresh_mutex_);
+
+      queue_depth_cache_value_ = depth;
+      queue_oldest_age_cache_value_ = oldestAge;
    }
 
    AnsiString
-   MetricsServer::BuildCertificateExpiryMetrics_()
+   MetricsServer::GetCachedCertificateExpiryMetrics_()
    {
-      // Cached for minutes: a certificate's notAfter only changes when the
-      // certificate is replaced, and re-reading and re-parsing every configured PEM
-      // on every scrape would put avoidable file I/O on the listener thread.
-      const ULONGLONG cacheWindowMs = 300000;
-      ULONGLONG now = GetTickCount64();
+      std::lock_guard<std::mutex> guard(refresh_mutex_);
 
-      if (certificate_cache_tick_ != 0 && (now - certificate_cache_tick_) < cacheWindowMs)
-         return certificate_cache_body_;
+      certificate_refresh_requested_ = true;
 
-      certificate_cache_tick_ = now;
+      return certificate_cache_body_;
+   }
+
+   void
+   MetricsServer::RefreshCertificateExpiryCache_()
+   {
+      {
+         std::lock_guard<std::mutex> guard(refresh_mutex_);
+
+         // Same on-demand rule as the delivery queue: no scrape since the last
+         // refresh means nothing needs these series, so nothing re-reads the PEMs.
+         if (!certificate_refresh_requested_)
+            return;
+
+         if (certificate_cache_tick_ != 0 && (GetTickCount64() - certificate_cache_tick_) < CertificateRefreshIntervalMilliseconds)
+            return;
+
+         certificate_cache_tick_ = GetTickCount64();
+         certificate_refresh_requested_ = false;
+      }
 
       // Keyed by the label value, because the label value is what makes a series
       // unique. sslcertificatename has no unique constraint in any of the schemas, so
@@ -1587,30 +1965,77 @@ namespace HM
       }
       catch (...)
       {
-         LOG_DEBUG("MetricsServer: TLS certificate expiry metrics could not be built. Omitting them from this scrape.");
+         // Abandoned rather than published. The previous body stays in the cache,
+         // which is the difference between "this refresh found nothing new" and
+         // "these series vanish for the next five minutes" - and vanishing is what
+         // the old code did, because it wrote whatever it had built when the
+         // exception fired straight into the cache. A certificate-expiry series that
+         // disappears reads to an alert on absent data exactly like a certificate
+         // that was deleted on purpose.
+         LOG_DEBUG("MetricsServer: TLS certificate expiry metrics could not be refreshed. Serving the previously cached series.");
+         return;
+      }
+
+      // Ordered by expiry, soonest first, and then by name so that two certificates
+      // expiring at the same instant still come out in the same order on every
+      // refresh. The order is what makes the ceiling below defensible: if an
+      // installation ever has more certificates than the endpoint will emit series
+      // for, the ones that survive are the ones about to expire, which are the only
+      // ones anybody would have alerted on.
+      std::vector<std::pair<__int64, AnsiString> > byExpiry;
+
+      for (std::map<AnsiString, __int64>::const_iterator it = earliestExpiryByName.begin();
+           it != earliestExpiryByName.end(); ++it)
+      {
+         byExpiry.push_back(std::pair<__int64, AnsiString>(it->second, it->first));
+      }
+
+      // The comparator is spelled out rather than left to std::pair's own operator<,
+      // because the second member is an AnsiString and relying on which of
+      // CStdString's comparison overloads a pair comparison resolves to is not worth
+      // the risk on a /WX build.
+      std::sort(byExpiry.begin(), byExpiry.end(),
+         [](const std::pair<__int64, AnsiString> &left, const std::pair<__int64, AnsiString> &right)
+         {
+            if (left.first != right.first)
+               return left.first < right.first;
+
+            return strcmp(left.second.c_str(), right.second.c_str()) < 0;
+         });
+
+      size_t emitted = byExpiry.size();
+
+      if (emitted > MaxCertificateExpirySeries)
+      {
+         emitted = MaxCertificateExpirySeries;
+
+         String message;
+         message.Format(_T("MetricsServer: %d configured TLS certificates have a readable expiry, which is more than the %d series hmailserver_tls_certificate_expiry_seconds will emit. The %d expiring soonest are exposed; the rest are omitted so one scrape cannot grow without bound."),
+            (int) byExpiry.size(), (int) MaxCertificateExpirySeries, (int) MaxCertificateExpirySeries);
+         LOG_APPLICATION(message);
       }
 
       AnsiString body;
 
       // Nothing is emitted when no certificate is configured, which is the shipped
       // default - an empty metric family would only invite an alert on absent data.
-      if (!earliestExpiryByName.empty())
+      if (emitted > 0)
       {
          body += "# HELP hmailserver_tls_certificate_expiry_seconds Unix timestamp at which a configured TLS certificate expires. Alert on hmailserver_tls_certificate_expiry_seconds - time() falling below your renewal window.\n";
          body += "# TYPE hmailserver_tls_certificate_expiry_seconds gauge\n";
 
          AnsiString line;
-         for (const auto &entry : earliestExpiryByName)
+         for (size_t i = 0; i < emitted; i++)
          {
             line.Format("hmailserver_tls_certificate_expiry_seconds{certificate=\"%s\"} %I64d\n",
-               entry.first.c_str(), entry.second);
+               byExpiry[i].second.c_str(), byExpiry[i].first);
             body += line;
          }
       }
 
-      certificate_cache_body_ = body;
+      std::lock_guard<std::mutex> guard(refresh_mutex_);
 
-      return body;
+      certificate_cache_body_ = body;
    }
 
    __int64
@@ -1700,6 +2125,57 @@ namespace HM
    }
 
    bool
+   MetricsServer::IsDatabaseAnswering_(AnsiString &reason)
+   {
+      // Three conditions, and the second and third are the point. See rule 6 in the
+      // header for the failure they replace.
+      //
+      // First: the pool has to hold connections at all. That is the only thing this
+      // used to check, and on its own it is nearly worthless - the pool is built once
+      // at start-up and nothing empties it when the database goes away, so
+      // GetIsConnected() answers "connected" for a server nothing can reach. It is
+      // kept because it is the one condition that is true before the first probe and
+      // false after Disconnect(), and it costs one uncontended lock.
+      std::shared_ptr<DatabaseConnectionManager> db_manager = Application::Instance()->GetDBManager();
+
+      if (!db_manager || !db_manager->GetIsConnected())
+      {
+         reason = "database not connected";
+         return false;
+      }
+
+      std::lock_guard<std::mutex> guard(refresh_mutex_);
+
+      // Second: the most recent probe has to have SUCCEEDED. This is what makes the
+      // answer about the database rather than about this process's data structures.
+      if (!database_reachable_)
+      {
+         reason = "database did not answer the last readiness probe";
+         return false;
+      }
+
+      // Third: it has to have succeeded RECENTLY, and this one covers the case the
+      // second cannot. A probe against a database that has stopped answering does not
+      // necessarily fail - it can simply not come back, for as long as
+      // DBConnectionAcquireTimeout allows, which is sixty seconds by default. During
+      // that minute database_reachable_ still holds the last good answer, so without
+      // this ceiling /readyz would keep a node in a load balancer's rotation for a
+      // full minute after the database stopped answering, and every message routed to
+      // it in that minute is rejected or deferred.
+      //
+      // Never held for a probe that has not started: Start() seeds the success tick
+      // with the moment the listener started, which is a moment when the database had
+      // just been connected and its schema version read.
+      if ((GetTickCount64() - database_probe_success_tick_) > DatabaseProbeStalenessMilliseconds)
+      {
+         reason = "database readiness probe has not completed recently";
+         return false;
+      }
+
+      return true;
+   }
+
+   bool
    MetricsServer::IsReady_(AnsiString &reason)
    {
       if (ServerStatus::Instance()->GetState() != ServerStatus::StateRunning)
@@ -1708,14 +2184,7 @@ namespace HM
          return false;
       }
 
-      std::shared_ptr<DatabaseConnectionManager> db_manager = Application::Instance()->GetDBManager();
-      if (!db_manager || !db_manager->GetIsConnected())
-      {
-         reason = "database not connected";
-         return false;
-      }
-
-      return true;
+      return IsDatabaseAnswering_(reason);
    }
 
    AnsiString
@@ -1725,8 +2194,8 @@ namespace HM
       int state = status->GetState();
       bool running = state == ServerStatus::StateRunning;
 
-      std::shared_ptr<DatabaseConnectionManager> db_manager = Application::Instance()->GetDBManager();
-      bool database_up = db_manager && db_manager->GetIsConnected();
+      AnsiString databaseReason;
+      bool database_up = IsDatabaseAnswering_(databaseReason);
 
       healthy = running && database_up;
 
@@ -1738,17 +2207,32 @@ namespace HM
          state == ServerStatus::StateStopping ? "stopping" :
          state == ServerStatus::StateStopped ? "stopped" : "unknown";
 
+      // The session counts are deliberately gone from this body.
+      //
+      // They were the one thing here that this listener refuses to serve elsewhere.
+      // Rule 2 closes /metrics with a 503 on a non-loopback bind precisely so that
+      // "delivery-queue depth, session counts, authentication-failure counts and the
+      // build and schema versions" are not readable from the network without a
+      // credential - and then /healthz, which rule 1 keeps open and unauthenticated
+      // in every configuration including that one, published the session counts
+      // anyway. In the topology docs/HighAvailabilityRunbook.md section 3 ships -
+      // 0.0.0.0, plain HTTP, no credential - anyone who could reach the port could
+      // poll /healthz and watch this server's SMTP, IMAP and POP3 concurrency, which
+      // is how much mail it is handling and when. An access-control rule that one
+      // path enforces and another path hands out is not a rule.
+      //
+      // Nothing needed them: a health check acts on the status, and the same numbers
+      // are in hmailserver_sessions behind whatever protection /metrics has. What
+      // stays is what a probe has to be able to say - whether it is healthy, why not,
+      // and for how long the process has been up - and that matches the shape this
+      // endpoint has always been documented as having ("JSON status/state/database").
       AnsiString body;
       body.Format(
          "{\"status\":\"%s\",\"state\":\"%s\",\"database\":\"%s\","
-         "\"sessions\":{\"smtp\":%d,\"imap\":%d,\"pop3\":%d},"
          "\"uptime_seconds\":%I64u}\n",
          healthy ? "ok" : "unavailable",
          state_name,
          database_up ? "up" : "down",
-         status->GetNumberOfSessions(STSMTP),
-         status->GetNumberOfSessions(STIMAP),
-         status->GetNumberOfSessions(STPOP3),
          uptime_seconds);
 
       return body;

@@ -8,6 +8,7 @@
 #include "ServerStatus.h"
 
 #include <thread>
+#include <condition_variable>
 #include <map>
 #include <mutex>
 #include <string>
@@ -138,6 +139,64 @@ namespace HM
    // Refusals are counted instead - hmailserver_metrics_unauthorized_requests_total
    // - so an operator can alert on the rate rather than find it in a log nobody
    // reads.
+   //
+   // ---------------------------------------------------------------------------
+   //  5. NOTHING ON THE REQUEST PATH TOUCHES THE DATABASE OR THE FILE SYSTEM.
+   //     Every value a request can need is read out of a cache that a second
+   //     thread - the refresher, Run_Refresher_ below - fills. The request thread
+   //     takes refresh_mutex_, copies what it needs and drops it; the refresher
+   //     does its I/O with NO lock held and takes the same mutex only to publish
+   //     the result. That is the whole safety argument, and it is why the mutex is
+   //     never held across a database call.
+   //
+   //     This is not tidiness, it is the fix for a way a database problem could
+   //     kill the mail server. /metrics used to run two aggregate queries against
+   //     hm_messages on the listener thread. A query goes through
+   //     DatabaseConnectionManager::GetConnection_, which waits for a pooled
+   //     connection for up to [Settings] DBConnectionAcquireTimeout - SIXTY
+   //     SECONDS by default - so a database that had stopped answering (a locked
+   //     table, a backup, a failed-over server holding sockets open) parked this
+   //     single-threaded listener for a minute per scrape, twice over. /livez and
+   //     /readyz queue behind it on the same thread. A Kubernetes liveness probe
+   //     with the default timeoutSeconds 1, periodSeconds 10 and failureThreshold
+   //     3 therefore fails three times in thirty seconds and the container is
+   //     KILLED - a transient database stall turned into a restart of a mail
+   //     server that was healthy, and the restart made the stall worse. The same
+   //     shape on an ELB or ALB fences the node out instead.
+   //
+   //  6. READINESS IS PROVED BY A ROUND TRIP, NOT BY THE POOL BEING POPULATED.
+   //     /readyz and /healthz used to ask DatabaseConnectionManager::GetIsConnected(),
+   //     which counts CONNECTION OBJECTS in the pool - not whether any of them can
+   //     still reach a server. The pool is built once at start-up and nothing
+   //     empties it when the database goes away, so that function answers
+   //     "connected" for a database nothing can talk to, and /readyz answered 200
+   //     for a node that could not look up a single recipient. A load balancer
+   //     driven by that probe - which is exactly what docs/HighAvailabilityRunbook.md
+   //     section 3 tells operators to build - keeps routing mail to it, and every
+   //     message is rejected or deferred. A readiness probe that cannot go unready
+   //     is not a readiness probe.
+   //
+   //     So the refresher proves it: one "select * from hm_dbversion" every few
+   //     seconds, which is a full round trip (connection acquired, statement
+   //     executed, row returned) against a one-row table that exists on all four
+   //     supported backends. Readiness needs all three of a populated pool, a
+   //     probe that SUCCEEDED, and a probe that succeeded RECENTLY - the third
+   //     because a probe can also get stuck rather than fail, for the same sixty
+   //     seconds, and serving the last good answer for that minute is the failure
+   //     this replaces. The probe result and its age are published as
+   //     hmailserver_database_probe_success_timestamp_seconds and
+   //     hmailserver_database_probe_age_seconds so that "when did this node last
+   //     prove it could reach the database" is answerable from monitoring, and
+   //     hmailserver_database_connected now means that same round trip rather than
+   //     a count of objects.
+   //
+   //     The probe goes through the ordinary chokepoint, so it is measured by
+   //     hmailserver_db_query_seconds and traced as a db.query span like any other
+   //     statement. That is accepted rather than worked around: it is one indexed
+   //     one-row read every few seconds, it lands in the fastest bucket, and a
+   //     self-probe that shows up in the latency histogram is a canary rather than
+   //     noise. Hiding it would mean a second path around the chokepoint, which is
+   //     how the two listeners that build their own SSL_CTX ended up diverging.
    class MetricsServer
    {
    public:
@@ -275,15 +334,38 @@ namespace HM
 
       AnsiString BuildMetricsBody_();
 
-      // Refreshes the cached SMTP delivery-queue figures (depth and the age of the
-      // oldest queued message), querying the database at most once every few seconds
-      // so scrapes never hammer it. Never throws: a database failure leaves the
-      // previous values in place.
-      void UpdateDeliveryQueueCache_();
+      // The refresher thread. Owns every database read and every certificate file
+      // read this class performs, so the listener thread performs none - see rule 5.
+      // Wakes on a short tick, does whatever is due, and is woken early by Stop().
+      void Run_Refresher_();
 
-      // Expiry timestamps of the configured TLS certificates, cached for minutes
-      // because a notAfter only changes when a certificate is replaced.
-      AnsiString BuildCertificateExpiryMetrics_();
+      // Proves the database can still answer, and records when it last could.
+      // Called only from the refresher.
+      void RefreshDatabaseProbe_();
+
+      // Refreshes the cached SMTP delivery-queue figures (depth and the age of the
+      // oldest queued message). Called only from the refresher, and only when a
+      // scrape has asked for them since the last refresh - so an installation with
+      // the port open and nothing scraping it still pays nothing for the two
+      // aggregate queries, exactly as before this moved off the request path.
+      // Never throws: a database failure leaves the previous values in place.
+      void RefreshDeliveryQueueCache_();
+
+      // Re-reads the configured TLS certificates and rebuilds their expiry series.
+      // Called only from the refresher, on a much longer cadence, because a notAfter
+      // only changes when a certificate is replaced.
+      void RefreshCertificateExpiryCache_();
+
+      // Whether the database has proved recently that it can answer. All three
+      // conditions in rule 6, with the reason for the first one that fails. This is
+      // the only thing /readyz, /healthz and hmailserver_database_connected consult;
+      // none of them issues a query of its own.
+      bool IsDatabaseAnswering_(AnsiString &reason);
+
+      // The certificate expiry series as the refresher last built them. A copy
+      // rather than a reference: the refresher may replace the cached body while a
+      // response is being assembled.
+      AnsiString GetCachedCertificateExpiryMetrics_();
 
       // Reads notAfter out of a PEM certificate as a Unix timestamp. Returns 0 when
       // the file is missing, unreadable or unparseable.
@@ -299,10 +381,18 @@ namespace HM
       // the whole scrape unparseable.
       static AnsiString EscapeLabelValue_(const String &value);
 
-      // Health probes (Kubernetes-style): liveness is always served, readiness and
-      // health additionally check that the server is running and the database is
-      // connected.
+      // Health probes (Kubernetes-style). Liveness is always served and checks
+      // nothing, because a dependency failure must not get a healthy process killed.
+      // Readiness and health additionally require that the server is in the running
+      // state and that the database has recently PROVED it can answer - see rule 6.
+      // Neither issues a query: both read what the refresher published, so a stalled
+      // database cannot stall a probe.
       bool IsReady_(AnsiString &reason);
+
+      // The /healthz body. Carries status, state, database and uptime - and
+      // deliberately not the session counts, which rule 2 refuses to serve on
+      // /metrics in exactly the configuration where this endpoint stays open. See the
+      // definition.
       AnsiString BuildHealthBody_(bool &healthy);
       static AnsiString BuildHttpResponse_(int status_code, const char *content_type, const AnsiString &body,
          const AnsiString &extra_headers = AnsiString());
@@ -336,10 +426,37 @@ namespace HM
       ULONGLONG start_tick_count_;
       __int64 start_unix_time_;
 
+      // The refresher thread and everything it publishes. Started by Start() after
+      // the socket is listening and stopped by Stop() before tls_context_ is
+      // released, because it reads nothing else the listener owns.
+      std::thread refresher_;
+      std::condition_variable refresher_wakeup_;
+
+      // Guards every member below it. Held for a handful of instructions at a time
+      // and NEVER across a database call or a file read - that is the invariant that
+      // stops a stalled database from blocking the request thread through the back
+      // door, which would reintroduce the very failure rule 5 exists to remove.
+      std::mutex refresh_mutex_;
+
+      bool refresher_stop_;
+
+      // Result of the most recent completed probe, the tick and wall-clock time of
+      // the most recent SUCCESSFUL one, and the tick at which the most recent probe
+      // was STARTED. Four values rather than one because the three questions
+      // readiness asks are different: did it fail, how long ago did it last succeed,
+      // and is one already in flight.
+      bool database_reachable_;
+      ULONGLONG database_probe_success_tick_;
+      __int64 database_probe_success_unix_time_;
+      ULONGLONG database_probe_tick_;
+
+      // Set by a /metrics scrape, cleared by the refresher when it acts on it.
+      bool queue_refresh_requested_;
       ULONGLONG queue_cache_tick_;
       int queue_depth_cache_value_;
       __int64 queue_oldest_age_cache_value_;
 
+      bool certificate_refresh_requested_;
       ULONGLONG certificate_cache_tick_;
       AnsiString certificate_cache_body_;
 

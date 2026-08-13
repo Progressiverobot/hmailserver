@@ -7,6 +7,7 @@
 #include "ByteBuffer.h"
 
 #include <io.h>
+#include <climits>
 #include <boost/filesystem.hpp>
 
 #ifdef _DEBUG
@@ -100,13 +101,37 @@ namespace HM
       return true;
    }
 
-   int 
+   int
    File::GetSize()
    {
-      if (file_ == INVALID_HANDLE_VALUE)
+      // The guard here compared a FILE* against INVALID_HANDLE_VALUE, which is
+      // (HANDLE)-1: a closed File has file_ == nullptr, so the test was never true
+      // and the "not open" case fell through to file_size() with an empty name_ -
+      // which throws boost::filesystem::filesystem_error. ReadFile() calls this
+      // OUTSIDE ReadChunk's try block, so that exception would leave File with no
+      // HM report of its own.
+      if (file_ == nullptr)
          return 0;
 
-      return (int) boost::filesystem::file_size(name_);
+      // ...and with the error_code overload, a file that has become unreadable
+      // between Open and here answers 0 rather than throwing.
+      boost::system::error_code error_code;
+      boost::uintmax_t size = boost::filesystem::file_size(name_, error_code);
+
+      if (error_code)
+         return 0;
+
+      // The result is an int, so this is a 2 GiB ceiling on anything read through
+      // ReadFile/ReadTextFile. Saturate rather than truncate: a plain cast turns
+      // 2 GiB into a negative number, and ReadChunk would then be asked to allocate
+      // (size_t)(negative). Saturating means a file that large is read as far as
+      // INT_MAX instead, which is wrong but bounded - see the note in File.h.
+      const boost::uintmax_t maxRepresentable = (boost::uintmax_t) INT_MAX;
+
+      if (size > maxRepresentable)
+         return INT_MAX;
+
+      return (int) size;
    }
 
    bool
@@ -241,7 +266,14 @@ namespace HM
 
          if (file_ == nullptr)
             throw std::logic_error("Attempt to read from file which has not been opened.");
-         
+
+         // Allocate takes a size_t, so a negative iMaxSize becomes a request for
+         // very nearly SIZE_MAX bytes. Refuse it here with something that names the
+         // cause, rather than letting it surface as a bad_alloc whose message says
+         // nothing about where the number came from.
+         if (iMaxSize < 0)
+            throw std::runtime_error(Formatter::FormatAsAnsi("Refusing to read a negative number of bytes ({0}) from file {1}.", iMaxSize, name_));
+
          // Create a buffer to hold the file
          pFileContents->Allocate(iMaxSize);
 

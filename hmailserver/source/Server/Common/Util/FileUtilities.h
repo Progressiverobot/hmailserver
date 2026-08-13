@@ -36,7 +36,16 @@ namespace HM
       static bool WriteToFile(const String &sFilename, const String &sData, bool bUnicode);
       static bool WriteToFile(const String &sFilename, const AnsiString &sData);
 
+      // The size of a file, or 0 when it cannot be read. long is 32 bits here, so a
+      // size over LONG_MAX is SATURATED rather than truncated - see the definition
+      // for why the previous truncation turned three "> maximum" guards into
+      // guards that admitted the oversized file. Use FileSize64 where the true
+      // size matters.
       static long FileSize(const String &sFileName);
+
+      // The true 64-bit size. Returns false when the file cannot be read, which is
+      // the case FileSize cannot distinguish from an empty file.
+      static bool FileSize64(const String &sFileName, unsigned __int64 &size);
 
       static String GetTempFileName();
       static bool CreateDirectory(const String &sName);
@@ -82,6 +91,13 @@ namespace HM
       void Test();
    private:
 
+      void TestDeleteFile_();
+      void TestFileSize_();
+      void TestReadFileToBuf_();
 
+      // ByteBuffer and File have no tester of their own, and adding one would mean
+      // editing ClassTester::DoTests to reach it. They are the layer this class is
+      // built on, so their coverage lives here.
+      void TestByteBuffer_();
    };
 }

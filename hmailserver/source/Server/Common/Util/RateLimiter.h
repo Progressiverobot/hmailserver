@@ -86,6 +86,13 @@ namespace HM
 
       bool TryConsume(const String &key, int maxPerMinute);
 
+      // TryConsume with the clock supplied rather than read from time(0). This is
+      // the whole of TryConsume - the same map, the same lock, the same pruning -
+      // and exists because the window's behaviour across a clock step cannot be
+      // tested otherwise, which is how a bucket that could never expire went
+      // unnoticed. Production code calls TryConsume.
+      bool TryConsumeAt(const String &key, int maxPerMinute, time_t now);
+
       // Removes all per-minute buckets (used by self-tests and on configuration
       // reload). Deliberately does NOT touch the per-account quota counters:
       // those are persistent state, and wiping them would hand a compromised

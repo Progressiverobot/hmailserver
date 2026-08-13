@@ -508,7 +508,10 @@ namespace HM
    protected:
 	   bool AllocateBuffer(size_t nBufSize);
 	   void FreeBuffer();
-      AnsiString ReadBodyFromSourceFile() const;
+      // Answers false when the body could NOT be read, which an empty return value used
+      // to be indistinguishable from - see the comment on the definition. An empty body
+      // with a true return is legitimate: a header-only message has no body.
+      bool ReadBodyFromSourceFile(AnsiString &body) const;
 
       String GenerateFileNameFromEncapsulatedSubject(bool unicode) const;
    };

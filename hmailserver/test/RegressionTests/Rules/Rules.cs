@@ -1810,6 +1810,261 @@ namespace RegressionTests.Rules
          oRuleAction.Save();
       }
 
+      /// <summary>
+      /// The rule-loop counter is the depth of the chain that produced a message, not a
+      /// property of the message. ApplyAction_Reply built a brand-new Message and called
+      /// IncreaseRuleLoopCount() on it, and since a message with no
+      /// X-hMailServer-LoopCount header counts as zero, the reply always went out
+      /// carrying 1 - whatever the message that triggered it carried.
+      ///
+      /// Against the unfixed server this test fails on the final assertion with
+      /// "X-hMailServer-LoopCount: 1" in the reply instead of 3.
+      /// </summary>
+      [Test]
+      [Description("A rule REPLY must carry the triggering message's rule-loop count forward, not restart it at 1.")]
+      public void WhenRuleRepliesTheLoopCountShouldBeCarriedForward()
+      {
+         // Stated rather than assumed: the shipped default is 5 and PerformBasicSetup
+         // does not reset it, so a fixture that ran earlier could have left it anywhere.
+         _settings.RuleLoopLimit = 5;
+
+         var sender = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "loopcarry-src@example.test", "test");
+         var replier = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "loopcarry-dst@example.test", "test");
+
+         var rule = replier.Rules.Add();
+         rule.Name = "Loop count carry";
+         rule.Active = true;
+
+         var ruleCriteria = rule.Criterias.Add();
+         ruleCriteria.UsePredefined = true;
+         ruleCriteria.PredefinedField = eRulePredefinedField.eFTMessageSize;
+         ruleCriteria.MatchType = eRuleMatchType.eMTGreaterThan;
+         ruleCriteria.MatchValue = "0";
+         ruleCriteria.Save();
+
+         var ruleAction = rule.Actions.Add();
+         ruleAction.Type = eRuleActionType.eRAReply;
+         ruleAction.FromAddress = replier.Address;
+         ruleAction.FromName = "Loop Carry";
+         ruleAction.Subject = "Autoreply";
+         ruleAction.Body = "Autoreply body.";
+         ruleAction.Save();
+
+         rule.Save();
+
+         // Two hops already spent on this message, so the reply it provokes is the third.
+         var message =
+            "From: " + sender.Address + "\r\n" +
+            "To: " + replier.Address + "\r\n" +
+            "Subject: Carry the count\r\n" +
+            "X-hMailServer-LoopCount: 2\r\n" +
+            "\r\n" +
+            "Trigger the reply rule.\r\n";
+
+         var smtpClientSimulator = new SmtpClientSimulator();
+         smtpClientSimulator.SendRaw(sender.Address, replier.Address, message);
+
+         CustomAsserts.AssertRecipientsInDeliveryQueue(0);
+
+         var replyText = Pop3ClientSimulator.AssertGetFirstMessageText(sender.Address, "test");
+
+         StringAssert.Contains("X-hMailServer-LoopCount: 3", replyText, replyText);
+      }
+
+      /// <summary>
+      /// Why the count has to be carried and not merely reported: the Forward action
+      /// deliberately does not honour Auto-Submitted (a forward is not a generated
+      /// response), so a chain that alternates reply and forward is guarded by the
+      /// counter and by nothing else. Restarting the counter at every reply makes that
+      /// chain unbounded.
+      ///
+      /// Here the reply is generated at the loop limit, so the forward that would carry
+      /// it onwards must be refused.
+      ///
+      /// Against the unfixed server the reply carries 1 rather than 5, the forward is
+      /// permitted, and this test fails on the observer's message count being 1.
+      /// </summary>
+      [Test]
+      [Description("A reply generated at the rule-loop limit must not then be forwardable by another rule.")]
+      public void WhenReplyReachesTheLoopLimitAFollowOnForwardShouldBeRefused()
+      {
+         _settings.RuleLoopLimit = 5;
+
+         var sender = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "loopstop-src@example.test", "test");
+         var replier = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "loopstop-dst@example.test", "test");
+         var observer = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "loopstop-obs@example.test", "test");
+
+         // The replier answers anything it receives.
+         var replyRule = replier.Rules.Add();
+         replyRule.Name = "Loop stop reply";
+         replyRule.Active = true;
+
+         var replyCriteria = replyRule.Criterias.Add();
+         replyCriteria.UsePredefined = true;
+         replyCriteria.PredefinedField = eRulePredefinedField.eFTMessageSize;
+         replyCriteria.MatchType = eRuleMatchType.eMTGreaterThan;
+         replyCriteria.MatchValue = "0";
+         replyCriteria.Save();
+
+         var replyAction = replyRule.Actions.Add();
+         replyAction.Type = eRuleActionType.eRAReply;
+         replyAction.FromAddress = replier.Address;
+         replyAction.FromName = "Loop Stop";
+         replyAction.Subject = "Autoreply";
+         replyAction.Body = "Autoreply body.";
+         replyAction.Save();
+
+         replyRule.Save();
+
+         // The sender forwards anything it receives - including that reply - onwards.
+         var forwardRule = sender.Rules.Add();
+         forwardRule.Name = "Loop stop forward";
+         forwardRule.Active = true;
+
+         var forwardCriteria = forwardRule.Criterias.Add();
+         forwardCriteria.UsePredefined = true;
+         forwardCriteria.PredefinedField = eRulePredefinedField.eFTMessageSize;
+         forwardCriteria.MatchType = eRuleMatchType.eMTGreaterThan;
+         forwardCriteria.MatchValue = "0";
+         forwardCriteria.Save();
+
+         var forwardAction = forwardRule.Actions.Add();
+         forwardAction.Type = eRuleActionType.eRAForwardEmail;
+         forwardAction.To = observer.Address;
+         forwardAction.Save();
+
+         forwardRule.Save();
+
+         // Four hops spent, so the reply is the fifth and the limit is reached exactly at
+         // the point the forward would have to be generated.
+         var message =
+            "From: " + sender.Address + "\r\n" +
+            "To: " + replier.Address + "\r\n" +
+            "Subject: Stop the chain\r\n" +
+            "X-hMailServer-LoopCount: 4\r\n" +
+            "\r\n" +
+            "Trigger the reply rule.\r\n";
+
+         var smtpClientSimulator = new SmtpClientSimulator();
+         smtpClientSimulator.SendRaw(sender.Address, replier.Address, message);
+
+         CustomAsserts.AssertRecipientsInDeliveryQueue(0);
+
+         // The reply itself is delivered; it is the hop after it that must not happen.
+         ImapClientSimulator.AssertMessageCount(sender.Address, "test", "Inbox", 1);
+         ImapClientSimulator.AssertMessageCount(observer.Address, "test", "Inbox", 0);
+
+         // Polls for the entry and then clears the log. The clearing matters as much as
+         // the assertion: PerformBasicSetup calls AssertNoReportedError, so an error log
+         // left behind by a test that provoked one on purpose fails every test after it.
+         CustomAsserts.AssertReportedError("Maximum rule loop count reached");
+      }
+
+      /// <summary>
+      /// RegularExpression::TestExactMatch swallows a pattern that will not compile and
+      /// returns "no match", so a criterion with one unmatched bracket produces a rule
+      /// that is Active in the editor, matches nothing ever, and says nothing about it.
+      /// That is the worst configuration fault to diagnose, because the rule looks
+      /// correct and the mail looks like it simply did not match.
+      ///
+      /// The message must still be delivered normally - a broken criterion may not break
+      /// delivery - so the observable change is the report, not the routing.
+      ///
+      /// Against the unfixed server the two message-count assertions pass and the final
+      /// assertion fails, because the error log is empty.
+      /// </summary>
+      [Test]
+      [Description("A regex criterion that cannot be compiled must be reported, not silently never match.")]
+      public void WhenRegexCriterionCannotBeCompiledItShouldBeReported()
+      {
+         var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "badregex@example.test", "test");
+
+         var rule = account.Rules.Add();
+         rule.Name = "Broken regex criteria";
+         rule.Active = true;
+
+         var ruleCriteria = rule.Criterias.Add();
+         ruleCriteria.UsePredefined = false;
+         ruleCriteria.HeaderField = "Subject";
+         ruleCriteria.MatchType = eRuleMatchType.eMTRegExMatch;
+
+         // An unterminated character class. Perl syntax has no reading of this, so Boost
+         // raises error_brack while constructing the expression - which is the same
+         // exception type it raises when it abandons a match, which is exactly why the
+         // two had to be told apart.
+         //
+         // The GUID is not decoration. A pattern that has been reported once is suspended
+         // for RegexSuspensionSeconds and deliberately NOT reported again inside that
+         // window, so a fixed pattern would make this test pass on a cold service and
+         // fail if it were run twice within five minutes - the sort of test that gets
+         // marked flaky and then ignored. A fresh pattern per run is always a fresh key.
+         ruleCriteria.MatchValue = "[unterminated-" + Guid.NewGuid().ToString("N");
+         ruleCriteria.Save();
+
+         var ruleAction = rule.Actions.Add();
+         ruleAction.Type = eRuleActionType.eRAMoveToImapFolder;
+         ruleAction.IMAPFolder = "INBOX.BrokenRegex";
+         ruleAction.Save();
+
+         rule.Save();
+
+         var smtpClientSimulator = new SmtpClientSimulator();
+         smtpClientSimulator.Send(account.Address, account.Address, "Any subject at all",
+            "The criterion cannot compile, so this must be delivered untouched.");
+
+         CustomAsserts.AssertRecipientsInDeliveryQueue(0);
+
+         // Unchanged behaviour: the criterion does not match, so the rule does not fire.
+         ImapClientSimulator.AssertMessageCount(account.Address, "test", "Inbox", 1);
+
+         CustomAsserts.AssertReportedError("is not a valid regular expression");
+      }
+
+      /// <summary>
+      /// The negative control for the pair above, and the reason it is here: the two
+      /// tests would both pass if a regex criterion had simply stopped working
+      /// altogether. This one pins that a valid pattern still matches and still moves
+      /// the message, and that nothing is reported for it.
+      /// </summary>
+      [Test]
+      [Description("Negative control: a valid regex criterion must still match, move the message, and report nothing.")]
+      public void WhenRegexCriterionIsValidItShouldStillMatchAndReportNothing()
+      {
+         var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "goodregex@example.test", "test");
+
+         var rule = account.Rules.Add();
+         rule.Name = "Working regex criteria";
+         rule.Active = true;
+
+         var ruleCriteria = rule.Criterias.Add();
+         ruleCriteria.UsePredefined = false;
+         ruleCriteria.HeaderField = "Subject";
+         ruleCriteria.MatchType = eRuleMatchType.eMTRegExMatch;
+         ruleCriteria.MatchValue = "[a-f]*";
+         ruleCriteria.Save();
+
+         var ruleAction = rule.Actions.Add();
+         ruleAction.Type = eRuleActionType.eRAMoveToImapFolder;
+         ruleAction.IMAPFolder = "INBOX.WorkingRegex";
+         ruleAction.Save();
+
+         rule.Save();
+
+         var smtpClientSimulator = new SmtpClientSimulator();
+         smtpClientSimulator.Send(account.Address, account.Address, "abcdef", "This matches [a-f]*.");
+         smtpClientSimulator.Send(account.Address, account.Address, "xyz", "This does not.");
+
+         CustomAsserts.AssertRecipientsInDeliveryQueue(0);
+
+         ImapClientSimulator.AssertMessageCount(account.Address, "test", "Inbox.WorkingRegex", 1);
+         ImapClientSimulator.AssertMessageCount(account.Address, "test", "Inbox", 1);
+
+         // Nothing at all should have been reported. Asserting the absence of the whole
+         // log rather than the absence of one string is deliberate: a criterion that
+         // silently stopped being evaluated would satisfy a narrower check.
+         CustomAsserts.AssertNoReportedError();
+      }
+
       private void AddExactMatchRule(Account account)
       {
          var rule = account.Rules.Add();

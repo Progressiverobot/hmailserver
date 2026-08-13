@@ -130,10 +130,21 @@ namespace HM
    // but gives better performance than allocating a whole new buffer.
    //---------------------------------------------------------------------------()
    {
-      if (buffer_size_ - iDecreaseWith < 0)
+      // The test used to be "buffer_size_ - iDecreaseWith < 0", which cannot be
+      // true: both operands are size_t, so the subtraction is unsigned and wraps
+      // rather than going negative. The guard therefore never fired and the case it
+      // was written to catch was the one it let through - buffer_size_ became a
+      // value near SIZE_MAX, and since GetSize() and GetBuffer() are what every
+      // caller reads the buffer through, the next read walked gigabytes of heap
+      // past a small allocation.
+      //
+      // Compare before subtracting. No caller reaches this today (File::ReadChunk
+      // never reads more than it allocated, and TransparentTransmissionBuffer
+      // checks the buffer length before stripping a terminator from it), so this
+      // is the guard doing what it always claimed rather than a fix for a live
+      // fault - but it is the guard those callers are written against.
+      if (iDecreaseWith > buffer_size_)
       {
-         // We should never get here. This code is only run if you
-         // decrease so that the size get's negative.
          ErrorManager::Instance()->ReportError(ErrorManager::High, 4222, "ByteBuffer::DecreaseSize", "Tried to decrease the size of the buffer to a negative value.");
          return ;
       }

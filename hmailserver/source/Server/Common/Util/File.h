@@ -46,6 +46,12 @@ namespace HM
       bool FlushToDisk();
 
       void Write_(void *buffer, int item_size, int item_count);
+
+      // The size of the open file, 0 if it is not open or cannot be stat'ed. The
+      // int result caps this at INT_MAX, and a larger file saturates rather than
+      // wrapping negative - so ReadFile()/ReadTextFile() cannot read past 2 GiB.
+      // Widening it means widening ReadChunk too, which is a public change with
+      // callers outside this class.
       int GetSize();
 
       bool SetPosition(int position);

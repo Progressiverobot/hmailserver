@@ -91,6 +91,31 @@ namespace HM
    void
    RateLimiter::PruneExpired_(std::deque<time_t> &events, time_t now) const
    {
+      // An event dated in the future cannot satisfy the expiry test below, so it is
+      // not retired when it should be: once maxPerMinute of them are recorded, the
+      // bucket refuses everything until the wall clock passes those timestamps plus
+      // the window. Be precise about the duration, because it is the whole
+      // consequence - it is however far ahead the clock had run. An hour ahead is an
+      // hour of refused submissions from that remote IP address or to that
+      // destination domain; a machine whose clock was set years ahead and then
+      // corrected does not recover at all in any useful sense.
+      //
+      // It needs no attacker: a forward clock correction that is later put back, a
+      // resumed virtual machine, or a mis-set hardware clock all produce it. And
+      // nothing else notices, because these counters are not persisted and never
+      // logged.
+      //
+      // Pull such an event back to now: the count is kept, and it ages out normally
+      // one window from here. This is the same guard PruneUsage_ already carries for
+      // the per-account quota; the per-minute window never got it. The deque stays
+      // sorted because every timestamp still in the future is clamped to the same
+      // value, and anything already at or before now is older than that value.
+      for (time_t &event : events)
+      {
+         if (event > now)
+            event = now;
+      }
+
       while (!events.empty() && events.front() <= now - kWindowSeconds)
          events.pop_front();
    }
@@ -98,12 +123,16 @@ namespace HM
    bool
    RateLimiter::TryConsume(const String &key, int maxPerMinute)
    {
+      return TryConsumeAt(key, maxPerMinute, time(0));
+   }
+
+   bool
+   RateLimiter::TryConsumeAt(const String &key, int maxPerMinute, time_t now)
+   {
       if (maxPerMinute <= 0)
          return true;
 
       boost::lock_guard<boost::recursive_mutex> guard(mutex_);
-
-      time_t now = time(0);
 
       auto it = buckets_.find(key);
       if (it == buckets_.end())

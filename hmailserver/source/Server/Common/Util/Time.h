@@ -54,9 +54,16 @@ namespace HM
    {
    public :
       TimeTester () {};
-      ~TimeTester () {};      
+      ~TimeTester () {};
 
       void Test();
-   };  
+
+   private:
+
+      // Clock-behaviour coverage for RateLimiter's per-minute window. Lives with
+      // the time tests because that is what it is testing, and because TimeTester
+      // is already reached from ClassTester::DoTests.
+      void TestRateLimiterClockRegression_();
+   };
 
 }

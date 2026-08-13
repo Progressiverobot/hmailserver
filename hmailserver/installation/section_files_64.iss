@@ -13,12 +13,15 @@ Source: "WebAdmin\index.html"; DestDir: "{app}\WebAdmin"; Flags: ignoreversion; 
 
 ; hMailServer Control Panel (modern .NET 10 WPF admin app)
 Source: "..\source\Tools\ControlPanel\publish\*"; DestDir: "{app}\ControlPanel"; Flags: ignoreversion recursesubdirs; Components: controlpanel;
-; .NET 10 Desktop Runtime, installed silently when missing. The server
-; component needs it too: DBSetup/DBSetupQuick/DBUpdater are .NET 10 apps
-; that run during installation (from [Code], before [Run] executes - see
+; .NET {#DOTNET_MAJOR} Desktop Runtime, installed silently when missing. The server
+; component needs it too: DBSetup/DBSetupQuick/DBUpdater are .NET {#DOTNET_MAJOR}
+; apps that run during installation (from [Code], before [Run] executes - see
 ; InstallDotNetRuntime in hMailServerInnoExtension.iss).
 ; (file is downloaded by build\get-dotnet-runtime.ps1; not in the repository)
-Source: "DotNet\windowsdesktop-runtime-10.0-win-x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall; Components: server controlpanel;
+; The filename comes from DOTNET_RUNTIME_FILE in hMailServer64.iss so that this
+; entry, the [Run] entry and the installed-version probe cannot name different
+; versions - they already had.
+Source: "DotNet\{#DOTNET_RUNTIME_FILE}"; DestDir: "{tmp}"; Flags: deleteafterinstall; Components: server controlpanel;
 
 Source: "SQLCE\SSCERuntime_x64-ENU.msi"; Flags: deleteafterinstall ; Excludes: ".svn"; DestDir: "{tmp}"; Components: server;
 

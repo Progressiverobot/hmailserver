@@ -1,5 +1,12 @@
 [Setup]
 AppName=hMailServer
+; Pinned rather than left to default to AppName. The uninstall registry key is
+; "<AppId>_is1", and hMailServerInnoExtension.iss reads
+; ...\Uninstall\hMailServer_is1\InstallLocation by name in two places (GetInifile
+; and OverrideInstallationFolder, the latter being how an x86-to-x64 upgrade finds
+; the existing installation directory). This value produces exactly the key those
+; already use; changing AppName without it would silently break both.
+AppId=hMailServer
 AppCopyright=Copyright (C) 2026
 DefaultDirName={pf}\hMailServer
 DefaultGroupName=hMailServer

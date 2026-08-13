@@ -5,6 +5,10 @@
 #include "stdafx.h"
 #include "Time.h"
 
+// For TimeTester::TestRateLimiterClockRegression_ below: the per-minute window is
+// clock behaviour, so its coverage lives with the time tests.
+#include "RateLimiter.h"
+
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
 #define new DEBUG_NEW
@@ -503,7 +507,6 @@ namespace HM
       // 30-Apr-2004 17:38:48 +0200
 
       std::vector<String> vecParts = StringParser::SplitString(sMIMEDate, " ");
-      auto iterPart = vecParts.begin();
 
       String sResult = "";
 
@@ -515,22 +518,66 @@ namespace HM
       std::vector<String> vecDateParts = StringParser::SplitString(sPart1, "-");
       if (vecDateParts.size() != 3 )
          return "";
-      
+
       long lDay = _ttoi(vecDateParts[0]);
       long lMonth = GetMonthIndex(vecDateParts[1]);
       long lYear = _ttoi(vecDateParts[2]);
 
-      // Parse time
+      // Parse time.
+      //
+      // The size test that used to sit here named vecDateParts - a copy of the date
+      // test above - so it re-checked the date and never checked the time at all.
+      // vecTimeParts[1] and [2] were then read unconditionally, so a time with
+      // fewer than three colon-separated fields indexed one or two elements PAST
+      // THE END of the vector, interpreted whatever heap followed the allocation as
+      // a String, and handed that to _ttoi - which dereferences its buffer pointer.
+      //
+      // That was reachable from the network: this function's only caller is
+      // IMAPCommandAppend, which passes any quoted word from the APPEND command
+      // through unvalidated, so "APPEND INBOX \"01-Jan-2020 12:30\" {4}" (no
+      // seconds) or "\"01-Jan-2020 +0000\"" (no time at all) was an out-of-bounds
+      // read on an authenticated IMAP command.
+      //
+      // A short time is zero-filled rather than refused: the date parsed cleanly,
+      // and returning "" would throw that away too and leave the message with no
+      // internal date at all.
       String sPart2 = vecParts[1];
       std::vector<String> vecTimeParts = StringParser::SplitString(sPart2, ":");
-      if (vecDateParts.size() != 3 )
-         return "";
-      
-      long lHour = _ttoi(vecTimeParts[0]);
-      long lMinute = _ttoi(vecTimeParts[1]);
-      long lSecond = _ttoi(vecTimeParts[2]);
 
-      sResult.Format(_T("%04d-%.02d-%.02d %.02d:%.02d:%.02d"), 
+      long lHour = vecTimeParts.size() >= 1 ? _ttoi(vecTimeParts[0]) : 0;
+      long lMinute = vecTimeParts.size() >= 2 ? _ttoi(vecTimeParts[1]) : 0;
+      long lSecond = vecTimeParts.size() >= 3 ? _ttoi(vecTimeParts[2]) : 0;
+
+      // The result of this function goes to Message::SetCreateTime and from there
+      // into hm_messages.messagecreatetime, which is a datetime/timestamp column on
+      // every backend - so it has to be a date that exists, not merely six numbers.
+      // Nothing checked that: "APPEND INBOX \"01-Jan-2020 99:99:99\"" produced
+      // "2020-01-01 99:99:99", and an unparseable month name produced month 00,
+      // either of which the database refuses. PersistentMessage::SaveObject's result
+      // is not checked by the APPEND path, so the client was answered OK for a
+      // message whose row was never written - the file stays in the user's directory
+      // where no client will ever see it and no quota will ever count it.
+      //
+      // "" is the right answer for input we cannot use, and it is already the
+      // established one: SaveObject substitutes the current time for an empty create
+      // time, so the message is stored with a slightly wrong date instead of being
+      // stored nowhere. DateTime::SetDateTime is the range check (OleDateFromTm
+      // rejects month 0, day 30 of February, hour 24, minute and second 60).
+      DateTime validate;
+      validate.SetDateTime((int) lYear, (int) lMonth, (int) lDay, (int) lHour, (int) lMinute, (int) lSecond);
+
+      if (validate.GetStatus() != DateTime::valid)
+         return "";
+
+      // ...and a year the column cannot hold, which SetDateTime does not police:
+      // OleDateFromTm accepts any year up to 9999, while SQL Server's datetime
+      // begins at 1753. Below that the INSERT fails again, so the same fallback
+      // applies.
+      const long minimumStorableYear = 1753;
+      if (lYear < minimumStorableYear)
+         return "";
+
+      sResult.Format(_T("%04d-%.02d-%.02d %.02d:%.02d:%.02d"),
             lYear, lMonth, lDay, lHour, lMinute, lSecond);
 
       return sResult;
@@ -825,6 +872,121 @@ namespace HM
          throw;
       if (iHours != -1 || iMinutes != 0)
          throw;
+
+      // GetInternalDateFromIMAPInternalDate. The well-formed form first, so the
+      // cases below cannot pass by the function having stopped working.
+      if (Time::GetInternalDateFromIMAPInternalDate(_T("30-Apr-2004 17:38:48 +0200")) != _T("2004-04-30 17:38:48"))
+         throw;
+
+      // A time with no seconds, and one with no time at all. Against the code
+      // before this was fixed, both read one or two elements past the end of the
+      // vector of colon-separated time fields and produced whatever heap followed
+      // it - so a run either faulted or returned a garbage second. Both forms are
+      // reachable from an IMAP APPEND, where the internal date is any quoted word
+      // the client sends.
+      if (Time::GetInternalDateFromIMAPInternalDate(_T("01-Jan-2020 12:30")) != _T("2020-01-01 12:30:00"))
+         throw;
+      if (Time::GetInternalDateFromIMAPInternalDate(_T("01-Jan-2020 12")) != _T("2020-01-01 12:00:00"))
+         throw;
+      if (Time::GetInternalDateFromIMAPInternalDate(_T("01-Jan-2020 +0000")) != _T("2020-01-01 00:00:00"))
+         throw;
+
+      // Still refused: a date that is not three dash-separated fields, and a value
+      // with nothing after the date. Unchanged behaviour, pinned so the tolerance
+      // added above does not quietly grow.
+      if (Time::GetInternalDateFromIMAPInternalDate(_T("01-Jan 12:30:00")) != _T(""))
+         throw;
+      if (Time::GetInternalDateFromIMAPInternalDate(_T("01-Jan-2020")) != _T(""))
+         throw;
+
+      // A date that does not exist. Every one of these used to be formatted and
+      // returned - "2020-01-01 99:99:99", or a month of 00 for a month name that
+      // does not parse - and then written to a datetime column, which refuses it.
+      // The APPEND path does not check the result of the save, so the client was
+      // told OK for a message that acquired no row at all. "" makes the save
+      // substitute the current time, which keeps the message.
+      if (Time::GetInternalDateFromIMAPInternalDate(_T("01-Jan-2020 99:99:99")) != _T(""))
+         throw;
+      if (Time::GetInternalDateFromIMAPInternalDate(_T("01-Jan-2020 24:00:00")) != _T(""))
+         throw;
+      if (Time::GetInternalDateFromIMAPInternalDate(_T("01-Marcha-2020 10:00:00")) != _T(""))
+         throw;
+      if (Time::GetInternalDateFromIMAPInternalDate(_T("32-Jan-2020 10:00:00")) != _T(""))
+         throw;
+      if (Time::GetInternalDateFromIMAPInternalDate(_T("30-Feb-2020 10:00:00")) != _T(""))
+         throw;
+      if (Time::GetInternalDateFromIMAPInternalDate(_T("01-Jan-1700 10:00:00")) != _T(""))
+         throw;
+
+      // ...and a real leap day is still accepted, so the range check above is a
+      // range check and not a blanket refusal.
+      if (Time::GetInternalDateFromIMAPInternalDate(_T("29-Feb-2020 10:00:00")) != _T("2020-02-29 10:00:00"))
+         throw;
+
+      // The per-minute rate-limiter window is driven by time(0), and a clock that
+      // steps backwards used to leave a bucket permanently at its ceiling. The
+      // assertions live here rather than with the other RateLimiter tests in
+      // ClassTester because this is clock behaviour and TimeTester is already
+      // wired into ClassTester::DoTests.
+      TestRateLimiterClockRegression_();
+   }
+
+   void
+   TimeTester::TestRateLimiterClockRegression_()
+   {
+      // Start from a known state. Clear() only touches the per-minute buckets, not
+      // the persisted per-account quota counters.
+      RateLimiter::Instance()->Clear();
+
+      const String key = _T("timetester-clock-regression");
+      const time_t base = 1600000000; // an arbitrary fixed point, so nothing depends on the wall clock
+
+      // Ordinary behaviour first: two events fill a ceiling of two, and the third is
+      // refused.
+      if (!RateLimiter::Instance()->TryConsumeAt(key, 2, base))
+         throw;
+      if (!RateLimiter::Instance()->TryConsumeAt(key, 2, base))
+         throw;
+      if (RateLimiter::Instance()->TryConsumeAt(key, 2, base))
+         throw;
+
+      // Past the window, the bucket is free again.
+      if (!RateLimiter::Instance()->TryConsumeAt(key, 2, base + 61))
+         throw;
+
+      RateLimiter::Instance()->Clear();
+
+      // Now the clock regression. Fill the ceiling at a clock a day ahead of where we
+      // are about to pretend to be - what a forward NTP correction, a resumed virtual
+      // machine or a mis-set BIOS clock leaves behind once the time is put right.
+      const time_t future = base + (24 * 3600);
+      if (!RateLimiter::Instance()->TryConsumeAt(key, 2, future))
+         throw;
+      if (!RateLimiter::Instance()->TryConsumeAt(key, 2, future))
+         throw;
+
+      // At the corrected clock the bucket is still full, which is correct either way:
+      // two events were recorded and nothing has aged out yet.
+      if (RateLimiter::Instance()->TryConsumeAt(key, 2, base))
+         throw;
+
+      // This is the assertion that separates fixed from unfixed. A window later the
+      // bucket must be usable again. Before the fix the two events kept their future
+      // timestamps, so "older than now minus 60 seconds" could not become true until
+      // the wall clock caught up with them - a day of refused submissions for that
+      // remote IP address or destination domain here, and unbounded for a clock that
+      // had been set years ahead.
+      if (!RateLimiter::Instance()->TryConsumeAt(key, 2, base + 61))
+         throw;
+
+      // ...and it is a working window again rather than simply open: the event above
+      // still counts, one more fills it, and the next is refused.
+      if (!RateLimiter::Instance()->TryConsumeAt(key, 2, base + 61))
+         throw;
+      if (RateLimiter::Instance()->TryConsumeAt(key, 2, base + 61))
+         throw;
+
+      RateLimiter::Instance()->Clear();
    }
 
 }

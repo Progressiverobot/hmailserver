@@ -229,6 +229,7 @@ EXIT 0
     <ClCompile Include="..\Common\Sieve\SieveStorage.cpp" />
     <ClCompile Include="..\Common\Sieve\SieveVacationTracker.cpp" />
     <ClCompile Include="..\Common\Sieve\SieveVacationResponder.cpp" />
+    <ClCompile Include="..\Common\Rules\RuleGuard.cpp" />
     <ClCompile Include="..\Common\Sieve\ManageSieveServer.cpp" />
     <ClCompile Include="..\Common\Application\RemoveExpiredRecords.cpp" />
     <ClCompile Include="..\Common\Application\Scheduler.cpp" />
@@ -765,6 +766,7 @@ EXIT 0
     <ClInclude Include="..\Common\Sieve\SieveStorage.h" />
     <ClInclude Include="..\Common\Sieve\SieveVacationTracker.h" />
     <ClInclude Include="..\Common\Sieve\SieveVacationResponder.h" />
+    <ClInclude Include="..\Common\Rules\RuleGuard.h" />
     <ClInclude Include="..\Common\Sieve\ManageSieveServer.h" />
     <ClInclude Include="..\Common\Application\RemoveExpiredRecords.h" />
     <ClInclude Include="..\Common\Application\Scheduler.h" />

@@ -21,6 +21,7 @@
 #include "../Common/Cache/CacheContainer.h"
 #include "../Common/Util/Time.h"
 #include "../Common/Util/RegularExpression.h"
+#include "../Common/Rules/RuleGuard.h"
 
 #include "../Common/Persistence/PersistentMessage.h"
 
@@ -62,8 +63,17 @@ namespace HM
       }
 
       std::shared_ptr<MessageData> pMessageData = std::shared_ptr<MessageData>(new MessageData());
-      pMessageData->LoadFromMessage(account, pMessage);
-      
+      const bool loaded = pMessageData->LoadFromMessage(account, pMessage);
+
+      // The rule set must not run against a MessageData the engine could not populate.
+      // Every criterion would then be compared against an empty string, NotEquals and
+      // NotContains would match, and a "Subject NotContains [approved] -> Delete" rule
+      // would destroy the message. RuleGuard reports it; we deliver unfiltered, because
+      // unfiltered mail in an inbox is recoverable and deleted mail is not.
+      if (!RuleGuard::MessageIsUsableForRules(loaded, account, pMessage))
+         return;
+
+
       rule_account_id_ = pRules->GetAccountID();
 
       for (int i = 0; i < pRules->GetCount(); i++)
@@ -390,7 +400,12 @@ namespace HM
 
       String fileName = PersistentMessage::GetFileName(account, pMsgData->GetMessage());
 
-      pMsgData->Write(fileName);
+      // Write is not atomic - MimeBody::SaveAllToFile rewrites the file in place - so a
+      // failure part-way through leaves a message that is neither the original nor the
+      // rewritten one, and delivery continues with it. This does not repair that; it
+      // stops it being silent, which it has been since the action was written.
+      if (!pMsgData->Write(fileName))
+         RuleGuard::ReportActionFailed(_T("SetHeaderValue"), fileName);
    }
 
    void 
@@ -438,7 +453,11 @@ namespace HM
       pNewMsgData->SetBody(pAction->GetBody());
       pNewMsgData->SetSentTime(Time::GetCurrentMimeDate());
       pNewMsgData->SetAutoReplied();
-      pNewMsgData->IncreaseRuleLoopCount();
+
+      // Carry the count forward from the message that triggered the reply. pMsg is a
+      // brand-new Message, so IncreaseRuleLoopCount() here always produced 1 whatever
+      // the original carried, and the RuleLoopLimit bound restarted at every reply.
+      RuleGuard::CarryLoopCountForward(pMsgData, pNewMsgData);
       pNewMsgData->Write(newMessageFileName);
 
       // Add recipients.
@@ -570,10 +589,11 @@ namespace HM
          }
       case RuleCriteria::MatchesRegEx:
          {
-            if (RegularExpression::TestExactMatch(matchValue, testValue))
-               return true;
-            else
-               return false;
+            // Not RegularExpression::TestExactMatch any more. That function collapses
+            // "this pattern will not compile" and "Boost abandoned the match" into the
+            // same silent false, and both of those need saying out loud - see RuleGuard.
+            // The construction and the match itself are unchanged.
+            return RuleGuard::RegexCriteriaMatches(matchValue, testValue);
          }
       case RuleCriteria::Wildcard:
          {

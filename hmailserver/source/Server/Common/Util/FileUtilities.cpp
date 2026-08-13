@@ -15,6 +15,7 @@
 #include "../Util/RegularExpression.h"
 
 #include <boost/filesystem.hpp>
+#include <climits>
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -38,44 +39,51 @@ namespace HM
    {
       const int iMaxNumberOfTries = 5;
 
-      const int FILE_NOT_FOUND = 2;
-      const int PATH_NOT_FOUND = 3;
-
       for (int i = 1; i <= iMaxNumberOfTries; i++)
       {
-         AnsiString sFilename = FileName;
-
          boost::system::error_code error_code;
 
-         boost::filesystem::path path(sFilename.begin(), sFilename.end());
+         // Two defects lived in the four lines this replaces, and they compounded.
+         //
+         // 1. The name was narrowed to ANSI first and the path built from those
+         //    bytes, so every character outside the active code page was replaced.
+         //    The delete then named a path that does not exist, boost answered
+         //    "did not exist", and the code below called that success. Non-ASCII
+         //    reaches these paths through IDN domains and non-ASCII account names,
+         //    where the message file is under a directory named after the domain.
+         //    Every other function in this file passes the wide String straight to
+         //    boost; this one did not.
+         //
+         // 2. boost::filesystem::remove returns false BOTH when the file was not
+         //    there and when the delete failed - in the failure case it also sets
+         //    error_code, which is the only way to tell them apart. The old code
+         //    returned true on false without looking at error_code, so a delete
+         //    that failed because another process held the file open reported
+         //    success. That also made the retry loop and the HM5047 report below
+         //    unreachable: DeleteFile could not return false for any input, so
+         //    every caller that checks the result - PersistentMessage::DeleteFile,
+         //    SieveStorage::DeleteScript, the external POP3 fetcher, the log and
+         //    backup retention passes - was checking a constant.
+         boost::filesystem::remove(boost::filesystem::path(std::wstring(FileName)), error_code);
 
-         if (!boost::filesystem::remove(path, error_code))
+         if (!error_code)
          {
-            // file did not exist.
+            // Deleted, or was not there in the first place. Both satisfy a caller
+            // whose intent is "this file must not exist".
             return true;
          }
 
-         if (error_code)
+         if (i == iMaxNumberOfTries)
          {
-            // We failed to delete the file. 
-
-            if (i == iMaxNumberOfTries)
-            {
-               // We still couldn't delete the file. Lets give up and report in windows event log.
-               String sErrorMessage;
-               sErrorMessage.Format(_T("Could not delete the file %s. Tried 5 times without success."), FileName.c_str());
-               ErrorManager::Instance()->ReportError(ErrorManager::High, 5047, "File::DeleteFile", sErrorMessage, error_code);
-               return false;
-            }
-
-            // Some other process must have locked the file.
-            Sleep(1000);
+            // We still couldn't delete the file. Lets give up and report in windows event log.
+            String sErrorMessage;
+            sErrorMessage.Format(_T("Could not delete the file %s. Tried %d times without success."), FileName.c_str(), iMaxNumberOfTries);
+            ErrorManager::Instance()->ReportError(ErrorManager::High, 5047, "FileUtilities::DeleteFile", sErrorMessage, error_code);
+            return false;
          }
-         else
-         {
-            // file deleted.
-            return true;
-         }
+
+         // Some other process must have locked the file.
+         Sleep(1000);
       }
 
       return false;
@@ -288,18 +296,50 @@ namespace HM
    void
    FileUtilities::ReadFileToBuf(const String &sFilename, BYTE *OutBuf, int iStart, int iCount)
    {
+      // Nothing asked for. Returning early also keeps the ReadChunk(0) case out of
+      // the way rather than relying on new BYTE[0] behaving.
+      if (iCount <= 0)
+         return;
+
+      // The declared defaults are -1/-1 and no caller uses them: -1 seeks nowhere
+      // and a count of -1 becomes a near-SIZE_MAX allocation inside ReadChunk. A
+      // negative start now reads from the beginning, which is what a caller asking
+      // for "the whole file" means, and a non-positive count is nothing to do.
+      if (iStart < 0)
+         iStart = 0;
+
       File file;
       if (!file.Open(sFilename, File::OTReadOnly))
       {
          throw std::logic_error(Formatter::FormatAsAnsi("Unable to open file {0}", sFilename));
       }
 
-      file.SetPosition(iStart);
+      // The result of the seek used to be discarded. A failed seek leaves the
+      // position at the start of the file, and the read then returned the FIRST
+      // iCount bytes while the caller believed it had the bytes at iStart - for the
+      // one caller, IMAPFetch's BODY[]<start.count> partial fetch, that is the
+      // wrong region of the message handed to the client with no indication that
+      // anything went wrong. Throwing matches how the failed open above is already
+      // reported, so the caller's existing barrier covers it.
+      if (!file.SetPosition(iStart))
+      {
+         throw std::runtime_error(Formatter::FormatAsAnsi("Unable to seek to offset {0} in file {1}", iStart, sFilename));
+      }
 
       std::shared_ptr<ByteBuffer> bytes = file.ReadChunk(iCount);
 
-      memcpy(OutBuf, bytes->GetBuffer(), iCount);
+      // Copy only what was actually read, and zero the rest. The old copy took
+      // iCount unconditionally; it stayed inside the allocation because ReadChunk
+      // allocates and zeroes iCount bytes before reading, but that is an accident of
+      // ReadChunk's implementation rather than something this call was entitled to.
+      const size_t bytesRead = bytes->GetSize();
+      const size_t requested = (size_t) iCount;
 
+      if (bytesRead > 0)
+         memcpy(OutBuf, bytes->GetBuffer(), bytesRead < requested ? bytesRead : requested);
+
+      if (bytesRead < requested)
+         memset(OutBuf + bytesRead, 0, requested - bytesRead);
    }
 
    bool 
@@ -346,16 +386,54 @@ namespace HM
       return true;
    }
 
+   bool
+   FileUtilities::FileSize64(const String &sFileName, unsigned __int64 &size)
+   {
+      size = 0;
+
+      boost::system::error_code error_code;
+      boost::uintmax_t result = boost::filesystem::file_size(sFileName, error_code);
+
+      if (error_code)
+         return false;
+
+      size = (unsigned __int64) result;
+      return true;
+   }
+
    long
    FileUtilities::FileSize(const String &sFileName)
    {
-      boost::system::error_code error_code;
-      int result = (int)boost::filesystem::file_size(sFileName, error_code);
+      unsigned __int64 size = 0;
 
-      if (error_code)
+      if (!FileSize64(sFileName, size))
          return 0;
 
-      return result;
+      // long is 32 bits here, so a file over 2 GiB does not fit in the result. It
+      // used to be truncated by a plain (int) cast, and truncation fails in the
+      // worst possible direction: at 2 GiB the value goes NEGATIVE, and at exactly
+      // 4 GiB it comes out as zero.
+      //
+      // That matters because three separate ceilings are written as
+      // "FileUtilities::FileSize(x) > Max..." - DKIM::Sign/Verify, MessageData's
+      // load guard and SieveVacationTracker's store guard - and a negative number
+      // passes every one of them, so each guard admitted precisely the file it
+      // existed to refuse. Elsewhere the result is handed straight to
+      // Message::SetSize, and a negative message size then feeds quota accounting,
+      // SpaceAvailable and the POP3 octet counts.
+      //
+      // Saturating is the safe direction: those comparisons now refuse, and a size
+      // that is capped beats one that is negative. Two other files already avoid
+      // this function for exactly this reason and say so in their comments
+      // (RateLimiter::LoadUsageFile_ and BackupScheduleTask) - the narrowing was
+      // known and worked around twice rather than fixed here. Callers that need the
+      // true size have FileSize64.
+      const unsigned __int64 maxRepresentable = (unsigned __int64) LONG_MAX;
+
+      if (size > maxRepresentable)
+         return LONG_MAX;
+
+      return (long) size;
    }
 
    String
@@ -466,14 +544,53 @@ namespace HM
       // Iterate with an error_code so a missing/inaccessible directory does
       // not throw (nothing to delete in that case).
       boost::system::error_code ec;
+
+      // A file we could not delete, and the reason. The result of each remove used
+      // to be dropped into the shared iteration error_code and then never read, so
+      // this function returned true whatever happened - including for the caller
+      // that matters most, BackupExecuter's restore, which clears the data
+      // directory before unpacking over it and checks this return value. A restore
+      // that unpacked on top of files it believed it had removed is a corrupted
+      // data directory, so the failure is now carried out.
+      //
+      // The loop still visits every entry: deleting what can be deleted is more
+      // useful to the caller than stopping at the first refusal, and the first
+      // failure is the one reported.
+      bool allDeleted = true;
+      String firstFailure;
+      boost::system::error_code firstFailureCode;
+
       for (boost::filesystem::directory_iterator file(std::wstring(sDirName), ec); !ec && file != boost::filesystem::directory_iterator(); ++file)
       {
          boost::filesystem::path current(file->path());
-         if (!boost::filesystem::is_directory(current))
-            boost::filesystem::remove(current, ec);
+         if (boost::filesystem::is_directory(current))
+            continue;
+
+         boost::system::error_code remove_error;
+         boost::filesystem::remove(current, remove_error);
+
+         if (remove_error)
+         {
+            if (allDeleted)
+            {
+               firstFailure = current.wstring().c_str();
+               firstFailureCode = remove_error;
+            }
+
+            allDeleted = false;
+         }
       }
 
-      return true;
+      if (!allDeleted)
+      {
+         String sErrorMessage;
+         sErrorMessage.Format(_T("Could not delete the file %s while emptying the directory %s."),
+            firstFailure.c_str(), sDirName.c_str());
+
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 6050, "FileUtilities::DeleteFilesInDirectory", sErrorMessage, firstFailureCode);
+      }
+
+      return allDeleted;
    }
 
 
@@ -493,8 +610,23 @@ namespace HM
 
          if (RegularExpression::TestExactMatch(regularExpressionTest, current.filename().wstring()))
          {
-            WIN32_FILE_ATTRIBUTE_DATA file_info;
-            GetFileAttributesExW(current.wstring().c_str(), GetFileExInfoStandard, &file_info);
+            // The result of GetFileAttributesExW used to be dropped, which left
+            // file_info - and therefore the creation time handed to FileInfo -
+            // uninitialised stack when the call failed. It can fail on an entry that
+            // was removed between the enumeration and this call, or one the service
+            // cannot open. That timestamp is not decoration: ExceptionLogger::
+            // TryToMakeRoom picks the OLDEST entry by it and deletes that file, so a
+            // garbage value chose which minidump to destroy and could also make the
+            // "keep everything for four hours" test read as satisfied.
+            //
+            // Zero-initialised, and an entry whose attributes could not be read is
+            // skipped rather than reported with an invented time. Skipping is safe
+            // for both callers: they prune, so a file left out this pass is
+            // considered again on the next one.
+            WIN32_FILE_ATTRIBUTE_DATA file_info = {};
+
+            if (!GetFileAttributesExW(current.wstring().c_str(), GetFileExInfoStandard, &file_info))
+               continue;
 
             result.push_back(FileInfo(current.filename().wstring(), file_info.ftCreationTime));
          }
@@ -655,5 +787,150 @@ namespace HM
       Assert::AreEqual("source", FileUtilities::ReadCompleteTextFile(sDst));
       FileUtilities::DeleteFile(sSrc);
       FileUtilities::DeleteFile(sDst);
+
+      TestDeleteFile_();
+      TestFileSize_();
+      TestReadFileToBuf_();
+      TestByteBuffer_();
+   }
+
+   void
+   FileUtilitiesTester::TestDeleteFile_()
+   {
+      // A file that is not there is success - the caller's intent is "this must not
+      // exist" - and so is one that is deleted.
+      String missing = FileUtilities::GetTempFileName();
+      Assert::IsTrue(FileUtilities::DeleteFile(missing));
+
+      String present = FileUtilities::GetTempFileName();
+      FileUtilities::WriteToFile(present, AnsiString("delete me"));
+      Assert::IsTrue(FileUtilities::Exists(present));
+      Assert::IsTrue(FileUtilities::DeleteFile(present));
+      Assert::IsFalse(FileUtilities::Exists(present));
+
+      // A non-ASCII name, written with universal-character escapes so the assertion
+      // does not depend on this source file's encoding: "hm-<a-ring><a-diaeresis>
+      // <o-diaeresis>-<nihongo>-<guid>.tmp".
+      //
+      // Against the code before this was fixed the name was narrowed to ANSI before
+      // the path was built, so every character outside the active code page was
+      // replaced - the delete named a path that does not exist, boost answered "did
+      // not exist", and DeleteFile returned true with the file still on disk. The
+      // Exists check after the delete is what catches that; the return value did
+      // not, and could not.
+      String unicodeName;
+      unicodeName.Format(_T("%s\\hm-\u00E5\u00E4\u00F6-\u65E5\u672C\u8A9E-%s.tmp"),
+         IniFileSettings::Instance()->GetTempDirectory().c_str(),
+         GUIDCreator::GetGUID().c_str());
+
+      if (FileUtilities::WriteToFile(unicodeName, AnsiString("delete me too")))
+      {
+         Assert::IsTrue(FileUtilities::Exists(unicodeName));
+         Assert::IsTrue(FileUtilities::DeleteFile(unicodeName));
+         Assert::IsFalse(FileUtilities::Exists(unicodeName));
+      }
+
+      // The failure path - a delete that cannot succeed - is deliberately NOT
+      // provoked here. It reports HM5047, and an ERROR log entry written from inside
+      // RunTestSuite fails the next fixture's AssertNoReportedError and every test
+      // after it. It also sleeps through five attempts. Both are correct in
+      // production and wrong in a self-test.
+   }
+
+   void
+   FileUtilitiesTester::TestFileSize_()
+   {
+      String sizeFile = FileUtilities::GetTempFileName();
+      FileUtilities::WriteToFile(sizeFile, AnsiString("0123456789"));
+
+      Assert::IsTrue(FileUtilities::FileSize(sizeFile) == 10);
+
+      unsigned __int64 size64 = 0;
+      Assert::IsTrue(FileUtilities::FileSize64(sizeFile, size64));
+      Assert::IsTrue(size64 == (unsigned __int64) 10);
+
+      FileUtilities::DeleteFile(sizeFile);
+
+      // FileSize cannot tell an unreadable file from an empty one; FileSize64 can,
+      // and that is the reason it exists.
+      Assert::IsTrue(FileUtilities::FileSize(sizeFile) == 0);
+      Assert::IsFalse(FileUtilities::FileSize64(sizeFile, size64));
+      Assert::IsTrue(size64 == (unsigned __int64) 0);
+
+      // The saturation added to FileSize needs a file over 2 GiB to observe, which a
+      // self-test has no business creating. It is stated at the definition instead.
+   }
+
+   void
+   FileUtilitiesTester::TestReadFileToBuf_()
+   {
+      String readFile = FileUtilities::GetTempFileName();
+      FileUtilities::WriteToFile(readFile, AnsiString("ABCDEFGHIJ"));
+
+      // A partial read from an offset. Before the seek result was checked, a failed
+      // seek silently returned the bytes from position 0 instead - the wrong region
+      // of the message on an IMAP BODY[]<start.count> fetch.
+      BYTE buffer[8];
+      memset(buffer, 'x', sizeof(buffer));
+      FileUtilities::ReadFileToBuf(readFile, buffer, 4, 3);
+      Assert::IsTrue(buffer[0] == 'E' && buffer[1] == 'F' && buffer[2] == 'G');
+      Assert::IsTrue(buffer[3] == 'x');
+
+      // Asking for more than is there zero-fills the tail rather than leaving the
+      // caller's buffer holding whatever it held before.
+      memset(buffer, 'x', sizeof(buffer));
+      FileUtilities::ReadFileToBuf(readFile, buffer, 8, 4);
+      Assert::IsTrue(buffer[0] == 'I' && buffer[1] == 'J');
+      Assert::IsTrue(buffer[2] == 0 && buffer[3] == 0);
+      Assert::IsTrue(buffer[4] == 'x');
+
+      // Nothing asked for is nothing done, and a negative start reads from the
+      // beginning. Both used to reach ReadChunk with a count of -1 and ask for a
+      // near-SIZE_MAX allocation.
+      memset(buffer, 'x', sizeof(buffer));
+      FileUtilities::ReadFileToBuf(readFile, buffer, 0, 0);
+      Assert::IsTrue(buffer[0] == 'x');
+
+      memset(buffer, 'x', sizeof(buffer));
+      FileUtilities::ReadFileToBuf(readFile, buffer, -1, 2);
+      Assert::IsTrue(buffer[0] == 'A' && buffer[1] == 'B');
+
+      FileUtilities::DeleteFile(readFile);
+   }
+
+   void
+   FileUtilitiesTester::TestByteBuffer_()
+   {
+      // ByteBuffer and File have no tester of their own and are the layer
+      // FileUtilities is built on, so their coverage lives here rather than in a new
+      // class that ClassTester::DoTests would have to be edited to reach.
+      ByteBuffer buffer;
+      const BYTE data[5] = { 0x31, 0x32, 0x33, 0x34, 0x35 }; // "12345"
+      buffer.Add(data, 5);
+      Assert::IsTrue(buffer.GetSize() == (size_t) 5);
+
+      buffer.DecreaseSize(2);
+      Assert::IsTrue(buffer.GetSize() == (size_t) 3);
+      Assert::IsTrue(buffer.GetCharBuffer()[2] == '3');
+
+      // Down to exactly nothing, which is the boundary the SMTP data path uses when
+      // a flush ends on the transmission terminator.
+      buffer.DecreaseSize(3);
+      Assert::IsTrue(buffer.GetSize() == (size_t) 0);
+      Assert::IsTrue(buffer.IsEmpty());
+
+      // Decreasing by MORE than the buffer holds - the case the guard in
+      // DecreaseSize was written for and, until it was fixed, could not detect - is
+      // deliberately not exercised here: the refusal reports HM4222, and an ERROR
+      // entry written from inside RunTestSuite fails the next fixture's
+      // AssertNoReportedError and every test after it. Verified by inspection
+      // instead, and see the report accompanying this change.
+
+      // File::GetSize on a File that was never opened. The guard compared a FILE*
+      // against INVALID_HANDLE_VALUE, so it never fired: the not-open case fell
+      // through to boost::filesystem::file_size() with an empty path, which throws.
+      // Against the unfixed code this line propagates a filesystem_error.
+      File unopened;
+      Assert::IsTrue(unopened.GetSize() == 0);
    }
 }

@@ -8,4 +8,9 @@ Filename: "{app}\Bin\hMailServer.INI"; Section: "Directories"; Key: "EventFolder
 
 ; Languages
 Filename: "{app}\Bin\hMailServer.INI"; Section: "GUILanguages"; Key: "ValidLanguages"; String: "english,swedish";
-Filename: "{app}\Bin\hMailServer.INI"; Section: "Security"; Key: "AdministratorPassword"; String: "{code:GetHashedPassword}"; Flags: createkeyifdoesntexist; Components: server;
+; Check: HasAdministratorPassword is what keeps an installation that never collected
+; a password from writing the MD5 of the empty string here - a value the server
+; accepts an empty password against, while looking configured to everything that
+; tests for "unset". Silent installs can supply one with /adminpassword=<password>.
+; See HasAdministratorPassword in hMailServerInnoExtension.iss.
+Filename: "{app}\Bin\hMailServer.INI"; Section: "Security"; Key: "AdministratorPassword"; String: "{code:GetHashedPassword}"; Flags: createkeyifdoesntexist; Components: server; Check: HasAdministratorPassword;
