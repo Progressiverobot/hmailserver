@@ -137,6 +137,17 @@ namespace hMailServer.ControlPanel.Services
             "Create the public folder, then grant accounts or groups permission on it."),
 
          // ---- Spam and viruses ---------------------------------------------
+         // The overview first, because "is my spam filtering set up sensibly" is a
+         // question the five editing pages could not answer between them: each one
+         // shows its own switch and none shows the order, the scores or the two
+         // thresholds that decide what the score means.
+         new IntentEntry("what is my spam configuration", "spamoverview",
+            "Every check in the order the server runs them, its score, and what the total does to the message."),
+         new IntentEntry("which spam checks are running", "spamoverview",
+            "One list of the nine checks, which are on, and which of the two phases each one runs in."),
+         new IntentEntry("why is my spam filter not catching anything", "spamoverview",
+            "The overview names the arrangements that silently do nothing - a zero threshold, a threshold no "
+            + "enabled check can reach, a check scoring zero."),
          new IntentEntry("stop spam", "antispam",
             "Scores and thresholds, SPF, DKIM, DMARC, greylisting and SpamAssassin all live here."),
          new IntentEntry("too much spam is getting through", "antispam",
@@ -175,10 +186,21 @@ namespace hMailServer.ControlPanel.Services
             "Turn on the require-authentication options for the range that covers your clients."),
          new IntentEntry("make sure i am not an open relay", "ipranges",
             "Check that the internet-wide range does not allow deliveries to external accounts."),
-         new IntentEntry("someone is trying to guess passwords", "tls",
+         // These three used to land on one page called "Auto-ban & SSL/TLS", which
+         // meant two of them showed the reader a cipher list they had not asked
+         // for and the third showed them a lockout threshold. The page is now two
+         // pages and the phrases point at the half each one is about.
+         new IntentEntry("someone is trying to guess passwords", "autoban",
             "Auto-ban locks out an address after repeated logon failures."),
-         new IntentEntry("lock out repeated failed logons", "tls",
+         new IntentEntry("lock out repeated failed logons", "autoban",
             "Set the auto-ban threshold and how long the lockout lasts."),
+         // Deliberately phrased with "unban" rather than "unblock": "block" is
+         // folded onto by ban/deny/reject and is the word the IP ranges page owns,
+         // so an "unblock..." phrase here scored against "block an ip" and the two
+         // could tie. "unban" is nobody else's word.
+         new IntentEntry("unban an address that was locked out", "autoban",
+            "Raise the threshold here and clear the counted failures. An address already locked out stays out "
+            + "until its \"Auto-ban:\" range expires, or you delete that range on the IP ranges page."),
          new IntentEntry("which tls versions are allowed", "tls",
             "The accepted TLS versions and cipher suites are set here."),
          new IntentEntry("change the administrator password", "adminaccess",

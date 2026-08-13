@@ -88,6 +88,14 @@ namespace hMailServer.ControlPanel.Services
    ///     invalidate all of it. Where a better name exists it is added as an
    ///     alias, which the palette searches, instead of replacing the title.
    ///
+   ///     Splitting a page is the one case that cannot obey that rule, because a
+   ///     title naming two subjects cannot survive on a page that now holds one
+   ///     of them. "Auto-ban &amp; SSL/TLS" is the only one so far, and the cost
+   ///     is paid rather than avoided: the old title is an alias on BOTH halves,
+   ///     the documented path to it still resolves (to the auto-ban half - see
+   ///     <see cref="LegacyPaths"/>), and each half signposts the other. Anyone
+   ///     splitting another page owes the reader the same three things.
+   ///
    /// Living in a WPF-free file rather than in MainWindow is deliberate: the
    /// structure is the thing worth testing, and the tests reference
    /// ControlPanel.Core, which has no WPF.
@@ -212,7 +220,24 @@ namespace hMailServer.ControlPanel.Services
 
             ["Settings > Security > Authentication"] = "authentication",
             ["Settings > Security > Administrative access"] = "adminaccess",
-            ["Settings > Security > Auto-ban & SSL/TLS"] = "tls",
+
+            // "Auto-ban & SSL/TLS" was one page holding two unrelated subjects,
+            // and it is now two: "Auto-ban" under Access & abuse protection and
+            // "SSL/TLS" under TLS & certificates.
+            //
+            // A path can only resolve to one page, so the combined path resolves
+            // to the brute-force half: an administrator typing it is following a
+            // note about repeated logon failures far more often than one about
+            // cipher suites, and the auto-ban settings are the ones with no other
+            // home (versions and ciphers are findable from four other TLS pages).
+            // The other half is not lost - the old title is an alias on BOTH
+            // pages, so typing it in the palette offers the two of them, and each
+            // page signposts the other.
+            ["Settings > Security > Auto-ban & SSL/TLS"] = "autoban",
+            ["Settings > Security > Auto-ban"] = "autoban",
+            ["Settings > Advanced > Auto-ban"] = "autoban",
+            ["Settings > Security > SSL/TLS"] = "tls",
+            ["Settings > Advanced > SSL/TLS"] = "tls",
             ["Settings > Security > IP ranges"] = "ipranges",
             ["Settings > Security > SSL certificates"] = "certs",
             ["Settings > Security > Transport security"] = "security",
@@ -405,30 +430,51 @@ namespace hMailServer.ControlPanel.Services
                "Everything that decides whether a message is wanted.",
                "Anti-spam|Antispam|Anti-virus|Antivirus|Filtering|Junk|Malware|Content filtering",
 
+               // The group had five spam pages and no answer to the question an
+               // administrator actually arrives with: what will all of this do to
+               // a message? Each page is a correct editor for its own subject and
+               // none of them can show the pipeline - the order the checks run in,
+               // what each one adds to the score, the two thresholds that turn a
+               // score into a verdict, and the several arrangements in which the
+               // whole thing silently does nothing.
+               //
+               // Deliberately read-only. It is a diagnosis, not a sixth editor:
+               // every row links to the page that owns the setting, which is also
+               // what keeps this page from becoming a second place to change the
+               // same value.
+               Page("spamoverview", "Spam filtering overview",
+                  "Every spam check in the order the server runs them, what each adds to the score, and what that score then does to the message.",
+                  aliases: "Spam overview|Anti-spam overview|Spam pipeline|Spam summary|What is my spam configuration|Spam checks|Order of spam checks|Spam thresholds|Spam verdict|Why was this marked as spam",
+                  seeAlso: "antispam|spamwhitelist|logs"),
+
                Page("antispam", "Anti-spam settings",
                   "Scores and thresholds, SPF, DKIM and DMARC checks, greylisting, and SpamAssassin.",
                   aliases: "Spam filter|Stop spam|Score|Threshold|SPF|DKIM|DMARC|ARC|Greylisting|SpamAssassin|Junk mail|PTR|HELO check|Subject prefix",
-                  seeAlso: "dnsbl|surbl|spamwhitelist|greylistwhitelist"),
+                  seeAlso: "spamoverview|dnsbl|surbl|spamwhitelist|greylistwhitelist"),
 
+               // The overview is first in every one of these lists on purpose: it
+               // is the one page that says what the change just made on this page
+               // does to a message, and only three signposts fit beside the
+               // breadcrumb.
                Page("surbl", "SURBL servers",
                   "Block lists checked against the links found inside a message body.",
                   aliases: "SURBL|URI block list|Link blacklist|Body URL check|Spamhaus DBL",
-                  seeAlso: "antispam|dnsbl"),
+                  seeAlso: "spamoverview|antispam|dnsbl"),
 
                Page("dnsbl", "DNS blacklists",
                   "Block lists checked against the IP address that is connecting.",
                   aliases: "DNSBL|DNS blacklists (DNSBL)|RBL|Blackhole list|Spamhaus|Barracuda|Block an IP by reputation",
-                  seeAlso: "antispam|surbl|ipranges"),
+                  seeAlso: "spamoverview|antispam|surbl|ipranges"),
 
                Page("spamwhitelist", "White list",
                   "Senders and IP ranges that bypass spam protection entirely.",
                   aliases: "Anti-spam white list|Allow list|Safe senders|False positive|Let a sender through|Exempt from spam filter",
-                  seeAlso: "antispam|greylistwhitelist"),
+                  seeAlso: "spamoverview|antispam|greylistwhitelist"),
 
                Page("greylistwhitelist", "Greylisting white list",
                   "IP addresses exempt from the greylisting delay, for senders that will not retry.",
                   aliases: "Greylist exemption|Greylisting delay|Slow mail|First message delayed|Retry delay",
-                  seeAlso: "antispam|spamwhitelist"),
+                  seeAlso: "spamoverview|antispam|spamwhitelist"),
 
                Page("antivirus", "Anti-virus settings",
                   "ClamAV and external scanners, and what to do with a message that is found to be infected.",
@@ -478,6 +524,16 @@ namespace hMailServer.ControlPanel.Services
                   aliases: "ACME|Let's Encrypt|Letsencrypt|Automatic renewal|http-01|Certbot|Free certificate",
                   seeAlso: "certs|webservices|ports"),
 
+               // The TLS half of what used to be "Auto-ban & SSL/TLS". The title
+               // is new because the old one named two subjects and this page is
+               // now one of them; the old title stays as an alias, and it is also
+               // an alias on the Auto-ban page, so a note naming it reaches
+               // whichever half its reader wanted.
+               Page("tls", "SSL/TLS",
+                  "Which TLS versions and ciphers this server will negotiate, and whether it verifies the certificate of the server it delivers to.",
+                  aliases: "Auto-ban & SSL/TLS|TLS versions|TLS 1.0|TLS 1.1|TLS 1.2|TLS 1.3|Ciphers|Cipher list|Cipher suites|OpenSSL cipher string|Disable old TLS|Weak ciphers|ChaCha20|Verify remote certificate",
+                  seeAlso: "certs|ports|security|autoban"),
+
                Page("security", "Transport security",
                   "DANE, MTA-STS, ARC and TLS reporting - proving to other servers that TLS is required.",
                   aliases: "DANE|TLSA|MTA-STS|TLS-RPT|TLS reporting|ARC|Downgrade|Opportunistic TLS|Enforce TLS",
@@ -490,22 +546,35 @@ namespace hMailServer.ControlPanel.Services
                Page("authentication", "Authentication",
                   "How accounts prove who they are: password hashing, OAuth2 / XOAUTH2, and required mechanisms.",
                   aliases: "Password hashing|bcrypt|Argon2|OAuth2|XOAUTH2|Modern authentication|Microsoft 365|Google|SASL|CRAM-MD5|APOP|Two-factor|Pepper",
-                  seeAlso: "adminaccess|ipranges|protocols"),
+                  seeAlso: "adminaccess|autoban|ipranges|protocols"),
 
                Page("adminaccess", "Administrative access",
                   "The server administration password, and who is allowed to use these tools at all.",
                   aliases: "Admin password|Administrator password|Change the admin password|Remote administration|COM API access",
                   seeAlso: "authentication"),
 
-               Page("tls", "Auto-ban & SSL/TLS",
-                  "Automatic lockout after repeated logon failures, and the TLS versions and ciphers accepted.",
-                  aliases: "Auto-ban|Autoban|Brute force|Lockout|Failed logons|Fail2ban|Cipher suites|TLS 1.2|TLS 1.3|Protocol versions|Hammering",
-                  seeAlso: "ipranges|authentication|ports"),
+               // The brute-force half of what used to be "Auto-ban & SSL/TLS".
+               // The two subjects on that page shared nothing: an administrator
+               // arrives at one of them because somebody is guessing passwords and
+               // at the other because a client cannot negotiate a cipher, and
+               // whichever they wanted, half the page was noise. Splitting it also
+               // lets each half sit in the group where its subject lives - this one
+               // beside IP ranges, which is where the ban it creates ends up.
+               Page("autoban", "Auto-ban",
+                  "Lock out an address that keeps failing to log on - and let one back in that should not have been locked out.",
+                  aliases: "Auto-ban & SSL/TLS|Autoban|Brute force|Bruteforce|Lockout|Locked out|Failed logons|Failed logins|Password guessing|Dictionary attack|Fail2ban|Hammering|Temporary ban|Logon failure list",
+                  // "tls" is here, and "autoban" is on the SSL/TLS page, so a
+                  // reader who followed an old note about the combined page and
+                  // wanted the other half has a way across. Only the first three
+                  // are drawn beside the breadcrumb, and the order puts the escape
+                  // hatch inside that cut on this page rather than on the other
+                  // one, because this is the half the documented path resolves to.
+                  seeAlso: "ipranges|authentication|tls|logs"),
 
                Page("ipranges", "IP ranges",
                   "Which addresses may connect, which may relay without authenticating, and which must authenticate first.",
                   aliases: "IP range|Firewall|Block an IP|Allow an IP|Open relay|Relay permissions|Require authentication|Let a device send mail|Printer|Scanner|LAN|Localhost|My IP",
-                  seeAlso: "authentication|relays|delivery")),
+                  seeAlso: "authentication|autoban|relays|delivery")),
 
             Group("Maintenance",
                "Housekeeping, tuning, and the settings that still have no better home.",

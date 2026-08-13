@@ -30,6 +30,7 @@
     <Compile Include="..\ControlPanel\Services\ChartCatalog.cs" />
     <Compile Include="..\ControlPanel\Services\ChartDataTable.cs" />
     <Compile Include="..\ControlPanel\Services\StatusSemantics.cs" />
+    <Compile Include="..\ControlPanel\Services\SpamPipeline.cs" />
   </ItemGroup>
 
   <ItemGroup>

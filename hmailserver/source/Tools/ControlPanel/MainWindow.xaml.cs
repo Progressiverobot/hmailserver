@@ -95,6 +95,7 @@ namespace hMailServer.ControlPanel
          pageFactories_["delivery"] = () => new ServerSettingsView(ServerSettingsView.Section.Delivery);
          pageFactories_["routes"] = () => new RoutesView();
          pageFactories_["publicfolders"] = () => new PublicFoldersView();
+         pageFactories_["spamoverview"] = () => new SpamOverviewView();
          pageFactories_["antispam"] = () => new ServerSettingsView(ServerSettingsView.Section.AntiSpam);
          pageFactories_["surbl"] = () => CollectionSpecs.SurblServers();
          pageFactories_["dnsbl"] = () => CollectionSpecs.DnsBlackLists();
@@ -104,6 +105,7 @@ namespace hMailServer.ControlPanel
          pageFactories_["blockedattachments"] = () => CollectionSpecs.BlockedAttachments();
          pageFactories_["logging"] = () => new ServerSettingsView(ServerSettingsView.Section.Logging);
          pageFactories_["tls"] = () => new ServerSettingsView(ServerSettingsView.Section.Tls);
+         pageFactories_["autoban"] = () => new ServerSettingsView(ServerSettingsView.Section.AutoBan);
          pageFactories_["performance"] = () => new ServerSettingsView(ServerSettingsView.Section.Performance);
          pageFactories_["advanced"] = () => new ServerSettingsView(ServerSettingsView.Section.Advanced);
          pageFactories_["adminaccess"] = () => new ServerSettingsView(ServerSettingsView.Section.AdminAccess);

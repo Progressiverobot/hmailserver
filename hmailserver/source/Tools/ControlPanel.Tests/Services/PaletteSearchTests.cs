@@ -161,7 +161,9 @@ namespace hMailServer.ControlPanel.Tests.Services
       [InlineData("add a mailbox", "domains")]
       [InlineData("my ssl certificate expired", "certs")]
       [InlineData("the server is slow", "performance")]
-      [InlineData("someone is guessing passwords", "tls")]
+      // Brute-force protection is its own page now; before the split this landed
+      // on a page that was half cipher suites.
+      [InlineData("someone is guessing passwords", "autoban")]
       public void RewordedOutcomePhrase_StillFindsThePage(string query, string page)
       {
          IReadOnlyList<PaletteRow> rows = PaletteSearch.Query(query, null, null);
@@ -264,7 +266,7 @@ namespace hMailServer.ControlPanel.Tests.Services
       [InlineData("Anti-spam white list", "spamwhitelist")]
       [InlineData("DNS blacklists (DNSBL)", "dnsbl")]
       [InlineData("MX-query", "mxquery")]
-      [InlineData("Auto-ban", "tls")]
+      [InlineData("Auto-ban", "autoban")]
       [InlineData("Let's Encrypt", "acme")]
       [InlineData("Shared folders", "publicfolders")]
       public void LegacyOrAlternativeName_StillFindsThePage(string query, string page)

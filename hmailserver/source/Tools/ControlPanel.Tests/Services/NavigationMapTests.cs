@@ -32,6 +32,13 @@ namespace hMailServer.ControlPanel.Tests.Services
       /// A failure here means a title was changed: either revert it, or accept
       /// that every existing instruction naming that page is now wrong.
       ///
+      /// One title HAS changed, and it is the only one: "Auto-ban &amp; SSL/TLS"
+      /// became "SSL/TLS" when the page was split in two, because a title naming
+      /// two subjects cannot survive on a page holding one of them. That is the
+      /// only reason to edit a row here, and it costs the three things
+      /// PageSplitTests pins - the old title as an alias on both halves, a legacy
+      /// path that still resolves, and each half signposting the other.
+      ///
       /// Fails against the unfixed code because NavigationMap does not exist
       /// there; from now on it fails whenever a title moves.
       /// </summary>
@@ -47,6 +54,7 @@ namespace hMailServer.ControlPanel.Tests.Services
       [InlineData("delivery", "Delivery of e-mail")]
       [InlineData("routes", "Routes")]
       [InlineData("publicfolders", "Public folders")]
+      [InlineData("spamoverview", "Spam filtering overview")]
       [InlineData("antispam", "Anti-spam settings")]
       [InlineData("surbl", "SURBL servers")]
       [InlineData("dnsbl", "DNS blacklists")]
@@ -55,7 +63,8 @@ namespace hMailServer.ControlPanel.Tests.Services
       [InlineData("antivirus", "Anti-virus settings")]
       [InlineData("blockedattachments", "Blocked attachments")]
       [InlineData("logging", "Logging")]
-      [InlineData("tls", "Auto-ban & SSL/TLS")]
+      [InlineData("tls", "SSL/TLS")]
+      [InlineData("autoban", "Auto-ban")]
       [InlineData("performance", "Performance")]
       [InlineData("advanced", "Advanced & scripting")]
       [InlineData("hardening", "Advanced INI settings")]
@@ -249,7 +258,11 @@ namespace hMailServer.ControlPanel.Tests.Services
       [InlineData("Settings > Advanced > TCP/IP ports", "ports")]
       [InlineData("Settings > Advanced > Routes", "routes")]
       [InlineData("Settings > Advanced hardening", "hardening")]
-      [InlineData("Settings > Security > Auto-ban & SSL/TLS", "tls")]
+      // The split page: the combined path now resolves to the brute-force half,
+      // and both halves also have a path of their own.
+      [InlineData("Settings > Security > Auto-ban & SSL/TLS", "autoban")]
+      [InlineData("Settings > Advanced > Auto-ban", "autoban")]
+      [InlineData("Settings > Advanced > SSL/TLS", "tls")]
       [InlineData("Settings > Security > Certificates (ACME)", "acme")]
       [InlineData("Settings > Network > Web services & autoconfiguration", "webservices")]
       [InlineData("Settings > Maintenance > Event scripts", "scripts")]

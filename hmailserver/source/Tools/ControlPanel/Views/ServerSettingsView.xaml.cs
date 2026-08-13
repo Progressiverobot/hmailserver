@@ -23,7 +23,15 @@ namespace hMailServer.ControlPanel.Views
          Delivery,
          AntiSpam,
          AntiVirus,
+
+         /// <summary>
+         /// TLS versions, ciphers and remote-certificate verification. Auto-ban
+         /// used to be a third tab here; it is <see cref="AutoBan"/> now, because
+         /// brute-force lockout and transport encryption share nothing but the
+         /// letters SSL.
+         /// </summary>
          Tls,
+         AutoBan,
          Logging,
          Performance,
          Advanced,
@@ -154,7 +162,21 @@ namespace hMailServer.ControlPanel.Views
                System.Windows.Automation.AutomationProperties.SetName(box_, AccessibleName);
             }
 
-            return box_;
+            // Blurb was silently dropped on this row type: every other editor here
+            // calls Annotate and this one returned the bare checkbox, so a note
+            // written on a COM-backed checkbox appeared nowhere and no build
+            // warning said so. IniBool - the same control backed by the INI file -
+            // has always wrapped and annotated, which is what makes the omission a
+            // bug rather than a decision. Only wrapped when there is something to
+            // say, so the ~60 checkboxes with no Blurb keep the visual tree they
+            // had.
+            if (string.IsNullOrEmpty(Blurb))
+               return box_;
+
+            var panel = new StackPanel();
+            panel.Children.Add(box_);
+            Annotate(box_, panel);
+            return panel;
          }
 
          public override object ReadEditor() => box_.IsChecked == true;
@@ -814,6 +836,7 @@ namespace hMailServer.ControlPanel.Views
             case Section.AntiSpam: BuildAntiSpam(); break;
             case Section.AntiVirus: BuildAntiVirus(); break;
             case Section.Tls: BuildTls(); break;
+            case Section.AutoBan: BuildAutoBan(); break;
             case Section.Logging: BuildLogging(); break;
             case Section.Performance: BuildPerformance(); break;
             case Section.Advanced: BuildAdvanced(); break;
@@ -1077,8 +1100,10 @@ namespace hMailServer.ControlPanel.Views
 
       private void BuildTls()
       {
-         TitleText.Text = "SSL / TLS";
-         SubtitleText.Text = "Protocol versions, cipher configuration and brute-force protection.";
+         TitleText.Text = "SSL/TLS";
+         SubtitleText.Text = "Which TLS versions and ciphers this server negotiates, for its own listeners and " +
+                             "for the connections it makes when delivering. Certificates are on the SSL certificates " +
+                             "page; DANE and MTA-STS are on Transport security; brute-force lockout is on Auto-ban.";
 
          var ver = Card("Protocol versions", "TLS 1.2 and 1.3 are the recommended baseline; older versions exist only for legacy clients.");
          var tls10 = new ComBool { Path = "TlsVersion10Enabled", Label = "TLS 1.0 (legacy)" };
@@ -1104,12 +1129,70 @@ namespace hMailServer.ControlPanel.Views
          // cipher order and a modern TLS version is enabled. Reflect that
          // dependency live in the UI instead of letting it silently no-op.
          afterBuildUi_ = () => WireChaChaDependency(preferServer, chacha, tls12, tls13);
+      }
 
-         var ban = Card("Auto-ban", "Temporarily blocks IP addresses after repeated failed logons.");
-         ban.Settings.Add(new ComBool { Path = "AutoBanOnLogonFailure", Label = "Enable auto-ban" });
-         ban.Settings.Add(new ComText { Path = "MaxInvalidLogonAttempts", Label = "Max invalid logon attempts", Numeric = true });
-         ban.Settings.Add(new ComText { Path = "MaxInvalidLogonAttemptsWithin", Label = "...within (minutes)", Numeric = true });
-         ban.Settings.Add(new ComText { Path = "AutoBanMinutes", Label = "Ban duration (minutes)", Numeric = true });
+      /// <summary>
+      /// Brute-force lockout, which used to be the third tab of the SSL/TLS page.
+      ///
+      /// The two subjects shared a page and nothing else: you arrive at one of them
+      /// because somebody is guessing passwords and at the other because a client
+      /// cannot negotiate a cipher, and whichever you came for, half the page was
+      /// noise. The roadmap's words for the old title were "an admission that the
+      /// page is a bucket".
+      ///
+      /// The three notes below are the reason this is worth more than a move. Every
+      /// one of them is a way the feature silently does nothing, and none of them
+      /// was visible anywhere in the interface:
+      ///
+      ///   - AccountLogon::RegisterFailedLogin returns immediately when
+      ///     GetAutoBanLogonEnabled() is false OR MaxInvalidLogonAttempts is 0, so
+      ///     a limit of zero turns auto-ban off with the switch still on;
+      ///   - with AutoBanMinutes at 0 it disconnects the client and creates no
+      ///     range at all, so nothing is blocked;
+      ///   - the "within" value is not a sliding window evaluated at logon time. It
+      ///     is how long a failure record survives: RemoveExpiredRecords (every
+      ///     minute) deletes failures older than it, and only while auto-ban is
+      ///     enabled.
+      /// </summary>
+      private void BuildAutoBan()
+      {
+         TitleText.Text = "Auto-ban";
+         SubtitleText.Text = "Automatic lockout of an address that keeps failing to log on. " +
+                             "The ban itself is an expiring IP range, so it is listed on the IP ranges page.";
+
+         var ban = Card("Auto-ban",
+            "Counted per connecting IP address across every protocol that authenticates - SMTP AUTH, POP3, IMAP, " +
+            "ManageSieve and the REST API all feed the same counter. On reaching the limit the server clears that " +
+            "address's counted failures and creates an IP range named \"Auto-ban: <user>\" at priority 100 covering " +
+            "that one address, which expires on its own.");
+         ban.Settings.Add(new ComBool
+         {
+            Path = "AutoBanOnLogonFailure",
+            Label = "Enable auto-ban",
+            Blurb = "Also turned off by a limit of 0 below, whatever this box says."
+         });
+         ban.Settings.Add(new ComText
+         {
+            Path = "MaxInvalidLogonAttempts",
+            Label = "Max invalid logon attempts",
+            Numeric = true,
+            Blurb = "0 disables auto-ban entirely, even with the box above ticked."
+         });
+         ban.Settings.Add(new ComText
+         {
+            Path = "MaxInvalidLogonAttemptsWithin",
+            Label = "...within (minutes)",
+            Numeric = true,
+            Blurb = "How long a counted failure is kept, rather than a sliding window: a housekeeping pass running " +
+                    "once a minute deletes failure records older than this - and only while auto-ban is enabled."
+         });
+         ban.Settings.Add(new ComText
+         {
+            Path = "AutoBanMinutes",
+            Label = "Ban duration (minutes)",
+            Numeric = true,
+            Blurb = "0 means the connection is dropped but no range is created, so the address is not actually banned."
+         });
          ban.Settings.Add(new ComAction
          {
             Path = "AutoBanOnLogonFailure",
@@ -1117,7 +1200,18 @@ namespace hMailServer.ControlPanel.Views
             Action = () =>
             {
                dynamic s = ServerSession.Current.Application.Settings;
-               try { s.ClearLogonFailureList(); return (true, "Logon-failure list cleared."); }
+               try
+               {
+                  s.ClearLogonFailureList();
+                  // Deliberately explicit about what this does NOT do. It calls
+                  // Configuration::ClearOldLogonFailures, i.e. ClearOldFailures(-1)
+                  // on the failure table; the ban is a separate IP range and is
+                  // untouched. Somebody pressing this to release a locked-out user
+                  // and getting "cleared" would otherwise reasonably conclude the
+                  // lockout was lifted.
+                  return (true, "Counted logon failures cleared. Addresses already banned stay banned until their " +
+                                "\"Auto-ban:\" range expires - delete it on the IP ranges page to release one now.");
+               }
                finally { ServerSession.Release((object) s); }
             }
          });
