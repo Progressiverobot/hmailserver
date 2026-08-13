@@ -14,6 +14,8 @@
 #include "../BO/Domain.h"
 #include "../BO/DomainAliases.h"
 #include "../Persistence/PersistentAccount.h"
+#include "../LDAP/LdapDirectoryAuthenticator.h"
+#include "../LDAP/LdapSettings.h"
 #include "../Util/SSPIValidation.h"
 #include "../Util/Crypt.h"
 #include "../Scripting/Result.h"
@@ -141,6 +143,56 @@ namespace HM
       {
          String sADDomain = pAccount->GetADDomain();
          String sADUsername = pAccount->GetADUsername();
+
+         // LDAP directory authentication, when an administrator has switched it on.
+         //
+         // Off by default and inert when off: GetEnabled reads a cached value and, when
+         // it is false, this branch behaves exactly as it did before - LogonUser, same
+         // arguments, same result. Nothing about a non-AD account is touched at all.
+         //
+         // When it IS on, an account already linked to Active Directory is validated by
+         // an LDAP bind instead of by LogonUser, using the same AD domain and user name
+         // that are already stored against it. That is deliberate: this is the same
+         // population of accounts, authenticated against the same directory, by a
+         // mechanism that does not require the mail server host to be domain-joined.
+         // LogonUser does require that, and on a host in a workgroup it cannot even
+         // report the difference between an unreachable domain and a wrong password -
+         // every attempt returns ERROR_LOGON_FAILURE. See LdapDirectoryAuthenticator.h
+         // for the measurement.
+         if (LdapSettings::Instance()->GetEnabled())
+         {
+            LdapAuthenticationResult ldapResult = LdapDirectoryAuthenticator::ValidateUser(
+               sADDomain, sADUsername, pAccount->GetAddress(), sPassword);
+
+            if (ldapResult == LdapAuthenticationResult::ResultAccepted)
+               return true;
+
+            if (ldapResult == LdapAuthenticationResult::ResultRejected)
+            {
+               // The directory answered and said no. Falling through to LogonUser here
+               // would be wrong twice over: it would double every failed attempt
+               // against the directory - which is how a lockout policy is triggered by
+               // a single wrong password - and on an unjoined host it would return the
+               // same refusal anyway, just later.
+               return false;
+            }
+
+            if (ldapResult == LdapAuthenticationResult::ResultUnavailable &&
+                !LdapSettings::Instance()->GetConfiguration().fallback_to_windows_logon)
+            {
+               // The directory could not answer, and the reason has been reported
+               // (throttled) by the authenticator. Refused rather than retried through
+               // LogonUser, because on the deployment this feature exists for -
+               // a mail server that is not domain-joined - LogonUser cannot succeed and
+               // its failure would overwrite a precise diagnostic with an
+               // indistinguishable one. FallbackToWindowsLogon=1 opts into the retry
+               // for a domain-joined host that wants LDAP as its first choice only.
+               return false;
+            }
+
+            // ResultNotConfigured, or an infrastructure failure with fallback enabled:
+            // carry on to the existing path.
+         }
 
          bool bUserOK = SSPIValidation::ValidateUser(sADDomain, sADUsername, sPassword);
 

@@ -125,7 +125,10 @@ namespace HM
 
       // responseOnceOpen, when set, is sent only after the file has been opened
       // successfully, so a failure can still be answered with "-ERR".
-      bool SendFileHeader_(const String &sFilename, int iNoOfLines = 0, const String &responseOnceOpen = String());
+      // endedWithNewline reports whether the last byte handed to the client was a
+      // newline; the caller needs it to terminate the multi-line response without
+      // inventing a blank line the message does not contain.
+      bool SendFileHeader_(const String &sFilename, int iNoOfLines, const String &responseOnceOpen, bool &endedWithNewline);
 
       void SaveMailboxChanges_();
       void UnlockMailbox_();

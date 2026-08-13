@@ -342,6 +342,7 @@
     <Compile Include="Infrastructure\IPRanges.cs" />
     <Compile Include="Infrastructure\MainOperations.cs" />
     <Compile Include="Infrastructure\Persistence\Basics.cs" />
+    <Compile Include="POP3\RfcConformance.cs" />
     <Compile Include="POP3\Basics.cs" />
     <Compile Include="Shared\Pop3ClientSimulator.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -422,6 +423,7 @@
     <Compile Include="IMAP\Sort.cs" />
     <Compile Include="POP3\Fetching\Basics.cs" />
     <Compile Include="Shared\Pop3ServerSimulator.cs" />
+    <Compile Include="Security\LdapDirectoryAuthentication.cs" />
     <Compile Include="Security\ActiveDirectoryAuthentication.cs" />
     <Compile Include="Security\AutoBan.cs" />
     <Compile Include="Security\HashPolicy.cs" />

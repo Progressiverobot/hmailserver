@@ -169,7 +169,7 @@ namespace HM
 
       if (command == _T("NOOP"))
          resolvedCommand = NOOP;
-      if (command == _T("STLS"))
+      else if (command == _T("STLS"))
          resolvedCommand = STLS;
       else if (command == _T("USER"))
          resolvedCommand = USER;
@@ -409,6 +409,17 @@ namespace HM
    void
    POP3Connection::ProtocolRSET_()
    {
+      // Every other TRANSACTION-state handler checks this and RSET did not. The
+      // autologout path (OnConnectionTimeout -> UnlockMailbox_) releases the lock and
+      // drops account_ while current_state_ is still TRANSACTION, so a command still
+      // in flight when the timer fires reaches a handler with no account. Untested
+      // defence in depth: it needs a race with the idle timer to provoke.
+      if (!account_)
+      {
+         EnqueueWrite_("-ERR Message list not loaded");
+         return;
+      }
+
       if (Application::Instance()->GetFolderManager()->GetInboxMessages((int) account_->GetID(), messages_))
       {
          ResetMailbox_();
@@ -425,7 +436,19 @@ namespace HM
    {
       String capabilities = "UIDL\r\nTOP\r\n";
 
-      if (IsSSLConnection() || GetConnectionSecurity() != CSSTARTTLSRequired)
+      // RFC 2449 section 5: CAPA must not list a capability the server will not honour
+      // on this connection. Authentication is refused on a cleartext connection in two
+      // cases, not one - the port being CSSTARTTLSRequired, and the connecting IP range
+      // setting RequireTLSForAuth - and only the first was reflected here. In the second
+      // case CAPA offered USER and SASL and then ProtocolUSER_/ProtocolAUTH_ refused
+      // them, which is worse than untidy: a client that takes up the SASL offer sends
+      // "AUTH PLAIN <base64 authcid NUL passwd>" and only then learns the connection is
+      // unacceptable, so the password has already crossed the wire in the clear.
+      const bool authRefusedOnCleartext =
+         GetConnectionSecurity() == CSSTARTTLSRequired ||
+         GetSecurityRange()->GetRequireTLSForAuth();
+
+      if (IsSSLConnection() || !authRefusedOnCleartext)
       {
          capabilities+="USER\r\n";
          // RFC 5034: advertise the SASL mechanisms available for the AUTH command.
@@ -444,9 +467,19 @@ namespace HM
          capabilities+="\r\n";
       }
 
-      if (GetConnectionSecurity() == CSSTARTTLSOptional ||
-          GetConnectionSecurity() == CSSTARTTLSRequired)
+      // STLS is only honoured while the connection is still cleartext: once TLS is
+      // active ProtocolSTLS_ answers "-ERR Command not permitted when TLS active". It
+      // was advertised in both cases, so the CAPA a client is told to re-issue after the
+      // handshake (RFC 2595) still offered a command that could only fail.
+      if ((GetConnectionSecurity() == CSSTARTTLSOptional ||
+           GetConnectionSecurity() == CSSTARTTLSRequired) &&
+          !IsSSLConnection())
          capabilities+="STLS\r\n";
+
+      // RFC 2449 section 8: declare that an -ERR may carry an extended response code in
+      // brackets. The server emits [IN-USE] when another session holds the maildrop, and
+      // a client is not entitled to interpret the bracketed text unless this is present.
+      capabilities+="RESP-CODES\r\n";
 
       // RFC 6856: advertise UTF-8 support so clients may issue the UTF8 command.
       capabilities+="UTF8\r\n";
@@ -502,10 +535,26 @@ namespace HM
          return;
       }
 
+      // RFC 1939: the argument to USER is mandatory. An empty or all-whitespace one was
+      // accepted and answered "+OK Send your password", and the PASS that followed then
+      // spent one of this connection's ten logon attempts - and an auto-ban strike
+      // against the client's IP - on a name the client never supplied. Trimming before
+      // the test also means "USER  name" resolves, where the second space used to become
+      // part of the address and the logon simply failed.
+      String sName = Parameter;
+      sName.TrimLeft();
+      sName.TrimRight();
+
+      if (sName.IsEmpty())
+      {
+         EnqueueWrite_("-ERR Missing user name.");
+         return;
+      }
+
       // Apply domain aliases to the user name.
       std::shared_ptr<DomainAliases> pDA = ObjectCache::Instance()->GetDomainAliases();
-      username_ = pDA->ApplyAliasesOnAddress(Parameter);
-      EnqueueWrite_("+OK Send your password" );      
+      username_ = pDA->ApplyAliasesOnAddress(sName);
+      EnqueueWrite_("+OK Send your password" );
    }
 
    bool
@@ -519,6 +568,18 @@ namespace HM
             EnqueueWrite_("-ERR Command not permitted when TLS active");
             return false;
          }
+
+         // Discard anything the client told us before the handshake, in the same spirit
+         // as RFC 3207 section 4.2 for SMTP STARTTLS. A man in the middle can inject
+         // cleartext commands ahead of the client's STLS; TCPConnection clears the
+         // receive buffer when the handshake completes, so injected lines are not
+         // executed afterwards, but a USER command that had already been parsed left its
+         // name in username_. A PASS arriving after the handshake would then have
+         // completed a logon for an identity the genuine client never named. Clients
+         // issue STLS before USER (that is the point of STLS), so nothing legitimate is
+         // relying on the name surviving.
+         username_.Empty();
+         password_.Empty();
 
          EnqueueWrite_("+OK Begin TLS negotiation");
          EnqueueHandshake();
@@ -534,6 +595,18 @@ namespace HM
    POP3Connection::ParseResult
    POP3Connection::ProtocolPASS_(const String &Parameter)
    {
+      // RFC 1939: PASS is only valid after a successful USER. A bare PASS used to run a
+      // full logon against an empty user name, and losing that logon has three side
+      // effects that a command carrying no identity has not earned: OnClientLogon fires
+      // with a blank username, AccountLogon::Logon registers a failed login against the
+      // client's IP and so feeds the auto-ban, and one of this connection's ten attempts
+      // is spent. Refuse it and leave all three alone.
+      if (username_.IsEmpty())
+      {
+         EnqueueWrite_("-ERR Send USER first.");
+         return ResultNormalResponse;
+      }
+
       password_ = Parameter;
       return FinishPasswordLogin_();
    }
@@ -618,7 +691,12 @@ namespace HM
          // disconnect path cannot release a lock this session never held.
          account_.reset();
 
-         EnqueueWrite_("-ERR Your mailbox is already locked");
+         // RFC 2449 extended response code [IN-USE] (advertised as RESP-CODES in CAPA):
+         // the credentials were accepted and only the maildrop was unavailable, which is
+         // transient and worth retrying. Without the code this reply is indistinguishable
+         // from a rejected password to a client that reads only "-ERR", which is why a
+         // second mail client on the same account reports a wrong password.
+         EnqueueWrite_("-ERR [IN-USE] Your mailbox is already locked");
          return ResultNormalResponse;
       }
 
@@ -1075,13 +1153,30 @@ namespace HM
       }
 
       std::shared_ptr<Message> message = GetMessage_(lMessageID);
-      if (message)
+      if (!message)
       {
-         message->SetFlagDeleted(true);
-         EnqueueWrite_("+OK msg deleted"); 
-      }
-      else
          EnqueueWrite_("-ERR No such message");
+         return true;
+      }
+
+      // RFC 1939 DELE: a message already marked deleted must be refused, not marked
+      // again. STAT, RETR, TOP, the scan listings and - since the audit fixes - LIST n
+      // and UIDL n all treat a flagged message as absent; this was the one command left
+      // where a deleted message still answered as though it were present, so a client
+      // resyncing after a lost response could not tell its DELE had already been taken.
+      //
+      // The text deliberately keeps the "No such message" prefix: Shared/
+      // POP3ClientSimulator.cs waits for one of two literal replies and lives outside
+      // this developer's files, so an entirely new string would hang every test that
+      // calls its DELE helper.
+      if (message->GetFlagDeleted())
+      {
+         EnqueueWrite_("-ERR No such message (already deleted)");
+         return true;
+      }
+
+      message->SetFlagDeleted(true);
+      EnqueueWrite_("+OK msg deleted");
 
       return true;
    }
@@ -1347,25 +1442,40 @@ namespace HM
       }
 
       String Msg;
-   
+
       long iNoOfLines = 0;
       int iSpacePos = Parameter.Find(_T(" "));
       if (iSpacePos >= 0)
       {
-         Msg = Parameter.Mid(0, Parameter.Find(_T(" ")));
+         Msg = Parameter.Mid(0, iSpacePos);
 
          String sNoOfLines;
          sNoOfLines = Parameter.Mid(iSpacePos + 1);
+         sNoOfLines.TrimLeft();
+         sNoOfLines.TrimRight();
 
          if (!sNoOfLines.IsEmpty())
          {
-            iNoOfLines = _ttoi(sNoOfLines);
+            // RFC 1939 defines the second argument as "a non-negative number of lines".
+            // A negative or non-numeric count fell out of _ttoi as 0, so "TOP 1 -5" and
+            // "TOP 1 rubbish" were quietly answered as if the client had asked for the
+            // headers alone - the server obeyed a command that had not been given.
+            // Refused here, before the maildrop is touched, so nothing changes state.
+            if (!StringParser::IsNumeric(sNoOfLines))
+            {
+               EnqueueWrite_("-ERR Invalid number of lines");
+               return true;
+            }
+
+            iNoOfLines = _ttol(sNoOfLines);
          }
       }
       else
          Msg = Parameter;
 
-      bool bMsgFound = false;
+      // A count that is absent rather than invalid stays permissive (headers only). That
+      // is long-standing behaviour here, and Shared/POP3ClientSimulator.cs - owned
+      // elsewhere - sends "TOP n" with no count whenever a test asks for zero lines.
 
       int iRequestedMessageIndex = _tstol(Msg);
 
@@ -1387,13 +1497,23 @@ namespace HM
          String sResponse;
          sResponse.Format(_T("+OK %d octets"), pMessage->GetSize());
 
-         if (!SendFileHeader_(fileName, iNoOfLines, sResponse))
+         bool endedWithNewline = true;
+         if (!SendFileHeader_(fileName, iNoOfLines, sResponse, endedWithNewline))
          {
             EnqueueWrite_("-ERR Unable to read the message file");
             return true;
          }
 
-         EnqueueWrite_("\r\n.");
+         // RFC 1939: a multi-line response ends CRLF "." CRLF. "\r\n." was written
+         // unconditionally, and a stored message already ends with CRLF, so TOP handed
+         // the client one blank line of body that RETR does not - the same message
+         // fetched the two ways differed. The newline is still needed when the file's
+         // last line has none, which is the case RETR covers with
+         // GetLastSendEndedWithNewline.
+         if (endedWithNewline)
+            EnqueueWrite_(".");
+         else
+            EnqueueWrite_("\r\n.");
       }
         
 
@@ -1424,8 +1544,12 @@ namespace HM
    }
 
    bool
-   POP3Connection::SendFileHeader_(const String &sFilename, int iNoOfLines, const String &responseOnceOpen)
+   POP3Connection::SendFileHeader_(const String &sFilename, int iNoOfLines, const String &responseOnceOpen, bool &endedWithNewline)
    {
+      // An unreadable file, or one with no lines at all, needs no newline of its own
+      // before the terminating ".".
+      endedWithNewline = true;
+
       File file;
       bool opened = false;
       try
@@ -1465,6 +1589,7 @@ namespace HM
                break;
 
             output_buffer += line;
+            endedWithNewline = line.EndsWith("\n");
 
             current_body_line_count++;
 
@@ -1477,6 +1602,7 @@ namespace HM
                header_sent = true;
 
             output_buffer += line;
+            endedWithNewline = line.EndsWith("\n");
          }
 
          if (output_buffer.size() > 10000)
