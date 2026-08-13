@@ -171,11 +171,20 @@ namespace HM
          int iColIdx = GetColumnIndex_(FieldName);
          char *pValue = PQgetvalue(result_, cur_row_num_, iColIdx);
 
-         if (pValue == 0 || strlen(pValue) == 0)
+         if (pValue == 0)
+            return "";
+
+         // PQgetlength rather than strlen: a column value may contain an embedded NUL,
+         // and strlen truncated it at the first one on the way out of the database. See
+         // the equivalent in MySQLRecordset - the same defect, in both backends that
+         // read values as char*.
+         const size_t valueLength = (size_t) PQgetlength(result_, cur_row_num_, iColIdx);
+
+         if (valueLength == 0)
             return "";
 
          String sOutput;
-         if (!Unicode::MultiByteToWide(pValue, sOutput))
+         if (!Unicode::MultiByteToWide(AnsiString(pValue, valueLength), sOutput))
          {
             ErrorManager::Instance()->ReportError(ErrorManager::Critical, 5110, "PGRecordset::GetStringValue", "Could not convert multi byte to wide char.");
             return "";

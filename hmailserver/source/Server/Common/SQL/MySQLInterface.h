@@ -37,6 +37,9 @@ typedef unsigned int STDCALL hm_mysql_errno(hm_MYSQL *mysql);
 typedef unsigned long long STDCALL hm_mysql_num_rows(hm_MYSQL_RES *res);
 typedef hm_MYSQL_ROW STDCALL hm_mysql_fetch_row(hm_MYSQL_RES *result);
 typedef unsigned int STDCALL hm_mysql_num_fields(hm_MYSQL_RES *res);
+// The byte length of every column in the current row. Needed because a column value is
+// not necessarily a C string: strlen stops at an embedded NUL and truncates the value.
+typedef unsigned long * STDCALL hm_mysql_fetch_lengths(hm_MYSQL_RES *res);
 typedef hm_st_mysql_field *STDCALL hm_mysql_fetch_field_direct(hm_MYSQL_RES *res, unsigned int fieldnr);
 typedef unsigned long STDCALL hm_mysql_get_server_version(hm_MYSQL *mysql);
 
@@ -67,6 +70,7 @@ namespace HM
       hm_mysql_num_rows *p_mysql_num_rows;
       hm_mysql_fetch_row *p_mysql_fetch_row;
       hm_mysql_num_fields *p_mysql_num_fields;
+      hm_mysql_fetch_lengths *p_mysql_fetch_lengths;
       hm_mysql_fetch_field_direct *p_mysql_fetch_field_direct;
       hm_mysql_get_server_version *p_mysql_get_server_version;
    private:

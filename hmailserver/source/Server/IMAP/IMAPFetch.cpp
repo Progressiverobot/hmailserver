@@ -1206,7 +1206,21 @@ namespace HM
    void
    IMAPFetch::ReportCriticalError_(const String &messageFileName, const String &sMessage)
    // ----
-   // Reports an error to the ERROR log and then throws an exception.
+   // Reports an error to the ERROR log. It does NOT throw.
+   //
+   // The comment here said "and then throws an exception" and it never did, which
+   // matters because both callers are written as though the function ends the
+   // operation: each reports and then carries on to return a MimeBody that was
+   // never loaded, so the client is answered from an empty body with an OK. The
+   // message renders blank, and the client caches that and stops asking.
+   //
+   // Left as-is deliberately rather than made to match the comment. Throwing here
+   // has no handler between this and TCPConnection's catch-all, so it would drop
+   // the whole IMAP session over one unreadable message - a client would lose the
+   // session repeatedly instead of one blank message. The right answer is a NO
+   // response for that message alone, which needs the failure carried back to the
+   // command handler, and that is a change worth making with a test rather than as
+   // a side effect of correcting a comment.
    // ---
    {
       String sErrorMessage = sMessage + " - " + messageFileName;

@@ -29,6 +29,7 @@ namespace HM
       p_mysql_num_rows(0),
       p_mysql_fetch_row(0),
       p_mysql_num_fields(0),
+      p_mysql_fetch_lengths(0),
       p_mysql_fetch_field_direct(0),
       p_mysql_get_server_version(0)
    {
@@ -132,6 +133,7 @@ namespace HM
       p_mysql_num_rows = (hm_mysql_num_rows*) GetProcAddress( (HMODULE)library_instance_, "mysql_num_rows" );
       p_mysql_fetch_row = (hm_mysql_fetch_row*) GetProcAddress( (HMODULE)library_instance_, "mysql_fetch_row" );
       p_mysql_num_fields = (hm_mysql_num_fields*) GetProcAddress( (HMODULE)library_instance_, "mysql_num_fields" );
+      p_mysql_fetch_lengths = (hm_mysql_fetch_lengths*) GetProcAddress( (HMODULE)library_instance_, "mysql_fetch_lengths" );
       p_mysql_fetch_field_direct = (hm_mysql_fetch_field_direct*) GetProcAddress( (HMODULE)library_instance_, "mysql_fetch_field_direct" );
       p_mysql_get_server_version = (hm_mysql_get_server_version*) GetProcAddress( (HMODULE)library_instance_, "mysql_get_server_version" );
 

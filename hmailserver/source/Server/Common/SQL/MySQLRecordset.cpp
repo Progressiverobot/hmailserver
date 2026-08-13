@@ -195,12 +195,41 @@ namespace HM
       {
          int iColIdx = GetColumnIndex_(FieldName);
          char *pValue = current_[iColIdx];
-         
-         if (pValue == 0 || strlen(pValue) == 0)
+
+         if (pValue == 0)
+            return "";
+
+         // A column value is NOT a C string. MySQL returns the byte length of every
+         // column in the row separately, precisely because the value may contain an
+         // embedded NUL - and using strlen here truncated it at the first one, silently,
+         // on the way out of the database. Anything round-tripped through a column then
+         // came back shorter than it went in: a message subject, a header value, a
+         // script, a Sieve rule.
+         //
+         // Fall back to strlen only if the driver did not give us the lengths, which
+         // means an old libmysql without mysql_fetch_lengths. That is the previous
+         // behaviour, and it is better than refusing to read the row.
+         size_t valueLength = 0;
+
+         if (MySQLInterface::Instance()->p_mysql_fetch_lengths != 0)
+         {
+            unsigned long *lengths = MySQLInterface::Instance()->p_mysql_fetch_lengths(result_);
+
+            if (lengths != 0)
+               valueLength = (size_t) lengths[iColIdx];
+            else
+               valueLength = strlen(pValue);
+         }
+         else
+         {
+            valueLength = strlen(pValue);
+         }
+
+         if (valueLength == 0)
             return "";
 
          String sOutput;
-         if (!Unicode::MultiByteToWide(pValue, sOutput))
+         if (!Unicode::MultiByteToWide(AnsiString(pValue, valueLength), sOutput))
          {
             ErrorManager::Instance()->ReportError(ErrorManager::Critical, 5109, "MySQLRecordset::GetStringValue", "Could not convert multi byte to wide char.");
             return "";            
