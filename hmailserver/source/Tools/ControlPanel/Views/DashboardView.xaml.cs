@@ -147,7 +147,13 @@ namespace hMailServer.ControlPanel.Views
 
          if (level == StatusLevel.Normal)
          {
-            KpiQueueBadge.Visibility = Visibility.Collapsed;
+            // Hidden, not Collapsed. A collapsed badge gives its space back, so the card
+            // grew by the badge's height the moment the queue crossed the backlog
+            // threshold - and because the five KPI cards share a UniformGrid, the whole
+            // row jumped taller at precisely the moment an operator was most likely to be
+            // staring at it. Reserving the space costs nineteen pixels of empty card in
+            // the normal case and buys a dashboard that does not move under the reader.
+            KpiQueueBadge.Visibility = Visibility.Hidden;
             AutomationProperties.SetName(KpiQueue, "In queue, " + text);
             return;
          }
