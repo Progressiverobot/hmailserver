@@ -82,7 +82,13 @@ namespace RegressionTests.Infrastructure
          }
          finally
          {
-            LogHandler.DeleteErrorLog();
+            // Settled rather than deleted once. AssertReportedError above returns as soon
+            // as the entry it was told to look for is present, and a crash simulation
+            // writes several from different paths - the last of them only after an
+            // out-of-process minidump writer finishes. A single delete at that moment
+            // leaves the stragglers to recreate the file, and then every fixture that runs
+            // after this one fails in setup on an error this test caused deliberately.
+            LogHandler.ClearErrorLogUntilSettled();
             DeleteAllMinidumps();
             CrashOracleAsserts.Clear();
          }

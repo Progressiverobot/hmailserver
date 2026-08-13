@@ -28,6 +28,66 @@ namespace RegressionTests.Infrastructure
          return contents;
       }
 
+      /// <summary>
+      ///    Clears the ERROR log and keeps clearing it until it has stayed absent for a
+      ///    settling window. For use by a test that provoked errors on purpose.
+      ///
+      ///    DeleteErrorLog on its own is not enough after a deliberate crash, and this has
+      ///    cost two full twenty-minute regression runs. One crash simulation writes at
+      ///    least three ERROR entries from three different paths - the protocol parse
+      ///    failure (HM5136), the exception handler (HM4208), and the "a mini dump has
+      ///    been written" line (HM5519) which cannot be logged until an OUT-OF-PROCESS
+      ///    minidump writer has finished. A test that waits for the entries it cares
+      ///    about and then deletes the file therefore deletes it while the rest are still
+      ///    arriving, and the stragglers recreate it moments later.
+      ///
+      ///    Nothing notices at the time. The next fixture's PerformBasicSetup calls
+      ///    AssertNoReportedError, which fails if the ERROR log exists at all, so every
+      ///    test that runs after the leak fails in setup - 683 of them in the run that
+      ///    prompted this, all reporting a deliberate "Crash simulation test" line, none
+      ///    of them broken.
+      ///
+      ///    Bounded on both sides: it gives up after <paramref name="timeoutSeconds"/> so
+      ///    that a genuinely broken server writing an error every second cannot spin here
+      ///    for ever, and it returns as soon as the log has been absent for the settle
+      ///    window rather than always paying the full timeout.
+      /// </summary>
+      /// <returns>
+      ///    True if the log is absent and settled. False means errors are still arriving,
+      ///    which the caller should treat as a real problem rather than ignore.
+      /// </returns>
+      public static bool ClearErrorLogUntilSettled(int settleMilliseconds = 2500, int timeoutSeconds = 25)
+      {
+         var deadline = DateTime.UtcNow.AddSeconds(timeoutSeconds);
+         DateTime? quietSince = null;
+
+         while (DateTime.UtcNow < deadline)
+         {
+            if (File.Exists(GetErrorLogFileName()))
+            {
+               DeleteErrorLog();
+
+               // A straggler restarts the window: what matters is that nothing has
+               // arrived for the whole of it, not that something was deleted recently.
+               quietSince = null;
+               Thread.Sleep(150);
+               continue;
+            }
+
+            if (quietSince == null)
+               quietSince = DateTime.UtcNow;
+            else if ((DateTime.UtcNow - quietSince.Value).TotalMilliseconds >= settleMilliseconds)
+               return true;
+
+            Thread.Sleep(150);
+         }
+
+         // Best effort on the way out, so the next fixture has the best chance even
+         // though this one is about to report the problem.
+         DeleteErrorLog();
+         return false;
+      }
+
       public static string ReadErrorLog()
       {
          var file = GetErrorLogFileName();

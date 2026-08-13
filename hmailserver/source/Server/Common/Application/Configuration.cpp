@@ -98,6 +98,20 @@ namespace HM
          // Activate the logger.
          Logger::Instance()->SetLogMask(pProperty->GetLongValue());
       }
+      else if (sPropertyName == PROPERTY_LOGDEVICE)
+      {
+         // Activate the configured log device. PropertySet::Refresh() raises a
+         // change event for every property when the settings are loaded, so this
+         // carries the stored value at startup as well as on change - exactly how
+         // PROPERTY_LOGGING above gets its initial value. Having the Logger read
+         // the setting itself instead is not an option: it logs during startup,
+         // before the property set exists.
+         Logger::Instance()->SetLogDevice(pProperty->GetLongValue());
+      }
+      else if (sPropertyName == PROPERTY_LOGFORMAT)
+      {
+         Logger::Instance()->SetLogFormat(pProperty->GetLongValue());
+      }
       else if (sPropertyName == PROPERTY_AWSTATSENABLED)
       {
          AWStats::SetEnabled(GetAWStatsEnabled());

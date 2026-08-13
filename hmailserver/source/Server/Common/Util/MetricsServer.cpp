@@ -9,6 +9,8 @@
 #include "ServerStatus.h"
 #include "AcmeClient.h"
 #include "FileUtilities.h"
+#include "SecureCompare.h"
+#include "Encoding/Base64.h"
 
 #include "../Application/Application.h"
 #include "../Application/Configuration.h"
@@ -18,13 +20,17 @@
 #include "../SQL/DatabaseConnectionManager.h"
 #include "../Persistence/PersistentMessage.h"
 #include "../TCPIP/SocketConstants.h"
+#include "../TCPIP/SslContextInitializer.h"
 
 #include <ws2tcpip.h>
 
 #include <openssl/bio.h>
+#include <openssl/err.h>
 #include <openssl/pem.h>
+#include <openssl/ssl.h>
 #include <openssl/x509.h>
 
+#include <cstring>
 #include <ctime>
 
 #ifdef _DEBUG
@@ -36,6 +42,52 @@ namespace HM
 {
    namespace
    {
+      // Upper bound on one request's header block. Nothing that scrapes or probes
+      // this endpoint sends anything close to it; it exists so an unauthenticated
+      // client cannot make the listener buffer without limit.
+      const size_t MaxRequestSize = 8192;
+
+      // Per-call socket timeout, unchanged from before this listener had any
+      // access control. It bounds one read or one write, which is not the same
+      // thing as bounding a request - see the two deadlines below.
+      const DWORD SocketTimeoutMilliseconds = 5000;
+
+      // Absolute ceiling on reading one request's headers, across all reads. The
+      // per-socket SO_RCVTIMEO bounds a single read only, so without a total
+      // deadline a client dribbling one byte at a time just under that timeout
+      // would occupy the single listener thread indefinitely.
+      const ULONGLONG RequestReadTimeoutMilliseconds = 5000;
+
+      // Absolute ceiling on writing one response, across all writes. Longer than
+      // the read deadline because the response is the one part of an exchange that
+      // is genuinely large - the exposition grows with every configured
+      // certificate and every histogram bucket - and a slow but honest link should
+      // still finish. Bounded all the same: the write is a loop (a blocking send
+      // may accept fewer bytes than it was handed), and a peer that reads a
+      // handful of bytes every few seconds would otherwise keep that loop alive
+      // for as long as it liked, denying every other scrape AND every health probe
+      // behind it on this single-threaded listener.
+      const ULONGLONG ResponseWriteTimeoutMilliseconds = 15000;
+
+      // Strips leading and trailing HTTP optional whitespace (space and horizontal
+      // tab, per RFC 7230's OWS rule). Not a general trim: CR and LF have already
+      // been removed by the line splitter, and stripping anything else would mean
+      // silently altering a credential.
+      void TrimOptionalWhitespace(std::string &value)
+      {
+         size_t first = value.find_first_not_of(" \t");
+
+         if (first == std::string::npos)
+         {
+            value.clear();
+            return;
+         }
+
+         size_t last = value.find_last_not_of(" \t");
+
+         value = value.substr(first, last - first + 1);
+      }
+
       // The StateSet layout for hmailserver_state: one series per state, so PromQL
       // selects a state by name instead of by magic number.
       struct StateSeries
@@ -89,12 +141,14 @@ namespace HM
    MetricsServer::MetricsServer() :
       listen_socket_(INVALID_SOCKET),
       running_(false),
+      active_client_socket_(INVALID_SOCKET),
       start_tick_count_(0),
       start_unix_time_(0),
       queue_cache_tick_(0),
       queue_depth_cache_value_(0),
       queue_oldest_age_cache_value_(0),
-      certificate_cache_tick_(0)
+      certificate_cache_tick_(0),
+      metrics_availability_(MetricsAvailable)
    {
 
    }
@@ -110,6 +164,12 @@ namespace HM
       if (running_)
          return true;
 
+      // The bind address is validated first, ahead of everything else, because the
+      // rules below are phrased in terms of whether it is a loopback address and a
+      // value that is not an address at all has no honest answer to that question.
+      // Validating it here means a typo is reported as a typo rather than as
+      // "not loopback, and no credential is configured" - true, but it would send
+      // the operator looking for the wrong problem.
       AnsiString narrowBindAddress = bind_address;
 
       sockaddr_in address = {};
@@ -122,9 +182,105 @@ namespace HM
          return false;
       }
 
+      // Credentials and TLS are read here rather than passed in, so the call in
+      // Application::Start does not have to change shape every time this listener
+      // grows another knob. Everything is worked out into locals first: nothing is
+      // written to the members until the socket is actually listening, so a failed
+      // bind cannot leave the object holding a secret or an SSL context that no
+      // thread will ever use.
+      //
+      // The token and the user name are trimmed, because a value typed into an ini
+      // file picks up trailing spaces and a token nobody can present is
+      // indistinguishable from a broken listener. The password is deliberately NOT
+      // trimmed: leading and trailing whitespace is legitimate inside a password,
+      // and silently removing it would reject a credential the operator set on
+      // purpose.
+      AnsiString token = IniFileSettings::Instance()->GetMetricsServerAuthToken();
+      token.Trim();
+
+      AnsiString basicUsername = IniFileSettings::Instance()->GetMetricsServerAuthUsername();
+      basicUsername.Trim();
+
+      AnsiString basicPassword = IniFileSettings::Instance()->GetMetricsServerAuthPassword();
+
+      AnsiString basicCredentials;
+
+      if (!basicUsername.IsEmpty() && !basicPassword.IsEmpty())
+      {
+         basicCredentials = basicUsername + ":" + basicPassword;
+      }
+      else if (!basicUsername.IsEmpty() || !basicPassword.IsEmpty())
+      {
+         // Half a Basic credential is the trap this message exists to stop.
+         // Without it, an operator who set only the password would get a listener
+         // that behaves exactly as if they had configured nothing - which, on a
+         // loopback bind, is silently no authentication at all. The value is never
+         // named, only its absence.
+         LOG_APPLICATION("MetricsServer: MetricsServerAuthUsername and MetricsServerAuthPassword must both be set for HTTP Basic authentication. Only one of them is set, so Basic authentication is NOT enabled.");
+      }
+
+      bool credentialConfigured = !token.IsEmpty() || !basicCredentials.IsEmpty();
+
+      String certificateFile = IniFileSettings::Instance()->GetMetricsServerCertificateFile();
+      String privateKeyFile = IniFileSettings::Instance()->GetMetricsServerPrivateKeyFile();
+
+      bool tlsRequested = !certificateFile.IsEmpty() && !privateKeyFile.IsEmpty();
+
+      if (!tlsRequested && (!certificateFile.IsEmpty() || !privateKeyFile.IsEmpty()))
+      {
+         // Same class of trap as the half-configured Basic credential, and worse in
+         // its consequence: half a TLS configuration would otherwise mean plain
+         // HTTP on a listener whose operator believes they enabled encryption.
+         LOG_APPLICATION("MetricsServer: MetricsServerCertificateFile and MetricsServerPrivateKeyFile must both be set to serve HTTPS. Only one of them is set, so TLS is NOT enabled.");
+      }
+
+      bool loopbackOnly = IsLoopbackAddress_(bind_address);
+
+      std::shared_ptr<boost::asio::ssl::context> tlsContext;
+      bool tlsFailed = false;
+
+      if (tlsRequested && !InitializeTls_(bind_address, port, certificateFile, privateKeyFile, tlsContext))
+         tlsFailed = true;
+
+      // Every condition is logged, not just the one that ends up being reported to
+      // clients, because an operator reading the log after an upgrade needs to see
+      // everything that is wrong rather than the first thing.
+      if (tlsFailed)
+      {
+         // The specific cause - an unreadable certificate, a private key that does
+         // not match it - has already been reported by SslContextInitializer as
+         // HM5113. This line says what the listener did about it.
+         LOG_APPLICATION("MetricsServer: TLS is configured but could not be prepared. The health probes will still be served, over plain HTTP, but /metrics will answer 503: serving the exposition in the clear instead would publish it - and any credential presented with it - on a listener that was asked to encrypt.");
+      }
+
+      if (!loopbackOnly && !credentialConfigured)
+      {
+         String message;
+         message.Format(_T("MetricsServer: /metrics will answer 503 - the listener is bound to %s, which is not a loopback address, and no credential is configured. /metrics publishes delivery-queue depth, session counts, authentication-failure counts and the build and schema versions, so it must not be readable from the network unauthenticated. Set MetricsServerAuthToken, or set both MetricsServerAuthUsername and MetricsServerAuthPassword, or bind to 127.0.0.1. /livez, /readyz and /healthz are unaffected and keep answering without authentication."),
+            bind_address.c_str());
+         LOG_APPLICATION(message);
+      }
+
+      if (!loopbackOnly && credentialConfigured && !tlsRequested)
+      {
+         // A warning and not a refusal, on purpose: see rule 3 in the header. The
+         // operator who reads this and decides their pod network is trustworthy is
+         // making a defensible call, and taking their monitoring away instead would
+         // only teach them to pin the old version.
+         String message;
+         message.Format(_T("MetricsServer: the listener is bound to %s with a credential but without TLS, so that credential will cross the network in clear text on every scrape and can be replayed by anyone on the path. Set MetricsServerCertificateFile and MetricsServerPrivateKeyFile to encrypt it, or bind to 127.0.0.1."),
+            bind_address.c_str());
+         LOG_APPLICATION(message);
+      }
+
       listen_socket_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
       if (listen_socket_ == INVALID_SOCKET)
+      {
+         ScrubSecret_(basicPassword);
+         ScrubSecret_(basicCredentials);
+         ScrubSecret_(token);
          return false;
+      }
 
       BOOL reuseAddress = TRUE;
       setsockopt(listen_socket_, SOL_SOCKET, SO_REUSEADDR, (const char*) &reuseAddress, sizeof(reuseAddress));
@@ -138,8 +294,32 @@ namespace HM
 
          closesocket(listen_socket_);
          listen_socket_ = INVALID_SOCKET;
+
+         ScrubSecret_(basicPassword);
+         ScrubSecret_(basicCredentials);
+         ScrubSecret_(token);
          return false;
       }
+
+      // Everything the worker thread reads is published here, before the thread
+      // exists, and torn down in Stop() after it has been joined. The worker
+      // therefore never observes any of it change, which is why none of it is
+      // locked.
+      auth_token_ = token;
+      auth_basic_credentials_ = basicCredentials;
+      tls_context_ = tlsContext;
+
+      metrics_availability_ =
+         tlsFailed ? MetricsNeedsTls :
+         (!loopbackOnly && !credentialConfigured) ? MetricsNeedsCredential : MetricsAvailable;
+
+      // The locals are scrubbed now that the members hold the values. This is
+      // housekeeping rather than a security boundary - see ScrubSecret_ - but it
+      // costs nothing and it keeps the number of live copies of a credential in
+      // this process to the smallest number that still works.
+      ScrubSecret_(basicPassword);
+      ScrubSecret_(basicCredentials);
+      ScrubSecret_(token);
 
       start_tick_count_ = GetTickCount64();
       start_unix_time_ = static_cast<__int64>(time(nullptr));
@@ -147,8 +327,24 @@ namespace HM
 
       worker_ = std::thread(&MetricsServer::Run_, this);
 
+      // The startup line states the access-control shape in full, because an
+      // operator reading the log after an upgrade needs to be able to see at a
+      // glance whether this endpoint is protected - and because a listener that is
+      // deliberately exposed should say so every time it starts. No credential
+      // value appears in it, only which schemes are accepted.
+      const wchar_t *transport = tls_context_ ? _T("HTTPS") : _T("plain HTTP");
+
+      const wchar_t *metricsAccess =
+         metrics_availability_ == MetricsNeedsTls ? _T("/metrics is closed (503) because TLS could not be prepared") :
+         metrics_availability_ == MetricsNeedsCredential ? _T("/metrics is closed (503) because a non-loopback bind requires a credential") :
+         !auth_token_.IsEmpty() && !auth_basic_credentials_.IsEmpty() ? _T("/metrics requires a bearer token or HTTP Basic") :
+         !auth_token_.IsEmpty() ? _T("/metrics requires a bearer token") :
+         !auth_basic_credentials_.IsEmpty() ? _T("/metrics requires HTTP Basic") :
+         loopbackOnly ? _T("/metrics is open, loopback bind only") : _T("/metrics is open");
+
       String message;
-      message.Format(_T("MetricsServer: Listening on %s:%d (/metrics, /livez, /readyz, /healthz)."), bind_address.c_str(), port);
+      message.Format(_T("MetricsServer: Listening on %s:%d over %s. %s. /livez, /readyz and /healthz are always served without authentication."),
+         bind_address.c_str(), port, transport, metricsAccess);
       LOG_APPLICATION(message);
 
       return true;
@@ -168,8 +364,167 @@ namespace HM
          listen_socket_ = INVALID_SOCKET;
       }
 
+      // Closing the listen socket only stops NEW connections; it says nothing
+      // about the one the worker may be in the middle of. Shut that one down too,
+      // so a blocked handshake, read or write fails immediately and the join below
+      // completes in milliseconds instead of waiting on a remote peer. The read and
+      // write deadlines bound the wait even without this, but "bounded" there means
+      // seconds per phase, and a service stop that a client can stretch is a
+      // service stop that Windows can time out and turn into a kill.
+      //
+      // shutdown() and not closesocket(): the worker owns the handle and is the
+      // only thing that closes it, and the ordering rule described in the header
+      // (cleared under the lock before it is closed) is what guarantees the handle
+      // is still open and still ours while this runs.
+      {
+         std::lock_guard<std::mutex> guard(active_client_mutex_);
+
+         if (active_client_socket_ != INVALID_SOCKET)
+            shutdown(active_client_socket_, SD_BOTH);
+      }
+
       if (worker_.joinable())
          worker_.join();
+
+      // After the join, never before: the worker reads the context for every
+      // handshake and the credentials for every scrape, so releasing either while
+      // that thread was alive would be a use-after-free. Dropped rather than kept
+      // so a Start() after a configuration change picks up the current
+      // certificate, TLS settings and credentials.
+      tls_context_.reset();
+      metrics_availability_ = MetricsAvailable;
+
+      ScrubSecret_(auth_token_);
+      ScrubSecret_(auth_basic_credentials_);
+   }
+
+   void
+   MetricsServer::ScrubSecret_(AnsiString &secret)
+   {
+      // Overwrites the bytes before releasing them, rather than only emptying the
+      // string. Assigning "" or calling Empty() sets the length to zero and leaves
+      // the characters sitting in the buffer, where a minidump - and this build
+      // writes minidumps on a crash by design - would hand them to whoever reads
+      // it. SecureZeroMemory rather than memset because the compiler is entitled
+      // to delete a memset over storage nothing reads afterwards, which is exactly
+      // this case.
+      //
+      // What this does NOT claim: that the credential is gone from the process.
+      // IniFileSettings holds the configured value for the lifetime of the service
+      // - that is the whole point of caching ini settings - and hMailServer.ini
+      // holds it on disk. Scrubbing here buys two specific things: a STOPPED
+      // listener is not still holding a live copy, and the intermediate copies
+      // Start() makes while assembling "username:password" do not outlive the call
+      // that made them. Fixing the rest means deciding how every secret in the ini
+      // file is held, which is a change to IniFileSettings and not to this file.
+      if (!secret.empty())
+         SecureZeroMemory(&secret[0], secret.size());
+
+      secret.Empty();
+   }
+
+   bool
+   MetricsServer::IsLoopbackAddress_(const String &bind_address)
+   {
+      AnsiString narrowBindAddress = bind_address;
+
+      in_addr parsed = {};
+
+      if (inet_pton(AF_INET, narrowBindAddress.c_str(), &parsed) != 1)
+      {
+         // Not an IPv4 literal, which Start() has already refused before calling
+         // this - so unreachable today. It answers "not loopback" rather than
+         // "loopback" so that if that ordering is ever changed, the credential gate
+         // fails closed instead of treating an unparseable address as safe.
+         return false;
+      }
+
+      // The whole of 127.0.0.0/8, not just 127.0.0.1. An operator who binds
+      // 127.0.0.2 has bound an address only this machine can reach, and demanding a
+      // credential there would be a false positive. Note that "localhost" is not
+      // accepted here because Start() does not accept it either (inet_pton takes
+      // literals only), so treating it as loopback would be dead code claiming to
+      // handle a case that cannot arrive.
+      return (ntohl(parsed.s_addr) >> 24) == 127u;
+   }
+
+   bool
+   MetricsServer::InitializeTls_(const String &bind_address, int port,
+      const String &certificate_file, const String &private_key_file,
+      std::shared_ptr<boost::asio::ssl::context> &context)
+   {
+      // Why this goes through SslContextInitializer rather than calling
+      // SSL_CTX_new: that function is the single place SMTP, POP3 and IMAP get
+      // their TLS configuration from - the cipher list, the enabled protocol
+      // versions, the server-preference and ChaCha options, the DH parameters, and
+      // the key-exchange group list, which since August 2026 carries the hybrid
+      // post-quantum KEMs from [Settings] TlsKeyExchangeGroups. A listener that
+      // builds its own context restates all of that and then diverges from it the
+      // next time it changes, silently, towards the weaker end. That is not
+      // hypothetical in this tree: RestApiServer and WebServicesServer each call
+      // SSL_CTX_new directly, and neither of them has the group list or the
+      // version toggles at all.
+      //
+      // The bridge between the two stacks is as thin as it can be.
+      // SslContextInitializer takes a boost::asio::ssl::context, so one is built
+      // here and handed to it, and the raw SSL_CTX it wraps (native_handle) is what
+      // this listener's blocking sockets pass to SSL_new. Nothing about the
+      // configuration is restated locally, so nothing local can drift. sslv23 is
+      // the same method TCPServer constructs its context with, deliberately: the
+      // usable protocol versions come from the option mask InitServer applies, and
+      // choosing a different method here would silently change which versions the
+      // mask is applied to.
+      //
+      // The certificate is this listener's own setting rather than one borrowed
+      // from a mail port, for a reason specific to what does the scraping. A mail
+      // client reaches the mail host name, so the mail certificate is the one it
+      // already trusts. A Prometheus server reaches this endpoint by container
+      // name, service name or bare IP, so the mail certificate's subject would not
+      // match and the scrape would need verification turned off anyway - at which
+      // point borrowing it has bought nothing and has tied the monitoring port's
+      // availability to the mail certificate's renewal. An explicit pair, exactly
+      // like RestApiCertificateFile, is the honest shape.
+      //
+      // This is the small correct thing, not the finished thing: the listener is
+      // still its own std::thread accept loop with blocking reads, so it does not
+      // get the shared listener's session accounting, its OnAccept scripting event
+      // or its asynchronous timeouts. Re-hosting it on the Boost.Asio stack, which
+      // would delete this function, is Phase 1 work.
+      try
+      {
+         auto certificate = std::shared_ptr<SSLCertificate>(new SSLCertificate());
+
+         certificate->SetName(_T("MetricsServer"));
+         certificate->SetCertificateFile(certificate_file);
+         certificate->SetPrivateKeyFile(private_key_file);
+
+         auto built = std::shared_ptr<boost::asio::ssl::context>(
+            new boost::asio::ssl::context(boost::asio::ssl::context::sslv23));
+
+         if (!SslContextInitializer::InitServer(*built, certificate, bind_address, port))
+            return false;
+
+         // The one thing deliberately not taken from the shared configuration. The
+         // shared option mask is driven by the [Settings] TLS version toggles,
+         // which an administrator may well have opened up to TLS 1.0 for an ancient
+         // mail client. That argument does not extend to a monitoring endpoint -
+         // there is no 2008-era Prometheus - so the floor stays at 1.2, applied
+         // after InitServer so it can only tighten what the shared configuration
+         // allows, never loosen it.
+         SSL_CTX_set_min_proto_version(built->native_handle(), TLS1_2_VERSION);
+
+         context = built;
+
+         return true;
+      }
+      catch (...)
+      {
+         // Constructing the context, or reading the configuration, can throw. This
+         // runs on the startup path, where an escape would take the whole service
+         // down before a single listener is up, so it is contained here and the
+         // caller turns it into a closed /metrics.
+         return false;
+      }
    }
 
    void
@@ -188,14 +543,40 @@ namespace HM
             continue;
          }
 
+         Connection connection(clientSocket);
+
+         // Published for Stop() before anything can block on it, and withdrawn
+         // below before it is closed. See the header for why that order is the
+         // whole safety argument.
+         {
+            std::lock_guard<std::mutex> guard(active_client_mutex_);
+            active_client_socket_ = clientSocket;
+         }
+
+         // Set before anything is read, which since TLS arrived means before the
+         // handshake as well as before the request. SSL_accept on a blocking socket
+         // inherits SO_RCVTIMEO, so a client that opens a connection and then says
+         // nothing - a port scanner, a load balancer probing the port, a plain-HTTP
+         // request to an HTTPS listener - is bounded instead of holding this
+         // single-threaded accept loop open. A client that keeps dribbling
+         // handshake bytes just under the timeout can still stretch the handshake
+         // beyond it, which is the one phase here with no absolute deadline: OpenSSL
+         // gives no way to bound a blocking SSL_accept without driving it
+         // non-blocking through select(), and Stop()'s shutdown() above is what
+         // makes that acceptable, because it means such a client can delay this
+         // listener but not the service stop.
+         DWORD timeout = SocketTimeoutMilliseconds;
+         setsockopt(connection.socket, SOL_SOCKET, SO_RCVTIMEO, (const char*) &timeout, sizeof(timeout));
+         setsockopt(connection.socket, SOL_SOCKET, SO_SNDTIMEO, (const char*) &timeout, sizeof(timeout));
+
          // This function is the top of a std::thread. There is nothing above it to
          // catch anything, so an exception that escaped here would be
          // std::terminate() - the entire mail server would die because a monitoring
          // scrape went wrong. Everything the handler touches is fenced off behind
          // this barrier: the database reads behind /metrics and /readyz, the
-         // certificate files, and the string building. The socket is deliberately
-         // closed out here rather than inside the handler, so the barrier firing
-         // cannot leak a handle either.
+         // certificate files, and the string building. The connection is
+         // deliberately closed out here rather than inside the handler, so the
+         // barrier firing cannot leak a socket handle or an SSL object either.
          //
          // The catch blocks below only record what happened; they do not report it.
          // Reporting has to wait until after the socket is closed and has to be
@@ -210,7 +591,7 @@ namespace HM
 
          try
          {
-            HandleClient_(clientSocket);
+            HandleClient_(connection);
          }
          catch (const std::exception &error)
          {
@@ -234,8 +615,17 @@ namespace HM
             exceptionEscaped = true;
          }
 
-         shutdown(clientSocket, SD_SEND);
-         closesocket(clientSocket);
+         // Withdrawn from Stop()'s reach BEFORE it is closed, under the lock. If
+         // these two were the other way round, Stop() could take the lock in the
+         // window between the close and the clear and call shutdown() on a handle
+         // Winsock may already have reissued to an entirely different socket
+         // somewhere else in the process.
+         {
+            std::lock_guard<std::mutex> guard(active_client_mutex_);
+            active_client_socket_ = INVALID_SOCKET;
+         }
+
+         CloseConnection_(connection);
 
          if (exceptionEscaped)
          {
@@ -266,40 +656,50 @@ namespace HM
    }
 
    void
-   MetricsServer::HandleClient_(SOCKET client_socket)
+   MetricsServer::HandleClient_(Connection &connection)
    {
-      DWORD timeout = 5000;
-      setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*) &timeout, sizeof(timeout));
-      setsockopt(client_socket, SOL_SOCKET, SO_SNDTIMEO, (const char*) &timeout, sizeof(timeout));
-
-      char requestBuffer[2048];
-      int bytesReceived = recv(client_socket, requestBuffer, sizeof(requestBuffer) - 1, 0);
-
-      if (bytesReceived <= 0)
+      // The handshake comes first and its failure is silent: nothing is written
+      // back to a client whose ClientHello we could not complete. In particular
+      // there is no fall back to plain HTTP, which would hand the whole exposition
+      // - and the credential the client was about to present - to anyone who simply
+      // spoke HTTP to a listener configured for HTTPS.
+      if (tls_context_ && !StartTls_(connection))
          return;
 
-      requestBuffer[bytesReceived] = '\0';
+      std::string headerBlock;
 
-      AnsiString request(requestBuffer);
+      if (!ReadRequest_(connection, headerBlock))
+         return;
+
+      std::vector<std::string> lines;
+      SplitHeaderLines_(headerBlock, lines);
+
+      // Whole paths rather than prefixes. The old StartsWith("GET /metrics") also
+      // matched "GET /metricsanything", which was harmless while nothing on this
+      // listener was protected and is not a habit worth keeping now that one branch
+      // of this dispatch sits behind a credential and three deliberately do not.
+      //
+      // Matched case-insensitively, which is not what RFC 7230 says about paths but
+      // is exactly what StartsWith did here before - StartsWith in this string class
+      // folds case - and the point of this change is to stop matching too much, not
+      // to start rejecting a request shape that used to work. It costs nothing in
+      // safety: every spelling of /metrics lands in the same branch and so passes
+      // through the same check.
+      std::string path = GetRequestPath_(lines);
       AnsiString response;
 
-      if (request.StartsWith("GET /metrics"))
-      {
-         AnsiString body = BuildMetricsBody_();
-
-         AnsiString headers;
-         headers.Format("HTTP/1.0 200 OK\r\nContent-Type: text/plain; version=0.0.4; charset=utf-8\r\nContent-Length: %d\r\nConnection: close\r\n\r\n", body.GetLength());
-
-         response = headers + body;
-      }
-      else if (request.StartsWith("GET /livez"))
+      // The three probes are answered FIRST, before anything that could refuse.
+      // The ordering is deliberate and is the invariant this whole class is built
+      // around: a probe has nowhere to keep a credential, so no configuration and
+      // no future edit to the branches below may put a refusal in front of them.
+      if (_stricmp(path.c_str(), "/livez") == 0)
       {
          // Liveness: if we got here, the process and the listener thread are
          // responsive. No dependency checks (so a database outage does not cause
          // an orchestrator to kill an otherwise-healthy process).
          response = BuildHttpResponse_(200, "text/plain; charset=utf-8", "alive\n");
       }
-      else if (request.StartsWith("GET /readyz"))
+      else if (_stricmp(path.c_str(), "/readyz") == 0)
       {
          // Readiness: the server is running and the database is connected.
          AnsiString reason;
@@ -307,18 +707,520 @@ namespace HM
          response = BuildHttpResponse_(ready ? 200 : 503, "text/plain; charset=utf-8",
             ready ? AnsiString("ready\n") : ("not ready: " + reason + "\n"));
       }
-      else if (request.StartsWith("GET /healthz"))
+      else if (_stricmp(path.c_str(), "/healthz") == 0)
       {
          bool healthy = false;
          AnsiString body = BuildHealthBody_(healthy);
          response = BuildHttpResponse_(healthy ? 200 : 503, "application/json; charset=utf-8", body);
+      }
+      else if (_stricmp(path.c_str(), "/metrics") == 0)
+      {
+         if (metrics_availability_ != MetricsAvailable)
+         {
+            // Not counted in hmailserver_metrics_unauthorized_requests_total: this
+            // is not a rejected credential, and counting it would be pointless
+            // anyway, because the only way to read that counter is the endpoint
+            // that is closed. The reason was written to the application log once,
+            // at start, where the operator can act on it.
+            response = BuildMetricsUnavailableResponse_();
+         }
+         else if (!IsRequestAuthorized_(lines))
+         {
+            // Counted rather than logged. A metrics endpoint reachable from a
+            // network gets scanned, and one log line per attempt would fill the
+            // application log with something nobody can act on individually; a
+            // counter turns the same information into a rate an operator can alert
+            // on. Nothing about what was presented is recorded anywhere.
+            ServerStatus::Instance()->OnMetricsRequestUnauthorized();
+
+            response = BuildUnauthorizedResponse_();
+         }
+         else
+         {
+            response = BuildHttpResponse_(200, "text/plain; version=0.0.4; charset=utf-8", BuildMetricsBody_());
+         }
       }
       else
       {
          response = "HTTP/1.0 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
       }
 
-      send(client_socket, response.c_str(), response.GetLength(), 0);
+      Send_(connection, response);
+   }
+
+   void
+   MetricsServer::CloseConnection_(Connection &connection)
+   {
+      if (connection.tls_session != nullptr)
+      {
+         // One attempt at close_notify, not a loop: this also runs on the path
+         // where the exception barrier has just fired, and a peer that is not
+         // reading must not be able to hold the accept loop here. The send timeout
+         // bounds it, and Stop() can cut it short.
+         SSL_shutdown(connection.tls_session);
+         SSL_free(connection.tls_session);
+         connection.tls_session = nullptr;
+      }
+
+      if (connection.socket != INVALID_SOCKET)
+      {
+         // SD_SEND, not SD_BOTH: this half-close is what tells the client the
+         // response is complete, and shutting the receive direction down as well
+         // would risk a reset that discarded a response the client had not finished
+         // reading.
+         shutdown(connection.socket, SD_SEND);
+         closesocket(connection.socket);
+         connection.socket = INVALID_SOCKET;
+      }
+   }
+
+   bool
+   MetricsServer::StartTls_(Connection &connection) const
+   {
+      // native_handle() is the SSL_CTX SslContextInitializer configured. Taking it
+      // rather than making one is what makes the session below inherit the shared
+      // cipher list, TLS version toggles and key-exchange groups without this file
+      // naming any of them.
+      SSL *session = SSL_new(tls_context_->native_handle());
+
+      if (session == nullptr)
+      {
+         ERR_clear_error();
+         return false;
+      }
+
+      SSL_set_fd(session, static_cast<int>(connection.socket));
+
+      if (SSL_accept(session) != 1)
+      {
+         // Deliberately not counted anywhere. A failed handshake here is
+         // client-driven - a plain HTTP request to an HTTPS port, a TLS version
+         // below the floor, a port scanner - and feeding it into
+         // hmailserver_tls_handshake_failures_total would make monitoring traffic
+         // move the number that describes TLS on the MAIL protocols, so a scanner
+         // knocking on the metrics port would page somebody about SMTP. It gets no
+         // counter of its own either: a scraper that cannot handshake is already
+         // reported by Prometheus's own synthetic up == 0 for that target, which is
+         // a better signal than anything this endpoint could say about its own
+         // unreachability.
+         //
+         // Clear this thread's OpenSSL error queue. It is shared with every other
+         // OpenSSL call on this thread - including the certificate parsing behind
+         // hmailserver_tls_certificate_expiry_seconds - so a failure left behind
+         // here would later be reported against something unrelated.
+         ERR_clear_error();
+
+         SSL_free(session);
+         return false;
+      }
+
+      connection.tls_session = session;
+
+      return true;
+   }
+
+   int
+   MetricsServer::Receive_(Connection &connection, char *buffer, int size)
+   {
+      if (connection.tls_session != nullptr)
+         return SSL_read(connection.tls_session, buffer, size);
+
+      return recv(connection.socket, buffer, size, 0);
+   }
+
+   void
+   MetricsServer::Send_(Connection &connection, const AnsiString &data)
+   {
+      // Written in a loop, not in one call. A blocking send() is permitted to
+      // accept fewer bytes than it was handed, and this response is several
+      // kilobytes and grows with every configured certificate and every histogram
+      // bucket - so a short write would truncate the exposition mid-line, which
+      // Prometheus reports as a parse failure against the ENTIRE scrape rather than
+      // as one missing metric. The single-call send this replaces was safe only for
+      // as long as the body stayed small and the link stayed fast.
+      //
+      // The loop needs its own absolute deadline, and this is the reason: the
+      // socket send timeout bounds one call, so a peer that accepts a few bytes and
+      // then stalls, over and over, keeps making just enough progress to reset that
+      // timeout forever. On a single-threaded accept loop that is a denial of every
+      // other scrape and, worse, of every health probe behind it. A write that runs
+      // out of budget is abandoned: there is nothing useful left to say to a client
+      // that has stopped reading, and the connection is closed either way.
+      const int total = data.GetLength();
+      int sent = 0;
+
+      const ULONGLONG deadline = GetTickCount64() + ResponseWriteTimeoutMilliseconds;
+
+      while (sent < total)
+      {
+         if (GetTickCount64() >= deadline)
+            return;
+
+         int written = connection.tls_session != nullptr
+            ? SSL_write(connection.tls_session, data.c_str() + sent, total - sent)
+            : send(connection.socket, data.c_str() + sent, total - sent, 0);
+
+         if (written <= 0)
+            return;
+
+         sent += written;
+      }
+   }
+
+   bool
+   MetricsServer::ReadRequest_(Connection &connection, std::string &header_block)
+   {
+      // The listener used to take whatever one recv() returned and parse that. For
+      // a request line alone that was almost always enough; for a request line plus
+      // an Authorization header it is not, because nothing stops the header from
+      // arriving in a second TCP segment - and a scrape that got a 401 for that
+      // reason would be an intermittent failure with no explanation anywhere. So
+      // the headers are read until the terminating blank line, bounded in both size
+      // and total time.
+      //
+      // Two properties of this function are load bearing, and both of them were
+      // wrong in the first attempt at it.
+      //
+      // First, it returns the HEADER BLOCK ONLY. Reading until the blank line and
+      // then handing the whole buffer to the parser meant an Authorization header
+      // placed AFTER the blank line - in what is, by definition, the body - was
+      // found and honoured. The body of a request is not part of its metadata and
+      // must never be searched for credentials, so the buffer is truncated at the
+      // terminator here, once, rather than left to every caller to remember.
+      //
+      // Second, a request that is NOT terminated by a blank line is still served.
+      // The old code answered anything that arrived in one recv, terminated or not,
+      // and probes rely on that: "GET /livez\n\n" from a shell one-liner, an LF-only
+      // client, a health checker that half-closes after writing. Returning false for
+      // those - which is what an implementation that insists on CRLFCRLF does - shows
+      // up as a silent close, which a load balancer reads as a failed health check
+      // and a dead node. So false here means one thing only: nothing at all arrived.
+      std::string data;
+      char buffer[4096];
+
+      const ULONGLONG deadline = GetTickCount64() + RequestReadTimeoutMilliseconds;
+
+      size_t blockEnd = std::string::npos;
+
+      while (data.size() < MaxRequestSize)
+      {
+         if (GetTickCount64() >= deadline)
+            break;
+
+         int bytesRead = Receive_(connection, buffer, static_cast<int>(sizeof(buffer)));
+         if (bytesRead <= 0)
+            break;
+
+         data.append(buffer, static_cast<size_t>(bytesRead));
+
+         // The request body, if any, is deliberately never read. Every endpoint
+         // here is a GET, so a body would be ignored in any case, and reading one
+         // would only give an unauthenticated client a way to make us buffer.
+         blockEnd = FindHeaderBlockEnd_(data);
+         if (blockEnd != std::string::npos)
+            break;
+      }
+
+      if (data.empty())
+         return false;
+
+      header_block = blockEnd == std::string::npos ? data : data.substr(0, blockEnd);
+
+      return true;
+   }
+
+   size_t
+   MetricsServer::FindHeaderBlockEnd_(const std::string &data)
+   {
+      // Bare LF counts as a line ending, not only CRLF. RFC 7230 says a recipient
+      // MAY accept it and this listener always did, by accident, because it never
+      // looked for a terminator at all; probes and hand-typed requests depend on it
+      // often enough that tightening it here would be a regression dressed up as
+      // correctness.
+      size_t lineStart = 0;
+
+      for (size_t i = 0; i < data.size(); i++)
+      {
+         if (data[i] != '\n')
+            continue;
+
+         size_t lineEnd = i;
+
+         if (lineEnd > lineStart && data[lineEnd - 1] == '\r')
+            lineEnd--;
+
+         // An empty line ends the header block. The lineStart != 0 guard tolerates
+         // a leading empty line, which RFC 7230 tells a server to ignore rather
+         // than treat as an empty request with no headers.
+         if (lineEnd == lineStart && lineStart != 0)
+            return i + 1;
+
+         lineStart = i + 1;
+      }
+
+      return std::string::npos;
+   }
+
+   void
+   MetricsServer::SplitHeaderLines_(const std::string &header_block, std::vector<std::string> &lines)
+   {
+      size_t lineStart = 0;
+
+      for (;;)
+      {
+         size_t newline = header_block.find('\n', lineStart);
+         size_t lineEnd = newline == std::string::npos ? header_block.size() : newline;
+
+         size_t contentEnd = lineEnd;
+
+         if (contentEnd > lineStart && header_block[contentEnd - 1] == '\r')
+            contentEnd--;
+
+         lines.push_back(header_block.substr(lineStart, contentEnd - lineStart));
+
+         if (newline == std::string::npos)
+            return;
+
+         lineStart = newline + 1;
+      }
+   }
+
+   std::string
+   MetricsServer::GetRequestPath_(const std::vector<std::string> &lines)
+   {
+      // Only GET is served, and only the origin form of the request target that a
+      // scraper or a probe actually sends. An absolute-form target
+      // ("GET http://host/metrics") is not recognised, exactly as before this
+      // listener understood paths at all - nothing that scrapes it emits one, and
+      // accepting a form nobody sends would mean two spellings of the protected
+      // path where one is enough.
+      //
+      // The method is matched case-insensitively even though RFC 7230 makes methods
+      // case-sensitive, for the same reason the path is: StartsWith folded case
+      // here before, so "get /livez" used to work, and nothing is gained by
+      // breaking it.
+      if (lines.empty())
+         return "";
+
+      const std::string &requestLine = lines[0];
+
+      if (requestLine.size() < 5 || _strnicmp(requestLine.c_str(), "GET ", 4) != 0)
+         return "";
+
+      const size_t pathStart = 4;
+
+      size_t pathEnd = requestLine.find(' ', pathStart);
+      if (pathEnd == std::string::npos)
+         pathEnd = requestLine.size();
+
+      if (pathEnd <= pathStart)
+         return "";
+
+      std::string path = requestLine.substr(pathStart, pathEnd - pathStart);
+
+      // A query string is stripped rather than made part of the path, so that
+      // "/metrics?collect[]=x" is the metrics endpoint - and therefore is behind the
+      // credential - rather than an unknown path that 404s.
+      size_t query = path.find('?');
+      if (query != std::string::npos)
+         path = path.substr(0, query);
+
+      return path;
+   }
+
+   std::string
+   MetricsServer::GetHeaderValue_(const std::vector<std::string> &lines, const char *header_name)
+   {
+      // Header names are case-insensitive in HTTP and clients differ
+      // ("Authorization" from Prometheus, "authorization" from anything speaking
+      // HTTP/2 through a proxy), so the match has to be too.
+      //
+      // Matched as a whole field name against the bytes before the colon, rather
+      // than by searching the request for the name: a search would find the name
+      // inside another header's value, and - before the header block was separated
+      // from the body - inside the body as well. The field name has to fill those
+      // bytes exactly, with no space before the colon, which is what RFC 7230
+      // requires and what a request smuggling attempt gets wrong.
+      //
+      // Obsolete line folding (a continuation line beginning with a space) is not
+      // reassembled. Nothing that scrapes this emits it, RFC 7230 deprecates it,
+      // and the failure direction is safe: a folded credential parses as a header
+      // with no colon, is skipped, and the request is refused.
+      //
+      // The first matching header wins. A duplicate Authorization header is
+      // malformed, and picking the first means what an operator's proxy prepends is
+      // what gets checked, rather than whatever a client appended after it.
+      size_t nameLength = strlen(header_name);
+
+      for (size_t i = 1; i < lines.size(); i++)
+      {
+         const std::string &line = lines[i];
+
+         size_t colon = line.find(':');
+         if (colon == std::string::npos)
+            continue;
+
+         if (colon != nameLength || _strnicmp(line.c_str(), header_name, nameLength) != 0)
+            continue;
+
+         std::string value = line.substr(colon + 1);
+         TrimOptionalWhitespace(value);
+
+         return value;
+      }
+
+      return "";
+   }
+
+   bool
+   MetricsServer::IsRequestAuthorized_(const std::vector<std::string> &lines) const
+   {
+      // No credential configured means no authentication, which is what a loopback
+      // scrape has always had and has to keep having: this is the branch every
+      // existing installation and every regression fixture takes. Start() is what
+      // guarantees that a non-loopback bind cannot reach this branch - it closes
+      // /metrics outright instead, before authorization is ever consulted.
+      if (auth_token_.IsEmpty() && auth_basic_credentials_.IsEmpty())
+         return true;
+
+      std::string headerValue = GetHeaderValue_(lines, "authorization");
+      if (headerValue.empty())
+         return false;
+
+      if (headerValue.size() >= 7 && _strnicmp(headerValue.c_str(), "bearer ", 7) == 0)
+      {
+         if (auth_token_.IsEmpty())
+            return false;
+
+         std::string presented = headerValue.substr(7);
+         TrimOptionalWhitespace(presented);
+
+         return SecureEquals(presented, auth_token_);
+      }
+
+      if (headerValue.size() >= 6 && _strnicmp(headerValue.c_str(), "basic ", 6) == 0)
+      {
+         if (auth_basic_credentials_.IsEmpty())
+            return false;
+
+         std::string encoded = headerValue.substr(6);
+         TrimOptionalWhitespace(encoded);
+
+         // Refused before the decoder sees it, rather than relying on what the
+         // base64 decoder does with a zero-length input.
+         if (encoded.empty())
+            return false;
+
+         // The decoder stops at the first character outside the base64 alphabet and
+         // returns what it had, so junk decodes to something short and the
+         // comparison below simply fails. No input validation is needed in front of
+         // it, and none is added: the same decoder is on the REST API's Basic path
+         // already.
+         AnsiString presented = Base64::Decode(encoded.c_str(), static_cast<int>(encoded.size()));
+
+         // One comparison over "username:password" as a whole. Comparing the two
+         // halves separately would leak, through the time taken, whether the user
+         // name was right - which is the more guessable half and the one an attacker
+         // would pin down first.
+         //
+         // Both sides are bytes, and the expected side was narrowed from the ini
+         // file's UTF-16 through the system code page, while the presented side is
+         // whatever the client base64-encoded (in practice UTF-8). So a credential
+         // outside ASCII can compare unequal even when it looks identical. That is
+         // worth knowing rather than worth fixing here: it is the same narrowing the
+         // administrator password takes on the REST API, fixing it properly means
+         // deciding an encoding for every secret in the ini file, and the credential
+         // this listener needs is a machine-generated token that has no business
+         // containing anything but ASCII.
+         //
+         // Note what is deliberately NOT scrubbed here: this decoded copy, the
+         // base64 still in "encoded", the header value, the line in "lines" and the
+         // raw bytes in ReadRequest_'s buffer. All five hold the presented
+         // credential and all five are freed within microseconds. Scrubbing one of
+         // them would be theatre - it would read as though the presented credential
+         // were being contained when four copies of it were not - and containing all
+         // five means a custom allocator for the request path, not a scrub call.
+         // ScrubSecret_ is applied where it actually changes something: the
+         // CONFIGURED credential, which lives for as long as the listener does.
+         return SecureEquals(presented, auth_basic_credentials_);
+      }
+
+      // An unrecognised scheme, which also catches a bare "Bearer" or "Basic" with
+      // nothing after it - the header value is trimmed, so those are too short to
+      // match either prefix. Refused, not ignored: a client configured with a
+      // scheme this listener does not accept must not be able to read the
+      // exposition by presenting one, and a credential that is present but unusable
+      // belongs on the counted failure path rather than being waved through as
+      // "absent".
+      return false;
+   }
+
+   AnsiString
+   MetricsServer::BuildUnauthorizedResponse_() const
+   {
+      // RFC 7235 permits more than one challenge, and which ones are advertised
+      // follows what is actually configured. Advertising Basic when only a bearer
+      // token exists would make a browser prompt for a password that can never
+      // work; advertising Bearer when only Basic exists would tell a client to stop
+      // sending the credential that would have worked.
+      AnsiString headers;
+
+      if (!auth_token_.IsEmpty())
+         headers += "WWW-Authenticate: Bearer realm=\"hMailServer metrics\"\r\n";
+
+      if (!auth_basic_credentials_.IsEmpty())
+         headers += "WWW-Authenticate: Basic realm=\"hMailServer metrics\"\r\n";
+
+      // The body says nothing about which scheme was tried, whether the credential
+      // was absent or merely wrong, or how close it came.
+      return BuildHttpResponse_(401, "text/plain; charset=utf-8", "unauthorized\n", headers);
+   }
+
+   AnsiString
+   MetricsServer::BuildMetricsUnavailableResponse_() const
+   {
+      // 503 and not 401: there is no credential that would work in either of these
+      // configurations, so a challenge would invite a client to guess at one that
+      // does not exist. 503 is also what a scraper already understands as "this
+      // target is not serving right now", so it lands in the operator's existing
+      // "target down" alert instead of needing a new one.
+      //
+      // The body names the settings. It therefore tells an anonymous caller that
+      // the endpoint is misconfigured rather than merely protected, which is a
+      // deliberate trade: it gives an attacker nothing - the endpoint is shut
+      // either way, and there is no secret to work towards - and it is the
+      // difference between an operator fixing this in a minute with curl and
+      // reporting that monitoring broke on upgrade. The same reason is in the
+      // application log, once, from Start().
+      //
+      // No part of the exposition, and no metric name, appears in any of these
+      // bodies.
+      const char *body;
+
+      switch (metrics_availability_)
+      {
+      case MetricsNeedsCredential:
+         body = "metrics unavailable: this listener is bound to a non-loopback address and no credential is configured, "
+                "so the exposition would be readable by anyone who can reach this port. Set MetricsServerAuthToken, or "
+                "set both MetricsServerAuthUsername and MetricsServerAuthPassword, or bind to 127.0.0.1. The health "
+                "probes /livez, /readyz and /healthz are unaffected.\n";
+         break;
+
+      case MetricsNeedsTls:
+         body = "metrics unavailable: MetricsServerCertificateFile and MetricsServerPrivateKeyFile are set but the TLS "
+                "context could not be prepared, and serving the exposition in the clear instead would defeat the "
+                "configuration. See the application and error logs for the certificate or key failure. The health "
+                "probes /livez, /readyz and /healthz are unaffected.\n";
+         break;
+
+      default:
+         // Unreachable: the caller checks for MetricsAvailable first. Present so
+         // that adding an enumerator cannot silently produce an empty body.
+         body = "metrics unavailable\n";
+         break;
+      }
+
+      return BuildHttpResponse_(503, "text/plain; charset=utf-8", body);
    }
 
    AnsiString
@@ -363,6 +1265,23 @@ namespace HM
       body += "# HELP hmailserver_auth_failures_total Number of failed authentication attempts since server start.\n";
       body += "# TYPE hmailserver_auth_failures_total counter\n";
       line.Format("hmailserver_auth_failures_total %d\n", status->GetNumberOfAuthenticationFailures());
+      body += line;
+
+      // The one thing an operator cannot otherwise see about this listener. Failed
+      // credentials are deliberately not logged per request (see HandleClient_), so
+      // without this series a password-guessing run against an exposed /metrics
+      // leaves no trace at all. It is a counter rather than a log line so that
+      // "somebody is probing the monitoring port" is an alertable rate, and it stays
+      // at zero on every installation that has no credential configured - which
+      // means a value above zero is always worth reading.
+      //
+      // Note what it is NOT: it is not folded into hmailserver_auth_failures_total.
+      // That counter means "an account failed to log on to a mail protocol" and is
+      // what brute-force alerts are built on; a refused scrape has nothing to do
+      // with an account and would corrupt it.
+      body += "# HELP hmailserver_metrics_unauthorized_requests_total Requests to /metrics refused for a missing or wrong credential. Always 0 when no credential is configured. Alert on rate(hmailserver_metrics_unauthorized_requests_total[5m]) > 0.\n";
+      body += "# TYPE hmailserver_metrics_unauthorized_requests_total counter\n";
+      line.Format("hmailserver_metrics_unauthorized_requests_total %I64u\n", status->GetMetricsUnauthorizedRequestsCount());
       body += line;
 
       body += "# HELP hmailserver_messages_delivered_total Number of message delivery passes that completed successfully.\n";
@@ -754,20 +1673,28 @@ namespace HM
    }
 
    AnsiString
-   MetricsServer::BuildHttpResponse_(int status_code, const char *content_type, const AnsiString &body)
+   MetricsServer::BuildHttpResponse_(int status_code, const char *content_type, const AnsiString &body,
+      const AnsiString &extra_headers)
    {
       const char *reason;
       switch (status_code)
       {
       case 200: reason = "OK"; break;
+      case 401: reason = "Unauthorized"; break;
       case 404: reason = "Not Found"; break;
       case 503: reason = "Service Unavailable"; break;
       default:  reason = "OK"; break;
       }
 
+      // extra_headers, where present, already ends each line it carries with CRLF,
+      // so it goes in before the blank line that terminates the header block rather
+      // than being concatenated onto the format string with separators of its own.
       AnsiString headers;
-      headers.Format("HTTP/1.0 %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\nConnection: close\r\n\r\n",
+      headers.Format("HTTP/1.0 %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\nConnection: close\r\n",
          status_code, reason, content_type, body.GetLength());
+
+      headers += extra_headers;
+      headers += "\r\n";
 
       return headers + body;
    }

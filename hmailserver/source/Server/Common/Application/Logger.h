@@ -78,8 +78,45 @@ namespace HM
          LiveLogMaxSize = 1000000
       };
 
-         
+      // Where log entries are written. Mirrors eLogDevice in the IDL after the
+      // COM layer's mapping (hLogDeviceUnknown -> 0, hLogDeviceSQL -> 1,
+      // hLogDeviceFile -> 2), which is the form stored in the logdevice setting.
+      // Unknown - the value every CreateTables script inserts, so the value every
+      // installation that has never touched the setting still has - means file, so
+      // that installation behaves exactly as it always has.
+      enum LogDevice
+      {
+         DeviceUnknown = 0,
+         DeviceSQL = 1,
+         DeviceFile = 2
+      };
+
+      // How each entry is rendered. Mirrors eLogOutputFormat after the COM
+      // layer's mapping (hLogFormatDefault -> 0, hLogFormatCSA -> 1). Note that
+      // the IDL numbers those 1 and 2; the stored values are 0 and 1.
+      enum LogOutputFormat
+      {
+         FormatDefault = 0,
+         FormatNCSA = 1
+      };
+
       void SetLogMask(int iMask);
+
+      // Both are driven by Configuration::OnPropertyChanged, which
+      // PropertySet::Refresh() raises for every setting at load time as well as
+      // on change - so these also carry the stored value at startup. Reading the
+      // settings from inside the Logger instead is not an option: the Logger logs
+      // during startup, before the property set exists.
+      void SetLogDevice(int device);
+      void SetLogFormat(int format);
+
+      int GetLogDevice() const { return log_device_; }
+      int GetLogFormat() const { return log_format_; }
+
+      // Writes an already-rendered line straight to the file device, bypassing
+      // device selection. Used by the SQL log device when it has to fall back to
+      // files, which is the whole of its degradation path.
+      void WriteLineToFile(const String &line, LogType lt);
 
       void LogApplication(const String &sMessage);
       void LogApplication(const String &sMessage, bool isError);
@@ -115,6 +152,42 @@ namespace HM
 
    private:
 
+      // One log record before it has been rendered for any particular device.
+      // Introduced so that format selection and device selection each live in one
+      // place: every Log* function used to repeat the "JSON or default?" choice
+      // inline, and adding a third format plus a second device to seven copies of
+      // that decision is how renderings end up disagreeing with each other.
+      //
+      // LogEvent, LogAWStats and LogBackup deliberately do NOT go through this.
+      // Each of those three writes a separate file with an external consumer that
+      // parses a fixed field list - an AWStats installation, a backup report, an
+      // event log an administrator's own tooling reads - so neither the format
+      // setting nor the device setting touches them. They are logs of a different
+      // kind that happen to share a writer.
+      struct Entry
+      {
+         Entry() : thread(0), session(-1) {}
+
+         String category;      // "SMTPD", "APPLICATION", "DEBUG", ...
+         long thread;
+         int session;          // -1 when the entry belongs to no protocol session
+         String remote_host;   // empty when the entry has no peer
+         String time;
+         String message;       // unescaped; each rendering escapes as it needs to
+      };
+
+      Entry MakeEntry_(const String &category, int session, const String &remoteHost, const String &message);
+
+      // Renders one entry in whichever format is configured.
+      String Render_(const Entry &entry);
+
+      // Hands the rendered line to the configured device. The entry is always
+      // written somewhere: whenever the SQL device will not take it - off,
+      // degraded, buffer full, or the caller is its own flush thread - it goes to
+      // the file instead, so there is no path through here that discards it and
+      // nothing for a caller to check.
+      void Write_(const Entry &entry, const String &line, LogType lt);
+
       String CleanLogMessage_(const String &message);
       File* GetCurrentLogFile_(LogType lt);
 
@@ -141,6 +214,14 @@ namespace HM
 
       String live_log_;
       int log_mask_;
+
+      // Written by whichever thread applies a settings change, read by every
+      // thread that logs. Deliberately plain ints and not synchronised, exactly
+      // as log_mask_ above already is: both are aligned 32-bit values that cannot
+      // tear, and the worst a racing reader can see is one entry rendered or
+      // routed by the previous setting.
+      int log_device_;
+      int log_format_;
 
       File normal_log_file_;
       File error_log_file_;

@@ -198,6 +198,8 @@ EXIT 0
     <ClCompile Include="..\Common\Application\Backup.cpp" />
     <ClCompile Include="..\Common\Application\BackupExecuter.cpp" />
     <ClCompile Include="..\Common\Application\BackupManager.cpp" />
+    <ClCompile Include="..\Common\Application\BackupRetention.cpp" />
+    <ClCompile Include="..\Common\Application\BackupScheduleTask.cpp" />
     <ClCompile Include="..\Common\Application\BackupTask.cpp" />
     <ClCompile Include="..\Common\Application\Configuration.cpp" />
     <ClCompile Include="..\Common\Application\DefaultDomain.cpp" />
@@ -207,6 +209,8 @@ EXIT 0
     <ClCompile Include="..\Common\Application\FolderManager.cpp" />
     <ClCompile Include="..\Common\Application\IniFileSettings.cpp" />
     <ClCompile Include="..\Common\Application\Logger.cpp" />
+    <ClCompile Include="..\Common\Application\NcsaLogFormatter.cpp" />
+    <ClCompile Include="..\Common\Application\SqlLogDevice.cpp" />
     <ClCompile Include="..\Common\Application\MessageIndexer.cpp" />
     <ClCompile Include="..\Common\Application\ObjectCache.cpp" />
     <ClCompile Include="..\Common\Application\OutOfMemoryHandler.cpp" />
@@ -721,6 +725,8 @@ EXIT 0
     <ClInclude Include="..\Common\Application\Backup.h" />
     <ClInclude Include="..\Common\Application\BackupExecuter.h" />
     <ClInclude Include="..\Common\Application\BackupManager.h" />
+    <ClInclude Include="..\Common\Application\BackupRetention.h" />
+    <ClInclude Include="..\Common\Application\BackupScheduleTask.h" />
     <ClInclude Include="..\Common\Application\BackupTask.h" />
     <ClInclude Include="..\Common\Application\Configuration.h" />
     <ClInclude Include="..\Common\Application\Constants.h" />
@@ -731,6 +737,8 @@ EXIT 0
     <ClInclude Include="..\Common\Application\FolderManager.h" />
     <ClInclude Include="..\Common\Application\IniFileSettings.h" />
     <ClInclude Include="..\Common\Application\Logger.h" />
+    <ClInclude Include="..\Common\Application\NcsaLogFormatter.h" />
+    <ClInclude Include="..\Common\Application\SqlLogDevice.h" />
     <ClInclude Include="..\Common\Application\MessageIndexer.h" />
     <ClInclude Include="..\Common\Application\ObjectCache.h" />
     <ClInclude Include="..\Common\Application\OutOfMemoryHandler.h" />
@@ -1006,6 +1014,7 @@ EXIT 0
     <ClInclude Include="..\Common\Util\WebServicesServer.h" />
     <ClInclude Include="..\Common\Util\TlsRptStore.h" />
     <ClInclude Include="..\Common\Util\ServerStatus.h" />
+    <ClInclude Include="..\Common\Util\SecureCompare.h" />
     <ClInclude Include="..\Common\Util\ServiceManager.h" />
     <ClInclude Include="..\Common\Util\SignatureAdder.h" />
     <ClInclude Include="..\Common\Util\Singleton.h" />

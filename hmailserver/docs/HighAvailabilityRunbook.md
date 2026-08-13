@@ -83,8 +83,24 @@ hMailServer exposes Kubernetes-style probes on the metrics listener. Enable it o
 [Settings]
 MetricsServerPort=8080
 MetricsServerBindAddress=0.0.0.0    ; reachable by the load balancer / health checker
+MetricsServerAuthToken=<32+ random characters>   ; see below - required for /metrics on a non-loopback bind
 ShutdownDrainSeconds=30             ; let in-flight sessions finish on a graceful stop
 ```
+
+**The three probes never require a credential, and the exposition now does.** On a
+non-loopback bind, `/metrics` answers **503** until `MetricsServerAuthToken` (or the
+`MetricsServerAuthUsername`/`MetricsServerAuthPassword` pair) is set, and the 503 body
+names the settings that would open it. `/livez`, `/readyz` and `/healthz` are served
+unauthenticated in every configuration, because a load balancer cannot present a
+credential and a health check cannot hold a secret — so **the VIP configuration in this
+runbook keeps working exactly as written**, with or without the token.
+
+The reason the exposition is treated differently: on `0.0.0.0` it publishes queue depth,
+session counts and authentication-failure counts to anything that can reach the port.
+Add the token, and give the scraper an `Authorization: Bearer <token>` header. If you
+want the metrics port encrypted as well, set `MetricsServerCertificateFile` and
+`MetricsServerPrivateKeyFile`; without them the listener stays plain HTTP and says so in
+the application log rather than refusing to start.
 
 Probes (HTTP):
 
@@ -157,6 +173,10 @@ Reverse the steps to fail back.
       shared storage.
 * [ ] `MetricsServerPort` is enabled and reachable by the health checker on both
       nodes; the VIP health check targets `/readyz`.
+* [ ] `MetricsServerAuthToken` is set on both nodes, and the scraper sends it. Without
+      it `/metrics` answers 503 on a non-loopback bind — the probes and therefore the
+      failover still work, so this fails quietly as *missing dashboards*, not as an
+      outage.
 * [ ] `ShutdownDrainSeconds` is set so planned failovers drain gracefully.
 * [ ] Passive node's service is stopped and set to Manual/Disabled.
 * [ ] A documented fencing step exists for unplanned failover.

@@ -337,6 +337,26 @@ namespace HM
       message_store_consistency_check_ = ReadIniSettingInteger_("Settings", "MessageStoreConsistencyCheck", 0) == 1;
       metrics_server_port_ = ReadIniSettingInteger_("Settings", "MetricsServerPort", 0);
       metrics_server_bind_address_ = ReadIniSettingString_("Settings", "MetricsServerBindAddress", "127.0.0.1");
+
+      // Metrics access control and TLS. Every one of these defaults to empty, which is
+      // the old behaviour exactly: a loopback scrape is unauthenticated plain HTTP as it
+      // has always been. They only start mattering once an operator moves the listener
+      // off loopback, which is when /metrics needs a credential to stay open.
+      metrics_server_auth_token_ = ReadIniSettingString_("Settings", "MetricsServerAuthToken", "");
+      metrics_server_auth_username_ = ReadIniSettingString_("Settings", "MetricsServerAuthUsername", "");
+      metrics_server_auth_password_ = ReadIniSettingString_("Settings", "MetricsServerAuthPassword", "");
+      metrics_server_certificate_file_ = ReadIniSettingString_("Settings", "MetricsServerCertificateFile", "");
+      metrics_server_private_key_file_ = ReadIniSettingString_("Settings", "MetricsServerPrivateKeyFile", "");
+
+      // Scheduled backups. All four absent by default: no schedule is registered and no
+      // archive is ever deleted, so an existing installation is untouched until somebody
+      // configures one. Retention is deliberately off rather than defaulted to something
+      // tidy - a default that deletes archives is a default that loses somebody's only
+      // backup.
+      scheduled_backup_time_ = ReadIniSettingString_("Settings", "ScheduledBackupTime", "");
+      scheduled_backup_interval_minutes_ = ReadIniSettingInteger_("Settings", "ScheduledBackupIntervalMinutes", 0);
+      scheduled_backup_keep_count_ = ReadIniSettingInteger_("Settings", "ScheduledBackupKeepCount", 0);
+      scheduled_backup_max_age_days_ = ReadIniSettingInteger_("Settings", "ScheduledBackupMaxAgeDays", 0);
       otel_endpoint_ = ReadIniSettingString_("Settings", "OtelEndpoint", "");
       otel_service_name_ = ReadIniSettingString_("Settings", "OtelServiceName", "hmailserver");
       manage_sieve_server_port_ = ReadIniSettingInteger_("Settings", "ManageSieveServerPort", 0);

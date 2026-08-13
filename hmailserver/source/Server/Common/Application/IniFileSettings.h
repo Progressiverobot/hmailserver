@@ -193,6 +193,39 @@ namespace HM
       bool GetMessageStoreConsistencyCheck() const { return message_store_consistency_check_; }
       int GetMetricsServerPort() const { return metrics_server_port_; }
       String GetMetricsServerBindAddress() const { return metrics_server_bind_address_; }
+
+      // Access control on the metrics listener. All five are absent by default, so a
+      // loopback scrape behaves exactly as it always has, and /livez, /readyz and
+      // /healthz are never authenticated whatever these say - a load balancer cannot
+      // present a credential and a probe cannot hold a secret.
+      //
+      // A credential is REQUIRED for /metrics when the bind address is not loopback:
+      // without one /metrics answers 503 and names these settings, while the listener
+      // and the probes keep serving. Refusing to start instead would have taken the
+      // probes down with the exposition, which is the configuration
+      // docs/HighAvailabilityRunbook.md section 3 actually ships.
+      String GetMetricsServerAuthToken() const { return metrics_server_auth_token_; }
+      String GetMetricsServerAuthUsername() const { return metrics_server_auth_username_; }
+      String GetMetricsServerAuthPassword() const { return metrics_server_auth_password_; }
+
+      // Both must be set to serve HTTPS on the metrics port. Never inferred: a
+      // non-loopback bind without TLS is warned about in the application log and served,
+      // because a monitoring endpoint that silently stops answering is worse than one
+      // that answers over plain HTTP on a network the operator chose.
+      String GetMetricsServerCertificateFile() const { return metrics_server_certificate_file_; }
+      String GetMetricsServerPrivateKeyFile() const { return metrics_server_private_key_file_; }
+
+      // Scheduled backups. Absent means the task is never constructed and no archive is
+      // ever deleted, so an upgrade changes nothing until an administrator asks for it.
+      //
+      // ScheduledBackupTime is 24-hour local "HH:MM" and wins over the interval when
+      // both are set. What goes into a backup and where it is written still come from the
+      // existing backup settings; these only decide WHEN a backup happens and which old
+      // archives survive.
+      String GetScheduledBackupTime() const { return scheduled_backup_time_; }
+      int GetScheduledBackupIntervalMinutes() const { return scheduled_backup_interval_minutes_; }
+      int GetScheduledBackupKeepCount() const { return scheduled_backup_keep_count_; }
+      int GetScheduledBackupMaxAgeDays() const { return scheduled_backup_max_age_days_; }
       // OTLP/HTTP collector endpoint for OpenTelemetry trace export (e.g.
       // http://127.0.0.1:4318/v1/traces). Empty disables tracing.
       String GetOtelEndpoint() const { return otel_endpoint_; }
@@ -364,6 +397,16 @@ namespace HM
       bool message_store_consistency_check_ = false;
       int metrics_server_port_ = 0;
       String metrics_server_bind_address_;
+      String metrics_server_auth_token_;
+      String metrics_server_auth_username_;
+      String metrics_server_auth_password_;
+      String metrics_server_certificate_file_;
+      String metrics_server_private_key_file_;
+
+      String scheduled_backup_time_;
+      int scheduled_backup_interval_minutes_ = 0;
+      int scheduled_backup_keep_count_ = 0;
+      int scheduled_backup_max_age_days_ = 0;
       String otel_endpoint_;
       String otel_service_name_;
       int manage_sieve_server_port_ = 0;

@@ -105,6 +105,7 @@ namespace HM
       database_query_micros_total_ = 0;
       database_queries_count_ = 0;
       database_slow_queries_count_ = 0;
+      metrics_unauthorized_requests_ = 0;
       state_ = StateUnknown ;
 
       // One slot per bound, plus the +Inf slot. Sized once here so the observation
@@ -296,6 +297,28 @@ namespace HM
       // Called when an authentication attempt fails (any protocol).
       boost::lock_guard<boost::recursive_mutex> guard(authentication_mutex_);
       number_of_authentication_failures_++;
+   }
+
+   unsigned __int64
+   ServerStatus::GetMetricsUnauthorizedRequestsCount() const
+   {
+      boost::lock_guard<boost::recursive_mutex> guard(metrics_request_mutex_);
+      return metrics_unauthorized_requests_;
+   }
+
+   void
+   ServerStatus::OnMetricsRequestUnauthorized()
+   {
+      // Called only from the metrics listener's single accept thread, which handles
+      // one request to completion before reading the next - so there is no
+      // concurrency here to protect against today. The lock is taken anyway,
+      // because the read side is a 64-bit load that is not atomic on the 32-bit
+      // build, and because "this happens to be single-threaded" is the sort of
+      // invariant that stops being true when the listener is eventually re-hosted
+      // on the shared Boost.Asio stack with a worker pool. It costs one uncontended
+      // lock per refused request.
+      boost::lock_guard<boost::recursive_mutex> guard(metrics_request_mutex_);
+      metrics_unauthorized_requests_++;
    }
 
    int

@@ -21,6 +21,22 @@ namespace RegressionTests.Infrastructure
       {
          _settings.CrashSimulationMode = 0;
 
+         // Every test in this fixture provokes real crashes, and the ERROR entries they
+         // produce do not all arrive at once - the "a mini dump has been written" line
+         // cannot be logged until an out-of-process writer has finished. Deleting the log
+         // the moment the expected entries are present therefore leaves the rest to
+         // recreate it, and the next fixture's AssertNoReportedError then fails every test
+         // in the remainder of the run. That has happened twice, costing a
+         // twenty-minute run each time, which is why this waits for quiet rather than
+         // deleting once.
+         //
+         // Asserted rather than best-effort: if errors are STILL arriving after the
+         // timeout, something is genuinely wrong and this fixture should say so here,
+         // where the cause is obvious, instead of letting an unrelated fixture fail later.
+         bool settled = LogHandler.ClearErrorLogUntilSettled();
+
+         DeleteAllMinidumps();
+
          // This is the one fixture that faults the server on purpose, so it is the one
          // fixture responsible for clearing the crash oracle's marker file. The oracle
          // deliberately does not clear it - a fault has to keep failing fixtures until
@@ -28,6 +44,13 @@ namespace RegressionTests.Infrastructure
          // so without this every test that runs after this fixture fails on a fault
          // that was the point of the test.
          CrashOracleAsserts.Clear();
+
+         // Last, so that the clearing above always happens even when this fails.
+         Assert.IsTrue(settled,
+            "Deliberate crash errors were still arriving after the settle timeout, so the "
+            + "ERROR log could not be left clean. Every fixture that runs after this one "
+            + "would fail in setup on AssertNoReportedError, reporting an error this "
+            + "fixture caused on purpose.");
       }
 
       private void DeleteAllMinidumps()

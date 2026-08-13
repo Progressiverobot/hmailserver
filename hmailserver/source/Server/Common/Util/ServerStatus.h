@@ -44,6 +44,21 @@ namespace HM
       void OnAuthenticationFailed();
       int GetNumberOfAuthenticationFailures() const;
 
+      // Requests to /metrics that the metrics listener refused because they carried
+      // no credential or the wrong one. Kept here rather than inside MetricsServer
+      // so that it survives the listener being stopped and restarted by a
+      // configuration reload - which is exactly when an operator most wants to know
+      // that something has been probing the port - and so that it is exposed through
+      // the same path as every other counter rather than through a second mechanism.
+      //
+      // Deliberately separate from OnAuthenticationFailed: that counter means "an
+      // account failed to log on", and folding a refused monitoring scrape into it
+      // would corrupt the one number people build brute-force alerts on. For the
+      // same reason nothing on the metrics listener touches the TLS handshake
+      // counters either.
+      void OnMetricsRequestUnauthorized();
+      unsigned __int64 GetMetricsUnauthorizedRequestsCount() const;
+
       // Outbound/delivery outcome counters, incremented from the SMTP delivery
       // threads as each queued message reaches a terminal outcome for a pass.
       void OnMessageDelivered();
@@ -137,6 +152,7 @@ namespace HM
       unsigned __int64 database_query_micros_total_;
       unsigned __int64 database_queries_count_;
       unsigned __int64 database_slow_queries_count_;
+      unsigned __int64 metrics_unauthorized_requests_;
 
       // Per-bucket (not cumulative) observation counts, sized to the bucket bounds
       // plus one slot for +Inf. The snapshot getters accumulate them.
@@ -155,6 +171,13 @@ namespace HM
       // buckets.
       mutable boost::recursive_mutex command_latency_mutex_;
       mutable boost::recursive_mutex database_query_mutex_;
+
+      // Mutable for the same reason: the getter is a logically const read of a
+      // 64-bit value, and a 64-bit read is not atomic on the 32-bit build, so it has
+      // to take the lock or risk a torn value. The other 64-bit counters in this
+      // class read unlocked, which is a latent hazard on that build; this one does
+      // not repeat it.
+      mutable boost::recursive_mutex metrics_request_mutex_;
 
       ServerState state_;
    };

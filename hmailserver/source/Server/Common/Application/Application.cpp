@@ -61,6 +61,7 @@
 #include "LogRetentionTask.h"
 #include "MessageStoreConsistencyTask.h"
 #include "WorkQueueHealthTask.h"
+#include "BackupScheduleTask.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -539,6 +540,36 @@ namespace HM
       workQueueHealthTask->SetReoccurance(ScheduledTask::RunInfinitely);
       workQueueHealthTask->SetMinutesBetweenRun(1);
       scheduler_->ScheduleTask(workQueueHealthTask);
+
+      // Scheduled backups. Only registered when a schedule is configured in
+      // hMailServer.ini ([Settings] ScheduledBackupTime or
+      // ScheduledBackupIntervalMinutes), so a default installation gets no backup
+      // task at all and behaves exactly as every release before this one did.
+      //
+      // Registered on a one-minute tick rather than at the backup interval, and that
+      // is deliberate. The task only decides whether a run is owed - it hands the run
+      // itself to the maintenance work queue - so the tick is cheap, and both
+      // schedule modes need a fine-grained clock. A daily 02:00 backup cannot be
+      // expressed as SetMinutesBetweenRun(1440): ScheduledTask::SetNextRunTime
+      // computes the next run as "now plus the interval" every time the scheduler is
+      // created, so a restart at 09:00 would quietly move the backup window to 09:00
+      // the following day, and a server restarted every morning would move it every
+      // day. The task compares against the wall clock instead, and recovers the time
+      // of the last backup from the destination.
+      //
+      // Not also registered as a RunOnce task at startup, unlike log retention and
+      // the consistency check. Those are cheap and idempotent; a backup is neither,
+      // and starting one during startup - while the connection pool and the work
+      // queues are still being built - is the one moment it should not happen. A
+      // backup that is genuinely owed is taken on the first tick a minute later,
+      // which is also when the task first reads the destination.
+      if (BackupScheduleTask::IsEnabled())
+      {
+         std::shared_ptr<BackupScheduleTask> backupScheduleTask = std::shared_ptr<BackupScheduleTask>(new BackupScheduleTask);
+         backupScheduleTask->SetReoccurance(ScheduledTask::RunInfinitely);
+         backupScheduleTask->SetMinutesBetweenRun(1);
+         scheduler_->ScheduleTask(backupScheduleTask);
+      }
 
       // Automatic certificate renewal via ACME (Let's Encrypt).
       if (IniFileSettings::Instance()->GetAcmeEnabled())

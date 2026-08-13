@@ -7,6 +7,9 @@
 #include "../Util/Time.h"
 #include "../Util/File.h"
 
+#include "NcsaLogFormatter.h"
+#include "SqlLogDevice.h"
+
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
 #define new DEBUG_NEW
@@ -19,6 +22,12 @@ namespace HM
    {
       log_mask_ = 0;
       enable_live_log_ = false;
+
+      // Files and the default line format until the stored settings arrive, which
+      // keeps the entries logged during startup - before Configuration::Load has
+      // read anything - exactly where they have always been.
+      log_device_ = DeviceFile;
+      log_format_ = FormatDefault;
 
       auto ini_file_settings = IniFileSettings::Instance();
 
@@ -39,7 +48,46 @@ namespace HM
          log_mask_ = 0;
    }
 
-   bool 
+   void
+   Logger::SetLogDevice(int device)
+   {
+      // An out-of-range value can only come from a hand-edited or corrupted
+      // logdevice row. Files are the safe answer and LOG_APPLICATION is the right
+      // channel for it: an ErrorManager report here would fire on the way to
+      // reporting itself, and this is a configuration observation, not a fault.
+      if (device != DeviceUnknown && device != DeviceSQL && device != DeviceFile)
+      {
+         String message;
+         message.Format(_T("Unknown log device %d configured. Logging to file."), device);
+         LOG_APPLICATION(message);
+
+         device = DeviceFile;
+      }
+
+      log_device_ = device;
+
+      // Started lazily, and only ever when SQL has actually been selected: an
+      // installation that leaves the setting alone never creates the flush thread
+      // and never touches the log table.
+      SqlLogDevice::Instance()->SetEnabled(device == DeviceSQL);
+   }
+
+   void
+   Logger::SetLogFormat(int format)
+   {
+      if (format != FormatDefault && format != FormatNCSA)
+      {
+         String message;
+         message.Format(_T("Unknown log format %d configured. Using the default log format."), format);
+         LOG_APPLICATION(message);
+
+         format = FormatDefault;
+      }
+
+      log_format_ = format;
+   }
+
+   bool
    Logger::GetLoggingEnabled() const
    {
       if (log_mask_ & LSEnabled)
@@ -48,76 +96,130 @@ namespace HM
          return false;
    }
 
-   void 
+   Logger::Entry
+   Logger::MakeEntry_(const String &category, int session, const String &remoteHost, const String &message)
+   {
+      Entry entry;
+
+      entry.category = category;
+      entry.thread = GetThreadID_();
+      entry.session = session;
+      entry.remote_host = remoteHost;
+      entry.time = GetCurrentTime();
+      entry.message = message;
+
+      return entry;
+   }
+
+   String
+   Logger::Render_(const Entry &entry)
+   {
+      // NCSA wins over JsonLogging when both are configured. It is the choice an
+      // administrator makes in the Control Panel, and this whole change exists
+      // because a choice made there was being silently ignored. JsonLogging is an
+      // ini-file override that predates a working format setting and stays in
+      // effect for everyone who has not picked a format, because the stored
+      // default is FormatDefault and only an explicit selection reaches
+      // FormatNCSA.
+      if (log_format_ == FormatNCSA)
+         return NcsaLogFormatter::Format(entry.category, entry.session, entry.remote_host, entry.time, entry.message);
+
+      if (UseJsonFormat_())
+         return BuildJsonEntry_(entry.category, entry.thread, entry.session, entry.remote_host, entry.time, entry.message);
+
+      // The two shapes the default format has always had, byte for byte. Which
+      // one applies is decided by the entry rather than by the caller: a negative
+      // session means an entry that belongs to no conversation, and those have
+      // never carried the session column.
+      String result;
+
+      if (entry.session >= 0)
+      {
+         result.Format(_T("\"%s\"\t%d\t%d\t\"%s\"\t\"%s\"\t\"%s\"\r\n"),
+            entry.category.c_str(), entry.thread, entry.session, entry.time.c_str(),
+            entry.remote_host.c_str(), CleanLogMessage_(entry.message).c_str());
+      }
+      else
+      {
+         result.Format(_T("\"%s\"\t%d\t\"%s\"\t\"%s\"\r\n"),
+            entry.category.c_str(), entry.thread, entry.time.c_str(),
+            CleanLogMessage_(entry.message).c_str());
+      }
+
+      return result;
+   }
+
+   void
+   Logger::Write_(const Entry &entry, const String &line, LogType lt)
+   {
+      if (log_device_ == DeviceSQL)
+      {
+         if (SqlLogDevice::Instance()->Enqueue(entry.category, (int) lt, entry.thread, entry.session,
+                                              entry.remote_host, entry.time, entry.message, line))
+         {
+            return;
+         }
+      }
+
+      // The SQL device refused it (off, degraded, buffer full, or this is its own
+      // flush thread), or files were selected in the first place. Either way the
+      // entry is written, never discarded.
+      WriteData_(line, lt);
+   }
+
+   void
+   Logger::WriteLineToFile(const String &line, LogType lt)
+   {
+      WriteData_(line, lt);
+   }
+
+   void
    Logger::LogSMTPConversation(int iSessionID, const String &sRemoteHost, const String &sMessage, bool bClient)
    {
       if (!(log_mask_ & LSSMTP))
-         return; // not intressted in this...   
+         return; // not intressted in this...
 
-      long lThread = GetThreadID_();
-      String sTime = GetCurrentTime();
-
-      String sData;
-
-      if (UseJsonFormat_())
-         sData = BuildJsonEntry_(bClient ? _T("SMTPC") : _T("SMTPD"), lThread, iSessionID, sRemoteHost, sTime, sMessage);
-      else if (bClient)
-         sData.Format(_T("\"SMTPC\"\t%d\t%d\t\"%s\"\t\"%s\"\t\"%s\"\r\n"), lThread, iSessionID, sTime.c_str(), sRemoteHost.c_str(), CleanLogMessage_(sMessage).c_str());
-      else
-         sData.Format(_T("\"SMTPD\"\t%d\t%d\t\"%s\"\t\"%s\"\t\"%s\"\r\n"), lThread, iSessionID, sTime.c_str(), sRemoteHost.c_str(), CleanLogMessage_(sMessage).c_str());
+      Entry entry = MakeEntry_(bClient ? _T("SMTPC") : _T("SMTPD"), iSessionID, sRemoteHost, sMessage);
+      String sData = Render_(entry);
 
       if (enable_live_log_)
          LogLive_(sData);
 
-      WriteData_(sData, SMTP);
-   
+      Write_(entry, sData, SMTP);
+
    }
 
-   void 
+   void
    Logger::LogPOP3Conversation(int iSessionID, const String &sRemoteHost, const String &sMessage, bool bClient)
    {
       if (!(log_mask_ & LSPOP3))
-         return; // not intressted in this...   
+         return; // not intressted in this...
 
-      long lThread = GetThreadID_();
-      String sTime = GetCurrentTime();
-
-      String sData;
       // Seems this was never done so now external account activity logs as client
-      if (UseJsonFormat_())
-         sData = BuildJsonEntry_(bClient ? _T("POP3C") : _T("POP3D"), lThread, iSessionID, sRemoteHost, sTime, sMessage);
-      else if (bClient)
-         sData.Format(_T("\"POP3C\"\t%d\t%d\t\"%s\"\t\"%s\"\t\"%s\"\r\n"), lThread, iSessionID, sTime.c_str(), sRemoteHost, CleanLogMessage_(sMessage).c_str());
-      else
-         sData.Format(_T("\"POP3D\"\t%d\t%d\t\"%s\"\t\"%s\"\t\"%s\"\r\n"), lThread, iSessionID, sTime.c_str(), sRemoteHost, CleanLogMessage_(sMessage).c_str());
+      Entry entry = MakeEntry_(bClient ? _T("POP3C") : _T("POP3D"), iSessionID, sRemoteHost, sMessage);
+      String sData = Render_(entry);
 
       if (enable_live_log_)
          LogLive_(sData);
 
-      WriteData_(sData, POP3);
-   
+      Write_(entry, sData, POP3);
+
    }
 
-   void 
+   void
    Logger::LogIMAPConversation(int iSessionID, const String &sRemoteHost, const String &sMessage)
    {
       if (!(log_mask_ & LSIMAP))
-         return; // not intressted in this...   
+         return; // not intressted in this...
 
-      long lThread = GetThreadID_();
-      String sTime = GetCurrentTime();
-
-      String sData;
-      if (UseJsonFormat_())
-         sData = BuildJsonEntry_(_T("IMAPD"), lThread, iSessionID, sRemoteHost, sTime, sMessage);
-      else
-         sData.Format(_T("\"IMAPD\"\t%d\t%d\t\"%s\"\t\"%s\"\t\"%s\"\r\n"), lThread, iSessionID, sTime.c_str(), sRemoteHost.c_str(), CleanLogMessage_(sMessage).c_str());
+      Entry entry = MakeEntry_(_T("IMAPD"), iSessionID, sRemoteHost, sMessage);
+      String sData = Render_(entry);
 
       if (enable_live_log_)
          LogLive_(sData);
 
-      WriteData_(sData, IMAP);
-   
+      Write_(entry, sData, IMAP);
+
    }
 
    void 
@@ -131,17 +233,11 @@ namespace HM
    {
 #ifndef _DEBUG
       if (!(log_mask_ & LSApplication))
-         return; // not intressted in this...   
+         return; // not intressted in this...
 #endif
 
-      long lThread = GetThreadID_();
-      String sTime = GetCurrentTime();
-
-      String sData;
-      if (UseJsonFormat_())
-         sData = BuildJsonEntry_(_T("APPLICATION"), lThread, -1, "", sTime, sMessage);
-      else
-         sData.Format(_T("\"APPLICATION\"\t%d\t\"%s\"\t\"%s\"\r\n"), lThread, sTime.c_str(), CleanLogMessage_(sMessage).c_str());
+      Entry entry = MakeEntry_(_T("APPLICATION"), -1, _T(""), sMessage);
+      String sData = Render_(entry);
 
 #ifdef _DEBUG
       OutputDebugString(sData);
@@ -151,75 +247,66 @@ namespace HM
          LogLive_(sData);
 
       if (log_mask_ & LSApplication)
-         WriteData_(sData);
+         Write_(entry, sData, Normal);
    }
 
-   void 
+   void
    Logger::LogDebug(const String &sMessage)
    {
       if (!(log_mask_ & LSDebug))
-         return; // not intressted in this...   
+         return; // not intressted in this...
 
-      long lThread = GetThreadID_();
-      String sTime = GetCurrentTime();
-
-      String sData;
-      if (UseJsonFormat_())
-         sData = BuildJsonEntry_(_T("DEBUG"), lThread, -1, "", sTime, sMessage);
-      else
-         sData.Format(_T("\"DEBUG\"\t%d\t\"%s\"\t\"%s\"\r\n"), lThread, sTime.c_str(), CleanLogMessage_(sMessage).c_str());
+      Entry entry = MakeEntry_(_T("DEBUG"), -1, _T(""), sMessage);
+      String sData = Render_(entry);
 
       if (enable_live_log_)
          LogLive_(sData);
 
 
-      WriteData_(sData);
-   
+      Write_(entry, sData, Normal);
+
    }
 
-   
-   void 
+
+   void
    Logger::LogError(const String &sMessage)
    {
-      long lThread = GetThreadID_();
-      String sTime = GetCurrentTime();
-
-      String sData;
-      if (UseJsonFormat_())
-         sData = BuildJsonEntry_(_T("ERROR"), lThread, -1, "", sTime, sMessage);
-      else
-         sData.Format(_T("\"ERROR\"\t%d\t\"%s\"\t\"%s\"\r\n"), lThread, sTime.c_str(), CleanLogMessage_(sMessage).c_str());
+      Entry entry = MakeEntry_(_T("ERROR"), -1, _T(""), sMessage);
+      String sData = Render_(entry);
 
       if (enable_live_log_)
          LogLive_(sData);
 
+      // The error log goes to a file whatever device is selected, and that is a
+      // deliberate exception to the rule that the device decides. The error log is
+      // what you read when the database is the thing that broke: routing it
+      // exclusively into the database means the report "the database is
+      // unavailable" has nowhere to go, and the one record that could have
+      // explained the outage is the one record that could not be written.
       WriteData_(sData, Error);
 
       // Also log this in the application log if some other logging is enabled.
+      // This copy does follow the device, so an installation logging to SQL still
+      // gets its errors in the table - carried by the copy whose destination is
+      // the main log, not by a second row for the same event.
       if (GetLoggingEnabled())
-         WriteData_(sData, Normal);
+         Write_(entry, sData, Normal);
    }
 
 
-   void 
+   void
    Logger::LogTCPIP(const String &sMessage)
    {
       if (!(log_mask_ & LSTCPIP))
-         return; // not intressted in this...   
+         return; // not intressted in this...
 
-      long lThread = GetThreadID_();
-      String sTime = GetCurrentTime();
-
-      String sData;
-      if (UseJsonFormat_())
-         sData = BuildJsonEntry_(_T("TCPIP"), lThread, -1, "", sTime, sMessage);
-      else
-         sData.Format(_T("\"TCPIP\"\t%d\t\"%s\"\t\"%s\"\r\n"), lThread, sTime.c_str(), CleanLogMessage_(sMessage).c_str());
+      Entry entry = MakeEntry_(_T("TCPIP"), -1, _T(""), sMessage);
+      String sData = Render_(entry);
 
       if (enable_live_log_)
          LogLive_(sData);
 
-      WriteData_(sData);
+      Write_(entry, sData, Normal);
    }
 
    void 

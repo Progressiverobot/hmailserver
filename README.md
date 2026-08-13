@@ -339,6 +339,19 @@ Administration and monitoring:
    RestApiPrivateKeyFile=
    MetricsServerPort=0           ; Prometheus metrics endpoint (/metrics) + health probes
    MetricsServerBindAddress=127.0.0.1
+   MetricsServerAuthToken=       ; Bearer token for /metrics. REQUIRED on a non-loopback bind: without a
+                                 ; credential /metrics answers 503 there. /livez, /readyz and /healthz are
+                                 ; never authenticated, so a load balancer's health check is unaffected
+   MetricsServerAuthUsername=    ; HTTP Basic alternative to the token (both must be set to use it)
+   MetricsServerAuthPassword=
+   MetricsServerCertificateFile= ; PEM; both must be set to serve the metrics port over HTTPS
+   MetricsServerPrivateKeyFile=  ; without them the port stays plain HTTP and says so in the application log
+   ScheduledBackupTime=          ; 24-hour local "HH:MM" for a daily backup (empty = none); wins over the interval
+   ScheduledBackupIntervalMinutes=0   ; minutes between backups (0 = none). What is backed up and where comes
+                                 ; from the existing backup settings; these only decide when
+   ScheduledBackupKeepCount=0    ; keep at most N archives (0 = keep everything)
+   ScheduledBackupMaxAgeDays=0   ; delete archives older than N days (0 = keep everything). Never applied to
+                                 ; the two newest, and never before a new backup has completed successfully
    LogDeleteDays=0               ; prune hMailServer's own date-stamped logs older than N days (0 = keep all)
    ShutdownDrainSeconds=0        ; on stop, wait up to N seconds for active sessions to finish (0 = stop immediately)
    MessageStoreFsync=0           ; force each received message to physical disk before it is acknowledged (1 = on)
