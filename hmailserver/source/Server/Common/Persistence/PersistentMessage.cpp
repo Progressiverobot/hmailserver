@@ -241,7 +241,19 @@ namespace HM
       if (bReadRecipients)
       {
          // The message recipients has been parsed.
-         ReadRecipients_(pMessage);
+         //
+         // Unchecked, and this function then returned true - so a database failure
+         // while loading the recipients produced a Message object that looked
+         // completely valid and had none. SMTPDeliverer::DeliverMessage sees a message
+         // with no recipients, reports HM5007 "No remaining recipients", and DELETES
+         // it. A transient database error while reading one table therefore destroyed a
+         // queued message that had nothing wrong with it.
+         //
+         // ReadRecipients_ answers false only when OpenRecordset fails, i.e. only for a
+         // real database error - never for a message that legitimately has none - so
+         // failing the load here cannot refuse anything that should have been accepted.
+         if (!ReadRecipients_(pMessage))
+            return false;
       }
 
 
@@ -307,9 +319,10 @@ namespace HM
       if (!pRS || pRS->IsEOF())
          return false;
 
-      ReadObject(pRS, pMessage);
-  
-      return true;
+      // The result was discarded and true returned regardless, which is the second
+      // half of the same hole: even once ReadObject above can say the recipients did
+      // not load, this would have gone on reporting a complete message.
+      return ReadObject(pRS, pMessage);
    }
 
    bool 

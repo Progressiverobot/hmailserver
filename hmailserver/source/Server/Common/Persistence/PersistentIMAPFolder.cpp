@@ -93,7 +93,17 @@ namespace HM
 
          // RFC 7162 (QRESYNC): the folder is gone, so its expunge tombstones are no longer
          // meaningful (a recreated folder gets a new UIDVALIDITY). Discard them.
-         DeleteExpungedForFolder(pFolder->GetID());
+         //
+         // Checked, which it was not. The tombstones are what a QRESYNC client is given
+         // to reconcile a mailbox it has not seen for a while, so a table of them
+         // belonging to folders that no longer exist is not merely untidy - it grows
+         // every time a folder is deleted and is never read or cleaned again.
+         if (!DeleteExpungedForFolder(pFolder->GetID()))
+         {
+            ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6117, "PersistentIMAPFolder::DeleteObject",
+               Formatter::Format("The QRESYNC expunge records for deleted folder {0} could not be removed and have been left behind as orphan rows.",
+                  pFolder->GetID()));
+         }
 
          return result;
       }
@@ -264,7 +274,24 @@ namespace HM
       if (folderID == 0)
          return 0;
 
-      IncreaseCurrentUID_(folderID);
+      // The increase was unchecked, and the line below reads the counter back - so when
+      // the UPDATE failed, GetCurrentUID_ returned the value it had before and this
+      // function handed out the SAME UID it handed out last time, from a function whose
+      // name is GetUniqueMessageID.
+      //
+      // RFC 3501 requires UIDs to be unique and strictly ascending within a mailbox,
+      // and clients rely on it completely: a client that has cached UID N and is then
+      // offered a different message with UID N will not fetch it, because as far as it
+      // is concerned it already has it. The message is delivered, visible on the server,
+      // and invisible in the client - which is the worst shape a mail bug can take,
+      // because nothing anywhere looks wrong.
+      //
+      // Zero is already this function's "no UID" answer, and PersistentMessage::AddObject
+      // already handles it properly: it reports HM5205 and refuses to store the message.
+      // So the fix is to be honest here and let the machinery that exists do its job.
+      if (!IncreaseCurrentUID_(folderID))
+         return 0;
+
       unsigned int newUID = GetCurrentUID_(folderID);
 
       IMAPFolderContainer::Instance()->UpdateCurrentUID(accountID, folderID, newUID);
@@ -306,7 +333,19 @@ namespace HM
       // RFC 7162: per-mailbox mod-sequence values must increase strictly and never
       // decrease (even across expunges), so we use a monotonic per-folder counter
       // mirroring the existing UID counter.
-      IncreaseCurrentModSeq_(folderID);
+      //
+      // Which is exactly what a discarded result here broke: the counter did not move,
+      // GetCurrentModSeq_ read back the old value, and this handed out a mod-sequence
+      // a client may already have synced past - so the change it marks is one the
+      // client will never ask for again.
+      //
+      // Zero rather than the stale value, because both callers already write
+      // "if (newModSeq > 0)" and keep the message's previous mod-sequence otherwise.
+      // No error record: the DAL has already reported the SQL failure, and one report
+      // per message during a database outage would bury it.
+      if (!IncreaseCurrentModSeq_(folderID))
+         return 0;
+
       __int64 newModSeq = GetCurrentModSeq_(folderID);
 
       IMAPFolderContainer::Instance()->UpdateCurrentModSeq(accountID, folderID, newModSeq);

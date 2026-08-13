@@ -42,7 +42,21 @@ namespace HM
          return false;
       }
 
-      DeleteMembers(pDistList);
+      // Unchecked, and the list row below is deleted regardless - so a failure here
+      // leaves every member row behind, pointing at a distribution list that no longer
+      // exists. Nothing reads those rows again and nothing cleans them up, and they are
+      // addresses: on a server where lists are created and removed by a provisioning
+      // script, that is an unbounded accumulation of somebody's recipients.
+      //
+      // Reported rather than fatal, for the same reason as the account cascade: this is
+      // a delete with no transaction around it, and stopping half way leaves more behind
+      // rather than less.
+      if (!DeleteMembers(pDistList))
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6116, "PersistentDistributionList::DeleteObject",
+            Formatter::Format("The members of distribution list {0} could not be deleted and have been left behind as orphan rows.",
+               pDistList->GetAddress()));
+      }
 
       SQLCommand deleteCommand("delete from hm_distributionlists where distributionlistid = @LISTID");
       deleteCommand.AddParameter("@LISTID", pDistList->GetID());

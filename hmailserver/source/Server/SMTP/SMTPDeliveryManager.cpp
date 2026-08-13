@@ -162,7 +162,27 @@ namespace HM
          // require 1 extra statement towards the database, since we
          // need to read recipients 
          pRetMessage = std::shared_ptr<Message> (new Message(false));
-         PersistentMessage::ReadObject(pending_messages_, pRetMessage);
+
+         // Unchecked, and the message was handed to the deliverer regardless. With the
+         // recipient load now able to report a database failure, ignoring it here would
+         // simply move the same defect one frame outwards: a message whose recipients
+         // could not be read would go to DeliverMessage, look recipient-less, and be
+         // deleted.
+         //
+         // Returning nothing ends this delivery pass rather than skipping the one
+         // message, which is deliberate. Everything that can fail here is the database
+         // being unavailable, and there is no reason to believe the next message in the
+         // queue will fare better; the queue is untouched and the next poll starts
+         // again. Stopping is also what the caller's "while (message = GetNextMessage_())"
+         // already means.
+         if (!PersistentMessage::ReadObject(pending_messages_, pRetMessage))
+         {
+            ErrorManager::Instance()->ReportError(ErrorManager::High, 6118, "SMTPDeliveryManager::GetNextMessage_",
+               "A queued message could not be loaded from the database, so this delivery pass has been stopped. The message is untouched and delivery resumes on the next pass.");
+
+            std::shared_ptr<Message> empty;
+            return empty;
+         }
       }
 
       // Move to the next message in the cache.
