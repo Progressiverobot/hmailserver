@@ -59,6 +59,19 @@ namespace HM
 
          CTCharset = 40,
 
+         // RFC 3501 base search keys. No keyword can ever be stored - messageflags is a
+         // fixed 8-bit bitmask with no room for client-defined flags and SELECT
+         // advertises no \* in PERMANENTFLAGS - so KEYWORD matches nothing and
+         // UNKEYWORD matches everything. That is exact rather than approximate, and it
+         // is a great deal better than what these used to do, which was to fall through
+         // as unrecognised words and leave the search matching every message.
+         CTKeyword = 41,
+         CTUnkeyword = 42,
+
+         // RFC 5032 (WITHIN): relative-age keys measured against the internal date.
+         CTOlder = 43,
+         CTYounger = 44,
+
          CTSubCriteria = 100
       };
 
@@ -123,6 +136,10 @@ namespace HM
 
       IMAPResult ParseCommand(std::shared_ptr<IMAPCommandArgument> pArgument, bool bIsSort);
 
+      // RFC 5182 (SEARCHRES): the UIDs saved by an earlier SEARCH RETURN (SAVE), so the
+      // "$" search key can be resolved during parsing. Must be set before ParseCommand.
+      void SetSavedSearchResult(const std::vector<__int64> &uids) { saved_search_result_ = uids; }
+
       std::shared_ptr<IMAPSearchCriteria>  GetCriteria() {return result_criteria_;}
       std::shared_ptr<IMAPSortParser> GetSortParser() {return sort_parser_; }
 
@@ -134,9 +151,12 @@ namespace HM
    private:
 
       bool IsValidCharset_(const String &charsetName);
+      static IMAPResult BadCharsetResult_();
       bool NeedsDecoding_(IMAPSearchCriteria::CriteriaType criteriaType);
       String DecodeWordAccordingToCharset_(const String &inputValue);
-      
+
+      static bool IsNonZeroNumber_(const String &value);
+
       IMAPResult ParseSegment_(std::shared_ptr<IMAPSimpleCommandParser> pSimpleParser, int &currentWord, std::shared_ptr<IMAPSearchCriteria> pCriteria, int iRecursion);
 
       IMAPResult ParseWord_(std::shared_ptr<IMAPSimpleCommandParser> pSimpleParser, std::shared_ptr<IMAPSearchCriteria> pNewCriteria, int &iCurrentWord);
@@ -145,6 +165,7 @@ namespace HM
       std::shared_ptr<IMAPSearchCriteria> result_criteria_;
 
       String charset_name_;
+      std::vector<__int64> saved_search_result_;
    };
 
 }

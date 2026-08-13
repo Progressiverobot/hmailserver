@@ -695,6 +695,7 @@ EXIT 0
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Common\AntiSpam\AntiSpamConfiguration.h" />
+    <ClInclude Include="..\Common\AntiSpam\AntiSpamDiagnostics.h" />
     <ClInclude Include="..\Common\AntiSpam\DKIM\Canonicalization.h" />
     <ClInclude Include="..\Common\AntiSpam\DKIM\Arc.h" />
     <ClInclude Include="..\Common\AntiSpam\DKIM\DKIM.h" />

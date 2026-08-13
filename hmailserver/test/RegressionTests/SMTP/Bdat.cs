@@ -145,6 +145,81 @@ namespace RegressionTests.SMTP
       }
 
       [Test]
+      [Description("A zero-length \"BDAT 0 LAST\" terminates a message whose content arrived in " +
+                   "earlier chunks (RFC 3030) - coverage for behaviour that was verified by reading " +
+                   "the code and had no test.")]
+      public void TestZeroLengthLastChunkTerminatesTheMessage()
+      {
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "bdat@example.test", "test");
+
+         using (var socket = ConnectAndEhlo())
+         {
+            StartTransaction(socket, "sender@external.example", "bdat@example.test");
+
+            string content = "Subject: BDAT zero-length terminator\r\n" +
+                             "From: <sender@external.example>\r\n" +
+                             "To: <bdat@example.test>\r\n" +
+                             "\r\n" +
+                             "Body marker-ZERO-451\r\n";
+
+            socket.Send("BDAT " + ByteLen(content) + "\r\n");
+            socket.Send(content);
+            Assert.IsTrue(socket.Receive().StartsWith("250"), "First BDAT chunk was not accepted.");
+
+            // No payload at all follows this one, so a server that waits for octets
+            // after it hangs instead of delivering.
+            Assert.IsTrue(socket.SendAndReceive("BDAT 0 LAST\r\n").StartsWith("250"),
+               "A zero-length LAST chunk did not complete the message.");
+
+            socket.Send("QUIT\r\n");
+         }
+
+         string delivered = Pop3ClientSimulator.AssertGetFirstMessageText("bdat@example.test", "test");
+         Assert.IsTrue(delivered.Contains("Body marker-ZERO-451"),
+            "The message terminated by \"BDAT 0 LAST\" was not delivered intact. Got: " + delivered);
+      }
+
+      [Test]
+      [Description("BDAT without a sender and recipient is refused, and its announced payload is " +
+                   "consumed rather than parsed as commands - coverage for behaviour that was " +
+                   "verified by reading the code and had no test.")]
+      public void TestBdatWithoutSenderIsRefusedWithoutDesynchronising()
+      {
+         var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "bdat@example.test", "test");
+
+         using (var socket = ConnectAndEhlo())
+         {
+            // The payload here is deliberately a line that would be a valid SMTP verb
+            // if the server ever let it reach the command parser.
+            const string smuggled = "NOOP\r\n";
+
+            socket.Send("BDAT " + ByteLen(smuggled) + "\r\n");
+            socket.Send(smuggled);
+
+            string response = socket.Receive();
+            Assert.IsTrue(response.StartsWith("503"),
+               "BDAT without MAIL FROM/RCPT TO should be refused with 503. Got: " + response);
+
+            // Exactly one reply for the BDAT: if the chunk had been parsed as commands
+            // there would be a second reply queued behind it, and this transaction would
+            // read that instead of its own 250.
+            Assert.IsTrue(socket.SendAndReceive("MAIL FROM:<sender@external.example>\r\n").StartsWith("250"),
+               "The session did not resynchronise after the refused BDAT.");
+            Assert.IsTrue(socket.SendAndReceive("RCPT TO:<" + account.Address + ">\r\n").StartsWith("250"));
+
+            const string content = "Subject: after refused BDAT\r\n\r\nmarker-RESYNC-902\r\n";
+            socket.Send("BDAT " + ByteLen(content) + " LAST\r\n");
+            socket.Send(content);
+            Assert.IsTrue(socket.Receive().StartsWith("250"), "The following transaction was not accepted.");
+
+            socket.Send("QUIT\r\n");
+         }
+
+         string delivered = Pop3ClientSimulator.AssertGetFirstMessageText(account.Address, "test");
+         Assert.IsTrue(delivered.Contains("marker-RESYNC-902"), delivered);
+      }
+
+      [Test]
       [Description("A BDAT command with a non-numeric chunk-size is rejected with a 501 syntax error.")]
       public void TestInvalidBdatSizeRejected()
       {

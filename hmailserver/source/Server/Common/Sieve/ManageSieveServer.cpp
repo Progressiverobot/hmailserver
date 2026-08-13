@@ -227,7 +227,8 @@ namespace HM
 
    ManageSieveServer::ManageSieveServer() :
       listen_socket_(INVALID_SOCKET),
-      running_(false)
+      running_(false),
+      warned_tls_required_without_certificate_(false)
    {
    }
 
@@ -491,9 +492,14 @@ namespace HM
          {
             IPAddress clientIPAddress = GetClientAddress_((sockaddr*) &clientAddress);
 
-            if (IsConnectionAllowed_(clientIPAddress))
+            // Carried out of the range lookup below rather than read again inside the
+            // session: one database read decides both whether this peer may connect
+            // and whether it may hand over a password in clear text.
+            bool requireTlsForAuth = false;
+
+            if (IsConnectionAllowed_(clientIPAddress, requireTlsForAuth))
             {
-               HandleClient_(connection, clientIPAddress);
+               HandleClient_(connection, clientIPAddress, requireTlsForAuth);
             }
             else
             {
@@ -581,8 +587,13 @@ namespace HM
    }
 
    bool
-   ManageSieveServer::IsConnectionAllowed_(const IPAddress &client_address)
+   ManageSieveServer::IsConnectionAllowed_(const IPAddress &client_address, bool &require_tls_for_auth)
    {
+      // Fail closed on the policy as well as on the access decision: a peer that is
+      // refused below never authenticates at all, and a caller that ignored the
+      // return value would at least get the safe answer here.
+      require_tls_for_auth = true;
+
       // Parity with TCPServer::HandleAccept: look the peer up in the security
       // ranges and only continue if a range matches and permits the connection.
       // This is what gives AccountLogon::RegisterFailedLogin teeth on this
@@ -601,6 +612,12 @@ namespace HM
       if (!securityRange)
          return false;
 
+      // The same per-range option POP3, IMAP and SMTP consult, honoured here rather
+      // than duplicated as a ManageSieve-specific setting - see the class comment for
+      // why that is the design and not a shortcut. Read from the row that has just
+      // decided access, so the two can never come from different rows.
+      require_tls_for_auth = securityRange->GetRequireTLSForAuth();
+
       // There is no ManageSieve-specific IP range option and adding one would mean
       // a schema and administration-UI change. ManageSieve does nothing but
       // manipulate the filters of a mailbox, so it is gated on the range allowing
@@ -608,6 +625,12 @@ namespace HM
       // POP3 keeps working; an auto-ban range permits neither, so it blocks
       // ManageSieve as intended.
       return securityRange->GetAllowIMAP() || securityRange->GetAllowPOP3();
+   }
+
+   bool
+   ManageSieveServer::IsAuthenticationRefusedOnCleartext_(const Connection &connection)
+   {
+      return connection.require_tls_for_auth && connection.tls_session == nullptr;
    }
 
    IPAddress
@@ -761,7 +784,23 @@ namespace HM
       if (tls_context_ && connection.tls_session == nullptr)
          Send_(connection, "\"STARTTLS\"\r\n");
 
-      Send_(connection, "\"SASL\" \"PLAIN\"\r\n");
+      // RFC 5804 1.7 allows the SASL capability to carry an empty mechanism list, and
+      // that is the only honest value when policy will refuse every mechanism on this
+      // connection. A ManageSieve client builds its logon step from this line: offer
+      // PLAIN here and the client sends "AUTHENTICATE \"PLAIN\" \"<base64 user NUL
+      // password>\"" and only then learns the connection was unacceptable - so the
+      // password has already crossed the wire in the clear, which is exactly the
+      // defect fixed in POP3's CAPA. Suppressing the mechanism is what makes the
+      // refusal below reachable without a password ever being sent.
+      //
+      // STARTTLS above is still advertised, so the client is not left without a way
+      // forward: it upgrades, the capability response is re-issued (RFC 5804 2.2) and
+      // PLAIN appears in it. That re-issue is the whole reason the RFC requires one.
+      if (IsAuthenticationRefusedOnCleartext_(connection))
+         Send_(connection, "\"SASL\" \"\"\r\n");
+      else
+         Send_(connection, "\"SASL\" \"PLAIN\"\r\n");
+
       Send_(connection, "\"VERSION\" \"1.0\"\r\n");
    }
 
@@ -786,6 +825,39 @@ namespace HM
       String mechanism;
       ParseToken(line, pos, mechanism);
       mechanism.ToUpper();
+
+      // Refused HERE - before the mechanism is validated, before the SASL response is
+      // parsed off the command line and before a single byte of a literal is read -
+      // because the point of the refusal is that the server never takes a password off
+      // the wire on a connection the policy has already ruled out. Getting this order
+      // wrong is what POP3 did: it advertised SASL, read the whole AUTH PLAIN payload,
+      // and refused afterwards.
+      //
+      // ENCRYPT-NEEDED is the RFC 5804 1.3 response code for exactly this, and sending
+      // it is what lets a client say "this server wants TLS first" instead of showing
+      // the user a failed password. It is not counted as an authentication failure:
+      // nothing was guessed, and counting it would let a client that misread the
+      // capability line burn its own attempts. MaxPreAuthenticationCommands still
+      // bounds the loop.
+      if (IsAuthenticationRefusedOnCleartext_(connection))
+      {
+         Send_(connection, "NO (ENCRYPT-NEEDED) \"A TLS connection is required before authentication from this IP range. Issue STARTTLS first.\"\r\n");
+
+         // A literal was announced. RFC 5804 4 only defines the non-synchronizing form
+         // {NNN+}, so those bytes are already in flight and will not be read - which
+         // means the command stream can no longer be trusted, the same situation as an
+         // oversized SASL literal below, and the connection goes rather than being
+         // allowed to desynchronize and execute a password as a command. The test for
+         // the brace alone, rather than for a parseable size, is deliberate: a length
+         // that does not parse leaves just as many unread bytes coming.
+         int literalStart = pos;
+         SkipSpaces(line, literalStart);
+
+         if (literalStart < line.GetLength() && line[literalStart] == L'{')
+            return AuthenticationAborted;
+
+         return AuthenticationFailed;
+      }
 
       if (mechanism != _T("PLAIN"))
       {
@@ -891,11 +963,28 @@ namespace HM
    }
 
    void
-   ManageSieveServer::HandleClient_(Connection &connection, const IPAddress &client_address)
+   ManageSieveServer::HandleClient_(Connection &connection, const IPAddress &client_address, bool require_tls_for_auth)
    {
       DWORD timeout = 30000;
       setsockopt(connection.socket, SOL_SOCKET, SO_RCVTIMEO, (const char*) &timeout, sizeof(timeout));
       setsockopt(connection.socket, SOL_SOCKET, SO_SNDTIMEO, (const char*) &timeout, sizeof(timeout));
+
+      // Recorded on the connection before the greeting is built, because the greeting
+      // is the first thing that has to reflect it: SendCapabilities_ decides whether
+      // to offer a SASL mechanism at all from this.
+      connection.require_tls_for_auth = require_tls_for_auth;
+
+      if (require_tls_for_auth && !tls_context_ && !warned_tls_required_without_certificate_)
+      {
+         // The one combination in which no client from this range can ever log on:
+         // policy demands TLS and there is no certificate to offer STARTTLS with. That
+         // is the correct, fail-closed outcome - it must not fall back to cleartext -
+         // but it is invisible from the client's side, so say it once, plainly, where
+         // an operator will find it.
+         warned_tls_required_without_certificate_ = true;
+
+         LOG_APPLICATION("ManageSieveServer: The IP range matching this client requires TLS for authentication, but no TLS certificate is available to this listener, so STARTTLS cannot be offered and no client from that range can authenticate. Configure a certificate on an IMAP, POP3 or SMTP port, or clear 'Require SSL/TLS for authentication' on the range.");
+      }
 
       bool authenticated = false;
       String accountAddress;

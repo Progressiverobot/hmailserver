@@ -66,7 +66,11 @@ namespace HM
       // will send CREATE ... USE (\Sent), so without it the clients that want to create
       // their own sent folder - Apple Mail, Outlook mobile - never ask the server to
       // designate it, and go back to naming it and hoping.
-      sResponse += " NAMESPACE RIGHTS=texk MOVE ID SPECIAL-USE CREATE-SPECIAL-USE UNSELECT UIDPLUS ENABLE STATUS=SIZE ESEARCH CONDSTORE QRESYNC LIST-EXTENDED SEARCHRES UTF8=ACCEPT";
+      // WITHIN (RFC 5032) is advertised because SEARCH now implements OLDER and YOUNGER.
+      // A client will not send a relative-age search without seeing it, and after the
+      // SEARCH parser started refusing keys it does not know, sending one unannounced
+      // would have been answered with BAD rather than silently ignored.
+      sResponse += " NAMESPACE RIGHTS=texk MOVE ID SPECIAL-USE CREATE-SPECIAL-USE UNSELECT UIDPLUS ENABLE STATUS=SIZE ESEARCH CONDSTORE QRESYNC LIST-EXTENDED SEARCHRES WITHIN UTF8=ACCEPT";
 
       sResponse += "\r\n";
       sResponse += pArgument->Tag() + " OK CAPABILITY completed\r\n";

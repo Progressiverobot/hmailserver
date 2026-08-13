@@ -296,6 +296,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="SMTP\EsmtpConformance.cs" />
+    <Compile Include="SMTP\StartTlsAlreadyActive.cs" />
     <Compile Include="API\StatusTests.cs" />
     <Compile Include="API\Messages.cs" />
     <Compile Include="IMAP\ConcurrentConnections.cs" />

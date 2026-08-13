@@ -1940,6 +1940,38 @@ namespace RegressionTests.IMAP
       }
 
       [Test]
+      [Description("A GETQUOTAROOT whose parameter list never closes must be refused. The word parser " +
+                   "produces no words for a command that fails validation, and the parameter count then " +
+                   "underflowed past the guard that protects the unchecked read below it.")]
+      public void TestGetQuotaRootWithUnclosedParameterListIsRefused()
+      {
+         _settings.IMAPQuotaEnabled = true;
+
+         var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "quotacrash@example.test", "test");
+
+         var simulator = new ImapClientSimulator();
+         Assert.IsTrue(simulator.ConnectAndLogon(account.Address, "test"));
+
+         // Against the unfixed server this line produces no response at all: ParamCount() was
+         // "size() - 1" on a size_t, so zero words meant SIZE_MAX parameters, which passes
+         // "if (ParamCount() < 1)" and reaches Word(1) on an empty vector. The /EHa catch(...)
+         // in TCPConnection swallows the access violation, logs error 5136 and drops the
+         // session; the crash oracle records the fault, which is what fails this test.
+         var result = simulator.SendSingleCommand("A01 GETQUOTAROOT (");
+         Assert.IsTrue(result.Contains("A01 BAD"),
+            "An unclosed GETQUOTAROOT parameter list must be answered BAD. " + result);
+         Assert.IsFalse(result.Contains("QUOTA is not enabled"),
+            "This test only proves anything with QUOTA enabled. " + result);
+
+         // The session is still alive and a real GETQUOTAROOT still answers on it.
+         result = simulator.SendSingleCommand("A02 GETQUOTAROOT INBOX");
+         Assert.IsTrue(result.Contains("A02 OK"),
+            "A valid GETQUOTAROOT must still work after a refused one. " + result);
+
+         simulator.Disconnect();
+      }
+
+      [Test]
       public void TestIdle()
       {
          _settings.IMAPIdleEnabled = true;

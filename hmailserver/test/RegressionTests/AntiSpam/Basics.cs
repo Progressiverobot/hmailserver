@@ -642,5 +642,40 @@ namespace RegressionTests.AntiSpam
          Assert.IsTrue(LogHandler.DefaultLogContains("SURBL: Lookup: ca.secunia.com.multi.surbl.org"));
          Assert.IsTrue(LogHandler.DefaultLogContains("SURBL: Lookup: ubuntu.com.multi.surbl.org"));
       }
+
+      [Test]
+      [Description(
+         "Every enabled spam test must still run when neither threshold is set. Scoring off with " +
+         "greylisting on is a supported configuration, but the pipeline's early exit compared the " +
+         "running score against max(mark, delete) - and 0 >= 0 is true before any test has run, so " +
+         "only the first enabled test ever ran. That produced no visible scoring difference, because " +
+         "neither action is armed, but PerformGreyListing looks for the SPF result in that same " +
+         "result set to honour BypassGreyListingOnSPFSuccess, and SPF is the fifth test in the order.")]
+      public void TestAllTestsRunWhenNeitherThresholdIsSet()
+      {
+         var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "nothreshold@example.test", "test");
+
+         // Both actions disabled: nothing can be marked and nothing can be deleted.
+         _antiSpam.SpamMarkThreshold = 0;
+         _antiSpam.SpamDeleteThreshold = 0;
+
+         // Two pre-transmission tests, first and fifth in the pipeline order. What
+         // is being observed is that the fifth one still runs; neither has to
+         // produce a score, and the HELO check does not even apply to a loopback
+         // client - the runner logs each test it ran either way.
+         _antiSpam.CheckHostInHelo = true;
+         _antiSpam.CheckHostInHeloScore = 3;
+         _antiSpam.UseSPF = true;
+         _antiSpam.UseSPFScore = 3;
+
+         SmtpClientSimulator.StaticSend("test@example.com", account.Address, "Test", "TestBody");
+
+         Pop3ClientSimulator.AssertMessageCount(account.Address, "test", 1);
+
+         Assert.IsTrue(LogHandler.DefaultLogContains("Spam test: SpamTestHeloHost"),
+            LogHandler.ReadCurrentDefaultLog());
+         Assert.IsTrue(LogHandler.DefaultLogContains("Spam test: SpamTestSPF"),
+            LogHandler.ReadCurrentDefaultLog());
+      }
    }
 }

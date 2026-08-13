@@ -11,6 +11,7 @@
 #include "../SpamTestData.h"
 #include "../SpamTestResult.h"
 #include "../AntiSpamConfiguration.h"
+#include "../AntiSpamDiagnostics.h"
 #include "../DKIM/DKIM.h"
 
 #include "../../BO/MessageData.h"
@@ -118,9 +119,26 @@ namespace HM
             LOG_DEBUG("DMARC: Message failed DMARC for domain " + AnsiString(fromDomain) + " but policy is none.");
             break;
          }
+      case DMARC::TempError:
+         {
+            // The policy record could not be looked up, so a p=reject domain was
+            // just treated exactly like a domain with no DMARC record at all: the
+            // message is accepted and nothing is scored. Per message that is the
+            // right call, but while the resolver is unavailable it is true of
+            // every message, and a DMARC check that has quietly stopped checking
+            // looks the same from the outside as one that is passing everything.
+            AntiSpamDiagnostics::ReportCheckIncomplete(AntiSpamDiagnostics::CheckDmarc,
+               Formatter::Format("DMARC: The policy lookup for {0} did not complete. Policies cannot be applied while that continues, and affected messages are accepted without a DMARC verdict.", fromDomain));
+            break;
+         }
+      case DMARC::PermError:
+         {
+            LOG_DEBUG("DMARC: The policy record of " + AnsiString(fromDomain) + " could not be evaluated. No score applied.");
+            break;
+         }
       default:
          {
-            // NoPolicy, TempError or PermError: no scoring.
+            // NoPolicy: the domain published no policy, so there is nothing to do.
             break;
          }
       }

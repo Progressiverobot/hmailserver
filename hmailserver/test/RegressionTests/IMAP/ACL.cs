@@ -1248,5 +1248,38 @@ namespace RegressionTests.IMAP
 
          imapClientSimulator.Disconnect();
       }
+
+      [Test]
+      [Description("A SETACL whose parameter list never closes must be refused. The word parser produces no " +
+                   "words at all for a command that fails validation, and the parameter count then " +
+                   "underflowed past the guard that protects the unchecked reads below it.")]
+      public void TestSetAclWithUnclosedParameterListIsRefused()
+      {
+         _settings.IMAPACLEnabled = true;
+
+         var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "aclcrash@example.test", "test");
+
+         var simulator = new ImapClientSimulator();
+         Assert.IsTrue(simulator.ConnectAndLogon(account.Address, "test"));
+
+         // Against the unfixed server this line produces no response at all. ParamCount() was
+         // "size() - 1" on a size_t, so zero words meant SIZE_MAX parameters, which sails
+         // through "if (ParamCount() < 3)" and straight into Word(1) on an empty vector. The
+         // access violation is swallowed by the /EHa catch(...) in TCPConnection, which logs
+         // error 5136 and drops the session - and the crash oracle records it, which is what
+         // fails this test.
+         var result = simulator.SendSingleCommand("A01 SETACL (");
+         Assert.IsTrue(result.Contains("A01 BAD"),
+            "An unclosed SETACL parameter list must be answered BAD. " + result);
+         Assert.IsFalse(result.Contains("ACL is not enabled"),
+            "This test only proves anything with ACL enabled. " + result);
+
+         // Still a live session, and a SETACL that is merely wrong is still answered.
+         result = simulator.SendSingleCommand("A02 SETACL");
+         Assert.IsTrue(result.Contains("A02 BAD"),
+            "A SETACL with no parameters must be answered BAD. " + result);
+
+         simulator.Disconnect();
+      }
    }
 }

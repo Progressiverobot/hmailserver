@@ -70,7 +70,11 @@ namespace HM
       bool HasSignatureForDomain_(MimeHeader &mimeHeader, const AnsiString &domain);
       static std::vector<AnsiString> recommendedHeaderFields_;
 
-      std::vector<std::pair<AnsiString, AnsiString> > GetSignatureFields(MimeHeader &mimeHeader);
+      // Returns the DKIM-Signature fields of the message, up to the verification
+      // limit in DKIM.cpp. moreThanWeVerify, when given, is set if the message
+      // carried more than that - the caller has then not seen every signature and
+      // must not report the message as having failed.
+      std::vector<std::pair<AnsiString, AnsiString> > GetSignatureFields(MimeHeader &mimeHeader, bool *moreThanWeVerify = nullptr);
    };
 
 }

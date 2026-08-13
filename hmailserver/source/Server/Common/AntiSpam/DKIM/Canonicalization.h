@@ -69,4 +69,18 @@ namespace HM
       }
 
    };
-} 
+
+   // In-process tests for DKIM canonicalization, run from ClassTester::DoTests
+   // (the regression suite reaches it through Utilities.RunTestSuite).
+   //
+   // These belong in process rather than in the C# suite because the two things
+   // they pin down - which bytes go into the body hash, and which bytes of the
+   // DKIM-Signature field go into the header hash - are not observable from
+   // outside: every way of getting them wrong produces the same externally
+   // visible outcome, a signature that does not verify.
+   class CanonicalizationTester
+   {
+   public:
+      void Test();
+   };
+}

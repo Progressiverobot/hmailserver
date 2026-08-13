@@ -33,6 +33,28 @@ namespace HM
    // behaves exactly as it did before: plain text only, so bind to 127.0.0.1
    // unless fronted by a TLS terminator.
    //
+   // REQUIRING TLS BEFORE A PASSWORD: the listener honours the SAME per-IP-range
+   // setting the mailbox protocols do - SecurityRange::GetRequireTLSForAuth, the
+   // "Require SSL/TLS for authentication" option on an IP range, which POP3
+   // (ProtocolUSER_/ProtocolAUTH_), IMAP (IMAPCommandLogin/Authenticate) and SMTP
+   // all consult. It is deliberately NOT a second, ManageSieve-specific setting:
+   // an operator who has already declared that a range must not authenticate in
+   // the clear means it for the Sieve filters of the same mailbox, and two
+   // settings that could disagree would eventually disagree in the direction of
+   // the weaker one. It costs nothing to read, because IsConnectionAllowed_
+   // already fetches the matching range for every accepted connection.
+   //
+   // The consequence, when that option is set and the connection is still in
+   // clear text, is that the capability line offers no SASL mechanism at all
+   // ("SASL" "") and AUTHENTICATE is answered NO (ENCRYPT-NEEDED) before the SASL
+   // payload is parsed or read - so the password is never taken off the wire.
+   // Advertising a mechanism and refusing it afterwards is the same defect that
+   // was fixed in POP3's CAPA: a client builds its logon UI from that line and
+   // sends the password before it can learn the connection was unacceptable.
+   //
+   // With the option clear - the shipped default on every range - nothing changes:
+   // SASL PLAIN is advertised and accepted in clear text exactly as before.
+   //
    // Because it does not run on the shared Boost.Asio listener, this class has to
    // apply the security-range check itself when it accepts a connection - see
    // IsConnectionAllowed_. Without it the auto-ban written on repeated logon
@@ -106,7 +128,8 @@ namespace HM
       {
          explicit Connection(SOCKET client_socket) :
             socket(client_socket),
-            tls_session(nullptr)
+            tls_session(nullptr),
+            require_tls_for_auth(false)
          {
          }
 
@@ -118,11 +141,20 @@ namespace HM
 
          SOCKET socket;
          SSL *tls_session;
+
+         // The authentication policy of the security range this peer matched,
+         // captured once when the connection was accepted. Kept on the connection
+         // rather than passed around because both the capability line and the
+         // AUTHENTICATE handler have to answer the same question, and they must
+         // never answer it differently - advertising a mechanism that will then be
+         // refused is precisely the defect being fixed.
+         bool require_tls_for_auth;
+
          std::string buffer;
       };
 
       void Run_();
-      void HandleClient_(Connection &connection, const IPAddress &client_address);
+      void HandleClient_(Connection &connection, const IPAddress &client_address, bool require_tls_for_auth);
 
       // Releases the TLS session, if any, and closes the socket. Called from the
       // accept loop rather than from HandleClient_, so that the exception barrier
@@ -132,7 +164,19 @@ namespace HM
       // Accept-time IP restriction check. This is the equivalent of what
       // TCPServer::HandleAccept does for SMTP/POP3/IMAP and is what makes an
       // auto-ban actually stop a reconnecting client.
-      static bool IsConnectionAllowed_(const IPAddress &client_address);
+      //
+      // require_tls_for_auth is an output because the same range lookup answers
+      // both questions, and one database read per connection is the whole budget:
+      // reading the range twice would also let the access decision and the
+      // authentication policy come from two different rows if a range were edited
+      // in between.
+      static bool IsConnectionAllowed_(const IPAddress &client_address, bool &require_tls_for_auth);
+
+      // True when a credential must not be accepted on this connection: the range
+      // that matched the peer requires TLS for authentication and the connection is
+      // still in clear text. The single answer used both by the capability line and
+      // by AUTHENTICATE.
+      static bool IsAuthenticationRefusedOnCleartext_(const Connection &connection);
 
       static IPAddress GetClientAddress_(const sockaddr *address);
 
@@ -183,6 +227,21 @@ namespace HM
       SOCKET listen_socket_;
       std::thread worker_;
       bool running_;
+
+      // One application-log line per service start for the configuration that locks
+      // everybody out: a range that requires TLS for authentication reaching a
+      // listener with no certificate, where there is neither a SASL mechanism to
+      // offer nor a STARTTLS to reach one through. Without it that combination is
+      // silent, and the operator sees only clients that cannot log on.
+      //
+      // Deliberately not an ErrorManager report: it is an operator configuration
+      // mistake rather than a defect, and an entry in the ERROR log makes
+      // PerformBasicSetup fail for every regression fixture that follows - which
+      // includes the fixture that provokes this exact state on purpose.
+      //
+      // Only ever touched from the single worker thread (Run_ -> HandleClient_), so
+      // it needs no synchronisation.
+      bool warned_tls_required_without_certificate_;
 
       // Held as a Boost.Asio context only because that is what
       // SslContextInitializer configures; the SSL_CTX inside it is what this

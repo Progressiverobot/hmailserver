@@ -111,7 +111,17 @@ namespace HM
             LOG_DEBUG(sSpamTestResult);
          }
 
-         if (iTotalScore >= iMaxScore)
+         // Stop only if there is a threshold to reach. iMaxScore is
+         // max(mark threshold, delete threshold), and both are disabled by being
+         // set to zero - a supported configuration, because greylisting and the
+         // white list do not depend on scoring. With iMaxScore at zero the
+         // condition below was true before a single test had run, so the pipeline
+         // stopped after the first enabled test. Nothing about scoring changed
+         // (neither action is armed), but SpamProtection::PerformGreyListing looks
+         // for the SPF result *in this result set* to honour
+         // BypassGreyListingOnSPFSuccess - and SPF is the fifth test, so it never
+         // ran and the bypass silently stopped working.
+         if (iMaxScore > 0 && iTotalScore >= iMaxScore)
          {
             // Threshold has been reached. No point in running any more tests.
             break;

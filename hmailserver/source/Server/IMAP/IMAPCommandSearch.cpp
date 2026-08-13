@@ -79,14 +79,14 @@ namespace HM
          // or SEARCH
          String sCommand = pArgument->Command();
 
-         int iCommandStartPos;
-         
-         if (is_uid_)
-            iCommandStartPos = sCommand.Find(_T(" "), 4) + 1;
-         else
-            iCommandStartPos = sCommand.Find(_T(" ")) + 1;
+         // Find() answers -1 when the command word carries no arguments at all - a bare
+         // "SEARCH" - and adding one turned that into Mid(0), which handed the criteria
+         // parser the word "SEARCH" as if the client had sent it as a search key. Pass an
+         // empty criteria string instead, so the parser reports the criteria as missing
+         // rather than complaining about a key nobody typed.
+         const int iSeparatorPos = is_uid_ ? sCommand.Find(_T(" "), 4) : sCommand.Find(_T(" "));
 
-         sCommand = sCommand.Mid(iCommandStartPos); // 3 as in UID
+         sCommand = (iSeparatorPos < 0) ? String() : sCommand.Mid(iSeparatorPos + 1); // 4 as in "UID "
 
          pArgument->Command(sCommand);
       }
@@ -139,6 +139,10 @@ namespace HM
       }
 
       std::shared_ptr<IMAPSearchParser> pParser = std::shared_ptr<IMAPSearchParser>(new IMAPSearchParser());
+
+      // RFC 5182 (SEARCHRES): the parser resolves a "$" search key against this.
+      pParser->SetSavedSearchResult(pConnection->GetSavedSearchResult());
+
       IMAPResult result = pParser->ParseCommand(pArgument, is_sort_);
       if (result.GetResult() != IMAPResult::ResultOK)
          return result;
@@ -597,6 +601,33 @@ namespace HM
                   bMessageIsMatchingCriteria = false;
                break;
             }
+         case IMAPSearchCriteria::CTKeyword:
+            {
+               // No keyword can ever be set on a message here - messageflags is a fixed
+               // 8-bit bitmask and PERMANENTFLAGS advertises no \* - so a positive
+               // KEYWORD matches nothing at all, and NOT KEYWORD matches everything.
+               // Before this existed, KEYWORD and its argument were both discarded as
+               // unrecognised words, which left the criteria list empty and reported
+               // every message in the mailbox as a match.
+               if (pCriteria->GetPositive())
+                  bMessageIsMatchingCriteria = false;
+               break;
+            }
+         case IMAPSearchCriteria::CTUnkeyword:
+            {
+               // The mirror image: no message has the keyword, so UNKEYWORD matches
+               // every message and NOT UNKEYWORD matches none.
+               if (!pCriteria->GetPositive())
+                  bMessageIsMatchingCriteria = false;
+               break;
+            }
+         case IMAPSearchCriteria::CTOlder:
+         case IMAPSearchCriteria::CTYounger:
+            {
+               if (!MatchesWITHINCriteria_(pMessage, pCriteria))
+                  bMessageIsMatchingCriteria = false;
+               break;
+            }
          case IMAPSearchCriteria::CTModSeq:
             {
                // RFC 7162 (CONDSTORE): match messages whose mod-sequence is >= the value.
@@ -898,6 +929,58 @@ namespace HM
       DateTime dtCriteria = Time::GetDateFromIMAP(pCriteria->GetText());
 
       if (dtMessageDate < dtCriteria)
+         return pCriteria->GetPositive();
+      else
+         return !pCriteria->GetPositive();
+   }
+
+   bool
+   IMAPCommandSEARCH::MatchesWITHINCriteria_(std::shared_ptr<Message> pMessage, std::shared_ptr<IMAPSearchCriteria> pCriteria)
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // RFC 5032 (WITHIN): OLDER <n> matches messages whose internal date is at or before
+   // (now - n seconds), YOUNGER <n> those whose internal date is after it.
+   //
+   // Unlike BEFORE and SINCE, which compare calendar dates only, these compare the whole
+   // timestamp - that is the point of the extension and the reason "YOUNGER 3600" can be
+   // answered at all. The interval was validated as a positive integer by the parser.
+   //
+   // Both sides are server-local: GetCreateTime is written from GetLocalTime and
+   // DateTime::GetCurrentTime goes through localtime_s, so no timezone correction is
+   // needed here - and adding one would be wrong.
+   //---------------------------------------------------------------------------()
+   {
+      __int64 intervalSeconds = _ttoi64(pCriteria->GetText());
+
+      // A century back is indistinguishable from any longer interval for stored mail,
+      // and clamping keeps the day count safely inside the long that SetDateTimeSpan
+      // takes however many digits the client sent.
+      const __int64 maxIntervalSeconds = (__int64) 100 * 365 * 24 * 60 * 60;
+      if (intervalSeconds > maxIntervalSeconds)
+         intervalSeconds = maxIntervalSeconds;
+
+      DateTimeSpan span;
+      span.SetDateTimeSpan((long) (intervalSeconds / 86400), 0, 0, (int) (intervalSeconds % 86400));
+
+      const DateTime cutoff = DateTime::GetCurrentTime() - span;
+      const DateTime internalDate = Time::GetDateFromSystemDate(pMessage->GetCreateTime());
+
+      // Written as statements rather than as an assignment from the comparison, because
+      // the DateTime operators return BOOL and /WX would reject the narrowing.
+      bool bMatch = false;
+
+      if (pCriteria->GetType() == IMAPSearchCriteria::CTOlder)
+      {
+         if (internalDate <= cutoff)
+            bMatch = true;
+      }
+      else
+      {
+         if (internalDate > cutoff)
+            bMatch = true;
+      }
+
+      if (bMatch)
          return pCriteria->GetPositive();
       else
          return !pCriteria->GetPositive();

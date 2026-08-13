@@ -197,7 +197,16 @@ namespace RegressionTests.IMAP
          Assert.IsTrue(simulator.SelectFolder("INBOX"));
 
          var result = simulator.SendSingleCommand("A01 SEARCH CHARSET NONEXISTANT ALL SUBJECT MySubject");
-         Assert.AreEqual("A01 NO [BADCHARSET]\r\n", result);
+
+         // RFC 3501 section 7.1: BADCHARSET may name the charsets that would have worked, and
+         // a response code is always followed by text. The reply used to be the bare
+         // "A01 NO [BADCHARSET]", which is not a well-formed resp-text and gives the client
+         // nothing to retry with.
+         Assert.IsTrue(result.StartsWith("A01 NO [BADCHARSET"), result);
+         Assert.IsTrue(result.Contains("UTF-8"),
+            "BADCHARSET should name the charsets the server does accept. " + result);
+         Assert.IsTrue(result.EndsWith("supported.\r\n"),
+            "The BADCHARSET response code must be followed by human-readable text. " + result);
       }
 
       [Test]
@@ -692,6 +701,176 @@ namespace RegressionTests.IMAP
             simulator.Search("(OR FROM \"TestSubject\" (OR SUBJECT \"TestSubject\" BODY \"TestSubject\")) NOT DELETED");
 
          Assert.AreEqual("1", searchResult);
+      }
+
+      [Test]
+      [Description("RFC 3501: a search key the server does not implement must be refused with BAD. It used to " +
+                   "be dropped, and a search whose keys were all dropped matched every message in the mailbox.")]
+      public void TestUnrecognizedSearchKeyIsRefusedRatherThanIgnored()
+      {
+         var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "search@example.test", "test");
+
+         SmtpClientSimulator.StaticSend(account.Address, account.Address, "MySubject", "MyBody");
+         ImapClientSimulator.AssertMessageCount(account.Address, "test", "INBOX", 1);
+
+         var simulator = new ImapClientSimulator();
+         Assert.IsTrue(simulator.ConnectAndLogon(account.Address, "test"));
+         Assert.IsTrue(simulator.SelectFolder("INBOX"));
+
+         // Against the unfixed server this answered "* SEARCH 1" and then OK: the key and its
+         // argument were both discarded as unrecognised words, which left an empty criteria
+         // list, and an empty criteria list matches everything. The danger is not the wrong
+         // line, it is what a client does with it - Thunderbird's Search Messages window
+         // offers Delete over the result, and an archiver moves "whatever the search
+         // returned", so the whole mailbox gets acted on.
+         var result = simulator.SendSingleCommand("A01 SEARCH X-NO-SUCH-KEY 12");
+         Assert.IsFalse(result.Contains("* SEARCH 1"),
+            "An unrecognised search key must not silently match every message. " + result);
+         Assert.IsTrue(result.Contains("A01 BAD"),
+            "An unrecognised search key must be answered BAD. " + result);
+
+         // A SEARCH with no criteria at all reached the same empty-criteria path.
+         result = simulator.SendSingleCommand("A02 SEARCH");
+         Assert.IsFalse(result.Contains("* SEARCH 1"),
+            "A SEARCH with no search key must not match every message. " + result);
+         Assert.IsTrue(result.Contains("A02 BAD"),
+            "A SEARCH with no search key must be answered BAD. " + result);
+
+         // Refusing those two must not have cost us the ordinary case, and the session has
+         // to survive both refusals.
+         result = simulator.SendSingleCommand("A03 SEARCH ALL");
+         Assert.IsTrue(result.Contains("* SEARCH 1"),
+            "A valid search must still work after a refused one. " + result);
+
+         simulator.Disconnect();
+      }
+
+      [Test]
+      [Description("RFC 3501: KEYWORD matches messages carrying a keyword flag and UNKEYWORD those without it. " +
+                   "No keyword can be stored here, so KEYWORD matches nothing - it used to match everything.")]
+      public void TestKeywordSearchKeys()
+      {
+         var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "search@example.test", "test");
+
+         SmtpClientSimulator.StaticSend(account.Address, account.Address, "MySubject", "MyBody");
+         ImapClientSimulator.AssertMessageCount(account.Address, "test", "INBOX", 1);
+
+         var simulator = new ImapClientSimulator();
+         Assert.IsTrue(simulator.ConnectAndLogon(account.Address, "test"));
+         Assert.IsTrue(simulator.SelectFolder("INBOX"));
+
+         // Unfixed: "* SEARCH 1". KEYWORD and its argument were dropped, the criteria list came
+         // out empty, and a client asking "which of my messages carry this label" was told
+         // "all of them". Nothing can carry a keyword - messageflags is a fixed 8-bit bitmask
+         // and PERMANENTFLAGS advertises no \* - so the correct answer is none of them.
+         var result = simulator.SendSingleCommand("A01 SEARCH KEYWORD $Forwarded");
+         Assert.IsTrue(result.Contains("* SEARCH\r\n"),
+            "KEYWORD cannot match anything, because no keyword can be stored. " + result);
+         Assert.IsTrue(result.Contains("A01 OK"),
+            "KEYWORD is a base RFC 3501 key and must not be refused. " + result);
+
+         result = simulator.SendSingleCommand("A02 SEARCH UNKEYWORD $Forwarded");
+         Assert.IsTrue(result.Contains("* SEARCH 1"),
+            "UNKEYWORD matches every message, since no message carries the keyword. " + result);
+
+         simulator.Disconnect();
+      }
+
+      [Test]
+      [Description("IMAP keywords are case-insensitive, so a lower-case \"not\" must invert the key that " +
+                   "follows it. It was compared case-sensitively, which gave the opposite result set.")]
+      public void TestLowerCaseNotInvertsTheFollowingKey()
+      {
+         var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "search@example.test", "test");
+
+         SmtpClientSimulator.StaticSend(account.Address, account.Address, "MySubject", "MyBody");
+         ImapClientSimulator.AssertMessageCount(account.Address, "test", "INBOX", 1);
+
+         var simulator = new ImapClientSimulator();
+         Assert.IsTrue(simulator.ConnectAndLogon(account.Address, "test"));
+         Assert.IsTrue(simulator.SelectFolder("INBOX"));
+
+         Assert.AreEqual("1", simulator.Search("NOT DELETED"));
+
+         // Unfixed this returned "" - the lower-case "not" was discarded as an unrecognised
+         // word and the DELETED that followed was then applied positively, so the client
+         // asking for undeleted mail was handed the deleted mail instead.
+         Assert.AreEqual("1", simulator.Search("not deleted"));
+
+         simulator.Disconnect();
+      }
+
+      [Test]
+      [Description("RFC 5032 (WITHIN): OLDER and YOUNGER match on the internal date relative to now, " +
+                   "the interval must be a positive number of seconds, and WITHIN is advertised.")]
+      public void TestWithinOlderAndYounger()
+      {
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "within@example.test", "test");
+
+         var simulator = new ImapClientSimulator();
+         simulator.Connect();
+         simulator.LogonWithLiteral("within@example.test", "test");
+
+         Assert.IsTrue(simulator.GetCapabilities().Contains(" WITHIN"),
+            "CAPABILITY must advertise WITHIN, or no client will ever send OLDER or YOUNGER.");
+
+         Assert.IsTrue(simulator.SelectFolder("INBOX"));
+
+         // Message 1 is given an internal date in 2008 by APPEND; message 2 gets "now".
+         var appended =
+            simulator.SendSingleCommandWithLiteral("A01 APPEND INBOX \"22-Feb-2008 22:00:00 +0200\" {37}",
+               "Date: Wed, 15 Dec 2010 13:00:00 +0000");
+         Assert.IsTrue(appended.Contains("* 1 EXISTS"), appended);
+
+         appended = simulator.SendSingleCommandWithLiteral("A02 APPEND INBOX {4}", "ABCD");
+         Assert.IsTrue(appended.Contains("* 2 EXISTS"), appended);
+
+         // Unfixed, both of these returned "1 2": OLDER/YOUNGER and their intervals were
+         // discarded, leaving an empty criteria list that matched the whole mailbox.
+         Assert.AreEqual("1", simulator.Search("OLDER 3600"));
+         Assert.AreEqual("2", simulator.Search("YOUNGER 3600"));
+
+         // RFC 5032 says the interval is an nz-number. A zero or non-numeric interval is a
+         // syntax error rather than "0 seconds ago", which would match on one key and not
+         // on the other and look like the server had made a decision about the mail.
+         var result = simulator.SendSingleCommand("A03 SEARCH OLDER notanumber");
+         Assert.IsTrue(result.Contains("A03 BAD"), result);
+
+         result = simulator.SendSingleCommand("A04 SEARCH YOUNGER 0");
+         Assert.IsTrue(result.Contains("A04 BAD"), result);
+
+         simulator.Disconnect();
+      }
+
+      [Test]
+      [Description("RFC 5182 section 2.1: the result saved by SEARCH RETURN (SAVE) can be used as a search " +
+                   "key. \"$\" used to be an unrecognised word, which matched every message instead.")]
+      public void TestSavedSearchResultUsedAsSearchKey()
+      {
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "searchresk@example.test", "test");
+
+         var simulator = new ImapClientSimulator();
+         simulator.Connect();
+         simulator.LogonWithLiteral("searchresk@example.test", "test");
+
+         simulator.SendSingleCommandWithLiteral("A01 APPEND INBOX {4}", "ABCD");
+         simulator.SendSingleCommandWithLiteral("A02 APPEND INBOX {4}", "EFGH");
+         simulator.SendSingleCommandWithLiteral("A03 APPEND INBOX {4}", "IJKL");
+         Assert.IsTrue(simulator.SelectFolder("INBOX"));
+
+         simulator.SendSingleCommand("A04 STORE 2 +FLAGS (\\Seen)");
+
+         var save = simulator.SendSingleCommand("A05 UID SEARCH RETURN (SAVE) SEEN");
+         Assert.IsTrue(save.Contains("A05 OK"), save);
+
+         // Unfixed: "1 2 3". The saved set is the second message and nothing else.
+         Assert.AreEqual("2", simulator.Search("$"));
+
+         // Combined with another key, as RFC 5182's own example does.
+         Assert.AreEqual("", simulator.Search("$ UNSEEN"));
+         Assert.AreEqual("2", simulator.Search("$ SEEN"));
+
+         simulator.Disconnect();
       }
    }
 }

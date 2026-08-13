@@ -268,7 +268,19 @@ namespace HM
 
       bool inSample = true;
       if (pct < 100)
-         inSample = (rand() % 100) < pct;
+      {
+         // rand() was the wrong source here. The MSVC CRT keeps its state per
+         // thread and seeds every thread with the same value, so the sequence of
+         // sampling decisions restarted identically on each new connection thread
+         // and after every service restart - which is to say a sender could work
+         // out which of its messages escape a pct<100 policy. rand_s is already
+         // used elsewhere in the server (ExternalDelivery) for the same reason.
+         unsigned int randomValue = 0;
+         if (rand_s(&randomValue) == 0)
+            inSample = static_cast<int>(randomValue % 100) < pct;
+         else
+            inSample = true; // No randomness available: apply the published policy in full.
+      }
 
       if (policy.CompareNoCase(_T("reject")) == 0)
          return inSample ? FailReject : FailQuarantine;

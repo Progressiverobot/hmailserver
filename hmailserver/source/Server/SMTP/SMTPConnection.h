@@ -223,6 +223,10 @@ namespace HM
       // when the session is ESMTP (the client greeted with EHLO).
       void SendResponse_(int code, const String &enhancedCode, const String &text);
       static String DeriveEnhancedStatusCode_(int code);
+      // SIZE (RFC 1870) parameter parsing. Returns false for anything that is not a
+      // representable decimal octet count, so the caller can answer 501 instead of
+      // silently treating a malformed declaration as "no size given".
+      static bool ParseSizeParameter_(const String &value, unsigned __int64 &size);
       // DSN (RFC 3461) parameter validation helpers.
       static bool IsValidXtext_(const String &value);
       static bool IsValidOrcpt_(const String &value);

@@ -639,13 +639,34 @@ namespace HM
       std::vector<String>::iterator iterParam = vecParams.begin();
 
       String sAuthParam;
-      size_t iEstimatedMessageSize = 0;
+      unsigned __int64 iEstimatedMessageSize = 0;
       while (iterParam != vecParams.end())
       {
          String parameter = (*iterParam);
-         if (parameter.Left(4).CompareNoCase(_T("SIZE")) == 0)
-            iEstimatedMessageSize = _ttoi(parameter.Mid(5));
-         else if (parameter.Left(4).CompareNoCase(_T("AUTH")) == 0)
+         // The keyword tests below are deliberately against "SIZE=" and "AUTH=", not
+         // the first four characters. Matching on Left(4) meant every parameter whose
+         // name merely STARTS with one of them was swallowed: "SIZEX=1" was read as a
+         // size declaration of 1 (Mid(5) skips the X), a bare "SIZE" with no value was
+         // accepted as "no size", and both went through as if understood. An extension
+         // the server does not implement has to be refused (RFC 5321 section 4.1.1.11),
+         // and every other parameter here - BODY=, SMTPUTF8, RET=, ENVID= - was already
+         // matched exactly, so this was the odd one out rather than a deliberate
+         // tolerance.
+         if (parameter.Left(5).CompareNoCase(_T("SIZE=")) == 0)
+         {
+            // RFC 1870: a decimal octet count. It used to be read with _ttoi, which
+            // returns 0 for anything non-numeric - so "SIZE=abc" was quietly treated as
+            // "no size declared" and the one thing the extension exists for, refusing
+            // an oversized transaction before its octets are sent, was skipped. _ttoi
+            // also saturates at INT_MAX, so a declaration above 2 GB was compared
+            // against the wrong number.
+            if (!ParseSizeParameter_(parameter.Mid(5), iEstimatedMessageSize))
+            {
+               SendErrorResponse_(501, "Syntax error in SIZE parameter (must be a decimal octet count).");
+               return;
+            }
+         }
+         else if (parameter.Left(5).CompareNoCase(_T("AUTH=")) == 0)
             sAuthParam = parameter.Mid(5);
          else if (parameter.CompareNoCase(_T("BODY=7BIT")) == 0 ||
                   parameter.CompareNoCase(_T("BODY=8BITMIME")) == 0)
@@ -719,12 +740,12 @@ namespace HM
 
       // Check if estimated message size exceedes our
       // maximum message size (according to RFC1653)
-      if (max_message_size_kb_ > 0 && 
-          iEstimatedMessageSize / 1024 > max_message_size_kb_)
+      if (max_message_size_kb_ > 0 &&
+          iEstimatedMessageSize / 1024 > (unsigned __int64) max_message_size_kb_)
       {
          // Message too big. Reject it. 5.3.4 = message too big for system (RFC 3463).
          String sMessage;
-         sMessage.Format(_T("Message size exceeds fixed maximum message size. Size: %d KB, Max size: %d KB"),
+         sMessage.Format(_T("Message size exceeds fixed maximum message size. Size: %I64u KB, Max size: %Iu KB"),
                iEstimatedMessageSize / 1024, max_message_size_kb_);
          SendResponse_(552, _T("5.3.4"), sMessage);
          return ;
@@ -1768,9 +1789,18 @@ namespace HM
       if (max_message_size_kb_ > 0 && (transmission_buffer_->GetSize() / 1024) > max_message_size_kb_)
       {
          String sMessage;
-         sMessage.Format(_T("Rejected - Message size exceeds fixed maximum message size. Size: %d KB, Max size: %d KB"),
+         sMessage.Format(_T("Rejected - Message size exceeds fixed maximum message size. Size: %Iu KB, Max size: %Iu KB"),
             transmission_buffer_->GetSize() / 1024, max_message_size_kb_);
-         SendResponse_(554, _T("5.3.4"), sMessage);
+
+         // 552, not 554. RFC 1870 section 5 names 552 as the reply for a message that
+         // exceeds the fixed maximum, whether the excess is discovered from the SIZE=
+         // declaration or from the octets themselves, and the server's own other two
+         // size refusals (the MAIL FROM estimate and the SMTPDMaxSizeDrop ceiling)
+         // already answer 552. This one said 554 "transaction failed", so the same
+         // condition was reported with two different codes depending on whether the
+         // client had declared a size - and a sender looking at 554 5.3.4 cannot tell a
+         // size refusal from any other transaction failure.
+         SendResponse_(552, _T("5.3.4"), sMessage);
          LogAwstatsMessageRejected_();
          return false;
       }
@@ -2318,7 +2348,30 @@ namespace HM
       if (crash_simulation_mode > 0)
          CrashSimulation::Execute(crash_simulation_mode);
 
-      EnqueueWrite_("211 DATA HELO EHLO MAIL NOOP QUIT RCPT RSET SAML TURN VRFY");
+      // The list used to be "DATA HELO EHLO MAIL NOOP QUIT RCPT RSET SAML TURN VRFY".
+      // Three of those were wrong in both directions. SAML is not implemented at all -
+      // GetCommandType_ does not know the verb, so a client that took the advice got
+      // "503 Bad sequence of commands" - while TURN and VRFY are recognised only in
+      // order to answer 502, so naming them invites the two requests the server always
+      // refuses. Meanwhile AUTH, BDAT and STARTTLS, which are implemented and
+      // advertised, were missing. HELP is not a capability announcement, but a list
+      // that names commands the server does not have and omits the ones it does is
+      // worse than no list.
+      //
+      // AUTH and STARTTLS are conditional for the same reason they are conditional in
+      // the EHLO response: on a port where AUTH is disabled, or a connection which is
+      // already encrypted, offering them would be untrue. ETRN stays out deliberately -
+      // it is implemented but not advertised.
+      String helpCommands = "DATA EHLO HELO HELP MAIL NOOP QUIT RCPT RSET BDAT";
+
+      if (GetAuthIsEnabled_() && (IsSSLConnection() || GetConnectionSecurity() != CSSTARTTLSRequired))
+         helpCommands += " AUTH";
+
+      if (!IsSSLConnection() &&
+          (GetConnectionSecurity() == CSSTARTTLSOptional || GetConnectionSecurity() == CSSTARTTLSRequired))
+         helpCommands += " STARTTLS";
+
+      SendResponse_(211, _T("2.0.0"), helpCommands);
    }
 
    void
@@ -2931,6 +2984,26 @@ namespace HM
       if (GetConnectionSecurity() == CSSTARTTLSOptional ||
           GetConnectionSecurity() == CSSTARTTLSRequired)
       {
+         // RFC 3207 section 4: "A client MUST NOT attempt to start a TLS session if a
+         // TLS session is already active", and the server has to refuse if one does.
+         // The EHLO half of that rule was already honoured - SendEHLOKeywords_ omits
+         // STARTTLS once IsSSLConnection() is true - but the command itself was still
+         // accepted, and start_tls_used_ was set for this purpose and then never read.
+         //
+         // Accepting it does not merely breach the RFC, it wedges the session: the
+         // server answers 220, sets current_state_ = STARTTLS (so ParseData enqueues no
+         // read) and starts a second handshake INSIDE the established one. OpenSSL then
+         // tries to parse the client's next application bytes as a ClientHello, the
+         // handshake fails, and SMTPConnection::OnHandshakeFailed is empty - so nothing
+         // re-arms a read and nothing disconnects. The socket and its session slot are
+         // held until the idle timeout expires, which is up to ten minutes, for the
+         // cost of one command.
+         if (start_tls_used_ || IsSSLConnection())
+         {
+            SendErrorResponse_(503, "STARTTLS is not allowed: a TLS session is already active.");
+            return;
+         }
+
          const int commandLength = 8;
 
          auto trimmedRequest = sRequest;
@@ -3506,8 +3579,16 @@ namespace HM
          if (Configuration::Instance()->GetDisconnectInvalidClients() &&
             cur_no_of_invalid_commands_ > Configuration::Instance()->GetMaximumIncorrectCommands())
          {
-            // Disconnect
-            EnqueueWrite_("Too many invalid commands. Bye!");
+            // Disconnect. 421 is mandatory, not decoration: RFC 5321 section 4.2
+            // requires every reply to begin with a three-digit code, and this line
+            // was sent as bare text - "Too many invalid commands. Bye!" with no code
+            // at all. A client reading it gets a line it cannot parse as a reply
+            // immediately before the channel closes, which is indistinguishable from
+            // a truncated response or a hijacked session; the sending MTA reports a
+            // protocol error rather than "the server hung up on me for sending
+            // rubbish". 421 is the code RFC 5321 reserves for "service not available,
+            // closing transmission channel", which is exactly what happens next.
+            SendResponse_(421, _T("4.7.0"), _T("Too many invalid commands. Bye!"));
             pending_disconnect_ = true;
             EnqueueDisconnect();
 
@@ -3633,6 +3714,37 @@ namespace HM
       if (code >= 500 && code < 600) return _T("5.0.0");
 
       return _T("");
+   }
+
+   bool
+   SMTPConnection::ParseSizeParameter_(const String &value, unsigned __int64 &size)
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // RFC 1870 SIZE=<n>: a non-empty run of decimal digits and nothing else. A value
+   // that cannot be represented is refused rather than wrapped or saturated - a size
+   // the server cannot compare is not a size it may quietly ignore, because ignoring
+   // it means the transaction proceeds and the octets arrive.
+   //---------------------------------------------------------------------------()
+   {
+      size = 0;
+
+      const int length = value.GetLength();
+
+      // 19 digits is the widest decimal value that always fits an unsigned 64-bit
+      // integer, so the accumulation below cannot overflow.
+      if (length == 0 || length > 19)
+         return false;
+
+      for (int i = 0; i < length; i++)
+      {
+         wchar_t c = value.GetAt(i);
+         if (c < '0' || c > '9')
+            return false;
+
+         size = size * 10 + (unsigned __int64) (c - '0');
+      }
+
+      return true;
    }
 
    bool

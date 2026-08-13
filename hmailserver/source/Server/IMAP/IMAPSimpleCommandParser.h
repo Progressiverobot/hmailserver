@@ -48,11 +48,34 @@ namespace HM
 
       void Parse(std::shared_ptr<IMAPCommandArgument> pArgument);
       size_t WordCount() {return parsed_words_.size(); }
-      size_t ParamCount() { return parsed_words_.size() - 1; }
-      
+
+      // Parameters are the words after the command word. This was "size() - 1" on a
+      // size_t, and Parse() produces NO words at all when the command fails validation -
+      // which unbalanced parentheses outside a quoted string do. Zero words therefore
+      // meant a parameter count of SIZE_MAX, which passes every "ParamCount() < n" guard
+      // in the command handlers instead of failing it. Two of those guards are the only
+      // thing standing in front of an unchecked Word(1): "SETACL (" and
+      // "GETQUOTAROOT (" each got as far as indexing an empty vector.
+      size_t ParamCount() { return parsed_words_.empty() ? 0 : parsed_words_.size() - 1; }
+
       String GetParamValue(std::shared_ptr<IMAPCommandArgument> pArguments, int iParamIndex);
 
-      std::shared_ptr<IMAPSimpleWord> Word(size_t iIndex) {return parsed_words_[iIndex]; }
+      // Bounds-checked deliberately, in the same spirit as IMAPCommandArgument::Literal.
+      // This indexed the vector directly, so an out-of-range read was an access violation
+      // rather than an error: the /EHa catch(...) in TCPConnection::AsyncReadCompleted
+      // logs it as error 5136, drops the session and rethrows for a minidump - and an
+      // entry in the ERROR log is itself enough to break the next test fixture. Around
+      // thirty call sites dereference the result without checking it, so handing back an
+      // empty word rather than an empty pointer is what actually helps: the command then
+      // follows the "parameter missing" or "folder could not be found" path it already
+      // has.
+      std::shared_ptr<IMAPSimpleWord> Word(size_t iIndex)
+      {
+         if (iIndex >= parsed_words_.size())
+            return std::shared_ptr<IMAPSimpleWord>(new IMAPSimpleWord());
+
+         return parsed_words_[iIndex];
+      }
 
       std::shared_ptr<IMAPSimpleWord> QuotedWord();
       std::shared_ptr<IMAPSimpleWord> ParantheziedWord();

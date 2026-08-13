@@ -90,6 +90,15 @@ namespace HM
          return CTUnflagged;
       else if (sTmp == _T("all"))
          return CTAll;
+      else if (sTmp == _T("keyword"))
+         return CTKeyword;
+      else if (sTmp == _T("unkeyword"))
+         return CTUnkeyword;
+      // RFC 5032 (WITHIN).
+      else if (sTmp == _T("older"))
+         return CTOlder;
+      else if (sTmp == _T("younger"))
+         return CTYounger;
       else if (IsSequenceSet_(sTmp))
          return CTSequenceSet;
 
@@ -128,6 +137,19 @@ namespace HM
          pSimpleParser->Parse(pArgument);
          pSimpleParser->UnliteralData();
 
+         // Checked before Word(0) is touched, not after. The parser produces NO words at
+         // all when the command fails validation - which unbalanced parentheses outside a
+         // quoted string do - and Word() used to index the vector directly, so "SORT ("
+         // read parsed_words_[0] on an empty vector. One line on an authenticated
+         // connection, and the fault it raises is swallowed by the /EHa catch(...) in
+         // TCPConnection::AsyncReadCompleted, which logs it as error 5136, drops the
+         // session and rethrows for a minidump. Word() is bounds-checked now as well;
+         // this ordering is what makes the client's answer the right one.
+         if (pSimpleParser->WordCount() < 2)
+         {
+            return IMAPResult(IMAPResult::ResultBad, "SearchCharacter set must be specified.");
+         }
+
          std::shared_ptr<IMAPSimpleWord> pSort = pSimpleParser->Word(0);
          if (pSort->Paranthezied())
          {
@@ -135,23 +157,58 @@ namespace HM
             sort_parser_->Parse(pSort->Value());
          }
 
-         
-         // Second part should be character set.
-         if (pSimpleParser->WordCount() < 2)
-         {
-            return IMAPResult(IMAPResult::ResultBad, "SearchCharacter set must be specified.");
-         }
-
          charset_name_ = pSimpleParser->Word(1)->Value();
          if (!IsValidCharset_(charset_name_))
-            return IMAPResult(IMAPResult::ResultNo, "[BADCHARSET]");
+            return BadCharsetResult_();
 
-         // Trim away the SORT part of the SEARCH expresson 
+         // Trim away the SORT part of the SEARCH expresson
          // since we only care about SEARCH below.
          String tempString = pArgument->Command();
 
          if (tempString.Find(_T(")")) > 0)
             tempString = tempString.Mid(tempString.Find(_T(")"))+2);
+
+         // The charset has already been taken into charset_name_ above, and it is not a
+         // search key, so it has to come out of the string the criteria parser sees.
+         // It used to be left in and quietly discarded further down as an unrecognised
+         // word - which stopped being viable the moment an unrecognised word became an
+         // error, because "SORT (DATE) US-ASCII ALL" would then fail on "US-ASCII".
+         tempString.TrimLeft();
+
+         if (!tempString.IsEmpty() && tempString.GetAt(0) == '"')
+         {
+            // Quoted charset: drop everything up to and including the closing quote.
+            int closingQuote = tempString.Find(_T("\""), 1);
+            if (closingQuote > 0)
+               tempString = tempString.Mid(closingQuote + 1);
+         }
+         else if (!tempString.IsEmpty() && tempString.GetAt(0) == '{')
+         {
+            // Charset sent as a literal. What stands in the command is the "{n}" token,
+            // while the value above came from the literal data. Both have to go, and
+            // together: leaving the token behind makes the criteria parser read "UTF-8"
+            // as a search key, and dropping only the token shifts every remaining literal
+            // by one so the wrong data is paired with the wrong word.
+            int closingBrace = tempString.Find(_T("}"));
+            if (closingBrace > 0)
+            {
+               tempString = tempString.Mid(closingBrace + 1);
+
+               std::vector<String> remainingLiterals = pArgument->Literals();
+               if (!remainingLiterals.empty())
+               {
+                  remainingLiterals.erase(remainingLiterals.begin());
+                  pArgument->Literals(remainingLiterals);
+               }
+            }
+         }
+         else if (!charset_name_.IsEmpty() &&
+                  tempString.Mid(0, charset_name_.GetLength()).CompareNoCase(charset_name_) == 0)
+         {
+            tempString = tempString.Mid(charset_name_.GetLength());
+         }
+
+         tempString.TrimLeft();
 
          pArgument->Command(tempString);
       }
@@ -201,6 +258,17 @@ namespace HM
       IMAPResult result = ParseSegment_(pSimpleParser, currentWord, pCriteria, 0);
       if (result.GetResult() != IMAPResult::ResultOK)
          return result;
+
+      // RFC 3501: a SEARCH must carry at least one search key. Nothing at all here used
+      // to be treated as "no restrictions", and DoesMessageMatch_ answers true for an
+      // empty criteria list - so a command whose keys were all dropped, or a bare
+      // "SEARCH", reported every message in the mailbox as a match. A client that acts
+      // on a result set in bulk (Thunderbird's Search Messages window offering Delete,
+      // an archiver moving "what the search returned") would then act on the whole
+      // mailbox. Refusing the command is the only answer the protocol lets a client
+      // detect.
+      if (pCriteria->GetSubCriterias().empty())
+         return IMAPResult(IMAPResult::ResultBad, "No search criteria specified.");
 
       result_criteria_ = pCriteria;
 
@@ -275,7 +343,11 @@ namespace HM
    {
       String sCurCommand = pSimpleParser->Word(iCurrentWord)->Value();
 
-      if (sCurCommand == _T("NOT"))
+      // Compared case-insensitively because IMAP keywords are case-insensitive. This was
+      // an exact match against "NOT", so a client sending "not deleted" had the NOT
+      // silently discarded as an unrecognised word and got the messages that ARE
+      // deleted - the exact opposite of what it asked for.
+      if (sCurCommand.CompareNoCase(_T("NOT")) == 0)
       {
          pNewCriteria->SetPositive(false);
          iCurrentWord++;
@@ -288,6 +360,32 @@ namespace HM
       }
       else
          pNewCriteria->SetPositive(true);
+
+      // RFC 5182 (SEARCHRES): "$" stands for the result saved by an earlier
+      // SEARCH RETURN (SAVE), and RFC 5182 section 2.1 uses it as a search key
+      // ("SEARCH $ SMALLER 4096") as well as in FETCH/STORE/COPY. The saved result is a
+      // UID list, so it is matched as a UID set - the same set of messages whether this
+      // is a SEARCH or a UID SEARCH. An empty saved result becomes the set "0", which
+      // no message matches, so the search returns nothing rather than everything.
+      if (sCurCommand == _T("$"))
+      {
+         std::vector<String> savedSet;
+
+         for (__int64 savedUid : saved_search_result_)
+         {
+            String uidText;
+            uidText.Format(_T("%I64d"), savedUid);
+            savedSet.push_back(uidText);
+         }
+
+         if (savedSet.empty())
+            savedSet.push_back(_T("0"));
+
+         pNewCriteria->SetSequenceSet(savedSet);
+         pNewCriteria->SetType(IMAPSearchCriteria::CTUID);
+
+         return IMAPResult();
+      }
 
       IMAPSearchCriteria::CriteriaType ct = IMAPSearchCriteria::GetCriteriaTypeByName(sCurCommand);
 
@@ -352,6 +450,41 @@ namespace HM
          }
 
       }
+      else if (ct == IMAPSearchCriteria::CTOlder ||
+         ct == IMAPSearchCriteria::CTYounger)
+      {
+         // RFC 5032 (WITHIN): the interval is an nz-number of seconds. Validated here
+         // rather than left to the matcher, because a non-numeric or zero interval would
+         // otherwise silently become "0 seconds ago" and match either everything or
+         // nothing depending on which key it was.
+         iCurrentWord++;
+
+         if (iCurrentWord > (int) pSimpleParser->WordCount() - 1)
+            return IMAPResult(IMAPResult::ResultBad, "Syntax error. Missing interval.");
+
+         String interval = pSimpleParser->Word(iCurrentWord)->Value();
+
+         if (!IsNonZeroNumber_(interval))
+            return IMAPResult(IMAPResult::ResultBad, "Syntax error. The OLDER and YOUNGER intervals must be a positive number of seconds.");
+
+         pNewCriteria->SetText(interval);
+         pNewCriteria->SetType(ct);
+      }
+      else if (ct == IMAPSearchCriteria::CTKeyword ||
+         ct == IMAPSearchCriteria::CTUnkeyword)
+      {
+         // The keyword name is consumed but never looked at: no keyword can be stored,
+         // so KEYWORD matches nothing and UNKEYWORD matches everything whatever the name
+         // is. It still has to be consumed, or it would be read as a search key of its
+         // own on the next pass.
+         iCurrentWord++;
+
+         if (iCurrentWord > (int) pSimpleParser->WordCount() - 1)
+            return IMAPResult(IMAPResult::ResultBad, "Syntax error. Missing keyword name.");
+
+         pNewCriteria->SetText(pSimpleParser->Word(iCurrentWord)->Value());
+         pNewCriteria->SetType(ct);
+      }
       else if (ct == IMAPSearchCriteria::CTUID)
       {
          // Check which UID's we should send back.
@@ -408,16 +541,67 @@ namespace HM
             String charsetName = pWord->Value();
 
             if (!IsValidCharset_(charsetName))
-               return IMAPResult(IMAPResult::ResultNo, "[BADCHARSET]");
+               return BadCharsetResult_();
 
             charset_name_ = charsetName;
          }
+      }
+      else if (!sCurCommand.IsEmpty())
+      {
+         // An unrecognised search key used to be dropped on the floor here, which is the
+         // worst of the three possible answers. The key the client relied on to narrow
+         // the search was simply not applied, and a command whose keys were ALL
+         // unrecognised - "SEARCH KEYWORD $Label1" before KEYWORD existed, or anything
+         // from an extension this server does not implement - left an empty criteria list
+         // that matches every message in the mailbox. RFC 3501 requires BAD for a key the
+         // server does not know, and BAD is also the only answer a client can detect: a
+         // "* SEARCH" line is indistinguishable from a correct one.
+         //
+         // The IsEmpty() guard is deliberate. The word splitter emits an empty word for
+         // each run of two or more spaces, and clients do send those ("SEARCH FLAGGED  "),
+         // so an empty word is whitespace rather than a key and stays ignored.
+         return IMAPResult(IMAPResult::ResultBad,
+            Formatter::Format("Unrecognized search key: {0}", sCurCommand));
       }
 
       return IMAPResult();
    }
 
-   bool 
+   bool
+   IMAPSearchParser::IsNonZeroNumber_(const String &value)
+   {
+      if (value.IsEmpty())
+         return false;
+
+      for (int i = 0; i < value.GetLength(); i++)
+      {
+         TCHAR ch = value.GetAt(i);
+         if (ch < _T('0') || ch > _T('9'))
+            return false;
+      }
+
+      return _ttoi64(value) > 0;
+   }
+
+   IMAPResult
+   IMAPSearchParser::BadCharsetResult_()
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // RFC 3501 section 7.1: the BADCHARSET response code may name the charsets the server
+   // does support, and every response code is followed by human-readable text.
+   //
+   // This used to be the bare "[BADCHARSET]" with nothing after it, which is not a
+   // well-formed resp-text - text is not optional in the grammar - and tells the client
+   // nothing it can act on. The list is the part that helps: a client whose first choice
+   // is refused can reissue the same search in a charset that will work, instead of
+   // reporting the search as broken.
+   //---------------------------------------------------------------------------()
+   {
+      return IMAPResult(IMAPResult::ResultNo,
+         "[BADCHARSET (US-ASCII UTF-8 ISO-8859-1)] The specified charset is not supported.");
+   }
+
+   bool
    IMAPSearchParser::IsValidCharset_(const String &charsetName)
    {
       if (charsetName.CompareNoCase(_T("UTF-8")) == 0 ||

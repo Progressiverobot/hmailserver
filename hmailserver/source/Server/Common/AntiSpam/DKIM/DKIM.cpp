@@ -7,6 +7,7 @@
 #include "DKIM.h"
 #include "DKIMParameters.h"
 
+#include "../AntiSpamDiagnostics.h"
 #include "../../Util/Hashing/HashCreator.h"
 #include "../../Util/Encoding/Base64.h"
 #include "../../BO/Message.h"
@@ -24,6 +25,44 @@
 
 namespace HM
 {
+   namespace
+   {
+      // The number of signatures we are prepared to verify in one message. Each
+      // one costs a DNS lookup and a hash of the whole body, so it is bounded;
+      // GetSignatureFields reports back when a message had more than this, and
+      // the verdict is softened accordingly (see DKIM::Verify).
+      const size_t MaxSignaturesToVerify = 10;
+
+      // Ranks a single signature's outcome for the message-level verdict.
+      //
+      // A message is verified if any one signature verifies (RFC 6376 6.1). When
+      // none does, the strongest thing we learned has to survive: a signature we
+      // could not even parse must not overwrite the *failure* of one we could.
+      // Before this existed, the last signature in the header simply won, so
+      // appending one deliberately unparseable DKIM-Signature (v=2 is enough)
+      // after a forged one turned the verdict from PermFail into Neutral and the
+      // DKIM failure score - and with it the rejection - disappeared.
+      //
+      // PermFail outranks TempFail on purpose, and not only for tidiness: a
+      // lookup for a selector that does not exist is a PermFail, but one for a
+      // domain whose name servers are unreachable is a TempFail, so if TempFail
+      // won the same trick would work with an unresolvable d= instead.
+      int RankSignatureResult(DKIM::Result result)
+      {
+         switch (result)
+         {
+         case DKIM::Pass:
+            return 4;
+         case DKIM::PermFail:
+            return 3;
+         case DKIM::TempFail:
+            return 2;
+         default:
+            return 1; // Neutral: this signature tells us nothing.
+         }
+      }
+   }
+
    std::vector<AnsiString> DKIM::recommendedHeaderFields_;
 
    DKIM::DKIM()
@@ -320,7 +359,8 @@ namespace HM
       MimeHeader mimeHeader;
       mimeHeader.Load(messageHeader.GetBuffer(), messageHeader.GetLength(), false);
 
-      std::vector<std::pair<AnsiString, AnsiString> > signatureFields = GetSignatureFields(mimeHeader);
+      bool moreSignaturesThanWeVerify = false;
+      std::vector<std::pair<AnsiString, AnsiString> > signatureFields = GetSignatureFields(mimeHeader, &moreSignaturesThanWeVerify);
 
       if (signatureFields.size() == 0)
       {
@@ -335,18 +375,29 @@ namespace HM
       {
          AnsiString signingDomain;
          Result signatureResult = VerifySignature_(fileName, messageHeader, signatureField, signingDomain);
-         if (signatureResult == Pass)
-         {
-            if (!signingDomain.IsEmpty())
-               passingDomains.push_back(signingDomain);
 
-            result = Pass;
-         }
-         else if (result != Pass)
+         if (signatureResult == Pass && !signingDomain.IsEmpty())
          {
-            result = signatureResult;
+            // Every passing d= is collected, not just the first: DMARC needs all
+            // of them, because alignment may hold for one and not another.
+            passingDomains.push_back(signingDomain);
          }
+
+         if (RankSignatureResult(signatureResult) > RankSignatureResult(result))
+            result = signatureResult;
       };
+
+      if (moreSignaturesThanWeVerify && result == PermFail)
+      {
+         // We stopped before the end of the list, so "this message failed DKIM"
+         // is not a claim we are entitled to make - the signature that verifies
+         // may be one of the ones we never looked at. Report no assertion, which
+         // scores nothing, rather than a failure. Otherwise anyone could get a
+         // legitimately signed message scored as a DKIM failure by prepending a
+         // handful of junk signatures to it.
+         LOG_DEBUG("DKIM: The message carries more signatures than are verified. Reporting no assertion rather than a failure.");
+         result = Neutral;
+      }
 
       return result;
 
@@ -453,11 +504,12 @@ namespace HM
          signature = sig-alg(header-hash, key)
       */
 
-      HashCreator shaer(tagA == "rsa-sha256" ? HashCreator::SHA256 : HashCreator::SHA1);
-      AnsiString headerHash = shaer.GenerateHashNoSalt(canonicalizedHeader, HashCreator::base64);
-
+      // The header hash is not computed here: VerifyHeaderHash_ digests the
+      // canonicalized header itself, inside the EVP verify context. A hash was
+      // being taken over the whole header and then dropped on the floor - and
+      // with SHA1 whenever a= was ed25519-sha256, which shows how unused it was.
       AnsiString tagB = signatureParams.GetValue("b");
-      
+
 
       Result result = VerifyHeaderHash_(canonicalizedHeader, tagA, tagB, publicKeyString);
 
@@ -709,6 +761,17 @@ namespace HM
       if (!resolver.GetTXTRecords(keyName, results))
       {
          LOG_DEBUG("DKIM: Error when retrieving public key. Failed to do DNS/TXT lookup.");
+
+         // The lookup did not complete, so this signature is neither verified nor
+         // refused and the message is accepted with no DKIM verdict at all. While
+         // the resolver is unavailable that is true of every signed message that
+         // arrives, so it is said once in the application log: a check that has
+         // silently stopped checking is indistinguishable from one that is
+         // working. Note that a selector which does not exist is not this case -
+         // that is an answer, and it is a PermFail below.
+         AntiSpamDiagnostics::ReportCheckIncomplete(AntiSpamDiagnostics::CheckDkim,
+            Formatter::Format("DKIM: The DNS lookup of the public key {0} did not complete. Signatures cannot be verified while that continues, and affected messages are accepted without a DKIM verdict.", keyName));
+
          return TempFail;
       }
 
@@ -940,23 +1003,33 @@ namespace HM
    }
 
    std::vector<std::pair<AnsiString, AnsiString> >
-   DKIM::GetSignatureFields(MimeHeader &mimeHeader)
+   DKIM::GetSignatureFields(MimeHeader &mimeHeader, bool *moreThanWeVerify)
    {
       std::vector<std::pair<AnsiString, AnsiString>> result;
       std::vector<MimeField> &fields = mimeHeader.Fields();
+
+      size_t signatureFieldCount = 0;
 
       for(MimeField f : fields)
       {
          AnsiString name = f.GetName();
          if (name.CompareNoCase("DKIM-Signature") == 0)
          {
-            AnsiString headerValue = f.GetValue();
-            result.push_back(std::make_pair(name, headerValue));
+            signatureFieldCount++;
 
-            if (result.size() >= 5)
-               break;
+            // Keep counting past the limit rather than breaking out, so that the
+            // caller can be told the difference between a message with exactly
+            // the limit and one with more than we are willing to verify.
+            if (result.size() < MaxSignaturesToVerify)
+            {
+               AnsiString headerValue = f.GetValue();
+               result.push_back(std::make_pair(name, headerValue));
+            }
          }
       };
+
+      if (moreThanWeVerify)
+         *moreThanWeVerify = signatureFieldCount > MaxSignaturesToVerify;
 
       return result;
    }

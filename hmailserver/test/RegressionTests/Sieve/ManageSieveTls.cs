@@ -11,6 +11,7 @@ using System.Text;
 using System.Threading;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
+using RegressionTests.Infrastructure;
 using RegressionTests.SSL;
 using RegressionTests.Shared;
 using hMailServer;
@@ -103,6 +104,37 @@ namespace RegressionTests.Sieve
          Thread.Sleep(500);
       }
 
+      /// <summary>
+      /// Starts the listener with no TLS certificate available to it. Deliberately
+      /// does NOT call SslSetup.SetupSSLPorts: PerformBasicSetup resets the ports and
+      /// clears the certificate list before every test, so this is the shipped state -
+      /// and it is the state in which a range that requires TLS for authentication has
+      /// to fail closed rather than quietly fall back to cleartext.
+      /// </summary>
+      private void StartListenerWithoutTls()
+      {
+         WriteSetting("ManageSieveServerBindAddress", "127.0.0.1");
+         WriteSetting("ManageSieveServerPort", ManageSievePort.ToString());
+
+         _application.Reinitialize();
+
+         Thread.Sleep(500);
+      }
+
+      // The three tests below set RequireSSLTLSForAuth on the range that matches
+      // 127.0.0.1 inline rather than through a helper, because the setter and the
+      // matching restore in the finally block have to be visible together: a range
+      // left requiring TLS refuses cleartext authentication for every fixture that
+      // runs afterwards. (PerformBasicSetup calls SecurityRanges.SetDefault() before
+      // every test, so it would be undone eventually - but not before the rest of the
+      // test that set it.)
+      //
+      // That setting is the existing per-IP-range one which POP3, IMAP and SMTP
+      // already honour. ManageSieve now reads the same one instead of carrying a
+      // setting of its own, which is what makes these tests possible at all: before
+      // the change there was no configuration anywhere that could express "do not
+      // accept a ManageSieve password in clear text".
+
       private void StopListener()
       {
          WriteSetting("ManageSieveServerPort", "0");
@@ -154,13 +186,33 @@ namespace RegressionTests.Sieve
             get { return _networkStream; }
          }
 
+         public void SetReadTimeout(int milliseconds)
+         {
+            _active.ReadTimeout = milliseconds;
+         }
+
          private string ReadLine()
          {
             var bytes = new List<byte>();
             int previous = -1;
             while (true)
             {
-               int current = _active.ReadByte();
+               int current;
+               try
+               {
+                  current = _active.ReadByte();
+               }
+               catch (IOException)
+               {
+                  // A read timeout is treated the same as a close, as the sibling
+                  // fixture's helper already does. It matters for the refusal tests
+                  // below: the unfixed server answers those by saying nothing at all
+                  // until its 30-second socket timeout, and an IOException thrown out
+                  // of here would report that as an error rather than as the failed
+                  // assertion that names what went wrong.
+                  return null;
+               }
+
                if (current == -1)
                {
                   if (bytes.Count == 0)
@@ -498,6 +550,14 @@ namespace RegressionTests.Sieve
                string greeting = session.ReadResponse();
                StringAssert.Contains("IMPLEMENTATION", greeting);
 
+               // The default range does not require TLS, so PLAIN must still be
+               // offered. This is the negative control for the capability-suppression
+               // change: a bug that emitted "SASL" "" unconditionally would take
+               // every existing client's logon step away, and every other assertion
+               // in this file would still pass.
+               StringAssert.Contains("\"SASL\" \"PLAIN\"", greeting,
+                  "PLAIN must still be advertised when no range requires TLS for authentication. Got: " + greeting);
+
                // The negative control for the whole change. Every existing
                // ManageSieve client connects in clear text and never asks for TLS;
                // making TLS available must not make a single one of them stop
@@ -515,6 +575,207 @@ namespace RegressionTests.Sieve
          }
          finally
          {
+            StopListener();
+         }
+      }
+
+      [Test]
+      [Description("When the connecting IP range requires TLS for authentication, the cleartext capability line offers no SASL mechanism and AUTHENTICATE is refused with (ENCRYPT-NEEDED) - and the same credentials are accepted once STARTTLS has run.")]
+      public void AuthenticateIsRefusedInCleartextWhenTheIpRangeRequiresTls()
+      {
+         const string address = "managesieve-requiretls@example.test";
+         const string password = "Sieve-Pass1";
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, address, password);
+
+         StartListenerWithTls();
+
+         var range = _settings.SecurityRanges.get_ItemByName("My computer");
+         range.RequireSSLTLSForAuth = true;
+         range.Save();
+
+         try
+         {
+            using (var session = new Session())
+            {
+               string greeting = session.ReadResponse();
+
+               // Fails before the change: the greeting carried "SASL" "PLAIN" whatever
+               // the range said, because nothing in this listener had ever read the
+               // setting - there was no setting for it to read. A ManageSieve client
+               // builds its logon step from this line, so the offer itself is what puts
+               // the password on the wire.
+               StringAssert.Contains("\"SASL\" \"\"", greeting,
+                  "The cleartext capability line must advertise an empty SASL mechanism list when the range " +
+                  "requires TLS for authentication. Got: " + greeting);
+               Assert.IsFalse(greeting.Contains("\"SASL\" \"PLAIN\""),
+                  "PLAIN must not be advertised on a connection where it will be refused. Got: " + greeting);
+
+               // STARTTLS is still there, so the refusal leaves the client somewhere to
+               // go. A capability line with neither a mechanism nor an upgrade would be
+               // a dead end.
+               StringAssert.Contains("STARTTLS", greeting,
+                  "STARTTLS must still be advertised alongside the empty SASL list. Got: " + greeting);
+
+               // These credentials are CORRECT. Before the change this was answered
+               // OK "Authentication successful." over an unencrypted connection, with
+               // nothing anywhere in the server able to refuse it - that is the defect.
+               string refused = session.Authenticate(address, password);
+               StringAssert.StartsWith("NO", refused.TrimStart(),
+                  "AUTHENTICATE must be refused in cleartext when the range requires TLS. Got: " + refused);
+               StringAssert.Contains("ENCRYPT-NEEDED", refused,
+                  "The refusal must carry the RFC 5804 1.3 ENCRYPT-NEEDED response code, which is how a client " +
+                  "tells 'this server wants TLS first' from 'your password is wrong'. Got: " + refused);
+
+               // Refused rather than merely answered NO: the session did not log on.
+               string list = session.SendCommand("LISTSCRIPTS");
+               StringAssert.Contains("Authentication required", list,
+                  "The refused AUTHENTICATE must not have authenticated the session. Got: " + list);
+
+               // The point of the design, and the negative control for the refusal: it
+               // is about the channel, not the credential. The same password works the
+               // moment the connection is protected, and the capability response the RFC
+               // requires after the handshake is where the client finds that out.
+               StringAssert.StartsWith("OK", session.SendCommand("STARTTLS").TrimStart());
+               session.HandshakeAsClient();
+
+               string afterHandshake = session.ReadResponse();
+               StringAssert.Contains("\"SASL\" \"PLAIN\"", afterHandshake,
+                  "The capability response re-issued after the handshake (RFC 5804 2.2) must now offer PLAIN. " +
+                  "Got: " + afterHandshake);
+
+               string accepted = session.Authenticate(address, password);
+               StringAssert.StartsWith("OK", accepted.TrimStart(),
+                  "The same credentials must be accepted once TLS is active. Got: " + accepted);
+
+               StringAssert.StartsWith("OK", session.SendCommand("LOGOUT").TrimStart());
+            }
+         }
+         finally
+         {
+            range.RequireSSLTLSForAuth = false;
+            range.Save();
+            StopListener();
+         }
+      }
+
+      [Test]
+      [Description("An AUTHENTICATE whose SASL response is announced as a literal is refused before the literal is read, so the password is never taken off the wire.")]
+      public void AuthenticateLiteralIsRefusedBeforeThePasswordIsRead()
+      {
+         const string address = "managesieve-requiretls-literal@example.test";
+         const string password = "Sieve-Pass1";
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, address, password);
+
+         StartListenerWithTls();
+
+         var range = _settings.SecurityRanges.get_ItemByName("My computer");
+         range.RequireSSLTLSForAuth = true;
+         range.Save();
+
+         try
+         {
+            using (var session = new Session())
+            {
+               session.ReadResponse(); // greeting
+
+               string sasl = Convert.ToBase64String(Encoding.UTF8.GetBytes("\0" + address + "\0" + password));
+
+               // The literal is announced and then DELIBERATELY NOT SENT. That is what
+               // makes this test about ordering rather than about the refusal: a server
+               // that refuses before reading answers immediately, and a server that
+               // reads first cannot answer at all until the bytes arrive. "The password
+               // never crosses the wire" is only true of the first one.
+               //
+               // Against the unfixed server this fails by timing out here - it accepted
+               // the announced length, sat in ReadBytes_ waiting for a payload that
+               // never comes, and closed the connection on the 30-second socket timeout
+               // without sending anything. The shortened read timeout keeps that failure
+               // from costing the suite the full 30 seconds.
+               session.SetReadTimeout(10000);
+               session.SendRaw("AUTHENTICATE \"PLAIN\" {" + sasl.Length + "+}\r\n");
+
+               string refused = session.ReadResponse();
+               StringAssert.Contains("ENCRYPT-NEEDED", refused,
+                  "The command must be refused on the command line, before the announced literal is read. " +
+                  "Got: " + refused);
+
+               // The announced bytes were never read, so the command stream can no
+               // longer be trusted - whatever is still to arrive would be parsed as
+               // commands. The connection is closed for that reason, which is the same
+               // decision the oversized-SASL-literal path already makes.
+               string afterwards = session.ReadUntilClosed(5000);
+               Assert.AreEqual(string.Empty, afterwards,
+                  "The connection should be closed after refusing a command whose literal was left unread. " +
+                  "Received: " + afterwards);
+            }
+         }
+         finally
+         {
+            range.RequireSSLTLSForAuth = false;
+            range.Save();
+            StopListener();
+         }
+      }
+
+      [Test]
+      [Description("With no TLS certificate available the requirement fails closed: no STARTTLS, no SASL mechanism, and AUTHENTICATE refused - rather than falling back to accepting the password in clear text.")]
+      public void AuthenticationFailsClosedWhenTlsIsRequiredAndNoCertificateIsAvailable()
+      {
+         const string address = "managesieve-requiretls-nocert@example.test";
+         const string password = "Sieve-Pass1";
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, address, password);
+
+         // No certificate for this listener to borrow, which is the shipped state.
+         StartListenerWithoutTls();
+
+         var range = _settings.SecurityRanges.get_ItemByName("My computer");
+         range.RequireSSLTLSForAuth = true;
+         range.Save();
+
+         try
+         {
+            using (var session = new Session())
+            {
+               string greeting = session.ReadResponse();
+
+               // Nothing to upgrade to...
+               Assert.IsFalse(greeting.Contains("STARTTLS"),
+                  "STARTTLS must not be advertised when no certificate is available. Got: " + greeting);
+
+               // ...and therefore nothing to authenticate with. This is the assertion
+               // that fails against the unfixed server: it advertised PLAIN and then
+               // accepted the password in clear text, which is the worst of the three
+               // possible answers here.
+               StringAssert.Contains("\"SASL\" \"\"", greeting,
+                  "No SASL mechanism may be offered when the range requires TLS and TLS is not available. " +
+                  "Got: " + greeting);
+
+               string refused = session.Authenticate(address, password);
+               StringAssert.Contains("ENCRYPT-NEEDED", refused,
+                  "AUTHENTICATE must be refused rather than falling back to cleartext. Got: " + refused);
+
+               string list = session.SendCommand("LISTSCRIPTS");
+               StringAssert.Contains("Authentication required", list,
+                  "The refused AUTHENTICATE must not have authenticated the session. Got: " + list);
+
+               // The operator-facing half of this: the combination is a configuration
+               // mistake that locks the range out, and it is reported once per service
+               // start in the application log - deliberately NOT the ERROR log, because
+               // an entry there makes PerformBasicSetup fail for every fixture that runs
+               // after this one, and this test provokes the condition on purpose.
+               //
+               // DefaultLogContains retries, so this does not depend on how promptly the
+               // logger flushes.
+               Assert.IsTrue(
+                  LogHandler.DefaultLogContains("no TLS certificate is available to this listener"),
+                  "The lockout should be explained in the application log, or an operator sees only clients " +
+                  "that cannot log on and nothing that says why. Log: " + LogHandler.ReadCurrentDefaultLog());
+            }
+         }
+         finally
+         {
+            range.RequireSSLTLSForAuth = false;
+            range.Save();
             StopListener();
          }
       }

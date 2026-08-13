@@ -409,5 +409,45 @@ namespace RegressionTests.IMAP
          Assert.AreEqual("1", simulator.Sort("(SUBJECT) UTF-8 ALL HEADER SUBJECT \"Te(st1\""));
          Assert.AreEqual("2", simulator.Sort("(SUBJECT) UTF-8 ALL HEADER SUBJECT \"Te)st2\""));
       }
+
+      [Test]
+      [Description("A SORT whose parameter list never closes is a syntax error, not an access violation. " +
+                   "The word parser produces no words at all for a command that fails validation, and the " +
+                   "sort key list and charset were then read out of an empty vector.")]
+      public void TestSortWithUnclosedParameterListIsRefused()
+      {
+         var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "sortcrash@example.test", "test");
+
+         SmtpClientSimulator.StaticSend(account.Address, account.Address, "MySubject", "MyBody");
+         ImapClientSimulator.AssertMessageCount(account.Address, "test", "INBOX", 1);
+
+         var simulator = new ImapClientSimulator();
+         Assert.IsTrue(simulator.ConnectAndLogon(account.Address, "test"));
+         Assert.IsTrue(simulator.SelectFolder("INBOX"));
+
+         // Against the unfixed server this line produces no response at all: the parser
+         // yields no words for a command that fails validation, and the sort key list was
+         // read from element 0 of that empty vector. The /EHa catch(...) in TCPConnection
+         // swallows the access violation, logs error 5136 and drops the session; the crash
+         // oracle records the fault, which is what fails this test.
+         var result = simulator.SendSingleCommand("A01 SORT (");
+         Assert.IsTrue(result.Contains("A01 BAD"),
+            "An unclosed SORT parameter list must be answered BAD. " + result);
+
+         // The session survived, and a real SORT still works on it. Both spellings of the
+         // charset are covered on purpose: the SORT path now has to consume that token
+         // itself, because it used to survive into the criteria parser and be discarded
+         // there as an unrecognised word - which is no longer something that happens
+         // quietly.
+         result = simulator.SendSingleCommand("A02 SORT (DATE) US-ASCII ALL");
+         Assert.IsTrue(result.Contains("A02 OK"),
+            "A valid SORT must still work after a refused one. " + result);
+
+         result = simulator.SendSingleCommand("A03 SORT (DATE) \"US-ASCII\" ALL");
+         Assert.IsTrue(result.Contains("A03 OK"),
+            "A quoted charset must be accepted by SORT. " + result);
+
+         simulator.Disconnect();
+      }
    }
 }

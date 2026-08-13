@@ -5,6 +5,7 @@
 #include "StdAfx.h"
 #include ".\surbl.h"
 
+#include "../../Common/AntiSpam/AntiSpamDiagnostics.h"
 #include "../../Common/BO/MessageData.h"
 #include "../../Common/BO/SURBLServer.h"
 #include "../../Common/TCPIP/DNSResolver.h"
@@ -175,6 +176,15 @@ namespace HM
          if (!resolver.GetIpAddresses(sHostToLookup, saFoundNames, false))
          {
             LOG_DEBUG("SURBL: DNS query failed.");
+
+            // Abandoning the whole list on the first failed lookup means the URLs
+            // after it are never checked either, and the message is reported as
+            // clean. That is the safe direction to fail, but it was completely
+            // silent, so a resolver that had stopped answering presented as a
+            // SURBL that never matches anything.
+            AntiSpamDiagnostics::ReportCheckIncomplete(AntiSpamDiagnostics::CheckSurbl,
+               Formatter::Format("SURBL: The lookup of {0} did not complete. URI blacklists cannot be checked while that continues, and affected messages are accepted without a SURBL verdict.", sHostToLookup));
+
             return true;
          }
 
