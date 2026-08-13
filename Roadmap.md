@@ -50,7 +50,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Structural prerequisites](#structural-prerequisites) | 6 | 1 | 2 | – |
 | **Control Panel findability and accessibility** | | | | |
 | [What is concretely wrong](#what-is-concretely-wrong) | 3 | – | 4 | – |
-| [What to do about it](#what-to-do-about-it) | 2 | 2 | 2 | – |
+| [What to do about it](#what-to-do-about-it) | 3 | 2 | 1 | – |
 | [Accessibility, which is not optional](#accessibility-which-is-not-optional) | 5 | 2 | 1 | – |
 | **The capability matrix** | | | | |
 | [SMTP and ESMTP](#smtp-and-esmtp) | 23 | – | 4 | – |
@@ -72,7 +72,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 1 | – | 5 | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 4 | 1 | 2 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 3 | – | 6 | – |
-| **Total** | **537** | **11** | **188** | **14** |
+| **Total** | **538** | **11** | **187** | **14** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage and the administration surface are the best-covered areas**, and the
@@ -1139,7 +1139,7 @@ Named specifically, because "improve the UX" is not actionable:
 | ⬜ | **Give every settings page a one-line purpose statement** | A page whose title needs the manual has failed. This also feeds the palette: a searchable description is far more useful than a searchable identifier. |
 | 🔄 | **Expand the task-oriented entry point** | Grow the Welcome tiles into a real starting page keyed on intent, including a direct route into the stall-diagnosis path documented in [DiagnosingStalledMail.md](hmailserver/docs/DiagnosingStalledMail.md). The information exists; nothing points at it from the UI. |
 | ✅ | **Keep Ctrl+K, and make it better** | It stays — it is genuinely the fastest route for an experienced administrator. Improvements worth having once the IA is fixed: match on the purpose statements above, show the navigation path of each result so the palette teaches the structure rather than bypassing it, and surface recently-visited pages. |
-| ⬜ | **Settle the MVVM question** | `CONTROL-PANEL-PLAN.md` pre-decided `CommunityToolkit.Mvvm` and a `ViewModels/` folder. Neither exists; every view is imperative code-behind. That is not automatically wrong, but the plan and the code disagree, and a large reorganisation is the moment to decide rather than discover. |
+| ✅ | **Settle the MVVM question** | `CONTROL-PANEL-PLAN.md` pre-decided `CommunityToolkit.Mvvm` and a `ViewModels/` folder. Neither exists; every view is imperative code-behind. That is not automatically wrong, but the plan and the code disagree, and a large reorganisation is the moment to decide rather than discover. |
 
 ### Accessibility, which is not optional
 
