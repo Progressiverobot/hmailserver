@@ -41,6 +41,7 @@
 #include "../../ExternalFetcher/ExternalFetchManager.h"
 
 #include "../Threading/WorkQueueManager.h"
+#include "../Threading/WorkQueue.h"
 #include "../Tracking/NotificationServer.h"
 #include "SessionManager.h"
 
@@ -167,6 +168,17 @@ namespace HM
       // only delays the lookups themselves, which degrade to "Unknown".
       WorkQueueManager::Instance()->CreateWorkQueue(Configuration::Instance()->GetAsynchronousThreads(),
                                                     name_lookup_queue_);
+
+      // Both of these run tasks that are expected to finish, so "every thread busy
+      // for longer than the threshold" means something is wedged and is worth an
+      // error. The maintenance, main server and IOCP queues are deliberately not
+      // opted in - see WorkQueue::SetMonitorForStalls for why that would report the
+      // healthy state of a stock installation once a minute.
+      if (std::shared_ptr<WorkQueue> queue = WorkQueueManager::Instance()->GetQueue(asynchronous_tasks_queue_))
+         queue->SetMonitorForStalls(true);
+
+      if (std::shared_ptr<WorkQueue> queue = WorkQueueManager::Instance()->GetQueue(name_lookup_queue_))
+         queue->SetMonitorForStalls(true);
 
       return true;
    }

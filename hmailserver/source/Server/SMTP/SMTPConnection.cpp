@@ -1395,7 +1395,20 @@ namespace HM
             (std::bind(&SMTPConnection::HandleSMTPFinalizationTaskCompleted_, this), shared_from_this(),
              Formatter::Format("SMTP-accept session={0} ip={1}", GetSessionID(), GetIPAddressString())));
 
-      Application::Instance()->GetAsyncWorkQueue()->AddTask(finalizationTask);
+      // TaskMayBlock, which is what this task has always been in fact and never in
+      // declaration. It runs the script and virus-scanner stages, so it blocks on
+      // things outside this process - and every task on this queue was TaskNormal, so
+      // AsyncQueueReservedThreads reserved nothing here at all. Its only user in the
+      // tree was BackupManager, on a different queue. A wedged scanner or a slow script
+      // could therefore take every thread in the async pool, which is precisely what
+      // the reservation exists to prevent and what the roadmap row claimed it did.
+      //
+      // The two caller constraints on TaskMayBlock were checked before making this
+      // change, because getting them wrong deadlocks mail rather than slowing it:
+      // HandleSMTPFinalizationTaskCompleted_ neither posts to nor waits on another task
+      // on this queue, and nothing anywhere waits on this task's GetIsStartedEvent() -
+      // the only references to finalizationTask are its construction and this call.
+      Application::Instance()->GetAsyncWorkQueue()->AddTask(finalizationTask, WorkQueue::TaskMayBlock);
    }
 
    void
@@ -2755,7 +2768,9 @@ namespace HM
             (std::bind(&SMTPConnection::HandleSMTPFinalizationTaskCompleted_, this), shared_from_this(),
              Formatter::Format("SMTP-accept session={0} ip={1}", GetSessionID(), GetIPAddressString())));
 
-      Application::Instance()->GetAsyncWorkQueue()->AddTask(finalizationTask);
+      // TaskMayBlock - the BDAT path into the same handler. See the equivalent above for
+      // why, and for the two caller constraints that were checked first.
+      Application::Instance()->GetAsyncWorkQueue()->AddTask(finalizationTask, WorkQueue::TaskMayBlock);
    }
 
    bool

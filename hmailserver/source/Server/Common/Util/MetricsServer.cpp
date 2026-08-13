@@ -13,6 +13,8 @@
 #include "Encoding/Base64.h"
 
 #include "../Application/Application.h"
+#include "../Threading/WorkQueueManager.h"
+#include "../Threading/WorkQueue.h"
 #include "../Application/Configuration.h"
 #include "../BO/Message.h"
 #include "../BO/SSLCertificate.h"
@@ -1441,6 +1443,52 @@ namespace HM
       body += line;
       line.Format("hmailserver_sessions{protocol=\"pop3\"} %d\n", status->GetNumberOfSessions(STPOP3));
       body += line;
+
+      // Work queue depth, per queue.
+      //
+      // WorkQueue has had GetQueueDepth and GetWaitingBlockingTaskCount for a while
+      // and they were correct and had no caller anywhere in the tree, so the only
+      // route any of it reached an operator was the stall report - which fires only
+      // once a queue is already wedged. A queue filling up is the part you want to
+      // see coming.
+      //
+      // Both are cheap enough for the request thread, which is the constraint this
+      // listener works under: depth is an atomic load, and the waiting count is a
+      // short lock around a size(). Neither touches the database or the disk.
+      //
+      // Cardinality is bounded and static - this server creates five queues, all
+      // named at startup - so a queue label cannot grow a time series per message
+      // the way a per-task label would. GetRunningTasks is deliberately NOT exposed
+      // here for exactly that reason: it is per-task detail with a name and a thread
+      // id, which belongs in the stall report that already prints it, not in a
+      // metric that would mint a series per task.
+      std::vector<std::shared_ptr<WorkQueue> > queues = WorkQueueManager::Instance()->GetAllQueues();
+
+      body += "# HELP hmailserver_workqueue_depth Tasks accepted but not yet started, per work queue.\n";
+      body += "# TYPE hmailserver_workqueue_depth gauge\n";
+
+      for (std::shared_ptr<WorkQueue> queue : queues)
+      {
+         if (!queue)
+            continue;
+
+         line.Format("hmailserver_workqueue_depth{queue=\"%s\"} %d\n",
+                     AnsiString(queue->GetName()).c_str(), queue->GetQueueDepth());
+         body += line;
+      }
+
+      body += "# HELP hmailserver_workqueue_blocking_tasks_waiting Tasks marked as possibly blocking that are waiting for a slot, per work queue. These hold no worker thread; a number that stays above zero means the AsyncQueueReservedThreads cap is doing its job and the dependency behind those tasks is slow.\n";
+      body += "# TYPE hmailserver_workqueue_blocking_tasks_waiting gauge\n";
+
+      for (std::shared_ptr<WorkQueue> queue : queues)
+      {
+         if (!queue)
+            continue;
+
+         line.Format("hmailserver_workqueue_blocking_tasks_waiting{queue=\"%s\"} %d\n",
+                     AnsiString(queue->GetName()).c_str(), queue->GetWaitingBlockingTaskCount());
+         body += line;
+      }
 
       // A start timestamp rather than an uptime counter, matching the
       // process_start_time_seconds convention every Prometheus client library

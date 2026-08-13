@@ -61,6 +61,26 @@ namespace HM
 
       const String &GetName() const;
 
+      // Whether WorkQueueHealthTask should report this queue's threads as stalled
+      // when they are all busy for longer than AsyncQueueStallThreshold.
+      //
+      // Off by default, and that default is the important part. The stall report
+      // means "nothing posted here can start", which is only a fault on a queue
+      // whose tasks are expected to finish. Three of this server's queues host
+      // tasks that never finish by design - the main server queue runs the
+      // delivery manager and the external-fetch manager as permanent looping
+      // tasks, and the IOCP queue's threads sit in io_context::run for the life of
+      // the process - so on those "all threads busy for two minutes" is the
+      // healthy state and reporting it would raise a High error every minute on a
+      // stock installation. The maintenance queue is excluded for a milder version
+      // of the same reason: a backup or a message-store consistency pass can
+      // legitimately run for much longer than the threshold.
+      //
+      // So this is opt-in, per queue, at the point the queue is created, where
+      // whoever adds the next queue has to decide which kind theirs is.
+      void SetMonitorForStalls(bool monitor);
+      bool GetMonitorForStalls() const;
+
       // Tasks accepted but not yet started, including those held back by the
       // TaskMayBlock cap.
       int GetQueueDepth() const;
@@ -154,6 +174,10 @@ namespace HM
       unsigned int max_simultaneous_;
 
       String queue_name_;
+
+      // See SetMonitorForStalls. Atomic because the health task reads it from the
+      // scheduler thread while the queue runs on its own.
+      std::atomic<bool> monitor_for_stalls_{false};
 
       std::set<std::shared_ptr<boost::thread>> workerThreads_;
    };

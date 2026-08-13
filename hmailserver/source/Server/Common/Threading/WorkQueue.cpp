@@ -860,7 +860,23 @@ namespace HM
                                         workerThreads_.size(), queue_name_));
    }
 
-   const String&
+   void
+   WorkQueue::SetMonitorForStalls(bool monitor)
+   //---------------------------------------------------------------------------
+   // DESCRIPTION:
+   // Opts this queue in to the stall report. See the header for why it is opt-in.
+   //---------------------------------------------------------------------------
+   {
+      monitor_for_stalls_.store(monitor);
+   }
+
+   bool
+   WorkQueue::GetMonitorForStalls() const
+   {
+      return monitor_for_stalls_.load();
+   }
+
+   const String &
    WorkQueue::GetName() const
    //---------------------------------------------------------------------------
    // DESCRIPTION:

@@ -37,7 +37,7 @@ Transport security
 
 * **TLS 1.2 and 1.3** by default, on implicit-TLS and STARTTLS ports, with SNI and configurable cipher suites.
 * **MTA-STS** (RFC 8461) policy discovery and enforcement for outbound mail, and optional hosting of your own policy at `mta-sts.<domain>`.
-* **DANE** (RFC 7672) with full in-process **DNSSEC validation** (RFC 4033–4035) — a bogus chain blocks delivery to that host rather than silently downgrading.
+* **DANE** (RFC 7672) with full in-process **DNSSEC validation** (RFC 4033–4035) — a bogus chain blocks delivery to that host rather than silently downgrading. The **MX RRset is validated too**, not just the TLSA record (RFC 7672 §2.2): DANE is applied only to a host the recipient domain provably published, so a forged MX answer cannot redirect delivery to a host whose own TLSA record then validates.
 * DNSSEC validation also protects SPF, DKIM and DMARC record lookups.
 * **TLS-RPT** (RFC 8460) daily aggregate reports to recipient domains.
 * **ACME v2 (Let's Encrypt)** built in: certificates are issued, renewed, assigned to TLS ports and hot-reloaded without a restart. The private key is reused across renewals, so published DANE TLSA records stay valid.
@@ -57,6 +57,7 @@ Account security and authentication
 
 * **SCRAM-SHA-256** SASL across IMAP, SMTP submission and POP3, plus **SCRAM-SHA-256-PLUS** channel binding on all three, with deterministic anti-enumeration salts.
 * **OAuth2 / OpenID Connect** bearer tokens — SASL XOAUTH2 and OAUTHBEARER (RFC 7628) — validated against an external identity provider's signing key.
+* **LDAP directory authentication** against Active Directory or any LDAP directory, so accounts authenticate with their domain password. Simple bind and SASL Negotiate; LDAPS and StartTLS; certificate validation on by default, and a password is never sent over an unprotected connection unless that is explicitly permitted. Unlike the Windows-logon path it needs no domain-joined host, which is the usual situation for a mail server in a DMZ. Infrastructure failures are reported separately from wrong passwords, so a directory outage does not read as a hundred users mistyping. Off by default: the whole `[LDAP]` ini section is absent until you add it.
 * **Argon2id** and **PBKDF2-HMAC-SHA256** password hashing, with transparent upgrade on login, a minimum-accepted-hash policy, and an optional server-side pepper.
 * Full RFC 4013 SASLprep of non-ASCII credentials.
 * Optional **TOTP two-factor authentication** for administrative logon.
@@ -105,7 +106,7 @@ Administration
 * Optional TOTP two-factor authentication on logon.
 * Requires the .NET 10 Desktop Runtime, which the installer bundles and installs silently when missing.
 
-**REST administration API** for domains, accounts, the delivery queue, server status and TLSA records, with authenticated access and bounded request handling (a size cap and a receive deadline, so a slow or oversized request cannot occupy a worker).
+**REST administration API** for domains, accounts, the delivery queue, server status and TLSA records, with authenticated access and bounded request handling (a size cap and a receive deadline, so a slow or oversized request cannot occupy a worker). Callers authenticate with the administrator password or with a **scoped API key** — a bearer token stored only as a SHA-256 digest, with a mandatory expiry, an optional source-address restriction, and a scope that is read-only unless you say otherwise and can be confined to named domains. No key of any scope can mint or revoke keys; that needs the administrator password, or a narrow key would escalate itself in one request.
 
 **Client autoconfiguration**: Thunderbird autoconfig and Outlook autodiscover are served for every local domain, so clients configure themselves from an address and password.
 

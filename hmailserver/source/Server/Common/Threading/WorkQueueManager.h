@@ -25,6 +25,13 @@ namespace HM
 
       std::shared_ptr<WorkQueue> GetQueue(const String &sQueueName);
 
+      // Every queue that currently exists, for callers that measure rather than
+      // dispatch. Returned by value, and deliberately: the health check must not
+      // hold the manager's lock while it walks each queue's own state, or the two
+      // locks are taken in opposite orders by anything that creates a queue while
+      // holding a queue lock.
+      std::vector<std::shared_ptr<WorkQueue> > GetAllQueues();
+
    private:
 
       std::map<size_t, std::shared_ptr<WorkQueue> >::iterator GetQueueIterator_(const String &sQueueName);

@@ -147,11 +147,39 @@ namespace HM
 
    }
 
-   std::shared_ptr<WorkQueue> 
+   std::vector<std::shared_ptr<WorkQueue> >
+   WorkQueueManager::GetAllQueues()
+   //---------------------------------------------------------------------------
+   // DESCRIPTION:
+   // Every queue that currently exists.
+   //
+   // A copy is taken under the lock and the lock released before the caller looks
+   // at any of them. The health check walks each queue's own state, which takes
+   // that queue's lock; holding this one across that would mean two locks acquired
+   // in the opposite order from anything that creates or removes a queue while
+   // holding a queue lock, and a deadlock in the thing that exists to notice a
+   // stall would be a poor joke.
+   //---------------------------------------------------------------------------
+   {
+      boost::lock_guard<boost::recursive_mutex> guard(mutex_);
+
+      std::vector<std::shared_ptr<WorkQueue> > queues;
+      queues.reserve(work_queues_.size());
+
+      for (auto &entry : work_queues_)
+      {
+         if (entry.second)
+            queues.push_back(entry.second);
+      }
+
+      return queues;
+   }
+
+   std::shared_ptr<WorkQueue>
    WorkQueueManager::GetQueue(const String &sQueueName)
    //---------------------------------------------------------------------------
    // DESCRIPTION:
-   // Returns the queue with a specific name. 
+   // Returns the queue with a specific name.
    //---------------------------------------------------------------------------
    {
       boost::lock_guard<boost::recursive_mutex> guard(mutex_);
