@@ -24,6 +24,8 @@
        dispatcher, without an Application, and without the build agent having to be
        running a High Contrast theme. -->
   <ItemGroup>
+    <Compile Include="..\ControlPanel\Services\AccessibleNames.cs" />
+    <Compile Include="..\ControlPanel\Services\SettingClaims.cs" />
     <Compile Include="..\ControlPanel\Services\ChartPalette.cs" />
     <Compile Include="..\ControlPanel\Services\ChartCatalog.cs" />
     <Compile Include="..\ControlPanel\Services\ChartDataTable.cs" />

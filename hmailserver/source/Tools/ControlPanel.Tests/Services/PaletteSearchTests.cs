@@ -41,6 +41,36 @@ namespace hMailServer.ControlPanel.Tests.Services
       }
 
       /// <summary>
+      /// Settings that exist, work, and were unfindable in the words anybody would
+      /// use for them.
+      ///
+      /// Each of these was measured against the intent table as it stood: none of
+      /// them matched anything, because the words an administrator uses appear in no
+      /// page title and no setting label. The log-format and log-destination ones
+      /// are new arrivals in a different sense - both settings were selectable for
+      /// years while the server ignored them, so "how do I get my logs into
+      /// something that reads them" had no answer to be found; now it does.
+      /// "do not offer authentication on port 25" led to the TCP/IP ports page,
+      /// which is the one place the setting is not.
+      ///
+      /// Fails against the unfixed code: the first selectable row is null.
+      /// </summary>
+      [Theory]
+      [InlineData("send my logs to a log analyser", "logging")]
+      [InlineData("write the log to a database", "logging")]
+      [InlineData("make awstats work", "logging")]
+      [InlineData("do not offer authentication on port 25", "authentication")]
+      [InlineData("limit how many messages an account can send per minute", "hardening")]
+      public void NewlyFindableOutcome_LandsOnTheRightPageFirst(string query, string page)
+      {
+         IReadOnlyList<PaletteRow> rows = PaletteSearch.Query(query, null, null);
+
+         PaletteRow first = FirstSelectable(rows);
+         Assert.True(first != null, "'" + query + "' matched nothing at all.");
+         Assert.Equal(page, first.Page);
+      }
+
+      /// <summary>
       /// Every intent has to lead somewhere that exists.
       ///
       /// An IntentIndex entry naming a page key that NavigationMap does not have is

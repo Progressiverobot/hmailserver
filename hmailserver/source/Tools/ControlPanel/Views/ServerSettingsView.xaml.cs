@@ -36,16 +36,80 @@ namespace hMailServer.ControlPanel.Views
       {
          public string Path;   // dotted path under app.Settings
          public string Label;
+
+         /// <summary>
+         /// What a screen reader should call this editor. Assigned by
+         /// <see cref="AssignAccessibleNames"/> before the editors are built,
+         /// because the answer depends on the whole page - see
+         /// <see cref="AccessibleNames"/>.
+         /// </summary>
+         public string AccessibleName;
+
+         /// <summary>
+         /// A caption printed under the editor and attached to it as accessible
+         /// help text. Some rows already carried one; the honest statements in
+         /// <see cref="SettingClaims"/> about what the server actually does with a
+         /// value are the reason it is now on every row type rather than on two of
+         /// them.
+         /// </summary>
+         public string Blurb;
+
          public virtual bool WantsInitialValue => true;
          public abstract FrameworkElement CreateEditor(object value);
          public abstract object ReadEditor();
 
-         // Give the interactive editor control a stable AutomationId so screen
-         // readers and UI-automation can address it reliably.
+         // Give the interactive editor control a stable AutomationId so
+         // UI-automation can address it reliably.
          protected static void SetAid(FrameworkElement element, string id)
          {
             if (element != null && !string.IsNullOrEmpty(id))
                System.Windows.Automation.AutomationProperties.SetAutomationId(element, id);
+         }
+
+         /// <summary>
+         /// The AutomationId plus the accessible name.
+         ///
+         /// An AutomationId is not spoken; it exists for test automation. Every
+         /// editor on these pages is labelled by a separate TextBlock above it, and
+         /// WPF does not connect the two, so before this each of the ~150 settings
+         /// on these pages was announced as a bare "edit" or "combo box" with no
+         /// name at all. Checkboxes were the only exception, because their label is
+         /// their Content.
+         /// </summary>
+         protected void Describe(FrameworkElement element, string id)
+         {
+            SetAid(element, id);
+
+            if (element != null && !string.IsNullOrEmpty(AccessibleName))
+               System.Windows.Automation.AutomationProperties.SetName(element, AccessibleName);
+         }
+
+         /// <summary>
+         /// Prints <see cref="Blurb"/> under the control and attaches it to the
+         /// control as accessible help text.
+         ///
+         /// Both, deliberately. A caption sitting loose in the panel is a separate
+         /// node in the automation tree, so a listener reaches it only after moving
+         /// past the editor - and a note saying "this value is overridden" or "the
+         /// server does less than this suggests" is exactly the part that has to be
+         /// heard with the control, not after it.
+         /// </summary>
+         protected void Annotate(FrameworkElement editor, Panel panel)
+         {
+            if (string.IsNullOrEmpty(Blurb))
+               return;
+
+            if (editor != null)
+               System.Windows.Automation.AutomationProperties.SetHelpText(editor, Blurb);
+
+            panel?.Children.Add(new TextBlock
+            {
+               Text = Blurb,
+               FontSize = Typography.Caption,
+               TextWrapping = TextWrapping.Wrap,
+               Opacity = 0.65,
+               Margin = new Thickness(0, 4, 0, 0)
+            });
          }
 
          protected static string Slug(string text)
@@ -79,6 +143,17 @@ namespace hMailServer.ControlPanel.Views
          {
             box_ = new CheckBox { Content = Label, IsChecked = value is bool b && b, FontSize = 13.5 };
             SetAid(box_, Path);
+
+            // A checkbox is named by its Content, so it needs an override only
+            // when the resolved name differs from the label - which happens when
+            // the same wording appears on more than one card and has been
+            // qualified with the card title.
+            if (!string.IsNullOrEmpty(AccessibleName) &&
+                !string.Equals(AccessibleName, Label, StringComparison.Ordinal))
+            {
+               System.Windows.Automation.AutomationProperties.SetName(box_, AccessibleName);
+            }
+
             return box_;
          }
 
@@ -136,8 +211,9 @@ namespace hMailServer.ControlPanel.Views
                   MinWidth = 120,
                   HorizontalAlignment = HorizontalAlignment.Left
                };
-               SetAid(number_, Path);
+               Describe(number_, Path);
                panel.Children.Add(number_);
+               Annotate(number_, panel);
                return panel;
             }
 
@@ -149,7 +225,7 @@ namespace hMailServer.ControlPanel.Views
                HorizontalAlignment = HorizontalAlignment.Left,
                MinWidth = 320
             };
-            SetAid(box_, Path);
+            Describe(box_, Path);
 
             if (BrowseFile || BrowseFolder)
             {
@@ -171,6 +247,12 @@ namespace hMailServer.ControlPanel.Views
                   ToolTip = BrowseFolder ? "Browse for a folder" : "Browse for a file"
                };
                SetAid(browse, Path + "Browse");
+               // The button's content is a single ellipsis character, so its
+               // content names it "…" and a listener is told nothing at all about
+               // which of the several browse buttons on the page they are on.
+               System.Windows.Automation.AutomationProperties.SetName(browse,
+                  (BrowseFolder ? "Browse for a folder for " : "Browse for a file for ")
+                  + (AccessibleName ?? Label ?? "this setting"));
                browse.Click += (s, e) =>
                {
                   string picked = BrowseFolder
@@ -187,6 +269,8 @@ namespace hMailServer.ControlPanel.Views
             {
                panel.Children.Add(box_);
             }
+
+            Annotate(box_, panel);
             return panel;
          }
 
@@ -216,10 +300,12 @@ namespace hMailServer.ControlPanel.Views
       /// </summary>
       private class IniBool : ComSetting, IIniSetting
       {
-         public string Blurb;
          public bool Default;
          public IniFeatureStore IniStore;
          private CheckBox box_;
+
+         /// <summary>The created checkbox (for cross-field dependency wiring).</summary>
+         public CheckBox Box => box_;
 
          public override bool WantsInitialValue => false;
 
@@ -233,20 +319,14 @@ namespace hMailServer.ControlPanel.Views
 
             box_ = new CheckBox { Content = Label, IsChecked = current, FontSize = 13.5 };
             SetAid(box_, Path);
-            panel.Children.Add(box_);
-
-            if (!string.IsNullOrEmpty(Blurb))
+            if (!string.IsNullOrEmpty(AccessibleName) &&
+                !string.Equals(AccessibleName, Label, StringComparison.Ordinal))
             {
-               panel.Children.Add(new TextBlock
-               {
-                  Text = Blurb,
-                  FontSize = Typography.Caption,
-                  TextWrapping = TextWrapping.Wrap,
-                  Opacity = 0.65,
-                  Margin = new Thickness(0, 4, 0, 0)
-               });
+               System.Windows.Automation.AutomationProperties.SetName(box_, AccessibleName);
             }
 
+            panel.Children.Add(box_);
+            Annotate(box_, panel);
             return panel;
          }
 
@@ -269,7 +349,6 @@ namespace hMailServer.ControlPanel.Views
       /// </summary>
       private class IniNumber : ComSetting, IIniSetting
       {
-         public string Blurb;
          public int Default;
          private Wpf.Ui.Controls.NumberBox number_;
 
@@ -302,21 +381,9 @@ namespace hMailServer.ControlPanel.Views
                MinWidth = 120,
                HorizontalAlignment = HorizontalAlignment.Left
             };
-            SetAid(number_, Path);
+            Describe(number_, Path);
             panel.Children.Add(number_);
-
-            if (!string.IsNullOrEmpty(Blurb))
-            {
-               panel.Children.Add(new TextBlock
-               {
-                  Text = Blurb,
-                  FontSize = Typography.Caption,
-                  TextWrapping = TextWrapping.Wrap,
-                  Opacity = 0.65,
-                  Margin = new Thickness(0, 4, 0, 0)
-               });
-            }
-
+            Annotate(number_, panel);
             return panel;
          }
 
@@ -368,7 +435,7 @@ namespace hMailServer.ControlPanel.Views
                FontSize = 13,
                HorizontalAlignment = HorizontalAlignment.Stretch
             };
-            SetAid(box_, Path);
+            Describe(box_, Path);
 
             if (BrowseFolder)
             {
@@ -387,6 +454,9 @@ namespace hMailServer.ControlPanel.Views
                   ToolTip = "Browse for a folder"
                };
                SetAid(browse, Path + "Browse");
+               // See ComText: "\u2026" is not a name.
+               System.Windows.Automation.AutomationProperties.SetName(browse,
+                  "Browse for a folder for " + (AccessibleName ?? Label ?? "this setting"));
                browse.Click += (s, e) =>
                {
                   string picked = Services.PathPicker.PickFolder(box_.Text);
@@ -405,6 +475,7 @@ namespace hMailServer.ControlPanel.Views
                panel.Children.Add(box_);
             }
 
+            Annotate(box_, panel);
             return panel;
          }
 
@@ -424,6 +495,13 @@ namespace hMailServer.ControlPanel.Views
          public (int Value, string Label)[] Options;
          private ComboBox combo_;
 
+         /// <summary>The created combo (for cross-field dependency wiring).</summary>
+         public ComboBox Combo => combo_;
+
+         /// <summary>The value currently selected, or 0 before the editor is built.</summary>
+         public int SelectedValue
+            => combo_?.SelectedItem is ComboBoxItem cbi ? (int) cbi.Tag : 0;
+
          public override FrameworkElement CreateEditor(object value)
          {
             var panel = new StackPanel();
@@ -440,8 +518,9 @@ namespace hMailServer.ControlPanel.Views
             }
             if (combo_.SelectedItem == null && combo_.Items.Count > 0)
                combo_.SelectedIndex = 0;
-            SetAid(combo_, Path);
+            Describe(combo_, Path);
             panel.Children.Add(combo_);
+            Annotate(combo_, panel);
             return panel;
          }
 
@@ -467,8 +546,9 @@ namespace hMailServer.ControlPanel.Views
                Padding = new Thickness(6),
                HorizontalAlignment = HorizontalAlignment.Left
             };
-            SetAid(box_, Path);
+            Describe(box_, Path);
             panel.Children.Add(box_);
+            Annotate(box_, panel);
             return panel;
          }
 
@@ -506,6 +586,23 @@ namespace hMailServer.ControlPanel.Views
                Margin = new Thickness(0, 8, 0, 0),
                TextWrapping = TextWrapping.Wrap
             };
+
+            // A polite live region, so the outcome of "Test ClamAV connection" is
+            // announced rather than only coloured. Colour is the only other channel
+            // this line has - green for success, red for failure - so without this a
+            // screen-reader user pressed the button and was told nothing whatsoever,
+            // and there is no way to discover the answer by moving around, because
+            // the text did not exist before the click.
+            //
+            // Polite rather than assertive, and safe to make a live region here in a
+            // way the dashboard's summary line is not (see AccessibleChartCard): this
+            // text changes only when the user presses the button, so an announcement
+            // is the answer to something they just asked.
+            System.Windows.Automation.AutomationProperties.SetLiveSetting(
+               result_, System.Windows.Automation.AutomationLiveSetting.Polite);
+            System.Windows.Automation.AutomationProperties.SetName(result_,
+               (ButtonText ?? "Test") + " result");
+
             btn.Click += (s, e) =>
             {
                try
@@ -566,7 +663,7 @@ namespace hMailServer.ControlPanel.Views
             };
 
             panel.Children.Add(combo);
-            SetAid(combo, "preset-" + Slug(Label));
+            Describe(combo, "preset-" + Slug(Label));
             return panel;
          }
 
@@ -574,6 +671,63 @@ namespace hMailServer.ControlPanel.Views
          public override void Write(object owner, string property) { }
       }
 
+      /// <summary>
+      /// Marker for a row that writes nothing, so <see cref="Save_Click"/> does not
+      /// count it among the settings it saved.
+      /// </summary>
+      private interface INotPersisted
+      {
+      }
+
+      /// <summary>
+      /// A setting the server stores and never reads - see
+      /// <see cref="SettingClaims"/> for how one is established, and
+      /// WorkerThreadPriority for the one this exists for.
+      ///
+      /// The value is shown and cannot be changed. Both halves are deliberate. An
+      /// editable control is the failure being fixed: an administrator raises a
+      /// number, saves, gets no error, and believes something happened. Removing
+      /// the row instead would hide a value somebody may well have set years ago
+      /// and be relying on, and would leave them with no way to find out that it
+      /// never did anything. The row also stays in the generated search index, so
+      /// Ctrl+K still finds the setting by name and lands the reader on the note
+      /// that explains it, rather than on nothing at all.
+      /// </summary>
+      private class ComInert : ComSetting, INotPersisted
+      {
+         public override FrameworkElement CreateEditor(object value)
+         {
+            var panel = new StackPanel();
+            panel.Children.Add(new TextBlock { Text = Label, FontSize = 13, Margin = new Thickness(0, 0, 0, 4) });
+
+            var box = new TextBox
+            {
+               Text = Convert.ToString(value) ?? "",
+               FontSize = 13,
+               MaxWidth = 180,
+               MinWidth = 120,
+               HorizontalAlignment = HorizontalAlignment.Left,
+               IsReadOnly = true
+            };
+
+            // Read-only rather than disabled: a disabled control is skipped by the
+            // keyboard and, in most screen readers, not reachable at all - so
+            // disabling it would hide the value and the explanation from precisely
+            // the reader who cannot see the greyed-out styling either. Read-only
+            // keeps it in the tab order and announced, and still refuses the edit.
+            Describe(box, Path);
+
+            panel.Children.Add(box);
+            Annotate(box, panel);
+            return panel;
+         }
+
+         public override object ReadEditor() => null;
+
+         public override void Write(object owner, string property)
+         {
+         }
+      }
 
       private class CardDef
       {
@@ -634,6 +788,20 @@ namespace hMailServer.ControlPanel.Views
 
       private static CardDef Card(string title, string blurb = null)
          => new() { Title = title, Blurb = blurb };
+
+      /// <summary>
+      /// Adapts an option table from <see cref="SettingClaims"/> to the array
+      /// <see cref="ComCombo"/> takes. The tables live there rather than here
+      /// because the wording of an option is a claim about what the server can
+      /// produce, and a claim buried in a view literal is one no test can see.
+      /// </summary>
+      private static (int Value, string Label)[] ToOptions(IReadOnlyList<(int Value, string Label)> options)
+      {
+         var result = new (int Value, string Label)[options.Count];
+         for (int i = 0; i < options.Count; i++)
+            result[i] = options[i];
+         return result;
+      }
 
       private void BuildDefinition()
       {
@@ -975,16 +1143,41 @@ namespace hMailServer.ControlPanel.Views
          log.Settings.Add(new ComBool { Path = "Logging.LogDebug", Label = "Debug messages" });
          log.Settings.Add(new ComBool { Path = "Logging.AWStatsEnabled", Label = "AWStats-compatible log" });
          log.Settings.Add(new ComBool { Path = "Logging.KeepFilesOpen", Label = "Keep log files open (performance)" });
-         log.Settings.Add(new ComCombo { Path = "Logging.Device", Label = "Log destination", Options = new (int, string)[] { (2, "Files on disk"), (1, "Database (SQL)") } });
-         log.Settings.Add(new ComCombo { Path = "Logging.LogFormat", Label = "Log line format", Options = new (int, string)[] { (1, "Default"), (2, "NCSA / combined (AWStats)") } });
-         log.Settings.Add(new IniBool
+         log.Settings.Add(new ComCombo
+         {
+            Path = "Logging.Device",
+            Label = "Log destination",
+            Options = ToOptions(SettingClaims.LogDeviceOptions),
+            Blurb = SettingClaims.NoteFor("Logging.Device")
+         });
+
+         // The two log-rendering controls are wired together below, because the
+         // server has a precedence between them that nothing in the interface used
+         // to show: Logger::Render_ tests the line-format setting first, so choosing
+         // NCSA makes the JSON switch inert. Two ways of formatting a log line on
+         // one card, one of which silently wins, is the same defect class as a
+         // setting that does nothing at all.
+         //
+         // The option wording itself lives in SettingClaims, and the claim the old
+         // wording made is pinned there by a test that scans this file for it.
+         var format = new ComCombo
+         {
+            Path = "Logging.LogFormat",
+            Label = "Log line format",
+            Options = ToOptions(SettingClaims.LogFormatOptions),
+            Blurb = SettingClaims.NoteFor("Logging.LogFormat")
+         };
+         var json = new IniBool
          {
             Path = "JsonLogging",
             Label = "Write logs as JSON lines",
             Default = false,
             Blurb = "Machine-readable output for log shippers. Applies after a service restart.",
             IniStore = iniStore_
-         });
+         };
+         log.Settings.Add(format);
+         log.Settings.Add(json);
+         afterBuildUi_ = () => WireLogFormatDependency(format, json);
          logging.Cards.Add(log);
 
          // How much is written, next to what is written and how long it is kept -
@@ -1042,7 +1235,18 @@ namespace hMailServer.ControlPanel.Views
          threads.Settings.Add(new ComText { Path = "MaxDeliveryThreads", Label = "Max delivery threads", Numeric = true });
          threads.Settings.Add(new ComText { Path = "MaxAsynchronousThreads", Label = "Max asynchronous task threads", Numeric = true });
          threads.Settings.Add(new ComText { Path = "TCPIPThreads", Label = "TCP/IP threads", Numeric = true });
-         threads.Settings.Add(new ComText { Path = "WorkerThreadPriority", Label = "Worker thread priority", Numeric = true });
+
+         // Not a NumberBox any more. The server writes this value to the settings
+         // table and reads it back only through the COM getter: there is no
+         // SetThreadPriority call anywhere in the tree, so nothing has ever acted on
+         // it. The label says so as well as the note, because the label is what the
+         // Ctrl+K palette shows.
+         threads.Settings.Add(new ComInert
+         {
+            Path = "WorkerThreadPriority",
+            Label = "Worker thread priority (stored, but the server does not use it)",
+            Blurb = SettingClaims.NoteFor("WorkerThreadPriority")
+         });
          Tab("Threads").Cards.Add(threads);
 
          var cache = Card("Cache", "Caches domain/account/alias lookups in memory to reduce database round-trips. TTL in seconds.");
@@ -1076,7 +1280,20 @@ namespace hMailServer.ControlPanel.Views
             "The administrator password and two-factor authentication are on the Administrative access page.");
          general.Settings.Add(new ComText { Path = "DefaultDomain", Label = "Default domain (for unqualified logons)" });
          general.Settings.Add(new ComBool { Path = "IPv6PreferredEnabled", Label = "Prefer IPv6 when delivering" });
-         general.Settings.Add(new ComText { Path = "UserInterfaceLanguage", Label = "Administrator UI language (legacy COM admin tools)" });
+
+         // The old label said "legacy COM admin tools", which was closer to the
+         // truth than most of this page but still let an administrator believe it
+         // would translate something they can see. It cannot: the server hands the
+         // value straight back over COM and translates nothing itself, and this
+         // Control Panel has no resx at all, so the only consumer is a third-party
+         // tool. Left editable rather than made inert for exactly that reason - a
+         // script may be reading it.
+         general.Settings.Add(new ComText
+         {
+            Path = "UserInterfaceLanguage",
+            Label = "Administrator UI language (third-party COM tools only)",
+            Blurb = SettingClaims.NoteFor("UserInterfaceLanguage")
+         });
          Tab("General").Cards.Add(general);
 
          // Mirroring and archiving are the two ways of keeping a copy of every
@@ -1180,11 +1397,42 @@ namespace hMailServer.ControlPanel.Views
 
       // ---- UI ----------------------------------------------------------------
 
+      /// <summary>
+      /// Works out what a screen reader should call each editor, before any of
+      /// them are built.
+      ///
+      /// It has to be done for the whole page at once, which is why it is not
+      /// simply part of CreateEditor: on the Protocols page "Max simultaneous
+      /// connections (0 = unlimited)" and "Welcome banner (empty = default)" each
+      /// appear three times, once per protocol card, and only a pass over the page
+      /// can tell which labels need qualifying with their card title.
+      /// <see cref="AccessibleNames"/> holds the decision.
+      /// </summary>
+      private void AssignAccessibleNames()
+      {
+         var settings = new List<ComSetting>();
+         var editors = new List<LabelledEditor>();
+
+         foreach (TabDef tab in tabs_)
+         foreach (CardDef card in tab.Cards)
+         foreach (ComSetting setting in card.Settings)
+         {
+            settings.Add(setting);
+            editors.Add(new LabelledEditor(setting.Label, card.Title, setting.Path));
+         }
+
+         IReadOnlyList<string> names = AccessibleNames.Resolve(editors);
+         for (int i = 0; i < settings.Count; i++)
+            settings[i].AccessibleName = names[i];
+      }
+
       private void BuildUi()
       {
          SettingsTabs.Items.Clear();
          diag_ = null;
          failedReads_ = 0;
+
+         AssignAccessibleNames();
 
          foreach (TabDef tab in tabs_)
          {
@@ -1421,6 +1669,45 @@ namespace hMailServer.ControlPanel.Views
       }
 
 
+      /// <summary>
+      /// Makes the log-format precedence visible.
+      ///
+      /// Logger::Render_ tests the NCSA format before it looks at JsonLogging, so
+      /// with NCSA selected the JSON switch does nothing - and until now the
+      /// Logging page offered both, side by side, with no hint that one silently
+      /// beat the other. That is the same defect as a setting the server ignores
+      /// entirely: the administrator ticks a box, gets no error, and does not get
+      /// JSON logs.
+      ///
+      /// The checkbox is disabled rather than cleared, so the stored INI value is
+      /// left alone: a disabled CheckBox keeps its IsChecked state, SaveToIni
+      /// writes that state back unchanged, and switching the format away from NCSA
+      /// restores the JSON logging the administrator had configured. Clearing it
+      /// would silently discard a setting on a page visit.
+      /// </summary>
+      private static void WireLogFormatDependency(ComCombo format, IniBool json)
+      {
+         if (format?.Combo == null || json?.Box == null)
+            return;
+
+         void Update()
+         {
+            bool overridden = format.SelectedValue == SettingClaims.LogFormatNcsa;
+
+            json.Box.IsEnabled = !overridden;
+            json.Box.ToolTip = overridden ? SettingClaims.JsonOverriddenByNcsa : null;
+
+            // Kept on the checkbox itself as well as in the tool tip: a tool tip
+            // needs a hover, and a disabled control that gives no reason for being
+            // disabled is indistinguishable from a broken page.
+            System.Windows.Automation.AutomationProperties.SetHelpText(json.Box,
+               overridden ? SettingClaims.JsonOverriddenByNcsa : "");
+         }
+
+         format.Combo.SelectionChanged += (s, e) => Update();
+         Update();
+      }
+
       private static void WireChaChaDependency(ComBool preferServer, ComBool chacha, ComBool tls12, ComBool tls13)
       {
          if (preferServer?.Box == null || chacha?.Box == null || tls12?.Box == null || tls13?.Box == null)
@@ -1468,6 +1755,12 @@ namespace hMailServer.ControlPanel.Views
                   saved++;
                   continue;
                }
+
+               // A row for a setting the server never reads writes nothing, and must
+               // not be counted among the settings that were saved - "Saved 18
+               // settings" has to be true.
+               if (setting is INotPersisted)
+                  continue;
 
                // Buttons and preset pickers persist nothing and name no property;
                // resolving one would fail and be counted as a save error.

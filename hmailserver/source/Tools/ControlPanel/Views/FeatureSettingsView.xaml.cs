@@ -34,6 +34,23 @@ namespace hMailServer.ControlPanel.Views
       {
          public string Key;
          public string Label;
+
+         /// <summary>
+         /// A caption printed under the editor and attached to it as accessible
+         /// help text - for the statements in <see cref="SettingClaims"/> about
+         /// what the server actually does with the value. Named to match
+         /// ServerSettingsView, so the two settings views read the same way.
+         /// </summary>
+         public string Blurb;
+
+         /// <summary>
+         /// What a screen reader should call this editor. Assigned by
+         /// <see cref="AssignAccessibleNames"/> before the editors are built,
+         /// because the answer depends on the whole page - see
+         /// <see cref="AccessibleNames"/>.
+         /// </summary>
+         public string AccessibleName;
+
          public abstract FrameworkElement CreateEditor(IniFeatureStore store);
          public abstract void Save(IniFeatureStore store);
 
@@ -41,6 +58,49 @@ namespace hMailServer.ControlPanel.Views
          {
             if (element != null && !string.IsNullOrEmpty(id))
                System.Windows.Automation.AutomationProperties.SetAutomationId(element, id);
+         }
+
+         /// <summary>
+         /// The AutomationId plus the accessible name.
+         ///
+         /// An AutomationId is for test automation and is never spoken. Every
+         /// editor on this page is labelled by a separate TextBlock above it and
+         /// WPF does not connect the two, so before this each of the 83 INI
+         /// settings here was announced as an unnamed "edit" - including the
+         /// password pepper, whose label carries the warning that changing it
+         /// invalidates every stored password.
+         /// </summary>
+         protected void Describe(FrameworkElement element, string id)
+         {
+            SetAid(element, id);
+
+            if (element != null && !string.IsNullOrEmpty(AccessibleName))
+               System.Windows.Automation.AutomationProperties.SetName(element, AccessibleName);
+         }
+
+         /// <summary>
+         /// Prints <see cref="Blurb"/> under the control and attaches it to the
+         /// control as accessible help text. Both, for the reason given on
+         /// ServerSettingsView's Annotate: a caption sitting loose in the panel is
+         /// reached only after the editor, and a note saying the server does less
+         /// than the control suggests has to be heard with it.
+         /// </summary>
+         protected void Annotate(FrameworkElement editor, Panel panel)
+         {
+            if (string.IsNullOrEmpty(Blurb))
+               return;
+
+            if (editor != null)
+               System.Windows.Automation.AutomationProperties.SetHelpText(editor, Blurb);
+
+            panel?.Children.Add(new TextBlock
+            {
+               Text = Blurb,
+               FontSize = Typography.Caption,
+               TextWrapping = TextWrapping.Wrap,
+               Opacity = 0.65,
+               Margin = new Thickness(0, 4, 0, 0)
+            });
          }
       }
 
@@ -51,6 +111,8 @@ namespace hMailServer.ControlPanel.Views
 
          public override FrameworkElement CreateEditor(IniFeatureStore store)
          {
+            var panel = new StackPanel();
+
             box_ = new CheckBox
             {
                Content = Label,
@@ -58,7 +120,19 @@ namespace hMailServer.ControlPanel.Views
                FontSize = 13.5
             };
             SetAid(box_, Key);
-            return box_;
+
+            // A checkbox names itself from its Content, so it needs an override
+            // only when the resolved name differs - i.e. when the same wording
+            // appears on another card and has been qualified with the card title.
+            if (!string.IsNullOrEmpty(AccessibleName) &&
+                !string.Equals(AccessibleName, Label, StringComparison.Ordinal))
+            {
+               System.Windows.Automation.AutomationProperties.SetName(box_, AccessibleName);
+            }
+
+            panel.Children.Add(box_);
+            Annotate(box_, panel);
+            return panel;
          }
 
          public override void Save(IniFeatureStore store)
@@ -89,8 +163,9 @@ namespace hMailServer.ControlPanel.Views
                MinWidth = 320,
                HorizontalAlignment = HorizontalAlignment.Left
             };
-            SetAid(box_, Key);
+            Describe(box_, Key);
             panel.Children.Add(box_);
+            Annotate(box_, panel);
             return panel;
          }
 
@@ -131,7 +206,7 @@ namespace hMailServer.ControlPanel.Views
                FontSize = 13,
                HorizontalAlignment = HorizontalAlignment.Stretch
             };
-            SetAid(box_, Key);
+            Describe(box_, Key);
             Grid.SetColumn(box_, 0);
             row.Children.Add(box_);
 
@@ -144,6 +219,12 @@ namespace hMailServer.ControlPanel.Views
                ToolTip = PickFolder ? "Browse for a folder" : "Browse for a file"
             };
             SetAid(browse, Key + "Browse");
+            // The content is a single ellipsis, so without this the certificate and
+            // private-key browse buttons on the REST API card are announced as two
+            // identical "\u2026" and there is no way to tell which one is which.
+            System.Windows.Automation.AutomationProperties.SetName(browse,
+               (PickFolder ? "Browse for a folder for " : "Browse for a file for ")
+               + (AccessibleName ?? Label ?? "this setting"));
             browse.Click += (s, e) =>
             {
                string picked = PickFolder
@@ -156,6 +237,7 @@ namespace hMailServer.ControlPanel.Views
             row.Children.Add(browse);
 
             panel.Children.Add(row);
+            Annotate(box_, panel);
             return panel;
          }
 
@@ -192,8 +274,9 @@ namespace hMailServer.ControlPanel.Views
             if (combo_.SelectedItem == null && combo_.Items.Count > 0)
                combo_.SelectedIndex = 0;
 
-            SetAid(combo_, Key);
+            Describe(combo_, Key);
             panel.Children.Add(combo_);
+            Annotate(combo_, panel);
             return panel;
          }
 
@@ -212,7 +295,14 @@ namespace hMailServer.ControlPanel.Views
       /// </summary>
       private class SecretSetting : Setting
       {
-         public string Note = "";
+         /// <summary>
+         /// Placeholder text shown when no secret is configured yet. It was called
+         /// Note; renamed because the base class now carries the note that says what
+         /// the server does with the value, and two members of that name would have
+         /// been one silently shadowing the other.
+         /// </summary>
+         public string Hint = "";
+
          private Wpf.Ui.Controls.PasswordBox box_;
 
          public override FrameworkElement CreateEditor(IniFeatureStore store)
@@ -221,18 +311,44 @@ namespace hMailServer.ControlPanel.Views
             panel.Children.Add(new TextBlock { Text = Label, FontSize = 13, Margin = new Thickness(0, 0, 0, 4) });
 
             bool hasExisting = !string.IsNullOrEmpty(store.Read(Key, "").Trim());
+            string placeholder = hasExisting
+               ? "A secret is configured — leave blank to keep it"
+               : (string.IsNullOrEmpty(Hint) ? "Enter a secret" : Hint);
+
             box_ = new Wpf.Ui.Controls.PasswordBox
             {
-               PlaceholderText = hasExisting
-                  ? "A secret is configured — leave blank to keep it"
-                  : (string.IsNullOrEmpty(Note) ? "Enter a secret" : Note),
+               PlaceholderText = placeholder,
                FontSize = 13,
                MaxWidth = 520,
                MinWidth = 320,
                HorizontalAlignment = HorizontalAlignment.Left
             };
-            SetAid(box_, Key);
+            Describe(box_, Key);
+
+            // A PasswordBox's placeholder is not part of its accessible name, and
+            // whether a secret is already stored is the one thing this control
+            // conveys that its label does not - leaving the field blank keeps the
+            // existing value, so a listener who cannot see the placeholder has no
+            // way to know whether there is one.
+            System.Windows.Automation.AutomationProperties.SetHelpText(box_,
+               string.IsNullOrEmpty(Blurb) ? placeholder : placeholder + " " + Blurb);
+
             panel.Children.Add(box_);
+
+            // Annotate would overwrite the help text set just above, so only the
+            // printed caption is wanted here.
+            if (!string.IsNullOrEmpty(Blurb))
+            {
+               panel.Children.Add(new TextBlock
+               {
+                  Text = Blurb,
+                  FontSize = Typography.Caption,
+                  TextWrapping = TextWrapping.Wrap,
+                  Opacity = 0.65,
+                  Margin = new Thickness(0, 4, 0, 0)
+               });
+            }
+
             return panel;
          }
 
@@ -374,13 +490,32 @@ namespace hMailServer.ControlPanel.Views
                cards_.Add(new CardDef
                {
                   Title = "Monitoring",
-                  Blurb = "Prometheus metrics (/metrics), OpenTelemetry traces/metrics export, a slow-query log and JSON-structured log output for log aggregators.",
+                  // This blurb used to advertise an OpenTelemetry metrics export
+                  // alongside the trace export. Only the trace signal exists:
+                  // OtelTracer hard-codes the /v1/traces path and there is no metric
+                  // or log record builder, so a collector configured here receives
+                  // spans and nothing else. An administrator who read that blurb and
+                  // pointed their collector at the server expecting OTLP metrics got
+                  // none, and no error to explain why - the metrics that do exist are
+                  // the Prometheus endpoint above, which is a different mechanism.
+                  //
+                  // The withdrawn wording is pinned by SettingClaimsTests, which
+                  // scans this file for it; do not reintroduce it, in a comment or
+                  // otherwise, without a metrics exporter behind it.
+                  Blurb = "Prometheus metrics (/metrics), OpenTelemetry trace export, a slow-query log, and "
+                          + "JSON-structured log output for log aggregators (on the Logging page).",
                   Settings =
                   {
                      new TextSetting { Key = "MetricsServerPort", Default = "0", Label = "Metrics port (0 = disabled)", Placeholder = "9090" },
                      new TextSetting { Key = "MetricsServerBindAddress", Default = "127.0.0.1", Label = "Metrics bind address" },
                      // JsonLogging moved to the Logging page, with the other log settings.
-                     new TextSetting { Key = "OtelEndpoint", Label = "OpenTelemetry OTLP endpoint (empty = disabled)", Placeholder = "http://localhost:4318" },
+                     new TextSetting
+                     {
+                        Key = "OtelEndpoint",
+                        Label = "OpenTelemetry OTLP endpoint for traces (empty = disabled)",
+                        Placeholder = "http://localhost:4318",
+                        Blurb = SettingClaims.NoteFor("OtelEndpoint")
+                     },
                      new TextSetting { Key = "OtelServiceName", Default = "hmailserver", Label = "OpenTelemetry service name" },
                      new TextSetting { Key = "SlowQueryLogMilliseconds", Default = "0", Label = "Log database queries slower than N ms (0 = off)", Placeholder = "250" }
                   }
@@ -468,9 +603,9 @@ namespace hMailServer.ControlPanel.Views
                   Settings =
                   {
                      new BoolSetting { Key = "SRSEnabled", Default = false, Label = "Enable Sender Rewriting Scheme (SRS) on forwarded mail" },
-                     new SecretSetting { Key = "SRSSecret", Label = "SRS signing secret", Note = "A random server-wide secret" },
+                     new SecretSetting { Key = "SRSSecret", Label = "SRS signing secret", Hint = "A random server-wide secret" },
                      new BoolSetting { Key = "BATVEnabled", Default = false, Label = "Tag outbound envelope senders with BATV and validate returning bounces" },
-                     new SecretSetting { Key = "BATVSecret", Label = "BATV signing secret", Note = "A random server-wide secret" }
+                     new SecretSetting { Key = "BATVSecret", Label = "BATV signing secret", Hint = "A random server-wide secret" }
                   }
                });
                cards_.Add(new CardDef
@@ -573,7 +708,7 @@ namespace hMailServer.ControlPanel.Views
                      new TextSetting { Key = "OAuth2AllowedAlgorithms", Default = "RS256", Label = "Allowed signing algorithms (comma separated)", Placeholder = "RS256, ES256" },
                      new TextSetting { Key = "OAuth2UsernameClaim", Default = "email", Label = "Claim that holds the mailbox address", Placeholder = "email" },
                      new PathSetting { Key = "OAuth2PublicKeyFile", FileFilter = "PEM/key files (*.pem;*.crt;*.cer;*.key;*.pub)|*.pem;*.crt;*.cer;*.key;*.pub|All files (*.*)|*.*", Label = "RSA/EC public key file (PEM, for RS*/ES* tokens)", Placeholder = "Path to the issuer's public key" },
-                     new SecretSetting { Key = "OAuth2HmacSecret", Label = "Shared HMAC secret (only for HS256/384/512 tokens)", Note = "Only needed for HS* algorithms" }
+                     new SecretSetting { Key = "OAuth2HmacSecret", Label = "Shared HMAC secret (only for HS256/384/512 tokens)", Hint = "Only needed for HS* algorithms" }
                   }
                });
                cards_.Add(new CardDef
@@ -610,7 +745,7 @@ namespace hMailServer.ControlPanel.Views
                            (5, "Argon2id only")
                         }
                      },
-                     new SecretSetting { Key = "PasswordPepper", Label = "Password pepper — WARNING: set before creating accounts; changing it later invalidates ALL existing passwords", Note = "Server-wide secret mixed into password hashes" }
+                     new SecretSetting { Key = "PasswordPepper", Label = "Password pepper — WARNING: set before creating accounts; changing it later invalidates ALL existing passwords", Hint = "Server-wide secret mixed into password hashes" }
                   }
                });
                cards_.Add(new CardDef
@@ -712,9 +847,40 @@ namespace hMailServer.ControlPanel.Views
          }
       }
 
+      /// <summary>
+      /// Works out what a screen reader should call each editor, before any of them
+      /// are built.
+      ///
+      /// No label on these seven pages currently repeats within its own page - that
+      /// was counted rather than assumed - so nothing here is qualified today. It
+      /// still goes through the same resolver as the COM settings pages: the naming
+      /// rule must not be one thing on one settings page and another on the next,
+      /// and a card added to this page tomorrow that repeats a label somewhere else
+      /// on it will be handled without anybody having to remember to.
+      /// <see cref="AccessibleNames"/> holds the decision.
+      /// </summary>
+      private void AssignAccessibleNames()
+      {
+         var settings = new List<Setting>();
+         var editors = new List<LabelledEditor>();
+
+         foreach (CardDef card in cards_)
+         foreach (Setting setting in card.Settings)
+         {
+            settings.Add(setting);
+            editors.Add(new LabelledEditor(setting.Label, card.Title, setting.Key));
+         }
+
+         IReadOnlyList<string> names = AccessibleNames.Resolve(editors);
+         for (int i = 0; i < settings.Count; i++)
+            settings[i].AccessibleName = names[i];
+      }
+
       private void BuildUi()
       {
          CardsPanel.Children.Clear();
+
+         AssignAccessibleNames();
 
          if (!store_.IsAvailable)
          {

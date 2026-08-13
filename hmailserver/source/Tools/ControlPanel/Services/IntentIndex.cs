@@ -187,6 +187,12 @@ namespace hMailServer.ControlPanel.Services
             "Configure OAuth2 / XOAUTH2 so clients authenticate with a token instead of a password."),
          new IntentEntry("make stored passwords harder to crack", "authentication",
             "Choose the password hashing algorithm and its work factor."),
+         // DisableAUTHList is a comma-separated list of ports on the Authentication
+         // page. Nothing in its label or its page title contains the word "port",
+         // so the one query anybody would type for it found the TCP/IP ports page,
+         // which is not where the setting is.
+         new IntentEntry("do not offer authentication on port 25", "authentication",
+            "List the local ports where AUTH should not be advertised - typically a port 25 that only takes inbound mail."),
 
          // ---- Getting mail in and out --------------------------------------
          new IntentEntry("send all mail through my provider", "delivery",
@@ -237,12 +243,30 @@ namespace hMailServer.ControlPanel.Services
             "Reduce the log level, or set how many days of logs are kept."),
          new IntentEntry("turn on more detailed logging", "logging",
             "Raise the log level and choose which log files are written."),
+         // The three phrases below are for capabilities the server has and the
+         // interface never advertised in words anybody would type. The log format
+         // and the SQL log device were selectable for years while the server
+         // ignored them; now that both work, "how do I get my logs into something
+         // that reads them" is a question with an answer, and it should be
+         // findable in the terms it is asked in.
+         new IntentEntry("send my logs to a log analyser", "logging",
+            "Choose the NCSA Common Log Format so an analyser can read the lines, or JSON for a log shipper."),
+         new IntentEntry("write the log to a database", "logging",
+            "Set the log destination to the database; entries fall back to the log files if it is unreachable."),
+         new IntentEntry("make awstats work", "logging",
+            "Turn on the AWStats-compatible log. That is a separate file - the log line format setting does not change it."),
          new IntentEntry("run code when mail arrives", "scripts",
             "Event scripts run on delivery, logon and error events."),
          new IntentEntry("keep a copy of every message", "advanced",
             "Archiving writes a copy of every message to a folder you choose."),
          new IntentEntry("change a setting with no page", "hardening",
             "Individual hMailServer.INI values are editable here."),
+         // MaxSubmissionsPerIPPerMinute. An abused account sending thousands of
+         // messages an hour is one of the commonest reasons an administrator opens
+         // this application in a hurry, and the only setting that helps was
+         // reachable by knowing its name.
+         new IntentEntry("limit how many messages an account can send per minute", "hardening",
+            "Set the per-IP submission rate limit; authenticated senders above it are refused."),
          new IntentEntry("monitor the server from outside", "api",
             "Prometheus metrics, health endpoints and the REST API are enabled here."),
          new IntentEntry("what version am i running", "about",
