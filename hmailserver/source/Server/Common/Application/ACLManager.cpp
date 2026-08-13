@@ -56,7 +56,18 @@ namespace HM
    */
 
 
-   std::shared_ptr<ACLPermission> 
+   bool
+   ACLManager::GetAclEnforcementEnabled()
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // Whether folder access control is enforced. See the header for why this is one
+   // function rather than a setting each caller reads for itself.
+   //---------------------------------------------------------------------------()
+   {
+      return Configuration::Instance()->GetIMAPConfiguration()->GetUseIMAPACL();
+   }
+
+   std::shared_ptr<ACLPermission>
    ACLManager::GetPermissionForFolder(__int64 iAccountID, std::shared_ptr<IMAPFolder> pFolder)
    //---------------------------------------------------------------------------()
    // DESCRIPTION:

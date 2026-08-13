@@ -416,9 +416,33 @@ namespace HM
 
    String 
    Logger::CleanLogMessage_(const String &message)
+   //---------------------------------------------------------------------------
+   // DESCRIPTION:
+   // Flattens line breaks so that one logged message is one log record.
+   //
+   // This replaced the CRLF PAIR and nothing else, so a lone LF - or a lone CR -
+   // went into the file untouched and split one record into two. Every record here
+   // is tab-separated with quoted fields, so the halves do not look like damage:
+   // they look like two ordinary log lines, and the second one's contents are
+   // chosen by whoever supplied the message.
+   //
+   // The messages are not ours. Protocol conversations are logged verbatim, and so
+   // are header values, peer banners, resolver text and remote host names. The
+   // server accepts bare LFs on the wire deliberately (GetAllowIncorrectLineEndings
+   // and the end-of-data handling exist for exactly that), so "the protocol strips
+   // it first" is not true here.
+   //
+   // ErrorManager was given the same treatment earlier today for the error log and
+   // the OnError script hook. This is the same defect in the general logger, which
+   // every other log line goes through.
+   //
+   // The pair is replaced first so that a CRLF becomes one marker rather than two.
+   //---------------------------------------------------------------------------
    {
       String result = message;
       result.Replace(_T("\r\n"), _T("[nl]"));
+      result.Replace(_T("\n"), _T("[nl]"));
+      result.Replace(_T("\r"), _T("[nl]"));
       return result;
    }
 
@@ -471,8 +495,17 @@ namespace HM
    File*
    Logger::GetCurrentLogFile_(LogType lt)
    {
-      String fileName = GetCurrentLogFileName(lt);
+      // Read the setting BEFORE building the name, not after. GetCurrentLogFileName
+      // consults sep_svc_logs_ to decide between hmailserver_IMAP_<date>.log and the
+      // combined hmailserver_<date>.log, so refreshing it afterwards meant that on the
+      // one call where the setting changed, the file NAME was chosen with the old
+      // value and the file OBJECT below with the new one. That writes a line into the
+      // wrong file - the per-protocol File handle opened on the combined path, or the
+      // reverse - and it corrects itself only on the next line, when the mismatch
+      // finally triggers the reopen.
       sep_svc_logs_ = IniFileSettings::Instance()->GetSepSvcLogs();
+
+      String fileName = GetCurrentLogFileName(lt);
 
       bool writeUnicode = false;
 
@@ -615,7 +648,35 @@ namespace HM
          log_level_ = IniFileSettings::Instance()->GetLogLevel();
          max_log_line_len_ = IniFileSettings::Instance()->GetMaxLogLineLen();
 
-         if ((Logger::Instance()->GetLogDebug()) || (log_level_ > 2) || (iDataLenTmp < max_log_line_len_ ))
+         // AWStats is never truncated, whatever MaxLogLineLen says.
+         //
+         // The other logs are read by people, so cutting the middle out of a very long
+         // line loses detail and nothing else. The AWStats journal is not: it is a
+         // positional, tab-separated record - time, sender, recipient, sender IP,
+         // recipient IP, protocol, code, bytes - and an AWStats installation parses it
+         // by field number. Removing bytes from the middle does not produce a truncated
+         // record, it produces a record whose every remaining column has moved, and it
+         // parses without complaint into the wrong fields. A long recipient list is all
+         // it takes.
+         //
+         // Reachable only with LogLevel <= 2 and debug logging off, so not on a default
+         // configuration - which is exactly why it would have gone unnoticed on the
+         // installations where it does fire.
+         //
+         // The arithmetic is also guarded now. The head/tail split subtracts 30 and 25
+         // from lengths it never checked, so a MaxLogLineLen smaller than those - which
+         // is an administrator's to set - produced Mid() calls with negative counts and,
+         // through CStdString's clamping, a "truncated" line LONGER than the original.
+         const int minimumSensibleLength = 80;
+
+         bool truncate =
+            lt != AWStats &&
+            !Logger::Instance()->GetLogDebug() &&
+            log_level_ <= 2 &&
+            max_log_line_len_ >= minimumSensibleLength &&
+            iDataLenTmp >= max_log_line_len_;
+
+         if (!truncate)
             sAnsiString = sData;
          else
             sAnsiString = sData.Mid(0, max_log_line_len_ - 30) + " ... " + sData.Mid(iDataLenTmp - 25);

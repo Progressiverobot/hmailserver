@@ -1212,6 +1212,24 @@ namespace HM
             return true;
          }
 
+         if (oBodyPart.GetShowBodyFull())
+         {
+            // BODY[] is served straight from the message file - see the
+            // GetShowBodyFull branch in GetByteBufferByBodyPart_, which seeks in the
+            // file and never touches the MimeBody it is handed. Parsing the message
+            // to serve it is therefore pure waste, and it is not a small waste: this
+            // is the form clients use to download a message in pieces, so the parse
+            // happened once per CHUNK. A 20 MB message pulled down in 64 KB pieces
+            // parsed itself over three hundred times - quadratic work on exactly the
+            // access pattern Apple Mail always uses and Thunderbird uses by default,
+            // which is consistent with issue #26's report that Apple Mail suffers
+            // most.
+            //
+            // The header is still loaded, because that is cheap and it keeps a
+            // usable MimeBody in the hands of every other caller in this function.
+            return false;
+         }
+
          if (!oBodyPart.GetBodyTextNeeded())
          {
             // We only need the header.

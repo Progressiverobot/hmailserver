@@ -405,6 +405,13 @@ namespace HM
       seenNonRequire_ = false;
       required_.clear();
 
+      // DepthGuard unwinds these on every path including the error returns, so they
+      // are already zero here. Reset anyway, with the rest of the per-parse state: a
+      // parser instance can be reused, and a counter that only stays correct because
+      // nothing has gone wrong yet is the kind that stops being correct quietly.
+      block_depth_ = 0;
+      test_depth_ = 0;
+
       commands.clear();
 
       if (!ParseCommands_(commands, true, errorMessage))
@@ -426,6 +433,18 @@ namespace HM
    bool
    SieveParser::ParseCommands_(std::vector<std::shared_ptr<SieveCommand>> &commands, bool topLevel, String &errorMessage)
    {
+      // One level per "{": ParseCommand_ calls back here for a command's block. See
+      // the comment on block_depth_ - this recursion had no bound at all, and the
+      // script is supplied by an authenticated user.
+      DepthGuard guard(block_depth_);
+
+      if (block_depth_ > MaxNestingDepth)
+      {
+         errorMessage.Format(_T("Line %d: the script nests blocks more than %d deep. This is refused rather than parsed: the parser recurses once per level and a script nested far enough would exhaust the stack."),
+                             Current_().line, MaxNestingDepth);
+         return false;
+      }
+
       while (Current_().type == SieveTokenType::Identifier)
       {
          std::shared_ptr<SieveCommand> command;
@@ -664,6 +683,18 @@ namespace HM
    bool
    SieveParser::ParseTest_(std::shared_ptr<SieveTest> &test, String &errorMessage)
    {
+      // One level per nested test - a parenthesised test list, or anyof/allof/not
+      // wrapping another test. Unbounded before this, exactly as the block recursion
+      // above was.
+      DepthGuard guard(test_depth_);
+
+      if (test_depth_ > MaxNestingDepth)
+      {
+         errorMessage.Format(_T("Line %d: the script nests tests more than %d deep. This is refused rather than parsed: the parser recurses once per level and a script nested far enough would exhaust the stack."),
+                             Current_().line, MaxNestingDepth);
+         return false;
+      }
+
       if (Current_().type == SieveTokenType::LeftParen)
       {
          // Test list: ( test *( "," test ) ). Represented as a synthetic

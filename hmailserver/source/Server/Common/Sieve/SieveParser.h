@@ -179,6 +179,40 @@ namespace HM
       size_t index_;
       bool seenNonRequire_;
 
+      // How deep the two recursive descents currently are: blocks
+      // (ParseCommands_ -> ParseCommand_ -> ParseCommands_, one level per "{") and
+      // tests (ParseTest_ -> ParseTest_, one level per nested anyof/allof/not).
+      //
+      // Neither had a bound. A Sieve script is supplied by an authenticated user
+      // through ManageSieve PUTSCRIPT or CHECKSCRIPT, and the size limit is 1 MB -
+      // "if true{" is eight bytes, so a script well inside the limit asks for tens
+      // of thousands of levels of recursion and takes the stack with it. A stack
+      // overflow is not an exception this can catch: it is the process.
+      //
+      // The same shape as the MIME nesting defect fixed in the same week, and the
+      // same answer - a bound far above anything a person writes, enforced where
+      // the recursion happens rather than trusted to the input.
+      int block_depth_ = 0;
+      int test_depth_ = 0;
+
+      // Real scripts nest a handful deep; generated ones from a rule builder rarely
+      // pass ten. Fifty is beyond any legitimate script and thousands below the
+      // stack, which is the useful place for a limit like this to sit.
+      static const int MaxNestingDepth = 50;
+
+      // Increments a depth counter for the lifetime of one parse level and puts it
+      // back however the level is left, including the error returns.
+      class DepthGuard
+      {
+      public:
+         explicit DepthGuard(int &depth) : depth_(depth) { depth_++; }
+         ~DepthGuard() { depth_--; }
+      private:
+         DepthGuard(const DepthGuard &) = delete;
+         DepthGuard &operator=(const DepthGuard &) = delete;
+         int &depth_;
+      };
+
       // Capability names named by the script's "require" statements.
       std::set<String> required_;
    };

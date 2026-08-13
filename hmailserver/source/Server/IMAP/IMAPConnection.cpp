@@ -1103,9 +1103,11 @@ namespace HM
    bool 
    IMAPConnection::CheckPermission(std::shared_ptr<IMAPFolder> pFolder, int iPermission)
    {
-      if (!Configuration::Instance()->GetIMAPConfiguration()->GetUseIMAPACL())
+      // One decision, asked rather than re-derived. See ACLManager for why the copy
+      // that used to be here was a problem.
+      if (!ACLManager::GetAclEnforcementEnabled())
       {
-         // IMAP ACL has been disabled. Allow everything.
+         // Access control has been disabled. Allow everything.
          return true;
       }
 
@@ -1127,9 +1129,11 @@ namespace HM
       readAccess = false;
       writeAccess = false;
 
-      if (!Configuration::Instance()->GetIMAPConfiguration()->GetUseIMAPACL())
+      // The second of the two copies this replaces. Both read the same setting and
+      // each decided for itself what "allow everything" meant.
+      if (!ACLManager::GetAclEnforcementEnabled())
       {
-         // IMAP ACL has been disabled. Allow everything.
+         // Access control has been disabled. Allow everything.
          readAccess = true;
          writeAccess = true;
 
