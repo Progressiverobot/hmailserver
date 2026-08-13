@@ -1,0 +1,133 @@
+# libFuzzer dictionary for the hMailServer MIME targets.
+#
+# Why a dictionary at all: libFuzzer's mutators are byte-level. Left alone they
+# will not stumble on "Content-Transfer-Encoding:" or "=?iso-8859-1?Q?" in any
+# useful number of executions, so whole decoders sit unreached while the run
+# looks busy. Every token below is one the parser branches on.
+#
+# Format: libFuzzer dictionary. One "name=value" or bare "value" per line,
+# values double-quoted, "\\" "\"" and "\xNN" the only escapes. A malformed line
+# makes libFuzzer exit at startup with "ParseDictionaryFile: error in line N",
+# which is easy to miss in a -jobs run - hence the regression test that parses
+# this file.
+#
+# The boundary tokens near the bottom are copied verbatim from the messages in
+# hmailserver\test\RegressionTests\Resources and hmailserver\test\TestData\DKIM.
+# They are here because a multipart body only parses when the delimiter matches
+# the boundary parameter exactly: without a real boundary string in the
+# dictionary, the mutator has to invent the same 40-character token twice in one
+# input, which it will not do. Nothing here is invented - if a token is not in
+# a real test message or an RFC, it is not in this file.
+
+#
+# Structural
+#
+crlf="\x0d\x0a"
+end_of_header="\x0d\x0a\x0d\x0a"
+fold_space="\x0d\x0a "
+fold_tab="\x0d\x0a\x09"
+boundary_prefix="--"
+closing_boundary="--\x0d\x0a"
+semicolon="; "
+equals_quote="=\""
+
+#
+# Header field names the parser or its callers look for by name
+#
+h_mime_version="MIME-Version: 1.0"
+h_content_type="Content-Type: "
+h_content_transfer_encoding="Content-Transfer-Encoding: "
+h_content_disposition="Content-Disposition: "
+h_content_id="Content-ID: "
+h_content_description="Content-Description: "
+h_subject="Subject: "
+h_from="From: "
+h_to="To: "
+h_cc="Cc: "
+h_reply_to="Reply-To: "
+h_date="Date: "
+h_received="Received: "
+h_dkim_signature="DKIM-Signature: "
+
+#
+# Media types. multipart and message/rfc822 are the two that make the parser
+# recurse, which is the only place a small input can build a big structure.
+#
+mt_multipart_mixed="multipart/mixed"
+mt_multipart_alternative="multipart/alternative"
+mt_multipart_related="multipart/related"
+mt_multipart_digest="multipart/digest"
+mt_multipart_signed="multipart/signed"
+mt_multipart_report="multipart/report"
+mt_message_rfc822="message/rfc822"
+mt_message_delivery_status="message/delivery-status"
+mt_text_plain="text/plain"
+mt_text_html="text/html"
+mt_application_octet_stream="application/octet-stream"
+mt_image_jpeg="image/jpeg"
+
+#
+# Parameters
+#
+p_boundary="boundary="
+p_charset="charset="
+p_name="name="
+p_filename="filename="
+p_inline="inline"
+p_attachment="attachment"
+
+# RFC 2231 / 2184 continuations and extended values. The "*0*=" form with a
+# charset''value payload is what MimeParameterRFC2184Decoder exists for.
+p_continuation_0="*0*="
+p_continuation_1="*1*="
+p_extended="*="
+p_rfc2231_prefix="iso-8859-1''"
+p_percent_hex="%41"
+
+#
+# Transfer encodings. "7bit" and "8bit" are deliberately included even though
+# MimeEnvironment does not register a coder for them by default - they take the
+# pass-through path, which is a distinct branch.
+#
+te_base64="base64"
+te_quoted_printable="quoted-printable"
+te_7bit="7bit"
+te_8bit="8bit"
+te_binary="binary"
+te_uuencode="x-uuencode"
+
+#
+# Charsets that map to a real code page in CodePages::Initialize, plus one that
+# does not (GetCodePage returns 0, i.e. CP_ACP, a different branch).
+#
+cs_utf8="utf-8"
+cs_utf7="utf-7"
+cs_us_ascii="US-ASCII"
+cs_iso_8859_1="iso-8859-1"
+cs_windows_1252="windows-1252"
+cs_iso_2022_jp="iso-2022-jp"
+cs_big5="BIG5"
+cs_unmapped="x-unknown-charset"
+
+#
+# RFC 2047 encoded words
+#
+ew_b_utf8="=?utf-8?B?"
+ew_q_iso="=?iso-8859-1?Q?"
+ew_b_iso="=?ISO-8859-1?B?"
+ew_open="=?"
+ew_close="?="
+ew_q_underscore="_"
+qp_escape="=3D"
+qp_soft_break="=\x0d\x0a"
+b64_padding="=="
+
+#
+# Real boundary strings from the seed messages
+#
+b_nextpart_000="----=_NextPart_000_005E_01CFE3D9.283B7F70"
+b_nextpart_001="----=_NextPart_001_1325_01CFE218.7ABF8CE0"
+b_part_20675="----=_Part_20675_4029655.1160508432731"
+b_yahoo="0-237517700-1160508627=:29354"
+b_part_break="0317-1841-39-PART-BREAK"
+b_exchange="_000_HE1PR0501MB255496AF50F6922154EFF2D5EED50HE1PR0501MB2554_"

@@ -3429,9 +3429,32 @@ public:
 	}
 
 	// ReverseFind overload that's not in CString but might be useful
+	//
+	// Written as an if rather than the ternary it used to be. The ternary was
+	//
+	//    this->rfind(0 == szFind ? MYTYPE() : szFind, pos)
+	//
+	// which mixes MYTYPE and PCMYSTR in the two arms, and since each converts to
+	// the other, the conditional has no unique composite type. MSVC picks one and
+	// compiles it; clang rejects it outright ("conditional expression is
+	// ambiguous"), and because a template member is only instantiated when
+	// something calls it, that made every clang-cl build of any file calling
+	// ReverseFind fail on this line - which is what stopped the MIME fuzz harness
+	// from compiling StringParser.cpp.
+	//
+	// The behaviour is deliberately unchanged, including for a null szFind: that
+	// case searched for an EMPTY string, which finds a position rather than
+	// failing, so it must keep calling rfind rather than short-circuiting to npos.
+	// The non-null path no longer builds a temporary MYTYPE at all.
 	int ReverseFind(PCMYSTR szFind, MYSIZE pos=MYBASE::npos) const
 	{
-		MYSIZE nIdx	= this->rfind(0 == szFind ? MYTYPE() : szFind, pos);
+		MYSIZE nIdx;
+
+		if (0 == szFind)
+			nIdx = this->rfind(MYTYPE(), pos);
+		else
+			nIdx = this->rfind(szFind, pos);
+
 		return static_cast<int>(MYBASE::npos == nIdx ? -1 : nIdx);
 	}
 

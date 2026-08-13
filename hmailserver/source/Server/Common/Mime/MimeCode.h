@@ -131,6 +131,24 @@ namespace HM
 		   input_size_(0),
 		   is_encoding_(false) {}
 
+	   // Virtual, and it has to be. This class has virtual Encode/Decode and is
+	   // always used polymorphically: MimeEnvironment::CreateCoder returns a
+	   // derived coder as a MimeCodeBase*, and there are six `delete pCoder` sites
+	   // in Mime.cpp that free it through that base pointer. Deleting a derived
+	   // object through a base pointer whose destructor is not virtual is
+	   // undefined behaviour - the derived destructor never runs, so anything a
+	   // coder owns is leaked, and the deallocation itself is performed with the
+	   // wrong size.
+	   //
+	   // Found by the MIME fuzz harness on its first run, as
+	   //   AddressSanitizer: new-delete-type-mismatch
+	   //   Mime.cpp:1044 in HM::MimeBody::GetUnicodeText()
+	   // reached by an ordinary message with a charset and a transfer encoding, so
+	   // it was live on the GetUnicodeText path rather than a corner case. It is
+	   // exactly the class of defect the suite could not see: nothing crashed, and
+	   // the leak is small enough per message to look like ordinary growth.
+	   virtual ~MimeCodeBase() {}
+
    public:
 	   void SetInput(const char* pbInput, size_t nInputSize, bool bEncoding)
 	   {

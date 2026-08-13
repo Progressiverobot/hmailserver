@@ -1,0 +1,25 @@
+# Build output and everything a fuzz run generates.
+#
+# The generated seed corpus is ignored on purpose: it is copied out of
+# hmailserver\test at build time by make-corpus.ps1, so committing it would be a
+# second copy of ~50 test messages that could then drift from the originals -
+# including the two DKIM-signed .eml files, where a drifted copy is worse than no
+# copy. The originals stay the single source of truth.
+#
+# The growing corpus and the crash artifacts are ignored because they are
+# machine-local and can reach hundreds of megabytes. When a finding is worth
+# keeping, it is *moved* into fuzz\regression\<target>\, which is not ignored -
+# see fuzz\regression\README.md.
+
+build/
+bin/
+corpus/
+artifacts/
+*.pdb
+*.ilk
+*.obj
+*.exe
+
+# ...but the reproducers and their README are tracked.
+!regression/
+!regression/**

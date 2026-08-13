@@ -1,0 +1,32 @@
+###############################################################################
+# Fuzzing inputs are bytes, not text.
+#
+# The repository root sets "* text=auto eol=crlf", which normalises line endings
+# in the repository and forces CRLF on checkout. That is right for every source
+# file here and wrong for every fuzzing input:
+#
+#   - A crash reproducer only reproduces if its bytes are exactly what libFuzzer
+#     wrote. Normalising a lone LF into a CRLF changes the input the MIME parser
+#     sees - and since the parser branches on CRLF everywhere, the changed input
+#     will usually stop reaching the code the reproducer was kept for. The file
+#     would still be there, still be replayed, and no longer prove anything.
+#   - The same applies in reverse to inputs full of high bytes: git's text
+#     heuristic can classify a mutated MIME message as text and then rewrite it.
+#
+# So the reproducers and any committed corpus are marked binary (-text -diff).
+# Everything else in fuzz\ inherits the root rules, which is what we want for
+# the scripts, the harness sources and the dictionary.
+###############################################################################
+
+regression/** -text -diff
+corpus/** -text -diff
+artifacts/** -text -diff
+
+# ...except the documentation that lives among the reproducers. Later rules win,
+# so this puts regression\README.md back under the normal text handling; without
+# it git refuses to show a diff for it, which is exactly the wrong outcome for
+# the file that explains the rules.
+regression/README.md text eol=crlf diff
+
+# The dictionary is source: it is reviewed as text and every line is 7-bit.
+dict/*.dict text eol=crlf
