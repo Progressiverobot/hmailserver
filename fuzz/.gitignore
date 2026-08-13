@@ -23,3 +23,7 @@ artifacts/
 # ...but the reproducers and their README are tracked.
 !regression/
 !regression/**
+
+# Open findings are tracked for the same reason regression/ is - see fuzz\findings\README.md.
+!findings/
+!findings/**
