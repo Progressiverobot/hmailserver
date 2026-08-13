@@ -80,7 +80,17 @@ namespace HM
 
       if (failureCount >= maxInvalidLogonAttempts)
       {
-         logonFailure.ClearFailuresByIP(ipaddress);
+         // Unchecked. Failing here leaves this address's spent failures in the table
+         // after the ban has been created, so when the ban expires the next single
+         // failure re-crosses the threshold and bans it again. That errs towards
+         // blocking rather than allowing, which is why it is reported rather than
+         // treated as fatal - but an address that cannot get back in after its ban
+         // expires is a support call, and this is the only place that would explain it.
+         if (!logonFailure.ClearFailuresByIP(ipaddress))
+         {
+            ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6113, "AccountLogon::RegisterFailedLogin",
+               "The spent logon failures for a banned address could not be cleared, so it may be re-banned immediately after this ban expires.");
+         }
 
          int minutes = Configuration::Instance()->GetAutoBanMinutes();
          if (minutes == 0)
@@ -97,7 +107,22 @@ namespace HM
       }
 
       // logon failed, add new failure.
-      logonFailure.AddFailure(ipaddress);
+      //
+      // This is the counting half of auto-ban, and its result was discarded - the same
+      // defect as the range save in CreateIPRange below it, one method name away from
+      // the sweep that found that one, because this class does not call its writers
+      // SaveObject.
+      //
+      // It is the more serious half. If the failure cannot be recorded the count never
+      // rises, GetCurrrentFailureCount keeps returning the same number, the threshold
+      // is never crossed and no ban is ever created - so an attacker guesses passwords
+      // indefinitely against a server whose brute-force protection is switched on,
+      // configured, and silently doing nothing at all.
+      if (!logonFailure.AddFailure(ipaddress))
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 6114, "AccountLogon::RegisterFailedLogin",
+            "A failed logon could not be recorded, so it does not count towards the auto-ban threshold. While this persists, repeated logon failures from any address will never trigger a ban.");
+      }
    }
 
    void

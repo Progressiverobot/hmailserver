@@ -222,18 +222,55 @@ namespace HM
 			if (imapmasteruser.GetLength() == 0)
 				return IMAPResult(IMAPResult::ResultBad, "No master user defined.");
 
+			// Three things were wrong here, and none of them could be seen from one
+			// branch alone. The feature has no test of any kind - TestSetup only
+			// clears IMAPMasterUser - which is how all three survived.
+			//
+			// 1. The two branches resolved a bare master name against DIFFERENT
+			//    domains: the server's default domain when authzid arrived without
+			//    one, and the authenticating account's domain when it arrived with
+			//    one. So which account held impersonation privilege depended on how
+			//    the client happened to format its input, and on a multi-domain
+			//    server those are two different accounts. They agree only when the
+			//    authenticating account is in the default domain - the single-domain
+			//    install, i.e. exactly the deployment where nobody would notice.
+			//
+			//    Resolved against the authenticating account's domain in both cases
+			//    now. That is the narrower of the two grants - a bare "admin" means
+			//    "admin in the domain of whoever is authenticating", so a master can
+			//    only ever impersonate within their own domain - and it is what the
+			//    qualified branch already did.
+			//
+			// 2. That branch appended a domain WITHOUT asking whether the configured
+			//    master user already had one, so "admin@example.com" became
+			//    "admin@example.com@example.com" and could never match. A master user
+			//    configured as a full address simply did not work, and the client was
+			//    told "Invalid master user" whatever it did. ApplyDefaultDomain on the
+			//    sibling branch is careful about precisely this case.
+			//
+			// 3. The comparison was std::wstring::compare, which is case-sensitive,
+			//    while every other address comparison in this tree uses CompareNoCase.
+			//    "Admin@example.com" was refused where "admin@example.com" was not.
+			//
+			// All three failed closed, so this is a security feature that did not
+			// work rather than a hole - but a master user who cannot log in is
+			// indistinguishable from one whose password is wrong, and that is a bad
+			// way to spend an afternoon.
+
+			// The account being impersonated is canonicalised exactly as authcid was.
 			if (authzid.Find(_T("@")) == -1)
 			{
 				if (sDefaultDomain.IsEmpty())
 					return IMAPResult(IMAPResult::ResultNo, "Invalid user name. Please use full email address as user name.");
 
-				imapmasteruser = DefaultDomain::ApplyDefaultDomain(imapmasteruser);
 				authzid = DefaultDomain::ApplyDefaultDomain(authzid);
 			}
-			else
+
+			// And so is the configured master user - only when it needs it.
+			if (imapmasteruser.Find(_T("@")) == -1)
 				imapmasteruser += "@" + StringParser::ExtractDomain(authcid);
 
-			if (imapmasteruser.compare(authcid))
+			if (imapmasteruser.CompareNoCase(authcid) != 0)
 				return IMAPResult(IMAPResult::ResultBad, "Invalid master user.");
 		}
 

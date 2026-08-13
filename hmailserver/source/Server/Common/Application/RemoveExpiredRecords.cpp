@@ -50,8 +50,18 @@ namespace HM
       {
          int logonFailureMinutes = Configuration::Instance()->GetMaxLogonAttemptsWithin();
          
+         // Unchecked, and this one errs towards blocking: failures older than
+         // MaxLogonAttemptsWithin are what stop a handful of typos spread over a week
+         // from adding up to a ban. If they are never cleared they keep accumulating,
+         // and a legitimate user who mistypes their password occasionally is
+         // eventually banned for it.
          PersistentLogonFailure persistentLogonFailure;
-         persistentLogonFailure.ClearOldFailures(logonFailureMinutes);
+
+         if (!persistentLogonFailure.ClearOldFailures(logonFailureMinutes))
+         {
+            ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6115, "RemoveExpiredRecords::DoWork",
+               "Expired logon failures could not be cleared. They keep counting towards the auto-ban threshold until this succeeds, so occasional failures spread over a long period may add up to a ban.");
+         }
       }
    }
 
