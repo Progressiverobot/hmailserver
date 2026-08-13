@@ -41,6 +41,59 @@ namespace hMailServer.ControlPanel.Tests.Services
       }
 
       /// <summary>
+      /// A verb plus a noun must not return less than the noun alone.
+      ///
+      /// Two words is the commonest thing anybody types, and it was the one length the
+      /// partial rule could never fire for: a two-token query needed two matches to
+      /// reach it, and two matches is all of them, which the all-tokens branch had
+      /// already answered. So "spam" worked and "reduce spam" showed "Nothing matched" -
+      /// and a palette that punishes a user for being more specific teaches them not to
+      /// use it. These are the pairs measured on the unfixed build; every one of them
+      /// returned nothing.
+      /// </summary>
+      [Theory]
+      [InlineData("reduce spam")]
+      [InlineData("enable imap")]
+      [InlineData("configure imap")]
+      [InlineData("disable pop3")]
+      [InlineData("clear queue")]
+      [InlineData("flush queue")]
+      [InlineData("import certificate")]
+      [InlineData("change ports")]
+      [InlineData("new domain")]
+      [InlineData("add route")]
+      [InlineData("schedule backup")]
+      [InlineData("disable greylisting")]
+      public void VerbPlusNoun_FindsAtLeastWhatTheNounAloneFinds(string query)
+      {
+         IReadOnlyList<PaletteRow> rows = PaletteSearch.Query(query, null, null);
+
+         Assert.True(FirstSelectable(rows) != null,
+            "'" + query + "' matched nothing, while its noun alone does. Adding an "
+            + "ordinary verb must never take results away.");
+      }
+
+      /// <summary>
+      /// The other half of that rule. One matched word out of two is accepted only when
+      /// the word that did NOT match is an action verb, so a verb paired with a word
+      /// that appears nowhere still finds nothing - and, more importantly, two topical
+      /// words still both have to match: "spam ports" must not return the ports page,
+      /// which is what SearchTermsTests.Score_RefusesAMatchOnTooLittleOfTheQuery pins.
+      /// </summary>
+      [Theory]
+      [InlineData("add zzzzqqq")]
+      [InlineData("new zzzzqqq")]
+      [InlineData("set zzzzqqq")]
+      public void VerbPlusNonsense_MatchesNothing(string query)
+      {
+         IReadOnlyList<PaletteRow> rows = PaletteSearch.Query(query, null, null);
+
+         Assert.True(FirstSelectable(rows) == null,
+            "'" + query + "' matched something. A three-letter verb plus a word that "
+            + "appears nowhere must not be a wildcard.");
+      }
+
+      /// <summary>
       /// Phrasing is not a memory test. The synonym folding in SearchTerms has to
       /// carry the obvious rewordings, or the intent table would need every
       /// variant spelled out and would still miss the one a given person used.

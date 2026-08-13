@@ -90,6 +90,42 @@ namespace hMailServer.ControlPanel.Services
       };
 
       /// <summary>
+      /// Verbs that say what the user wants DONE rather than what it is done to.
+      ///
+      /// These exist for one narrow rule: a two-word query where only one word matched
+      /// is accepted when the word that did not match is one of these. That is the
+      /// difference between "reduce spam", where "spam" is the whole topic and "reduce"
+      /// is packaging, and "spam ports", where dropping either word changes what was
+      /// asked for - so the first must find the spam pages and the second must still
+      /// find nothing.
+      ///
+      /// Deliberately not merged into <see cref="StopWords"/>. A stop word is dropped
+      /// from the comparison entirely, which would make "reduce" and "delete"
+      /// invisible - and "delete a user" needs "delete" to reach the intent phrases
+      /// that were added for exactly that query. These words are matched normally and
+      /// only forgiven when they are the sole thing missing.
+      /// </summary>
+      private static readonly HashSet<string> ActionVerbs = new HashSet<string>(StringComparer.Ordinal)
+      {
+         "add", "new", "create", "make", "set", "setup", "configure", "change", "edit",
+         "update", "enable", "disable", "turn", "allow", "block", "stop", "start",
+         "reduce", "increase", "improve", "clear", "flush", "purge", "clean",
+         "delete", "remove", "revoke", "reset", "restore", "import", "export",
+         "upload", "download", "install", "schedule", "show", "find", "open", "view",
+         "check", "test", "fix", "move", "rename", "send", "receive", "limit"
+      };
+
+      /// <summary>
+      /// True if the word says what the user wants done rather than what it is done to.
+      /// Exposed as a predicate rather than the set so the table stays private and
+      /// SearchQuery cannot accumulate its own opinions about it.
+      /// </summary>
+      internal static bool IsActionVerb(string word)
+      {
+         return word != null && ActionVerbs.Contains(word);
+      }
+
+      /// <summary>
       /// Word-level synonyms, folded onto a single canonical word on both sides
       /// of the comparison. Symmetric folding rather than one-sided query
       /// expansion: expanding only the query means "junk" finds the page whose
@@ -407,6 +443,12 @@ namespace hMailServer.ControlPanel.Services
 
          int matched = 0;
 
+         // Which single query word failed to match, when exactly one did. The partial
+         // rule below forgives a missing ACTION verb ("reduce spam") but not a missing
+         // topic ("spam ports"), and it needs to know which word was missing to tell
+         // those apart.
+         string soleUnmatchedToken = null;
+
          if (tokens_.Count > 0)
          {
             List<string> candidateTokens = SearchTerms.Tokenize(normalized);
@@ -416,14 +458,20 @@ namespace hMailServer.ControlPanel.Services
             // rather than merely whether all of them did.
             foreach (string queryToken in tokens_)
             {
+               bool hit = false;
+
                foreach (string candidateToken in candidateTokens)
                {
                   if (SearchTerms.TokenMatches(queryToken, candidateToken))
                   {
                      matched++;
+                     hit = true;
                      break;
                   }
                }
+
+               if (!hit)
+                  soleUnmatchedToken = soleUnmatchedToken == null ? queryToken : null;
             }
 
             if (matched == tokens_.Count)
@@ -441,6 +489,28 @@ namespace hMailServer.ControlPanel.Services
 
          if (matched >= SearchTerms.MinPartialTokens && matched * 3 >= tokens_.Count * 2)
             return SearchTerms.MostTokens + (tokens_.Count - matched);
+
+         // Two-word queries used to be unreachable here, and two words is the commonest
+         // length a person types. For a two-token query the branch above needs matched
+         // >= 2, and matched == 2 is matched == tokens_.Count, which the all-tokens
+         // branch has already returned - so the partial rule could never fire, and
+         // adding one ordinary verb to a working one-word query returned nothing at all.
+         // "spam" worked and "reduce spam" did not; so did "enable imap", "clear queue",
+         // "new domain", "add route", "schedule backup" and nine others measured.
+         //
+         // A single match out of two is accepted only when the word that did NOT match
+         // is an action verb - what the user wants done, rather than what it is done to.
+         // "reduce spam" therefore finds the spam pages, while "spam ports" still finds
+         // nothing, because dropping either half of that one changes the question. A
+         // first attempt keyed this on the matched word being four characters or longer
+         // and was too loose: it accepted "spam ports" against "TCP/IP ports", which an
+         // existing test correctly refuses.
+         //
+         // Scored below MostTokens so that anything matching more of the query outranks
+         // it, and the query is guaranteed to have exactly one unmatched word here, so
+         // soleUnmatchedToken is the word in question.
+         if (tokens_.Count == 2 && matched == 1 && SearchTerms.IsActionVerb(soleUnmatchedToken))
+            return SearchTerms.MostTokens + tokens_.Count;
 
          return SearchTerms.NoMatch;
       }
