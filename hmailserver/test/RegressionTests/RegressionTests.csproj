@@ -298,6 +298,7 @@
   <ItemGroup>
     <Compile Include="MIME\MalformedInput.cs" />
     <Compile Include="Infrastructure\AcceptPathResilience.cs" />
+    <Compile Include="Infrastructure\BackendPortability.cs" />
     <Compile Include="Infrastructure\SqlLayerErrorHandling.cs" />
     <Compile Include="Infrastructure\WorkQueueLifecycle.cs" />
     <Compile Include="IMAP\AppendInternalDate.cs" />

@@ -20,6 +20,7 @@ Contents
 * [Installing](#installing) — supported platforms and unattended install
 * [Building hMailServer](#building-hmailserver)
 * [Configuration reference](#configuration-reference)
+* [Operator documentation](#operator-documentation) — the runbooks
 
 Capabilities
 ============
@@ -449,6 +450,17 @@ For 100% coverage the suite expects three optional integrations (tests degrade t
    * **`AddXOriginalRcptTo=1`** in `hMailServer.INI` for the X-Original-Rcpt-To header tests.
 
 The complete dev-tree provisioning recipe (directories, certificates, DB scripts, runtime files) is kept with the maintainer's internal notes; open an issue if you need it to reproduce a build.
+
+Operator documentation
+======================
+
+Runbooks for running the server, rather than for changing it, live in
+[hmailserver/docs](hmailserver/docs/README.md). The ones most often needed:
+
+* [Diagnosing slow or stalled mail](hmailserver/docs/DiagnosingStalledMail.md) — mail is not moving and the server looks healthy.
+* [Upgrading](hmailserver/docs/Upgrading.md) — moving to a new release, or from the original upstream project.
+* [Migrating to a different database backend](hmailserver/docs/MigratingDatabaseBackend.md) — in practice, moving off SQL Server Compact, which the installer still picks by default. No tool is needed: back up, repoint, restore.
+* [High availability](hmailserver/docs/HighAvailabilityRunbook.md) — warm standby and shared-database topologies, and what is not supported.
 
 Releasing hMailServer
 =====================
