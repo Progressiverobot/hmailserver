@@ -507,7 +507,16 @@ namespace HM
       if (backup_mode_ & Backup::BOSettings)
       {
          Logger::Instance()->LogBackup("Backing up settings...");
-         Configuration::Instance()->XMLStore(pBackupNode);
+
+         // Checked, which it was not - and until Configuration::XMLStore was made
+         // capable of answering false there was nothing here to check. The two went
+         // together: a settings section that could not fail, called by a caller that
+         // would not have listened.
+         if (!Configuration::Instance()->XMLStore(pBackupNode))
+         {
+            Application::Instance()->GetBackupManager()->OnBackupFailed("The server settings could not be written to the backup. Check the hMailServer error log. No archive has been created.");
+            return false;
+         }
       }
 
       // The last database read has happened. Nothing has been written to the
@@ -779,9 +788,20 @@ namespace HM
             }
          }
 
-         // We need to do the same with public folders.
+         // We need to do the same with public folders - and to check it, which this
+         // did not, one line below the domain delete that does. The consequence is
+         // not symmetrical with the domains case: XMLLoad puts the backup's public
+         // folders in on top of whatever survived, so a failed delete leaves the
+         // server holding folders the backup never contained, alongside duplicates
+         // of the ones it did, and reports a successful restore over the top of it.
          if (iRestoreOptions & Backup::BOSettings && !bMessagesDBOnly)
-            Configuration::Instance()->GetIMAPConfiguration()->GetPublicFolders()->DeleteAll();
+         {
+            if (!Configuration::Instance()->GetIMAPConfiguration()->GetPublicFolders()->DeleteAll())
+            {
+               ReportRestoreFailure_("Restore failed: the public folders that are on this server now could not be deleted, so the backup's public folders cannot be put in their place. The restore has been stopped part-way through - the domains have already been removed. Check the hMailServer error log, then restore again.");
+               return false;
+            }
+         }
 
          // Should we restore messages as well? Prepare staged the message store
          // exactly when the options and BackupMessagesDBOnly call for one, so asking

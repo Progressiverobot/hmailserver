@@ -224,11 +224,13 @@ STDMETHODIMP InterfaceSecurityRanges::SetDefault()
       if (!security_ranges_)
          return GetAccessDenied();
 
-      if (!security_ranges_)
-         return authentication_->GetAccessDenied();
-   
-      security_ranges_->SetDefault();
-   
+      if (!security_ranges_->SetDefault())
+      {
+         // As above for the ports: the previous ranges are gone whether or not the
+         // replacements were written, and an address matching no range is refused.
+         return COMError::GenerateError("The default IP ranges could not be restored. The previous ranges were removed first, so the server may now refuse connections it previously accepted - check the hMailServer error log, correct the problem and try again.");
+      }
+
       return S_OK;
    }
    catch (...)

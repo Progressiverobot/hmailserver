@@ -339,11 +339,19 @@ namespace HM
    bool
    SMTPConfiguration::XMLLoad(XNode *pBackupNode, int iRestoreOptions)
    {
+      // Checked, which they were not. Configuration::XMLLoad guards every other
+      // collection it restores and then calls this one, which answered true whatever
+      // happened inside it - so routes and incoming relays were the two the guard did
+      // not reach. Both decide where mail is allowed to go and who is allowed to send
+      // through this server, so silently restoring neither is the wrong pair to be
+      // quiet about.
       routes_->Refresh();
-      routes_->XMLLoad(pBackupNode, iRestoreOptions);
- 
+      if (!routes_->XMLLoad(pBackupNode, iRestoreOptions))
+         return false;
+
       incoming_relays_->Refresh();
-      incoming_relays_->XMLLoad(pBackupNode, iRestoreOptions);
+      if (!incoming_relays_->XMLLoad(pBackupNode, iRestoreOptions))
+         return false;
 
       return true;
    }

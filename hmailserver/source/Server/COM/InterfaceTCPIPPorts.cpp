@@ -41,9 +41,16 @@ InterfaceTCPIPPorts::SetDefault()
    {
       if (!tcpip_ports_)
          return S_FALSE;
-   
-      tcpip_ports_->SetDefault();
-   
+
+      if (!tcpip_ports_->SetDefault())
+      {
+         // The existing ports were deleted before the defaults were written, so this
+         // is not "nothing happened" - the server may be listening on fewer ports
+         // than it was a moment ago. Reported as an error rather than swallowed,
+         // because the administration tool otherwise says the defaults were restored.
+         return COMError::GenerateError("The default TCP/IP ports could not be restored. The previous ports were removed first, so the server may now be listening on fewer ports than before - check the hMailServer error log, correct the problem and try again.");
+      }
+
       return S_OK;
    }
    catch (...)

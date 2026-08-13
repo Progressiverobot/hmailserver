@@ -155,7 +155,25 @@ namespace HM
          return true;
       }
 
-      PersistentMessage::SaveObject(pNewMessage);
+      // This one could lose the message outright, which the other unchecked saves in
+      // the delivery path could not. The return value decides whether the original is
+      // kept, and an account configured to forward *without* keeping a copy answers
+      // false - so a failed save meant the forwarded copy was never queued and the
+      // original was deleted immediately afterwards. Nothing was delivered anywhere
+      // and nothing said so.
+      //
+      // On failure the original is kept whatever the account setting says. That is
+      // deliberately not what the administrator asked for: they asked not to keep a
+      // copy of a message that was forwarded, and this one was not.
+      if (!PersistentMessage::SaveObject(pNewMessage))
+      {
+         FileUtilities::DeleteFile(newFileName);
+
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 6087, "SMTPDeliverer::_ApplyForwarding",
+            "Could not forward message; the forwarded copy could not be saved. The original has been kept regardless of the account's 'keep original' setting, so that the message is not lost.");
+
+         return true;
+      }
 
       bool bKeepOriginal = pRecipientAccount->GetForwardKeepOriginal();
 
@@ -258,7 +276,18 @@ namespace HM
          return false;
       }
 
-      PersistentMessage::SaveObject(pNewMessage);
+      // Returning false here means "not redirected", which is what the no-recipients
+      // case above returns and what the caller needs in order to fall back to normal
+      // delivery rather than assume the message has gone somewhere.
+      if (!PersistentMessage::SaveObject(pNewMessage))
+      {
+         FileUtilities::DeleteFile(newFileName);
+
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 6088, "SMTPForwarding::RedirectToAddress",
+            "Could not redirect message; the redirected copy could not be saved. The file has been removed rather than left on disk with nothing referring to it.");
+
+         return false;
+      }
 
       // Wake the delivery manager so the redirected copy is sent promptly rather
       // than waiting for the next queue poll.

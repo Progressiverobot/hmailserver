@@ -34,12 +34,21 @@ namespace HM
       DBLoad_(sSQL);
    }
 
-   void 
+   bool
    TCPIPPorts::SetDefault()
    //---------------------------------------------------------------------------()
    // DESCRIPTION:
    // Resets all TCP/IP Ports to their default values.
    //---------------------------------------------------------------------------()
+   // Every port is deleted before the four defaults are written, and the four writes
+   // used to be unchecked - the function even declared error_message, passed it to
+   // each save, and then threw away whatever came back in it, four times. A database
+   // that failed anywhere in that sequence left the server listening on fewer ports
+   // than it started with, possibly none at all, while the COM caller got S_OK and
+   // the administration tool said the defaults had been restored.
+   //
+   // Which is the worst possible moment for silence: restoring the default ports is
+   // what an administrator does when connections are already not working.
    {
       Refresh();
 
@@ -58,37 +67,63 @@ namespace HM
             vecObjects[2]->GetPortNumber() == 143 && vecObjects[2]->GetProtocol() == STIMAP && vecObjects[2]->GetConnectionSecurity() == CSNone &&
             vecObjects[3]->GetPortNumber() == 587 && vecObjects[3]->GetProtocol() == STSMTP && vecObjects[3]->GetConnectionSecurity() == CSNone)
          {
-            // no changes are needed. 
-            return;
+            // no changes are needed.
+            return true;
          }
       }
-    
+
       // Delete all existing ports and then add new ones.
       DeleteAll();
 
-      String error_message;
+      String first_failure;
 
-      std::shared_ptr<TCPIPPort> pTCPIPPort = std::shared_ptr<TCPIPPort>(new TCPIPPort);
-      pTCPIPPort->SetPortNumber(25);
-      pTCPIPPort->SetProtocol(STSMTP);
-      PersistentTCPIPPort::SaveObject(pTCPIPPort, error_message, PersistenceModeNormal);
+      // Every port is attempted even after one has failed, because they are
+      // independent rows and three working ports is a better place to leave an
+      // administrator than one. The first reason is the one reported - later ones
+      // from the same outage say the same thing.
+      auto saveDefaultPort = [&first_failure](int portNumber, SessionType protocol)
+      {
+         std::shared_ptr<TCPIPPort> port = std::shared_ptr<TCPIPPort>(new TCPIPPort);
+         port->SetPortNumber(portNumber);
+         port->SetProtocol(protocol);
 
-      pTCPIPPort = std::shared_ptr<TCPIPPort>(new TCPIPPort);
-      pTCPIPPort->SetPortNumber(110);
-      pTCPIPPort->SetProtocol(STPOP3);
-      PersistentTCPIPPort::SaveObject(pTCPIPPort, error_message, PersistenceModeNormal);
+         String error_message;
 
-      pTCPIPPort = std::shared_ptr<TCPIPPort>(new TCPIPPort);
-      pTCPIPPort->SetPortNumber(143);
-      pTCPIPPort->SetProtocol(STIMAP);
-      PersistentTCPIPPort::SaveObject(pTCPIPPort, error_message, PersistenceModeNormal);
+         if (PersistentTCPIPPort::SaveObject(port, error_message, PersistenceModeNormal))
+            return true;
 
-      pTCPIPPort = std::shared_ptr<TCPIPPort>(new TCPIPPort);
-      pTCPIPPort->SetPortNumber(587);
-      pTCPIPPort->SetProtocol(STSMTP);
-      PersistentTCPIPPort::SaveObject(pTCPIPPort, error_message, PersistenceModeNormal);
+         if (first_failure.IsEmpty())
+         {
+            first_failure.Format(_T("Port %d could not be saved: %s"), portNumber,
+               error_message.IsEmpty() ? _T("no reason was given.") : error_message.c_str());
+         }
+
+         return false;
+      };
+
+      bool allSaved = true;
+
+      // Written out rather than folded into one expression so that no short-circuit
+      // can skip a port.
+      if (!saveDefaultPort(25, STSMTP)) allSaved = false;
+      if (!saveDefaultPort(110, STPOP3)) allSaved = false;
+      if (!saveDefaultPort(143, STIMAP)) allSaved = false;
+      if (!saveDefaultPort(587, STSMTP)) allSaved = false;
 
       Refresh();
+
+      if (!allSaved)
+      {
+         String message;
+         message.Format(_T("Restoring the default TCP/IP ports failed. The existing ports were deleted first, so the server is now listening on %d port(s) rather than the usual 4, and will not accept connections on the rest until this is corrected. %s"),
+            (int) vecObjects.size(), first_failure.c_str());
+
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 6079, "TCPIPPorts::SetDefault", message);
+
+         return false;
+      }
+
+      return true;
    }
 
    std::shared_ptr<TCPIPPort> 

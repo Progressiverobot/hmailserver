@@ -110,7 +110,9 @@ namespace HM
 
       void MarkCurrentMessageAsRead_();
       void ParseMessageHeaders_();
-      void SaveMessage_();
+      // False only when the message could not be saved. The caller must then abandon
+      // the session without a DELE, so the message stays on the remote server.
+      bool SaveMessage_();
       bool DoSpamProtection_();
       void SendUserName_();
       void StartMailboxCleanup_();

@@ -1154,7 +1154,19 @@ namespace HM
          FireOnExternalAccountDownload_(current_message_, (*cur_message_).second);
 
          // the message was not classified as spam which we should delete.
-         SaveMessage_();
+         if (!SaveMessage_())
+         {
+            // The save failed. SaveMessage_ has removed the file and said why; what
+            // matters here is what is *not* done next - MarkCurrentMessageAsRead_ does
+            // not run, so no UIDL row is written, and QuitNow_ ends the session without
+            // a DELE. The message is still on the remote server and will be collected
+            // on the next poll. Same handling as a truncated download above, for the
+            // same reason: the remote copy is the only one left.
+            download_finalized_ = true;
+
+            QuitNow_();
+            return;
+         }
 
          // Notify the SMTP deliverer that there is a new message.
          Application::Instance()->SubmitPendingEmail();
@@ -1313,16 +1325,45 @@ namespace HM
       RetrieveReceivedDate_(pHeader);
    }
 
-   void
+   bool
    POP3ClientConnection::SaveMessage_()
    {
       if (current_message_->GetRecipients()->GetCount() > 0)
       {
          current_message_->SetState(Message::Delivering);
 
-         PersistentMessage::SaveObject(current_message_);
+         // Unchecked, and this is the one place in this class where that could
+         // destroy mail rather than merely mislay it. On failure the message was not
+         // stored, but MarkCurrentMessageAsRead_ ran anyway and the DELE that follows
+         // removed it from the remote server - which for a provider that will not
+         // serve the same message twice is the only copy. The file was left behind in
+         // the data directory as well, one per occurrence, every time the account was
+         // checked.
+         //
+         // Treated exactly like the truncated-download case above: delete the file,
+         // report, and abandon the session without a DELE so the message is still on
+         // the remote server to be fetched again on the next poll. That is the whole
+         // reason this class already has that shape.
+         if (!PersistentMessage::SaveObject(current_message_))
+         {
+            // Released first because it may still hold the file open.
+            transmission_buffer_.reset();
 
-         return;
+            String fileName = PersistentMessage::GetFileName(current_message_);
+
+            if (!FileUtilities::DeleteFile(fileName))
+            {
+               ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5703, "POP3ClientConnection::SaveMessage_",
+                  "Could not delete the message file for a download that could not be saved: " + fileName);
+            }
+
+            ErrorManager::Instance()->ReportError(ErrorManager::High, 6092, "POP3ClientConnection::SaveMessage_",
+               "A message downloaded from an external POP3 account could not be saved, so it has not been delivered. It has been left on the remote server to be fetched again rather than deleted from it.");
+
+            return false;
+         }
+
+         return true;
       }
 
       // Nothing in the message resolved to a local account, so it is never saved.
@@ -1335,13 +1376,18 @@ namespace HM
       {
          ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5704, "POP3ClientConnection::SaveMessage_",
             "Could not delete the message file for a downloaded message with no local recipients: " + fileName);
-         return;
+
+         // True, not false: the message was deliberately discarded rather than lost,
+         // and a file that could not be tidied up is not a reason to fetch it again.
+         return true;
       }
 
       String sMessage;
       sMessage.Format(_T("POP3 External Account: A message downloaded from %s was discarded because none of its recipients belong to this server."),
          account_->GetName().c_str());
       LOG_APPLICATION(sMessage);
+
+      return true;
    }
 
    void

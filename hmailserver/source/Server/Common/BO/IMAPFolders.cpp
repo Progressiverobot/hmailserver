@@ -289,7 +289,18 @@ namespace HM
          pFolder->SetFolderName(sTopLevel);
          pFolder->SetIsSubscribed(bAutoSubscribe);
 
-         PersistentIMAPFolder::SaveObject(pFolder);
+         // Unchecked, and the AddItem below then put a folder with an id of 0 into the
+         // collection - where the caller looks it up by name, finds it, and files a
+         // message into folder 0. Stopping here instead leaves the lookup failing,
+         // which every caller already has to handle, because a folder path can always
+         // fail to be created for reasons that have nothing to do with the database.
+         if (!PersistentIMAPFolder::SaveObject(pFolder))
+         {
+            ErrorManager::Instance()->ReportError(ErrorManager::High, 6095, "IMAPFolders::CreatePath",
+               "The IMAP folder '" + sTopLevel + "' could not be created because it could not be saved. The rest of the folder path has not been created either.");
+
+            return;
+         }
 
          // Add the folder to the collection.
          pParentContainer->AddItem(pFolder);

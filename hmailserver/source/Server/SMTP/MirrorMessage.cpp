@@ -16,6 +16,7 @@
 #include "../Common/BO/RouteAddresses.h"
 #include "../common/Cache/CacheContainer.h"
 #include "../common/Persistence/PersistentMessage.h"
+#include "../Common/Util/FileUtilities.h"
 #include "../Common/Util/MailerDaemonAddressDeterminer.h"
 
 #include "RecipientParser.h"
@@ -136,8 +137,18 @@ namespace HM
       // Save the message
       if (pMsg->GetRecipients()->GetCount() > 0)
       {
-         // Save message
-         PersistentMessage::SaveObject(pMsg);
+         // Unchecked, so a failed save left the spool copy made by CopyToQueue above
+         // on disk with no row referring to it, and the mirror silently did not
+         // happen - on a feature whose whole point is that somebody is watching the
+         // mail. Reported at the same severity as the copy failure a few lines up,
+         // which is the same event one step earlier.
+         if (!PersistentMessage::SaveObject(pMsg))
+         {
+            FileUtilities::DeleteFile(PersistentMessage::GetFileName(pMsg));
+
+            ErrorManager::Instance()->ReportError(ErrorManager::High, 6086, "MirrorMessage::Send",
+               "Could not mirror the message because the copy of it could not be saved. The copy's file has been removed rather than left on disk with nothing referring to it.");
+         }
       }
 
       // --- Tell the deliverer that a new message is pending.

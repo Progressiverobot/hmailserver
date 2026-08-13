@@ -99,9 +99,18 @@ namespace HM
       RecipientParser recipientParser;
       recipientParser.CreateMessageRecipientList(sRecipient, pMsg->GetRecipients(), recipientOK);
 
-      // Save message
+      // Save message. As in SMTPVacationMessageCreator: the WriteReported above was
+      // checked and this was not, which leaves the other half of the same pair open.
       if (pMsg->GetRecipients()->GetCount() > 0)
-         PersistentMessage::SaveObject(pMsg);
+      {
+         if (!PersistentMessage::SaveObject(pMsg))
+         {
+            FileUtilities::DeleteFile(PersistentMessage::GetFileName(pMsg));
+
+            ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6090, "SMTPVirusNotifier::CreateMessageDeletedNotification",
+               "The virus notification could not be saved and has not been sent, so nobody has been told that a message was deleted. Its file has been removed rather than left on disk with nothing referring to it.");
+         }
+      }
 
       // Tell app to submit mail
       Application::Instance()->SubmitPendingEmail();  

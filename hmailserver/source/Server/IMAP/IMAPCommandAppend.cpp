@@ -345,7 +345,31 @@ namespace HM
          current_message_->SetCreateTime(create_time_to_set_);
       }
 
-      PersistentMessage::SaveObject(current_message_);
+      // The save that makes an APPEND real, and its result was discarded - so a
+      // database failure here answered the client "OK [APPENDUID ...] APPEND
+      // completed" for a message that had not been stored, having first inserted
+      // whatever GetID() happened to be into the recent set and told the folder it
+      // had changed. The client believes it is safe to delete its copy, and for a
+      // migration tool moving a mailbox into this server over IMAP - which is the
+      // main thing APPEND is used for at volume - that is the copy that mattered.
+      //
+      // NO rather than BAD: the command was well formed, the server could not do it.
+      // The file is removed so it is not left on disk with no row referring to it.
+      if (!PersistentMessage::SaveObject(current_message_))
+      {
+         // The file this wrote is the one KillCurrentMessage_ already knows how to
+         // remove, and it is what every other abandoned APPEND in this class uses.
+         KillCurrentMessage_();
+
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 6091, "IMAPCommandAppend::Finish_",
+            "An APPEND could not be saved and has been refused. The message file has been removed rather than left on disk with nothing referring to it.");
+
+         pConnection->SendAsciiData(current_tag_ + " NO APPEND failed: the message could not be saved.\r\n");
+
+         destination_folder_.reset();
+         current_message_.reset();
+         return;
+      }
 
       pConnection->GetRecentMessages().insert(current_message_->GetID());
 

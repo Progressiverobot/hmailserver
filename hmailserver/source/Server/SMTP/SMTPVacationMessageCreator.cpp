@@ -120,9 +120,19 @@ namespace HM
       RecipientParser recipientParser;
       recipientParser.CreateMessageRecipientList(sToAddress, pMsg->GetRecipients(), recipientOK);
 
-      // Save message
+      // Save message. Checked for the same reason the WriteReported above it is: the
+      // pair that leaves nothing behind is a file with no row and a row with no file,
+      // and this end was unguarded while the other was.
       if (pMsg->GetRecipients()->GetCount() > 0)
-         PersistentMessage::SaveObject(pMsg);
+      {
+         if (!PersistentMessage::SaveObject(pMsg))
+         {
+            FileUtilities::DeleteFile(newFileName);
+
+            ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6089, "SMTPVacationMessageCreator::CreateVacationMessage",
+               "The out-of-office reply could not be saved and has not been sent. Its file has been removed rather than left on disk with nothing referring to it.");
+         }
+      }
 
       // Tell app to submit mail
       Application::Instance()->SubmitPendingEmail();  

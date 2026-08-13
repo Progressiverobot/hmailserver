@@ -701,28 +701,56 @@ namespace HM
    bool 
    Configuration::XMLStore(XNode *pBackupNode)
    {
+      // Every one of these was called for its side effect and its answer thrown away,
+      // under a function that then returned true - so this half of the backup could
+      // not fail. XMLLoad below is checked at every single step, which is the shape
+      // that gives it away: the restore was hardened and the backup was not, and a
+      // backup that cannot report a failure is worse than one that fails loudly. It
+      // is the file somebody reaches for after they have already lost something, and
+      // the one place a missing section is guaranteed not to be noticed is at the
+      // moment it is written.
+      //
+      // Ordered as before, and each one still attempted only if the previous
+      // succeeded: a half-written settings section is not worth continuing past, and
+      // BackupExecuter deletes the archive it was building when this returns false.
+
       // PROPERTIES
-      property_set_->XMLStore(pBackupNode);
+      if (!property_set_->XMLStore(pBackupNode))
+         return false;
 
       // SECURITY RANGES
       SecurityRanges securityRanges;
       securityRanges.Refresh();
-      securityRanges.XMLStore(pBackupNode, 0);
+      if (!securityRanges.XMLStore(pBackupNode, 0))
+         return false;
 
       // RULES
       std::shared_ptr<Rules> pRules = std::shared_ptr<Rules>(new Rules(0));
       pRules->Refresh();
-      pRules->XMLStore(pBackupNode, 0);
+      if (!pRules->XMLStore(pBackupNode, 0))
+         return false;
 
       // TCP/IP ports
-      GetTCPIPPorts()->XMLStore(pBackupNode, 0);
-      ssl_certificates_->XMLStore(pBackupNode, 0);
-      blocked_attachments_->XMLStore(pBackupNode, 0);
+      if (!GetTCPIPPorts()->XMLStore(pBackupNode, 0))
+         return false;
 
-      smtp_configuration_->XMLStore(pBackupNode, 0);
-      imap_configuration_->XMLStore(pBackupNode, 0);
-      anti_spam_configuration_.XMLStore(pBackupNode, 0);
-      cache_configuration_->XMLStore(pBackupNode, 0);
+      if (!ssl_certificates_->XMLStore(pBackupNode, 0))
+         return false;
+
+      if (!blocked_attachments_->XMLStore(pBackupNode, 0))
+         return false;
+
+      if (!smtp_configuration_->XMLStore(pBackupNode, 0))
+         return false;
+
+      if (!imap_configuration_->XMLStore(pBackupNode, 0))
+         return false;
+
+      if (!anti_spam_configuration_.XMLStore(pBackupNode, 0))
+         return false;
+
+      if (!cache_configuration_->XMLStore(pBackupNode, 0))
+         return false;
 
       return true;
    }

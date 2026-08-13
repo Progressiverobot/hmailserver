@@ -363,11 +363,28 @@ namespace HM
 
       if (pMsg->GetRecipients()->GetCount() > 0)
       {
-         // Save message
-         PersistentMessage::SaveObject(pMsg);
+         // Save message.
+         //
+         // Unchecked, and the counter below it fired regardless - so a failed save
+         // meant the delivery-failure notification was never queued while the metrics
+         // said a bounce had been sent. The sender's message had already failed; this
+         // is the notification telling them so, and losing it silently is how a
+         // message disappears with nobody anywhere knowing.
+         if (PersistentMessage::SaveObject(pMsg))
+         {
+            // A bounce/NDR was actually generated and queued for the sender.
+            ServerStatus::Instance()->OnMessageBounced();
+         }
+         else
+         {
+            FileUtilities::DeleteFile(newFileName);
 
-         // A bounce/NDR was actually generated and queued for the sender.
-         ServerStatus::Instance()->OnMessageBounced();
+            String errorMessage;
+            errorMessage.Format(_T("The delivery-failure notification for message %I64d could not be saved, so the sender has not been told that their message failed."),
+               pOrigMessage->GetID());
+
+            ErrorManager::Instance()->ReportError(ErrorManager::High, 6085, "SMTPDeliverer::SubmitErrorLog_", errorMessage);
+         }
       }
       else
       {

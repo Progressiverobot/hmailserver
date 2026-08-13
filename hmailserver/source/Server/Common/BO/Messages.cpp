@@ -137,10 +137,29 @@ namespace HM
       {
          LOG_DEBUG("Messages::Save() - Iteration");
 
-         if (oMessage->GetFlagDeleted()) 
-            PersistentMessage::DeleteObject(oMessage);
+         // Both were unchecked. No mail is lost either way - the file and the row are
+         // both still there - but this is where IMAP flag changes are persisted, so a
+         // failure means a client was told its STORE succeeded and will find the flags
+         // back as they were at the next reconnect, with nothing anywhere explaining
+         // it. Reported rather than propagated: Save() has no way to answer, its
+         // callers are mid-command, and one message failing is not a reason to abandon
+         // the rest of the folder.
+         if (oMessage->GetFlagDeleted())
+         {
+            if (!PersistentMessage::DeleteObject(oMessage))
+            {
+               ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6093, "Messages::Save",
+                  Formatter::Format("Message {0} is flagged as deleted but could not be removed from the database. It will still be there at the next refresh.", oMessage->GetID()));
+            }
+         }
          else
-            PersistentMessage::SaveObject(oMessage);
+         {
+            if (!PersistentMessage::SaveObject(oMessage))
+            {
+               ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6094, "Messages::Save",
+                  Formatter::Format("Changes to message {0} could not be saved. Any flags just set on it will revert at the next refresh.", oMessage->GetID()));
+            }
+         }
       }
 
       LOG_DEBUG("Messages::~Save()");

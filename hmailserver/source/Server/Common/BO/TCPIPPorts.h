@@ -22,7 +22,10 @@ namespace HM
       void Refresh();
       // Refreshes this collection from the database.
 
-      void SetDefault();
+      // False if the defaults could not be written. The existing ports are deleted
+      // first, so a false return means the server may now be listening on fewer
+      // ports than it started with - possibly none.
+      bool SetDefault();
       // Generates a default set of items in this collection.
 
    protected:

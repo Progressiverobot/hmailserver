@@ -288,7 +288,17 @@ namespace HM
          return;
       }
 
-      PersistentMessage::SaveObject(pMsg);
+      // Unchecked, so a failed save left the forwarded copy's file on disk with no
+      // row referring to it and the forward silently not happening. The original
+      // message is untouched either way - this creates a second one - so the cost is
+      // an orphaned file and a rule that quietly did not run, not lost mail. Handled
+      // the same way as the no-recipients case immediately above.
+      if (!PersistentMessage::SaveObject(pMsg))
+      {
+         FileUtilities::DeleteFile(newFileName);
+
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6082, "RuleApplier::ApplyAction_Forward", "Could not forward message; the forwarded copy could not be saved. The file has been removed rather than left on disk with nothing referring to it.");
+      }
    }
 
    void 
@@ -359,7 +369,13 @@ namespace HM
          return;
       }
 
-      PersistentMessage::SaveObject(pMsg);
+      // As in ApplyAction_Forward above.
+      if (!PersistentMessage::SaveObject(pMsg))
+      {
+         FileUtilities::DeleteFile(newMessageFileName);
+
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6083, "RuleApplier::ApplyAction_Copy", "Could not copy message; the copy could not be saved. The file has been removed rather than left on disk with nothing referring to it.");
+      }
    }
 
    void 
@@ -474,7 +490,15 @@ namespace HM
       RecipientParser recipientParser;
       recipientParser.CreateMessageRecipientList(sReplyRecipientAddress, pMsg->GetRecipients(), recipientOK);
 
-      PersistentMessage::SaveObject(pMsg);
+      // As above, and for the same reason the WriteReported check a few lines up
+      // exists: a row without its file, or here a file without its row, is worse than
+      // no reply at all.
+      if (!PersistentMessage::SaveObject(pMsg))
+      {
+         FileUtilities::DeleteFile(newMessageFileName);
+
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6084, "RuleApplier::ApplyAction_Reply", "Could not send the rule-generated reply; it could not be saved. The file has been removed rather than left on disk with nothing referring to it.");
+      }
    }
 
    bool

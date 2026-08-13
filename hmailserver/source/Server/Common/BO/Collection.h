@@ -52,6 +52,16 @@ namespace HM
       bool DBLoad_(const String &sSQL);
       bool DBLoad_(const SQLCommand &command);
 
+      // Reports a delete the database refused. Both delete paths return false to
+      // their caller now, but every one of the fifty-six COM Delete methods that
+      // reach them still discards that answer, and changing all of them at once is
+      // not the safe move: false has always also meant "no such item", which those
+      // methods are entitled to ignore, so propagating it wholesale would turn
+      // deleting something twice into an error. Reporting here separates the two -
+      // a genuine database failure lands in the error log whatever the caller does,
+      // and "not found" stays silent, which is what it was.
+      static void ReportDeleteFailure_(std::shared_ptr<T> object);
+
       mutable boost::recursive_mutex _mutex;
 
       std::vector<std::shared_ptr<T> > vecObjects;
@@ -88,8 +98,16 @@ namespace HM
       boost::lock_guard<boost::recursive_mutex> guard(_mutex);
 
       // First delete the currently existing items.
+      //
+      // This used to answer *true* when the delete failed, and then load nothing - so
+      // a restore that could not clear a collection reported that it had restored it,
+      // over a collection it had left exactly as it found it. Every caller in the
+      // restore path treats true as "this collection now holds what the backup held",
+      // and none of them had any way to find out otherwise. BackupExecuter guards the
+      // domains case from the outside for that reason; this is the same guard where it
+      // belongs, so it covers every collection rather than the one that was noticed.
       if (!DeleteAll())
-         return true;
+         return false;
 
       XNode *pCollNode = pBackupNode->GetChild(GetCollectionName());
 
@@ -113,7 +131,12 @@ namespace HM
                {
                   // Handle failure..
                   String message;
-                  message.Format(_T("Failed to save object %s. Error: %s"), pItem->GetName().c_str(), result);
+                  // result.c_str(), not result. String is CStdStringW, a class, and
+                  // passing one through a variadic %s hands Format the object rather
+                  // than a pointer - for a short string that is character data being
+                  // dereferenced as an address. The one line that reports why a restore
+                  // failed was the line most likely to take the process down with it.
+                  message.Format(_T("Failed to save object %s. Error: %s"), pItem->GetName().c_str(), result.c_str());
 
                   ErrorManager::Instance()->ReportError(ErrorManager::Critical, 5212, "Collection::XMLLoad", message);
                   return false;
@@ -191,7 +214,15 @@ namespace HM
          std::shared_ptr<T> pObject = (*iter);
          if (pObject->GetID() == DBID)
          {
-            P::DeleteObject(pObject);
+            // Same as DeleteItem above: the database delete was unchecked and the
+            // object was dropped from the collection regardless, so a refused delete
+            // read as a successful one until the next Refresh brought the object back.
+            if (!P::DeleteObject(pObject))
+            {
+               ReportDeleteFailure_(pObject);
+               return false;
+            }
+
             vecObjects.erase(iter);
             return true;
          }
@@ -224,9 +255,20 @@ namespace HM
          return false;
 
       auto iter = vecObjects.begin() + index;
-      P::DeleteObject(*iter);
+
+      // The database delete was unchecked, and the item was dropped from the
+      // in-memory collection either way - so a delete that the database refused was
+      // reported as done, the object vanished from the administration tool, and it
+      // came back at the next Refresh. Leaving it in the collection on failure is the
+      // truthful outcome: what the caller sees then matches what is actually stored.
+      if (!P::DeleteObject(*iter))
+      {
+         ReportDeleteFailure_(*iter);
+         return false;
+      }
+
       vecObjects.erase(iter);
-      
+
       return true;
    }  
 
@@ -247,7 +289,23 @@ namespace HM
       return EmptyObject;
    }  
 
-   template <class T, class P>  
+   template <class T, class P>
+   void Collection<T,P>::ReportDeleteFailure_(std::shared_ptr<T> object)
+   {
+      // An object that was never saved has no row to delete, and every persister
+      // refuses that case up front with an assert - a programming error rather than
+      // a database one, and not worth an entry in an administrator's error log.
+      if (!object || object->GetID() <= 0)
+         return;
+
+      String message;
+      message.Format(_T("The database refused to delete %s (id %I64d). It has been left in the server's view of the collection rather than removed from it, so what is shown now matches what is stored."),
+         object->GetName().c_str(), object->GetID());
+
+      ErrorManager::Instance()->ReportError(ErrorManager::High, 6080, "Collection::Delete", message);
+   }
+
+   template <class T, class P>
    bool Collection<T,P>::DBLoad_(const String &sSQL)
    {
       return DBLoad_(SQLCommand(sSQL));

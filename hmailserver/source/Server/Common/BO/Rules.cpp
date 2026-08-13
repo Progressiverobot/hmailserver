@@ -123,8 +123,20 @@ namespace HM
          if (pRule->GetSortOrder() != iSortOrder)
          {
             // We need to update the sort order of this rule.
+            //
+            // Reported rather than propagated: this function returns void, it is
+            // renumbering a whole list, and one row failing is not a reason to abandon
+            // the rest. But rules run in sort order and that order decides which of
+            // two conflicting rules wins, so a silent failure here changes what the
+            // server does with mail while the administration tool shows the order the
+            // administrator asked for.
             pRule->SetSortOrder(iSortOrder);
-            PersistentRule::SaveObject(pRule);
+
+            if (!PersistentRule::SaveObject(pRule))
+            {
+               ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6096, "Rules::UpdateSortOrder_",
+                  Formatter::Format("The sort order of rule {0} could not be saved, so the rules will run in a different order than the one shown.", pRule->GetName()));
+            }
          }
          
       }

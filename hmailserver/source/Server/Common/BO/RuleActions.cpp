@@ -106,9 +106,18 @@ namespace HM
             pRuleAction->SetSortOrder(iSortOrder);
 
             // If it's a new rule action, we should not save it now.
+            //
+            // As in Rules::UpdateSortOrder_: reported rather than propagated, because
+            // this renumbers a whole list and returns void. The order decides which
+            // action runs first, so a silent failure changes what a rule does while
+            // the administration tool shows the order that was asked for.
             if (pRuleAction->GetID() > 0)
             {
-               PersistentRuleAction::SaveObject(pRuleAction);
+               if (!PersistentRuleAction::SaveObject(pRuleAction))
+               {
+                  ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6097, "RuleActions::UpdateSortOrder_",
+                     Formatter::Format("The sort order of rule action {0} could not be saved, so the actions will run in a different order than the one shown.", pRuleAction->GetID()));
+               }
             }
          }
       }

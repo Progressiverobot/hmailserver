@@ -168,9 +168,54 @@ namespace HM
       // Recalculate filesize after Return-Path and optionally Delivered-To header(s) are added
       accountLevelMessage->SetSize(FileUtilities::FileSize(PersistentMessage::GetFileName(account, accountLevelMessage)));
 
-      PersistentMessage::SaveObject(accountLevelMessage);
+      // This is the save that makes the delivery real, and its result was discarded.
+      //
+      // What followed on failure: the folder was marked as refreshed, a
+      // NotificationMessageAdded went out for a message that was not added, AWStats
+      // recorded a successful delivery, and DeliverMessage counted the message
+      // delivered and then deleted the queue row - because saErrorMessages was empty
+      // and the message had not been rescheduled. The file stayed on disk with
+      // nothing pointing at it. So a database failure at this one line lost the
+      // message outright, told the recipient nothing, told the sender nothing, and
+      // wrote "delivered" into the statistics.
+      //
+      // Handled the same way as the pre-process failure above - delete the file we
+      // wrote, give the reused row back, and stop before anything claims the
+      // delivery happened - with two additions: this one is a server fault rather
+      // than a recipient-side one, so it is reported; and the sender is told, subject
+      // to the same NOTIFY opt-out the quota path honours.
+      //
+      // A bounce is not the ideal answer to what may be a transient database outage -
+      // holding the message for a later attempt would be - but local delivery has no
+      // reschedule path the way ExternalDelivery does, and telling the sender it
+      // failed is strictly better than the message evaporating. The reschedule is
+      // worth building and is a larger change than this one.
+      if (!PersistentMessage::SaveObject(accountLevelMessage))
+      {
+         FileUtilities::DeleteFile(PersistentMessage::GetFileName(account, accountLevelMessage));
 
-      // Tell the folder container that the users inbox is updated this will 
+         if (messageReused)
+         {
+            accountLevelMessage->SetAccountID(0);
+            messageReused = false;
+         }
+
+         String errorMessage;
+         errorMessage.Format(_T("Message %I64d could not be saved during delivery to %s, so it has not been delivered. The message file has been removed rather than left on disk with nothing referring to it."),
+            original_message_->GetID(), String(account->GetAddress()).c_str());
+
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 6081, "LocalDelivery::DeliverToLocalAccount_", errorMessage);
+
+         if (!suppressFailureDsn)
+         {
+            saErrorMessages.push_back(Formatter::Format("{0}\r\n   Error Type: SMTP\r\n   Error Description: Delivery failed\r\n   Additional information: The message could not be saved to the recipient's mailbox. The server administrator should check the hMailServer error log.\r\n\r\n",
+               account->GetAddress()));
+         }
+
+         return;
+      }
+
+      // Tell the folder container that the users inbox is updated this will
       // cause a refresh in the imap server whenever a new imap command is sent.
       MessagesContainer::Instance()->SetFolderNeedsRefresh(accountLevelMessage->GetFolderID());
 

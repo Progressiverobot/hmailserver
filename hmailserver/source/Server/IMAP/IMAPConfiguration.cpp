@@ -225,9 +225,11 @@ namespace HM
    bool 
    IMAPConfiguration::XMLStore(XNode *pBackupNode, int iOptions)
    {
-      // Public folders
+      // Public folders. Checked now - the groups store below it always was, so this
+      // was one of a pair where only one half could fail the backup.
       std::shared_ptr<IMAPFolders> pIMAPFolders = GetPublicFolders();
-      pIMAPFolders->XMLStore(pBackupNode, iOptions);
+      if (!pIMAPFolders->XMLStore(pBackupNode, iOptions))
+         return false;
 
       if (!GetGroups()->XMLStore(pBackupNode, iOptions))
          return false;
@@ -238,12 +240,18 @@ namespace HM
    bool
    IMAPConfiguration::XMLLoad(XNode *pBackupNode, int iRestoreOptions)
    {
-      GetGroups()->XMLLoad(pBackupNode, iRestoreOptions);
+      // As with the store above and with SMTPConfiguration::XMLLoad: both of these
+      // were unchecked under a function that answered true regardless, so a restore
+      // that could not put the IMAP groups or the public folders back reported that
+      // it had.
+      if (!GetGroups()->XMLLoad(pBackupNode, iRestoreOptions))
+         return false;
 
       // Should we restore messages as well?
       if (iRestoreOptions & Backup::BOMessages)
       {
-         GetPublicFolders()->XMLLoad(pBackupNode, iRestoreOptions);
+         if (!GetPublicFolders()->XMLLoad(pBackupNode, iRestoreOptions))
+            return false;
       }
 
       return true;

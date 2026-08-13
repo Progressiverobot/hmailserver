@@ -553,9 +553,12 @@ namespace HM
 
    /*
       Escapes a value so that it can be placed inside a single-quoted SQL string
-      literal. Only used on the backends which do not support real command
-      parameters (MySQL and PostgreSQL) - the ADO-based backends bind values and
-      never come here.
+      literal. Two callers, and they differ in reach. The statement builders above
+      come here only on the backends that do not support real command parameters
+      (MySQL and PostgreSQL), because the ADO-based backends bind values instead.
+      SqlLogDevice comes here on all four - it inlines its values deliberately,
+      for the reason written above BuildValuesTuple_ - so this function is on the
+      path for every backend and not only for two.
 
       Doubling the quote is correct on every backend. Doubling the backslash is
       correct on MySQL in its default sql_mode, and on PostgreSQL only when
