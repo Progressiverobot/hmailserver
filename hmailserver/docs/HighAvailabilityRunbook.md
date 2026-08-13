@@ -30,10 +30,11 @@ locking model; that is out of scope here.
                 │                                  │
                 └──────────────┬───────────────────┘
                                │
-              ┌────────────────▼─────────────────┐
-              │  Shared database (MSSQL/MySQL/PG) │
-              │  Shared message store (DataDirectory) │
-              └───────────────────────────────────┘
+              ┌──────────────────────────────────────┐
+              │  Shared database (MSSQL/MySQL/PG)    │
+              │  Shared message store ([Directories] │
+              │  DataFolder)                         │
+              └──────────────────────────────────────┘
 ```
 
 Exactly **one** node runs the hMailServer service at any time. Both nodes are
@@ -55,11 +56,15 @@ message-store directory.
 
 ### 2.2 Shared message store
 
-* hMailServer stores message files under `DataDirectory`. Both nodes must see the
-  **same** directory on shared storage (SAN/NAS/clustered file system, or a
-  cloud file share). The database row for each message references its on-disk
-  path; the database and the message store must therefore stay consistent with
-  each other, so keep them on the same failover boundary.
+* hMailServer stores message files under the data directory, which is
+  `hMailServer.INI` → `[Directories]` → **`DataFolder`** (there is no setting called
+  `DataDirectory`; that is the name of the accessor in the code). Both nodes must see
+  the **same** directory on shared storage (SAN/NAS/clustered file system, or a cloud
+  file share). Note that this key lives in the per-node ini file, not in the shared
+  database, so it is one of the values the "keep the INI in sync" step below is for.
+  The database row for each message references its on-disk path; the database and the
+  message store must therefore stay consistent with each other, so keep them on the
+  same failover boundary.
 * Ensure both nodes' service accounts have identical read/write access to the
   share.
 
@@ -102,13 +107,27 @@ want the metrics port encrypted as well, set `MetricsServerCertificateFile` and
 `MetricsServerPrivateKeyFile`; without them the listener stays plain HTTP and says so in
 the application log rather than refusing to start.
 
+Two properties of this listener to design the health check around, both deliberate:
+
+* **`MetricsServerBindAddress` takes an IPv4 literal and nothing else.** It is parsed
+  with `inet_pton(AF_INET, …)`, so `0.0.0.0` and `127.0.0.1` work, while a host name,
+  `localhost` or an IPv6 address is rejected — the listener logs
+  `MetricsServer: Invalid bind address` and does not start, which takes the probes with
+  it. If your health check gets a refused connection on a node whose service is
+  running, this is the first thing to check.
+* **It is a single accept loop serving one connection at a time.** Probes are cheap and
+  answered before anything that can refuse, but a scrape and a probe are still
+  serialised behind each other. Keep the probe interval and its timeout comfortably
+  apart (the listener bounds a request read at 5s and a response write at 15s), and do
+  not point a sub-second health check at it.
+
 Probes (HTTP):
 
 | Path       | Meaning                                                                 | Use for                          |
 |------------|-------------------------------------------------------------------------|----------------------------------|
 | `/livez`   | Process is alive (200 whenever the listener is up).                     | Liveness restarts.               |
-| `/readyz`  | 200 only when the server is `Running` **and** the database is connected. Returns **503** while the server is starting, stopping, or draining. | **VIP / load-balancer routing.** |
-| `/healthz` | JSON: `status`, server `state`, `database`.                            | Dashboards / debugging.          |
+| `/readyz`  | 200 only when the server is `Running` **and** the database is connected. Returns **503** while the server is stopping or draining, or if the database connection is lost. During *startup* it is not 503 but **refused**: this listener is the last thing brought up, after the state has already gone to `Running`, so there is nothing listening until the server is ready. Both read as unhealthy to a load balancer, which is all that matters here. | **VIP / load-balancer routing.** |
+| `/healthz` | JSON: `status` (`ok`/`unavailable`), `state`, `database` (`up`/`down`), `sessions` per protocol and `uptime_seconds`. 200 when running with the database up, 503 otherwise. | Dashboards / debugging.          |
 
 **Configure the VIP/load balancer health check against `/readyz`.** Because the
 passive node's service is stopped, its `/readyz` connection is refused (unhealthy)
@@ -169,8 +188,8 @@ Reverse the steps to fail back.
 
 ## 7. Validation checklist
 
-* [ ] Both nodes use the same external database and the same `DataDirectory` on
-      shared storage.
+* [ ] Both nodes use the same external database and the same `[Directories]`
+      `DataFolder` on shared storage.
 * [ ] `MetricsServerPort` is enabled and reachable by the health checker on both
       nodes; the VIP health check targets `/readyz`.
 * [ ] `MetricsServerAuthToken` is set on both nodes, and the scraper sends it. Without
@@ -193,3 +212,28 @@ Reverse the steps to fail back.
 | Graceful shutdown drain (`ShutdownDrainSeconds`)         | Shared database with its own HA           |
 | Shared-database + shared-store single-active design      | Shared message storage (SAN/NAS/cloud)    |
 | `/metrics` for alerting on the active node               | Fencing of a failed node                  |
+
+---
+
+## 9. Verified against the code
+
+Checked 13 August 2026. Every setting named on this page exists in
+`IniFileSettings::LoadSettings` with the default stated (`MetricsServerPort` 0,
+`MetricsServerBindAddress` `127.0.0.1`, `MetricsServerAuthToken` /
+`MetricsServerAuthUsername` / `MetricsServerAuthPassword` /
+`MetricsServerCertificateFile` / `MetricsServerPrivateKeyFile` all empty,
+`ShutdownDrainSeconds` 0). The probe behaviour is `MetricsServer::HandleClient_`,
+which answers `/livez`, `/readyz` and `/healthz` **before** any branch that can
+refuse — a deliberate invariant recorded at that code, and the reason the VIP
+configuration here does not change when a credential is added. `/metrics` closing
+with 503 rather than 401 on a non-loopback bind with no credential is
+`MetricsServer::Start` plus `BuildMetricsUnavailableResponse_`; the loopback test is
+`IsLoopbackAddress_`, which accepts the whole of `127.0.0.0/8`. The drain order —
+state to `Stopping` first, so `/readyz` is already 503, then the bounded wait, then
+the listeners come down — is `Application::StopServers`. The `/healthz` body is
+`BuildHealthBody_`. The bind-address parsing and the request/response deadlines are
+in `MetricsServer::Start`, `ReadRequest_` and `Send_`.
+
+There is regression coverage for the parts that would fail silently:
+`test/RegressionTests/Infrastructure/HealthProbes.cs` and
+`test/RegressionTests/Infrastructure/MetricsSecurity.cs`.

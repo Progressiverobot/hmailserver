@@ -21,14 +21,33 @@ upgrade cannot do is undo itself. See [Rolling back](#rolling-back).
 Where you can upgrade from
 --------------------------
 
-**Any earlier hMailServer version.** The upgrade chain is continuous: 56 registered
-steps, from schema version `0` through to the current **6005**, applied in sequence.
-A database at any intermediate version is brought forward one step at a time, so
-there is no "you must first upgrade to 5.x" hop to plan around.
+The upgrade chain is continuous: **57 registered steps**, from schema version `0`
+through to the current **6006**, applied in sequence. A database at any
+intermediate version is brought forward one step at a time, so there is no "you
+must first upgrade to 5.x" hop to plan around.
 
 That includes databases created by the *original* upstream project. This fork did
-not branch the schema; it extended it. Version 6005 is a superset, reached by the
+not branch the schema; it extended it. Version 6006 is a superset, reached by the
 same mechanism upstream used.
+
+**How far back the chain reaches depends on your backend, and this is the one
+qualification worth knowing before you start.** The steps are registered once, for
+every backend, but the SQL scripts they run are per-dialect and they do not all
+exist:
+
+| Backend | Steps that ship | Reaches back to |
+|---|---|---|
+| MySQL / MariaDB | all 57 | schema `0` (hMailServer 1.0) |
+| Microsoft SQL Server | all 57 | schema `0` (hMailServer 1.0) |
+| PostgreSQL | the last 30 | schema `5001` |
+| SQL Server Compact (internal) | the last 30 | schema `5001` |
+
+In practice that is not a gap, because neither PostgreSQL nor the internal SQL CE
+database was a supported backend before hMailServer 5, so no database older than
+`5001` exists on either. But it is why the answer is "any version of *your*
+backend" rather than "any version". If a step's script is missing, DBUpdater says
+so by name and stops before touching anything — it checks that every file on the
+path exists before it runs the first one.
 
 What the upgrade touches
 ------------------------
@@ -39,10 +58,14 @@ What the upgrade touches
 * **Every supported backend.** Separate script sets exist for MySQL/MariaDB, MS SQL
   Server, PostgreSQL and the embedded SQL CE. The installer picks the set matching
   your configured backend.
-* **Nothing is deleted that carries data.** On some backends a few long-dead tables
-  are left in place rather than dropped, so a schema comparison between an upgraded
-  database and a freshly created one can show extra tables. That is expected and
-  harmless; it is not a sign of a partial upgrade.
+* **Nothing is deleted that carries live data.** One consequence is worth knowing
+  because it looks alarming and is not: a schema comparison between an upgraded
+  database and a freshly created one can show an extra table. The concrete case is
+  `hm_adsynchronization`, a long-dead table that step 5004 → 5005 drops on MS SQL
+  Server, MySQL and SQL CE but not on PostgreSQL, and which no `CreateTables` script
+  creates on any backend. So an upgraded PostgreSQL database keeps it and a fresh one
+  never had it. It is unused either way, and its presence is not a sign of a partial
+  upgrade.
 
 Doing it
 --------
@@ -53,9 +76,12 @@ Doing it
      what you want if you need to restore into a different server.
    * the **data directory** — the message files. This is the part that cannot be
      reconstructed from anything else.
-2. **Note your current versions.** The server version is in the Control Panel, and
-   the schema version is the `dbversion` value in the settings table. Write both down
-   — if you need support, they are the first two questions.
+2. **Note your current versions.** The server version is in the Control Panel. The
+   schema version is in a table of its own — `select value from hm_dbversion`, a
+   single-column, single-row table, *not* a row in the settings table. (The Control
+   Panel shows it on the **Server status** page and DBUpdater reads it too; the SQL
+   is here for when the server will not start and neither of them will connect.)
+   Write both down — if you need support, they are the first two questions.
 3. **Run the new installer.** It stops the service, installs, upgrades the schema,
    and restarts.
 4. **Check it came up.** The service should be running and listening on your
@@ -68,9 +94,15 @@ If the upgrade fails
 --------------------
 
 The installer checks both that the database tool launched *and* its exit code, so a
-failed or cancelled schema upgrade will not report a successful install. That
-matters: the alternative is a service running against a schema it does not
-understand.
+failed or cancelled schema upgrade is reported instead of passing silently. Be
+clear about what that check does and does not do, because it is easy to read more
+into it than it delivers: on a non-zero exit code the installer shows an error
+dialog naming the exit code and telling you to re-run `DBSetupQuick.exe`, and then
+**carries on** — it goes on to start the service and the wizard finishes. So the
+signal is the dialog and the log, not a failed installation. If you script
+installs, treat that dialog's appearance, or a `hm_dbversion` that is still on the
+old value afterwards, as the failure; do not treat "the installer finished" as
+success.
 
 If it does fail, the service may be installed but the schema only partly upgraded.
 The server does not paper over that: on startup it compares the database's version
@@ -127,13 +159,46 @@ matches where you actually put it. Upgrade afterwards, as a separate step, so th
 something goes wrong you know which of the two changes caused it.
 
 **Upgrading silently** — see the [unattended install](../../README.md#unattended-install)
-notes. One limitation matters here: the administrator password cannot be supplied on
-the command line, and a silent upgrade of an existing installation cannot prompt for
-it. Upgrade interactively, or set the password non-interactively beforehand.
+notes, and read this paragraph before you try it on an installation that has an
+administrator password set, because the failure is a hang rather than an error.
+
+`DBSetupQuick.exe` forwards only `/SilentIfOk` and `/silent` to `DBUpdater.exe`; it
+does **not** forward the `password:` argument, and it only reads that argument on
+the *create* path in the first place. DBUpdater then authenticates as
+`Administrator` by trying an empty password, then each of its own command-line
+arguments verbatim as a password, and if none works it opens a modal password
+dialog — which it does regardless of `/silent`. So:
+
+* administrator password empty → a silent upgrade works;
+* administrator password set → a silent upgrade **blocks on a password dialog**
+  nobody is there to answer, and the install sits there until it is dismissed.
+
+Upgrade interactively on such an installation. (`DBUpdater.exe` on its own does
+accept the password, but only as a bare argument with no `password:` prefix —
+`DBUpdater.exe /silent <password>` — because of how that argument-as-password loop
+works. That is a workaround exploiting a quirk, not a documented interface, so
+prefer the interactive upgrade.)
 
 **The .NET 10 runtime.** From the first release after 6.2.18, the Control Panel and
 the setup tools require the .NET 10 Desktop Runtime, which the installer bundles and
 installs when missing; 6.2.18 and earlier used .NET 8. Nothing about the server
 itself changed — it is native code with no .NET dependency, so an upgrade that
 fails to install the runtime still leaves you with a working mail server, just
-without the Control Panel.
+without the Control Panel. The runtime is bundled as
+`windowsdesktop-runtime-10.0-win-x64.exe` and installed `/quiet /norestart`, only
+when it is missing, and the setup tools (`DBSetup`, `DBSetupQuick`, `DBUpdater`)
+need it as well as the Control Panel does.
+
+Verified against the code
+-------------------------
+
+Checked 13 August 2026, because two numbers on this page had already gone stale
+once. Against: `formMain.LoadScripts` in `DBUpdater` (the 57 registered steps and
+the version at each end), `Constants.h`'s `REQUIRED_DB_VERSION` (6006),
+`hmailserver/source/DBScripts` (which dialects ship which steps, and the
+`hm_adsynchronization` asymmetry), `DatabaseConnectionManager::GetCurrentDatabaseVersion`
+(`select … from hm_dbversion`), `Application::OnDatabaseConnected` (the two refusal
+messages, verbatim), `hMailServerInnoExtension.iss` (the exit-code check and what
+follows it, and the .NET 10 bundling), `DBSetupQuick`'s `UpgradeDatabase` (which
+arguments are forwarded) and `Authenticator.AuthenticateUser` (the silent-upgrade
+password dialog).

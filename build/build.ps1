@@ -44,14 +44,21 @@ $msbuildArgs = @(
 
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
 
-& "$msbuild" @msbuildArgs *>&1
+# $logsDir was created above and nothing was ever written to it. A server build
+# emits warnings worth grepping after the fact, and a failure worth reading once
+# the console has scrolled, so the output goes to a file as well as the terminal.
+# $LASTEXITCODE still carries MSBuild's own exit code through the pipeline.
+$msbuildLog = Join-Path $logsDir "build-$Configuration.log"
+
+& "$msbuild" @msbuildArgs *>&1 | Tee-Object -FilePath $msbuildLog
 
 $exitCode = $LASTEXITCODE
 $sw.Stop()
 Write-Host ("Build completed in {0:F1} seconds." -f $sw.Elapsed.TotalSeconds)
 if ($exitCode -ne 0) {
+	Write-Error "Build failed with exit code $exitCode. Build log: $msbuildLog"
 	exit $exitCode
 }
 
-Write-Host "Build succeeded."
+Write-Host "Build succeeded. Build log: $msbuildLog"
 

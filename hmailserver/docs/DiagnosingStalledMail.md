@@ -53,22 +53,44 @@ Spam test: SpamTestDNSBlackLists, Score: 0, Time: 12 ms
 Spam test: SpamTestSpamAssassin, Score: 0, Time: 120000 ms
 SMTPConnection - accept: done spam-protection in 120047 ms (session 5).
 SMTPConnection - accept: done message-modifications in 0 ms (session 5).
+SMTPConnection - accept: start script/save.
 SMTPConnection - accept: done script/save in 3 ms (session 5).
 ```
 
-**How to read it.** A `start` line with no matching `done` line is the stage that
-is stuck — that is the whole diagnosis. If every stage completes but one took a
-long time, the `Time:` value names the culprit directly. A stage taking more than
-ten seconds is logged at application level even without debug logging.
+**How to read it.** Read it as a sequence and look for the last line written —
+the stage that is stuck is the one after it. Two stages announce themselves with
+a `start` line (`spam-protection` and `script/save`), so for those a `start` with
+no matching `done` is the whole diagnosis. The middle stage does **not** have a
+`start` line: message modifications run between `done spam-protection` and
+`start script/save`, so a stall there shows up as `done spam-protection` followed
+by silence. If every stage completes but one took a long time, the `Time:` or
+`done ... in` value names the culprit directly. A stage taking ten seconds or
+more is logged at application level even without debug logging, and so is any
+individual spam test that takes ten seconds or more.
 
 Common causes, in the order they actually occur:
 
 | What the log shows | Cause |
 |---|---|
 | `SpamTestSpamAssassin` with a large `Time:` | spamd is unreachable, overloaded, or accepting connections without answering |
-| `SpamTestDNSBlackLists` / `SURBL` / `SPF` slow | the resolver is not answering; check `DNSServer` in `hMailServer.ini`, and note that setting it bypasses the Windows DNS cache so every lookup pays full price |
+| `SpamTestDNSBlackLists`, `SpamTestSURBL` or `SpamTestSPF` slow | the resolver is not answering. Look in the TCP/IP log for `DNS - Query timed out` and `DNS - Query failure`. **Do not reach for `DNSServer` as the fix** — see the warning below |
+| `done spam-protection`, then silence | message modifications: the spam headers, the signature, the List-\* headers, or the write of the modified message back to disk |
 | `script/save` slow | an `OnAcceptMessage` event script, or the database |
-| Nothing between `354` and silence | you are on a version older than 6.2.15; upgrade, because that is the version that added these lines |
+| Nothing between `354` and silence | you are on a version older than 6.2.17; upgrade, because that is the version that added these lines |
+
+> **`DNSServer` is currently broken, and setting it makes this worse rather than
+> better.** With `[Settings] DNSServer` configured, lookups through the custom
+> server fail — AAAA and CNAME queries return `ERROR_TIMEOUT` in the same
+> millisecond they were issued, and the A query returns a status the resolver
+> treats as "no records". This is a regression introduced in 6.2.17 and it is not
+> yet fixed (issue #25); the comment in `DNSResolverWinApi::Query` records what
+> has been ruled out. SpamAssassin is the visible symptom because it reports a
+> failed lookup, but DNSBL, SURBL, SPF, DKIM and MX lookups fail the same way in
+> silence — a server in that state has quietly stopped most of its spam filtering
+> and is still accepting mail. Leave `DNSServer` empty so the system resolvers are
+> used, and fix name resolution at the operating system instead. (For the record,
+> the setting also switches on `DNS_QUERY_BYPASS_CACHE`, so even when it worked
+> every lookup paid full price.)
 
 Since 6.2.17 acceptance is also bounded: if it exceeds `FinalizationTimeout`
 (240 seconds by default) the server answers `451` and the sender retries, rather
@@ -105,12 +127,17 @@ Delivery runs on a separate, smaller pool. The usual causes:
 
 * **A virus scanner that stops responding.** ClamAV is contacted after the
   message is accepted, so a wedged clamd shows up as "accepted but never
-  delivered". Since 6.2.18 the connection is bounded and a timeout is reported
-  rather than holding the thread forever.
+  delivered". Each socket operation is bounded by `ClamMinTimeout` /
+  `ClamMaxTimeout` and a clamd that never answers is reported rather than held.
+  Be precise about what that bound is, though: it is a deadline on *one* read or
+  write, armed fresh each time, and the message is streamed to clamd in chunks —
+  so a clamd that answers each chunk just before the deadline can make a single
+  large message take considerably longer than `ClamMaxTimeout` in total. It cannot
+  hold the thread forever; it can hold it for a while.
 * **A remote server that answers extremely slowly.** The idle timeout is re-armed
   on every byte received, so a host that sends one byte occasionally used to hold
-  a delivery thread indefinitely. There is now an absolute ceiling
-  (`ClientSessionCeiling`, 30 minutes by default).
+  a delivery thread indefinitely. Since 6.2.18 there is an absolute ceiling
+  (`ClientSessionCeiling`, 30 minutes by default), armed once and never re-armed.
 * **A custom virus scanner or external tool that hangs** — bounded by
   `ExternalProcessTimeout`.
 * **The database.** Check for errors mentioning the connection pool.
@@ -121,22 +148,32 @@ destination in question.
 Settings that bound each stage
 ------------------------------
 
-All are in `hMailServer.ini` under `[Settings]`, in seconds, and `0` disables the
-bound. Defaults are chosen to be well inside a typical sending server's timeout.
+All are in `hMailServer.ini` under `[Settings]` and all are in seconds. Defaults
+are chosen to be well inside a typical sending server's timeout.
 
-| Setting | Default | Bounds |
-|---|---|---|
-| `FinalizationTimeout` | 240 | The whole accept pipeline, after which the sender gets a `451` |
-| `SAMaxTimeout` | 90 | SpamAssassin (the session ceiling is this plus 30s) |
-| `ClamMaxTimeout` | 90 | ClamAV |
-| `DNSQueryTimeout` | 10 | A single DNS query |
-| `ScriptTimeout` | 60 | One event script invocation |
-| `ExternalProcessTimeout` | 300 | An external scanner process |
-| `ClientSessionCeiling` | 1800 | An entire outbound delivery session |
-| `AsyncQueueStallThreshold` | 120 | How long every worker may be busy before the saturation report |
-| `DBConnectionAcquireTimeout` | 60 | Waiting for a pooled database connection |
+| Setting | Default | Bounds | `0` means |
+|---|---|---|---|
+| `FinalizationTimeout` | 240 | The whole accept pipeline, after which the sender gets a `451` | no bound |
+| `SAMaxTimeout` | 90 | SpamAssassin: idle timeout, and a session ceiling of this plus 30s | **not** "no bound" — see below |
+| `ClamMaxTimeout` | 90 | ClamAV: idle timeout per socket operation | **not** "no bound" — see below |
+| `DNSQueryTimeout` | 10 | A single DNS query | no bound |
+| `ScriptTimeout` | 60 | One event script invocation | no bound |
+| `ExternalProcessTimeout` | 300 | An external scanner process | no bound |
+| `ClientSessionCeiling` | 1800 | An entire outbound delivery session | no bound |
+| `AsyncQueueStallThreshold` | 120 | How long every worker may be busy before the saturation report | reporting off |
+| `DBConnectionAcquireTimeout` | 60 | Waiting for a pooled database connection | no bound |
 
-When the pool deadline expires, a recipient lookup answers `451` rather than
+**The two exceptions matter, because `0` tightens them instead of removing them.**
+`SAMaxTimeout` and `ClamMaxTimeout` are not passed straight through: they go to
+`TimeoutCalculator::Calculate(min, max)`, which returns the *minimum* whenever the
+maximum is lower than it. So `SAMaxTimeout=0` gives a 30-second idle timeout
+(`SAMinTimeout`) and a 30-second session ceiling — a *shorter* bound than the
+default, not an absent one — and `ClamMaxTimeout=0` gives 15 seconds
+(`ClamMinTimeout`). To lengthen either, raise the value; to lengthen it a long way,
+raise the matching `...MinTimeout` too, or the calculator will pull it back under
+load. There is no way to make either unbounded.
+
+When the pool deadline expires, a recipient lookup answers `451 4.3.2` rather than
 `550`: the server can tell "the database did not answer" from "no such address",
 so a database locked by a backup defers the mail instead of bouncing it.
 
@@ -152,3 +189,22 @@ If the above does not identify it, open an issue with:
 4. Whether the message eventually arrives, arrives twice, or never arrives.
 
 See [SUPPORT.md](../../.github/SUPPORT.md).
+
+Verified against the code
+-------------------------
+
+Every log line quoted here was copied from the source rather than from a running
+server, and every default was read from the code that reads the ini file. Checked
+13 August 2026 against: `SMTPConnection::LogFinalizationStage_` and
+`FinalizationDeadlineExceeded_` (the stage lines, the ten-second escalation, the
+`451 4.3.1` and error 5525); `SpamTestRunner::RunSpamTest` (the `Spam test:` line
+and its own ten-second escalation); `WorkQueue::ExecuteTask` and
+`WorkQueue::ReportStalledTasks`, plus `Application`'s `"Asynchronous task queue"`
+(the two saturation lines, the second of which is error 5526);
+`IniFileSettings::LoadSettings` (every default in the table);
+`TimeoutCalculator::Calculate` (the `0` exceptions); `SpamAssassinClient`'s
+`SetSessionCeiling(GetSAMaxTimeout() + 30)`; `SMTPConnection::ProtocolRCPT_`'s two
+`DatabaseUnavailableMarker::Scope` blocks (`451 4.3.2` rather than `550`);
+`DNSResolverWinApi::Query` (the `DNSServer` regression and the cache bypass); and
+`Logger`'s `ERROR_hmailserver_%s.log`. If you change one of those, this page is
+the second place to look.

@@ -4,7 +4,7 @@ Documentation
 Operator-facing documentation for this fork of hMailServer. Everything here is
 written for someone running the server, not for someone reading the code — the
 codebase map and contribution notes live at the repository root
-([CONTRIBUTING.md](../../CONTRIBUTING.md), [RELEASE.md](../../RELEASE.md)).
+([CONTRIBUTING.md](../../.github/CONTRIBUTING.md), [RELEASE.md](../../RELEASE.md)).
 
 | Document | Read it when |
 |---|---|

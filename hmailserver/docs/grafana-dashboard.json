@@ -114,11 +114,11 @@
     {
       "type": "stat",
       "title": "TLS certificate expiry",
-      "description": "hmailserver_tls_certificate_expiry_seconds as a Unix timestamp, per certificate. Renewal is automatic when ACME is enabled, so this panel exists to catch renewal having silently stopped. Amber inside 21 days, red inside 7.",
+      "description": "Time left on each configured TLS certificate, one series per certificate, taken from hmailserver_tls_certificate_expiry_seconds (a Unix timestamp) minus now. Renewal is automatic when ACME is enabled, so this panel exists to catch renewal having silently stopped. Amber inside 21 days, red inside 7. The series label is 'certificate' - the metric carries no 'name' label, and grouping by one collapses every certificate into a single unlabelled series. No series at all means no certificate is configured and no ACME fullchain.pem exists, which is the shipped default.",
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "gridPos": { "h": 4, "w": 5, "x": 19, "y": 1 },
       "targets": [
-        { "expr": "min by (name) (hmailserver_tls_certificate_expiry_seconds{instance=~\"$instance\"} - time())", "legendFormat": "{{name}}", "refId": "A" }
+        { "expr": "min by (certificate) (hmailserver_tls_certificate_expiry_seconds{instance=~\"$instance\"} - time())", "legendFormat": "{{certificate}}", "refId": "A" }
       ],
       "fieldConfig": {
         "defaults": {

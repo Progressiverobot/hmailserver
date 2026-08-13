@@ -23,13 +23,20 @@ function Test-IsElevated {
 }
 
 if (-not (Test-IsElevated)) {
-    Write-Host "Not running elevated — relaunching as Administrator..."
+    Write-Host "Not running elevated - relaunching as Administrator..."
     try {
-        Start-Process -FilePath 'powershell.exe' -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File',$PSCommandPath -Verb RunAs -WindowStyle Normal
+        # -Wait and the child's exit code, because the bare "exit" that used to be
+        # here returned 0 whatever happened: a declined UAC prompt, or an icacls
+        # failure inside the elevated run, both reported success to whatever called
+        # this script.
+        $child = Start-Process -FilePath 'powershell.exe' `
+            -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File',$PSCommandPath `
+            -Verb RunAs -WindowStyle Normal -Wait -PassThru
+        exit $child.ExitCode
     } catch {
         Write-Error "Failed to elevate. Aborting."
+        exit 1
     }
-    exit
 }
 
 $exitCode = 0

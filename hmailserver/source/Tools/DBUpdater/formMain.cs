@@ -54,14 +54,36 @@ namespace DBUpdater
       public bool CreateUpgradePath()
       {
          _upgradePath = new UpgradeScripts();
-         
+
          int from = _application.Database.CurrentVersion;
          int to = _application.Database.RequiredVersion;
 
-       
+         // A database from a newer build reaches the loop below and comes out as
+         // "no upgrade script is registered for version 6007", which sends the
+         // operator looking for a missing file. There is no missing file: this
+         // copy of hMailServer is the old one. Reinstalling an earlier build over
+         // a newer database is the normal way to arrive here.
+         if (from > to)
+         {
+            ShowError(string.Format("This database is from a newer version of hMailServer (database version {0}); this build requires version {1}. Downgrading a database is not supported - install the newer hMailServer, or restore a backup taken before the upgrade.", from, to), "hMailServer");
+            return false;
+         }
+
+         // The walk below only terminates while every step moves strictly
+         // forward. A duplicate or self-referencing registration in LoadScripts
+         // would spin here, adding the same step forever, so the number of
+         // registered steps is the ceiling: no valid path can be longer.
+         int stepLimit = _upgradeScripts.GetList().Count;
+
          // Actually create the path.
          while (from != to)
          {
+            if (_upgradePath.GetList().Count >= stepLimit)
+            {
+               ShowError(string.Format("Upgrade path could not be built: it exceeded the {0} registered upgrade steps without reaching version {1}. The upgrade step table in DBUpdater is inconsistent.", stepLimit, to), "hMailServer");
+               return false;
+            }
+
             UpgradeScript script = _upgradeScripts.GetScriptUpgradingFrom(from);
 
             if (script == null)
@@ -398,6 +420,21 @@ namespace DBUpdater
 
             }
 
+            // Prove the schema really changed before committing it. A script that
+            // did not throw is not evidence that it did anything - see
+            // SchemaVerification for why - and this is the last moment at which
+            // the answer can still be acted on: the probes run on the
+            // transaction's own connection (InterfaceDatabase::ExecuteSQL uses
+            // conn_ while a transaction is open), so they see the uncommitted DDL
+            // and a missing object can still be rolled back on the two backends
+            // that have transactional DDL.
+            string verificationError;
+            if (!VerifyUpgradedSchema(database, out verificationError))
+            {
+               HandleUpgradeError(database, verificationError, "Schema verification");
+               return;
+            }
+
             try
             {
                database.CommitTransaction();
@@ -408,9 +445,45 @@ namespace DBUpdater
                return;
             }
 
-            // The schema is committed from here on, so record success before the
-            // cleanup below: a COM/RPC failure while reinitializing must not report
-            // an upgrade that did happen as a failure.
+            // hm_dbversion is written by a statement of its own, in the same
+            // script as the schema change but independent of whether it worked.
+            // Read it back rather than infer it: Database.CurrentVersion
+            // re-queries hm_dbversion on every call
+            // (DatabaseConnectionManager::GetCurrentDatabaseVersion caches
+            // nothing) and the transaction is closed by now, so this is the
+            // committed value the server will see when it next starts.
+            //
+            // Nothing can be rolled back from here, so a mismatch is reported and
+            // the error log is deliberately left in place - RemoveErrorLog below
+            // would delete the server's own complaint about the version and leave
+            // the operator with no trace of it at all.
+            int reachedVersion;
+            try
+            {
+               reachedVersion = database.CurrentVersion;
+            }
+            catch (Exception e)
+            {
+               ShowError("The upgrade was committed but the resulting database version could not be read: " + e.Message, "hMailServer");
+               buttonClose.Enabled = true;
+               return;
+            }
+
+            // Read through the reference already held, not _application.Database:
+            // that property hands out a fresh COM object on every access, and the
+            // one below is released a few lines further down.
+            int targetVersion = database.RequiredVersion;
+
+            if (reachedVersion != targetVersion)
+            {
+               ShowError(string.Format("The upgrade scripts ran without reporting an error, but the database is at version {0} and this build of hMailServer requires version {1}. The upgrade is incomplete: restore the backup taken before the upgrade and check the hMailServer error log. The database has NOT been left in a usable state.", reachedVersion, targetVersion), "hMailServer");
+               buttonClose.Enabled = true;
+               return;
+            }
+
+            // The schema is committed and verified from here on, so record success
+            // before the cleanup below: a COM/RPC failure while reinitializing must
+            // not report an upgrade that did happen as a failure.
             UpgradeSucceeded = true;
 
             Marshal.ReleaseComObject(database);
@@ -425,7 +498,53 @@ namespace DBUpdater
 
       }
 
+      /// <summary>
+      /// Runs the registered schema probes for every step in the upgrade path.
+      /// Returns false, with a message naming the object that is missing, if any
+      /// probe fails.
+      /// </summary>
+      private bool VerifyUpgradedSchema(hMailServer.Database database, out string error)
+      {
+         error = null;
+
+         foreach (ListViewItem item in listRequiredUpgrades.Items)
+         {
+            UpgradeScript script = (UpgradeScript) item.Tag;
+
+            foreach (SchemaProbe probe in SchemaVerification.GetProbesFor(script.To))
+            {
+               try
+               {
+                  database.ExecuteSQL(probe.Statement);
+               }
+               catch (Exception e)
+               {
+                  // The step's script reported success, so the only way to be
+                  // here is an error that [IGNORE-ERRORS] discarded. Say that
+                  // outright: the operator's next question is always "but it said
+                  // it worked".
+                  error = string.Format(
+                     "{0} did not create {1}. The script reported success because its ALTER statement is marked [IGNORE-ERRORS], which discards every error, not only \"already exists\" - so the real failure was thrown away. The upgrade has been rolled back where the backend allows it. Probe: {2}{3}Error: {4}",
+                     Path.GetFileName(GetScriptFileName(script)),
+                     probe.Describes,
+                     probe.Statement,
+                     Environment.NewLine,
+                     e.Message);
+
+                  return false;
+               }
+            }
+         }
+
+         return true;
+      }
+
       private void HandleUpgradeError(hMailServer.Database database, Exception error, string scriptToExecute)
+      {
+         HandleUpgradeError(database, error.Message, scriptToExecute);
+      }
+
+      private void HandleUpgradeError(hMailServer.Database database, string error, string scriptToExecute)
       {
          try
          {
@@ -442,7 +561,7 @@ namespace DBUpdater
          }
          finally
          {
-            ShowError(error.Message, scriptToExecute);
+            ShowError(error, scriptToExecute);
          }
 
          buttonClose.Enabled = true;

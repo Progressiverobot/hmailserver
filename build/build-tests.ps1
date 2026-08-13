@@ -44,11 +44,17 @@ $msbuildArgs = @(
     '/p:Platform=x64'
 )
 
-# Run MSBuild and tee output to log
-& "$msbuild" @msbuildArgs *>&1
+# The log is written, not just announced. This script created $logsDir and then
+# never wrote anything into it, while the success message below quoted a
+# $msbuildLog variable that was never assigned - so it printed "Build log: " and
+# a release checklist that says to check the build log had nothing to check.
+$msbuildLog = Join-Path $logsDir 'build-tests.log'
+
+& "$msbuild" @msbuildArgs *>&1 | Tee-Object -FilePath $msbuildLog
 
 $exitCode = $LASTEXITCODE
 if ($exitCode -ne 0) {
+    Write-Error "Test build failed with exit code $exitCode. Build log: $msbuildLog"
     exit $exitCode
 }
 

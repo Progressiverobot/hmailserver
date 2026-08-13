@@ -129,12 +129,49 @@ Not because either instrument compels it, but because they are the right shape
 for a security-relevant product and they would be prerequisites if scope ever
 changed:
 
-* SPDX and CycloneDX SBOMs attached to every release.
+* SPDX and CycloneDX SBOMs attached to every release
+  ([`sbom.yml`](../../.github/workflows/sbom.yml)), including the native
+  dependencies — OpenSSL, Boost and libpq — that a source-tree scan does not see.
+  That matters for exactly the purpose an SBOM has: without them, anyone checking a
+  release against a CVE feed would have concluded this server does not link OpenSSL.
+* **Every release asset signed**, with Sigstore cosign, keyless via OIDC, the
+  signature recorded in the public Rekor transparency log and verified in the same
+  job so a malformed bundle cannot reach a user
+  ([`sign-release.yml`](../../.github/workflows/sign-release.yml)). Keyless
+  deliberately: for a single-maintainer project a long-lived signing key held in CI
+  is itself the thing most worth stealing.
 * A documented security policy and private disclosure route
-  ([SECURITY.md](../../.github/SECURITY.md)).
-* Static analysis and CodeQL in CI; a full regression suite gating every release.
+  ([SECURITY.md](../../.github/SECURITY.md)), plus a machine-readable `security.txt`
+  (RFC 9116) served at `/.well-known/security.txt` by the web services listener.
+* Static analysis, CodeQL and OpenSSF Scorecard in CI; a full regression suite
+  gating every release.
 * Release notes that name unfixed known issues rather than omitting them.
 
-Still outstanding, and tracked in [Roadmap.md](../../Roadmap.md): signing of
-release artefacts, and a machine-readable `security.txt` (RFC 9116) — the latter
-now served by the web services listener.
+Still outstanding, and tracked in [Roadmap.md](../../Roadmap.md): **Authenticode**
+signing of the installer. Cosign and Authenticode are complementary rather than
+alternatives — SmartScreen and the UAC prompt care about Authenticode and know
+nothing about Sigstore, so a downloaded installer is verifiable by anyone who checks
+and Windows still shows an unknown-publisher warning. Azure Trusted Signing is the
+realistic route.
+
+What in this document is checkable, and what is not
+--------------------------------------------------
+
+Worth separating, because the two halves have very different half-lives.
+
+The **determination** — the scope analysis, the commerciality test, the steward
+question, the PLD reasoning — is a dated legal self-assessment. Nothing in the
+repository can confirm or refute it; it stands or falls on the legislation and on the
+distribution facts listed under "Who is asking", and it is re-done when one of the
+review triggers fires. Reviewed 12 August 2026.
+
+The **"What we do anyway" list** is different: every item is a claim about this
+repository, and each one is verifiable. Re-checked 13 August 2026 against
+`.github/workflows/sbom.yml` (SPDX and CycloneDX, both attached on a `release`
+event, with `build/merge-native-dependencies-into-sbom.ps1` adding OpenSSL, Boost
+and libpq), `.github/workflows/sign-release.yml` (cosign `sign-blob` over every
+asset, then `verify-blob` in the same job), `.github/workflows/codeql.yml`,
+`.github/workflows/scorecard.yml`, `.github/SECURITY.md`, and
+`WebServicesServer`'s `/.well-known/security.txt` handler. This half is the one to
+re-read before quoting the page: the signing line was wrong for a while precisely
+because a capability shipped and the paragraph saying it had not was never revisited.

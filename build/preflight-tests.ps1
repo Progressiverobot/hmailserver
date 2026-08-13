@@ -5,6 +5,8 @@
 #   - a stale InstallLocation registry value redirecting the server's config
 #   - a deliberate error left in the ERROR log by an aborted run, which fails
 #     every fixture's setup in the next run
+#   - a bench database left behind by a release that moved REQUIRED_DB_VERSION,
+#     which stops the service for a reason none of the other checks name
 #   - clamd not listening, which fails the live-scanner tests
 # Run with -Clean to remove a stale ERROR log instead of just reporting it.
 Param(
@@ -65,13 +67,38 @@ try {
         'Authentication failed - if a stray install is running, its password is not testar.'
     if ($null -ne $auth) {
         Report ($app.Domains.Count -eq 1) 'Test domain present (Domains.Count = 1)' ("Count is {0}." -f $app.Domains.Count)
-        Report ($app.Settings.TCPIPPorts.Count -eq 4) 'Standard port set (TCPIPPorts.Count = 4)' ("Count is {0}." -f $app.Settings.TCPIPPorts.Count)
+        # This is also the check RELEASE.md step 4 relies on for the TLS fixtures'
+        # twelve extra ports: an aborted run leaves them registered, so the count
+        # comes back 16. Worth naming in the message, because "Count is 16" on its
+        # own does not tell anyone what to delete.
+        Report ($app.Settings.TCPIPPorts.Count -eq 4) 'Standard port set (TCPIPPorts.Count = 4)' `
+            ("Count is {0}. More than 4 usually means an aborted run left the TLS fixtures' extra ports registered - remove the non-standard ports in the Control Panel, or re-add the four standard ones if there are fewer." -f $app.Settings.TCPIPPorts.Count)
     }
 } catch {
     Report $false 'COM object creation' $_.Exception.Message
 }
 
-# 4. No leftover ERROR log. TestFixtureBase.SetUp fails every test if the file
+# 4. The bench database has to be at the schema version this build compiles in.
+#    REQUIRED_DB_VERSION moves whenever a release adds a column - it went 6005 ->
+#    6006 for hm_imapfolders.folderspecialuse - and a bench nobody upgraded fails
+#    in a way that points somewhere else entirely: Application::OnDatabaseConnected
+#    refuses the connection, so check 1 says "could not start" and check 5 says
+#    there is a stale ERROR log, and neither of them says the word "database".
+#    This check is here to say it, and it goes before the ERROR log check because
+#    the log entry it is about to find is this one.
+if ($null -ne $app) {
+    try {
+        $currentDbVersion  = $app.Database.CurrentVersion
+        $requiredDbVersion = $app.Database.RequiredVersion
+        Report ($currentDbVersion -eq $requiredDbVersion) 'Database schema at the required version' `
+            ("Schema is {0}, this build requires {1}. Run the published DBUpdater.exe (build\build-tools.ps1 publishes it to Tools\DBUpdater\publish) - the service will not start until they match." -f $currentDbVersion, $requiredDbVersion)
+    } catch {
+        Report $false 'Database schema version check' `
+            ("Could not read the schema version: {0}" -f $_.Exception.Message)
+    }
+}
+
+# 5. No leftover ERROR log. TestFixtureBase.SetUp fails every test if the file
 #    exists at all - an aborted run's deliberate scanner error poisons the next
 #    run completely (observed as 1038/1038 failed).
 if ($null -ne $app) {
@@ -93,33 +120,33 @@ if ($null -ne $app) {
     }
 }
 
-# 5. clamd must be listening. It runs as a bare process from C:\clamav, not a
+# 6. clamd must be listening. It runs as a bare process from C:\clamav, not a
 #    Windows service, so Get-Service finds nothing.
 $clamd = [bool](Get-NetTCPConnection -LocalPort 3310 -State Listen -ErrorAction SilentlyContinue)
 Report $clamd 'clamd listening on 3310' 'Start C:\clamav\clamd.exe - the live-scanner tests need it.'
 
-# 6. SpamAssassin service must exist (TestSANotRunning stops/starts it, which
+# 7. SpamAssassin service must exist (TestSANotRunning stops/starts it, which
 #    needs the sc sdset AU grant that a service re-registration silently drops).
 $sa = Get-Service -Name SpamAssassinJAM -ErrorAction SilentlyContinue
 Report ($null -ne $sa) 'SpamAssassinJAM service exists' 'The suite stops and starts it; see IMPLEMENTATION-NOTES.md for the sdset grant.'
 
-# 7. Protocol listeners.
+# 8. Protocol listeners.
 foreach ($port in 25, 110, 143) {
     Report ([bool](Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue)) "Listening on $port" `
         'Service is running but not listening - usually the stray-registry fault above.'
 }
 
-# 8. Interference sources that have broken runs before (warn only).
+# 9. Interference sources that have broken runs before (warn only).
 $vpn = Get-NetAdapter -ErrorAction SilentlyContinue | Where-Object { $_.InterfaceDescription -match 'Proton|WireGuard' -and $_.Status -eq 'Up' }
 if ($vpn) { Write-Host ("  WARN  VPN adapter up: {0} - has broken address selection in tests before." -f ($vpn.Name -join ', ')) -ForegroundColor Yellow }
 
-# 9. Test assets.
+# 10. Test assets.
 $nunit = Join-Path $repoRoot 'hmailserver\test\packages\NUnit.ConsoleRunner.3.22.0\tools\nunit3-console.exe'
 $dll = Join-Path $repoRoot 'hmailserver\test\RegressionTests\bin\x64\Debug\RegressionTests.dll'
 Report (Test-Path $nunit) 'NUnit console runner present' 'Restore packages via build\build-tests.ps1.'
 Report (Test-Path $dll) 'RegressionTests.dll built' 'Build via build\build-tests.ps1.'
 
-# 10. Orphan test files.
+# 11. Orphan test files.
 #
 # RegressionTests.csproj is a legacy non-SDK project: it lists every source file
 # explicitly, with no glob. So a new test file that nobody adds to the csproj is

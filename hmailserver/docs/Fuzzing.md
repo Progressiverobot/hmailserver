@@ -53,7 +53,9 @@ So there were two things to build, in order:
    *before* any `catch (...)` gets the chance to swallow it, and records it. The
    regression suite checks the oracle after every test, so a swallowed access
    violation now fails the test that provoked it instead of passing quietly. That
-   is what makes the 1164-test suite an oracle rather than just a lot of asserts.
+   is what makes the regression suite an oracle rather than just a lot of asserts
+   (1,257 tests as of 13 August 2026 — a figure that only ever goes up, so treat it
+   as a floor rather than a fact to maintain).
 2. **An oracle for the fuzz build**, which is AddressSanitizer. ASan is stronger
    than a crash handler: it traps the *first* out-of-bounds byte rather than
    waiting for an access that happens to land on an unmapped page, and it reports
@@ -173,12 +175,15 @@ The build:
 * finds clang-cl through `vswhere` and imports the MSVC environment itself, so it
   works from an ordinary PowerShell prompt (clang-cl links with `link.exe` and
   against the MSVC CRT, so that environment is not optional);
-* compiles the real `Common\Mime` sources plus the four utility translation units
-  they need, with `-fsanitize=fuzzer-no-link,address`;
+* compiles the five real `Common\Mime` sources (`Mime`, `MimeChar`, `MimeCode`,
+  `MimeType`, `CodePages`) plus the five utility translation units they need
+  (`Charset`, `ByteBuffer`, `Unicode`, `RegularExpression`, `StringParser`), with
+  `-fsanitize=fuzzer-no-link,address`;
 * links one executable per target with `-fsanitize=fuzzer,address` into
   `fuzz\bin\`;
-* copies the dynamic ASan runtime DLL next to the executables, because with `/MD`
-  the targets will not start without it;
+* copies `clang_rt.asan_dynamic-x86_64.dll` next to the executables **for both CRT
+  choices**, because a `/MT` target imports it too — see point 3 above, which is the
+  bug this bullet used to repeat;
 * regenerates the seed corpus from the real test messages.
 
 It never builds `hMailServer.sln`, never runs its pre/post-build events and never
@@ -290,11 +295,19 @@ routinely misread:
   survived; raise nothing and lower `kMaxTraversalDepth` instead.
 * **`timeout` / `oom`** — a parser that stops making progress or allocates without
   bound is a remote denial of service, which for a mail server is a real
-  vulnerability rather than a performance note. `MimeEncodedWord::BEncode` has a
-  loop of exactly this shape: its block size is
-  `(75 - charset_length - 7) / 4 * 3`, which reaches zero for a long enough
-  charset name, and a zero-size block means the loop makes no progress while
-  appending to its output every iteration.
+  vulnerability rather than a performance note. `MimeEncodedWord::BEncode` **had** a
+  loop of exactly this shape, and it is the example to keep in mind because the
+  cause was arithmetic rather than buffer handling: its block size was
+  `(MAX_ENCODEDWORD_LEN - charset_length - 7) / 4 * 3`, and since that constant is
+  75, a charset name of 69 characters or more drove it to zero or below — a
+  zero-size block means the loop makes no progress while appending an encoded-word
+  header to its output every iteration, so it never terminated at all. The only
+  guard was an `ASSERT`, compiled out of Release. Both `BEncode` and `QEncode` now
+  fall back to the raw encoder when no legal encoded word can be built
+  (`if (nMaxBlockSize < 3)`), and the reproducer lives in
+  `fuzz\regression\mime_decode_fuzzer\out-of-memory-mimeunicodeencoder-encodevalue`,
+  so every run re-proves it. Read the shape, not the location: the same "budget goes
+  non-positive, loop still appends" pattern is what to look for in the next one.
 * **An assertion abort** — only possible if the target was built with
   `-Asserts`. The shipped Release build compiles `ASSERT` to `((void)0)`, so an
   assertion failure is a violated internal invariant, not a crash. Interesting,
@@ -368,3 +381,25 @@ What is not covered yet
 Each of those is a new target next to the three that exist, not new
 infrastructure: the shim, the environment stubs and the build script are the part
 that was hard, and they are done.
+
+Verified against the code
+-------------------------
+
+Checked 13 August 2026. Confirmed present and as described: `/EHa`
+(`<ExceptionHandling>Async</ExceptionHandling>`, both configurations in
+`hMailServer.vcxproj`) against the fuzz build's `/EHsc`;
+`Common\Util\CrashOracle.{h,cpp}`; `MimeBody::LoadFromFile`'s `catch (...)` and its
+copy into `Problematic messages`; the three targets and the ten translation units
+`build-fuzz.ps1` compiles; `/MT` as the default `-RuntimeLibrary` and the ASan DLL
+copied for both; `_DISABLE_STRING_ANNOTATION` / `_DISABLE_VECTOR_ANNOTATION`;
+Boost from `%hMailServerLibs%\boost_1_91_0` or `-BoostInclude`; `run-fuzz.ps1`'s
+`-Target` / `-Minutes` / `-Jobs` / `-Replay` / `-Reproduce` and `-error_exitcode=77`;
+`kMaxTraversalDepth` and `hm_fuzz::ExerciseBody` in `fuzz_mime_common`;
+`mime_header_fuzzer`'s three shapes including `Utilities::GetMimeHeader`'s truncated
+length; `fuzz\.gitattributes` marking `regression/**`, `corpus/**` and
+`artifacts/**` as `-text -diff` with `regression/README.md` put back to text.
+
+One thing was stale and is now corrected in place: the `BEncode` example above was
+written in the present tense after the defect had been fixed. If you are updating
+this page, that is the failure mode to watch for — a document about finding bugs is
+the one most likely to keep describing them after they are gone.
