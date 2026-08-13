@@ -63,16 +63,16 @@ strong and where it is thin far more honestly than any prose summary.
 | [Storage, accounts and data model](#storage-accounts-and-data-model) | 81 | – | 9 | – |
 | [Routing, queue and delivery](#routing-queue-and-delivery) | 19 | – | 4 | 1 |
 | [Administration, API and Control Panel](#administration-api-and-control-panel) | 52 | – | 8 | – |
-| [Observability and diagnostics](#observability-and-diagnostics) | 26 | – | 12 | 1 |
+| [Observability and diagnostics](#observability-and-diagnostics) | 27 | – | 11 | 1 |
 | [Extensibility and scripting](#extensibility-and-scripting) | 37 | – | 3 | – |
 | [Build, testing and supply chain](#build-testing-and-supply-chain) | 4 | – | 1 | – |
 | [Cross-cutting and platform](#cross-cutting-and-platform) | 9 | 1 | 2 | – |
 | **Forward-looking** | | | | |
 | [Planned work](#planned-work) | 1 | 2 | 15 | 2 |
-| [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 1 | – | 5 | 2 |
+| [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 2 | – | 4 | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 4 | 1 | 2 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 3 | – | 6 | – |
-| **Total** | **543** | **12** | **181** | **14** |
+| **Total** | **545** | **12** | **179** | **14** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage and the administration surface are the best-covered areas**, and the
@@ -840,7 +840,7 @@ the source, not from documentation.
 
 ### Observability and diagnostics
 
-26 shipped · 0 underway · 12 not started · 1 deferred
+27 shipped · 0 underway · 11 not started · 1 deferred
 
 | | Capability | Detail |
 |:-:|---|---|
@@ -874,7 +874,7 @@ the source, not from documentation.
 | ⬜ | Archive retention, index, search, immutability, per-domain scope | None of these exist. The archive is a raw directory tree with no database record, no retention sweep, no WORM/legal hold and no way to scope it to particular domains; only ArchiveDir and ArchiveHardLinks are configurable. |
 | ⬜ | Authentication on /metrics | The metrics listener performs no authentication or authorisation of any kind — protection is entirely the bind address (default 127.0.0.1). Exposing it on 0.0.0.0 publishes queue depth, session counts and auth-failure counts to anyone. |
 | ⬜ | TLS on /metrics | The metrics listener has no `SSL_CTX` and serves plain HTTP; it touches OpenSSL only to read certificate files and export their expiry as a metric. On the loopback default that is a reasonable choice and not a defect, which is why it is listed here rather than with the [TLS unification work](#structural-prerequisites) — but it means `MetricsServerBindAddress` cannot be moved off 127.0.0.1 without publishing the scrape in clear, and the same is then true of `/livez`, `/readyz` and `/healthz`. Decide it deliberately: either TLS through `SslContextInitializer` like ManageSieve, or documented as loopback-only by design and validated as such at startup. |
-| ⬜ | Latency percentiles | hmailserver_command_processing_seconds and hmailserver_db_query_seconds are emitted as Prometheus summaries carrying only _sum and _count, so only the mean is derivable. No histogram buckets, no quantiles, so p95/p99 are unavailable. |
+| ✅ | Latency percentiles | hmailserver_command_processing_seconds and hmailserver_db_query_seconds are emitted as Prometheus summaries carrying only _sum and _count, so only the mean is derivable. No histogram buckets, no quantiles, so p95/p99 are unavailable. |
 | ⬜ | Metric history / persistence | /metrics is a stateless scrape and nothing stores samples server-side; the only history anywhere is the Control Panel's three-minute in-RAM buffer. No metrics-sample table, no retention setting, so no 24 h / 7 d / 30 d views. |
 | ⬜ | OTLP metrics and logs signals | Only the traces signal is implemented — the exporter path is hard-coded to /v1/traces and there is no metric or log record builder. The Control Panel blurb advertising "OpenTelemetry traces/metrics export" overstates what ships. |
 | ⬜ | Queryable message trace | No per-message event store. The AWStats journal is already a per-recipient delivery event stream called from every interesting site, but it has no correlation key and no home… |
@@ -1215,7 +1215,7 @@ Future-proofing: standards and protocols
 | ⬜ | **ACME renewal robustness and ARI** | Certificate lifetimes fall to 100 days (Mar 2027) and 47 days with 10-day validation reuse (Mar 2029); Let's Encrypt defaults to 64 days from Feb 2027. Renewal and reload must be unattended and bulletproof, and ARI (renewal-info) becomes worth implementing. Treat 2027 as the real deadline. |
 | ⬜ | **Legacy algorithm audit (RFC 9905)** | Audit for SHA-1, RSA-1024 and other deprecated primitives. No external deadline. TLS 1.2 has no sunset date and is not going anywhere soon — do not pre-emptively drop it. |
 | ⬜ | **SPF void lookup limit** | Cheap correctness item, already biting in the field. |
-| ⬜ | **Certificate expiry and queue-age metrics** | Both are things mail operators actually alert on, and the data is already there. Queue *depth* alone does not distinguish a burst from a stuck relay. |
+| ✅ | **Certificate expiry and queue-age metrics** | Both are things mail operators actually alert on, and the data is already there. Queue *depth* alone does not distinguish a burst from a stuck relay. |
 | ⏸️ | **DKIM2** | Real momentum and the right backers, but the working group has already slipped its milestone by a year and there is no publication date. Track; hedge only by keeping the signing path abstracted. |
 | ⏸️ | **PQC signatures (ML-DSA) and PQC for DNSSEC/DANE** | 2028 at the earliest, and they arrive through OpenSSL and the ACME client rather than as code written here. No allocated DNSSEC algorithm and an unsolved packet-size problem. Track only. |
 
