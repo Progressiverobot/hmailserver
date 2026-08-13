@@ -57,7 +57,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Transport security and deliverability](#transport-security-and-deliverability) | 28 | – | 16 | 1 |
 | [IMAP](#imap) | 55 | – | 19 | 3 |
 | [POP3](#pop3) | 17 | – | 9 | – |
-| [Sieve, ManageSieve and rules](#sieve-managesieve-and-rules) | 38 | – | 21 | – |
+| [Sieve, ManageSieve and rules](#sieve-managesieve-and-rules) | 42 | 1 | 16 | – |
 | [Authentication and cryptography](#authentication-and-cryptography) | 55 | – | 19 | – |
 | [Anti-spam, anti-virus and content control](#anti-spam-anti-virus-and-content-control) | 52 | – | 13 | – |
 | [Storage, accounts and data model](#storage-accounts-and-data-model) | 81 | – | 9 | – |
@@ -72,7 +72,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 1 | – | 5 | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 4 | 1 | 2 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 3 | – | 6 | – |
-| **Total** | **539** | **11** | **186** | **14** |
+| **Total** | **543** | **12** | **181** | **14** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage and the administration surface are the best-covered areas**, and the
@@ -426,7 +426,7 @@ the source, not from documentation.
 
 ### Sieve, ManageSieve and rules
 
-38 shipped · 0 underway · 21 not started · 0 deferred
+42 shipped · 1 underway · 16 not started · 0 deferred
 
 | | Capability | Detail |
 |:-:|---|---|
@@ -468,26 +468,26 @@ the source, not from documentation.
 | ✅ | Two-level rule application | Global rules run once in SMTPDeliverer before recipient split; account rules run per recipient in LocalDelivery after the message file is in the account's folder. Results carry move-to-folder, delete… |
 | ✅ | Unimplemented constructs fail silently | Real hazard: the parser accepts reject, ereject, vacation, setflag, addflag, removeflag, notify, error, return, include, global and set as valid commands, and envelope, body, hasflag, string, date, currentdate… |
 | ✅ | Vacation expiry with auto-disable | Optional expiry date; on the first delivery after it passes the flag is switched off in the database rather than merely being ignored. An unparsable date fails open (vacation stays on) |
-| ⬜ | copy (RFC 3894) | Not implemented. There is no :copy tag on fileinto or redirect, so a redirect always cancels the implicit keep unless an explicit keep is also written |
+| ✅ | copy (RFC 3894) | Not implemented. There is no :copy tag on fileinto or redirect, so a redirect always cancels the implicit keep unless an explicit keep is also written **Shipped in dc9301a** - the row above described the state before it. |
 | ⬜ | date and index (RFC 5260) | Not implemented. date/currentdate parse as known tests and evaluate false; there is no :index/:last tagged argument for selecting among repeated header fields |
 | ⬜ | duplicate (RFC 7352) | Not implemented; no duplicate test and no tracking store for :handle/:uniqueid seen-values |
 | ⬜ | editheader (RFC 5293) | Not implemented. addheader/deleteheader are not even in the known-command list, so a script using them fails CHECKSCRIPT with "unknown command" |
 | ⬜ | enotify (RFC 5435) | Not implemented. `notify` parses as a known command and no-ops; there are no notification methods, no valid_notify_method test and no NOTIFY capability advertised over ManageSieve |
-| ⬜ | envelope (RFC 5228 §5.4) and body (RFC 5173) | Not implemented and this is the most user-visible gap: the SMTP envelope is never passed to the evaluator (SieveMessage is built from the raw file only)… |
+| ⬜ | envelope (RFC 5228 §5.4) and body (RFC 5173) | Not implemented and this is the most user-visible gap: the SMTP envelope is never passed to the evaluator (SieveMessage is built from the raw file only)… **Half shipped in dc9301a: `envelope` is implemented, `body` is not.** This row bundles two extensions and is deliberately left unticked for that reason - the SMTP envelope now reaches the script, and there is still no way to test the message body. |
 | ⬜ | ihave (RFC 5463) and environment (RFC 5183) | Not implemented. Both parse as known tests and evaluate false — which is actively wrong for ihave, whose whole purpose is capability probing, and means an ihave-guarded fallback script silently takes the wrong branch |
-| ⬜ | imap4flags (RFC 5232) | Not implemented. setflag/addflag/removeflag parse and no-op; the hasflag test parses and evaluates false; there is no :flags tagged argument on keep/fileinto |
+| ✅ | imap4flags (RFC 5232) | Not implemented. setflag/addflag/removeflag parse and no-op; the hasflag test parses and evaluates false; there is no :flags tagged argument on keep/fileinto **Shipped in dc9301a.** `ExecuteFlagCommand_` genuinely mutates the flag set; the "parse and no-op" description was true before that commit. |
 | ⬜ | include (RFC 6609) | Not implemented. include, return and global parse as known commands and no-op; there is no personal/global script namespace in SieveStorage to include from |
 | ⬜ | mailbox / mboxmetadata (RFC 5490) | Not implemented. No :create tag on fileinto and no mailboxexists test — a fileinto naming a folder that does not exist relies on whatever MoveToIMAPFolder does rather than declared Sieve semantics |
 | ⬜ | Out-of-office scheduling and scope | Only an end date exists — there is no start date, so a future absence cannot be scheduled and must be switched on manually. There is also no domain-level or server-level auto-reply, no separate internal/external message… |
 | ⬜ | regex (draft-ietf-sieve-regex) | Not implemented as a Sieve match type, even though the server already carries a regex engine used by the legacy rules engine (RuleCriteria::MatchesRegEx). Wiring it into MatchValue_ would be small |
 | ⬜ | reject / ereject (RFC 5429) | Not implemented. Both parse as known commands and silently no-op, which is the worst case for these two specifically: the author believes mail is being refused while it is in fact being kept |
-| ⬜ | relational (RFC 5231) | Not implemented. No :count or :value match types, and no i;ascii-numeric comparator to make them meaningful — SplitArguments recognises only is/contains/matches |
+| ✅ | relational (RFC 5231) | Not implemented. No :count or :value match types, and no i;ascii-numeric comparator to make them meaningful — SplitArguments recognises only is/contains/matches **Shipped in dc9301a.** |
 | ⬜ | RENAMESCRIPT and UNAUTHENTICATE | Neither implemented; both fall through to NO "Unknown command." A client renaming a script must GETSCRIPT/PUTSCRIPT/DELETESCRIPT by hand |
 | ⬜ | spamtest / spamtestplus / virustest (RFC 5235) | Not implemented, and again the underlying data exists: messages already carry a spam flag and SpamAssassin/AV scores from the antispam pipeline, but no Sieve test can read them |
 | ⬜ | Structured response codes | Not implemented. Responses are bare OK / NO with a quoted human string — no (WARNINGS), (QUOTA/maxsize), (QUOTA/maxscripts), (NONEXISTENT), (ALREADYEXISTS), (TAG), (REFERRAL) or BYE codes… |
-| ⬜ | subaddress (RFC 5233) | Not implemented. Address parts stop at :all/:localpart/:domain; :user and :detail are not recognised, so plus-addressing cannot be filtered on |
+| ✅ | subaddress (RFC 5233) | Not implemented. Address parts stop at :all/:localpart/:domain; :user and :detail are not recognised, so plus-addressing cannot be filtered on **Shipped in dc9301a.** |
 | ⬜ | TLS | None. STARTTLS is recognised but always answered NO "STARTTLS is not supported on this listener.", it is not advertised as a capability, and there is no implicit-TLS variant — so SASL PLAIN credentials cross the wire in the clear… |
-| ⬜ | vacation (RFC 5230) | Not implemented. The `vacation` keyword parses as a known command and is then discarded. The irony is that a full native auto-reply engine already exists (subject, body, expiry, spam guard… |
+| 🔄 | vacation (RFC 5230) | Not implemented. The `vacation` keyword parses as a known command and is then discarded. The irony is that a full native auto-reply engine already exists (subject, body, expiry, spam guard… **Half shipped in dc9301a: the decision is implemented and the reply is not sent.** `SieveEvaluator::ExecuteVacation_` exists, honours the once-per-script rule of RFC 5230 4.7 and refuses to reply when the envelope sender is unknown - but nothing hands a message to the delivery path, so no auto-reply ever leaves the server. What is left is the sending half plus the suppression store that stops it becoming a mail loop. |
 | ⬜ | variables (RFC 5229) | Not implemented. `set` parses and no-ops; there is no ${name} expansion anywhere in the lexer or evaluator, and no match-variable capture from :matches |
 
 ### Authentication and cryptography
