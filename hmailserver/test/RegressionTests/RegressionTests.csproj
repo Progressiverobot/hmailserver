@@ -301,6 +301,7 @@
     <Compile Include="IMAP\ConcurrentConnections.cs" />
     <Compile Include="Infrastructure\AccountProperties.cs" />
     <Compile Include="Infrastructure\AccountServices.cs" />
+    <Compile Include="AntiSpam\HostLiteralResolution.cs" />
     <Compile Include="AntiSpam\Combinations.cs" />
     <Compile Include="AntiSpam\Basics.cs" />
     <Compile Include="AntiSpam\SpamAssassin.cs" />
@@ -345,6 +346,7 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Rules\Rules.cs" />
     <Compile Include="Shared\SingletonProvider.cs" />
+    <Compile Include="SMTP\BareLineFeedEndOfData.cs" />
     <Compile Include="SMTP\AWStatsLoggingTests.cs" />
     <Compile Include="SMTP\Basics.cs" />
     <Compile Include="SMTP\ESmtpTests.cs" />
@@ -418,6 +420,7 @@
     <Compile Include="IMAP\Sort.cs" />
     <Compile Include="POP3\Fetching\Basics.cs" />
     <Compile Include="Shared\Pop3ServerSimulator.cs" />
+    <Compile Include="Security\ActiveDirectoryAuthentication.cs" />
     <Compile Include="Security\AutoBan.cs" />
     <Compile Include="Security\HashPolicy.cs" />
     <Compile Include="Security\OAuth2Bearer.cs" />

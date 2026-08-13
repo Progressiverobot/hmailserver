@@ -54,6 +54,22 @@ namespace HM
       // already buffered beyond the requested count are left in the receive buffer for
       // the following read. The connection must be in binary receive mode.
       void EnqueueReadExact(size_t numBytes);
+
+      // Throws away anything already received and not yet parsed.
+      //
+      // Exists for one specific job: when a message's end-of-data was recognised in a
+      // non-standard spelling (a bare LF where the standard requires CRLF, accepted only
+      // because the administrator asked for that tolerance), anything the peer has already
+      // pipelined behind that terminator must NOT go on to be parsed as SMTP commands.
+      // Honouring it is the SMTP smuggling primitive of CVE-2023-51764: an upstream relay
+      // that does not treat those bytes as a terminator forwards one message, and a server
+      // that does treat them as one, and then executes what follows, has been made to
+      // accept a second message the relay never authorised.
+      //
+      // Discarding is safe for legitimate clients because RFC 2920 requires a client to
+      // wait for the reply after end-of-data, so a well-behaved sender has nothing in
+      // flight at this point.
+      void DiscardBufferedInput();
       void EnqueueShutdownSend();
       void EnqueueDisconnect();
       void EnqueueHandshake();

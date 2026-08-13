@@ -49,6 +49,13 @@ namespace HM
       // BDAT: the caller marks end-of-message once the final (LAST) chunk has been
       // fully received, so the next Flush closes (and optionally fsyncs) the file.
       void MarkTransmissionEnded() { transmission_ended_ = true; }
+
+      // Whether the end-of-data marker that ended this transmission was the standard
+      // CRLF.CRLF or one of the bare-LF spellings accepted only under "allow incorrect
+      // line endings". The caller needs to know because anything pipelined behind a
+      // non-standard marker must be discarded rather than parsed as commands - that is
+      // the CVE-2023-51764 smuggling primitive.
+      bool GetEndedOnNonStandardMarker() const { return ended_on_non_standard_marker_; }
       
       std::shared_ptr<ByteBuffer> GetBuffer() 
       {
@@ -108,6 +115,15 @@ namespace HM
       // end-of-data sequence detection). Default false = classic DATA behaviour.
 
       bool last_send_ended_with_newline_;
+
+      // Whether the previous chunk handed to RemoveTransmissionPeriod_ ended on a
+      // carriage return. Only needed for the bare-LF repair, and only ever true when a
+      // forced flush split the data between a CR and its LF - without it, the LF at
+      // the start of the next chunk looks bare and gets a second carriage return put
+      // in front of it, corrupting the line the split fell inside.
+      bool previous_chunk_ended_with_carriage_return_;
+
+      bool ended_on_non_standard_marker_;
       
       // Output types
       File file_;

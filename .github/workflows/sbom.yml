@@ -29,16 +29,76 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # Syft writes to a file and does NOT upload here. Both uploads happen further down,
+      # after the native dependencies have been added - otherwise the artifact and the
+      # release asset are the incomplete SBOM this workflow used to publish.
       - name: Generate SPDX SBOM
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
         with:
           path: .
           format: spdx-json
-          artifact-name: hmailserver.spdx.json
+          output-file: hmailserver.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
 
       - name: Generate CycloneDX SBOM
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
         with:
           path: .
           format: cyclonedx-json
-          artifact-name: hmailserver.cyclonedx.json
+          output-file: hmailserver.cyclonedx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      # The step this workflow was missing. Syft reports what is in the repository, and
+      # OpenSSL, Boost and libpq are not: they are built separately and reached through
+      # $(hMailServerLibs). The published SBOM therefore listed 54 packages, every one of
+      # them .NET, for a mail server whose TLS is OpenSSL and whose entire socket layer is
+      # Boost Asio - so anyone checking a release against a CVE feed, which is the whole
+      # purpose of shipping an SBOM, would have concluded this server does not link
+      # OpenSSL. Versions come from the include paths in hMailServer.vcxproj, which is what
+      # the compiler is actually given and so cannot be stale while the build works.
+      - name: Add the native dependencies Syft cannot see
+        shell: pwsh
+        run: |
+          ./build/merge-native-dependencies-into-sbom.ps1 -SbomFile hmailserver.spdx.json
+          ./build/merge-native-dependencies-into-sbom.ps1 -SbomFile hmailserver.cyclonedx.json
+
+      # Fails the job rather than shipping a silently incomplete SBOM. The whole defect
+      # this workflow just fixed was an absence nobody noticed, so the absence is now
+      # something CI notices.
+      - name: Verify both SBOMs name every native dependency
+        shell: pwsh
+        run: |
+          $expected = (./build/native-dependencies.ps1 | ConvertFrom-Json)
+          $failed = $false
+          foreach ($file in @('hmailserver.spdx.json', 'hmailserver.cyclonedx.json')) {
+            $content = Get-Content $file -Raw
+            foreach ($dependency in $expected) {
+              if ($content -notmatch [regex]::Escape($dependency.purl)) {
+                Write-Host "::error file=$file::$file does not list $($dependency.purl)"
+                $failed = $true
+              }
+            }
+          }
+          if ($failed) { exit 1 }
+          Write-Host "Both SBOMs list all $($expected.Count) native dependencies."
+
+      - name: Upload the SBOMs as artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sbom
+          path: |
+            hmailserver.spdx.json
+            hmailserver.cyclonedx.json
+          retention-days: 90
+
+      - name: Attach the SBOMs to the release
+        if: ${{ github.event_name == 'release' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release upload "${{ github.event.release.tag_name }}" \
+            hmailserver.spdx.json hmailserver.cyclonedx.json --clobber

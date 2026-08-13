@@ -11,6 +11,7 @@
 #include <boost/asio.hpp>
 
 #include "HostNameAndIpAddress.h"
+#include "IPAddress.h"
 
 using boost::asio::ip::tcp;
 
@@ -59,9 +60,40 @@ namespace HM
       return values;
    }
    
-   bool 
+   bool
    DNSResolver::GetIpAddresses(const String &sDomain, std::vector<String> &vecFoundNames, bool followCnameRecords)
    {
+      // An address is not a name, so it is not asked about in DNS.
+      //
+      // Without this, a host configured as "127.0.0.1" - which is what the SpamAssassin,
+      // ClamAV and relay settings hold on most installations, and what the shipped default
+      // is - becomes a DNS query for an A record NAMED "127.0.0.1". Whether that returns
+      // anything is then up to the resolver: the Windows DNS client answers it from its own
+      // literal handling in the common case, but that path is not taken when the query is
+      // directed at a specific DNS server or has to bypass the cache, and an upstream
+      // resolver has no reason to answer at all. When it does not answer, hMailServer
+      // reports "The IP address for SpamAssassin could not be resolved" and stops - so a
+      // correctly configured server appears to have lost SpamAssassin entirely, which is
+      // issue #25.
+      //
+      // The IPv6 case is not a maybe: a host of "::1" fails here every time, on every
+      // machine, because nothing in DNS is named "::1". That is reproducible and was
+      // reproduced.
+      //
+      // Doing this at the top of the public entry point rather than inside the recursive
+      // helper is deliberate: it applies to every caller - spam tests, virus scanning,
+      // route hosts, relay hosts, external fetching - and it also removes a pointless
+      // round trip from the hot path, because the overwhelmingly common configuration for
+      // all of those is a literal address.
+      IPAddress parsedAddress;
+      if (parsedAddress.TryParse(AnsiString(sDomain), false))
+      {
+         // Normalised through IPAddress rather than echoed back, so that the caller gets
+         // the same canonical form it would get from a lookup.
+         vecFoundNames.push_back(String(parsedAddress.ToString()));
+         return true;
+      }
+
       return GetIpAddressesRecursive_(sDomain, vecFoundNames, 0, followCnameRecords);
    }
 

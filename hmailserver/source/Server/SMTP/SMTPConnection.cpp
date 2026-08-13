@@ -1353,6 +1353,20 @@ namespace HM
          }
       }
 
+      // The message ended. If it ended on a bare-LF spelling of the marker - accepted only
+      // because this server was configured to tolerate incorrect line endings - then
+      // anything the peer has already sent behind it is thrown away instead of being
+      // parsed as SMTP commands.
+      //
+      // This is the CVE-2023-51764 mitigation for the tolerance, and without it the fix
+      // for the hang would have opened a smuggling hole: a relay that does not accept
+      // "\n.\r\n" as end-of-data forwards one message, and a server that accepts it and
+      // then executes the lines behind it has been made to inject a second message the
+      // relay never saw. Legitimate senders lose nothing, because RFC 2920 requires a
+      // client to wait for the reply after end-of-data.
+      if (transmission_buffer_->GetEndedOnNonStandardMarker())
+         DiscardBufferedInput();
+
       // Since this may be a time-consuming task, do it asynchronously
       finalization_enqueued_tick_ = GetTickCount64();
       std::shared_ptr<AsynchronousTask<TCPConnection> > finalizationTask =

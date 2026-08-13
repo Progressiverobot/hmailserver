@@ -516,7 +516,28 @@ namespace HM
       ProcessOperationQueue_(0);
    }
 
-   void 
+   void
+   TCPConnection::DiscardBufferedInput()
+   {
+      size_t buffered = receive_buffer_.size();
+
+      if (buffered == 0)
+         return;
+
+      receive_buffer_.consume(buffered);
+
+      // Logged, and at application level rather than debug, because this only happens
+      // when a peer sent something behind a non-standard end-of-data marker. That is
+      // either a badly behaved client or an attempt at SMTP smuggling, and in both cases
+      // an administrator looking into odd traffic wants to know it happened.
+      String message;
+      message.Format(_T("TCPConnection - Discarded %Iu byte(s) received behind a non-standard end-of-data marker on session %d from %s. See CVE-2023-51764."),
+         buffered, session_id_, SafeGetIPAddress().c_str());
+
+      LOG_APPLICATION(message);
+   }
+
+   void
    TCPConnection::AsyncRead(const AnsiString &delimitor)
    {
       UpdateAutoLogoutTimer();

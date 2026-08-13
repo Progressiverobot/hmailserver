@@ -8,6 +8,8 @@
 
 #include "ByteBuffer.h"
 #include "../Application/IniFileSettings.h"
+#include "../Application/Configuration.h"
+#include "../../SMTP/SMTPConfiguration.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -21,6 +23,8 @@ namespace HM
       binary_mode_(false),
       transmission_ended_(false),
       last_send_ended_with_newline_(false),
+      previous_chunk_ended_with_carriage_return_(false),
+      ended_on_non_standard_marker_(false),
       data_sent_(0),
       max_size_kb_(0),
       cancel_transmission_(false),
@@ -105,21 +109,93 @@ namespace HM
          size_t iSize = buffer_->GetSize();
          const char *pCharBuffer = buffer_->GetCharBuffer();
 
-         // Check if the buffer only contains a dot on an empty line.
-         bool bDotCRLFOnEmptyLine = (pCharBuffer[0] == '.' && pCharBuffer[1] == '\r' && pCharBuffer[2] == '\n');
+         // Whether a bare LF is accepted where the standard requires CRLF. This is the
+         // existing "Allow incorrect line endings" setting, and until now it was honoured
+         // everywhere EXCEPT the one place where getting it wrong hangs the session.
+         //
+         // The old test for end-of-data required, literally, \r\n.\r\n at the end of the
+         // buffer. So a message whose final body line ended with a bare LF arrived as
+         // ...text\n.\r\n - and the byte five back is 't', not '\r', so end-of-data was
+         // never recognised. The other test only fires when the dot is the first byte in
+         // the buffer, which happens only when the preceding flush ended exactly on a
+         // newline, so it does not cover this either. The result is not a rejection but a
+         // HANG: every byte of the message has arrived, the server goes on waiting for a
+         // terminator that has already been and gone, the sending MTA waits for a reply
+         // that will never come, and the spool file is left at zero bytes. That is
+         // discussion #18's exact signature - "no external receiving is possible", with
+         // the log stopping dead after 354 - and it is why the reporter's workaround of
+         // disabling PIPELINING appeared to help: it changed how the data was segmented.
+         //
+         // Gated on the setting rather than always allowed, because RFC 5321 is specific
+         // that the terminator is <CRLF>.<CRLF>, and a server should not invent
+         // tolerances it was not asked for. A server that WAS asked for them should not
+         // then refuse in the one case that matters.
+         const bool allowBareLineFeed =
+            Configuration::Instance()->GetSMTPConfiguration()->GetAllowIncorrectLineEndings();
 
-         // Look for \r\n.\r\n. 
-         bool bLineBeginnningWithDotCRLF = buffer_->GetSize() >= 5 &&
-            (pCharBuffer[iSize -5] == '\r' && 
-            pCharBuffer[iSize -4] == '\n' && 
-            pCharBuffer[iSize -3] == '.' && 
-            pCharBuffer[iSize -2] == '\r' && 
-            pCharBuffer[iSize -1] == '\n');
+         // How many bytes the terminator occupies, so the right number are removed. The
+         // old code always removed three, which is correct for ".\r\n" and one byte too
+         // many for ".\n" - and one byte too many means the last character of the message
+         // body is silently eaten.
+         size_t terminatorLength = 0;
 
-         if (bDotCRLFOnEmptyLine || bLineBeginnningWithDotCRLF)
+         // A dot alone on a line, at the start of the buffer: the preceding flush ended
+         // on the line boundary, so the newline before the dot is no longer here.
+         if (pCharBuffer[0] == '.' && pCharBuffer[1] == '\r' && pCharBuffer[2] == '\n')
+            terminatorLength = 3;
+         else if (allowBareLineFeed && iSize >= 2 && pCharBuffer[0] == '.' && pCharBuffer[1] == '\n')
          {
-            // Remove the transmission-end characters. (the 3 last)
-            buffer_->DecreaseSize(3);
+            terminatorLength = 2;
+            ended_on_non_standard_marker_ = true;
+         }
+
+         if (terminatorLength == 0 && iSize >= 5 &&
+             pCharBuffer[iSize - 5] == '\r' && pCharBuffer[iSize - 4] == '\n' &&
+             pCharBuffer[iSize - 3] == '.' &&
+             pCharBuffer[iSize - 2] == '\r' && pCharBuffer[iSize - 1] == '\n')
+         {
+            terminatorLength = 3;
+         }
+
+         // Everything matched up to this point is the standard marker. Anything matched
+         // below it is not, and the distinction is carried out to the caller rather than
+         // being forgotten here: a non-standard marker means anything the peer has already
+         // pipelined behind it has to be thrown away instead of parsed as SMTP commands.
+         // Honouring those bytes is the CVE-2023-51764 smuggling primitive - a relay
+         // upstream that does not recognise the marker forwards one message, and a server
+         // that recognises it AND executes what follows has been made to accept a second
+         // message nobody authorised.
+         if (terminatorLength == 0 && allowBareLineFeed)
+         {
+            // The four spellings a sender with bare-LF line endings can produce. Each is
+            // checked against the end of the buffer, and each removes only the dot and
+            // the newline that follows it, leaving the body's own line ending in place.
+            const bool crlfDotLf = iSize >= 4 &&
+               pCharBuffer[iSize - 4] == '\r' && pCharBuffer[iSize - 3] == '\n' &&
+               pCharBuffer[iSize - 2] == '.'  && pCharBuffer[iSize - 1] == '\n';
+
+            const bool lfDotCrlf = iSize >= 4 &&
+               pCharBuffer[iSize - 4] == '\n' && pCharBuffer[iSize - 3] == '.' &&
+               pCharBuffer[iSize - 2] == '\r' && pCharBuffer[iSize - 1] == '\n';
+
+            const bool lfDotLf = iSize >= 3 &&
+               pCharBuffer[iSize - 3] == '\n' && pCharBuffer[iSize - 2] == '.' &&
+               pCharBuffer[iSize - 1] == '\n';
+
+            if (lfDotCrlf)
+               terminatorLength = 3;
+            else if (crlfDotLf || lfDotLf)
+               terminatorLength = 2;
+
+            if (terminatorLength > 0)
+               ended_on_non_standard_marker_ = true;
+         }
+
+         if (terminatorLength > 0)
+         {
+            // Remove the transmission-end characters, leaving the message body and its
+            // own final line ending.
+            buffer_->DecreaseSize(terminatorLength);
 
             transmission_ended_ = true;
          }
@@ -411,10 +487,33 @@ namespace HM
       // Allocate maximum required length for the out buffer.
       char *pInBuffer = (char*) pBuffer->GetCharBuffer();
 
-      char *pOutBuffer = new char[pBuffer->GetSize()];
-      char *pOutBufferStart = pOutBuffer;
-
       size_t iInBufferSize = pBuffer->GetSize();
+
+      // Whether bare line feeds are repaired on the way to the spool file rather than
+      // stored as they arrived. This is the same "Allow incorrect line endings" setting
+      // that decides whether such a message is accepted at all - with it off, the message
+      // is refused with 554 and never reaches here.
+      //
+      // Repairing rather than merely tolerating is the point. Accepting a message and
+      // storing it with bare LFs produces a message the server cannot correctly serve
+      // afterwards: POP3 RETR and IMAP FETCH both terminate their payload with CRLF.CRLF,
+      // so a stored body whose last line ends with a bare LF is sent as "...\n.\r\n" and a
+      // strict client cannot find the end of it - the retrieval hangs in the same shape as
+      // the reception hang this setting was blocking. Proven, not theorised: the first
+      // build that accepted these messages then hung the suite's own POP3 client on
+      // exactly that, after the SMTP side had logged "250 Queued".
+      //
+      // So the rule is: accept the sender's sloppiness at the door and normalise it once,
+      // here, where every byte is already being walked for dot-unstuffing and the extra
+      // work is a comparison per character.
+      const bool repairBareLineFeeds = !is_sending_ &&
+         Configuration::Instance()->GetSMTPConfiguration()->GetAllowIncorrectLineEndings();
+
+      // Twice the input, because repairing grows the data: every bare LF becomes CRLF. The
+      // old allocation was exactly the input size, which was correct while this loop could
+      // only ever remove bytes.
+      char *pOutBuffer = new char[iInBufferSize * 2 + 2];
+      char *pOutBufferStart = pOutBuffer;
 
       for (size_t i = 0; i < iInBufferSize; i++)
       {
@@ -427,11 +526,31 @@ namespace HM
                continue;
          }
 
+         // A line feed with no carriage return in front of it. The preceding byte may be
+         // in the PREVIOUS chunk - Flush hands this function whole lines, but a forced
+         // flush (an over-long line, or a cancelled transmission) can split anywhere,
+         // including between a CR and its LF. Hence the carried state: without it, a split
+         // there would produce "\r\r\n" and corrupt the line the split fell inside.
+         if (repairBareLineFeeds && c == '\n')
+         {
+            const bool precededByCarriageReturn = i > 0
+               ? pInBuffer[i - 1] == '\r'
+               : previous_chunk_ended_with_carriage_return_;
+
+            if (!precededByCarriageReturn)
+            {
+               *pOutBuffer = '\r';
+               pOutBuffer++;
+            }
+         }
+
          // Add the character to the out buffer
          *pOutBuffer = c;
          pOutBuffer++;
 
       }
+
+      previous_chunk_ended_with_carriage_return_ = iInBufferSize > 0 && pInBuffer[iInBufferSize - 1] == '\r';
 
       // Clear the buffer and insert the new data
       size_t iOutBufferLen = pOutBuffer - pOutBufferStart;
