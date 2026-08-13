@@ -51,6 +51,10 @@ namespace HM
       std::shared_ptr<DALConnection> GetConnection_();
       void ReleaseConnection_(std::shared_ptr<DALConnection> pConn);
 
+      // Test-only fault injection; see the comment above the definition. Off unless
+      // [Settings] SimulateDatabaseFailureFor names a substring of the statement.
+      static bool SimulateFailureFor_(const SQLCommand &command);
+
       // Records a statement's execution latency into the observability metrics and,
       // when it exceeds [Settings] SlowQueryLogMilliseconds, logs it (literals
       // redacted). Backend-agnostic: called from the single Execute/OpenRecordset

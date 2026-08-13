@@ -100,6 +100,11 @@ namespace HM
          pObject->SetID((int) iDBID);
 
 
-      return true;
+      // bRetVal, not true. This computed whether the statement had succeeded and then
+      // reported success regardless, so every caller that checked was checking a
+      // constant - including the ones hardened earlier this week, whose checks were
+      // therefore correct code that could never fire. Found by the database fault
+      // injector on its first run, which is the entire argument for having built it.
+      return bRetVal;
    }
 }

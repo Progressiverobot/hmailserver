@@ -299,6 +299,7 @@
     <Compile Include="MIME\MalformedInput.cs" />
     <Compile Include="Infrastructure\AcceptPathResilience.cs" />
     <Compile Include="Infrastructure\BackendPortability.cs" />
+    <Compile Include="Infrastructure\DatabaseFailureHandling.cs" />
     <Compile Include="IMAP\CapabilityAuthAdvertisement.cs" />
     <Compile Include="IMAP\MasterUserImpersonation.cs" />
     <Compile Include="Infrastructure\SqlLayerErrorHandling.cs" />

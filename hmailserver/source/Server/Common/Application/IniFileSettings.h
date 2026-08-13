@@ -190,6 +190,34 @@ namespace HM
       // Deliberately not exposed in the Control Panel, and read from the ini rather than
       // over COM, so that turning it on takes a deliberate edit plus a reinitialize.
       int GetSimulateSpoolWriteFailure() const { return simulate_spool_write_failure_; }
+
+      // Test-only fault injection for the database layer, and the reason it exists is
+      // worth stating: three sweeps in August 2026 fixed 51 places where the result of
+      // a database write was discarded, and every one of those defects lived in error
+      // handling that had never executed. Adding 51 more error branches that also never
+      // execute repeats the mistake at one remove. This is what lets a test make one
+      // specific statement fail so the branch actually runs.
+      //
+      // A substring of the statement rather than a switch, so a test can name exactly
+      // the write it wants to break - "update hm_imapfolders set foldercurrentuid" -
+      // and every other statement on every other thread carries on normally. That
+      // precision is what makes it usable at all on a running server with delivery
+      // threads working.
+      //
+      // Empty out of the box, which is the whole of its safety: the check is one
+      // IsEmpty() per statement, it can only be turned on by editing hMailServer.ini
+      // and reinitialising, and Application::Reinitialize reports HM6119 whenever it
+      // is set - because a fault injector that is silently on is far worse than not
+      // having one. Follows SimulateSpoolWriteFailure and CrashSimulationMode, which
+      // are the same idea for the disk and the crash handler.
+      // Asked before every single database statement, so it must cost nothing when the
+      // facility is off. Every String getter in this class returns by value, which is
+      // fine for settings read once at startup and quite wrong for one read per
+      // statement - a heap copy per query is not a price a mail server should pay for a
+      // test hook. Hence the bool: the string is only fetched once it says yes.
+      bool GetSimulateDatabaseFailureEnabled() const { return simulate_database_failure_enabled_; }
+
+      String GetSimulateDatabaseFailureFor() const { return simulate_database_failure_for_; }
       bool GetMessageStoreConsistencyCheck() const { return message_store_consistency_check_; }
       int GetMetricsServerPort() const { return metrics_server_port_; }
       String GetMetricsServerBindAddress() const { return metrics_server_bind_address_; }
@@ -394,6 +422,8 @@ namespace HM
       int slow_query_log_ms_ = 0;
       bool message_store_fsync_ = false;
       int simulate_spool_write_failure_ = 0;
+      String simulate_database_failure_for_;
+      bool simulate_database_failure_enabled_ = false;
       bool message_store_consistency_check_ = false;
       int metrics_server_port_ = 0;
       String metrics_server_bind_address_;

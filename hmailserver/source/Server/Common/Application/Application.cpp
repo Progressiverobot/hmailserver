@@ -196,6 +196,27 @@ namespace HM
          return false;
       }
 
+      // The database fault injector is a test facility, and the way a facility like
+      // this hurts somebody is not by being switched on - it is by being left on. So
+      // it announces itself, every time the server starts or reinitialises, for as
+      // long as it is set.
+      //
+      // High severity and the error log rather than the application log, deliberately:
+      // this makes writes fail on purpose, and an operator who finds mail behaving
+      // strangely should meet this line before they start looking anywhere else.
+      // SimulateSpoolWriteFailure and CrashSimulationMode do not do this and arguably
+      // should; the difference is that they affect one path each, while this can fail
+      // any statement in the server.
+      const String simulateDatabaseFailureFor = IniFileSettings::Instance()->GetSimulateDatabaseFailureFor();
+
+      if (!simulateDatabaseFailureFor.IsEmpty())
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 6119, "Application::OpenDatabase",
+            "[Settings] SimulateDatabaseFailureFor is set to '" + simulateDatabaseFailureFor +
+            "', so every database statement containing that text is being FAILED ON PURPOSE. This is a test facility. "
+            "Clear the setting in hMailServer.INI and restart the server unless you are deliberately testing failure handling.");
+      }
+
       db_manager_ = std::shared_ptr<DatabaseConnectionManager>(new DatabaseConnectionManager);
       bool bConnectedSuccessfully = db_manager_->CreateConnections(sErrorMessage);
 

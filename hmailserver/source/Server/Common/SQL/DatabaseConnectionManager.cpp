@@ -155,6 +155,12 @@ namespace HM
    bool 
    DatabaseConnectionManager::Execute(const SQLCommand &command, __int64 *iInsertID, int iIgnoreErrors, String &sErrorMessage)
    {
+      if (SimulateFailureFor_(command))
+      {
+         sErrorMessage = "Simulated database failure ([Settings] SimulateDatabaseFailureFor).";
+         return false;
+      }
+
       std::shared_ptr<DALConnection> pDALConn = GetConnection_();
 
       if (!pDALConn)
@@ -178,16 +184,67 @@ namespace HM
       return bResult;
    }
 
-   std::shared_ptr<DALRecordset> 
+   std::shared_ptr<DALRecordset>
    DatabaseConnectionManager::OpenRecordset(const SQLStatement &statement)
    {
       return OpenRecordset(statement.GetCommand());
+   }
+
+   /*
+      Test-only fault injection. True when [Settings] SimulateDatabaseFailureFor is set
+      and this statement contains it, in which case the caller is answered exactly as it
+      would be by a database that refused the statement.
+
+      Why it exists: three sweeps in August 2026 fixed 51 places where the result of a
+      database operation was discarded, and every defect found was in error handling
+      that had never once executed - a `return true` where the delete had failed, a
+      String passed through a variadic %s in the line that reports a failed restore, a
+      UID counter read back after an unchecked increment. Those 51 fixes added 51 more
+      branches that also never execute. Without a way to run them, the fixes are
+      untested code of exactly the kind that was just found to be wrong.
+
+      Why a substring of the statement and not a mode: the server has delivery threads,
+      scheduled tasks and protocol sessions all issuing statements at once, so "fail the
+      next statement" would fail whatever happened to be next. Naming the statement -
+      "update hm_imapfolders set foldercurrentuid" - fails precisely one write and
+      leaves everything else working, which is the only thing that makes this usable
+      against a running server.
+
+      Why it is safe: empty out of the box, so the cost is one IsEmpty() per statement
+      and the behaviour is unchanged. It cannot be set remotely or over COM - only by
+      editing hMailServer.INI and reinitialising - and Application::Reinitialize reports
+      HM6119 for as long as it is set, because the failure mode of a facility like this
+      is being quietly left on, not being turned on. SimulateSpoolWriteFailure and
+      CrashSimulationMode are the same idea for the disk and the crash handler.
+   */
+   bool
+   DatabaseConnectionManager::SimulateFailureFor_(const SQLCommand &command)
+   {
+      // The bool first, and it is the whole reason this is affordable: this runs before
+      // every statement the server issues, and the String getters in IniFileSettings
+      // return by value, so asking for the pattern here would put a heap copy on the
+      // path of every query to support a facility that is off on every real server.
+      if (!IniFileSettings::Instance()->GetSimulateDatabaseFailureEnabled())
+         return false;
+
+      const String pattern = IniFileSettings::Instance()->GetSimulateDatabaseFailureFor();
+
+      if (pattern.IsEmpty())
+         return false;
+
+      return command.GetQueryString().Find(pattern) >= 0;
    }
 
    std::shared_ptr<DALRecordset> 
    DatabaseConnectionManager::OpenRecordset(const SQLCommand &command)
    {
       std::shared_ptr<DALRecordset> pRecordset;
+
+      // Reads as well as writes: several of the defects this exists to test are on the
+      // read side - ReadRecipients_ failing made a queued message look recipient-less,
+      // and the delivery manager then deleted it.
+      if (SimulateFailureFor_(command))
+         return pRecordset;
 
       std::shared_ptr<DALConnection> pDALConn = GetConnection_();
 

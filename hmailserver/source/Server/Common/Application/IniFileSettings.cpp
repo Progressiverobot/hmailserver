@@ -334,6 +334,8 @@ namespace HM
       slow_query_log_ms_ = ReadIniSettingInteger_("Settings", "SlowQueryLogMilliseconds", 0);
       message_store_fsync_ = ReadIniSettingInteger_("Settings", "MessageStoreFsync", 0) == 1;
       simulate_spool_write_failure_ = ReadIniSettingInteger_("Settings", "SimulateSpoolWriteFailure", 0);
+      simulate_database_failure_for_ = ReadIniSettingString_("Settings", "SimulateDatabaseFailureFor", "");
+      simulate_database_failure_enabled_ = !simulate_database_failure_for_.IsEmpty();
       message_store_consistency_check_ = ReadIniSettingInteger_("Settings", "MessageStoreConsistencyCheck", 0) == 1;
       metrics_server_port_ = ReadIniSettingInteger_("Settings", "MetricsServerPort", 0);
       metrics_server_bind_address_ = ReadIniSettingString_("Settings", "MetricsServerBindAddress", "127.0.0.1");
