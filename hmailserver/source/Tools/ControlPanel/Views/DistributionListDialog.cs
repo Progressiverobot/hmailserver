@@ -1,5 +1,6 @@
 using System;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
 
@@ -38,7 +39,7 @@ namespace hMailServer.ControlPanel.Views
          panel.Children.Add(header);
 
          panel.Children.Add(active_);
-         panel.Children.Add(Label("List address"));
+         panel.Children.Add(Label("List address", addressBox_));
          panel.Children.Add(Input(addressBox_));
 
          mode_.Items.Add(Combo("Public — anyone can send", 0));
@@ -48,17 +49,18 @@ namespace hMailServer.ControlPanel.Views
          mode_.Items.Add(Combo("Anyone with a server account can send", 4));
          mode_.FontSize = 13;
          mode_.Margin = new Thickness(0, 0, 0, 8);
-         panel.Children.Add(Label("Who may send to this list"));
+         panel.Children.Add(Label("Who may send to this list", mode_));
          panel.Children.Add(mode_);
 
          panel.Children.Add(requireAuth_);
-         panel.Children.Add(Label("Require sender address (empty = any)"));
+         panel.Children.Add(Label("Require sender address (empty = any)", requireSender_));
          panel.Children.Add(Input(requireSender_));
 
          var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
-         var save = new Wpf.Ui.Controls.Button { Content = "Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80 };
+         // Enter saves, Escape cancels. Neither worked before.
+         var save = new Wpf.Ui.Controls.Button { Content = "Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80, IsDefault = true };
          save.Click += (s, e) => Save();
-         var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel", MinWidth = 80 };
+         var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel", MinWidth = 80, IsCancel = true };
          cancel.Click += (s, e) => Close();
          buttons.Children.Add(save);
          buttons.Children.Add(cancel);
@@ -130,10 +132,19 @@ namespace hMailServer.ControlPanel.Views
 
       // ---- UI helpers ----
 
-      private static TextBlock Label(string text)
+      /// <summary>
+      /// A caption, and - when the editor it captions is passed in - that editor's
+      /// accessible name. A TextBlock above a control tells UI Automation nothing.
+      /// The two checkboxes need nothing: a content control names itself.
+      /// </summary>
+      private static TextBlock Label(string text, FrameworkElement editor = null)
       {
          var t = new TextBlock { Text = text, FontSize = 12.5, Margin = new Thickness(0, 8, 0, 4) };
          t.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
+
+         if (editor != null)
+            AutomationProperties.SetName(editor, AccessibleNames.Qualify(text, ""));
+
          return t;
       }
 

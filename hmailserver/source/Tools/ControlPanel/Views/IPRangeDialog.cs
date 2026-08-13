@@ -1,5 +1,6 @@
 using System;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
 
@@ -75,9 +76,10 @@ namespace hMailServer.ControlPanel.Views
          root.Children.Add(tabs);
 
          var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
-         var save = new Wpf.Ui.Controls.Button { Content = "Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0) };
+         // Enter saves, Escape cancels. Neither worked before.
+         var save = new Wpf.Ui.Controls.Button { Content = "Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
          save.Click += (s, e) => Save();
-         var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel" };
+         var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel", IsCancel = true };
          cancel.Click += (s, e) => Close();
          buttons.Children.Add(save);
          buttons.Children.Add(cancel);
@@ -91,13 +93,13 @@ namespace hMailServer.ControlPanel.Views
       private ScrollViewer BuildGeneral()
       {
          var p = Panel();
-         p.Children.Add(Label("Name"));
+         p.Children.Add(Label("Name", name_));
          p.Children.Add(Input(name_));
-         p.Children.Add(Label("Lower IP address"));
+         p.Children.Add(Label("Lower IP address", lower_));
          p.Children.Add(Input(lower_));
-         p.Children.Add(Label("Upper IP address"));
+         p.Children.Add(Label("Upper IP address", upper_));
          p.Children.Add(Input(upper_));
-         p.Children.Add(Label("Priority (higher wins when ranges overlap)"));
+         p.Children.Add(Label("Priority (higher wins when ranges overlap)", priority_));
          p.Children.Add(Input(priority_));
          return Scroll(p);
       }
@@ -142,7 +144,7 @@ namespace hMailServer.ControlPanel.Views
          p.Children.Add(virus_);
          p.Children.Add(Separator());
          p.Children.Add(expires_);
-         p.Children.Add(Label("Expiry time (YYYY-MM-DD HH:MM:SS)"));
+         p.Children.Add(Label("Expiry time (YYYY-MM-DD HH:MM:SS)", expiresTime_));
          p.Children.Add(Input(expiresTime_));
          return Scroll(p);
       }
@@ -261,10 +263,22 @@ namespace hMailServer.ControlPanel.Views
       private static StackPanel Panel() => new() { Margin = new Thickness(4, 12, 4, 4) };
       private static ScrollViewer Scroll(StackPanel p) => new() { Content = p, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
 
-      private static TextBlock Label(string text)
+      /// <summary>
+      /// A caption, and - when the editor it captions is passed in - that editor's
+      /// accessible name. A TextBlock above a control tells UI Automation nothing,
+      /// so the four boxes on the General tab announced themselves as "edit, edit,
+      /// edit, edit" on a dialog where two of them are the ends of an IP range.
+      /// The checkboxes are already named by their own Content, which is why the
+      /// group captions here are passed no editor.
+      /// </summary>
+      private static TextBlock Label(string text, FrameworkElement editor = null)
       {
          var t = new TextBlock { Text = text, FontSize = 12.5, Margin = new Thickness(0, 8, 0, 4) };
          t.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
+
+         if (editor != null)
+            AutomationProperties.SetName(editor, AccessibleNames.Qualify(text, ""));
+
          return t;
       }
 

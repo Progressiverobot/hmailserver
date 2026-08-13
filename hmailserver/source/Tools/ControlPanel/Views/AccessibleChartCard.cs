@@ -436,7 +436,7 @@ namespace hMailServer.ControlPanel.Views
          placeholder_.Foreground = ShapeMarkVisuals.ToBrush(chrome.PlaceholderTextArgb);
 
          ApplySurface_(chrome);
-         BuildLegend_();
+         BuildLegend_(chrome);
       }
 
       /// <summary>
@@ -557,7 +557,17 @@ namespace hMailServer.ControlPanel.Views
          };
       }
 
-      private void BuildLegend_()
+      /// <summary>
+      /// Rebuilds the legend for the theme just resolved.
+      ///
+      /// Takes the chrome rather than reading it back from ThemeTokens so that the
+      /// legend cannot end up describing a different theme from the plot it sits
+      /// under - and because the series-name labels have to be repainted with the
+      /// card's own text colour whenever the card owns its surface. See the comment
+      /// on that assignment below: it is the same App.xaml implicit-style trap that
+      /// ApplySurface_ documents for the data grid, and the legend fell into it.
+      /// </summary>
+      private void BuildLegend_(ChartChrome chrome)
       {
          legend_.Children.Clear();
          legendValues_.Clear();
@@ -617,6 +627,34 @@ namespace hMailServer.ControlPanel.Views
                FontSize = Typography.Caption,
                VerticalAlignment = VerticalAlignment.Center
             };
+
+            // The one element of the card the High Contrast palette did not reach.
+            //
+            // App.xaml carries an implicit Style for TextBlock that sets Foreground
+            // to the theme's TextFillColorPrimaryBrush, and a style setter beats an
+            // inherited value - which is exactly the trap ApplySurface_ documents
+            // for DataGridCell and DataGridColumnHeader. So a legend label left
+            // alone kept the *application* theme's text colour on a card that had
+            // just been repainted in the *system* colours: on a High Contrast White
+            // desktop with the Control Panel in its default dark theme the series
+            // names were near-white on the white system window colour, and on High
+            // Contrast Black with the light theme they were near-black on black.
+            // Either way they were gone.
+            //
+            // That is not a cosmetic loss. The plot draws no markers (GeometrySize
+            // is 0), so the only thing mapping a dash pattern back to "SMTP" is this
+            // label - lose it and a High Contrast reader has three anonymous lines,
+            // which is the precise failure the whole exercise exists to remove.
+            //
+            // A resolved brush when the card owns its surface, a resource reference
+            // when it does not: pinning a brush in the ordinary themes would freeze
+            // the label on whatever colour was current, the same reason
+            // ApplySurface_ clears its local values instead of assigning them.
+            if (chrome.SurfaceTextArgb.HasValue)
+               name.Foreground = ShapeMarkVisuals.ToBrush(chrome.SurfaceTextArgb.Value);
+            else
+               name.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorPrimaryBrush");
+
             // The dash pattern is what identifies the series when the colour cannot be
             // relied on, so it is said in words to anyone listening rather than only
             // drawn. The marker shape is deliberately NOT announced: the plot draws no

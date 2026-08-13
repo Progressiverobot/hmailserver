@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
 using hMailServer.ControlPanel.Services;
@@ -88,7 +89,17 @@ namespace hMailServer.ControlPanel.Views
             Margin = new Thickness(0, 14, 0, 0)
          };
          okButton_.Click += (s, e) => Accept();
-         var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel" };
+
+         // Escape closes. It did not before, on a dialog that can sit for several
+         // seconds on a directory query.
+         //
+         // Select is deliberately NOT the default button. Enter in the search box
+         // means "search" and always has (see BuildQueryRow), and a default button
+         // would fire on the same keystroke - so Enter would search and then try to
+         // accept a selection the search had just cleared. Enter on the results list
+         // is the natural "select" gesture and is reached by tabbing to the list,
+         // which is why the list's key handling is left to the ListView.
+         var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel", IsCancel = true };
          cancel.Click += (s, e) => { DialogResult = false; Close(); };
          buttons.Children.Add(okButton_);
          buttons.Children.Add(cancel);
@@ -119,12 +130,33 @@ namespace hMailServer.ControlPanel.Views
          grid.Children.Add(domainLabel);
 
          domainBox_.Margin = new Thickness(0, 0, 12, 0);
+         AutomationProperties.SetName(domainBox_, "Domain");
          Grid.SetColumn(domainBox_, 1);
          grid.Children.Add(domainBox_);
 
          searchBox_.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
          searchBox_.Background = System.Windows.Media.Brushes.Transparent;
-         searchBox_.KeyDown += (s, e) => { if (e.Key == Key.Enter) Search(); };
+
+         // The search box has no caption of its own at all - it is a bare box
+         // between the domain list and the Search button, so a screen reader
+         // announced "edit" and a keyboard user tabbing in had no way to know what
+         // it was for. The name says what it does and what an empty box means,
+         // because "search with an empty box to list all users" is real behaviour
+         // that only the status line mentions.
+         AutomationProperties.SetName(searchBox_,
+            "Search for part of an account name. Leave empty to list every user in the domain.");
+
+         // Handled, so the keystroke stops here. Without that, adding a default
+         // button anywhere in this dialog would make one Enter both search and
+         // accept.
+         searchBox_.KeyDown += (s, e) =>
+         {
+            if (e.Key != Key.Enter)
+               return;
+
+            Search();
+            e.Handled = true;
+         };
          Grid.SetColumn(searchBox_, 2);
          grid.Children.Add(searchBox_);
 
@@ -155,8 +187,24 @@ namespace hMailServer.ControlPanel.Views
          gridView.Columns.Add(new GridViewColumn { Header = "E-mail", DisplayMemberBinding = new System.Windows.Data.Binding(nameof(AdUser.Email)), Width = 240 });
          list_.View = gridView;
 
+         AutomationProperties.SetName(list_, multiSelect_
+            ? "Matching Active Directory accounts. Select one or more."
+            : "Matching Active Directory accounts. Select one.");
+
          list_.SelectionChanged += (s, e) => okButton_.IsEnabled = list_.SelectedItems.Count > 0;
          list_.MouseDoubleClick += (s, e) => { if (!multiSelect_ && list_.SelectedItem is AdUser) Accept(); };
+
+         // The keyboard equivalent of the double-click above. Without it the only
+         // way to commit a highlighted row was to tab out of the list and back to
+         // the Select button - and Enter is what every list in Windows does.
+         list_.KeyDown += (s, e) =>
+         {
+            if (e.Key != Key.Enter || list_.SelectedItems.Count == 0)
+               return;
+
+            Accept();
+            e.Handled = true;
+         };
       }
 
       private void LoadDomains()

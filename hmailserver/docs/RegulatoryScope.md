@@ -134,6 +134,16 @@ changed:
   dependencies — OpenSSL, Boost and libpq — that a source-tree scan does not see.
   That matters for exactly the purpose an SBOM has: without them, anyone checking a
   release against a CVE feed would have concluded this server does not link OpenSSL.
+* An inventory of **every binary committed to the repository** — 40 files, each
+  with a SHA-256, an upstream, a version, a licence and a reason it is in the
+  tree ([`third-party-binaries.json`](third-party-binaries.json), explained in
+  [ThirdPartyBinaries.md](ThirdPartyBinaries.md)). Checked on every push and
+  pull request by
+  [`verify-binary-provenance.yml`](../../.github/workflows/verify-binary-provenance.yml),
+  which fails the build if a committed binary changes hash *or* if one appears
+  that the inventory does not describe. The SBOM answers "what does this link
+  against"; this answers the separate question "what unreviewable files are in
+  the source tree, and who made them".
 * **Every release asset signed**, with Sigstore cosign, keyless via OIDC, the
   signature recorded in the public Rekor transparency log and verified in the same
   job so a malformed bundle cannot reach a user
@@ -171,7 +181,10 @@ repository, and each one is verifiable. Re-checked 13 August 2026 against
 event, with `build/merge-native-dependencies-into-sbom.ps1` adding OpenSSL, Boost
 and libpq), `.github/workflows/sign-release.yml` (cosign `sign-blob` over every
 asset, then `verify-blob` in the same job), `.github/workflows/codeql.yml`,
-`.github/workflows/scorecard.yml`, `.github/SECURITY.md`, and
+`.github/workflows/scorecard.yml`,
+`.github/workflows/verify-binary-provenance.yml` (run against this tree: 40
+manifest entries, 40 binaries found, 0 unlisted, every hash matching the bytes
+stored in git), `.github/SECURITY.md`, and
 `WebServicesServer`'s `/.well-known/security.txt` handler. This half is the one to
 re-read before quoting the page: the signing line was wrong for a while precisely
 because a capability shipped and the paragraph saying it had not was never revisited.

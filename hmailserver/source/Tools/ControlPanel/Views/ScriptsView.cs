@@ -57,6 +57,18 @@ namespace hMailServer.ControlPanel.Views
          Grid.SetRow(pathText_, 1);
          root.Children.Add(pathText_);
 
+         // The editor is the only control in the Control Panel with AcceptsTab, so
+         // it is the only one where Tab types a character instead of moving on.
+         // WPF's own KeyboardNavigation makes Ctrl+Tab the way out, so this is not a
+         // keyboard trap - but nothing said so, which for a keyboard-only user is
+         // very nearly as bad. The name says it, and so does the tool tip.
+         //
+         // It also had no accessible name at all: a screen reader announced the
+         // server's entire event-handler script as an unnamed "edit".
+         System.Windows.Automation.AutomationProperties.SetName(editor_,
+            "Event handler script. Tab inserts a tab character; press Control and Tab together to move to the next control.");
+         editor_.ToolTip = "Tab indents. Use Ctrl+Tab to move focus out of the editor.";
+
          var toolbar = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 0, 0, 10) };
          Grid.SetRow(toolbar, 2);
 

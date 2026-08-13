@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace hMailServer.ControlPanel.Services
@@ -206,6 +207,19 @@ namespace hMailServer.ControlPanel.Services
    public static class ChartPalette
    {
       /// <summary>
+      /// The least contrast a chart line may have against the surface it is drawn
+      /// on before we refuse to draw it at all.
+      ///
+      /// 3:1 is the WCAG 2.1 non-text contrast minimum (success criterion 1.4.11)
+      /// for a graphical object whose shape carries meaning, which is exactly what
+      /// a plotted line is. Deliberately not the 4.5:1 text threshold - a
+      /// two-and-a-half pixel stroke is not eleven point text - and just as
+      /// deliberately not the "is it literally the same number as the background"
+      /// test this replaced, which passed a line nobody could see.
+      /// </summary>
+      public const double MinimumSeriesContrast = 3.0;
+
+      /// <summary>
       /// Assigned to series in order and cycled. Five patterns against three High
       /// Contrast colours means the (colour, pattern) pair stays unique for
       /// fifteen series even though the colours repeat every third one - see
@@ -383,6 +397,30 @@ namespace hMailServer.ControlPanel.Services
          }
       }
 
+      /// <summary>
+      /// The WCAG 2.1 contrast ratio between two opaque 0xAARRGGBB colours: 1.0
+      /// when they are the same colour, 21.0 for black against white.
+      ///
+      /// Alpha is ignored on purpose. Every colour this palette hands out is
+      /// opaque, and a translucent one has no defined contrast at all until you
+      /// know what is behind it - which is the reason the area fill and the
+      /// translucent card were removed rather than tuned.
+      ///
+      /// Here rather than in the test project because it is what
+      /// <see cref="MinimumSeriesContrast"/> is measured with, and a threshold
+      /// whose measurement lives somewhere else is a threshold that will drift
+      /// away from the code enforcing it.
+      /// </summary>
+      public static double ContrastRatio(uint first, uint second)
+      {
+         double a = RelativeLuminance_(first);
+         double b = RelativeLuminance_(second);
+         double lighter = Math.Max(a, b);
+         double darker = Math.Min(a, b);
+
+         return (lighter + 0.05) / (darker + 0.05);
+      }
+
       /// <summary>The marker shape in words, for an accessible name.</summary>
       public static string DescribeMarker(ShapeMark marker)
       {
@@ -409,24 +447,63 @@ namespace hMailServer.ControlPanel.Services
             return DarkSeriesColors;
 
          // High Contrast: the only colours we are allowed to use are the ones the
-         // theme itself defines. Any candidate that has collapsed onto the
-         // background colour is dropped rather than drawn - a High Contrast theme
-         // is free to define Highlight as the window colour, and an invisible
-         // line is a worse failure than two lines sharing a colour, because the
-         // dash pattern can still tell those two apart.
+         // theme itself defines. Any candidate that cannot be seen against the
+         // background colour is dropped rather than drawn - an invisible line is a
+         // worse failure than two lines sharing a colour, because the dash pattern
+         // can still tell those two apart.
          var colors = new List<uint>(3);
          AddIfVisible_(colors, system.WindowText, system.Window);
          AddIfVisible_(colors, system.Highlight, system.Window);
          AddIfVisible_(colors, system.HotTrack, system.Window);
+
+         // Nothing survived, which means the theme's own foreground colours do not
+         // contrast with its own background. Draw in the window text colour anyway:
+         // it is the one colour the theme contracts to be readable on the window,
+         // so if it is wrong there is nothing better to fall back to, and a chart
+         // that draws nothing at all is not an improvement on one that draws
+         // faintly.
          if (colors.Count == 0)
             colors.Add(system.WindowText);
+
          return colors.ToArray();
       }
 
+      /// <summary>
+      /// Adds a candidate system colour if it can actually be seen on the surface
+      /// the chart is drawn on.
+      ///
+      /// This used to test <c>candidate != background</c>, which only rejects an
+      /// exact match, and the case that occurs in practice is not an exact match.
+      /// Windows' own shipped "High Contrast #1" theme defines Highlight as
+      /// #800000 on a #000000 window: a contrast ratio of 1.92:1, a dark red line
+      /// on black that is invisible at any size - and the old guard drew it,
+      /// because 0xFF800000 is not equal to 0xFF000000. That failure was found by
+      /// computing the ratios for the four shipped High Contrast themes rather
+      /// than by looking at a screenshot, which is the only way this kind of thing
+      /// is ever found.
+      /// </summary>
       private static void AddIfVisible_(List<uint> colors, uint candidate, uint background)
       {
-         if (candidate != background && !colors.Contains(candidate))
+         if (ContrastRatio(candidate, background) < MinimumSeriesContrast)
+            return;
+
+         if (!colors.Contains(candidate))
             colors.Add(candidate);
+      }
+
+      private static double RelativeLuminance_(uint argb)
+      {
+         double r = Channel_((byte) (argb >> 16));
+         double g = Channel_((byte) (argb >> 8));
+         double b = Channel_((byte) argb);
+
+         return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      }
+
+      private static double Channel_(byte value)
+      {
+         double c = value / 255.0;
+         return c <= 0.03928 ? c / 12.92 : Math.Pow((c + 0.055) / 1.055, 2.4);
       }
    }
 }

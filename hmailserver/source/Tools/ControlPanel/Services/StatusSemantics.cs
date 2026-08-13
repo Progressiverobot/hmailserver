@@ -115,5 +115,74 @@ namespace hMailServer.ControlPanel.Services
       {
          return queueLength > threshold ? StatusLevel.Warning : StatusLevel.Normal;
       }
+
+      /// <summary>
+      /// Every severity word the Server status page prints on a configuration
+      /// warning. Here so a test can walk the whole set rather than spot-check the
+      /// three the author happened to think of.
+      /// </summary>
+      public static IReadOnlyList<string> ConfigurationWarningSeverities { get; } = new[]
+      {
+         "Critical", "High", "Medium", "Info"
+      };
+
+      /// <summary>
+      /// Maps one of those words onto the single status vocabulary the rest of the
+      /// application uses.
+      ///
+      /// WHY THIS EXISTS: the warnings panel on the Server status page had its own
+      /// private severity scale and, with it, its own private colour table - four
+      /// hardcoded RGB values with <c>Brushes.White</c> text on top - and that
+      /// carried three separate defects.
+      ///
+      /// The colours never consulted the theme, so a High Contrast desktop got
+      /// exactly the four colours the user had just told Windows they could not
+      /// read, on the one page that says "this server may be an open relay".
+      ///
+      /// White on the "Medium" amber #C28A00 measures 3.03:1 and white on the
+      /// "High" orange #D24F1A measures 4.31:1, against the 4.5:1 that eleven-point
+      /// text needs - so two of the four badges failed WCAG AA in every theme,
+      /// including the two everybody runs. That was found by computing the ratios,
+      /// not by looking at them; by eye all four look perfectly confident.
+      ///
+      /// And the colour table's default arm returned the calmest of the four, so a
+      /// severity word that did not match anything - a typo, or a word added at a
+      /// new call site - rendered as the least alarming badge on the page and
+      /// nothing anywhere said so. That is the ignored-return-value defect wearing
+      /// a different hat: a failure the representation could not express.
+      ///
+      /// Anything unrecognised is therefore a <see cref="StatusLevel.Warning"/>,
+      /// never <see cref="StatusLevel.Normal"/>: Normal renders as ordinary body
+      /// text with no badge at all, and a warning that renders as body text is a
+      /// warning that is not shown.
+      /// </summary>
+      public static StatusLevel ForConfigurationWarning(string severity)
+      {
+         if (string.IsNullOrWhiteSpace(severity))
+            return StatusLevel.Warning;
+
+         switch (severity.Trim().ToLowerInvariant())
+         {
+            case "critical":
+               return StatusLevel.Critical;
+
+            // "High" is a misconfiguration the administrator has to act on.
+            case "high":
+            case "warning":
+               return StatusLevel.Warning;
+
+            // "Medium" is only ever used for a count of auto-ban ranges, and
+            // "Info" for "some checks could not be evaluated". Neither is a defect
+            // in the configuration, and collapsing them removes a distinction the
+            // page never actually made use of.
+            case "medium":
+            case "info":
+            case "information":
+               return StatusLevel.Information;
+
+            default:
+               return StatusLevel.Warning;
+         }
+      }
    }
 }

@@ -509,6 +509,13 @@ namespace hMailServer.ControlPanel
          ConnBadge.Visibility = Visibility.Visible;
          ConnText.Text = ServerSession.Current.UserName + " @ " + ServerSession.Current.Host;
 
+         // "admin @ mail.example.test" is a fact, not a statement: nothing in it
+         // says that this is a live connection. That was carried entirely by the
+         // green dot beside it, which is information conveyed by colour alone and
+         // reaches a screen reader not at all - an Ellipse has no automation peer.
+         System.Windows.Automation.AutomationProperties.SetName(ConnText,
+            "Connected to " + ServerSession.Current.Host + " as " + ServerSession.Current.UserName);
+
          try
          {
             VersionText.Text = "hMailServer " + (string) ServerSession.Current.Application.Version;

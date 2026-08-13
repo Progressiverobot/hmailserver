@@ -1,5 +1,6 @@
 using System;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
 
@@ -41,7 +42,7 @@ namespace hMailServer.ControlPanel.Views
          root.Children.Add(header);
 
          var body = new StackPanel();
-         body.Children.Add(Label("Field"));
+         body.Children.Add(Label("Field", field_));
          field_.Items.Add(Combo("From", 1));
          field_.Items.Add(Combo("To", 2));
          field_.Items.Add(Combo("CC", 3));
@@ -54,11 +55,11 @@ namespace hMailServer.ControlPanel.Views
          field_.SelectionChanged += (s, e) => UpdateVisibility();
          body.Children.Add(field_);
 
-         headerPanel_.Children.Add(Label("Header name (e.g. X-Spam-Status)"));
+         headerPanel_.Children.Add(Label("Header name (e.g. X-Spam-Status)", header_));
          headerPanel_.Children.Add(Input(header_));
          body.Children.Add(headerPanel_);
 
-         body.Children.Add(Label("Match type"));
+         body.Children.Add(Label("Match type", match_));
          match_.Items.Add(Combo("equals", 1));
          match_.Items.Add(Combo("contains", 2));
          match_.Items.Add(Combo("is less than", 3));
@@ -69,7 +70,7 @@ namespace hMailServer.ControlPanel.Views
          match_.Items.Add(Combo("matches wildcard", 8));
          body.Children.Add(match_);
 
-         body.Children.Add(Label("Value"));
+         body.Children.Add(Label("Value", value_));
          body.Children.Add(Input(value_));
 
          var scroll = new ScrollViewer { Content = body, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
@@ -77,9 +78,10 @@ namespace hMailServer.ControlPanel.Views
          root.Children.Add(scroll);
 
          var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
-         var save = new Wpf.Ui.Controls.Button { Content = "Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0) };
+         // Enter saves, Escape cancels. Neither worked before.
+         var save = new Wpf.Ui.Controls.Button { Content = "Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
          save.Click += (s, e) => Save();
-         var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel" };
+         var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel", IsCancel = true };
          cancel.Click += (s, e) => Close();
          buttons.Children.Add(save);
          buttons.Children.Add(cancel);
@@ -194,10 +196,19 @@ namespace hMailServer.ControlPanel.Views
 
       // ---- UI helpers ----
 
-      private static TextBlock Label(string text)
+      /// <summary>
+      /// A caption, and - when the editor it captions is passed in - that editor's
+      /// accessible name. A TextBlock above a control tells UI Automation nothing,
+      /// so this dialog announced itself as "combo box, edit, combo box, edit".
+      /// </summary>
+      private static TextBlock Label(string text, FrameworkElement editor = null)
       {
          var t = new TextBlock { Text = text, FontSize = 12.5, Margin = new Thickness(0, 8, 0, 4) };
          t.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
+
+         if (editor != null)
+            AutomationProperties.SetName(editor, AccessibleNames.Qualify(text, ""));
+
          return t;
       }
 

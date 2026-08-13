@@ -27,13 +27,21 @@ namespace hMailServer.ControlPanel.Views
          label.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
          panel.Children.Add(label);
          var box = new TextBox { Text = initial, FontSize = 13, Padding = new Thickness(6), Margin = new Thickness(0, 0, 0, 12) };
+         // The prompt is a TextBlock above the box, which UI Automation does not
+         // connect to it: this is the dialog that asks for a public folder name, and
+         // a screen reader announced it as an unnamed "edit".
+         System.Windows.Automation.AutomationProperties.SetName(box,
+            hMailServer.ControlPanel.Services.AccessibleNames.Qualify(prompt, ""));
          panel.Children.Add(box);
 
          var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
          string result = null;
-         var ok = new Wpf.Ui.Controls.Button { Content = "OK", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80 };
+         // Enter accepts and Escape cancels. This is a single-field prompt, so typing
+         // a name and pressing Enter is the only way anyone expects to use it, and it
+         // did nothing at all.
+         var ok = new Wpf.Ui.Controls.Button { Content = "OK", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80, IsDefault = true };
          ok.Click += (s, e) => { result = box.Text; dlg.DialogResult = true; dlg.Close(); };
-         var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel", MinWidth = 80 };
+         var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel", MinWidth = 80, IsCancel = true };
          cancel.Click += (s, e) => dlg.Close();
          buttons.Children.Add(ok);
          buttons.Children.Add(cancel);
@@ -100,8 +108,13 @@ namespace hMailServer.ControlPanel.Views
          edit.Click += (s, e) => { if (list_.SelectedIndex >= 0) AddOrEdit(ids_[list_.SelectedIndex]); };
          var del = new Wpf.Ui.Controls.Button { Content = "Delete", Appearance = Wpf.Ui.Controls.ControlAppearance.Danger, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80 };
          del.Click += (s, e) => DeleteSelected();
-         var close = new Wpf.Ui.Controls.Button { Content = "Close", MinWidth = 80 };
+         // IsCancel only. "Add" is deliberately not the default button: Enter with a
+         // row selected in the list must not open the add dialog, and the list's own
+         // double-click already covers "open the thing I am looking at".
+         var close = new Wpf.Ui.Controls.Button { Content = "Close", MinWidth = 80, IsCancel = true };
          close.Click += (s, e) => Close();
+         System.Windows.Automation.AutomationProperties.SetName(list_,
+            "Access-control entries for " + folderName);
          buttons.Children.Add(add);
          buttons.Children.Add(edit);
          buttons.Children.Add(del);
@@ -333,14 +346,14 @@ namespace hMailServer.ControlPanel.Views
          SetResourceReference(Control.BackgroundProperty, "ApplicationBackgroundBrush");
 
          var panel = new StackPanel { Margin = new Thickness(20) };
-         panel.Children.Add(Label("Applies to"));
+         panel.Children.Add(Label("Applies to", typeCombo_));
          foreach ((int value, string label) in types)
             typeCombo_.Items.Add(new ComboBoxItem { Content = label, Tag = value });
          typeCombo_.SelectedIndex = 0;
          typeCombo_.SelectionChanged += (s, e) => UpdateSubjectState();
          panel.Children.Add(typeCombo_);
 
-         subjectLabel_ = Label("Account address");
+         subjectLabel_ = Label("Account address", subject_);
          panel.Children.Add(subjectLabel_);
          panel.Children.Add(subject_);
 
@@ -353,9 +366,10 @@ namespace hMailServer.ControlPanel.Views
          }
 
          var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
-         var ok = new Wpf.Ui.Controls.Button { Content = "Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80 };
+         // Enter saves, Escape cancels. Neither worked before.
+         var ok = new Wpf.Ui.Controls.Button { Content = "Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80, IsDefault = true };
          ok.Click += (s, e) => Commit();
-         var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel", MinWidth = 80 };
+         var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel", MinWidth = 80, IsCancel = true };
          cancel.Click += (s, e) => Close();
          buttons.Children.Add(ok);
          buttons.Children.Add(cancel);
@@ -383,6 +397,12 @@ namespace hMailServer.ControlPanel.Views
          subjectLabel_.Text = type == 1 ? "Group name" : "Account address";
          subjectLabel_.Visibility = needsSubject ? Visibility.Visible : Visibility.Collapsed;
          subject_.Visibility = needsSubject ? Visibility.Visible : Visibility.Collapsed;
+
+         // The caption above this box changes with the entry type, so its accessible
+         // name has to change with it. Setting the name once at construction - which
+         // is what Label does for every other editor in this file - would leave a
+         // group entry announcing itself as "Account address".
+         System.Windows.Automation.AutomationProperties.SetName(subject_, subjectLabel_.Text);
       }
 
       private void Commit()
@@ -398,10 +418,19 @@ namespace hMailServer.ControlPanel.Views
          Close();
       }
 
-      private static TextBlock Label(string text)
+      /// <summary>
+      /// A caption, and - when the editor it captions is passed in - that editor's
+      /// accessible name. A TextBlock above a control tells UI Automation nothing.
+      /// The eleven permission checkboxes are already named by their own Content.
+      /// </summary>
+      private static TextBlock Label(string text, FrameworkElement editor = null)
       {
          var t = new TextBlock { Text = text, FontSize = 12.5, Margin = new Thickness(0, 6, 0, 4) };
          t.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
+
+         if (editor != null)
+            System.Windows.Automation.AutomationProperties.SetName(editor, AccessibleNames.Qualify(text, ""));
+
          return t;
       }
    }

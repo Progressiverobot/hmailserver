@@ -49,7 +49,15 @@
                              words as well. -->
                         <StackPanel>
                             <TextBlock x:Name="KpiQueue" Text="0" Style="{StaticResource KpiValue}" />
-                            <StackPanel x:Name="KpiQueueBadge" Orientation="Horizontal" Visibility="Collapsed"
+                            <!-- Hidden, not Collapsed, and for the reason ShowQueue_
+                                 documents: a collapsed badge gives its space back,
+                                 so the KPI row grows taller the first time the queue
+                                 crosses the backlog threshold. ShowQueue_ sets
+                                 Hidden; the initial value here said Collapsed, so
+                                 the row still jumped once - on the first refresh
+                                 after the page opened, which is exactly when an
+                                 operator is looking at it. -->
+                            <StackPanel x:Name="KpiQueueBadge" Orientation="Horizontal" Visibility="Hidden"
                                         Margin="0,4,0,0">
                                 <Path x:Name="KpiQueueShape" Width="10" Height="10" Stretch="Fill"
                                       VerticalAlignment="Center" Margin="0,0,5,0" />

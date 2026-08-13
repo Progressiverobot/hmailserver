@@ -1,5 +1,6 @@
 using System;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
 
@@ -61,7 +62,7 @@ namespace hMailServer.ControlPanel.Views
          root.Children.Add(header);
 
          var body = new StackPanel();
-         body.Children.Add(Label("Action"));
+         body.Children.Add(Label("Action", type_));
          type_.Items.Add(Combo("Delete e-mail", 1));
          type_.Items.Add(Combo("Forward e-mail", 2));
          type_.Items.Add(Combo("Reply", 3));
@@ -78,47 +79,47 @@ namespace hMailServer.ControlPanel.Views
          body.Children.Add(type_);
 
          // Forward
-         forwardPanel_.Children.Add(Label("To"));
+         forwardPanel_.Children.Add(Label("To", to_));
          forwardPanel_.Children.Add(Input(to_));
          forwardPanel_.Children.Add(abortSpam_);
          body.Children.Add(forwardPanel_);
 
          // Reply
-         replyPanel_.Children.Add(Label("From (name)"));
+         replyPanel_.Children.Add(Label("From (name)", fromName_));
          replyPanel_.Children.Add(Input(fromName_));
-         replyPanel_.Children.Add(Label("From (address)"));
+         replyPanel_.Children.Add(Label("From (address)", fromAddress_));
          replyPanel_.Children.Add(Input(fromAddress_));
-         replyPanel_.Children.Add(Label("Subject"));
+         replyPanel_.Children.Add(Label("Subject", subject_));
          replyPanel_.Children.Add(Input(subject_));
-         replyPanel_.Children.Add(Label("Body"));
+         replyPanel_.Children.Add(Label("Body", body_));
          Input(body_);
          replyPanel_.Children.Add(body_);
          body.Children.Add(replyPanel_);
 
          // Move to folder
-         folderPanel_.Children.Add(Label("IMAP folder (e.g. INBOX.Archive)"));
+         folderPanel_.Children.Add(Label("IMAP folder (e.g. INBOX.Archive)", imapFolder_));
          folderPanel_.Children.Add(Input(imapFolder_));
          body.Children.Add(folderPanel_);
 
          // Script
-         scriptPanel_.Children.Add(Label("Script function"));
+         scriptPanel_.Children.Add(Label("Script function", scriptFunction_));
          scriptPanel_.Children.Add(Input(scriptFunction_));
          body.Children.Add(scriptPanel_);
 
          // Set header
-         headerPanel_.Children.Add(Label("Header name"));
+         headerPanel_.Children.Add(Label("Header name", headerName_));
          headerPanel_.Children.Add(Input(headerName_));
-         headerPanel_.Children.Add(Label("Value"));
+         headerPanel_.Children.Add(Label("Value", value_));
          headerPanel_.Children.Add(Input(value_));
          body.Children.Add(headerPanel_);
 
          // Route
-         routePanel_.Children.Add(Label("Route"));
+         routePanel_.Children.Add(Label("Route", route_));
          routePanel_.Children.Add(route_);
          body.Children.Add(routePanel_);
 
          // Bind to address
-         bindPanel_.Children.Add(Label("IP address"));
+         bindPanel_.Children.Add(Label("IP address", bindAddress_));
          bindPanel_.Children.Add(Input(bindAddress_));
          body.Children.Add(bindPanel_);
 
@@ -129,9 +130,12 @@ namespace hMailServer.ControlPanel.Views
          root.Children.Add(scroll);
 
          var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
-         var save = new Wpf.Ui.Controls.Button { Content = "Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0) };
+         // Enter saves, Escape cancels. Neither worked before. Safe alongside the
+         // multi-line reply body: a TextBox with AcceptsReturn handles Enter itself
+         // and marks the key handled, so it never reaches the default button.
+         var save = new Wpf.Ui.Controls.Button { Content = "Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
          save.Click += (s, e) => Save();
-         var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel" };
+         var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel", IsCancel = true };
          cancel.Click += (s, e) => Close();
          buttons.Children.Add(save);
          buttons.Children.Add(cancel);
@@ -301,10 +305,20 @@ namespace hMailServer.ControlPanel.Views
 
       // ---- UI helpers ----
 
-      private static TextBlock Label(string text)
+      /// <summary>
+      /// A caption, and - when the editor it captions is passed in - that editor's
+      /// accessible name. A TextBlock above a control tells UI Automation nothing,
+      /// and this dialog has eleven of them: to a screen reader every parameter of
+      /// every rule action was an anonymous "edit".
+      /// </summary>
+      private static TextBlock Label(string text, FrameworkElement editor = null)
       {
          var t = new TextBlock { Text = text, FontSize = 12.5, Margin = new Thickness(0, 8, 0, 4) };
          t.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
+
+         if (editor != null)
+            AutomationProperties.SetName(editor, AccessibleNames.Qualify(text, ""));
+
          return t;
       }
 

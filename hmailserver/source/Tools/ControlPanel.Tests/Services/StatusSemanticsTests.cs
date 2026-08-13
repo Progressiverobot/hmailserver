@@ -104,5 +104,82 @@ namespace hMailServer.ControlPanel.Tests.Services
          Assert.Equal(StatusLevel.Normal, StatusSemantics.ForQueueLength(500, 1000));
          Assert.Equal(StatusLevel.Warning, StatusSemantics.ForQueueLength(1001, 1000));
       }
+
+      // ---- Configuration warnings on the Server status page ------------------
+      //
+      // Why these could not be written before: the Server status page had its own
+      // private severity scale ("Critical" / "High" / "Medium" / "Info") feeding a
+      // private switch that returned a hardcoded SolidColorBrush, inside a private
+      // method of a WPF view. There was no type anywhere that could answer "what
+      // level is a High warning" or "what happens to a severity nobody recognises",
+      // which is why the whole of that behaviour went unexamined - including the
+      // two badges whose text failed WCAG AA.
+
+      [Fact]
+      public void EveryConfigurationWarningSeverityIsRecognised()
+      {
+         foreach (string severity in StatusSemantics.ConfigurationWarningSeverities)
+         {
+            StatusLevel level = StatusSemantics.ForConfigurationWarning(severity);
+
+            Assert.NotEqual(StatusLevel.Normal, level);
+            Assert.NotEqual(StatusLevel.Good, level);
+         }
+      }
+
+      [Theory]
+      [InlineData("Critical", StatusLevel.Critical)]
+      [InlineData("High", StatusLevel.Warning)]
+      [InlineData("Medium", StatusLevel.Information)]
+      [InlineData("Info", StatusLevel.Information)]
+      public void TheConfigurationWarningScaleMapsOntoTheOneStatusVocabulary(string severity, StatusLevel expected)
+      {
+         Assert.Equal(expected, StatusSemantics.ForConfigurationWarning(severity));
+      }
+
+      [Theory]
+      [InlineData("critical")]
+      [InlineData("CRITICAL")]
+      [InlineData("  Critical  ")]
+      public void ASeverityWordIsMatchedWithoutRegardToCaseOrSurroundingSpace(string severity)
+      {
+         Assert.Equal(StatusLevel.Critical, StatusSemantics.ForConfigurationWarning(severity));
+      }
+
+      [Theory]
+      [InlineData(null)]
+      [InlineData("")]
+      [InlineData("   ")]
+      [InlineData("Sever")]
+      [InlineData("urgent")]
+      public void AnUnrecognisedSeverityIsAWarningRatherThanTheCalmestBadgeOnThePage(string severity)
+      {
+         // The behaviour being replaced: the colour table's default arm returned the
+         // steel-blue "Info" brush, so a severity word that matched nothing rendered
+         // as the least alarming thing on the page and nothing said so. Normal is
+         // worse still - it draws no badge at all, so the warning would be a
+         // sentence of ordinary body text.
+         StatusLevel level = StatusSemantics.ForConfigurationWarning(severity);
+
+         Assert.Equal(StatusLevel.Warning, level);
+         Assert.NotEqual("TextFillColorPrimaryBrush", StatusSemantics.For(level).BrushKey);
+      }
+
+      [Fact]
+      public void EveryConfigurationWarningIsDrawnWithAShapeAsWellAsAColour()
+      {
+         // The badge used to be a filled pill whose entire non-textual content was
+         // its colour. A shape is what survives High Contrast squashing four colours
+         // onto two, and it is the channel the dashboard's backlog badge already
+         // uses - so a reader who learns the cross means Critical there sees the
+         // same cross here.
+         foreach (string severity in StatusSemantics.ConfigurationWarningSeverities)
+         {
+            StatusPresentation status = StatusSemantics.For(StatusSemantics.ForConfigurationWarning(severity));
+
+            Assert.True(Enum.IsDefined(status.Shape), severity + " has no shape.");
+            Assert.StartsWith("App", status.BrushKey);
+         }
+      }
    }
 }

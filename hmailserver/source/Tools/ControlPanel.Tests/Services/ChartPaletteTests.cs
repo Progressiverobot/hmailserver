@@ -28,12 +28,21 @@ namespace hMailServer.ControlPanel.Tests.Services
    {
       // Deliberately meaningless, distinct values: any of them appearing in the
       // output can only have come from the system palette.
+      //
+      // They are also deliberately far apart in luminance. The original set ran
+      // 0x010101 to 0x050505 - five shades of near-black - which was fine while the
+      // palette only asked "is this candidate the same number as the background",
+      // and became wrong the moment it started asking "can this candidate be seen
+      // against the background": every one of them would have been dropped, the
+      // High Contrast palette would have fallen back to a single colour, and the
+      // tests below would have been asserting against a degenerate case rather than
+      // against a plausible theme. A sentinel has to be meaningless, not unusable.
       private static readonly ChartSystemColors Sentinels = new ChartSystemColors(
          windowText: 0xFF010101,
-         window: 0xFF020202,
-         highlight: 0xFF030303,
-         hotTrack: 0xFF040404,
-         grayText: 0xFF050505);
+         window: 0xFFFEFEFE,
+         highlight: 0xFF3C0078,
+         hotTrack: 0xFF00007F,
+         grayText: 0xFF5A5A5A);
 
       private static readonly string[] ThreeSeries = { "SMTP", "IMAP", "POP3" };
 
@@ -92,17 +101,138 @@ namespace hMailServer.ControlPanel.Tests.Services
          // An invisible line is a worse failure than two lines sharing a colour,
          // because the dash pattern still tells those two apart.
          var collapsed = new ChartSystemColors(
-            windowText: 0xFF010101,
-            window: 0xFF030303,
-            highlight: 0xFF030303,
-            hotTrack: 0xFF040404,
-            grayText: 0xFF050505);
+            windowText: 0xFFFFFFFF,
+            window: 0xFF000000,
+            highlight: 0xFF000000,
+            hotTrack: 0xFF8080FF,
+            grayText: 0xFF00FF00);
 
          IReadOnlyList<ChartSeriesStyle> styles =
             ChartPalette.ResolveSeries(ChartTheme.HighContrast, collapsed, ThreeSeries);
 
          Assert.DoesNotContain(collapsed.Window, styles.Select(s => s.Argb));
          Assert.All(styles, s => Assert.True(s.Argb == collapsed.WindowText || s.Argb == collapsed.HotTrack));
+      }
+
+      [Fact]
+      public void HighContrast_DropsASystemColourThatIsMerelyInvisibleRatherThanIdentical()
+      {
+         // These are Windows' own shipped "High Contrast #1" colours: a #800000
+         // Highlight on a #000000 window. That is 1.92:1 - a dark red line on black
+         // that cannot be seen at any size or magnification - and it is NOT equal to
+         // the background, so the previous guard, which tested only for equality,
+         // drew it. This is the case that actually occurs on a real desktop, and it
+         // was invisible to every existing test because every existing test used a
+         // Highlight that was either usable or literally the window colour.
+         var highContrast1 = new ChartSystemColors(
+            windowText: 0xFFFFFFFF,
+            window: 0xFF000000,
+            highlight: 0xFF800000,
+            hotTrack: 0xFF8080FF,
+            grayText: 0xFF00FF00);
+
+         Assert.True(ChartPalette.ContrastRatio(0xFF800000, 0xFF000000) < ChartPalette.MinimumSeriesContrast,
+            "The premise of this test is that #800000 on #000000 is below the threshold.");
+
+         IReadOnlyList<ChartSeriesStyle> styles =
+            ChartPalette.ResolveSeries(ChartTheme.HighContrast, highContrast1, ThreeSeries);
+
+         Assert.DoesNotContain(0xFF800000u, styles.Select(s => s.Argb));
+
+         // And what is left is still enough to draw three distinguishable series,
+         // because the dash pattern never depended on the colour count.
+         Assert.Equal(3, styles.Select(s => s.Pattern).Distinct().Count());
+      }
+
+      [Fact]
+      public void EverySeriesColourClearsTheContrastThresholdInEveryShippedHighContrastTheme()
+      {
+         // The four themes Windows ships, as (windowText, window, highlight,
+         // hotTrack, grayText). Walked rather than spot-checked because the palette's
+         // whole promise in High Contrast is "whatever the theme is, you can see the
+         // lines", and that promise is only worth anything if it has been evaluated
+         // against the themes people actually turn on.
+         var themes = new[]
+         {
+            ("High Contrast White", new ChartSystemColors(0xFF000000, 0xFFFFFFFF, 0xFF37006E, 0xFF00009F, 0xFF600000)),
+            ("High Contrast Black", new ChartSystemColors(0xFFFFFFFF, 0xFF000000, 0xFF1AEBFF, 0xFF8080FF, 0xFF3FF23F)),
+            ("High Contrast #1", new ChartSystemColors(0xFFFFFFFF, 0xFF000000, 0xFF800000, 0xFF8080FF, 0xFF00FF00)),
+            ("High Contrast #2", new ChartSystemColors(0xFFFFFFFF, 0xFF000000, 0xFF008080, 0xFF8080FF, 0xFF00FF00))
+         };
+
+         foreach ((string name, ChartSystemColors system) in themes)
+         {
+            IReadOnlyList<ChartSeriesStyle> styles =
+               ChartPalette.ResolveSeries(ChartTheme.HighContrast, system, ThreeSeries);
+            ChartChrome chrome = ChartPalette.ResolveChrome(ChartTheme.HighContrast, system);
+
+            foreach (ChartSeriesStyle style in styles)
+            {
+               double ratio = ChartPalette.ContrastRatio(style.Argb, system.Window);
+               Assert.True(ratio >= ChartPalette.MinimumSeriesContrast,
+                  name + " draws " + style.Name + " at " + ratio.ToString("F2") + ":1 against the window colour.");
+            }
+
+            // Axis labels are text, so they answer to the 4.5:1 text threshold
+            // rather than the 3:1 graphical one.
+            Assert.True(ChartPalette.ContrastRatio(chrome.AxisTextArgb, system.Window) >= 4.5,
+               name + " draws its axis labels below 4.5:1.");
+            Assert.True(ChartPalette.ContrastRatio(chrome.TooltipTextArgb, chrome.TooltipBackgroundArgb) >= 4.5,
+               name + " draws its tooltip text below 4.5:1.");
+         }
+      }
+
+      [Fact]
+      public void ContrastRatio_MatchesTheWcagReferenceValues()
+      {
+         // Black on white is the definition of 21:1 and a colour against itself is
+         // 1:1. Without these two the threshold above could be enforcing anything.
+         Assert.Equal(21.0, ChartPalette.ContrastRatio(0xFF000000, 0xFFFFFFFF), 2);
+         Assert.Equal(1.0, ChartPalette.ContrastRatio(0xFF2F6FE0, 0xFF2F6FE0), 6);
+
+         // Symmetric, and blind to alpha - the palette only ever produces opaque
+         // colours, and a translucent one has no contrast until you know what is
+         // behind it.
+         Assert.Equal(ChartPalette.ContrastRatio(0xFF000000, 0xFFFFFFFF),
+                      ChartPalette.ContrastRatio(0xFFFFFFFF, 0xFF000000), 6);
+         Assert.Equal(ChartPalette.ContrastRatio(0xFF1A7F37, 0xFFFFFFFF),
+                      ChartPalette.ContrastRatio(0x001A7F37, 0x00FFFFFF), 6);
+      }
+
+      [Theory]
+      [InlineData(ChartTheme.Light, 0xFFFFFFFFu)]
+      [InlineData(ChartTheme.Dark, 0xFF1B1B1Bu)]
+      public void TheOrdinaryPalettesClearTheTextThresholdOnTheSurfaceTheyClaimToBeTunedFor(
+         ChartTheme theme, uint surface)
+      {
+         // ChartPalette's own comment claims "each of these clears 4.5:1 against a
+         // white surface; each of the dark set clears it against #1B1B1B", and
+         // nothing checked it. A claim in a comment is worth exactly as much as the
+         // test behind it: this is what stops the next person who nudges a hue for
+         // aesthetic reasons from quietly dropping a series below the line.
+         //
+         // 4.5:1 rather than the 3:1 graphical minimum on purpose. These same five
+         // hues are the status token palette in ThemeTokens, where they are used for
+         // small text on badges and log lines, so the stricter of the two thresholds
+         // is the one that has to hold.
+         IReadOnlyList<ChartSeriesStyle> styles =
+            ChartPalette.ResolveSeries(theme, Sentinels, new[] { "A", "B", "C", "D", "E" });
+         ChartChrome chrome = ChartPalette.ResolveChrome(theme, Sentinels);
+
+         foreach (ChartSeriesStyle style in styles)
+         {
+            double ratio = ChartPalette.ContrastRatio(style.Argb, surface);
+            Assert.True(ratio >= 4.5,
+               theme + " series " + style.Name + " is " + ratio.ToString("F2") + ":1 on 0x" + surface.ToString("X8"));
+         }
+
+         Assert.True(ChartPalette.ContrastRatio(chrome.AxisTextArgb, surface) >= 4.5,
+            theme + " axis labels are below 4.5:1 - this is the defect the roadmap recorded as "
+            + "\"the axis grey failed the contrast ratio on the light theme\".");
+         Assert.True(ChartPalette.ContrastRatio(chrome.PlaceholderTextArgb, surface) >= 4.5,
+            theme + " empty-state text is below 4.5:1.");
+         Assert.True(ChartPalette.ContrastRatio(chrome.TooltipTextArgb, chrome.TooltipBackgroundArgb) >= 4.5,
+            theme + " tooltip text is below 4.5:1.");
       }
 
       [Fact]

@@ -1,0 +1,166 @@
+name: Binary provenance
+
+# Every binary committed to this repository is inventoried in
+# hmailserver/docs/third-party-binaries.json, with a SHA-256, where it came
+# from, and why it is here. This workflow is what stops that inventory being
+# a document that used to be true.
+#
+# It answers two questions, and only these two:
+#
+#   1. Has a listed binary changed, or gone missing? A committed DLL is a file
+#      nobody can review in a diff. The hash is the only thing standing between
+#      "we vendored MariaDB Connector/C 3.4.9" and "something with that name is
+#      in the tree". A hash change is a hard failure - if the change is
+#      intentional, the manifest entry is updated in the same commit, which is
+#      exactly the review moment we want.
+#
+#   2. Has a binary appeared that nobody wrote down? This is the one that
+#      matters. Adding a DLL to a Windows project is a two-second operation and
+#      it is invisible in review. An unlisted binary fails the build.
+#
+# The detector is deliberately the same shape as the one OpenSSF Scorecard's
+# Binary-Artifacts check uses: the file extension set from
+# checks/raw/binary_artifact.go, plus a content sniff, because Scorecard sniffs
+# content too. That second half is not theoretical here - libraries/msado28/*.tlb
+# are PE images with a .tlb extension, so an extension-only scan misses them and
+# Scorecard does not. As of the commit that added this workflow, an extension
+# scan finds 38 files, a magic-byte scan finds 40, and Scorecard reports 40.
+#
+# What this does NOT do: re-verify Authenticode signatures. The manifest records
+# the signature status of each file as captured on Windows, but
+# Get-AuthenticodeSignature is Windows-only and this job runs on Linux in
+# seconds. If signature re-verification is wanted it needs a windows runner and
+# belongs in the release workflow, not here.
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify committed binaries against the manifest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Verify the manifest against the tree
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $manifestPath = 'hmailserver/docs/third-party-binaries.json'
+          if (-not (Test-Path -LiteralPath $manifestPath)) {
+             Write-Host "::error file=$manifestPath::The binary provenance manifest is missing."
+             exit 1
+          }
+
+          $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+          $problems = New-Object System.Collections.Generic.List[string]
+          $warnings = New-Object System.Collections.Generic.List[string]
+          $listed = @{}
+
+          # --- 1. Every listed artifact is present and unchanged --------------
+          foreach ($artifact in $manifest.artifacts) {
+             $listed[$artifact.path] = $true
+
+             if (-not (Test-Path -LiteralPath $artifact.path -PathType Leaf)) {
+                # Not automatically an error: the manifest deliberately lists
+                # files marked for removal, and the whole point is that removing
+                # one should be easy. Only an unexplained disappearance is a
+                # problem, and that is a manifest edit away from being clean.
+                $problems.Add("MISSING   $($artifact.path)`n          Listed in the manifest but not in the tree. If it was removed on purpose, remove its manifest entry in the same commit.")
+                continue
+             }
+
+             $actual = (Get-FileHash -LiteralPath $artifact.path -Algorithm SHA256).Hash.ToLower()
+             $expected = ([string]$artifact.sha256).ToLower()
+
+             if ($actual -ne $expected) {
+                $problems.Add("CHANGED   $($artifact.path)`n          manifest: $expected`n          on disk : $actual`n          A committed binary changed content. If that was intentional, update the manifest entry - version, upstream and sha256 - in the same commit.")
+             }
+
+             if ($artifact.disposition -like 'remove-*') {
+                $warnings.Add("$($artifact.path) is marked '$($artifact.disposition)' and is still in the tree: $($artifact.why)")
+             }
+          }
+
+          # --- 2. No binary exists that the manifest does not know about ------
+          # Extension set copied from Scorecard's checks/raw/binary_artifact.go.
+          $binaryExtensions = @(
+             'crx','deb','dex','dey','elf','o','a','so','macho','iso','class',
+             'jar','bundle','dylib','lib','msi','dll','drv','efi','exe','ocx',
+             'pyc','pyo','par','rpm','wasm','whl'
+          )
+
+          $tracked = (git ls-files -z) -split ([char]0) | Where-Object { $_ }
+          Write-Host "Scanning $($tracked.Count) tracked files."
+
+          $unlisted = New-Object System.Collections.Generic.List[string]
+
+          foreach ($file in $tracked) {
+             if ($listed.ContainsKey($file)) { continue }
+
+             $full = Join-Path $PWD.Path $file
+             if (-not (Test-Path -LiteralPath $full -PathType Leaf)) { continue }
+
+             $isBinary = $false
+
+             $extension = ([System.IO.Path]::GetExtension($file)).TrimStart('.').ToLower()
+             if ($extension -and $binaryExtensions -contains $extension) { $isBinary = $true }
+
+             if (-not $isBinary) {
+                # Content sniff: PE (MZ), ELF, and OLE compound files (.msi).
+                # Four bytes is enough for all three and keeps this cheap over
+                # several thousand files.
+                $stream = [System.IO.File]::OpenRead($full)
+                try {
+                   $head = New-Object byte[] 4
+                   $read = $stream.Read($head, 0, 4)
+                }
+                finally { $stream.Dispose() }
+
+                if ($read -ge 2 -and $head[0] -eq 0x4D -and $head[1] -eq 0x5A) { $isBinary = $true }
+                elseif ($read -ge 4 -and $head[0] -eq 0x7F -and $head[1] -eq 0x45 -and $head[2] -eq 0x4C -and $head[3] -eq 0x46) { $isBinary = $true }
+                elseif ($read -ge 4 -and $head[0] -eq 0xD0 -and $head[1] -eq 0xCF -and $head[2] -eq 0x11 -and $head[3] -eq 0xE0) { $isBinary = $true }
+             }
+
+             if ($isBinary) { $unlisted.Add($file) }
+          }
+
+          foreach ($file in $unlisted) {
+             $problems.Add("UNLISTED  $file`n          A binary was committed that the provenance manifest does not describe. Add an entry to $manifestPath giving its SHA-256, upstream, version, licence and why it has to be in the tree - or do not commit it.")
+          }
+
+          # --- Report ---------------------------------------------------------
+          Write-Host ""
+          Write-Host "Manifest entries : $($manifest.artifacts.Count)"
+          Write-Host "Unlisted binaries: $($unlisted.Count)"
+          Write-Host ""
+          $manifest.artifacts |
+             Group-Object disposition |
+             Sort-Object Name |
+             ForEach-Object { Write-Host ("  {0,-18} {1}" -f $_.Name, $_.Count) }
+          Write-Host ""
+
+          foreach ($warning in $warnings) {
+             Write-Host "::warning file=$manifestPath::$warning"
+          }
+
+          if ($problems.Count -gt 0) {
+             Write-Host ""
+             foreach ($problem in $problems) {
+                Write-Host $problem
+                Write-Host ""
+             }
+             Write-Host "::error file=$manifestPath::$($problems.Count) binary provenance problem(s). See hmailserver/docs/ThirdPartyBinaries.md for what each one means and how to fix it."
+             exit 1
+          }
+
+          Write-Host "Every committed binary is accounted for and unchanged."

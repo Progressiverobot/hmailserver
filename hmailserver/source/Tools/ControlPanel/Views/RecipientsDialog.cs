@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Input;
 using hMailServer.ControlPanel.Services;
 
 namespace hMailServer.ControlPanel.Views
@@ -37,6 +39,7 @@ namespace hMailServer.ControlPanel.Views
          listBox_.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
          listBox_.Background = System.Windows.Media.Brushes.Transparent;
          listBox_.FontSize = 13;
+         AutomationProperties.SetName(listBox_, "Recipients of " + listAddress);
          grid.Children.Add(listBox_);
 
          var bottom = new Grid { Margin = new Thickness(0, 12, 0, 0) };
@@ -49,6 +52,21 @@ namespace hMailServer.ControlPanel.Views
          addBox_.Padding = new Thickness(6);
          addBox_.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
          addBox_.Background = System.Windows.Media.Brushes.Transparent;
+
+         // The box has no caption anywhere on the dialog - it is a bare box beside
+         // three buttons - so a screen reader announced it as "edit".
+         AutomationProperties.SetName(addBox_, "E-mail address to add to the list");
+
+         // Enter adds. Handled, so the keystroke cannot also reach a default button
+         // if one is ever added here.
+         addBox_.KeyDown += (s, e) =>
+         {
+            if (e.Key != Key.Enter)
+               return;
+
+            AddRecipient();
+            e.Handled = true;
+         };
          bottom.Children.Add(addBox_);
 
          var addButton = new Wpf.Ui.Controls.Button { Content = "Add", Margin = new Thickness(8, 0, 0, 0) };
@@ -73,6 +91,30 @@ namespace hMailServer.ControlPanel.Views
 
          Grid.SetRow(bottom, 1);
          grid.Children.Add(bottom);
+
+         // This dialog had no closing button of any kind, and nothing marked
+         // IsCancel, so the only ways out were the title-bar X and Alt+F4: a
+         // keyboard user who opened it could operate every control in it and could
+         // not leave it. Escape now closes it, and there is a visible Close for
+         // anybody who was looking for one.
+         //
+         // A row of its own rather than beside Add / Add from AD / Remove selected,
+         // because those three act on the list and this one ends the dialog -
+         // putting a "leave" next to a "delete" is how the wrong one gets pressed.
+         var closeButton = new Wpf.Ui.Controls.Button
+         {
+            Content = "Close",
+            MinWidth = 88,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Margin = new Thickness(0, 10, 0, 0),
+            IsCancel = true
+         };
+         closeButton.Click += (s, e) => Close();
+         AutomationProperties.SetName(closeButton, "Close the recipient list");
+
+         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+         Grid.SetRow(closeButton, 2);
+         grid.Children.Add(closeButton);
 
          Content = grid;
          Loaded += (s, e) => Reload();

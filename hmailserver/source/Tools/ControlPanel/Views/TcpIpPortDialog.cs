@@ -1,5 +1,6 @@
 using System;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
 
@@ -39,12 +40,12 @@ namespace hMailServer.ControlPanel.Views
          protocol_.Items.Add(Combo("POP3", ServerSession.SessionPop3));
          protocol_.Items.Add(Combo("IMAP", ServerSession.SessionImap));
          StyleCombo(protocol_);
-         panel.Children.Add(Label("Protocol"));
+         panel.Children.Add(Label("Protocol", protocol_));
          panel.Children.Add(protocol_);
 
-         panel.Children.Add(Label("Bind address"));
+         panel.Children.Add(Label("Bind address", address_));
          panel.Children.Add(Input(address_));
-         panel.Children.Add(Label("Port"));
+         panel.Children.Add(Label("Port", port_));
          panel.Children.Add(Input(port_));
 
          security_.Items.Add(Combo("None", 0));
@@ -52,17 +53,21 @@ namespace hMailServer.ControlPanel.Views
          security_.Items.Add(Combo("STARTTLS (optional)", 2));
          security_.Items.Add(Combo("STARTTLS (required)", 3));
          StyleCombo(security_);
-         panel.Children.Add(Label("Connection security"));
+         panel.Children.Add(Label("Connection security", security_));
          panel.Children.Add(security_);
 
          StyleCombo(certificate_);
-         panel.Children.Add(Label("SSL certificate (required for SSL/TLS and STARTTLS)"));
+         panel.Children.Add(Label("SSL certificate (required for SSL/TLS and STARTTLS)", certificate_));
          panel.Children.Add(certificate_);
 
          var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 14, 0, 0) };
-         var save = new Wpf.Ui.Controls.Button { Content = "Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80 };
+         // Enter saves and Escape cancels. Neither did anything here: a dialog whose
+         // only way out is the mouse or Alt+F4 is a dialog a keyboard user is stuck
+         // in, and the two properties that fix it are the ones the account and domain
+         // dialogs already set.
+         var save = new Wpf.Ui.Controls.Button { Content = "Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80, IsDefault = true };
          save.Click += (s, e) => Save();
-         var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel", MinWidth = 80 };
+         var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel", MinWidth = 80, IsCancel = true };
          cancel.Click += (s, e) => Close();
          buttons.Children.Add(save);
          buttons.Children.Add(cancel);
@@ -163,10 +168,25 @@ namespace hMailServer.ControlPanel.Views
 
       // ---- UI helpers ----
 
-      private static TextBlock Label(string text)
+      /// <summary>
+      /// A caption, and - when the editor it captions is passed in - the editor's
+      /// accessible name.
+      ///
+      /// A TextBlock placed above a control tells UI Automation nothing: this dialog
+      /// binds a network port and announced itself to a screen reader as "combo box,
+      /// edit, edit, combo box, combo box". That is the same defect
+      /// <see cref="AccessibleNames"/> was written for on the generated settings
+      /// pages, and the hand-built dialogs were never done. The cleaning rule comes
+      /// from there too, so "Host:" is not read out as "Host colon".
+      /// </summary>
+      private static TextBlock Label(string text, FrameworkElement editor = null)
       {
          var t = new TextBlock { Text = text, FontSize = 12.5, Margin = new Thickness(0, 8, 0, 4) };
          t.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
+
+         if (editor != null)
+            AutomationProperties.SetName(editor, AccessibleNames.Qualify(text, ""));
+
          return t;
       }
 

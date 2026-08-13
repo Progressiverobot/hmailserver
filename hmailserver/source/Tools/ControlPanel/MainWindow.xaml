@@ -152,8 +152,18 @@
 
                 <!-- Footer -->
                 <StackPanel Grid.Row="3" Margin="18,0,18,14">
+                    <!-- The connection indicator. The dot was a literal #3FB950,
+                         which is the dark theme's success green painted regardless
+                         of theme: on a High Contrast desktop it is an off-palette
+                         green the user has told Windows not to show them, and it is
+                         the only thing on the window that says "connected" - the
+                         text beside it says "user @ host" and never says what the
+                         relationship is. The fill now follows AppSuccessBrush, which
+                         ThemeTokens recomputes from SystemColors under High
+                         Contrast, and ConnText carries the statement in words in its
+                         accessible name (set in OnConnected). -->
                     <StackPanel x:Name="ConnBadge" Orientation="Horizontal" Visibility="Collapsed">
-                        <Ellipse Width="8" Height="8" Fill="#3FB950" VerticalAlignment="Center" />
+                        <Ellipse Width="8" Height="8" Fill="{DynamicResource AppSuccessBrush}" VerticalAlignment="Center" />
                         <TextBlock x:Name="ConnText" Margin="7,0,0,0" FontSize="11.5"
                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                     </StackPanel>

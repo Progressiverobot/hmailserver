@@ -1,0 +1,58 @@
+# Code owners for Progressiverobot/hmailserver
+#
+# READ THIS BEFORE TURNING ON "Require review from Code Owners".
+#
+# This file on its own changes nothing. It only has an effect once branch
+# protection on master enables "Require a pull request before merging" and
+# "Require review from Code Owners". Until then GitHub uses it to *request*
+# reviews automatically, which is harmless and mildly useful.
+#
+# The catch, stated plainly: GitHub will not let you approve your own pull
+# request. While @chrisholloway5 is the only owner listed here, enabling
+# "Require review from Code Owners" makes every pull request he opens
+# unmergeable except by an admin bypass. That is not a hypothetical - it is
+# the single most common way a solo maintainer locks themselves out of their
+# own default branch. Add a second owner with *write* access before turning
+# that setting on, or accept that the rule is satisfied only by bypass.
+#
+# Ownership order matters: the LAST matching pattern wins, unlike .gitignore.
+
+# Default owner for everything in the repository.
+*                                   @chrisholloway5
+
+# Supply chain and CI. A change here can alter what ships or what is trusted
+# without touching a line of server code, so it deserves the same scrutiny as
+# the protocol handlers.
+/.github/                           @chrisholloway5
+/.github/workflows/                 @chrisholloway5
+/.github/CODEOWNERS                 @chrisholloway5
+/.github/SECURITY.md                @chrisholloway5
+/hmailserver/docs/ThirdPartyBinaries.md   @chrisholloway5
+/hmailserver/docs/third-party-binaries.json @chrisholloway5
+
+# Committed third-party binaries. Nobody can review a DLL in a diff, so the
+# review that matters is of the provenance record that accompanies it.
+/libraries/                         @chrisholloway5
+/hmailserver/installation/          @chrisholloway5
+/hmailserver/source/Tools/Interop/  @chrisholloway5
+
+# Security-relevant server code: TLS, certificate and DANE verification, and
+# the crypto helpers that the security policy names as in scope. (Paths here
+# are checked against the tree - CODEOWNERS silently ignores a pattern that
+# matches nothing, so a typo costs you the rule with no warning.)
+/hmailserver/source/Server/Common/TCPIP/        @chrisholloway5
+/hmailserver/source/Server/Common/Util/Crypt.cpp @chrisholloway5
+/hmailserver/source/Server/Common/Util/Crypt.h  @chrisholloway5
+/hmailserver/source/Server/Common/LDAP/         @chrisholloway5
+
+# Release and signing.
+/RELEASE.md                         @chrisholloway5
+/build/                             @chrisholloway5
+
+# --- Add a second reviewer here ----------------------------------------------
+# Uncomment and replace once a second person holds write access on this
+# repository. A code owner with only read access cannot supply an approval
+# that satisfies branch protection, so granting write is part of the change,
+# not an optional extra.
+#
+# *                                 @chrisholloway5 @second-maintainer
