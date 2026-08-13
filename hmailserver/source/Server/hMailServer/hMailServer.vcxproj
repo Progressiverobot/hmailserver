@@ -198,6 +198,7 @@ EXIT 0
     <ClCompile Include="..\Common\Application\Backup.cpp" />
     <ClCompile Include="..\Common\Application\BackupExecuter.cpp" />
     <ClCompile Include="..\Common\Application\BackupManager.cpp" />
+    <ClCompile Include="..\Common\Application\BackupRestorer.cpp" />
     <ClCompile Include="..\Common\Application\BackupRetention.cpp" />
     <ClCompile Include="..\Common\Application\BackupScheduleTask.cpp" />
     <ClCompile Include="..\Common\Application\BackupTask.cpp" />
@@ -732,6 +733,7 @@ EXIT 0
     <ClInclude Include="..\Common\Application\Backup.h" />
     <ClInclude Include="..\Common\Application\BackupExecuter.h" />
     <ClInclude Include="..\Common\Application\BackupManager.h" />
+    <ClInclude Include="..\Common\Application\BackupRestorer.h" />
     <ClInclude Include="..\Common\Application\BackupRetention.h" />
     <ClInclude Include="..\Common\Application\BackupScheduleTask.h" />
     <ClInclude Include="..\Common\Application\BackupTask.h" />

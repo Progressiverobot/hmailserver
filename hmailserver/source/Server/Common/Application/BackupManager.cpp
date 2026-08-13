@@ -7,6 +7,7 @@
 #include "BackupManager.h"
 
 #include "Backup.h"
+#include "BackupRestorer.h"
 
 #include "../Scripting/ScriptServer.h"
 #include "../Scripting/ScriptObjectContainer.h"
@@ -244,37 +245,71 @@ namespace HM
 
    std::shared_ptr<Backup>
    BackupManager::LoadBackup(const String &sZipFile) const
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // Opens a backup archive and reports what is in it, or nothing at all if it is
+   // not an archive this server could restore.
+   //
+   // WHAT THIS USED TO DO INSTEAD, AND WHY IT MATTERED
+   //
+   // It ignored the result of the extraction, read the file the extraction was
+   // supposed to have produced, and carried on. Three consequences, all of them on
+   // the path an administrator takes in a disaster:
+   //
+   //  * A truncated or half-copied archive - the case the whole feature exists to
+   //    survive - extracted nothing, read as empty, parsed to no Backup element and
+   //    returned a Backup object with Contains=0 and, because SetBackupFile was
+   //    called after that early return, no file name either. The COM caller was
+   //    handed that object with S_OK. Nothing was written to any log.
+   //
+   //  * An archive whose index parsed but had no BackupInformation element, or no
+   //    Mode attribute on it, dereferenced the null that GetChildAttr returns.
+   //
+   //  * The index was extracted to a fixed path in the temp directory, so two
+   //    administrators opening two different archives at the same moment - or one
+   //    doing it while a restore was extracting its own index to the same path -
+   //    could read each other's. See BackupRestorer.
+   //
+   // Returning nothing instead of an empty object is what makes the first case
+   // visible: InterfaceBackupManager::LoadBackup turns it into DISP_E_BADINDEX, so
+   // the Control Panel says the restore could not be started rather than starting a
+   // restore that will do nothing.
+   //---------------------------------------------------------------------------()
    {
       LOG_DEBUG("BackupManager::LoadBackup");
 
-      std::shared_ptr<Backup> pResult = std::shared_ptr<Backup>(new Backup);
+      int archiveContents = 0;
+      String archiveVersion;
+      String failureReason;
 
-      // First uncompress our specification file.
-      String sTempDir = IniFileSettings::Instance()->GetTempDirectory();
-      String sXMLFile = sTempDir + "\\hMailServerBackup.xml";
-      FileUtilities::DeleteFile(sXMLFile);
-      Compression oComp;
-      oComp.Uncompress(sZipFile, sTempDir, "hMailServerBackup.xml");
-
-      // Load the XML document
-      String sXMLBuffer = FileUtilities::ReadCompleteTextFile(sXMLFile);
-      XDoc oXMLDocument;
-      oXMLDocument.Load(sXMLBuffer);
-
-      XNode *pBackupNode = oXMLDocument.GetChild(_T("Backup"));
-      if (!pBackupNode)
+      if (!BackupRestorer::ReadArchiveIndex(sZipFile, archiveContents, archiveVersion, failureReason))
       {
+         // LOG_APPLICATION and the backup log, not ReportError. Pointing this at a
+         // file that is not a backup is an ordinary mistake made by hand at a
+         // prompt, and a server that writes to its ERROR log because somebody
+         // mistyped a path is a server whose ERROR log stops meaning anything.
+         Logger::Instance()->LogBackup("Could not open the backup " + sZipFile + ". " + failureReason);
+         LOG_APPLICATION("Could not open the backup " + sZipFile + ". " + failureReason);
+
          LOG_DEBUG("BackupManager::~LoadBackup - E1");
-         return pResult;
+         return std::shared_ptr<Backup>();
       }
 
-      int iMode = _ttoi(pBackupNode->GetChildAttr(_T("BackupInformation"), _T("Mode"))->value);
+      // Refused here rather than at the start of the restore, so that the
+      // administrator finds out while they are still choosing what to restore.
+      if (!BackupRestorer::VersionIsRestorable(archiveVersion, failureReason))
+      {
+         Logger::Instance()->LogBackup("Could not open the backup " + sZipFile + ". " + failureReason);
+         LOG_APPLICATION("Could not open the backup " + sZipFile + ". " + failureReason);
+
+         LOG_DEBUG("BackupManager::~LoadBackup - E3");
+         return std::shared_ptr<Backup>();
+      }
+
+      std::shared_ptr<Backup> pResult = std::shared_ptr<Backup>(new Backup);
 
       pResult->SetBackupFile(sZipFile);
-      pResult->SetContains(iMode);
-
-      // Delete the XML file we temporarly created
-      FileUtilities::DeleteFile(sXMLFile);
+      pResult->SetContains(archiveContents);
 
       LOG_DEBUG("BackupManager::~LoadBackup - E2");
       return pResult;

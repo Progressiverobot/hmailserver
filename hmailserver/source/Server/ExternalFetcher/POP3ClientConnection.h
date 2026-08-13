@@ -79,6 +79,15 @@ namespace HM
       void ParseUsernameSent_(const String &sData);
       void ParsePasswordSent_(const String &sData);
       void ParseUIDLResponse_(const String &sData);
+
+      // Parses one "<message-number> <unique-id>" line of a UIDL listing. False for a
+      // line that is not of that shape; such a line is ignored rather than guessed at.
+      bool ParseUIDLLine_(const String &line, int &messageIndex, String &messageUID);
+
+      // Returns a form of the remote unique-id that fits the 255-character column it is
+      // stored in. Normally the id unchanged, since RFC 1939 caps it at 70.
+      static String FoldRemoteUID_(const String &uid);
+
       void ParseRETRResponse_(const String &sData);
       bool ParseQuitResponse_(const String &sData);
       void ParseDELEResponse_(const String &sData);
@@ -114,8 +123,12 @@ namespace HM
       // Cleans up the current message.
 
       void DeleteUIDsNoLongerOnServer_();
-      // Deletes the UID's in the local database if 
+      // Deletes the UID's in the local database if
       // the UID does not exist on the POP3 server.
+
+      void DiscardUnfinishedDownload_();
+      // Removes the spool file of a download that never completed, so an interrupted
+      // fetch does not leave a file in the data directory that nothing refers to.
 
       std::shared_ptr<FetchAccount> account_;
       // The current fetch account.
@@ -135,8 +148,16 @@ namespace HM
          StateQUITSent
       };
 
+      enum Limits
+      {
+         // Most bytes accepted in a single UIDL listing. The listing is accumulated in
+         // memory until its terminator arrives, and the peer is a machine the
+         // administrator does not control, so it needs a ceiling.
+         MaxUIDLResponseBytes = 8 * 1024 * 1024
+      };
+
       State current_state_;
-     
+
       AnsiString command_buffer_;
 
       std::map<int ,String> uidlresponse_;
@@ -149,9 +170,24 @@ namespace HM
 
       std::shared_ptr<Message> current_message_;
 
+      // Every unique-id seen in this session's UIDL listing. Used to tell a listing that
+      // repeats an id - a server that derives the id from the message content does that
+      // for two identical messages - from an id recorded during an earlier session.
+      std::set<String> uids_seen_this_session_;
+
+      // The unique-id of the message a DELE has been sent for and not yet acknowledged.
+      // The local record of that message is only removed once the server confirms the
+      // deletion, so a refused or unanswered DELE cannot lead to a second delivery.
+      String pending_delete_uid_;
+
       // Set when the remote server rejected the RETR command. No message data
       // follows such a response, so no message file must be created for it.
       bool retr_failed_;
+
+      // False from the moment a RETR is sent until the message it produced has been
+      // dealt with. If the session ends while it is false there is a partly written
+      // message file in the data directory that nothing will ever refer to.
+      bool download_finalized_;
 
       // Tick at which the per-message finalization was handed to the async work
       // queue. The queue is shared with the SMTP acknowledgement path, so the

@@ -316,7 +316,20 @@ STDMETHODIMP InterfaceSecurityRange::get_RequireAuthForDeliveryToLocal(VARIANT_B
       if (!object_)
          return GetAccessDenied();
 
-      // OBSOLETE: Removed i 5.1
+      if (!pVal)
+         return E_POINTER;
+
+      // OBSOLETE: replaced in 5.1 by the four RequireSMTPAuth* properties, which
+      // split the single question by the locality of the sender as well as the
+      // recipient. This one is answered from those, rather than left unanswered:
+      // returning S_OK without writing the out parameter, which is what this did,
+      // hands a 4.x-era caller a value out of its own stack and lets it believe the
+      // server said so.
+      bool require = object_->GetRequireSMTPAuthLocalToLocal() ||
+                     object_->GetRequireSMTPAuthExternalToLocal();
+
+      *pVal = require ? VARIANT_TRUE : VARIANT_FALSE;
+
       return S_OK;
    }
    catch (...)
@@ -348,7 +361,16 @@ STDMETHODIMP InterfaceSecurityRange::get_RequireAuthForDeliveryToRemote(VARIANT_
       if (!object_)
          return GetAccessDenied();
 
-      // OBSOLETE: Removed i 5.1
+      if (!pVal)
+         return E_POINTER;
+
+      // OBSOLETE: see get_RequireAuthForDeliveryToLocal. Same reasoning, other half
+      // of the 5.1 split.
+      bool require = object_->GetRequireSMTPAuthLocalToExternal() ||
+                     object_->GetRequireSMTPAuthExternalToExternal();
+
+      *pVal = require ? VARIANT_TRUE : VARIANT_FALSE;
+
       return S_OK;
    }
    catch (...)
@@ -732,7 +754,15 @@ STDMETHODIMP InterfaceSecurityRange::get_IsForwardingRelay(VARIANT_BOOL *pVal)
       if (!object_)
          return GetAccessDenied();
 
-      // OBSOLETE: Remove in 6.0. No longer used as of 5.1.
+      if (!pVal)
+         return E_POINTER;
+
+      // OBSOLETE: no longer used as of 5.1, and unlike the two properties above there
+      // is nothing left in the range to answer from - so the answer is a flat no, and
+      // it is written rather than left to the caller's stack. A range is never a
+      // forwarding relay any more, which is exactly what false says.
+      *pVal = VARIANT_FALSE;
+
       return S_OK;
    }
    catch (...)

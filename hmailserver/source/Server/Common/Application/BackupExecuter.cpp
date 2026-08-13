@@ -23,12 +23,15 @@
 
 #include "BackupManager.h"
 #include "BackupRetention.h"
+#include "BackupRestorer.h"
 #include "ACLManager.h"
 #include "Reinitializator.h"
 
 #include "..\SQL\DatabaseUnavailableMarker.h"
 
 #include "../../IMAP/IMAPConfiguration.h"
+
+#include <boost/filesystem.hpp>
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -37,6 +40,227 @@
 
 namespace HM
 {
+   // WHY THIS FILE COPIES DIRECTORY TREES ITSELF INSTEAD OF CALLING
+   // FileUtilities::CopyDirectory
+   //
+   // CopyDirectory copies each file with the throwing overload of
+   // boost::filesystem::copy_file, with no copy_options, and lets whatever comes out
+   // of it escape. Three ordinary things make it throw, and the consequence of any
+   // of them is the same and is much worse than a failed backup:
+   //
+   //  * The destination file already exists. copy_options::none means "fail if the
+   //    destination exists", so staging into a DataBackup folder left behind by an
+   //    earlier run throws. With CompressDestinationFiles switched off nothing ever
+   //    removes that folder - it *is* the backup - so on that configuration the
+   //    second backup the server ever takes throws, every time.
+   //
+   //  * The source file no longer exists. The tree is enumerated and then copied,
+   //    and this is a live mail server: a POP3 DELE, an IMAP EXPUNGE or a delivery
+   //    finishing removes message files continuously. Between listing a file and
+   //    copying it, it can be gone.
+   //
+   //  * Something else has the file open in a way that denies read sharing - an
+   //    anti-virus scanner mid-scan being the usual one.
+   //
+   // Where the exception goes is the problem. ExceptionHandler::Run reports it and
+   // rethrows; WorkQueue::ExecuteTask releases its blocking slot and rethrows;
+   // io_context::run propagates it; WorkQueue::IoServiceRunWorker rethrows anything
+   // that is not ERROR_ABANDONED_WAIT_0 - and it is then an exception escaping a
+   // boost::thread function, which calls std::terminate. A message file being
+   // deleted while a backup runs takes the whole service down with it, and because
+   // OnBackupFailed is never reached there is no BACKUP ERROR line and no
+   // OnBackupFailed event to explain why.
+   //
+   // So the backup does its own copy, with the error_code overloads, and gives each
+   // of the three cases the answer it deserves: overwrite, skip and count, retry
+   // briefly then fail the backup naming the file. FileUtilities::CopyDirectory is
+   // left alone because its other callers are not backups and a shared file is not
+   // this change's to redefine.
+
+   // How long, in total, one copy may spend waiting for files something else has
+   // open. Bounded because it is not: a store of two hundred thousand messages
+   // behind a scanner that is holding all of them would otherwise retry for days.
+   // Past the budget the next locked file fails the run, with its name.
+   const unsigned int COPY_RETRY_BUDGET_MS = 30000;
+   const unsigned int COPY_RETRY_PAUSE_MS = 250;
+
+   struct TreeCopyOutcome
+   {
+      unsigned int copied;
+
+      // Files that were listed and then were not there. Normal on a live server,
+      // reported as a count so that a number which is not small is visible.
+      unsigned int vanished;
+
+      unsigned int retry_sleep_ms;
+
+      String failed_file;
+      String failure_detail;
+
+      TreeCopyOutcome() :
+         copied(0),
+         vanished(0),
+         retry_sleep_ms(0)
+      {
+      }
+   };
+
+   static bool
+   CopyOneFile_(const boost::filesystem::path &from, const boost::filesystem::path &to, TreeCopyOutcome &outcome)
+   {
+      for (;;)
+      {
+         boost::system::error_code copyError;
+         boost::filesystem::copy_file(from, to, boost::filesystem::copy_options::overwrite_existing, copyError);
+
+         if (!copyError)
+         {
+            outcome.copied++;
+            return true;
+         }
+
+         // Gone rather than unreadable. hMailServer opens its own message files with
+         // _SH_DENYNO (see File::Open), so a file that is still there and still will
+         // not copy is being held by something outside the server, which is worth
+         // waiting for and then failing over. A file that has been deleted since the
+         // directory was listed is just mail flow, and failing the nightly backup
+         // because a user emptied their trash during it would be absurd.
+         //
+         // "Positively established as absent", not "could not be found": exists()
+         // reports a failure to look through its error_code, and treating that as
+         // absence would silently leave a message out of the backup - which is the
+         // outcome all of this exists to prevent.
+         boost::system::error_code existsError;
+         bool sourceStillExists = boost::filesystem::exists(from, existsError);
+
+         if (!existsError && !sourceStillExists)
+         {
+            outcome.vanished++;
+            return true;
+         }
+
+         if (outcome.retry_sleep_ms >= COPY_RETRY_BUDGET_MS)
+         {
+            outcome.failed_file = String(from.wstring());
+            outcome.failure_detail = copyError.message().c_str();
+            return false;
+         }
+
+         Sleep(COPY_RETRY_PAUSE_MS);
+         outcome.retry_sleep_ms += COPY_RETRY_PAUSE_MS;
+      }
+   }
+
+   static bool
+   CopyTree_(const boost::filesystem::path &from, const boost::filesystem::path &to, TreeCopyOutcome &outcome)
+   {
+      boost::system::error_code createError;
+      boost::filesystem::create_directories(to, createError);
+
+      if (createError)
+      {
+         outcome.failed_file = String(to.wstring());
+         outcome.failure_detail = createError.message().c_str();
+         return false;
+      }
+
+      boost::system::error_code iterateError;
+      boost::filesystem::directory_iterator file(from, iterateError);
+
+      if (iterateError)
+      {
+         // A source directory that cannot be listed is a real failure, including the
+         // case where it does not exist. CopyDirectory threw std::logic_error for
+         // that one, which no caller was catching.
+         outcome.failed_file = String(from.wstring());
+         outcome.failure_detail = iterateError.message().c_str();
+         return false;
+      }
+
+      boost::filesystem::directory_iterator end;
+
+      for (; file != end; ++file)
+      {
+         boost::filesystem::path current(file->path());
+
+         boost::system::error_code statusError;
+         bool isDirectory = boost::filesystem::is_directory(current, statusError);
+
+         if (statusError)
+         {
+            // Listed, and then we could not ask what it was. Almost always because it
+            // has just been deleted - but only "almost", so the entry has to be shown
+            // to be gone before it is written off. Skipping a directory we simply
+            // could not read would leave a whole account out of the backup.
+            boost::system::error_code existsError;
+            bool stillExists = boost::filesystem::exists(current, existsError);
+
+            if (!existsError && !stillExists)
+            {
+               outcome.vanished++;
+               continue;
+            }
+
+            outcome.failed_file = String(current.wstring());
+            outcome.failure_detail = statusError.message().c_str();
+            return false;
+         }
+
+         if (isDirectory)
+         {
+            if (!CopyTree_(current, to / current.filename(), outcome))
+               return false;
+         }
+         else
+         {
+            if (!CopyOneFile_(current, to / current.filename(), outcome))
+               return false;
+         }
+      }
+
+      return true;
+   }
+
+   static bool
+   CopyTreeGuarded_(const String &from, const String &to, TreeCopyOutcome &outcome)
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // CopyTree_ with a backstop. Every operation inside it uses an error_code
+   // overload, so nothing should reach here - but the whole point of this code is
+   // that an exception escaping a work-queue task terminates the process, and that
+   // property must not depend on having enumerated every throwing call correctly.
+   //---------------------------------------------------------------------------()
+   {
+      try
+      {
+         return CopyTree_(boost::filesystem::path(from.c_str()), boost::filesystem::path(to.c_str()), outcome);
+      }
+      catch (boost::thread_interrupted const &)
+      {
+         // The service is shutting down. Task::Run handles this one and must go on
+         // being allowed to.
+         throw;
+      }
+      catch (std::exception const &exception)
+      {
+         outcome.failed_file = from;
+         outcome.failure_detail = exception.what();
+         return false;
+      }
+      catch (...)
+      {
+         outcome.failed_file = from;
+         outcome.failure_detail = "an unrecognised error";
+         return false;
+      }
+   }
+
+   static String
+   DescribeCopyFailure_(const TreeCopyOutcome &outcome)
+   {
+      return Formatter::Format("{0} could not be copied: {1}.", outcome.failed_file, outcome.failure_detail);
+   }
+
    static bool
    DatabaseReadsFailed_()
    //---------------------------------------------------------------------------()
@@ -352,6 +576,24 @@ namespace HM
          }
        }
 
+      // The archive is read back before it is called a backup.
+      //
+      // Everything above checks that each step reported success. None of it checks
+      // that the result can be opened - and "reported success but cannot be opened"
+      // is exactly what a destination that ran out of space part-way through a write
+      // produces, along with an archive on a share that was interrupted, and one
+      // 7za's exit code called a warning rather than an error. An archive nobody has
+      // ever opened is not a backup; the trailing zero in 3-2-1-1-0 is "verified
+      // restores", and this is the smallest honest version of it.
+      //
+      // It happens before retention on purpose. An unverifiable archive must never be
+      // the reason an older archive that could be restored was deleted.
+      if (!VerifyArchive_(sZipFile))
+      {
+         DiscardIncompleteArchive_(sZipFile, zipExistedBeforeThisRun);
+         return false;
+      }
+
       // Retention runs here and nowhere else. This is the one point that every
       // failure path above has already returned past, so the new archive is
       // complete on disk before anything old is even considered for deletion. That
@@ -384,13 +626,33 @@ namespace HM
    {
       String sDataDir = IniFileSettings::Instance()->GetDataDirectory();
 
-      String errorMessage;
+      // See the comment at the top of this file for why this is not
+      // FileUtilities::CopyDirectory any more. In short: that call terminated the
+      // service if a message file was deleted while the copy was running, or if a
+      // DataBackup folder from an earlier run was still there.
+      TreeCopyOutcome outcome;
 
-      bool bResult = FileUtilities::CopyDirectory(sDataDir, sDataBackupDir, errorMessage);
+      bool bResult = CopyTreeGuarded_(sDataDir, sDataBackupDir, outcome);
       if (!bResult)
       {
-         Logger::Instance()->LogBackup("Failed to copy data directory. Details: " + errorMessage);
+         Logger::Instance()->LogBackup("Failed to copy data directory. Details: " + DescribeCopyFailure_(outcome));
          return bResult;
+      }
+
+      if (outcome.vanished > 0)
+      {
+         // Worth a line, and worth being honest about what it means: a backup of a
+         // running server is not a snapshot. The message rows were read out of the
+         // database before this copy started, so a message deleted in between leaves
+         // a row in the archive whose file is not in it, and after a restore that
+         // message is listed but cannot be fetched. Small numbers are simply what
+         // mail flow looks like; a large number means the backup was taken during
+         // something like a bulk expunge and is worth taking again.
+         String line;
+         line.Format(_T("Backed up %u file(s). %u file(s) were deleted by the running server while the copy was in progress and are not in this backup."),
+            outcome.copied, outcome.vanished);
+
+         Logger::Instance()->LogBackup(line);
       }
 
       bResult = FileUtilities::DeleteFilesInDirectory(sDataBackupDir);
@@ -422,49 +684,73 @@ namespace HM
    }
 
    bool
+   BackupExecuter::VerifyArchive_(const String &sZipFile)
+   {
+      Logger::Instance()->LogBackup("Verifying the archive...");
+
+      int archiveContents = 0;
+      String archiveVersion;
+      String failureReason;
+
+      // Deliberately the same code path a restore uses to open an archive, rather
+      // than a private check of its own. A verification that passes where a restore
+      // would fail is worth nothing, and the only way to keep the two honest is for
+      // them to be one function.
+      if (!BackupRestorer::ReadArchiveIndex(sZipFile, archiveContents, archiveVersion, failureReason))
+      {
+         Application::Instance()->GetBackupManager()->OnBackupFailed(
+            "The backup was written but could not be read back afterwards, so it is not a usable backup. " + failureReason);
+
+         return false;
+      }
+
+      if (archiveContents != backup_mode_)
+      {
+         // The index survived but does not say what this run put in it, which means
+         // the archive on disk is not the archive this run intended to write.
+         String message;
+         message.Format(_T("The backup was written but reads back as containing %d rather than %d, so its index does not describe what was backed up. It is not a usable backup."),
+            archiveContents, backup_mode_);
+
+         Application::Instance()->GetBackupManager()->OnBackupFailed(message);
+
+         return false;
+      }
+
+      return true;
+   }
+
+   bool
    BackupExecuter::StartRestore(std::shared_ptr<Backup> pBackup)
    {
       bool bMessagesDBOnly = IniFileSettings::Instance()->GetBackupMessagesDBOnly();
 
       Logger::Instance()->LogBackup("Reading XML file...");
-      String sZipFile = pBackup->GetBackupFile();
 
-      String sTempDir = IniFileSettings::Instance()->GetTempDirectory();
-      String sXMLFile = sTempDir + "\\hMailServerBackup.xml";
-      FileUtilities::DeleteFile(sXMLFile);
+      // PHASE ONE: everything that can be established without changing anything.
+      //
+      // A restore has no transaction and nothing can undo it, so every question that
+      // has an answer before the first deletion has to be asked before the first
+      // deletion - including "is the message store this restore needs actually
+      // inside the archive?", which is what used to be asked forty lines too late.
+      // See BackupRestorer for the four ways that ended in a server with nothing on
+      // it. A false return here means the server has not been touched.
+      BackupRestorer restorer;
+      String failureReason;
 
-      Compression oComp;
-      if (!oComp.Uncompress(sZipFile, sTempDir, "hMailServerBackup.xml"))
+      if (!restorer.Prepare(pBackup, failureReason))
       {
-         String sErrorMessage = Formatter::Format("Unable to uncompress hMailServerBackup.xml from {0} to {1}. Please confirm that hMailServer has permissions to {0} and {1}.", sZipFile, sTempDir);
-         Application::Instance()->GetBackupManager()->OnBackupFailed(sErrorMessage);
+         ReportRestoreFailure_(failureReason);
          return false;
       }
 
-      String sXMLData = FileUtilities::ReadCompleteTextFile(sXMLFile);
-      if (sXMLData.IsEmpty())
-      {
-         String sErrorMessage = Formatter::Format("The file {0} could not be read.", sXMLFile);
-         Application::Instance()->GetBackupManager()->OnBackupFailed(sErrorMessage);
-         return false;
-      }
+      XNode *pBackupNode = restorer.GetBackupNode();
+      int iRestoreOptions = restorer.GetRestoreOptions();
 
-      XDoc oDoc;
-      oDoc.Load(sXMLData);
-
-      FileUtilities::DeleteFile(sXMLFile);
-
-      String sBackup = "Backup";
-      XNode *pBackupNode = oDoc.GetChild(sBackup);
-      if (!pBackupNode)
-      {
-         String sErrorMessage = "The supplied XML file is not a valid hMailServer backup file";
-         Application::Instance()->GetBackupManager()->OnBackupFailed(sErrorMessage);
-         return false;
-      }
-
-      int iRestoreOptions = pBackup->GetRestoreOptions();
-
+      // PHASE TWO: the destructive part. From here on, a failure leaves the server
+      // part-way through a restore, which is why nothing that could have been
+      // checked is checked below.
+      Logger::Instance()->LogBackup("Backup archive accepted. Starting the restore...");
 
       if (iRestoreOptions & Backup::BODomains)
       {
@@ -476,19 +762,35 @@ namespace HM
          std::shared_ptr<Domains> pDomains = std::shared_ptr<Domains>(new Domains);
 
          pDomains->Refresh();
+
          if (!bMessagesDBOnly)
-            pDomains->DeleteAll();
+         {
+            // Checked, unlike before, and this is the one place where stopping on a
+            // failed deletion is better than carrying on. Collection::XMLLoad also
+            // begins by calling DeleteAll, and when that fails it returns *true* and
+            // loads nothing - so a restore that could not clear the existing domains
+            // used to be reported as having completed successfully against a server
+            // it had emptied. (That "return true" is in Collection.h and is not this
+            // change's to make; refusing here means it cannot be reached this way.)
+            if (!pDomains->DeleteAll())
+            {
+               ReportRestoreFailure_("Restore failed: the domains that are on this server now could not be deleted, so the backup's domains cannot be put in their place. The restore has been stopped part-way through - some domains may already have been removed. Check the hMailServer error log, then restore again.");
+               return false;
+            }
+         }
 
          // We need to do the same with public folders.
          if (iRestoreOptions & Backup::BOSettings && !bMessagesDBOnly)
             Configuration::Instance()->GetIMAPConfiguration()->GetPublicFolders()->DeleteAll();
 
-         // Should we restore messages as well?
-         if (iRestoreOptions & Backup::BOMessages && !bMessagesDBOnly)
+         // Should we restore messages as well? Prepare staged the message store
+         // exactly when the options and BackupMessagesDBOnly call for one, so asking
+         // it is the same test as before and cannot disagree with what was staged.
+         if (restorer.GetHasStagedMessageStore())
          {
             Logger::Instance()->LogBackup("Restoring data directory...");
 
-            if (!RestoreDataDirectory_(pBackup, pBackupNode))
+            if (!RestoreDataDirectory_(restorer))
                return false;
          }
 
@@ -533,63 +835,21 @@ namespace HM
    }
 
    bool
-   BackupExecuter::RestoreDataDirectory_(std::shared_ptr<Backup> pBackup, XNode *pBackupNode)
+   BackupExecuter::RestoreDataDirectory_(BackupRestorer &restorer)
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // Replaces the live data directory with the message store the restorer has
+   // already put on local disk.
+   //
+   // Everything that used to happen here before the deletion - working out where the
+   // messages are, extracting them, confirming they exist - has moved into
+   // BackupRestorer::Prepare, which runs before any domain is deleted. What is left
+   // is the part that cannot be made safe by ordering: between the delete and the
+   // end of the copy there is no complete copy of the mail store on this server, only
+   // the one in the staging directory.
+   //---------------------------------------------------------------------------()
    {
-      XNode *pBackupInfoNode = pBackupNode->GetChild(_T("BackupInformation"));
-
-      // Create the path to the zip file.
-      String sBackupFile = pBackup->GetBackupFile();
-      String sPath = sBackupFile.Mid(0, sBackupFile.ReverseFind(_T("\\")));
-
-      String sDirContainingDataFiles;
-      String sDataFileFormat = pBackupInfoNode->GetChildAttr(_T("DataFiles"), _T("Format"))->value;
-
-      bool extractedToTempDirectory = sDataFileFormat.CompareNoCase(_T("7Z")) == 0;
-
-      String sExtractedFilesDirectory;
-      if (extractedToTempDirectory)
-      {
-         // Create the path to the directory that will contain the extracted files.
-         //  This directory is temporary and will be removed when we're done.
-         sExtractedFilesDirectory = Utilities::GetUniqueTempDirectory();
-
-         // Extract the files to this directory.
-         Compression oComp;
-         if (!oComp.Uncompress(sBackupFile, sExtractedFilesDirectory))
-         {
-            FileUtilities::DeleteDirectory(sExtractedFilesDirectory, true);
-
-            ReportRestoreFailure_("Restore failed: the messages could not be extracted from " + sBackupFile +
-                                  ". The existing data directory has not been touched.");
-            return false;
-         }
-
-         // The data files in the zip file are stored in
-         // a directory called DataBackup.
-         sDirContainingDataFiles = sExtractedFilesDirectory + "\\DataBackup";
-      }
-      else
-      {
-         // Fetch the path to the data files.
-         String sFolderName = pBackupInfoNode->GetChildAttr(_T("DataFiles"), _T("FolderName"))->value;
-         sDirContainingDataFiles = sPath + "\\" + sFolderName;
-      }
-
-      // Confirm the replacement exists before deleting what is there now. The copy
-      // below throws when its source is missing - which is what a settings-only
-      // backup restored with the messages option set looks like - and by then the
-      // deletion had already run, so the live data directory was emptied and the
-      // only remaining copy of the mail was in a temporary folder that nothing
-      // cleans up and nobody would think to look in.
-      if (!FileUtilities::DirectoryExists(sDirContainingDataFiles))
-      {
-         if (extractedToTempDirectory)
-            FileUtilities::DeleteDirectory(sExtractedFilesDirectory, true);
-
-         ReportRestoreFailure_("Restore failed: the backup does not contain a message store (" + sDirContainingDataFiles +
-                               " does not exist). The existing data directory has not been touched.");
-         return false;
-      }
+      String sDirContainingDataFiles = restorer.GetStagedMessageStore();
 
       // Delete all directories from the data directory
       // so that we're sure that we're doing a clean restore
@@ -598,25 +858,22 @@ namespace HM
       FileUtilities::DeleteFilesInDirectory(sDataDirectory);
       FileUtilities::DeleteDirectoriesInDirectory(sDataDirectory);
 
-      String errorMessage;
-      bool copied = FileUtilities::CopyDirectory(sDirContainingDataFiles, sDataDirectory, errorMessage);
+      TreeCopyOutcome outcome;
+      bool copied = CopyTreeGuarded_(sDirContainingDataFiles, sDataDirectory, outcome);
 
       if (!copied)
       {
-         // From here on the data directory has already been emptied, so the
-         // extracted copy is deliberately left in place: it is the only copy of
-         // the messages that still exists, and the administrator is told where.
-         ReportRestoreFailure_("Restore failed while copying messages into " + sDataDirectory + ". " + errorMessage +
+         // The data directory has already been emptied, so the staged copy is
+         // deliberately kept: it is the only copy of the messages that still exists,
+         // and the administrator is told where it is. Without this the restorer's
+         // destructor would delete it on the way out - which is what the previous
+         // version of this code got right and is the reason RetainStagedFiles exists.
+         restorer.RetainStagedFiles();
+
+         ReportRestoreFailure_("Restore failed while copying messages into " + sDataDirectory + ". " + DescribeCopyFailure_(outcome) +
                                " The messages from the backup have been left in " + sDirContainingDataFiles +
                                " - do not delete that folder until they have been recovered.");
          return false;
-      }
-
-      if (extractedToTempDirectory)
-      {
-         // The temporary directory we created while
-         // unzipping should be deleted now.
-         FileUtilities::DeleteDirectory(sExtractedFilesDirectory, true);
       }
 
       return true;

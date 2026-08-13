@@ -92,7 +92,13 @@ namespace RegressionTests.POP3
          fetchAccount.DownloadNow();
          pop3Server.WaitForCompletion();
 
-         Pop3ClientSimulator.AssertMessageCount(_account.Address, "test", 2);
+         // One copy, not two. The first session delivered the message and then lost the
+         // connection before the DELE was acknowledged, so the message was still on the
+         // remote server - but it had been delivered, and the UID table now records that,
+         // so the second session recognises it, deletes it and delivers nothing. This
+         // assertion used to expect 2, which was the duplicate delivery rather than a
+         // requirement.
+         Pop3ClientSimulator.AssertMessageCount(_account.Address, "test", 1);
       }
 
       [Test]

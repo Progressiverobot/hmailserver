@@ -23,6 +23,7 @@
 #include "../BO/Message.h"
 #include "../Persistence/PersistentAccount.h"
 #include "../Persistence/PersistentMessage.h"
+#include "../Persistence/PersistenceMode.h"
 #include "../TCPIP/SocketConstants.h"
 #include "../TCPIP/SslContextInitializer.h"
 #include "../../SMTP/DeliveryQueue.h"
@@ -46,7 +47,11 @@ namespace HM
 {
    namespace
    {
-      const int MaxRequestSize = 64 * 1024;
+      // size_t rather than int so that every comparison against a std::string
+      // size below is between like types. /W3 /WX would otherwise turn one of
+      // them into a signed/unsigned build failure the first time it is written
+      // without a constant on the signed side.
+      const size_t MaxRequestSize = 64 * 1024;
       const DWORD SocketTimeoutMilliseconds = 10000;
 
       // Total time allowed to read one request, across all reads.
@@ -88,6 +93,75 @@ namespace HM
       // expiry at all is exactly the property that makes the administrator
       // password dangerous, so "unlimited" is not an option.
       const int ApiKeyDefaultLifetimeDays = 90;
+
+      // The only Scope value that widens a key beyond reading. Compared
+      // case-insensitively; anything else - including nothing at all - leaves
+      // the key read-only.
+      const TCHAR *ApiKeyScopeFull = _T("full");
+      const TCHAR *ApiKeyScopeReadOnly = _T("readonly");
+
+      // The same two words narrow, for the JSON bodies (Format's %hs) and for
+      // reading the create request. Spelled once each so the store, the request
+      // and the response can never disagree about them.
+      const char *ApiKeyScopeFullNarrow = "full";
+      const char *ApiKeyScopeReadOnlyNarrow = "readonly";
+
+      // ------------------------------------------------------------------
+      // Per-credential request budget.
+      //
+      // The refused-source set below bounds *failed* authentication. Nothing
+      // bounded successful requests at all: one valid credential could drive
+      // this listener as fast as its single worker thread could answer, and
+      // every request costs a key-store read plus, on most routes, queries on
+      // the same database connection pool that SMTP, IMAP and POP3 use. So a
+      // leaked key was not only administrative access, it was a lever on mail
+      // delivery.
+      //
+      // Per credential rather than per source address, deliberately, and in
+      // both directions:
+      //
+      //  - a key is the thing whose budget we want to cap, and an address is
+      //    not: rotating source addresses must not multiply what one leaked key
+      //    can spend;
+      //  - two honest keys behind one NAT must not be able to starve each
+      //    other, which is what a per-address budget would do.
+      //
+      // A fixed window, not a sliding one: when a window is older than
+      // RateWindowMilliseconds its entry is dropped and the next request starts
+      // a fresh one. That makes Retry-After exact - a caller that waits the
+      // window out is certainly inside a new window - at the cost of allowing
+      // up to twice the budget across a window boundary, which is the right
+      // trade for a management API.
+      //
+      // A short window and a generous budget, on purpose. This is not a throttle
+      // meant to shape normal use; it is a ceiling that stops one credential
+      // turning into a denial of service against mail. Twenty requests a second
+      // sustained is far more than any administrator or dashboard produces
+      // (a status poll once a second is 5% of it) and far less than the thread
+      // can serve, so what it removes is only the abusive case. The short window
+      // also means an honest client that briefly overshoots is forgiven in
+      // seconds rather than being locked out for a minute.
+      //
+      // Nothing here fires on the shipped default configuration: the listener
+      // does not run unless RestApiPort is set.
+      // ------------------------------------------------------------------
+      const int MaxRequestsPerWindowPerCredential = 200;
+      const ULONGLONG RateWindowMilliseconds = 10 * 1000;
+
+      // Only the administrator can mint keys, so this cap is not reachable by
+      // an attacker. It is here so that a store with thousands of keys cannot
+      // turn this into unbounded memory.
+      const size_t MaxRateLimitedCredentials = 64;
+
+      struct CredentialRate
+      {
+         AnsiString identity;
+         ULONGLONG window_started_at;
+         int count;
+      };
+
+      std::mutex credential_rate_mutex;
+      std::vector<CredentialRate> credential_rates;
 
       // ------------------------------------------------------------------
       // The refused-source set.
@@ -363,10 +437,21 @@ namespace HM
          return id > 0;
       }
 
+      // Why an enum and not a bool: an oversized request and a malformed one
+      // are different answers (413 and 400), and a caller that cannot tell them
+      // apart is the reason the oversize case used to be answered by silently
+      // truncating the body. See the totalExpected check below.
+      enum RequestReadResult
+      {
+         RequestReadOk = 0,
+         RequestReadMalformed = 1,
+         RequestReadTooLarge = 2
+      };
+
       // Reads an HTTP request (headers + body according to Content-Length)
       // using the supplied read function.
       template <typename ReadFunction>
-      bool ReadHttpRequest(ReadFunction readSome, AnsiString &request)
+      RequestReadResult ReadHttpRequest(ReadFunction readSome, AnsiString &request)
       {
          std::string data;
          char buffer[4096];
@@ -380,10 +465,10 @@ namespace HM
          // shutdown, since Stop() waits for the handler to return.
          const ULONGLONG deadline = GetTickCount64() + RequestReadTimeoutMilliseconds;
 
-         while (data.size() < MaxRequestSize)
+         for (;;)
          {
             if (GetTickCount64() >= deadline)
-               return false;
+               return RequestReadMalformed;
 
             int bytesRead = readSome(buffer, sizeof(buffer));
             if (bytesRead <= 0)
@@ -392,33 +477,70 @@ namespace HM
             data.append(buffer, bytesRead);
 
             headerEnd = data.find("\r\n\r\n");
-            if (headerEnd != std::string::npos)
+
+            if (headerEnd == std::string::npos)
             {
-               // Determine expected body length.
-               size_t contentLength = 0;
+               // Header block still not terminated. Bounded here rather than by
+               // the loop condition, so that "the headers alone are bigger than
+               // the cap" is an oversized request rather than one that is
+               // quietly treated as having no body.
+               if (data.size() >= MaxRequestSize)
+                  return RequestReadTooLarge;
 
-               std::string headersLower = data.substr(0, headerEnd);
-               for (size_t i = 0; i < headersLower.size(); i++)
-                  headersLower[i] = (char) tolower((unsigned char) headersLower[i]);
-
-               size_t lengthPosition = headersLower.find("content-length:");
-               if (lengthPosition != std::string::npos)
-                  contentLength = strtoul(headersLower.c_str() + lengthPosition + 15, nullptr, 10);
-
-               if (contentLength > MaxRequestSize)
-                  return false;
-
-               size_t totalExpected = headerEnd + 4 + contentLength;
-               if (data.size() >= totalExpected)
-                  break;
+               continue;
             }
+
+            // Determine expected body length.
+            size_t contentLength = 0;
+
+            std::string headersLower = data.substr(0, headerEnd);
+            for (size_t i = 0; i < headersLower.size(); i++)
+               headersLower[i] = (char) tolower((unsigned char) headersLower[i]);
+
+            size_t lengthPosition = headersLower.find("content-length:");
+            if (lengthPosition != std::string::npos)
+               contentLength = strtoul(headersLower.c_str() + lengthPosition + 15, nullptr, 10);
+
+            // Headers, terminator and body against the one cap.
+            //
+            // The bug this replaces: the cap was the loop condition and only
+            // the declared body length was measured against it, so a request
+            // whose headers and body *together* exceeded 64 KB left the loop
+            // with the body cut short and was then processed as if it were
+            // complete.
+            //
+            // A truncated JSON body is not a syntax error to GetJsonStringValue_,
+            // which looks each field up independently: whichever fields survived
+            // the cut are honoured and the rest read as absent. So a
+            // POST /api/v1/apikeys whose label came first created a key from a
+            // request that was never fully received, and a create-account body
+            // could lose its password the same way. One answer now, 413,
+            // whichever half is oversized.
+            size_t totalExpected = headerEnd + 4 + contentLength;
+
+            if (contentLength > MaxRequestSize || totalExpected > MaxRequestSize)
+               return RequestReadTooLarge;
+
+            if (data.size() >= totalExpected)
+               break;
          }
 
          if (headerEnd == std::string::npos)
-            return false;
+            return RequestReadMalformed;
 
-         request = data.c_str();
-         return true;
+         // A NUL anywhere in the request refuses it.
+         //
+         // There is no legitimate NUL in an HTTP request line, a header block or
+         // a JSON body, and `request = data.c_str()` - what this replaces -
+         // truncated the request at the first one. So a client could cut its own
+         // request short at a byte of its choosing and still have the remains
+         // processed, and every length the reader had just checked described a
+         // different string from the one the parser saw.
+         if (data.find('\0') != std::string::npos)
+            return RequestReadMalformed;
+
+         request.assign(data.c_str(), data.size());
+         return RequestReadOk;
       }
    }
 
@@ -583,9 +705,10 @@ namespace HM
          worker_.join();
 
       // After the join, so there is no reader left to race with. A stopped
-      // listener holds no refusals: whatever was in force is dropped rather
-      // than surviving into the next Start().
+      // listener holds no refusals and no request counts: whatever was in force
+      // is dropped rather than surviving into the next Start().
       ClearRefusedAddresses_();
+      ClearRequestRates_();
 
       // Deliberately no SSL_CTX_free: the boost context owns the SSL_CTX and frees it
       // in its own destructor, so freeing it here as well would be a double free the
@@ -665,6 +788,22 @@ namespace HM
       setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*) &timeout, sizeof(timeout));
       setsockopt(client_socket, SOL_SOCKET, SO_SNDTIMEO, (const char*) &timeout, sizeof(timeout));
 
+      // One place that turns a read outcome into a response, shared by the TLS
+      // and plaintext paths below, so the two cannot answer the same condition
+      // differently.
+      auto answer = [&](RequestReadResult readResult, const AnsiString &httpRequest) -> AnsiString
+      {
+         if (readResult == RequestReadOk)
+            return ProcessRequest_(httpRequest, peer_address);
+
+         // Says nothing about the cap. An administrator hitting this reads the
+         // documentation; a stranger measuring it learns nothing useful.
+         if (readResult == RequestReadTooLarge)
+            return BuildResponse_(413, "{\"error\":\"request too large\"}");
+
+         return BuildResponse_(400, "{\"error\":\"malformed request\"}");
+      };
+
       if (use_tls_)
       {
          SSL *tlsSession = SSL_new(tls_context);
@@ -680,13 +819,11 @@ namespace HM
          {
             AnsiString request;
 
-            bool requestOk = ReadHttpRequest(
+            RequestReadResult readResult = ReadHttpRequest(
                [&](char *buffer, int size) { return SSL_read(tlsSession, buffer, size); },
                request);
 
-            AnsiString response = requestOk
-               ? ProcessRequest_(request, peer_address)
-               : BuildResponse_(400, "{\"error\":\"malformed request\"}");
+            AnsiString response = answer(readResult, request);
 
             SSL_write(tlsSession, response.c_str(), response.GetLength());
             SSL_shutdown(tlsSession);
@@ -699,13 +836,11 @@ namespace HM
 
       AnsiString request;
 
-      bool requestOk = ReadHttpRequest(
+      RequestReadResult readResult = ReadHttpRequest(
          [&](char *buffer, int size) { return recv(client_socket, buffer, size, 0); },
          request);
 
-      AnsiString response = requestOk
-         ? ProcessRequest_(request, peer_address)
-         : BuildResponse_(400, "{\"error\":\"malformed request\"}");
+      AnsiString response = answer(readResult, request);
 
       send(client_socket, response.c_str(), response.GetLength(), 0);
 
@@ -734,12 +869,17 @@ namespace HM
       return headerValue;
    }
 
-   RestApiServer::AuthenticationResult
+   RestApiServer::Caller
    RestApiServer::Authenticate_(const AnsiString &request, const IPAddress &peer_address)
    {
+      // Default-constructed: AuthenticationFailed, read-only, no domains. Every
+      // early return below is therefore a refusal that grants nothing, and a
+      // path that forgets to set the authority cannot accidentally widen one.
+      Caller caller;
+
       AnsiString headerValue = GetAuthorizationHeader_(request);
       if (headerValue.IsEmpty())
-         return AuthenticationFailed;
+         return caller;
 
       // Bearer is preferred when present. Basic is still accepted, unchanged,
       // because every existing script depends on it.
@@ -753,9 +893,7 @@ namespace HM
          AnsiString token = headerValue.Mid(7);
          token.Trim();
 
-         AuthenticationResult result = AuthenticateBearer_(token, peer_address);
-
-         if (result == AuthenticationFailed)
+         if (!AuthenticateBearer_(token, peer_address, caller))
          {
             // Deliberately does not say whether the token was unknown, expired
             // or refused by source address - the caller gets one 401 either
@@ -764,7 +902,7 @@ namespace HM
             RegisterAuthenticationFailure_(peer_address);
          }
 
-         return result;
+         return caller;
       }
 
       if (headerValue.GetLength() >= 6 && headerValue.Mid(0, 6).CompareNoCase("basic ") == 0)
@@ -773,7 +911,17 @@ namespace HM
          encodedCredentials.Trim();
 
          if (AuthenticateBasic_(encodedCredentials))
-            return AuthenticatedAsAdministrator;
+         {
+            // The administrator password is the full-authority credential and
+            // always has been. It is not read-only and it is not restricted to
+            // any domain: the scoping added for API keys narrows keys, and
+            // narrowing this one would break every script that exists.
+            caller.result = AuthenticatedAsAdministrator;
+            caller.read_only = false;
+            caller.identity = "administrator";
+
+            return caller;
+         }
 
          // A rejected credential leaves a trace, so repeated guessing against an
          // exposed management port is at least visible to the administrator.
@@ -783,7 +931,7 @@ namespace HM
          RegisterAuthenticationFailure_(peer_address);
       }
 
-      return AuthenticationFailed;
+      return caller;
    }
 
    bool
@@ -815,25 +963,25 @@ namespace HM
       return Crypt::Instance()->Validate(password, correctPassword, hashType);
    }
 
-   RestApiServer::AuthenticationResult
-   RestApiServer::AuthenticateBearer_(const AnsiString &token, const IPAddress &peer_address)
+   bool
+   RestApiServer::AuthenticateBearer_(const AnsiString &token, const IPAddress &peer_address, Caller &caller)
    {
       // Cheap syntactic rejection first, so that a flood of junk tokens does
       // not cause the store to be read at all.
       AnsiString prefix(ApiKeyTokenPrefix);
 
       if (token.GetLength() != prefix.GetLength() + ApiKeySecretBytes * 2)
-         return AuthenticationFailed;
+         return false;
 
       if (token.Mid(0, prefix.GetLength()) != prefix)
-         return AuthenticationFailed;
+         return false;
 
       if (!IsLowerHex(token.Mid(prefix.GetLength()), ApiKeySecretBytes * 2))
-         return AuthenticationFailed;
+         return false;
 
       AnsiString presentedHash = HashApiKeyToken(token);
       if (presentedHash.IsEmpty())
-         return AuthenticationFailed;
+         return false;
 
       std::vector<ApiKeyRecord> keys = LoadKeys_();
 
@@ -849,7 +997,7 @@ namespace HM
       }
 
       if (matched == nullptr)
-         return AuthenticationFailed;
+         return false;
 
       // Expiry and source restriction are checked after the secret matched, and
       // both produce the same indistinguishable failure.
@@ -859,7 +1007,7 @@ namespace HM
          message.Format(_T("REST API: API key '%s' was presented after it expired (%s)."),
             matched->label.c_str(), matched->expires.c_str());
          LOG_APPLICATION(message);
-         return AuthenticationFailed;
+         return false;
       }
 
       if (!IsSourceAllowed_(matched->allowed_from, peer_address))
@@ -868,10 +1016,94 @@ namespace HM
          message.Format(_T("REST API: API key '%s' was presented from %s, which is outside its allowed source '%s'."),
             matched->label.c_str(), String(peer_address.ToString()).c_str(), matched->allowed_from.c_str());
          LOG_APPLICATION(message);
-         return AuthenticationFailed;
+         return false;
       }
 
-      return AuthenticatedWithApiKey;
+      // The key's authority travels with the request from here. Copied out of
+      // the record rather than looked up again later, so that a store edited
+      // between the authentication and the authorisation of one request cannot
+      // change the answer half way through.
+      caller.result = AuthenticatedWithApiKey;
+      caller.identity = AnsiString("key:") + AnsiString(matched->id);
+      caller.read_only = matched->read_only;
+      caller.domains = matched->domains;
+
+      return true;
+   }
+
+   bool
+   RestApiServer::IsWithinRequestRate_(const AnsiString &identity, bool &firstRefusal)
+   {
+      firstRefusal = false;
+
+      // Not reachable: every authenticated caller has an identity. Belt and
+      // braces, because the alternative to returning true here would be an
+      // unnamed credential sharing one budget with every other.
+      if (identity.IsEmpty())
+         return true;
+
+      const ULONGLONG now = GetTickCount64();
+
+      std::lock_guard<std::mutex> guard(credential_rate_mutex);
+
+      for (std::vector<CredentialRate>::iterator it = credential_rates.begin(); it != credential_rates.end(); )
+      {
+         // Closed windows are dropped as they are met, so the set empties itself
+         // even if no further request ever arrives.
+         if (now - it->window_started_at >= RateWindowMilliseconds)
+         {
+            it = credential_rates.erase(it);
+            continue;
+         }
+
+         if (it->identity == identity)
+         {
+            it->count++;
+
+            // The refused requests are counted too. A caller that keeps pushing
+            // stays refused for the rest of its window rather than being let
+            // back in one request at a time.
+            firstRefusal = it->count == MaxRequestsPerWindowPerCredential + 1;
+
+            return it->count <= MaxRequestsPerWindowPerCredential;
+         }
+
+         ++it;
+      }
+
+      CredentialRate entry;
+      entry.identity = identity;
+      entry.window_started_at = now;
+      entry.count = 1;
+
+      if (credential_rates.size() < MaxRateLimitedCredentials)
+      {
+         credential_rates.push_back(entry);
+         return true;
+      }
+
+      // Full. Replace the oldest window rather than growing, so this is a hard
+      // bound on memory whatever the store contains.
+      size_t oldest = 0;
+
+      for (size_t i = 1; i < credential_rates.size(); i++)
+      {
+         if (credential_rates[i].window_started_at < credential_rates[oldest].window_started_at)
+            oldest = i;
+      }
+
+      credential_rates[oldest] = entry;
+
+      return true;
+   }
+
+   void
+   RestApiServer::ClearRequestRates_()
+   {
+      std::lock_guard<std::mutex> guard(credential_rate_mutex);
+
+      credential_rates.clear();
+      credential_rates.shrink_to_fit();
    }
 
    bool
@@ -1061,8 +1293,10 @@ namespace HM
          path = path.Mid(0, queryPosition);
 
       // The web admin SPA shell is served without authentication (it is a
-      // static login page). Every data endpoint below still requires either an
-      // API key (Authorization: Bearer) or HTTP Basic authentication.
+      // static login page). This is the only unauthenticated route in the
+      // listener: everything else goes through Authenticate_ below, once, and
+      // no handler is reachable except from the dispatch at the bottom of this
+      // function.
       if (method == "GET" && (path == "/" || path == "/index.html"))
          return HandleWebAdminPage_();
 
@@ -1072,104 +1306,104 @@ namespace HM
          // recording a failure touches the database, neither of which may turn
          // an unauthenticated request into an unhandled exception on the single
          // REST worker thread.
-         AuthenticationResult authentication = Authenticate_(request, peer_address);
+         Caller caller = Authenticate_(request, peer_address);
 
-         if (authentication == AuthenticationFailed)
+         if (caller.result == AuthenticationFailed)
             return BuildUnauthorizedResponse_();
 
-         // Key management is administrator-password only. An API key that could
-         // mint keys would be able to issue itself a replacement with no expiry
-         // and no source restriction, which would give away the whole point of
-         // having scoped keys; and one that could revoke keys could lock the
-         // administrator out of their own management interface. Answering 401
-         // rather than 403 keeps the refusal indistinguishable from any other
-         // credential problem.
-         AnsiString apiKeysPath = "/api/v1/apikeys";
+         // After authentication, so the budget belongs to the credential rather
+         // than to a source address, and before routing, so that being over it
+         // costs nothing but this comparison.
+         bool firstRefusal = false;
 
-         if (path == apiKeysPath || path.StartsWith(apiKeysPath + "/"))
+         if (!IsWithinRequestRate_(caller.identity, firstRefusal))
          {
-            if (authentication != AuthenticatedAsAdministrator)
-               return BuildUnauthorizedResponse_();
-
-            if (path == apiKeysPath)
+            if (firstRefusal)
             {
-               if (method == "GET")
-                  return HandleListApiKeys_();
-
-               if (method == "POST")
-                  return HandleCreateApiKey_(GetRequestBody_(request));
-            }
-            else if (method == "DELETE")
-            {
-               AnsiString id = path.Mid(apiKeysPath.GetLength() + 1);
-               if (!id.IsEmpty() && id.Find("/") < 0)
-                  return HandleRevokeApiKey_(id);
+               // One line per credential per window. A line per refused request
+               // would answer a flood of cheap requests with a flood of log
+               // writes, which is the shape of problem being fixed.
+               String message;
+               message.Format(_T("REST API: Credential '%s' has exceeded %d requests in %d seconds and is refused for the rest of the window."),
+                  String(caller.identity).c_str(), MaxRequestsPerWindowPerCredential,
+                  (int) (RateWindowMilliseconds / 1000));
+               LOG_APPLICATION(message);
             }
 
-            return BuildResponse_(404, "{\"error\":\"not found\"}");
+            return BuildTooManyRequestsResponse_();
          }
 
-         if (method == "GET" && path == "/api/v1/status")
+         Route route;
+         ParseRoute_(method, path, route);
+
+         // The single authorisation choke point. Every route is decided here,
+         // by kind, before any handler runs - so a handler cannot be reached by
+         // a credential that was never checked against it, and a new endpoint
+         // cannot be added without appearing in Authorize_ as well.
+         AnsiString refusalReason;
+         AuthorizationResult authorization = Authorize_(caller, route, refusalReason);
+
+         if (authorization == AuthorizationUnauthenticated)
+            return BuildUnauthorizedResponse_();
+
+         if (authorization == AuthorizationForbidden)
+         {
+            String message;
+            message.Format(_T("REST API: Credential '%s' was refused %s %s - %s."),
+               String(caller.identity).c_str(), String(method).c_str(),
+               String(path).c_str(), String(refusalReason).c_str());
+            LOG_APPLICATION(message);
+
+            return BuildForbiddenResponse_(refusalReason);
+         }
+
+         switch (route.kind)
+         {
+         case RouteApiKeyList:
+            return HandleListApiKeys_();
+
+         case RouteApiKeyCreate:
+            return HandleCreateApiKey_(GetRequestBody_(request));
+
+         case RouteApiKeyRevoke:
+            return HandleRevokeApiKey_(route.identifier);
+
+         case RouteStatus:
             return HandleStatus_();
 
-         if (method == "GET" && path == "/api/v1/domains")
-            return HandleListDomains_();
+         case RouteDomainList:
+            return HandleListDomains_(caller.domains);
 
-         // /api/v1/domains/<name>/accounts
-         AnsiString domainsPrefix = "/api/v1/domains/";
-         if (path.StartsWith(domainsPrefix) && path.EndsWith("/accounts"))
-         {
-            AnsiString domainName = path.Mid(domainsPrefix.GetLength(),
-               path.GetLength() - domainsPrefix.GetLength() - AnsiString("/accounts").GetLength());
+         case RouteAccountList:
+            return HandleListAccounts_(String(route.identifier));
 
-            if (!domainName.IsEmpty() && domainName.Find("/") < 0)
-            {
-               if (method == "GET")
-                  return HandleListAccounts_(String(domainName));
+         case RouteAccountCreate:
+            return HandleCreateAccount_(String(route.identifier), GetRequestBody_(request));
 
-               if (method == "POST")
-                  return HandleCreateAccount_(String(domainName), GetRequestBody_(request));
-            }
-         }
+         case RouteAccountDelete:
+            return HandleDeleteAccount_(String(route.identifier));
 
-         // /api/v1/accounts/<address>
-         AnsiString accountsPrefix = "/api/v1/accounts/";
-         if (method == "DELETE" && path.StartsWith(accountsPrefix))
-         {
-            AnsiString address = path.Mid(accountsPrefix.GetLength());
-            if (!address.IsEmpty() && address.Find("/") < 0)
-               return HandleDeleteAccount_(String(address));
-         }
-
-         if (method == "GET" && path == "/api/v1/queue")
+         case RouteQueueList:
             return HandleListQueue_();
 
-         // /api/v1/queue/<id>/retry and /api/v1/queue/<id>
-         AnsiString queuePrefix = "/api/v1/queue/";
-         if (path.StartsWith(queuePrefix))
-         {
-            AnsiString remainder = path.Mid(queuePrefix.GetLength());
+         case RouteQueueRetry:
+            return HandleQueueRetry_(route.message_id);
 
-            if (method == "POST" && remainder.EndsWith("/retry"))
-            {
-               AnsiString idPart = remainder.Mid(0, remainder.GetLength() - AnsiString("/retry").GetLength());
+         case RouteQueueDelete:
+            return HandleQueueDelete_(route.message_id);
 
-               __int64 messageId = 0;
-               if (ParseQueueId(idPart, messageId))
-                  return HandleQueueRetry_(messageId);
-            }
-
-            if (method == "DELETE" && remainder.Find("/") < 0)
-            {
-               __int64 messageId = 0;
-               if (ParseQueueId(remainder, messageId))
-                  return HandleQueueDelete_(messageId);
-            }
-         }
-
-         if (method == "GET" && path == "/api/v1/tlsa")
+         case RouteTlsa:
             return HandleTlsa_();
 
+         default:
+            break;
+         }
+
+         // RouteUnknown, and RouteApiKeyUnsupported once the administrator check
+         // in Authorize_ has let it through. Deliberately after the switch rather
+         // than inside its default: a switch every arm of which returns still
+         // leaves /W3 asking whether the function does, and answering that with
+         // an unreachable return is worse than this.
          return BuildResponse_(404, "{\"error\":\"not found\"}");
       }
       catch (...)
@@ -1178,23 +1412,304 @@ namespace HM
       }
    }
 
-   AnsiString
-   RestApiServer::BuildResponse_(int statusCode, const AnsiString &body)
+   void
+   RestApiServer::ParseRoute_(const AnsiString &method, const AnsiString &path, Route &route)
    {
+      // Transcribed from the dispatch this replaced, predicate for predicate and
+      // in the same order, so that which requests reach which handler is
+      // unchanged. Note that StartsWith and EndsWith are case-insensitive in
+      // this tree while operator== is not - long-standing behaviour, preserved
+      // here rather than tidied, because tightening it is a separate change with
+      // its own compatibility question.
+      route.kind = RouteUnknown;
+      route.identifier = "";
+      route.message_id = 0;
+
+      const AnsiString apiKeysPath = "/api/v1/apikeys";
+
+      if (path == apiKeysPath || path.StartsWith(apiKeysPath + "/"))
+      {
+         route.kind = RouteApiKeyUnsupported;
+
+         if (path == apiKeysPath)
+         {
+            if (method == "GET")
+               route.kind = RouteApiKeyList;
+            else if (method == "POST")
+               route.kind = RouteApiKeyCreate;
+         }
+         else if (method == "DELETE")
+         {
+            AnsiString id = path.Mid(apiKeysPath.GetLength() + 1);
+
+            if (!id.IsEmpty() && id.Find("/") < 0)
+            {
+               route.kind = RouteApiKeyRevoke;
+               route.identifier = id;
+            }
+         }
+
+         return;
+      }
+
+      if (method == "GET" && path == "/api/v1/status")
+      {
+         route.kind = RouteStatus;
+         return;
+      }
+
+      if (method == "GET" && path == "/api/v1/domains")
+      {
+         route.kind = RouteDomainList;
+         return;
+      }
+
+      // /api/v1/domains/<name>/accounts
+      const AnsiString domainsPrefix = "/api/v1/domains/";
+
+      if (path.StartsWith(domainsPrefix) && path.EndsWith("/accounts"))
+      {
+         AnsiString domainName = path.Mid(domainsPrefix.GetLength(),
+            path.GetLength() - domainsPrefix.GetLength() - AnsiString("/accounts").GetLength());
+
+         if (!domainName.IsEmpty() && domainName.Find("/") < 0)
+         {
+            if (method == "GET")
+            {
+               route.kind = RouteAccountList;
+               route.identifier = domainName;
+               return;
+            }
+
+            if (method == "POST")
+            {
+               route.kind = RouteAccountCreate;
+               route.identifier = domainName;
+               return;
+            }
+         }
+      }
+
+      // /api/v1/accounts/<address>
+      const AnsiString accountsPrefix = "/api/v1/accounts/";
+
+      if (method == "DELETE" && path.StartsWith(accountsPrefix))
+      {
+         AnsiString address = path.Mid(accountsPrefix.GetLength());
+
+         if (!address.IsEmpty() && address.Find("/") < 0)
+         {
+            route.kind = RouteAccountDelete;
+            route.identifier = address;
+            return;
+         }
+      }
+
+      if (method == "GET" && path == "/api/v1/queue")
+      {
+         route.kind = RouteQueueList;
+         return;
+      }
+
+      // /api/v1/queue/<id>/retry and /api/v1/queue/<id>
+      const AnsiString queuePrefix = "/api/v1/queue/";
+
+      if (path.StartsWith(queuePrefix))
+      {
+         AnsiString remainder = path.Mid(queuePrefix.GetLength());
+
+         if (method == "POST" && remainder.EndsWith("/retry"))
+         {
+            AnsiString idPart = remainder.Mid(0, remainder.GetLength() - AnsiString("/retry").GetLength());
+
+            __int64 messageId = 0;
+            if (ParseQueueId(idPart, messageId))
+            {
+               route.kind = RouteQueueRetry;
+               route.message_id = messageId;
+               return;
+            }
+         }
+
+         if (method == "DELETE" && remainder.Find("/") < 0)
+         {
+            __int64 messageId = 0;
+            if (ParseQueueId(remainder, messageId))
+            {
+               route.kind = RouteQueueDelete;
+               route.message_id = messageId;
+               return;
+            }
+         }
+      }
+
+      if (method == "GET" && path == "/api/v1/tlsa")
+         route.kind = RouteTlsa;
+   }
+
+   bool
+   RestApiServer::IsApiKeyRoute_(RouteKind kind)
+   {
+      switch (kind)
+      {
+      case RouteApiKeyUnsupported:
+      case RouteApiKeyList:
+      case RouteApiKeyCreate:
+      case RouteApiKeyRevoke:
+         return true;
+
+      default:
+         break;
+      }
+
+      return false;
+   }
+
+   bool
+   RestApiServer::IsMutatingRoute_(RouteKind kind)
+   {
+      // By kind and not by HTTP method, deliberately. The method is what a
+      // client asserts; the kind is what this server decided the request
+      // actually does, so a route that changed something under a GET could not
+      // slip past a read-only key by being spelled harmlessly.
+      switch (kind)
+      {
+      case RouteApiKeyCreate:
+      case RouteApiKeyRevoke:
+      case RouteAccountCreate:
+      case RouteAccountDelete:
+      case RouteQueueRetry:
+      case RouteQueueDelete:
+         return true;
+
+      default:
+         break;
+      }
+
+      return false;
+   }
+
+   bool
+   RestApiServer::IsDomainAllowed_(const std::vector<String> &domains, const String &domainName)
+   {
+      // No list means every domain, which is what an unrestricted key and the
+      // administrator password both have.
+      if (domains.empty())
+         return true;
+
+      if (domainName.IsEmpty())
+         return false;
+
+      for (const String &allowed : domains)
+      {
+         if (allowed.CompareNoCase(domainName.c_str()) == 0)
+            return true;
+      }
+
+      return false;
+   }
+
+   RestApiServer::AuthorizationResult
+   RestApiServer::Authorize_(const Caller &caller, const Route &route, AnsiString &refusalReason)
+   {
+      refusalReason = "";
+
+      // The administrator password carries full authority and always has. This
+      // is the one credential nothing below narrows.
+      if (caller.result == AuthenticatedAsAdministrator)
+         return AuthorizationAllowed;
+
+      // Key management is administrator-password only. An API key that could
+      // mint keys would be able to issue itself a replacement with no expiry,
+      // no source restriction and full scope, which would give away the whole
+      // point of having scoped keys; and one that could revoke keys could lock
+      // the administrator out of their own management interface. Answering 401
+      // rather than 403 keeps the refusal indistinguishable from any other
+      // credential problem - including for a verb that does not exist, which is
+      // why RouteApiKeyUnsupported is in this set.
+      if (IsApiKeyRoute_(route.kind))
+         return AuthorizationUnauthenticated;
+
+      if (caller.read_only && IsMutatingRoute_(route.kind))
+      {
+         refusalReason = "this api key is read-only";
+         return AuthorizationForbidden;
+      }
+
+      if (caller.domains.empty())
+         return AuthorizationAllowed;
+
+      // A key restricted to named domains. The delivery queue is server-wide -
+      // one queued message carries recipients in any number of domains, and
+      // GET /api/v1/queue lists the sender and every recipient of all of them -
+      // so there is no honest way to narrow it to a domain. Refused outright
+      // rather than narrowed wrongly.
+      if (route.kind == RouteQueueList || route.kind == RouteQueueRetry || route.kind == RouteQueueDelete)
+      {
+         refusalReason = "this api key is restricted to named domains, and the delivery queue is server-wide";
+         return AuthorizationForbidden;
+      }
+
+      String targetDomain;
+
+      switch (route.kind)
+      {
+      case RouteAccountList:
+      case RouteAccountCreate:
+         targetDomain = String(route.identifier);
+         break;
+
+      case RouteAccountDelete:
+         // The reason the whole mechanism exists. The account to delete is named
+         // by an address in the path and nothing else, so without this a key
+         // issued for one domain could delete a mailbox in another by editing
+         // one path segment - the classic identifier-in-the-path authorisation
+         // bypass, against a route that destroys mail.
+         targetDomain = StringParser::ExtractDomain(String(route.identifier));
+         break;
+
+      default:
+         // Server-wide and read-only: /status, /tlsa, and the domain listing,
+         // which its handler filters to the key's domains rather than refusing
+         // (a listing that answered 403 would be useless to exactly the
+         // credential the restriction exists for).
+         return AuthorizationAllowed;
+      }
+
+      if (!IsDomainAllowed_(caller.domains, targetDomain))
+      {
+         refusalReason = "this api key is not permitted for that domain";
+         return AuthorizationForbidden;
+      }
+
+      return AuthorizationAllowed;
+   }
+
+   AnsiString
+   RestApiServer::BuildResponse_(int statusCode, const AnsiString &body, const AnsiString &extraHeaders)
+   {
+      // Any status not named here becomes a 500, deliberately - a wrong number
+      // in a response line is worse than an honest server error. Which is also
+      // why 403, 413 and 429 had to be added below the moment anything started
+      // using them: BuildResponse_(429, ...) against the previous list answered
+      // "500 Internal Server Error" while carrying a rate-limit body.
       AnsiString statusText;
       switch (statusCode)
       {
       case 200: statusText = "OK"; break;
       case 201: statusText = "Created"; break;
       case 400: statusText = "Bad Request"; break;
+      case 403: statusText = "Forbidden"; break;
       case 404: statusText = "Not Found"; break;
       case 409: statusText = "Conflict"; break;
+      case 413: statusText = "Payload Too Large"; break;
+      case 429: statusText = "Too Many Requests"; break;
       default:  statusText = "Internal Server Error"; statusCode = 500; break;
       }
 
       AnsiString response;
-      response.Format("HTTP/1.0 %d %hs\r\nContent-Type: application/json\r\nContent-Length: %d\r\nConnection: close\r\n\r\n",
-         statusCode, statusText.c_str(), body.GetLength());
+      response.Format("HTTP/1.0 %d %hs\r\nContent-Type: application/json\r\nContent-Length: %d\r\n%hsConnection: close\r\n\r\n",
+         statusCode, statusText.c_str(), body.GetLength(), extraHeaders.c_str());
       response += body;
 
       return response;
@@ -1224,6 +1739,38 @@ namespace HM
       return response;
    }
 
+   AnsiString
+   RestApiServer::BuildForbiddenResponse_(const AnsiString &reason)
+   {
+      // 403 and not 401, and it says why.
+      //
+      // The refusals answered 401 above are about the *credential*, where every
+      // extra word confirms something to somebody holding a token they should
+      // not have. This one is about permission: the caller has already proved
+      // its key is genuine (it got this far), so concealing which restriction
+      // stopped it protects nothing and costs an administrator an afternoon
+      // wondering why a key that authenticates cannot delete an account.
+      //
+      // The reasons are fixed sentences written here. None of them names a file,
+      // a query, a row or another domain.
+      AnsiString body;
+      body.Format("{\"error\":\"%hs\"}", JsonEscape_(reason).c_str());
+
+      return BuildResponse_(403, body);
+   }
+
+   AnsiString
+   RestApiServer::BuildTooManyRequestsResponse_()
+   {
+      // Retry-After is the whole window. The window is fixed rather than
+      // sliding, so a caller that waits that long is certainly inside a new one
+      // - which is what makes the advice honest rather than a guess.
+      AnsiString retryAfter;
+      retryAfter.Format("Retry-After: %d\r\n", (int) (RateWindowMilliseconds / 1000));
+
+      return BuildResponse_(429, "{\"error\":\"too many requests\"}", retryAfter);
+   }
+
    String
    RestApiServer::GetApiKeyStoreFile()
    {
@@ -1247,6 +1794,13 @@ namespace HM
       //    Hash=<64 lower-case hex characters>
       //    Expires=2027-01-01 00:00:00
       //    AllowedFrom=10.0.0.0/24
+      //    Scope=full
+      //    Domains=example.com,example.net
+      //
+      // Scope and Domains both fail closed, which is what makes hand-editing
+      // this file safe: a section with no Scope, or a Scope value that is not
+      // the literal "full", is read-only, and a Domains list that survives
+      // normalisation as nothing at all leaves the key able to reach no domain.
       //
       // An administrator can revoke a key by hand by deleting its section, and
       // can revoke every key by deleting the file; either takes effect on the
@@ -1397,6 +1951,40 @@ namespace HM
             current.expires = value;
          else if (name.CompareNoCase(_T("AllowedFrom")) == 0)
             current.allowed_from = value;
+         else if (name.CompareNoCase(_T("Scope")) == 0)
+         {
+            // Only the literal "full" widens a key. Every other value - a
+            // misspelling, a truncated write, a line an administrator meant to
+            // comment out - leaves it read-only, because the opposite default
+            // would turn a typo into write access over every domain.
+            current.read_only = value.CompareNoCase(ApiKeyScopeFull) != 0;
+         }
+         else if (name.CompareNoCase(_T("Domains")) == 0)
+         {
+            // Normalised on the way in - trimmed, lower-cased, empty items
+            // dropped - so that the exact comparison in IsDomainAllowed_ is the
+            // only thing that has to be right.
+            //
+            // An entry that is not a real domain name is kept and simply matches
+            // nothing, which is the fail-closed direction. A value that is empty
+            // or is nothing but separators leaves the list empty, which means
+            // "every domain" - the same reading AllowedFrom gives an empty value,
+            // and the only one consistent with a section that has no Domains line
+            // at all.
+            current.domains.clear();
+
+            std::vector<String> parts = StringParser::SplitString(value, _T(","));
+
+            for (const String &part : parts)
+            {
+               String domainName = part;
+               domainName.Trim();
+               domainName.MakeLower();
+
+               if (!domainName.IsEmpty())
+                  current.domains.push_back(domainName);
+            }
+         }
       }
 
       commit();
@@ -1464,10 +2052,17 @@ namespace HM
 
       for (const ApiKeyRecord &key : keys)
       {
+         // scope and domains are reported because a restriction an administrator
+         // cannot see is a restriction they will not trust: the whole point of
+         // issuing a narrow key is being able to confirm afterwards that it is
+         // narrow.
          AnsiString item;
-         item.Format("{\"id\":\"%hs\",\"label\":\"%hs\",\"expires\":\"%hs\",\"allowed_from\":\"%hs\",\"expired\":%hs}",
+         item.Format("{\"id\":\"%hs\",\"label\":\"%hs\",\"scope\":\"%hs\",\"domains\":\"%hs\","
+                     "\"expires\":\"%hs\",\"allowed_from\":\"%hs\",\"expired\":%hs}",
             JsonEscape_(AnsiString(key.id)).c_str(),
             JsonEscape_(AnsiString(key.label)).c_str(),
+            key.read_only ? ApiKeyScopeReadOnlyNarrow : ApiKeyScopeFullNarrow,
+            JsonEscape_(AnsiString(StringParser::JoinVector(key.domains, _T(",")))).c_str(),
             JsonEscape_(AnsiString(key.expires)).c_str(),
             JsonEscape_(AnsiString(key.allowed_from)).c_str(),
             IsExpired_(key.expires) ? "true" : "false");
@@ -1491,10 +2086,14 @@ namespace HM
       AnsiString label = GetJsonStringValue_(requestBody, "label");
       AnsiString expires = GetJsonStringValue_(requestBody, "expires");
       AnsiString allowedFrom = GetJsonStringValue_(requestBody, "allowed_from");
+      AnsiString scope = GetJsonStringValue_(requestBody, "scope");
+      AnsiString domains = GetJsonStringValue_(requestBody, "domains");
 
       label.Trim();
       expires.Trim();
       allowedFrom.Trim();
+      scope.Trim();
+      domains.Trim();
 
       if (label.IsEmpty())
          return BuildResponse_(400, "{\"error\":\"label is required\"}");
@@ -1511,6 +2110,61 @@ namespace HM
             return BuildResponse_(400, "{\"error\":\"label must not contain control characters\"}");
       }
 
+      // Least privilege by default. A create request that does not name a scope
+      // gets a read-only key, because the alternative is that every caller who
+      // has not read the documentation is handed a credential that can delete
+      // accounts - and a key is most often minted for something that only reads
+      // (a monitoring probe, a CI status check). "full" is one word away for the
+      // callers that need it, and the 201 below says which one they got.
+      bool readOnly = true;
+
+      if (!scope.IsEmpty())
+      {
+         if (scope.CompareNoCase(ApiKeyScopeFullNarrow) == 0)
+            readOnly = false;
+         else if (scope.CompareNoCase(ApiKeyScopeReadOnlyNarrow) != 0)
+            return BuildResponse_(400, "{\"error\":\"scope must be 'readonly' or 'full'\"}");
+      }
+
+      // The domain restriction is normalised here and stored in that form, so
+      // that nothing the caller typed reaches the store verbatim and the value
+      // LoadKeys_ reads back is the value this function decided on.
+      String normalizedDomains;
+
+      if (!domains.IsEmpty())
+      {
+         std::vector<AnsiString> parts = StringParser::SplitString(domains, ",");
+
+         for (const AnsiString &part : parts)
+         {
+            String domainName = String(part);
+            domainName.Trim();
+            domainName.MakeLower();
+
+            if (domainName.IsEmpty())
+               continue;
+
+            // Refuse a restriction we would refuse every request against,
+            // rather than issuing a key that can never reach anything. The
+            // domain does not have to exist yet - a key may legitimately be
+            // issued before the domain it will manage - but it does have to be
+            // a domain name.
+            if (!StringParser::IsValidDomainName(domainName))
+               return BuildResponse_(400, "{\"error\":\"domains must be a comma-separated list of domain names\"}");
+
+            if (!normalizedDomains.IsEmpty())
+               normalizedDomains += _T(",");
+
+            normalizedDomains += domainName;
+         }
+
+         // The caller asked for a restriction and nothing survived
+         // normalisation ("domains":" , "). Storing that would silently mean
+         // "every domain", which is the opposite of what was asked for.
+         if (normalizedDomains.IsEmpty())
+            return BuildResponse_(400, "{\"error\":\"domains must be a comma-separated list of domain names\"}");
+      }
+
       if (expires.IsEmpty())
       {
          // No expiry named: default to a bounded lifetime rather than forever.
@@ -1525,6 +2179,23 @@ namespace HM
       // silently be treated as expired on first use.
       if (IsExpired_(String(expires)))
          return BuildResponse_(400, "{\"error\":\"expires must be a future date in the form YYYY-MM-DD HH:MM:SS\"}");
+
+      // Then store the parsed date rather than the text that produced it.
+      //
+      // Defence in depth against ini injection: the store is one section per
+      // key and is parsed line by line from the file's bytes, so any value that
+      // reached WritePrivateProfileString carrying a CRLF would appear to
+      // LoadKeys_ as further lines - a second [Key.*] section, or a Scope=full
+      // line under an existing one. The label is already refused if it holds a
+      // control character and AllowedFrom has to parse as an address, but the
+      // expiry had only a length-and-parse check, which says nothing about what
+      // follows the nineteenth character. Canonicalising removes the question
+      // instead of answering it: what is written is generated here.
+      DateTime canonicalExpiry = Time::GetDateFromSystemDate(String(expires));
+      if (canonicalExpiry.GetStatus() != DateTime::valid)
+         return BuildResponse_(400, "{\"error\":\"expires must be a future date in the form YYYY-MM-DD HH:MM:SS\"}");
+
+      expires = AnsiString(Time::GetTimeStampFromDateTime(canonicalExpiry));
 
       // Same for the source restriction: reject a form we would refuse every
       // request against, instead of issuing a key that can never be used.
@@ -1584,6 +2255,17 @@ namespace HM
          preamble += ";             expiry is missing or unreadable counts as expired.\r\n";
          preamble += "; AllowedFrom Optional. An address, a 'lower-upper' range, or CIDR.\r\n";
          preamble += ";             Empty means any source address.\r\n";
+         preamble += "; Scope       'full' or 'readonly'. Anything else - including a missing\r\n";
+         preamble += ";             line - is readonly, so a typo cannot widen a key. A\r\n";
+         preamble += ";             readonly key is refused every request that changes\r\n";
+         preamble += ";             something.\r\n";
+         preamble += "; Domains     Optional, comma-separated. Empty means every domain. A key\r\n";
+         preamble += ";             with a list may only act on those domains, and is refused\r\n";
+         preamble += ";             the delivery-queue endpoints outright because the queue is\r\n";
+         preamble += ";             server-wide.\r\n";
+         preamble += ";\r\n";
+         preamble += "; No key of any scope can create or revoke keys: that needs the\r\n";
+         preamble += "; administrator password.\r\n";
          preamble += "\r\n";
 
          FileUtilities::WriteToFile(storeFile, preamble);
@@ -1591,11 +2273,16 @@ namespace HM
 
       // Write the hash last: until it is there the section is ignored by
       // LoadKeys_, so a failure part way through leaves an unusable record
-      // rather than a usable key with no expiry.
+      // rather than a usable key with no expiry - or, now, one with no
+      // restrictions. Scope and Domains are written before it for the same
+      // reason: a key that became usable before its restrictions landed would be
+      // briefly unrestricted, and briefly is enough.
       bool written =
          WritePrivateProfileString(section, _T("Label"), String(label), storeFile) != FALSE &&
          WritePrivateProfileString(section, _T("Expires"), String(expires), storeFile) != FALSE &&
          WritePrivateProfileString(section, _T("AllowedFrom"), String(allowedFrom), storeFile) != FALSE &&
+         WritePrivateProfileString(section, _T("Scope"), readOnly ? ApiKeyScopeReadOnly : ApiKeyScopeFull, storeFile) != FALSE &&
+         WritePrivateProfileString(section, _T("Domains"), normalizedDomains, storeFile) != FALSE &&
          WritePrivateProfileString(section, _T("Hash"), String(hash), storeFile) != FALSE;
 
       // Flush the profile cache so the very next request sees the new key.
@@ -1612,14 +2299,25 @@ namespace HM
          return BuildResponse_(500, "{\"error\":\"failed to store the key\"}");
       }
 
-      LOG_APPLICATION("RestApi: API key '" + String(label) + "' (" + id + ") created.");
+      // The scope is in the log line as well as the response: which keys are
+      // full-authority is the thing an administrator will want to answer months
+      // later from the log alone.
+      String created;
+      created.Format(_T("RestApi: API key '%s' (%s) created. Scope: %s. Domains: %s."),
+         String(label).c_str(), id.c_str(),
+         readOnly ? ApiKeyScopeReadOnly : ApiKeyScopeFull,
+         normalizedDomains.IsEmpty() ? _T("(all)") : normalizedDomains.c_str());
+      LOG_APPLICATION(created);
 
       // The clear-text token is returned exactly once, here. It is not stored
       // and cannot be recovered afterwards.
       AnsiString body;
-      body.Format("{\"id\":\"%hs\",\"label\":\"%hs\",\"expires\":\"%hs\",\"allowed_from\":\"%hs\",\"key\":\"%hs\"}",
+      body.Format("{\"id\":\"%hs\",\"label\":\"%hs\",\"scope\":\"%hs\",\"domains\":\"%hs\","
+                  "\"expires\":\"%hs\",\"allowed_from\":\"%hs\",\"key\":\"%hs\"}",
          JsonEscape_(AnsiString(id)).c_str(),
          JsonEscape_(label).c_str(),
+         readOnly ? ApiKeyScopeReadOnlyNarrow : ApiKeyScopeFullNarrow,
+         JsonEscape_(AnsiString(normalizedDomains)).c_str(),
          JsonEscape_(expires).c_str(),
          JsonEscape_(allowedFrom).c_str(),
          JsonEscape_(token).c_str());
@@ -1721,12 +2419,18 @@ namespace HM
    }
 
    AnsiString
-   RestApiServer::HandleListDomains_()
+   RestApiServer::HandleListDomains_(const std::vector<String> &allowedDomains)
    {
       Domains domains;
       domains.Refresh();
 
       AnsiString body = "[";
+
+      // A separate count rather than the loop index, which is the difference
+      // between valid and invalid JSON now that entries can be skipped: the
+      // separator has to follow the last entry *emitted*, not the last index
+      // visited. With `i > 0` a skipped first domain produced "[,{...}]".
+      int count = 0;
 
       for (int i = 0; i < domains.GetCount(); i++)
       {
@@ -1734,7 +2438,15 @@ namespace HM
          if (!domain)
             continue;
 
-         if (i > 0)
+         // A key restricted to named domains sees only those. Filtered rather
+         // than refused, because a listing that answered 403 would be useless to
+         // exactly the credential the restriction exists for - and a listing that
+         // returned everything would tell a key issued for one customer the names
+         // of all the others.
+         if (!IsDomainAllowed_(allowedDomains, domain->GetName()))
+            continue;
+
+         if (count > 0)
             body += ",";
 
          AnsiString entry;
@@ -1743,6 +2455,7 @@ namespace HM
             domain->GetIsActive() ? "true" : "false");
 
          body += entry;
+         count++;
       }
 
       body += "]";
@@ -1765,13 +2478,17 @@ namespace HM
 
       AnsiString body = "[";
 
+      // As in HandleListDomains_: counted, not indexed, so that a skipped entry
+      // cannot put a separator where there is nothing to separate.
+      int count = 0;
+
       for (int i = 0; i < accounts.GetCount(); i++)
       {
          std::shared_ptr<Account> account = accounts.GetItem(i);
          if (!account)
             continue;
 
-         if (i > 0)
+         if (count > 0)
             body += ",";
 
          AnsiString entry;
@@ -1780,6 +2497,7 @@ namespace HM
             account->GetActive() ? "true" : "false");
 
          body += entry;
+         count++;
       }
 
       body += "]";
@@ -1822,8 +2540,82 @@ namespace HM
       account->SetPasswordEncryption(preferredHashAlgorithm);
       account->SetActive(true);
 
-      if (!PersistentAccount::SaveObject(account))
+      // createInbox: true. This argument is the whole reason this call changed,
+      // and it was losing mail.
+      //
+      // PersistentAccount::SaveObject(account) - the one-argument overload used
+      // here before - forwards createInbox as *false*, so the hm_accounts row was
+      // written and no INBOX row in hm_imapfolders was. Every COM caller passes
+      // true (InterfaceAccount::Save), so an account made in hMailAdmin or the
+      // Control Panel got one and an account made over the REST API did not.
+      //
+      // What that costs, following the delivery path for a message addressed to
+      // such an account: SMTP accepts it at RCPT TO because the account exists,
+      // then LocalDelivery::CreateAccountLevelMessage_ asks
+      // InboxIDCache::GetUserInboxFolder for the folder to put it in.
+      // PersistentIMAPFolder::GetUserInboxFolder selects folderid where
+      // foldername = 'INBOX', finds no row, and returns 0; the delivery gives up
+      // and returns an empty message. The caller reports HM5209 and returns
+      // without adding anything to the bounce list - so the sender is told the
+      // message was accepted, the recipient never sees it, and no non-delivery
+      // report is generated. The message is simply gone.
+      //
+      // Worse, InboxIDCache caches the zero, so creating the inbox afterwards
+      // does not fix delivery until the cache is cleared.
+      //
+      // The error message is also captured now. SaveObject already ran
+      // PreSaveLimitationsCheck through this path and the old code discarded
+      // everything it said, answering 500 "failed to save account" for what are
+      // almost always the caller's own doing.
+      String saveError;
+
+      if (!PersistentAccount::SaveObject(account, saveError, true, PersistenceModeNormal))
+      {
+         // Two different failures, told apart by whether anything explained it.
+         //
+         // A non-empty message comes from PreSaveLimitationsCheck: the address is
+         // not a valid mailbox address, the domain has reached its maximum number
+         // of accounts, the domain has a maximum account size and this account has
+         // none. Those are all the caller's problem, so 400 and say which - an
+         // administrator who was told only "failed to save account", with a 500,
+         // could not tell a configured limit from a broken database. Every one of
+         // those strings is a fixed sentence written for an administrator; none of
+         // them carries a path, a query, a row or another account's name, which is
+         // what makes passing it through safe.
+         //
+         // An empty message means the INSERT itself failed. That one is ours: 500,
+         // and deliberately without detail.
+         if (!saveError.IsEmpty())
+         {
+            LOG_APPLICATION("RestApi: Refused to create account " + String(address) + ": " + saveError);
+
+            AnsiString body;
+            body.Format("{\"error\":\"%hs\"}", JsonEscape_(AnsiString(saveError)).c_str());
+
+            return BuildResponse_(400, body);
+         }
+
          return BuildResponse_(500, "{\"error\":\"failed to save account\"}");
+      }
+
+      // Confirm the account is really there before reporting that it was made.
+      //
+      // Not belt and braces: PersistentAccount::SaveObject returns the result of
+      // the INSERT, and when the inbox it now creates cannot be created it
+      // deletes the row it has just written and *still* returns true. So without
+      // this the endpoint could answer 201 for a mailbox that no longer exists -
+      // the same "reported a success that did not happen" that the queue
+      // endpoints were fixed for. The account object keeps its id after the
+      // delete, so the question has to be put to the database.
+      std::shared_ptr<Account> savedAccount = std::shared_ptr<Account>(new Account());
+
+      if (!PersistentAccount::ReadObject(savedAccount, String(address)) || savedAccount->GetID() == 0)
+      {
+         LOG_APPLICATION("RestApi: Account " + String(address) +
+            " could not be created - it was not present after being saved, which happens when its inbox could not be created.");
+
+         return BuildResponse_(500, "{\"error\":\"failed to save account\"}");
+      }
 
       LOG_APPLICATION("RestApi: Account " + String(address) + " created.");
 

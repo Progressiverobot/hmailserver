@@ -108,6 +108,11 @@ namespace HM
 
       bool encode_fields_;
       bool unfold_with_space_;
+
+      // Set when LoadFromMessage gave up (message over the parser's size cap, or an
+      // exception while parsing). The MimeBody is empty in that case, so Write must
+      // refuse rather than replace the message on disk with nothing. See Write.
+      bool load_failed_;
    };
 
    class MessageDataTester

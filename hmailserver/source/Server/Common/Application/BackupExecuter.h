@@ -13,6 +13,7 @@ namespace HM
    class Messages;
    class Message;
    class BackupManager;
+   class BackupRestorer;
 
    class BackupExecuter
    {
@@ -30,7 +31,18 @@ namespace HM
       bool BackupDomains_(XNode *pNode);
       bool BackupDataDirectory_(const String &sDataBackupDir);
 
-      bool RestoreDataDirectory_(std::shared_ptr<Backup> pBackup, XNode *pBackupNode);
+      // Reads back the archive this run has just written and confirms it is one an
+      // hMailServer of this version could restore. Runs before BackupRetention is
+      // allowed to consider deleting anything, so an archive that cannot be read is
+      // never the reason an older one that could be read was deleted.
+      bool VerifyArchive_(const String &sZipFile);
+
+      // Takes the restorer rather than the Backup and the XML node, because by the
+      // time this is called the archive has been validated and the message store is
+      // already on local disk - and because the one thing this function has to be
+      // able to say, when the copy into an emptied data directory fails, is "keep
+      // the staged files, they are now the only copy".
+      bool RestoreDataDirectory_(BackupRestorer &restorer);
       void ReportRestoreFailure_(const String &message);
       
       int backup_mode_;

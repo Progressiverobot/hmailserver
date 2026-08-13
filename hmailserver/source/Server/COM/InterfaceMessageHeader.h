@@ -60,8 +60,36 @@ public:
 
 private:
 
+   HM::MimeField *ResolveField_();
+   // Looks the field up in the collection as it stands right now. Returns NULL if it
+   // is no longer there. See the comment at the definition: this object must not
+   // cache a MimeField*, because a MimeHeader keeps its fields in a vector by value.
+
+   HRESULT ReportUnavailable_();
+   // Refuses a call whose field could not be resolved, with a description the caller
+   // can act on.
+
+   static bool IsValidFieldName_(const HM::AnsiString &name);
+   // Whether name is an RFC 5322 field name: at least one character, all of them
+   // printable US-ASCII other than the colon.
+
    std::shared_ptr<HM::MimeHeader> header_;
-   HM::MimeField *object_;
+
+   // The name of the field, and where it was when this object was handed out.
+   //
+   // Deliberately not a MimeField*. MimeHeader stores its fields in a
+   // std::vector<MimeField> *by value*, so adding a field can reallocate the vector
+   // and deleting one shifts its successors down over it and destroys the final
+   // slot. Any raw pointer into that vector is invalidated by either. The position
+   // is a hint that is re-checked against the name before it is used, never
+   // dereferenced blind.
+   HM::AnsiString field_name_;
+   int field_index_;
+
+   // Set once Delete has removed the field. Neither the position nor the name
+   // identifies it any more, so every later call is refused rather than allowed to
+   // resolve onto some other field that happens to share the name.
+   bool deleted_;
 
 };
 

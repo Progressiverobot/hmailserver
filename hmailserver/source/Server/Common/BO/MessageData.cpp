@@ -37,6 +37,11 @@ namespace HM
       encode_fields_ = true;
       unfold_with_space_ = true;
 
+      // A MessageData that is built up from scratch (a bounce, an auto-reply, a
+      // distribution-list copy) never calls LoadFromMessage, and writing that is
+      // exactly what it is for - so the default has to be "loaded".
+      load_failed_ = false;
+
       mime_mail_ = std::shared_ptr<MimeBody>(new MimeBody);
    }
 
@@ -55,7 +60,12 @@ namespace HM
       message_ = pMessage;
       message_file_name_ = fileName;
 
+      // Note that the previous contents are dropped here, before either of the failure
+      // returns below: after a failed load - including a failed RefreshFromMessage on a
+      // MessageData that was perfectly good a moment ago - this object holds an empty
+      // message, not the one it held before.
       mime_mail_ = std::shared_ptr<MimeBody>(new MimeBody);
+      load_failed_ = true;
 
       const int MaxSize = 1024*1024 * 80; // we'll ignore messages larger than 80MB.
       if (FileUtilities::FileSize(message_file_name_) > MaxSize)
@@ -100,6 +110,8 @@ namespace HM
          SetCharset("utf-8");
          SetFieldValue(CMimeConst::MimeVersion(), "1.0");
       }
+
+      load_failed_ = false;
 
       return true;
    }
@@ -737,21 +749,56 @@ namespace HM
 
    }
 
-   bool 
+   bool
    MessageData::Write(const String &fileName)
    {
-      const HM::String directoryName = HM::FileUtilities::GetFilePath(fileName);
-      if (!HM::FileUtilities::Exists(directoryName))
-         HM::FileUtilities::CreateDirectory(directoryName);
+      // A MessageData whose load failed holds an empty MimeBody, and writing that over
+      // a message file replaces the message with a couple of bytes of nothing. It is
+      // reachable: LoadFromMessage answers false for a message above the 80 MB parser
+      // cap and for one that threw while being parsed, and most callers ignore that
+      // answer and write anyway - RuleApplier (a set-header rule on a large message),
+      // VirusScanner's attachment stripping, SMTPForwarding, EmailAllUsers.
+      // SpamTestSpamAssassin already guards its own call site for precisely this
+      // reason; the guard belongs here, where it covers all of them.
+      if (load_failed_)
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 6010, "MessageData::Write",
+            "Refusing to write the message file " + fileName + " because the message could not be loaded into memory. Writing it would have replaced the message with an empty one.");
+         return false;
+      }
 
-      bool result = mime_mail_->SaveAllToFile(fileName);
+      const HM::String directoryName = HM::FileUtilities::GetFilePath(fileName);
+      if (!HM::FileUtilities::Exists(directoryName) && !HM::FileUtilities::CreateDirectory(directoryName))
+      {
+         // Without the directory the write below cannot succeed, and going on to it
+         // would only add a second, less specific error. CreateDirectory has already
+         // reported the operating-system reason.
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 6011, "MessageData::Write",
+            "Failed to write the message file " + fileName + " because its directory could not be created.");
+         return false;
+      }
+
+      if (!mime_mail_->SaveAllToFile(fileName))
+      {
+         // The size below used to be taken from the file even when the write had
+         // failed. For a message being written for the first time that is a size of
+         // zero - the file is not there - which makes PersistentMessage::AddObject
+         // refuse the row as "zero bytes" and the message is dropped without a word
+         // about the real cause; for a rewrite in place it is whatever survived on
+         // disk. Either way the row stops describing the message. Leave the size alone
+         // and report the write, which the callers that ignore the return value would
+         // otherwise turn into silence.
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 6011, "MessageData::Write",
+            "Failed to write the message file " + fileName + ". The message data was not stored.");
+         return false;
+      }
 
       if (message_)
       {
          message_->SetSize(FileUtilities::FileSize(fileName));
       }
 
-      return result;
+      return true;
    }
 
    bool 

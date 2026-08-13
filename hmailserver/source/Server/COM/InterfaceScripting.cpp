@@ -84,7 +84,33 @@ STDMETHODIMP InterfaceScripting::put_Language(BSTR newVal)
       if (!ini_file_settings_)
          return GetAccessDenied();
 
-      config_->SetScriptLanguage(newVal);
+      // Validated, because an unrecognised language does not fail loudly - it turns
+      // every event handler off in silence, and reports success while doing it.
+      //
+      // ScriptServer knows exactly two language names. Anything else makes
+      // GetScriptExtension_ return an empty extension, so the file the server looks
+      // for is "EventHandlers." with nothing after the dot; no such file exists, the
+      // script it loads is empty, and OnAcceptMessage, OnClientLogon and
+      // OnClientValidatePassword simply stop firing. An operator who mistyped the
+      // language got no error from this setter, no error in the log, and an
+      // anti-spam or logon handler that had quietly stopped running.
+      HM::String requested = newVal;
+      requested.Trim();
+
+      HM::String canonical;
+
+      if (requested.CompareNoCase(_T("VBScript")) == 0)
+         canonical = _T("VBScript");
+      else if (requested.CompareNoCase(_T("JScript")) == 0)
+         canonical = _T("JScript");
+      else
+         return COMError::GenerateError(HM::Formatter::Format("The script language '{0}' is not supported. hMailServer can run VBScript or JScript.", requested));
+
+      // Stored in the spelling ScriptServer compares against, not the caller's. Those
+      // comparisons are String::operator==, which is case-sensitive, so accepting
+      // "vbscript" and storing it as typed would leave scripting exactly as silently
+      // dead as an unknown name would.
+      config_->SetScriptLanguage(canonical);
       return S_OK;
    }
    catch (...)

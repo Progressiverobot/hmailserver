@@ -573,7 +573,10 @@ namespace RegressionTests.Shared
          return AddDomain(domains, name);
       }
 
-      public Domain AddDomain(Domains domains, string sName)
+      // hMailServer.Domains is qualified deliberately: the suite now has a
+      // RegressionTests.Domains namespace, and from inside RegressionTests.Shared an
+      // unqualified "Domains" binds to that namespace rather than to the COM type.
+      public Domain AddDomain(hMailServer.Domains domains, string sName)
       {
          var domain = domains.Add();
          domain.Name = sName;

@@ -37,8 +37,21 @@ STDMETHODIMP InterfaceBlockedAttachments::get_Count(long *pVal)
 {
    try
    {
+      if (!pVal)
+         return E_POINTER;
+
+      // Guarded, as Refresh already was. BlockedAttachments is a registered coclass, so
+      // one can be created directly rather than obtained from AntiVirus, and one created
+      // that way has no collection attached for this to count.
+      //
+      // Refused rather than answered S_FALSE, which Refresh uses: S_FALSE is a success
+      // code, so a caller would go on to read an out parameter nobody had written -
+      // which is the same defect as the one this guard is here to close.
+      if (!blocked_attachments_)
+         return COMError::GenerateError("This BlockedAttachments collection is not attached to anything. Obtain it from Settings.AntiVirus.BlockedAttachments rather than creating it directly.");
+
       *pVal = blocked_attachments_->GetCount();
-   
+
       return S_OK;
    }
    catch (...)
@@ -47,19 +60,30 @@ STDMETHODIMP InterfaceBlockedAttachments::get_Count(long *pVal)
    }
 }
 
-STDMETHODIMP 
+STDMETHODIMP
 InterfaceBlockedAttachments::get_Item(long Index, IInterfaceBlockedAttachment **pVal)
 {
    try
    {
-      CComObject<InterfaceBlockedAttachment>* pInterfaceBlockedAttachment = new CComObject<InterfaceBlockedAttachment>();
-      pInterfaceBlockedAttachment->SetAuthentication(authentication_);
-   
+      if (!pVal)
+         return E_POINTER;
+
+      *pVal = nullptr;
+
+      if (!blocked_attachments_)
+         return COMError::GenerateError("This BlockedAttachments collection is not attached to anything. Obtain it from Settings.AntiVirus.BlockedAttachments rather than creating it directly.");
+
+      // Looked up before the wrapper is created, not after: the wrapper used to be
+      // constructed first and abandoned on the bad-index path, and a CComObject that
+      // has never been AddRef'd is never freed.
       std::shared_ptr<HM::BlockedAttachment> pBA = blocked_attachments_->GetItem(Index);
-   
+
       if (!pBA)
          return DISP_E_BADINDEX;
-   
+
+      CComObject<InterfaceBlockedAttachment>* pInterfaceBlockedAttachment = new CComObject<InterfaceBlockedAttachment>();
+      pInterfaceBlockedAttachment->SetAuthentication(authentication_);
+
       pInterfaceBlockedAttachment->AttachItem(pBA);
       pInterfaceBlockedAttachment->AttachParent(blocked_attachments_, true);
       pInterfaceBlockedAttachment->AddRef();

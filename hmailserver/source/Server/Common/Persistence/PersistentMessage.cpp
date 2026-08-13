@@ -107,10 +107,25 @@ namespace HM
          pMessage->SetID(0);
 
          std::shared_ptr<const Account> account;
-         
+
          if (pMessage->GetAccountID() > 0)
          {
             account = CacheContainer::Instance()->GetAccount(pMessage->GetAccountID());
+
+            // Without the account we cannot build the account-folder path. GetFileName
+            // then falls back on a public-folder path (the folder id of a delivered
+            // message is non-zero), deleting that path "succeeds" because nothing is
+            // there, and the real file is left on disk with no row pointing at it -
+            // invisible to quota, to expunge and to the consistency scan, which only
+            // walks rows. Say so rather than leaking silently.
+            if (!account)
+            {
+               String logMessage;
+               logMessage.Format(_T("PersistentMessage::DeleteObject - account %I64d could not be loaded for message %I64d, so its file may be left on disk. File name: %s"),
+                  pMessage->GetAccountID(), iMessageID, pMessage->GetPartialFileName().c_str());
+
+               LOG_APPLICATION(logMessage);
+            }
          }
 
          if (!DeleteFile(account, pMessage))
@@ -782,8 +797,16 @@ namespace HM
       // in which the message should be put. If the dir doesn't exist, we'll
       // have slight problems creating a file in it.
       String sPath = FileUtilities::GetFilePath(sFileName);
-      FileUtilities::CreateDirectory(sPath);
 
+      if (!FileUtilities::Exists(sPath) && !FileUtilities::CreateDirectory(sPath))
+      {
+         // Nothing below can succeed without the directory, and the message row must
+         // be left describing the message it was written for rather than a placeholder
+         // that does not exist. CreateDirectory has already reported the reason.
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6012, "PersistentMessage::EnsureFileExistance",
+            "The directory for message file " + sFileName + " could not be created, so no placeholder could be written for the missing message. The message row was left unchanged.");
+         return;
+      }
 
       // The file does not exists. May have been deleted
       // by anti virus software.
@@ -802,18 +825,55 @@ namespace HM
                            _T("\r\n"),
                            sMessageUndeliverable.c_str(),
                            Time::GetCurrentMimeDate().c_str(),
-                           sMessageBody.c_str(),
-                           sFileName.c_str());
+                           sMessageBody.c_str());
 
-      
+      if (!FileUtilities::WriteToFile(sFileName, sErrorMessage, false))
+      {
+         // This result used to be dropped, and the size below was then taken from a
+         // file which does not exist - FileUtilities::FileSize answers 0 for that. A
+         // zero size makes AddObject refuse the update ("message is zero bytes"), so
+         // the failure was invisible twice over, and the caller went on to stream a
+         // message whose row claimed a size nothing on disk could satisfy.
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6012, "PersistentMessage::EnsureFileExistance",
+            "A placeholder could not be written for the missing message file " + sFileName + ". The message row was left unchanged.");
+         return;
+      }
 
-      FileUtilities::WriteToFile(sFileName, sErrorMessage, false);
+      // Update the database with the new size of the file. Both are long, so that
+      // FileSize is stored without a narrowing conversion of its own; the conversion
+      // into SetSize is the one this code has always made.
+      const long previousSize = pMessage->GetSize();
+      const long placeholderSize = FileUtilities::FileSize(sFileName);
 
-      // Update the database with the new size of the file.
-      pMessage->SetSize(FileUtilities::FileSize(sFileName));
+      pMessage->SetSize(placeholderSize);
 
       // Save the new size.
-      SaveObject(pMessage);
+      if (!SaveObject(pMessage))
+      {
+         // The row still claims the size of the message that is gone. Worth a line in
+         // the log, because the next consistency report will find the file present and
+         // the size wrong, and this is the reason.
+         String logMessage;
+         logMessage.Format(_T("PersistentMessage::EnsureFileExistance - the size of message %I64d could not be updated to that of the placeholder written for its missing file. File: %s"),
+            pMessage->GetID(), sFileName.c_str());
+
+         LOG_APPLICATION(logMessage);
+      }
+      else if (pMessage->GetAccountID() > 0)
+      {
+         // The row just shrank from the size of the message to the size of the
+         // placeholder, but the cached account size - which is what quota enforcement
+         // in LocalDelivery and IMAP QUOTA both report - was left at the old value. The
+         // account therefore stayed charged for a message that no longer exists on disk
+         // until the cache happened to be dropped, and an account close to its limit
+         // stopped accepting mail because of bytes that were already gone.
+         //
+         // Two calls rather than one signed delta: the placeholder can be larger than
+         // the message it replaces (a one-line message), and the direction of a
+         // subtraction that can go either way is easy to get wrong.
+         AccountSizeCache::Instance()->ModifySize(pMessage->GetAccountID(), previousSize, false);
+         AccountSizeCache::Instance()->ModifySize(pMessage->GetAccountID(), placeholderSize, true);
+      }
 
       // Log the error.
       ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5026, "PersistentMessage::EnsureFileExistance", "Message retrieval failed because message file " + sFileName + " did not exist.");
@@ -990,8 +1050,17 @@ namespace HM
    bool
    PersistentMessage::DeleteByAccountID(__int64 iAccountID)
    {
-      // delete the file messages
-      SQLCommand selectCommand ("select messagefilename from hm_messages where messageaccountid = @ACCOUNTID");
+      // The account address is selected alongside the rows because messagefilename
+      // normally holds only the {guid}.eml part; the directory it lives in has to be
+      // reconstructed from the address and the message's location. This used to hand
+      // the partial name straight to DeleteFile, which resolved it against the
+      // process working directory, found nothing there, and answered "deleted" -
+      // FileUtilities::DeleteFile treats an absent file as success. Every message file
+      // in the account was therefore left on disk after its row had gone.
+      SQLCommand selectCommand(
+         "select m.messagefilename, m.messageaccountid, m.messagefolderid, a.accountaddress "
+         "from hm_messages m left join hm_accounts a on m.messageaccountid = a.accountid "
+         "where m.messageaccountid = @ACCOUNTID");
       selectCommand.AddParameter("@ACCOUNTID", iAccountID);
 
       std::shared_ptr<DALRecordset> pRS = Application::Instance()->GetDBManager()->OpenRecordset(selectCommand);
@@ -1007,14 +1076,26 @@ namespace HM
 
       while (!pRS->IsEOF())
       {
-         String sFileName = pRS->GetStringValue("messagefilename");;
+         String partialFileName = pRS->GetStringValue("messagefilename");
 
-         if (!FileUtilities::DeleteFile(sFileName))
+         if (!partialFileName.IsEmpty())
          {
-            String sErrorMessage;
-            sErrorMessage.Format(_T("Failed to delete file %s while deleting messages in account %I64d"), sFileName.c_str(), iAccountID);
+            // false: this message exists only to resolve a path, so it must not be
+            // given a freshly generated file name.
+            std::shared_ptr<Message> message = std::shared_ptr<Message>(new Message(false));
+            message->SetPartialFileName(partialFileName);
+            message->SetAccountID(pRS->GetLongValue("messageaccountid"));
+            message->SetFolderID(pRS->GetLongValue("messagefolderid"));
 
-            ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5024, "PersistentAccount::DeleteMessages", sErrorMessage);
+            String sFileName = GetFileName(pRS->GetStringValue("accountaddress"), message);
+
+            if (!FileUtilities::DeleteFile(sFileName))
+            {
+               String sErrorMessage;
+               sErrorMessage.Format(_T("Failed to delete file %s while deleting messages in account %I64d"), sFileName.c_str(), iAccountID);
+
+               ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5024, "PersistentAccount::DeleteMessages", sErrorMessage);
+            }
          }
 
          pRS->MoveNext();
@@ -1350,11 +1431,26 @@ namespace HM
          if (guidSlashPos != 2)
             return false;
 
-         String lastLevelName = filePath.Mid(guidSlashPos);
+         // Mid(0, guidSlashPos), not Mid(guidSlashPos). The one-argument form returns
+         // everything FROM the separator onwards ("\{guid}.eml") rather than the
+         // two-character fan-out folder in front of it, so the comparison below could
+         // never succeed and no path inside the public folder was ever recognised as
+         // part of the message store. Two consequences: GetMessageID could not find a
+         // public-folder message by its partial name, so the importer took an
+         // already-imported message for a new one; and MailImporter, told it could not
+         // build a partial name, generated a new GUID and moved a file that was already
+         // correctly placed - a move that can fail and take the message with it. The
+         // account-folder branch below always used the two-argument form and was fine.
+         String lastLevelName = filePath.Mid(0, guidSlashPos);
 
          filePath = filePath.Mid(guidSlashPos+1);
 
-         if (lastLevelName != filePath.Mid(1,2))
+         // Compared without case: this is a Windows path, where the fan-out directory
+         // that was created from these two characters and the two characters in the
+         // name are the same folder whatever case the caller wrote them in. A
+         // case-sensitive comparison here rejected the path and sent the file off to be
+         // renamed and moved for no reason.
+         if (lastLevelName.CompareNoCase(filePath.Mid(1,2).c_str()) != 0)
             return false;
       }
       else
@@ -1380,10 +1476,11 @@ namespace HM
             String lastLevelName = filePath.Mid(accountSlashPos+1, lastLevelLength);
 
             filePath = filePath.Mid(guidSlashPos+1);
-            
-            if (lastLevelName != filePath.Mid(1,2))
+
+            // Case-insensitive for the same reason as in the public-folder branch above.
+            if (lastLevelName.CompareNoCase(filePath.Mid(1,2).c_str()) != 0)
                return false;
-           
+
          }
       }
 

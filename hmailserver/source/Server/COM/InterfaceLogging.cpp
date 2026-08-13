@@ -550,7 +550,16 @@ STDMETHODIMP InterfaceLogging::get_MaskPasswordsInLog(VARIANT_BOOL *pVal)
       if (!config_)
          return GetAccessDenied();
 
-      // OBSOLETE
+      if (!pVal)
+         return E_POINTER;
+
+      // OBSOLETE: masking is unconditional, which is what the IDL help string says.
+      // The value is written all the same. This returned S_OK without ever touching
+      // the out parameter, so a caller read back whatever was in its own stack slot
+      // and treated it as the server's answer - a property that reports a setting it
+      // never looked at is worse than one that is not there.
+      *pVal = VARIANT_TRUE;
+
       return S_OK;
    }
    catch (...)

@@ -93,16 +93,31 @@ namespace HM
 
       bool bRet = Application::Instance()->GetDBManager()->Execute(deleteCommand);
 
-      // Delete folder from data directory
-      String sDomainName = StringParser::ExtractDomain(pAccount->GetAddress());
-      String sMailbox = StringParser::ExtractAddress(pAccount->GetAddress());
-
-      if (!sDomainName.IsEmpty() && !sMailbox.IsEmpty())
+      // The directory is only removed once the row is definitely gone. Before this
+      // it was removed either way, so a delete that failed at the statement above -
+      // a locked database, a dropped connection - left an account that still
+      // exists, still authenticates and still accepts mail, with its entire
+      // mailbox directory removed from under it. Recreating the tree is not the
+      // problem; the problem was that the failure looked like nothing had
+      // happened, because DeleteObject's return value is all the caller sees.
+      if (bRet)
       {
-         String sAccountFolder = IniFileSettings::Instance()->GetDataDirectory() + "\\" + sDomainName + "\\" + sMailbox;
-         FileUtilities::DeleteDirectory(sAccountFolder, false);
+         // Delete folder from data directory
+         String sDomainName = StringParser::ExtractDomain(pAccount->GetAddress());
+         String sMailbox = StringParser::ExtractAddress(pAccount->GetAddress());
+
+         if (!sDomainName.IsEmpty() && !sMailbox.IsEmpty())
+         {
+            String sAccountFolder = IniFileSettings::Instance()->GetDataDirectory() + "\\" + sDomainName + "\\" + sMailbox;
+            FileUtilities::DeleteDirectory(sAccountFolder, false);
+         }
       }
-	  
+      else
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 5983, "PersistentAccount::DeleteObject",
+            Formatter::Format("The account row for {0} could not be deleted. Its messages, rules, fetch accounts and group memberships have already been removed, so the account still exists but is empty. Retry the delete.", pAccount->GetAddress()));
+      }
+
       // Refresh caches.
       Cache<Account>::Instance()->RemoveObject(pAccount);
 

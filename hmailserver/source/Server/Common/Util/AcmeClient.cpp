@@ -18,6 +18,7 @@
 #include "../Persistence/PersistentTCPIPPort.h"
 #include "../TCPIP/CertificateVerifier.h"
 #include "../TCPIP/SocketConstants.h"
+#include "../TCPIP/SslContextInitializer.h"
 
 #include <boost/asio.hpp>
 #include <boost/asio/ssl.hpp>
@@ -48,6 +49,55 @@ namespace HM
       const size_t MaxResponseSize = 1024 * 1024;
       const int PollIntervalMilliseconds = 2000;
       const int MaxPollAttempts = 30;
+
+      // How close to expiry a failed renewal stops being a log line and becomes a
+      // reported error. Renewal starts 30 days out, so a single failure usually has
+      // weeks of slack; an ERROR entry for that would teach an administrator to
+      // ignore the error log. Inside this window the certificate is about to stop
+      // working, which is a different thing entirely.
+      const int ImminentExpiryDays = 7;
+
+      // Reads the notAfter of the first certificate in a PEM file as a time_t.
+      // False when there is no file, it does not parse, or the date does not
+      // convert - all of which callers treat as "no usable certificate" rather than
+      // as a certificate with a known expiry.
+      bool ReadCertificateNotAfter(const String &certificateFile, time_t &notAfter)
+      {
+         notAfter = 0;
+
+         if (!FileUtilities::Exists(certificateFile))
+            return false;
+
+         AnsiString narrowFileName = certificateFile;
+
+         BIO *bio = BIO_new_file(narrowFileName.c_str(), "r");
+         if (bio == nullptr)
+            return false;
+
+         X509 *certificate = PEM_read_bio_X509(bio, nullptr, nullptr, nullptr);
+         BIO_free(bio);
+
+         if (certificate == nullptr)
+            return false;
+
+         tm notAfterTm = {};
+         bool parsed = false;
+
+         if (ASN1_TIME_to_tm(X509_get0_notAfter(certificate), &notAfterTm) == 1)
+         {
+            time_t converted = _mkgmtime(&notAfterTm);
+
+            if (converted != -1)
+            {
+               notAfter = converted;
+               parsed = true;
+            }
+         }
+
+         X509_free(certificate);
+
+         return parsed;
+      }
 
       // Splits https://host[:port]/path into components.
       bool ParseHttpsUrl(const AnsiString &url, AnsiString &host, AnsiString &port, AnsiString &path)
@@ -178,37 +228,18 @@ namespace HM
    bool
    AcmeClient::RenewalNeeded()
    {
-      String certificateFile = GetCertificateDirectory() + _T("\\fullchain.pem");
+      // Unchanged behaviour: no certificate, an unreadable one or one whose date
+      // will not parse all mean "renew". The parsing itself moved into
+      // ReadCertificateNotAfter so that AcmeRenewalTask::DoWork can ask the same
+      // question about how much time is left when a renewal has just failed.
+      time_t notAfter = 0;
 
-      if (!FileUtilities::Exists(certificateFile))
-         return true;
-
-      AnsiString narrowFileName = certificateFile;
-
-      BIO *bio = BIO_new_file(narrowFileName.c_str(), "r");
-      if (bio == nullptr)
-         return true;
-
-      X509 *certificate = PEM_read_bio_X509(bio, nullptr, nullptr, nullptr);
-      BIO_free(bio);
-
-      if (certificate == nullptr)
+      if (!ReadCertificateNotAfter(GetCertificateDirectory() + _T("\\fullchain.pem"), notAfter))
          return true;
 
       time_t cutoff = time(nullptr) + static_cast<time_t>(RenewalWindowDays) * 86400;
 
-      tm notAfterTm = {};
-      bool stillValid = false;
-
-      if (ASN1_TIME_to_tm(X509_get0_notAfter(certificate), &notAfterTm) == 1)
-      {
-         time_t notAfter = _mkgmtime(&notAfterTm);
-         stillValid = notAfter != -1 && notAfter > cutoff;
-      }
-
-      X509_free(certificate);
-
-      return !stillValid;
+      return notAfter <= cutoff;
    }
 
    bool
@@ -231,6 +262,15 @@ namespace HM
 
          boost::asio::ssl::context sslContext(boost::asio::ssl::context::tls_client);
          sslContext.set_default_verify_paths();
+
+         // Through the shared client initialiser, for the same reason the optional
+         // HTTP listeners were moved onto the shared server one: this context was
+         // built here and configured nowhere, so the enabled TLS versions, the
+         // cipher list and the key-exchange groups did not apply to it. The
+         // connection that fetches this server's own certificate was the least
+         // configured TLS in the build. InitClient does not touch the verify mode
+         // or the verify callback set below, so peer verification is unaffected.
+         SslContextInitializer::InitClient(sslContext);
 
          boost::asio::ssl::stream<boost::asio::ip::tcp::socket> stream(ioContext, sslContext);
 
@@ -620,10 +660,28 @@ namespace HM
    bool
    AcmeClient::CompleteAuthorization_(const AnsiString &authorizationUrl)
    {
+      // Every failure below says which step failed. They used to return false in
+      // silence, so a renewal could fail with nothing at all in the log between
+      // "Requesting a new certificate" and the next hourly attempt saying the same
+      // thing - and no way for an administrator to tell a DNS problem from a
+      // firewalled port 80 from a CA rate limit.
+      //
+      // Application log rather than reported errors: each of these is one step of
+      // one attempt, the attempt is retried in an hour, and the outcome that
+      // actually matters - a renewal still failing while the certificate in use is
+      // about to expire - is reported once, by AcmeRenewalTask::DoWork.
+
       // POST-as-GET: empty string payload.
       HttpResponse authorizationResponse;
       if (!SignedPost_(authorizationUrl, "", authorizationResponse) || authorizationResponse.status_code != 200)
+      {
+         String message;
+         message.Format(_T("ACME: Could not read the authorization (HTTP status %d). URL: %s"),
+            authorizationResponse.status_code, String(authorizationUrl).c_str());
+         LOG_APPLICATION(message);
+
          return false;
+      }
 
       AnsiString status = JsonStringValue_(authorizationResponse.body, "status");
       if (status == "valid")
@@ -643,7 +701,10 @@ namespace HM
       AnsiString token = JsonStringValue_(challengeObject, "token");
 
       if (challengeUrl.IsEmpty() || token.IsEmpty())
+      {
+         LOG_APPLICATION("ACME: The http-01 challenge carried no url or no token, so it cannot be answered.");
          return false;
+      }
 
       AnsiString keyAuthorization = token + "." + GetJwkThumbprint_();
 
@@ -671,7 +732,10 @@ namespace HM
       // Tell the CA to validate.
       HttpResponse challengeResponse;
       if (!SignedPost_(challengeUrl, "{}", challengeResponse))
+      {
+         LOG_APPLICATION("ACME: Could not ask the CA to validate the http-01 challenge.");
          return false;
+      }
 
       // Poll the authorization until it leaves the pending state.
       for (int attempt = 0; attempt < MaxPollAttempts; attempt++)
@@ -680,7 +744,14 @@ namespace HM
 
          HttpResponse pollResponse;
          if (!SignedPost_(authorizationUrl, "", pollResponse) || pollResponse.status_code != 200)
+         {
+            String message;
+            message.Format(_T("ACME: Could not read the authorization while waiting for validation (HTTP status %d)."),
+               pollResponse.status_code);
+            LOG_APPLICATION(message);
+
             return false;
+         }
 
          status = JsonStringValue_(pollResponse.body, "status");
 
@@ -772,6 +843,7 @@ namespace HM
 
       if (!csrOk)
       {
+         LOG_APPLICATION("ACME: Could not build the certificate signing request.");
          EVP_PKEY_free(domainKey);
          return false;
       }
@@ -781,6 +853,12 @@ namespace HM
       HttpResponse finalizeResponse;
       if (!SignedPost_(finalizeUrl, payload, finalizeResponse) || finalizeResponse.status_code != 200)
       {
+         // The CA's reply body carries the ACME problem document, which is the one
+         // thing that says *why* - a rate limit, a CAA record, an unauthorized
+         // identifier. It was discarded.
+         LOG_APPLICATION(Formatter::Format("ACME: The CA rejected the certificate request (HTTP status {0}). Response: {1}",
+            finalizeResponse.status_code, String(finalizeResponse.body.Mid(0, 500))));
+
          EVP_PKEY_free(domainKey);
          return false;
       }
@@ -793,6 +871,9 @@ namespace HM
          HttpResponse orderResponse;
          if (!SignedPost_(orderUrl, "", orderResponse) || orderResponse.status_code != 200)
          {
+            LOG_APPLICATION(Formatter::Format("ACME: Could not read the order while waiting for the certificate to be issued (HTTP status {0}).",
+               orderResponse.status_code));
+
             EVP_PKEY_free(domainKey);
             return false;
          }
@@ -817,6 +898,11 @@ namespace HM
 
       if (certificateUrl.IsEmpty())
       {
+         // Either the order never left the "processing" state within the polling
+         // window, or it went valid without naming a certificate. Both used to be
+         // silent.
+         LOG_APPLICATION("ACME: The order did not produce a certificate URL within the polling window.");
+
          EVP_PKEY_free(domainKey);
          return false;
       }
@@ -825,17 +911,42 @@ namespace HM
       HttpResponse certificateResponse;
       if (!SignedPost_(certificateUrl, "", certificateResponse) || certificateResponse.status_code != 200)
       {
+         LOG_APPLICATION(Formatter::Format("ACME: Could not download the issued certificate (HTTP status {0}).",
+            certificateResponse.status_code));
+
          EVP_PKEY_free(domainKey);
          return false;
       }
 
-      // Persist the private key.
+      // Both halves of the new pair are written under temporary names and moved
+      // into place only once both writes have succeeded.
+      //
+      // The order used to be privkey.pem straight over the live key and then
+      // fullchain.pem, and a failure on the second write - a full disk, a scanner
+      // or a backup holding the file open - left the directory holding the *new*
+      // private key beside the *previous* certificate. That pair does not match,
+      // and a mismatched pair is not a degraded listener: OpenSSL refuses the key,
+      // InitServer returns false, and every port using the ACME certificate stops
+      // listening at the next restart. A renewal failure that takes SMTP, IMAP and
+      // POP3 down is a worse outcome than the expiry it was trying to avoid.
+      //
+      // Two renames are not one atomic operation, but FileUtilities::Move is a
+      // replacing rename - the destination always names either the old file or the
+      // new one, never nothing - and a rename does not fail half-way the way a
+      // write does. The key is moved first so that the certificate is never the
+      // newer of the two: a certificate whose key has not arrived yet is the same
+      // mismatch in the other direction.
       String directory = GetCertificateDirectory();
-      AnsiString narrowKeyFile = directory + _T("\\privkey.pem");
+      String keyFile = directory + _T("\\privkey.pem");
+      String certificateFile = directory + _T("\\fullchain.pem");
+      String pendingKeyFile = keyFile + _T(".new");
+      String pendingCertificateFile = certificateFile + _T(".new");
+
+      AnsiString narrowPendingKeyFile = pendingKeyFile;
 
       bool keyWritten = false;
 
-      BIO *bio = BIO_new_file(narrowKeyFile.c_str(), "w");
+      BIO *bio = BIO_new_file(narrowPendingKeyFile.c_str(), "w");
       if (bio != nullptr)
       {
          keyWritten = PEM_write_bio_PrivateKey(bio, domainKey, nullptr, nullptr, 0, nullptr, nullptr) == 1;
@@ -845,11 +956,44 @@ namespace HM
       EVP_PKEY_free(domainKey);
 
       if (!keyWritten)
+      {
+         LOG_APPLICATION(Formatter::Format("ACME: Could not write the new private key to {0}. The certificate and key in use are unchanged.", pendingKeyFile));
          return false;
+      }
 
-      // Persist the certificate chain.
-      if (!FileUtilities::WriteToFile(directory + _T("\\fullchain.pem"), certificateResponse.body))
+      if (!FileUtilities::WriteToFile(pendingCertificateFile, certificateResponse.body))
+      {
+         LOG_APPLICATION(Formatter::Format("ACME: Could not write the issued certificate to {0}. The certificate and key in use are unchanged.", pendingCertificateFile));
+
+         // Leaving this behind would not break anything - nothing reads a .new
+         // file - but it would be mistaken for a renewal in progress by the next
+         // person to look in the directory.
+         FileUtilities::DeleteFile(pendingKeyFile);
          return false;
+      }
+
+      if (!FileUtilities::Move(pendingKeyFile, keyFile))
+      {
+         LOG_APPLICATION(Formatter::Format("ACME: Could not replace {0}. The certificate and key in use are unchanged.", keyFile));
+
+         FileUtilities::DeleteFile(pendingKeyFile);
+         FileUtilities::DeleteFile(pendingCertificateFile);
+         return false;
+      }
+
+      if (!FileUtilities::Move(pendingCertificateFile, certificateFile))
+      {
+         // The one genuinely bad outcome left, and the reason this is an error
+         // rather than a log line: the key has been replaced and the certificate
+         // has not, so the pair on disk does not match and every listener using it
+         // will refuse to start. Say so explicitly, with the file to look at,
+         // because the fix is manual.
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 5993, "AcmeClient::FinalizeOrder_",
+            Formatter::Format("The new private key was installed as {0} but the certificate could not be moved from {1} to {2}. The key and certificate on disk no longer match, and any listener using them will refuse to start. Move {1} into place by hand, or restore the pair from a backup.",
+               keyFile, pendingCertificateFile, certificateFile));
+
+         return false;
+      }
 
       return true;
    }
@@ -905,19 +1049,36 @@ namespace HM
       AnsiString orderUrl = orderResponse.location;
       AnsiString finalizeUrl = JsonStringValue_(orderResponse.body, "finalize");
 
+      // The three checks below are the CA answering 201 with a body this client
+      // cannot use. Each returned false without a word, which is the worst kind of
+      // failure to diagnose remotely: the log said an order had been created and
+      // then said nothing at all. The response is included because it is the only
+      // evidence of what the CA actually sent.
       if (orderUrl.IsEmpty() || finalizeUrl.IsEmpty())
+      {
+         LOG_APPLICATION(Formatter::Format("ACME: The new order is missing its location header or its finalize URL. Response: {0}",
+            String(orderResponse.body.Mid(0, 500))));
          return false;
+      }
 
       // Complete every authorization in the order.
       int searchPosition = orderResponse.body.Find("\"authorizations\"");
       if (searchPosition < 0)
+      {
+         LOG_APPLICATION(Formatter::Format("ACME: The new order lists no authorizations. Response: {0}",
+            String(orderResponse.body.Mid(0, 500))));
          return false;
+      }
 
       int arrayStart = orderResponse.body.Find("[", searchPosition);
       int arrayEnd = orderResponse.body.Find("]", arrayStart);
 
       if (arrayStart < 0 || arrayEnd < 0)
+      {
+         LOG_APPLICATION(Formatter::Format("ACME: The authorization list in the new order could not be parsed. Response: {0}",
+            String(orderResponse.body.Mid(0, 500))));
          return false;
+      }
 
       AnsiString authorizationArray = orderResponse.body.Mid(arrayStart, arrayEnd - arrayStart + 1);
 
@@ -1255,6 +1416,58 @@ namespace HM
       LOG_APPLICATION("ACME: Certificate is missing or expires soon. Requesting a new certificate.");
 
       AcmeClient client;
-      client.RequestCertificate();
+
+      if (client.RequestCertificate())
+         return;
+
+      // Why the return value is looked at at all now: it was discarded. A renewal
+      // that failed left exactly one line in the log - the one above, announcing
+      // that a renewal was about to be attempted - and nothing anywhere saying it
+      // had not happened. An hour later the task ran again and said the same thing,
+      // so the log read like a renewal permanently in progress right up to the
+      // moment the certificate expired and TLS stopped working. Automatic renewal
+      // whose failure is invisible is worse than manual renewal, because nobody is
+      // watching the calendar either.
+      LOG_APPLICATION("ACME: Certificate renewal FAILED. The failing step is in the lines above; the next attempt is in one hour. The certificate currently installed has not been changed.");
+
+      String certificateFile = AcmeClient::GetCertificateDirectory() + _T("\\fullchain.pem");
+
+      time_t notAfter = 0;
+
+      if (!ReadCertificateNotAfter(certificateFile, notAfter))
+      {
+         // Nothing usable in the directory at all: no expiry to run out, but also
+         // no certificate for the listeners that were pointed at this directory,
+         // and ACME is switched on precisely so that there would be one. Reported
+         // rather than logged because an operator who enabled ACME will not go
+         // looking for the reason it never produced anything.
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5992, "AcmeRenewalTask::DoWork",
+            Formatter::Format("ACME is enabled but certificate issuance failed and there is no usable certificate in {0}. Any listener configured to use that pair has no certificate. The failing step is in the hMailServer application log.", certificateFile));
+
+         return;
+      }
+
+      // An error, not just a log line, once the certificate this renewal was meant
+      // to replace is close enough to expiry that continued failure means TLS
+      // stops working. Deliberately not reported for every failure: renewal begins
+      // 30 days out, and an ERROR entry for a failure with four weeks of slack left
+      // would train an administrator to ignore the error log. Cannot fire on a
+      // default installation - AcmeEnabled is 0 and DoWork returns above.
+      time_t secondsRemaining = notAfter - time(nullptr);
+
+      if (secondsRemaining > static_cast<time_t>(ImminentExpiryDays) * 86400)
+         return;
+
+      if (secondsRemaining <= 0)
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 5992, "AcmeRenewalTask::DoWork",
+            Formatter::Format("ACME renewal failed and the certificate {0} has already expired. TLS clients are refusing this server's certificate now. The failing step is in the hMailServer application log.", certificateFile));
+
+         return;
+      }
+
+      ErrorManager::Instance()->ReportError(ErrorManager::High, 5992, "AcmeRenewalTask::DoWork",
+         Formatter::Format("ACME renewal failed and the certificate {0} expires in less than {1} day(s). TLS will stop working when it does. The failing step is in the hMailServer application log.",
+            certificateFile, static_cast<int>(secondsRemaining / 86400) + 1));
    }
 }

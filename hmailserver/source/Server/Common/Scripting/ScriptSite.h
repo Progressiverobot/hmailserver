@@ -151,12 +151,28 @@ public:
    // the script engine that your objects exist).
    STDMETHOD(LookupNamedItem)(LPCOLESTR pstrName,LPUNKNOWN* ppunkItem)
    {
-      object_container_->GetObjectByName(pstrName, ppunkItem);
+      if (ppunkItem == NULL)
+         return E_POINTER;
 
-      if (ppunkItem == 0)
+      *ppunkItem = NULL;
+
+      // A site that is only being used to compile a script has no object container at
+      // all: ScriptServer::CompileContents_ and DoesFunctionExist_ never call
+      // SetObjectContainer, because they add no named items.
+      if (!object_container_)
          return TYPE_E_ELEMENTNOTFOUND;
-      else
-         return S_OK;
+
+      // The return value is what says whether an object was produced. This used to
+      // test "ppunkItem == 0" - the address of the caller's variable, which is never
+      // null - and discard GetObjectByName's answer, so a name it had produced nothing
+      // for was reported to the script engine as a successful lookup with a null item.
+      if (!object_container_->GetObjectByName(pstrName, ppunkItem))
+         return TYPE_E_ELEMENTNOTFOUND;
+
+      if (*ppunkItem == NULL)
+         return TYPE_E_ELEMENTNOTFOUND;
+
+      return S_OK;
    }
 
    // This is an implementation method.

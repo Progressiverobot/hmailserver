@@ -36,11 +36,39 @@ namespace HM
       SQLCommand command("delete from hm_groups where groupid = @GROUPID");
       command.AddParameter("@GROUPID", pObject->GetID());
 
-      bool bResult = Application::Instance()->GetDBManager()->Execute(command);
+      if (!Application::Instance()->GetDBManager()->Execute(command))
+      {
+         // The group is still there, so leave its memberships and its ACL grants
+         // alone. Stripping the members and the permissions off a group that still
+         // exists is a worse outcome than the delete that did not happen, and that
+         // is what the unconditional cleanup below used to do.
+         return false;
+      }
+
+      // The membership rows have to go with the group. There is no foreign key
+      // anywhere in the schema, so nothing else was ever going to remove them:
+      // before this, deleting a group left one hm_group_members row per member
+      // naming a group id that no longer exists, for the life of the database.
+      // They are dead weight while the id stays unused, and worse than that if it
+      // is ever handed out again - an identity counter reseeded by a restore, or a
+      // backend that reuses ids, would silently give a brand new group the old
+      // group's members, and a group is an ACL principal.
+      //
+      // Written here rather than as PersistentGroupMember::DeleteByGroup, which is
+      // where it belongs, only because that would need a change to a header this
+      // change set does not own.
+      SQLCommand deleteMembersCommand("delete from hm_group_members where membergroupid = @GROUPID");
+      deleteMembersCommand.AddParameter("@GROUPID", pObject->GetID());
+
+      if (!Application::Instance()->GetDBManager()->Execute(deleteMembersCommand))
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5982, "PersistentGroup::DeleteObject",
+            Formatter::Format("Group {0} was deleted but its membership rows could not be removed. hm_group_members now holds rows for group id {1}, which no longer exists.", pObject->GetName(), pObject->GetID()));
+      }
 
       PersistentACLPermission::DeleteOwnedByGroup(pObject->GetID());
 
-      return bResult;
+      return true;
    }
 
    bool 

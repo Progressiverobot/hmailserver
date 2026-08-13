@@ -59,6 +59,14 @@ namespace HM
    bool
    ScriptObjectContainer::GetObjectByName(const String &sName, LPUNKNOWN* ppunkItem) const
    {
+      if (!ppunkItem)
+         return false;
+
+      // Cleared first, so that a caller which believes a false return means "nothing
+      // produced" - which is now what the script site does - cannot be handed a stale
+      // pointer from its own stack on any of the paths below.
+      *ppunkItem = nullptr;
+
       std::map<String, std::shared_ptr<ScriptObject> >::const_iterator iterPos = objects_.find(sName);
       if (iterPos == objects_.end())
          return false;
@@ -117,10 +125,14 @@ namespace HM
             return true;
          }
       default:
-         return true;
+         // No wrapper exists for this object type, so nothing has been produced.
+         // Returning true here told the caller that a null item was a successful
+         // lookup, which is how a name with no object behind it reached the script
+         // engine as an item.
+         return false;
       }
 
-      return true;
+      return false;
    }
 
    std::vector<String> 

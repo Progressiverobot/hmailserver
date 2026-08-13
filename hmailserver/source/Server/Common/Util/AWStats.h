@@ -24,6 +24,11 @@ namespace HM
 
       static void Log_(const String &senderIP, const String &recipientIP, const String &senderAddress, const String &recipientAddress, int iErrorCode, int iBytesReceived);
 
+      // Strips anything from a value that could end the journal record early or move
+      // a column: control characters (a CR or an LF would forge a second record),
+      // spaces and angle brackets.
+      static String SanitizeField_(const String &value);
+
       static bool enabled_;
    };
 }

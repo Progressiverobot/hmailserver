@@ -116,7 +116,13 @@ namespace HM
 
       ObjectCache::Instance()->SetDomainAliasesNeedsReload();
 
-      return true;
+      // Was an unconditional "return true", so a statement the database refused -
+      // an over-long alias name is the reachable one, since nothing validates the
+      // length before we get here - was reported to the caller as a successful
+      // save. Through COM that meant Save() returning without error while the
+      // domain alias did not exist, and every one of the sibling Persistent*
+      // classes returns the result of its Execute.
+      return bRetVal;
    }
    
 

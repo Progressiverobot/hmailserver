@@ -55,6 +55,7 @@ namespace HM
       account_(pAccount),
       current_state_(StateConnected),
       retr_failed_(false),
+      download_finalized_(true),
       finalization_enqueued_tick_(0)
    {
 
@@ -72,7 +73,71 @@ namespace HM
 
    POP3ClientConnection::~POP3ClientConnection(void)
    {
-      
+      try
+      {
+         DiscardUnfinishedDownload_();
+      }
+      catch (...)
+      {
+         // A destructor must not let anything escape, and this one runs while the
+         // connection is being torn down - possibly during shutdown.
+      }
+   }
+
+   void
+   POP3ClientConnection::DiscardUnfinishedDownload_()
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // Removes the spool file of a download that never completed.
+   //
+   // A message being downloaded is written straight into a file in the data directory,
+   // and only the finalization that runs once \r\n.\r\n has arrived saves a database row
+   // referring to it. If the remote server disconnects part-way through a RETR - or the
+   // session times out, or the fetch is abandoned for any other reason - that file used
+   // to be simply left behind: no row ever referred to it, nothing ever deleted it, and
+   // every interrupted fetch added another one to the data directory. Since a fetch talks
+   // to a machine the administrator does not control, an unreliable (or hostile) remote
+   // server could grow that pile without limit.
+   //
+   // The message itself is not lost by discarding the fragment: nothing was recorded in
+   // the UID table and no DELE was sent, so the next fetch collects it again.
+   //---------------------------------------------------------------------------()
+   {
+      if (download_finalized_ || !current_message_)
+         return;
+
+      // Second, independent guard on the one thing that must never happen here: deleting
+      // the file of a message that has been saved. A non-zero id means PersistentMessage
+      // has written a row pointing at this file, so even if the flag above were somehow
+      // wrong - an exception escaping the finalization between the save and the flag, say
+      // - the delivered message is not touched.
+      if (current_message_->GetID() > 0)
+      {
+         download_finalized_ = true;
+         return;
+      }
+
+      // Released first, because the buffer owns the open file handle.
+      transmission_buffer_.reset();
+
+      download_finalized_ = true;
+
+      String fileName = PersistentMessage::GetFileName(current_message_);
+
+      if (!FileUtilities::Exists(fileName))
+         return;
+
+      if (!FileUtilities::DeleteFile(fileName))
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5985, "POP3ClientConnection::DiscardUnfinishedDownload_",
+            "Could not delete the spool file of an interrupted external account download: " + fileName);
+         return;
+      }
+
+      String logMessage =
+         Formatter::Format("POP3 External Account: the download of a message from {0} was interrupted, so the incomplete spool file has been discarded. The message has not been deleted from the remote server and will be downloaded again.", account_->GetName());
+
+      LOG_APPLICATION(logMessage);
    }
 
    void
@@ -360,51 +425,181 @@ namespace HM
       return;
    }
 
-   void 
+   void
    POP3ClientConnection::ParseUIDLResponse_(const String &sData)
    {
-      if (CommandIsSuccessfull_(sData))
+      if (!CommandIsSuccessfull_(sData))
       {
-         // We have connected successfully.
-         // Time to send the username.
-         
-         std::vector<String> vecLines = StringParser::SplitString(sData, "\r\n");
-         auto iter = vecLines.begin();
-
-         if (vecLines.size() < 3)
-         {
-            StartMailboxCleanup_();
-            return;
-         }
-
-         // Move to first line containing a message ID.
-         iter++;
-
-         while (iter != vecLines.end())
-         {
-            String sLine = (*iter);
-
-            if (sLine == _T("."))
-               break;
-
-            int iSpacePos = sLine.Find(_T(" "));
-            String sMessageIndex = sLine.Mid(0,iSpacePos);
-            String sMessageUID = sLine.Mid(iSpacePos + 1);
-
-            int iMessageIdx = _ttoi(sMessageIndex);
-            uidlresponse_[iMessageIdx] = sMessageUID;
-
-            iter++;
-         }
-
-         cur_message_ = uidlresponse_.begin();
-
-         RequestNextMessage_();
-
+         QuitNow_();
          return;
       }
 
-      QuitNow_();
+      std::vector<String> vecLines = StringParser::SplitString(sData, "\r\n");
+
+      if (vecLines.size() < 3)
+      {
+         // Nothing but the status line and the terminator: an empty mailbox.
+         StartMailboxCleanup_();
+         return;
+      }
+
+      auto iter = vecLines.begin();
+
+      // Move to first line containing a message ID.
+      iter++;
+
+      int rejectedLines = 0;
+      int foldedUIDs = 0;
+
+      while (iter != vecLines.end())
+      {
+         String sLine = (*iter);
+         iter++;
+
+         if (sLine == _T("."))
+            break;
+
+         if (sLine.IsEmpty())
+            continue;
+
+         int iMessageIdx = 0;
+         String sMessageUID;
+
+         if (!ParseUIDLLine_(sLine, iMessageIdx, sMessageUID))
+         {
+            rejectedLines++;
+            continue;
+         }
+
+         String sStorableUID = FoldRemoteUID_(sMessageUID);
+
+         if (sStorableUID != sMessageUID)
+            foldedUIDs++;
+
+         uidlresponse_[iMessageIdx] = sStorableUID;
+      }
+
+      // Reported at application level rather than debug: a listing this server cannot
+      // make sense of means messages it will not collect, and the administrator cannot
+      // see that from the outside.
+      if (rejectedLines > 0)
+      {
+         String message =
+            Formatter::Format("The remote POP3 server returned {0} unusable line(s) in the UIDL listing of external account {1}. Those messages have been ignored; the rest of the listing is being collected as normal.",
+               rejectedLines, account_->GetName());
+
+         LOG_APPLICATION(message);
+      }
+
+      if (foldedUIDs > 0)
+      {
+         String message =
+            Formatter::Format("The remote POP3 server returned {0} unique-id(s) longer than 255 characters for external account {1}. RFC 1939 allows 70. They have been shortened for storage, which is what stops the affected messages from being downloaded again on every check.",
+               foldedUIDs, account_->GetName());
+
+         LOG_APPLICATION(message);
+      }
+
+      cur_message_ = uidlresponse_.begin();
+
+      RequestNextMessage_();
+   }
+
+   bool
+   POP3ClientConnection::ParseUIDLLine_(const String &line, int &messageIndex, String &messageUID)
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // Parses one line of a UIDL listing, "<message-number> <unique-id>" (RFC 1939).
+   // Returns false for a line that is not of that shape.
+   //
+   // Rejecting rather than guessing matters because of what the guess used to be. Find
+   // returned -1 for a line with no space, Mid(0, -1) range-checked its way to an empty
+   // string, _ttoi turned that into 0, and the entire junk line was stored as the
+   // unique-id of message number 0. uidlresponse_ is a std::map, which orders by key, so
+   // that bogus entry became the FIRST message requested; "RETR 0" is not a message, the
+   // server refused it, and a refused RETR used to abandon the whole session. One
+   // unparseable line from the remote server therefore meant no mail was ever collected
+   // from that account again - on this check and on every check after it.
+   //---------------------------------------------------------------------------()
+   {
+      int spacePosition = line.Find(_T(" "));
+
+      if (spacePosition <= 0)
+         return false;
+
+      String indexPart = line.Mid(0, spacePosition);
+      String uidPart = line.Mid(spacePosition + 1);
+
+      uidPart.TrimLeft(_T(" \t"));
+      uidPart.TrimRight(_T(" \t"));
+
+      if (uidPart.IsEmpty())
+         return false;
+
+      // The message number must be a plain positive integer. _ttoi silently answers 0
+      // for anything else, and there is no message 0. More than nine digits is refused
+      // rather than allowed to overflow into a valid-looking message number.
+      const int indexLength = indexPart.GetLength();
+
+      if (indexLength > 9)
+         return false;
+
+      for (int i = 0; i < indexLength; i++)
+      {
+         wchar_t c = indexPart.GetAt(i);
+
+         if (c < '0' || c > '9')
+            return false;
+      }
+
+      messageIndex = _ttoi(indexPart);
+
+      if (messageIndex <= 0)
+         return false;
+
+      messageUID = uidPart;
+
+      return true;
+   }
+
+   String
+   POP3ClientConnection::FoldRemoteUID_(const String &uid)
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // Returns a form of the remote unique-id that fits the column it is stored in.
+   //
+   // hm_fetchaccounts_uids.uidvalue is 255 characters wide and RFC 1939 caps a
+   // unique-id at 70, so this normally returns the id unchanged. A server that hands out
+   // something longer could not be tracked at all: the insert is refused (or silently
+   // truncated) by the database, the next session's Refresh finds no match for the id it
+   // was given, and the message is downloaded and delivered AGAIN - not once, but every
+   // single time the account is checked, for ever. That is the worst duplicate-delivery
+   // shape in this subsystem and it is driven entirely by the remote server.
+   //
+   // The folded form keeps the first 200 characters and appends a hash of the whole id
+   // plus its length, so two ids that share a long prefix still map to different keys.
+   //---------------------------------------------------------------------------()
+   {
+      const int maxStorableLength = 255;
+      const int length = uid.GetLength();
+
+      if (length <= maxStorableLength)
+         return uid;
+
+      // FNV-1a, 32 bit. Chosen for being short and dependency-free; this is a
+      // collision-avoidance aid for a malformed input, not a security decision.
+      unsigned int hash = 2166136261u;
+
+      for (int i = 0; i < length; i++)
+      {
+         hash ^= (unsigned int) (unsigned short) uid.GetAt(i);
+         hash *= 16777619u;
+      }
+
+      String folded;
+      folded.Format(_T("%s~%08x~%d"), uid.Mid(0, 200).c_str(), hash, length);
+
+      return folded;
    }
 
    bool
@@ -419,8 +614,28 @@ namespace HM
 
          bool bMessageDownloaded = GetUIDList_()->IsUIDInList(sCurrentUID);
 
+         // A unique-id is meant to identify exactly one message, but a server that
+         // derives it from the message content gives the same id to two identical
+         // messages. Now that the local record is written even for messages that are
+         // about to be deleted (see MarkCurrentMessageAsRead_), the second copy would
+         // look like one collected during an earlier session and would be silently
+         // dropped - so an id appearing twice in the SAME listing is treated as what it
+         // is: a second message.
+         //
+         // Deliberately limited to the delete-immediately case. When messages are left
+         // on the server the same listing comes back every session, and downloading the
+         // repeated entry each time would deliver an extra copy on every check, for
+         // ever. There, collapsing the duplicate is the lesser of the two evils.
+         const bool duplicateWithinThisListing =
+            uids_seen_this_session_.find(sCurrentUID) != uids_seen_this_session_.end();
+
+         if (bMessageDownloaded && duplicateWithinThisListing && GetDaysToKeep_(sCurrentUID) == -1)
+            bMessageDownloaded = false;
+
+         uids_seen_this_session_.insert(sCurrentUID);
+
          if (bMessageDownloaded)
-         {  
+         {
             // Mark this message as downloaded. This is so that we can
             // drop it later on when purging the mailbox. (We only purge
             // items we have downloaded). And since it was downloaded during
@@ -448,6 +663,11 @@ namespace HM
 
             current_state_ = StateRETRSent;
             retr_failed_ = false;
+
+            // From here until the finalization completes there is a message part-way
+            // through arriving. If the session ends before that, the fragment on disk
+            // has to be cleaned up - see DiscardUnfinishedDownload_.
+            download_finalized_ = false;
 
             // Reset the transmission buffer. It will be
             // recreated when we receive binary the next time.
@@ -558,7 +778,7 @@ namespace HM
       return false;
    }
 
-   void 
+   void
    POP3ClientConnection::ParseRETRResponse_(const String &sData)
    {
       if (CommandIsSuccessfull_(sData))
@@ -571,18 +791,63 @@ namespace HM
          return;
       }
 
+      // The server listed this message in its UIDL response and has now refused to send
+      // it. That happens for real reasons - another client deleted it between the two
+      // commands, or the server cannot read it back - so only this message is given up
+      // on. ParseData moves past it and the rest of the listing is still collected.
+      //
+      // This used to abandon the entire session and go straight to the mailbox cleanup.
+      // Because the listing is walked in message-number order, one message that fails
+      // permanently and happens to sit at the front of the mailbox stopped every message
+      // behind it from being collected - not merely on this check, but on every check
+      // after it, silently and for ever. Nothing was written to any log.
       retr_failed_ = true;
 
-      SetReceiveBinary(false);
+      // No message data follows a refused RETR, so there is no fragment to clean up.
+      download_finalized_ = true;
 
-      // Do a mailbox cleanup and disconnect after that.
-      StartMailboxCleanup_();
+      String response = sData;
+      response.TrimRight(_T("\r\n"));
+
+      String message =
+         Formatter::Format("The remote POP3 server refused to send message {0} of external account {1}, so it has been skipped. The remaining messages are still being collected. Server response: {2}",
+            (*cur_message_).first, account_->GetName(), response);
+
+      LOG_APPLICATION(message);
    }
 
 
-   void 
+   void
    POP3ClientConnection::ParseDELEResponse_(const String &sData)
    {
+      // The response used to be ignored entirely, which meant a refused deletion was
+      // treated exactly like a successful one.
+      if (!pending_delete_uid_.IsEmpty())
+      {
+         if (CommandIsSuccessfull_(sData))
+         {
+            // The message is gone from the remote server, so the local record of having
+            // downloaded it has done its job and can go.
+            GetUIDList_()->DeleteUID(pending_delete_uid_);
+         }
+         else
+         {
+            // The server refused to delete it, so the message is still there. The local
+            // record therefore stays as well: it is the only thing that stops the next
+            // fetch downloading and delivering the same message again.
+            String response = sData;
+            response.TrimRight(_T("\r\n"));
+
+            String message =
+               Formatter::Format("The remote POP3 server refused to delete a message downloaded from external account {0}. It has been left on the server and will not be downloaded again. Server response: {1}",
+                  account_->GetName(), response);
+
+            LOG_APPLICATION(message);
+         }
+
+         pending_delete_uid_.Empty();
+      }
+
       // Clean up the next message.
       MailboxCleanup_();
 
@@ -682,6 +947,26 @@ namespace HM
 
          pBuf->Empty();
 
+         // A remote server that never terminates its UIDL listing would otherwise grow
+         // this buffer without limit: the read below is re-armed for as long as the
+         // terminating ".\r\n" has not arrived, there is no cap on how much may arrive,
+         // and the machine on the other end is one the administrator does not control.
+         // Eight megabytes is roughly a hundred thousand entries at the RFC 1939 maximum
+         // unique-id length and several times that for typical ids, which is far more
+         // than this fetcher could work through in a session anyway.
+         if (command_buffer_.GetLength() > MaxUIDLResponseBytes)
+         {
+            String message =
+               Formatter::Format("The UIDL listing returned by the remote POP3 server for external account {0} exceeded {1} bytes without ending. The fetch has been abandoned; no messages have been deleted from the server.",
+                  account_->GetName(), (int) MaxUIDLResponseBytes);
+
+            LOG_APPLICATION(message);
+
+            command_buffer_.clear();
+            QuitNow_();
+            return;
+         }
+
          if (command_buffer_.StartsWith("-ERR"))
          {
             // The server does not support UIDL. We can't fetch from this server.
@@ -721,11 +1006,21 @@ namespace HM
 
          if (retr_failed_)
          {
-            // The remote server rejected the RETR, so no message data follows and
-            // ParseRETRResponse_ has already moved the session on to the cleanup.
-            // Creating a message file here would leave a file behind in the data
-            // directory which no database row ever refers to.
+            // The remote server rejected the RETR, so no message data follows. Creating
+            // a message file here would leave a file behind in the data directory which
+            // no database row ever refers to.
             pBuf->Empty();
+
+            // Step over the refused message and carry on with the rest of the listing.
+            // RequestNextMessage_ clears retr_failed_ when it issues the next RETR, and
+            // starts the mailbox cleanup when there is nothing left to ask for. Done here
+            // rather than inside ParseRETRResponse_ because that runs before this check:
+            // requesting the next message there would clear retr_failed_ too early and
+            // this code would then treat the leftover bytes as the start of a message.
+            if (cur_message_ != uidlresponse_.end())
+               cur_message_++;
+
+            RequestNextMessage_();
 
             EnqueueRead("");
             return;
@@ -824,6 +1119,9 @@ namespace HM
                "Could not delete the incomplete downloaded message file: " + fileName);
          }
 
+         // Dealt with, so the teardown cleanup must not look for it a second time.
+         download_finalized_ = true;
+
          QuitNow_();
          return;
       }
@@ -865,6 +1163,10 @@ namespace HM
       }
 
       MarkCurrentMessageAsRead_();
+
+      // This message is completely dealt with: either delivered, or deliberately
+      // discarded. Nothing is left on disk for the teardown cleanup to remove.
+      download_finalized_ = true;
 
       // Switch to ASCII since we're going to request a new message.
       SetReceiveBinary(false);
@@ -1042,23 +1344,33 @@ namespace HM
       LOG_APPLICATION(sMessage);
    }
 
-   void 
+   void
    POP3ClientConnection::MarkCurrentMessageAsRead_()
    {
-      if (cur_message_ != uidlresponse_.end())
-      {
-         String sUID = (*cur_message_).second;
+      if (cur_message_ == uidlresponse_.end())
+         return;
 
-         // If we're deleting this message immediately, there's
-         // no point in adding it to the table.
-         if (GetDaysToKeep_(sUID) != -1)
-         {
-            // Make sure that the UID exists in the database.
-            // If it already exists, AddUID() will do nothing.
-            GetUIDList_()->AddUID(sUID); 
-         }
+      String sUID = (*cur_message_).second;
 
-      }
+      // Recorded even when this message is about to be deleted from the remote server.
+      //
+      // That case used to be skipped as an optimisation - why write a row that is about
+      // to be removed? - but the delivery and the DELE are two separate events with a
+      // gap between them, and anything that interrupts the session in that gap left the
+      // message sitting on the remote server with nothing recorded locally to say it had
+      // already been delivered. The remote server dropping the connection during the
+      // cleanup, a service restart, a DELE the server refuses: in every one of those the
+      // next fetch downloaded and delivered the same message a second time. That is the
+      // duplicate mail this subsystem is most likely to produce in the field, and it
+      // needs one row per message to close.
+      //
+      // The row does not accumulate: it is removed as soon as the DELE is acknowledged
+      // (ParseDELEResponse_), and any row whose message has since left the server is
+      // pruned by DeleteUIDsNoLongerOnServer_ at the end of the session.
+      //
+      // Make sure that the UID exists in the database.
+      // If it already exists, AddUID() will do nothing.
+      GetUIDList_()->AddUID(sUID);
    }
 
    bool
@@ -1070,7 +1382,6 @@ namespace HM
       int iDaysToKeep = GetDaysToKeep_(sUID);
 
       String sResponse;
-      bool bDeleteMessageNow = false;
 
       if (iDaysToKeep == 0)
       {
@@ -1081,6 +1392,22 @@ namespace HM
       {
          // Check wether we should delete this UID.
          std::shared_ptr<FetchAccountUID> pUID = GetUIDList_()->GetUID(sUID);
+
+         // GetUID answers an empty pointer for an id it does not hold, and this used to
+         // dereference it unconditionally - an access violation, so the whole service
+         // dies, triggered by what the remote server put in its UIDL listing. It is
+         // reachable: a server that hands the same unique-id to two message numbers gets
+         // the row deleted while the first one is being cleaned up, and the second one
+         // then finds nothing. With no creation date there is no way to judge the
+         // retention window, so the safe answer is to leave the message on the server.
+         if (!pUID)
+         {
+            String message =
+               Formatter::Format("No download date is recorded for a message on external account {0}, so it has been left on the remote server rather than deleted. This happens when the server gives the same unique-id to more than one message.", account_->GetName());
+
+            LOG_APPLICATION(message);
+            return false;
+         }
 
          // Get the creation date of the UID.
          DateTime dtCreation = pUID->GetCreationDate();
@@ -1101,9 +1428,12 @@ namespace HM
 
       current_state_ = StateDELESent;
 
-      // Delete this UID from the database.
-      GetUIDList_()->DeleteUID(sUID);
-     
+      // The local record is kept until the server confirms the deletion. Deleting it
+      // here, as this used to, threw away the only evidence that the message had already
+      // been delivered - so a DELE the server refused, or a connection that died before
+      // the response arrived, left the message on the server and nothing to stop the next
+      // fetch delivering it a second time.
+      pending_delete_uid_ = sUID;
 
       return true;
    }

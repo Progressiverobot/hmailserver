@@ -256,8 +256,18 @@ namespace HM
 
       if (list->GetID() == 0)
       {
-         if (domain->GetMaxNoOfDistributionLists()  && 
-            domain->GetDistributionLists()->GetCount() >= domain->GetMaxNoOfDistributionLists())
+         // The flag, not the number. The Control Panel draws this limit as a
+         // checkbox beside a number - DomainDialog.cs writes both
+         // MaxNumberOfDistributionListsEnabled and MaxNumberOfDistributionLists -
+         // and leaves the number alone when the box is cleared, so testing the
+         // number meant clearing the box did nothing at all: the old number went on
+         // being enforced. Ticking it with the number at 0 enforced nothing. The
+         // account and alias checks above both test their flag. Both columns
+         // arrived in the same schema step (Upgrade4301to4400MSSQL.sql), so no
+         // upgraded database can hold a number without the flag - the only way to
+         // reach the broken state is for an administrator to switch the limit off.
+         if (domain->GetMaxNoOfDistributionListsEnabled() &&
+             domain->GetDistributionLists()->GetCount() >= domain->GetMaxNoOfDistributionLists())
          {
             resultDescription = "The maximum number of distribution lists have been created.";
             return false;

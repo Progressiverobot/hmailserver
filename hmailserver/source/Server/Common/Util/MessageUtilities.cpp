@@ -192,7 +192,27 @@ namespace HM
       if (!pNewMessage)
          return false;
 
-      PersistentMessage::SaveObject(pNewMessage);
+      // The file has already been copied by the call above. If the row cannot be
+      // written there is now a message file that nothing points at: no folder lists it,
+      // no quota counts it, no expunge will ever remove it, and the consistency scan
+      // cannot see it either because that walks rows and looks for files, not the other
+      // way round. The result of this save used to be dropped, so the caller - COM
+      // Message.Copy - was told the copy had succeeded. Remove the orphan and fail.
+      if (!PersistentMessage::SaveObject(pNewMessage))
+      {
+         const String orphanedFile = PersistentMessage::GetFileName(pAccount, pNewMessage);
+
+         String errorMessage;
+         errorMessage.Format(_T("The copy of message %I64d could not be saved in the database. Copied file: %s"),
+            pMessage->GetID(), orphanedFile.c_str());
+
+         if (!FileUtilities::DeleteFile(orphanedFile))
+            errorMessage += _T(" The file could not be deleted either and is left orphaned.");
+
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 6013, "MessageUtilities::CopyToIMAPFolder", errorMessage);
+
+         return false;
+      }
 
       pFolder->GetMessages()->Refresh(false);
 

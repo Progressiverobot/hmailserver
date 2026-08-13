@@ -33,6 +33,13 @@ namespace HM
       // all, which OpenSSL accepts but which makes TLS 1.3 unusable.
       static bool ContainsGroupToAdd_(const AnsiString& groupList);
 
+      // Reports an expired or not-yet-valid certificate on a context that has just
+      // loaded one. OpenSSL checks the validity period of certificates it verifies
+      // and not of the one it is told to serve, so without this an expired
+      // certificate is served silently and fails every handshake at the client.
+      // Reports; does not fail the listener - see the call site.
+      static void ReportCertificateValidityProblem_(boost::asio::ssl::context& context, const String &certificate_file, const String &ip_address, int port);
+
       // First error on OpenSSL's per-thread error queue, as text. Empties the
       // queue so our failure is not later reported against an unrelated call.
       static AnsiString GetOpenSslError_();

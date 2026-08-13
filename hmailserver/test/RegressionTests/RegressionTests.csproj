@@ -296,8 +296,23 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="API\ComPropertyValidation.cs" />
+    <Compile Include="API\MessageHeaderObjects.cs" />
+    <Compile Include="API\RestApiAuthorization.cs" />
+    <Compile Include="Domains\DomainDeleteCascade.cs" />
+    <Compile Include="Domains\DomainLimitEnableFlags.cs" />
+    <Compile Include="Domains\DomainRenameCascade.cs" />
+    <Compile Include="ExternalAccounts\HostileRemoteServer.cs" />
+    <Compile Include="ExternalAccounts\ScriptedPop3Server.cs" />
+    <Compile Include="Infrastructure\BackupRestoreSafety.cs" />
+    <Compile Include="Infrastructure\ErrorManagerDiagnosticsTests.cs" />
+    <Compile Include="Infrastructure\ExceptionHandlerDiagnosticsTests.cs" />
+    <Compile Include="Infrastructure\MessageStoreLayout.cs" />
     <Compile Include="SMTP\EsmtpConformance.cs" />
     <Compile Include="SMTP\StartTlsAlreadyActive.cs" />
+    <Compile Include="Security\TlsAcmeRenewal.cs" />
+    <Compile Include="Security\TlsCertificateValidity.cs" />
+    <Compile Include="Security\TlsProtocolVersions.cs" />
     <Compile Include="API\StatusTests.cs" />
     <Compile Include="API\Messages.cs" />
     <Compile Include="IMAP\ConcurrentConnections.cs" />

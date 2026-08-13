@@ -261,10 +261,18 @@ STDMETHODIMP InterfaceAntiVirus::put_Action(eAntivirusAction newVal)
          break;
       case hDeleteAttachments:
          iAction = HM::AntiVirusConfiguration::ActionStripAttachments;
+         break;
+      default:
+         // Refused rather than stored. There was no default here and iAction was
+         // uninitialised, so a caller passing anything outside the enum - and a
+         // scripting language hands this property an ordinary integer, with no
+         // enum to constrain it - wrote whatever happened to be in that stack slot
+         // into the persisted action taken on a virus-bearing message.
+         return COMError::GenerateError("Antivirus action must be 0 (delete the message) or 1 (strip the attachments).");
       }
-   
+
       antiVirusConfiguration_.AVAction (iAction);
-   
+
       return S_OK;
    }
    catch (...)
