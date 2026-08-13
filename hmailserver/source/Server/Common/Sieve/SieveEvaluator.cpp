@@ -379,8 +379,18 @@ namespace HM
 
       SieveArgumentSet set;
       String ignored;
-      if (!SieveParser::SplitArguments(command->arguments, set, ignored) ||
-          set.stringLists.empty() || set.stringLists[0].empty())
+      if (!SieveParser::SplitArguments(command->arguments, set, ignored))
+      {
+         // The validator accepted this script, so the two disagreeing is a defect in
+         // this file rather than a bad script - the same reasoning as the
+         // keep/fileinto and redirect paths above. Not replying is the safe outcome,
+         // so there is nothing to fall back to.
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5895, _T("SieveEvaluator::ExecuteVacation_"),
+            _T("A Sieve vacation action passed validation but could not be split into arguments: ") + ignored);
+         return;
+      }
+
+      if (set.stringLists.empty() || set.stringLists[0].empty())
          return;
 
       String sender;
@@ -417,8 +427,42 @@ namespace HM
       if (set.handleGiven)
          decision.handle = set.handle;
 
+      if (set.fromGiven)
+      {
+         // Recorded, not judged. Whether this address may actually be used is a
+         // question about the account, which the evaluator does not have -
+         // SieveVacationResponder checks it against the account's own addresses and
+         // falls back to the account address when it does not belong to the user.
+         // Deciding it here would mean trusting the script.
+         decision.from = set.fromAddress;
+      }
+
       if (set.daysGiven)
          decision.days = set.days;
+
+      if (set.secondsGiven)
+      {
+         decision.secondsGiven = true;
+         decision.seconds = set.seconds;
+      }
+
+      // Context for the reply that only the original message can supply.
+      std::vector<String> subjects = message.GetHeaderValues(_T("Subject"));
+      if (!subjects.empty())
+         decision.originalSubject = subjects[0];
+
+      std::vector<String> messageIds = message.GetHeaderValues(_T("Message-ID"));
+      if (!messageIds.empty())
+         decision.originalMessageId = messageIds[0];
+
+      // hMailServer's own generated-mail loop counter. Carrying it into the reply
+      // (and refusing to reply once it is at the configured limit) is what stops a
+      // vacation reply, a forward, an account rule auto-reply and a bounce from
+      // taking turns forever: each generated message increments it, so any cycle
+      // that includes at least one of them terminates.
+      std::vector<String> loopCounts = message.GetHeaderValues(_T("X-hMailServer-LoopCount"));
+      if (!loopCounts.empty())
+         decision.loopCount = _wtoi(loopCounts[0].c_str());
 
       // No entry is added to actions_ and localDecided_ is left alone: a vacation
       // reply says nothing about whether the message itself is kept.
@@ -430,6 +474,29 @@ namespace HM
                                      const SieveArgumentSet &set,
                                      String &reason) const
    {
+      // A sender that is not an address cannot be replied to. Without this check the
+      // reply is composed, the response is recorded as sent, and the recipient parser
+      // then produces no recipients - so the reply is silently lost and the
+      // suppression window is burnt for a sender who never hears anything. Better to
+      // decide here, where the reason can be logged.
+      if (!StringParser::IsValidEmailAddress(sender))
+      {
+         reason = _T("the envelope sender is not a valid email address.");
+         return true;
+      }
+
+      // RFC 3834 2 / RFC 2142: addresses that identify a robot or a list manager
+      // rather than a person. This is the other half of the mailing-list check
+      // further down: the List-* headers catch a list that follows RFC 2369, and
+      // these local parts catch the older listserv and majordomo shapes that do not -
+      // the "-request" and "owner-" conventions predate those headers by a decade and
+      // are still what an unsubscribe robot answers on.
+      if (IsAutomatedSenderAddress_(sender))
+      {
+         reason = _T("the envelope sender is a robot or list-management address.");
+         return true;
+      }
+
       // RFC 3834 2: an automatic response must not be sent to a message that is
       // itself automatic.
       std::vector<String> autoSubmitted = message.GetHeaderValues(_T("Auto-Submitted"));
@@ -551,6 +618,57 @@ namespace HM
 
       reason = _T("none of the user's addresses appear in the message's recipient headers.");
       return true;
+   }
+
+   bool
+   SieveEvaluator::IsAutomatedSenderAddress_(const String &sender)
+   {
+      int at = sender.Find(_T("@"));
+      String localPart = at >= 0 ? sender.Mid(0, at) : sender;
+      localPart.ToLower();
+
+      // Exact matches. "postmaster" and "mailer-daemon" are named by RFC 3834 2
+      // itself; the rest are the conventional "this mailbox is not read by a person"
+      // names, and a holiday notice sent to one of them is at best thrown away and at
+      // worst answered by whatever is behind it.
+      static const wchar_t *exactNames[] =
+      {
+         L"mailer-daemon", L"postmaster", L"listserv", L"majordomo",
+         L"no-reply", L"noreply", L"donotreply", L"do-not-reply",
+         L"bounce", L"bounces", L"nobody"
+      };
+
+      for (const wchar_t *exactName : exactNames)
+      {
+         if (localPart.Compare(exactName) == 0)
+            return true;
+      }
+
+      // The list-management conventions. "owner-list" and "list-request" are the
+      // pre-RFC-2369 way of addressing a list's administrative side, and the
+      // "-bounces" / "-confirm" forms are what Mailman uses for its verification and
+      // bounce-processing robots. Answering any of them either reaches nobody or
+      // reaches a program that answers back.
+      static const wchar_t *prefixes[] = { L"owner-", L"bounce-", L"bounces-", L"listserv-" };
+      for (const wchar_t *prefix : prefixes)
+      {
+         if (localPart.StartsWith(prefix))
+            return true;
+      }
+
+      static const wchar_t *suffixes[] =
+      {
+         L"-request", L"-owner", L"-bounce", L"-bounces", L"-confirm",
+         L"-subscribe", L"-unsubscribe", L"-help", L"-admin", L"-noreply"
+      };
+
+      for (const wchar_t *suffix : suffixes)
+      {
+         if (localPart.EndsWith(suffix))
+            return true;
+      }
+
+      return false;
    }
 
    bool

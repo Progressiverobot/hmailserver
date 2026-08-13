@@ -49,8 +49,55 @@ namespace HM
       void SetCreationTime(const DateTime &currentUID) {create_time_ = currentUID;}
 
 
-      bool GetIsSubscribed() const { return folder_is_subscribed_;} 
+      bool GetIsSubscribed() const { return folder_is_subscribed_;}
       void SetIsSubscribed(bool bNewVal) { folder_is_subscribed_ = bNewVal;}
+
+      // RFC 6154 (SPECIAL-USE): the special-use attributes this folder has been
+      // explicitly designated with, as an IMAPSpecialUse::Designation bitmask. Zero
+      // means "no explicit designation", in which case LIST falls back to guessing
+      // from the folder name exactly as it did before 6.2.19.
+      //
+      // This is stored on the folder row (hm_imapfolders.folderspecialuse) rather than
+      // as a settings row: the designation is per folder and per account, it must
+      // disappear when the folder is deleted and follow it when it is renamed, and it
+      // is read on every LIST. A row in hm_settings would have given none of that -
+      // that table has a 30 character unique name column, is cached in its entirety in
+      // memory at startup, and nothing would ever clean up the entry for a folder that
+      // no longer exists.
+      //
+      // SetSpecialUseFlags only touches memory and exists for the two places that
+      // load a folder from somewhere (IMAPFolders::Refresh reading the row, XMLLoad
+      // reading a backup). Anything that wants to CHANGE a live folder's designation
+      // must use StoreSpecialUseFlags below, or the value will not survive a restart.
+      int GetSpecialUseFlags() const { return special_use_flags_;}
+      void SetSpecialUseFlags(int newVal) { special_use_flags_ = newVal;}
+
+      // Writes this folder's special-use designation to the database and, only on
+      // success, updates the cached value. Returns false when the folder has no row
+      // yet or the write failed; the caller must then refuse the command, because a
+      // designation that exists only in the shared folder cache would be advertised
+      // by LIST until the next restart and then silently vanish - the hardest kind of
+      // bug to get a report for.
+      //
+      // This is a targeted single-column UPDATE keyed on folderid, deliberately NOT
+      // PersistentIMAPFolder::SaveObject, for two reasons that both cost data:
+      //
+      //   * SaveObject decides between INSERT and UPDATE by asking the in-memory
+      //     object for its id. IMAPFolders::CreatePath ignores the result of its own
+      //     save, so a folder whose insert failed is still put into the per-account
+      //     cache with id 0; a designation written through SaveObject would then be
+      //     an INSERT, producing a second hm_imapfolders row for a folder that
+      //     already had one (or being rejected outright by the unique index on
+      //     folderaccountid/folderparentid/foldername, which is no better - the
+      //     command fails after the folder was created).
+      //   * SaveObject rewrites foldername, folderparentid and folderaccountid from
+      //     the cached object as well. A RENAME committed by another connection
+      //     between the CREATE and the designation write would be silently undone.
+      //
+      // The SQL lives here rather than in PersistentIMAPFolder because IMAPFolders,
+      // this object's own collection, already issues its SELECT the same way; keeping
+      // the two halves of one column together beats spreading them across two files.
+      bool StoreSpecialUseFlags(int designations);
 
       String GetFolderName() const { return folder_name_;}
       void SetFolderName(const String & sNewVal) { folder_name_ =sNewVal; }
@@ -84,6 +131,7 @@ namespace HM
       __int64 current_modseq_;
 
       bool folder_is_subscribed_;
+      int special_use_flags_;
       AnsiString folder_name_;
 
       std::shared_ptr<Messages> messages_;

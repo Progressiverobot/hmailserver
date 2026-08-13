@@ -60,7 +60,13 @@ namespace HM
       if (pConfig->GetUseIMAPSASLInitialResponse())
 	      sResponse += " SASL-IR";
 
-      sResponse += " NAMESPACE RIGHTS=texk MOVE ID SPECIAL-USE UNSELECT UIDPLUS ENABLE STATUS=SIZE ESEARCH CONDSTORE QRESYNC LIST-EXTENDED SEARCHRES UTF8=ACCEPT";
+      // RFC 6154 section 6 defines two capability names and a client needs both. Only
+      // SPECIAL-USE used to be advertised, which says the attributes and the LIST
+      // options are understood; CREATE-SPECIAL-USE is the one a client checks before it
+      // will send CREATE ... USE (\Sent), so without it the clients that want to create
+      // their own sent folder - Apple Mail, Outlook mobile - never ask the server to
+      // designate it, and go back to naming it and hoping.
+      sResponse += " NAMESPACE RIGHTS=texk MOVE ID SPECIAL-USE CREATE-SPECIAL-USE UNSELECT UIDPLUS ENABLE STATUS=SIZE ESEARCH CONDSTORE QRESYNC LIST-EXTENDED SEARCHRES UTF8=ACCEPT";
 
       sResponse += "\r\n";
       sResponse += pArgument->Tag() + " OK CAPABILITY completed\r\n";

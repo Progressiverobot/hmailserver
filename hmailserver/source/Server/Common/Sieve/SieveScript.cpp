@@ -64,4 +64,28 @@ namespace HM
       SieveEvaluator evaluator;
       return evaluator.Evaluate(sieveScript.GetCommands(), message);
    }
+
+   String
+   SieveScript::Evaluate(const String &script,
+                         const String &rawMessage,
+                         const SieveEnvelope &envelope,
+                         SieveResult &result)
+   {
+      String errorMessage;
+
+      SieveScript sieveScript;
+      if (!sieveScript.Parse(script, errorMessage))
+      {
+         // Leave the result at its defaults, which keep the message. A script that no
+         // longer parses - because it was hand-edited on disk, or because a later
+         // version of this server tightened the grammar - must not be able to stop
+         // mail being delivered.
+         result = SieveResult();
+         return _T("error: ") + errorMessage;
+      }
+
+      SieveMessage message(rawMessage);
+      SieveEvaluator evaluator;
+      return evaluator.Evaluate(sieveScript.GetCommands(), message, envelope, result);
+   }
 }

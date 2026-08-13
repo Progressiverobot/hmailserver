@@ -5,6 +5,8 @@
 
 #include "SieveStorage.h"
 
+#include "SieveVacationTracker.h"
+
 #include "../Application/IniFileSettings.h"
 #include "../Util/FileUtilities.h"
 #include "../Util/Parsing/StringParser.h"
@@ -64,6 +66,12 @@ namespace HM
    }
 
    String
+   SieveStorage::GetVacationStorePath(const String &accountAddress)
+   {
+      return FileUtilities::Combine(GetAccountDirectory_(accountAddress), _T("vacation.responses"));
+   }
+
+   String
    SieveStorage::GetActiveScript(const String &accountAddress)
    {
       String path = GetActiveScriptPath_(accountAddress);
@@ -83,6 +91,22 @@ namespace HM
       {
          if (FileUtilities::Exists(path))
             FileUtilities::DeleteFile(path);
+
+         // Switching Sieve filtering off also clears the vacation response records,
+         // mirroring SMTPVacationMessageCreator::VacationMessageTurnedOff for the
+         // account-level auto-reply. Without this, a user who ends their holiday,
+         // deletes the script, then goes away again a week later would find that the
+         // people who wrote to them in between hear nothing, because their
+         // suppression windows are still running. It also stops an abandoned account
+         // leaving a tracking file behind indefinitely: the file prunes itself only
+         // when an auto-reply is next considered, which for a deactivated script is
+         // never.
+         //
+         // This is the only place anything is allowed to forget a recorded response,
+         // and it is safe precisely because it needs a deliberate act by the account
+         // owner: a script that is off sends no replies, so there is no window in
+         // which forgetting here can produce a second one.
+         SieveVacationTracker::Instance()->Forget(accountAddress);
 
          return true;
       }

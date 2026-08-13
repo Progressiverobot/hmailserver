@@ -317,6 +317,7 @@
     <Compile Include="Infrastructure\MessageStoreConsistency.cs" />
     <Compile Include="Infrastructure\MessageStoreDurability.cs" />
     <Compile Include="Infrastructure\ShutdownDrain.cs" />
+    <Compile Include="Sieve\SieveVacationDelivery.cs" />
     <Compile Include="Sieve\SieveSyntax.cs" />
     <Compile Include="Sieve\SieveEvaluation.cs" />
     <Compile Include="Sieve\SieveAccountScript.cs" />
@@ -404,6 +405,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="API\Message.cs" />
+    <Compile Include="IMAP\SpecialUse.cs" />
     <Compile Include="IMAP\ACL.cs" />
   </ItemGroup>
   <ItemGroup>

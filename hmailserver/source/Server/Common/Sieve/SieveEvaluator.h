@@ -26,18 +26,42 @@ namespace HM
    };
 
    // A vacation (RFC 5230) auto-reply that the script asked for and that passed
-   // every loop-prevention check. Everything needed to send it is here; the
-   // sending itself belongs to the delivery path, which owns the account and the
-   // message.
+   // every loop-prevention check the evaluator can apply. Everything needed to
+   // send it is here; the sending itself belongs to SieveVacationResponder, which
+   // owns the account and the suppression store.
+   //
+   // The fields that describe the original message (subject, message id, loop
+   // count) are filled in here rather than re-read from the message file by the
+   // responder. That is deliberate: the evaluator has the parsed message in front
+   // of it already, and a second read would be a second chance for the two to
+   // disagree about which message this reply answers - the message file moves into
+   // the user's IMAP folder shortly after evaluation, so "read it again later" is
+   // not even reliably possible.
    struct SieveVacationDecision
    {
       bool send = false;
       String to;         // the envelope sender the reply goes back to
-      String subject;    // ":subject"; empty means "build a Re: from the original"
+      String subject;    // ":subject"; empty means "build one from the original"
       String reason;     // the reply body
       String handle;     // ":handle", empty when the script gave none
+      String from;       // ":from"; empty means "the account's own address"
       __int64 days = 7;  // ":days" - the per-sender suppression window
+
+      // ":seconds" (RFC 6131), which replaces the days-based window when present.
+      // Zero is a legal value and means "reply to every qualifying message", so the
+      // flag is what distinguishes "the script said 0" from "the script said
+      // nothing".
+      bool secondsGiven = false;
+      __int64 seconds = 0;
+
       bool mime = false; // ":mime" - reason is a complete MIME entity, not text
+
+      // Context taken from the message being replied to. Held raw: decoding a
+      // MIME-encoded subject needs the MIME machinery, which belongs to the
+      // responder that formats the reply.
+      String originalSubject;
+      String originalMessageId;
+      int loopCount = 0;
    };
 
    // Everything a script decided, for callers that need more than the ';'-joined
@@ -57,8 +81,9 @@ namespace HM
    // core tests (true/false/not/allof/anyof/header/address/exists/size with
    // :is/:contains/:matches and the default comparator), the core actions
    // (keep/fileinto/discard/redirect, plus implicit keep), and the extensions
-   // vacation (RFC 5230), imap4flags (RFC 5232), envelope (RFC 5228 5.4),
-   // copy (RFC 3894), relational (RFC 5231) and subaddress (RFC 5233).
+   // vacation (RFC 5230), vacation-seconds (RFC 6131), imap4flags (RFC 5232),
+   // envelope (RFC 5228 5.4), copy (RFC 3894), relational (RFC 5231) and
+   // subaddress (RFC 5233).
    class SieveEvaluator
    {
    public:
@@ -112,6 +137,12 @@ namespace HM
                              const String &sender,
                              const SieveArgumentSet &set,
                              String &reason) const;
+
+      // True for an envelope sender that must never be auto-replied to because of
+      // what its address says about it: the RFC 2142 / RFC 3834 robot and
+      // list-management local parts. This catches the list traffic that the List-*
+      // header check misses.
+      static bool IsAutomatedSenderAddress_(const String &sender);
 
       static bool MatchValue_(const String &matchType, bool caseSensitive, const String &value, const String &key);
       static bool MatchWithArguments_(const SieveArgumentSet &set, const String &value, const String &key);

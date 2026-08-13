@@ -57,7 +57,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Transport security and deliverability](#transport-security-and-deliverability) | 28 | – | 16 | 1 |
 | [IMAP](#imap) | 55 | – | 19 | 3 |
 | [POP3](#pop3) | 17 | – | 9 | – |
-| [Sieve, ManageSieve and rules](#sieve-managesieve-and-rules) | 42 | 1 | 16 | – |
+| [Sieve, ManageSieve and rules](#sieve-managesieve-and-rules) | 43 | 0 | 16 | – |
 | [Authentication and cryptography](#authentication-and-cryptography) | 55 | – | 19 | – |
 | [Anti-spam, anti-virus and content control](#anti-spam-anti-virus-and-content-control) | 52 | – | 13 | – |
 | [Storage, accounts and data model](#storage-accounts-and-data-model) | 81 | – | 9 | – |
@@ -72,7 +72,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 2 | – | 4 | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 4 | 1 | 2 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 3 | – | 6 | – |
-| **Total** | **549** | **12** | **175** | **14** |
+| **Total** | **550** | **11** | **175** | **14** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage and the administration surface are the best-covered areas**, and the
@@ -360,7 +360,7 @@ the source, not from documentation.
 | ✅ | SELECT / EXAMINE | SELECT emits EXISTS, RECENT, FLAGS, [UIDVALIDITY], [UNSEEN], [UIDNEXT], [PERMANENTFLAGS] and READ-WRITE/READ-ONLY per ACL. EXAMINE is the same path forced read-only. [UNSEEN] correctly carries a sequence number, not a UID. |
 | ✅ | Session timeout and excessive-data handling | Idle-session timeout is load-scaled between 5 and 30 minutes via TimeoutCalculator, with a "* BYE" on both timeout and excessive data. |
 | ✅ | SORT (RFC 5256) | Config-gated. Sort keys: ARRIVAL, CC, DATE, FROM, SIZE, SUBJECT, TO, with REVERSE. Available as both SORT and UID SORT. DISPLAYFROM/DISPLAYTO (RFC 5957) are absent. |
-| ✅ | SPECIAL-USE (RFC 6154) — attribute annotation only | Advertised and emitted: \Sent, \Drafts, \Trash, \Junk, \Archive are attached by matching well-known top-level folder names (Sent/Sent Items/Sent Messages, Drafts, Trash/Deleted Items/Deleted Messages, Junk/Junk E-mail/Junk Email/Spam… |
+| ✅ | SPECIAL-USE (RFC 6154) — designation, not just annotation | Advertised and emitted: \Sent, \Drafts, \Trash, \Junk, \Archive are attached by matching well-known top-level folder names, and as of 13 August 2026 a folder can also be **designated explicitly** rather than only recognised by its English name. That was the real gap and it was reported by a user: a Spanish-language client creating "Enviados" could not mark it \Sent, so every client that navigates by special-use attribute rather than by name went to the wrong folder or created a second one. `IMAPSpecialUse` owns the designation rules, `CREATE ... (USE (\Sent))` is accepted per RFC 6154 section 3, a designation that another folder already holds is refused so the one-owner-per-attribute rule holds, and the designation is stored in a new `hm_imapfolders.folderspecialuse` column - which is why this commit carries the database version from 6005 to 6006 with upgrade scripts for all four backends. Public folders are refused a designation, because the attribute describes a user's own mailbox. |
 | ✅ | STARTTLS (RFC 2595) and implicit TLS | STARTTLS is advertised whenever connection security is STARTTLS-optional or -required, and the handshake is driven from the command. Implicit-TLS (IMAPS) sends its banner only after the handshake completes. With STARTTLS required… |
 | ✅ | STATUS data items | MESSAGES, UNSEEN, RECENT, UIDNEXT, UIDVALIDITY, SIZE and HIGHESTMODSEQ. RECENT is correctly counted per queried folder rather than reusing the selected folder's count. Items are matched by case-insensitive substring, not tokenised… |
 | ✅ | STATUS=SIZE (RFC 8438) | Advertised and implemented: SIZE sums RFC822.SIZE across the mailbox. Computed by iterating every message on each call, so it is O(n) per STATUS with no cached total. |
@@ -426,7 +426,7 @@ the source, not from documentation.
 
 ### Sieve, ManageSieve and rules
 
-42 shipped · 1 underway · 16 not started · 0 deferred
+43 shipped · 0 underway · 16 not started · 0 deferred
 
 | | Capability | Detail |
 |:-:|---|---|
@@ -487,7 +487,7 @@ the source, not from documentation.
 | ⬜ | Structured response codes | Not implemented. Responses are bare OK / NO with a quoted human string — no (WARNINGS), (QUOTA/maxsize), (QUOTA/maxscripts), (NONEXISTENT), (ALREADYEXISTS), (TAG), (REFERRAL) or BYE codes… |
 | ✅ | subaddress (RFC 5233) | Not implemented. Address parts stop at :all/:localpart/:domain; :user and :detail are not recognised, so plus-addressing cannot be filtered on **Shipped in dc9301a.** |
 | ⬜ | TLS | None. STARTTLS is recognised but always answered NO "STARTTLS is not supported on this listener.", it is not advertised as a capability, and there is no implicit-TLS variant — so SASL PLAIN credentials cross the wire in the clear… |
-| 🔄 | vacation (RFC 5230) | Not implemented. The `vacation` keyword parses as a known command and is then discarded. The irony is that a full native auto-reply engine already exists (subject, body, expiry, spam guard… **Half shipped in dc9301a: the decision is implemented and the reply is not sent.** `SieveEvaluator::ExecuteVacation_` exists, honours the once-per-script rule of RFC 5230 4.7 and refuses to reply when the envelope sender is unknown - but nothing hands a message to the delivery path, so no auto-reply ever leaves the server. What is left is the sending half plus the suppression store that stops it becoming a mail loop. |
+| ✅ | vacation (RFC 5230) | **Complete as of 13 August 2026, and it took three attempts to get there honestly.** The engine decides, `SieveVacationResponder` composes and queues the reply, and `SieveVacationTracker` records the suppression window in a store that fails closed - every path that cannot prove "not yet replied to this sender" declines to reply, including an unreadable store, an unparseable record, a foreign header line, a key that is not a 64-character hex digest, more records than the writer could have produced, a file over 1 MB, and a failed write. The store is written to a temporary file and renamed, so an interrupted write cannot leave a truncated store that the loader would then correctly refuse for ever. The record key is a SHA-256 of the lowercased sender plus the `:handle`, so neither a handle nor a sender containing a newline can forge or delete a record. Records are pruned on load and the pruned set written back on the suppressed and at-capacity paths too, so the store shrinks without a sweeper. RFC 3834 compliance is real, not asserted: `Auto-Submitted: auto-replied`, `X-Auto-Response-Suppress: All`, a null envelope return path, `In-Reply-To`/`References` carried from the original, the loop counter carried forward and refused at the configured limit, and the robot and list-management local parts of RFC 2142 suppressed - which catches the pre-RFC-2369 list traffic that a `List-*` header check cannot see. `:seconds` and `vacation-seconds` are supported, `:from` is honoured only for an address that actually reaches the account, and `:mime` reasons pass through a `Content-*`/`MIME-Version` whitelist. The extension moved into the ManageSieve capability line in this same commit, under the rule written at that line - not before. Twelve end-to-end tests in `SieveVacationDelivery.cs` assert that mail arrives rather than that a summary token was produced, which is the distinction that let this sit half-built through two releases: the action summary always said it had worked. Known gap, declared: there is no test for the store being full at the exact moment of a reply beyond the unit path, because a store at capacity has to be constructed by hand. |
 | ⬜ | variables (RFC 5229) | Not implemented. `set` parses and no-ops; there is no ${name} expansion anywhere in the lexer or evaluator, and no match-variable capture from :matches |
 
 ### Authentication and cryptography

@@ -23,22 +23,24 @@ namespace HM
 
 
    IMAPFolder::IMAPFolder(__int64 iAccountID, __int64 iParentFolderID) :
-      account_id_(iAccountID), 
+      account_id_(iAccountID),
       dbid_(0),
       current_uid_(0),
       current_modseq_(1),
       folder_is_subscribed_(false),
+      special_use_flags_(0),
       parent_folder_id_(iParentFolderID)
    {
-      
+
    }
 
    IMAPFolder::IMAPFolder() :
-      account_id_(0), 
+      account_id_(0),
       dbid_(0),
       current_uid_(0),
       current_modseq_(1),
       folder_is_subscribed_(false),
+      special_use_flags_(0),
       parent_folder_id_(-1)
    {
 
@@ -70,6 +72,30 @@ namespace HM
       return sub_folders_;
    }
 
+
+   bool
+   IMAPFolder::StoreSpecialUseFlags(int designations)
+   {
+      // No row, nothing to update. Returning false rather than falling through to an
+      // insert is the whole point of this function existing - see the header.
+      if (dbid_ <= 0)
+         return false;
+
+      SQLCommand command("UPDATE hm_imapfolders SET folderspecialuse = @SPECIALUSE WHERE folderid = @FOLDERID");
+      command.AddParameter("@SPECIALUSE", designations);
+      command.AddParameter("@FOLDERID", dbid_);
+
+      if (!Application::Instance()->GetDBManager()->Execute(command))
+         return false;
+
+      // Written to the cache only after the row is on disk. The folder tree is shared
+      // by every connection for this account, so the in-memory value is what LIST
+      // reports until the service restarts; updating it first and then failing the
+      // write would advertise an attribute that disappears at the next restart.
+      special_use_flags_ = designations;
+
+      return true;
+   }
 
    std::shared_ptr<ACLPermissions>
    IMAPFolder::GetPermissions()
@@ -132,6 +158,14 @@ namespace HM
       pNode->AppendAttr(_T("CreateTime"), String(Time::GetTimeStampFromDateTime(create_time_)));
       pNode->AppendAttr(_T("CurrentUID"), StringParser::IntToString(current_uid_));
 
+      // RFC 6154 (SPECIAL-USE). Backed up with the folder, because a restore that
+      // dropped it would leave the user's client hunting for a sent folder in a
+      // mailbox whose folder names are not in English - which is exactly the mailbox
+      // the designation existed for. Written unconditionally rather than only when
+      // non-zero: an attribute that appears and disappears depending on the value
+      // makes two backups of the same mailbox impossible to diff.
+      pNode->AppendAttr(_T("SpecialUse"), StringParser::IntToString(special_use_flags_));
+
       if (!GetMessages()->XMLStore(pNode, iBackupOptions))
          return false;
 
@@ -156,6 +190,12 @@ namespace HM
       folder_is_subscribed_ = pFolderNode->GetAttrValue(_T("Subscribed")) == _T("1");
       create_time_ = Time::GetDateFromSystemDate(pFolderNode->GetAttrValue(_T("CreateTime")));
       current_uid_ = _ttoi(pFolderNode->GetAttrValue(_T("CurrentUID")));
+
+      // A backup taken by 6.2.18 or earlier has no SpecialUse attribute; GetAttrValue
+      // returns an empty string and _ttoi turns that into 0, which is precisely "no
+      // explicit designation" and lets LIST fall back to the folder-name guess. That
+      // is why no version check is needed here.
+      special_use_flags_ = _ttoi(pFolderNode->GetAttrValue(_T("SpecialUse")));
 
       return true;
    }

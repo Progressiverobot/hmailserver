@@ -363,8 +363,9 @@ create table hm_imapfolders
 	folderissubscribed tinyint NOT NULL,
    foldercreationtime datetime NOT NULL,
    foldercurrentuid bigint NOT NULL,
-   foldercurrentmodseq bigint NOT NULL
-) 
+   foldercurrentmodseq bigint NOT NULL,
+   folderspecialuse int NOT NULL DEFAULT 0
+)
 
 ALTER TABLE hm_imapfolders ADD CONSTRAINT hm_imapfolders_pk PRIMARY KEY NONCLUSTERED (folderid) 
 
@@ -978,4 +979,4 @@ insert into hm_tcpipports (portprotocol, portnumber, portaddress1, portaddress2,
 
 insert into hm_tcpipports (portprotocol, portnumber, portaddress1, portaddress2, portconnectionsecurity, portsslcertificateid) values (5, 143, 0, NULL, 0, 0) 
 
-insert into hm_dbversion values (6005)
+insert into hm_dbversion values (6006)

@@ -20,6 +20,10 @@ namespace HM
    private:
       // RFC 5258: split a parenthesised mailbox-pattern list into individual patterns.
       static void ExtractPatterns_(const String &sParenContent, std::vector<String> &patterns);
+
+      // True when the parenthesised selection/return option list contains sOption as a
+      // whole, case-insensitive token.
+      static bool HasOption_(const String &sParenContent, const String &sOption);
    };
 
 }

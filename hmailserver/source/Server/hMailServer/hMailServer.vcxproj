@@ -226,6 +226,8 @@ EXIT 0
     <ClCompile Include="..\Common\Sieve\SieveParser.cpp" />
     <ClCompile Include="..\Common\Sieve\SieveScript.cpp" />
     <ClCompile Include="..\Common\Sieve\SieveStorage.cpp" />
+    <ClCompile Include="..\Common\Sieve\SieveVacationTracker.cpp" />
+    <ClCompile Include="..\Common\Sieve\SieveVacationResponder.cpp" />
     <ClCompile Include="..\Common\Sieve\ManageSieveServer.cpp" />
     <ClCompile Include="..\Common\Application\RemoveExpiredRecords.cpp" />
     <ClCompile Include="..\Common\Application\Scheduler.cpp" />
@@ -586,6 +588,7 @@ EXIT 0
     <ClCompile Include="..\ExternalFetcher\FetchAccountUIDList.cpp" />
     <ClCompile Include="..\ExternalFetcher\POP3ClientConnection.cpp" />
     <ClCompile Include="..\IMAP\FolderListCreator.cpp" />
+    <ClCompile Include="..\IMAP\IMAPSpecialUse.cpp" />
     <ClCompile Include="..\IMAP\IMAPACLHelper.cpp" />
     <ClCompile Include="..\Imap\IMAPCommand.cpp" />
     <ClCompile Include="..\Imap\IMAPCommandAppend.cpp" />
@@ -754,6 +757,8 @@ EXIT 0
     <ClInclude Include="..\Common\Sieve\SieveParser.h" />
     <ClInclude Include="..\Common\Sieve\SieveScript.h" />
     <ClInclude Include="..\Common\Sieve\SieveStorage.h" />
+    <ClInclude Include="..\Common\Sieve\SieveVacationTracker.h" />
+    <ClInclude Include="..\Common\Sieve\SieveVacationResponder.h" />
     <ClInclude Include="..\Common\Sieve\ManageSieveServer.h" />
     <ClInclude Include="..\Common\Application\RemoveExpiredRecords.h" />
     <ClInclude Include="..\Common\Application\Scheduler.h" />
@@ -1127,6 +1132,7 @@ EXIT 0
     <ClInclude Include="..\ExternalFetcher\FetchAccountUIDList.h" />
     <ClInclude Include="..\ExternalFetcher\POP3ClientConnection.h" />
     <ClInclude Include="..\IMAP\FolderListCreator.h" />
+    <ClInclude Include="..\IMAP\IMAPSpecialUse.h" />
     <ClInclude Include="..\IMAP\IMAPACLHelper.h" />
     <ClInclude Include="..\Imap\IMAPCommand.h" />
     <ClInclude Include="..\Imap\IMAPCommandAppend.h" />

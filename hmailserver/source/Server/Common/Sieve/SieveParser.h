@@ -90,6 +90,11 @@ namespace HM
       // vacation (RFC 5230) tags.
       bool daysGiven = false;
       __int64 days = 0;
+      // ":seconds" (RFC 6131). Held separately from days rather than folded into it,
+      // because the two are mutually exclusive and the validator has to be able to
+      // say which one the script actually wrote.
+      bool secondsGiven = false;
+      __int64 seconds = 0;
       bool subjectGiven = false;
       String subject;
       bool handleGiven = false;

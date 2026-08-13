@@ -52,14 +52,19 @@ namespace HM
 
       size_t iIdx = 1;
 
-      // Optional leading selection-option list, e.g. "(SUBSCRIBED)".
+      // Optional leading selection-option list, e.g. "(SUBSCRIBED)" or
+      // "(SPECIAL-USE)".
       bool bOnlySubscribed = false;
+      bool bOnlySpecialUse = false;
       if (pParser->Word(iIdx)->Paranthezied())
       {
          String sSelection = pParser->Word(iIdx)->Value();
-         sSelection.MakeUpper();
-         if (sSelection.Find(_T("SUBSCRIBED")) >= 0)
-            bOnlySubscribed = true;
+
+         bOnlySubscribed = HasOption_(sSelection, _T("SUBSCRIBED"));
+
+         // RFC 6154 section 4.1: return only mailboxes that have a special use.
+         bOnlySpecialUse = HasOption_(sSelection, _T("SPECIAL-USE"));
+
          // REMOTE / RECURSIVEMATCH are accepted but have no effect (no remote folders).
          iIdx++;
       }
@@ -88,15 +93,25 @@ namespace HM
          if (iIdx < iWordCount && pParser->Word(iIdx)->Paranthezied())
          {
             String sReturn = pParser->Word(iIdx)->Value();
-            sReturn.MakeUpper();
-            if (sReturn.Find(_T("SUBSCRIBED")) >= 0)
+
+            if (HasOption_(sReturn, _T("SUBSCRIBED")))
                bAnnotateSubscribed = true;
-            // CHILDREN is always reported (\HasChildren / \HasNoChildren), so it needs no flag.
+
+            // CHILDREN is always reported (\HasChildren / \HasNoChildren), so it needs
+            // no flag.
+            //
+            // RFC 6154 section 4.2, SPECIAL-USE, is likewise accepted and needs no
+            // flag: the special-use attributes are part of every LIST response this
+            // server produces. RFC 6154 allows that, and hMailServer 6.2.18 already
+            // did it for the name-derived attributes, so making them conditional on
+            // the return option would silently strip them from every existing client
+            // that does not know to ask. The option is still parsed, so that a client
+            // sending it is not answered BAD.
             iIdx++;
          }
       }
 
-      bool bExtended = bOnlySubscribed || bAnnotateSubscribed;
+      bool bExtended = bOnlySubscribed || bAnnotateSubscribed || bOnlySpecialUse;
 
       // RFC 5258: every mailbox returned for a SUBSCRIBED selection is, by
       // definition, subscribed, so it must carry the \Subscribed attribute.
@@ -128,8 +143,8 @@ namespace HM
          String sPatternResult;
          if (bExtended)
          {
-            sPatternResult = FolderListCreator::GetIMAPFolderListExtended(pConnection->GetAccount()->GetID(), pFolders, folderSpecifier, "", bOnlySubscribed, bAnnotateSubscribed) +
-                             FolderListCreator::GetIMAPFolderListExtended(pConnection->GetAccount()->GetID(), pPublicFolders, folderSpecifier, sPublicFolderName, bOnlySubscribed, bAnnotateSubscribed);
+            sPatternResult = FolderListCreator::GetIMAPFolderListExtended(pConnection->GetAccount()->GetID(), pFolders, folderSpecifier, "", bOnlySubscribed, bAnnotateSubscribed, bOnlySpecialUse) +
+                             FolderListCreator::GetIMAPFolderListExtended(pConnection->GetAccount()->GetID(), pPublicFolders, folderSpecifier, sPublicFolderName, bOnlySubscribed, bAnnotateSubscribed, bOnlySpecialUse);
          }
          else
          {
@@ -151,8 +166,13 @@ namespace HM
       }
 
       // When nothing matched a non-wildcard request, report the hierarchy root.
-      // (RFC 5258 SUBSCRIBED selection legitimately returns an empty list.)
-      if (sResult.IsEmpty() && bAllPatternsEmpty && !bOnlySubscribed)
+      //
+      // RFC 5258 SUBSCRIBED and RFC 6154 SPECIAL-USE selection legitimately return an
+      // empty list, so the root must not be synthesised for them: it is a plain-LIST
+      // convention from RFC 3501, and the root is \Noselect and can never have a
+      // special use, so a client filtering on SPECIAL-USE would have to know to throw
+      // it away again.
+      if (sResult.IsEmpty() && bAllPatternsEmpty && !bOnlySubscribed && !bOnlySpecialUse)
       {
          hierarchyDelimiter.Replace(_T("\\"), _T("\\\\"));
          sResult = _T("* LIST (\\Noselect) \"") + hierarchyDelimiter + _T("\" \"\"\r\n");
@@ -162,6 +182,31 @@ namespace HM
       pConnection->SendAsciiData(sResult);   
 
       return IMAPResult();
+   }
+
+   bool
+   IMAPCommandLIST::HasOption_(const String &sParenContent, const String &sOption)
+   {
+      // Whole-token comparison rather than a substring search.
+      //
+      // A substring search is what this code used to do, and it was already one option
+      // name away from being wrong: RFC 6154's SPECIAL-USE arrived alongside RFC 5258's
+      // SUBSCRIBED, and any option whose name embeds another - the registry already has
+      // RECURSIVEMATCH next to REMOTE - would silently switch on a filter the client
+      // never asked for. For SUBSCRIBED that means a client suddenly being shown only
+      // part of its mailbox, with nothing in the exchange to explain why.
+      std::vector<String> tokens = StringParser::SplitString(sParenContent, _T(" "));
+
+      for (const String &token : tokens)
+      {
+         String candidate = token;
+         candidate.Trim();
+
+         if (candidate.CompareNoCase(sOption) == 0)
+            return true;
+      }
+
+      return false;
    }
 
    void

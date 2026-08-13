@@ -12,6 +12,7 @@
 #include "../Common/BO/IMAPFolders.h"
 
 #include "../IMAP/IMAPConfiguration.h"
+#include "../IMAP/IMAPSpecialUse.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -30,45 +31,59 @@ namespace HM
 
    }
 
-   String 
-   FolderListCreator::GetIMAPFolderList(__int64 iAccountID, std::shared_ptr<IMAPFolders> pStartFolders, const String &sWildcard, const String &sPrefix) 
+   String
+   FolderListCreator::GetIMAPFolderList(__int64 iAccountID, std::shared_ptr<IMAPFolders> pStartFolders, const String &sWildcard, const String &sPrefix)
    {
-      std::vector<String> vecCurrentFolder;
-      std::vector<String> vecMatchingFolders;
+      ListRequest_ request;
+      request.emit_as_list_ = true;
 
-      CreateIMAPFolderList_(iAccountID, pStartFolders, sWildcard, false, sPrefix, vecCurrentFolder, vecMatchingFolders, true, false);
-
-      String sRet = StringParser::JoinVector(vecMatchingFolders, "\r\n");
-
-      if (!sRet.IsEmpty())
-         sRet += "\r\n";
-
-      return sRet;
-   }
-
-   String 
-   FolderListCreator::GetIMAPLSUBFolderList(__int64 iAccountID, std::shared_ptr<IMAPFolders> pStartFolders, const String &sWildcard, const String &sPrefix) 
-   {
-      std::vector<String> vecCurrentFolder;
-      std::vector<String> vecMatchingFolders;
-
-      CreateIMAPFolderList_(iAccountID, pStartFolders, sWildcard, true, sPrefix, vecCurrentFolder, vecMatchingFolders, false, false);
-
-      String sRet = StringParser::JoinVector(vecMatchingFolders, "\r\n");
-
-      if (!sRet.IsEmpty())
-         sRet += "\r\n";
-
-      return sRet;
+      return Create_(iAccountID, pStartFolders, sWildcard, sPrefix, request);
    }
 
    String
-   FolderListCreator::GetIMAPFolderListExtended(__int64 iAccountID, std::shared_ptr<IMAPFolders> pStartFolders, const String &sWildcard, const String &sPrefix, bool bOnlySubscribed, bool bAnnotateSubscribed)
+   FolderListCreator::GetIMAPLSUBFolderList(__int64 iAccountID, std::shared_ptr<IMAPFolders> pStartFolders, const String &sWildcard, const String &sPrefix)
    {
+      ListRequest_ request;
+      request.emit_as_list_ = false;
+      request.only_subscribed_ = true;
+
+      return Create_(iAccountID, pStartFolders, sWildcard, sPrefix, request);
+   }
+
+   String
+   FolderListCreator::GetIMAPFolderListExtended(__int64 iAccountID, std::shared_ptr<IMAPFolders> pStartFolders, const String &sWildcard, const String &sPrefix, bool bOnlySubscribed, bool bAnnotateSubscribed, bool bOnlySpecialUse)
+   {
+      ListRequest_ request;
+      request.emit_as_list_ = true;
+      request.only_subscribed_ = bOnlySubscribed;
+      request.annotate_subscribed_ = bAnnotateSubscribed;
+      request.only_special_use_ = bOnlySpecialUse;
+
+      return Create_(iAccountID, pStartFolders, sWildcard, sPrefix, request);
+   }
+
+   String
+   FolderListCreator::Create_(__int64 iAccountID, std::shared_ptr<IMAPFolders> pStartFolders, const String &sWildcard, const String &sPrefix, ListRequest_ &request)
+   {
+      // RFC 6154: work out which folder owns which special-use attribute once, before
+      // the walk, rather than deciding per folder inside it.
+      //
+      // It has to be done up front because the rule is a global one - an attribute may
+      // be handed out at most once per mailbox - and a walk that emits each line as it
+      // reaches it cannot know whether a later folder has a better claim. The cost is
+      // one extra pass over the (in-memory, already cached) folder tree per pattern;
+      // the walk itself was already a pass over the same tree, so this doubles a cost
+      // measured in microseconds for a realistic mailbox.
+      //
+      // The public folder collection is identified by account id zero and gets no
+      // designations at all, deliberately: see ListRequest_::special_use_.
+      if (pStartFolders && pStartFolders->GetAccountID() != 0)
+         IMAPSpecialUse::Resolve(pStartFolders, request.special_use_);
+
       std::vector<String> vecCurrentFolder;
       std::vector<String> vecMatchingFolders;
 
-      CreateIMAPFolderList_(iAccountID, pStartFolders, sWildcard, bOnlySubscribed, sPrefix, vecCurrentFolder, vecMatchingFolders, true, bAnnotateSubscribed);
+      CreateIMAPFolderList_(iAccountID, pStartFolders, sWildcard, sPrefix, vecCurrentFolder, vecMatchingFolders, request);
 
       String sRet = StringParser::JoinVector(vecMatchingFolders, "\r\n");
 
@@ -79,7 +94,7 @@ namespace HM
    }
 
    void
-   FolderListCreator::CreateIMAPFolderList_(__int64 iAccountID, std::shared_ptr<IMAPFolders> pStartFolders, const String &sWildcard, bool bOnlySubscribed, const String &sPrefix, std::vector<String> &vecCurrentFolder, std::vector<String> &vecMatchingFolders, bool bEmitAsList, bool bAnnotateSubscribed) 
+   FolderListCreator::CreateIMAPFolderList_(__int64 iAccountID, std::shared_ptr<IMAPFolders> pStartFolders, const String &sWildcard, const String &sPrefix, std::vector<String> &vecCurrentFolder, std::vector<String> &vecMatchingFolders, const ListRequest_ &request)
    {
       if (vecCurrentFolder.size() > IMAPFolder::MaxFolderDepth)    
          return;
@@ -114,14 +129,14 @@ namespace HM
          // Do we match?
          if (FolderWildcardMatch_(sFullPath, sWildcard, hierarchyDelimiter))
          {
-            String sFolderLine = CreateFolderLine_(currentFolder, bOnlySubscribed, hasSubFolders, sFullPath, sWildcard, true, hierarchyDelimiter, bEmitAsList, bAnnotateSubscribed );
+            String sFolderLine = CreateFolderLine_(currentFolder, hasSubFolders, sFullPath, sWildcard, true, hierarchyDelimiter, request);
 
             if (!sFolderLine.IsEmpty())
                vecMatchingFolders.push_back(sFolderLine);
          }
 
          if (hasSubFolders)
-            CreateIMAPFolderList_(iAccountID, subFolders, sWildcard, bOnlySubscribed, sPrefix, vecCurrentFolder, vecMatchingFolders, bEmitAsList, bAnnotateSubscribed);
+            CreateIMAPFolderList_(iAccountID, subFolders, sWildcard, sPrefix, vecCurrentFolder, vecMatchingFolders, request);
 
          vecCurrentFolder.erase(vecCurrentFolder.end() - 1);
       }
@@ -135,7 +150,7 @@ namespace HM
          if (FolderWildcardMatch_(publicFolderName, sWildcard, hierarchyDelimiter))
          {
             std::shared_ptr<IMAPFolder> pFolderDummy;
-            String sFolderLine = CreateFolderLine_(pFolderDummy, bOnlySubscribed, true, publicFolderName, sWildcard, false, hierarchyDelimiter, bEmitAsList, bAnnotateSubscribed);
+            String sFolderLine = CreateFolderLine_(pFolderDummy, true, publicFolderName, sWildcard, false, hierarchyDelimiter, request);
 
             if (!sFolderLine.IsEmpty())
                vecMatchingFolders.push_back(sFolderLine);
@@ -145,27 +160,37 @@ namespace HM
 
    }
 
-   String 
-   FolderListCreator::CreateFolderLine_(std::shared_ptr<IMAPFolder> currentFolder, bool bOnlySubscribed, bool hasSubFolders, String &sFullPath, const String &sWildcard, bool isSelectable, String hierarchyDelimiter, bool bEmitAsList, bool bAnnotateSubscribed)
+   String
+   FolderListCreator::CreateFolderLine_(std::shared_ptr<IMAPFolder> currentFolder, bool hasSubFolders, String &sFullPath, const String &sWildcard, bool isSelectable, String hierarchyDelimiter, const ListRequest_ &request)
    {
       String nameAttributes = hasSubFolders ? "\\HasChildren" : "\\HasNoChildren";
 
       if (!isSelectable)
          nameAttributes += " \\Noselect";
 
-      // RFC 6154 special-use attributes for well-known top-level folders,
-      // so that clients map Sent/Drafts/Trash/Junk automatically instead
-      // of creating duplicates.
-      if (isSelectable && sFullPath.Find(hierarchyDelimiter) < 0)
-      {
-         String specialUse = GetSpecialUseAttribute_(sFullPath);
-         if (!specialUse.IsEmpty())
-            nameAttributes += " " + specialUse;
-      }
+      // RFC 6154 special-use attributes, so that clients map Sent/Drafts/Trash/Junk
+      // automatically instead of creating duplicates. Which folder owns which
+      // attribute was decided once, for the whole mailbox, in Create_.
+      //
+      // They are emitted whether or not the client asked for them with
+      // RETURN (SPECIAL-USE). RFC 6154 section 4.2 permits that, and hMailServer
+      // 6.2.18 already emitted the name-derived ones unconditionally: making them
+      // conditional now would take the attributes away from every client that relies
+      // on the old behaviour without asking, which is the larger regression.
+      int designations = GetDesignations_(currentFolder, request);
+      if (isSelectable && designations != IMAPSpecialUse::DesignationNone)
+         nameAttributes += " " + IMAPSpecialUse::FormatDesignations(designations);
+
+      // RFC 6154 section 4.1, the SPECIAL-USE selection option: return only mailboxes
+      // that have a special use. Checked after the attributes are computed and before
+      // anything is emitted, so the \Noselect public-folder root - which can never
+      // carry a designation - is filtered out too.
+      if (request.only_special_use_ && (!isSelectable || designations == IMAPSpecialUse::DesignationNone))
+         return _T("");
 
       // RFC 5258 (LIST-EXTENDED) return option SUBSCRIBED: annotate folders the
       // user is subscribed to with the \Subscribed attribute.
-      if (bAnnotateSubscribed && (!currentFolder || currentFolder->GetIsSubscribed()))
+      if (request.annotate_subscribed_ && (!currentFolder || currentFolder->GetIsSubscribed()))
          nameAttributes += " \\Subscribed";
 
       // Workaround for Outlook "feature".
@@ -185,17 +210,17 @@ namespace HM
       // \ needs to be escaped.
       hierarchyDelimiter.Replace(_T("\\"), _T("\\\\"));
 
-      if (!bEmitAsList)
+      if (!request.emit_as_list_)
       {
          // LSUB listing: only subscribed folders, emitted as "* LSUB".
-         if (bOnlySubscribed && (!currentFolder || currentFolder->GetIsSubscribed()))
+         if (request.only_subscribed_ && (!currentFolder || currentFolder->GetIsSubscribed()))
             sFolderLine.Format(_T("* LSUB (%s) \"%s\" %s"), nameAttributes.c_str(), hierarchyDelimiter.c_str(), sFullPath.c_str());
       }
       else
       {
          // LIST / LIST-EXTENDED listing, emitted as "* LIST". When the SUBSCRIBED
          // selection option is active, unsubscribed folders are filtered out.
-         if (bOnlySubscribed && currentFolder && !currentFolder->GetIsSubscribed())
+         if (request.only_subscribed_ && currentFolder && !currentFolder->GetIsSubscribed())
             return _T("");
 
          sFolderLine.Format(_T("* LIST (%s) \"%s\" %s"), nameAttributes.c_str(), hierarchyDelimiter.c_str(), sFullPath.c_str());
@@ -204,33 +229,19 @@ namespace HM
       return sFolderLine;
    }
 
-   String
-   FolderListCreator::GetSpecialUseAttribute_(const String &folderName)
+   int
+   FolderListCreator::GetDesignations_(std::shared_ptr<IMAPFolder> currentFolder, const ListRequest_ &request)
    {
-      if (folderName.CompareNoCase(_T("Sent")) == 0 ||
-          folderName.CompareNoCase(_T("Sent Items")) == 0 ||
-          folderName.CompareNoCase(_T("Sent Messages")) == 0)
-         return "\\Sent";
+      // The dummy folder used for the public-folder root has no row and therefore no
+      // designation.
+      if (!currentFolder)
+         return IMAPSpecialUse::DesignationNone;
 
-      if (folderName.CompareNoCase(_T("Drafts")) == 0)
-         return "\\Drafts";
+      auto iterDesignation = request.special_use_.find(currentFolder->GetID());
+      if (iterDesignation == request.special_use_.end())
+         return IMAPSpecialUse::DesignationNone;
 
-      if (folderName.CompareNoCase(_T("Trash")) == 0 ||
-          folderName.CompareNoCase(_T("Deleted Items")) == 0 ||
-          folderName.CompareNoCase(_T("Deleted Messages")) == 0)
-         return "\\Trash";
-
-      if (folderName.CompareNoCase(_T("Junk")) == 0 ||
-          folderName.CompareNoCase(_T("Junk E-mail")) == 0 ||
-          folderName.CompareNoCase(_T("Junk Email")) == 0 ||
-          folderName.CompareNoCase(_T("Spam")) == 0)
-         return "\\Junk";
-
-      if (folderName.CompareNoCase(_T("Archive")) == 0 ||
-          folderName.CompareNoCase(_T("Archives")) == 0)
-         return "\\Archive";
-
-      return "";
+      return (*iterDesignation).second;
    }
 
    bool

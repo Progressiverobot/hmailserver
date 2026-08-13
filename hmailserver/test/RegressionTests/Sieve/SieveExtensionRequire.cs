@@ -130,9 +130,18 @@ namespace RegressionTests.Sieve
          Assert.IsNotEmpty(CheckSyntax("require \"vacation\";\r\nvacation :days 0 \"away\";"));
          Assert.IsEmpty(CheckSyntax("require \"vacation\";\r\nvacation :days 1 \"away\";"));
 
-         // ":from" would forge the sender of the reply; the reply always comes from
-         // the account itself, so accepting the tag and ignoring it would mislead.
-         Assert.IsNotEmpty(CheckSyntax("require \"vacation\";\r\nvacation :from \"other@example.test\" \"away\";"));
+         // ":from" used to be refused outright on the grounds that accepting a tag and
+         // ignoring it would mislead. It is implemented now, so refusing it would be the
+         // misleading answer: it is honoured only for an address that actually reaches this
+         // account - the account itself or an active alias pointing at it - which cannot be
+         // checked without the account, so it is enforced at delivery time in
+         // SieveVacationResponder and covered by SieveVacationDelivery.
+         //
+         // What the validator can still check is that it is an address at all, and it must,
+         // because a malformed :from would otherwise fail silently at delivery on a script
+         // the user was told was valid.
+         Assert.IsEmpty(CheckSyntax("require \"vacation\";\r\nvacation :from \"other@example.test\" \"away\";"));
+         Assert.IsNotEmpty(CheckSyntax("require \"vacation\";\r\nvacation :from \"not an address\" \"away\";"));
       }
 
       [Test]

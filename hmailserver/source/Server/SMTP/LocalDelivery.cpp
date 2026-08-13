@@ -30,6 +30,7 @@
 #include "../common/Util/Parsing/StringParser.h"
 #include "../common/Sieve/SieveStorage.h"
 #include "../common/Sieve/SieveScript.h"
+#include "../common/Sieve/SieveVacationResponder.h"
 
 #include "../IMAP/MessagesContainer.h"
 
@@ -218,7 +219,7 @@ namespace HM
       // (a discard, or a redirect with no keep).
       String sieveFolder;
       bool sieveDrop = false;
-      EvaluateSieveScript_(account, accountLevelMessage, sieveFolder, sieveDrop);
+      EvaluateSieveScript_(account, accountLevelMessage, sOriginalAddress, sieveFolder, sieveDrop);
 
       if (sieveDrop)
       {
@@ -268,7 +269,7 @@ namespace HM
    }
 
    void
-   LocalDelivery::EvaluateSieveScript_(std::shared_ptr<const Account> account, std::shared_ptr<Message> message, String &sieveFolder, bool &sieveDrop)
+   LocalDelivery::EvaluateSieveScript_(std::shared_ptr<const Account> account, std::shared_ptr<Message> message, const String &sOriginalAddress, String &sieveFolder, bool &sieveDrop)
    {
       sieveFolder = _T("");
       sieveDrop = false;
@@ -281,10 +282,23 @@ namespace HM
       String messageFileName = PersistentMessage::GetFileName(account, message);
       String rawMessage = FileUtilities::ReadCompleteTextFile(messageFileName);
 
-      String actions = SieveScript::Evaluate(script, rawMessage);
+      // The SMTP envelope. The evaluator can fall back to the Return-Path and
+      // Delivered-To trace headers, but Delivered-To is off in the shipped
+      // configuration, and without the envelope recipient the RFC 5230 4.5 check that
+      // refuses to auto-reply to mail the user was not addressed in has nothing to
+      // check against - it would be silently skipped on a default install, which is
+      // the failure mode of a loop guard that exists on paper only.
+      SieveEnvelope envelope;
+      envelope.available = true;
+      envelope.from = message->GetFromAddress();
+      envelope.to = sOriginalAddress.IsEmpty() ? account->GetAddress() : sOriginalAddress;
+
+      SieveResult sieveResult;
+      String actions = SieveScript::Evaluate(script, rawMessage, envelope, sieveResult);
 
       // A script that fails to parse must never break delivery; fall through to a
-      // normal keep.
+      // normal keep. (The structured result is already at its defaults in that case,
+      // so the early return only exists to log which script and why.)
       if (actions.StartsWith(_T("error:")))
       {
          String sMessage = Formatter::Format("SMTPDeliverer - Message {0}: Sieve script for {1} could not be evaluated ({2}).",
@@ -293,38 +307,32 @@ namespace HM
          return;
       }
 
-      bool keepLocal = false;
-      String fileInto;
-      std::vector<String> redirects;
-
-      std::vector<String> tokens = StringParser::SplitString(actions, _T(";"));
-      for (const String &token : tokens)
-      {
-         if (token.CompareNoCase(_T("keep")) == 0)
-            keepLocal = true;
-         else if (token.StartsWith(_T("fileinto:")))
-         {
-            fileInto = token.Mid(9);
-            keepLocal = true;
-         }
-         else if (token.StartsWith(_T("redirect:")))
-            redirects.push_back(token.Mid(9));
-         // "discard" leaves keepLocal false (no local delivery).
-      }
-
-      // Fire any redirect actions (each queues a copy to the target address).
-      for (const String &target : redirects)
+      // The delivery decision is read from the structured result rather than parsed
+      // back out of the ';'-joined summary string. Both were available before and this
+      // used the summary, which was wrong twice over: a mailbox name containing a ';'
+      // ("fileinto \"Projects;2026\"") split into two tokens and filed the message
+      // nowhere, and having the vacation decision come from one representation while
+      // the keep/fileinto decision came from the other is precisely how the two drift
+      // apart. The summary is still what the COM diagnostic and the tests read, so it
+      // is not going away - it just is not what delivery acts on.
+      for (const String &target : sieveResult.redirects)
       {
          SMTPForwarding forwarder;
          forwarder.RedirectToAddress(account, message, target);
       }
 
-      if (!fileInto.IsEmpty())
-         sieveFolder = fileInto;
+      // Fire the RFC 5230 vacation auto-reply, if the script asked for one and it
+      // survived every loop-prevention check the evaluator could apply. The responder
+      // applies the suppression window and the remaining guards, and never touches the
+      // delivery of the message itself, so nothing below depends on it.
+      SieveVacationResponder::Instance()->Respond(account, sieveResult.vacation);
 
-      // When the script kept neither an explicit nor implicit local copy (a
-      // discard, or a redirect that cancels the implicit keep), drop it locally.
-      if (!keepLocal)
+      if (!sieveResult.fileInto.IsEmpty())
+         sieveFolder = sieveResult.fileInto;
+
+      // When the script kept neither an explicit nor implicit local copy (a discard,
+      // or a redirect that cancels the implicit keep), drop it locally.
+      if (!sieveResult.keepLocal)
          sieveDrop = true;
    }
 

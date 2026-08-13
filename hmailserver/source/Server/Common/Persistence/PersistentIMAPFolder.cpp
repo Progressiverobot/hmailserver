@@ -133,6 +133,24 @@ namespace HM
          oStatement.AddColumn("foldercurrentuid", pFolder->GetCurrentUID());
          oStatement.AddColumnInt64("foldercurrentmodseq", pFolder->GetCurrentModSeq());
          oStatement.AddColumnDate("foldercreationtime", pFolder->GetCreationTime());
+
+         // RFC 6154 (SPECIAL-USE), on the insert path only, and the asymmetry is
+         // deliberate.
+         //
+         // It has to be here at all because a backup restore inserts folders through
+         // Collection::XMLLoad, and a restore that dropped the designation would leave
+         // the user's client guessing again in the one mailbox where guessing does not
+         // work. A CREATE always inserts zero here; the designation is written
+         // afterwards by IMAPFolder::StoreSpecialUseFlags.
+         //
+         // It must NOT be in the update column list below. Every caller that saves an
+         // existing folder - RENAME, the COM Subscribed setter, the folder collection -
+         // would then write back whatever designation its cached copy happens to hold,
+         // so a stale object from before a CREATE ... USE would silently clear the
+         // attribute. Leaving the column out of the UPDATE means the only writer of a
+         // live row is the single-column statement in StoreSpecialUseFlags, which is
+         // also the only code that has been asked to change it.
+         oStatement.AddColumn("folderspecialuse", (long) pFolder->GetSpecialUseFlags());
       }
       else
       {

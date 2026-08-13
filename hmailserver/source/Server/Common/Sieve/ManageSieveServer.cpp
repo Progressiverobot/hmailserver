@@ -126,19 +126,33 @@ namespace HM
       // engine also implements "vacation", "imap4flags" and "envelope", and each
       // needs exactly one more step in the delivery path before it is real:
       //
-      //   vacation    LocalDelivery::EvaluateSieveScript_ must act on the
-      //               "vacation" summary token (or better, on
-      //               SieveResult::vacation) by calling
-      //               SMTPVacationMessageCreator::CreateVacationMessage.
       //   imap4flags  ... must act on the "flags:" summary token when it stores
       //               the local copy of the message.
       //   envelope    ... must pass the SMTP envelope into the evaluator, so that
       //               envelope "to" works without the Delivered-To header, which
-      //               is off in the shipped configuration.
+      //               is off in the shipped configuration. LocalDelivery now does
+      //               pass the envelope in - it had to, because RFC 5230 4.5's
+      //               recipient check for vacation depends on it - so this one is
+      //               close, but "close" is not the bar this comment sets: it goes
+      //               in when a test proves the envelope test command itself works,
+      //               not when the plumbing that would let it work exists.
       //
       // Move a name in here in the same commit that lands its delivery-side step.
       // Not before.
-      const char *AdvertisedSieveExtensions = "fileinto copy relational subaddress";
+      //
+      // vacation moved in on 13 August 2026, under that rule and not ahead of it:
+      // the reply is composed and queued (SieveVacationResponder), the suppression
+      // window is recorded in a store that fails closed (SieveVacationTracker), and
+      // twelve end-to-end tests in SieveVacationDelivery.cs assert that mail
+      // actually arrives rather than that a summary token was produced - which is
+      // the distinction that let "vacation" sit half-built for so long, because the
+      // action summary said it had happened.
+      //
+      // vacation-seconds is named alongside it because the parser accepts :seconds
+      // and RFC 6131 requires the capability to be advertised separately; a client
+      // that offers a seconds-granularity control it cannot rely on is the same
+      // defect in the other direction.
+      const char *AdvertisedSieveExtensions = "fileinto copy relational subaddress vacation vacation-seconds";
 
       AnsiString EscapeQuoted(const String &value)
       {

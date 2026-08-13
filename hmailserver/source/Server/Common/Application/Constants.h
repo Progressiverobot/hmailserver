@@ -140,4 +140,5 @@
 
 #define PROPERTY_TLSOPTIONS                     _T("TlsOptions")
 
-#define REQUIRED_DB_VERSION            6005
+// 6006 adds hm_imapfolders.folderspecialuse (RFC 6154 SPECIAL-USE).
+#define REQUIRED_DB_VERSION            6006

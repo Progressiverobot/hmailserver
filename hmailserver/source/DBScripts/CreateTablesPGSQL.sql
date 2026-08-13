@@ -255,7 +255,8 @@ create table hm_imapfolders
   folderissubscribed smallint NOT NULL,
   foldercreationtime timestamp NOT NULL,
   foldercurrentuid bigint NOT NULL,
-  foldercurrentmodseq bigint NOT NULL default 1
+  foldercurrentmodseq bigint NOT NULL default 1,
+  folderspecialuse int NOT NULL default 0
 );
 
 CREATE INDEX idx_hm_imapfolders ON hm_imapfolders (folderaccountid);
@@ -820,4 +821,4 @@ insert into hm_tcpipports (portprotocol, portnumber, portaddress1, portaddress2,
 
 insert into hm_tcpipports (portprotocol, portnumber, portaddress1, portaddress2, portconnectionsecurity, portsslcertificateid) values (5, 143, 0, NULL, 0, 0);
 
-insert into hm_dbversion values (6005);
+insert into hm_dbversion values (6006);

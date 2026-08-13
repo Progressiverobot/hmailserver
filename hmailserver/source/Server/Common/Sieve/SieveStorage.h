@@ -41,6 +41,13 @@ namespace HM
       // empty name deactivates Sieve filtering for the account.
       static bool SetActiveScriptName(const String &accountAddress, const String &name);
 
+      // Where SieveVacationTracker keeps the account's RFC 5230 4.7 response
+      // records. It lives here rather than in the tracker so that the layout of an
+      // account's Sieve directory is described in exactly one place - the
+      // sanitisation that stops an unusual local-part escaping that directory is the
+      // part that must not be reimplemented.
+      static String GetVacationStorePath(const String &accountAddress);
+
    private:
       static String GetAccountDirectory_(const String &accountAddress);
       static String GetActiveScriptPath_(const String &accountAddress);

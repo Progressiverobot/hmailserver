@@ -24,6 +24,7 @@ namespace HM
                 lowerTag == _T("count") ||
                 lowerTag == _T("flags") ||
                 lowerTag == _T("days") ||
+                lowerTag == _T("seconds") ||
                 lowerTag == _T("subject") ||
                 lowerTag == _T("handle") ||
                 lowerTag == _T("from") ||
@@ -90,6 +91,11 @@ namespace HM
          L"envelope",
          L"imap4flags",
          L"vacation",
+         // RFC 6131. Naming it separately from "vacation" is the point of the
+         // extension: a script that says ":seconds" must be refused outright by a
+         // server that would round it up to a day, because "reply again after two
+         // minutes" and "reply again tomorrow" are not the same instruction.
+         L"vacation-seconds",
          L"copy",
          L"relational",
          L"subaddress",
@@ -266,6 +272,20 @@ namespace HM
 
             result.days = value->number;
             result.daysGiven = true;
+            i++;
+            continue;
+         }
+
+         if (tag == _T("seconds"))
+         {
+            if (value == nullptr || value->kind != SieveArgument::Kind::Number)
+            {
+               errorMessage.Format(_T("Line %d: ':seconds' must be followed by a number."), argument.line);
+               return false;
+            }
+
+            result.seconds = value->number;
+            result.secondsGiven = true;
             i++;
             continue;
          }
@@ -505,6 +525,14 @@ namespace HM
             }
 
             required_.insert(name);
+
+            // RFC 6131 3: "vacation-seconds" implies "vacation". A script that
+            // requires only the former and then uses a plain "vacation :days" is
+            // legal, so the implication has to be recorded here rather than demanded
+            // of the author.
+            if (name.Compare(_T("vacation-seconds")) == 0)
+               required_.insert(_T("vacation"));
+
             sawCapability = true;
          }
       }
@@ -982,16 +1010,19 @@ namespace HM
          if (!NeedExtension_(_T("vacation"), _T("the 'vacation' action"), command->line, errorMessage))
             return false;
 
-         if (!CheckTags_(set, _T("days subject addresses mime handle from"), _T("'vacation'"), errorMessage))
+         if (!CheckTags_(set, _T("days seconds subject addresses mime handle from"), _T("'vacation'"), errorMessage))
             return false;
 
-         if (set.fromGiven)
+         if (set.secondsGiven && !NeedExtension_(_T("vacation-seconds"), _T("':seconds'"), command->line, errorMessage))
+            return false;
+
+         if (set.daysGiven && set.secondsGiven)
          {
-            // The auto-reply is generated with the account's own address as the
-            // sender. Accepting :from and then ignoring it would let a script
-            // believe it can forge the reply's sender.
-            errorMessage.Format(_T("Line %d: 'vacation :from' is not supported by this server; ")
-               _T("the reply is always sent from the account's own address."), command->line);
+            // RFC 6131 3: the two are mutually exclusive. Silently preferring one
+            // would make the suppression window depend on which branch of the
+            // evaluator the reader happened to look at, and the author would have no
+            // way of finding out which they got.
+            errorMessage.Format(_T("Line %d: 'vacation' takes either ':days' or ':seconds', not both."), command->line);
             return false;
          }
 
@@ -999,6 +1030,40 @@ namespace HM
          {
             errorMessage.Format(_T("Line %d: 'vacation :days' must be at least 1."), command->line);
             return false;
+         }
+
+         if (set.secondsGiven && set.seconds < 0)
+         {
+            // Zero is legal and meaningful (RFC 6131: respond to every message);
+            // negative is not, and would arrive at the tracker looking exactly like
+            // zero, which is not what the author wrote.
+            errorMessage.Format(_T("Line %d: 'vacation :seconds' cannot be negative."), command->line);
+            return false;
+         }
+
+         // ":from" and ":addresses" both name addresses, and both feed a decision
+         // about who a reply may be sent as and to. A malformed entry is therefore
+         // caught at upload time rather than shrugged off at delivery time: an
+         // ":addresses" entry that does not parse silently contributes nothing to the
+         // RFC 5230 4.5 recipient check, which is a loop guard, and the author would
+         // never know. ":from" is accepted here and checked again at delivery time,
+         // where the account is known and "is this one of the user's own addresses?"
+         // can actually be answered.
+         if (set.fromGiven && !StringParser::IsValidEmailAddress(set.fromAddress))
+         {
+            errorMessage.Format(_T("Line %d: 'vacation :from' is not a valid email address: '%s'."),
+               command->line, set.fromAddress.c_str());
+            return false;
+         }
+
+         for (const String &address : set.addresses)
+         {
+            if (!StringParser::IsValidEmailAddress(address))
+            {
+               errorMessage.Format(_T("Line %d: 'vacation :addresses' contains something that is not an email address: '%s'."),
+                  command->line, address.c_str());
+               return false;
+            }
          }
 
          if (set.stringLists.size() != 1 || set.stringLists[0].size() != 1)

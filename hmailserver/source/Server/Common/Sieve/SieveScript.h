@@ -7,6 +7,7 @@
 #include <memory>
 
 #include "SieveParser.h"
+#include "SieveEvaluator.h"
 
 namespace HM
 {
@@ -31,7 +32,23 @@ namespace HM
       // Convenience: parses the script and evaluates it against a raw RFC 822
       // message, returning the ';'-joined action summary (e.g. "fileinto:Spam",
       // "discard", "keep") or "error: <message>" when the script does not parse.
+      //
+      // This overload has no side effects, which is what makes it safe as the COM
+      // "evaluate this script against this message" diagnostic: it decides that a
+      // vacation reply is due (the summary carries a "vacation" token) without
+      // sending one or recording one as sent.
       static String Evaluate(const String &script, const String &rawMessage);
+
+      // As above, and also fills in the structured result. The delivery path needs
+      // this overload rather than the summary string for two reasons: the summary
+      // cannot carry a vacation reason or subject (either may contain the ';' the
+      // summary is joined with), and the SMTP envelope has to go in for "envelope"
+      // tests and the RFC 5230 4.5 recipient check to mean anything - the fallback
+      // trace header (Delivered-To) is off in a default install.
+      static String Evaluate(const String &script,
+                             const String &rawMessage,
+                             const SieveEnvelope &envelope,
+                             SieveResult &result);
 
    private:
       std::vector<std::shared_ptr<SieveCommand>> commands_;

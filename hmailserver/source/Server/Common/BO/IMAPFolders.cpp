@@ -46,7 +46,7 @@ namespace HM
 
       vecObjects.clear();
 
-      SQLCommand command("select folderid, folderparentid, foldername, folderissubscribed, foldercurrentuid, foldercurrentmodseq, foldercreationtime from hm_imapfolders "
+      SQLCommand command("select folderid, folderparentid, foldername, folderissubscribed, foldercurrentuid, foldercurrentmodseq, folderspecialuse, foldercreationtime from hm_imapfolders "
                          " where folderaccountid = @FOLDERACCOUNTID order by folderid asc");
 
       command.AddParameter("@FOLDERACCOUNTID", account_id_);
@@ -66,6 +66,7 @@ namespace HM
          bool bShared = false;
          unsigned int currentUID = 0;
          __int64 currentModSeq = 1;
+         int specialUseFlags = 0;
          DateTime creationTime;
 
          while (!pRS->IsEOF())
@@ -76,6 +77,12 @@ namespace HM
             bIsSubscribed = (pRS->GetLongValue("folderissubscribed") == 1) ? true : false;
             currentUID = (unsigned int) pRS->GetInt64Value("foldercurrentuid");
             currentModSeq = pRS->GetInt64Value("foldercurrentmodseq");
+
+            // RFC 6154 (SPECIAL-USE). Read as a long and narrowed: the column is int
+            // on every backend, so the value always fits, and taking it as a long
+            // keeps the recordset accessor the same one folderissubscribed uses.
+            specialUseFlags = (int) pRS->GetLongValue("folderspecialuse");
+
             creationTime = Time::GetDateFromSystemDate(pRS->GetStringValue("foldercreationtime"));
 
             // Initialize with dummy parent folder. We can't set it here since it may not
@@ -87,6 +94,7 @@ namespace HM
             pFolder->SetIsSubscribed(bIsSubscribed);
             pFolder->SetCurrentUID(currentUID);
             pFolder->SetCurrentModSeq(currentModSeq);
+            pFolder->SetSpecialUseFlags(specialUseFlags);
             pFolder->SetCreationTime(creationTime);
 
             vecIMAPFolders.push_back(std::make_pair(iParentID, pFolder));

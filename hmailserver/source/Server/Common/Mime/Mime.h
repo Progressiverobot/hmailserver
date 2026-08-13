@@ -258,8 +258,20 @@ namespace HM
 	   static const MediaTypeCvt type_cvt_table_[];
 	   static const char* type_table_[];
 
-   private:
+   public:
+      // Decodes one header value that is already in hand, rather than one held by a
+      // MimeHeader instance. Made public on 13 August 2026 for the Sieve vacation
+      // responder, which has the raw Subject of the message it is replying to and needs
+      // the decoded form to build "Auto: <subject>".
+      //
+      // Public is the right access for it: it is a static pure function of its two
+      // arguments, holds no state and touches none, so exposing it grants no access to a
+      // header's internals. The alternative - having the caller construct a MimeHeader
+      // around a value it already has, purely to reach the instance overload - would be
+      // more code doing more work for the same result.
       static String GetUnicodeFieldValue(const AnsiString &pszFieldName, const AnsiString &sRawFieldValue);
+
+   private:
 
 	   MimeHeader& operator=(const MimeHeader&);		// forbid operator =
    };
