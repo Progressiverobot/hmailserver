@@ -2109,7 +2109,27 @@ namespace HM
          }
       }
 
-      if (GetAuthIsEnabled_() && (IsSSLConnection() || GetConnectionSecurity() != CSSTARTTLSRequired))
+      // RFC 4954 section 4: a server must not announce a mechanism it will not accept on
+      // this connection. AUTH is refused on a cleartext connection in two cases, not one
+      // - the port being CSSTARTTLSRequired, and the connecting IP range setting
+      // RequireTLSForAuth (see the 530 in ProtocolAUTH_) - and only the first was
+      // reflected here.
+      //
+      // In the second case EHLO offered "AUTH LOGIN PLAIN SCRAM-SHA-256" and the AUTH
+      // that followed was answered 530, by which time the client had already sent
+      // base64(authzid NUL authcid NUL password) for PLAIN, or the base64 user name and
+      // password for LOGIN. The credential is on the wire in the clear before the
+      // refusal, which is the exact thing RequireTLSForAuth exists to prevent.
+      //
+      // Fourth protocol with this defect and the most exposed of them: POP3 CAPA and the
+      // ManageSieve capability response were fixed earlier the same week, IMAP CAPABILITY
+      // in the same change as this one. The condition is written the same way in all
+      // four so they read as one decision rather than four that happen to agree.
+      const bool authRefusedOnCleartext =
+         GetConnectionSecurity() == CSSTARTTLSRequired ||
+         GetSecurityRange()->GetRequireTLSForAuth();
+
+      if (GetAuthIsEnabled_() && (IsSSLConnection() || !authRefusedOnCleartext))
       {
          String sAuth = "\r\n250-AUTH LOGIN";
 
