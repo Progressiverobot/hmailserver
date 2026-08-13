@@ -41,6 +41,29 @@ namespace hMailServer.ControlPanel.Tests.Services
       }
 
       /// <summary>
+      /// Every intent has to lead somewhere that exists.
+      ///
+      /// An IntentIndex entry naming a page key that NavigationMap does not have is
+      /// worse than a missing intent: the palette offers the row, the user picks it, and
+      /// nothing happens - or the application navigates to nothing. It is also the
+      /// easiest mistake to make here, because the phrases and the page keys are written
+      /// in different files by hand, and nothing but this test connects them. Fails the
+      /// moment a page is renamed without its intents being updated.
+      /// </summary>
+      [Fact]
+      public void EveryIntentPointsAtAPageThatExists()
+      {
+         var missing = IntentIndex.Entries
+            .Where(entry => NavigationMap.Find(entry.Page) == null)
+            .Select(entry => "'" + entry.Phrase + "' -> " + entry.Page)
+            .ToList();
+
+         Assert.True(missing.Count == 0,
+            "These intents name pages that do not exist in NavigationMap: "
+            + string.Join("; ", missing));
+      }
+
+      /// <summary>
       /// A verb plus a noun must not return less than the noun alone.
       ///
       /// Two words is the commonest thing anybody types, and it was the one length the

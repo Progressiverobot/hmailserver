@@ -113,6 +113,28 @@ namespace hMailServer.ControlPanel.Tests.Services
       }
 
       [Fact]
+      public void BuildRefusesASeriesListThatDoesNotMatchTheDefinition()
+      {
+         // Headers come from the definition and value cells from the series list, so a
+         // caller supplying a different number of series than the chart defines builds a
+         // table whose columns do not line up - and ToDelimitedText then emits a TSV that
+         // pastes into a spreadsheet as misaligned data rather than as an error. Refused
+         // rather than padded: a mismatch means the caller and the definition disagree
+         // about what the chart is, and guessing turns a wiring mistake into wrong
+         // numbers on a screen somebody trusts.
+         ChartDefinition definition = ChartCatalog.DashboardSessions;   // three series
+
+         var tooFew = new[]
+         {
+            new ChartSeriesSamples("SMTP", new double?[] { 1, 2, 3 })
+         };
+
+         var times = new List<DateTime> { DateTime.Now, DateTime.Now, DateTime.Now };
+
+         Assert.Throws<ArgumentException>(() => ChartDataTable.Build(definition, tooFew, times));
+      }
+
+      [Fact]
       public void RowsAreNewestFirst()
       {
          // Reading a table with a screen reader is sequential, and the row the

@@ -476,11 +476,45 @@ namespace hMailServer.ControlPanel.Views
          surface_.ClearValue(Border.BackgroundProperty);
          surface_.ClearValue(Border.BorderBrushProperty);
          surface_.ClearValue(Border.BorderThicknessProperty);
+
+         MakeSurfaceOpaque_();
          table_.ClearValue(Control.ForegroundProperty);
          table_.ClearValue(DataGrid.CellStyleProperty);
          table_.ClearValue(DataGrid.ColumnHeaderStyleProperty);
          titleText_.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
          summaryText_.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
+      }
+
+      /// <summary>
+      ///    Removes the transparency from the card's background without choosing its
+      ///    colour.
+      ///
+      ///    A chart series lands on whatever is behind it, and the window is Mica - so a
+      ///    card whose background carries any alpha puts the plot over a non-deterministic
+      ///    composited surface, and no contrast ratio computed against the card's nominal
+      ///    colour actually holds. That is the whole of the "chart cards are translucent
+      ///    over Mica" defect: not that the colour is wrong, but that there is no
+      ///    guaranteed colour at all.
+      ///
+      ///    Deliberately keeps the theme's own colour and only forces the alpha channel.
+      ///    Picking an opaque token here instead would mean this file having an opinion
+      ///    about the card palette for Light and Dark, which is the designer's decision
+      ///    and would drift the moment the theme changed. Re-applied on every theme
+      ///    change, because it pins a local value over the style - and ApplyTheme_ now
+      ///    runs on the light/dark toggle AND on Windows switching High Contrast, so the
+      ///    pin can never outlive the colour it was derived from.
+      ///
+      ///    Anything that is not a plain SolidColorBrush is left alone: a gradient or an
+      ///    image behind a chart is a deliberate choice by whoever put it there, and
+      ///    flattening it would be this method exceeding its remit.
+      /// </summary>
+      private void MakeSurfaceOpaque_()
+      {
+         if (surface_.Background is not SolidColorBrush brush || brush.Color.A == 255)
+            return;
+
+         Color c = brush.Color;
+         surface_.Background = new SolidColorBrush(Color.FromRgb(c.R, c.G, c.B));
       }
 
       /// <summary>

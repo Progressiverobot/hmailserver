@@ -51,7 +51,7 @@ strong and where it is thin far more honestly than any prose summary.
 | **Control Panel findability and accessibility** | | | | |
 | [What is concretely wrong](#what-is-concretely-wrong) | 3 | – | 4 | – |
 | [What to do about it](#what-to-do-about-it) | 2 | 2 | 2 | – |
-| [Accessibility, which is not optional](#accessibility-which-is-not-optional) | 4 | 2 | 2 | – |
+| [Accessibility, which is not optional](#accessibility-which-is-not-optional) | 5 | 2 | 1 | – |
 | **The capability matrix** | | | | |
 | [SMTP and ESMTP](#smtp-and-esmtp) | 23 | – | 4 | – |
 | [Transport security and deliverability](#transport-security-and-deliverability) | 28 | – | 16 | 1 |
@@ -72,7 +72,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 1 | – | 5 | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 4 | 1 | 2 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 3 | – | 6 | – |
-| **Total** | **536** | **11** | **189** | **14** |
+| **Total** | **537** | **11** | **188** | **14** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage and the administration surface are the best-covered areas**, and the
@@ -1163,7 +1163,7 @@ list, which is exactly why leaving them ticked would have been the expensive mis
 | ✅ | **Charts ignore the theme toggle** | `DashboardView.xaml.cs` bakes `static readonly SKColor` values and never re-reads them, so the charts are the one part of the application that does not respond to `◐`. Needs a `ThemeTokens`→`SKColor` bridge subscribed to the theme-changed event. |
 | ✅ | **`LineSmoothness = 0.8` on monitoring data** | Spline interpolation invents values between samples and rounds off spikes — precisely the events being watched for. Monitoring series must be `0`. |
 | ✅ | **The X axis is hidden** | `IsVisible = false`, so the reader cannot tell whether the window is three minutes or three hours. It is three minutes. |
-| ⬜ | **Chart cards are translucent over Mica** | Series land on a non-deterministic composited surface, so no contrast guarantee holds. Chart cards need an opaque background token. |
+| ✅ | **Chart cards are translucent over Mica** | Series land on a non-deterministic composited surface, so no contrast guarantee holds. Chart cards need an opaque background token. |
 | 🔄 | **High Contrast is ignored by the charts** | `ThemeTokens` already has a High Contrast palette using `SystemColors`; the charts do not consult it. Every chart also needs a table view — which is both the High Contrast answer and the screen-reader answer. |
 | 🔄 | **No screen-reader or keyboard audit has ever been done** | `AutomationProperties` are set on the navigation tree, which is a good start and is as far as it goes. A full pass needs: keyboard reachability for every control, a visible focus indicator, labels on every input, and announcement of validation errors. |
 | ⬜ | **The Control Panel has no localisation at all** | No resx, so the admin UI is English-only while the server itself ships UI strings in two languages. |

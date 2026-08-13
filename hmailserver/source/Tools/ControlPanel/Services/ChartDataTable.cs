@@ -121,6 +121,26 @@ namespace hMailServer.ControlPanel.Services
 
       public ChartDefinition Definition { get; }
 
+      /// <summary>
+      ///    Refuses a series list that does not match the definition, so that a table
+      ///    can never be built with more or fewer value columns than it has headers.
+      /// </summary>
+      private static void AssertSeriesMatchDefinition_(ChartDefinition definition,
+                                                       IReadOnlyList<ChartSeriesSamples> series)
+      {
+         int supplied = series == null ? 0 : series.Count;
+         int expected = definition.SeriesNames.Count;
+
+         if (supplied == expected)
+            return;
+
+         throw new ArgumentException(
+            "The chart '" + definition.Title + "' defines " + expected + " series but "
+            + supplied + " were supplied. Headers come from the definition and values "
+            + "from this list, so a mismatch builds a table whose columns do not line up.",
+            nameof(series));
+      }
+
       /// <summary>Time column, then one per series - <see cref="ChartDefinition.TableHeaders"/>.</summary>
       public IReadOnlyList<string> Headers { get; }
 
@@ -147,6 +167,20 @@ namespace hMailServer.ControlPanel.Services
       {
          if (definition == null)
             throw new ArgumentNullException(nameof(definition));
+
+         // The headers come from the definition and the value cells from the series
+         // list, so a caller passing a series list of a different length than the
+         // definition describes builds a table whose rows and headers disagree - and
+         // ToDelimitedText then emits a TSV with the wrong number of columns, which
+         // pastes into a spreadsheet as silently misaligned data rather than as an
+         // error. Nothing in the application does this today (Push always supplies one
+         // value per series), so this guards the next caller rather than fixing a live
+         // defect, which is when a guard is cheapest.
+         //
+         // Thrown rather than tolerated: a mismatch means the caller and the definition
+         // disagree about what the chart is, and quietly padding or truncating would
+         // turn a wiring mistake into wrong numbers on a screen somebody trusts.
+         AssertSeriesMatchDefinition_(definition, series);
 
          int sampleCount = SampleCount_(series);
          var rows = new List<ChartTableRow>(sampleCount);
