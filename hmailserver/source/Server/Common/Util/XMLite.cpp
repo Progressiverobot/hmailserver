@@ -744,8 +744,39 @@ LPTSTR LoadOtherNodes( LPXNode node, bool* pbRet, LPCTSTR pszXml, LPPARSEINFO pi
 // Coder    Date                      Desc
 // bro      2002-10-29
 //========================================================
+// Increments pi->depth for the lifetime of one Load and puts it back however that
+// Load is left. Load has a dozen return statements, so a manual decrement would be
+// wrong at the first one somebody added afterwards.
+struct XmlDepthGuard
+{
+	explicit XmlDepthGuard( LPPARSEINFO pi ) : pi_(pi) { if (pi_) pi_->depth++; }
+	~XmlDepthGuard() { if (pi_) pi_->depth--; }
+private:
+	XmlDepthGuard( const XmlDepthGuard& );
+	XmlDepthGuard& operator=( const XmlDepthGuard& );
+	LPPARSEINFO pi_;
+};
+
 LPTSTR _tagXMLNode::Load( LPCTSTR pszXml, LPPARSEINFO pi /*= &piDefault*/ )
 {
+	// This function recurses once per child element and had no bound at all, so a
+	// document nested deeply enough exhausted the stack - which is not something the
+	// process survives or can report. The only caller is BackupRestorer reading a
+	// backup index, so the document is a file an administrator points the server at
+	// rather than anything arriving on a socket; the realistic case is a corrupt or
+	// hostile archive, which is exactly what the restore path already refuses on
+	// version and content grounds.
+	XmlDepthGuard depthGuard( pi );
+
+	if( pi != NULL && pi->depth > pi->max_depth )
+	{
+		pi->erorr_occur = true;
+		pi->error_pointer = (LPTSTR)pszXml;
+		pi->error_code = PIE_NOT_NESTED;
+		pi->error_string.Format(_T("XML nested deeper than %d elements. The document is refused rather than parsed: this parser recurses once per element and a document nested far enough would exhaust the stack."), pi->max_depth);
+		return NULL;
+	}
+
 	// Close it
 	Close();
 

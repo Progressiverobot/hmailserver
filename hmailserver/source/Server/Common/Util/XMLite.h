@@ -89,6 +89,19 @@ typedef struct _tagParseInfo
 	TCHAR		escape_value;		// [set] escape value (default '\\')
 	bool		force_parse;		// [set] force parse even if xml is not welformed
 
+	// Nesting depth of the current _tagXMLNode::Load, and the ceiling it is checked
+	// against. Load recurses once per child element and had no bound, so a document
+	// nested deeply enough exhausts the stack - which is not an exception this can
+	// catch, it is the process. The only consumer is the backup index read by
+	// BackupRestorer, so the document is a file an administrator supplies rather
+	// than anything off the wire; that makes this a hostile-file problem rather than
+	// a remote one, and worth a bound rather than an alarm.
+	//
+	// It lives in PARSEINFO because PARSEINFO is already threaded through every
+	// recursive call, so the counter needs no change to the signatures.
+	int			depth;				// [get] current nesting depth
+	int			max_depth;			// [set] refuse beyond this depth
+
 	LPTSTR		xml;				// [get] xml source
 	bool		erorr_occur;		// [get] is occurance of error?
 	LPTSTR		error_pointer;		// [get] error position of xml source
@@ -107,9 +120,14 @@ typedef struct _tagParseInfo
          xml = NULL; 
          erorr_occur = false; 
          error_pointer = NULL; 
-         error_code = PIE_PARSE_WELFORMED; 
-         escape_value = 0; 
-         
+         error_code = PIE_PARSE_WELFORMED;
+         escape_value = 0;
+
+         // A backup index is a handful of levels deep; 100 is far beyond any
+         // document this server writes and thousands of frames below the stack.
+         depth = 0;
+         max_depth = 100;
+
    }
 }PARSEINFO,*LPPARSEINFO;
 extern PARSEINFO piDefault;

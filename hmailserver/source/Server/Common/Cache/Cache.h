@@ -154,10 +154,20 @@ namespace HM
       current_estimated_size_ = 0;
    }
 
-   template <class T> 
+   template <class T>
    void
    Cache<T>::SetTTL(int iNewVal)
    {
+      // These two setters were the only members of this class that touched shared
+      // state without taking _mutex, while every reader takes it. Both are reached
+      // from the COM API when an administrator changes a cache setting, so they run
+      // on an administration thread while delivery and protocol threads are reading
+      // the same fields.
+      //
+      // The mutex is recursive, so SetEnabled below can hold it across its call to
+      // Clear(), which takes it again.
+      boost::lock_guard<boost::recursive_mutex> guard(_mutex);
+
       ttl_ = iNewVal;
 
       no_of_misses_ = 0;
@@ -165,10 +175,12 @@ namespace HM
    }
 
 
-   template <class T> 
+   template <class T>
    void
    Cache<T>::SetEnabled(bool bEnabled)
    {
+      boost::lock_guard<boost::recursive_mutex> guard(_mutex);
+
       enabled_ = bEnabled;
 
       if (!enabled_)
@@ -179,6 +191,11 @@ namespace HM
    void
    Cache<T>::SetMaxSize(size_t max_size)
    {
+      // Reached from the COM API when an administrator changes the cache size, so it
+      // runs on an administration thread against a value protocol threads read under
+      // the lock. The last of the public mutators that did not take it.
+      boost::lock_guard<boost::recursive_mutex> guard(_mutex);
+
       max_size_ = max_size;
    }
 
@@ -353,6 +370,17 @@ namespace HM
    void
    Cache<T>::AdjustEstimatedSize(bool increase, size_t size_change)
    {
+      // Public, and called from outside this class - MessagesContainer adjusts the
+      // message cache from the IMAP path - so it runs on protocol threads while
+      // other protocol threads are reading and writing the same total under the
+      // lock. It was the one public mutator that did not take it.
+      //
+      // A lost or torn update here does not corrupt memory, it corrupts the
+      // accounting that the size cap is computed from, and the size cap is what
+      // bounds how much memory this cache is allowed to hold. The read-modify-write
+      // below is exactly the shape that loses updates without one.
+      boost::lock_guard<boost::recursive_mutex> guard(_mutex);
+
       if (increase)
       {
          current_estimated_size_ += size_change;
