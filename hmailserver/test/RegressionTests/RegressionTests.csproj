@@ -318,6 +318,7 @@
     <Compile Include="Infrastructure\MessageStoreDurability.cs" />
     <Compile Include="Infrastructure\ShutdownDrain.cs" />
     <Compile Include="Sieve\SieveVacationDelivery.cs" />
+    <Compile Include="Sieve\ManageSieveSecurity.cs" />
     <Compile Include="Sieve\SieveSyntax.cs" />
     <Compile Include="Sieve\SieveEvaluation.cs" />
     <Compile Include="Sieve\SieveAccountScript.cs" />

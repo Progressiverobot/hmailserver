@@ -202,6 +202,37 @@ namespace HM
             serverAddress.sin_family = AF_INET;
             serverAddress.sin_addr.s_addr = customServerAddress;
 
+            // The port. Until 6.2.16 the custom server went to the classic DnsQuery as a
+            // PIP4_ARRAY - a bare list of IPv4 addresses with no port field, so the DNS
+            // client had nothing to use but 53. DnsQueryEx takes a DNS_ADDR_ARRAY, which
+            // carries a full SOCKADDR per server, and this code filled in the family and
+            // the address and left the port at the zero the memset had put there. A
+            // destination port of zero is wrong however you look at it, so it is set.
+            //
+            // Being straight about what this does and does not fix, because the
+            // investigation is not finished: setting it did NOT restore resolution
+            // through a custom DNS server. That is still broken, and it is a REGRESSION
+            // IN 6.2.17 - see the note in Roadmap.md against the DNS row. What is
+            // established: with DNSServer configured, AAAA and CNAME queries come back
+            // with ERROR_TIMEOUT (1460) in the same millisecond they were issued - which
+            // is not what a real timeout looks like - and the A query returns a status
+            // that IsDNSError_ treats as "no records" rather than an error, so the whole
+            // lookup yields nothing and the caller reports that the name could not be
+            // resolved. The same DNS server answers all three record types correctly when
+            // queried directly, so the fault is on this side, not the directory's.
+            //
+            // What has been ruled out: the DNS_ADDR_ARRAY field layout matches
+            // windnsdef.h; the answer-name comparison further down is case-insensitive
+            // (String::Equals defaults to bUseCase = false); and the port, here.
+            //
+            // Why this matters more than the report that surfaced it: SpamAssassin is one
+            // of the few callers that reports a failed lookup instead of failing open, so
+            // it is the visible symptom (issue #25). DNSBL, SURBL, SPF, DKIM and MX
+            // lookups fail the same way in silence, which is worse - a server in that
+            // state quietly stops most of its spam filtering and carries on accepting
+            // mail.
+            serverAddress.sin_port = htons(53);
+
             pAsyncQuery->ServerList.MaxCount = 1;
             pAsyncQuery->ServerList.AddrCount = 1;
             pAsyncQuery->ServerList.Family = AF_INET;

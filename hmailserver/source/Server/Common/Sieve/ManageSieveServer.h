@@ -52,11 +52,42 @@ namespace HM
       // dropped, matching the other protocol servers.
       enum { MaxAuthenticationFailures = 3 };
 
-      // Upper bound on a SASL response supplied as a literal. A base64-encoded
-      // PLAIN response holding a real address and password is an order of
-      // magnitude smaller; the cap stops an unauthenticated client from making
-      // us buffer an arbitrary amount of data.
+      // Upper bound on a SASL response, in either of the two forms RFC 5804
+      // allows it to arrive in - a literal, or a quoted string on the command
+      // line. A base64-encoded PLAIN response holding a real address and password
+      // is an order of magnitude smaller; the cap stops an unauthenticated client
+      // from making us buffer an arbitrary amount of data. It applies to the
+      // inline form too because a cap that only covered the literal form was no
+      // cap at all: the same payload sent as a quoted string was bounded only by
+      // the one-megabyte line guard in ReadLine_.
       enum { MaxSaslResponseSize = 8192 };
+
+      // Commands accepted from a client that has not authenticated yet, after
+      // which the session is closed.
+      //
+      // This is not the same protection as MaxAuthenticationFailures, which only
+      // counts commands that actually carried a credential - CAPABILITY, NOOP and
+      // AUTHENTICATE naming an unknown mechanism were all unlimited. That matters
+      // more on this listener than on the mailbox protocols because Run_ serves
+      // connections one at a time on a single worker thread, so an unauthenticated
+      // client looping NOOP does not merely waste its own connection: it holds the
+      // whole ManageSieve service. Set far above any real client, which needs at
+      // most CAPABILITY, STARTTLS, CAPABILITY and AUTHENTICATE.
+      enum { MaxPreAuthenticationCommands = 25 };
+
+      // Largest script PUTSCRIPT and CHECKSCRIPT will accept, and the figure
+      // HAVESPACE answers against. One megabyte is the same order as the limit
+      // other ManageSieve implementations ship with, and a Sieve script that
+      // approaches it is generated rather than written.
+      //
+      // Deliberately a constant and not a setting. The value only has to be high
+      // enough that no genuine script meets it and low enough that a malicious one
+      // cannot make the server buffer without bound, and no operator has a reason
+      // to pick a number in between - whereas the previous behaviour, where the
+      // only bound was the ten-megabyte buffer guard inside ReadBytes_ and
+      // exceeding it closed the connection without a response, had no defensible
+      // value at all.
+      enum { MaxScriptSize = 1024 * 1024 };
 
       // The outcome of a single AUTHENTICATE command.
       enum AuthenticationOutcome
@@ -122,6 +153,11 @@ namespace HM
       // through here so that no failure can escape the auto-ban accounting or
       // the per-connection cap. On success, account_address holds the address of
       // the account that was logged on to.
+      //
+      // Only ever called for a client that has not authenticated yet: HandleClient_
+      // refuses a second AUTHENTICATE outright, because a success here sets
+      // authentication_failures back to zero, and a client able to reach that path
+      // repeatedly could clear the cap between guesses.
       AuthenticationOutcome HandleAuthenticate_(Connection &connection,
                                                 const IPAddress &client_address,
                                                 const String &line,

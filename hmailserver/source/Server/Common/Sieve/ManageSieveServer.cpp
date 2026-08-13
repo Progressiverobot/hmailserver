@@ -86,6 +86,13 @@ namespace HM
       }
 
       // Detects a trailing literal marker {NNN} or {NNN+} and returns its size.
+      //
+      // The digits are accumulated in a 64-bit value and anything beyond INT_MAX is
+      // reported as a parse failure. That replaces _wtoi, whose behaviour on
+      // overflow is undefined: a client announcing {99999999999} got whatever int
+      // fell out of it, and every caller then treated that as a length it could
+      // trust. Refusing to parse it is the only answer that is right for all three
+      // callers - the SASL response, PUTSCRIPT and CHECKSCRIPT.
       bool ParseLiteralSize(const String &line, int &size)
       {
          size = 0;
@@ -103,14 +110,50 @@ namespace HM
          if (inner.IsEmpty())
             return false;
 
+         unsigned __int64 value = 0;
+
          for (int i = 0; i < inner.GetLength(); i++)
          {
             if (inner[i] < L'0' || inner[i] > L'9')
                return false;
+
+            value = value * 10 + static_cast<unsigned __int64>(inner[i] - L'0');
+
+            // Checked on every digit, so the accumulator itself cannot wrap however
+            // many digits the client sends.
+            if (value > static_cast<unsigned __int64>(INT_MAX))
+               return false;
          }
 
-         size = _wtoi(inner.c_str());
+         size = static_cast<int>(value);
          return true;
+      }
+
+      // Parses the bare decimal size argument of HAVESPACE.
+      //
+      // Saturates instead of overflowing. The caller only ever compares the result
+      // against the script size limit, so a value too large to represent is still
+      // correctly "too large" - whereas wrapping it could turn an absurd request
+      // into a small one and have the server answer OK to it.
+      bool ParseSize(const String &line, int &pos, unsigned __int64 &value)
+      {
+         value = 0;
+         SkipSpaces(line, pos);
+
+         int start = pos;
+
+         while (pos < line.GetLength() && line[pos] >= L'0' && line[pos] <= L'9')
+         {
+            // Once the value is past INT_MAX it has already outgrown any script
+            // limit, so it stops accumulating and the remaining digits are consumed
+            // without being added.
+            if (value <= static_cast<unsigned __int64>(INT_MAX))
+               value = value * 10 + static_cast<unsigned __int64>(line[pos] - L'0');
+
+            pos++;
+         }
+
+         return pos > start;
       }
 
       // The Sieve extensions named in the RFC 5804 "SIEVE" capability line.
@@ -167,6 +210,18 @@ namespace HM
 
          AnsiString result = escaped;
          return result;
+      }
+
+      // The refusal for a script that is over the size limit, shared by HAVESPACE,
+      // PUTSCRIPT and CHECKSCRIPT so that all three quote the same number.
+      //
+      // QUOTA/MAXSIZE is the RFC 5804 response code for exactly this, and sending it
+      // is what lets a client say "that script is too big" instead of showing the
+      // user a lost connection. The limit is named in the text because a client that
+      // knows the number can tell the user how much to cut.
+      AnsiString ScriptTooLargeResponse(int limit)
+      {
+         return Formatter::FormatAsAnsi("NO (QUOTA/MAXSIZE) \"The script exceeds the maximum size of {0} bytes.\"\r\n", limit);
       }
    }
 
@@ -773,6 +828,24 @@ namespace HM
          return AuthenticationFailed;
       }
 
+      // The same cap the literal branch above applies, applied to the inline form.
+      // Without it the cap could simply be sidestepped by sending the base64 as a
+      // quoted string instead of a literal, where the only bound was ReadLine_'s
+      // one-megabyte line guard - a megabyte of base64 to decode and split, from a
+      // client that has not authenticated, per command.
+      //
+      // Unlike the literal branch this does not have to close the connection: the
+      // whole command arrived on one line and has already been consumed, so there is
+      // nothing unread to desynchronize the stream. It is counted as a failed
+      // attempt, the same as a response that will not decode.
+      if (saslResponse.GetLength() > MaxSaslResponseSize)
+      {
+         if (ApplyAuthenticationFailure_(connection, authentication_failures, false, "NO \"SASL response too large.\"\r\n"))
+            return AuthenticationAborted;
+
+         return AuthenticationFailed;
+      }
+
       String authzid, authcid, password;
       if (!StringParser::DecodeSaslPlain(saslResponse, authzid, authcid, password))
       {
@@ -827,6 +900,7 @@ namespace HM
       bool authenticated = false;
       String accountAddress;
       int authentication_failures = 0;
+      int pre_authentication_commands = 0;
 
       // Greeting: advertise capabilities then an OK.
       SendCapabilities_(connection);
@@ -837,6 +911,17 @@ namespace HM
          String line;
          if (!ReadLine_(connection, line))
             break;
+
+         // Counted before the line is parsed, so that empty lines - which take the
+         // "Empty command." path below and never reach any other counter - are
+         // covered too. See MaxPreAuthenticationCommands for why the attempt cap is
+         // not sufficient on its own: it only counts commands bearing a credential,
+         // and this listener serves one connection at a time.
+         if (!authenticated && ++pre_authentication_commands > MaxPreAuthenticationCommands)
+         {
+            Send_(connection, "BYE \"Too many commands before authentication.\"\r\n");
+            break;
+         }
 
          int pos = 0;
          String command;
@@ -926,6 +1011,21 @@ namespace HM
 
          if (command == _T("AUTHENTICATE"))
          {
+            if (authenticated)
+            {
+               // RFC 5804 offers AUTHENTICATE to a client that has not authenticated
+               // yet; re-authenticating on an established session is not part of the
+               // protocol. Refusing it is a security fix rather than pedantry, because
+               // a successful AUTHENTICATE resets authentication_failures to zero:
+               // anyone holding one valid password could log on, spend two guesses on
+               // some other account, log on again to clear the counter and carry on
+               // indefinitely. That made the per-connection cap unbounded for any
+               // client with a single account on this server, leaving the per-IP
+               // auto-ban as the only real limit.
+               Send_(connection, "NO \"Already authenticated.\"\r\n");
+               continue;
+            }
+
             String authenticatedAddress;
             AuthenticationOutcome outcome = HandleAuthenticate_(connection, client_address, line, pos,
                authentication_failures, authenticatedAddress);
@@ -981,6 +1081,25 @@ namespace HM
             {
                Send_(connection, "NO \"Expected a script literal.\"\r\n");
                continue;
+            }
+
+            if (literalSize > MaxScriptSize)
+            {
+               // Refused on the announced size, before a byte of it is read, so the
+               // server never buffers an oversized script at all. That leaves the
+               // payload unread, and - exactly as with an oversized SASL literal -
+               // the stream cannot be resynchronized afterwards, because the script
+               // bytes still to arrive would be parsed as commands. So the connection
+               // ends. A client that asks HAVESPACE first gets the same refusal
+               // without losing its session, which is what HAVESPACE is for.
+               //
+               // The previous bound was the ten-megabyte buffer guard inside
+               // ReadBytes_, reached only after buffering ten megabytes, and it
+               // failed by returning false - which lands on the break below and
+               // closes the connection with no response whatsoever. From the client
+               // that is indistinguishable from the network failing mid-upload.
+               Send_(connection, ScriptTooLargeResponse(MaxScriptSize));
+               break;
             }
 
             String content;
@@ -1072,6 +1191,15 @@ namespace HM
                continue;
             }
 
+            // Same limit and the same reason as PUTSCRIPT above. Checking a script
+            // costs more than storing it - it is parsed - so leaving this path
+            // uncapped while capping PUTSCRIPT would just move the problem.
+            if (literalSize > MaxScriptSize)
+            {
+               Send_(connection, ScriptTooLargeResponse(MaxScriptSize));
+               break;
+            }
+
             String content;
             if (!ReadBytes_(connection, literalSize, content))
                break;
@@ -1089,7 +1217,35 @@ namespace HM
 
          if (command == _T("HAVESPACE"))
          {
-            // No per-account script quota is enforced.
+            // Answered against the same limit PUTSCRIPT enforces, rather than with an
+            // unconditional OK. RFC 5804 has the client ask this before it uploads,
+            // precisely so it can be told no while its connection is still usable -
+            // so an unconditional OK was not a harmless stub, it was a promise that
+            // PUTSCRIPT would then break by dropping the connection.
+            //
+            // There is still no per-account *quota*: this is the per-script size
+            // limit only. A total-bytes-per-account quota would need a setting and a
+            // place to configure it, and nothing asks for one.
+            String name;
+            if (!ParseToken(line, pos, name) || !SieveStorage::IsValidScriptName(name))
+            {
+               Send_(connection, "NO \"Invalid script name.\"\r\n");
+               continue;
+            }
+
+            unsigned __int64 requestedSize = 0;
+            if (!ParseSize(line, pos, requestedSize))
+            {
+               Send_(connection, "NO \"Expected a script size.\"\r\n");
+               continue;
+            }
+
+            if (requestedSize > static_cast<unsigned __int64>(MaxScriptSize))
+            {
+               Send_(connection, ScriptTooLargeResponse(MaxScriptSize));
+               continue;
+            }
+
             Send_(connection, "OK\r\n");
             continue;
          }
