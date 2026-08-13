@@ -202,36 +202,26 @@ namespace HM
             serverAddress.sin_family = AF_INET;
             serverAddress.sin_addr.s_addr = customServerAddress;
 
-            // The port. Until 6.2.16 the custom server went to the classic DnsQuery as a
-            // PIP4_ARRAY - a bare list of IPv4 addresses with no port field, so the DNS
-            // client had nothing to use but 53. DnsQueryEx takes a DNS_ADDR_ARRAY, which
-            // carries a full SOCKADDR per server, and this code filled in the family and
-            // the address and left the port at the zero the memset had put there. A
-            // destination port of zero is wrong however you look at it, so it is set.
+            // The port is deliberately left at zero, and this comment exists because
+            // setting it to 53 - which looks obviously right - breaks every lookup.
             //
-            // Being straight about what this does and does not fix, because the
-            // investigation is not finished: setting it did NOT restore resolution
-            // through a custom DNS server. That is still broken, and it is a REGRESSION
-            // IN 6.2.17 - see the note in Roadmap.md against the DNS row. What is
-            // established: with DNSServer configured, AAAA and CNAME queries come back
-            // with ERROR_TIMEOUT (1460) in the same millisecond they were issued - which
-            // is not what a real timeout looks like - and the A query returns a status
-            // that IsDNSError_ treats as "no records" rather than an error, so the whole
-            // lookup yields nothing and the caller reports that the name could not be
-            // resolved. The same DNS server answers all three record types correctly when
-            // queried directly, so the fault is on this side, not the directory's.
+            // A DNS_ADDR carries a full SOCKADDR, so a destination port of zero looks
+            // like an oversight. It is not: the DNS client supplies the port itself and
+            // rejects a server entry that specifies one. With htons(53) here, DnsQueryEx
+            // returns ERROR_INVALID_PARAMETER (87) for every query type before any packet
+            // is sent - so name resolution fails completely for anyone who has configured
+            // DNSServer, and fails in a way that looks like a network problem rather than
+            // a rejected argument.
             //
-            // What has been ruled out: the DNS_ADDR_ARRAY field layout matches
-            // windnsdef.h; the answer-name comparison further down is case-insensitive
-            // (String::Equals defaults to bUseCase = false); and the port, here.
+            // Established by measurement, in both directions, against a real DNS server:
+            // with port 53 all three record types return status 87 and no records; with
+            // port 0 the A query returns status 0 with its record and the AAAA query
+            // returns DNS_INFO_NO_RECORDS, which is the correct answer for a host that
+            // has no AAAA record.
             //
-            // Why this matters more than the report that surfaced it: SpamAssassin is one
-            // of the few callers that reports a failed lookup instead of failing open, so
-            // it is the visible symptom (issue #25). DNSBL, SURBL, SPF, DKIM and MX
-            // lookups fail the same way in silence, which is worse - a server in that
-            // state quietly stops most of its spam filtering and carries on accepting
-            // mail.
-            serverAddress.sin_port = htons(53);
+            // Do not "fix" this line. The classic DnsQuery took a PIP4_ARRAY with no port
+            // field at all, which is why the question never arose before 6.2.17.
+            serverAddress.sin_port = 0;
 
             pAsyncQuery->ServerList.MaxCount = 1;
             pAsyncQuery->ServerList.AddrCount = 1;
@@ -298,6 +288,35 @@ namespace HM
       }
 
       // Sole owner from here on: the callback has either finished or was never queued.
+
+      // Logged HERE, before the status is classified, and the placement is the point.
+      // A status that IsDNSError_ treats as benign - "no such name", "no records" - returns
+      // success with an empty record list and writes nothing, so a lookup that quietly
+      // found nothing was indistinguishable from one that was never made. That blind spot
+      // is why the custom-DNS-server regression took three wrong theories to corner: the
+      // A query was disappearing through this branch while only AAAA and CNAME left a
+      // trace. Debug level, so it costs nothing until someone is diagnosing resolution,
+      // which is a recurring support question.
+      if (Logger::Instance()->GetLogDebug())
+      {
+         int recordCount = 0;
+         for (PDNS_RECORD walk = pAsyncQuery->Result.pQueryRecords; walk != nullptr; walk = walk->pNext)
+            recordCount++;
+
+         // Formatter::Format takes at most five arguments after the format string, so the
+         // two descriptive fields are folded into one before the call.
+         String situation = pAsyncQuery->Request.pDnsServerList != nullptr
+            ? _T("custom server, ") : _T("system servers, ");
+
+         situation += nDnsStatus == 0
+            ? _T("success")
+            : (IsDNSError_(nDnsStatus) ? _T("classified as an error")
+                                       : _T("classified as benign - returns success with no records"));
+
+         LOG_DEBUG(Formatter::Format("DNS - Result. Query: {0}, type {1}, status {2}, records {3}, {4}",
+            query, resourceType, (int) nDnsStatus, recordCount, situation));
+      }
+
       if (nDnsStatus != 0)
       {
          bool bDNSError = IsDNSError_(nDnsStatus);
@@ -317,11 +336,35 @@ namespace HM
 
       PDNS_RECORD pDnsRecord = pAsyncQuery->Result.pQueryRecords;
 
+      // Every record the resolver handed back, before any filtering, and what the query
+      // itself reported. This exists because a lookup that returns nothing is otherwise
+      // indistinguishable from a lookup that returned records this function then rejected -
+      // and telling those two apart is exactly what was needed to make progress on the
+      // custom-DNS-server regression. Debug level, so it costs nothing until someone is
+      // actually diagnosing a resolution problem, which is a recurring support question.
+      if (Logger::Instance()->GetLogDebug())
+      {
+         int recordCount = 0;
+         for (PDNS_RECORD walk = pDnsRecord; walk != nullptr; walk = walk->pNext)
+            recordCount++;
+
+         LOG_DEBUG(Formatter::Format("DNS - Answered. Query: {0}, Type: {1}, status: {2}, records: {3}, custom server: {4}",
+            query, resourceType, (int) nDnsStatus, recordCount,
+            pAsyncQuery->Request.pDnsServerList != nullptr ? _T("yes") : _T("no")));
+
+         for (PDNS_RECORD walk = pDnsRecord; walk != nullptr; walk = walk->pNext)
+         {
+            LOG_DEBUG(Formatter::Format("DNS -   record name '{0}' type {1}{2}",
+               String(walk->pName == nullptr ? _T("(null)") : walk->pName), (int) walk->wType,
+               walk->wType == resourceType && query.Equals(String(walk->pName)) ? _T("") : _T("  [FILTERED OUT]")));
+         }
+      }
+
       while (pDnsRecord != nullptr)
       {
          String name = pDnsRecord->pName;
 
-         if (pDnsRecord->wType == resourceType && 
+         if (pDnsRecord->wType == resourceType &&
              query.Equals(name))
          {
             switch (pDnsRecord->wType)

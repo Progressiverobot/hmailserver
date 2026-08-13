@@ -38,7 +38,7 @@ as ⬜, not ✅.
 
 ### Contents and totals
 
-750 items. The counts are the point of this table — they say where the fork is
+752 items. The counts are the point of this table — they say where the fork is
 strong and where it is thin far more honestly than any prose summary.
 
 | Section | ✅ | 🔄 | ⬜ | ⏸️ |
@@ -59,7 +59,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [POP3](#pop3) | 17 | – | 9 | – |
 | [Sieve, ManageSieve and rules](#sieve-managesieve-and-rules) | 43 | 0 | 16 | – |
 | [Authentication and cryptography](#authentication-and-cryptography) | 55 | – | 19 | – |
-| [Anti-spam, anti-virus and content control](#anti-spam-anti-virus-and-content-control) | 52 | – | 13 | – |
+| [Anti-spam, anti-virus and content control](#anti-spam-anti-virus-and-content-control) | 54 | – | 13 | – |
 | [Storage, accounts and data model](#storage-accounts-and-data-model) | 81 | – | 9 | – |
 | [Routing, queue and delivery](#routing-queue-and-delivery) | 19 | – | 4 | 1 |
 | [Administration, API and Control Panel](#administration-api-and-control-panel) | 52 | – | 8 | – |
@@ -72,7 +72,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 2 | – | 4 | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 4 | 1 | 2 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 3 | – | 6 | – |
-| **Total** | **550** | **11** | **175** | **14** |
+| **Total** | **552** | **11** | **175** | **14** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage and the administration surface are the best-covered areas**, and the
@@ -573,7 +573,7 @@ the source, not from documentation.
 
 ### Anti-spam, anti-virus and content control
 
-52 shipped · 0 underway · 13 not started · 0 deferred
+54 shipped · 0 underway · 13 not started · 0 deferred
 
 | | Capability | Detail |
 |:-:|---|---|
@@ -594,6 +594,8 @@ the source, not from documentation.
 | ✅ | Custom external command-line scanner | Runs any executable; %FILE% is substituted anywhere in the command line, otherwise the quoted file path is appended. A configurable exit code means "infected"; virus name is again "Unknown" |
 | ✅ | Custom-scanner presets in the Control Panel | One-click command lines and exit codes for Microsoft Defender (MpCmdRun), Sophos savscan, ESET ecls, Bitdefender bdscan and Kaspersky avp.com, plus Test buttons for all three scanner types and ClamWin auto-detect |
 | ✅ | DKIM and DMARC as scored tests | DKIM permfail and DMARC reject/quarantine each contribute their configured failure score; a DMARC p=quarantine verdict is scored exactly like p=reject (there is no quarantine store to honour it), and p=none is logged only |
+| ✅ | Custom DNS server for all lookups | `[Settings] DNSServer` sends every DNSBL, SURBL, SPF, DKIM, DMARC, MX, PTR and host lookup to one nominated IPv4 resolver instead of the system's, which is what makes a DMZ mail server usable when the host's own resolver cannot see the internal zones. Bounded since 6.2.17 by `DNSQueryTimeout` (default 10s), so an unresponsive resolver can no longer hold a delivery thread. **Documented here for the first time on 13 August 2026, after it spent a morning broken by a one-line "improvement" of mine and being fixed again.** 6.2.17 moved from the classic `DnsQuery` - which took a bare `PIP4_ARRAY` of addresses with no port field - to `DnsQueryEx`, whose `DNS_ADDR_ARRAY` carries a full `SOCKADDR` per server. A `SOCKADDR` with a zero port reads like an oversight, so it was "corrected" to 53; the DNS client supplies the port itself and **rejects** an entry that specifies one, returning `ERROR_INVALID_PARAMETER` for every query before a packet leaves the machine. Every lookup then fails, and because DNSBL, SURBL, SPF and DMARC all fail open and silently, the only visible symptom is SpamAssassin - one of the few callers that reports a failed lookup - while the spam filtering quietly stops. Measured both ways against a real DNS server before and after. The port is now zero with a comment at the line saying not to change it, and `Infrastructure/CustomDnsServer.cs` covers it, marked explicit because the setting only takes effect on a service restart and that invalidates the COM object the fixture base caches. |
+| ✅ | DNS results are traceable | A `DNS - Result.` debug line for every query records the name, record type, the raw status, how many records came back, whether the nominated server was used, and how the status was classified. Added because the absence of it is what hid the defect above through three wrong theories: a status the resolver treats as benign - "no such name", "no records" - returned success with an empty list and logged nothing at all, so a lookup that quietly found nothing was indistinguishable from one that was never made. Debug level, so it costs nothing until somebody is diagnosing resolution, which is a recurring support question. |
 | ✅ | DNSBL / RBL checking | Multiple configurable lists, each with its own DNS host, expected-result expression, score and rejection text. Expected results support pipe-separated alternatives, last-octet ranges (127.0.0.1-5) and wildcards… |
 | ✅ | DNSBL check timing | [Settings] DNSBLChecksAfterMailFrom (default 1) moves the pre-transmission checks from connect time to after MAIL FROM; hosts listed as incoming relays are switched to post-transmission scoring instead of pre-transmission rejection. |
 | ✅ | DNSBL check timing is configurable | DNSBLChecksAfterMailFrom (default 1) moves blacklist lookups from connect time to after MAIL FROM, so a blacklisted client is not paying DNS cost before it has identified itself |
