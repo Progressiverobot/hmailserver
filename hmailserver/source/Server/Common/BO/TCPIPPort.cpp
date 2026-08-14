@@ -17,7 +17,8 @@ namespace HM
       port_number_(0),
       port_protocol_(STUnknown),
       sslcertificate_id_(0),
-      connection_security_(CSNone)
+      connection_security_(CSNone),
+      client_certificate_policy_(CCPOff)
    {
 
    }
@@ -44,6 +45,8 @@ namespace HM
       pNode->AppendAttr(_T("PortProtocol"), StringParser::IntToString(port_protocol_));
       pNode->AppendAttr(_T("PortNumber"), StringParser::IntToString(port_number_));
       pNode->AppendAttr(_T("ConnectionSecurity"), StringParser::IntToString(connection_security_));
+      pNode->AppendAttr(_T("ClientCertificatePolicy"), StringParser::IntToString(client_certificate_policy_));
+      pNode->AppendAttr(_T("ClientCertificateCAFile"), client_certificate_ca_file_);
       pNode->AppendAttr(_T("Address"), String(address_.ToString()));
       
       if (sslcertificate_id_ > 0)
@@ -62,6 +65,13 @@ namespace HM
 
       address_.TryParse(pNode->GetAttrValue(_T("Address")));
       sslcertificate_id_  = GetSSLCertificateID_(pNode->GetAttrValue(_T("SSLCertificateName")));
+
+      // A backup taken before these attributes existed simply lacks them, and
+      // GetAttrValue then returns an empty string. _ttoi("") is 0, which is CCPOff -
+      // so restoring an old backup lands every port on today's behaviour rather
+      // than on an accidental "request" or "require".
+      client_certificate_policy_ = (ClientCertificatePolicy) _ttoi(pNode->GetAttrValue(_T("ClientCertificatePolicy")));
+      client_certificate_ca_file_ = pNode->GetAttrValue(_T("ClientCertificateCAFile"));
 
       // Backwards compatibiltiy
       if (pNode->GetAttrValue(_T("UseSSL")) == _T("1"))

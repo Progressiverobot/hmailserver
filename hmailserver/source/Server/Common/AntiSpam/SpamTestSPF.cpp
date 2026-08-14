@@ -6,6 +6,7 @@
 #include "SpamTestSPF.h"
 
 #include "SpamTestData.h"
+#include "AuthenticationResults.h"
 #include "SpamTestResult.h"
 
 #include "AntiSpamConfiguration.h"
@@ -56,7 +57,33 @@ namespace HM
 
       String sExplanation;
       SPF::Result result = SPF::Instance()->Test(originatingAddress.ToString(), pTestData->GetEnvelopeFrom(), pTestData->GetHeloHost(), sExplanation);
-      
+
+      // Recorded before the scoring below, because the scoring throws most of it away.
+      // Only Fail and Pass produce a SpamTestResult at all, so from the outside a
+      // neutral verdict and "SPF never ran" look identical - and RFC 8601 needs to say
+      // which of those happened.
+      std::shared_ptr<AuthenticationResults> authenticationResults = pTestData->GetAuthenticationResults();
+      if (authenticationResults)
+      {
+         AuthenticationResults::MethodResult methodResult = AuthenticationResults::ResultNeutral;
+
+         if (result == SPF::Pass)
+            methodResult = AuthenticationResults::ResultPass;
+         else if (result == SPF::Fail)
+            methodResult = AuthenticationResults::ResultFail;
+         else if (pTestData->GetEnvelopeFrom().IsEmpty())
+            methodResult = AuthenticationResults::ResultNone;
+
+         // smtp.mailfrom is the identity SPF was evaluated against here; SPF::Test is
+         // given the envelope sender, and falls back to HELO only inside the library.
+         authenticationResults->SetSpf(methodResult,
+                                       "smtp.mailfrom",
+                                       AnsiString(pTestData->GetEnvelopeFrom()),
+                                       AnsiString(originatingAddress.ToString()),
+                                       AnsiString(pTestData->GetHeloHost()));
+      }
+
+
       if (result == SPF::Fail)
       {
          // Blocked by SPF.s

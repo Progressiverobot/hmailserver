@@ -4,6 +4,7 @@
 
 #include "StdAfx.h"
 #include "SpamTestData.h"
+#include "AuthenticationResults.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -80,6 +81,18 @@ namespace HM
    SpamTestData::GetMessageData()  const
    {
       return message_data_;
+   }
+
+   void
+   SpamTestData::SetAuthenticationResults(std::shared_ptr<AuthenticationResults> results)
+   {
+      authentication_results_ = results;
+   }
+
+   std::shared_ptr<AuthenticationResults>
+   SpamTestData::GetAuthenticationResults() const
+   {
+      return authentication_results_;
    }
 
 }

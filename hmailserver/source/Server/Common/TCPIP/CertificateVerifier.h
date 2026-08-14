@@ -33,4 +33,44 @@ namespace HM
       String host_name_;
       int session_id_;
    };
+
+   // Verifies the certificate an INBOUND session presents when a port's
+   // ClientCertificatePolicy asks for one.
+   //
+   // A separate class rather than a mode on CertificateVerifier, because every
+   // assumption CertificateVerifier makes is a server-certificate assumption:
+   // it builds the chain with Windows' AUTHTYPE_SERVER policy, it matches an
+   // expected host name (a client certificate has none), and OverrideResult_
+   // deliberately forgives any failure on CSSTARTTLSOptional connections -
+   // correct for opportunistic OUTBOUND TLS (RFC 7435), and precisely the
+   // forgiveness that must never apply when an administrator has said a port
+   // REQUIRES a trusted client certificate. Keeping the inbound path in its own
+   // class means no future change to either can quietly weaken the other.
+   //
+   // The chain itself is validated by OpenSSL's built-in verification against
+   // the CA bundle TCPServer loaded into the port's SSL context - that is what
+   // 'preverified' reports - so this callback only has to decide what a failure
+   // means for the session, and to name the certificate in the log so the
+   // administrator can tell WHICH client was refused.
+   class ClientCertificateVerifier
+   {
+   public:
+
+      /// The type of the function object's result.
+      typedef bool result_type;
+
+      // fail_handshake_on_error: true for CCPRequire (an unverifiable
+      // certificate ends the handshake), false for CCPRequest (the outcome is
+      // logged and the session continues; that mode exists for inventorying
+      // clients before enforcement is switched on).
+      ClientCertificateVerifier(int session_id, bool fail_handshake_on_error);
+
+      /// Perform certificate verification.
+      bool operator()(bool preverified, boost::asio::ssl::verify_context& ctx) const;
+
+   private:
+
+      int session_id_;
+      bool fail_handshake_on_error_;
+   };
 }

@@ -404,6 +404,48 @@ namespace HM
             }
          }
       }
+      else if (!IsClient() && inbound_client_certificate_policy_ != CCPOff)
+      {
+         // INBOUND client-certificate verification (mutual TLS), configured per
+         // listening port. A deliberately separate branch from the one above: that
+         // branch is the OUTBOUND path - global certificate verification, MTA-STS
+         // enforcement and DANE-EE all flow through it - and its condition includes
+         // IsClient(), so this branch is unreachable for any outbound handshake and
+         // adds nothing to the outbound condition. Folding the two together is how
+         // an inbound setting would one day leak into MTA-STS or DANE behaviour.
+         //
+         // CCPRequest is the one mode that must never fail a handshake; anything
+         // else in this branch - CCPRequire, and any value a hand-edited database
+         // invents - fails closed. Treating an unknown policy as "require" means a
+         // corrupted value can only reject clients that should have been let in,
+         // never admit clients that should have been kept out.
+         bool fail_handshake_on_error = inbound_client_certificate_policy_ != CCPRequest;
+
+         verify_mode = boost::asio::ssl::context::verify_peer;
+
+         // fail_if_no_peer_cert makes OpenSSL end the handshake when the client
+         // simply declines to send a certificate - the verify callback is never
+         // invoked in that case, so without this flag "require" would pass every
+         // certificate-less client.
+         if (fail_handshake_on_error)
+            verify_mode |= boost::asio::ssl::context::verify_fail_if_no_peer_cert;
+
+         ssl_socket_.set_verify_callback(ClientCertificateVerifier(session_id_, fail_handshake_on_error), error_code);
+
+         if (error_code.value() != 0)
+         {
+            String errorMessage = Formatter::Format(_T("Failed to set the client certificate verification callback for session {0}"), session_id_);
+            ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6141, "TCPConnection::AsyncHandshake", errorMessage, error_code);
+
+            // Fail the session rather than continue without the callback: on a
+            // "require" port, carrying on would mean accepting what the
+            // administrator said must be verified.
+            HandshakeFailed_(error_code, true);
+            return;
+         }
+
+         LOG_DEBUG(Formatter::Format("Requesting client certificate for inbound session {0}. Policy: {1}", session_id_, (int) inbound_client_certificate_policy_));
+      }
       else
       {
          verify_mode = boost::asio::ssl::context::verify_none;
@@ -469,7 +511,13 @@ namespace HM
          String sMessage;
          sMessage.Format(_T("TCPConnection - TLS/SSL handshake completed. Session Id: %d, Remote IP: %s, Version: %s, Cipher: %s, Bits: %d"), session_id_, SafeGetIPAddress().c_str(), String(cipher_info.GetVersion()).c_str(), String(cipher_info.GetName()).c_str(), cipher_info.GetBits());
          LOG_TCPIP(sMessage);
-         
+
+         // Only inbound sessions on a port with a client-certificate policy have
+         // anything to report; for every other session (all outbound ones
+         // included) this is skipped entirely.
+         if (!is_client_ && inbound_client_certificate_policy_ != CCPOff)
+            LogInboundClientCertificate_();
+
          receive_buffer_.consume(receive_buffer_.size());
 
          OnHandshakeCompleted();
@@ -483,6 +531,57 @@ namespace HM
       operation_queue_.Pop(IOOperation::BCTHandshake);
       ProcessOperationQueue_(0);
 
+   }
+
+   void
+   TCPConnection::LogInboundClientCertificate_()
+   {
+      SSL *ssl = ssl_socket_.native_handle();
+
+      // Owned reference (SSL_get_peer_certificate increments the refcount), so it
+      // must be freed on every path below.
+      X509 *certificate = SSL_get_peer_certificate(ssl);
+
+      if (certificate == nullptr)
+      {
+         // Only reachable in CCPRequest mode: with CCPRequire the
+         // fail_if_no_peer_cert flag has already ended any handshake without a
+         // certificate, so this session never got here. Logged at TCP/IP level
+         // because the whole point of "request" is producing this inventory of
+         // which clients would survive "require".
+         String message;
+         message.Format(_T("TCPConnection - No client certificate presented. Session Id: %d, Remote IP: %s"), session_id_, SafeGetIPAddress().c_str());
+         LOG_TCPIP(message);
+         return;
+      }
+
+      char subject[256] = { 0 };
+      X509_NAME_oneline(X509_get_subject_name(certificate), subject, sizeof(subject));
+
+      // The verdict survives a CCPRequest override: when the verify callback
+      // returns true despite a failure, OpenSSL still records the failure code,
+      // and reading it here is what keeps an unverified certificate from ever
+      // being reported - or later used - as a verified identity.
+      long verify_result = SSL_get_verify_result(ssl);
+
+      if (verify_result == X509_V_OK)
+      {
+         verified_client_certificate_subject_ = subject;
+
+         String message;
+         message.Format(_T("TCPConnection - Client certificate verified. Session Id: %d, Remote IP: %s, Subject: %s"),
+            session_id_, SafeGetIPAddress().c_str(), String(subject).c_str());
+         LOG_TCPIP(message);
+      }
+      else
+      {
+         String message;
+         message.Format(_T("TCPConnection - Client certificate presented but NOT verified. Session Id: %d, Remote IP: %s, Subject: %s, Error: %s"),
+            session_id_, SafeGetIPAddress().c_str(), String(subject).c_str(), String(X509_verify_cert_error_string(verify_result)).c_str());
+         LOG_TCPIP(message);
+      }
+
+      X509_free(certificate);
    }
 
    void

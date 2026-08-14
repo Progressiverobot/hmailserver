@@ -238,7 +238,9 @@ create table hm_domains (
 	domainlimitationsenabled int not null,
 	domainmaxaccountsize int not null,
    domaindkimselector nvarchar(255) not null,
-   domaindkimprivatekeyfile nvarchar(255) not null
+   domaindkimprivatekeyfile nvarchar(255) not null,
+   domaindkimsecondaryselector nvarchar(255) not null,
+   domaindkimsecondaryprivatekeyfile nvarchar(255) not null
 ) 
 
 ALTER TABLE hm_domains ADD CONSTRAINT hm_domains_pk PRIMARY KEY NONCLUSTERED (domainid) 
@@ -601,7 +603,9 @@ create table hm_tcpipports
 	portaddress1 bigint not null,
     portaddress2 bigint null,
 	portconnectionsecurity tinyint not null,
-	portsslcertificateid bigint not null
+	portsslcertificateid bigint not null,
+	portclientcertificatepolicy tinyint not null default 0,
+	portclientcertificatecafile nvarchar(255) not null default ''
 ) 
 
 ALTER TABLE hm_tcpipports ADD CONSTRAINT hm_tcpipports_pk PRIMARY KEY NONCLUSTERED (portid) 
@@ -979,4 +983,4 @@ insert into hm_tcpipports (portprotocol, portnumber, portaddress1, portaddress2,
 
 insert into hm_tcpipports (portprotocol, portnumber, portaddress1, portaddress2, portconnectionsecurity, portsslcertificateid) values (5, 143, 0, NULL, 0, 0) 
 
-insert into hm_dbversion values (6006)
+insert into hm_dbversion values (6008)

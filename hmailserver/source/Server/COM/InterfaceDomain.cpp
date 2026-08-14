@@ -1428,9 +1428,115 @@ STDMETHODIMP InterfaceDomain::put_DKIMSigningAlgorithm(eDKIMAlgorithm newVal)
 
       if (!authentication_->GetIsDomainAdmin())
          return authentication_->GetAccessDenied();
-   
+
       object_->SetDKIMSigningAlgorithm(newVal);
-   
+
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceDomain::get_DKIMSecondarySelector(BSTR *pVal)
+{
+   try
+   {
+      if (!object_)
+         return GetAccessDenied();
+
+      if (!authentication_->GetIsDomainAdmin())
+         return authentication_->GetAccessDenied();
+
+      *pVal = object_->GetDKIMSecondarySelector().AllocSysString();
+
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceDomain::put_DKIMSecondarySelector(BSTR newVal)
+{
+   try
+   {
+      if (!object_)
+         return GetAccessDenied();
+
+      if (!authentication_->GetIsDomainAdmin())
+         return authentication_->GetAccessDenied();
+
+      object_->SetDKIMSecondarySelector(newVal);
+
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceDomain::get_DKIMSecondaryPrivateKeyFile(BSTR *pVal)
+{
+   try
+   {
+      if (!object_)
+         return GetAccessDenied();
+
+      if (!authentication_->GetIsDomainAdmin())
+         return authentication_->GetAccessDenied();
+
+      *pVal = object_->GetDKIMSecondaryPrivateKeyFile().AllocSysString();
+
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceDomain::put_DKIMSecondaryPrivateKeyFile(BSTR newVal)
+{
+   try
+   {
+      if (!object_)
+         return GetAccessDenied();
+
+      if (!authentication_->GetIsDomainAdmin())
+         return authentication_->GetAccessDenied();
+
+      object_->SetDKIMSecondaryPrivateKeyFile(newVal);
+
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceDomain::DKIMPromoteSecondary()
+{
+   try
+   {
+      if (!object_)
+         return GetAccessDenied();
+
+      if (!authentication_->GetIsDomainAdmin())
+         return authentication_->GetAccessDenied();
+
+      // Only the in-memory object changes here, matching every other mutator
+      // on this interface: the caller decides when to Save(), and a promote it
+      // then thinks better of is discarded along with any other unsaved edit
+      // rather than half-persisted.
+      HM::String sErrorMessage;
+      if (!object_->PromoteDKIMSecondary(sErrorMessage))
+         return COMError::GenerateError(sErrorMessage);
+
       return S_OK;
    }
    catch (...)

@@ -134,7 +134,9 @@ create table hm_domains
 	domainlimitationsenabled int not null,
 	domainmaxaccountsize int not null,
    domaindkimselector varchar(255) not null,
-   domaindkimprivatekeyfile varchar(255) not null
+   domaindkimprivatekeyfile varchar(255) not null,
+   domaindkimsecondaryselector varchar(255) not null,
+   domaindkimsecondaryprivatekeyfile varchar(255) not null
 )  DEFAULT CHARSET=utf8;
 
 CREATE INDEX idx_hm_domains ON hm_domains (domainname);
@@ -444,7 +446,9 @@ create table hm_tcpipports
 	portaddress1 bigint not null,
    portaddress2 bigint null,
 	portconnectionsecurity tinyint not null,
-	portsslcertificateid bigint not null
+	portsslcertificateid bigint not null,
+	portclientcertificatepolicy tinyint not null default 0,
+	portclientcertificatecafile varchar(255) not null default ''
 ) DEFAULT CHARSET=utf8;
 
 create table hm_whitelist
@@ -805,4 +809,4 @@ insert into hm_tcpipports (portprotocol, portnumber, portaddress1, portaddress2,
 
 insert into hm_tcpipports (portprotocol, portnumber, portaddress1, portaddress2, portconnectionsecurity, portsslcertificateid) values (5, 143, 0, NULL, 0, 0);
 
-insert into hm_dbversion values (6006);
+insert into hm_dbversion values (6008);

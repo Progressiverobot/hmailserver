@@ -21,6 +21,7 @@ namespace HM
    class MessageData;
    class Domain;
    class SpamTestResult;
+   class AuthenticationResults;
    class Account;
    class ScramSha256;
 
@@ -118,6 +119,12 @@ namespace HM
       eSMTPCommandTypes GetCommandType_(const String &sType);
 
       void DoPreAcceptMessageModifications_();
+
+      // Writes the RFC 8601 Authentication-Results and RFC 7208 9.1 Received-SPF
+      // fields, and removes any Authentication-Results field the message arrived with
+      // that claims our own authserv-id. Does nothing unless one of the two settings
+      // is on.
+      void AddAuthenticationResultHeaders_();
       // Make changes to the message before it's accepted for delivery. This is
       // for example where message signature and spam-headers are added.
 
@@ -308,6 +315,15 @@ namespace HM
       std::shared_ptr<const Account> sender_account_;
 
       std::set<std::shared_ptr<SpamTestResult> > spam_test_results_;
+
+      // What the spam tests concluded about this message's authentication, for the
+      // RFC 8601 header. Owned by the connection because SPF runs pre-transmission
+      // while DKIM and DMARC run post-transmission, so nothing scoped to one phase
+      // could hold the whole answer.
+      //
+      // Null unless AuthenticationResultsEnabled or ReceivedSpfHeaderEnabled is on, so
+      // by default this costs one null check per message and nothing else.
+      std::shared_ptr<AuthenticationResults> authentication_results_;
 
       bool re_authenticate_user_;
       bool pending_disconnect_;

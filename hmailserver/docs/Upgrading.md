@@ -22,12 +22,12 @@ Where you can upgrade from
 --------------------------
 
 The upgrade chain is continuous: **57 registered steps**, from schema version `0`
-through to the current **6006**, applied in sequence. A database at any
+through to the current **6008**, applied in sequence. A database at any
 intermediate version is brought forward one step at a time, so there is no "you
 must first upgrade to 5.x" hop to plan around.
 
 That includes databases created by the *original* upstream project. This fork did
-not branch the schema; it extended it. Version 6006 is a superset, reached by the
+not branch the schema; it extended it. Version 6008 is a superset, reached by the
 same mechanism upstream used.
 
 **How far back the chain reaches depends on your backend, and this is the one
@@ -194,7 +194,7 @@ Verified against the code
 
 Checked 13 August 2026, because two numbers on this page had already gone stale
 once. Against: `formMain.LoadScripts` in `DBUpdater` (the 57 registered steps and
-the version at each end), `Constants.h`'s `REQUIRED_DB_VERSION` (6006),
+the version at each end), `Constants.h`'s `REQUIRED_DB_VERSION` (6008),
 `hmailserver/source/DBScripts` (which dialects ship which steps, and the
 `hm_adsynchronization` asymmetry), `DatabaseConnectionManager::GetCurrentDatabaseVersion`
 (`select … from hm_dbversion`), `Application::OnDatabaseConnected` (the two refusal

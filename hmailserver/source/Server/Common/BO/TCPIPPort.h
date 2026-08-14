@@ -33,6 +33,19 @@ namespace HM
       ConnectionSecurity GetConnectionSecurity() const  {return connection_security_; }
       void SetConnectionSecurity(ConnectionSecurity connection_security) {connection_security_ = connection_security;}
 
+      // Mutual TLS for inbound sessions on this port. Off by default: every
+      // pre-existing port must keep behaving exactly as it did before the
+      // setting existed. See ClientCertificatePolicy in SocketConstants.h.
+      ClientCertificatePolicy GetClientCertificatePolicy() const {return client_certificate_policy_; }
+      void SetClientCertificatePolicy(ClientCertificatePolicy policy) {client_certificate_policy_ = policy;}
+
+      // Path to a PEM file holding the CA certificate(s) trusted to issue client
+      // certificates for this port. Per-port rather than global, for the reason
+      // given on ClientCertificatePolicy: different listeners serve different
+      // client populations with different issuing CAs.
+      String GetClientCertificateCAFile() const {return client_certificate_ca_file_; }
+      void SetClientCertificateCAFile(const String &file) {client_certificate_ca_file_ = file;}
+
       bool XMLStore(XNode *pNode, int iOptions);
       bool XMLLoad(XNode *pNode, int iOptions);
       bool XMLLoadSubItems (XNode *pNode, int iOptions) {return true;};
@@ -47,6 +60,9 @@ namespace HM
       int sslcertificate_id_;
 
       ConnectionSecurity connection_security_;
+
+      ClientCertificatePolicy client_certificate_policy_;
+      String client_certificate_ca_file_;
 
       IPAddress address_;
    };

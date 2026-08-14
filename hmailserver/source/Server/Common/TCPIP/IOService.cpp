@@ -132,7 +132,8 @@ namespace HM
             continue;
          }
 
-         pTCPServer = std::shared_ptr<TCPServer>(new TCPServer(io_context_, address, iPort, st, pSSLCertificate, pConnectionFactory, connection_security));
+         pTCPServer = std::shared_ptr<TCPServer>(new TCPServer(io_context_, address, iPort, st, pSSLCertificate, pConnectionFactory, connection_security,
+            pPort->GetClientCertificatePolicy(), pPort->GetClientCertificateCAFile()));
 
          pTCPServer->Run();
 

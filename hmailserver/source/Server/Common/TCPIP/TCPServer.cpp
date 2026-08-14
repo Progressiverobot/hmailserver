@@ -24,6 +24,8 @@
 
 #include "SslContextInitializer.h"
 
+#include <openssl/ssl.h>
+
 using boost::asio::ip::tcp;
 
 #ifdef _DEBUG
@@ -91,13 +93,16 @@ namespace HM
       };
    }
 
-   TCPServer::TCPServer(boost::asio::io_context& io_context, const IPAddress &ipaddress, int port, SessionType sessionType, std::shared_ptr<SSLCertificate> certificate, std::shared_ptr<TCPConnectionFactory> connectionFactory, ConnectionSecurity connection_security) :
+   TCPServer::TCPServer(boost::asio::io_context& io_context, const IPAddress &ipaddress, int port, SessionType sessionType, std::shared_ptr<SSLCertificate> certificate, std::shared_ptr<TCPConnectionFactory> connectionFactory, ConnectionSecurity connection_security,
+      ClientCertificatePolicy client_certificate_policy, const String &client_certificate_ca_file) :
       acceptor_(io_context),
       context_(boost::asio::ssl::context::sslv23),
       io_context_(io_context),
       ipaddress_(ipaddress),
       port_(port),
-      connection_security_(connection_security)
+      connection_security_(connection_security),
+      client_certificate_policy_(client_certificate_policy),
+      client_certificate_ca_file_(client_certificate_ca_file)
    {
       sessionType_ = sessionType;
       certificate_ = certificate;
@@ -182,12 +187,95 @@ namespace HM
       {
          if (!SslContextInitializer::InitServer(context_, certificate_, ipaddress_.ToString(), port_))
             return;
+
+         if (client_certificate_policy_ != CCPOff &&
+             !InitInboundClientCertificateVerification_())
+            return;
+      }
+      else if (client_certificate_policy_ != CCPOff)
+      {
+         // Only reachable through a hand-edited database: PersistentTCPIPPort
+         // refuses to save this combination. A plaintext port never performs a
+         // handshake, so the policy could never run.
+         //
+         // For "require" that is fatal: a requirement the administrator believes
+         // is in force but which gates nothing is worse than a port that visibly
+         // does not come up, so the listener is not started. "Request" promises
+         // only logging, never enforcement, so taking the port down over it would
+         // cost service to prevent nothing - report it and start anyway.
+         bool fatal = client_certificate_policy_ != CCPRequest;
+
+         ErrorManager::Instance()->ReportError(fatal ? ErrorManager::High : ErrorManager::Medium, 6142, "TCPServer::Run",
+            Formatter::Format("The port {0}:{1} has a client certificate policy configured but no SSL/TLS or STARTTLS, so the policy can never be applied.{2} Enable SSL/TLS or STARTTLS on the port, or set the client certificate policy to off.",
+               String(ipaddress_.ToString()), port_,
+               fatal ? String(" The listener has not been started.") : String("")));
+
+         if (fatal)
+            return;
       }
 
       if (!InitAcceptor())
          return;
 
       StartAccept();
+   }
+
+   bool
+   TCPServer::InitInboundClientCertificateVerification_()
+   {
+      AnsiString ca_file = client_certificate_ca_file_;
+
+      // The bundle goes into this listener's own SSL context, so it is the ONLY
+      // trust anchor set for client certificates on this port - deliberately not
+      // the Windows certificate store, which would admit a certificate from any
+      // public CA onto a port meant for one private one, and deliberately not a
+      // global setting, because different ports serve different client
+      // populations (a partner-relay SMTP port and the staff IMAP port do not
+      // share an issuing CA).
+      boost::system::error_code error_code;
+      context_.load_verify_file(ca_file, error_code);
+
+      if (error_code)
+      {
+         ErrorManager::Instance()->ReportError(
+            client_certificate_policy_ == CCPRequire ? ErrorManager::High : ErrorManager::Medium, 6140,
+            "TCPServer::InitInboundClientCertificateVerification_",
+            Formatter::Format("Failed to load the client certificate CA file {0} for port {1}:{2}.",
+               String(ca_file), String(ipaddress_.ToString()), port_), error_code);
+
+         // "Require" with no trust anchors can only reject every client - the
+         // port is unreachable either way - so refusing to start loses nothing
+         // and reports the real problem once, at startup, instead of as an
+         // endless stream of handshake failures. "Request" must never take a
+         // port down, so it starts anyway; certificates are still requested,
+         // and any that arrive are logged as unverified.
+         return client_certificate_policy_ != CCPRequire;
+      }
+
+      // Also announce the CA names in the TLS CertificateRequest. Well-behaved
+      // clients choose (or agree to send) a certificate by matching its issuer
+      // against this list, so without it "request" collects nothing from most
+      // clients and "require" fails handshakes that would otherwise succeed.
+      STACK_OF(X509_NAME) *ca_names = SSL_load_client_CA_file(ca_file.c_str());
+
+      if (ca_names == nullptr)
+      {
+         // load_verify_file above accepted the file, so this means it holds no
+         // usable certificate at all - same situation as an unloadable file,
+         // handled the same way.
+         ErrorManager::Instance()->ReportError(
+            client_certificate_policy_ == CCPRequire ? ErrorManager::High : ErrorManager::Medium, 6140,
+            "TCPServer::InitInboundClientCertificateVerification_",
+            Formatter::Format("The client certificate CA file {0} for port {1}:{2} contains no CA certificate.",
+               String(ca_file), String(ipaddress_.ToString()), port_));
+
+         return client_certificate_policy_ != CCPRequire;
+      }
+
+      // The context takes ownership of ca_names.
+      SSL_CTX_set_client_CA_list(context_.native_handle(), ca_names);
+
+      return true;
    }
 
    void
@@ -197,6 +285,14 @@ namespace HM
       {
         
          std::shared_ptr<TCPConnection> pNewConnection = connectionFactory_->Create(connection_security_, io_context_, context_);
+
+         // The CA bundle lives in the shared SSL context, but the decision to ask
+         // for (or insist on) a certificate is made per handshake, in
+         // TCPConnection::AsyncHandshake - so every connection accepted on this
+         // port needs to know the port's policy before any handshake can run.
+         // That covers both SSL ports (handshake at accept) and STARTTLS ports
+         // (handshake whenever the client issues STARTTLS).
+         pNewConnection->SetInboundClientCertificatePolicy(client_certificate_policy_);
 
          acceptor_.async_accept(pNewConnection->GetSocket(),
             std::bind(&TCPServer::HandleAccept, this, pNewConnection,

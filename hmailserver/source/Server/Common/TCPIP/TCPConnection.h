@@ -111,6 +111,21 @@ namespace HM
       // instead of the PKIX chain (RFC 7672).
       void SetDaneRecords(const std::vector<TlsaRecord> &records) { dane_records_ = records; }
 
+      // Mutual TLS for INBOUND sessions: set by TCPServer from the listening
+      // port's configuration before the connection starts. Deliberately separate
+      // from SetRequirePeerVerification above, which drives the OUTBOUND
+      // (client-side) verification path - conflating the two is how a setting
+      // meant for one direction ends up altering MTA-STS or DANE behaviour in
+      // the other.
+      void SetInboundClientCertificatePolicy(ClientCertificatePolicy policy) { inbound_client_certificate_policy_ = policy; }
+
+      // The subject of the client certificate this inbound session presented,
+      // set only when the certificate chained to the port's CA bundle. Empty
+      // otherwise. This is the hook through which the verified identity could
+      // later reach authentication (SASL EXTERNAL); today it is surfaced in the
+      // TCP/IP log by AsyncHandshakeCompleted.
+      AnsiString GetVerifiedClientCertificateSubject() const { return verified_client_certificate_subject_; }
+
       int GetSessionID();
 
    protected:
@@ -193,6 +208,14 @@ namespace HM
       void AsyncRead(const AnsiString &delimitor);
       void AsyncHandshake();
 
+      // After a successful inbound handshake on a port with a client-certificate
+      // policy: log what the peer presented (or that it presented nothing) and
+      // capture the subject when it verified. Runs after the handshake rather
+      // than inside the verify callback because the callback is a copied functor
+      // with no channel back to the connection, and because only here is the
+      // final verdict (SSL_get_verify_result) known.
+      void LogInboundClientCertificate_();
+
       void AsyncConnectCompleted(const boost::system::error_code& err);
       void AsyncHandshakeCompleted(const boost::system::error_code& error);
       void AsyncReadCompleted(const boost::system::error_code& /*error*/, size_t bytes_transferred);
@@ -244,6 +267,14 @@ namespace HM
       bool allow_connect_to_self_;
       bool require_peer_verification_ = false;
       std::vector<TlsaRecord> dane_records_;
+
+      // Inbound-only; see SetInboundClientCertificatePolicy. CCPOff keeps the
+      // handshake exactly as it always was (verify_none).
+      ClientCertificatePolicy inbound_client_certificate_policy_ = CCPOff;
+
+      // Set only for an inbound session whose client certificate verified
+      // against the port's CA bundle; see GetVerifiedClientCertificateSubject.
+      AnsiString verified_client_certificate_subject_;
 
       boost::atomic<ConnectionState> connection_state_;
       boost::mutex autologout_timer_;

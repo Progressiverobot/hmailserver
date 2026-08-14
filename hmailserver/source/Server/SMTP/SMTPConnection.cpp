@@ -51,6 +51,8 @@
 
 #include "../Common/AntiSpam/AntiSpamConfiguration.h"
 #include "../Common/AntiSpam/SpamProtection.h"
+#include "../Common/AntiSpam/AuthenticationResults.h"
+#include "../Common/AntiSpam/AuthenticationResultsWriter.h"
 
 #include "../Common/Application/TimeoutCalculator.h"
 #include "../Common/Scripting/ScriptServer.h"
@@ -1188,17 +1190,27 @@ namespace HM
       if (!GetDoSpamProtection_())
          return true;
 
+      // Created on first use, and only when a header is actually going to be written.
+      // With both settings off this stays null for the whole session and every
+      // recording site skips itself.
+      if (!authentication_results_ &&
+          (IniFileSettings::Instance()->GetAuthenticationResultsEnabled() ||
+           IniFileSettings::Instance()->GetReceivedSpfHeaderEnabled()))
+      {
+         authentication_results_ = std::shared_ptr<AuthenticationResults>(new AuthenticationResults);
+      }
+
       if (spType == SPPreTransmission)
       {
-         std::set<std::shared_ptr<SpamTestResult> > setResult = 
-            SpamProtection::Instance()->RunPreTransmissionTests(sFromAddress, lIPAddress, GetRemoteEndpointAddress(), hostName);
+         std::set<std::shared_ptr<SpamTestResult> > setResult =
+            SpamProtection::Instance()->RunPreTransmissionTests(sFromAddress, lIPAddress, GetRemoteEndpointAddress(), hostName, authentication_results_);
 
          spam_test_results_.insert(setResult.begin(), setResult.end());
       }
       else if (spType == SPPostTransmission)
       {
-         std::set<std::shared_ptr<SpamTestResult> > setResult = 
-            SpamProtection::Instance()->RunPostTransmissionTests(sFromAddress, lIPAddress, GetRemoteEndpointAddress(), current_message_);
+         std::set<std::shared_ptr<SpamTestResult> > setResult =
+            SpamProtection::Instance()->RunPostTransmissionTests(sFromAddress, lIPAddress, GetRemoteEndpointAddress(), current_message_, authentication_results_);
 
          spam_test_results_.insert(setResult.begin(), setResult.end());
 
@@ -1619,6 +1631,12 @@ namespace HM
             // Reset the spam protection results.
             spam_test_results_.clear();
 
+            // And the authentication verdicts with them. A client may send several
+            // messages down one connection, and carrying a previous message's SPF or
+            // DKIM result into the next one would put a verdict on mail that check
+            // never ran against.
+            authentication_results_.reset();
+
             // Tell the client that everything went fine. This
             // will cause the client to either disconnect or to
             // start a new message.
@@ -1751,6 +1769,39 @@ namespace HM
       // the file size from disk immediately afterwards, which is what makes the
       // rewritten size authoritative.
       DistributionListSender::AddListHeaders(current_message_);
+
+      // Last, and for the same two reasons the List-* call gives: it must come after
+      // every rewrite that re-serialises the file from a MessageData loaded earlier,
+      // or that write would discard these fields, and it must stay inside this
+      // function because the caller re-reads the file size from disk immediately
+      // afterwards.
+      //
+      // Being last also puts our fields at the very top of the header block, above the
+      // Received line this server wrote, which is where a reader expects the most
+      // recent trace information to be.
+      AddAuthenticationResultHeaders_();
+   }
+
+   void
+   SMTPConnection::AddAuthenticationResultHeaders_()
+   {
+      if (!authentication_results_)
+         return;
+
+      if (!IniFileSettings::Instance()->GetAuthenticationResultsEnabled() &&
+          !IniFileSettings::Instance()->GetReceivedSpfHeaderEnabled())
+         return;
+
+      // Only for mail arriving from outside. On a submission this server authenticated,
+      // there is no third party whose claims need recording, and the account is already
+      // named by X-AuthUser - whereas writing our own authserv-id onto a message a
+      // local user hands us would put a verdict there that no check actually produced.
+      if (isAuthenticated_)
+         return;
+
+      AuthenticationResultsWriter::Write(PersistentMessage::GetFileName(current_message_),
+                                         current_message_,
+                                         authentication_results_);
    }
 
    void
@@ -2037,8 +2088,9 @@ namespace HM
       sender_account_.reset();
 
       spam_test_results_.clear();
+      authentication_results_.reset();
 
-      // Reset the number of RCPT TO's for this 
+      // Reset the number of RCPT TO's for this
       // message.
       cur_no_of_rcptto_ = 0;
 

@@ -129,6 +129,25 @@ namespace HM
       String GetDKIMPrivateKeyFile() const;
       void SetDKIMPrivateKeyFile(const String &newValue);
 
+      // The secondary selector/key pair stages a key rotation. It never signs
+      // anything: it is configuration parked next to the primary so that the
+      // new public key can be published in DNS and confirmed to resolve while
+      // the primary key continues to sign every message. Without it, rotating
+      // a key means editing the one selector in place, and every message
+      // signed between that edit and DNS propagation fails verification.
+      AnsiString GetDKIMSecondarySelector() const;
+      void SetDKIMSecondarySelector(const String &newValue);
+
+      String GetDKIMSecondaryPrivateKeyFile() const;
+      void SetDKIMSecondaryPrivateKeyFile(const String &newValue);
+
+      // The cutover: the secondary becomes the primary and the secondary slot
+      // is cleared. Fails, with a reason in errorMessage, rather than promote
+      // a half-configured or unusable pair - a bad promote would stop DKIM
+      // signing for the domain, which is the outage this scheme exists to
+      // prevent. The caller is responsible for persisting the domain afterwards.
+      bool PromoteDKIMSecondary(String &errorMessage);
+
       int GetDKIMHeaderCanonicalizationMethod() const;
       void SetDKIMHeaderCanonicalizationMethod(int newValue);
 
@@ -180,6 +199,9 @@ namespace HM
 
       String dkim_selector_;
       String dkim_private_key_file_;
+
+      String dkim_secondary_selector_;
+      String dkim_secondary_private_key_file_;
 
       std::shared_ptr<Accounts> accounts_;
       std::shared_ptr<Aliases> aliases_;

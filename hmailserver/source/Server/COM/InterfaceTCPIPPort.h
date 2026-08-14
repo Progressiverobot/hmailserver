@@ -82,6 +82,12 @@ public:
    STDMETHOD(get_ConnectionSecurity)(/*[out, retval]*/ eConnectionSecurity *pVal);
    STDMETHOD(put_ConnectionSecurity)(/*[in]*/ eConnectionSecurity newVal);
 
+   STDMETHOD(get_ClientCertificatePolicy)(/*[out, retval]*/ long *pVal);
+   STDMETHOD(put_ClientCertificatePolicy)(/*[in]*/ long newVal);
+
+   STDMETHOD(get_ClientCertificateCAFile)(/*[out, retval]*/ BSTR *pVal);
+   STDMETHOD(put_ClientCertificateCAFile)(/*[in]*/ BSTR newVal);
+
 };
 
 OBJECT_ENTRY_AUTO(__uuidof(TCPIPPort), InterfaceTCPIPPort)

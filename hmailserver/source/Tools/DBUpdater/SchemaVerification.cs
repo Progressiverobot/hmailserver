@@ -85,7 +85,24 @@ namespace DBUpdater
          // because a probe that only runs on some backends is a probe that gets
          // out of step with the scripts.
          new SchemaProbe(6006, "hm_imapfolders.folderspecialuse",
-                         "update hm_imapfolders set folderspecialuse = folderspecialuse where 1 = 0")
+                         "update hm_imapfolders set folderspecialuse = folderspecialuse where 1 = 0"),
+
+         // Upgrade6006to6007* - two columns, and therefore two probes rather than one.
+         // SQL CE commits each ALTER implicitly and cannot roll back, so this step can
+         // half-apply: the first column lands, the second fails, and the version row is
+         // never reached. A single probe on either column alone would then either miss
+         // the failure or misreport a database that is genuinely fine.
+         new SchemaProbe(6007, "hm_domains.domaindkimsecondaryselector",
+                         "update hm_domains set domaindkimsecondaryselector = domaindkimsecondaryselector where 1 = 0"),
+         new SchemaProbe(6007, "hm_domains.domaindkimsecondaryprivatekeyfile",
+                         "update hm_domains set domaindkimsecondaryprivatekeyfile = domaindkimsecondaryprivatekeyfile where 1 = 0"),
+
+         // Upgrade6007to6008* - two columns again, so two probes, for the same
+         // half-apply reason as the step above.
+         new SchemaProbe(6008, "hm_tcpipports.portclientcertificatepolicy",
+                         "update hm_tcpipports set portclientcertificatepolicy = portclientcertificatepolicy where 1 = 0"),
+         new SchemaProbe(6008, "hm_tcpipports.portclientcertificatecafile",
+                         "update hm_tcpipports set portclientcertificatecafile = portclientcertificatecafile where 1 = 0")
       };
 
       /// <summary>

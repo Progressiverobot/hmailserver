@@ -383,6 +383,14 @@ namespace HM
          dkim_expiry_clock_skew_seconds_ = 0;
 
       dkim_oversign_headers_ = ReadIniSettingString_("Settings", "DkimOversignHeaders", "");
+
+      // RFC 8601 / RFC 7208 9.1 trace headers on inbound mail. Both default off: an
+      // Authentication-Results field is a claim other systems act on, and it is worth
+      // something only if the reader trusts this server's name, so turning it on is a
+      // deliberate act rather than something an upgrade does quietly.
+      authentication_results_enabled_ = ReadIniSettingInteger_("Settings", "AuthenticationResultsEnabled", 0) == 1;
+      received_spf_header_enabled_ = ReadIniSettingInteger_("Settings", "ReceivedSpfHeaderEnabled", 0) == 1;
+      authentication_results_identity_ = ReadIniSettingString_("Settings", "AuthenticationResultsIdentity", "");
       tls_rpt_from_address_ = ReadIniSettingString_("Settings", "TlsRptFromAddress", "");
       tls_rpt_organization_name_ = ReadIniSettingString_("Settings", "TlsRptOrganizationName", "hMailServer");
 

@@ -9,6 +9,7 @@
 #include "DMARC.h"
 
 #include "../SpamTestData.h"
+#include "../AuthenticationResults.h"
 #include "../SpamTestResult.h"
 #include "../AntiSpamConfiguration.h"
 #include "../AntiSpamDiagnostics.h"
@@ -126,6 +127,49 @@ namespace HM
       DMARC::Result result = dmarc.Verify(fromDomain, envelopeFromDomain, spfPassed, dkimPassingDomains);
 
       AntiSpamConfiguration &config = Configuration::Instance()->GetAntiSpamConfiguration();
+
+      std::shared_ptr<AuthenticationResults> authenticationResults = pTestData->GetAuthenticationResults();
+      if (authenticationResults)
+      {
+         AuthenticationResults::MethodResult methodResult = AuthenticationResults::ResultNone;
+         AnsiString policyText;
+
+         switch (result)
+         {
+         case DMARC::Pass:
+            methodResult = AuthenticationResults::ResultPass;
+            break;
+         case DMARC::FailReject:
+            methodResult = AuthenticationResults::ResultFail;
+            policyText = "reject";
+            break;
+         case DMARC::FailQuarantine:
+            methodResult = AuthenticationResults::ResultFail;
+            policyText = "quarantine";
+            break;
+         case DMARC::FailNone:
+            methodResult = AuthenticationResults::ResultFail;
+            policyText = "none";
+            break;
+         case DMARC::TempError:
+            methodResult = AuthenticationResults::ResultTempError;
+            break;
+         case DMARC::PermError:
+            methodResult = AuthenticationResults::ResultPermError;
+            break;
+         default:
+            // NoPolicy: we looked and the domain publishes none, which is "none" -
+            // distinct from the check not having run at all.
+            methodResult = AuthenticationResults::ResultNone;
+            break;
+         }
+
+         // The policy travels with the verdict because the keyword cannot carry it. A
+         // downstream filter treats "dmarc=fail" from a p=none domain, which is asking
+         // to be told and nothing more, very differently from a p=reject the domain
+         // owner meant to be enforced.
+         authenticationResults->SetDmarc(methodResult, AnsiString(fromDomain), policyText);
+      }
 
       switch (result)
       {

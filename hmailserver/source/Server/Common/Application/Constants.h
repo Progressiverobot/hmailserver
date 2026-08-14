@@ -141,4 +141,11 @@
 #define PROPERTY_TLSOPTIONS                     _T("TlsOptions")
 
 // 6006 adds hm_imapfolders.folderspecialuse (RFC 6154 SPECIAL-USE).
-#define REQUIRED_DB_VERSION            6006
+// 6007 adds hm_domains.domaindkimsecondaryselector and
+//      hm_domains.domaindkimsecondaryprivatekeyfile, the staged half of a DKIM key
+//      rotation. Both default to empty, which is a domain that has never staged one.
+// 6008 adds hm_tcpipports.portclientcertificatepolicy and
+//      hm_tcpipports.portclientcertificatecafile, per-port inbound client-certificate
+//      policy. Policy 0 is "off", which is every existing port, so an upgraded
+//      database behaves exactly as it did.
+#define REQUIRED_DB_VERSION            6008

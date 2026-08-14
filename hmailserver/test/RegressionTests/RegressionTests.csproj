@@ -444,6 +444,7 @@
     <Compile Include="IMAP\Search.cs" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AntiSpam\AuthenticationResultsHeader.cs" />
     <Compile Include="AntiSpam\DKIM\Signing.cs" />
     <Compile Include="AntiSpam\DKIM\Verification.cs" />
     <Compile Include="API\Events.cs" />

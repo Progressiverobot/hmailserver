@@ -192,6 +192,19 @@ namespace HM
 
       LOG_DEBUG("Signing message using DKIM...");
 
+      // Only the primary selector/key ever signs. The domain may also hold a
+      // secondary pair (GetDKIMSecondarySelector), but that pair exists purely
+      // to stage a key rotation: it is configuration waiting for its DNS record
+      // to propagate, and by definition that record may not be resolvable yet.
+      // Signing with it as well would attach a signature that fails
+      // verification at every receiver until propagation completes - and while
+      // RFC 6376 section 6.1 tells verifiers to accept a message on any one
+      // passing signature, real-world filters are known to score broken
+      // signatures negatively, so a second signature can only lower
+      // deliverability, never raise it. A failure to read the new key must
+      // also never break signing with the old key that is still valid. The
+      // rotation therefore cuts over atomically via Domain::PromoteDKIMSecondary
+      // instead of ever signing with both.
       AnsiString selector = pDomain->GetDKIMSelector();
       // the senderDomain is either the main domain or it is allowed to sign using the key from the main domain
       AnsiString domain = senderDomain;
@@ -313,6 +326,9 @@ namespace HM
       if (!pDomain || !pDomain->GetIsActive() || !pDomain->GetDKIMEnabled())
          return false;
 
+      // The primary pair only, for the same reason DKIM signing uses it: an
+      // ARC seal has to verify at the very next hop, and the secondary pair is
+      // by definition still waiting for its DNS record to propagate.
       AnsiString selector = pDomain->GetDKIMSelector();
       String privateKeyFile = pDomain->GetDKIMPrivateKeyFile();
 

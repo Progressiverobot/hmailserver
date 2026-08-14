@@ -132,6 +132,8 @@ namespace HM
 
       pNode->AppendAttr(_T("DKIMSelector"), dkim_selector_);
       pNode->AppendAttr(_T("DKIMPrivateKeyFile"), dkim_private_key_file_);
+      pNode->AppendAttr(_T("DKIMSecondarySelector"), dkim_secondary_selector_);
+      pNode->AppendAttr(_T("DKIMSecondaryPrivateKeyFile"), dkim_secondary_private_key_file_);
 
       if (!GetDomainAliases()->XMLStore(pNode, iBackupOptions))
          return false;
@@ -180,6 +182,13 @@ namespace HM
 
       dkim_selector_ = pNode->GetAttrValue(_T("DKIMSelector"));
       dkim_private_key_file_ = pNode->GetAttrValue(_T("DKIMPrivateKeyFile"));
+
+      // A backup taken before the secondary selector existed has no such
+      // attributes, and GetAttrValue then returns an empty string - which is
+      // exactly the state of a domain that has never staged a rotation, so an
+      // old backup restores to today's behaviour.
+      dkim_secondary_selector_ = pNode->GetAttrValue(_T("DKIMSecondarySelector"));
+      dkim_secondary_private_key_file_ = pNode->GetAttrValue(_T("DKIMSecondaryPrivateKeyFile"));
 
       return true;
    }
@@ -445,16 +454,78 @@ namespace HM
       dkim_selector_ = newValue;
    }
 
-   String 
+   String
    Domain::GetDKIMPrivateKeyFile() const
    {
       return dkim_private_key_file_;
    }
 
-   void 
+   void
    Domain::SetDKIMPrivateKeyFile(const String &newValue)
    {
       dkim_private_key_file_ = newValue;
+   }
+
+   AnsiString
+   Domain::GetDKIMSecondarySelector() const
+   {
+      return dkim_secondary_selector_;
+   }
+
+   void
+   Domain::SetDKIMSecondarySelector(const String &newValue)
+   {
+      dkim_secondary_selector_ = newValue;
+   }
+
+   String
+   Domain::GetDKIMSecondaryPrivateKeyFile() const
+   {
+      return dkim_secondary_private_key_file_;
+   }
+
+   void
+   Domain::SetDKIMSecondaryPrivateKeyFile(const String &newValue)
+   {
+      dkim_secondary_private_key_file_ = newValue;
+   }
+
+   bool
+   Domain::PromoteDKIMSecondary(String &errorMessage)
+   {
+      // Promoting with nothing staged would overwrite the primary with empty
+      // values, and the next message from this domain would go out unsigned
+      // with only an error-log entry to show for it. Refusing here turns that
+      // silent outage into an immediate, visible failure of the promote itself.
+      if (dkim_secondary_selector_.IsEmpty() || dkim_secondary_private_key_file_.IsEmpty())
+      {
+         errorMessage = "A secondary DKIM selector and its private key file must both be configured before they can be promoted.";
+         return false;
+      }
+
+      // The key file is checked now rather than at the first signing attempt,
+      // because the promote below erases the old key from the configuration.
+      // A promote onto a missing file would leave the domain with no usable
+      // key at all - precisely the signing outage a staged rotation exists to
+      // prevent - so it is refused while the old key is still in place.
+      if (!FileUtilities::Exists(dkim_secondary_private_key_file_))
+      {
+         errorMessage = Formatter::Format("The secondary DKIM private key file {0} does not exist. Promoting it would leave the domain unable to sign.", dkim_secondary_private_key_file_);
+         return false;
+      }
+
+      dkim_selector_ = dkim_secondary_selector_;
+      dkim_private_key_file_ = dkim_secondary_private_key_file_;
+
+      // The old primary is cleared rather than swapped into the secondary
+      // slot. Rotation retires the old key: keeping it staged would invite a
+      // second promote that resurrects a key whose DNS record the operator is
+      // about to remove, and every message signed with it would then fail
+      // verification.
+      dkim_secondary_selector_.Empty();
+      dkim_secondary_private_key_file_.Empty();
+
+      return true;
    }
 
    int 

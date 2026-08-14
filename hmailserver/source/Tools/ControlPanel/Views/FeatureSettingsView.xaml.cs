@@ -474,6 +474,52 @@ namespace hMailServer.ControlPanel.Views
                });
                cards_.Add(new CardDef
                {
+                  // No mention of SMTP AUTH verdicts here on purpose: the server's
+                  // results carrier has an auth= slot, but nothing feeds it yet, so
+                  // advertising it would be a capability claim with nothing behind it.
+                  Title = "Authentication results on inbound mail",
+                  Blurb = "Records the verdicts this server itself reached about each inbound message - SPF, DKIM and " +
+                          "DMARC - as trace headers on the delivered message, for downstream filters and diagnostics " +
+                          "(RFC 8601, RFC 7208).",
+                  Settings =
+                  {
+                     new BoolSetting
+                     {
+                        Key = "AuthenticationResultsEnabled",
+                        Default = false,
+                        Label = "Write an Authentication-Results header on inbound mail",
+                        Blurb = "Each accepted inbound message gets one Authentication-Results header (RFC 8601) carrying " +
+                                "the SPF, DKIM and DMARC verdicts this server reached about it. Only checks that actually " +
+                                "ran are reported - which checks run is configured on the Anti-spam page - and a message " +
+                                "on which no check ran gets no header. An arriving message that already carries an " +
+                                "Authentication-Results header claiming this server's own identity has that header " +
+                                "removed first, so a sender cannot have a verdict written in this server's name believed " +
+                                "downstream (RFC 8601 section 5)."
+                     },
+                     new BoolSetting
+                     {
+                        Key = "ReceivedSpfHeaderEnabled",
+                        Default = false,
+                        Label = "Write a Received-SPF header on inbound mail",
+                        Blurb = "Records the SPF verdict for each accepted inbound message as a Received-SPF header " +
+                                "(RFC 7208 section 9.1). The header is only written when the SPF check actually ran, " +
+                                "so 'Check SPF' must be enabled on the Anti-spam page for it to appear."
+                     },
+                     new TextSetting
+                     {
+                        Key = "AuthenticationResultsIdentity",
+                        Label = "Identity the results are written under (empty = this computer's name)",
+                        Placeholder = "mail.yourdomain.com",
+                        Blurb = "The authserv-id: the first token of every Authentication-Results header this server " +
+                                "writes, always lower-cased, and the name a downstream filter checks before trusting " +
+                                "the verdicts. The same name decides which arriving Authentication-Results headers are " +
+                                "treated as forged: one claiming this identity is removed, while one naming any other " +
+                                "identity is left completely untouched."
+                     }
+                  }
+               });
+               cards_.Add(new CardDef
+               {
                   Title = "TLS reporting (TLS-RPT)",
                   Blurb = "Sends daily aggregate reports about TLS connection failures to recipient domains (RFC 8460).",
                   Settings =

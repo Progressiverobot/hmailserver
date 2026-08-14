@@ -289,6 +289,20 @@ namespace HM
       // also forbids a legitimate intermediary from adding a first one, and a
       // discussion list adding Reply-To or Sender is normal, so the administrator says.
       String GetDkimOversignHeaders() const { return dkim_oversign_headers_; }
+
+      // RFC 8601 Authentication-Results and RFC 7208 9.1 Received-SPF on inbound mail.
+      //
+      // Off by default. The header is a statement other systems act on, and it is only
+      // worth anything if the reader trusts this server's name - so switching it on is
+      // a deliberate act, not something an upgrade does quietly.
+      bool GetAuthenticationResultsEnabled() const { return authentication_results_enabled_; }
+      bool GetReceivedSpfHeaderEnabled() const { return received_spf_header_enabled_; }
+
+      // The authserv-id: the name this server authenticates as. Empty means use the
+      // computer name, which is what the Received header already says the message was
+      // received "by", so the two agree. Set it explicitly when several servers share
+      // one administrative identity.
+      String GetAuthenticationResultsIdentity() const { return authentication_results_identity_; }
       String GetTlsRptFromAddress() const { return tls_rpt_from_address_; }
       String GetTlsRptOrganizationName() const { return tls_rpt_organization_name_; }
       // TLS key-exchange groups, in OpenSSL group-list syntax, most preferred
@@ -495,6 +509,9 @@ namespace HM
       bool dkim_enforce_signature_expiry_ = true;
       int dkim_expiry_clock_skew_seconds_ = 300;
       String dkim_oversign_headers_;
+      bool authentication_results_enabled_ = false;
+      bool received_spf_header_enabled_ = false;
+      String authentication_results_identity_;
       String tls_rpt_from_address_;
       String tls_rpt_organization_name_;
       String tls_key_exchange_groups_;

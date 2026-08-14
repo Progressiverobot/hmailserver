@@ -11,6 +11,7 @@ namespace HM
 
    class SpamTestRunner;
    class SpamTestResult;
+   class AuthenticationResults;
 
    class SpamProtection : public Singleton<SpamProtection>
    {
@@ -20,8 +21,16 @@ namespace HM
 
       void Load();
 
-      std::set<std::shared_ptr<SpamTestResult> > RunPreTransmissionTests(const String &sFromAddress, const IPAddress & iOriginatingIP, const IPAddress &iConnectingIP, const String &sHeloHost);
-      std::set<std::shared_ptr<SpamTestResult> > RunPostTransmissionTests(const String &sFromAddress, const IPAddress & iOriginatingIP, const IPAddress &iConnectingIP, std::shared_ptr<Message> pMessage);
+      // authenticationResults is where the tests record what they concluded, for the
+      // RFC 8601 header. It is defaulted and null-checked everywhere, so with the
+      // feature off nothing is allocated and no test does anything extra.
+      //
+      // It spans both phases deliberately: SPF is a pre-transmission test while DKIM
+      // and DMARC are post-transmission, so a carrier scoped to one phase could only
+      // ever describe part of the answer. The connection owns it for the length of the
+      // message.
+      std::set<std::shared_ptr<SpamTestResult> > RunPreTransmissionTests(const String &sFromAddress, const IPAddress & iOriginatingIP, const IPAddress &iConnectingIP, const String &sHeloHost, std::shared_ptr<AuthenticationResults> authenticationResults = nullptr);
+      std::set<std::shared_ptr<SpamTestResult> > RunPostTransmissionTests(const String &sFromAddress, const IPAddress & iOriginatingIP, const IPAddress &iConnectingIP, std::shared_ptr<Message> pMessage, std::shared_ptr<AuthenticationResults> authenticationResults = nullptr);
 
       static std::shared_ptr<MessageData> AddSpamScoreHeaders(std::shared_ptr<Message> pMessage, std::set<std::shared_ptr<SpamTestResult> > setResult, bool classifiedAsSpam);
       static bool GreyListingAllowSend(const String &sSenderAddress, const String &sRecipientAddress, const IPAddress & iRemoteIP);

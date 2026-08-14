@@ -154,6 +154,11 @@ END_COM_MAP()
    STDMETHOD(put_DKIMBodyCanonicalizationMethod)(/*[in]*/ eDKIMCanonicalizationMethod newVal);
    STDMETHOD(get_DKIMSigningAlgorithm)(/*[out, retval]*/ eDKIMAlgorithm *pVal);
    STDMETHOD(put_DKIMSigningAlgorithm)(/*[in]*/ eDKIMAlgorithm newVal);
+   STDMETHOD(get_DKIMSecondarySelector)(/*[out, retval]*/ BSTR *pVal);
+   STDMETHOD(put_DKIMSecondarySelector)(/*[in]*/ BSTR newVal);
+   STDMETHOD(get_DKIMSecondaryPrivateKeyFile)(/*[out, retval]*/ BSTR *pVal);
+   STDMETHOD(put_DKIMSecondaryPrivateKeyFile)(/*[in]*/ BSTR newVal);
+   STDMETHOD(DKIMPromoteSecondary)();
 
    // dkim end.
 private:

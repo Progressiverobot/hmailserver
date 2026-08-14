@@ -455,6 +455,12 @@ namespace HM
       pDomain->SetDKIMSelector(pRS->GetStringValue("domaindkimselector"));
       pDomain->SetDKIMPrivateKeyFile(pRS->GetStringValue("domaindkimprivatekeyfile"));
 
+      // Both columns default to an empty string (upgrade step 6006 -> 6007), so
+      // a domain that has never staged a DKIM key rotation reads back exactly
+      // the state it had before the columns existed.
+      pDomain->SetDKIMSecondarySelector(pRS->GetStringValue("domaindkimsecondaryselector"));
+      pDomain->SetDKIMSecondaryPrivateKeyFile(pRS->GetStringValue("domaindkimsecondaryprivatekeyfile"));
+
       return true;
    }
 
@@ -534,6 +540,8 @@ namespace HM
 
       oStatement.AddColumn("domaindkimselector", pDomain->GetDKIMSelector());
       oStatement.AddColumn("domaindkimprivatekeyfile", pDomain->GetDKIMPrivateKeyFile());
+      oStatement.AddColumn("domaindkimsecondaryselector", pDomain->GetDKIMSecondarySelector());
+      oStatement.AddColumn("domaindkimsecondaryprivatekeyfile", pDomain->GetDKIMSecondaryPrivateKeyFile());
 
       oStatement.SetTable("hm_domains");
       

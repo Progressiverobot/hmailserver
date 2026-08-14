@@ -29,26 +29,27 @@ Mail protocols
 --------------
 
 * **SMTP** with PIPELINING, ENHANCEDSTATUSCODES, 8BITMIME, SIZE, CHUNKING/BDAT (RFC 3030), DSN delivery status notifications (RFC 3461/3464) and SMTPUTF8/EAI for internationalised addresses.
-* **IMAP4rev1 and IMAP4rev2**, with IDLE, MOVE (RFC 6851), UIDPLUS (RFC 4315), CONDSTORE/QRESYNC (RFC 7162), SEARCHRES (RFC 5182), ESEARCH (RFC 4731), SORT, ACL, NAMESPACE, ID (RFC 2971), SPECIAL-USE (RFC 6154) and QUOTA.
+* **IMAP4rev1**, plus **IMAP4rev2** (RFC 9051) advertised with its behavioural deltas implemented — a few of the extensions rev2 folds in (LIST-STATUS, non-synchronising literals, BINARY) are still missing — with IDLE, MOVE (RFC 6851), UIDPLUS (RFC 4315), CONDSTORE/QRESYNC (RFC 7162), SEARCHRES (RFC 5182), ESEARCH (RFC 4731), SORT, ACL, NAMESPACE, ID (RFC 2971), SPECIAL-USE (RFC 6154, including explicit designation via `CREATE ... (USE (\Sent))`) and QUOTA.
 * **POP3**, including retrieval from external POP3 accounts on a schedule.
 * **Public folders**, shared across accounts with per-user ACLs.
 
 Transport security
 ------------------
 
-* **TLS 1.2 and 1.3** by default, on implicit-TLS and STARTTLS ports, with SNI and configurable cipher suites.
+* **TLS 1.2 and 1.3** by default, on implicit-TLS and STARTTLS ports, with SNI, configurable cipher suites (separately for TLS ≤ 1.2 and TLS 1.3) and configurable key-exchange groups — **hybrid post-quantum key exchange** (X25519MLKEM768) is preferred by default, on every TLS context inbound and outbound.
 * **MTA-STS** (RFC 8461) policy discovery and enforcement for outbound mail, and optional hosting of your own policy at `mta-sts.<domain>`.
 * **DANE** (RFC 7672) with full in-process **DNSSEC validation** (RFC 4033–4035) — a bogus chain blocks delivery to that host rather than silently downgrading. The **MX RRset is validated too**, not just the TLSA record (RFC 7672 §2.2): DANE is applied only to a host the recipient domain provably published, so a forged MX answer cannot redirect delivery to a host whose own TLSA record then validates.
 * DNSSEC validation also protects SPF, DKIM and DMARC record lookups.
-* **TLS-RPT** (RFC 8460) daily aggregate reports to recipient domains.
+* **TLS-RPT** (RFC 8460) daily aggregate reports to recipient domains — off until `TlsRptFromAddress` is set (the server notes this in the application log while statistics are collected unsent).
 * **ACME v2 (Let's Encrypt)** built in: certificates are issued, renewed, assigned to TLS ports and hot-reloaded without a restart. The private key is reused across renewals, so published DANE TLSA records stay valid.
 
 Sender authentication and anti-abuse
 ------------------------------------
 
 * **SPF**, **DKIM** signing and verification (including Ed25519, RFC 8463) and **DMARC** evaluation with alignment.
-* **ARC** sealing (RFC 8617) so forwarded mail keeps a verifiable authentication chain.
-* **SRS** sender rewriting for forwarded mail, and optional **BATV** (`prvs`) backscatter protection.
+* **DKIM signature timestamps**: every signature carries `t=`; an `x=` expiry is added when `DKIMSignatureValiditySeconds` is set, and expired signatures are refused on verification (on by default, with a configurable clock-skew allowance). Optional **oversigning** (`DkimOversignHeaders`, off by default) stops a second `From:` being prepended to signed mail.
+* **ARC** sealing (RFC 8617) so forwarded mail keeps a verifiable authentication chain — off by default (`ArcSealingEnabled`).
+* Optional **SRS** sender rewriting for forwarded mail (`SRSEnabled`, off by default), and optional **BATV** (`prvs`) backscatter protection.
 * **SpamAssassin** integration, **DNSBL** and **SURBL** lookups, greylisting, HELO/PTR/MX sanity checks and a weighted scoring pipeline.
 * **Virus scanning** via ClamAV (clamd or clamscan) or any command-line scanner.
 * Attachment blocking, IP ranges with per-range policy, and connection auto-banning after repeated authentication failures.
@@ -56,17 +57,17 @@ Sender authentication and anti-abuse
 Account security and authentication
 -----------------------------------
 
-* **SCRAM-SHA-256** SASL across IMAP, SMTP submission and POP3, plus **SCRAM-SHA-256-PLUS** channel binding on all three, with deterministic anti-enumeration salts.
+* **SCRAM-SHA-256** SASL across IMAP, SMTP submission and POP3, plus **SCRAM-SHA-256-PLUS** channel binding on all three, with deterministic anti-enumeration salts. SMTP and POP3 offer SCRAM whenever AUTH is available; on IMAP, SASL (PLAIN and SCRAM alike) sits behind one setting whose shipped default is off.
 * **OAuth2 / OpenID Connect** bearer tokens — SASL XOAUTH2 and OAUTHBEARER (RFC 7628) — validated against an external identity provider's signing key.
 * **LDAP directory authentication** against Active Directory or any LDAP directory, so accounts authenticate with their domain password. Simple bind and SASL Negotiate; LDAPS and StartTLS; certificate validation on by default, and a password is never sent over an unprotected connection unless that is explicitly permitted. Unlike the Windows-logon path it needs no domain-joined host, which is the usual situation for a mail server in a DMZ. Infrastructure failures are reported separately from wrong passwords, so a directory outage does not read as a hundred users mistyping. Off by default: the whole `[LDAP]` ini section is absent until you add it.
 * **Argon2id** and **PBKDF2-HMAC-SHA256** password hashing, with transparent upgrade on login, a minimum-accepted-hash policy, and an optional server-side pepper.
-* Full RFC 4013 SASLprep of non-ASCII credentials.
+* Full RFC 4013 SASLprep of non-ASCII credentials on the PLAIN and LOGIN paths (SCRAM usernames are matched as sent).
 * Optional **TOTP two-factor authentication** for administrative logon.
 
 Mail filtering and routing
 --------------------------
 
-* **Sieve** (RFC 5228) — a standards-based interpreter runs each account's active script during delivery (`keep`, `fileinto`, `discard`, `redirect`, implicit keep), with an optional **ManageSieve** (RFC 5804) listener so clients can manage scripts over TCP.
+* **Sieve** (RFC 5228) — a standards-based interpreter runs each account's active script during delivery (`keep`, `fileinto`, `discard`, `redirect`, implicit keep, plus the `copy`, `relational`, `subaddress`, `imap4flags` and `vacation` extensions), with an optional **ManageSieve** (RFC 5804) listener so clients can manage scripts over TCP.
 * The original rules engine, with global and per-account rules, regular-expression criteria and scripted actions.
 * Server-side **event scripts** (VBScript/JScript) on connection, HELO, DATA, accept and delivery events.
 * Routes, aliases, distribution lists, catch-all addresses and plus-addressing.
@@ -93,7 +94,7 @@ Technology
 | MySQL/MariaDB client | MariaDB Connector/C, shipped as `libmysql.dll` with auth plugins — works with MySQL 8 `caching_sha2_password` and MariaDB `ed25519`/`gssapi` out of the box |
 | Administration GUI and tools | C# / .NET 10 (WPF, Fluent design) |
 | Extensibility | COM/IDispatch API, plus a REST administration API |
-| Schema | Database version 6005, upgradeable from every earlier hMailServer release |
+| Schema | Database version 6008, upgradeable from every earlier hMailServer release |
 
 **Quality gates.** Every release ships SPDX and CycloneDX SBOMs (Syft). The repository runs CodeQL analysis, Dependabot CVE alerts with grouped update pull requests, a dependency-review gate on pull requests, an installer smoke test that installs the built installer on a clean machine and verifies the service comes up, and a monthly comparison against the original upstream repository so nothing landing there is missed.
 
@@ -298,6 +299,17 @@ Transport security and authentication:
    DaneEnforcementEnabled=1      ; honor recipient DANE/TLSA records when sending
    DnssecValidationEnabled=1     ; validate DNSSEC for DANE and SPF/DKIM/DMARC lookups
    DnssecTrustAnchors=           ; override root trust anchors ("tag alg digesttype hex;...")
+   TlsKeyExchangeGroups=X25519MLKEM768:SecP256r1MLKEM768:X25519:secp384r1:secp256r1
+                                 ; TLS key-exchange groups, hybrid post-quantum first; reaches every
+                                 ; TLS context in the server, inbound and outbound
+   TlsCipherSuites13=            ; TLS 1.3 ciphersuites (empty = OpenSSL's defaults; the SslCipherList
+                                 ; setting covers TLS 1.2 and below)
+   DkimOversignHeaders=          ; DKIM oversigning (RFC 6376 5.4): header names listed in h= once more
+                                 ; than the message carries them (empty = off; From is always included
+                                 ; when the feature is on)
+   DKIMSignatureValiditySeconds=0 ; add an x= expiry to outgoing DKIM signatures (0 = no x= tag)
+   DKIMEnforceSignatureExpiry=1  ; refuse expired DKIM signatures when verifying
+   DKIMExpiryClockSkewSeconds=300 ; clock-drift allowance when enforcing x=
    ArcSealingEnabled=0           ; add ARC seals when forwarding (uses the domain's DKIM key)
    TlsRptFromAddress=            ; sender for daily TLS-RPT reports (empty = disabled)
    TlsRptOrganizationName=hMailServer
@@ -364,15 +376,17 @@ Administration and monitoring:
                                  ; SEARCH BODY/TEXT reads every message in the mailbox, so these bound what a single
                                  ; authenticated command can cost; raise them for mailboxes of several hundred thousand messages
    ManageSieveServerPort=0       ; ManageSieve (RFC 5804) script-management service (0 = disabled, standard port 4190)
-   ManageSieveServerBindAddress=127.0.0.1  ; SASL PLAIN over plaintext; bind to localhost unless TLS-fronted
+   ManageSieveServerBindAddress=127.0.0.1  ; STARTTLS is offered when a TLS certificate is configured, and an
+                                 ; IP range can require TLS before authentication; otherwise SASL PLAIN
+                                 ; travels in the clear, so keep the bind on localhost
    JsonLogging=0                 ; write logs as JSON lines
    </pre>
 
-   **Mail filtering (Sieve, RFC 5228).** Each account can have an active Sieve script that runs during local delivery, supporting `keep`, `fileinto`, `discard` and `redirect` with the core tests (`header`, `address`, `exists`, `size`, `allof`/`anyof`/`not`) and `:is`/`:contains`/`:matches` match types. Scripts are edited from the Control Panel account **Sieve** tab (or the COM `Account.SieveScript` property) and stored as files under the data directory. With `ManageSieveServerPort` set, mail clients can upload and manage multiple named scripts over **ManageSieve (RFC 5804)** (`CAPABILITY`, SASL `PLAIN` `AUTHENTICATE`, `PUTSCRIPT`/`CHECKSCRIPT`, `LISTSCRIPTS`, `GETSCRIPT`, `SETACTIVE`, `DELETESCRIPT`).
+   **Mail filtering (Sieve, RFC 5228).** Each account can have an active Sieve script that runs during local delivery, supporting `keep`, `fileinto`, `discard`, `redirect` and `stop` with the core tests (`header`, `address`, `envelope`, `exists`, `size`, `allof`/`anyof`/`not`), the `:is`/`:contains`/`:matches` match types, and the extensions **copy** (RFC 3894), **relational** (RFC 5231), **subaddress** (RFC 5233), **imap4flags** (RFC 5232) and **vacation** (RFC 5230, including `:seconds`). Scripts are edited from the Control Panel account **Sieve** tab (or the COM `Account.SieveScript` property) and stored as files under the data directory. With `ManageSieveServerPort` set, mail clients can upload and manage multiple named scripts over **ManageSieve (RFC 5804)** (`CAPABILITY`, `STARTTLS`, SASL `PLAIN` `AUTHENTICATE`, `PUTSCRIPT`/`CHECKSCRIPT`, `LISTSCRIPTS`, `GETSCRIPT`, `SETACTIVE`, `DELETESCRIPT`, `HAVESPACE`).
 
-   The metrics listener also serves Kubernetes-style health probes: `/livez` (process liveness), `/readyz` (200 when `StateRunning` and the database pool is connected, else 503 — and 503 while the server is draining/stopping) and `/healthz` (JSON: status, server state, database). `/metrics` exposes counters and gauges for processed/spam/virus messages, TLS handshakes (success/failure), authentication (success/failure), sessions per protocol, uptime, database up/pool, the SMTP delivery-queue depth, delivery outcomes (`hmailserver_messages_delivered_total`/`_deferred_total`/`_bounced_total`), the message-store consistency result (`hmailserver_messagestore_missing_files`), and aggregate per-command processing latency (`hmailserver_command_processing_seconds` summary).
+   The metrics listener also serves Kubernetes-style health probes: `/livez` (process liveness), `/readyz` (200 only when `StateRunning` and the database has answered a real round trip within the last 20 seconds, else 503 — and 503 while the server is draining/stopping) and `/healthz` (JSON: status, server state, database, uptime). `/metrics` exposes counters and gauges for processed/spam/virus messages, TLS handshakes (success/failure), authentication (success/failure), sessions per protocol, the start time (`hmailserver_start_time_seconds`), database connectivity (`hmailserver_database_connected`, proved by a round trip, plus pool gauges), the SMTP delivery-queue depth and oldest-message age, certificate expiry, work-queue depth, delivery outcomes (`hmailserver_messages_delivered_total`/`_deferred_total`/`_bounced_total`), the message-store consistency result (`hmailserver_messagestore_missing_files`), and per-command and per-query latency histograms (`hmailserver_command_processing_seconds`, `hmailserver_db_query_seconds`).
 
-   REST endpoints: `/api/v1/status`, `/api/v1/domains`, `/api/v1/domains/<name>/accounts` (GET/POST), `/api/v1/accounts/<address>` (DELETE), `/api/v1/queue` (GET), `/api/v1/queue/<id>/retry` (POST), `/api/v1/queue/<id>` (DELETE), `/api/v1/tlsa` (GET, publish-ready DANE TLSA records).
+   REST endpoints: `/api/v1/status`, `/api/v1/domains`, `/api/v1/domains/<name>/accounts` (GET/POST), `/api/v1/accounts/<address>` (DELETE), `/api/v1/queue` (GET), `/api/v1/queue/<id>/retry` (POST), `/api/v1/queue/<id>` (DELETE), `/api/v1/apikeys` (GET/POST, administrator password only), `/api/v1/apikeys/<id>` (DELETE), `/api/v1/tlsa` (GET, publish-ready DANE TLSA records).
 
 Secret protection and least-privilege:
 

@@ -280,6 +280,81 @@ STDMETHODIMP InterfaceTCPIPPort::get_SSLCertificateID(long *pVal)
    }
 }
 
+STDMETHODIMP InterfaceTCPIPPort::put_ClientCertificatePolicy(long newVal)
+{
+   try
+   {
+      if (!object_)
+         return GetAccessDenied();
+
+      // Rejected here rather than coerced: the server side treats any unknown
+      // stored value as "require" (it fails closed), so letting a bad value
+      // through would not create a hole - but it would create a port that
+      // rejects every client with nothing in the API having ever said the
+      // value was wrong.
+      if (newVal != HM::CCPOff && newVal != HM::CCPRequest && newVal != HM::CCPRequire)
+         return COMError::GenerateError("Invalid client certificate policy. Valid values are 0 (off), 1 (request) and 2 (require).");
+
+      object_->SetClientCertificatePolicy((HM::ClientCertificatePolicy) newVal);
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceTCPIPPort::get_ClientCertificatePolicy(long *pVal)
+{
+   try
+   {
+      if (!object_)
+         return GetAccessDenied();
+
+      *pVal = (long) object_->GetClientCertificatePolicy();
+
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceTCPIPPort::put_ClientCertificateCAFile(BSTR newVal)
+{
+   try
+   {
+      if (!object_)
+         return GetAccessDenied();
+
+      object_->SetClientCertificateCAFile(newVal);
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceTCPIPPort::get_ClientCertificateCAFile(BSTR *pVal)
+{
+   try
+   {
+      if (!object_)
+         return GetAccessDenied();
+
+      HM::String sCAFile = object_->GetClientCertificateCAFile();
+      *pVal = sCAFile.AllocSysString();
+
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
 STDMETHODIMP InterfaceTCPIPPort::Delete()
 {
    try

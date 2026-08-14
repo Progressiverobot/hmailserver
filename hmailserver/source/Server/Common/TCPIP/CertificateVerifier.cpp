@@ -7,6 +7,8 @@
 #include "CertificateVerifier.h"
 #include "SocketConstants.h"
 
+#include <openssl/x509.h>
+
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
 #define new DEBUG_NEW
@@ -146,7 +148,7 @@ namespace HM
 
    }
 
-   bool 
+   bool
    CertificateVerifier::OverrideResult_(bool result) const
    {
       if (result == false)
@@ -156,8 +158,51 @@ namespace HM
          else
             return false;
       }
-      
+
       return true;
+   }
+
+   ClientCertificateVerifier::ClientCertificateVerifier(int session_id, bool fail_handshake_on_error) :
+      session_id_(session_id),
+      fail_handshake_on_error_(fail_handshake_on_error)
+   {
+
+   }
+
+   bool
+   ClientCertificateVerifier::operator() (bool preverified, boost::asio::ssl::verify_context& ctx) const
+   {
+      // OpenSSL has already checked this chain element against the CA bundle the
+      // port was configured with (TCPServer loads it into the SSL context), so a
+      // true preverification is the whole answer. There is deliberately no
+      // Windows-store fallback here: the point of a per-port CA bundle is that
+      // ONLY the named CA vouches for clients on this port, and consulting the
+      // machine's general trust store would let a certificate from any public CA
+      // through a port meant for one private one.
+      if (preverified)
+         return true;
+
+      // Name the failing certificate and the reason. Without this line the
+      // administrator of a "require" port sees only a generic handshake failure
+      // and cannot tell a partner with an expired certificate from a stranger.
+      int depth = X509_STORE_CTX_get_error_depth(ctx.native_handle());
+      int verify_error = X509_STORE_CTX_get_error(ctx.native_handle());
+
+      char subject[256] = "(no certificate)";
+      X509* cert = X509_STORE_CTX_get_current_cert(ctx.native_handle());
+      if (cert != nullptr)
+         X509_NAME_oneline(X509_get_subject_name(cert), subject, sizeof(subject));
+
+      String message;
+      message.Format(_T("Client certificate verification failed for session %d. Subject: %s, Depth: %d, Error: %s"),
+         session_id_, String(subject).c_str(), depth, String(X509_verify_cert_error_string(verify_error)).c_str());
+      LOG_TCPIP(message);
+
+      // CCPRequire fails the handshake; CCPRequest records the failure above and
+      // lets the session continue - TCPConnection::AsyncHandshakeCompleted reads
+      // the surviving error out of SSL_get_verify_result and logs the summary, so
+      // an overridden failure is never mistaken for a verified identity.
+      return !fail_handshake_on_error_;
    }
 
 }

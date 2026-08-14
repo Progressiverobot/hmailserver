@@ -780,7 +780,13 @@ interface IInterfaceDomain : IDispatch
 	   [propget, id(39), helpstring("Gets or sets the signing algorithm.")] HRESULT DKIMSigningAlgorithm([out, retval] eDKIMAlgorithm *pVal);
 	   [propput, id(39), helpstring("Gets or sets the signing algorithm.")] HRESULT DKIMSigningAlgorithm([in] eDKIMAlgorithm newVal);
 	   [propget, id(40), helpstring("Enable DKIM signing for aliases.")] HRESULT DKIMSignAliasesEnabled([out, retval] VARIANT_BOOL *pVal);
-	   [propput, id(40), helpstring("Enable DKIM signing for aliases.")] HRESULT DKIMSignAliasesEnabled([in] VARIANT_BOOL pVal);   
+	   [propput, id(40), helpstring("Enable DKIM signing for aliases.")] HRESULT DKIMSignAliasesEnabled([in] VARIANT_BOOL pVal);
+
+	   [propget, id(41), helpstring("The secondary (staged) DKIM selector. Never used for signing; publish its DNS record, verify it, then call DKIMPromoteSecondary.")] HRESULT DKIMSecondarySelector([out, retval] BSTR *pVal);
+	   [propput, id(41), helpstring("The secondary (staged) DKIM selector. Never used for signing; publish its DNS record, verify it, then call DKIMPromoteSecondary.")] HRESULT DKIMSecondarySelector([in] BSTR newVal);
+	   [propget, id(42), helpstring("The private key file belonging to the secondary DKIM selector.")] HRESULT DKIMSecondaryPrivateKeyFile([out, retval] BSTR *pVal);
+	   [propput, id(42), helpstring("The private key file belonging to the secondary DKIM selector.")] HRESULT DKIMSecondaryPrivateKeyFile([in] BSTR newVal);
+	   [id(43), helpstring("Makes the secondary DKIM selector/key the primary one and clears the secondary. Fails if no usable secondary is staged. Call Save afterwards to persist the change.")] HRESULT DKIMPromoteSecondary();
 
 };
 [
@@ -2438,6 +2444,10 @@ interface IInterfaceTCPIPPort : IDispatch
    [id(8), helpstring("Deletes the object from the database.")] HRESULT Delete();
    [propget, id(9), helpstring("Connection security for this TCP/IP port.")] HRESULT ConnectionSecurity([out, retval] eConnectionSecurity *pVal);
    [propput, id(9), helpstring("Connection security for this TCP/IP port.")] HRESULT ConnectionSecurity([in] eConnectionSecurity newVal);
+   [propget, id(10), helpstring("TLS client certificate policy for inbound connections on this port. 0 = Off, 1 = Request (verify and log but never fail), 2 = Require (handshake fails without a trusted certificate).")] HRESULT ClientCertificatePolicy([out, retval] long *pVal);
+   [propput, id(10), helpstring("TLS client certificate policy for inbound connections on this port. 0 = Off, 1 = Request (verify and log but never fail), 2 = Require (handshake fails without a trusted certificate).")] HRESULT ClientCertificatePolicy([in] long newVal);
+   [propget, id(11), helpstring("Path to a PEM file containing the CA certificate(s) trusted to issue client certificates for this port.")] HRESULT ClientCertificateCAFile([out, retval] BSTR *pVal);
+   [propput, id(11), helpstring("Path to a PEM file containing the CA certificate(s) trusted to issue client certificates for this port.")] HRESULT ClientCertificateCAFile([in] BSTR newVal);
 };
 
 
