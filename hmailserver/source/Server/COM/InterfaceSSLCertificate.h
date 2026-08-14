@@ -70,6 +70,9 @@ public:
    
    STDMETHOD(get_PrivateKeyFile)(/*[out, retval]*/ BSTR *pVal);
    STDMETHOD(put_PrivateKeyFile)(/*[in]*/ BSTR newVal);
+
+   STDMETHOD(get_PrivateKeyPassword)(/*[out, retval]*/ BSTR *pVal);
+   STDMETHOD(put_PrivateKeyPassword)(/*[in]*/ BSTR newVal);
 };
 
 OBJECT_ENTRY_AUTO(__uuidof(SSLCertificate), InterfaceSSLCertificate)

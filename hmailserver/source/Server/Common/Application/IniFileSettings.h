@@ -340,6 +340,32 @@ namespace HM
       // outbound delivery, but NOT the REST API or Web Services listeners, which build
       // their own SSL_CTX.
       String GetTlsCipherSuites13() const { return tls_cipher_suites13_; }
+
+      // TLS session resumption and session-ticket management, on the listener contexts
+      // SslContextInitializer builds. Every one of these defaults to "make no OpenSSL
+      // call at all", which is the house pattern here and the only way to mean "leave
+      // the library's own behaviour alone".
+      //
+      // Tickets on is today's behaviour. Turning them off sets SSL_OP_NO_TICKET AND
+      // SSL_CTX_set_num_tickets(0), because the option alone only makes TLS 1.3 tickets
+      // stateful rather than absent.
+      bool GetTlsSessionTicketsEnabled() const { return tls_session_tickets_enabled_; }
+
+      // 0 leaves OpenSSL's cache size; a negative value turns the server-side
+      // session-ID cache off. Bounds what a client churning handshakes can make this
+      // server remember.
+      int GetTlsSessionCacheSize() const { return tls_session_cache_size_; }
+
+      // 0 leaves OpenSSL's timeout. Bounds how long a stolen resumption secret stays
+      // usable.
+      int GetTlsSessionTimeoutSeconds() const { return tls_session_timeout_seconds_; }
+
+      // 0 - the default - installs no ticket-key callback, so OpenSSL keeps its own key:
+      // one per context, generated at startup and never rotated, so every ticket the
+      // process ever issues is sealed under it and a key recovered later decrypts all of
+      // them. A positive interval rotates, keeping the previous key so tickets issued
+      // under it still resume, which bounds that exposure to two intervals.
+      int GetTlsTicketKeyRotationSeconds() const { return tls_ticket_key_rotation_seconds_; }
       int GetRestApiPort() const { return rest_api_port_; }
       String GetRestApiBindAddress() const { return rest_api_bind_address_; }
       String GetRestApiCertificateFile() const { return rest_api_certificate_file_; }
@@ -516,6 +542,10 @@ namespace HM
       String tls_rpt_organization_name_;
       String tls_key_exchange_groups_;
       String tls_cipher_suites13_;
+      bool tls_session_tickets_enabled_ = true;
+      int tls_session_cache_size_ = 0;
+      int tls_session_timeout_seconds_ = 0;
+      int tls_ticket_key_rotation_seconds_ = 0;
       int rest_api_port_ = 0;
       String rest_api_bind_address_;
       String rest_api_certificate_file_;

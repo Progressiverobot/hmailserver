@@ -5,10 +5,13 @@
 #include "StdAfx.h"
 
 #include "DMARC.h"
+#include "PublicSuffixList.h"
 
 #include "../../TCPIP/DNSResolver.h"
 #include "../../Util/Parsing/StringParser.h"
 #include "../../Util/Parsing/AddresslistParser.h"
+
+#include <atomic>
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -19,62 +22,6 @@ namespace HM
 {
    namespace
    {
-      // Common multi-label public suffixes. Used by the organizational-domain
-      // heuristic. This is intentionally a compact subset of the Public Suffix
-      // List covering the most frequently seen registry suffixes.
-      const wchar_t *multiLabelPublicSuffixes[] =
-      {
-         L"co.uk", L"org.uk", L"me.uk", L"ltd.uk", L"plc.uk", L"net.uk", L"sch.uk", L"ac.uk", L"gov.uk", L"nhs.uk",
-         L"com.au", L"net.au", L"org.au", L"edu.au", L"gov.au", L"id.au", L"asn.au",
-         L"co.nz", L"net.nz", L"org.nz", L"govt.nz", L"ac.nz",
-         L"co.jp", L"ne.jp", L"or.jp", L"ac.jp", L"go.jp",
-         L"com.br", L"net.br", L"org.br", L"gov.br",
-         L"com.cn", L"net.cn", L"org.cn", L"gov.cn",
-         L"com.mx", L"com.ar", L"com.tr", L"com.tw", L"com.hk", L"com.sg", L"com.my", L"com.ph",
-         L"co.in", L"net.in", L"org.in", L"firm.in", L"gen.in", L"ind.in",
-         L"co.za", L"net.za", L"org.za", L"web.za",
-         L"co.kr", L"or.kr", L"ne.kr", L"re.kr", L"go.kr",
-         L"com.es", L"org.es", L"nom.es",
-         L"com.pl", L"net.pl", L"org.pl",
-         L"com.ru", L"net.ru", L"org.ru",
-         L"co.il", L"org.il", L"net.il", L"ac.il", L"gov.il",
-         L"com.ua", L"net.ua", L"org.ua",
-         L"com.co", L"net.co", L"org.co",
-         L"com.vn", L"net.vn", L"org.vn",
-
-         // Second-level labels that are NOT generic registry words, so the shape rule
-         // below cannot infer them. Added after a review found the shape rule still
-         // collapsed these to the bare suffix.
-         L"my.id", L"biz.id", L"desa.id", L"ponpes.id",
-         L"gr.jp", L"ad.jp", L"ed.jp", L"lg.jp",
-         L"sc.ke", L"me.ke", L"mi.th",
-         L"art.br", L"eco.br", L"emp.br", L"eng.br", L"blog.br", L"med.br", L"adv.br",
-         L"esp.br", L"etc.br", L"ind.br", L"inf.br", L"jor.br", L"rec.br", L"srv.br",
-         L"tur.br", L"vet.br", L"wiki.br"
-      };
-
-      // Two-letter TLDs that are FLAT - anybody may register directly beneath them, so
-      // a two-label name under one of these is a registrant, not a public suffix.
-      //
-      // This list exists to bound the shape rule below, and it was added because that
-      // rule without it was a REGRESSION rather than a fix. "co", "gen", "web", "info",
-      // "in", "pro" and friends are perfectly ordinary company names, and they are
-      // registered directly under .io/.ai/.me every day. Treating co.io as a public
-      // suffix makes GetOrganizationalDomain("mail.co.io") return "mail.co.io" while
-      // GetOrganizationalDomain("co.io") returns "co.io", so relaxed alignment compares
-      // two different strings and correctly-signed mail from a real company FAILS
-      // DMARC. Rejecting legitimate mail is a worse outcome than the forgery the shape
-      // rule was added to prevent, so the rule is not applied here.
-      const wchar_t *flatTwoLetterRegistries[] =
-      {
-         L"io", L"ai", L"me", L"cc", L"tv", L"sh", L"fm", L"gg", L"im",
-         L"la", L"to", L"ly", L"st", L"is", L"ms", L"nu", L"tk", L"ws",
-         L"vc", L"gs", L"mn", L"si", L"su", L"ee", L"lv", L"lt", L"sk",
-         L"cz", L"be", L"nl", L"de", L"fr", L"it", L"ch", L"at", L"dk",
-         L"se", L"no", L"fi", L"pl", L"pt", L"gr", L"ie", L"lu", L"ca",
-         L"us", L"eu", L"cl", L"uy", L"ec", L"bo", L"py"
-      };
-
       // RFC 5322 3.2.2: a comment is a parenthesised run that may nest, may contain
       // quoted strings, and may appear anywhere between lexical tokens. It is NOT part
       // of any address - but AddresslistParser does not know that. Its
@@ -209,78 +156,76 @@ namespace HM
       lowerDomain.TrimRight(_T("."));
 
       std::vector<String> labels = StringParser::SplitString(lowerDomain, ".");
-      if (labels.size() <= 2)
+      if (labels.size() <= 1)
          return lowerDomain;
 
-      // Determine the number of labels making up the public suffix.
-      size_t suffixLabels = 1;
+      // The public suffix comes from the real Public Suffix List, compiled in
+      // (see PublicSuffixList.h and build\generate-public-suffix-list.ps1).
+      //
+      // This replaced a heuristic - a ~120-entry table of common multi-label
+      // suffixes plus a shape rule for registry-looking labels under two-letter
+      // ccTLDs - and the heuristic had to go because BOTH of its error
+      // directions were live, and each one is a real failure on real mail:
+      //
+      //  - Too few suffix labels and the "organizational domain" of a name
+      //    under a multi-label suffix collapses to the suffix itself:
+      //    GetOrganizationalDomain("bank.my.id") gave "my.id", and so did
+      //    "attacker.my.id" - relaxed alignment (the DMARC default for both
+      //    aspf and adkim) then compares "my.id" with "my.id" and passes, so
+      //    anyone holding any name under the suffix could forge any other
+      //    name under it past a p=reject. The shape rule could never learn
+      //    suffixes whose second label is not a registry word (my.id, gr.jp,
+      //    ad.jp, sc.ke, art.br, ...), so each of those stayed a bypass.
+      //
+      //  - Too many suffix labels and relaxed alignment silently becomes
+      //    strict for a legitimate registrant: the shape rule decided
+      //    "gov.je" was a registry suffix (registry word under a two-letter
+      //    ccTLD not on its exclusion list), so mail.gov.je was its own
+      //    organizational domain, subdomain policy discovery never fell back
+      //    to _dmarc.gov.je, and correctly-signed mail failed to align.
+      //    Rejecting real mail is the worse direction of the two.
+      //
+      // The full list closes both directions at once because it is no longer
+      // an approximation from either side: what it names is a suffix, what it
+      // does not name is a registrant.
+      size_t suffixLabels = PublicSuffixList::GetPublicSuffixLabelCount(labels);
 
-      String secondLevel = labels[labels.size() - 2];
-      String topLevel = labels[labels.size() - 1];
-
-      String lastTwo = secondLevel + _T(".") + topLevel;
-      for (const wchar_t *suffix : multiLabelPublicSuffixes)
+      if (suffixLabels == 0)
       {
-         if (lastTwo.CompareNoCase(suffix) == 0)
+         // The compiled-in tables are empty. A correct build cannot produce
+         // this - the generator refuses to emit a truncated header - so this
+         // is a guard against a broken regeneration being committed, and it
+         // must pick a failure direction:
+         //
+         // Falling back to a one-label suffix fails OPEN - alignment becomes
+         // looser than intended and multi-label-suffix registrants become
+         // mutually forgeable again, exactly the pre-hardening behaviour.
+         // The alternative, treating the whole domain as its own
+         // organizational domain, fails CLOSED - relaxed alignment silently
+         // behaves as strict and correctly-signed subdomain mail from every
+         // domain on the planet starts failing DMARC. Rejecting legitimate
+         // mail wholesale is worse than weakening one check that SPF, DKIM
+         // and content scoring still back up, so this fails open - and says
+         // so once in the error log, because a security check that has
+         // quietly degraded looks identical to one that is working.
+         static std::atomic<bool> emptyTablesReported(false);
+         if (!emptyTablesReported.exchange(true))
          {
-            suffixLabels = 2;
-            break;
+            ErrorManager::Instance()->ReportError(ErrorManager::High, 6150, "DMARC::GetOrganizationalDomain",
+               "The compiled-in Public Suffix List is empty, so organizational domains are computed from the "
+               "top-level domain alone and DMARC relaxed alignment is weaker than intended. The build is broken: "
+               "regenerate PublicSuffixListData.h with build\\generate-public-suffix-list.ps1 and rebuild.");
          }
+
+         suffixLabels = 1;
       }
 
-      // The table above is a subset of the Public Suffix List, and a subset used on
-      // its own is a DMARC bypass rather than merely an approximation.
-      //
-      // com.pt, co.id, co.th, com.ng, co.ke and com.pe were among the suffixes not in
-      // it. For any of those, this returned the *public suffix itself* as the
-      // organizational domain - GetOrganizationalDomain("bank.com.pt") gave "com.pt".
-      // Relaxed alignment is the DMARC default for both aspf and adkim, so
-      // DomainsAligned_ then compared "com.pt" with "com.pt" and passed: register
-      // attacker.com.pt, publish "v=spf1 +all", send MAIL FROM there with
-      // From: ceo@bank.com.pt, and bank.com.pt's p=reject was bypassed. Every domain
-      // under a suffix missing from the table was forgeable by anyone holding any
-      // other name under the same suffix.
-      //
-      // Completing the table is not the fix - the PSL has ~9,000 rules and changes
-      // weekly, so the next missing entry is the next bypass. This covers the shape
-      // instead: a registry label directly under a two-letter ccTLD. That is what
-      // essentially every ccTLD of this kind looks like, including all of the ones the
-      // table already lists, and it needs no maintenance.
-      //
-      // It errs towards treating a name as a public suffix, which makes alignment
-      // stricter rather than looser - the safe direction. The cost is a registrant who
-      // literally holds "co.<cc>" as their own name seeing relaxed alignment behave
-      // strictly for their subdomains; the alternative is the bypass above.
-      bool topLevelIsFlat = false;
-      for (const wchar_t *flat : flatTwoLetterRegistries)
-      {
-         if (topLevel.CompareNoCase(flat) == 0)
-         {
-            topLevelIsFlat = true;
-            break;
-         }
-      }
-
-      if (suffixLabels == 1 && topLevel.GetLength() == 2 && !topLevelIsFlat)
-      {
-         static const wchar_t *registryLabels[] =
-         {
-            L"com", L"net", L"org", L"edu", L"gov", L"mil", L"int",
-            L"co", L"ac", L"or", L"ne", L"go", L"re", L"id", L"in",
-            L"biz", L"info", L"name", L"nom", L"web", L"firm", L"gen", L"ind",
-            L"sch", L"asn", L"govt", L"nhs", L"ltd", L"plc", L"priv", L"pro"
-         };
-
-         for (const wchar_t *label : registryLabels)
-         {
-            if (secondLevel.CompareNoCase(label) == 0)
-            {
-               suffixLabels = 2;
-               break;
-            }
-         }
-      }
-
+      // The organizational domain is the public suffix plus the single label
+      // the registrant registered under it (RFC 7489 3.2). A domain that is
+      // itself a public suffix - or shorter than one, as gr.jp is - has no
+      // organizational domain distinct from itself and is returned unchanged;
+      // DomainsAligned_ then compares it as-is, so a sender claiming the bare
+      // suffix does not align with anything under it.
       size_t organizationalLabels = suffixLabels + 1;
       if (labels.size() <= organizationalLabels)
          return lowerDomain;

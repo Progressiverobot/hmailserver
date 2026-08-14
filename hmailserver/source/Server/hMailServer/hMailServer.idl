@@ -2549,6 +2549,8 @@ interface IInterfaceSSLCertificate : IDispatch
    [propget, id(5), helpstring("The private key file.")] HRESULT PrivateKeyFile([out, retval] BSTR *pVal);
    [propput, id(5), helpstring("The private key file")] HRESULT PrivateKeyFile([in] BSTR newVal);
    [id(6), helpstring("Deletes the object from the database.")] HRESULT Delete();
+   [propget, id(7), helpstring("The passphrase for the private key file. Empty when the private key file is not encrypted. Reading it requires server administrator rights.")] HRESULT PrivateKeyPassword([out, retval] BSTR *pVal);
+   [propput, id(7), helpstring("The passphrase for the private key file")] HRESULT PrivateKeyPassword([in] BSTR newVal);
 };
 
 

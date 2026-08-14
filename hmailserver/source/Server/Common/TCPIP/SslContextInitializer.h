@@ -19,8 +19,21 @@ namespace HM
    private:
 
       static void SetContextOptions_(boost::asio::ssl::context& context);
- 
-      static std::string  GetPassword_();
+
+      // The PEM passphrase callback body. OpenSSL only invokes it when the private
+      // key file is actually encrypted, so an unencrypted key never reaches this
+      // and behaves exactly as it always has. Returns the passphrase configured on
+      // the certificate, or an empty string - which makes the key load fail and be
+      // reported by InitServer - when none is configured.
+      static std::string GetPassword_(std::shared_ptr<SSLCertificate> certificate);
+
+      // Session resumption policy for a server context: an explicit session-ID
+      // context, cache size and lifetime control, the ability to turn session
+      // tickets off, and ticket-key rotation. Server-side only - none of these
+      // apply to the outbound client context. Every setting defaults to "make no
+      // OpenSSL call at all", so a default configuration keeps OpenSSL's stock
+      // behaviour; see the function body for which knob defends which failure.
+      static void SetSessionResumption_(boost::asio::ssl::context& context, const String &ip_address, int port);
 
       static void SetCipherList_(boost::asio::ssl::context& context);
       static void SetTls13CipherSuites_(boost::asio::ssl::context& context);

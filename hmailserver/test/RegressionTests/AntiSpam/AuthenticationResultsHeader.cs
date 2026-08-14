@@ -269,7 +269,129 @@ namespace RegressionTests.AntiSpam
       }
 
       [Test]
-      [Description("Only a header bearing OUR authserv-id may be stripped; one naming any other identity is " +
+      [Description("A forged header may be FOLDED, which is ordinary RFC 5322 and needs no special effort. " +
+                   "Deciding on the first physical line alone saw an empty value there, kept the field, and " +
+                   "kept the continuation that actually carries our identity - so the sender's own dkim=pass " +
+                   "survived under our name. The decision has to be made on the unfolded field.")]
+      public void ForgedHeaderThatIsFolded_IsStillRemoved()
+      {
+         try
+         {
+            IniFileSetting.Write("AuthenticationResultsEnabled", "1");
+            IniFileSetting.Write("AuthenticationResultsIdentity", ConfiguredIdentity);
+            _application.Reinitialize();
+
+            EnableSpfEvaluation();
+
+            string forgedMessage =
+               "Authentication-Results:\r\n" +
+               "\t" + ConfiguredIdentity + "; dkim=pass header.d=attacker.example\r\n" +
+               "From: test@example.com\r\n" +
+               "To: forged-folded@example.test\r\n" +
+               "Subject: Folded forged Authentication-Results\r\n" +
+               "\r\n" +
+               "Body text\r\n";
+
+            var messageData = SendRawInboundMessageAndFetchIt("forged-folded@example.test", forgedMessage);
+
+            Assert.AreEqual(1, CountAuthenticationResultsHeaders(messageData),
+               "The folded forgery must be removed, leaving only ours.\r\n" + messageData);
+            Assert.IsFalse(messageData.ToLower().Contains("attacker.example"),
+               "No part of the folded forgery may survive.\r\n" + messageData);
+            Assert.IsFalse(messageData.ToLower().Contains("dkim=pass"),
+               "No DKIM verification ran, so a surviving dkim=pass is the forged verdict.\r\n" + messageData);
+         }
+         finally
+         {
+            RestoreIniDefaults();
+         }
+      }
+
+      [Test]
+      [Description("RFC 8601 allows the authserv-id as a quoted string, and the quotes are not part of the " +
+                   "identity. Comparing with them attached meant \"ours\" did not match ours, so the forgery " +
+                   "survived - and a downstream reader unquotes it and trusts it.")]
+      public void ForgedHeaderWithQuotedAuthservId_IsStillRemoved()
+      {
+         try
+         {
+            IniFileSetting.Write("AuthenticationResultsEnabled", "1");
+            IniFileSetting.Write("AuthenticationResultsIdentity", ConfiguredIdentity);
+            _application.Reinitialize();
+
+            EnableSpfEvaluation();
+
+            string forgedMessage =
+               "Authentication-Results: \"" + ConfiguredIdentity + "\"; dkim=pass header.d=attacker.example\r\n" +
+               "From: test@example.com\r\n" +
+               "To: forged-quoted@example.test\r\n" +
+               "Subject: Quoted authserv-id\r\n" +
+               "\r\n" +
+               "Body text\r\n";
+
+            var messageData = SendRawInboundMessageAndFetchIt("forged-quoted@example.test", forgedMessage);
+
+            Assert.AreEqual(1, CountAuthenticationResultsHeaders(messageData),
+               "A quoted authserv-id is still our identity and must be stripped.\r\n" + messageData);
+            Assert.IsFalse(messageData.ToLower().Contains("attacker.example"),
+               "No part of the forgery may survive.\r\n" + messageData);
+         }
+         finally
+         {
+            RestoreIniDefaults();
+         }
+      }
+
+      [Test]
+      [Description("The strip path rewrites the message by seeking past the header, so the header length it " +
+                   "uses must be a RAW BYTE count. It was taken from PersistentMessage::LoadHeader, whose " +
+                   "return value has been through a code-page round trip - so with any non-ASCII header byte " +
+                   "the seek landed in the wrong place and spliced the last header line onto the body, or " +
+                   "duplicated header bytes ahead of it, on a message the sender had already been told 250 for. " +
+                   "This asserts the body and the other headers survive the strip intact.")]
+      public void StrippingAForgedHeaderMustNotCorruptANonAsciiHeader()
+      {
+         try
+         {
+            IniFileSetting.Write("AuthenticationResultsEnabled", "1");
+            IniFileSetting.Write("AuthenticationResultsIdentity", ConfiguredIdentity);
+            _application.Reinitialize();
+
+            EnableSpfEvaluation();
+
+            // A non-ASCII byte in a kept header, on the strip path. The subject is raw
+            // 8-bit rather than encoded-word on purpose: it is the byte count that the
+            // defect got wrong, and an encoded-word would be pure ASCII and prove nothing.
+            const string bodyMarker = "BodyMustSurviveIntact";
+            string forgedMessage =
+               "Authentication-Results: " + ConfiguredIdentity + "; dkim=pass header.d=attacker.example\r\n" +
+               "From: test@example.com\r\n" +
+               "To: forged-nonascii@example.test\r\n" +
+               "Subject: café naïve über\r\n" +
+               "X-Keep-Me: intact\r\n" +
+               "\r\n" +
+               bodyMarker + "\r\n";
+
+            var messageData = SendRawInboundMessageAndFetchIt("forged-nonascii@example.test", forgedMessage);
+
+            Assert.AreEqual(1, CountAuthenticationResultsHeaders(messageData),
+               "The forgery must still be removed.\r\n" + messageData);
+            Assert.IsTrue(messageData.Contains(bodyMarker),
+               "The body must survive the strip. A mis-measured header length truncates or duplicates at the " +
+               "header/body boundary.\r\n" + messageData);
+            Assert.IsTrue(messageData.Contains("X-Keep-Me: intact"),
+               "A header after the stripped one must survive byte for byte.\r\n" + messageData);
+            Assert.IsFalse(messageData.Contains("\r\r\n"),
+               "A mis-measured header length leaves \\r\\r\\n where the header/body boundary should be.\r\n" + messageData);
+         }
+         finally
+         {
+            RestoreIniDefaults();
+         }
+      }
+
+      [Test]
+      [Description("Only a header bearing OUR authserv-id may be stripped; one naming any other identity is" +
                    "left completely intact. If this regresses, the verdicts of legitimate upstream verifiers " +
                    "- a forwarding MX, a mailing list - are destroyed in transit, every downstream consumer " +
                    "of those verdicts goes blind, and any DKIM signature covering those header bytes breaks.")]

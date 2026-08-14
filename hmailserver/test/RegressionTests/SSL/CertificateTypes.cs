@@ -36,7 +36,12 @@ namespace RegressionTests.SSL
          _application.Stop();
          _application.Start();
 
-         CustomAsserts.AssertReportedError("The private key file has a password. hMailServer does not support this.",
+         // The message changed because the limitation it described was removed. An
+         // encrypted key with NO passphrase configured still fails to load and the
+         // listener still does not come up - which is what this test pins - but the
+         // server no longer says the feature is unsupported. It names the property to
+         // set instead (SSLCertificate.PrivateKeyPassword), because it now works.
+         CustomAsserts.AssertReportedError("no passphrase is configured for the certificate",
             "Failed to load private key file.");
 
          SingletonProvider<TestSetup>.Instance.PerformBasicSetup();

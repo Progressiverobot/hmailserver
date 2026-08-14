@@ -640,12 +640,29 @@ namespace HM
       }
       else
       {
-         if (method.Find("/") > 0)
-         {
-            std::vector<AnsiString> vec = StringParser::SplitString(method, "/");    
+         // Split by index rather than with SplitString, which DISCARDS a trailing empty
+         // token. For c=relaxed/ it returned a one-element vector and the old code then
+         // read vec[1] - an out-of-bounds vector index driven straight from an
+         // attacker-supplied DKIM-Signature tag, on the inbound verification path.
+         //
+         // The old guard was also Find("/") > 0, so c=/relaxed took the else branch and
+         // used "/relaxed" as the header method; the >= 0 here handles it.
+         int separator = method.Find("/");
 
-            headerMethod = vec[0];
-            bodyMethod = vec[1];
+         if (separator >= 0)
+         {
+            headerMethod = method.Mid(0, separator);
+            bodyMethod = method.Mid(separator + 1);
+
+            // An empty half is not a canonicalization name. "simple" is what the tag
+            // means when it is absent altogether (RFC 6376 3.5), so it is the honest
+            // reading of a half that says nothing - and it matches what this function
+            // already does for a c= tag that is missing entirely.
+            if (headerMethod.IsEmpty())
+               headerMethod = "simple";
+
+            if (bodyMethod.IsEmpty())
+               bodyMethod = "simple";
          }
          else
          {

@@ -259,6 +259,70 @@ namespace HM
    }
 
    bool
+   AuthenticationResults::FieldCarriesAuthservId_(const AnsiString &field, const AnsiString &wantedLowerCase)
+   {
+      int colonPosition = field.Find(":");
+
+      if (colonPosition <= 0)
+         return false;
+
+      AnsiString name = field.Mid(0, colonPosition);
+      name.Trim();
+
+      if (name.CompareNoCase("Authentication-Results") != 0)
+         return false;
+
+      AnsiString value = field.Mid(colonPosition + 1);
+
+      // UNFOLDED before anything is read out of it, which is what the previous version
+      // failed to do. It looked at the first physical line only, so
+      //
+      //    Authentication-Results:\r\n
+      //    \tmail; spf=pass smtp.mailfrom=attacker.example\r\n
+      //
+      // presented an empty value on line one, matched nothing, and the forged field
+      // survived - while every RFC 8601 reader unfolds it and sees our own identity
+      // vouching for the sender's own verdict. Folding is legal RFC 5322 and needs no
+      // special configuration to produce, so this was a bypass of the whole point of
+      // the strip.
+      value.Replace("\r", "");
+      value.Replace("\n", " ");
+
+      // The authserv-id is the first token, ahead of the optional version number and
+      // the first ';'.
+      int semicolonPosition = value.Find(";");
+      if (semicolonPosition >= 0)
+         value = value.Mid(0, semicolonPosition);
+
+      value.Trim();
+
+      // RFC 8601 permits the authserv-id as a quoted string, and the quotes are not
+      // part of the identity. Comparing with them attached was the second bypass:
+      // Authentication-Results: "mail"; dkim=pass was not recognised as ours, and a
+      // downstream reader unquotes it and trusts it.
+      if (value.GetLength() >= 2 && value[0] == '"')
+      {
+         int closingQuote = value.Find("\"", 1);
+
+         if (closingQuote > 0)
+            value = value.Mid(1, closingQuote - 1);
+         else
+            value = value.Mid(1);
+      }
+      else
+      {
+         int spacePosition = value.Find(" ");
+         if (spacePosition > 0)
+            value = value.Mid(0, spacePosition);
+      }
+
+      value.Trim();
+      value.MakeLower();
+
+      return value == wantedLowerCase;
+   }
+
+   bool
    AuthenticationResults::ContainsResultsForAuthservId(const AnsiString &headerBlock, const AnsiString &authservId)
    {
       int removedCount = 0;
@@ -298,75 +362,45 @@ namespace HM
       const bool inputEndsWithNewline = !headerBlock.IsEmpty() &&
                                         headerBlock[headerBlock.GetLength() - 1] == '\n';
 
-      bool droppingField = false;
+      // A whole field at a time, with its continuation lines, and the decision taken on
+      // the complete unfolded value.
+      //
+      // Deciding line by line was what let a folded field through: the first line of
+      // "Authentication-Results:\r\n\tmail; ..." carries no authserv-id at all, so the
+      // field was kept and its continuation - which is where the identity actually is -
+      // was kept with it. Buffering the field means the same bytes are emitted or
+      // dropped as a unit, and the test sees what a reader would see.
+      AnsiString pendingField;
 
-      for (size_t i = 0; i < lines.size(); i++)
+      for (size_t i = 0; i <= lines.size(); i++)
       {
-         const AnsiString &line = lines[i];
+         const bool isEnd = (i == lines.size());
 
-         // SplitString removed the "\n"; the "\r" is still on the line.
-         const bool hasNewline = ((i + 1) < lines.size()) || inputEndsWithNewline;
+         // A continuation line begins with WSP; anything else starts a new field and
+         // therefore settles the previous one.
+         const bool isContinuation = !isEnd && !lines[i].IsEmpty() &&
+                                     (lines[i][0] == ' ' || lines[i][0] == '\t');
 
-         if (!line.IsEmpty() && (line[0] == ' ' || line[0] == '\t'))
+         if (!isContinuation && !pendingField.IsEmpty())
          {
-            // A folded continuation belongs to whichever field preceded it, so it goes
-            // wherever that field went.
-            if (!droppingField)
-            {
-               result += line;
+            if (FieldCarriesAuthservId_(pendingField, wanted))
+               removedCount++;
+            else
+               result += pendingField;
 
-               if (hasNewline)
-                  result += "\n";
-            }
-
-            continue;
+            pendingField.Empty();
          }
 
-         droppingField = false;
+         if (isEnd)
+            break;
 
-         AnsiString candidate = line;
-         candidate.TrimRight("\r");
+         // SplitString removed the "\n"; the "\r" is still on the line. Rebuilt exactly
+         // as found, so a kept field is byte-for-byte what arrived - which matters
+         // because a DKIM signature may cover those exact bytes.
+         pendingField += lines[i];
 
-         int colonPosition = candidate.Find(":");
-
-         if (colonPosition > 0)
-         {
-            AnsiString name = candidate.Mid(0, colonPosition);
-            name.Trim();
-
-            if (name.CompareNoCase("Authentication-Results") == 0)
-            {
-               // The authserv-id is the first token of the value, ahead of the optional
-               // version number and the first ';'. Nothing else in the field decides
-               // whether it is ours.
-               AnsiString value = candidate.Mid(colonPosition + 1);
-
-               int semicolonPosition = value.Find(";");
-               if (semicolonPosition >= 0)
-                  value = value.Mid(0, semicolonPosition);
-
-               value.Trim();
-
-               int spacePosition = value.Find(" ");
-               if (spacePosition > 0)
-                  value = value.Mid(0, spacePosition);
-
-               value.Trim();
-               value.MakeLower();
-
-               if (value == wanted)
-               {
-                  droppingField = true;
-                  removedCount++;
-                  continue;
-               }
-            }
-         }
-
-         result += line;
-
-         if (hasNewline)
-            result += "\n";
+         if (((i + 1) < lines.size()) || inputEndsWithNewline)
+            pendingField += "\n";
       }
 
       return result;

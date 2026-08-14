@@ -16,6 +16,7 @@
 #include "SpamTestSPF.h"
 #include "SpamTestSURBL.h"
 #include "SpamTestSpamAssassin.h"
+#include "DKIM/SpamTestArc.h"
 #include "DKIM/SpamTestDKIM.h"
 #include "DMARC/SpamTestDMARC.h"
 
@@ -46,6 +47,10 @@ namespace HM
       spam_tests_.push_back(std::shared_ptr<SpamTestSPF> (new SpamTestSPF));
       spam_tests_.push_back(std::shared_ptr<SpamTestSURBL> (new SpamTestSURBL));
       spam_tests_.push_back(std::shared_ptr<SpamTestDKIM> (new SpamTestDKIM));
+      // ARC must run before DMARC: its only output is a negative offset of the
+      // DMARC failure score, and the early-out below on iMaxScore would skip a
+      // test registered after DMARC in exactly the case the offset exists for.
+      spam_tests_.push_back(std::shared_ptr<SpamTestArc> (new SpamTestArc));
       spam_tests_.push_back(std::shared_ptr<SpamTestDMARC> (new SpamTestDMARC));
       spam_tests_.push_back(std::shared_ptr<SpamTestSpamAssassin> (new SpamTestSpamAssassin));
    }

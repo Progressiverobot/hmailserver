@@ -7,9 +7,17 @@
 
 #include "../BO/SSLCertificate.h"
 #include "../Util/Encoding/Base64.h"
+#include "../Util/Unicode.h"
 #include "../Util/Utilities.h"
 
+#include <openssl/core_names.h>
+#include <openssl/evp.h>
+#include <openssl/params.h>
+#include <openssl/rand.h>
 #include <openssl/x509.h>
+
+#include <cstring>
+#include <mutex>
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -81,6 +89,192 @@ namespace HM
 
          return unapplied;
       }
+
+      // --- TLS session-ticket key rotation -------------------------------------
+      //
+      // OpenSSL's default is one ticket key per SSL_CTX, generated when the context
+      // is created and kept for the life of the process. Every session ticket this
+      // server ever hands out is encrypted under that one key, so a passive attacker
+      // who records traffic and later recovers the key - a memory disclosure, a core
+      // dump, a hibernation file - can decrypt every recorded ticket and with it the
+      // resumption secrets inside. That is the forward-secrecy hole rotation closes:
+      // with rotation on, a captured ticket is decryptable for at most two rotation
+      // intervals (one as the current key, one as the previous), after which the key
+      // material it was sealed with no longer exists anywhere.
+      //
+      // The store is process-global rather than per-context on purpose. All listeners
+      // rotate together, and a ticket issued by one listener is *cryptographically*
+      // readable by another - but cross-listener resumption is still refused, because
+      // each listener gets its own session-ID context (see SetSessionResumption_) and
+      // OpenSSL compares that after decrypting the ticket. Keys are generated lazily,
+      // on the first ticket operation, so process start-up never depends on the RNG.
+      //
+      // File-local for the same reason FormatCertificateTime is: the header does not
+      // have to expose OpenSSL types.
+
+      struct TicketKey
+      {
+         unsigned char name[16] = {};
+         unsigned char aes[32] = {};
+         unsigned char hmac[32] = {};
+         time_t created = 0;
+         bool valid = false;
+      };
+
+      struct TicketKeyStore
+      {
+         std::mutex mutex;
+         TicketKey current;
+         TicketKey previous;
+         int rotation_interval_seconds = 0;
+         bool generation_failure_reported = false;
+      };
+
+      // Function-local static so initialization order against other globals can
+      // never matter.
+      TicketKeyStore& GetTicketKeyStore()
+      {
+         static TicketKeyStore store;
+         return store;
+      }
+
+      bool GenerateTicketKey(TicketKey &key, time_t now)
+      {
+         if (RAND_bytes(key.name, sizeof(key.name)) != 1 ||
+             RAND_bytes(key.aes, sizeof(key.aes)) != 1 ||
+             RAND_bytes(key.hmac, sizeof(key.hmac)) != 1)
+         {
+            key.valid = false;
+            return false;
+         }
+
+         key.created = now;
+         key.valid = true;
+         return true;
+      }
+
+      // The OpenSSL ticket-key callback (SSL_CTX_set_tlsext_ticket_key_evp_cb form),
+      // called on every ticket issued and on every ticket presented, for TLS 1.2
+      // RFC 5077 tickets and TLS 1.3 NewSessionTicket alike.
+      //
+      // Every failure path in here returns 0, never -1. For encryption, 0 means "no
+      // ticket for this session" and the handshake completes without one; for
+      // decryption, 0 means "not my ticket" and the client simply does a full
+      // handshake. Returning -1 would abort the handshake, which would let a broken
+      // RNG - or a garbage ticket from a hostile client - take a connection down
+      // instead of merely costing it resumption. Losing a ticket is always
+      // acceptable; losing the connection is not.
+      int TicketKeyCallback(SSL* /*ssl*/, unsigned char *key_name, unsigned char *iv,
+         EVP_CIPHER_CTX *cipherContext, EVP_MAC_CTX *macContext, int encrypt)
+      {
+         TicketKeyStore &store = GetTicketKeyStore();
+
+         TicketKey key;
+         bool renewTicket = false;
+         bool reportGenerationFailure = false;
+
+         {
+            std::lock_guard<std::mutex> guard(store.mutex);
+
+            if (encrypt)
+            {
+               time_t now = time(nullptr);
+
+               // Rotation is lazy: checked whenever a ticket is about to be issued.
+               // A timer would rotate on schedule even when idle, but an idle server
+               // issues no tickets, so lazy rotation gives the identical guarantee -
+               // no ticket is ever sealed under a key older than the interval -
+               // without a thread to own, start and stop.
+               if (!store.current.valid ||
+                   (store.rotation_interval_seconds > 0 &&
+                    now - store.current.created >= store.rotation_interval_seconds))
+               {
+                  TicketKey fresh;
+                  if (!GenerateTicketKey(fresh, now))
+                  {
+                     // Report once per process rather than once per handshake: if the
+                     // RNG is broken it is broken for every connection, and a report
+                     // per handshake would bury the log.
+                     if (!store.generation_failure_reported)
+                     {
+                        store.generation_failure_reported = true;
+                        reportGenerationFailure = true;
+                     }
+                  }
+                  else
+                  {
+                     store.previous = store.current;
+                     store.current = fresh;
+                  }
+               }
+
+               key = store.current;
+            }
+            else
+            {
+               if (store.current.valid &&
+                   memcmp(key_name, store.current.name, sizeof(store.current.name)) == 0)
+               {
+                  key = store.current;
+               }
+               else if (store.previous.valid &&
+                        memcmp(key_name, store.previous.name, sizeof(store.previous.name)) == 0)
+               {
+                  // Sealed under the previous key: still accepted, but returning 2
+                  // below makes OpenSSL issue a replacement ticket under the current
+                  // key, so a busy client's ticket keeps rolling forward and never
+                  // ages past the two-interval window.
+                  key = store.previous;
+                  renewTicket = true;
+               }
+               else
+               {
+                  // A key this process does not hold - a ticket from before a restart,
+                  // or older than two intervals. Full handshake.
+                  return 0;
+               }
+            }
+         }
+
+         if (reportGenerationFailure)
+         {
+            ErrorManager::Instance()->ReportError(ErrorManager::High, 6172, "SslContextInitializer::TicketKeyCallback",
+               "Failed to generate a TLS session-ticket key (the OpenSSL random number generator reported an error). Session tickets will not be issued until it recovers; connections and full handshakes are unaffected.");
+         }
+
+         if (!key.valid)
+            return 0;
+
+         if (encrypt)
+         {
+            if (RAND_bytes(iv, EVP_MAX_IV_LENGTH) != 1)
+               return 0;
+
+            if (EVP_EncryptInit_ex(cipherContext, EVP_aes_256_cbc(), nullptr, key.aes, iv) != 1)
+               return 0;
+
+            memcpy(key_name, key.name, sizeof(key.name));
+         }
+         else
+         {
+            if (EVP_DecryptInit_ex(cipherContext, EVP_aes_256_cbc(), nullptr, key.aes, iv) != 1)
+               return 0;
+         }
+
+         // OSSL_PARAM_construct_utf8_string wants a mutable buffer; a local array
+         // keeps us clear of casting away const from a string literal.
+         char digestName[] = "SHA256";
+
+         OSSL_PARAM params[3];
+         params[0] = OSSL_PARAM_construct_octet_string(OSSL_MAC_PARAM_KEY, key.hmac, sizeof(key.hmac));
+         params[1] = OSSL_PARAM_construct_utf8_string(OSSL_MAC_PARAM_DIGEST, digestName, 0);
+         params[2] = OSSL_PARAM_construct_end();
+
+         if (EVP_MAC_CTX_set_params(macContext, params) != 1)
+            return 0;
+
+         return encrypt ? 1 : (renewTicket ? 2 : 1);
+      }
    }
 
    bool
@@ -98,6 +292,7 @@ namespace HM
 
       SetCipherList_(context);
       SetTls13CipherSuites_(context);
+      SetSessionResumption_(context, ip_address, port);
 
       try
       {
@@ -167,7 +362,17 @@ namespace HM
 
       try
       {
-         context.set_password_callback(std::bind(&SslContextInitializer::GetPassword_));
+         // The callback captures the certificate so that each listener hands OpenSSL
+         // the passphrase configured for *its* key - different certificates can have
+         // different passphrases. OpenSSL only calls it when the key file is actually
+         // encrypted, so the overwhelmingly common unencrypted key never runs a line
+         // of it and loads exactly as before.
+         std::shared_ptr<SSLCertificate> passphrase_source = certificate;
+         context.set_password_callback(
+            [passphrase_source](std::size_t /*max_length*/, boost::asio::ssl::context_base::password_purpose /*purpose*/)
+            {
+               return GetPassword_(passphrase_source);
+            });
          context.use_private_key_file(privateKeyFile, boost::asio::ssl::context::pem);
       }
       catch (boost::system::system_error ec)
@@ -274,11 +479,158 @@ namespace HM
       }
    }
 
-   std::string 
-   SslContextInitializer::GetPassword_()
+   std::string
+   SslContextInitializer::GetPassword_(std::shared_ptr<SSLCertificate> certificate)
    {
-      ErrorManager::Instance()->ReportError(ErrorManager::High, 5143, "TCPServer::GetPassword()", "The private key file has a password. hMailServer does not support this.");
-      return "";
+      // Reaching this function at all means OpenSSL found the private key file to
+      // be encrypted. Until database version 6009 that was a dead end (error 5143,
+      // "hMailServer does not support this"); now the passphrase can be configured
+      // per certificate, because different certificates can have different
+      // passphrases and a single global one would force them all to match.
+      //
+      // What the stored passphrase is worth to an attacker: at rest it is protected
+      // the same way the other reversible secrets in this database are (see
+      // PersistentSSLCertificate::SaveObject), which with the default
+      // ProtectStoredSecretsWithDPAPI=1 means a machine-bound DPAPI envelope. An
+      // attacker who steals the database, a backup, or hMailServer.ini therefore
+      // gets a blob that is useless off this machine - and, notably, gets less than
+      // they already had, because the private key FILE the passphrase unlocks sits
+      // on this machine's disk too. An attacker who can run code on this machine
+      // can decrypt it, exactly as they could read an unencrypted key file today;
+      // an encrypted key plus a stored passphrase is protection for the key file
+      // when it travels (copied, backed up, committed somewhere by mistake), not
+      // against a compromise of the running server.
+      String configuredPassphrase = certificate ? certificate->GetPrivateKeyPassword() : String();
+
+      if (configuredPassphrase.IsEmpty())
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 6170, "SslContextInitializer::GetPassword_",
+            Formatter::Format("The private key file {0} is encrypted (it has a passphrase), and no passphrase is configured for the certificate. Set the PrivateKeyPassword property on the SSL certificate (COM: SSLCertificate.PrivateKeyPassword), or use an unencrypted key. The key was not loaded.",
+               certificate ? certificate->GetPrivateKeyFile() : String()));
+         return "";
+      }
+
+      // OpenSSL sees bytes, not characters, so a non-ASCII passphrase must be
+      // handed over in one well-defined encoding. UTF-8, matching what Crypt uses
+      // when it protects the value at rest, so the bytes OpenSSL gets are the bytes
+      // the administrator typed regardless of the console or COM client involved.
+      AnsiString utf8Passphrase;
+      Unicode::WideToMultiByte(configuredPassphrase, utf8Passphrase);
+
+      return std::string(utf8Passphrase);
+   }
+
+   void
+   SslContextInitializer::SetSessionResumption_(boost::asio::ssl::context& context, const String &ip_address, int port)
+   {
+      SSL_CTX* ssl = context.native_handle();
+
+      // (1) An explicit session-ID context, always. This is the one call here that
+      // is not behind a setting, because leaving it unset is not a behaviour anyone
+      // can want: OpenSSL refuses to resume a session into a context whose
+      // session-ID context differs from the one the session was created under, and
+      // a server that verifies client certificates (per-port policy, database
+      // version 6008) but never set a session-ID context fails resumed handshakes
+      // outright with "session id context uninitialized".
+      //
+      // It is derived from the listener's address and port, not shared, so that a
+      // session established on one listener can never be resumed on another. That
+      // matters because resumption skips certificate verification: a session from a
+      // port with no client-certificate requirement, resumed on a port that
+      // requires one, would walk straight past the requirement. Distinct session-ID
+      // contexts are the mechanism OpenSSL provides to stop exactly that, and they
+      // also keep the process-global ticket keys (below) from softening the same
+      // boundary. Hashed to fit: the raw string can exceed the 32-byte
+      // SSL_MAX_SSL_SESSION_ID_LENGTH limit for an IPv6 listener, and a SHA-256
+      // digest is exactly 32 bytes.
+      AnsiString sessionIdSource;
+      sessionIdSource.Format("hMailServer;%s;%d", AnsiString(ip_address).c_str(), port);
+
+      unsigned char sessionIdContext[EVP_MAX_MD_SIZE];
+      unsigned int sessionIdContextLength = 0;
+
+      if (EVP_Digest(sessionIdSource.c_str(), static_cast<size_t>(sessionIdSource.GetLength()), sessionIdContext, &sessionIdContextLength, EVP_sha256(), nullptr) == 1)
+      {
+         SSL_CTX_set_session_id_context(ssl, sessionIdContext, sessionIdContextLength);
+      }
+
+      // Everything below follows the house rule for OpenSSL configuration: the
+      // default value of every setting means "make no call at all", so a default
+      // configuration keeps OpenSSL's stock behaviour bit for bit, and no
+      // empty-or-zero value is ever passed through to a call that would accept it
+      // and quietly break TLS.
+
+      // (2) Session cache size. Defends against cache exhaustion: the server-side
+      // session-ID cache costs memory per cached session, and a client that churns
+      // handshakes grows it. OpenSSL caps it at 20480 sessions by default; a
+      // positive value replaces that cap, a negative value turns the server-side
+      // cache off entirely (session-ID resumption stops; tickets, which cost the
+      // server no memory, are unaffected), and 0 - the default - leaves OpenSSL
+      // alone.
+      int cacheSize = IniFileSettings::Instance()->GetTlsSessionCacheSize();
+
+      if (cacheSize > 0)
+         SSL_CTX_sess_set_cache_size(ssl, cacheSize);
+      else if (cacheSize < 0)
+         SSL_CTX_set_session_cache_mode(ssl, SSL_SESS_CACHE_OFF);
+
+      // (3) Session lifetime, in seconds, for both cached sessions and tickets.
+      // Defends against a stolen resumption secret staying useful: however a
+      // session leaks (a ticket recorded off the wire, a session cache read out of
+      // a core dump), it stops being resumable when it expires. 0 - the default -
+      // leaves OpenSSL's per-protocol default (300 seconds) alone; values below
+      // zero are meaningless and are skipped rather than handed to OpenSSL.
+      int sessionTimeoutSeconds = IniFileSettings::Instance()->GetTlsSessionTimeoutSeconds();
+
+      if (sessionTimeoutSeconds > 0)
+         SSL_CTX_set_timeout(ssl, sessionTimeoutSeconds);
+
+      if (!IniFileSettings::Instance()->GetTlsSessionTicketsEnabled())
+      {
+         // (4) Tickets off entirely, for an administrator whose policy is that
+         // nothing derived from a long-lived key ever goes on the wire. Two calls
+         // because OpenSSL treats the versions differently: SSL_OP_NO_TICKET stops
+         // RFC 5077 tickets on TLS 1.2 and below (those clients fall back to
+         // session-ID resumption, which stays inside this process), but on TLS 1.3
+         // it only switches to "stateful" tickets - still a NewSessionTicket
+         // message, just an opaque cache handle rather than encrypted state.
+         // SSL_CTX_set_num_tickets(0) is what actually stops TLS 1.3 tickets being
+         // sent. Costs only resumption efficiency; every client can still connect.
+         SSL_CTX_set_options(ssl, SSL_OP_NO_TICKET);
+         SSL_CTX_set_num_tickets(ssl, 0);
+      }
+      else
+      {
+         // (5) Ticket-key rotation. Defends forward secrecy: OpenSSL's default
+         // ticket key is generated once per context and lives as long as the
+         // process, so on a mail server - a process that runs for months - a
+         // recorded ticket stays decryptable for months if that key is ever
+         // recovered. With an interval set, a captured ticket is useless after at
+         // most two intervals (see the TicketKeyCallback comment). 0 - the default
+         // - installs nothing and keeps OpenSSL's per-context key, i.e. exactly
+         // today's behaviour.
+         int rotationSeconds = IniFileSettings::Instance()->GetTlsTicketKeyRotationSeconds();
+
+         if (rotationSeconds > 0)
+         {
+            {
+               TicketKeyStore &store = GetTicketKeyStore();
+               std::lock_guard<std::mutex> guard(store.mutex);
+               store.rotation_interval_seconds = rotationSeconds;
+            }
+
+            if (SSL_CTX_set_tlsext_ticket_key_evp_cb(ssl, TicketKeyCallback) != 1)
+            {
+               // The callback was not installed, so this context keeps OpenSSL's
+               // default per-context key. Tickets and resumption keep working -
+               // what is missing is the rotation the administrator asked for, so
+               // say so and carry on rather than degrade TLS.
+               ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6171, "SslContextInitializer::SetSessionResumption_",
+                  Formatter::Format("Failed to enable TLS session-ticket key rotation for the listener on {0}:{1}. Message: {2}. Tickets remain enabled with OpenSSL's default non-rotating key.",
+                     ip_address, port, String(GetOpenSslError_())));
+            }
+         }
+      }
    }
 
    void
@@ -292,6 +644,46 @@ namespace HM
 
       if (cipher_list.Trim().IsEmpty())
          return;
+
+      // "AEAD-ONLY" (case-insensitive) is a named preset, not an OpenSSL cipher
+      // string. An administrator could always reach this policy by hand-editing
+      // SslCipherList, but the raw string is easy to get subtly wrong - one typo'd
+      // suite name is silently skipped, and nothing says so - so the vetted list
+      // ships under a name instead.
+      //
+      // What it means: for TLS 1.2, only AEAD ciphers (AES-GCM and
+      // ChaCha20-Poly1305) with forward-secret key exchange (ECDHE or DHE). What it
+      // excludes: every CBC-mode construction and with them every HMAC-SHA1 and
+      // CBC-HMAC-SHA2 suite (the padding-oracle family: Lucky13 and its
+      // descendants), and static-RSA key exchange (no forward secrecy). What it
+      // costs: clients that cannot do TLS 1.2 with an AEAD suite cannot connect at
+      // all - GCM and ChaCha20 do not exist below TLS 1.2, so enabling TLS 1.0/1.1
+      // alongside this preset leaves those protocols with no usable cipher, and
+      // TLS 1.2 stacks from roughly the Windows 7 / Java 6 era that only speak CBC
+      // suites are shut out. TLS 1.3 needs no help from the preset: its suites are
+      // AEAD by construction, and its separate list (TlsCipherSuites13, handled in
+      // SetTls13CipherSuites_) is not touched here.
+      //
+      // A misspelled preset name ("AEAD_ONLY", "AeadOnly2", ...) is not silently
+      // ignored: it flows through to SSL_CTX_set_cipher_list below, which rejects a
+      // list containing no known cipher, and the 5511 report names the string. The
+      // shipped default SslCipherList is unchanged - the preset only takes effect
+      // when an administrator sets the setting to exactly this name.
+      if (cipher_list.CompareNoCase("AEAD-ONLY") == 0)
+      {
+         cipher_list =
+            "ECDHE-ECDSA-AES256-GCM-SHA384:"
+            "ECDHE-RSA-AES256-GCM-SHA384:"
+            "ECDHE-ECDSA-CHACHA20-POLY1305:"
+            "ECDHE-RSA-CHACHA20-POLY1305:"
+            "ECDHE-ECDSA-AES128-GCM-SHA256:"
+            "ECDHE-RSA-AES128-GCM-SHA256:"
+            "DHE-RSA-AES256-GCM-SHA384:"
+            "DHE-RSA-CHACHA20-POLY1305:"
+            "DHE-RSA-AES128-GCM-SHA256";
+
+         LOG_DEBUG("SslContextInitializer::SetCipherList_ - SslCipherList is the AEAD-ONLY preset; applying " + String(cipher_list));
+      }
 
       // Asio does not expose cipher list. Access underlaying layer (OpenSSL) directly.
       SSL_CTX* ssl = context.native_handle();

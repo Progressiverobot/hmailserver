@@ -101,6 +101,12 @@ namespace HM
 
       static void AppendMethod_(AnsiString &target, const AnsiString &clause);
 
+      // Whether one complete header field - first line plus every continuation line - is
+      // an Authentication-Results field carrying this authserv-id. The value is unfolded
+      // and an optionally quoted authserv-id is unquoted before comparison, because a
+      // reader downstream will do both and a strip that does neither can be walked past.
+      static bool FieldCarriesAuthservId_(const AnsiString &field, const AnsiString &wantedLowerCase);
+
       MethodResult spf_result_;
       AnsiString spf_identity_type_;
       AnsiString spf_identity_value_;

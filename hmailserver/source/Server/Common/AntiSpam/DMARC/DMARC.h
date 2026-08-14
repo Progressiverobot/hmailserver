@@ -47,7 +47,10 @@ namespace HM
       // "Display Name <user@example.com>" -> "user@example.com".
       static String ExtractAddressFromHeaderValue(const String &headerValue);
 
-      // Returns the organizational domain, e.g. mail.example.co.uk -> example.co.uk
+      // Returns the organizational domain per RFC 7489 3.2, e.g.
+      // mail.example.co.uk -> example.co.uk, resolved against the bundled
+      // Public Suffix List (see PublicSuffixList.h). A domain that is itself
+      // a public suffix is returned unchanged.
       static String GetOrganizationalDomain(const String &domain);
 
    private:

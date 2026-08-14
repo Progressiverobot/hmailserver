@@ -1,6 +1,6 @@
 // Copyright (c) 2026 hMailServer
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
-// ARC sealing (RFC 8617). See Arc.h.
+// ARC sealing and chain evaluation (RFC 8617). See Arc.h.
 
 #include "StdAfx.h"
 
@@ -10,6 +10,7 @@
 #include "Canonicalization.h"
 
 #include "../../BO/Message.h"
+#include "../../MIME/Mime.h"
 #include "../../Persistence/PersistentMessage.h"
 #include "../../TCPIP/DNSResolver.h"
 #include "../../Util/TraceHeaderWriter.h"
@@ -28,6 +29,17 @@ namespace HM
    namespace
    {
       const int MaxArcInstance = 50; // RFC 8617 section 5.2
+
+      // The longest chain we are prepared to validate in full. Every set costs
+      // a signature verification and up to one DNS lookup, all on the thread
+      // that still owes the client its SMTP response - and the sets are
+      // attacker-supplied, with attacker-controlled d= domains whose name
+      // servers can be made arbitrarily slow. Ten is the same bound DKIM
+      // verification applies to signatures (MaxSignaturesToVerify), and real
+      // chains run two to four sets; a longer chain is refused as Fail, which
+      // for the sealing path means cv=fail and for the filtering path means
+      // no score offset - never anything more permissive.
+      const size_t MaxArcSetsToValidate = 10;
 
       // Header fields covered by the ARC-Message-Signature. ARC headers
       // themselves must never be included (RFC 8617 section 4.1.2).
@@ -90,7 +102,20 @@ namespace HM
       }
 
       // Determine the chain validation status for the cv= tag.
-      AnsiString chainValidation = existingSets.empty() ? "none" : ValidateExistingChain_(existingSets);
+      //
+      // This is the full RFC 8617 section 5.2 validation - every seal and the
+      // newest ARC-Message-Signature - not just the most recent seal. A seal
+      // that says cv=pass is an attestation downstream receivers act on; if we
+      // had verified only the newest seal, we would be re-attesting a chain
+      // whose earlier links and whose message signature nobody ever checked.
+      // A lookup that does not complete (TempError) becomes cv=fail, as it
+      // always has here: cv= has no "unknown" value, and "pass" is the one
+      // thing an unverified chain must not be called.
+      AnsiString chainValidation;
+      if (existingSets.empty())
+         chainValidation = "none";
+      else
+         chainValidation = ValidateChainSets_(existingSets, header, fileName) == ChainValidationStatus::Pass ? "pass" : "fail";
 
       AnsiString privateKeyContent = FileUtilities::ReadCompleteTextFile(privateKeyFile);
       if (privateKeyContent.IsEmpty())
@@ -292,25 +317,308 @@ namespace HM
       return true;
    }
 
-   AnsiString
-   Arc::ValidateExistingChain_(const std::map<int, ArcSet> &sets)
+   Arc::ChainParseStatus
+   Arc::ParseChain(const AnsiString &header, ChainInfo &info)
    {
-      // If the most recent hop recorded a failed chain, the chain stays
-      // failed (RFC 8617 section 5.1.2).
-      const ArcSet &latestSet = sets.rbegin()->second;
+      std::map<int, ArcSet> sets;
+      if (!ParseExistingSets_(header, sets))
+         return ChainParseStatus::Malformed;
+
+      if (sets.empty())
+         return ChainParseStatus::NoChain;
+
+      info.instance_count = (int) sets.size();
+      info.oldest_authentication_results = sets.begin()->second.authentication_results;
+
+      for (auto iter = sets.begin(); iter != sets.end(); ++iter)
+      {
+         DKIMParameters sealParameters;
+         sealParameters.Load(iter->second.seal);
+
+         AnsiString sealDomain = sealParameters.GetValue("d");
+         sealDomain.MakeLower();
+
+         // A seal that does not even name its signer cannot be attributed to
+         // anyone, so no trust decision about it is possible.
+         if (sealDomain.IsEmpty())
+            return ChainParseStatus::Malformed;
+
+         info.sealer_domains.push_back(sealDomain);
+      }
+
+      // The newest AMS signer - see the comment on ChainInfo::sealer_domains
+      // for why the content signer belongs in the trust decision.
+      DKIMParameters amsParameters;
+      amsParameters.Load(sets.rbegin()->second.message_signature);
+
+      AnsiString amsDomain = amsParameters.GetValue("d");
+      amsDomain.MakeLower();
+
+      if (amsDomain.IsEmpty())
+         return ChainParseStatus::Malformed;
+
+      info.sealer_domains.push_back(amsDomain);
+
+      return ChainParseStatus::Parsed;
+   }
+
+   Arc::ChainValidationStatus
+   Arc::ValidateChain(const String &messageFileName, const AnsiString &header)
+   {
+      std::map<int, ArcSet> sets;
+      if (!ParseExistingSets_(header, sets) || sets.empty())
+         return ChainValidationStatus::Fail;
+
+      return ValidateChainSets_(sets, header, messageFileName);
+   }
+
+   Arc::ChainValidationStatus
+   Arc::ValidateChainSets_(const std::map<int, ArcSet> &sets, const AnsiString &header, const String &messageFileName)
+   {
+      // RFC 8617 section 5.2, in full. The order below fails as early and as
+      // cheaply as possible: the cv= ladder costs only parsing, the message
+      // signature costs one body hash and usually one DNS lookup, and the
+      // seals cost one verification each with their key lookups cached.
+
+      if (sets.empty())
+         return ChainValidationStatus::Fail;
+
+      if (sets.size() > MaxArcSetsToValidate)
+      {
+         LOG_DEBUG("ARC: The chain has more sets than are validated. Treating it as failed.");
+         return ChainValidationStatus::Fail;
+      }
+
+      // 1. The cv= ladder: the first seal must say cv=none (there was no chain
+      //    before it) and every later seal must say cv=pass. A cv=fail anywhere
+      //    is a hop's own statement that the chain was already broken, and a
+      //    chain once failed can never become valid again (RFC 8617 5.1.2).
+      for (auto iter = sets.begin(); iter != sets.end(); ++iter)
+      {
+         DKIMParameters sealParameters;
+         sealParameters.Load(iter->second.seal);
+
+         AnsiString chainValidationTag = sealParameters.GetValue("cv");
+         chainValidationTag.MakeLower();
+
+         if (iter->first == 1)
+         {
+            if (chainValidationTag != "none")
+               return ChainValidationStatus::Fail;
+         }
+         else
+         {
+            if (chainValidationTag != "pass")
+               return ChainValidationStatus::Fail;
+         }
+      }
+
+      std::map<AnsiString, KeyLookupResult> keyCache;
+
+      // 2. The newest ARC-Message-Signature. This is the only signature over
+      //    the CURRENT message content (earlier AMS instances are expected to
+      //    be broken - later hops modified the message; that is why they
+      //    resealed). Without it, a captured chain from any legitimately
+      //    forwarded message could be transplanted onto arbitrary content.
+      ChainValidationStatus messageSignatureStatus = VerifyNewestMessageSignature_(sets, header, messageFileName, keyCache);
+      if (messageSignatureStatus != ChainValidationStatus::Pass)
+         return messageSignatureStatus;
+
+      // 3. Every seal, oldest first. Verifying only the newest seal would
+      //    prove the last hop sealed what it received, but not that the
+      //    earlier sets - including the instance-1 authentication results a
+      //    filtering decision recovers - were ever signed by the domains
+      //    whose names they carry.
+      for (auto iter = sets.begin(); iter != sets.end(); ++iter)
+      {
+         ChainValidationStatus sealStatus = VerifySealSignature_(sets, iter->first, keyCache);
+         if (sealStatus != ChainValidationStatus::Pass)
+            return sealStatus;
+      }
+
+      return ChainValidationStatus::Pass;
+   }
+
+   Arc::ChainValidationStatus
+   Arc::VerifyNewestMessageSignature_(const std::map<int, ArcSet> &sets,
+                                      const AnsiString &header,
+                                      const String &messageFileName,
+                                      std::map<AnsiString, KeyLookupResult> &keyCache)
+   {
+      const int newestInstance = sets.rbegin()->first;
+
+      // The AMS must be re-read from the raw header rather than taken from the
+      // unfolded copy ParseExistingSets_ produced: with simple header
+      // canonicalization the field is hashed byte for byte, folding included,
+      // and unfolding it first would fail every simple-canonicalized chain.
+      MimeHeader mimeHeader;
+      mimeHeader.Load(header.c_str(), header.GetLength(), false);
+
+      std::pair<AnsiString, AnsiString> signatureField;
+
+      for (MimeField field : mimeHeader.Fields())
+      {
+         AnsiString fieldName = field.GetName();
+         if (fieldName.CompareNoCase("ARC-Message-Signature") != 0)
+            continue;
+
+         AnsiString rawValue = field.GetValue();
+
+         AnsiString unfoldedCandidate = rawValue;
+         MimeField::UnfoldField(unfoldedCandidate);
+
+         DKIMParameters candidateParameters;
+         candidateParameters.Load(unfoldedCandidate);
+
+         AnsiString instanceValue = candidateParameters.GetValue("i");
+         if (StringParser::IsNumeric(instanceValue) && atoi(instanceValue) == newestInstance)
+         {
+            signatureField = std::make_pair(fieldName, rawValue);
+            break;
+         }
+      }
+
+      if (signatureField.first.IsEmpty())
+         return ChainValidationStatus::Fail;
+
+      AnsiString unfoldedValue = signatureField.second;
+      MimeField::UnfoldField(unfoldedValue);
+
+      DKIMParameters signatureParameters;
+      signatureParameters.Load(unfoldedValue);
+
+      AnsiString tagA = signatureParameters.GetValue("a");
+      AnsiString tagB = signatureParameters.GetValue("b");
+      AnsiString tagBH = signatureParameters.GetValue("bh");
+      AnsiString tagD = signatureParameters.GetValue("d");
+      AnsiString tagS = signatureParameters.GetValue("s");
+      AnsiString tagH = signatureParameters.GetValue("h");
+
+      if (tagA.IsEmpty() || tagB.IsEmpty() || tagBH.IsEmpty() || tagD.IsEmpty() || tagS.IsEmpty() || tagH.IsEmpty())
+         return ChainValidationStatus::Fail;
+
+      // rsa-sha1 is deliberately absent: RFC 8301 forbids verifying it, and a
+      // downgrade to a broken hash is worth more to an attacker on ARC than on
+      // DKIM, because a passing chain here is later allowed to offset a score.
+      if (tagA != "rsa-sha256" && tagA != "ed25519-sha256")
+         return ChainValidationStatus::Fail;
+
+      std::vector<AnsiString> headerFields = StringParser::SplitString(tagH, ":");
+
+      bool fromIsSigned = false;
+      for (AnsiString headerField : headerFields)
+      {
+         headerField.Trim();
+         headerField.MakeLower();
+
+         // RFC 8617 4.1.2: the AMS h= MUST NOT include ARC header fields.
+         if (headerField.StartsWith("arc-"))
+            return ChainValidationStatus::Fail;
+
+         if (headerField == "from")
+            fromIsSigned = true;
+      }
+
+      // From must be covered, exactly as RFC 6376 5.4 requires of the
+      // DKIM-Signature the AMS inherits its semantics from. This is what makes
+      // a chain non-transplantable onto a different author: the filtering
+      // offset only ever fires when DMARC fails for the From domain, so an
+      // AMS that left From unsigned would let a captured trusted chain be
+      // re-used on a message whose From was rewritten to any domain at all.
+      if (!fromIsSigned)
+         return ChainValidationStatus::Fail;
+
+      // Canonicalization methods; the AMS has DKIM-Signature semantics
+      // (RFC 8617 4.1.2), including the simple/simple default and the "header
+      // method alone" shorthand. Split on the slash by index rather than via
+      // SplitString: that helper drops an empty trailing token, so "relaxed/"
+      // would yield one element and indexing the second would walk off the
+      // vector - on input any stranger can send.
+      AnsiString method = signatureParameters.GetValue("c");
+      AnsiString headerMethod = "simple";
+      AnsiString bodyMethod = "simple";
+
+      if (!method.IsEmpty())
+      {
+         int slashPosition = method.Find("/");
+         if (slashPosition >= 0)
+         {
+            headerMethod = method.Mid(0, slashPosition);
+            bodyMethod = method.Mid(slashPosition + 1);
+         }
+         else
+         {
+            headerMethod = method;
+         }
+      }
+
+      if ((headerMethod != "simple" && headerMethod != "relaxed") ||
+          (bodyMethod != "simple" && bodyMethod != "relaxed"))
+         return ChainValidationStatus::Fail;
+
+      std::shared_ptr<Canonicalization> headerCanonicalization;
+      if (headerMethod == "simple")
+         headerCanonicalization = std::shared_ptr<Canonicalization>(new SimpleCanonicalization);
+      else
+         headerCanonicalization = std::shared_ptr<Canonicalization>(new RelaxedCanonicalization);
+
+      std::shared_ptr<Canonicalization> bodyCanonicalization;
+      if (bodyMethod == "simple")
+         bodyCanonicalization = std::shared_ptr<Canonicalization>(new SimpleCanonicalization);
+      else
+         bodyCanonicalization = std::shared_ptr<Canonicalization>(new RelaxedCanonicalization);
+
+      // Body hash, with the same l= handling as DKIM::ValidateBodyHash_.
+      AnsiString canonicalizedBody = bodyCanonicalization->CanonicalizeBody(PersistentMessage::LoadBody(messageFileName));
+
+      AnsiString tagL = signatureParameters.GetValue("l");
+      if (!tagL.IsEmpty())
+      {
+         if (!StringParser::IsNumeric(tagL))
+            return ChainValidationStatus::Fail;
+
+         int coveredLength = atoi(tagL);
+         if (coveredLength > canonicalizedBody.GetLength())
+            return ChainValidationStatus::Fail;
+
+         canonicalizedBody = canonicalizedBody.Mid(0, coveredLength);
+      }
+
+      HashCreator hasher(HashCreator::SHA256);
+      AnsiString bodyHash = hasher.GenerateHashNoSalt(canonicalizedBody, HashCreator::base64);
+
+      tagBH.Replace(" ", "");
+      if (tagBH.Compare(bodyHash) != 0)
+         return ChainValidationStatus::Fail;
+
+      KeyLookupResult key = RetrieveArcPublicKey_(tagS, tagD, keyCache);
+      if (key.status != ChainValidationStatus::Pass)
+         return key.status;
+
+      AnsiString fieldList;
+      AnsiString canonicalizedHeader = headerCanonicalization->CanonicalizeHeader(header, signatureField, headerFields, fieldList);
+
+      tagB.Replace(" ", "");
+
+      DKIM verifier;
+      if (verifier.VerifyHeaderHash_(canonicalizedHeader, tagA, tagB, key.public_key) == DKIM::Pass)
+         return ChainValidationStatus::Pass;
+
+      return ChainValidationStatus::Fail;
+   }
+
+   Arc::ChainValidationStatus
+   Arc::VerifySealSignature_(const std::map<int, ArcSet> &sets,
+                             int instance,
+                             std::map<AnsiString, KeyLookupResult> &keyCache)
+   {
+      auto setIterator = sets.find(instance);
+      if (setIterator == sets.end())
+         return ChainValidationStatus::Fail;
 
       DKIMParameters sealParameters;
-      sealParameters.Load(latestSet.seal);
+      sealParameters.Load(setIterator->second.seal);
 
-      AnsiString previousValidation = sealParameters.GetValue("cv");
-      previousValidation.MakeLower();
-
-      if (sets.size() > 1 && previousValidation == "fail")
-         return "fail";
-
-      // Verify the most recent ARC-Seal. Its signature covers every ARC
-      // header of all preceding sets, which gives chain integrity for the
-      // headers we extend.
       AnsiString sealDomain = sealParameters.GetValue("d");
       AnsiString sealSelector = sealParameters.GetValue("s");
       AnsiString sealAlgorithm = sealParameters.GetValue("a");
@@ -318,58 +626,97 @@ namespace HM
       sealSignature.Replace(" ", "");
 
       if (sealDomain.IsEmpty() || sealSelector.IsEmpty() || sealSignature.IsEmpty())
-         return "fail";
+         return ChainValidationStatus::Fail;
 
       if (sealAlgorithm.IsEmpty())
          sealAlgorithm = "rsa-sha256";
 
-      // Fetch the public key from DNS.
-      DNSResolver resolver;
-      std::vector<String> txtRecords;
-      if (!resolver.GetTXTRecords(String(sealSelector) + "._domainkey." + String(sealDomain), txtRecords) || txtRecords.empty())
-         return "fail";
+      if (sealAlgorithm != "rsa-sha256" && sealAlgorithm != "ed25519-sha256")
+         return ChainValidationStatus::Fail;
 
-      AnsiString publicKey;
-      for (const String &record : txtRecords)
-      {
-         DKIMParameters keyParameters;
-         keyParameters.Load(AnsiString(record));
+      KeyLookupResult key = RetrieveArcPublicKey_(sealSelector, sealDomain, keyCache);
+      if (key.status != ChainValidationStatus::Pass)
+         return key.status;
 
-         AnsiString keyValue = keyParameters.GetValue("p");
-         if (!keyValue.IsEmpty())
-         {
-            keyValue.Replace(" ", "");
-            publicKey = keyValue;
-            break;
-         }
-      }
-
-      if (publicKey.IsEmpty())
-         return "fail";
-
-      // Reconstruct the seal scope: all ARC headers in instance order, with
-      // the b= value of the latest seal removed.
+      // Reconstruct what this seal signed: the ARC sets that existed when it
+      // was made - instances 1 through this one, in instance order - with the
+      // b= value of THIS seal removed and no CRLF after the final line. The
+      // seal always uses relaxed header canonicalization; RFC 8617 4.1.3
+      // allows it no c= tag. This mirrors, field for field, the scope
+      // Arc::Seal signs above.
       RelaxedCanonicalization relaxed;
       AnsiString sealScope;
 
-      int latestInstance = sets.rbegin()->first;
-
-      for (auto iter = sets.begin(); iter != sets.end(); ++iter)
+      for (auto iter = sets.begin(); iter != sets.end() && iter->first <= instance; ++iter)
       {
          sealScope += relaxed.CanonicalizeHeaderLine("arc-authentication-results", iter->second.authentication_results) + "\r\n";
          sealScope += relaxed.CanonicalizeHeaderLine("arc-message-signature", iter->second.message_signature) + "\r\n";
 
-         if (iter->first == latestInstance)
+         if (iter->first == instance)
             sealScope += relaxed.CanonicalizeHeaderLine("arc-seal", StripSealSignatureValue_(iter->second.seal));
          else
             sealScope += relaxed.CanonicalizeHeaderLine("arc-seal", iter->second.seal) + "\r\n";
       }
 
       DKIM verifier;
-      if (verifier.VerifyHeaderHash_(sealScope, sealAlgorithm, sealSignature, publicKey) == DKIM::Pass)
-         return "pass";
+      if (verifier.VerifyHeaderHash_(sealScope, sealAlgorithm, sealSignature, key.public_key) == DKIM::Pass)
+         return ChainValidationStatus::Pass;
 
-      return "fail";
+      return ChainValidationStatus::Fail;
+   }
+
+   Arc::KeyLookupResult
+   Arc::RetrieveArcPublicKey_(const AnsiString &selector,
+                              const AnsiString &domain,
+                              std::map<AnsiString, KeyLookupResult> &keyCache)
+   {
+      AnsiString lookupName = selector + "._domainkey." + domain;
+      lookupName.MakeLower();
+
+      auto cached = keyCache.find(lookupName);
+      if (cached != keyCache.end())
+         return cached->second;
+
+      KeyLookupResult result;
+
+      DNSResolver resolver;
+      std::vector<String> txtRecords;
+      if (!resolver.GetTXTRecords(String(lookupName), txtRecords))
+      {
+         // The lookup did not COMPLETE, which is not an answer. It must stay
+         // distinguishable from "the key does not exist" (a definitive Fail
+         // below): the filtering caller treats TempError as "act as if there
+         // were no chain", while a Fail is a chain someone broke.
+         result.status = ChainValidationStatus::TempError;
+      }
+      else
+      {
+         // The selector may hold several TXT records (key rotation); use the
+         // first usable key record, as DKIM::RetrievePublicKey_ does. A record
+         // whose p= is empty is a revoked key and is not usable.
+         for (const String &record : txtRecords)
+         {
+            DKIMParameters keyParameters;
+            keyParameters.Load(AnsiString(record));
+
+            AnsiString versionTag = keyParameters.GetValue("v");
+            if (!versionTag.IsEmpty() && versionTag != "DKIM1")
+               continue;
+
+            AnsiString keyValue = keyParameters.GetValue("p");
+            if (keyValue.IsEmpty())
+               continue;
+
+            keyValue.Replace(" ", "");
+
+            result.status = ChainValidationStatus::Pass;
+            result.public_key = keyValue;
+            break;
+         }
+      }
+
+      keyCache[lookupName] = result;
+      return result;
    }
 
    AnsiString

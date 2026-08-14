@@ -467,7 +467,8 @@ create table hm_sslcertificates
 	sslcertificateid bigint auto_increment not null, primary key(sslcertificateid), unique(sslcertificateid),
 	sslcertificatename varchar(255) not null,
 	sslcertificatefile varchar(255) not null,
-	sslprivatekeyfile varchar(255) not null
+	sslprivatekeyfile varchar(255) not null,
+	sslprivatekeypassword varchar(1024) not null
 	
 ) DEFAULT CHARSET=utf8;
 
@@ -750,6 +751,8 @@ insert into hm_settings (settingname, settingstring, settinginteger) values ('AS
 insert into hm_settings (settingname, settingstring, settinginteger) values ('ASDKIMVerificationFailureScore', '', 5);
 
 insert into hm_settings (settingname, settingstring, settinginteger) values ('ASDMARCEnabled', '', 1);
+insert into hm_settings (settingname, settingstring, settinginteger) values ('ASArcFilteringEnabled', '', 0);
+insert into hm_settings (settingname, settingstring, settinginteger) values ('ASArcTrustedSealers', '', 0);
 
 insert into hm_settings (settingname, settingstring, settinginteger) values ('ASDMARCFailureScore', '', 5);
 
@@ -809,4 +812,4 @@ insert into hm_tcpipports (portprotocol, portnumber, portaddress1, portaddress2,
 
 insert into hm_tcpipports (portprotocol, portnumber, portaddress1, portaddress2, portconnectionsecurity, portsslcertificateid) values (5, 143, 0, NULL, 0, 0);
 
-insert into hm_dbversion values (6008);
+insert into hm_dbversion values (6010);

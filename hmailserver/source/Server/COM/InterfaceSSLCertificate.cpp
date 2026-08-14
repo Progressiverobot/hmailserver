@@ -171,4 +171,45 @@ STDMETHODIMP InterfaceSSLCertificate::get_PrivateKeyFile(BSTR *pVal)
    }
 }
 
+STDMETHODIMP InterfaceSSLCertificate::put_PrivateKeyPassword(BSTR newVal)
+{
+   try
+   {
+      if (!object_)
+         return GetAccessDenied();
+
+      object_->SetPrivateKeyPassword(newVal);
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceSSLCertificate::get_PrivateKeyPassword(BSTR *pVal)
+{
+   try
+   {
+      if (!object_)
+         return GetAccessDenied();
+
+      // Unlike the other getters on this interface, which return file paths, this
+      // one returns a decryptable secret, so it is gated on server administrator
+      // the same way Save and Delete are rather than on mere possession of the
+      // object. The setter stays ungated like its siblings: writing a new
+      // passphrase discloses nothing, and it only takes effect through Save, which
+      // enforces server administrator itself.
+      if (!authentication_->GetIsServerAdmin())
+         return authentication_->GetAccessDenied();
+
+      *pVal = object_->GetPrivateKeyPassword().AllocSysString();
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
 

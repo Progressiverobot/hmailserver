@@ -102,7 +102,14 @@ namespace DBUpdater
          new SchemaProbe(6008, "hm_tcpipports.portclientcertificatepolicy",
                          "update hm_tcpipports set portclientcertificatepolicy = portclientcertificatepolicy where 1 = 0"),
          new SchemaProbe(6008, "hm_tcpipports.portclientcertificatecafile",
-                         "update hm_tcpipports set portclientcertificatecafile = portclientcertificatecafile where 1 = 0")
+                         "update hm_tcpipports set portclientcertificatecafile = portclientcertificatecafile where 1 = 0"),
+
+         // Upgrade6008to6009* - one column, so one probe. The half-apply hazard that
+         // forced two probes on the steps above cannot arise with a single ALTER, but the
+         // probe is still needed: the MSSQL/CE/MySQL scripts carry [IGNORE-ERRORS], so
+         // without it a failed ALTER would be swallowed and the version stamped anyway.
+         new SchemaProbe(6009, "hm_sslcertificates.sslprivatekeypassword",
+                         "update hm_sslcertificates set sslprivatekeypassword = sslprivatekeypassword where 1 = 0")
       };
 
       /// <summary>

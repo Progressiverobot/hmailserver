@@ -39,6 +39,9 @@ Transport security
 * **TLS 1.2 and 1.3** by default, on implicit-TLS and STARTTLS ports, with SNI, configurable cipher suites (separately for TLS ≤ 1.2 and TLS 1.3) and configurable key-exchange groups — **hybrid post-quantum key exchange** (X25519MLKEM768) is preferred by default, on every TLS context inbound and outbound.
 * **MTA-STS** (RFC 8461) policy discovery and enforcement for outbound mail, and optional hosting of your own policy at `mta-sts.<domain>`.
 * **DANE** (RFC 7672) with full in-process **DNSSEC validation** (RFC 4033–4035) — a bogus chain blocks delivery to that host rather than silently downgrading. The **MX RRset is validated too**, not just the TLSA record (RFC 7672 §2.2): DANE is applied only to a host the recipient domain provably published, so a forged MX answer cannot redirect delivery to a host whose own TLSA record then validates.
+* Encrypted (passphrase-protected) TLS private keys, with the passphrase held per certificate and protected at rest.
+* TLS session-ticket key **rotation** (OpenSSL's default key is generated once per process and never rotated, so every ticket it issues is sealed under the same key), plus session cache and timeout control and the ability to disable tickets entirely. All off by default.
+* An `AEAD-ONLY` cipher preset, which excludes every CBC construction and the Lucky13 family; nothing below TLS 1.2 can connect under it.
 * DNSSEC validation also protects SPF, DKIM and DMARC record lookups.
 * **TLS-RPT** (RFC 8460) daily aggregate reports to recipient domains — off until `TlsRptFromAddress` is set (the server notes this in the application log while statistics are collected unsent).
 * **ACME v2 (Let's Encrypt)** built in: certificates are issued, renewed, assigned to TLS ports and hot-reloaded without a restart. The private key is reused across renewals, so published DANE TLSA records stay valid.
@@ -46,9 +49,9 @@ Transport security
 Sender authentication and anti-abuse
 ------------------------------------
 
-* **SPF**, **DKIM** signing and verification (including Ed25519, RFC 8463) and **DMARC** evaluation with alignment.
+* **SPF**, **DKIM** signing and verification (including Ed25519, RFC 8463) and **DMARC** evaluation with alignment, with the organizational domain resolved from the real **Public Suffix List** (compiled in, wildcard and exception rules, ICANN and private sections) rather than a heuristic.
 * **DKIM signature timestamps**: every signature carries `t=`; an `x=` expiry is added when `DKIMSignatureValiditySeconds` is set, and expired signatures are refused on verification (on by default, with a configurable clock-skew allowance). Optional **oversigning** (`DkimOversignHeaders`, off by default) stops a second `From:` being prepended to signed mail.
-* **ARC** sealing (RFC 8617) so forwarded mail keeps a verifiable authentication chain — off by default (`ArcSealingEnabled`).
+* **ARC** sealing (RFC 8617) so forwarded mail keeps a verifiable authentication chain — off by default (`ArcSealingEnabled`). Inbound ARC results can also recover the original authentication result so forwarding stops costing legitimate mail its DMARC pass — off until both `ASArcFilteringEnabled` and a list of trusted sealer domains are set, because anyone can seal a chain with their own key and a passing chain proves nothing on its own.
 * Optional **SRS** sender rewriting for forwarded mail (`SRSEnabled`, off by default), and optional **BATV** (`prvs`) backscatter protection.
 * **SpamAssassin** integration, **DNSBL** and **SURBL** lookups, greylisting, HELO/PTR/MX sanity checks and a weighted scoring pipeline.
 * **Virus scanning** via ClamAV (clamd or clamscan) or any command-line scanner.
@@ -304,6 +307,12 @@ Transport security and authentication:
                                  ; TLS context in the server, inbound and outbound
    TlsCipherSuites13=            ; TLS 1.3 ciphersuites (empty = OpenSSL's defaults; the SslCipherList
                                  ; setting covers TLS 1.2 and below)
+   TlsSessionTicketsEnabled=1    ; TLS session tickets (0 also sets SSL_CTX_set_num_tickets(0), because
+                                 ; SSL_OP_NO_TICKET alone only makes TLS 1.3 tickets stateful)
+   TlsSessionCacheSize=0         ; server-side session cache entries (0 = OpenSSL's, negative = off)
+   TlsSessionTimeoutSeconds=0    ; session lifetime (0 = OpenSSL's)
+   TlsTicketKeyRotationSeconds=0 ; rotate the ticket key (0 = OpenSSL's single never-rotated key, so
+                                 ; every ticket the process issues is sealed under it)
    DkimOversignHeaders=          ; DKIM oversigning (RFC 6376 5.4): header names listed in h= once more
                                  ; than the message carries them (empty = off; From is always included
                                  ; when the feature is on)

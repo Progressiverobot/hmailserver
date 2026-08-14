@@ -173,6 +173,8 @@ EXIT 0
     <ClCompile Include="..\Common\AntiSpam\SpamAssassin\SpamAssassinClient.cpp" />
     <ClCompile Include="..\Common\AntiSpam\SpamAssassin\SpamAssassinTestConnect.cpp" />
     <ClCompile Include="..\Common\AntiSpam\AuthenticationResults.cpp" />
+    <ClCompile Include="..\Common\AntiSpam\DKIM\SpamTestArc.cpp" />
+    <ClCompile Include="..\Common\AntiSpam\DMARC\PublicSuffixList.cpp" />
     <ClCompile Include="..\Common\AntiSpam\AuthenticationResultsWriter.cpp" />
     <ClCompile Include="..\Common\AntiSpam\SpamProtection.cpp" />
     <ClCompile Include="..\Common\AntiSpam\SpamTest.cpp" />
@@ -711,6 +713,9 @@ EXIT 0
     <ClInclude Include="..\Common\AntiSpam\SpamAssassin\SpamAssassinClient.h" />
     <ClInclude Include="..\Common\AntiSpam\SpamAssassin\SpamAssassinTestConnect.h" />
     <ClInclude Include="..\Common\AntiSpam\AuthenticationResults.h" />
+    <ClInclude Include="..\Common\AntiSpam\DKIM\SpamTestArc.h" />
+    <ClInclude Include="..\Common\AntiSpam\DMARC\PublicSuffixList.h" />
+    <ClInclude Include="..\Common\AntiSpam\DMARC\PublicSuffixListData.h" />
     <ClInclude Include="..\Common\AntiSpam\AuthenticationResultsWriter.h" />
     <ClInclude Include="..\Common\AntiSpam\SpamProtection.h" />
     <ClInclude Include="..\Common\AntiSpam\SpamTest.h" />

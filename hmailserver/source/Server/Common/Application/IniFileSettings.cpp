@@ -407,6 +407,18 @@ namespace HM
       // silently keep them pinned as OpenSSL's own defaults moved on. Empty means "use
       // OpenSSL's", which is the better answer until an administrator says otherwise.
       tls_cipher_suites13_ = ReadIniSettingString_("Settings", "TlsCipherSuites13", "");
+
+      // TLS session resumption and ticket management. See SslContextInitializer's
+      // SetSessionResumption_ for what each one defends. Every default reproduces
+      // today's behaviour exactly: tickets on, OpenSSL's own cache size and timeout, and
+      // no ticket-key callback installed.
+      tls_session_tickets_enabled_ = ReadIniSettingInteger_("Settings", "TlsSessionTicketsEnabled", 1) == 1;
+      tls_session_cache_size_ = ReadIniSettingInteger_("Settings", "TlsSessionCacheSize", 0);
+      tls_session_timeout_seconds_ = ReadIniSettingInteger_("Settings", "TlsSessionTimeoutSeconds", 0);
+
+      tls_ticket_key_rotation_seconds_ = ReadIniSettingInteger_("Settings", "TlsTicketKeyRotationSeconds", 0);
+      if (tls_ticket_key_rotation_seconds_ < 0)
+         tls_ticket_key_rotation_seconds_ = 0;
       rest_api_port_ = ReadIniSettingInteger_("Settings", "RestApiPort", 0);
       rest_api_bind_address_ = ReadIniSettingString_("Settings", "RestApiBindAddress", "127.0.0.1");
       rest_api_certificate_file_ = ReadIniSettingString_("Settings", "RestApiCertificateFile", "");

@@ -445,6 +445,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AntiSpam\AuthenticationResultsHeader.cs" />
+    <Compile Include="AntiSpam\DmarcOrganizationalDomain.cs" />
+    <Compile Include="AntiSpam\DKIM\ArcInboundFiltering.cs" />
+    <Compile Include="AntiSpam\DKIM\DualSelectorRotation.cs" />
     <Compile Include="AntiSpam\DKIM\Signing.cs" />
     <Compile Include="AntiSpam\DKIM\Verification.cs" />
     <Compile Include="API\Events.cs" />
@@ -465,6 +468,8 @@
     <Compile Include="SMTP\Signatures.cs" />
     <Compile Include="Infrastructure\Persistence\Limitations.cs" />
     <Compile Include="SSL\CertificateTypes.cs" />
+    <Compile Include="SSL\InboundClientCertificates.cs" />
+    <Compile Include="SSL\SslPassphraseAndAeadPresetTests.cs" />
     <Compile Include="SSL\ScramPlus.cs" />
     <Compile Include="SSL\ScramPlusSmtp.cs" />
     <Compile Include="SSL\ScramPlusPop3.cs" />

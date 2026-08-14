@@ -148,4 +148,12 @@
 //      hm_tcpipports.portclientcertificatecafile, per-port inbound client-certificate
 //      policy. Policy 0 is "off", which is every existing port, so an upgraded
 //      database behaves exactly as it did.
-#define REQUIRED_DB_VERSION            6008
+// 6009 adds hm_sslcertificates.sslprivatekeypassword, the protected passphrase for an
+//      encrypted private key file. Empty means the key is not encrypted, which is
+//      every existing row, so an upgraded database behaves exactly as it did.
+// 6010 seeds hm_settings rows ASArcFilteringEnabled (0) and ASArcTrustedSealers ('').
+//      Both are today's behaviour - ARC results are not used for filtering unless an
+//      administrator names the sealers to trust. The rows exist rather than being
+//      absent-with-a-default because PropertySet reports error 5015 on every read of
+//      a missing property, which would fill the error log on ARC-bearing mail.
+#define REQUIRED_DB_VERSION            6010
