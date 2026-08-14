@@ -414,7 +414,9 @@ namespace HM
 
          String sMessage;
          sMessage.Format(_T("SMTPDeliverer - Message %I64d: The message was not delivered to %s. ")
-            _T("Delivery to this account was cancelled since the account inbox is full. Max size: %d MB, Current size (including cancelled message): %d MB"), 
+            // %I64d for currentSize: it is an __int64, and String::Format is variadic,
+            // so a %d here consumed 32 bits of a 64-bit argument.
+            _T("Delivery to this account was cancelled since the account inbox is full. Max size: %d MB, Current size (including cancelled message): %I64d MB"),
             original_message_->GetID(), String(pCheckAccount->GetAddress()).c_str(), pCheckAccount->GetAccountMaxSize(), (currentSize / 1024 / 1024));
 
          LOG_APPLICATION(sMessage);

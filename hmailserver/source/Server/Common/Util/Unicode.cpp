@@ -69,7 +69,35 @@ namespace HM
    {
       int iInputLength = sInput.GetLength();
 
+      // Empty in, empty out, and answered here rather than below: MultiByteToWideChar
+      // returns 0 for cbMultiByte == 0, which is indistinguishable from its error
+      // return, so an empty string used to look like a failed conversion - and left
+      // sOutput holding whatever it held before.
+      if (iInputLength == 0)
+      {
+         sOutput.Empty();
+         return true;
+      }
+
       int nNeedSize = MultiByteToWideChar( CP_UTF8, 0, sInput, iInputLength, NULL, 0);
+
+      if (nNeedSize == 0)
+         return false;
+
+      // resize, not GetBuffer alone. CStdStr::GetBuf only ever GROWS -
+      // "if (size() < nMinLen) resize(nMinLen)" - and nothing here called
+      // ReleaseBuffer to set the final length, so converting a SHORTER value into a
+      // String that already held a longer one left the old tail in place.
+      //
+      // That is not theoretical. SMTPConnection::ProtocolAUTH_ passes the session
+      // members username_ and password_ into DecodeSaslPlain, and
+      // ResetLoginCredentials_ clears username_ but not password_. So on one
+      // connection: AUTH PLAIN with password "LongPassword123" fails, the client
+      // retries with "x", and the server validated "xongPassword123" - a credential
+      // the client never sent. The user could never authenticate on that connection,
+      // and every mangled attempt fed RegisterFailedLogin towards an auto-ban of a
+      // legitimate address.
+      sOutput.resize(nNeedSize);
 
       if( MultiByteToWideChar( CP_UTF8, 0, sInput, iInputLength, sOutput.GetBuffer(nNeedSize), nNeedSize ) == 0 )
          return false;

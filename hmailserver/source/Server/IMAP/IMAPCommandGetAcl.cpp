@@ -12,6 +12,7 @@
 
 
 #include "../Common/BO/IMAPFolder.h"
+#include "../Common/BO/ACLPermission.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -55,6 +56,18 @@ namespace HM
       std::shared_ptr<IMAPFolder> pFolder = pConnection->GetFolderByFullPath(sFolderName);
       if (!pFolder)
          return IMAPResult(IMAPResult::ResultBad, "Folder could not be found.");
+
+      // RFC 4314 section 3.3 requires the "a" (administer) right for GETACL, and this
+      // was the one ACL command without the check - SETACL and DELETEACL both have it,
+      // three lines after their own folder lookup.
+      //
+      // Without it any authenticated user could read the complete access list of any
+      // folder they could name, which on a public folder means the email address of
+      // every account granted rights on it and exactly what each may do. Folder
+      // existence too: the reply distinguishes a folder they have no rights on from
+      // one that is not there.
+      if (!pConnection->CheckPermission(pFolder, ACLPermission::PermissionAdminister))
+         return IMAPResult(IMAPResult::ResultNo, "Permission denied.");
 
       String sResponse = IMAPACLHelper::CreateACLList(pFolder, sOriginalFolderName);
       sResponse += pArgument->Tag() + _T(" OK GetAcl complete\r\n");

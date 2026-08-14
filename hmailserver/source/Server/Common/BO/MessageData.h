@@ -60,6 +60,14 @@ namespace HM
       void SetFieldValue(const String &sField, const String &sValue);
       String GetFieldValue(const String &sName) const;
 
+      // How many times a header field appears.
+      //
+      // GetFieldValue answers with the FIRST match, which is the right answer for a
+      // field RFC 5322 allows only once - but it cannot distinguish a message carrying
+      // one From from a message carrying three, and that distinction is a DMARC
+      // question. See SpamTestDMARC::RunTest.
+      int GetFieldOccurrenceCount(const String &sName) const;
+
       int GetRuleLoopCount();
       void SetRuleLoopCount(int iLoopCount);
       void IncreaseRuleLoopCount();

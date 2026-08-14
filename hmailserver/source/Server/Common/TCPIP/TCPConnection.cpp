@@ -915,7 +915,20 @@ namespace HM
    IPAddress 
    TCPConnection::GetRemoteEndpointAddress()
    {
-      boost::asio::ip::tcp::endpoint remoteEndpoint = socket_.remote_endpoint();
+      // The non-throwing overload. remote_endpoint() with no argument raises
+      // boost::system::system_error once the peer has reset the connection, and several
+      // callers are plain logging paths - LogReceivedResponse_ and GetIPAddressString
+      // among them. There the exception escapes ParseData and is caught by the generic
+      // handler in AsyncReadCompleted, which reports error 5136 ("An error occured while
+      // parsing data"), drops the session, and rethrows so a minidump is written. An
+      // ordinary peer reset therefore produced a crash dump and a log line blaming the
+      // wrong thing, for what should have been a silent disconnect.
+      boost::system::error_code error_code;
+      boost::asio::ip::tcp::endpoint remoteEndpoint = socket_.remote_endpoint(error_code);
+
+      if (error_code)
+         return IPAddress();
+
       return IPAddress(remoteEndpoint.address());
    }
 

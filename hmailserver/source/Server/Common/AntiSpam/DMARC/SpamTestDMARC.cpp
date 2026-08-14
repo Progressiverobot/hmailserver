@@ -64,6 +64,40 @@ namespace HM
       if (fromDomain.IsEmpty())
          return setSpamTestResults;
 
+      // RFC 5322 3.6 allows exactly one From, and RFC 7489 6.6.1 requires a message
+      // carrying more than one to be refused or treated as failing DMARC. That is not
+      // pedantry here - it is the difference between two identities:
+      //
+      //    From: attacker@evil.example
+      //    From: ceo@bank.example
+      //    DKIM-Signature: ... d=evil.example; h=from:subject; b=...
+      //
+      // DKIM signs and verifies over the LAST From (RFC 6376 5.4.2, implemented in
+      // Canonicalization.cpp), while fromDomain above comes from GetFrom(), which is
+      // MimeHeader::FindField and answers with the FIRST. So the attacker signs one
+      // From with a domain they own, DKIM passes, DMARC finds that domain aligned with
+      // the From it read - and the recipient's client displays the other one. The
+      // message is delivered looking like it came from the bank, and if it is relayed
+      // on, Arc::BuildAuthenticationResults_ stamps dkim=pass into a sealed
+      // ARC-Authentication-Results that downstream ARC-trusting receivers accept.
+      //
+      // Checked before any alignment is computed, so no verdict is ever reached from an
+      // identity the author did not assert.
+      int fromFieldCount = pMessageData->GetFieldOccurrenceCount(_T("From"));
+      if (fromFieldCount > 1)
+      {
+         AntiSpamConfiguration &antiSpamConfig = Configuration::Instance()->GetAntiSpamConfiguration();
+
+         String sMessage;
+         sMessage.Format(_T("Blocked by DMARC: the message carries %d From header fields; RFC 5322 permits one."), fromFieldCount);
+
+         std::shared_ptr<SpamTestResult> pResult =
+            std::shared_ptr<SpamTestResult>(new SpamTestResult(GetName(), SpamTestResult::Fail, antiSpamConfig.GetDMARCFailureScore(), sMessage));
+         setSpamTestResults.insert(pResult);
+
+         return setSpamTestResults;
+      }
+
       // Evaluate SPF for the envelope sender.
       bool spfPassed = false;
       String envelopeFromDomain = StringParser::ExtractDomain(pTestData->GetEnvelopeFrom());

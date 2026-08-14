@@ -316,7 +316,22 @@ namespace HM
    {
       boost::lock_guard<boost::recursive_mutex> guard(_mutex);
 
-      vecObjects.clear();
+      // Loaded into a temporary and swapped in only once the whole read succeeded.
+      //
+      // This used to clear vecObjects as its first act, before the query had even been
+      // issued. So a transient database failure - OpenRecordset returning null, or a
+      // ReadObject failing part-way - left the collection EMPTY and returned false. Most
+      // Refresh() methods return void and discard that bool, so the failure was
+      // invisible and callers were simply told the collection had no members: a domain
+      // with no accounts, an account with no folders, a folder with no permissions.
+      // That is a far more dangerous answer than a stale one, because "nothing exists"
+      // is acted upon - it rejects recipients as unknown and hides ACL grants - whereas
+      // the previous contents are at worst slightly out of date.
+      //
+      // On success the swap replaces the contents wholesale, so the success path behaves
+      // exactly as before; only the failure path changes, and it now leaves the live
+      // collection untouched.
+      std::vector<std::shared_ptr<T> > loadedObjects;
 
       std::shared_ptr<DALRecordset> pRS = Application::Instance()->GetDBManager()->OpenRecordset(command);
       if (!pRS)
@@ -328,9 +343,11 @@ namespace HM
          if (!P::ReadObject(pItem, pRS))
             return false;
 
-         vecObjects.push_back(pItem);
+         loadedObjects.push_back(pItem);
          pRS->MoveNext();
       }
+
+      vecObjects.swap(loadedObjects);
 
       return true;
    }

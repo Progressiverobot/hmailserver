@@ -310,6 +310,27 @@ namespace HM
       return sRetVal;
    }
 
+   int
+   MessageData::GetFieldOccurrenceCount(const String &sName) const
+   {
+      if (!mime_mail_)
+         return 0;
+
+      // Counted over the header this object already parsed, rather than re-reading and
+      // re-parsing the message file: the comparison is the same case-insensitive one
+      // MimeHeader::FindField uses, so the two agree on what counts as a match.
+      AnsiString sFieldName = sName;
+
+      int count = 0;
+      for (MimeField &field : mime_mail_->Fields())
+      {
+         if (!::_stricmp(field.GetName(), sFieldName))
+            count++;
+      }
+
+      return count;
+   }
+
    int 
    MessageData::GetSize() const
    {

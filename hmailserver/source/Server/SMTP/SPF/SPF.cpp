@@ -31,8 +31,20 @@ namespace HM
       USES_CONVERSION;
       String sDomain = StringParser::ExtractDomain(sSenderEmail);
 
+      // >= 0, not > 0. Find returns the index, and an IPv6 address is allowed to start
+      // with its separator - "::1" and the v4-mapped "::ffff:203.0.113.5" both put the
+      // first colon at index 0, so those were classified AF_INET, SPFStringToAddr
+      // failed to parse them as IPv4 and the function returned Neutral below without
+      // evaluating the policy at all.
+      //
+      // Silent, and in the permissive direction: no Fail score for a -all sender, no
+      // greylisting decision, and SpamTestDMARC records spfPassed=false, so an
+      // SPF-only DMARC domain lost its alignment and could be forged. Reaching it
+      // needs a dual-stack listener with IPV6_V6ONLY off, since the string comes from
+      // the remote endpoint's to_string(); Windows defaults that option on, so this is
+      // configuration-dependent rather than universal.
       int family;
-      if (sSenderIP.Find(_T(":")) > 0)
+      if (sSenderIP.Find(_T(":")) >= 0)
          family=AF_INET6;
       else
          family=AF_INET;

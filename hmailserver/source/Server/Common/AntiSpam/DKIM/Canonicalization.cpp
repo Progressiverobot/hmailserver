@@ -21,6 +21,56 @@
 
 namespace HM
 {
+   namespace
+   {
+      // RFC 6376 3.4.2 and 3.4.4: "Convert all sequences of one or more WSP characters
+      // to a single SP character."
+      //
+      // Written as one pass because the obvious spelling of it is not linear, and this
+      // runs on attacker-supplied bytes before the message is accepted. It used to be
+      //
+      //    while (line.Find("  ") >= 0)
+      //       line.Replace("  ", " ");
+      //
+      // where CStdStr::Replace shortening a string does an in-place std::string::replace
+      // per hit, each shifting the whole tail down by one - O(n^2) per pass, and it takes
+      // O(log n) passes to collapse a long run. One header line of 8 million spaces is
+      // tens of billions of bytes moved.
+      //
+      // The reachable cost is worse than a single run suggests. An attacker publishes a
+      // DKIM key for a domain they own and signs the message themselves, so the
+      // signature verifies as far as canonicalisation is concerned; DKIM::Verify allows
+      // up to 10 signatures, ValidateBodyHash_ re-canonicalises per signature, and both
+      // SpamTestDKIM and SpamTestDMARC call Verify - so up to 20 runs over a body that
+      // may be ~49 MB under the default caps. All of it on the connection thread that
+      // still owes the client a 250, so a handful of connections exhausts the pool.
+      AnsiString CollapseWhitespaceRuns_(const AnsiString &input)
+      {
+         AnsiString result;
+         result.reserve(input.size());
+
+         bool previousWasWhitespace = false;
+
+         for (char c : input)
+         {
+            if (c == ' ' || c == '\t')
+            {
+               if (!previousWasWhitespace)
+                  result += ' ';
+
+               previousWasWhitespace = true;
+            }
+            else
+            {
+               result += c;
+               previousWasWhitespace = false;
+            }
+         }
+
+         return result;
+      }
+   }
+
    AnsiString
    Canonicalization::GetDKIMWithoutSignature_(AnsiString value)
    {
@@ -116,11 +166,8 @@ namespace HM
 
       for (AnsiString line : lines)
       {
-         line.Replace("\t", " ");
-
          //   o  Reduces all sequences of WSP within a line to a single SP character.
-         while (line.Find("  ") >= 0)
-            line.Replace("  ", " ");
+         line = CollapseWhitespaceRuns_(line);
 
          line.TrimRight();
 
@@ -258,18 +305,30 @@ namespace HM
       line folding boundary.
       */
 
-      value.Replace("\t ", " ");
-      value.Replace(" \t", " ");
-      
-      while (value.Find("  ") >= 0)
-         value.Replace("  ", " ");
+      // One pass, and it also fixes what the old spelling got wrong. It was
+      //
+      //    value.Replace("\t ", " "); value.Replace(" \t", " ");
+      //    while (value.Find("  ") >= 0) value.Replace("  ", " ");
+      //
+      // which left a *lone* tab as a tab, where RFC 6376 3.4.2 says every WSP run
+      // becomes a single SP - so a header value containing a single tab hashed
+      // differently here than at any compliant verifier, and our own signatures over
+      // such headers were rejected downstream.
+      value = CollapseWhitespaceRuns_(value);
 
       /*
       Delete all WSP characters at the end of each unfolded header field value.
       */
 
-      while (value.EndsWith(" ") || value.EndsWith("\t"))
-         value = value.Mid(0, value.GetLength() -1);
+      // Trimmed by index rather than by repeated Mid: Mid is substr, a full copy of the
+      // remainder, so stripping N trailing spaces one at a time copied O(N^2) bytes of
+      // a value an unauthenticated sender chooses the length of.
+      int trimmedLength = value.GetLength();
+      while (trimmedLength > 0 && (value[trimmedLength - 1] == ' ' || value[trimmedLength - 1] == '\t'))
+         trimmedLength--;
+
+      if (trimmedLength != value.GetLength())
+         value = value.Mid(0, trimmedLength);
 
       /* Delete any WSP characters remaining before and after the colon
       separating the header field name from the header field value.  The
@@ -285,10 +344,25 @@ namespace HM
    AnsiString 
    SimpleCanonicalization::CanonicalizeBody(AnsiString value)
    {
-      // remove all empty lines.
-      while (value.EndsWith("\r\n"))
-         value = value.Mid(0, value.GetLength()-2);
-      
+      // Remove all trailing empty lines (RFC 6376 3.4.3).
+      //
+      // Counted first, then copied once. This was
+      //
+      //    while (value.EndsWith("\r\n"))
+      //       value = value.Mid(0, value.GetLength()-2);
+      //
+      // where EndsWith calls Right() (a copy) and Mid is substr (another copy of the
+      // whole remainder), so a body ending in N CRLF pairs moved ~N^2 bytes. An 8 MB
+      // body of nothing but CRLF is ~4.2 million iterations averaging a 4 MB copy.
+      // The message needs no authentication to reach here - see the note on
+      // CollapseWhitespaceRuns_ for why one such message costs up to twenty runs.
+      int end = value.GetLength();
+      while (end >= 2 && value[end - 2] == '\r' && value[end - 1] == '\n')
+         end -= 2;
+
+      if (end != value.GetLength())
+         value = value.Mid(0, end);
+
       value += "\r\n";
       
       return value;
@@ -319,7 +393,17 @@ namespace HM
             int colonPos = line.Find(":");
             if (colonPos < 0)
             {
-               assert(0); // broken header.
+               // Not a header field (no colon) and not a folded continuation line, so it
+               // cannot be named in a signature's h= list and is dropped.
+               //
+               // This used to be assert(0), reachable from an inbound message that any
+               // stranger can send - which aborts the process outright in a Debug build.
+               // Release defines NDEBUG so the assert compiled away, but then the bare
+               // continue left foldedLines holding the continuation lines gathered for
+               // THIS line. The loop walks the header block in reverse, so those lines
+               // were then appended to the PRECEDING field instead, changing the bytes
+               // that get hashed and making a correctly-signed message fail to verify.
+               foldedLines = "";
                continue;
             }
 

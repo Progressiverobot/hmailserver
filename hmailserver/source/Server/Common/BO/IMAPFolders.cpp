@@ -208,19 +208,28 @@ namespace HM
       size_t lNoOfParts= vecFolders.size();
       for (unsigned int i = 0; i < lNoOfParts; i++)
       {
-         if (pCurFolder)
-         {
-            String sFoldName = vecFolders[i];
-            pCurFolder = pCurFolder->GetSubFolders()->GetFolderByName(sFoldName);
-         }
-         else
-         {
-            String sFoldName = vecFolders[i];
-            pCurFolder = GetFolderByName(sFoldName);
+         String sFoldName = vecFolders[i];
 
-            if (!pCurFolder)
-               return pCurFolder;
-         }
+         // Branch on the component INDEX, not on whether pCurFolder happens to be set.
+         //
+         // Keying it on pCurFolder meant a miss part-way down a path silently restarted
+         // the walk at the root. Only the FIRST component returned early on a miss; a
+         // missing middle component left pCurFolder null, and the next iteration then
+         // took the else branch and looked the remaining component up as a TOP-LEVEL
+         // folder. So "Archive.Missing.Trash" did not fail - it resolved to the
+         // top-level "Trash", and the caller went on to act on a real folder the client
+         // had not named. Through DELETE or RENAME that is destructive, and through
+         // SELECT/COPY it silently reads or writes the wrong mailbox.
+         //
+         // Every component after the first must resolve as a direct child of the one
+         // before it, and any miss means the path does not exist.
+         if (i == 0)
+            pCurFolder = GetFolderByName(sFoldName);
+         else
+            pCurFolder = pCurFolder->GetSubFolders()->GetFolderByName(sFoldName);
+
+         if (!pCurFolder)
+            return pCurFolder;
       }
 
       return pCurFolder;

@@ -221,7 +221,15 @@ namespace HM
       if (!pAccount)
       {
          // No account was found. Check if it's a group.
-         std::shared_ptr<Group> pGroup = Configuration::Instance()->GetIMAPConfiguration()->GetGroups()->GetItemByName(sIdentifier);
+         //
+         // Assigns the pGroup declared above rather than declaring another one. It used
+         // to read "std::shared_ptr<Group> pGroup = ...", which shadowed the outer
+         // variable: the group was found and null-checked here, then went out of scope
+         // at the end of this block, leaving the outer pGroup still empty. Line 248 then
+         // called pGroup->GetID() on it, so SETACL naming a *group* - an ordinary thing
+         // to do on a public folder - dereferenced a null shared_ptr and took the
+         // session down.
+         pGroup = Configuration::Instance()->GetIMAPConfiguration()->GetGroups()->GetItemByName(sIdentifier);
 
          if (!pGroup)
          {

@@ -8,6 +8,7 @@
 
 #include "../../TCPIP/DNSResolver.h"
 #include "../../Util/Parsing/StringParser.h"
+#include "../../Util/Parsing/AddresslistParser.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -39,8 +40,125 @@ namespace HM
          L"co.il", L"org.il", L"net.il", L"ac.il", L"gov.il",
          L"com.ua", L"net.ua", L"org.ua",
          L"com.co", L"net.co", L"org.co",
-         L"com.vn", L"net.vn", L"org.vn"
+         L"com.vn", L"net.vn", L"org.vn",
+
+         // Second-level labels that are NOT generic registry words, so the shape rule
+         // below cannot infer them. Added after a review found the shape rule still
+         // collapsed these to the bare suffix.
+         L"my.id", L"biz.id", L"desa.id", L"ponpes.id",
+         L"gr.jp", L"ad.jp", L"ed.jp", L"lg.jp",
+         L"sc.ke", L"me.ke", L"mi.th",
+         L"art.br", L"eco.br", L"emp.br", L"eng.br", L"blog.br", L"med.br", L"adv.br",
+         L"esp.br", L"etc.br", L"ind.br", L"inf.br", L"jor.br", L"rec.br", L"srv.br",
+         L"tur.br", L"vet.br", L"wiki.br"
       };
+
+      // Two-letter TLDs that are FLAT - anybody may register directly beneath them, so
+      // a two-label name under one of these is a registrant, not a public suffix.
+      //
+      // This list exists to bound the shape rule below, and it was added because that
+      // rule without it was a REGRESSION rather than a fix. "co", "gen", "web", "info",
+      // "in", "pro" and friends are perfectly ordinary company names, and they are
+      // registered directly under .io/.ai/.me every day. Treating co.io as a public
+      // suffix makes GetOrganizationalDomain("mail.co.io") return "mail.co.io" while
+      // GetOrganizationalDomain("co.io") returns "co.io", so relaxed alignment compares
+      // two different strings and correctly-signed mail from a real company FAILS
+      // DMARC. Rejecting legitimate mail is a worse outcome than the forgery the shape
+      // rule was added to prevent, so the rule is not applied here.
+      const wchar_t *flatTwoLetterRegistries[] =
+      {
+         L"io", L"ai", L"me", L"cc", L"tv", L"sh", L"fm", L"gg", L"im",
+         L"la", L"to", L"ly", L"st", L"is", L"ms", L"nu", L"tk", L"ws",
+         L"vc", L"gs", L"mn", L"si", L"su", L"ee", L"lv", L"lt", L"sk",
+         L"cz", L"be", L"nl", L"de", L"fr", L"it", L"ch", L"at", L"dk",
+         L"se", L"no", L"fi", L"pl", L"pt", L"gr", L"ie", L"lu", L"ca",
+         L"us", L"eu", L"cl", L"uy", L"ec", L"bo", L"py"
+      };
+
+      // RFC 5322 3.2.2: a comment is a parenthesised run that may nest, may contain
+      // quoted strings, and may appear anywhere between lexical tokens. It is NOT part
+      // of any address - but AddresslistParser does not know that. Its
+      // ExtractWithinGTLT_ tracks only '"' and '\' escapes and treats '(' and ')' as
+      // ordinary characters, recording the LAST '<' before the FIRST '>'.
+      //
+      // So delegating to that parser alone did not close the bypass it was meant to:
+      //
+      //    From: ceo@bank.example (<attacker@evil.example>)
+      //
+      // still yielded attacker@evil.example, and
+      //
+      //    From: Bob (<evil@evil.example>) <ceo@bank.example>
+      //
+      // yielded evil@evil.example while ignoring the real angle-addr completely - a
+      // header with a genuine address that every mail client renders as the bank.
+      // Removing comments first is what makes the parser agree with the client.
+      String StripComments_(const String &value)
+      {
+         String result;
+         result.reserve(value.GetLength());
+
+         int commentDepth = 0;
+         bool insideQuotedString = false;
+
+         for (int i = 0; i < value.GetLength(); i++)
+         {
+            wchar_t currentChar = value.GetAt(i);
+
+            if (currentChar == '\\')
+            {
+               // Quoted-pair. The escaped character is literal wherever it appears, so
+               // it is consumed here and never re-examined as a delimiter.
+               if (commentDepth == 0)
+               {
+                  result += currentChar;
+
+                  if (i + 1 < value.GetLength())
+                     result += value.GetAt(i + 1);
+               }
+
+               i++;
+               continue;
+            }
+
+            if (insideQuotedString)
+            {
+               if (currentChar == '"')
+                  insideQuotedString = false;
+
+               result += currentChar;
+               continue;
+            }
+
+            if (commentDepth > 0)
+            {
+               // A '"' inside a comment is just ctext, so it does not open a quoted
+               // string; only the nesting depth matters here.
+               if (currentChar == '(')
+                  commentDepth++;
+               else if (currentChar == ')')
+                  commentDepth--;
+
+               continue;
+            }
+
+            if (currentChar == '"')
+            {
+               insideQuotedString = true;
+               result += currentChar;
+               continue;
+            }
+
+            if (currentChar == '(')
+            {
+               commentDepth++;
+               continue;
+            }
+
+            result += currentChar;
+         }
+
+         return result;
+      }
    }
 
    DMARC::DMARC()
@@ -54,13 +172,31 @@ namespace HM
       String value = headerValue;
       value = value.Trim();
 
-      int startBracket = value.ReverseFind(_T("<"));
-      if (startBracket >= 0)
-      {
-         int endBracket = value.Find(_T(">"), startBracket);
-         if (endBracket > startBracket)
-            return value.Mid(startBracket + 1, endBracket - startBracket - 1).Trim();
-      }
+      // Parsed rather than scanned for angle brackets, and the difference is a DMARC
+      // bypass.
+      //
+      // This used to take ReverseFind("<") - the LAST '<' anywhere in the value. RFC
+      // 5322 allows comments in a From header and '<' and '>' are ordinary ctext, so
+      //
+      //    From: ceo@bank.example (<attacker@evil.example>)
+      //
+      // is a legal header that every RFC 5322 parser and every mail client reads as
+      // ceo@bank.example, while this read attacker@evil.example. DMARC would then be
+      // looked up at _dmarc.evil.example - a domain the sender controls, publishing
+      // p=none - so bank.example's p=reject was never fetched and the message was
+      // delivered while appearing to come from the bank.
+      //
+      // AddresslistParser is the tree's RFC 5322 address parser and DKIMSigner already
+      // uses it on this same header for this same purpose, so the two now agree on what
+      // the From address is - which matters more than either answer on its own.
+      //
+      // Comments are removed BEFORE parsing, because that parser does not understand
+      // them and would otherwise pick an address out of one - see StripComments_.
+      AddresslistParser parser;
+      auto addresses = parser.ParseList(StripComments_(value));
+
+      if (!addresses.empty() && !addresses[0]->sDomainName.IsEmpty())
+         return addresses[0]->sMailboxName + "@" + addresses[0]->sDomainName;
 
       return value;
    }
@@ -79,13 +215,69 @@ namespace HM
       // Determine the number of labels making up the public suffix.
       size_t suffixLabels = 1;
 
-      String lastTwo = labels[labels.size() - 2] + _T(".") + labels[labels.size() - 1];
+      String secondLevel = labels[labels.size() - 2];
+      String topLevel = labels[labels.size() - 1];
+
+      String lastTwo = secondLevel + _T(".") + topLevel;
       for (const wchar_t *suffix : multiLabelPublicSuffixes)
       {
          if (lastTwo.CompareNoCase(suffix) == 0)
          {
             suffixLabels = 2;
             break;
+         }
+      }
+
+      // The table above is a subset of the Public Suffix List, and a subset used on
+      // its own is a DMARC bypass rather than merely an approximation.
+      //
+      // com.pt, co.id, co.th, com.ng, co.ke and com.pe were among the suffixes not in
+      // it. For any of those, this returned the *public suffix itself* as the
+      // organizational domain - GetOrganizationalDomain("bank.com.pt") gave "com.pt".
+      // Relaxed alignment is the DMARC default for both aspf and adkim, so
+      // DomainsAligned_ then compared "com.pt" with "com.pt" and passed: register
+      // attacker.com.pt, publish "v=spf1 +all", send MAIL FROM there with
+      // From: ceo@bank.com.pt, and bank.com.pt's p=reject was bypassed. Every domain
+      // under a suffix missing from the table was forgeable by anyone holding any
+      // other name under the same suffix.
+      //
+      // Completing the table is not the fix - the PSL has ~9,000 rules and changes
+      // weekly, so the next missing entry is the next bypass. This covers the shape
+      // instead: a registry label directly under a two-letter ccTLD. That is what
+      // essentially every ccTLD of this kind looks like, including all of the ones the
+      // table already lists, and it needs no maintenance.
+      //
+      // It errs towards treating a name as a public suffix, which makes alignment
+      // stricter rather than looser - the safe direction. The cost is a registrant who
+      // literally holds "co.<cc>" as their own name seeing relaxed alignment behave
+      // strictly for their subdomains; the alternative is the bypass above.
+      bool topLevelIsFlat = false;
+      for (const wchar_t *flat : flatTwoLetterRegistries)
+      {
+         if (topLevel.CompareNoCase(flat) == 0)
+         {
+            topLevelIsFlat = true;
+            break;
+         }
+      }
+
+      if (suffixLabels == 1 && topLevel.GetLength() == 2 && !topLevelIsFlat)
+      {
+         static const wchar_t *registryLabels[] =
+         {
+            L"com", L"net", L"org", L"edu", L"gov", L"mil", L"int",
+            L"co", L"ac", L"or", L"ne", L"go", L"re", L"id", L"in",
+            L"biz", L"info", L"name", L"nom", L"web", L"firm", L"gen", L"ind",
+            L"sch", L"asn", L"govt", L"nhs", L"ltd", L"plc", L"priv", L"pro"
+         };
+
+         for (const wchar_t *label : registryLabels)
+         {
+            if (secondLevel.CompareNoCase(label) == 0)
+            {
+               suffixLabels = 2;
+               break;
+            }
          }
       }
 

@@ -46,6 +46,24 @@ namespace HM
 
          std::shared_ptr<const Account> pAccount = CacheContainer::Instance()->GetAccount(iAccountID);
 
+         // Null-checked, which it was not. A permission row is not necessarily a user
+         // row: ACLPermission has three types - PTUser, PTGroup and PTAnyone - and for
+         // the latter two permission_account_id_ is 0, so GetAccount(0) hands back an
+         // empty shared_ptr and this dereferenced it.
+         //
+         // Granting a *group* rights on a public folder is supported and ordinary, so
+         // one GETACL against such a folder was an access violation. It does not go
+         // unnoticed - the server builds with /EHa, so the catch(...) in
+         // TCPConnection::AsyncReadCompleted swallows it, logs 5136, drops the session
+         // and rethrows for a minidump - but a client could take a session down at
+         // will. IMAPCommandDeleteAcl null-checks the same call.
+         //
+         // Skipped rather than named: identifying group and "anyone" rows in the ACL
+         // response needs the RFC 4314 identifier forms, which is a feature rather than
+         // a crash fix, and listing them wrongly would be worse than omitting them.
+         if (!pAccount)
+            continue;
+
          String sIdentifier = pAccount->GetAddress();
          String sRights = pPermission->GetRights();
 

