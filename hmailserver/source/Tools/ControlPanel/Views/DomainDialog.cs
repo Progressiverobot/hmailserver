@@ -70,6 +70,27 @@ namespace hMailServer.ControlPanel.Views
       private StackPanel dkimDnsPanel_;
       private string dkimDnsValue_ = "";
 
+      // DKIM key rotation. Unlike the rest of this dialog, the staged (secondary)
+      // pair is written to the server the moment it changes: a rotation spans
+      // hours of DNS propagation, the administrator will close this dialog in
+      // between, and a staged pair that lived only in the dialog would be gone
+      // when they come back to promote it.
+      private readonly TextBox rotSelector_ = NewInput();
+      private readonly TextBox rotDnsHost_ = ReadOnlyBox(0);
+      private readonly TextBox rotDnsValue_ = ReadOnlyBox(70);
+      private TextBlock rotCurrent_;
+      private TextBlock rotStagedInfo_;
+      private TextBlock rotStatus_;
+      private StackPanel rotStartPanel_;
+      private StackPanel rotStagedPanel_;
+      private Wpf.Ui.Controls.Button rotCheck_;
+      private Wpf.Ui.Controls.Button rotPromote_;
+      private string rotStagedSelector_ = "";
+      private string rotStagedKeyFile_ = "";
+      private string rotExpectedTxt_;
+      private bool rotCheckPassed_;
+      private bool rotChecking_;
+
       // Names (domain aliases) — embedded list editor
       private CollectionEditorView aliasEditor_;
 
@@ -337,7 +358,537 @@ namespace hMailServer.ControlPanel.Views
          panel.Children.Add(dkimBodyCanon_);
          panel.Children.Add(Label("Signing algorithm"));
          panel.Children.Add(dkimAlgorithm_);
+
+         panel.Children.Add(Separator());
+         panel.Children.Add(BuildRotation());
+
          return Scroll(panel);
+      }
+
+      /// <summary>
+      /// The staged key-rotation walkthrough. Rotation is a sequence with an
+      /// out-of-band wait in the middle (publishing a DNS record and letting it
+      /// propagate), so the section reads as numbered steps and the Promote
+      /// button is gated on an actual DNS check instead of trusting the
+      /// administrator to have waited long enough.
+      /// </summary>
+      private StackPanel BuildRotation()
+      {
+         var section = new StackPanel();
+
+         var title = new TextBlock
+         {
+            Text = "Key rotation",
+            FontSize = 14,
+            FontWeight = FontWeights.SemiBold,
+            Margin = new Thickness(0, 0, 0, 2)
+         };
+         title.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
+         section.Children.Add(title);
+
+         var intro = Label("Replace the DKIM key without a gap in verification: stage a new key next to " +
+                           "the current one, publish its DNS record, wait for the record to propagate, " +
+                           "check it, and only then promote it.");
+         intro.TextWrapping = TextWrapping.Wrap;
+         section.Children.Add(intro);
+
+         rotCurrent_ = Label("");
+         rotCurrent_.TextWrapping = TextWrapping.Wrap;
+         section.Children.Add(rotCurrent_);
+
+         // Step 1 quotes the primary fields above, so it must follow their edits
+         // or it would describe a selector the user has already typed over.
+         dkimSelector_.TextChanged += (s, e) => UpdateRotationUi();
+         dkimKeyFile_.TextChanged += (s, e) => UpdateRotationUi();
+
+         // Step 2 while nothing is staged: choose a selector name and stage a key.
+         rotStartPanel_ = new StackPanel();
+         rotStartPanel_.Children.Add(Label("2. Stage a new key pair under a new selector name:"));
+         var startRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
+         Input(rotSelector_);
+         rotSelector_.MinWidth = 200;
+         rotSelector_.Margin = new Thickness(0);
+         System.Windows.Automation.AutomationProperties.SetAutomationId(rotSelector_, "DkimRotationSelector");
+         startRow.Children.Add(rotSelector_);
+         var start = new Wpf.Ui.Controls.Button { Content = "Generate and stage key…", Margin = new Thickness(8, 0, 0, 0) };
+         System.Windows.Automation.AutomationProperties.SetAutomationId(start, "DkimRotationStart");
+         start.Click += (s, e) => StartRotation();
+         startRow.Children.Add(start);
+         rotStartPanel_.Children.Add(startRow);
+         section.Children.Add(rotStartPanel_);
+
+         // Steps 2-5 once a rotation is staged.
+         rotStagedPanel_ = new StackPanel { Visibility = Visibility.Collapsed };
+
+         rotStagedInfo_ = Label("");
+         rotStagedInfo_.TextWrapping = TextWrapping.Wrap;
+         rotStagedPanel_.Children.Add(rotStagedInfo_);
+
+         rotStagedPanel_.Children.Add(Label("3. Publish this DNS TXT record at your DNS provider. Host/Name:"));
+         rotDnsHost_.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
+         rotStagedPanel_.Children.Add(rotDnsHost_);
+         rotStagedPanel_.Children.Add(Label("TXT value:"));
+         rotDnsValue_.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
+         rotStagedPanel_.Children.Add(rotDnsValue_);
+
+         var copyRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 4) };
+         var copyHost = new Wpf.Ui.Controls.Button { Content = "Copy host" };
+         System.Windows.Automation.AutomationProperties.SetAutomationId(copyHost, "DkimRotationCopyHost");
+         copyHost.Click += (s, e) => CopyToClipboard(rotDnsHost_.Text);
+         copyRow.Children.Add(copyHost);
+         var copyValue = new Wpf.Ui.Controls.Button { Content = "Copy value", Margin = new Thickness(8, 0, 0, 0) };
+         System.Windows.Automation.AutomationProperties.SetAutomationId(copyValue, "DkimRotationCopyValue");
+         copyValue.Click += (s, e) => CopyToClipboard(rotExpectedTxt_);
+         copyRow.Children.Add(copyValue);
+         rotStagedPanel_.Children.Add(copyRow);
+
+         rotStagedPanel_.Children.Add(Label("4. Check that the record is visible in DNS:"));
+         rotCheck_ = new Wpf.Ui.Controls.Button { Content = "Check DNS" };
+         System.Windows.Automation.AutomationProperties.SetAutomationId(rotCheck_, "DkimRotationCheck");
+         rotCheck_.Click += async (s, e) => await CheckRotationDns();
+         rotStagedPanel_.Children.Add(rotCheck_);
+
+         rotStatus_ = new TextBlock
+         {
+            TextWrapping = TextWrapping.Wrap,
+            FontSize = 12.5,
+            Margin = new Thickness(0, 6, 0, 8)
+         };
+         rotStagedPanel_.Children.Add(rotStatus_);
+
+         rotStagedPanel_.Children.Add(Label("5. Promote the staged key to become the signing key:"));
+         var promoteRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
+
+         // Promote stays locked until a "Check DNS" in this session has seen the
+         // new record on the wire and confirmed it matches the staged key.
+         // Promoting before the record has propagated makes the server sign
+         // immediately with a key whose public half much of the world cannot look
+         // up yet: every receiver whose resolver has not caught up fails the DKIM
+         // signature, and under a DMARC quarantine or reject policy that sends
+         // freshly signed mail to spam folders or bounces it outright until
+         // propagation completes.
+         rotPromote_ = new Wpf.Ui.Controls.Button
+         {
+            Content = "Promote…",
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
+            IsEnabled = false,
+            ToolTip = "Enabled once \"Check DNS\" has confirmed the published record matches the staged key."
+         };
+         ToolTipService.SetShowOnDisabled(rotPromote_, true);
+         System.Windows.Automation.AutomationProperties.SetAutomationId(rotPromote_, "DkimRotationPromote");
+         rotPromote_.Click += (s, e) => PromoteRotation();
+         promoteRow.Children.Add(rotPromote_);
+
+         var cancelRotation = new Wpf.Ui.Controls.Button { Content = "Cancel rotation…", Margin = new Thickness(8, 0, 0, 0) };
+         System.Windows.Automation.AutomationProperties.SetAutomationId(cancelRotation, "DkimRotationCancel");
+         cancelRotation.Click += (s, e) => CancelRotation();
+         promoteRow.Children.Add(cancelRotation);
+
+         rotStagedPanel_.Children.Add(promoteRow);
+         section.Children.Add(rotStagedPanel_);
+         return section;
+      }
+
+      // ---- DKIM key rotation ----
+
+      private void StartRotation()
+      {
+         string selector = rotSelector_.Text.Trim();
+         if (selector.Length == 0)
+         {
+            MessageBox.Show("Enter a selector name for the new key first.", "Control Panel");
+            return;
+         }
+
+         // Reusing the current selector name is refused outright: it would replace
+         // the published key under the same DNS name instead of running two keys
+         // side by side, and while resolvers still serve the old record every
+         // message signed with the new key fails verification - the exact outage
+         // a staged rotation exists to prevent.
+         if (string.Equals(selector, dkimSelector_.Text.Trim(), StringComparison.OrdinalIgnoreCase))
+         {
+            MessageBox.Show("The new selector must be different from the current selector (\"" + selector + "\"). " +
+                            "A rotation runs both keys side by side under different DNS names.", "Control Panel");
+            return;
+         }
+
+         var save = new Microsoft.Win32.SaveFileDialog
+         {
+            Title = "Save the new DKIM private key",
+            Filter = "PEM key files (*.pem)|*.pem|All files (*.*)|*.*",
+            FileName = selector + "._domainkey." + domainName_ + ".pem"
+         };
+         try
+         {
+            // Default to the folder the current key lives in, like the generator above.
+            string existing = dkimKeyFile_.Text.Trim();
+            if (existing.Length > 0)
+            {
+               string dir = System.IO.Path.GetDirectoryName(existing);
+               if (!string.IsNullOrEmpty(dir) && System.IO.Directory.Exists(dir))
+                  save.InitialDirectory = dir;
+            }
+         }
+         catch (Exception) { }
+
+         if (save.ShowDialog() != true)
+            return;
+
+         DkimKeyGenerator.Result generated;
+         try
+         {
+            generated = DkimKeyGenerator.Generate(selector, domainName_);
+            System.IO.File.WriteAllText(save.FileName, generated.PrivateKeyPem);
+         }
+         catch (Exception ex)
+         {
+            MessageBox.Show("Could not generate the DKIM key: " + ex.Message, "Control Panel");
+            return;
+         }
+
+         dynamic domains = ServerSession.Current.Application.Domains;
+         try
+         {
+            dynamic d = domains.ItemByName[domainName_];
+            d.DKIMSecondarySelector = selector;
+            d.DKIMSecondaryPrivateKeyFile = save.FileName;
+            d.Save();
+            ServerSession.Release(d);
+         }
+         catch (Exception ex)
+         {
+            MessageBox.Show("Could not stage the rotation on the server: " + ServerSession.DescribeComError(ex),
+               "Control Panel");
+            return;
+         }
+         finally
+         {
+            ServerSession.Release(domains);
+         }
+
+         rotStagedSelector_ = selector;
+         rotStagedKeyFile_ = save.FileName;
+         rotExpectedTxt_ = generated.DnsTxtValue;
+         rotCheckPassed_ = false;
+         UpdateRotationUi();
+         SetRotationStatus("Not checked yet. Publish the record, allow time for propagation, then press \"Check DNS\".",
+            ThemeTokens.Info);
+      }
+
+      private const string RotationNotFoundText =
+         "The record was not found yet. New DNS records usually appear within minutes but can take hours to " +
+         "propagate - publish the record above if you have not already, then check again later.";
+
+      private static string RotationLookupFailedText(string error) =>
+         "The DNS lookup itself failed: " + error + " This says nothing about the record - this machine could not " +
+         "get an answer from its DNS server. Check the network and try again.";
+
+      private async Task CheckRotationDns()
+      {
+         if (rotChecking_)
+            return;
+
+         if (rotStagedSelector_.Length == 0)
+         {
+            SetRotationStatus("The staged pair has no selector, so there is no DNS name to check. Cancel the rotation " +
+               "and start again.", ThemeTokens.Danger);
+            return;
+         }
+
+         string host = rotStagedSelector_ + "._domainkey." + domainName_;
+         string expected = rotExpectedTxt_;
+
+         rotChecking_ = true;
+         rotCheck_.IsEnabled = false;
+         SetRotationStatus("Checking " + host + "…", ThemeTokens.Info);
+
+         try
+         {
+            // The lookup blocks for the resolver's full timeout when the record is
+            // missing - the common case right after publishing - so it runs off the
+            // UI thread. DnsTxtLookup never throws; it reports through the result.
+            if (expected == null)
+            {
+               DnsTxtLookup.LookupResult found = await Task.Run(() => DnsTxtLookup.Query(host));
+               ReportUnverifiableCheck(found);
+               return;
+            }
+
+            DnsTxtLookup.MatchResult result = await Task.Run(() => DnsTxtLookup.CheckExpected(host, expected));
+
+            // Any outcome short of a confirmed match locks Promote (again): a
+            // pass from earlier in the session is stale evidence the moment a
+            // fresh check stops confirming it.
+            rotCheckPassed_ = result.Status == DnsTxtLookup.MatchStatus.FoundAndMatches;
+
+            switch (result.Status)
+            {
+               case DnsTxtLookup.MatchStatus.FoundAndMatches:
+                  SetRotationStatus("The published record matches the staged key. It is safe to promote.",
+                     ThemeTokens.Success);
+                  break;
+
+               case DnsTxtLookup.MatchStatus.NoRecord:
+                  SetRotationStatus(RotationNotFoundText, ThemeTokens.Warning);
+                  break;
+
+               case DnsTxtLookup.MatchStatus.FoundButDifferent:
+                  SetRotationStatus("A TXT record exists at " + host + ", but it does not match the staged key. " +
+                     "Waiting will not fix this: correct the published record so it matches the value above, then " +
+                     "check again." + DescribeFoundRecords(result.Records), ThemeTokens.Danger);
+                  break;
+
+               default:
+                  SetRotationStatus(RotationLookupFailedText(result.Error), ThemeTokens.Danger);
+                  break;
+            }
+         }
+         finally
+         {
+            rotPromote_.IsEnabled = rotCheckPassed_;
+            rotChecking_ = false;
+            rotCheck_.IsEnabled = true;
+         }
+      }
+
+      /// <summary>
+      /// Words the check when the staged private key file could not be read from
+      /// this machine (typically when administering a remote server, where the
+      /// path is on the server's disk): the record can still be looked up, but
+      /// not compared - and a record that cannot be verified must not unlock
+      /// Promote, however plausible it looks.
+      /// </summary>
+      private void ReportUnverifiableCheck(DnsTxtLookup.LookupResult found)
+      {
+         rotCheckPassed_ = false;
+
+         switch (found.Status)
+         {
+            case DnsTxtLookup.LookupStatus.Found:
+               SetRotationStatus("A TXT record exists, but the staged private key file (" + rotStagedKeyFile_ + ") " +
+                  "could not be read from this machine, so the record cannot be compared against the key. Run this " +
+                  "check on the server itself, or cancel the rotation and start it again from here.",
+                  ThemeTokens.Warning);
+               break;
+
+            case DnsTxtLookup.LookupStatus.NoRecord:
+               SetRotationStatus(RotationNotFoundText, ThemeTokens.Warning);
+               break;
+
+            default:
+               SetRotationStatus(RotationLookupFailedText(found.Error), ThemeTokens.Danger);
+               break;
+         }
+      }
+
+      private void PromoteRotation()
+      {
+         string oldSelector = dkimSelector_.Text.Trim();
+         string oldHost = oldSelector.Length > 0 ? oldSelector + "._domainkey." + domainName_ : "(none)";
+
+         if (MessageBox.Show(
+             "Promote the staged selector \"" + rotStagedSelector_ + "\"?\n\n" +
+             "From the next message on, mail from " + domainName_ + " is signed with the new key, and the old " +
+             "selector is cleared from the configuration.\n\n" +
+             "Leave the OLD DNS record (" + oldHost + ") published for at least a few days. Mail signed with the old " +
+             "key may still be in transit, and receivers can only verify it for as long as that record exists.",
+             "Control Panel", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            return;
+
+         dynamic domains = ServerSession.Current.Application.Domains;
+         try
+         {
+            dynamic d = domains.ItemByName[domainName_];
+
+            // The server refuses to promote a half-staged pair, and refuses when
+            // the staged key file is missing from its disk - either would leave
+            // the domain unable to sign. Its explanation reaches the administrator
+            // verbatim through the catch below instead of being swallowed.
+            d.DKIMPromoteSecondary();
+            d.Save();
+
+            string newSelector = (string) d.DKIMSelector ?? "";
+            string newKeyFile = (string) d.DKIMPrivateKeyFile ?? "";
+            ServerSession.Release(d);
+
+            // Mirror the promoted values into the primary fields: they now hold
+            // stale text, and a later Save of this dialog would otherwise write
+            // the old selector back and silently undo the promote.
+            dkimSelector_.Text = newSelector;
+            dkimKeyFile_.Text = newKeyFile;
+
+            rotStagedSelector_ = "";
+            rotStagedKeyFile_ = "";
+            rotExpectedTxt_ = null;
+            rotCheckPassed_ = false;
+            UpdateRotationUi();
+
+            MessageBox.Show("The rotation is complete: mail is now signed with selector \"" + newSelector + "\".\n\n" +
+               "Keep the old DNS record (" + oldHost + ") for a few more days while mail signed with the old key is " +
+               "still in transit, then remove it.", "Control Panel");
+         }
+         catch (Exception ex)
+         {
+            MessageBox.Show("Could not promote the staged key: " + ServerSession.DescribeComError(ex), "Control Panel");
+         }
+         finally
+         {
+            ServerSession.Release(domains);
+         }
+      }
+
+      private void CancelRotation()
+      {
+         if (MessageBox.Show(
+             "Cancel this rotation?\n\nThe staged selector \"" + rotStagedSelector_ + "\" is removed from the server " +
+             "configuration; signing continues with the current key, untouched. The generated key file stays on disk, " +
+             "and the DNS record for the staged selector - if you already published it - can simply be deleted.",
+             "Control Panel", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            return;
+
+         dynamic domains = ServerSession.Current.Application.Domains;
+         try
+         {
+            dynamic d = domains.ItemByName[domainName_];
+            d.DKIMSecondarySelector = "";
+            d.DKIMSecondaryPrivateKeyFile = "";
+            d.Save();
+            ServerSession.Release(d);
+         }
+         catch (Exception ex)
+         {
+            MessageBox.Show("Could not cancel the rotation: " + ServerSession.DescribeComError(ex), "Control Panel");
+            return;
+         }
+         finally
+         {
+            ServerSession.Release(domains);
+         }
+
+         rotStagedSelector_ = "";
+         rotStagedKeyFile_ = "";
+         rotExpectedTxt_ = null;
+         rotCheckPassed_ = false;
+         UpdateRotationUi();
+      }
+
+      /// <summary>
+      /// Puts the rotation section into the right step when the dialog opens and
+      /// a rotation is already staged on the server - staged pairs outlive the
+      /// dialog by design, because DNS propagation is waited out between
+      /// sessions. A check that passed in an earlier session deliberately does
+      /// not count: DNS can change while the dialog is closed, so Promote only
+      /// unlocks after a fresh check in this session.
+      /// </summary>
+      private void RestoreStagedRotation(string selector, string keyFile)
+      {
+         rotStagedSelector_ = selector;
+         rotStagedKeyFile_ = keyFile;
+         rotCheckPassed_ = false;
+         rotExpectedTxt_ = null;
+
+         if (selector.Length == 0 && keyFile.Length == 0)
+         {
+            UpdateRotationUi();
+            return;
+         }
+
+         if (keyFile.Length > 0)
+            rotExpectedTxt_ = DeriveDnsTxtValue(keyFile);
+
+         UpdateRotationUi();
+
+         if (selector.Length == 0 || keyFile.Length == 0)
+            SetRotationStatus("The staged rotation is incomplete (the selector or the key file is missing), so the " +
+               "server will refuse to promote it. Cancel the rotation and start again.", ThemeTokens.Danger);
+         else
+            SetRotationStatus("A rotation is already staged. If the DNS record is published, press \"Check DNS\"; " +
+               "promoting unlocks once the check passes in this session.", ThemeTokens.Info);
+      }
+
+      /// <summary>
+      /// Rebuilds the DNS TXT value from the staged private key's PEM file, so a
+      /// rotation staged in an earlier session can still show its record and have
+      /// "Check DNS" compare against it. Returns null when the file cannot be
+      /// read from this machine (for example when administering a remote server,
+      /// where the path is on the server's disk); the check then reports that it
+      /// cannot verify a match, and Promote stays locked.
+      /// </summary>
+      private static string DeriveDnsTxtValue(string keyFile)
+      {
+         try
+         {
+            string pem = System.IO.File.ReadAllText(keyFile);
+            using var rsa = System.Security.Cryptography.RSA.Create();
+            rsa.ImportFromPem(pem);
+            // The same record format DkimKeyGenerator emits when a key is first made.
+            return "v=DKIM1; k=rsa; p=" + Convert.ToBase64String(rsa.ExportSubjectPublicKeyInfo());
+         }
+         catch (Exception)
+         {
+            return null;
+         }
+      }
+
+      private void UpdateRotationUi()
+      {
+         string current = dkimSelector_.Text.Trim();
+         string currentFile = dkimKeyFile_.Text.Trim();
+         rotCurrent_.Text = current.Length > 0
+            ? "1. Currently signing with selector \"" + current + "\"" +
+              (currentFile.Length > 0 ? " (key file: " + currentFile + ")." : ".")
+            : "1. No signing selector is configured yet.";
+
+         bool staged = rotStagedSelector_.Length > 0 || rotStagedKeyFile_.Length > 0;
+         rotStartPanel_.Visibility = staged ? Visibility.Collapsed : Visibility.Visible;
+         rotStagedPanel_.Visibility = staged ? Visibility.Visible : Visibility.Collapsed;
+
+         if (!staged)
+         {
+            rotPromote_.IsEnabled = false;
+
+            // A dated selector name never collides with the old one and makes it
+            // obvious in DNS which key is the newer.
+            if (rotSelector_.Text.Trim().Length == 0)
+            {
+               string suggestion = "s" + DateTime.Now.ToString("yyyyMMdd");
+               if (!string.Equals(suggestion, current, StringComparison.OrdinalIgnoreCase))
+                  rotSelector_.Text = suggestion;
+            }
+            return;
+         }
+
+         rotStagedInfo_.Text = "2. A rotation is staged: selector \"" + rotStagedSelector_ + "\", key file " +
+            rotStagedKeyFile_ + ".";
+         rotDnsHost_.Text = rotStagedSelector_.Length > 0
+            ? rotStagedSelector_ + "._domainkey." + domainName_
+            : "(the staged pair has no selector)";
+         rotDnsValue_.Text = rotExpectedTxt_ ?? "(The staged private key file could not be read from this machine, " +
+            "so the record value cannot be shown here. It was shown when the rotation was started; if it is lost, " +
+            "cancel the rotation and start again.)";
+         rotPromote_.IsEnabled = rotCheckPassed_;
+      }
+
+      private void SetRotationStatus(string text, System.Windows.Media.Brush brush)
+      {
+         rotStatus_.Text = text;
+         rotStatus_.Foreground = brush;
+      }
+
+      private static string DescribeFoundRecords(System.Collections.Generic.List<string> records)
+      {
+         if (records == null || records.Count == 0)
+            return "";
+
+         string first = records[0];
+         if (first.Length > 120)
+            first = first.Substring(0, 120) + "…";
+         return Environment.NewLine + "Found: " + first;
+      }
+
+      private static void CopyToClipboard(string text)
+      {
+         try { if (!string.IsNullOrEmpty(text)) Clipboard.SetText(text); } catch (Exception) { }
       }
 
       private void Load()
@@ -377,6 +928,19 @@ namespace hMailServer.ControlPanel.Views
             SelectCombo(dkimHeaderCanon_, (int) d.DKIMHeaderCanonicalizationMethod);
             SelectCombo(dkimBodyCanon_, (int) d.DKIMBodyCanonicalizationMethod);
             SelectCombo(dkimAlgorithm_, (int) d.DKIMSigningAlgorithm);
+
+            // The staged rotation pair, if an earlier session left one behind.
+            // Read defensively: against an older server that predates the
+            // rotation API these properties do not exist, and the rest of the
+            // dialog must keep working without them.
+            string stagedSelector = "", stagedKeyFile = "";
+            try
+            {
+               stagedSelector = ((string) d.DKIMSecondarySelector ?? "").Trim();
+               stagedKeyFile = ((string) d.DKIMSecondaryPrivateKeyFile ?? "").Trim();
+            }
+            catch (Exception) { }
+            RestoreStagedRotation(stagedSelector, stagedKeyFile);
 
             ServerSession.Release(d);
          }
@@ -471,6 +1035,21 @@ namespace hMailServer.ControlPanel.Views
       };
 
       private static TextBox NewInput() => new Wpf.Ui.Controls.TextBox();
+
+      /// <summary>A selectable, read-only box in the style of the DKIM DNS-record
+      /// display above: values the user must copy exactly (host names, TXT
+      /// values) live in these rather than in labels, so they can be selected.</summary>
+      private static TextBox ReadOnlyBox(double minHeight) => new()
+      {
+         IsReadOnly = true,
+         AcceptsReturn = true,
+         TextWrapping = TextWrapping.Wrap,
+         FontSize = 12,
+         MinHeight = minHeight,
+         Padding = new Thickness(6),
+         Margin = new Thickness(0, 0, 0, 4),
+         Background = System.Windows.Media.Brushes.Transparent
+      };
 
       private static TextBox NewMemo() => new()
       {

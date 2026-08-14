@@ -38,7 +38,7 @@ as ⬜, not ✅.
 
 ### Contents and totals
 
-782 items. The counts are the point of this table — they say where the fork is
+785 items. The counts are the point of this table — they say where the fork is
 strong and where it is thin far more honestly than any prose summary.
 
 | Section | ✅ | 🔄 | ⬜ | ⏸️ |
@@ -62,7 +62,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Anti-spam, anti-virus and content control](#anti-spam-anti-virus-and-content-control) | 54 | – | 13 | – |
 | [Storage, accounts and data model](#storage-accounts-and-data-model) | 86 | – | 10 | – |
 | [Routing, queue and delivery](#routing-queue-and-delivery) | 19 | – | 4 | 1 |
-| [Administration, API and Control Panel](#administration-api-and-control-panel) | 52 | – | 9 | – |
+| [Administration, API and Control Panel](#administration-api-and-control-panel) | 55 | – | 9 | – |
 | [Observability and diagnostics](#observability-and-diagnostics) | 32 | – | 7 | 1 |
 | [Extensibility and scripting](#extensibility-and-scripting) | 37 | – | 3 | – |
 | [Build, testing and supply chain](#build-testing-and-supply-chain) | 7 | – | 0 | – |
@@ -72,7 +72,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 2 | – | 4 | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 5 | 1 | 2 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 4 | 1 | 4 | – |
-| **Total** | **600** | **12** | **156** | **14** |
+| **Total** | **603** | **12** | **156** | **14** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage and the administration surface are the best-covered areas**, and the
@@ -805,10 +805,13 @@ the source, not from documentation.
 
 ### Administration, API and Control Panel
 
-52 shipped · 0 underway · 9 not started · 0 deferred
+55 shipped · 0 underway · 9 not started · 0 deferred
 
 | | Capability | Detail |
 |:-:|---|---|
+| ✅ | Guided DKIM key rotation in the Control Panel | Rotation was COM-only and is the operation most easily got wrong, because promoting before the new selector has propagated signs mail with a key the world cannot look up. The domain dialog now walks it: stage a new selector, generate the key, copy the exact DNS host and TXT value separately, check whether the record is actually published, and promote - with Promote disabled until that check passes in this session, and a prior session's pass deliberately not counting. The check distinguishes three outcomes that need three different responses: not published yet (propagation takes minutes to hours), published but not matching (waiting will not fix it), and the lookup itself failing (which says nothing about the record). It bypasses the resolver cache, or an administrator who has just published would be told it is missing for as long as the negative cache lasts. |
+| ✅ | "What still needs doing outside hMailServer" | A checklist of every prerequisite the server cannot satisfy for itself - DNS records, CA bundles, trusted-sealer lists, key passphrases, reachability - each with a live status where one can be determined rather than a description. Eleven items, several found only while verifying the others: ARC sealing silently produces nothing with no domain DKIM key, OAuth2 with RS256 allowed and no public key file fails every token, and client autoconfiguration ships enabled with both web ports at zero. Statuses are Done / Not needed / Action needed / Cannot tell, and "cannot tell" is used honestly rather than guessed - a page whose purpose is to say what is really configured must not overclaim. |
+| ✅ | Per-port client certificates and ARC filtering in the Control Panel | Both shipped COM-only and were unreachable from the admin UI. Inbound mutual TLS is now a port setting with the three refused combinations shown as inline validation before Save rather than as a COM error after it - including that Require on a STARTTLS-optional port is a lock on an open door. ARC inbound filtering needed COM accessors first (`AntiSpam.ArcFilteringEnabled` / `ArcTrustedSealers`), because an editor that can write but not read back would misreport its own state on load, which is the exact defect this fork keeps finding. |
 | ⬜ | **The 126 `[Settings]` INI values move into the database** | Costed 14 August 2026. Of 149 INI reads, **126 are in `[Settings]` and should move**; 12 `[Database]`, 6 `[Directories]` and `AdministratorPassword` **cannot** — you need them to reach the database, `LogFolder` is where the "the database is down" message goes, and an administrator password held in the database locks you out of the tool you would use to diagnose a database outage. The two fault-injection switches stay INI-only deliberately. **The reason is not tidiness.** An INI setting is invisible to remote administration: `IniFeatureStore` reads a file that only exists on the server, which is why the Control Panel's own log-folder card has to say "not readable from this machine", and none of the 126 appear in `hmconfig.ps1`'s config-as-code. They are also **absent from every backup** (see the backup row above). One change closes all three. **Design.** `LoadSettings()` stays INI-only so the bootstrap still works, and is called a second time after `OpenDatabase`; `ReadIniSettingString_/Integer_` prefer a database overlay **only for the `[Settings]` section**, so the keys needed to reach the database can never be overridden from it — which is the security answer as well as the ordering one. No per-setting registry is needed because the existing loader is simply re-run. **A new table rather than widening `hm_settings`:** `settingname` is `nvarchar(30)`, five current names are 31–40 characters (`GreylistingEnabledDuringRecordExpiration` is 40), and the column is uniquely indexed on all four backends — so widening means dropping and recreating a unique constraint on **SQL CE, which commits DDL as it executes and cannot roll back**. `CREATE TABLE` is safe everywhere and needs no index surgery; the cost is that the backup wiring becomes ~20 explicit lines instead of free, which is the better trade. **Upgrade path**, which is the part that matters for existing installations: on first start, any `[Settings]` key present in the INI with no row in the database is copied in — idempotent, driven by "is there a row" rather than a version flag, so it is safe to interrupt and safe to re-run. Nothing is deleted from the INI, because deleting an operator's configuration during an upgrade is how people stop trusting upgrades. But a stale INI key that differs from the stored value is **reported by name on every start** — without that, somebody edits the INI, nothing happens, and there is no way to find out why, which is precisely the silent-ignore failure the August sweeps spent three passes removing. |
 | ✅ | ACME http-01 challenge serving (/.well-known/acme-challenge/) | Serves key authorizations from the in-process AcmeChallengeStore; rejects tokens containing a slash or longer than 256 characters. Always enabled on the web-services listener (not gated behind a setting). |
 | ✅ | Admin helper services | Active Directory account picker, DKIM RSA key-pair generator producing PEM + the DNS TXT p= value, password generator and strength meter, protected-secret storage, message-store consistency report parser. |

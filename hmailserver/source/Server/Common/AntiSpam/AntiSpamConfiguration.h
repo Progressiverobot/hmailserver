@@ -110,6 +110,12 @@ namespace HM
       int GetDMARCFailureScore();
       void SetDMARCFailureScore(int newValue);
 
+      bool GetArcFilteringEnabled();
+      void SetArcFilteringEnabled(bool newValue);
+
+      String GetArcTrustedSealers();
+      void SetArcTrustedSealers(const String &newValue);
+
       bool GetBypassGreyListingOnSPFSuccess();
       void SetBypassGreyListingOnSPFSuccess(bool newValue);
 

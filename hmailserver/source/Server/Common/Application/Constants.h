@@ -109,6 +109,14 @@
 #define PROPERTY_AS_DMARC_ENABLE                _T("ASDMARCEnabled")
 #define PROPERTY_AS_DMARC_FAILURE_SCORE         _T("ASDMARCFailureScore")
 
+// ARC inbound filtering (RFC 8617). Seeded as hm_settings rows at schema 6010.
+// The trusted-sealer list is not an option of the feature, it IS the feature: a
+// fabricated chain sealed with the attacker's own key validates perfectly, so a
+// passing chain proves nothing unless the sealer is already trusted. With the list
+// empty the test does nothing at all.
+#define PROPERTY_AS_ARC_FILTERING_ENABLED       _T("ASArcFilteringEnabled")
+#define PROPERTY_AS_ARC_TRUSTED_SEALERS         _T("ASArcTrustedSealers")
+
 #define PROPERTY_AUTOBAN_ENABLED                _T("AutoBanOnLogonFailureEnabled")
 #define PROPERTY_MAX_INVALID_LOGON_ATTEMPTS     _T("MaxInvalidLogonAttempts")
 #define PROPERTY_LOGON_ATTEMPTS_WITHIN          _T("LogonAttemptsWithinMinutes")

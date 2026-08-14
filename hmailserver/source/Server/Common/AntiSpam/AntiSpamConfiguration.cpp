@@ -459,6 +459,30 @@ namespace HM
       GetSettings_()->SetLong(PROPERTY_AS_DMARC_FAILURE_SCORE, newValue);
    }
 
+   bool
+   AntiSpamConfiguration::GetArcFilteringEnabled()
+   {
+      return GetSettings_()->GetBool(PROPERTY_AS_ARC_FILTERING_ENABLED);
+   }
+
+   void
+   AntiSpamConfiguration::SetArcFilteringEnabled(bool newValue)
+   {
+      GetSettings_()->SetBool(PROPERTY_AS_ARC_FILTERING_ENABLED, newValue);
+   }
+
+   String
+   AntiSpamConfiguration::GetArcTrustedSealers()
+   {
+      return GetSettings_()->GetString(PROPERTY_AS_ARC_TRUSTED_SEALERS);
+   }
+
+   void
+   AntiSpamConfiguration::SetArcTrustedSealers(const String &newValue)
+   {
+      GetSettings_()->SetString(PROPERTY_AS_ARC_TRUSTED_SEALERS, newValue);
+   }
+
    bool 
    AntiSpamConfiguration::GetBypassGreyListingOnSPFSuccess()
    {

@@ -1,13 +1,56 @@
 <UserControl
     x:Class="hMailServer.ControlPanel.Views.DashboardView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
 
     <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="26,20">
         <StackPanel>
             <TextBlock Text="Dashboard" Style="{StaticResource PageTitle}" />
             <TextBlock x:Name="SubtitleText" Text="Live server statistics, refreshed every 2 seconds."
                        Style="{StaticResource PageSubtitle}" />
+
+            <!-- "Needs attention" summary. The dashboard is the page an
+                 administrator lands on, so the one question the External setup
+                 page can answer - "is this server actually set up, and if not
+                 what next?" - is answered here too, or it is only answered for
+                 people who already knew where to look. The checks themselves are
+                 ExternalSetupChecks, the same code that page runs, so the two can
+                 never disagree. State is shown as colour + shape + word (the
+                 application-wide status vocabulary), never colour alone, and each
+                 item that needs action is one click from the page that fixes it.
+                 The check starts after first paint and its DNS half runs off the
+                 UI thread, so this card never delays the dashboard. -->
+            <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Path x:Name="AttentionMark" Width="11" Height="11" Stretch="Fill"
+                              Margin="0,4,8,0" VerticalAlignment="Top" Visibility="Collapsed" />
+                        <TextBlock x:Name="AttentionStateWord" Grid.Column="1" FontSize="12.5"
+                                   FontWeight="SemiBold" Margin="0,0,12,0" VerticalAlignment="Top"
+                                   Visibility="Collapsed" />
+                        <TextBlock x:Name="AttentionSummary" Grid.Column="2" FontSize="13"
+                                   FontWeight="SemiBold" TextWrapping="Wrap"
+                                   Text="Checking what this server still needs done outside it…" />
+                        <ui:Button x:Name="OpenExternalSetupButton" Grid.Column="3" Content="External setup…"
+                                   Appearance="Transparent" FontSize="12" Padding="8,3,8,3"
+                                   VerticalAlignment="Top" Cursor="Hand" Click="OpenExternalSetup_Click"
+                                   ToolTip="Open External setup, the full checklist of what this server needs done outside it"
+                                   AutomationProperties.Name="Open External setup, the full checklist of what this server needs done outside it"
+                                   AutomationProperties.AutomationId="dashboard-open-external-setup" />
+                    </Grid>
+                    <StackPanel x:Name="AttentionItems" Margin="19,2,0,0" />
+                    <TextBlock x:Name="AttentionNote" FontSize="12" TextWrapping="Wrap" Margin="19,6,0,0"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               Visibility="Collapsed" />
+                </StackPanel>
+            </Border>
 
             <!-- KPI row: fixed-height cards, value top-aligned, label bottom-anchored.
                  The accessible name of each value is set in code to "label, value"

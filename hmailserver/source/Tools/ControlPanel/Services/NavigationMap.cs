@@ -363,6 +363,24 @@ namespace hMailServer.ControlPanel.Services
                   aliases: "MX-query|MX lookup|DNS lookup|nslookup|Mail exchanger|Where does mail go",
                   seeAlso: "routes|dns|diagnostics"),
 
+               // Several shipped features are inert until something is done where
+               // the server has no reach - a DNS zone, a CA, an identity provider.
+               // This page is the one place that says which of those are still
+               // outstanding, so it lives with the other "is it actually working"
+               // pages rather than beside any one feature's settings.
+               Page("externalsetup", "External setup",
+                  "Everything this server needs done outside it - DNS records, key and CA files, trusted lists - and the state of each one.",
+                  aliases: "External prerequisites|Prerequisites|Setup checklist|Checklist|Outside the server|What still needs doing|Publish a DNS record|TXT record|Inert features|Action needed",
+                  seeAlso: "security|diagnostics|domains"),
+
+               // Sits beside External setup on purpose: that page says WHICH
+               // external steps are outstanding, this one produces the exact
+               // DNS records those steps need and checks each one.
+               Page("dnsrecords", "DNS records",
+                  "The exact SPF, DKIM, DMARC, MTA-STS and TLS-RPT records each domain should publish, with a check for whether each one is live.",
+                  aliases: "SPF record|DKIM record|DMARC record|MTA-STS record|TLS-RPT record|TXT records|Reverse DNS|PTR record|What DNS records do I need|Publish DNS records|DNS checklist|Sender authentication",
+                  seeAlso: "externalsetup|domains|security"),
+
                Page("logging", "Logging",
                   "Which log files the server writes, how much detail they carry, and how long they are kept.",
                   aliases: "Log level|Log files|Log folder|Retention|Delete old logs|Verbosity|Debug logging",

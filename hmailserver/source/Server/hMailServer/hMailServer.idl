@@ -2286,6 +2286,11 @@ interface IInterfaceAntiSpam : IDispatch
    [propput, id(39), helpstring("Enable DMARC policy verification.")] HRESULT DMARCEnabled([in] VARIANT_BOOL newVal);
    [propget, id(40), helpstring("DMARC policy failure score.")] HRESULT DMARCFailureScore([out, retval] long  *pVal);
    [propput, id(40), helpstring("DMARC policy failure score.")] HRESULT DMARCFailureScore([in] long newVal);
+
+   [propget, id(41), helpstring("Use a validated ARC chain from a trusted sealer to offset a DMARC failure caused by forwarding (RFC 8617). Does nothing while ArcTrustedSealers is empty.")] HRESULT ArcFilteringEnabled([out, retval] VARIANT_BOOL  *pVal);
+   [propput, id(41), helpstring("Use a validated ARC chain from a trusted sealer to offset a DMARC failure caused by forwarding (RFC 8617). Does nothing while ArcTrustedSealers is empty.")] HRESULT ArcFilteringEnabled([in] VARIANT_BOOL newVal);
+   [propget, id(42), helpstring("Domains whose ARC seals are honoured, separated by comma, semicolon or whitespace. Anyone can seal a chain with their own key, so a chain is only meaningful from a sealer you already trust.")] HRESULT ArcTrustedSealers([out, retval] BSTR  *pVal);
+   [propput, id(42), helpstring("Domains whose ARC seals are honoured, separated by comma, semicolon or whitespace. Anyone can seal a chain with their own key, so a chain is only meaningful from a sealer you already trust.")] HRESULT ArcTrustedSealers([in] BSTR newVal);
 };
 
 

@@ -32,18 +32,6 @@ namespace HM
 {
    namespace
    {
-      // The names of the two settings this test reads, following the AS*
-      // convention of the other scored anti-spam settings (compare
-      // ASDKIMVerificationEnabled). They are read straight off the
-      // PropertySet here because Constants.h, AntiSpamConfiguration, the COM
-      // interface and the hm_settings rows are owned by the settings work;
-      // when those land, these literals should move to Constants.h and the
-      // reads below should become AntiSpamConfiguration accessors. Until the
-      // rows exist, both reads return the documented defaults - disabled and
-      // empty - so the test does nothing.
-      const wchar_t *PropertyArcFilteringEnabled = L"ASArcFilteringEnabled";  // bool, default 0
-      const wchar_t *PropertyArcTrustedSealers = L"ASArcTrustedSealers";      // string, default ""
-
       // "example.org, example.net" / semicolons / whitespace - whatever an
       // administrator plausibly types - into lower-cased domain tokens.
       std::vector<AnsiString> ParseTrustedSealerList(const String &configuredList)
@@ -272,11 +260,9 @@ namespace HM
       if (!lowerHeader.StartsWith("arc-seal") && lowerHeader.Find("\narc-seal") < 0)
          return setSpamTestResults;
 
-      std::shared_ptr<PropertySet> pSettings = Configuration::Instance()->GetSettings();
-      if (!pSettings)
-         return setSpamTestResults;
+      AntiSpamConfiguration &arcConfig = Configuration::Instance()->GetAntiSpamConfiguration();
 
-      if (!pSettings->GetBool(PropertyArcFilteringEnabled))
+      if (!arcConfig.GetArcFilteringEnabled())
          return setSpamTestResults;
 
       // ARC IS ONLY WORTH ANYTHING FROM A SENDER YOU TRUST. An attacker can
@@ -285,7 +271,7 @@ namespace HM
       // as many words that a passing chain conveys no trust by itself. The
       // trusted-sealer list is therefore not an option of this feature; it IS
       // the feature. Without it this test MUST do nothing, and does.
-      std::vector<AnsiString> trustedSealers = ParseTrustedSealerList(pSettings->GetString(PropertyArcTrustedSealers));
+      std::vector<AnsiString> trustedSealers = ParseTrustedSealerList(arcConfig.GetArcTrustedSealers());
       if (trustedSealers.empty())
          return setSpamTestResults;
 

@@ -968,6 +968,27 @@ namespace hMailServer.ControlPanel.Views
          auth.Settings.Add(new ComText { Path = "AntiSpam.DKIMVerificationFailureScore", Label = "DKIM failure score", Numeric = true });
          auth.Settings.Add(new ComBool { Path = "AntiSpam.DMARCEnabled", Label = "Evaluate DMARC policies" });
          auth.Settings.Add(new ComText { Path = "AntiSpam.DMARCFailureScore", Label = "DMARC failure score", Numeric = true });
+         auth.Settings.Add(new ComBool
+         {
+            Path = "AntiSpam.ArcFilteringEnabled",
+            Label = "Use ARC results from trusted forwarders to offset a DMARC failure",
+            Blurb = "Forwarding breaks SPF, because the envelope sender changes, and often breaks DKIM, because the body " +
+                    "is modified - so a mailing list or a forwarded mailbox can turn a message that passed DMARC at the " +
+                    "sender into one that fails it here. A valid ARC chain (RFC 8617) from a forwarder you trust carries " +
+                    "the original result, and this cancels exactly the DMARC failure score, never more. It needs " +
+                    "'Evaluate DMARC policies' above to be on, since it only ever offsets a penalty that test adds."
+         });
+         auth.Settings.Add(new ComText
+         {
+            Path = "AntiSpam.ArcTrustedSealers",
+            Label = "Trusted ARC sealer domains",
+            Blurb = "Required. With this empty the setting above does nothing at all, and that is deliberate rather than " +
+                    "an oversight: anyone can fabricate a whole ARC chain and seal it with a key they publish in their " +
+                    "own DNS, and it will validate perfectly, so a passing chain proves nothing unless you already trust " +
+                    "the sealer. This list is not an option of the feature - it is the feature. Name the exact domains " +
+                    "whose seals you honour (the d= of their ARC-Seal), separated by commas, semicolons or spaces; " +
+                    "matching is exact, so a suffix of a trusted name is not trusted."
+         });
          Tab("Sender auth").Cards.Add(auth);
 
          var host = Card("Connecting host checks");
@@ -1133,7 +1154,18 @@ namespace hMailServer.ControlPanel.Views
          // 1.3 suites in a separate list that SSL_CTX_set_cipher_list does not touch, so
          // removing a cipher here and confirming it with a TLS 1.2 scan proved nothing
          // about the version most clients actually negotiate.
-         ciph.Settings.Add(new ComText { Path = "SslCipherList", Label = "Cipher list for TLS 1.2 and below (OpenSSL format)" });
+         ciph.Settings.Add(new ComText
+         {
+            Path = "SslCipherList",
+            Label = "Cipher list for TLS 1.2 and below (OpenSSL format)",
+            Blurb = "The single value AEAD-ONLY (case-insensitive) is a named preset rather than an OpenSSL cipher " +
+                    "string: forward-secret AEAD suites only (ECDHE or DHE with AES-GCM or ChaCha20-Poly1305), " +
+                    "excluding every CBC-mode suite - the Lucky13 padding-oracle family - and static-RSA key exchange. " +
+                    "The cost: TLS 1.2 clients that only speak CBC suites cannot connect, and TLS 1.0/1.1 are left with " +
+                    "no usable cipher at all, so do not enable those protocols alongside it. TLS 1.3 is unaffected - its " +
+                    "suites are AEAD by construction and are configured separately below. A misspelled preset name is " +
+                    "rejected and reported, not silently ignored."
+         });
          ciph.Settings.Add(new IniText
          {
             Path = "TlsCipherSuites13",

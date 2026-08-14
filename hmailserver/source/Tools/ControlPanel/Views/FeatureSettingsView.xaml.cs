@@ -436,6 +436,36 @@ namespace hMailServer.ControlPanel.Views
                });
                cards_.Add(new CardDef
                {
+                  // An information-only card, deliberately without editors. The two
+                  // values it describes live in the hm_settings database table (the
+                  // anti-spam PropertySet, seeded at database version 6010), which
+                  // nothing in this Control Panel can reach: IniFeatureStore reads
+                  // and writes only hMailServer.INI, and the COM AntiSpam interface
+                  // has no accessor for them, so the COM-path pattern the other
+                  // anti-spam settings use cannot reach them either. An editor here
+                  // that wrote INI keys of the same names would look configured and
+                  // change nothing - the exact defect this page's blurbs exist to
+                  // prevent - so until a real accessor exists, the card only tells
+                  // the truth about where the switch is and what it needs.
+                  Title = "ARC inbound filtering",
+                  // These two are database settings rather than ini values, so they are not
+                  // editable on this page - which is for hMailServer.INI. They ARE editable,
+                  // on the Anti-spam page, and this card points there. It used to say they
+                  // could not be edited at all, which stopped being true the moment the COM
+                  // properties landed; a card that describes a limitation the product no
+                  // longer has is the same defect as one that claims a feature it lacks.
+                  Blurb = "The counterpart to ARC sealing: on inbound mail, a valid ARC chain from a trusted sealer can " +
+                          "offset the DMARC failure score for a message whose DMARC pass was destroyed by forwarding " +
+                          "(RFC 8617). It is configured on the Anti-spam page, under sender authentication, because it " +
+                          "is stored with the other anti-spam settings rather than in hMailServer.INI. With the " +
+                          "trusted-sealer list empty the feature does nothing at all, by design: anyone can fabricate " +
+                          "an entire ARC chain and seal it with keys published in their own DNS, and it will validate " +
+                          "perfectly, so a passing chain proves nothing unless you already trust the sealer. The list " +
+                          "is not an option of the feature - it is the feature. The offset never exceeds the DMARC " +
+                          "failure score, and applies only while DMARC scoring is enabled on the Anti-spam page."
+               });
+               cards_.Add(new CardDef
+               {
                   Title = "DKIM signature timestamps",
                   Blurb = "When a DKIM signature was made, and when it stops being one a verifier should honour (RFC 6376 3.5).",
                   Settings =
@@ -716,6 +746,66 @@ namespace hMailServer.ControlPanel.Views
                      new TextSetting { Key = "POP3DMaxTimeout", Default = "600", Label = "POP3 server maximum timeout (s)" },
                      new TextSetting { Key = "POP3CMinTimeout", Default = "30", Label = "POP3 client minimum timeout (s)" },
                      new TextSetting { Key = "POP3CMaxTimeout", Default = "900", Label = "POP3 client maximum timeout (s)" }
+                  }
+               });
+               cards_.Add(new CardDef
+               {
+                  // Every claim below is from SslContextInitializer::SetSessionResumption_,
+                  // which follows the house rule that a default value makes no OpenSSL
+                  // call at all - so the card can honestly promise that the defaults
+                  // change nothing.
+                  Title = "TLS session resumption",
+                  Blurb = "Session caching and session tickets for every SSL/TLS and STARTTLS listener. At the defaults " +
+                          "these four settings make no OpenSSL call at all, so resumption keeps OpenSSL's stock " +
+                          "behaviour. TLS versions and cipher lists are on the SSL/TLS page.",
+                  Settings =
+                  {
+                     new BoolSetting
+                     {
+                        Key = "TlsSessionTicketsEnabled",
+                        Default = true,
+                        Label = "Issue TLS session tickets so clients can resume sessions",
+                        Blurb = "Turning this off stops session tickets on every TLS version: TLS 1.2 and older clients " +
+                                "fall back to the server-side session cache, which never leaves this process, and " +
+                                "TLS 1.3 clients are sent no ticket at all. For an administrator whose policy is that " +
+                                "nothing derived from a long-lived key ever goes on the wire. The only cost is " +
+                                "resumption efficiency - every client can still connect with a full handshake."
+                     },
+                     new TextSetting
+                     {
+                        Key = "TlsSessionCacheSize",
+                        Default = "0",
+                        Placeholder = "0",
+                        Label = "Server-side TLS session cache size (0 = OpenSSL's default cap of 20480)",
+                        Blurb = "Each cached session costs server memory, and a client that churns handshakes grows the " +
+                                "cache - this cap is the defence. A positive value replaces OpenSSL's default cap of " +
+                                "20480 sessions. A negative value turns the server-side cache off entirely, which stops " +
+                                "session-ID resumption but leaves tickets - which cost the server no memory - " +
+                                "unaffected. 0 leaves OpenSSL alone."
+                     },
+                     new TextSetting
+                     {
+                        Key = "TlsSessionTimeoutSeconds",
+                        Default = "0",
+                        Placeholder = "0",
+                        Label = "TLS resumption lifetime for cached sessions and tickets (seconds, 0 = OpenSSL's default of 300)",
+                        Blurb = "How long a session stays resumable, for cached sessions and tickets alike. It bounds how " +
+                                "long a leaked resumption secret stays useful: a ticket recorded off the wire, or a " +
+                                "session read out of a memory dump, stops working once it expires. 0 keeps OpenSSL's " +
+                                "own default of 300 seconds."
+                     },
+                     new TextSetting
+                     {
+                        Key = "TlsTicketKeyRotationSeconds",
+                        Default = "0",
+                        Placeholder = "86400",
+                        Label = "Rotate the session-ticket key every N seconds (0 = OpenSSL's single non-rotating key)",
+                        Blurb = "What rotation defends: OpenSSL's default ticket key is generated once, when the listener " +
+                                "starts, and is never rotated, so every ticket that listener issues for the life of the " +
+                                "process is sealed under the same key - and that key, recovered later, decrypts every " +
+                                "ticket ever recorded. With an interval set, a captured ticket is useless after at most " +
+                                "two intervals. Only meaningful while session tickets are enabled above."
+                     }
                   }
                });
                cards_.Add(new CardDef

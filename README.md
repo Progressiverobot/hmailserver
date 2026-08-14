@@ -80,7 +80,7 @@ Operations and observability
 ----------------------------
 
 * **Prometheus** `/metrics` (database pool, TLS handshakes, delivery queue, authentication outcomes, delivery outcomes, command and query latency) with Kubernetes-style `/livez`, `/readyz` and `/healthz` probes.
-* **OpenTelemetry** traces and metrics export, and message-to-session correlation IDs.
+* **OpenTelemetry** trace export (OTLP `/v1/traces`; traces only - there is no metrics or logs exporter, and `/metrics` is a separate Prometheus endpoint), and message-to-session correlation IDs.
 * Optional **JSON-structured logs**, log retention, per-service log files, and a slow-query log with every SQL string literal redacted.
 * Per-stage timing of message acceptance, so a slow scanner, DNS lookup or event script is identified by name in the log rather than appearing as an unexplained pause. Acceptance is also bounded: if it runs past its deadline the sender gets a temporary `451` and retries, instead of waiting for a reply that never comes. Every wait that can hold a pooled thread - scanners, DNS, event scripts, external processes, outbound sessions - has a ceiling, and the work queue reports which task is holding each thread when they are all busy. See [diagnosing slow or stalled mail](hmailserver/docs/DiagnosingStalledMail.md).
 * Backup and restore, a read-only **message-store consistency check** with a recovery report, configurable message-store fsync, graceful-shutdown drain, and a documented active/passive HA runbook.
@@ -97,7 +97,7 @@ Technology
 | MySQL/MariaDB client | MariaDB Connector/C, shipped as `libmysql.dll` with auth plugins — works with MySQL 8 `caching_sha2_password` and MariaDB `ed25519`/`gssapi` out of the box |
 | Administration GUI and tools | C# / .NET 10 (WPF, Fluent design) |
 | Extensibility | COM/IDispatch API, plus a REST administration API |
-| Schema | Database version 6008, upgradeable from every earlier hMailServer release |
+| Schema | Database version 6010, upgradeable from every earlier hMailServer release |
 
 **Quality gates.** Every release ships SPDX and CycloneDX SBOMs (Syft). The repository runs CodeQL analysis, Dependabot CVE alerts with grouped update pull requests, a dependency-review gate on pull requests, an installer smoke test that installs the built installer on a clean machine and verifies the service comes up, and a monthly comparison against the original upstream repository so nothing landing there is missed.
 

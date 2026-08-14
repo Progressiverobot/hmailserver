@@ -149,6 +149,11 @@ public:
    STDMETHOD(get_DMARCEnabled)(/*[out, retval]*/ VARIANT_BOOL *pVal);
    STDMETHOD(put_DMARCEnabled)(/*[in]*/ VARIANT_BOOL newVal);
 
+   STDMETHOD(get_ArcFilteringEnabled)(/*[out, retval]*/ VARIANT_BOOL *pVal);
+   STDMETHOD(put_ArcFilteringEnabled)(/*[in]*/ VARIANT_BOOL newVal);
+   STDMETHOD(get_ArcTrustedSealers)(/*[out, retval]*/ BSTR *pVal);
+   STDMETHOD(put_ArcTrustedSealers)(/*[in]*/ BSTR newVal);
+
    STDMETHOD(get_DMARCFailureScore)(/*[out, retval]*/ long *pVal);
    STDMETHOD(put_DMARCFailureScore)(/*[in]*/ long newVal);
 
