@@ -1420,7 +1420,21 @@ namespace HM
       // HandleSMTPFinalizationTaskCompleted_ neither posts to nor waits on another task
       // on this queue, and nothing anywhere waits on this task's GetIsStartedEvent() -
       // the only references to finalizationTask are its construction and this call.
-      Application::Instance()->GetAsyncWorkQueue()->AddTask(finalizationTask, WorkQueue::TaskMayBlock);
+      //
+      // Checked, because the queue genuinely can be absent: it exists only while the
+      // servers are running, and this runs on a session. Unchecked, "the servers
+      // stopped between end-of-data and here" was a null dereference in the accept
+      // path. The message is spooled but not accepted, so the honest answer is a
+      // temporary failure that leaves the sender holding it.
+      std::shared_ptr<WorkQueue> asyncQueue = Application::Instance()->GetAsyncWorkQueue();
+
+      if (!asyncQueue)
+      {
+         SendResponse_(451, _T("4.3.2"), _T("The server is shutting down and cannot accept the message. Please retry later."));
+         return;
+      }
+
+      asyncQueue->AddTask(finalizationTask, WorkQueue::TaskMayBlock);
    }
 
    void
@@ -2841,8 +2855,17 @@ namespace HM
              Formatter::Format("SMTP-accept session={0} ip={1}", GetSessionID(), GetIPAddressString())));
 
       // TaskMayBlock - the BDAT path into the same handler. See the equivalent above for
-      // why, and for the two caller constraints that were checked first.
-      Application::Instance()->GetAsyncWorkQueue()->AddTask(finalizationTask, WorkQueue::TaskMayBlock);
+      // why, for the two caller constraints that were checked first, and for why the
+      // queue is checked for rather than assumed.
+      std::shared_ptr<WorkQueue> asyncQueue = Application::Instance()->GetAsyncWorkQueue();
+
+      if (!asyncQueue)
+      {
+         SendResponse_(451, _T("4.3.2"), _T("The server is shutting down and cannot accept the message. Please retry later."));
+         return;
+      }
+
+      asyncQueue->AddTask(finalizationTask, WorkQueue::TaskMayBlock);
    }
 
    bool

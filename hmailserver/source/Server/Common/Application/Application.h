@@ -91,6 +91,13 @@ namespace HM
       void RegisterSessionTypes_();
       void CreateScheduledTasks_();
 
+      // The two queues whose tasks hold a live TCPConnection, and therefore a
+      // socket that belongs to io_service_'s io_context. Created and removed with
+      // the servers rather than with the process, so that their lifetime nests
+      // inside the io_context's instead of straddling it - see the definitions.
+      void CreateSessionWorkQueues_();
+      void RemoveSessionWorkQueues_();
+
       String version_;
       String start_time_;
       

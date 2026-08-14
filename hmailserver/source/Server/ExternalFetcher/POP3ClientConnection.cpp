@@ -1059,7 +1059,24 @@ namespace HM
          std::shared_ptr<AsynchronousTask<TCPConnection> >(new AsynchronousTask<TCPConnection>
          (std::bind(&POP3ClientConnection::HandlePOP3FinalizationTaskCompleted_, this), shared_from_this()));
 
-      Application::Instance()->GetAsyncWorkQueue()->AddTask(finalizationTask);
+      // Checked rather than assumed: the async queue exists only while the servers
+      // are running, and an external fetch that is mid-download when they stop
+      // reaches here with nothing to post to. Unchecked, that was a null dereference.
+      // Nothing is lost by giving up - the message has not been saved and DELE has
+      // not been sent, so it is still on the remote server and the next fetch cycle
+      // collects it.
+      std::shared_ptr<WorkQueue> asyncQueue = Application::Instance()->GetAsyncWorkQueue();
+
+      if (!asyncQueue)
+      {
+         LOG_APPLICATION(Formatter::Format("External account {0}: the message being downloaded was abandoned because the server is shutting down. It has been left on the remote server and will be fetched again.",
+                                           account_ ? account_->GetName() : String(_T("<unknown>"))));
+
+         EnqueueDisconnect();
+         return;
+      }
+
+      asyncQueue->AddTask(finalizationTask);
    }
 
    void

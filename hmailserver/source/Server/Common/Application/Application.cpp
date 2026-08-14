@@ -157,28 +157,9 @@ namespace HM
 
       LOG_DEBUG("Application::InitInstance - Configuration loaded.");
 
-      // Start an asynch workqueue which processes asynchronous tasks from clients.
-      WorkQueueManager::Instance()->CreateWorkQueue(Configuration::Instance()->GetAsynchronousThreads(),
-                                                    asynchronous_tasks_queue_);
-
-      // Separate queue for blocking name lookups made on behalf of a live
-      // session. These can stall for seconds on an address whose reverse zone
-      // is unreachable, so they are kept off the asynchronous task queue that
-      // finalizes (and acknowledges) received messages. Saturating this queue
-      // only delays the lookups themselves, which degrade to "Unknown".
-      WorkQueueManager::Instance()->CreateWorkQueue(Configuration::Instance()->GetAsynchronousThreads(),
-                                                    name_lookup_queue_);
-
-      // Both of these run tasks that are expected to finish, so "every thread busy
-      // for longer than the threshold" means something is wedged and is worth an
-      // error. The maintenance, main server and IOCP queues are deliberately not
-      // opted in - see WorkQueue::SetMonitorForStalls for why that would report the
-      // healthy state of a stock installation once a minute.
-      if (std::shared_ptr<WorkQueue> queue = WorkQueueManager::Instance()->GetQueue(asynchronous_tasks_queue_))
-         queue->SetMonitorForStalls(true);
-
-      if (std::shared_ptr<WorkQueue> queue = WorkQueueManager::Instance()->GetQueue(name_lookup_queue_))
-         queue->SetMonitorForStalls(true);
+      // The asynchronous task and name lookup queues are deliberately NOT created
+      // here. Their tasks hold live client connections, so they belong to the
+      // servers, not to the process - see CreateSessionWorkQueues_.
 
       return true;
    }
@@ -283,9 +264,11 @@ namespace HM
       // Close work queue
       WorkQueueManager::Instance()->RemoveQueue(maintenance_queue_);
 
-      WorkQueueManager::Instance()->RemoveQueue(asynchronous_tasks_queue_);
-
-      WorkQueueManager::Instance()->RemoveQueue(name_lookup_queue_);
+      // Normally already gone: StopServers removes these while io_service_ is still
+      // alive, which is the only ordering that is safe. Kept here as a backstop for
+      // the one path that skips it - a StartServers that failed before the state
+      // reached Running, after which StopServers returns at its own first check.
+      RemoveSessionWorkQueues_();
 
       // Backup manager is created by initinstance so should be destroyed here.
       if (backup_manager_) 
@@ -354,6 +337,78 @@ namespace HM
       return sPath;
    }
 
+   void
+   Application::CreateSessionWorkQueues_()
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // Creates the two work queues whose tasks hold a live TCPConnection.
+   //
+   // WHY THEY LIVE HERE AND NOT IN InitInstance. A task on either of these queues
+   // keeps its session alive through a shared_ptr, and that session owns a socket
+   // built on io_service_'s io_context. These queues were created in InitInstance
+   // and removed in ExitInstance, while io_service_ is created in StartServers and
+   // destroyed in StopServers - so the queues STRADDLED the io_context rather than
+   // nesting inside it, and the last reference to a connection could be dropped
+   // after the io_context it belonged to had been destroyed. The socket destructor
+   // then writes through the destroyed context.
+   //
+   // That is not theoretical. It was observed on a Reinitialize: a reverse-DNS
+   // prefetch sat in a two second DnsQuery while StopServers ran to completion,
+   // finished 1.9 seconds after "Destructing IOCP", released the last reference to
+   // its SMTPConnection, and faulted writing 0x...DC8 inside ~basic_stream_socket.
+   // The shutdown even logged that it was waiting for it - "Still 1 remaining
+   // threads in queue Name lookup queue. First task: AsynchronousTask" - it just
+   // waited in the wrong place, two teardown steps too late.
+   //
+   // Creating them here, before io_service_ exists, and removing them in
+   // StopServers before io_service_ is reset, makes the ordering an invariant of
+   // the two functions rather than something each new queue has to remember.
+   //---------------------------------------------------------------------------()
+   {
+      // Processes asynchronous tasks from clients - principally message
+      // finalization, which is what sends the final "250 OK".
+      WorkQueueManager::Instance()->CreateWorkQueue(Configuration::Instance()->GetAsynchronousThreads(),
+                                                    asynchronous_tasks_queue_);
+
+      // Separate queue for blocking name lookups made on behalf of a live
+      // session. These can stall for seconds on an address whose reverse zone
+      // is unreachable, so they are kept off the asynchronous task queue that
+      // finalizes (and acknowledges) received messages. Saturating this queue
+      // only delays the lookups themselves, which degrade to "Unknown".
+      WorkQueueManager::Instance()->CreateWorkQueue(Configuration::Instance()->GetAsynchronousThreads(),
+                                                    name_lookup_queue_);
+
+      // Both of these run tasks that are expected to finish, so "every thread busy
+      // for longer than the threshold" means something is wedged and is worth an
+      // error. The maintenance, main server and IOCP queues are deliberately not
+      // opted in - see WorkQueue::SetMonitorForStalls for why that would report the
+      // healthy state of a stock installation once a minute.
+      if (std::shared_ptr<WorkQueue> queue = WorkQueueManager::Instance()->GetQueue(asynchronous_tasks_queue_))
+         queue->SetMonitorForStalls(true);
+
+      if (std::shared_ptr<WorkQueue> queue = WorkQueueManager::Instance()->GetQueue(name_lookup_queue_))
+         queue->SetMonitorForStalls(true);
+   }
+
+   void
+   Application::RemoveSessionWorkQueues_()
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // Drains and removes the queues created by CreateSessionWorkQueues_. Must be
+   // called while io_service_ is still alive; see there for what happens if it is
+   // not. RemoveQueue joins the queue's worker threads, so on return no task can
+   // still be holding a connection.
+   //
+   // Safe to call twice - RemoveQueue on a name that is not registered is a
+   // no-op - which is what lets ExitInstance keep it as a backstop for a
+   // StartServers that failed before the state reached Running.
+   //---------------------------------------------------------------------------()
+   {
+      WorkQueueManager::Instance()->RemoveQueue(asynchronous_tasks_queue_);
+
+      WorkQueueManager::Instance()->RemoveQueue(name_lookup_queue_);
+   }
+
    bool
    Application::StartServers()
    {
@@ -368,6 +423,10 @@ namespace HM
       ServerStatus::Instance()->SetState(ServerStatus::StateStarting);
 
       SpamProtection::Instance()->Load();
+
+      // Before io_service_, so that no listener can ever accept a connection on a
+      // context whose session queues do not exist yet.
+      CreateSessionWorkQueues_();
 
       io_service_ = std::shared_ptr<IOService>(new IOService);
       io_service_->Initialize();
@@ -702,6 +761,14 @@ namespace HM
       WorkQueueManager::Instance()->RemoveQueue(server_work_queue_);
 
       OnServerStopped();
+
+      // Before the io_context goes, and after the acceptors have: no new session can
+      // arrive from here, and every task still holding one is joined while the
+      // socket it owns is still attached to a context that exists. This is the step
+      // whose absence made a slow reverse-DNS lookup fault the process on shutdown -
+      // CreateSessionWorkQueues_ has the detail.
+      LOG_DEBUG("Application::StopServers() - Draining session work queues");
+      RemoveSessionWorkQueues_();
 
       // Deinitialize servers
       LOG_DEBUG("Application::StopServers() - Destructing IOCP");
