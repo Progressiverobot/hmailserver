@@ -347,8 +347,29 @@ STDMETHODIMP InterfaceDistributionList::put_Mode(eDistributionListMode newVal)
       if (!object_)
          return GetAccessDenied();
 
-      HM::DistributionList::ListMode iMode = HM::DistributionList::LMPublic;
-   
+      /*
+         The seed value used to be LMPublic and the switch had no default, so a
+         value this server does not implement fell straight through and stored
+         "anyone may send" - the single most permissive mode there is.
+
+         That is not a theoretical hole. The IDL declares eLMServerMembers = 4
+         ("anyone with an account on this server"), which nothing in the server
+         implements: DistributionList::ListMode stops at LMDomainMembers = 3 and
+         RecipientParser::UserCanSendToList_ has no branch for a fifth mode. So
+         a caller selecting the more restrictive-sounding of the two "anyone..."
+         options - to keep outsiders off a list - silently got a list that
+         accepts mail from anywhere on the internet. get_Mode's own default then
+         reported it back as "Public", so the only visible symptom was a
+         selection that appeared not to have stuck.
+
+         Failing closed is not the answer either: silently substituting the most
+         restrictive mode would leave the caller equally misinformed, just in the
+         other direction. The value is refused, with a message naming what was
+         asked for, so the caller learns that the mode does not exist. This is
+         the same correction put_AdminLevel needed for the same reason.
+      */
+      HM::DistributionList::ListMode iMode;
+
       switch (newVal)
       {
       case eLMPublic:
@@ -363,10 +384,18 @@ STDMETHODIMP InterfaceDistributionList::put_Mode(eDistributionListMode newVal)
       case eLMDomainMembers:
          iMode = HM::DistributionList::LMDomainMembers;
          break;
+      default:
+         // HM::Formatter::Format, spelled the way InterfaceScripting.cpp spells it -
+         // the COM sources reach it through the precompiled header rather than a
+         // direct include.
+         return COMError::GenerateError(
+            HM::Formatter::Format("The distribution list mode {0} is not supported by this server. "
+                                  "Valid modes are 0 (Public), 1 (Membership), 2 (Announcement) and "
+                                  "3 (Domain members). The list has not been changed.", (int) newVal));
       }
-   
+
       object_->SetListMode(iMode);
-   
+
       return S_OK;
    }
    catch (...)

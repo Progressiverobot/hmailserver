@@ -201,8 +201,42 @@ namespace hMailServer.ControlPanel.Tests.Services
          Assert.True(ApiKeyStore.IsValidDomainName(name));
       }
 
+      /// <summary>
+      /// A single label IS a domain name to this server. StringParser's regex makes
+      /// the dotted part optional, and PreSaveLimitationsCheck validates a real
+      /// domain with that same function - so "intranet" and "localhost" can exist
+      /// as domains here. Refusing them, as this used to, meant an administrator
+      /// running a single-label internal domain could not scope a key to their own
+      /// domain and was told it "is not a domain name".
+      /// </summary>
       [Theory]
-      [InlineData("localhost")]      // no dot: cannot be a mail domain here
+      [InlineData("localhost")]
+      [InlineData("intranet")]
+      [InlineData("a")]
+      public void IsValidDomainName_AcceptsASingleLabel(string name)
+      {
+         Assert.True(ApiKeyStore.IsValidDomainName(name));
+      }
+
+      /// <summary>
+      /// The server's character class is [a-zA-Z0-9-], so an underscore can never
+      /// appear in an hMailServer domain name. Accepting one stored a restriction
+      /// that IsDomainAllowed_ - an exact comparison - could never match, while the
+      /// page listed it as though it were in force.
+      /// </summary>
+      [Theory]
+      [InlineData("my_domain.com")]
+      [InlineData("under_score")]
+      public void IsValidDomainName_RefusesUnderscores(string name)
+      {
+         Assert.False(ApiKeyStore.IsValidDomainName(name));
+      }
+
+      /// <summary>A label may not begin or end with a hyphen, and may not be empty.</summary>
+      [Theory]
+      [InlineData("-example.com")]
+      [InlineData("example-.com")]
+      [InlineData("ex..ample.com")]
       [InlineData("")]
       [InlineData(null)]
       public void IsValidDomainName_RefusesTheRest(string name)
@@ -233,6 +267,47 @@ namespace hMailServer.ControlPanel.Tests.Services
       public void LooksLikeSourceRestriction_RefusesWhatWouldNeverMatch(string value)
       {
          Assert.False(ApiKeyStore.LooksLikeSourceRestriction(value));
+      }
+
+      /// <summary>
+      /// The prefix ceiling is per family. ParseCidr caps an IPv4 prefix at 32 and
+      /// returns false above it, which makes ParseSourceRestriction fail, which
+      /// makes the server refuse the key from EVERY address on every request. So
+      /// "10.0.0.0/64" - a plausible copy-paste from an IPv6 example - has to be
+      /// caught here, or it is written, listed as healthy, and authenticates
+      /// nothing with no error anywhere to explain it.
+      /// </summary>
+      [Theory]
+      [InlineData("10.0.0.0/33")]
+      [InlineData("10.0.0.0/64")]
+      [InlineData("192.168.1.0/128")]
+      public void LooksLikeSourceRestriction_RefusesAnIPv4PrefixOverThirtyTwo(string value)
+      {
+         Assert.False(ApiKeyStore.LooksLikeSourceRestriction(value));
+      }
+
+      [Theory]
+      [InlineData("10.0.0.0/32")]
+      [InlineData("10.0.0.0/0")]
+      [InlineData("2001:db8::/128")]
+      [InlineData("2001:db8::/64")]
+      public void LooksLikeSourceRestriction_AcceptsAPrefixInsideItsFamilysCeiling(string value)
+      {
+         Assert.True(ApiKeyStore.LooksLikeSourceRestriction(value));
+      }
+
+      /// <summary>
+      /// ParseSourceRestriction ends with `return lower.GetType() == upper.GetType()`,
+      /// so a range whose ends are different families is refused - again leaving a
+      /// key usable from nowhere.
+      /// </summary>
+      [Fact]
+      public void LooksLikeSourceRestriction_RefusesAMixedFamilyRange()
+      {
+         Assert.False(ApiKeyStore.LooksLikeSourceRestriction("10.0.0.1-2001:db8::1"));
+         Assert.False(ApiKeyStore.LooksLikeSourceRestriction("2001:db8::1-10.0.0.1"));
+
+         Assert.True(ApiKeyStore.LooksLikeSourceRestriction("10.0.0.1-10.0.0.99"));
       }
 
       // ---- expiry ----------------------------------------------------------

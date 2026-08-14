@@ -415,8 +415,18 @@ namespace hMailServer.ControlPanel.Views
          else if (key.IsExpired)
          {
             level = StatusLevel.Information;
+
+            // Two different states, and the unreadable one is not "expired". This
+            // page parses the timestamp with one exact format; the server parses it
+            // with its own, so a hand-edited value can be readable to the server and
+            // not to this page. Saying "the server treats this as expired" would be
+            // a claim about the server made from a failure of ours - and the remedy
+            // (rewrite the line, or revoke and re-create) is the same either way
+            // without needing to assert which of us is right.
             state = key.ExpiresAt == null
-               ? "Expired - the stored expiry cannot be read, which the server treats as expired."
+               ? "The stored expiry could not be read in the form this page expects (YYYY-MM-DD HH:MM:SS), so "
+                 + "whether the server still accepts this key cannot be told from here. If the line was edited by "
+                 + "hand, correct it; otherwise revoke the key and create a replacement."
                : "Expired on " + key.ExpiresAt.Value.ToString("d MMMM yyyy HH:mm", CultureInfo.CurrentCulture)
                  + ". Every request it makes is refused.";
          }

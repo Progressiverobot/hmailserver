@@ -709,8 +709,26 @@ namespace hMailServer.ControlPanel.Views
          }
       }
 
-      /// <summary>A non-persistent action button (e.g. "Test connection") with a result line.</summary>
-      private class ComAction : ComSetting
+      /// <summary>
+      /// A non-persistent action button (e.g. "Test connection") with a result line.
+      ///
+      /// Marked INotPersisted, which it was not. Nothing was ever written wrongly -
+      /// Write below is a no-op override, which is what made the omission harmless -
+      /// but Save's skip test is "INotPersisted, or an empty Path", and the comment
+      /// on that second test ("buttons and preset pickers persist nothing and name
+      /// no property") is not true of these buttons: several carry a Path so they
+      /// sit beside the switch they act on - "Clear greylisting triplets" names
+      /// AntiSpam.GreyListingEnabled, "Test SpamAssassin connection" names
+      /// AntiSpam.SpamAssassinEnabled, and the index and repair actions name theirs.
+      ///
+      /// So each of those fell through to the no-op Write and then incremented the
+      /// counter, and "Saved 18 settings" counted buttons among the settings. That
+      /// sentence has to be true - it is the only confirmation an administrator
+      /// gets that a save did anything - so the row is excluded by the marker that
+      /// means what it says, rather than by a Path test that describes these rows
+      /// incorrectly.
+      /// </summary>
+      private class ComAction : ComSetting, INotPersisted
       {
          public string ButtonText;
          public Func<(bool ok, string text)> Action;
@@ -1803,7 +1821,9 @@ namespace hMailServer.ControlPanel.Views
          var cacheStats = Card("How the caches are performing",
             "Live, from the running server. The hit rate is the share of lookups answered from memory since the "
             + "counters last reset - which they do when the service restarts, when a cache is switched off, and "
-            + "when its TTL is changed, so a rate right after any of those describes a very short sample.");
+            + "when its TTL is changed, so a rate right after any of those describes a very short sample. A lookup "
+            + "for something that does not exist counts as a miss and caches nothing, so a server being probed for "
+            + "addresses it does not host shows a low rate without anything being wrong with the cache.");
          cacheStats.Settings.Add(new ComStat
          {
             Path = "Cache.HitRates",
@@ -2248,7 +2268,15 @@ namespace hMailServer.ControlPanel.Views
 
                if (rate == 0 && sizeKb == 0)
                {
-                  line += "nothing cached yet - no lookup has been made since the counters were reset.";
+                  // "Nothing is cached" is what this state proves. It is NOT proof
+                  // that nothing has been looked up: a lookup that found no such
+                  // domain or account counts as a miss and caches nothing, so a
+                  // server being probed for addresses it does not host sits here
+                  // with plenty of traffic. Saying "no lookup has been made" would
+                  // read as "this server is idle", which is the opposite of what
+                  // that traffic pattern means.
+                  line += "nothing is cached - either nothing has been looked up since the counters were reset, or "
+                          + "the lookups that happened found nothing to cache.";
                }
                else
                {

@@ -140,9 +140,12 @@ namespace hMailServer.ControlPanel.Services
       }
 
       /// <summary>
-      /// Every key in the store, newest-first by expiry so the list has a stable
-      /// order. An absent file is no keys rather than an error: the server creates
-      /// it when the first key is minted.
+      /// Every key in the store, ordered by label and then by id - alphabetical, so
+      /// the list is stable across reloads and a key can be found by the name it was
+      /// given. (The doc here used to say "newest-first by expiry", which the code
+      /// has never done; expiry is not creation order anyway, since the lifetime is
+      /// chosen per key.) An absent file is no keys rather than an error: the store
+      /// is created when the first key is minted.
       /// </summary>
       public static List<ApiKeyRecord> Read()
       {
@@ -476,26 +479,63 @@ namespace hMailServer.ControlPanel.Services
       }
 
       /// <summary>
-      /// A domain name for the purposes of this list. Deliberately permissive in
-      /// the same direction the server is: the domain need not exist yet, since a
-      /// key may be minted before the domain it will manage.
+      /// A domain name for the purposes of this list, matching what the server will
+      /// accept. The domain need not exist yet - a key may be minted before the
+      /// domain it will manage - so this is about shape only.
+      ///
+      /// The authority is StringParser::IsValidDomainName, which is also what
+      /// hMailServer validates a real domain name with when one is created. This
+      /// used to differ from it in BOTH directions, and each cost something:
+      ///
+      ///  - It required a dot. The server does not: "intranet" and "localhost" are
+      ///    valid domain names to it and can exist as domains on this server, so an
+      ///    administrator running a single-label internal domain could not scope a
+      ///    key to it at all, and was told their own domain "is not a domain name".
+      ///  - It allowed an underscore. The server's character class is
+      ///    [a-zA-Z0-9-], so "my_domain.com" can never name an hMailServer domain -
+      ///    the restriction was stored, listed on the page, and matched nothing,
+      ///    because IsDomainAllowed_ compares exactly.
+      ///
+      /// The rules are reimplemented rather than the regex copied: the C++ literal's
+      /// escaping does not match the pattern in the comment above it, so the exact
+      /// compiled behaviour of the bracketed-literal branches cannot be established
+      /// by reading. What IS certain from the character class and the label grammar
+      /// is everything below, and the two divergences that mattered are gone. Where
+      /// this and the server still disagree, the server refuses the key at creation
+      /// with its own message - a narrower failure than storing an unmatchable one.
       /// </summary>
       public static bool IsValidDomainName(string name)
       {
-         if (string.IsNullOrEmpty(name) || name.Length > 253)
+         if (string.IsNullOrEmpty(name) || name.Length > 255)
             return false;
+
+         // Address literals: [192.168.1.1] and [IPv6:....]. Accepted by the server's
+         // validator, so accepted here rather than reported as invalid.
+         if (name.StartsWith("[") && name.EndsWith("]"))
+            return name.Length > 2;
 
          if (name.StartsWith(".") || name.EndsWith(".") || name.Contains(".."))
             return false;
 
-         foreach (char c in name)
+         foreach (string label in name.Split('.'))
          {
-            bool ok = (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '.' || c == '-' || c == '_';
-            if (!ok)
+            // Up to 63 characters, not starting or ending with a hyphen.
+            if (label.Length == 0 || label.Length > 63)
                return false;
+
+            if (label.StartsWith("-") || label.EndsWith("-"))
+               return false;
+
+            foreach (char c in label)
+            {
+               bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-';
+               if (!ok)
+                  return false;
+            }
          }
 
-         return name.Contains('.');
+         // No dot required: a single label is a domain name the server accepts.
+         return true;
       }
 
       /// <summary>
@@ -513,9 +553,21 @@ namespace hMailServer.ControlPanel.Services
          if (slash > 0)
          {
             string prefix = text.Substring(slash + 1);
-            return System.Net.IPAddress.TryParse(text.Substring(0, slash), out _)
-                   && prefix.Length > 0 && prefix.Length <= 3
-                   && int.TryParse(prefix, out int bits) && bits >= 0 && bits <= 128;
+
+            if (!System.Net.IPAddress.TryParse(text.Substring(0, slash), out System.Net.IPAddress network))
+               return false;
+
+            if (prefix.Length == 0 || prefix.Length > 3 || !int.TryParse(prefix, out int bits) || bits < 0)
+               return false;
+
+            // The prefix ceiling depends on the family, and this used to allow 128
+            // for both. ParseCidr caps an IPv4 prefix at 32 and returns false above
+            // it, which makes ParseSourceRestriction fail, which makes the server
+            // refuse the key from EVERY address on every request. So "10.0.0.0/64" -
+            // a plausible copy-paste from an IPv6 example - was written, listed as
+            // healthy, and authenticated nothing.
+            int ceiling = network.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork ? 32 : 128;
+            return bits <= ceiling;
          }
 
          // A range is "lower-upper". IPv6 addresses contain colons but not
@@ -524,8 +576,17 @@ namespace hMailServer.ControlPanel.Services
          int dash = text.IndexOf('-');
          if (dash > 0)
          {
-            return System.Net.IPAddress.TryParse(text.Substring(0, dash).Trim(), out _)
-                   && System.Net.IPAddress.TryParse(text.Substring(dash + 1).Trim(), out _);
+            if (!System.Net.IPAddress.TryParse(text.Substring(0, dash).Trim(), out System.Net.IPAddress lower) ||
+                !System.Net.IPAddress.TryParse(text.Substring(dash + 1).Trim(), out System.Net.IPAddress upper))
+            {
+               return false;
+            }
+
+            // ParseSourceRestriction ends with `return lower.GetType() ==
+            // upper.GetType()`, so a range whose ends are different families is
+            // refused - with the same consequence as above: a key that can be used
+            // from nowhere. Checked here so the dialog says so before it is written.
+            return lower.AddressFamily == upper.AddressFamily;
          }
 
          return System.Net.IPAddress.TryParse(text, out _);

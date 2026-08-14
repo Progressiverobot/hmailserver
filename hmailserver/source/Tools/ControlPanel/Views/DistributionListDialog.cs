@@ -42,15 +42,40 @@ namespace hMailServer.ControlPanel.Views
          panel.Children.Add(Label("List address", addressBox_));
          panel.Children.Add(Input(addressBox_));
 
+         // Four modes, not five. There used to be a fifth - "Anyone with a server
+         // account can send", mode 4 - and it was the most dangerous entry in this
+         // dialog, because it did the opposite of what it said.
+         //
+         // The server does not implement it: DistributionList::ListMode stops at
+         // LMDomainMembers = 3 and RecipientParser::UserCanSendToList_ has no
+         // branch for a fifth mode. Mode 4 existed only as an enumerator in the
+         // type library. put_Mode's switch had no case for it and seeded its local
+         // with LMPublic, so choosing it stored "anyone may send" - and get_Mode's
+         // default reported it back as "Public", so the only symptom was a
+         // selection that looked as though it had not stuck.
+         //
+         // An administrator picking the more restrictive-sounding of the two
+         // "anyone..." entries, to keep outsiders off a list, was silently given
+         // the single most permissive setting the server has. put_Mode now refuses
+         // the value outright; the option is gone from here so nobody can reach it.
          mode_.Items.Add(Combo("Public — anyone can send", 0));
          mode_.Items.Add(Combo("Membership — only list members can send", 1));
          mode_.Items.Add(Combo("Announcements only", 2));
          mode_.Items.Add(Combo("Anyone in the domain can send", 3));
-         mode_.Items.Add(Combo("Anyone with a server account can send", 4));
          mode_.FontSize = 13;
          mode_.Margin = new Thickness(0, 0, 0, 8);
          panel.Children.Add(Label("Who may send to this list", mode_));
          panel.Children.Add(mode_);
+         panel.Children.Add(new TextBlock
+         {
+            Text = "\"Anyone in the domain\" means the sender's address is at a domain this server hosts, which an "
+                   + "outsider can claim unless the list also requires authentication. Tick that below if the list "
+                   + "must be restricted to people who have logged in.",
+            FontSize = Services.Typography.Caption,
+            TextWrapping = TextWrapping.Wrap,
+            Opacity = 0.65,
+            Margin = new Thickness(0, 0, 0, 10)
+         });
 
          panel.Children.Add(requireAuth_);
          panel.Children.Add(Label("Require sender address (empty = any)", requireSender_));

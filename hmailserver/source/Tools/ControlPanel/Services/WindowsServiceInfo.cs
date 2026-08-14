@@ -149,8 +149,17 @@ namespace hMailServer.ControlPanel.Services
       /// <see cref="PathName"/> holds the binary AND its arguments - hMailServer
       /// registers itself as <c>"C:\...\hMailServer.exe" RunAsService</c> - so
       /// quoting the whole string into a /Register command would name a path that
-      /// does not exist. Both spellings are handled, because an install whose path
-      /// has no space is registered unquoted.
+      /// does not exist.
+      ///
+      /// The unquoted branch is a guess and is treated as one. Splitting on the
+      /// first space is right for <c>C:\hMailServer\hMailServer.exe RunAsService</c>
+      /// and wrong for an unquoted path that contains a space, where it would
+      /// truncate to "C:\Program" - so the split only happens when what precedes
+      /// the space actually looks like the executable. Windows does start unquoted
+      /// paths with spaces (it probes each prefix), so this case is reachable on a
+      /// hand-registered service, and printing a truncated path in an instruction
+      /// an administrator is told to paste into an elevated prompt is worse than
+      /// printing a slightly long one.
       /// </summary>
       public static string ExecutableFrom(string pathName)
       {
@@ -163,6 +172,12 @@ namespace hMailServer.ControlPanel.Services
             int close = value.IndexOf('"', 1);
             return close > 1 ? value.Substring(1, close - 1) : value.Trim('"');
          }
+
+         // Prefer the last ".exe" boundary: it is the only marker in an unquoted
+         // command line that says where the path ends.
+         int exe = value.LastIndexOf(".exe", StringComparison.OrdinalIgnoreCase);
+         if (exe > 0)
+            return value.Substring(0, exe + 4);
 
          int space = value.IndexOf(' ');
          return space > 0 ? value.Substring(0, space) : value;

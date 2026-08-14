@@ -899,6 +899,13 @@ namespace hMailServer.ControlPanel.Views
          {
             // Nothing requested. Whether that is fine depends entirely on what the
             // service is already running as, so the answer is about the SCM value.
+            //
+            // Note what is NOT said here: that an empty value means LocalSystem. It
+            // means that only on the CreateService path, and this branch is only
+            // reached when the service already exists - so ReconfigureService_ is
+            // what would run, and there an empty value means "leave the account
+            // alone". Saying "empty = LocalSystem" would invite somebody to clear
+            // the box to undo a least-privilege account and get no change at all.
             bool localSystem = string.Equals(
                WindowsServiceInfo.Canonical(service.StartName, Environment.MachineName), "localsystem",
                StringComparison.OrdinalIgnoreCase);
@@ -910,8 +917,10 @@ namespace hMailServer.ControlPanel.Views
                   ? "The service is running as " + running + ". That is the default and it works, but every part of "
                     + "hMailServer that faces the network runs with it. Naming an account above - NT SERVICE\\hMailServer "
                     + "needs no password - and then re-registering the service is what changes it."
-                  : "The service is running as " + service.StartName + ". Nothing is requested above, so re-registering "
-                    + "the service would leave that account unchanged."
+                  : "The service is running as " + service.StartName + ", which is not LocalSystem, so it is already "
+                    + "contained. Nothing is requested above, and on an already-registered service an empty value "
+                    + "means \"leave the account as it is\" - so re-registering would not move it back to LocalSystem. "
+                    + "To do that, set the box to LocalSystem explicitly."
             };
          }
 
@@ -1126,13 +1135,23 @@ namespace hMailServer.ControlPanel.Views
 
          if (certificate.Length > 0)
          {
+            // Deliberately "expected to be", not "will be". Everything checkable
+            // from here has been checked - the certificate row exists and names
+            // both files - but the listener only truly gets STARTTLS if
+            // SslContextInitializer::InitServer can LOAD them at start-up, and a
+            // file that has been moved, is unreadable by the service account, or
+            // carries an encrypted key with no passphrase fails there. That
+            // happens on the server, at start-up, and cannot be established by
+            // reading configuration.
             return new WarningState
             {
                Level = StatusLevel.Good,
-               Text = "STARTTLS will be offered, using the certificate '" + certificate + "' borrowed from a "
-                      + "TLS-capable mailbox port - this listener has no certificate setting of its own, by design: "
+               Text = "STARTTLS is expected to be offered, using the certificate '" + certificate + "' borrowed from "
+                      + "a TLS-capable mailbox port - this listener has no certificate setting of its own, by design: "
                       + "the client editing Sieve filters is the client reading the mailbox, so the certificate it "
-                      + "already trusts is the right one to present."
+                      + "already trusts is the right one to present. Whether the files actually load is decided when "
+                      + "the service starts; if they do not, the listener runs in plain text and says so in the "
+                      + "application log, and the SSL certificates page checks the files themselves."
             };
          }
 
@@ -1168,8 +1187,20 @@ namespace hMailServer.ControlPanel.Views
 
       private string FindManageSieveCertificateName_()
       {
-         var namesById = new Dictionary<int, string>();
-         var certificateIdByProtocol = new Dictionary<int, int>();
+         // Usable, not merely referenced. FindTlsCertificate_ skips a port whose
+         // SSLCertificateID resolves to no certificate row, and skips one whose
+         // certificate has an empty certificate or private-key path - in both cases
+         // it KEEPS LOOKING rather than giving up.
+         //
+         // The first of those is reachable in one step: deleting a certificate
+         // issues only "delete from hm_sslcertificates" and never clears
+         // portsslcertificateid on the ports referencing it, so a dangling id is
+         // the ordinary result of removing a certificate that was in use. Matching
+         // on id alone reported "STARTTLS will be offered, using the certificate
+         // '#7'" for a certificate that no longer exists, while the server was
+         // logging that it had none and running the listener in plain text - with
+         // ManageSieve carrying mailbox passwords.
+         var usableCertificateNames = new Dictionary<int, string>();
 
          dynamic certificates = null;
          dynamic ports = null;
@@ -1183,13 +1214,26 @@ namespace hMailServer.ControlPanel.Views
                dynamic certificate = certificates.Item[i];
                try
                {
-                  namesById[(int) certificate.ID] = (string) certificate.Name ?? "";
+                  string certificateFile = ((string) certificate.CertificateFile ?? "").Trim();
+                  string privateKeyFile = ((string) certificate.PrivateKeyFile ?? "").Trim();
+
+                  if (certificateFile.Length == 0 || privateKeyFile.Length == 0)
+                     continue;
+
+                  usableCertificateNames[(int) certificate.ID] = (string) certificate.Name ?? "";
                }
                finally
                {
                   ServerSession.Release((object) certificate);
                }
             }
+
+            // Per protocol, the FIRST port the server would accept - which is not
+            // the first port of that protocol. The server walks the ports in order
+            // and skips the unusable ones, so keeping the first referenced id and
+            // then finding it unusable would name a different certificate from the
+            // one actually borrowed.
+            var certificateIdByProtocol = new Dictionary<int, int>();
 
             ports = ServerSession.Current.Application.Settings.TCPIPPorts;
             int portCount = (int) ports.Count;
@@ -1206,6 +1250,9 @@ namespace hMailServer.ControlPanel.Views
                   if (security <= 0 || certificateId <= 0)
                      continue;
 
+                  if (!usableCertificateNames.ContainsKey(certificateId))
+                     continue;
+
                   int protocol = (int) port.Protocol;
                   if (!certificateIdByProtocol.ContainsKey(protocol))
                      certificateIdByProtocol[protocol] = certificateId;
@@ -1214,6 +1261,15 @@ namespace hMailServer.ControlPanel.Views
                {
                   ServerSession.Release((object) port);
                }
+            }
+
+            foreach (int protocol in new[] { ServerSession.SessionImap, ServerSession.SessionPop3, ServerSession.SessionSmtp })
+            {
+               if (!certificateIdByProtocol.TryGetValue(protocol, out int certificateId))
+                  continue;
+
+               string name = usableCertificateNames[certificateId];
+               return name.Length > 0 ? name : "#" + certificateId;
             }
          }
          catch (Exception)
@@ -1226,65 +1282,133 @@ namespace hMailServer.ControlPanel.Views
             ServerSession.Release((object) certificates);
          }
 
-         foreach (int protocol in new[] { ServerSession.SessionImap, ServerSession.SessionPop3, ServerSession.SessionSmtp })
-         {
-            if (!certificateIdByProtocol.TryGetValue(protocol, out int certificateId))
-               continue;
-
-            return namesById.TryGetValue(certificateId, out string name) && name.Length > 0
-               ? name
-               : "#" + certificateId;
-         }
-
          return "";
       }
 
       /// <summary>
-      /// Whether the OAuth2 configuration can accept a token at all.
+      /// What an OAuth2 token actually has to satisfy to be accepted here.
       ///
-      /// Every input is on this page, so this reasons entirely about what the
-      /// administrator can see. It exists because the failure is invisible from the
-      /// switch: OAuth2TokenValidator rejects a token whose issuer or audience does
-      /// not match, and verifies its signature against key material chosen by the
-      /// algorithm - so a configuration missing any one of those accepts nobody,
-      /// while the switch reads enabled and the log records only a failed logon.
+      /// The first version of this method got the issuer and audience exactly
+      /// backwards, and in the dangerous direction. It treated a blank
+      /// OAuth2Issuer or OAuth2Audience as a fatal gap and told the administrator
+      /// that "no client can log on with a token". OAuth2TokenValidator.cpp does
+      /// the opposite: both checks sit behind `if (!config.issuer.IsEmpty())` and
+      /// `if (!config.audience.IsEmpty())`, so a blank value means "do not check
+      /// this at all". Blank is also the shipped default.
+      ///
+      /// So the configuration that warning fired on is not inert - it is
+      /// PERMISSIVE. With both blank, any correctly-signed, unexpired token
+      /// carrying the username claim is accepted, including one the identity
+      /// provider minted for a completely different application. Describing that
+      /// as a lockout hid the real risk behind an invented one, and an
+      /// administrator acting on it would have typed a guess into a working
+      /// configuration - where any value that does not exactly equal the token's
+      /// own iss (or appear in its aud) then rejects every token there is.
+      ///
+      /// What genuinely stops every token, verified against the same file: no key
+      /// material for the algorithms allowed (signature verification cannot run),
+      /// and no username claim (the server has nothing to resolve to a mailbox).
+      /// Those are the only two treated as blocking.
       /// </summary>
       private WarningState ComputeOAuth2State_()
       {
          if (!LiveBool_("OAuth2Enabled", false))
             return null;
 
-         var missing = new List<string>();
+         // The server implements exactly two algorithms, and nothing else. Reading
+         // ValidateWithConfig: "HS256" and "RS256" have verifiers; "ES256" is
+         // refused by name with "not supported by this server; use RS256 or HS256"
+         // because JWS carries an ECDSA signature as a raw R||S pair while OpenSSL
+         // wants X9.62 DER; and every other value falls into the final else and is
+         // refused as unsupported.
+         //
+         // So a family test - "does the list contain RS" - is not good enough:
+         // RS512 and PS256 pass it and are refused by the server, and the page
+         // would have called that configuration complete. The list is matched
+         // against the two names that exist.
+         string algorithmSetting = LiveText_("OAuth2AllowedAlgorithms", "RS256").Trim();
 
-         if (LiveText_("OAuth2Issuer", "").Trim().Length == 0)
-            missing.Add("the expected issuer (iss)");
+         var named = algorithmSetting
+            .Split(new[] { ',', ' ', ';' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(a => a.Trim().ToUpperInvariant())
+            .Where(a => a.Length > 0)
+            .ToList();
 
-         if (LiveText_("OAuth2Audience", "").Trim().Length == 0)
-            missing.Add("the expected audience (aud)");
+         bool allowsRs256 = named.Contains("RS256");
+         bool allowsHs256 = named.Contains("HS256");
+         List<string> unusable = named.Where(a => a != "RS256" && a != "HS256").ToList();
 
-         // Defaults mirror IniFileSettings.cpp: RS256 alone unless overridden.
-         string algorithms = LiveText_("OAuth2AllowedAlgorithms", "RS256").ToUpperInvariant();
-         bool allowsAsymmetric = algorithms.Contains("RS") || algorithms.Contains("ES");
-         bool allowsHmac = algorithms.Contains("HS");
+         var blocking = new List<string>();
 
-         if (allowsAsymmetric && LiveText_("OAuth2PublicKeyFile", "").Trim().Length == 0)
-            missing.Add("the issuer's public key file, which RS* and ES* tokens are verified against");
+         if (allowsRs256 && LiveText_("OAuth2PublicKeyFile", "").Trim().Length == 0)
+            blocking.Add("the issuer's public key file, which RS256 tokens are verified against");
 
-         if (allowsHmac && !SecretConfigured_("OAuth2HmacSecret"))
-            missing.Add("the shared HMAC secret, which HS* tokens are verified against");
+         if (allowsHs256 && !SecretConfigured_("OAuth2HmacSecret"))
+            blocking.Add("the shared HMAC secret, which HS256 tokens are verified against");
 
-         if (LiveText_("OAuth2UsernameClaim", "email").Trim().Length == 0)
-            missing.Add("the claim that carries the mailbox address");
+         if (!allowsRs256 && !allowsHs256)
+         {
+            blocking.Add("any algorithm this server can verify - it implements RS256 and HS256 only, and \""
+                         + algorithmSetting + "\" names neither, so every token is refused whatever key material "
+                         + "is installed");
+         }
 
-         if (missing.Count > 0)
+         if (blocking.Count > 0)
          {
             return new WarningState
             {
                Level = StatusLevel.Warning,
                Text = "OAuth2 is switched on but no client can log on with a token, because it is missing "
-                      + string.Join("; ", missing)
-                      + ". A token that fails any one of these checks is rejected, and the log records only a failed "
-                      + "logon - so this reads as \"the password is wrong\" rather than as a configuration gap."
+                      + string.Join("; ", blocking)
+                      + ". Signature verification cannot run at all, so every token is rejected and the log records "
+                      + "only a failed logon - which reads as \"the password is wrong\" rather than as a "
+                      + "configuration gap."
+            };
+         }
+
+         // A list that mixes a usable algorithm with unusable ones is not fatal -
+         // tokens signed with the usable one still work - but a client the
+         // identity provider configured for one of the others fails with nothing
+         // on this page to explain why, so it is named.
+         if (unusable.Count > 0)
+         {
+            return new WarningState
+            {
+               Level = StatusLevel.Warning,
+               Text = "Tokens signed with " + string.Join(" or ", unusable) + " are refused: this server implements "
+                      + "RS256 and HS256 only. " + (unusable.Contains("ES256")
+                         ? "ES256 in particular is rejected by name - JWS carries an ECDSA signature as a raw R||S "
+                           + "pair and OpenSSL expects DER, so it never verified and the server refuses it rather "
+                           + "than reporting a signature failure. "
+                         : "")
+                      + "Remove what the server cannot verify from the list, so a client offering it is refused for "
+                      + "a reason the log makes plain rather than appearing to be allowed."
+            };
+         }
+
+         // Signature verification works. What is left is how much a valid signature
+         // is allowed to prove, and that is where the blanks matter.
+         bool noIssuer = LiveText_("OAuth2Issuer", "").Trim().Length == 0;
+         bool noAudience = LiveText_("OAuth2Audience", "").Trim().Length == 0;
+
+         if (noIssuer || noAudience)
+         {
+            string unchecked_ = noIssuer && noAudience
+               ? "neither the issuer (iss) nor the audience (aud) is checked"
+               : noIssuer ? "the issuer (iss) is not checked" : "the audience (aud) is not checked";
+
+            return new WarningState
+            {
+               Level = StatusLevel.Warning,
+               Text = "Tokens are accepted, but " + unchecked_ + ": the server applies each of those only when you "
+                      + "have set it, and blank is the default. That is wider than it looks. Any token your identity "
+                      + "provider signs with this key is accepted - including one it issued to a different "
+                      + "application entirely, which is enough to log in as whichever mailbox that token names. "
+                      + "Set both to the exact values your provider puts in its tokens."
+                      + (LiveBool_("OAuth2RequireTLS", true)
+                         ? ""
+                         : " Tokens are also accepted over unencrypted connections, so a recorded one can be "
+                           + "replayed until it expires.")
             };
          }
 
@@ -1303,9 +1427,10 @@ namespace hMailServer.ControlPanel.Views
          return new WarningState
          {
             Level = StatusLevel.Good,
-            Text = "The configuration is complete: an issuer, an audience, key material for the algorithms allowed, "
-                   + "and a claim to read the mailbox address from. The mailbox a token names still has to exist as "
-                   + "a local account - a valid token for an address this server does not host is refused."
+            Text = "Key material is present for the algorithms allowed, and both the issuer and the audience are "
+                   + "checked, so a token has to have been minted by your provider for this server specifically. "
+                   + "The mailbox it names still has to exist as a local account - a valid token for an address "
+                   + "this server does not host is refused."
          };
       }
 
@@ -1358,11 +1483,7 @@ namespace hMailServer.ControlPanel.Views
          // ManageSieve, the account the service runs as, and the ACME pair on disk
          // can all have changed since this page was last open, and a warning
          // reasoning about a stale one is worse than no warning at all.
-         serviceInfo_ = null;
-         tlsPortCertificate_ = null;
-         tlsPortCertificateRead_ = false;
-         acmeHealth_ = null;
-         acmeHealthFolder_ = null;
+         ForgetExternalState_();
 
          BuildDefinition();
          BuildUi();
@@ -2179,10 +2300,21 @@ namespace hMailServer.ControlPanel.Views
                   // the only INI value it governs, and only at the moment it is
                   // set, through IniFileSettings::SetPassword.
                   Title = "Stored secret protection",
+                  // "Turn it off to restore a backup onto a different machine" was
+                  // the one reason this card gave, and it was misdirection: no
+                  // backed-up secret is in a DPAPI envelope. Configuration::XMLStore
+                  // writes the relayer password in clear (PropertySet decrypts at
+                  // Refresh), and Route, FetchAccount and SSLCertificate hard-code
+                  // Blowfish in both directions precisely so that backups restore
+                  // onto replacement hardware; restore then re-envelopes under the
+                  // destination machine's own setting. So a cross-machine restore
+                  // works with this left on, and following the old advice downgraded
+                  // every future secret write to a key that ships in the source.
                   Blurb = "Chooses the envelope hMailServer puts around the secrets it stores for its own use: machine-scoped " +
                           "Windows DPAPI, which cannot be decrypted on any other machine, or the legacy Blowfish scheme, " +
-                          "which can. Turn it off only to restore a backup onto a different machine - values written under " +
-                          "either scheme stay readable, so switching back and forth loses nothing.",
+                          "which can. Leave it on. It does not affect backup and restore - nothing in a backup archive is " +
+                          "DPAPI-protected, and a restore re-protects each secret under the destination machine's own " +
+                          "setting - so a backup taken here restores onto another machine with this switched on.",
                   Settings =
                   {
                      new BoolSetting
@@ -2195,9 +2327,10 @@ namespace hMailServer.ControlPanel.Views
                                 "each route's authentication password, each external fetch account's password, and each " +
                                 "SSL certificate's private-key passphrase. It does NOT cover the other secrets in " +
                                 "hMailServer.INI - the SRS and BATV secrets, the OAuth2 HMAC secret, the password pepper, " +
-                                "the metrics bearer token and the Windows service account password are all stored as you " +
-                                "typed them. Protecting those is the file's own permissions: hMailServer.INI should be " +
-                                "readable only by Administrators and by the account the service runs as."
+                                "the metrics bearer token, the metrics HTTP Basic password and the Windows service " +
+                                "account password are all stored as you typed them. Protecting those is the file's own " +
+                                "permissions: hMailServer.INI should be readable only by Administrators and by the " +
+                                "account the service runs as."
                      }
                   }
                });
@@ -2222,11 +2355,21 @@ namespace hMailServer.ControlPanel.Views
                      new TextSetting
                      {
                         Key = "ServiceAccountName",
-                        Label = "Account for the service to log on as (empty = LocalSystem)",
+                        // NOT "empty = LocalSystem". Empty means LocalSystem only on
+                        // the CreateService path, which runs when no hMailServer
+                        // service exists yet. On any machine that already has one -
+                        // which is every machine this page can read the SCM on -
+                        // ServiceManager takes ReconfigureService_, where an empty
+                        // value becomes NULL and ChangeServiceConfig is told to
+                        // leave the logon account alone. Clearing the box to go back
+                        // to LocalSystem therefore does nothing at all, silently.
+                        Label = "Account for the service to log on as (empty = leave the current account unchanged)",
                         Placeholder = "NT SERVICE\\hMailServer",
-                        Blurb = "Saving this does not move the service. It is read once, when the service is registered, " +
-                                "so it takes effect only after the registration command below has been run. The status " +
-                                "line under this card says which account the service is running as right now."
+                        Blurb = "Saving this does not move the service: it is read when the service is REGISTERED, so it " +
+                                "takes effect only after the command in the status line below has been run. Clearing it " +
+                                "does not move the service back to LocalSystem either - on an already-registered service " +
+                                "an empty value means \"leave the account as it is\". To return to LocalSystem, set this " +
+                                "to LocalSystem explicitly and re-register."
                      },
                      new SecretSetting
                      {
@@ -2258,17 +2401,32 @@ namespace hMailServer.ControlPanel.Views
                            if (string.IsNullOrWhiteSpace(LiveText_("ServiceAccountName", "")))
                               return null;
 
+                           // "Read access to the program folder" was wrong, and wrong
+                           // in a way that breaks things quietly. hMailServer.INI
+                           // lives in that folder, and the service process writes to
+                           // it: hMailServer.exe is the out-of-process COM server, so
+                           // every settings write executes under the service account.
+                           // With read-only rights those writes fail silently -
+                           // WriteIniSetting_ discards WritePrivateProfileString's
+                           // result and SetAdministratorPassword returns S_OK anyway -
+                           // so an administrator changes the administration password,
+                           // is told it worked, and the old one comes back at the next
+                           // restart. Following this card's own advice was what caused
+                           // it.
                            return new WarningState
                            {
                               Level = StatusLevel.Information,
                               Text = "Three things have to be true of that account before the service will start under it, "
                                      + "and none of them can be done from here. It needs the \"Log on as a service\" right "
                                      + "(secpol.msc > Local Policies > User Rights Assignment, or your domain policy). It "
-                                     + "needs read access to the hMailServer program folder and full control of the data "
-                                     + "folder, the log folder and - for the built-in database - the database folder. And "
-                                     + "for an external database it needs whatever that server requires, which for MSSQL "
-                                     + "with integrated security means a login of its own. A service that cannot log on "
-                                     + "reports error 1069 in the Windows event log and does not start."
+                                     + "needs full control of the data folder, the log folder and - for the built-in "
+                                     + "database - the database folder, plus read access to the program folder AND write "
+                                     + "access to hMailServer.INI inside it, because the service writes its own settings "
+                                     + "there; if that file is read-only to the account, saved settings are lost at the "
+                                     + "next restart with no error. And for an external database it needs whatever that "
+                                     + "server requires, which for MSSQL with integrated security means a login of its "
+                                     + "own. A service that cannot log on reports error 1069 in the Windows event log "
+                                     + "and does not start."
                            };
                         }
                      }
@@ -2665,8 +2823,33 @@ namespace hMailServer.ControlPanel.Views
 
       private void Reload_Click(object sender, RoutedEventArgs e)
       {
+         // Reload means reload, including the state read from outside the INI.
+         // Without this the button re-read the file but kept the cached Service
+         // Control Manager snapshot, so an administrator who ran the registration
+         // command in the other window and pressed Reload - the obvious thing to
+         // do, and what the status line invites - was shown the pre-registration
+         // account and told the change had not been applied.
+         ForgetExternalState_();
+
          BuildDefinition();
          BuildUi();
+      }
+
+      /// <summary>
+      /// Drops everything the computed warnings cache from outside hMailServer.INI.
+      ///
+      /// Each is cached per page instance because a computed warning re-runs on
+      /// every keystroke and these are expensive - a WMI query, two COM collection
+      /// walks, and parsing two PEM files. That makes them stale by construction,
+      /// so both entry points that mean "show me the current state" clear them.
+      /// </summary>
+      private void ForgetExternalState_()
+      {
+         serviceInfo_ = null;
+         tlsPortCertificate_ = null;
+         tlsPortCertificateRead_ = false;
+         acmeHealth_ = null;
+         acmeHealthFolder_ = null;
       }
 
       private void Save_Click(object sender, RoutedEventArgs e)

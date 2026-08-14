@@ -221,6 +221,55 @@ namespace RegressionTests.SMTP
             ImapClientSimulator.AssertMessageCount(recipientAddress, "test", "Inbox", 2);
       }
 
+      /// <summary>
+      /// A list mode the server does not implement must be refused, not silently
+      /// turned into the most permissive one there is.
+      ///
+      /// eLMServerMembers = 4 is declared in the type library and implemented
+      /// nowhere: DistributionList::ListMode stops at LMDomainMembers = 3 and
+      /// UserCanSendToList_ has no branch for a fifth mode. put_Mode's switch had no
+      /// case for it and seeded its local with LMPublic, so setting it stored
+      /// "anyone may send" - and get_Mode's default read it back as eLMPublic, so
+      /// the only symptom was a selection that looked as though it had not stuck.
+      ///
+      /// The direction is what makes this worth a test: somebody choosing the more
+      /// restrictive-sounding of the two "anyone..." options, to keep outsiders off
+      /// a list, got the single most permissive setting the server has. This test
+      /// fails against the previous build by accepting the assignment and then
+      /// delivering the external message.
+      /// </summary>
+      [Test]
+      public void TestUnsupportedListModeIsRefusedRatherThanTreatedAsPublic()
+      {
+         var recipients = new List<string> { "recipient1@example.test" };
+
+         var list = SingletonProvider<TestSetup>.Instance.AddDistributionList(_domain, "list1@example.test",
+            recipients);
+
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "recipient1@example.test", "test");
+
+         // Start from the most restrictive mode, so that a silent fall-through to
+         // LMPublic is visible both in the stored value and in what gets delivered.
+         list.Mode = eDistributionListMode.eLMMembership;
+         list.RequireSMTPAuth = false;
+         list.Save();
+
+         // The assignment itself must be refused. COM surfaces the failure as an
+         // exception on the property set.
+         CustomAsserts.Throws<Exception>(() => list.Mode = eDistributionListMode.eLMServerMembers);
+
+         // And the list must still be what it was - not public, and not changed by
+         // the attempt.
+         var reloaded = _domain.DistributionLists.ItemByAddress[list.Address];
+         Assert.AreEqual(eDistributionListMode.eLMMembership, reloaded.Mode);
+
+         // The behavioural half: an outsider is still refused. Under the old
+         // behaviour the list had become public and this message was accepted.
+         var smtpClient = new SmtpClientSimulator();
+         CustomAsserts.Throws<DeliveryFailedException>(() =>
+            smtpClient.Send("external@example.com", list.Address, "Mail 1", "Mail 1"));
+      }
+
       [Test]
       public void TestDistributionListsMembershipDomainAliases()
       {

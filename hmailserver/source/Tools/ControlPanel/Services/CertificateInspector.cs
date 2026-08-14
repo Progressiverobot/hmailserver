@@ -83,10 +83,16 @@ namespace hMailServer.ControlPanel.Services
       /// <summary>
       /// True when the Control Panel is connected to the machine it runs on, so
       /// the file paths in the server's configuration are readable from here.
-      /// The same test ExternalSetupChecks and DnsRecordsView use.
+      ///
+      /// Delegates rather than repeating the test. This was a second copy of the
+      /// same four comparisons, and when ServerSession's copy learned to recognise
+      /// this machine's own name - which /connect takes, and which an administrator
+      /// sitting at the server will type - the two immediately disagreed: the
+      /// certificate page would have gone on saying "not readable from this
+      /// machine" while looking straight at the files. One implementation, so
+      /// there is nothing to drift.
       /// </summary>
-      public static bool SessionIsLocal(string host)
-         => string.IsNullOrWhiteSpace(host) || host == "localhost" || host == "127.0.0.1" || host == "::1";
+      public static bool SessionIsLocal(string host) => ServerSession.IsLocalHost(host);
 
       /// <summary>
       /// Inspects one certificate entry. Never throws; every failure becomes a

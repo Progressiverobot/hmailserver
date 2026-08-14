@@ -113,8 +113,21 @@ namespace hMailServer.ControlPanel.Services
             if (listener == null || listener.Port != port)
                continue;
 
+            // A wildcard row is served by a wildcard listener, and Windows reports a
+            // successful wildcard bind literally as 0.0.0.0 or [::] - so matching
+            // any address on the port would be looser than the question asked.
+            // Narrowed after an adversarial check of this file: the loose form could
+            // read green when hMailServer's own wildcard listener was down (a TLS
+            // context failure, the service stopped) while some other program held
+            // that port on one specific address. That conjunction is narrow, but the
+            // tighter test costs nothing and cannot be wrong in that direction.
             if (wildcardRow)
-               return true;
+            {
+               if (listener.Address.Equals(IPAddress.Any) || listener.Address.Equals(IPAddress.IPv6Any))
+                  return true;
+
+               continue;
+            }
 
             if (listener.Address.Equals(configured))
                return true;
@@ -194,15 +207,27 @@ namespace hMailServer.ControlPanel.Services
             + "system's list of open ports, so it cannot tell hMailServer's listener from another program's - if "
             + "connections are being refused or answered by the wrong service, that is what to look for.",
 
+         // The first cause listed used to be a port conflict, and the sentence sent
+         // the reader to an error-log entry. Both were wrong for the commonest case
+         // by far: IOService reads the port list ONCE per server start and creates
+         // every listener in that pass, so a port added or changed since then is
+         // simply not bound - no bind was attempted, so there is no 4316 to find.
+         // The ports page adds rows and reloads immediately, which means every port
+         // an administrator creates here appeared at once as a yellow row blaming a
+         // conflict that does not exist.
          ListenerState.NotListening =>
             "The " + protocol + " server is switched on but nothing is listening here, so every connection to this "
-            + "port is refused. The usual causes are another program already holding the port, an address that does "
-            + "not exist on this machine, or - on a TLS port - a certificate the server could not load. The server "
-            + "records the reason once, at start-up, in the error log.",
+            + "port is refused. If you have just added or changed this port, that is the reason: the server reads "
+            + "its port list once when it starts, so a new row does nothing until the service is restarted. "
+            + "Otherwise the causes are another program already holding the port, an address that does not exist on "
+            + "this machine, or - on a TLS port - a certificate the server could not load; the server records which, "
+            + "once, in the error log at start-up.",
 
          ListenerState.ProtocolDisabled =>
             "The " + protocol + " server is switched off on the Protocols page, so this port is not listened on. "
-            + "The row is kept; it starts working again when the protocol is enabled.",
+            + "The row is kept. Switching the protocol back on does not start the listener on its own - the port "
+            + "list and the enabled protocols are both read once, when the service starts - so restart the service "
+            + "after enabling it.",
 
          _ =>
             "Whether this port is being listened on could not be determined from here. Open the Control Panel on "

@@ -14,6 +14,9 @@
 #include "hMailServer.h"
 
 #include "../Common/Util/ServiceManager.h"
+// For the LoadSettings call in the /Register branch: the service account the
+// registration installs is read from here, and nothing else on that path loads it.
+#include "../Common/Application/IniFileSettings.h"
 #include "../Common/Util/ClassTester.h"
 #include "../Common/Util/SystemInformation.h"
 #include "../Common/Util/CrashOracle.h"
@@ -211,11 +214,38 @@ extern "C" int WINAPI _tWinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstan
    bool bRegisterTypelib = bRegisterService || (sLastParam.CompareNoCase(_T("/RegisterTypeLib")) == 0);
    if (bRegisterService)
    {
+      /*
+         The settings have to be loaded before the service is registered, and
+         nothing on this path had loaded them.
+
+         ServiceManager::RegisterService and ReconfigureService_ both call
+         IniFileSettings::GetServiceAccountName() / GetServiceAccountPassword()
+         to decide which account the service logs on as. Those fields are
+         assigned in exactly one place - IniFileSettings::LoadSettings - and the
+         only caller of it is Application::InitInstance, which this branch never
+         reaches: /Register also sets bRegisterTypelib, so control returns a few
+         lines below.
+
+         The result was that ServiceAccountName had never worked, by any route.
+         The registration read a default-constructed empty String, passed NULL
+         for lpServiceStartName, and CreateService therefore installed the
+         service as LocalSystem while ChangeServiceConfig was told "no change" -
+         so an administrator could set the value, run the documented command any
+         number of times, and the account would never move. There was no error,
+         because from the SCM's point of view nothing was asked for.
+
+         LoadSettings is safe here. It reads hMailServer.ini and nothing else -
+         GetInitializationFile derives the path from the binary's own directory -
+         and Application::InitInstance itself calls it before OpenDatabase, so
+         it does not require a database, a COM session or a started server.
+      */
+      HM::IniFileSettings::Instance()->LoadSettings();
+
       // --- Register the hMailServer service.
       HM::ServiceManager hSCM;
       if (!hSCM.RegisterService("hMailServer", "hMailServer"))
       {
-         return -1;         
+         return -1;
       }
    }
 

@@ -52,6 +52,12 @@ namespace hMailServer.ControlPanel.Tests.Services
       /// hMailServer stores a wildcard as "0.0.0.0" - IPAddress default-constructs
       /// to IPv4 any and TCPIPPort::GetAddressString returns its ToString - so this
       /// is the shape of nearly every real row.
+      ///
+      /// A wildcard row is matched by a WILDCARD listener, not by any listener on
+      /// the port. Windows reports a successful wildcard bind literally as 0.0.0.0
+      /// or [::], so the narrow test is the accurate one; the loose form could read
+      /// green when hMailServer's own wildcard listener was down and some other
+      /// program happened to hold that port on one specific address.
       /// </summary>
       [Theory]
       [InlineData("0.0.0.0")]
@@ -60,11 +66,16 @@ namespace hMailServer.ControlPanel.Tests.Services
       [InlineData(null)]
       [InlineData("::")]
       [InlineData("[::]")]
-      public void IsBound_AWildcardRowMatchesAListenerOnAnyAddress(string configured)
+      public void IsBound_AWildcardRowNeedsAWildcardListener(string configured)
       {
-         Assert.True(ListenerProbe.IsBound(configured, 143, Listening("192.168.1.10:143")));
          Assert.True(ListenerProbe.IsBound(configured, 143, Listening("0.0.0.0:143")));
-         Assert.False(ListenerProbe.IsBound(configured, 143, Listening("192.168.1.10:993")));
+         Assert.True(ListenerProbe.IsBound(configured, 143, Listening(":::143")));
+
+         // A listener on one specific address does not serve the wildcard row.
+         Assert.False(ListenerProbe.IsBound(configured, 143, Listening("192.168.1.10:143")));
+
+         // Right address shape, wrong port.
+         Assert.False(ListenerProbe.IsBound(configured, 143, Listening("0.0.0.0:993")));
       }
 
       /// <summary>

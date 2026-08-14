@@ -146,7 +146,7 @@ namespace hMailServer.ControlPanel.Services
          new SettingEntry("Override DNS server (empty = the name servers Windows uses)", "DNSServer", "dns"),
          new SettingEntry("Run DNSBL checks after MAIL FROM (rather than at connect)", "DNSBLChecksAfterMailFrom", "dns"),
          new SettingEntry("Absolute lifetime of one client session (seconds)", "ClientSessionCeiling", "hardening"),
-         new SettingEntry("Account for the service to log on as (empty = LocalSystem)", "ServiceAccountName", "hardening"),
+         new SettingEntry("Account for the service to log on as (empty = leave the current account unchanged)", "ServiceAccountName", "hardening"),
          new SettingEntry("Add an X-AuthUser header with the authenticated account", "AddXAuthUserHeader", "hardening"),
          new SettingEntry("Add an X-OriginalRcptTo header", "AddXOriginalRcptTo", "hardening"),
          new SettingEntry("Body read chunk size (bytes)", "LoadBodyReadSize", "hardening"),

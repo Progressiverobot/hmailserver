@@ -328,7 +328,18 @@ typedef
 	[helpstring("Anyone in the domain can send to the list.")] 
 	eLMDomainMembers = 3,
 
-	[helpstring("Anyone with an account on the server can send to the list.")] 
+	// NOT IMPLEMENTED. Declared here and nowhere else: DistributionList::ListMode
+	// stops at LMDomainMembers = 3, and RecipientParser::UserCanSendToList_ has no
+	// branch for a fifth mode, so nothing in the server can enforce it.
+	//
+	// It is left declared rather than removed because the type library is a
+	// published interface and deleting an enumerator breaks every script that
+	// names it. put_Mode now refuses the value with a message saying so, instead
+	// of the previous behaviour - falling out of the switch and storing LMPublic,
+	// which turned the most restrictive-sounding choice into the most permissive
+	// setting the server has. Do not put this back in front of an administrator
+	// until something implements it.
+	[helpstring("NOT IMPLEMENTED - rejected by put_Mode. Reserved for: anyone with an account on the server can send to the list.")]
 	eLMServerMembers = 4,
 
 } eDistributionListMode;

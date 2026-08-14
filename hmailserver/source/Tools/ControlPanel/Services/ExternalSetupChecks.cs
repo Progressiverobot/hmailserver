@@ -579,12 +579,25 @@ namespace hMailServer.ControlPanel.Services
 
          if (configured.Length > 0 && ini.Read("ServiceAccountPassword", "").Trim().Length > 0)
          {
+            // ActionNeeded, not CannotTell. This finding is a fact the panel just
+            // established by reading the value's length - the one thing it is not is
+            // unknown, and CannotTell means unknown everywhere else in this file.
+            //
+            // The ranking is what made it actively harmful. AggregateFromFindings
+            // takes Max over the enum, where CannotTell (2) outranks Done (1) but
+            // ranks below ActionNeeded (3). So a service correctly re-registered
+            // under the configured account, carrying a leftover plaintext password,
+            // aggregated to "Cannot tell": the completed prerequisite was reported
+            // as unverifiable AND the leftover secret was never raised as an action.
+            // One state, both halves wrong.
+            //
             // Only emptiness is tested; the value is never read into the UI.
-            item.Add(SetupItemState.CannotTell,
+            item.Add(SetupItemState.ActionNeeded,
                "A service account password is stored in hMailServer.INI in plain text - the DPAPI setting does not "
-               + "cover it, because the registration step has nowhere else to read it from. Once the service has been "
-               + "registered, Windows keeps its own copy and the value here can be cleared. A virtual account "
-               + "(NT SERVICE\\hMailServer) or a group managed service account avoids the question entirely.");
+               + "cover it, because the registration step has nowhere else to read it from. Now that the service has "
+               + "been registered, Windows keeps its own copy, so clear the value on the Server limits & expert "
+               + "settings page. A virtual account (NT SERVICE\\hMailServer) or a group managed service account "
+               + "avoids the question entirely.");
          }
 
          item.AggregateFromFindings();
@@ -1420,11 +1433,37 @@ namespace hMailServer.ControlPanel.Services
                "HS256 is in OAuth2AllowedAlgorithms but OAuth2HmacSecret is empty, so HS256 tokens can never verify. Set the shared secret, or remove HS256 from the list.");
          }
 
+         // Blank is not "will be checked and might mismatch" - it is "not checked".
+         // OAuth2TokenValidator applies each of these only when it is set
+         // (`if (!config.issuer.IsEmpty())`), and blank is the shipped default, so
+         // the permissive case is the one an untouched configuration lands in. The
+         // previous wording ("a mismatch rejects every token") described only the
+         // case where they ARE set, which is the case that needs no warning.
+         bool noIssuer = ini.Read("OAuth2Issuer", "").Trim().Length == 0;
+         bool noAudience = ini.Read("OAuth2Audience", "").Trim().Length == 0;
+
+         if (noIssuer || noAudience)
+         {
+            anythingWrong = true;
+
+            string unchecked_ = noIssuer && noAudience
+               ? "Neither OAuth2Issuer nor OAuth2Audience is set, so neither is checked"
+               : noIssuer ? "OAuth2Issuer is not set, so the issuer is not checked"
+                          : "OAuth2Audience is not set, so the audience is not checked";
+
+            item.Add(SetupItemState.ActionNeeded,
+               unchecked_ + ". Any token the identity provider signs with this key is then accepted, including one "
+               + "it issued to a different application - which is enough to log in as whichever mailbox that token "
+               + "names. Set both to the exact values the provider puts in its tokens. The values come from the "
+               + "provider, which is why they are on this list.");
+         }
+
          if (!anythingWrong)
          {
             item.Add(SetupItemState.Done,
-               "OAuth2 is enabled and the key material its allowed algorithms need is in place. "
-               + "Make sure OAuth2Issuer and OAuth2Audience match what the identity provider actually puts in its tokens - a mismatch rejects every token.");
+               "OAuth2 is enabled, the key material its allowed algorithms need is in place, and both the issuer "
+               + "and the audience are checked - so a token has to have been minted by your provider for this "
+               + "server specifically.");
          }
 
          item.AggregateFromFindings();
