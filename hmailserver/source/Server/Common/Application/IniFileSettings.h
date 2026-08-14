@@ -261,6 +261,34 @@ namespace HM
       int GetManageSieveServerPort() const { return manage_sieve_server_port_; }
       String GetManageSieveServerBindAddress() const { return manage_sieve_server_bind_address_; }
       bool GetArcSealingEnabled() const { return arc_sealing_enabled_; }
+
+      // RFC 6376 3.5 signature timestamps.
+      //
+      // How long a signature we PRODUCE claims to stay valid. 0 - the default - emits
+      // no x= at all, keeping the emitted tag set as it was. An expiry is a promise
+      // about our own outbound mail that cannot be withdrawn once sent, and a window
+      // shorter than the delay a legitimate retry, greylist or mailing list introduces
+      // costs the message its DKIM pass and its DMARC alignment at the far end. A
+      // sender who wants one usually picks around 604800 (a week).
+      int GetDKIMSignatureValiditySeconds() const { return dkim_signature_validity_seconds_; }
+
+      // Whether a signature we VERIFY whose x= has passed is refused. On by default:
+      // x= is inside the bytes b= covers, so it is the signer's own instruction rather
+      // than something a third party can inject, and a check that ships off ships dead.
+      bool GetDKIMEnforceSignatureExpiry() const { return dkim_enforce_signature_expiry_; }
+
+      // RFC 6376 3.5's "fudge factor" for clock drift between us and the signer.
+      // Without it, our own clock running a few minutes fast turns other people's
+      // valid mail into a DKIM failure.
+      int GetDKIMExpiryClockSkewSeconds() const { return dkim_expiry_clock_skew_seconds_; }
+
+      // Header field names to oversign (RFC 6376 5.4): listed in h= once more often
+      // than the message carries them, so an instance ADDED after signing lands where
+      // nothing was hashed and the signature fails. Colon, comma or semicolon
+      // separated. Empty by default - oversigning a field the message does not carry
+      // also forbids a legitimate intermediary from adding a first one, and a
+      // discussion list adding Reply-To or Sender is normal, so the administrator says.
+      String GetDkimOversignHeaders() const { return dkim_oversign_headers_; }
       String GetTlsRptFromAddress() const { return tls_rpt_from_address_; }
       String GetTlsRptOrganizationName() const { return tls_rpt_organization_name_; }
       // TLS key-exchange groups, in OpenSSL group-list syntax, most preferred
@@ -277,6 +305,27 @@ namespace HM
       // never consult SslContextInitializer. Unifying that is worth doing, but it
       // is a wider change than this setting.
       String GetTlsKeyExchangeGroups() const { return tls_key_exchange_groups_; }
+      // TLS 1.3 cipher suites, colon separated, most preferred first, in the RFC 8446
+      // names: TLS_AES_256_GCM_SHA384, TLS_CHACHA20_POLY1305_SHA256,
+      // TLS_AES_128_GCM_SHA256, TLS_AES_128_CCM_SHA256, TLS_AES_128_CCM_8_SHA256.
+      //
+      // These are NOT the OpenSSL cipher-list names SslCipherList uses. OpenSSL keeps
+      // the two lists apart and neither constrains the other, so SslCipherList - which
+      // goes through SSL_CTX_set_cipher_list - governs TLS 1.2 and below only and
+      // restricts nothing on TLS 1.3, the version most peers now negotiate and one this
+      // server ships with enabled. Before this setting existed there was no way to
+      // influence the TLS 1.3 suites at all.
+      //
+      // Empty is the default and means "leave OpenSSL's own defaults alone". It has to
+      // be handled by not calling the setter: OpenSSL accepts an empty list, returns
+      // success, and leaves the context with no TLS 1.3 suite at all, after which every
+      // TLS 1.3 handshake fails with no shared cipher.
+      //
+      // Scope matches GetTlsKeyExchangeGroups above: every context built by
+      // SslContextInitializer, i.e. the SMTP, POP3, IMAP and ManageSieve listeners and
+      // outbound delivery, but NOT the REST API or Web Services listeners, which build
+      // their own SSL_CTX.
+      String GetTlsCipherSuites13() const { return tls_cipher_suites13_; }
       int GetRestApiPort() const { return rest_api_port_; }
       String GetRestApiBindAddress() const { return rest_api_bind_address_; }
       String GetRestApiCertificateFile() const { return rest_api_certificate_file_; }
@@ -442,9 +491,14 @@ namespace HM
       int manage_sieve_server_port_ = 0;
       String manage_sieve_server_bind_address_;
       bool arc_sealing_enabled_ = false;
+      int dkim_signature_validity_seconds_ = 0;
+      bool dkim_enforce_signature_expiry_ = true;
+      int dkim_expiry_clock_skew_seconds_ = 300;
+      String dkim_oversign_headers_;
       String tls_rpt_from_address_;
       String tls_rpt_organization_name_;
       String tls_key_exchange_groups_;
+      String tls_cipher_suites13_;
       int rest_api_port_ = 0;
       String rest_api_bind_address_;
       String rest_api_certificate_file_;

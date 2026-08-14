@@ -38,7 +38,7 @@ as ⬜, not ✅.
 
 ### Contents and totals
 
-781 items. The counts are the point of this table — they say where the fork is
+782 items. The counts are the point of this table — they say where the fork is
 strong and where it is thin far more honestly than any prose summary.
 
 | Section | ✅ | 🔄 | ⬜ | ⏸️ |
@@ -54,7 +54,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Accessibility, which is not optional](#accessibility-which-is-not-optional) | 6 | 1 | 2 | – |
 | **The capability matrix** | | | | |
 | [SMTP and ESMTP](#smtp-and-esmtp) | 24 | – | 4 | – |
-| [Transport security and deliverability](#transport-security-and-deliverability) | 32 | – | 14 | 1 |
+| [Transport security and deliverability](#transport-security-and-deliverability) | 35 | – | 12 | 1 |
 | [IMAP](#imap) | 57 | – | 18 | 3 |
 | [POP3](#pop3) | 18 | – | 9 | – |
 | [Sieve, ManageSieve and rules](#sieve-managesieve-and-rules) | 48 | 0 | 16 | – |
@@ -72,7 +72,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 2 | – | 4 | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 5 | 1 | 2 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 4 | 1 | 4 | – |
-| **Total** | **586** | **12** | **169** | **14** |
+| **Total** | **589** | **12** | **167** | **14** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage and the administration surface are the best-covered areas**, and the
@@ -264,7 +264,7 @@ the source, not from documentation.
 
 ### Transport security and deliverability
 
-32 shipped · 0 underway · 14 not started · 1 deferred
+35 shipped · 0 underway · 12 not started · 1 deferred
 
 | | Capability | Detail |
 |:-:|---|---|
@@ -306,15 +306,16 @@ the source, not from documentation.
 | ⬜ | Authentication-Results / Received-SPF header (RFC 8601) | No RFC 8601 Authentication-Results header and no Received-SPF header are written on inbound mail. Results only surface as X-hMailServer-Reason-* scoring headers, or inside ARC-Authentication-Results when ARC sealing is on. |
 | ⬜ | Client certificates (mutual TLS) for inbound sessions | Never requested. Peer verification is gated on `IsClient()`, so inbound SMTP/IMAP/POP3 always use `verify_none`; there is no per-port or per-IP-range client-certificate requirement. |
 | ⬜ | DKIM dual-selector rotation | Domain holds a single selector and a single private key file, so key rotation requires an edit-and-cutover rather than publishing two selectors. Called out as a gap in the roadmap. |
-| ⬜ | DKIM oversigning | No oversigning. A fixed 30-entry recommended-header list is used and each header name appears at most once in h= (found headers are erased from the pool after matching)… |
-| ⬜ | DKIM t= / x= signature timestamps | The emitted DKIM-Signature contains only v, a, d, s, c, q, h, bh, b. No signing timestamp (t=) and no expiry (x=), and no x= expiry check on the verify side either. |
+| ✅ | DKIM oversigning | `DkimOversignHeaders` (ini `[Settings]`, empty by default) lists field names to name in `h=` once more often than the message carries them, per RFC 6376 5.4. The extra listing hashes as the null string, so for an ordinary message the header hash is byte-identical — what it binds is the *count*: a verifier takes the bottom-most unused instance for each `h=` entry, so an instance added after signing lands where nothing was hashed and the signature fails. That is what stops a second `From:` being prepended, the one every mail client displays, while a bottom-up verifier passes on the original underneath. `From` is included whenever the feature is on at all, and a name that is not otherwise signed is added to the signed set too — listed once it would be a plain signature and no protection, which is the silent kind of no-op. Off by default because oversigning a field the message lacks also forbids a legitimate intermediary (a discussion list adding `Reply-To` or `Sender`) from adding a first one. Signing re-runs the canonicaliser with the final list rather than appending names to `h=`, so that a message genuinely carrying two of an oversigned name is hashed the way a verifier will read it. Also fixed on the way: `DKIM::Initialize` never cleared `recommendedHeaderFields_`, and it runs on every `Reinitialize`, so the list grew by 30 entries per settings reload — harmless only because repeats matched nothing, which is exactly the accident oversigning ends. |
+| ✅ | DKIM t= / x= signature timestamps | `t=` is emitted on every signature (RFC 6376 3.5, RECOMMENDED). `x=` is emitted only when `DKIMSignatureValiditySeconds` is set, because an expiry is a promise about mail already in flight and a window shorter than a legitimate retry or mailing-list delay costs the message its DKIM pass and DMARC alignment at the far end. On the verify side an expired signature is now PermFail — it had never been checked, so a captured signed message replayed for ever — governed by `DKIMEnforceSignatureExpiry` (default on, since `x=` is inside the bytes `b=` covers and is therefore the signer's own instruction) with `DKIMExpiryClockSkewSeconds` (default 300) as RFC 6376 3.5's fudge factor for clock drift. The two duplicated format strings in `BuildSignatureHeader_` were merged into one first: the field is hashed with `b=` emptied and then written, so any tag added to one copy and not the other yields a signature that verifies nowhere and fails nothing locally. |
 | ⬜ | DMARC aggregate (rua) and forensic (ruf) reporting | The server consumes DMARC policy but never generates reports for the domains it receives mail from - no rua/ruf parsing, no per-day DMARC aggregation, no report mail. (TLS-RPT reporting exists; DMARC reporting does not.) |
+| ⬜ | DMARC organizational domain from the real Public Suffix List | `DMARC::GetOrganizationalDomain` uses a ~120-entry table of multi-label suffixes plus a shape rule (a registry label such as `com`/`co`/`ac` directly under a two-letter ccTLD, excluding ccTLDs known to be flat). That is a large improvement on the bare table, which returned the *public suffix itself* as the organizational domain for anything it did not list — so under relaxed alignment, the default, every domain beneath a missing suffix was forgeable by anyone holding any other name beneath it. It is still a heuristic, and both error directions remain reachable: a two-label suffix whose second label is not a registry word (`my.id`, `gr.jp`, `sc.ke`, `art.br`) still collapses, and a flat-ccTLD registrant not on the exclusion list would align too strictly. The PSL has ~9,000 rules with wildcard and exception syntax and changes weekly, so completing the table by hand only relocates the next gap; the fix is to bundle and parse the list properly, with a refresh story. |
 | ⬜ | DNSSEC authenticated denial of existence (NSEC/NSEC3) | A missing DS record is treated as an unsigned (Insecure) delegation without validating the NSEC/NSEC3 proof, so a stripped-DS downgrade is not detected. No NSEC or NSEC3 handling exists in the resolver. |
 | ⬜ | Encrypted private keys for TLS certificates | Explicitly unsupported: the password callback logs error 5143 ("The private key file has a password. hMailServer does not support this.") and returns an empty string. |
 | ⬜ | Per-account outbound sending limits | RateLimiter is per-IP and per-destination-domain, per minute only. There is no per-account message quota, no daily cap and no recipient-count cap… |
 | ✅ | Post-quantum key exchange (X25519MLKEM768) | Shipped 12 Aug 2026 and completed 13 Aug 2026. The hard-coded three-curve list is gone; `TlsKeyExchangeGroups` defaults to the hybrid ML-KEM groups ahead of the classical curves and reaches every TLS context in the server, inbound and outbound. [See the defects list](#defects-found-by-the-audit) for the fallback that keeps a mistyped list from taking TLS down. |
 | ⬜ | Session resumption / ticket management | No configuration or code at all: no session-ID context, no cache sizing, no ticket-key rotation, no `SSL_OP_NO_TICKET`. Behaviour is whatever Boost.Asio/OpenSSL default to… |
-| ⬜ | TLS 1.3 ciphersuite configuration | Not exposed. `SSL_CTX_set_ciphersuites` is never called anywhere in the server, and `SSL_CTX_set_cipher_list` governs TLS 1.2 and below only — so on the protocol most clients now negotiate, and which ships enabled, `SslCipherList` restricts nothing. An administrator who removes a suite there and verifies with a TLS 1.2 scan gets a true result and a false conclusion. Needs one ini setting (`TlsCipherSuites13`) and a `SetCipherList_`-shaped application with a fallback: an empty or rejected TLS 1.3 suite list means no TLS 1.3 handshake at all. |
+| ✅ | TLS 1.3 ciphersuite configuration | `TlsCipherSuites13` (ini `[Settings]`, empty by default) applied through `SSL_CTX_set_ciphersuites` in `SslContextInitializer::SetTls13CipherSuites_`, on both the server and client contexts. Empty means "leave OpenSSL's defaults" and is implemented by not calling the setter at all — OpenSSL accepts an empty list, succeeds, and leaves the context with no TLS 1.3 suite whatsoever, after which every TLS 1.3 handshake fails with no shared cipher. A rejected list keeps the defaults and reports HM6120; names OpenSSL silently skips (a typo, or a suite this build disabled) are named individually in HM6121, because the parser drops an unknown element and returns success, which otherwise halves the offered suites in silence. The Control Panel gained a row beside the existing cipher list, which is now labelled "for TLS 1.2 and below" — the old label implied a reach it never had. |
 
 ### IMAP
 

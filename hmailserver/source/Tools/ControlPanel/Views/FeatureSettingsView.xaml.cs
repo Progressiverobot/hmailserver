@@ -436,6 +436,44 @@ namespace hMailServer.ControlPanel.Views
                });
                cards_.Add(new CardDef
                {
+                  Title = "DKIM signature timestamps",
+                  Blurb = "When a DKIM signature was made, and when it stops being one a verifier should honour (RFC 6376 3.5).",
+                  Settings =
+                  {
+                     new TextSetting
+                     {
+                        Key = "DKIMSignatureValiditySeconds",
+                        Default = "0",
+                        Placeholder = "604800",
+                        Label = "Validity window in seconds for signatures we produce (0 = no expiry)",
+                        Blurb = "0 emits no expiry at all, which is the safe default: an expiry is a promise about mail " +
+                                "already in flight, and a window shorter than the delay a retry, a greylist or a mailing " +
+                                "list adds costs the message its DKIM pass and its DMARC alignment at the far end. " +
+                                "604800 is a week, the usual choice for a sender who wants one. A signing timestamp is " +
+                                "always sent regardless of this value."
+                     },
+                     new BoolSetting
+                     {
+                        Key = "DKIMEnforceSignatureExpiry",
+                        Default = true,
+                        Label = "Refuse signatures on incoming mail whose expiry has passed",
+                        Blurb = "The expiry sits inside the bytes the signature covers, so it is the sending domain's own " +
+                                "instruction rather than something a third party can add. Turning this off means a " +
+                                "captured signed message can be replayed indefinitely."
+                     },
+                     new TextSetting
+                     {
+                        Key = "DKIMExpiryClockSkewSeconds",
+                        Default = "300",
+                        Placeholder = "300",
+                        Label = "Clock-drift tolerance in seconds when checking an expiry",
+                        Blurb = "Allows for this server's clock differing from the signer's. Without it, a clock running " +
+                                "a few minutes fast turns other people's valid mail into DKIM failures."
+                     }
+                  }
+               });
+               cards_.Add(new CardDef
+               {
                   Title = "TLS reporting (TLS-RPT)",
                   Blurb = "Sends daily aggregate reports about TLS connection failures to recipient domains (RFC 8460).",
                   Settings =

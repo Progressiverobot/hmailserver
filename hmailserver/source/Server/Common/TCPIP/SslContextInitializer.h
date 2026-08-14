@@ -23,6 +23,7 @@ namespace HM
       static std::string  GetPassword_();
 
       static void SetCipherList_(boost::asio::ssl::context& context);
+      static void SetTls13CipherSuites_(boost::asio::ssl::context& context);
 
       // Sets the TLS key-exchange group list. Named "groups" rather than "curves"
       // because the list now carries hybrid post-quantum KEMs (X25519MLKEM768 and

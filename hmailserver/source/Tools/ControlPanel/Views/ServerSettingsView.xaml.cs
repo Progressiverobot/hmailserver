@@ -1128,7 +1128,25 @@ namespace hMailServer.ControlPanel.Views
          var ciph = Card("Ciphers & verification");
          var preferServer = new ComBool { Path = "TlsOptionPreferServerCiphersEnabled", Label = "Prefer server cipher order" };
          var chacha = new ComBool { Path = "TlsOptionPrioritizeChaChaEnabled", Label = "Prioritize ChaCha20-Poly1305 when the client prefers it (needs TLS 1.2 or 1.3)" };
-         ciph.Settings.Add(new ComText { Path = "SslCipherList", Label = "Cipher list (OpenSSL format)" });
+         // Labelled "TLS 1.2 and below" rather than just "Cipher list", because that is
+         // what it governs and the old label implied otherwise. OpenSSL keeps the TLS
+         // 1.3 suites in a separate list that SSL_CTX_set_cipher_list does not touch, so
+         // removing a cipher here and confirming it with a TLS 1.2 scan proved nothing
+         // about the version most clients actually negotiate.
+         ciph.Settings.Add(new ComText { Path = "SslCipherList", Label = "Cipher list for TLS 1.2 and below (OpenSSL format)" });
+         ciph.Settings.Add(new IniText
+         {
+            Path = "TlsCipherSuites13",
+            Label = "TLS 1.3 cipher suites (empty = OpenSSL defaults)",
+            Placeholder = "TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256",
+            Blurb = "TLS 1.3 has its own suite list, its own names and its own setter, so the cipher list above " +
+                    "does not restrict it. Colon separated, most preferred first, using the RFC 8446 names " +
+                    "(TLS_AES_256_GCM_SHA384, TLS_CHACHA20_POLY1305_SHA256, TLS_AES_128_GCM_SHA256, " +
+                    "TLS_AES_128_CCM_SHA256, TLS_AES_128_CCM_8_SHA256) - not the OpenSSL cipher-list names. " +
+                    "Leave empty to keep OpenSSL's defaults; a name this build does not recognise is skipped " +
+                    "and reported rather than failing the whole list.",
+            IniStore = iniStore_
+         });
          ciph.Settings.Add(preferServer);
          ciph.Settings.Add(chacha);
          ciph.Settings.Add(new ComBool { Path = "VerifyRemoteSslCertificate", Label = "Verify remote certificates when delivering" });

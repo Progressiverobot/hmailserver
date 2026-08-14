@@ -115,6 +115,7 @@ namespace hMailServer.ControlPanel.Tests.Services
       [InlineData("TlsVersion12Enabled", "tls")]
       [InlineData("TlsVersion13Enabled", "tls")]
       [InlineData("SslCipherList", "tls")]
+      [InlineData("TlsCipherSuites13", "tls")]
       [InlineData("TlsOptionPreferServerCiphersEnabled", "tls")]
       [InlineData("VerifyRemoteSslCertificate", "tls")]
       public void EachSetting_IsIndexedAgainstTheHalfThatShowsIt(string key, string page)

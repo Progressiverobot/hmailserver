@@ -5,6 +5,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
 using hMailServer;
 using NUnit.Framework;
@@ -525,6 +526,215 @@ namespace RegressionTests.AntiSpam.DKIM
 
             Assert.IsTrue(localData.ToLower().Contains("dkim-signature"),
                "Expected a DKIM-Signature header in the locally-delivered message but none was found.\r\n" + localData);
+         }
+      }
+
+      /// <summary>
+      ///    Signs a message to a local account and returns the raw stored message.
+      /// </summary>
+      private string SignAndFetch(string accountName)
+      {
+         _domain.DKIMPrivateKeyFile = GetPrivateKeyFile();
+         _domain.DKIMSelector = "TestSelector";
+         _domain.DKIMSignEnabled = true;
+         _domain.Save();
+
+         var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, accountName, "test");
+
+         SmtpClientSimulator.StaticSend("sender@example.test", account.Address, "Test subject", "Test body");
+         ImapClientSimulator.AssertMessageCount(account.Address, "test", "Inbox", 1);
+
+         var imap = new ImapClientSimulator();
+         imap.ConnectAndLogon(account.Address, "test");
+         imap.SelectFolder("Inbox");
+
+         return imap.Fetch("1 RFC822");
+      }
+
+      [Test]
+      [Description("RFC 6376 3.5 lists t= as RECOMMENDED, and it is what makes an x= beside it " +
+                   "interpretable when a receiver complains. It is emitted unconditionally.")]
+      public void SignedMessageShouldCarryASigningTimestamp()
+      {
+         string messageData = SignAndFetch("t-tag@example.test");
+
+         var match = Regex.Match(messageData, @"[;\s]t=(\d+)\s*;");
+         Assert.IsTrue(match.Success,
+            "Expected the DKIM-Signature to carry a t= signing timestamp.\r\n" + messageData);
+
+         long signedAt = long.Parse(match.Groups[1].Value);
+         long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+
+         // Wide on purpose. The point is that t= is seconds since the UNIX epoch in UTC
+         // rather than, say, local time or milliseconds - a whole day of slack still
+         // catches every one of those mistakes.
+         Assert.IsTrue(Math.Abs(now - signedAt) < 86400,
+            $"t= was {signedAt}, which is not within a day of the current UNIX time {now}. " +
+            "It is meant to be seconds since the epoch, UTC.\r\n" + messageData);
+      }
+
+      [Test]
+      [Description("With no DKIMSignatureValiditySeconds configured - the default - no x= is emitted. " +
+                   "An expiry is a promise about mail already in flight and is not made unasked.")]
+      public void WithNoValidityWindowConfigured_SignedMessageShouldCarryNoExpiry()
+      {
+         string messageData = SignAndFetch("no-x-tag@example.test");
+
+         Assert.IsTrue(messageData.ToLower().Contains("dkim-signature"),
+            "Expected a DKIM-Signature header.\r\n" + messageData);
+         Assert.IsFalse(Regex.IsMatch(messageData, @"[;\s]x=\d+\s*;"),
+            "Expected no x= expiry tag when DKIMSignatureValiditySeconds is unset.\r\n" + messageData);
+      }
+
+      [Test]
+      [Description("DKIMSignatureValiditySeconds emits x= as t plus the window, so a verifier is told " +
+                   "exactly when to stop honouring the signature.")]
+      public void WithAValidityWindowConfigured_ExpiryShouldBeSigningTimePlusTheWindow()
+      {
+         const int validitySeconds = 604800;   // one week
+
+         IniFileSetting.Write("DKIMSignatureValiditySeconds", validitySeconds.ToString());
+         _application.Reinitialize();
+
+         try
+         {
+            string messageData = SignAndFetch("x-tag@example.test");
+
+            var t = Regex.Match(messageData, @"[;\s]t=(\d+)\s*;");
+            var x = Regex.Match(messageData, @"[;\s]x=(\d+)\s*;");
+
+            Assert.IsTrue(t.Success, "Expected a t= tag.\r\n" + messageData);
+            Assert.IsTrue(x.Success, "Expected an x= tag once a validity window is configured.\r\n" + messageData);
+
+            long signedAt = long.Parse(t.Groups[1].Value);
+            long expiresAt = long.Parse(x.Groups[1].Value);
+
+            Assert.AreEqual(signedAt + validitySeconds, expiresAt,
+               "x= should be exactly t= plus DKIMSignatureValiditySeconds.\r\n" + messageData);
+         }
+         finally
+         {
+            IniFileSetting.Write("DKIMSignatureValiditySeconds", "0");
+            _application.Reinitialize();
+         }
+      }
+
+      [Test]
+      [Description("The signature is computed over the DKIM-Signature field itself with b= emptied " +
+                   "(RFC 6376 3.7), so the tag order and spelling that are hashed must match what is " +
+                   "written. Adding t=/x= is precisely the change that can break that, and the symptom " +
+                   "is invisible here and total at every receiver, so the shape is pinned.")]
+      public void SignatureHeaderShouldKeepItsTagOrderWithTimestampsPresent()
+      {
+         string messageData = SignAndFetch("tag-order@example.test");
+
+         var match = Regex.Match(messageData,
+            @"DKIM-Signature:\s*v=1;\s*a=[^;]+;\s*d=[^;]+;\s*s=[^;]+;\s*c=[^;]+;\s*q=[^;]+;\s*t=\d+;\s*h=",
+            RegexOptions.IgnoreCase);
+
+         Assert.IsTrue(match.Success,
+            "Expected the tag order v=, a=, d=, s=, c=, q=, t=, h= - t= sits between q= and h=, " +
+            "and both the hashed and the written form must agree on it.\r\n" + messageData);
+      }
+
+      /// <summary>
+      ///    The h= tag with folding removed, lowercased.
+      /// </summary>
+      private static string HeaderFieldList(string messageData)
+      {
+         var match = Regex.Match(messageData, @"[;\s]h=([^;]+);", RegexOptions.IgnoreCase);
+         Assert.IsTrue(match.Success, "No h= tag found in the DKIM-Signature.\r\n" + messageData);
+
+         return Regex.Replace(match.Groups[1].Value, @"\s+", "").ToLowerInvariant();
+      }
+
+      [Test]
+      [Description("Oversigning is off unless asked for. Listing a field the message does not carry " +
+                   "also forbids a legitimate intermediary from adding a first one, so it is not a " +
+                   "default anyone should get without choosing it.")]
+      public void ByDefault_EachSignedHeaderIsNamedOnce()
+      {
+         string fieldList = HeaderFieldList(SignAndFetch("no-oversign@example.test"));
+
+         int fromCount = fieldList.Split(':').Count(f => f == "from");
+         Assert.AreEqual(1, fromCount,
+            $"Expected From to appear once in h= with no oversigning configured, but h= was '{fieldList}'.");
+      }
+
+      [Test]
+      [Description("RFC 6376 5.4: a name listed once more often than the message carries it means an " +
+                   "instance added afterwards lands where the signer hashed nothing, so the signature " +
+                   "breaks. That is what stops a second From: being prepended - which is the one every " +
+                   "mail client displays - while a bottom-up verifier passes on the original underneath.")]
+      public void WhenOversigningConfigured_TheFieldIsNamedTwiceInTheHeaderList()
+      {
+         IniFileSetting.Write("DkimOversignHeaders", "From:Subject");
+         _application.Reinitialize();
+
+         try
+         {
+            string fieldList = HeaderFieldList(SignAndFetch("oversign@example.test"));
+
+            var names = fieldList.Split(':');
+
+            Assert.AreEqual(2, names.Count(f => f == "from"),
+               $"Expected From to be listed twice in h= when oversigned, but h= was '{fieldList}'.");
+            Assert.AreEqual(2, names.Count(f => f == "subject"),
+               $"Expected Subject to be listed twice in h= when oversigned, but h= was '{fieldList}'.");
+         }
+         finally
+         {
+            IniFileSetting.Write("DkimOversignHeaders", "");
+            _application.Reinitialize();
+         }
+      }
+
+      [Test]
+      [Description("From is the field oversigning exists for, so it is included whenever the feature is " +
+                   "on at all. Oversigning something else but not From is a mistake, and one nothing " +
+                   "would otherwise report.")]
+      public void WhenOversigningConfiguredWithoutFrom_FromIsStillOversigned()
+      {
+         IniFileSetting.Write("DkimOversignHeaders", "Subject");
+         _application.Reinitialize();
+
+         try
+         {
+            string fieldList = HeaderFieldList(SignAndFetch("oversign-implicit-from@example.test"));
+
+            Assert.AreEqual(2, fieldList.Split(':').Count(f => f == "from"),
+               $"Expected From to be oversigned even though only Subject was named, but h= was '{fieldList}'.");
+         }
+         finally
+         {
+            IniFileSetting.Write("DkimOversignHeaders", "");
+            _application.Reinitialize();
+         }
+      }
+
+      [Test]
+      [Description("The rule is 'listed more times than it occurs', so a header the message does not " +
+                   "carry needs exactly one listing: a verifier finds nothing for it and hashes the " +
+                   "null string, which is what we hashed, and anyone who ADDS one makes the verifier " +
+                   "hash it where we hashed nothing. That is the protection, and it is why the count " +
+                   "is one here and two for a header that is present.")]
+      public void WhenOversigningAHeaderTheMessageDoesNotCarry_ItIsNamedOnce()
+      {
+         IniFileSetting.Write("DkimOversignHeaders", "X-Custom-Marker");
+         _application.Reinitialize();
+
+         try
+         {
+            string fieldList = HeaderFieldList(SignAndFetch("oversign-custom@example.test"));
+
+            Assert.AreEqual(1, fieldList.Split(':').Count(f => f == "x-custom-marker"),
+               "A header named for oversigning that the message does not carry must still be listed " +
+               $"once, or nothing stops one being added; h= was '{fieldList}'.");
+         }
+         finally
+         {
+            IniFileSetting.Write("DkimOversignHeaders", "");
+            _application.Reinitialize();
          }
       }
    }

@@ -39,6 +39,48 @@ namespace HM
 
          return formatted;
       }
+
+      // The TLS 1.3 suite names in `configured` that did not end up in the context,
+      // comma separated; empty when OpenSSL took all of them. File-local for the same
+      // reason FormatCertificateTime is - the header does not have to expose OpenSSL
+      // types.
+      //
+      // Worth the trouble because OpenSSL's ciphersuite parser skips an element it does
+      // not recognise and carries on, returning success. A list with one typo in it is
+      // applied minus that entry and nothing says so, which quietly halves the suites
+      // this server offers. Suites that parsed but whose algorithm this build has
+      // disabled are dropped too and land here as well, which is the same answer an
+      // administrator needs.
+      AnsiString FindUnappliedCipherSuites(SSL_CTX *ssl, const AnsiString &configured)
+      {
+         std::set<AnsiString> applied;
+
+         STACK_OF(SSL_CIPHER) *ciphers = SSL_CTX_get_ciphers(ssl);
+
+         // sk_SSL_CIPHER_num(nullptr) is -1, so a null stack simply skips the loop.
+         for (int i = 0; i < sk_SSL_CIPHER_num(ciphers); i++)
+         {
+            const char *standardName = SSL_CIPHER_standard_name(sk_SSL_CIPHER_value(ciphers, i));
+
+            if (standardName != nullptr)
+               applied.insert(AnsiString(standardName));
+         }
+
+         AnsiString unapplied;
+
+         for (AnsiString name : StringParser::SplitString(configured, ":"))
+         {
+            if (name.IsEmpty() || applied.find(name) != applied.end())
+               continue;
+
+            if (!unapplied.IsEmpty())
+               unapplied += ", ";
+
+            unapplied += name;
+         }
+
+         return unapplied;
+      }
    }
 
    bool
@@ -55,9 +97,10 @@ namespace HM
       SetKeyExchangeGroups_(context);
 
       SetCipherList_(context);
+      SetTls13CipherSuites_(context);
 
       try
-      {         
+      {
          String bin_directory = Utilities::GetBinDirectory();
          String dh2048_file = FileUtilities::Combine(bin_directory, "dh2048.pem");
 
@@ -183,6 +226,7 @@ namespace HM
       SetKeyExchangeGroups_(context);
 
       SetCipherList_(context);
+      SetTls13CipherSuites_(context);
 
       return true;
    }
@@ -263,6 +307,61 @@ namespace HM
          ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5511, "SslContextInitializer::SetCipherList_", Formatter::Format("Failed to set SSL ciphers. Message: {0}", String(GetOpenSslError_())));
       }
 
+   }
+
+   void
+   SslContextInitializer::SetTls13CipherSuites_(boost::asio::ssl::context& context)
+   {
+      // SetCipherList_ above applies SslCipherList through SSL_CTX_set_cipher_list,
+      // which configures the TLS 1.2-and-below cipher list and nothing else. TLS 1.3
+      // holds its suites in a separate list, with separate names and a separate setter,
+      // so on the protocol most peers now negotiate - and which ships enabled here -
+      // SslCipherList restricted nothing at all. An administrator who removed a suite
+      // there and confirmed it with a TLS 1.2 scan got a true result and a false
+      // conclusion.
+      AnsiString cipher_suites = IniFileSettings::Instance()->GetTlsCipherSuites13();
+
+      cipher_suites.Replace("\r", "");
+      cipher_suites.Replace("\n", "");
+      cipher_suites.Replace(" ", "");
+      cipher_suites = cipher_suites.Trim();
+
+      // Empty means "leave whatever OpenSSL defaulted to", and the only way to say that
+      // is not to call the function at all. SSL_CTX_set_ciphersuites accepts an empty
+      // list, succeeds, and leaves the context with no TLS 1.3 suite whatsoever, after
+      // which every TLS 1.3 handshake fails with no shared cipher. So this is a check
+      // rather than a look at the return value.
+      if (cipher_suites.IsEmpty())
+         return;
+
+      // Asio does not expose the TLS 1.3 suite list. Access the underlying layer
+      // (OpenSSL) directly, as SetCipherList_ does.
+      SSL_CTX* ssl = context.native_handle();
+
+      if (SSL_CTX_set_ciphersuites(ssl, cipher_suites.c_str()) != 1)
+      {
+         // No fallback list here, unlike SetKeyExchangeGroups_: OpenSSL builds the
+         // replacement list first and frees it on failure, so a rejected list is not
+         // applied at all and the context keeps its default suites. TLS 1.3 still works;
+         // what is wrong is that the administrator's list is not in force, so say so and
+         // carry on. GetOpenSslError_ also empties the error queue, which matters
+         // because InitServer goes on to load the certificate and private key.
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6120, "SslContextInitializer::SetTls13CipherSuites_",
+            Formatter::Format("Failed to set the TLS 1.3 cipher suites '{0}'. Message: {1}. TLS 1.3 keeps the OpenSSL default suites. Note that these are the RFC 8446 suite names (for example TLS_AES_256_GCM_SHA384) and not the OpenSSL cipher-list names used by SslCipherList.",
+               String(cipher_suites), String(GetOpenSslError_())));
+         return;
+      }
+
+      // A name OpenSSL does not recognise is skipped and the rest of the list is still
+      // accepted, so a single typo silently reduces the suites this server offers.
+      AnsiString ignored = FindUnappliedCipherSuites(ssl, cipher_suites);
+
+      if (!ignored.IsEmpty())
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6121, "SslContextInitializer::SetTls13CipherSuites_",
+            Formatter::Format("The TLS 1.3 cipher suite names {0} are not known to, or not available in, this OpenSSL build and were ignored. The rest of '{1}' was applied. Check the spelling against the RFC 8446 names.",
+               String(ignored), String(cipher_suites)));
+      }
    }
 
    void

@@ -65,10 +65,28 @@ namespace HM
       Result RetrievePublicKey_(const DKIMParameters &signatureParams, AnsiString &publicKey, AnsiString &flags);
       AnsiString GetDKIMWithoutSignature_(AnsiString value);
 
-      String BuildSignatureHeader_(const String &tagA, const String &tagD, const String &tagS, const String &tagC, const String &tagQ, const String &fieldList, const String &bodyHash, const String &signatureString);
+      String BuildSignatureHeader_(const String &tagA, const String &tagD, const String &tagS, const String &tagC, const String &tagQ, const String &timestampTags, const String &fieldList, const String &bodyHash, const String &signatureString);
+
+      // RFC 6376 3.5 signature timestamps. timestampTags above is either empty or
+      // carries its own leading space and trailing semicolon, e.g. " t=1786500000;".
+      static String BuildTimestampTags_(__int64 signingTime, int validitySeconds);
+      static bool IsSignatureExpired_(const AnsiString &tagX, __int64 verificationTime, int toleranceSeconds);
       std::shared_ptr<Canonicalization> CreateCanonicalization_(Canonicalization::CanonicalizeMethod method);
       bool HasSignatureForDomain_(MimeHeader &mimeHeader, const AnsiString &domain);
       static std::vector<AnsiString> recommendedHeaderFields_;
+
+      // RFC 6376 5.4 oversigning: header field names to list in h= once MORE often than
+      // the message carries them. The extra listing hashes as the null string (5.4.2),
+      // so for a well-formed message it changes not one byte of the header hash - what
+      // it binds is the COUNT. A verifier walks h= in order taking the bottom-most
+      // unused instance of each name, so an instance added after we signed lands where
+      // we hashed nothing and the signature fails.
+      //
+      // Without it, a second From: prepended to a message is what every mail client
+      // displays, while a bottom-up verifier still passes on the original underneath.
+      static std::vector<AnsiString> oversignHeaderFields_;
+
+      static void InitializeOversigning_();
 
       // Returns the DKIM-Signature fields of the message, up to the verification
       // limit in DKIM.cpp. moreThanWeVerify, when given, is set if the message

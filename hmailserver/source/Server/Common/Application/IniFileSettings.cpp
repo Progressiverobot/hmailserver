@@ -364,6 +364,25 @@ namespace HM
       manage_sieve_server_port_ = ReadIniSettingInteger_("Settings", "ManageSieveServerPort", 0);
       manage_sieve_server_bind_address_ = ReadIniSettingString_("Settings", "ManageSieveServerBindAddress", "127.0.0.1");
       arc_sealing_enabled_ = ReadIniSettingInteger_("Settings", "ArcSealingEnabled", 0) == 1;
+
+      // DKIM signature timestamps (RFC 6376 3.5). See DKIM::Sign and
+      // DKIM::VerifySignature_ for what each of these does.
+      //
+      // Enforcement defaults ON while emission of x= defaults OFF, and the asymmetry is
+      // deliberate: honouring an expiry another server published costs us nothing and is
+      // what the signer asked for, whereas publishing one of our own is a promise about
+      // mail already in flight.
+      dkim_signature_validity_seconds_ = ReadIniSettingInteger_("Settings", "DKIMSignatureValiditySeconds", 0);
+      if (dkim_signature_validity_seconds_ < 0)
+         dkim_signature_validity_seconds_ = 0;
+
+      dkim_enforce_signature_expiry_ = ReadIniSettingInteger_("Settings", "DKIMEnforceSignatureExpiry", 1) == 1;
+
+      dkim_expiry_clock_skew_seconds_ = ReadIniSettingInteger_("Settings", "DKIMExpiryClockSkewSeconds", 300);
+      if (dkim_expiry_clock_skew_seconds_ < 0)
+         dkim_expiry_clock_skew_seconds_ = 0;
+
+      dkim_oversign_headers_ = ReadIniSettingString_("Settings", "DkimOversignHeaders", "");
       tls_rpt_from_address_ = ReadIniSettingString_("Settings", "TlsRptFromAddress", "");
       tls_rpt_organization_name_ = ReadIniSettingString_("Settings", "TlsRptOrganizationName", "hMailServer");
 
@@ -374,6 +393,12 @@ namespace HM
       // SslContextInitializer::SetKeyExchangeGroups_ for the fallback that keeps
       // TLS working if OpenSSL rejects whatever is configured here.
       tls_key_exchange_groups_ = ReadIniSettingString_("Settings", "TlsKeyExchangeGroups", "X25519MLKEM768:SecP256r1MLKEM768:X25519:secp384r1:secp256r1");
+
+      // Empty, unlike the group list above, and deliberately so. A default here would
+      // pin the TLS 1.3 suites to whatever was current when this line was written and
+      // silently keep them pinned as OpenSSL's own defaults moved on. Empty means "use
+      // OpenSSL's", which is the better answer until an administrator says otherwise.
+      tls_cipher_suites13_ = ReadIniSettingString_("Settings", "TlsCipherSuites13", "");
       rest_api_port_ = ReadIniSettingInteger_("Settings", "RestApiPort", 0);
       rest_api_bind_address_ = ReadIniSettingString_("Settings", "RestApiBindAddress", "127.0.0.1");
       rest_api_certificate_file_ = ReadIniSettingString_("Settings", "RestApiCertificateFile", "");

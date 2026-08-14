@@ -61,9 +61,63 @@ namespace HM
             return 1; // Neutral: this signature tells us nothing.
          }
       }
+
+      // A bound on what an administrator can push into h=. The tag is emitted on a
+      // single unfolded line and RFC 5322 2.1.1 caps a header line at 998 octets; the
+      // 30 recommended fields can already account for around 350 of them.
+      const int MaxOversignHeadersLength = 256;
+
+      // RFC 5322 3.6.8 ftext: printable US-ASCII with the colon excluded. The colon is
+      // also h='s separator, so a name containing one would silently become two
+      // entries, and one containing ';' would end the tag early and corrupt every tag
+      // after it.
+      bool IsValidHeaderFieldName(const AnsiString &name)
+      {
+         if (name.IsEmpty())
+            return false;
+
+         for (char c : name)
+         {
+            if (c < 33 || c > 126 || c == ':')
+               return false;
+         }
+
+         return true;
+      }
+
+      bool ContainsFieldNoCase(const std::vector<AnsiString> &fields, const AnsiString &name)
+      {
+         for (const AnsiString &field : fields)
+         {
+            if (field.CompareNoCase(name) == 0)
+               return true;
+         }
+
+         return false;
+      }
+
+      // h= is a colon-separated list (RFC 6376 3.5).
+      AnsiString JoinFieldList(const std::vector<AnsiString> &fields)
+      {
+         AnsiString result;
+
+         for (const AnsiString &field : fields)
+         {
+            if (field.IsEmpty())
+               continue;
+
+            if (!result.IsEmpty())
+               result += ":";
+
+            result += field;
+         }
+
+         return result;
+      }
    }
 
    std::vector<AnsiString> DKIM::recommendedHeaderFields_;
+   std::vector<AnsiString> DKIM::oversignHeaderFields_;
 
    DKIM::DKIM()
    {
@@ -75,6 +129,18 @@ namespace HM
    {
       // OpenSSL 1.1.0+ initializes itself automatically; the legacy
       // ERR_load_EVP_strings() call is deprecated and no longer needed.
+
+      // Rebuilt from scratch rather than appended to. This is reached from
+      // SpamProtection::Load, which StartServers calls - and Application::Reinitialize
+      // calls StartServers again, so the list gained another 30 entries on every
+      // settings reload and grew without bound for the life of the process.
+      //
+      // It has been survivable only by accident: both canonicalizers consume a matched
+      // field from their pool and append to h= only when they found something, so the
+      // repeats matched nothing and were dropped. That accident stops holding the moment
+      // an entry is *meant* to repeat, which is what RFC 6376 5.4 oversigning does.
+      recommendedHeaderFields_.clear();
+      oversignHeaderFields_.clear();
 
       recommendedHeaderFields_.push_back("From");
       recommendedHeaderFields_.push_back("Sender");
@@ -112,6 +178,66 @@ namespace HM
 
       // Addition for CSA-Compliant Mail Headers
       recommendedHeaderFields_.push_back("X-CSA-Complaints");
+
+      InitializeOversigning_();
+   }
+
+   void
+   DKIM::InitializeOversigning_()
+   {
+      String configured = IniFileSettings::Instance()->GetDkimOversignHeaders();
+
+      if (configured.IsEmpty())
+         return;
+
+      if (configured.GetLength() > MaxOversignHeadersLength)
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6122, "DKIM::InitializeOversigning_",
+            Formatter::Format("DkimOversignHeaders is longer than {0} characters and was ignored. h= is emitted on one unfolded line, which RFC 5322 caps at 998 octets, and the fields signed by default already account for a large part of that.", MaxOversignHeadersLength));
+         return;
+      }
+
+      // Colon is the h= separator; comma and semicolon are accepted because they are
+      // what an administrator is likely to type.
+      AnsiString flattened = configured;
+      flattened.Replace(",", ":");
+      flattened.Replace(";", ":");
+
+      for (AnsiString name : StringParser::SplitString(flattened, ":"))
+      {
+         name = name.Trim();
+
+         if (name.IsEmpty())
+            continue;
+
+         if (!IsValidHeaderFieldName(name))
+         {
+            ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6123, "DKIM::InitializeOversigning_",
+               Formatter::Format("'{0}' is not a valid header field name and was dropped from DkimOversignHeaders. Names must be printable US-ASCII with no colon.", String(name)));
+            continue;
+         }
+
+         if (ContainsFieldNoCase(oversignHeaderFields_, name))
+            continue;
+
+         oversignHeaderFields_.push_back(name);
+
+         // Oversigning a field means "sign it, and forbid a second one". A name that is
+         // not signed in the first place would appear in h= exactly once, which is an
+         // ordinary signature over it and no protection at all - a silent no-op, and the
+         // dangerous kind, because the administrator asked for protection and the
+         // configuration looks like it was accepted.
+         if (!ContainsFieldNoCase(recommendedHeaderFields_, name))
+            recommendedHeaderFields_.push_back(name);
+      }
+
+      // From is the field oversigning exists for: a prepended second From: is what every
+      // mail client shows while a bottom-up verifier still passes on the one underneath.
+      // It is always present and always already signed, and no legitimate intermediary
+      // adds a second, so including it carries no interop cost. Oversigning anything at
+      // all but not From is a mistake, and one nothing would report.
+      if (!oversignHeaderFields_.empty() && !ContainsFieldNoCase(oversignHeaderFields_, "From"))
+         oversignHeaderFields_.push_back("From");
    }
 
    // helper.
@@ -173,6 +299,45 @@ namespace HM
 
       AnsiString fieldList;
       AnsiString canonicalizedHeader = headerCanonicalization->CanonicalizeHeader(header, dummySignatureField, recommendedHeaderFields_, fieldList);
+
+      if (!oversignHeaderFields_.empty())
+      {
+         // Oversigning has to go through the canonicalizer a second time rather than
+         // just appending names to h=, and the reason is the one case where the two
+         // differ: a message that GENUINELY carries two of an oversigned name.
+         //
+         // A verifier reads h= left to right and, for each entry, takes the bottom-most
+         // instance it has not used yet. So given h="...:from", it consumes the second
+         // From and hashes it. Pass one above consumed only the first, so appending the
+         // name to h= without re-canonicalizing would have us hashing one From where
+         // every verifier hashes two - a signature that fails everywhere and nowhere
+         // locally.
+         //
+         // Re-running with the final list makes the signer do exactly what the verifier
+         // will do. For the ordinary message - at most one of each name - the extra
+         // entries match nothing, contribute the null string, and the header hash is
+         // byte-identical to what pass one produced.
+         //
+         // fieldList carries the fields actually found, in the order they were taken,
+         // and is what h= would have been; the oversigned names are appended once each,
+         // which is all RFC 6376 5.4.2 needs. One more listing than the message has
+         // instances already forbids adding any further one.
+         std::vector<AnsiString> finalFields;
+
+         for (AnsiString found : StringParser::SplitString(fieldList, ":"))
+         {
+            if (!found.IsEmpty())
+               finalFields.push_back(found);
+         }
+
+         for (const AnsiString &oversigned : oversignHeaderFields_)
+            finalFields.push_back(oversigned);
+
+         AnsiString reCanonicalizedFieldList;
+         canonicalizedHeader = headerCanonicalization->CanonicalizeHeader(header, dummySignatureField, finalFields, reCanonicalizedFieldList);
+
+         fieldList = JoinFieldList(finalFields);
+      }
    
       AnsiString privateKeyContent = FileUtilities::ReadCompleteTextFile(String(privateKey));
 
@@ -187,7 +352,22 @@ namespace HM
       String tagDomain = domain;
       String tagSelector = selector;
 
-      String headerValue = BuildSignatureHeader_(tagA, tagDomain, tagSelector, tagC, tagQ, fieldList, bodyHash, "");
+      // RFC 6376 3.5: t= is when this signature was made and x= when it stops being one
+      // a verifier should honour, both in seconds since the UNIX epoch, UTC. time()
+      // gives that number directly.
+      //
+      // t= goes on every signature - the RFC lists it as RECOMMENDED, no verifier
+      // decides pass or fail on it, and an x= with no t= beside it is much harder to
+      // reason about when a receiver complains. x= appears only when an administrator
+      // has asked for a validity window, because an expiry is a promise about our own
+      // outbound mail that cannot be taken back once sent: a window shorter than the
+      // delay a legitimate retry, greylist or mailing list introduces silently costs
+      // the message its DKIM pass and its DMARC alignment at the far end.
+      const __int64 signingTime = static_cast<__int64>(time(nullptr));
+      const String timestampTags = BuildTimestampTags_(signingTime,
+         IniFileSettings::Instance()->GetDKIMSignatureValiditySeconds());
+
+      String headerValue = BuildSignatureHeader_(tagA, tagDomain, tagSelector, tagC, tagQ, timestampTags, fieldList, bodyHash, "");
       
       // The header name must be hashed exactly as it is written to the message:
       // "simple" header canonicalization preserves the case, so signing over
@@ -202,7 +382,7 @@ namespace HM
          return false;
       }
       
-      headerValue = BuildSignatureHeader_(tagA, tagDomain, tagSelector, tagC, tagQ, fieldList, bodyHash, signatureString);
+      headerValue = BuildSignatureHeader_(tagA, tagDomain, tagSelector, tagC, tagQ, timestampTags, fieldList, bodyHash, signatureString);
 
       // output to file.
       std::vector<std::pair<AnsiString, AnsiString> > fieldsToWrite;
@@ -423,6 +603,27 @@ namespace HM
       {
          // Skip this header.
          return Neutral;
+      }
+
+      // RFC 6376 3.5: "Signatures MAY be considered invalid if the verification time at
+      // the verifier is past the expiration date." x= was read by nothing here before,
+      // so a captured signed message replayed forever and a signer who deliberately
+      // short-lived its signatures got no benefit from doing so.
+      //
+      // PermFail rather than Neutral, because x= sits inside the bytes b= covers: an
+      // expired signature is the SIGNER's own instruction that it should no longer be
+      // honoured, not something a third party can inject. RFC 6376 6.1.1 names
+      // PERMFAIL (signature expired) as the outcome for exactly this.
+      if (IniFileSettings::Instance()->GetDKIMEnforceSignatureExpiry())
+      {
+         const __int64 verificationTime = static_cast<__int64>(time(nullptr));
+
+         if (IsSignatureExpired_(signatureParams.GetValue("x"), verificationTime,
+                                 IniFileSettings::Instance()->GetDKIMExpiryClockSkewSeconds()))
+         {
+            LOG_DEBUG("DKIM: Signature for domain " + signingDomain + " has passed its x= expiry.");
+            return PermFail;
+         }
       }
 
       std::shared_ptr<Canonicalization> headerCanonicalization;
@@ -950,36 +1151,93 @@ namespace HM
    }
 
    String 
-   DKIM::BuildSignatureHeader_(const String &tagA, const String &tagD, const String &tagS, const String &tagC, const String &tagQ, const String &fieldList, const String &bodyHash, const String &signatureString)
+   DKIM::BuildSignatureHeader_(const String &tagA, const String &tagD, const String &tagS, const String &tagC, const String &tagQ, const String &timestampTags, const String &fieldList, const String &bodyHash, const String &signatureString)
    {
+      // One format string, built once, for both callers.
+      //
+      // This is called twice per signature - once with an empty signatureString to
+      // produce the bytes that get hashed, and once with the real signature to produce
+      // the field that gets written - and RFC 6376 3.7 requires the two to be identical
+      // up to and including "b=". It used to be two separate Format calls with the tag
+      // list spelled out twice, which is a shape where adding a tag to one and not the
+      // other produces a signature that cannot verify anywhere, with nothing failing
+      // locally to say so. Adding t= and x= is exactly the change that would have done
+      // it, so the duplication goes first.
+      //
+      // timestampTags is either empty or carries its own leading space and trailing
+      // semicolon, so with no timestamps the output is byte-identical to the previous
+      // version.
       String headerValue;
+      headerValue.Format(_T("v=1; a=%s; d=%s; s=%s;\r\n")
+         _T("\tc=%s; q=%s;%s h=%s;\r\n")
+         _T("\tbh=%s;\r\n")
+         _T("\tb="), tagA.c_str(), tagD.c_str(), tagS.c_str(), tagC.c_str(), tagQ.c_str(),
+         timestampTags.c_str(), String(fieldList).c_str(), bodyHash.c_str());
 
       if (signatureString.IsEmpty())
+         return headerValue;
+
+      // The fold positions are part of the bytes a verifier canonicalizes, so this
+      // length is not a free number to tune.
+      const int lineLength = 250;
+
+      String splitSignatureString;
+      for (int i = 0; i < signatureString.GetLength(); i += lineLength)
       {
-         headerValue.Format(_T("v=1; a=%s; d=%s; s=%s;\r\n")
-            _T("\tc=%s; q=%s; h=%s;\r\n")
-            _T("\tbh=%s;\r\n")
-            _T("\tb="), tagA.c_str(), tagD.c_str(), tagS.c_str(), tagC.c_str(), tagQ.c_str(), String(fieldList).c_str(), bodyHash.c_str());
+         if (splitSignatureString.GetLength() > 0)
+            splitSignatureString += "\r\n\t";
+
+         splitSignatureString += signatureString.Mid(i, lineLength);
       }
+
+      return headerValue + splitSignatureString;
+   }
+
+   String
+   DKIM::BuildTimestampTags_(__int64 signingTime, int validitySeconds)
+   {
+      String tags;
+
+      // Leading space and trailing semicolon belong to this string, so that
+      // BuildSignatureHeader_ can splice it in with no conditional of its own and an
+      // empty value reproduces the previous bytes exactly.
+      if (validitySeconds > 0)
+         tags.Format(_T(" t=%I64d; x=%I64d;"), signingTime, signingTime + (__int64) validitySeconds);
       else
+         tags.Format(_T(" t=%I64d;"), signingTime);
+
+      return tags;
+   }
+
+   bool
+   DKIM::IsSignatureExpired_(const AnsiString &tagX, __int64 verificationTime, int toleranceSeconds)
+   {
+      // No x= means no expiry was claimed, which is the common case and not a failure.
+      if (tagX.IsEmpty())
+         return false;
+
+      // A malformed x= is not an expiry either. RFC 6376 3.5 defines the value as an
+      // unsigned decimal integer; anything else is a broken signature, and treating it
+      // as expired here would let a corrupt tag decide the verdict. Rejecting a value
+      // too long to fit is what keeps _atoi64 from silently saturating - nineteen
+      // digits is the most a signed 64-bit value has.
+      const int maxDigits = 19;
+
+      if (tagX.GetLength() > maxDigits)
+         return false;
+
+      for (int i = 0; i < tagX.GetLength(); i++)
       {
-         String splitSignatureString;
-         int lineLength = 250;
-         for (int i = 0; i < signatureString.GetLength(); i += lineLength)
-         {
-            if (splitSignatureString.GetLength() > 0)
-               splitSignatureString += "\r\n\t";
-
-            splitSignatureString += signatureString.Mid(i, lineLength);
-         }
-
-         headerValue.Format(_T("v=1; a=%s; d=%s; s=%s;\r\n")
-            _T("\tc=%s; q=%s; h=%s;\r\n")
-            _T("\tbh=%s;\r\n")
-            _T("\tb=%s"), tagA.c_str(), tagD.c_str(), tagS.c_str(), tagC.c_str(), tagQ.c_str(), String(fieldList).c_str(), bodyHash.c_str(), splitSignatureString.c_str());
+         if (tagX[i] < '0' || tagX[i] > '9')
+            return false;
       }
 
-      return headerValue;
+      __int64 expiry = _atoi64(tagX.c_str());
+
+      // The tolerance is RFC 6376 3.5's "fudge factor" for clock drift between us and
+      // the signer. Without it our own clock running a few minutes fast turns other
+      // people's perfectly valid mail into a DKIM failure.
+      return verificationTime > (expiry + (__int64) toleranceSeconds);
    }
 
    bool
