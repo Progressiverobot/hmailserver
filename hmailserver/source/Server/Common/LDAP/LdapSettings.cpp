@@ -39,6 +39,33 @@ namespace HM
    static const int kMaxTimeoutSeconds = 90;
    static const int kDefaultTimeoutSeconds = 10;
 
+   // Enabled person objects that carry a mail address.
+   //
+   // Every clause earns its place. objectCategory=person with objectClass=user is the
+   // pair Active Directory itself uses to mean "a human account" - either alone also
+   // matches contacts or computers. mail=* is what makes this an account source
+   // rather than a list of everyone: a directory entry with no address has nothing to
+   // provision a mailbox for. And the userAccountControl bit test excludes DISABLED
+   // accounts (ADS_UF_ACCOUNTDISABLE, 0x0002) using the LDAP_MATCHING_RULE_BIT_AND
+   // OID - without it, provisioning would create a live mailbox for every leaver the
+   // directory still holds, which is the opposite of what a directory is being trusted
+   // for.
+   static const wchar_t *kDefaultSyncFilter =
+      L"(&(objectClass=user)(objectCategory=person)(mail=*)"
+      L"(!(userAccountControl:1.2.840.113556.1.4.803:=2)))";
+
+   static const wchar_t *kDefaultSyncMailAttribute = L"mail";
+   static const wchar_t *kDefaultSyncUsernameAttribute = L"sAMAccountName";
+   static const wchar_t *kDefaultSyncDisplayNameAttribute = L"displayName";
+
+   static const int kDefaultSyncMaxUsers = 5000;
+
+   // A directory larger than this is not read in one pass. Not a judgement about how
+   // many people an organisation may have - it is the point beyond which holding the
+   // whole answer in memory, and then building a report out of it, costs more than
+   // the answer is worth.
+   static const int kMaxSyncMaxUsers = 100000;
+
    int
    LdapConfiguration::EffectivePort() const
    {
@@ -237,6 +264,42 @@ namespace HM
          loaded.timeout_seconds = kMaxTimeoutSeconds;
 
       loaded.fallback_to_windows_logon = ReadInteger_(iniFile, _T("FallbackToWindowsLogon"), 0) != 0;
+
+      loaded.sync_filter = ReadString_(iniFile, _T("SyncFilter"), kDefaultSyncFilter);
+      loaded.sync_mail_attribute = ReadString_(iniFile, _T("SyncMailAttribute"), kDefaultSyncMailAttribute);
+      loaded.sync_username_attribute = ReadString_(iniFile, _T("SyncUsernameAttribute"), kDefaultSyncUsernameAttribute);
+      loaded.sync_display_name_attribute = ReadString_(iniFile, _T("SyncDisplayNameAttribute"), kDefaultSyncDisplayNameAttribute);
+
+      // Emptied by hand in the ini, these fall back to the defaults rather than to
+      // nothing. An empty filter would match every object in the directory and an
+      // empty attribute name would read nothing from any of them - both are ways for
+      // a blank line to mean something much worse than the default.
+      if (loaded.sync_filter.IsEmpty())
+         loaded.sync_filter = kDefaultSyncFilter;
+
+      if (loaded.sync_mail_attribute.IsEmpty())
+         loaded.sync_mail_attribute = kDefaultSyncMailAttribute;
+
+      if (loaded.sync_username_attribute.IsEmpty())
+         loaded.sync_username_attribute = kDefaultSyncUsernameAttribute;
+
+      if (loaded.sync_display_name_attribute.IsEmpty())
+         loaded.sync_display_name_attribute = kDefaultSyncDisplayNameAttribute;
+
+      loaded.sync_max_users = ReadInteger_(iniFile, _T("SyncMaxUsers"), kDefaultSyncMaxUsers);
+
+      // Clamped at BOTH ends, like TimeoutSeconds above and for the same reason: this
+      // value exists to stop a misconfigured search base being answered by allocating
+      // until the process dies, and a ceiling that the misconfigured file sets itself
+      // is not a ceiling. Each entry costs a DN plus three attribute vectors - a few
+      // hundred bytes - and the report is then built as one string and copied again
+      // into a BSTR, so a value of 100000000 is two copies of a multi-gigabyte report
+      // inside the service.
+      if (loaded.sync_max_users <= 0)
+         loaded.sync_max_users = kDefaultSyncMaxUsers;
+
+      if (loaded.sync_max_users > kMaxSyncMaxUsers)
+         loaded.sync_max_users = kMaxSyncMaxUsers;
 
       {
          boost::lock_guard<boost::mutex> guard(settings_mutex_);

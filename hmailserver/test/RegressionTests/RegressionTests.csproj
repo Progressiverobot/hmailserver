@@ -459,6 +459,7 @@
     <Compile Include="POP3\Fetching\Basics.cs" />
     <Compile Include="Shared\Pop3ServerSimulator.cs" />
     <Compile Include="Security\LdapDirectoryAuthentication.cs" />
+    <Compile Include="Security\LdapDirectoryPreview.cs" />
     <Compile Include="Security\ActiveDirectoryAuthentication.cs" />
     <Compile Include="Security\AutoBan.cs" />
     <Compile Include="Security\HashPolicy.cs" />

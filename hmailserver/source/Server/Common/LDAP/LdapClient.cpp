@@ -701,6 +701,308 @@ namespace HM
    }
 
    LdapOperationOutcome
+   LdapClient::BindService(const LdapConfiguration &configuration)
+   {
+      if (configuration.service_username.IsEmpty())
+      {
+         // No service credential configured, so read the directory anonymously.
+         // Active Directory refuses anonymous searches by default, so this will
+         // usually fail - and it fails with a reported reason naming ServiceUsername,
+         // which is a better outcome than silently having no way to read anything.
+         return BindAnonymous();
+      }
+
+      if (configuration.bind_method == LdapBindMethod::BindNegotiate)
+      {
+         String username = configuration.service_username;
+         String domain = configuration.service_domain;
+
+         // DOMAIN\user is split here when ServiceDomain is empty, because that is the
+         // form administrators are told to use: the Control Panel offers no
+         // ServiceDomain editor and its note says to put the domain in the user name.
+         // SEC_WINNT_AUTH_IDENTITY_W does not do this splitting - User is documented
+         // as a bare name with the domain in Domain - so a backslash-qualified name
+         // with an empty Domain is rejected by NTLM, and the administrator is told
+         // their credential was refused while following the instructions on screen.
+         //
+         // A UPN (user@domain) is deliberately NOT split: SSPI resolves those itself
+         // with an empty domain, and cutting one up would break it.
+         if (domain.IsEmpty())
+         {
+            const int separator = username.Find(_T("\\"));
+
+            if (separator > 0)
+            {
+               domain = username.Mid(0, separator);
+               username = username.Mid(separator + 1);
+            }
+         }
+
+         return BindNegotiate(username, domain, configuration.service_password);
+      }
+
+      return BindSimple(configuration.service_username, configuration.service_password);
+   }
+
+   LdapOperationOutcome
+   LdapClient::SearchEntries(const String &searchBase, const String &filter,
+      const std::vector<String> &attributeNames, int maxEntries,
+      std::vector<LdapDirectoryEntry> &entries, bool &truncated)
+   {
+      entries.clear();
+      truncated = false;
+
+      if (session_ == nullptr)
+         return Record_(LDAP_LOCAL_ERROR);
+
+      if (maxEntries <= 0)
+         return Record_(LDAP_SUCCESS);
+
+      std::vector<wchar_t> baseBuffer;
+      std::vector<wchar_t> filterBuffer;
+
+      ToMutable_(searchBase, baseBuffer);
+      ToMutable_(filter, filterBuffer);
+
+      // The API wants an array of mutable pointers ending in a null. The buffers have
+      // to outlive the call, so they are held here rather than built inline - and the
+      // pointers are taken only after the vector has stopped growing, or every one of
+      // them would point into a buffer that has since moved.
+      std::vector<std::vector<wchar_t> > attributeBuffers;
+      std::vector<PWCHAR> attributePointers;
+
+      for (const String &name : attributeNames)
+      {
+         attributeBuffers.push_back(std::vector<wchar_t>());
+         ToMutable_(name, attributeBuffers.back());
+      }
+
+      for (auto &buffer : attributeBuffers)
+         attributePointers.push_back(&buffer[0]);
+
+      attributePointers.push_back(nullptr);
+
+      // 1000 is Active Directory's own default MaxPageSize. Asking for more does not
+      // get more - the server reduces it silently - so this matches rather than fights.
+      const ULONG pageSize = 1000;
+
+      berval *cookie = nullptr;
+
+      // Two bounds on the loop, because a paged search terminates only when the server
+      // decides to stop handing back a cookie, and this code cannot make it.
+      //
+      // RFC 2696 permits a page carrying NO entries and a non-empty cookie. Such a
+      // page advances neither the entry count nor the truncation check, so a server -
+      // or an LDAP-aware middlebox on the configured address - that returns a constant
+      // cookie with an empty result set would spin here for ever, on a thread inside a
+      // synchronous COM call, with no cancellation path and nothing thrown for the
+      // exception barrier to catch. TimeoutSeconds bounds ONE page, not the operation.
+      //
+      // So: a hard ceiling on pages, and a consecutive-no-progress detector for the
+      // pathological case that still answers within it.
+      const int maxPages = 10000;
+      int pagesRead = 0;
+      int pagesWithoutProgress = 0;
+
+      for (;;)
+      {
+         if (++pagesRead > maxPages)
+         {
+            // Treated as truncation rather than as an error, because it is exactly
+            // that: entries were read, and there may be more. Saying "success" here
+            // would be the silent-partial-view failure this whole method exists to
+            // avoid.
+            truncated = true;
+            break;
+         }
+
+         PLDAPControlW pageControl = nullptr;
+
+         // Not critical. A directory that does not implement paged results should
+         // answer the search anyway rather than refuse it outright; maxEntries still
+         // bounds the result, and one page is the correct answer for a small directory.
+         ULONG status = ldap_create_page_controlW(session_, pageSize, cookie, 0, &pageControl);
+
+         if (status != LDAP_SUCCESS)
+         {
+            if (cookie != nullptr)
+               ber_bvfree(cookie);
+
+            return Record_(status);
+         }
+
+         PLDAPControlW serverControls[2] = { pageControl, nullptr };
+
+         LDAP_TIMEVAL timeout;
+         timeout.tv_sec = timeout_seconds_;
+         timeout.tv_usec = 0;
+
+         LDAPMessage *searchResult = nullptr;
+
+         status = ldap_search_ext_sW(session_, &baseBuffer[0], LDAP_SCOPE_SUBTREE,
+            &filterBuffer[0], &attributePointers[0], 0, serverControls, nullptr,
+            &timeout, 0, &searchResult);
+
+         ldap_control_freeW(pageControl);
+
+         // A size-limit hit describes what the server sent rather than a failure, and
+         // the entries it did send are usable - but it ALSO means there were more, so
+         // it is truncation and has to be reported as such.
+         //
+         // FindUserDn forces its ambiguity flag on this same status for the same
+         // reason. This lost that discipline on the first attempt: the entries were
+         // kept, LDAP_SUCCESS was returned, and `truncated` stayed false - so an
+         // OpenLDAP directory with its default `sizelimit 500` and two thousand people
+         // would report "read 500 entries" as a complete answer, and an account source
+         // built on it would treat fifteen hundred real users as absent. That is
+         // precisely the failure the paging exists to prevent, arriving through the
+         // one status code paging does not cover.
+         if (status == LDAP_SIZELIMIT_EXCEEDED)
+            truncated = true;
+
+         if (status != LDAP_SUCCESS && status != LDAP_SIZELIMIT_EXCEEDED)
+         {
+            if (searchResult != nullptr)
+               ldap_msgfree(searchResult);
+
+            if (cookie != nullptr)
+               ber_bvfree(cookie);
+
+            if (IsTransportFailure_(status))
+               Abandon_();
+
+            return Record_(status);
+         }
+
+         if (searchResult == nullptr)
+         {
+            if (cookie != nullptr)
+               ber_bvfree(cookie);
+
+            return Record_(LDAP_SUCCESS);
+         }
+
+         const size_t sizeBeforeThisPage = entries.size();
+
+         for (LDAPMessage *entry = ldap_first_entry(session_, searchResult);
+              entry != nullptr;
+              entry = ldap_next_entry(session_, entry))
+         {
+            if ((int) entries.size() >= maxEntries)
+            {
+               truncated = true;
+               break;
+            }
+
+            LdapDirectoryEntry record;
+
+            PWSTR entryDn = ldap_get_dnW(session_, entry);
+
+            if (entryDn != nullptr)
+            {
+               record.dn = entryDn;
+               ldap_memfreeW(entryDn);
+            }
+
+            // Fetched by name rather than walked with ldap_first_attribute, because
+            // the caller has already said which attributes it wants and the BerElement
+            // the walk allocates would have to be freed on every path out of the loop.
+            for (const String &name : attributeNames)
+            {
+               std::vector<wchar_t> nameBuffer;
+               ToMutable_(name, nameBuffer);
+
+               PWCHAR *values = ldap_get_valuesW(session_, entry, &nameBuffer[0]);
+
+               if (values == nullptr)
+                  continue;
+
+               std::vector<String> collected;
+
+               for (int v = 0; values[v] != nullptr; v++)
+                  collected.push_back(String(values[v]));
+
+               ldap_value_freeW(values);
+
+               // An attribute the directory sent with no values is not recorded, so
+               // the map distinguishes "never sent" from "sent as empty" for a caller
+               // that inspects `attributes` directly. First() deliberately does NOT
+               // preserve that distinction - it answers an empty string for both -
+               // because every caller so far wants one question answered ("is there a
+               // usable value?") and would otherwise have to ask it twice.
+               if (!collected.empty())
+                  record.attributes[name] = collected;
+            }
+
+            entries.push_back(record);
+         }
+
+         // A page that added nothing. Tolerated a few times - a server may legitimately
+         // send an empty page when a filter matches nothing in that slice of the DIT -
+         // but not indefinitely, because a page with no entries and a non-empty cookie
+         // is the shape that never terminates on its own.
+         if (entries.size() == sizeBeforeThisPage)
+            pagesWithoutProgress++;
+         else
+            pagesWithoutProgress = 0;
+
+         if (cookie != nullptr)
+         {
+            ber_bvfree(cookie);
+            cookie = nullptr;
+         }
+
+         if (truncated || pagesWithoutProgress >= 16)
+         {
+            // truncated covers both the maxEntries stop and a server-side size limit;
+            // either way there is more than has been read, so paging further would
+            // change nothing about the answer being partial.
+            if (pagesWithoutProgress >= 16)
+               truncated = true;
+
+            ldap_msgfree(searchResult);
+            break;
+         }
+
+         ULONG totalCount = 0;
+         PLDAPControlW *returnedControls = nullptr;
+         ULONG resultCode = 0;
+
+         status = ldap_parse_resultW(session_, searchResult, &resultCode, nullptr, nullptr,
+            nullptr, &returnedControls, FALSE);
+
+         if (status == LDAP_SUCCESS && returnedControls != nullptr)
+         {
+            // A directory that ignored the control has no cookie to give back, which
+            // ends the loop after one page - the right behaviour for a server that
+            // answered the whole search at once.
+            ldap_parse_page_controlW(session_, returnedControls, &totalCount, &cookie);
+         }
+
+         if (returnedControls != nullptr)
+            ldap_controls_freeW(returnedControls);
+
+         ldap_msgfree(searchResult);
+
+         if (cookie == nullptr || cookie->bv_len == 0)
+         {
+            if (cookie != nullptr)
+            {
+               ber_bvfree(cookie);
+               cookie = nullptr;
+            }
+
+            break;
+         }
+      }
+
+      if (cookie != nullptr)
+         ber_bvfree(cookie);
+
+      return Record_(LDAP_SUCCESS);
+   }
+
+   LdapOperationOutcome
    LdapClient::FindUserDn(const LdapConfiguration &configuration, const String &filter,
       String &dn, int &matchCount)
    {

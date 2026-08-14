@@ -729,6 +729,19 @@ interface IInterfaceSettings : IDispatch{
    [propget, id(111), helpstring("Every name currently in the [Settings] section, one per line.")]
       HRESULT IniSettingNames([out, retval] BSTR *pVal);
 
+   // Reads the directory the way an account source would, and reports what it found.
+   //
+   // Runs ON THE SERVER, which is the point of it. The Control Panel's existing LDAP
+   // test card runs from the machine the Control Panel is on and says so - a firewall
+   // that treats that machine and the hMailServer service differently makes the two
+   // disagree, and it is the service's view that decides whether mail works.
+   //
+   // Read-only. It creates nothing, changes nothing and is safe to run against a live
+   // directory; it exists so an administrator can see which people the configured
+   // search base and filter actually select before anything is provisioned from them.
+   [id(112), helpstring("Reads the LDAP directory using the [LDAP] settings and reports the users an account source would see. Read-only.")]
+      HRESULT TestLdapDirectory([in] long MaxUsers, [out] BSTR *ResultText, [out, retval] VARIANT_BOOL *pResult);
+
 };
 
 

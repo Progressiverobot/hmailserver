@@ -13,6 +13,8 @@
 
 #include "../Common/Application/ACLManager.h"
 #include "../Common/Application/IniSettingStore.h"
+#include "../Common/LDAP/LdapClient.h"
+#include "../Common/LDAP/LdapSettings.h"
 #include "../Common/BO/TCPIPPorts.h"
 #include "../Common/BO/SSLCertificates.h"
 #include "../Common/BO/IncomingRelays.h"
@@ -2753,6 +2755,167 @@ STDMETHODIMP InterfaceSettings::get_IniSettingNames(BSTR *pVal)
       HM::String result = HM::StringParser::JoinVector(names, _T("\r\n"));
 
       *pVal = result.AllocSysString();
+
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceSettings::TestLdapDirectory(long MaxUsers, BSTR *ResultText, VARIANT_BOOL *pResult)
+{
+   try
+   {
+      if (!config_)
+         return GetAccessDenied();
+
+      if (!ResultText || !pResult)
+         return COMError::GenerateGenericMessage();
+
+      *pResult = VARIANT_FALSE;
+
+      const HM::LdapConfiguration configuration = HM::LdapSettings::Instance()->GetConfiguration();
+
+      if (!configuration.enabled)
+      {
+         *ResultText = HM::String("[LDAP] Enabled is 0, so directory access is switched off. Nothing was contacted.").AllocSysString();
+         return S_OK;
+      }
+
+      HM::String missing;
+
+      if (!configuration.IsComplete(missing))
+      {
+         *ResultText = HM::String(HM::Formatter::Format("The [LDAP] configuration is incomplete: {0}. Nothing was contacted.", missing)).AllocSysString();
+         return S_OK;
+      }
+
+      if (configuration.search_base.IsEmpty())
+      {
+         // Enumeration needs a base to search from. Authentication can get by with a
+         // UserDnTemplate and never search at all, so this is not covered by
+         // IsComplete - but an account source with no search base has nothing to read.
+         //
+         // Reached only when UserDnTemplate is set or BindMethod is Negotiate; in the
+         // plain search configuration IsComplete above already refuses, naming both
+         // SearchBase and UserDnTemplate as the two ways out.
+         *ResultText = HM::String("[LDAP] SearchBase is empty. Authentication can work without it when UserDnTemplate is set, but reading the directory as an account source cannot: there is nowhere to search. Nothing was contacted.").AllocSysString();
+         return S_OK;
+      }
+
+      // Checked here, before connecting, so that hMailServer's OWN refusal to send a
+      // credential is never reported as the directory refusing it.
+      //
+      // BindSimple and BindNegotiate both refuse an empty password locally, and
+      // BindSimple also refuses to put a password on an unprotected connection - all
+      // three return an LDAP result code without a packet leaving the machine. Left to
+      // fall through, those arrive at the "Connected, but the service credential was
+      // refused" message below, which asserts that the directory answered and points
+      // the administrator at the domain controller for a decision this server made.
+      if (!configuration.service_username.IsEmpty() && configuration.service_password.IsEmpty())
+      {
+         *ResultText = HM::String("[LDAP] ServiceUsername is set but ServicePassword is empty. hMailServer refuses to bind with an empty password rather than sending one, so the directory was not contacted.").AllocSysString();
+         return S_OK;
+      }
+
+      // Mirrors BindSimple's own guard exactly - `!transport_protected_ &&
+      // !unprotected_password_allowed_` - rather than PasswordIsProtected(), which
+      // does not account for AllowUnprotectedPassword and would refuse a
+      // configuration the bind itself would have accepted.
+      if (configuration.bind_method == HM::LdapBindMethod::BindSimple &&
+          !configuration.service_username.IsEmpty() &&
+          configuration.security == HM::LdapTransportSecurity::TransportPlain &&
+          !configuration.allow_unprotected_password)
+      {
+         *ResultText = HM::String("[LDAP] the service credential would be sent as a simple bind over an unprotected connection, which hMailServer refuses. Use Security=2 (LDAPS), or BindMethod=1 (Negotiate, which never puts the password on the wire), or set AllowUnprotectedPassword=1 if the network genuinely is trusted. The directory was not contacted.").AllocSysString();
+         return S_OK;
+      }
+
+      HM::LdapClient client;
+
+      if (client.Connect(configuration) != HM::LdapOperationOutcome::OutcomeSuccess)
+      {
+         *ResultText = HM::String(HM::Formatter::Format("Could not connect to the directory: {0}", client.DescribeLastError())).AllocSysString();
+         return S_OK;
+      }
+
+      if (client.BindService(configuration) != HM::LdapOperationOutcome::OutcomeSuccess)
+      {
+         HM::String diagnostic = client.GetLastDiagnostic();
+         HM::String substatus = HM::LdapClient::DescribeActiveDirectorySubStatus(diagnostic);
+
+         *ResultText = HM::String(HM::Formatter::Format("Connected, but the service credential was refused: {0}{1}",
+            client.DescribeLastError(), substatus.IsEmpty() ? HM::String() : HM::String(" - ") + substatus)).AllocSysString();
+         return S_OK;
+      }
+
+      // A ceiling the caller can lower for a quick look, but never raise past the
+      // configured one - that bound exists so a misconfigured search base cannot be
+      // answered by allocating until the process dies.
+      int limit = MaxUsers > 0 && MaxUsers < configuration.sync_max_users
+         ? (int) MaxUsers
+         : configuration.sync_max_users;
+
+      std::vector<HM::String> attributes;
+      attributes.push_back(configuration.sync_mail_attribute);
+      attributes.push_back(configuration.sync_username_attribute);
+      attributes.push_back(configuration.sync_display_name_attribute);
+
+      std::vector<HM::LdapDirectoryEntry> entries;
+      bool truncated = false;
+
+      if (client.SearchEntries(configuration.search_base, configuration.sync_filter,
+             attributes, limit, entries, truncated) != HM::LdapOperationOutcome::OutcomeSuccess)
+      {
+         *ResultText = HM::String(HM::Formatter::Format("The search failed: {0}. Base: {1}. Filter: {2}",
+            client.DescribeLastError(), configuration.search_base, configuration.sync_filter)).AllocSysString();
+         return S_OK;
+      }
+
+      HM::String report = HM::Formatter::Format("Read {0} directory entr{1} from {2}.\r\nFilter: {3}\r\n",
+         HM::StringParser::IntToString((int) entries.size()),
+         entries.size() == 1 ? HM::String("y") : HM::String("ies"),
+         configuration.search_base, configuration.sync_filter);
+
+      if (truncated)
+      {
+         report += HM::Formatter::Format("\r\nSTOPPED AT {0} ENTRIES - the directory holds more. This is a partial view, and an account source run against it would not see the rest.\r\n",
+            HM::StringParser::IntToString(limit));
+      }
+
+      int withoutAddress = 0;
+
+      report += _T("\r\n");
+
+      for (const HM::LdapDirectoryEntry &entry : entries)
+      {
+         const HM::String address = entry.First(configuration.sync_mail_attribute);
+         const HM::String username = entry.First(configuration.sync_username_attribute);
+         const HM::String display = entry.First(configuration.sync_display_name_attribute);
+
+         if (address.IsEmpty())
+            withoutAddress++;
+
+         report += HM::Formatter::Format("{0}\t{1}\t{2}\r\n",
+            address.IsEmpty() ? HM::String("(no address)") : address,
+            username.IsEmpty() ? HM::String("(no user name)") : username,
+            display);
+      }
+
+      if (withoutAddress > 0)
+      {
+         // Named rather than filtered out silently. An entry the filter selected but
+         // which carries no address cannot become a mailbox, and an administrator
+         // seeing "12 users" and getting 9 mailboxes deserves to know why here rather
+         // than afterwards.
+         report += HM::Formatter::Format("\r\n{0} of these carry no {1} attribute, so an account source could not provision them.\r\n",
+            HM::StringParser::IntToString(withoutAddress), configuration.sync_mail_attribute);
+      }
+
+      *ResultText = report.AllocSysString();
+      *pResult = VARIANT_TRUE;
 
       return S_OK;
    }

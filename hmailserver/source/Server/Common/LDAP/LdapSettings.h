@@ -62,6 +62,34 @@ namespace HM
       int timeout_seconds = 10;
       bool fallback_to_windows_logon = false;
 
+      // ---- directory as an account source -----------------------------------
+      //
+      // Separate from everything above, which is about authenticating a user who is
+      // ALREADY an account here. These describe reading the directory to find out
+      // which accounts should exist at all - a different question, with a different
+      // filter, so it gets its own settings rather than overloading
+      // user_search_filter (which carries %u placeholders and matches exactly one
+      // person by construction).
+
+      // The filter that selects the people who should have a mailbox. Defaults to
+      // enabled person objects that actually carry a mail address, because an account
+      // source keyed on anything else provisions mailboxes for service accounts,
+      // computers and disabled leavers.
+      String sync_filter;
+
+      // Which attribute carries the address, the logon name, and the display name.
+      // Configurable because these differ between directories - a non-Windows LDAP
+      // server has no sAMAccountName at all.
+      String sync_mail_attribute;
+      String sync_username_attribute;
+      String sync_display_name_attribute;
+
+      // A ceiling on how many directory entries one pass will read into memory. Not a
+      // page size - SearchEntries pages regardless - but a bound on a directory far
+      // larger than anyone expected, so a misconfigured search base cannot be answered
+      // by allocating until the process dies.
+      int sync_max_users = 5000;
+
       // 636 for LDAPS and 389 otherwise, unless Port says otherwise. Derived rather
       // than defaulted to 389 because a configuration that sets Security=2 and
       // forgets Port would otherwise attempt TLS against the cleartext port, which

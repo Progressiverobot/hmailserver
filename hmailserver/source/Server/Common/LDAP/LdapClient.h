@@ -30,6 +30,33 @@ namespace HM
       OutcomeUnavailable = 2
    };
 
+   // One entry returned by an enumeration: its distinguished name, and whichever of
+   // the requested attributes the directory actually sent back.
+   //
+   // Values are a vector because the attributes that matter here are genuinely
+   // multi-valued - proxyAddresses carries every address an Exchange-style directory
+   // knows for a user, and taking only the first would quietly discard aliases.
+   // An attribute the entry does not carry is ABSENT from the map rather than present
+   // and empty, so "the directory did not set this" stays distinguishable from "the
+   // directory set it to nothing".
+   struct LdapDirectoryEntry
+   {
+      String dn;
+      std::map<String, std::vector<String> > attributes;
+
+      // The first value of an attribute, or an empty string when the entry does not
+      // carry it. For the single-valued cases, which is most of them.
+      String First(const String &name) const
+      {
+         auto found = attributes.find(name);
+
+         if (found == attributes.end() || found->second.empty())
+            return String();
+
+         return found->second.front();
+      }
+   };
+
    // A single LDAP session, over the Windows LDAP API (wldap32). One instance owns at
    // most one connection and closes it in the destructor, so an early return on any
    // path cannot leak a session or leave a socket to the directory open.
@@ -66,6 +93,42 @@ namespace HM
       // against a domain controller that refuses cleartext simple binds and has no
       // usable certificate.
       LdapOperationOutcome BindNegotiate(const String &username, const String &domain, const String &password);
+
+      // Binds whatever credential the configuration nominates for READING the
+      // directory - the service credential, or anonymously when none is set.
+      //
+      // Honours BindMethod, which the previous file-local version of this did not.
+      // That matters for reading the directory as an ACCOUNT SOURCE, which searches
+      // whatever method users authenticate by: on a domain controller with no usable
+      // LDAPS certificate - the unjoined mail server this feature exists for - a
+      // simple bind cannot be made safely, while Negotiate never puts the password on
+      // the wire and signs the connection.
+      //
+      // It changes nothing for authentication. That path binds a service credential
+      // only inside `UsesSearch()`, which is false whenever BindMethod is Negotiate,
+      // so the Negotiate branch here is unreachable from it by construction.
+      LdapOperationOutcome BindService(const LdapConfiguration &configuration);
+
+      // Enumerates every entry matching a filter, with the named attributes.
+      //
+      // Separate from FindUserDn, which exists to authenticate ONE user and is built
+      // around that: it asks for two entries so it can detect ambiguity, and treats
+      // more than one match as a configuration fault. Enumeration wants the opposite -
+      // every match, however many - so folding the two together would make each worse.
+      //
+      // PAGED, and that is why this is not four lines. Active Directory caps a single
+      // search at MaxPageSize, 1000 by default, and answers a larger directory by
+      // returning the first thousand entries WITH A SUCCESS STATUS. A naive search
+      // against a real company therefore reports a complete-looking result missing
+      // everyone after the first thousand - and an account source that silently sees
+      // part of a directory is worse than one that fails, because the accounts it does
+      // not see look deleted rather than unread.
+      //
+      // maxEntries bounds what this accumulates in memory regardless; when it is
+      // reached, truncated is set and the caller must not treat the result as whole.
+      LdapOperationOutcome SearchEntries(const String &searchBase, const String &filter,
+         const std::vector<String> &attributeNames, int maxEntries,
+         std::vector<LdapDirectoryEntry> &entries, bool &truncated);
 
       // Runs the user search and returns the single matching DN.
       //

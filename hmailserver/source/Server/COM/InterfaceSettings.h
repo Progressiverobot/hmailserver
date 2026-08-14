@@ -254,6 +254,8 @@ END_COM_MAP()
    STDMETHOD(DeleteIniSetting)(/*[in]*/ BSTR Name);
    STDMETHOD(get_IniSettingNames)(/*[out, retval]*/ BSTR *pVal);
 
+   STDMETHOD(TestLdapDirectory)(/*[in]*/ long MaxUsers, /*[out]*/ BSTR *ResultText, /*[out, retval]*/ VARIANT_BOOL *pResult);
+
    bool LoadSettings();
 
 private:

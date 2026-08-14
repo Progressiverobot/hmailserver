@@ -150,17 +150,20 @@ namespace HM
 
       LdapOperationOutcome BindServiceCredential_(LdapClient &client, const LdapConfiguration &configuration)
       {
-         if (configuration.service_username.IsEmpty())
-         {
-            // No service credential configured, so read the directory anonymously.
-            // Active Directory refuses anonymous searches by default, so this will
-            // usually fail - and it fails with a reported reason naming
-            // ServiceUsername, which is a better outcome than silently having no way
-            // to find the user.
-            return client.BindAnonymous();
-         }
-
-         return client.BindSimple(configuration.service_username, configuration.service_password);
+         // One implementation, on the client, because reading the directory as an
+         // account source needs the same bind and two copies of "how do we read this
+         // directory" would drift apart.
+         //
+         // BindService also honours BindMethod, which this copy did not - but that
+         // makes NO difference on this path, and an earlier version of this comment
+         // wrongly claimed it fixed something here. It cannot: the only caller is
+         // inside `if (configuration.UsesSearch())`, and UsesSearch returns false
+         // whenever bind_method is BindNegotiate, because a Negotiate bind identifies
+         // the user by name and domain and never needs a DN to be found first. So the
+         // Negotiate branch is unreachable from authentication by construction. It is
+         // reached only by the directory enumeration, which searches regardless of how
+         // users authenticate - and that is the case it was written for.
+         return client.BindService(configuration);
       }
    }
 
