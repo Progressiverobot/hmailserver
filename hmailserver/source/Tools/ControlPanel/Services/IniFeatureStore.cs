@@ -110,14 +110,37 @@ namespace hMailServer.ControlPanel.Services
 
       public void WriteBool(string key, bool value) => Write(key, value ? "1" : "0");
 
+      /// <summary>
+      /// Reads a value from a named section rather than from [Settings].
+      ///
+      /// Most of hMailServer.INI is [Settings], which is why this class defaults to
+      /// it - but not all of it, and a page that edits [Database] or [Directories]
+      /// through Read() above would write keys of the right name into a section the
+      /// server never looks at. That is the worst shape of bug this project has:
+      /// the value appears saved, reads back correctly on the next visit, and does
+      /// nothing.
+      /// </summary>
+      public string ReadFrom(string section, string key, string defaultValue = "")
+      {
+         if (!IsAvailable)
+            return defaultValue;
+         var buffer = new StringBuilder(2048);
+         GetPrivateProfileString(section, key, defaultValue, buffer, buffer.Capacity, IniPath);
+         return buffer.ToString();
+      }
+
+      /// <summary>Writes a value to a named section. See <see cref="ReadFrom"/>.</summary>
+      public void WriteTo(string section, string key, string value)
+      {
+         if (!IsAvailable)
+            throw new InvalidOperationException("hMailServer.INI was not found on this machine.");
+         WritePrivateProfileString(section, key, value, IniPath);
+      }
+
       /// <summary>Reads the configured log folder from the [Directories] section.</summary>
       public string GetLogFolder()
       {
-         if (!IsAvailable)
-            return null;
-         var buffer = new StringBuilder(1024);
-         GetPrivateProfileString("Directories", "LogFolder", "", buffer, buffer.Capacity, IniPath);
-         string folder = buffer.ToString();
+         string folder = ReadFrom("Directories", "LogFolder", "");
          return string.IsNullOrWhiteSpace(folder) ? null : folder;
       }
    }

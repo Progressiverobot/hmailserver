@@ -437,6 +437,65 @@ namespace hMailServer.ControlPanel.Views
       }
 
       /// <summary>
+      /// A numeric setting in a named INI section other than [Settings].
+      ///
+      /// The database tuning values live in [Database]. Editing them through
+      /// IniNumber would write keys of the right name into [Settings], where the
+      /// server never looks - the value would appear saved, read back correctly on
+      /// the next visit, and do nothing at all.
+      /// </summary>
+      private class SectionIniNumber : ComSetting, IIniSetting
+      {
+         public string Section;
+         public int Default;
+         public int MinimumValue;
+         public IniFeatureStore IniStore;
+         private Wpf.Ui.Controls.NumberBox number_;
+
+         public override bool WantsInitialValue => false;
+
+         public override FrameworkElement CreateEditor(object value)
+         {
+            int current = Default;
+            if (IniStore != null && IniStore.IsAvailable)
+            {
+               if (!int.TryParse(IniStore.ReadFrom(Section, Path, Default.ToString()), out current))
+                  current = Default;
+            }
+
+            var panel = new StackPanel();
+            panel.Children.Add(new TextBlock { Text = Label, FontSize = 13, Margin = new Thickness(0, 0, 0, 4) });
+
+            number_ = new Wpf.Ui.Controls.NumberBox
+            {
+               Value = current,
+               Minimum = MinimumValue,
+               MaxDecimalPlaces = 0,
+               SmallChange = 1,
+               LargeChange = 10,
+               FontSize = 13,
+               MaxWidth = 180,
+               MinWidth = 120,
+               HorizontalAlignment = HorizontalAlignment.Left
+            };
+            Describe(number_, Path);
+            panel.Children.Add(number_);
+            Annotate(number_, panel);
+            return panel;
+         }
+
+         public override object ReadEditor() => (long) (number_?.Value ?? Default);
+
+         public void SaveToIni()
+         {
+            if (IniStore == null || !IniStore.IsAvailable || number_ == null)
+               return;
+
+            IniStore.WriteTo(Section, Path, ((long) (number_.Value ?? Default)).ToString());
+         }
+      }
+
+      /// <summary>
       /// A free-text setting stored in hMailServer.ini. Same purpose as IniBool
       /// and IniNumber: it puts an INI-backed value on the page that owns the
       /// feature it configures (the archive folder belongs next to the mirroring
@@ -960,6 +1019,25 @@ namespace hMailServer.ControlPanel.Views
          idle.Settings.Add(new IniNumber { Path = "POP3CMinTimeout", Label = "POP3 client minimum timeout (s)", Default = 30, IniStore = iniStore_ });
          idle.Settings.Add(new IniNumber { Path = "POP3CMaxTimeout", Label = "POP3 client maximum timeout (s)", Default = 900, IniStore = iniStore_ });
          Tab("Timeouts").Cards.Add(idle);
+
+         // On the IMAP tab because that is what it repairs, and because somebody
+         // arrives at this needing it - after a restored database, or after
+         // clients start showing the wrong message - rather than browsing for it.
+         var repair = Card("Repair",
+            "Maintenance for the IMAP folder state. Nothing here changes a message; the folder UID counter is "
+            + "bookkeeping that IMAP clients rely on to tell one message from another.");
+         repair.Settings.Add(new ComAction
+         {
+            Path = "ServiceIMAP",
+            ButtonText = "Recalculate folder UID counters",
+            Blurb = "Each IMAP folder keeps a counter for the next message UID it will issue. If that counter falls "
+                    + "behind the messages already in the folder - which a restored or hand-edited database can do - "
+                    + "the folder issues a UID it has already used, and a client that caches by UID shows one message "
+                    + "where another should be. This moves every counter up to the highest UID its folder actually "
+                    + "holds. It never moves one down, so it cannot cause the fault it repairs.",
+            Action = () => RecalculateFolderUids_()
+         });
+         Tab("IMAP").Cards.Add(repair);
       }
 
       private void BuildDelivery()
@@ -1669,7 +1747,117 @@ namespace hMailServer.ControlPanel.Views
          index.Settings.Add(new IniNumber { Path = "IndexerFullMinutes", Label = "Full re-index interval (minutes)", Default = 720, IniStore = iniStore_ });
          index.Settings.Add(new IniNumber { Path = "IndexerFullLimit", Label = "Messages per full-index pass", Default = 25000, IniStore = iniStore_ });
          index.Settings.Add(new IniNumber { Path = "IndexerQuickLimit", Label = "Messages per quick-index pass", Default = 1000, IniStore = iniStore_ });
+
+         // The two actions on MessageIndexing existed over COM and nowhere else, so
+         // "search finds nothing" or "search finds messages that were deleted" had
+         // no answer short of writing a script. Both report the counts they moved
+         // rather than only "done": the whole question an administrator has here is
+         // whether the index matches the mail, and a number answers it.
+         index.Settings.Add(new ComAction
+         {
+            Path = "MessageIndexing.Enabled",
+            ButtonText = "Index now, and show how far behind it is",
+            Blurb = "Wakes the indexer instead of waiting for its next pass, and reports how many of this server's "
+                    + "messages are currently indexed. The pass itself runs in the background and is bounded by the "
+                    + "limits above, so on a large backlog it makes progress rather than finishing. With indexing "
+                    + "switched off there is no indexer to wake, and this says so rather than reporting success.",
+            Action = () => RunIndexNow_()
+         });
+         index.Settings.Add(new ComAction
+         {
+            Path = "MessageIndexing.Enabled",
+            ButtonText = "Discard the index and rebuild it",
+            Blurb = "Empties the index and asks the indexer to rebuild it. No mail is touched - the index is derived "
+                    + "data - but until the rebuild catches up, IMAP SEARCH finds less than it should. Worth doing "
+                    + "when the index has more entries than the server has messages, which means entries for mail "
+                    + "that no longer exists.",
+            Action = () => RebuildIndex_()
+         });
          Tab("Indexing").Cards.Add(index);
+
+         // The three [Database] values that are tuning rather than connection detail.
+         //
+         // Everything else in that section - server, database name, credentials, type
+         // and provider - decides whether the server starts at all, and is owned by
+         // the setup wizard. These three change how it behaves once connected, and
+         // they had no editor anywhere: an administrator whose server logs
+         // "connection pool exhausted" had to hand-edit the file, and a mail server
+         // whose database is briefly unreachable at boot had no way to lengthen the
+         // retry window without doing the same.
+         //
+         // Defaults and the SQL CE override are read from IniFileSettings.cpp lines
+         // 135-145: five connections, six attempts, five seconds between them, and
+         // no_of_dbconnections_ forced to 1 when the type is MSSQLCE regardless of
+         // what the file says.
+         //
+         // Written out here rather than in a helper because the settings-index
+         // generator only reads the body of a Build<Section>() method; rows built
+         // anywhere else compile, render and save, and are invisible to Ctrl+K.
+         string databaseType = iniStore_.IsAvailable
+            ? iniStore_.ReadFrom("Database", "Type", "").Trim()
+            : "";
+
+         bool builtInDatabase = string.Equals(databaseType, "MSSQLCE", StringComparison.OrdinalIgnoreCase);
+
+         // Named rather than described: an administrator who is about to raise the
+         // pool size needs to know it will be ignored BEFORE they raise it, and the
+         // only honest way to know is to read the configured type.
+         string poolNote =
+            "How many database connections the server keeps open and shares between its worker threads. Raising it "
+            + "helps only when threads are visibly waiting for a connection - see the database connection acquire "
+            + "timeout on the Server limits & expert settings page, which is what they are waiting on.";
+
+         if (builtInDatabase)
+         {
+            poolNote += "  THIS SERVER USES THE BUILT-IN DATABASE (MSSQLCE), where the value is forced to 1 whatever "
+                        + "is set here. That is deliberate: SQL Server Compact does not behave reliably under "
+                        + "concurrent connections. Changing it below will have no effect until the server is moved "
+                        + "to MySQL, MSSQL or PostgreSQL.";
+         }
+
+         var database = Card("Database connections",
+            "How the server uses the database it is already configured for. Where that database IS - the server, "
+            + "name, credentials and type - is set up by the installation wizard and is deliberately not editable "
+            + "here, because a wrong value there stops the server from starting rather than making it slower. "
+            + "Applies after a service restart."
+            + (databaseType.Length > 0 ? "  Configured database type: " + databaseType + "." : ""));
+
+         database.Settings.Add(new SectionIniNumber
+         {
+            Section = "Database",
+            Path = "NumberOfConnections",
+            Label = "Connections in the pool" + (builtInDatabase ? " (ignored: this server uses the built-in database)" : ""),
+            Default = 5,
+            MinimumValue = 1,
+            Blurb = poolNote,
+            IniStore = iniStore_
+         });
+
+         database.Settings.Add(new SectionIniNumber
+         {
+            Section = "Database",
+            Path = "ConnectionAttempts",
+            Label = "Attempts to reach the database at start-up",
+            Default = 6,
+            MinimumValue = 1,
+            Blurb = "A mail server usually starts with the rest of the machine, and on a machine where the database "
+                    + "service starts second, the first few attempts fail. Together with the delay below this is the "
+                    + "whole window: six attempts five seconds apart is half a minute. Lengthen it rather than "
+                    + "delaying the service if the database is on another host that is slower to come up.",
+            IniStore = iniStore_
+         });
+
+         database.Settings.Add(new SectionIniNumber
+         {
+            Section = "Database",
+            Path = "ConnectionAttemptsDelay",
+            Label = "Seconds between those attempts",
+            Default = 5,
+            MinimumValue = 1,
+            IniStore = iniStore_
+         });
+
+         Tab("Database").Cards.Add(database);
       }
 
       private void BuildAdvanced()
@@ -1940,6 +2128,194 @@ namespace hMailServer.ControlPanel.Views
          {
             ServerSession.Release((object) antispam);
          }
+      }
+
+      // ---- message index actions ---------------------------------------------
+      //
+      // MessageIndexing.Index() and .Clear() existed over COM and nowhere else, so
+      // the two questions an administrator actually arrives with - "search finds
+      // nothing" and "search finds messages that are gone" - had no answer short of
+      // writing a script. Both actions report the counts on either side of the run
+      // rather than only "done", because the counts ARE the answer: an index behind
+      // the mailbox and an index ahead of it are different faults with different
+      // fixes, and neither is visible from a success message.
+
+      /// <summary>Total delivered messages and total indexed, or null when unreadable.</summary>
+      private static (long Messages, long Indexed)? ReadIndexCounts_()
+      {
+         dynamic indexing = ServerSession.Current.Application.Settings.MessageIndexing;
+         try
+         {
+            return ((long) (int) indexing.TotalMessageCount, (long) (int) indexing.TotalIndexedCount);
+         }
+         catch (Exception)
+         {
+            return null;
+         }
+         finally
+         {
+            ServerSession.Release((object) indexing);
+         }
+      }
+
+      private static string DescribeIndexCounts_((long Messages, long Indexed)? counts)
+      {
+         if (counts == null)
+            return "";
+
+         long messages = counts.Value.Messages;
+         long indexed = counts.Value.Indexed;
+
+         string text = " " + indexed.ToString("N0", System.Globalization.CultureInfo.CurrentCulture)
+                       + " of " + messages.ToString("N0", System.Globalization.CultureInfo.CurrentCulture)
+                       + " messages are indexed.";
+
+         if (indexed < messages)
+            text += " The rest are still waiting; run this again or leave the schedule to catch up.";
+         else if (indexed > messages)
+            text += " There are more index entries than messages, which means entries for mail that no longer exists - "
+                    + "discard and rebuild the index to clear them.";
+
+         return text;
+      }
+
+      /// <summary>
+      /// Whether the indexer is switched on, which decides whether either action
+      /// below does anything at all.
+      ///
+      /// MessageIndexer's worker thread is started only when indexing is enabled
+      /// (Application::Start, and Configuration::SetMessageIndexing). IndexNow()
+      /// does not index - it sets an event that worker waits on - so with indexing
+      /// off, "Index" signals a thread that is not running and reports success
+      /// having done nothing. Saying so is the whole point of checking.
+      /// </summary>
+      private static bool IndexingEnabled_()
+      {
+         dynamic indexing = ServerSession.Current.Application.Settings.MessageIndexing;
+         try
+         {
+            return (bool) indexing.Enabled;
+         }
+         catch (Exception)
+         {
+            // Unknown rather than off: refusing to act on a read that failed would
+            // be worse than letting the attempt report its own error.
+            return true;
+         }
+         finally
+         {
+            ServerSession.Release((object) indexing);
+         }
+      }
+
+      private const string IndexingOffNote =
+         "Message indexing is switched off, so there is no indexer running to ask. Tick \"Enable message indexing\" "
+         + "above and save first - nothing was done.";
+
+      private static (bool ok, string text) RunIndexNow_()
+      {
+         if (!IndexingEnabled_())
+            return (false, IndexingOffNote);
+
+         dynamic indexing = ServerSession.Current.Application.Settings.MessageIndexing;
+         try
+         {
+            indexing.Index();
+         }
+         finally
+         {
+            ServerSession.Release((object) indexing);
+         }
+
+         // The counts are read after signalling but describe the state BEFORE the
+         // pass, because the pass has not happened yet: IndexNow() sets an event and
+         // returns, and the worker picks it up. Reporting them as "now" would be a
+         // lie that looks like a stuck indexer, so the wording says which they are.
+         return (true, "The indexer has been asked to run; it works in the background and the counts below will not "
+                       + "move until it has. As things stand:" + DescribeIndexCounts_(ReadIndexCounts_()));
+      }
+
+      private static (bool ok, string text) RebuildIndex_()
+      {
+         if (!IndexingEnabled_())
+            return (false, IndexingOffNote);
+
+         (long Messages, long Indexed)? before = ReadIndexCounts_();
+
+         string warning = "Discard the search index and rebuild it?\r\n\r\nNo mail is touched - the index is derived "
+                          + "from it - but until the rebuild catches up, IMAP SEARCH will find less than it should.";
+
+         if (before != null)
+         {
+            warning += "\r\n\r\n" + before.Value.Indexed.ToString("N0", System.Globalization.CultureInfo.CurrentCulture)
+                       + " index entries will be discarded and rebuilt from "
+                       + before.Value.Messages.ToString("N0", System.Globalization.CultureInfo.CurrentCulture)
+                       + " messages.";
+         }
+
+         if (MessageBox.Show(warning, "Control Panel", MessageBoxButton.YesNo, MessageBoxImage.Warning)
+             != MessageBoxResult.Yes)
+         {
+            return (true, "Nothing was changed.");
+         }
+
+         dynamic indexing = ServerSession.Current.Application.Settings.MessageIndexing;
+         try
+         {
+            // Clear() is a DELETE and takes effect immediately; Index() only asks
+            // the worker to start rebuilding. So the index really is empty when
+            // this returns, and the rebuild really has not happened.
+            indexing.Clear();
+            indexing.Index();
+         }
+         finally
+         {
+            ServerSession.Release((object) indexing);
+         }
+
+         return (true, "The index has been emptied and the indexer asked to rebuild it. The rebuild runs in the "
+                       + "background, in passes bounded by the limits above, so on a large mailstore it will take "
+                       + "several passes - IMAP SEARCH finds less than it should until it finishes.");
+      }
+
+      /// <summary>
+      /// Utilities.PerformMaintenance(eUpdateIMAPFolderUID), which had no GUI at all.
+      ///
+      /// What it repairs, from Maintenance::RecalculateFolderUID_: for every IMAP
+      /// folder it sets foldercurrentuid to the highest message UID the folder
+      /// actually holds, and only where the stored value is LOWER. A folder whose
+      /// counter has fallen behind its messages hands the same UID out twice, and an
+      /// IMAP client that caches by UID then shows one message in place of another -
+      /// a data-integrity symptom with no obvious cause, and the reason this repair
+      /// exists. It cannot lower a counter, so it cannot cause the fault it fixes.
+      /// </summary>
+      private static (bool ok, string text) RecalculateFolderUids_()
+      {
+         if (MessageBox.Show(
+                "Recalculate the IMAP folder UID counters?\r\n\r\nFor every folder, the counter is moved up to the "
+                + "highest message UID that folder actually holds. Counters that are already correct or ahead are "
+                + "left alone, and no message is changed.\r\n\r\nRun this if clients report messages appearing under "
+                + "the wrong UID, or after restoring a database.",
+                "Control Panel", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+         {
+            return (true, "Nothing was changed.");
+         }
+
+         dynamic utilities = ServerSession.Current.Application.Utilities;
+         try
+         {
+            // eUpdateIMAPFolderUID = 1. The only operation the enum defines; the
+            // server answers "Unknown maintenance operation" for anything else.
+            ((object) utilities).GetType().InvokeMember(
+               "PerformMaintenance", BindingFlags.InvokeMethod, null, (object) utilities, new object[] { 1 });
+         }
+         finally
+         {
+            ServerSession.Release((object) utilities);
+         }
+
+         return (true, "The folder UID counters have been recalculated. Clients that cached the old values will "
+                       + "resynchronise on their next connection.");
       }
 
       // ---- anti-virus scanner test / preset helpers --------------------------

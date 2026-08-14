@@ -183,7 +183,16 @@ namespace hMailServer.ControlPanel.Views
             var col = new DataGridTextColumn
             {
                Header = f.Label,
-               Binding = new System.Windows.Data.Binding($"Values[{prop}]") { Converter = CellConverter.Instance },
+               // A Combo column stores the enum's number, and a grid cell reading
+               // "1" where the dialog above it reads "SSL/TLS" is not a display
+               // detail - it is the difference between a list an administrator can
+               // scan for the unencrypted row and one they cannot.
+               Binding = new System.Windows.Data.Binding($"Values[{prop}]")
+               {
+                  Converter = f.Kind == FieldKind.Combo && f.Options != null
+                     ? new CellConverter(f.Options)
+                     : CellConverter.Instance
+               },
                Width = double.IsNaN(f.GridWidth)
                   ? new DataGridLength(1, DataGridLengthUnitType.Star)
                   : new DataGridLength(f.GridWidth)
@@ -383,8 +392,48 @@ namespace hMailServer.ControlPanel.Views
 
       private sealed class CellConverter : System.Windows.Data.IValueConverter
       {
+         /// <summary>Option labels for a Combo column, or null for every other kind.</summary>
+         private readonly (int Value, string Label)[] options_;
+
+         private CellConverter()
+         {
+         }
+
+         public CellConverter((int Value, string Label)[] options) => options_ = options;
+
          public static readonly CellConverter Instance = new();
-         public object Convert(object value, Type t, object p, CultureInfo c) => FormatCell(value);
+
+         public object Convert(object value, Type t, object p, CultureInfo c)
+         {
+            if (options_ != null && value != null)
+            {
+               // A value with no matching option falls through to the number
+               // rather than being shown as blank or as the first option: an
+               // enum the GUI does not know about is a real thing to notice,
+               // and blanking it would hide it.
+               try
+               {
+                  int number = System.Convert.ToInt32(value, CultureInfo.InvariantCulture);
+                  foreach ((int Value, string Label) option in options_)
+                  {
+                     if (option.Value == number)
+                        return option.Label;
+                  }
+               }
+               catch (FormatException)
+               {
+               }
+               catch (InvalidCastException)
+               {
+               }
+               catch (OverflowException)
+               {
+               }
+            }
+
+            return FormatCell(value);
+         }
+
          public object ConvertBack(object value, Type t, object p, CultureInfo c) => value;
       }
    }

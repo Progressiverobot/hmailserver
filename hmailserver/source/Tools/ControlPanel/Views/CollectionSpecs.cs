@@ -16,6 +16,22 @@ namespace hMailServer.ControlPanel.Views
       private static dynamic AntiSpam => ServerSession.Current.Application.Settings.AntiSpam;
       private static dynamic Settings => ServerSession.Current.Application.Settings;
 
+      /// <summary>
+      /// hMailServer's eConnectionSecurity, in the order the enum declares it, and
+      /// worded the same way the SSL/TLS and Delivery pages word it so the same
+      /// choice does not read as two different things in two places. The wording
+      /// carries the port each one implies, because choosing the security without
+      /// changing the port is the single commonest way an external account is
+      /// configured and then never downloads anything.
+      /// </summary>
+      private static readonly (int Value, string Label)[] ConnectionSecurityOptions =
+      {
+         (0, "None - no encryption (port 110)"),
+         (1, "SSL/TLS - encrypted from the first byte (port 995)"),
+         (2, "STARTTLS, optional - upgrade if offered, continue in the clear if not (port 110)"),
+         (3, "STARTTLS, required - refuse to download unless the upgrade succeeds (port 110)")
+      };
+
       public static CollectionEditorView SurblServers() => new(new CollectionSpec
       {
          Title = "SURBL servers",
@@ -167,7 +183,8 @@ namespace hMailServer.ControlPanel.Views
       public static CollectionEditorView FetchAccounts(string domainName, string address) => new(new CollectionSpec
       {
          Title = "External accounts",
-         Subtitle = "POP3 mailboxes hMailServer downloads mail from on behalf of this account.",
+         Subtitle = "POP3 mailboxes hMailServer downloads mail from on behalf of this account. "
+                    + "Connection security and port go together: SSL/TLS on 995, STARTTLS on 110.",
          ItemNoun = "external account",
          GetCollection = () =>
          {
@@ -186,7 +203,28 @@ namespace hMailServer.ControlPanel.Views
             new FieldSpec { Prop = "Password", Label = "Password", Kind = FieldKind.Password, ShowInGrid = false, Default = "" },
             new FieldSpec { Prop = "MinutesBetweenFetch", Label = "Minutes between downloads", Kind = FieldKind.Number, ShowInGrid = false, Default = 15 },
             new FieldSpec { Prop = "DaysToKeepMessages", Label = "Days to keep on server (0 = delete after download)", Kind = FieldKind.Number, ShowInGrid = false, Default = 0 },
-            new FieldSpec { Prop = "UseSSL", Label = "Use SSL/TLS", Kind = FieldKind.Bool, ShowInGrid = false, Default = false },
+            // Was a "Use SSL/TLS" checkbox, which could not express STARTTLS at
+            // all. The COM property behind that checkbox is UseSSL, and its
+            // getter is ConnectionSecurity == CSSSL while its setter writes
+            // CSSSL or CSNone - so an account already set to STARTTLS read back
+            // as unticked, and ticking anything on that dialog rewrote it to
+            // implicit TLS on the next save. Implicit TLS on port 110 does not
+            // connect, which made STARTTLS effectively unreachable from the GUI
+            // for the very providers that require it.
+            //
+            // The server has supported all four values on the fetch path
+            // throughout: POP3ClientConnection sends CAPA, issues STLS, and on
+            // CSSTARTTLSRequired abandons the download with a log line when the
+            // far end does not advertise STLS.
+            new FieldSpec
+            {
+               Prop = "ConnectionSecurity",
+               Label = "Connection security",
+               Kind = FieldKind.Combo,
+               Options = ConnectionSecurityOptions,
+               GridWidth = 150,
+               Default = 0
+            },
             new FieldSpec { Prop = "UseAntiSpam", Label = "Run anti-spam on downloaded mail", Kind = FieldKind.Bool, ShowInGrid = false, Default = true },
             new FieldSpec { Prop = "UseAntiVirus", Label = "Run anti-virus on downloaded mail", Kind = FieldKind.Bool, ShowInGrid = false, Default = true }
          }
