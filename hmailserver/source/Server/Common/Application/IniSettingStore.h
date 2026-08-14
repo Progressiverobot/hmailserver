@@ -91,6 +91,54 @@ namespace HM
       /// <summary>Every row, as name -> (value, filevalue). Public for the backup path.</summary>
       static bool ReadAllRows(std::map<String, std::pair<String, String> > &rows);
 
+      // ---- administrative writes --------------------------------------------
+      //
+      // The COM surface for these settings, which is what lets a Control Panel on
+      // another machine administer them at all. The ordering below is the whole
+      // design and is the same as Synchronize's: THE FILE IS WRITTEN FIRST, and the
+      // row is only recorded as agreed with it if that write succeeded. Writing the
+      // row first and the file second would produce, on a service account that
+      // cannot write the ini, a stored value that every direct reader of the file -
+      // hmconfig.ps1, the DAV redirects, /Register - would disagree with, and no
+      // way to tell from either copy which was right.
+
+      /// <summary>
+      /// Sets one [Settings] value from an administrator, in file-then-row order.
+      /// False means the FILE could not be written, and nothing has been changed.
+      ///
+      /// Note what this does NOT do: it does not make the value take effect. Almost
+      /// every one of these is latched into a typed member by LoadSettings() at
+      /// start-up, and reloading them here would rewrite ~150 members underneath
+      /// running sessions. So the value is persisted and applies on the next start,
+      /// which is exactly the behaviour an administrator editing the file gets.
+      /// </summary>
+      static bool WriteSetting(const String &name, const String &value);
+
+      /// <summary>
+      /// Removes a key from the file and drops its row, which is how a setting is
+      /// returned to its default. False means the file could not be written.
+      /// </summary>
+      static bool RemoveSetting(const String &name);
+
+      /// <summary>
+      /// Whether a name can be stored at all: non-empty, within the 100 character
+      /// column, and free of the characters that would make it a different key -
+      /// or a different section - when written to an ini file.
+      /// </summary>
+      static bool IsStorableName(const String &name);
+
+      /// <summary>Whether a value fits the column. 4000 characters, as ReadIniSection_ enforces.</summary>
+      static bool IsStorableValue(const String &value);
+
+      /// <summary>
+      /// Every name currently in the [Settings] section, in the order the file has
+      /// them. Read from the FILE rather than the table because the file is the copy
+      /// that decides behaviour, and a name present in one and not the other is
+      /// exactly the state an administrator needs to see rather than have smoothed
+      /// over.
+      /// </summary>
+      static void ReadSettingNames(std::vector<String> &names);
+
    private:
 
       /// <summary>The whole [Settings] section of the ini, as name -> value.</summary>

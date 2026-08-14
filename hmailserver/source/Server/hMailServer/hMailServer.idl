@@ -704,6 +704,31 @@ interface IInterfaceSettings : IDispatch{
    [propget, id(107), helpstring("Rewrite envelope From address to the forwarding account address when forwarding.")] HRESULT RewriteEnvelopeFromWhenForwarding([out, retval] VARIANT_BOOL *pVal);
    [propput, id(107), helpstring("Rewrite envelope From address to the forwarding account address when forwarding.")] HRESULT RewriteEnvelopeFromWhenForwarding([in] VARIANT_BOOL newVal);
 
+   // The [Settings] section of hMailServer.INI, over COM.
+   //
+   // These settings decide whether the optional listeners run at all, and until now
+   // they could only be administered by opening a file on the server - so a Control
+   // Panel connected from another machine could not touch them, and they were absent
+   // from configuration-as-code. Reading and writing them here is the whole of what
+   // makes them remotely administrable.
+   //
+   // Server administrator only, like the rest of this interface: the section holds
+   // OAuth2HmacSecret, SRSSecret, BATVSecret and PasswordPepper. That is the same
+   // treatment Account.Password, FetchAccount.Password and
+   // SSLCertificate.PrivateKeyPassword already get.
+   //
+   // A write persists but does NOT take effect until the server is restarted, which
+   // is the contract editing the file by hand has always had - LoadSettings latches
+   // these into typed members at start-up.
+   [id(108), helpstring("Reads a value from the [Settings] section of hMailServer.INI. Empty when the setting is not present.")]
+      HRESULT GetIniSetting([in] BSTR Name, [out, retval] BSTR *pVal);
+   [id(109), helpstring("Writes a value to the [Settings] section of hMailServer.INI and mirrors it to the database. Applies after a server restart.")]
+      HRESULT SetIniSetting([in] BSTR Name, [in] BSTR Value);
+   [id(110), helpstring("Removes a key from the [Settings] section, returning the setting to its default. Not the same as writing an empty value.")]
+      HRESULT DeleteIniSetting([in] BSTR Name);
+   [propget, id(111), helpstring("Every name currently in the [Settings] section, one per line.")]
+      HRESULT IniSettingNames([out, retval] BSTR *pVal);
+
 };
 
 

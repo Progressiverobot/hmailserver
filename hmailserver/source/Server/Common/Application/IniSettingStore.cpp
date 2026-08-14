@@ -371,6 +371,113 @@ namespace HM
       return UpdateRow_(key, value, value);
    }
 
+   void
+   IniSettingStore::ReadSettingNames(std::vector<String> &names)
+   {
+      names.clear();
+
+      std::map<String, String> values;
+      ReadIniSection_(values);
+
+      for (auto iter = values.begin(); iter != values.end(); iter++)
+         names.push_back((*iter).first);
+   }
+
+   bool
+   IniSettingStore::IsStorableName(const String &name)
+   {
+      if (name.IsEmpty() || name.GetLength() > 100)
+         return false;
+
+      // A name carrying any of these would not come back as the same key. '=' ends
+      // the name in an ini file, '[' and ']' would make it look like a section
+      // header, and a newline would split it into two lines - each of which is a
+      // way to write one setting and silently create another.
+      if (name.Find(_T("=")) >= 0 || name.Find(_T("[")) >= 0 || name.Find(_T("]")) >= 0)
+         return false;
+
+      if (name.Find(_T("\r")) >= 0 || name.Find(_T("\n")) >= 0)
+         return false;
+
+      // Leading or trailing whitespace does not survive a round trip through
+      // GetPrivateProfileSection, so a name carrying it would never match again.
+      String trimmed = name;
+      trimmed.Trim();
+
+      return trimmed.Compare(name) == 0;
+   }
+
+   bool
+   IniSettingStore::IsStorableValue(const String &value)
+   {
+      if (value.GetLength() > 4000)
+         return false;
+
+      // Same reasoning as the name: a newline in a value writes a second line into
+      // the section, which on the next read is an entirely separate setting.
+      return value.Find(_T("\r")) < 0 && value.Find(_T("\n")) < 0;
+   }
+
+   bool
+   IniSettingStore::WriteSetting(const String &name, const String &value)
+   {
+      if (!IsStorableName(name) || !IsStorableValue(value))
+         return false;
+
+      // File first. See the header for why the order is not an implementation
+      // detail.
+      if (!WriteIniValue_(name, value))
+         return false;
+
+      std::map<String, std::pair<String, String> > rows;
+
+      if (!ReadAllRows(rows))
+      {
+         // The file now holds the new value and the mirror does not know. Not
+         // failed - the server is running on what the file says, which is the copy
+         // that decides behaviour - but it is out of step until the next start,
+         // where Synchronize will adopt it. Said out loud rather than swallowed,
+         // because "it saved but is not in the backup" is precisely the kind of
+         // half-success this whole feature exists to remove.
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5806, "IniSettingStore::WriteSetting",
+            Formatter::Format("The setting '{0}' was written to hMailServer.INI but the hm_inisettings table could not be read, so the change is not mirrored yet. It will be picked up on the next server start.", name));
+
+         return true;
+      }
+
+      if (rows.find(name) == rows.end())
+         InsertRow_(name, value, value);
+      else
+         UpdateRow_(name, value, value);
+
+      return true;
+   }
+
+   bool
+   IniSettingStore::RemoveSetting(const String &name)
+   {
+      if (!IsStorableName(name))
+         return false;
+
+      // Passing a null value is what DELETES the line rather than leaving "Key="
+      // behind - and "Key=" is not the same thing at all, because
+      // GetPrivateProfileInt reads an empty value as 0 rather than falling back to
+      // the caller's default. That distinction has bitten this project twice.
+      String iniFile = IniFileSettings::GetInitializationFile();
+
+      if (iniFile.IsEmpty())
+         return false;
+
+      if (WritePrivateProfileString(_T("Settings"), name.c_str(), nullptr, iniFile.c_str()) == FALSE)
+         return false;
+
+      WritePrivateProfileString(nullptr, nullptr, nullptr, iniFile.c_str());
+
+      DeleteRow_(name);
+
+      return true;
+   }
+
    bool
    IniSettingStore::XMLStore(XNode *pBackupNode)
    {

@@ -15,7 +15,42 @@ namespace hMailServer.ControlPanel.Services
       private const string Section = "Settings";
 
       public string IniPath { get; }
+
+      /// <summary>
+      /// Whether hMailServer.INI is on THIS machine. Unchanged in meaning: callers
+      /// that need the file itself - ApiKeyStore locating hMailServerApiKeys.ini
+      /// beside it, the log-folder card, anything reading [Database] or
+      /// [Directories] - still depend on this and still get the honest answer.
+      /// </summary>
       public bool IsAvailable => IniPath != null;
+
+      /// <summary>
+      /// How to read and write the [Settings] section over COM, for when the file is
+      /// not on this machine. Supplied by the application once a session exists.
+      ///
+      /// Injected rather than called directly, and that is not ceremony: this file is
+      /// compiled straight into ControlPanel.Tests, and reaching ServerSession from
+      /// here would drag COM and System.ServiceProcess into the test assembly behind
+      /// it - the same trap CertificateInspector's expiry constant fell into. Null in
+      /// the tests, and null before a connection exists, which is why every use is
+      /// guarded.
+      ///
+      /// [Settings] only. [Database] and [Directories] are deliberately NOT reachable
+      /// this way: they are the bootstrap that says where the database IS, and a
+      /// server whose database location could be changed through the database it is
+      /// currently using is a server that can be pointed somewhere else by anyone who
+      /// reaches the one it is on.
+      /// </summary>
+      public static Func<string, string> ComReadSetting;
+
+      /// <summary>Writes a [Settings] value over COM. An empty value DELETES the key - see Write.</summary>
+      public static Action<string, string> ComWriteSetting;
+
+      /// <summary>
+      /// Whether the [Settings] section can be reached at all, by either route. This
+      /// is what a settings page should ask before deciding it cannot edit anything.
+      /// </summary>
+      public bool SettingsReachable => IsAvailable || ComReadSetting != null;
 
       public IniFeatureStore()
       {
@@ -89,23 +124,73 @@ namespace hMailServer.ControlPanel.Services
          return null;
       }
 
+      /// <summary>
+      /// Reads a [Settings] value: from the file when it is on this machine, and over
+      /// COM otherwise.
+      ///
+      /// The file is preferred where both are possible, because it is the copy the
+      /// server itself runs on - the mirror follows it, not the other way round - so
+      /// reading it cannot show a value the running server disagrees with.
+      /// </summary>
       public string Read(string key, string defaultValue = "")
       {
-         if (!IsAvailable)
+         if (IsAvailable)
+         {
+            var buffer = new StringBuilder(2048);
+            GetPrivateProfileString(Section, key, defaultValue, buffer, buffer.Capacity, IniPath);
+            return buffer.ToString();
+         }
+
+         Func<string, string> read = ComReadSetting;
+
+         if (read == null)
             return defaultValue;
-         var buffer = new StringBuilder(2048);
-         GetPrivateProfileString(Section, key, defaultValue, buffer, buffer.Capacity, IniPath);
-         return buffer.ToString();
+
+         try
+         {
+            string value = read(key);
+
+            // The server cannot tell "absent" from "empty" either - an ini reader
+            // never can - so an empty answer means the caller's default applies,
+            // exactly as GetPrivateProfileString would have decided above.
+            return string.IsNullOrEmpty(value) ? defaultValue : value;
+         }
+         catch (Exception)
+         {
+            // An older server without these members, or a session that has gone
+            // away. The default is the same answer this returned before the COM
+            // route existed, so nothing that worked stops working.
+            return defaultValue;
+         }
       }
 
       public bool ReadBool(string key, bool defaultValue)
          => Read(key, defaultValue ? "1" : "0").Trim() == "1";
 
+      /// <summary>
+      /// Writes a [Settings] value: to the file when it is on this machine, and over
+      /// COM otherwise.
+      ///
+      /// A COM write also updates the database mirror in the same call, because the
+      /// server does both; a local file write is picked up by the merge on the next
+      /// start. Either way the file ends up holding the value, which is what keeps
+      /// /Register, hmconfig.ps1 and the DAV redirects correct.
+      /// </summary>
       public void Write(string key, string value)
       {
-         if (!IsAvailable)
-            throw new InvalidOperationException("hMailServer.INI was not found on this machine.");
-         WritePrivateProfileString(Section, key, value, IniPath);
+         if (IsAvailable)
+         {
+            WritePrivateProfileString(Section, key, value, IniPath);
+            return;
+         }
+
+         Action<string, string> write = ComWriteSetting;
+
+         if (write == null)
+            throw new InvalidOperationException(
+               "hMailServer.INI is not on this machine and the server did not offer the settings API, so this value cannot be changed from here.");
+
+         write(key, value);
       }
 
       public void WriteBool(string key, bool value) => Write(key, value ? "1" : "0");

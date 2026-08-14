@@ -63,7 +63,40 @@ namespace hMailServer.ControlPanel.Services
 
       public static ServerSession Current { get; private set; }
 
-      public static void SetCurrent(ServerSession session) => Current = session;
+      public static void SetCurrent(ServerSession session)
+      {
+         Current = session;
+
+         // Hand IniFeatureStore the COM route to the [Settings] section, so a
+         // Control Panel connected to another machine can administer settings that
+         // live in hMailServer.INI. It cannot reach ServerSession itself: it is
+         // compiled into the test assembly, which must not acquire COM and
+         // System.ServiceProcess as dependencies just to read a value.
+         //
+         // Set even when the session is null, so signing out revokes the route
+         // rather than leaving a delegate closed over a dead session.
+         if (session == null)
+         {
+            IniFeatureStore.ComReadSetting = null;
+            IniFeatureStore.ComWriteSetting = null;
+            return;
+         }
+
+         IniFeatureStore.ComReadSetting = key => (string) session.Application.Settings.GetIniSetting(key);
+
+         // Always SetIniSetting, including for an empty value, because that is
+         // precisely what the local file path does - WritePrivateProfileString with
+         // "" leaves "Key=" behind, and the shipped hMailServer.INI is full of such
+         // lines (OAuth2HmacSecret=, BATVSecret=, SRSSecret=). Deleting the key here
+         // instead would make the same edit mean two different things depending on
+         // which machine the Control Panel happened to be running on, and an absent
+         // key is NOT equivalent: it falls back to the reading code's default, where
+         // an empty one reads as 0 through GetPrivateProfileInt. DeleteIniSetting
+         // exists for callers that genuinely mean "return this to its default"; a
+         // text box being cleared is not one of them.
+         IniFeatureStore.ComWriteSetting = (key, value) =>
+            session.Application.Settings.SetIniSetting(key, value ?? "");
+      }
 
       public bool Connect(string host, string userName, string password, out string error)
       {

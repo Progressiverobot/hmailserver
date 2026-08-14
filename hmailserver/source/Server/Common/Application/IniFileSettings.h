@@ -48,6 +48,45 @@ namespace HM
       /// </summary>
       void SaveDatabaseSetting(const String &key, const String &value);
 
+      // ---- the administrative surface behind the COM API --------------------
+      //
+      // These are what let a Control Panel on another machine administer the
+      // [Settings] section at all. Before them, IniFeatureStore had to open the file
+      // itself, which only works when it is running on the server - which is why the
+      // log-folder card has to say "not readable from this machine".
+      //
+      // None of them makes the value take effect in the running process. Almost
+      // every one of these settings is latched into a typed member by LoadSettings()
+      // at start-up, and re-running that here would rewrite around 150 members
+      // underneath live sessions. Persist now, apply on the next start - the same
+      // contract an administrator editing the file by hand has always had, and the
+      // one the Control Panel's "applies after a service restart" wording already
+      // describes.
+
+      /// <summary>
+      /// Reads one [Settings] value as it stands right now - through the reconciled
+      /// map when one has been loaded, and from the file otherwise.
+      /// </summary>
+      String GetSettingsValue(const String &key);
+
+      /// <summary>
+      /// Writes one [Settings] value to the file and mirrors it. False means the FILE
+      /// could not be written and nothing was changed; see IniSettingStore::WriteSetting
+      /// for why that ordering matters.
+      /// </summary>
+      bool WriteSettingsValue(const String &key, const String &value);
+
+      /// <summary>
+      /// Removes one [Settings] key, returning the setting to its default, and drops
+      /// its row to match. Deliberately distinct from writing an empty string: an
+      /// absent key falls back to the caller's default, while "Key=" reads as 0
+      /// through GetPrivateProfileInt.
+      /// </summary>
+      bool RemoveSettingsValue(const String &key);
+
+      /// <summary>Every [Settings] name currently in the file.</summary>
+      void GetSettingsNames(std::vector<String> &names);
+
       bool CheckSettings(String &sErrorMessage);
 
       static String GetInitializationFile();

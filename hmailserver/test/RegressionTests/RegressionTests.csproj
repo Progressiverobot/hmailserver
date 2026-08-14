@@ -305,6 +305,7 @@
     <Compile Include="Infrastructure\SqlLayerErrorHandling.cs" />
     <Compile Include="Infrastructure\WorkQueueLifecycle.cs" />
     <Compile Include="Infrastructure\IniSettingsMirror.cs" />
+    <Compile Include="Infrastructure\IniSettingsOverCom.cs" />
     <Compile Include="IMAP\AppendInternalDate.cs" />
     <Compile Include="Infrastructure\MetricsReadiness.cs" />
     <Compile Include="Installation\InstallerPackaging.cs" />

@@ -247,6 +247,13 @@ END_COM_MAP()
    STDMETHOD(get_RewriteEnvelopeFromWhenForwarding)(/*[out, retval]*/ VARIANT_BOOL *pVal);
    STDMETHOD(put_RewriteEnvelopeFromWhenForwarding)(/*[in]*/ VARIANT_BOOL newVal);
 
+   // The [Settings] section of hMailServer.INI. See the IDL for why these exist and
+   // for the two things they deliberately do not do.
+   STDMETHOD(GetIniSetting)(/*[in]*/ BSTR Name, /*[out, retval]*/ BSTR *pVal);
+   STDMETHOD(SetIniSetting)(/*[in]*/ BSTR Name, /*[in]*/ BSTR Value);
+   STDMETHOD(DeleteIniSetting)(/*[in]*/ BSTR Name);
+   STDMETHOD(get_IniSettingNames)(/*[out, retval]*/ BSTR *pVal);
+
    bool LoadSettings();
 
 private:

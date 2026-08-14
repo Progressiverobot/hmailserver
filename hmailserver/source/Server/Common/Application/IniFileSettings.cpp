@@ -524,6 +524,57 @@ namespace HM
    }
 
    String
+   IniFileSettings::GetSettingsValue(const String &key)
+   {
+      // Straight through the ordinary read path, so a value fetched over COM is the
+      // same value the server itself would read for that key - overlay included.
+      // A separate implementation here would be a second answer to the same
+      // question, and the two would eventually disagree.
+      return ReadIniSettingString_(_T("Settings"), key, _T(""));
+   }
+
+   bool
+   IniFileSettings::WriteSettingsValue(const String &key, const String &value)
+   {
+      if (!IniSettingStore::WriteSetting(key, value))
+         return false;
+
+      // The overlay is updated only after the write succeeded, and to the value that
+      // actually reached the file. Updating it first would make this process read
+      // back a value that no other reader of the file can see.
+      {
+         boost::lock_guard<boost::recursive_mutex> guard(database_settings_mutex_);
+
+         if (database_settings_loaded_)
+            database_settings_[key] = value;
+      }
+
+      return true;
+   }
+
+   bool
+   IniFileSettings::RemoveSettingsValue(const String &key)
+   {
+      if (!IniSettingStore::RemoveSetting(key))
+         return false;
+
+      {
+         boost::lock_guard<boost::recursive_mutex> guard(database_settings_mutex_);
+
+         if (database_settings_loaded_)
+            database_settings_.erase(key);
+      }
+
+      return true;
+   }
+
+   void
+   IniFileSettings::GetSettingsNames(std::vector<String> &names)
+   {
+      IniSettingStore::ReadSettingNames(names);
+   }
+
+   String
    IniFileSettings::ReadIniSettingString_(const String &sSection, const String &sKey, const String &sDefault)
    {
       // [Settings] only, and only once the reconciliation has run. Every other

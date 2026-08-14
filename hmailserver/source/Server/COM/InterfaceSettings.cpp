@@ -12,6 +12,7 @@
 #include "InterfaceCache.h"
 
 #include "../Common/Application/ACLManager.h"
+#include "../Common/Application/IniSettingStore.h"
 #include "../Common/BO/TCPIPPorts.h"
 #include "../Common/BO/SSLCertificates.h"
 #include "../Common/BO/IncomingRelays.h"
@@ -2647,6 +2648,111 @@ STDMETHODIMP InterfaceSettings::put_RewriteEnvelopeFromWhenForwarding(VARIANT_BO
          return GetAccessDenied();
 
       ini_file_settings_->SetRewriteEnvelopeFromWhenForwarding(newVal == VARIANT_TRUE);
+
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+STDMETHODIMP InterfaceSettings::GetIniSetting(BSTR Name, BSTR *pVal)
+{
+   try
+   {
+      if (!config_)
+         return GetAccessDenied();
+
+      if (!pVal)
+         return COMError::GenerateGenericMessage();
+
+      HM::String name = Name;
+
+      // Refused rather than answered with an empty string. A name this store could
+      // never have written is a caller mistake, and "" is indistinguishable from a
+      // setting that is genuinely absent - which is exactly the ambiguity that makes
+      // a misspelled key look like a working one.
+      if (!HM::IniSettingStore::IsStorableName(name))
+         return COMError::GenerateError("The setting name is empty, longer than 100 characters, surrounded by whitespace, or contains one of = [ ] or a line break.");
+
+      *pVal = HM::IniFileSettings::Instance()->GetSettingsValue(name).AllocSysString();
+
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceSettings::SetIniSetting(BSTR Name, BSTR Value)
+{
+   try
+   {
+      if (!config_)
+         return GetAccessDenied();
+
+      HM::String name = Name;
+      HM::String value = Value;
+
+      if (!HM::IniSettingStore::IsStorableName(name))
+         return COMError::GenerateError("The setting name is empty, longer than 100 characters, surrounded by whitespace, or contains one of = [ ] or a line break.");
+
+      if (!HM::IniSettingStore::IsStorableValue(value))
+         return COMError::GenerateError("The value is longer than 4000 characters or contains a line break, so it could not be stored or read back as one setting.");
+
+      if (!HM::IniFileSettings::Instance()->WriteSettingsValue(name, value))
+         return COMError::GenerateError("The setting could not be written to hMailServer.INI. The account the server runs as needs write access to that file. Nothing has been changed.");
+
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceSettings::DeleteIniSetting(BSTR Name)
+{
+   try
+   {
+      if (!config_)
+         return GetAccessDenied();
+
+      HM::String name = Name;
+
+      if (!HM::IniSettingStore::IsStorableName(name))
+         return COMError::GenerateError("The setting name is empty, longer than 100 characters, surrounded by whitespace, or contains one of = [ ] or a line break.");
+
+      if (!HM::IniFileSettings::Instance()->RemoveSettingsValue(name))
+         return COMError::GenerateError("The setting could not be removed from hMailServer.INI. The account the server runs as needs write access to that file. Nothing has been changed.");
+
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceSettings::get_IniSettingNames(BSTR *pVal)
+{
+   try
+   {
+      if (!config_)
+         return GetAccessDenied();
+
+      if (!pVal)
+         return COMError::GenerateGenericMessage();
+
+      std::vector<HM::String> names;
+      HM::IniFileSettings::Instance()->GetSettingsNames(names);
+
+      // One per line, because a name cannot contain a line break - IsStorableName
+      // refuses one - so the separator can never appear inside a value of this list.
+      HM::String result = HM::StringParser::JoinVector(names, _T("\r\n"));
+
+      *pVal = result.AllocSysString();
 
       return S_OK;
    }
