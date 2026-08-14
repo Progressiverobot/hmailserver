@@ -626,9 +626,16 @@ namespace hMailServer.ControlPanel.Services
                   aliases: "EventHandlers|Scripts|OnDeliverMessage|OnClientLogon|OnAcceptMessage|VBScript|Run code on mail",
                   seeAlso: "advanced|rules"),
 
-               Page("hardening", "Advanced INI settings",
-                  "Individual hMailServer.INI values that have no page of their own. Change these deliberately.",
-                  aliases: "Advanced hardening|INI settings|hMailServer.INI|Registry|Undocumented|Expert settings|Everything else",
+               // Renamed from "Advanced INI settings", which named the page after
+               // the file its values are stored in. Everything on it that belonged
+               // to a feature with a page of its own has moved to that page; what
+               // is left really is server-wide, and the title now says so. Both old
+               // titles stay as aliases, and the key is unchanged, so every link,
+               // bookmark and remembered path still arrives here.
+               Page("hardening", "Server limits & expert settings",
+                  "Server-wide ceilings, durability and abuse controls that belong to no single protocol or feature.",
+                  aliases: "Advanced INI settings|Advanced hardening|INI settings|hMailServer.INI|Registry|Undocumented|Expert settings|Everything else|" +
+                           "Timeouts|Queue bounds|Sending limits|Rate limit|Throttle|fsync|Durability|DPAPI|Received headers|mailer-daemon",
                   seeAlso: "advanced|performance|backup")),
 
             Page("about", "About",

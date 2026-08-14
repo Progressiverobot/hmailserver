@@ -141,6 +141,56 @@ namespace hMailServer.ControlPanel.Tests.Services
       }
 
       /// <summary>
+      /// A setting belongs on the page that owns the feature it configures, not on
+      /// the page that matches where the value happens to be stored.
+      ///
+      /// hMailServer keeps settings in two places - the settings database, reached
+      /// over COM, and hMailServer.INI - and the Control Panel has one settings view
+      /// for each. That is an implementation detail of the Control Panel, and for a
+      /// long time it leaked straight into the navigation: half of greylisting was
+      /// on the Anti-spam page and the other half on a catch-all page called
+      /// "Advanced INI settings", the IMAP search limits that the README tells
+      /// owners of large mailboxes to raise were nowhere near IMAP, and the TLS
+      /// session-resumption settings were not on the SSL/TLS page. Nobody looking
+      /// for any of them would have looked there, because nobody knows or cares
+      /// which of the two stores a value lives in.
+      ///
+      /// Each row below is one setting that was moved for that reason. They are
+      /// pinned because the move is invisible in the source - both views can edit
+      /// an INI value, so putting one back on the wrong page compiles, runs, and
+      /// costs nothing until somebody cannot find it.
+      /// </summary>
+      [Theory]
+      [InlineData("GreylistingEnabledDuringRecordExpiration", "antispam")]
+      [InlineData("GreylistingRecordExpirationInterval", "antispam")]
+      [InlineData("SAMoveVsCopy", "antispam")]
+      [InlineData("IMAPSearchTimeout", "protocols")]
+      [InlineData("IMAPSearchMaxMegabytes", "protocols")]
+      [InlineData("SMTPDMaxTimeout", "protocols")]
+      [InlineData("POP3CMaxTimeout", "protocols")]
+      [InlineData("TlsSessionTicketsEnabled", "tls")]
+      [InlineData("TlsSessionCacheSize", "tls")]
+      [InlineData("TlsSessionTimeoutSeconds", "tls")]
+      [InlineData("TlsTicketKeyRotationSeconds", "tls")]
+      [InlineData("MXTriesFactor", "delivery")]
+      [InlineData("MaxNumberOfExternalFetchThreads", "performance")]
+      [InlineData("SRSEnabled", "security")]
+      [InlineData("BATVEnabled", "security")]
+      [InlineData("RewriteEnvelopeFromWhenForwarding", "security")]
+      public void Setting_IsFiledWithItsFeature_NotWithItsStorage(string key, string page)
+      {
+         SettingEntry entry = SettingsSearchIndex.Entries
+            .FirstOrDefault(e => string.Equals(e.Key, key, StringComparison.OrdinalIgnoreCase));
+
+         Assert.True(entry != null, $"'{key}' has fallen out of the search index entirely.");
+         Assert.True(string.Equals(page, entry.Page, StringComparison.OrdinalIgnoreCase),
+            $"'{key}' is on the '{entry.Page}' page. It configures a feature that lives on '{page}', " +
+            "and it was deliberately moved there so that an administrator finds the whole feature in one " +
+            "place. If it has genuinely changed subject, update this row; if it moved back to a catch-all " +
+            "page because that is where its storage lives, that is the mistake this test exists to catch.");
+      }
+
+      /// <summary>
       /// Every hMailServer.INI setting a page reads or writes directly must be
       /// searchable, whichever page ends up owning it in the index.
       /// </summary>

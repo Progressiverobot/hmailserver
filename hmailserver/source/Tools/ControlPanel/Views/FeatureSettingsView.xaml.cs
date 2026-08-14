@@ -671,6 +671,79 @@ namespace hMailServer.ControlPanel.Views
          }
       }
 
+      /// <summary>
+      /// A row for a setting that used to be on this page and is now somewhere
+      /// better, with a button that goes there.
+      ///
+      /// A setting that moves is a link an administrator has already followed once
+      /// and a note in somebody's runbook, and neither survives a silent relocation:
+      /// the page opens, the setting is not on it, and the reasonable conclusion is
+      /// that the feature was removed. This row is the alternative - it says where
+      /// the setting went and takes you there in one click.
+      ///
+      /// Deliberately not persisted, and deliberately carries no Key, so that the
+      /// settings-index generator cannot index it: the Ctrl+K palette must send
+      /// somebody searching for "session tickets" to the page that now owns the
+      /// setting, not back here to a signpost.
+      /// </summary>
+      private class MovedSetting : Setting
+      {
+         private readonly string page_;
+
+         /// <param name="page">Nav key of the page that owns the setting now.</param>
+         /// <param name="caption">What moved, in the administrator's words.</param>
+         public MovedSetting(string page, string caption)
+         {
+            page_ = page;
+            Label = caption;
+         }
+
+         public override FrameworkElement CreateEditor(IniFeatureStore store)
+         {
+            // LocationOf gives the full "group > page" trail and returns "" - not
+            // null - for a key it does not know, so an empty result has to fall
+            // back to the title rather than be printed as a blank destination.
+            string destination = NavigationMap.LocationOf(page_);
+            if (string.IsNullOrEmpty(destination))
+               destination = NavigationMap.TitleOf(page_);
+
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 2) };
+
+            var text = new TextBlock
+            {
+               Text = Label + "  →  " + destination,
+               FontSize = 13,
+               TextWrapping = TextWrapping.Wrap,
+               VerticalAlignment = VerticalAlignment.Center,
+               MaxWidth = 420
+            };
+            row.Children.Add(text);
+
+            var button = new Wpf.Ui.Controls.Button
+            {
+               Content = "Open…",
+               Appearance = Wpf.Ui.Controls.ControlAppearance.Transparent,
+               FontSize = Typography.Caption,
+               Padding = new Thickness(8, 3, 8, 3),
+               Margin = new Thickness(10, 0, 0, 0),
+               VerticalAlignment = VerticalAlignment.Center,
+               Cursor = System.Windows.Input.Cursors.Hand,
+               ToolTip = "Open " + destination
+            };
+            System.Windows.Automation.AutomationProperties.SetName(button, "Open " + destination + ", which now has " + Label);
+            SetAid(button, "moved-to-" + page_);
+            button.Click += (s, e) => (Application.Current?.MainWindow as MainWindow)?.NavigateTo(page_);
+            row.Children.Add(button);
+
+            return row;
+         }
+
+         /// <summary>Nothing to save: this row edits nothing.</summary>
+         public override void Save(IniFeatureStore store)
+         {
+         }
+      }
+
       /// <summary>What one computed warning has decided to say, or null for nothing.</summary>
       private class WarningState
       {
@@ -1047,6 +1120,80 @@ namespace hMailServer.ControlPanel.Views
                      new TextSetting { Key = "TlsRptOrganizationName", Default = "hMailServer", Label = "Organization name in reports" }
                   }
                });
+               // Moved here from the catch-all INI page. This is the same subject as
+               // the rest of this page - whether mail this server sends still passes
+               // the recipient's authentication checks - and forwarding is the single
+               // most common way a domain's SPF record starts failing for mail it
+               // genuinely sent. The plain rewrite fallback comes with it, because
+               // SRS silently replaces it and neither one can be judged alone.
+               cards_.Add(new CardDef
+               {
+                  Title = "Forwarded mail & bounce protection (SRS / BATV)",
+                  Blurb = "Forwarding a message keeps the original envelope sender, so the next hop checks SPF for a " +
+                          "domain that never authorised this server and the message fails. These are the two answers. " +
+                          "SRS rewrites the envelope sender into one this server can vouch for and can undo on the way " +
+                          "back, so bounces still reach the original sender; BATV tags the envelope sender of outbound " +
+                          "mail so a forged bounce - one for a message this server never sent - can be told apart from " +
+                          "a real one. Both use a server-wide secret and do nothing at all until one is set. " +
+                          "Changes take effect after a service restart.",
+                  Settings =
+                  {
+                     new BoolSetting
+                     {
+                        Key = "RewriteEnvelopeFromWhenForwarding",
+                        Default = false,
+                        Label = "Rewrite the envelope sender when forwarding (the simple fallback, no secret needed)",
+                        Blurb = "Replaces the envelope sender with the forwarding account's own address. That makes SPF " +
+                                "pass at the next hop, at the cost of the original sender's address: a bounce comes back " +
+                                "to the forwarding mailbox instead of to whoever wrote the message. SRS below does the " +
+                                "same job without losing the return path, and while SRS is enabled this setting is not " +
+                                "consulted at all."
+                     },
+                     new BoolSetting { Key = "SRSEnabled", Default = false, Label = "Enable Sender Rewriting Scheme (SRS) on forwarded mail" },
+                     new SecretSetting { Key = "SRSSecret", OfferGenerate = true, Label = "SRS signing secret", Hint = "A random server-wide secret" },
+                     new BoolSetting { Key = "BATVEnabled", Default = false, Label = "Tag outbound envelope senders with BATV and validate returning bounces" },
+                     new SecretSetting { Key = "BATVSecret", OfferGenerate = true, Label = "BATV signing secret", Hint = "A random server-wide secret" }
+                  },
+                  Warnings =
+                  {
+                     // Verified in SMTPForwarding.cpp: SRS::Forward returns nothing
+                     // when the secret is empty, and the RewriteEnvelopeFrom...
+                     // fallback sits in an "else if" behind SRSEnabled - so SRS-on
+                     // with no secret rewrites nothing AND suppresses the fallback.
+                     new WarningDef
+                     {
+                        Aid = "SrsSecretMissingWarning",
+                        Compute = () =>
+                        {
+                           if (!LiveBool_("SRSEnabled", false) || SecretConfigured_("SRSSecret"))
+                              return null;
+                           return new WarningState
+                           {
+                              Level = StatusLevel.Warning,
+                              Text = "SRS is switched on but no secret is set, so no envelope sender is rewritten - and " +
+                                     "while SRS is on, the plain rewrite fallback at the top of this card is skipped as " +
+                                     "well. This is strictly worse than switching SRS off. Generate or enter a secret."
+                           };
+                        }
+                     },
+                     new WarningDef
+                     {
+                        Aid = "BatvSecretMissingWarning",
+                        Compute = () =>
+                        {
+                           if (!LiveBool_("BATVEnabled", false) || SecretConfigured_("BATVSecret"))
+                              return null;
+                           return new WarningState
+                           {
+                              Level = StatusLevel.Warning,
+                              Text = "BATV is switched on but no secret is set, so outbound senders are not tagged and " +
+                                     "returning bounces are not validated - the switch reads enabled while it does " +
+                                     "nothing. Generate or enter a secret."
+                           };
+                        }
+                     }
+                  }
+               });
                break;
 
             case Section.Automation:
@@ -1335,53 +1482,19 @@ namespace hMailServer.ControlPanel.Views
                });
                break;
 
+            // "Advanced INI settings" filed by storage mechanism, which is the one
+            // thing an administrator never knows and never needs to. Everything on
+            // it that belonged to a feature with a page of its own has gone to that
+            // page; what is left is genuinely server-wide, so the page is now named
+            // for that rather than for the file the values happen to live in. The
+            // nav key stays "hardening" and the old titles stay as search aliases,
+            // so every existing link and bookmark still lands here.
             case Section.Hardening:
-               TitleText.Text = "Advanced INI settings";
-               SubtitleText.Text = "Lower-level hMailServer.INI [Settings] knobs that are not exposed on the other " +
-                                   "pages. The defaults are safe; change these only with a specific reason. " +
-                                   "Changes take effect after a service restart.";
-               cards_.Add(new CardDef
-               {
-                  Title = "Greylisting",
-                  Blurb = "Behaviour while a greylisting triplet is still within its expiration window.",
-                  Settings =
-                  {
-                     new BoolSetting { Key = "GreylistingEnabledDuringRecordExpiration", Default = true, Label = "Keep greylisting active during the record-expiration window" },
-                     new TextSetting { Key = "GreylistingRecordExpirationInterval", Default = "240", Label = "Record expiration interval (minutes, default 240)" }
-                  }
-               });
-               // Its own card, and named for the symptom rather than the subsystem,
-               // because these two are the settings the README tells owners of large
-               // mailboxes to raise - and until now there was nowhere in the GUI to do
-               // it. Somebody whose client reports a failed search will look for
-               // "IMAP search", so that is what the labels say.
-               cards_.Add(new CardDef
-               {
-                  Title = "IMAP search limits",
-                  Blurb = "Ceilings on a single IMAP SEARCH or SORT, measured from the start of the search. They exist so " +
-                          "that one client searching a very large mailbox cannot occupy a connection indefinitely. If " +
-                          "users with big mailboxes report searches failing or returning nothing, these are the two to " +
-                          "raise. Either half can be turned off on its own by setting it to 0.",
-                  Settings =
-                  {
-                     new TextSetting
-                     {
-                        Key = "IMAPSearchTimeout",
-                        Default = "60",
-                        Label = "Maximum time for one IMAP search (seconds; 0 = no limit)",
-                        Blurb = "The search stops when this is reached and the client is told the search failed, rather than " +
-                                "being given a partial result it would mistake for a complete one."
-                     },
-                     new TextSetting
-                     {
-                        Key = "IMAPSearchMaxMegabytes",
-                        Default = "2048",
-                        Label = "Maximum message content read for one IMAP search (MB; 0 = no limit)",
-                        Blurb = "A separate ceiling from the time limit, because a search that reads enormous amounts of " +
-                                "message content is expensive even when it finishes quickly."
-                     }
-                  }
-               });
+               TitleText.Text = "Server limits & expert settings";
+               SubtitleText.Text = "Server-wide ceilings, durability and abuse controls that belong to no single " +
+                                   "protocol or feature. The defaults are safe; change these only with a specific " +
+                                   "reason. Stored in hMailServer.INI, and unless a card says otherwise, changes " +
+                                   "take effect after a service restart.";
                cards_.Add(new CardDef
                {
                   Title = "Timeouts and queue bounds",
@@ -1425,12 +1538,28 @@ namespace hMailServer.ControlPanel.Views
                });
                cards_.Add(new CardDef
                {
-                  Title = "Other",
-                  Blurb = "Miscellaneous hardening knobs.",
+                  // Verified in TCPServer.cpp: the hold applies where a session could
+                  // not be created at all - a non-matching IP range or the connection
+                  // limit for that range - and nowhere else. It is not an auto-ban
+                  // setting, and the blurb says which page each of those is on so
+                  // nobody comes here looking for one and changes this instead.
+                  Title = "Refused connections",
+                  Blurb = "What happens to a TCP connection this server refuses before any protocol conversation starts: " +
+                          "one from an address no IP range allows, or one over that range's connection limit. Both of " +
+                          "those are configured on the IP ranges page. Locking out an address that keeps failing to log " +
+                          "on is a different mechanism entirely and is on the Auto-ban page.",
                   Settings =
                   {
-                     new TextSetting { Key = "BlockedIPHoldSeconds", Default = "0", Label = "Hold a blocked connection open before dropping it (seconds, 0 = drop immediately)" },
-                     new BoolSetting { Key = "RewriteEnvelopeFromWhenForwarding", Default = false, Label = "Rewrite the envelope sender when forwarding (helps SPF; see also SRS)" }
+                     new TextSetting
+                     {
+                        Key = "BlockedIPHoldSeconds",
+                        Default = "0",
+                        Label = "Hold a refused connection open before dropping it (seconds, 0 = drop immediately)",
+                        Blurb = "Anti-pounding: a host that reconnects the instant it is dropped can do so thousands of " +
+                                "times a minute, and holding the socket open slows it to one connection per interval " +
+                                "without costing this server a thread. The connection is held by a timer, so it consumes " +
+                                "nothing while it waits."
+                     }
                   }
                });
                cards_.Add(new CardDef
@@ -1442,58 +1571,6 @@ namespace hMailServer.ControlPanel.Views
                   {
                      new BoolSetting { Key = "MessageStoreFsync", Default = false, Label = "Flush each received message to disk before it is acknowledged (durable, slower)" },
                      new BoolSetting { Key = "MessageStoreConsistencyCheck", Default = false, Label = "Periodically cross-check message rows against files on disk (read-only; writes a report on divergence)" }
-                  }
-               });
-               cards_.Add(new CardDef
-               {
-                  Title = "Sender rewriting & bounce protection (SRS / BATV)",
-                  Blurb = "SRS rewrites the envelope sender when forwarding so SPF still passes at the next hop; BATV tags outbound envelope senders so forged bounces can be rejected. Both use a server-wide secret and do nothing at all until one is set.",
-                  Settings =
-                  {
-                     new BoolSetting { Key = "SRSEnabled", Default = false, Label = "Enable Sender Rewriting Scheme (SRS) on forwarded mail" },
-                     new SecretSetting { Key = "SRSSecret", OfferGenerate = true, Label = "SRS signing secret", Hint = "A random server-wide secret" },
-                     new BoolSetting { Key = "BATVEnabled", Default = false, Label = "Tag outbound envelope senders with BATV and validate returning bounces" },
-                     new SecretSetting { Key = "BATVSecret", OfferGenerate = true, Label = "BATV signing secret", Hint = "A random server-wide secret" }
-                  },
-                  Warnings =
-                  {
-                     // Verified in SMTPForwarding.cpp: SRS::Forward returns nothing
-                     // when the secret is empty, and the RewriteEnvelopeFrom...
-                     // fallback sits in an "else if" behind SRSEnabled - so SRS-on
-                     // with no secret rewrites nothing AND suppresses the fallback.
-                     new WarningDef
-                     {
-                        Aid = "SrsSecretMissingWarning",
-                        Compute = () =>
-                        {
-                           if (!LiveBool_("SRSEnabled", false) || SecretConfigured_("SRSSecret"))
-                              return null;
-                           return new WarningState
-                           {
-                              Level = StatusLevel.Warning,
-                              Text = "SRS is switched on but no secret is set, so no envelope sender is rewritten - and " +
-                                     "while SRS is on, the 'Rewrite the envelope sender when forwarding' fallback in the " +
-                                     "Other card above is skipped as well. This is strictly worse than switching SRS off. " +
-                                     "Generate or enter a secret."
-                           };
-                        }
-                     },
-                     new WarningDef
-                     {
-                        Aid = "BatvSecretMissingWarning",
-                        Compute = () =>
-                        {
-                           if (!LiveBool_("BATVEnabled", false) || SecretConfigured_("BATVSecret"))
-                              return null;
-                           return new WarningState
-                           {
-                              Level = StatusLevel.Warning,
-                              Text = "BATV is switched on but no secret is set, so outbound senders are not tagged and " +
-                                     "returning bounces are not validated - the switch reads enabled while it does " +
-                                     "nothing. Generate or enter a secret."
-                           };
-                        }
-                     }
                   }
                });
                cards_.Add(new CardDef
@@ -1572,94 +1649,6 @@ namespace hMailServer.ControlPanel.Views
                      new TextSetting { Key = "MaxSubmissionsPerIPPerMinute", Default = "0", Label = "Max authenticated submissions per client IP per minute (0 = unlimited)", Placeholder = "60" }
                   }
                });
-               cards_.Add(new CardDef
-               {
-                  Title = "Connection timeouts",
-                  Blurb = "Idle timeouts (seconds) per protocol. 'Server' = hMailServer accepting connections; 'client' = hMailServer connecting out for delivery / external fetch.",
-                  Settings =
-                  {
-                     new TextSetting { Key = "SMTPDMinTimeout", Default = "10", Label = "SMTP server minimum timeout (s)" },
-                     new TextSetting { Key = "SMTPDMaxTimeout", Default = "1800", Label = "SMTP server maximum timeout (s)" },
-                     new TextSetting { Key = "SMTPCMinTimeout", Default = "30", Label = "SMTP client minimum timeout (s)" },
-                     new TextSetting { Key = "SMTPCMaxTimeout", Default = "600", Label = "SMTP client maximum timeout (s)" },
-                     new TextSetting { Key = "POP3DMinTimeout", Default = "10", Label = "POP3 server minimum timeout (s)" },
-                     new TextSetting { Key = "POP3DMaxTimeout", Default = "600", Label = "POP3 server maximum timeout (s)" },
-                     new TextSetting { Key = "POP3CMinTimeout", Default = "30", Label = "POP3 client minimum timeout (s)" },
-                     new TextSetting { Key = "POP3CMaxTimeout", Default = "900", Label = "POP3 client maximum timeout (s)" }
-                  }
-               });
-               cards_.Add(new CardDef
-               {
-                  // Every claim below is from SslContextInitializer::SetSessionResumption_,
-                  // which follows the house rule that a default value makes no OpenSSL
-                  // call at all - so the card can honestly promise that the defaults
-                  // change nothing.
-                  Title = "TLS session resumption",
-                  Blurb = "Session caching and session tickets for every SSL/TLS and STARTTLS listener. At the defaults " +
-                          "these four settings make no OpenSSL call at all, so resumption keeps OpenSSL's stock " +
-                          "behaviour. TLS versions and cipher lists are on the SSL/TLS page.",
-                  Settings =
-                  {
-                     new BoolSetting
-                     {
-                        Key = "TlsSessionTicketsEnabled",
-                        Default = true,
-                        Label = "Issue TLS session tickets so clients can resume sessions",
-                        Blurb = "Turning this off stops session tickets on every TLS version: TLS 1.2 and older clients " +
-                                "fall back to the server-side session cache, which never leaves this process, and " +
-                                "TLS 1.3 clients are sent no ticket at all. For an administrator whose policy is that " +
-                                "nothing derived from a long-lived key ever goes on the wire. The only cost is " +
-                                "resumption efficiency - every client can still connect with a full handshake."
-                     },
-                     new TextSetting
-                     {
-                        Key = "TlsSessionCacheSize",
-                        Default = "0",
-                        Placeholder = "0",
-                        Label = "Server-side TLS session cache size (0 = OpenSSL's default cap of 20480)",
-                        Blurb = "Each cached session costs server memory, and a client that churns handshakes grows the " +
-                                "cache - this cap is the defence. A positive value replaces OpenSSL's default cap of " +
-                                "20480 sessions. A negative value turns the server-side cache off entirely, which stops " +
-                                "session-ID resumption but leaves tickets - which cost the server no memory - " +
-                                "unaffected. 0 leaves OpenSSL alone."
-                     },
-                     new TextSetting
-                     {
-                        Key = "TlsSessionTimeoutSeconds",
-                        Default = "0",
-                        Placeholder = "0",
-                        Label = "TLS resumption lifetime for cached sessions and tickets (seconds, 0 = OpenSSL's default of 300)",
-                        Blurb = "How long a session stays resumable, for cached sessions and tickets alike. It bounds how " +
-                                "long a leaked resumption secret stays useful: a ticket recorded off the wire, or a " +
-                                "session read out of a memory dump, stops working once it expires. 0 keeps OpenSSL's " +
-                                "own default of 300 seconds."
-                     },
-                     new TextSetting
-                     {
-                        Key = "TlsTicketKeyRotationSeconds",
-                        Default = "0",
-                        Placeholder = "86400",
-                        Label = "Rotate the session-ticket key every N seconds (0 = OpenSSL's single non-rotating key)",
-                        Blurb = "What rotation defends: OpenSSL's default ticket key is generated once, when the listener " +
-                                "starts, and is never rotated, so every ticket that listener issues for the life of the " +
-                                "process is sealed under the same key - and that key, recovered later, decrypts every " +
-                                "ticket ever recorded. With an interval set, a captured ticket is useless after at most " +
-                                "two intervals. Only meaningful while session tickets are enabled above."
-                     }
-                  }
-               });
-               cards_.Add(new CardDef
-               {
-                  Title = "External fetch & MX attempts",
-                  // Retry cadence, jitter and the outbound throttle moved to the
-                  // Delivery of e-mail page, next to the retry schedule they modify.
-                  Blurb = "Retry cadence and per-destination throttling are on the Delivery of e-mail page.",
-                  Settings =
-                  {
-                     new TextSetting { Key = "MXTriesFactor", Default = "0", Label = "Extra delivery attempts per additional MX host (0 = default)" },
-                     new TextSetting { Key = "MaxNumberOfExternalFetchThreads", Default = "15", Label = "Max parallel external POP3 fetch threads" }
-                  }
-               });
                // Logging detail moved to the Logging page, indexer cadence to
                // Performance > Indexing and message archiving to Advanced &
                // scripting (next to the mirroring address), so each setting sits
@@ -1686,7 +1675,9 @@ namespace hMailServer.ControlPanel.Views
                   Settings =
                   {
                      new TextSetting { Key = "SMTPDMaxSizeDrop", Default = "0", Label = "Drop oversized inbound messages above N bytes mid-transfer (0 = off)" },
-                     new BoolSetting { Key = "SAMoveVsCopy", Default = false, Label = "Move (not copy) the message when handing it to SpamAssassin" },
+                     // SAMoveVsCopy went to Anti-spam > SpamAssassin: it configures
+                     // how a message reaches that scanner, and belongs with the host,
+                     // port and timeouts that configure the rest of the same handoff.
                      new TextSetting { Key = "LoadHeaderReadSize", Default = "4000", Label = "Header read chunk size (bytes)" },
                      new TextSetting { Key = "LoadBodyReadSize", Default = "4000", Label = "Body read chunk size (bytes)" }
                   }
@@ -1699,6 +1690,23 @@ namespace hMailServer.ControlPanel.Views
                   Settings =
                   {
                      new BoolSetting { Key = "ProtectStoredSecretsWithDPAPI", Default = true, Label = "Protect stored secrets with Windows DPAPI" }
+                  }
+               });
+               cards_.Add(new CardDef
+               {
+                  Title = "Settings that used to be on this page",
+                  Blurb = "This page used to collect every hMailServer.INI value without a home, which meant it was " +
+                          "filed by where the value is stored rather than by what it does - and where a value is " +
+                          "stored is the one thing you never need to know. Each of these now sits with the rest of " +
+                          "its own feature. Nothing was removed and no value changed; only the page it is edited on.",
+                  Settings =
+                  {
+                     new MovedSetting("antispam", "Greylisting record expiration, and SpamAssassin move-vs-copy"),
+                     new MovedSetting("protocols", "IMAP search time and size limits, and the eight per-protocol idle timeouts"),
+                     new MovedSetting("tls", "TLS session tickets, session cache size, resumption lifetime and ticket-key rotation"),
+                     new MovedSetting("delivery", "Extra delivery attempts per additional MX host"),
+                     new MovedSetting("performance", "Max parallel external POP3 fetch threads"),
+                     new MovedSetting("security", "SRS, BATV and the plain envelope-sender rewrite for forwarded mail")
                   }
                });
                break;

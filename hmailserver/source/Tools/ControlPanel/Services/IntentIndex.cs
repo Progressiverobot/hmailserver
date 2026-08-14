@@ -282,7 +282,22 @@ namespace hMailServer.ControlPanel.Services
          new IntentEntry("keep a copy of every message", "advanced",
             "Archiving writes a copy of every message to a folder you choose."),
          new IntentEntry("change a setting with no page", "hardening",
-            "Individual hMailServer.INI values are editable here."),
+            "Server-wide ceilings, durability and abuse controls that belong to no single feature are edited here."),
+         // The six settings below moved to the page that owns their feature, which
+         // is where an administrator will now find them by browsing. These phrases
+         // cover the other half of the problem: knowing the symptom but not the
+         // subsystem. "IMAP search" is not a phrase anyone types when a search
+         // stops working - "searching my mailbox does not work" is.
+         new IntentEntry("searching a mailbox does not work", "protocols",
+            "Raise the IMAP search time and size limits; a search that hits either one is reported to the client as a failure."),
+         new IntentEntry("stop forwarded mail failing spf", "security",
+            "Turn on SRS so a forwarded message keeps a return path this server can vouch for."),
+         new IntentEntry("reject forged bounce messages", "security",
+            "Turn on BATV so a bounce for a message this server never sent can be told apart from a real one."),
+         new IntentEntry("limit how long a tls session can be resumed", "tls",
+            "Set the resumption lifetime and ticket-key rotation, which bound how long a captured resumption secret stays useful."),
+         new IntentEntry("disconnect idle clients sooner", "protocols",
+            "The per-protocol idle timeouts decide how long a connection may sit doing nothing before it is closed."),
          // MaxSubmissionsPerIPPerMinute. An abused account sending thousands of
          // messages an hour is one of the commonest reasons an administrator opens
          // this application in a hurry, and the only setting that helps was

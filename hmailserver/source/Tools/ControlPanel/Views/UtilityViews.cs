@@ -712,7 +712,10 @@ namespace hMailServer.ControlPanel.Views
          string path = System.IO.Path.Combine(logFolder, Services.MessageStoreConsistencyReport.FileName);
          string enabledNote = enabled
             ? ""
-            : " The periodic check is currently switched off (MessageStoreConsistencyCheck on the Advanced INI settings page), so this will not be refreshed.";
+            // Asked for by nav key rather than spelled out, so that renaming the
+            // page cannot leave this pointing at a page title that no longer exists.
+            : " The periodic check is currently switched off (MessageStoreConsistencyCheck on the "
+              + Services.NavigationMap.TitleOf("hardening") + " page), so this will not be refreshed.";
 
          string text;
          try
@@ -724,7 +727,8 @@ namespace hMailServer.ControlPanel.Views
                   Level = Severity.Neutral,
                   Message = enabled
                      ? "The consistency check is enabled but has not written a report yet. The server scans at start-up and then hourly, and writes " + path + "."
-                     : "The consistency check is switched off, so no scan has run. Enable MessageStoreConsistencyCheck on the Advanced INI settings page; " +
+                     : "The consistency check is switched off, so no scan has run. Enable MessageStoreConsistencyCheck on the "
+                       + Services.NavigationMap.TitleOf("hardening") + " page; " +
                        "the server then scans at start-up and hourly and writes " + path + "."
                };
             }

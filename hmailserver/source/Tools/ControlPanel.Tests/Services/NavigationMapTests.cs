@@ -67,7 +67,7 @@ namespace hMailServer.ControlPanel.Tests.Services
       [InlineData("autoban", "Auto-ban")]
       [InlineData("performance", "Performance")]
       [InlineData("advanced", "Advanced & scripting")]
-      [InlineData("hardening", "Advanced INI settings")]
+      [InlineData("hardening", "Server limits & expert settings")]
       [InlineData("scripts", "Event scripts")]
       [InlineData("servermessages", "Server messages")]
       [InlineData("groups", "Groups")]
@@ -211,8 +211,8 @@ namespace hMailServer.ControlPanel.Tests.Services
 
          Assert.Equal(2, trail.Count);
          Assert.Equal("Maintenance", trail[0].Title);
-         Assert.Equal("Advanced INI settings", trail[1].Title);
-         Assert.Equal("Maintenance > Advanced INI settings", NavigationMap.LocationOf("hardening"));
+         Assert.Equal("Server limits & expert settings", trail[1].Title);
+         Assert.Equal("Maintenance > Server limits & expert settings", NavigationMap.LocationOf("hardening"));
          Assert.Equal("Maintenance", NavigationMap.GroupOf("hardening"));
       }
 

@@ -372,6 +372,16 @@ namespace hMailServer.ControlPanel.Views
       private class IniNumber : ComSetting, IIniSetting
       {
          public int Default;
+
+         /// <summary>
+         /// Lowest value the box will accept. Zero for almost everything, because
+         /// almost every numeric INI value is a count or a number of seconds. It is
+         /// settable because a few are not: the TLS session cache size uses a
+         /// negative value to mean "no server-side cache at all", and a box that
+         /// silently refused to go below zero would hide that option entirely.
+         /// </summary>
+         public int MinimumValue;
+
          private Wpf.Ui.Controls.NumberBox number_;
 
          // The value comes from the INI file, not from a COM property.
@@ -394,7 +404,7 @@ namespace hMailServer.ControlPanel.Views
             number_ = new Wpf.Ui.Controls.NumberBox
             {
                Value = current,
-               Minimum = 0,
+               Minimum = MinimumValue,
                MaxDecimalPlaces = 0,
                SmallChange = 1,
                LargeChange = 10,
@@ -894,10 +904,62 @@ namespace hMailServer.ControlPanel.Views
          imap.Settings.Add(new ComText { Path = "IMAPHierarchyDelimiter", Label = "Folder hierarchy delimiter" });
          Tab("IMAP").Cards.Add(imap);
 
+         // These two are INI values rather than COM ones, and they used to be on
+         // the catch-all INI page for that reason alone - which put the answer to
+         // "IMAP search stopped working" on a page nobody opens looking for IMAP.
+         // Storage mechanism is not a subject heading; the search limits belong
+         // beside the SORT switch they interact with.
+         var imapSearch = Card("IMAP search limits",
+            "Ceilings on a single IMAP SEARCH or SORT, measured from the start of the search, so that one client " +
+            "searching a very large mailbox cannot occupy a connection indefinitely. If users with big mailboxes " +
+            "report searches failing or returning nothing, these are the two to raise. Either half can be turned " +
+            "off on its own by setting it to 0. Applies after a service restart.");
+         imapSearch.Settings.Add(new IniNumber
+         {
+            Path = "IMAPSearchTimeout",
+            Label = "Maximum time for one IMAP search (seconds; 0 = no limit)",
+            Default = 60,
+            Blurb = "The search stops when this is reached and the client is told the search failed, rather than being " +
+                    "given a partial result it would mistake for a complete one.",
+            IniStore = iniStore_
+         });
+         imapSearch.Settings.Add(new IniNumber
+         {
+            Path = "IMAPSearchMaxMegabytes",
+            Label = "Maximum message content read for one IMAP search (MB; 0 = no limit)",
+            Default = 2048,
+            Blurb = "A separate ceiling from the time limit, because a search that reads enormous amounts of message " +
+                    "content is expensive even when it finishes quickly.",
+            IniStore = iniStore_
+         });
+         Tab("IMAP").Cards.Add(imapSearch);
+
          var pop3 = Card("POP3");
          pop3.Settings.Add(new ComText { Path = "MaxPOP3Connections", Label = "Max simultaneous connections (0 = unlimited)", Numeric = true });
          pop3.Settings.Add(new ComText { Path = "WelcomePOP3", Label = "Welcome banner (empty = default)" });
          Tab("POP3").Cards.Add(pop3);
+
+         // The idle timeouts follow the same reasoning as the IMAP search limits
+         // above: they are per-protocol settings that sat on the INI page because
+         // of where they are stored. They get a tab rather than being split three
+         // ways across the protocol tabs because the server/client distinction is
+         // the thing that confuses people, and it only reads clearly when all
+         // eight are in one place.
+         var idle = Card("Idle timeouts",
+            "How long a connection may sit idle before it is closed, per protocol, in seconds. " +
+            "\"Server\" is hMailServer accepting a connection from a mail client or another mail server; " +
+            "\"client\" is hMailServer connecting out to deliver mail or to fetch it from an external POP3 " +
+            "account. The effective timeout moves between the minimum and the maximum with server load, so a " +
+            "busy server drops idle connections sooner. Applies after a service restart.");
+         idle.Settings.Add(new IniNumber { Path = "SMTPDMinTimeout", Label = "SMTP server minimum timeout (s)", Default = 10, IniStore = iniStore_ });
+         idle.Settings.Add(new IniNumber { Path = "SMTPDMaxTimeout", Label = "SMTP server maximum timeout (s)", Default = 1800, IniStore = iniStore_ });
+         idle.Settings.Add(new IniNumber { Path = "SMTPCMinTimeout", Label = "SMTP client minimum timeout (s)", Default = 30, IniStore = iniStore_ });
+         idle.Settings.Add(new IniNumber { Path = "SMTPCMaxTimeout", Label = "SMTP client maximum timeout (s)", Default = 600, IniStore = iniStore_ });
+         idle.Settings.Add(new IniNumber { Path = "POP3DMinTimeout", Label = "POP3 server minimum timeout (s)", Default = 10, IniStore = iniStore_ });
+         idle.Settings.Add(new IniNumber { Path = "POP3DMaxTimeout", Label = "POP3 server maximum timeout (s)", Default = 600, IniStore = iniStore_ });
+         idle.Settings.Add(new IniNumber { Path = "POP3CMinTimeout", Label = "POP3 client minimum timeout (s)", Default = 30, IniStore = iniStore_ });
+         idle.Settings.Add(new IniNumber { Path = "POP3CMaxTimeout", Label = "POP3 client maximum timeout (s)", Default = 900, IniStore = iniStore_ });
+         Tab("Timeouts").Cards.Add(idle);
       }
 
       private void BuildDelivery()
@@ -907,10 +969,23 @@ namespace hMailServer.ControlPanel.Views
 
          var del = Card("Delivery of e-mail",
             "Outbound delivery, retries and throttling. Keeping forwarded mail SPF-aligned (SRS) and " +
-            "bounce tagging (BATV) are on the Advanced INI settings page.");
+            "bounce tagging (BATV) are on the Transport security page.");
          del.Settings.Add(new ComText { Path = "SMTPNoOfTries", Label = "Number of delivery retries", Numeric = true });
          del.Settings.Add(new ComText { Path = "SMTPMinutesBetweenTry", Label = "Minutes between retries", Numeric = true });
          del.Settings.Add(new ComText { Path = "MaxNumberOfMXHosts", Label = "Max MX hosts to try (0 = all)", Numeric = true });
+         // Directly modifies the retry count three rows up, and only makes sense
+         // read together with the MX host limit immediately above it, so it moved
+         // here from the catch-all INI page.
+         del.Settings.Add(new IniNumber
+         {
+            Path = "MXTriesFactor",
+            Label = "Extra delivery attempts per additional MX host (0 = default)",
+            Default = 0,
+            Blurb = "A recipient domain with several MX hosts is worth more attempts than one with a single host, " +
+                    "because a retry can land on a different server. This multiplies the retry count above by the " +
+                    "number of MX hosts actually tried.",
+            IniStore = iniStore_
+         });
          del.Settings.Add(new ComText { Path = "SMTPDeliveryBindToIP", Label = "Bind outbound connections to IP (empty = any)" });
          del.Settings.Add(new ComCombo { Path = "SMTPConnectionSecurity", Label = "Outbound delivery security (after MX lookup)", Options = ConnSecurity });
          del.Settings.Add(new ComBool { Path = "AddDeliveredToHeader", Label = "Add Delivered-To header" });
@@ -1007,6 +1082,29 @@ namespace hMailServer.ControlPanel.Views
          grey.Settings.Add(new ComText { Path = "AntiSpam.GreyListingFinalDelete", Label = "Delete confirmed after (days)", Numeric = true, Divisor = 24 });
          grey.Settings.Add(new ComBool { Path = "AntiSpam.BypassGreylistingOnMailFromMX", Label = "Bypass when sender matches MX" });
          grey.Settings.Add(new ComBool { Path = "AntiSpam.BypassGreylistingOnSPFSuccess", Label = "Bypass on SPF success" });
+         // The last two greylisting settings are stored in hMailServer.INI rather
+         // than in the settings database, and they used to be on the catch-all INI
+         // page because of it - so half of greylisting was configured here and half
+         // somewhere an administrator would only find by accident. They apply after
+         // a service restart, unlike the COM rows above; the labels say so.
+         grey.Settings.Add(new IniBool
+         {
+            Path = "GreylistingEnabledDuringRecordExpiration",
+            Label = "Keep greylisting active during the record-expiration window (restart required)",
+            Default = true,
+            Blurb = "A triplet that has been seen before but has not yet been confirmed sits in a window before its " +
+                    "record expires. Turning this off lets mail through during that window instead of greylisting it " +
+                    "again, which is gentler on senders that retry slowly and weaker against a sender that retries once.",
+            IniStore = iniStore_
+         });
+         grey.Settings.Add(new IniNumber
+         {
+            Path = "GreylistingRecordExpirationInterval",
+            Label = "Record expiration interval, minutes (restart required)",
+            Default = 240,
+            Blurb = "How long that window lasts. Four hours by default.",
+            IniStore = iniStore_
+         });
          grey.Settings.Add(new ComAction
          {
             Path = "AntiSpam.GreyListingEnabled",
@@ -1048,6 +1146,16 @@ namespace hMailServer.ControlPanel.Views
             Label = "Maximum timeout (seconds)",
             Default = 90,
             Blurb = "The effective timeout moves between these values with server load.",
+            IniStore = iniStore_
+         });
+         sa.Settings.Add(new IniBool
+         {
+            Path = "SAMoveVsCopy",
+            Label = "Move the message file to SpamAssassin instead of copying it (restart required)",
+            Default = false,
+            Blurb = "How the message reaches SpamAssassin when it runs on this machine: a move saves writing a second " +
+                    "copy of every message to disk, which matters on a busy server. It only works when SpamAssassin " +
+                    "reads from the same volume; against a remote spamd it is the wrong choice.",
             IniStore = iniStore_
          });
          Tab("SpamAssassin").Cards.Add(sa);
@@ -1183,6 +1291,68 @@ namespace hMailServer.ControlPanel.Views
          ciph.Settings.Add(chacha);
          ciph.Settings.Add(new ComBool { Path = "VerifyRemoteSslCertificate", Label = "Verify remote certificates when delivering" });
          Tab("Ciphers").Cards.Add(ciph);
+
+         // Resumption governs every SSL/TLS and STARTTLS listener this server runs,
+         // so it belongs on the TLS page and nowhere else; it sat on the catch-all
+         // INI page only because that is where it is stored. Every claim below is
+         // from SslContextInitializer::SetSessionResumption_, which follows the
+         // house rule that a default value makes no OpenSSL call at all - so the
+         // card can honestly promise that the defaults change nothing.
+         var resume = Card("Session resumption",
+            "Session caching and session tickets let a returning client skip the full handshake. At the defaults " +
+            "these four settings make no OpenSSL call at all, so resumption keeps OpenSSL's stock behaviour - " +
+            "they are here for administrators who need to bound how long a resumption secret stays useful. " +
+            "Applies after a service restart.");
+         resume.Settings.Add(new IniBool
+         {
+            Path = "TlsSessionTicketsEnabled",
+            Label = "Issue TLS session tickets so clients can resume sessions",
+            Default = true,
+            Blurb = "Turning this off stops session tickets on every TLS version: TLS 1.2 and older clients fall back " +
+                    "to the server-side session cache, which never leaves this process, and TLS 1.3 clients are sent " +
+                    "no ticket at all. For an administrator whose policy is that nothing derived from a long-lived key " +
+                    "ever goes on the wire. The only cost is resumption efficiency - every client can still connect " +
+                    "with a full handshake.",
+            IniStore = iniStore_
+         });
+         resume.Settings.Add(new IniNumber
+         {
+            Path = "TlsSessionCacheSize",
+            Label = "Server-side session cache size (0 = OpenSSL's default cap of 20480; negative = no cache)",
+            Default = 0,
+            // The one numeric INI setting on any page where a negative value is
+            // meaningful rather than a mistake, which is why IniNumber grew a
+            // minimum at all.
+            MinimumValue = -1,
+            Blurb = "Each cached session costs server memory, and a client that churns handshakes grows the cache - " +
+                    "this cap is the defence. A positive value replaces OpenSSL's default cap of 20480 sessions. " +
+                    "-1 turns the server-side cache off entirely, which stops session-ID resumption but leaves " +
+                    "tickets - which cost the server no memory - unaffected. 0 leaves OpenSSL alone.",
+            IniStore = iniStore_
+         });
+         resume.Settings.Add(new IniNumber
+         {
+            Path = "TlsSessionTimeoutSeconds",
+            Label = "Resumption lifetime for cached sessions and tickets, seconds (0 = OpenSSL's default of 300)",
+            Default = 0,
+            Blurb = "How long a session stays resumable, for cached sessions and tickets alike. It bounds how long a " +
+                    "leaked resumption secret stays useful: a ticket recorded off the wire, or a session read out of a " +
+                    "memory dump, stops working once it expires.",
+            IniStore = iniStore_
+         });
+         resume.Settings.Add(new IniNumber
+         {
+            Path = "TlsTicketKeyRotationSeconds",
+            Label = "Rotate the session-ticket key every N seconds (0 = OpenSSL's single non-rotating key)",
+            Default = 0,
+            Blurb = "What rotation defends: OpenSSL's default ticket key is generated once, when the listener starts, " +
+                    "and is never rotated, so every ticket that listener issues for the life of the process is sealed " +
+                    "under the same key - and that key, recovered later, decrypts every ticket ever recorded. With an " +
+                    "interval set, a captured ticket is useless after at most two intervals. 86400 is a day. Only " +
+                    "meaningful while session tickets are enabled above.",
+            IniStore = iniStore_
+         });
+         Tab("Session resumption").Cards.Add(resume);
 
          // ChaCha prioritization only takes effect when the server chooses the
          // cipher order and a modern TLS version is enabled. Reflect that
@@ -1444,6 +1614,19 @@ namespace hMailServer.ControlPanel.Views
          threads.Settings.Add(new ComText { Path = "MaxDeliveryThreads", Label = "Max delivery threads", Numeric = true });
          threads.Settings.Add(new ComText { Path = "MaxAsynchronousThreads", Label = "Max asynchronous task threads", Numeric = true });
          threads.Settings.Add(new ComText { Path = "TCPIPThreads", Label = "TCP/IP threads", Numeric = true });
+         // The fourth thread pool, and the only one that was not on this card:
+         // it is an INI value rather than a COM one, which is not a reason for an
+         // administrator sizing thread pools to have to look somewhere else.
+         threads.Settings.Add(new IniNumber
+         {
+            Path = "MaxNumberOfExternalFetchThreads",
+            Label = "Max parallel external POP3 fetch threads (restart required)",
+            Default = 15,
+            Blurb = "How many external accounts, configured under a domain's accounts as external POP3 downloads, are " +
+                    "collected at the same time. Each one holds a connection to somebody else's server for as long as " +
+                    "the download takes.",
+            IniStore = iniStore_
+         });
 
          // Not a NumberBox any more. The server writes this value to the settings
          // table and reads it back only through the COM getter: there is no
