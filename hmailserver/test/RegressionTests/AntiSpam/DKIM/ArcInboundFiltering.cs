@@ -63,13 +63,35 @@ namespace RegressionTests.AntiSpam.DKIM
 
       private hMailServer.AntiSpam _antiSpam;
 
-      // A DKIM signature whose selector does not exist: the DNS answer is "no
-      // such name", which RFC 6376 6.1.2 makes a permanent failure. No key
-      // material and no live zone required.
-      private const string PermanentlyFailingDkimSignature =
-         "DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=example.test;\r\n" +
-         "\ts=nosuchselector; h=from:subject;\r\n" +
-         "\tbh=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=; b=AAAAAAAAAAAA\r\n";
+      /// <summary>
+      ///    A DKIM signature whose selector does not exist: the DNS answer is "no
+      ///    such name", which RFC 6376 6.1.2 makes a permanent failure. No key
+      ///    material and no live zone required.
+      ///
+      ///    The selector is a PARAMETER, and every test passes a different one, because
+      ///    these lookups go through the Windows DNS client cache and that cache is
+      ///    keyed by name. Once a name has been queried, a later query for the SAME
+      ///    name can be answered from the client's cached failure state with
+      ///    ERROR_TIMEOUT (1460) instead of the authoritative "no such name" - and an
+      ///    ERROR_TIMEOUT is a *temporary* DKIM failure, scoring 0, where a permanent
+      ///    one scores 6. So a single shared selector made the first test in this
+      ///    fixture pass and a later one fail, deterministically, while each passed on
+      ///    its own.
+      ///
+      ///    That was measured rather than guessed: with [Settings] UseDNSCache=0, which
+      ///    sets DNS_QUERY_BYPASS_CACHE, the whole fixture passes; with the cache on it
+      ///    does not, and clearing the cache first does not help because the fixture
+      ///    repopulates it on its own first test. The server is behaving correctly in
+      ///    both cases - a timeout genuinely is not "no such name" - so the fix belongs
+      ///    here, in the test data, and not in the resolver.
+      /// </summary>
+      private static string PermanentlyFailingDkimSignature(string selector)
+      {
+         return
+            "DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=example.test;\r\n" +
+            "\ts=" + selector + "; h=from:subject;\r\n" +
+            "\tbh=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=; b=AAAAAAAAAAAA\r\n";
+      }
 
       // A complete, syntactically valid ARC set that claims the message passed
       // everything at the first hop. Anyone can write one of these; that is the
@@ -136,7 +158,8 @@ namespace RegressionTests.AntiSpam.DKIM
       {
          var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "arcfilter1@example.test", "test");
 
-         var message = BuildMessage(account.Address, FabricatedAllPassChain + PermanentlyFailingDkimSignature);
+         var message = BuildMessage(account.Address,
+            FabricatedAllPassChain + PermanentlyFailingDkimSignature("nosuchselector-fabricated"));
 
          SmtpClientSimulator.StaticSendRaw(account.Address, account.Address, message);
 
@@ -157,7 +180,8 @@ namespace RegressionTests.AntiSpam.DKIM
       {
          var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "arcfilter2@example.test", "test");
 
-         var message = BuildMessage(account.Address, CvFailChain + PermanentlyFailingDkimSignature);
+         var message = BuildMessage(account.Address,
+            CvFailChain + PermanentlyFailingDkimSignature("nosuchselector-cvfail"));
 
          SmtpClientSimulator.StaticSendRaw(account.Address, account.Address, message);
 
