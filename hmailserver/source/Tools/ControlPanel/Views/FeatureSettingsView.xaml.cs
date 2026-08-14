@@ -1350,6 +1350,63 @@ namespace hMailServer.ControlPanel.Views
                      new TextSetting { Key = "GreylistingRecordExpirationInterval", Default = "240", Label = "Record expiration interval (minutes, default 240)" }
                   }
                });
+               // Its own card, and named for the symptom rather than the subsystem,
+               // because these two are the settings the README tells owners of large
+               // mailboxes to raise - and until now there was nowhere in the GUI to do
+               // it. Somebody whose client reports a failed search will look for
+               // "IMAP search", so that is what the labels say.
+               cards_.Add(new CardDef
+               {
+                  Title = "IMAP search limits",
+                  Blurb = "Ceilings on a single IMAP SEARCH or SORT, measured from the start of the search. They exist so " +
+                          "that one client searching a very large mailbox cannot occupy a connection indefinitely. If " +
+                          "users with big mailboxes report searches failing or returning nothing, these are the two to " +
+                          "raise. Either half can be turned off on its own by setting it to 0.",
+                  Settings =
+                  {
+                     new TextSetting
+                     {
+                        Key = "IMAPSearchTimeout",
+                        Default = "60",
+                        Label = "Maximum time for one IMAP search (seconds; 0 = no limit)",
+                        Blurb = "The search stops when this is reached and the client is told the search failed, rather than " +
+                                "being given a partial result it would mistake for a complete one."
+                     },
+                     new TextSetting
+                     {
+                        Key = "IMAPSearchMaxMegabytes",
+                        Default = "2048",
+                        Label = "Maximum message content read for one IMAP search (MB; 0 = no limit)",
+                        Blurb = "A separate ceiling from the time limit, because a search that reads enormous amounts of " +
+                                "message content is expensive even when it finishes quickly."
+                     }
+                  }
+               });
+               cards_.Add(new CardDef
+               {
+                  Title = "Timeouts and queue bounds",
+                  Blurb = "Server-wide ceilings that keep one slow operation from holding a resource forever. The defaults " +
+                          "are deliberate; each one is here because there is a diagnosable situation in which it is the " +
+                          "right thing to change. Note that 0 does not mean the same thing for all of them - each label says.",
+                  Settings =
+                  {
+                     new TextSetting
+                     {
+                        Key = "FinalizationTimeout",
+                        Default = "240",
+                        Label = "Message finalization deadline (seconds; 0 = no deadline)",
+                        Blurb = "How long the server will go on finalizing an accepted message before answering 451 and " +
+                                "asking the sender to retry, rather than holding the connection open indefinitely."
+                     },
+                     new TextSetting { Key = "DNSQueryTimeout", Default = "10", Label = "DNS query timeout (seconds; 0 = no bound)" },
+                     new TextSetting { Key = "ClientSessionCeiling", Default = "1800", Label = "Absolute lifetime of one client session (seconds)" },
+                     new TextSetting { Key = "DBConnectionAcquireTimeout", Default = "60", Label = "Wait for a free database connection (seconds)" },
+                     new TextSetting { Key = "ScriptTimeout", Default = "60", Label = "Event script execution timeout (seconds)" },
+                     new TextSetting { Key = "ExternalProcessTimeout", Default = "300", Label = "External process timeout, e.g. a command-line virus scanner (seconds)" },
+                     new TextSetting { Key = "AsyncQueueStallThreshold", Default = "120", Label = "Report the async work queue as stalled after (seconds)" },
+                     new TextSetting { Key = "AsyncQueueReservedThreads", Default = "2", Label = "Threads reserved so the async queue cannot be starved" }
+                  }
+               });
                // Scanner timeouts moved to the scanner they configure: SpamAssassin
                // on the Anti-spam page and ClamAV on the Anti-virus page. The
                // resolver settings moved to Network > DNS resolver.
@@ -1798,6 +1855,34 @@ namespace hMailServer.ControlPanel.Views
                      new TextSetting { Key = "MtaStsPolicyMode", Default = "enforce", Label = "MTA-STS policy mode (enforce / testing / none)" },
                      new TextSetting { Key = "MtaStsPolicyMaxAge", Default = "604800", Label = "Policy max age (seconds; default 604800 = 7 days)" },
                      new TextSetting { Key = "MtaStsPolicyMx", Label = "Policy MX host patterns (empty = derive from each domain's MX)", Placeholder = "mail.yourdomain.com, *.yourdomain.com" }
+                  }
+               });
+               cards_.Add(new CardDef
+               {
+                  Title = "Calendar and contacts discovery (CalDAV / CardDAV)",
+                  Blurb = "hMailServer does NOT implement CalDAV or CardDAV. These settings only answer the well-known " +
+                          "discovery URLs (RFC 6764) with a redirect to the server that does, so a client configured " +
+                          "with a user's mail address finds their calendar without being told a second address. Leave " +
+                          "both empty unless you run such a server: empty means the discovery URLs answer 404, which " +
+                          "is the honest response when there is nothing to point at. They need the web services " +
+                          "listener above to be running, like everything else on this page.",
+                  Settings =
+                  {
+                     new TextSetting
+                     {
+                        Key = "CalDavRedirectUrl",
+                        Label = "Redirect /.well-known/caldav to (empty = answer 404)",
+                        Placeholder = "https://calendar.yourdomain.com/dav/",
+                        Blurb = "Must be an absolute URL. A relative one is refused and the discovery URL answers 404 instead, " +
+                                "with the reason reported once in the error log."
+                     },
+                     new TextSetting
+                     {
+                        Key = "CardDavRedirectUrl",
+                        Label = "Redirect /.well-known/carddav to (empty = answer 404)",
+                        Placeholder = "https://contacts.yourdomain.com/dav/",
+                        Blurb = "Must be an absolute URL, as above."
+                     }
                   }
                });
                break;

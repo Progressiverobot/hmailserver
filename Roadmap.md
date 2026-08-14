@@ -38,7 +38,7 @@ as ⬜, not ✅.
 
 ### Contents and totals
 
-785 items. The counts are the point of this table — they say where the fork is
+788 items. The counts are the point of this table — they say where the fork is
 strong and where it is thin far more honestly than any prose summary.
 
 | Section | ✅ | 🔄 | ⬜ | ⏸️ |
@@ -62,7 +62,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Anti-spam, anti-virus and content control](#anti-spam-anti-virus-and-content-control) | 54 | – | 13 | – |
 | [Storage, accounts and data model](#storage-accounts-and-data-model) | 86 | – | 10 | – |
 | [Routing, queue and delivery](#routing-queue-and-delivery) | 19 | – | 4 | 1 |
-| [Administration, API and Control Panel](#administration-api-and-control-panel) | 55 | – | 9 | – |
+| [Administration, API and Control Panel](#administration-api-and-control-panel) | 58 | – | 9 | – |
 | [Observability and diagnostics](#observability-and-diagnostics) | 32 | – | 7 | 1 |
 | [Extensibility and scripting](#extensibility-and-scripting) | 37 | – | 3 | – |
 | [Build, testing and supply chain](#build-testing-and-supply-chain) | 7 | – | 0 | – |
@@ -72,7 +72,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 2 | – | 4 | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 5 | 1 | 2 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 4 | 1 | 4 | – |
-| **Total** | **603** | **12** | **156** | **14** |
+| **Total** | **606** | **12** | **156** | **14** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage and the administration surface are the best-covered areas**, and the
@@ -805,10 +805,13 @@ the source, not from documentation.
 
 ### Administration, API and Control Panel
 
-55 shipped · 0 underway · 9 not started · 0 deferred
+58 shipped · 0 underway · 9 not started · 0 deferred
 
 | | Capability | Detail |
 |:-:|---|---|
+| ✅ | Every setting an administrator needs is reachable from the Control Panel | A program-wide audit against the GUI rule found roughly eighteen capabilities with no GUI at all. The worst were not obscure: **directory authentication (LDAP)** was a README headline capability configurable only by hand-editing an INI section documented nowhere else, with no COM either; **scheduled backups** were invisible, so an administrator who set a destination and used the manual button reasonably believed backups were running while no scheduled task was ever constructed; and **group membership** could not be edited at all, so a group could be created and granted rights on a public folder while applying to nobody. Also closed: the SSL certificate passphrase (encrypted keys were advertised in README with no editor), metrics credentials and TLS (the GUI could move the bind off loopback, which makes `/metrics` answer 503, but not set the credential that fixes it), per-account sending limits, the IMAP search ceilings the README tells owners of large mailboxes to raise, the remaining timeout and queue bounds, and the CalDAV/CardDAV discovery redirects - implemented and served, and documented nowhere. |
+| ✅ | The GUI says when a setting is doing nothing | Eleven configurations look enabled and are inert, and the guards now compute and show each one. The worst is OAuth2 enabled with no usable key material: the mechanisms are still advertised to clients, every token fails, the failure is not logged server-side on SMTP, and failed bearer authentications feed auto-ban - so a correctly-configured client gets its IP banned by a half-configured server. Also `SRSEnabled` with an empty secret, which does nothing *and* suppresses the envelope-rewrite fallback, making it strictly worse than off; MTA-STS hosting and autoconfiguration enabled while both web ports are zero, which is the shipped state; and ARC sealing with no domain DKIM key. The cache-size editors were the same defect inside this GUI - runtime-only values with no storage behind them, presented as ordinary settings - and now say so, following the treatment `WorkerThreadPriority` already had. |
+| ✅ | Certificate state is visible | The certificates page showed file paths and nothing else. It now shows expiry and days remaining (already exported as a metric and displayed nowhere), whether the certificate and private key actually match, and whether a selected key file is encrypted while no passphrase is set - which would stop the listener using it from starting at all. On a remote Control Panel session, where the files cannot be read from this machine, it says so rather than showing a false green. |
 | ✅ | Guided DKIM key rotation in the Control Panel | Rotation was COM-only and is the operation most easily got wrong, because promoting before the new selector has propagated signs mail with a key the world cannot look up. The domain dialog now walks it: stage a new selector, generate the key, copy the exact DNS host and TXT value separately, check whether the record is actually published, and promote - with Promote disabled until that check passes in this session, and a prior session's pass deliberately not counting. The check distinguishes three outcomes that need three different responses: not published yet (propagation takes minutes to hours), published but not matching (waiting will not fix it), and the lookup itself failing (which says nothing about the record). It bypasses the resolver cache, or an administrator who has just published would be told it is missing for as long as the negative cache lasts. |
 | ✅ | "What still needs doing outside hMailServer" | A checklist of every prerequisite the server cannot satisfy for itself - DNS records, CA bundles, trusted-sealer lists, key passphrases, reachability - each with a live status where one can be determined rather than a description. Eleven items, several found only while verifying the others: ARC sealing silently produces nothing with no domain DKIM key, OAuth2 with RS256 allowed and no public key file fails every token, and client autoconfiguration ships enabled with both web ports at zero. Statuses are Done / Not needed / Action needed / Cannot tell, and "cannot tell" is used honestly rather than guessed - a page whose purpose is to say what is really configured must not overclaim. |
 | ✅ | Per-port client certificates and ARC filtering in the Control Panel | Both shipped COM-only and were unreachable from the admin UI. Inbound mutual TLS is now a port setting with the three refused combinations shown as inline validation before Save rather than as a COM error after it - including that Require on a STARTTLS-optional port is a lock on an open door. ARC inbound filtering needed COM accessors first (`AntiSpam.ArcFilteringEnabled` / `ArcTrustedSealers`), because an editor that can write but not read back would misreport its own state on load, which is the exact defect this fork keeps finding. |
