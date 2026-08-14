@@ -503,15 +503,27 @@ namespace hMailServer.ControlPanel.Services
                   aliases: "Greylist exemption|Greylisting delay|Slow mail|First message delayed|Retry delay",
                   seeAlso: "spamoverview|antispam|spamwhitelist"),
 
+               // The same argument as the spam overview above, and the anti-virus
+               // case is sharper: the settings page can show that a scanner is
+               // switched on and cannot show whether it is able to run. A scanner
+               // enabled with a missing host or executable errors on every message,
+               // and VirusScanner::ScanFile_ treats "every scanner errored" as
+               // NoVirusFound - so the mail is delivered as though it had been
+               // examined. Nothing in an editor for those settings can say that.
+               Page("virusoverview", "Virus scanning overview",
+                  "Which scanners can actually run, what size of message is scanned, and what happens to one that is found to be infected.",
+                  aliases: "Anti-virus overview|Antivirus overview|Virus overview|Virus summary|What is my virus configuration|Is virus scanning working|Am I scanning for viruses|Scanner not working|ClamAV not scanning|Unscanned mail",
+                  seeAlso: "antivirus|blockedattachments|logs"),
+
                Page("antivirus", "Anti-virus settings",
                   "ClamAV and external scanners, and what to do with a message that is found to be infected.",
                   aliases: "Virus scanner|ClamAV|Malware|Infected mail|Scan attachments|External scanner",
-                  seeAlso: "blockedattachments"),
+                  seeAlso: "virusoverview|blockedattachments"),
 
                Page("blockedattachments", "Blocked attachments",
                   "File-name patterns stripped from incoming messages regardless of what a scanner says.",
                   aliases: "Attachment blocking|Block exe|File extensions|Strip attachments|Dangerous files|Zip",
-                  seeAlso: "antivirus")),
+                  seeAlso: "virusoverview|antivirus")),
 
             Group("Connections & protocols",
                "Which services listen, on what, and how clients reach them.",
@@ -556,10 +568,31 @@ namespace hMailServer.ControlPanel.Services
                // now one of them; the old title stays as an alias, and it is also
                // an alias on the Auto-ban page, so a note naming it reaches
                // whichever half its reader wanted.
+               // Four pages own the pieces of transport security and none of them
+               // can answer the question an administrator arrives with: is anything
+               // here carrying a password in the clear, and will it still serve a
+               // valid certificate next month? The interesting states only exist in
+               // the combination - a port set to use TLS with no certificate does
+               // not fall back to plaintext, it fails to start; the AEAD-ONLY preset
+               // leaves TLS 1.0 and 1.1 advertised with no suite they can use; the
+               // one control that refuses a plaintext password lives on the IP
+               // ranges page, which is why it is so often never seen.
+               //
+               // Read-only, like the spam and virus overviews, and for the same
+               // reason: it must not become a fifth place to change the same value.
+               Page("tlsoverview", "Transport encryption overview",
+                  "What every listener protects, which certificate it presents and when that expires, and what can still be negotiated.",
+                  aliases: "TLS overview|SSL overview|Encryption overview|Is my mail encrypted|Plaintext password|Passwords in the clear|Unencrypted port|Certificate expiry|Certificate expiring|What TLS am I using|STARTTLS not required",
+                  seeAlso: "tls|certs|ports"),
+
                Page("tls", "SSL/TLS",
                   "Which TLS versions and ciphers this server will negotiate, and whether it verifies the certificate of the server it delivers to.",
                   aliases: "Auto-ban & SSL/TLS|TLS versions|TLS 1.0|TLS 1.1|TLS 1.2|TLS 1.3|Ciphers|Cipher list|Cipher suites|OpenSSL cipher string|Disable old TLS|Weak ciphers|ChaCha20|Verify remote certificate",
-                  seeAlso: "certs|ports|security|autoban"),
+                  // autoban stays in this list. This page and Auto-ban are the two
+                  // halves of the old "Auto-ban & SSL/TLS", and PageSplitTests holds
+                  // them to signposting each other so a reader who followed the old
+                  // title and landed on the wrong half can get to the right one.
+                  seeAlso: "tlsoverview|certs|ports|security|autoban"),
 
                Page("security", "Transport security",
                   "DANE, MTA-STS, ARC and TLS reporting - proving to other servers that TLS is required.",

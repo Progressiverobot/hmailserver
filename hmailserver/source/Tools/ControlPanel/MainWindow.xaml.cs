@@ -101,9 +101,11 @@ namespace hMailServer.ControlPanel
          pageFactories_["dnsbl"] = () => CollectionSpecs.DnsBlackLists();
          pageFactories_["spamwhitelist"] = () => CollectionSpecs.SpamWhiteList();
          pageFactories_["greylistwhitelist"] = () => CollectionSpecs.GreyListWhiteList();
+         pageFactories_["virusoverview"] = () => new VirusOverviewView();
          pageFactories_["antivirus"] = () => new ServerSettingsView(ServerSettingsView.Section.AntiVirus);
          pageFactories_["blockedattachments"] = () => CollectionSpecs.BlockedAttachments();
          pageFactories_["logging"] = () => new ServerSettingsView(ServerSettingsView.Section.Logging);
+         pageFactories_["tlsoverview"] = () => new TlsOverviewView();
          pageFactories_["tls"] = () => new ServerSettingsView(ServerSettingsView.Section.Tls);
          pageFactories_["autoban"] = () => new ServerSettingsView(ServerSettingsView.Section.AutoBan);
          pageFactories_["performance"] = () => new ServerSettingsView(ServerSettingsView.Section.Performance);

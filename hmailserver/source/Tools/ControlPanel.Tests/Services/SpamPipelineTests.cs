@@ -492,8 +492,11 @@ namespace hMailServer.ControlPanel.Tests.Services
       /// added to the group, or renamed, or moved, this fails until the overview
       /// knows about it.
       ///
-      /// The two anti-virus pages are deliberately excluded - they are in the same
+      /// The three anti-virus pages are deliberately excluded - they are in the same
       /// group but not part of the spam score - and so is the overview itself.
+      /// `virusoverview` joined that list when it was added: it is the virus half's
+      /// own overview, and a row on the spam overview links to the page that owns a
+      /// spam check, which no virus page does.
       /// </summary>
       [Fact]
       public void TheOverview_LinksToEverySpamPageInItsGroup()
@@ -503,7 +506,8 @@ namespace hMailServer.ControlPanel.Tests.Services
          var spamPages = group.Children
             .Where(c => c.IsPage)
             .Select(c => c.Key)
-            .Where(key => key != "spamoverview" && key != "antivirus" && key != "blockedattachments")
+            .Where(key => key != "spamoverview"
+                          && key != "virusoverview" && key != "antivirus" && key != "blockedattachments")
             .OrderBy(key => key, StringComparer.Ordinal)
             .ToList();
 

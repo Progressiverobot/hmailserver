@@ -76,6 +76,23 @@ namespace hMailServer.ControlPanel.Services
       /// </summary>
       public const int QueueBacklogThreshold = 100;
 
+      /// <summary>
+      /// Days before expiry at which a certificate starts reading as a warning.
+      /// Thirty, because that is the point at which ACME clients (including this
+      /// server's own AcmeRenewalTask) renew: a manually managed certificate inside
+      /// that window is later than the automation would be.
+      ///
+      /// It lives here rather than with the certificate code because two pages now
+      /// decide what to say about an expiry date - the certificates page and the
+      /// transport encryption overview - and two pages disagreeing about when a
+      /// certificate becomes urgent is worse than neither of them saying so.
+      /// <see cref="CertificateInspector.ExpiryWarningDays"/> is this number; so is
+      /// TlsPosture.ExpiryWarningDays. This is also the only one of the three that a
+      /// test can reach without dragging COM and System.ServiceProcess into the test
+      /// assembly, which is the practical reason it moved.
+      /// </summary>
+      public const int CertificateExpiryWarningDays = 30;
+
       private static readonly Dictionary<StatusLevel, StatusPresentation> Map = new()
       {
          [StatusLevel.Normal] =

@@ -49,6 +49,16 @@
          somebody hunting for a conflict that does not exist, and a dead port
          reported as up hides the commonest cause of "mail stopped arriving". -->
     <Compile Include="..\ControlPanel\Services\ListenerProbe.cs" />
+    <!-- The two overview pages' judgement. Both answer a question no editing page
+         can - "will an infected message actually be caught here", "is anything
+         carrying a password in the clear" - and both do it by deriving consequences
+         from settings rather than by displaying them. That derivation is the part
+         worth testing, and it is deliberately free of WPF so it can be tested
+         without a dispatcher or a live server. Neither pulls in ServerSession: the
+         certificate expiry threshold they share with the certificates page lives in
+         StatusSemantics above precisely so that it does not. -->
+    <Compile Include="..\ControlPanel\Services\VirusPipeline.cs" />
+    <Compile Include="..\ControlPanel\Services\TlsPosture.cs" />
   </ItemGroup>
 
   <ItemGroup>

@@ -73,12 +73,15 @@ namespace hMailServer.ControlPanel.Services
    public static class CertificateInspector
    {
       /// <summary>
-      /// Days before expiry at which the certificate starts reading as a
-      /// warning. Thirty, because that is the point at which ACME clients
-      /// (including this server's own AcmeRenewalTask) renew: a manually managed
-      /// certificate inside that window is later than the automation would be.
+      /// Days before expiry at which the certificate starts reading as a warning.
+      ///
+      /// Kept under its original name because this is what the certificate page and
+      /// its tests call it, but the number itself now lives in
+      /// <see cref="StatusSemantics.CertificateExpiryWarningDays"/> - the transport
+      /// encryption overview needs the same threshold, and a second literal 30 is a
+      /// second thing to forget to change.
       /// </summary>
-      public const int ExpiryWarningDays = 30;
+      public const int ExpiryWarningDays = StatusSemantics.CertificateExpiryWarningDays;
 
       /// <summary>
       /// True when the Control Panel is connected to the machine it runs on, so
