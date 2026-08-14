@@ -16,6 +16,15 @@ namespace hMailServer.ControlPanel.Views
          public int Port { get; set; }
          public string Security { get; set; }
          public string Certificate { get; set; }
+
+         /// <summary>"Listening", "Not listening", "Server off" or "Unknown".</summary>
+         public string ListeningWord { get; set; }
+
+         /// <summary>The full explanation, as the cell's tooltip and its accessible name.</summary>
+         public string ListeningTip { get; set; }
+
+         /// <summary>The badge, already shaped and coloured by ShapeMarkVisuals.</summary>
+         public FrameworkElement ListeningMark { get; set; }
       }
 
       private static readonly string[] SecurityNames = { "None", "SSL/TLS", "STARTTLS (optional)", "STARTTLS (required)" };
@@ -43,6 +52,16 @@ namespace hMailServer.ControlPanel.Views
       {
          var rows = new List<PortRow>();
          var certNames = LoadCertNames();
+
+         // Read once per reload, not per row: GetActiveTcpListeners walks the whole
+         // TCP table, and a server with twenty port rows would otherwise walk it
+         // twenty times for the same answer.
+         bool local = ServerSession.IsLocalSession;
+         IReadOnlyList<System.Net.IPEndPoint> listeners = local
+            ? ListenerProbe.ActiveListeners()
+            : System.Array.Empty<System.Net.IPEndPoint>();
+         Dictionary<string, bool?> protocolEnabled = LoadProtocolSwitches();
+
          dynamic ports = ServerSession.Current.Application.Settings.TCPIPPorts;
          try
          {
@@ -52,14 +71,26 @@ namespace hMailServer.ControlPanel.Views
                dynamic port = ports.Item[i];
                int security = (int) port.ConnectionSecurity;
                int certId = (int) port.SSLCertificateID;
+               string protocol = ProtocolName((int) port.Protocol);
+               string address = (string) port.Address;
+               int portNumber = (int) port.PortNumber;
+
+               protocolEnabled.TryGetValue(protocol, out bool? enabled);
+
+               ListenerState state = ListenerProbe.StateOf(address, portNumber, enabled, listeners, local);
+               StatusPresentation presentation = StatusSemantics.For(ListenerProbe.LevelFor(state));
+
                rows.Add(new PortRow
                {
                   Id = (int) port.ID,
-                  Protocol = ProtocolName((int) port.Protocol),
-                  Address = (string) port.Address,
-                  Port = (int) port.PortNumber,
+                  Protocol = protocol,
+                  Address = address,
+                  Port = portNumber,
                   Security = security >= 0 && security < SecurityNames.Length ? SecurityNames[security] : "#" + security,
-                  Certificate = certId > 0 && certNames.TryGetValue(certId, out string n) ? n : ""
+                  Certificate = certId > 0 && certNames.TryGetValue(certId, out string n) ? n : "",
+                  ListeningWord = ListenerProbe.WordFor(state),
+                  ListeningTip = ListenerProbe.WordFor(state) + ". " + ListenerProbe.ExplainFor(state, protocol),
+                  ListeningMark = MakeListeningMark(presentation)
                });
                ServerSession.Release(port);
             }
@@ -72,6 +103,104 @@ namespace hMailServer.ControlPanel.Views
          PortGrid.ItemsSource = rows;
          ListSearch.Apply(PortGrid, SearchBox.Text);
          StatusText.Show(EmptyStatus, rows.Count, null, "No ports configured.");
+
+         ShowListenerSummary(rows, local);
+      }
+
+      /// <summary>
+      /// One row's badge.
+      ///
+      /// The colour goes on as a resource reference rather than a resolved brush,
+      /// because ThemeTokens republishes the status brushes on every theme change
+      /// and a badge handed a brush would stay painted for the previous theme.
+      /// ApplyMark is also what knows that a stroke-only mark has to be stroked
+      /// rather than filled - a filled cross renders as nothing at all.
+      /// </summary>
+      private static FrameworkElement MakeListeningMark(StatusPresentation presentation)
+      {
+         var path = new System.Windows.Shapes.Path
+         {
+            Width = 10,
+            Height = 10,
+            Stretch = System.Windows.Media.Stretch.Fill,
+            VerticalAlignment = VerticalAlignment.Center
+         };
+
+         ShapeMarkVisuals.ApplyMark(path, presentation.Shape, presentation.BrushKey);
+         return path;
+      }
+
+      /// <summary>
+      /// The one line under the list, shown only when it has something to say.
+      ///
+      /// A per-row badge answers "is this port up"; it does not answer "why has mail
+      /// stopped", which is the question somebody opens this page with. A port that
+      /// is configured, enabled and not bound is the single most likely cause and
+      /// the least visible, so it gets said in words at the bottom of the page as
+      /// well as shown in a column.
+      /// </summary>
+      private void ShowListenerSummary(List<PortRow> rows, bool local)
+      {
+         if (!local)
+         {
+            ListenerSummary.Text = "Connected to another host, so whether these ports are being listened on cannot "
+                                   + "be read from here - open the Control Panel on the server itself to see it.";
+            ListenerSummary.Visibility = Visibility.Visible;
+            return;
+         }
+
+         var down = rows.FindAll(r => r.ListeningWord == ListenerProbe.WordFor(ListenerState.NotListening));
+
+         if (down.Count == 0)
+         {
+            ListenerSummary.Visibility = Visibility.Collapsed;
+            return;
+         }
+
+         var names = new List<string>();
+         foreach (PortRow row in down)
+            names.Add(row.Protocol + " " + row.Address + ":" + row.Port);
+
+         ListenerSummary.Text =
+            (down.Count == 1 ? "One configured port is not being listened on: " : down.Count + " configured ports are not being listened on: ")
+            + string.Join(", ", names)
+            + ". Connections to them are refused. The usual causes are another program already holding the port, a "
+            + "bind address that does not exist on this machine, or - on a TLS port - a certificate the server could "
+            + "not load; the server records which, once, in the error log at start-up.";
+         ListenerSummary.Visibility = Visibility.Visible;
+      }
+
+      /// <summary>
+      /// ServiceSMTP / ServicePOP3 / ServiceIMAP, keyed by the same protocol names
+      /// the rows carry. A value of null means the switch could not be read, which
+      /// makes an unbound port "unknown" rather than "broken" - the difference
+      /// between asking somebody to investigate and telling them nothing useful.
+      /// </summary>
+      private static Dictionary<string, bool?> LoadProtocolSwitches()
+      {
+         var map = new Dictionary<string, bool?>
+         {
+            ["SMTP"] = null,
+            ["POP3"] = null,
+            ["IMAP"] = null
+         };
+
+         dynamic settings = ServerSession.Current.Application.Settings;
+         try
+         {
+            map["SMTP"] = (bool) settings.ServiceSMTP;
+            map["POP3"] = (bool) settings.ServicePOP3;
+            map["IMAP"] = (bool) settings.ServiceIMAP;
+         }
+         catch (Exception)
+         {
+         }
+         finally
+         {
+            ServerSession.Release((object) settings);
+         }
+
+         return map;
       }
 
       private void Search_TextChanged(object sender, TextChangedEventArgs e)

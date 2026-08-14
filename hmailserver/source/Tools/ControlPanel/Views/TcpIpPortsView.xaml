@@ -8,12 +8,15 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
+            <!-- The listener summary: only as tall as what it has to say, and
+                 collapsed entirely when every port is up. -->
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <StackPanel>
             <TextBlock Text="TCP/IP ports" Style="{StaticResource PageTitle}" />
-            <TextBlock Text="The ports each protocol listens on, their bind address and connection security. The service must be restarted after changes."
+            <TextBlock Text="The ports each protocol listens on, their bind address and connection security. The service must be restarted after changes. The Listening column is read from this machine's open ports, not from the configuration, so it shows what is actually happening rather than what was asked for."
                        Style="{StaticResource PageSubtitle}" />
             <ui:TextBox x:Name="SearchBox" PlaceholderText="Search ports..." Width="300"
                         HorizontalAlignment="Left" Margin="0,10,0,0" TextChanged="Search_TextChanged"
@@ -40,6 +43,25 @@
                         </DataGridTextColumn.ElementStyle>
                     </DataGridTextColumn>
                     <DataGridTextColumn Header="Security" Binding="{Binding Security}" Width="180" />
+                    <!-- A shape as well as a word, so the difference between a live
+                         port and a dead one survives greyscale, colour blindness and
+                         High Contrast. The mark itself is built in the code-behind by
+                         ShapeMarkVisuals.ApplyMark and hosted here: a Path bound
+                         straight to Fill would render a stroke-only mark as nothing
+                         at all, which is precisely the silent failure that helper
+                         exists to prevent. -->
+                    <DataGridTemplateColumn Header="Listening" Width="150" SortMemberPath="ListeningWord">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal" ToolTip="{Binding ListeningTip}">
+                                    <ContentPresenter Content="{Binding ListeningMark}"
+                                                      VerticalAlignment="Center" Margin="0,0,6,0" />
+                                    <TextBlock Text="{Binding ListeningWord}" VerticalAlignment="Center"
+                                               AutomationProperties.Name="{Binding ListeningTip}" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
                     <DataGridTextColumn Header="Certificate" Binding="{Binding Certificate}" Width="*" />
                 </DataGrid.Columns>
             </DataGrid>
@@ -50,7 +72,12 @@
             </Grid>
         </Border>
 
-        <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,12,0,0">
+        <TextBlock x:Name="ListenerSummary" Grid.Row="2"
+                   Margin="2,10,2,0" FontSize="12.5" TextWrapping="Wrap"
+                   Visibility="Collapsed"
+                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+
+        <Border Grid.Row="3" Style="{StaticResource Card}" Margin="0,12,0,0">
             <StackPanel>
                 <TextBlock Text="Add port" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,12" />
                 <Grid>

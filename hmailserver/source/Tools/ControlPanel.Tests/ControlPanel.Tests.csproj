@@ -44,6 +44,11 @@
          with it because ApiKeyStore locates the store file through it. -->
     <Compile Include="..\ControlPanel\Services\ApiKeyStore.cs" />
     <Compile Include="..\ControlPanel\Services\IniFeatureStore.cs" />
+    <!-- Matching a configured port row against the machine's open ports. Both ways
+         of getting it wrong cost something: a live port reported as down sends
+         somebody hunting for a conflict that does not exist, and a dead port
+         reported as up hides the commonest cause of "mail stopped arriving". -->
+    <Compile Include="..\ControlPanel\Services\ListenerProbe.cs" />
   </ItemGroup>
 
   <ItemGroup>

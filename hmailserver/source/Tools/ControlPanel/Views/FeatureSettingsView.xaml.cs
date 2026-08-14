@@ -970,6 +970,346 @@ namespace hMailServer.ControlPanel.Views
       }
 
       /// <summary>
+      /// The state of the certificate ACME has actually issued.
+      ///
+      /// Every other thing on the ACME card is a request - a switch, an e-mail
+      /// address, a list of host names - and none of them says whether an issued
+      /// certificate exists, when it expires, or whether the renewal that is meant
+      /// to be automatic has in fact happened. An expired automatic certificate is
+      /// silent by construction: nothing on the page changes, and the first symptom
+      /// is clients refusing to connect. So the switch is joined by the one fact
+      /// that answers the question, read from the file on disk.
+      /// </summary>
+      private WarningState ComputeAcmeCertificateState_()
+      {
+         if (!LiveBool_("AcmeEnabled", false))
+            return null;
+
+         if (!ServerSession.IsLocalSession)
+         {
+            return new WarningState
+            {
+               Level = StatusLevel.Information,
+               Text = "The issued certificate is a file on the server's disk, and the Control Panel is connected to "
+                      + "another host, so its expiry cannot be read from here."
+            };
+         }
+
+         string folder = AcmeCertificateFolder_();
+
+         if (folder.Length == 0)
+         {
+            return new WarningState
+            {
+               Level = StatusLevel.Information,
+               Text = "Where the issued certificate would be written could not be determined, because neither the "
+                      + "output folder above nor [Directories] DataFolder in hMailServer.INI could be read."
+            };
+         }
+
+         if (!AcmeCertificateExists_())
+         {
+            return new WarningState
+            {
+               Level = StatusLevel.Warning,
+               Text = "ACME is switched on but no certificate has been issued yet - fullchain.pem and privkey.pem "
+                      + "are not both in " + folder + ". Issue happens on the server's own schedule, so this is "
+                      + "normal for a few minutes after enabling it; if it persists, the CA could not reach this "
+                      + "server, and the External setup page checks exactly that."
+            };
+         }
+
+         // Cached against the folder it was read for. A computed warning re-runs on
+         // every keystroke in every editor on the page, and Inspect opens and parses
+         // two PEM files - doing that per character typed into the contact address
+         // would be felt. Keying it on the folder means a change to the output
+         // folder still re-reads, which is the only edit on this card that can
+         // change the answer.
+         if (acmeHealth_ == null || acmeHealthFolder_ != folder)
+         {
+            acmeHealth_ = CertificateInspector.Inspect(
+               folder + "\\fullchain.pem", folder + "\\privkey.pem", filesReadableHere: true);
+            acmeHealthFolder_ = folder;
+         }
+
+         CertificateHealth health = acmeHealth_;
+
+         if (health.ExpiresOn == null || health.DaysRemaining == null)
+         {
+            return new WarningState
+            {
+               Level = StatusLevel.Information,
+               Text = "A certificate has been issued into " + folder + ", but its expiry could not be read: "
+                      + (health.CertificateFile?.Detail ?? "the file could not be parsed as a certificate.")
+            };
+         }
+
+         int days = health.DaysRemaining.Value;
+         string expires = health.ExpiresOn.Value.ToString("d MMMM yyyy", System.Globalization.CultureInfo.CurrentCulture);
+
+         if (days < 0)
+         {
+            return new WarningState
+            {
+               Level = StatusLevel.Critical,
+               Text = "The issued certificate EXPIRED on " + expires + ", " + (-days) + " days ago, and renewal has "
+                      + "not replaced it. Clients are refusing this server's TLS. Check the error log for the last "
+                      + "renewal attempt: the usual cause is that the CA can no longer reach this server on the "
+                      + "http-01 challenge port."
+            };
+         }
+
+         if (days <= CertificateInspector.ExpiryWarningDays)
+         {
+            return new WarningState
+            {
+               Level = StatusLevel.Warning,
+               Text = "The issued certificate expires on " + expires + ", in " + days + " days. The renewal task "
+                      + "runs inside this window, so this is only a problem if the number stops falling - if it does, "
+                      + "renewal is failing and the error log says why."
+            };
+         }
+
+         return new WarningState
+         {
+            Level = StatusLevel.Good,
+            Text = "A certificate is issued and valid until " + expires + ", " + days + " days from now. Renewal "
+                   + "starts automatically inside the last " + CertificateInspector.ExpiryWarningDays + " days."
+         };
+      }
+
+      /// <summary>The inspected ACME pair, and the folder it was inspected in.</summary>
+      private CertificateHealth acmeHealth_;
+      private string acmeHealthFolder_;
+
+      /// <summary>
+      /// Whether the ManageSieve listener will actually offer STARTTLS.
+      ///
+      /// It has no certificate setting of its own: ManageSieveServer::
+      /// FindTlsCertificate_ borrows one from a TLS-capable IMAP, POP3 or SMTP
+      /// port, in that order, and when there is none it starts anyway and offers
+      /// plain text only, saying so once in the application log. So an
+      /// administrator can configure the port, save, restart, connect - and hand
+      /// their mailbox password across the network in the clear, with nothing
+      /// anywhere in the GUI having suggested otherwise.
+      /// </summary>
+      private WarningState ComputeManageSieveTlsState_()
+      {
+         int port = LiveInt_("ManageSieveServerPort", 0);
+         if (port <= 0)
+            return null;
+
+         string bind = LiveText_("ManageSieveServerBindAddress", "127.0.0.1").Trim();
+         bool loopbackOnly = bind.StartsWith("127.") || bind == "::1";
+
+         // Read once per page instance, including when the answer is "could not
+         // tell": ??= alone would retry two COM collection walks on every keystroke
+         // for as long as the session stayed broken.
+         if (!tlsPortCertificateRead_)
+         {
+            tlsPortCertificate_ = FindManageSieveCertificateName_();
+            tlsPortCertificateRead_ = true;
+         }
+
+         string certificate = tlsPortCertificate_;
+
+         if (certificate == null)
+         {
+            return new WarningState
+            {
+               Level = StatusLevel.Information,
+               Text = "Whether STARTTLS will be offered could not be determined: the TCP/IP ports and certificates "
+                      + "could not be read. This listener borrows its certificate from a TLS-capable IMAP, POP3 or "
+                      + "SMTP port and has none of its own."
+            };
+         }
+
+         if (certificate.Length > 0)
+         {
+            return new WarningState
+            {
+               Level = StatusLevel.Good,
+               Text = "STARTTLS will be offered, using the certificate '" + certificate + "' borrowed from a "
+                      + "TLS-capable mailbox port - this listener has no certificate setting of its own, by design: "
+                      + "the client editing Sieve filters is the client reading the mailbox, so the certificate it "
+                      + "already trusts is the right one to present."
+            };
+         }
+
+         string missing = "No TLS-capable IMAP, POP3 or SMTP port has a certificate assigned, so this listener will "
+                          + "offer plain text only - ManageSieve authenticates with the mailbox password, which would "
+                          + "then cross the network in the clear. ";
+
+         return new WarningState
+         {
+            Level = loopbackOnly ? StatusLevel.Information : StatusLevel.Warning,
+            Text = loopbackOnly
+               ? missing + "It is bound to " + bind + ", which keeps it on this machine - that is the supported way "
+                 + "to run it without TLS. Assign a certificate to a mailbox port to offer STARTTLS."
+               : missing + "It is bound to " + bind + ", so those passwords cross the network. Either assign a "
+                 + "certificate to a TLS-capable mailbox port on the TCP/IP ports page, bind this listener to "
+                 + "127.0.0.1, or put it behind a TLS terminator."
+         };
+      }
+
+      /// <summary>
+      /// The name of the certificate ManageSieve would borrow: "" when no
+      /// TLS-capable mailbox port has one, or null when the question could not be
+      /// asked. Cached per page instance - it is two COM collection walks, and a
+      /// computed warning runs on every keystroke.
+      ///
+      /// The preference order is IMAP, then POP3, then SMTP, matching
+      /// ManageSieveServer::FindTlsCertificate_. Reporting a different one would be
+      /// worse than reporting none: an administrator would check the wrong
+      /// certificate's expiry and host names.
+      /// </summary>
+      private string tlsPortCertificate_;
+      private bool tlsPortCertificateRead_;
+
+      private string FindManageSieveCertificateName_()
+      {
+         var namesById = new Dictionary<int, string>();
+         var certificateIdByProtocol = new Dictionary<int, int>();
+
+         dynamic certificates = null;
+         dynamic ports = null;
+
+         try
+         {
+            certificates = ServerSession.Current.Application.Settings.SSLCertificates;
+            int certificateCount = (int) certificates.Count;
+            for (int i = 0; i < certificateCount; i++)
+            {
+               dynamic certificate = certificates.Item[i];
+               try
+               {
+                  namesById[(int) certificate.ID] = (string) certificate.Name ?? "";
+               }
+               finally
+               {
+                  ServerSession.Release((object) certificate);
+               }
+            }
+
+            ports = ServerSession.Current.Application.Settings.TCPIPPorts;
+            int portCount = (int) ports.Count;
+            for (int i = 0; i < portCount; i++)
+            {
+               dynamic port = ports.Item[i];
+               try
+               {
+                  int security = (int) port.ConnectionSecurity;
+                  int certificateId = (int) port.SSLCertificateID;
+
+                  // Only a port that will actually perform a handshake has a
+                  // certificate to lend: security 0 is plaintext.
+                  if (security <= 0 || certificateId <= 0)
+                     continue;
+
+                  int protocol = (int) port.Protocol;
+                  if (!certificateIdByProtocol.ContainsKey(protocol))
+                     certificateIdByProtocol[protocol] = certificateId;
+               }
+               finally
+               {
+                  ServerSession.Release((object) port);
+               }
+            }
+         }
+         catch (Exception)
+         {
+            return null;
+         }
+         finally
+         {
+            ServerSession.Release((object) ports);
+            ServerSession.Release((object) certificates);
+         }
+
+         foreach (int protocol in new[] { ServerSession.SessionImap, ServerSession.SessionPop3, ServerSession.SessionSmtp })
+         {
+            if (!certificateIdByProtocol.TryGetValue(protocol, out int certificateId))
+               continue;
+
+            return namesById.TryGetValue(certificateId, out string name) && name.Length > 0
+               ? name
+               : "#" + certificateId;
+         }
+
+         return "";
+      }
+
+      /// <summary>
+      /// Whether the OAuth2 configuration can accept a token at all.
+      ///
+      /// Every input is on this page, so this reasons entirely about what the
+      /// administrator can see. It exists because the failure is invisible from the
+      /// switch: OAuth2TokenValidator rejects a token whose issuer or audience does
+      /// not match, and verifies its signature against key material chosen by the
+      /// algorithm - so a configuration missing any one of those accepts nobody,
+      /// while the switch reads enabled and the log records only a failed logon.
+      /// </summary>
+      private WarningState ComputeOAuth2State_()
+      {
+         if (!LiveBool_("OAuth2Enabled", false))
+            return null;
+
+         var missing = new List<string>();
+
+         if (LiveText_("OAuth2Issuer", "").Trim().Length == 0)
+            missing.Add("the expected issuer (iss)");
+
+         if (LiveText_("OAuth2Audience", "").Trim().Length == 0)
+            missing.Add("the expected audience (aud)");
+
+         // Defaults mirror IniFileSettings.cpp: RS256 alone unless overridden.
+         string algorithms = LiveText_("OAuth2AllowedAlgorithms", "RS256").ToUpperInvariant();
+         bool allowsAsymmetric = algorithms.Contains("RS") || algorithms.Contains("ES");
+         bool allowsHmac = algorithms.Contains("HS");
+
+         if (allowsAsymmetric && LiveText_("OAuth2PublicKeyFile", "").Trim().Length == 0)
+            missing.Add("the issuer's public key file, which RS* and ES* tokens are verified against");
+
+         if (allowsHmac && !SecretConfigured_("OAuth2HmacSecret"))
+            missing.Add("the shared HMAC secret, which HS* tokens are verified against");
+
+         if (LiveText_("OAuth2UsernameClaim", "email").Trim().Length == 0)
+            missing.Add("the claim that carries the mailbox address");
+
+         if (missing.Count > 0)
+         {
+            return new WarningState
+            {
+               Level = StatusLevel.Warning,
+               Text = "OAuth2 is switched on but no client can log on with a token, because it is missing "
+                      + string.Join("; ", missing)
+                      + ". A token that fails any one of these checks is rejected, and the log records only a failed "
+                      + "logon - so this reads as \"the password is wrong\" rather than as a configuration gap."
+            };
+         }
+
+         if (!LiveBool_("OAuth2RequireTLS", true))
+         {
+            return new WarningState
+            {
+               Level = StatusLevel.Warning,
+               Text = "The configuration is complete, but tokens are accepted over connections that are not "
+                      + "encrypted. A bearer token is a credential in plain text: anyone who records the connection "
+                      + "can replay it until it expires. Turn TLS back on unless something in front of this server "
+                      + "is already terminating it."
+            };
+         }
+
+         return new WarningState
+         {
+            Level = StatusLevel.Good,
+            Text = "The configuration is complete: an issuer, an audience, key material for the algorithms allowed, "
+                   + "and a claim to read the mailbox address from. The mailbox a token names still has to exist as "
+                   + "a local account - a valid token for an address this server does not host is refused."
+         };
+      }
+
+      /// <summary>
       /// Strict dotted-quad parse, mirroring the inet_pton call in
       /// MetricsServer::Start - IPAddress.TryParse would accept "127.1" and IPv6,
       /// both of which the listener itself refuses.
@@ -1011,6 +1351,19 @@ namespace hMailServer.ControlPanel.Views
          // on every navigation. This keeps the editors in sync with values changed
          // elsewhere (a prior save, another tool, or a hand edit) instead of showing
          // stale data captured when the page was first constructed.
+         //
+         // The same reasoning applies to what the computed warnings read from
+         // outside the INI, which is cached per page instance so that it is not
+         // re-read on every keystroke: the certificate a mailbox port lends to
+         // ManageSieve, the account the service runs as, and the ACME pair on disk
+         // can all have changed since this page was last open, and a warning
+         // reasoning about a stale one is worse than no warning at all.
+         serviceInfo_ = null;
+         tlsPortCertificate_ = null;
+         tlsPortCertificateRead_ = false;
+         acmeHealth_ = null;
+         acmeHealthFolder_ = null;
+
          BuildDefinition();
          BuildUi();
       }
@@ -1310,6 +1663,19 @@ namespace hMailServer.ControlPanel.Views
                      new TextSetting { Key = "AcmeHttpPort", Default = "80", Label = "Port for http-01 challenges" },
                      new PathSetting { Key = "AcmeCertificateDirectory", PickFolder = true, Label = "Certificate output folder (empty = Data\\ACME)", Placeholder = "Falls back to Data\\ACME" },
                      new BoolSetting { Key = "AcmeReuseKey", Default = true, Label = "Reuse the private key across renewals (keeps DANE TLSA records valid)" }
+                  },
+                  Warnings =
+                  {
+                     // The whole point of automatic certificates is that nobody has
+                     // to think about them, which is also why a renewal that stops
+                     // working is silent: every control on this card still reads
+                     // exactly as it did. The expiry of the file on disk is the one
+                     // fact that distinguishes "working" from "was working".
+                     new WarningDef
+                     {
+                        Aid = "AcmeCertificateState",
+                        Compute = ComputeAcmeCertificateState_
+                     }
                   }
                });
                break;
@@ -1562,11 +1928,26 @@ namespace hMailServer.ControlPanel.Views
                {
                   Title = "ManageSieve (RFC 5804)",
                   Blurb = "Lets mail clients upload and manage per-account Sieve filter scripts over TCP. " +
-                          "Authentication is SASL PLAIN against the account database; bind to 127.0.0.1 unless fronted by a TLS terminator.",
+                          "Authentication is SASL PLAIN against the account database, so the mailbox password crosses " +
+                          "this connection. STARTTLS is offered only when a TLS-capable mailbox port has a certificate " +
+                          "to borrow - the status below says whether it will be.",
                   Settings =
                   {
                      new TextSetting { Key = "ManageSieveServerPort", Default = "0", Label = "ManageSieve port (0 = disabled)", Placeholder = "4190" },
                      new TextSetting { Key = "ManageSieveServerBindAddress", Default = "127.0.0.1", Label = "ManageSieve bind address" }
+                  },
+                  Warnings =
+                  {
+                     // This listener starts whether or not it can offer TLS, and
+                     // records the difference in one application-log line at
+                     // start-up. Nothing else anywhere said which of the two an
+                     // administrator was about to get, and the answer decides
+                     // whether mailbox passwords cross the network in the clear.
+                     new WarningDef
+                     {
+                        Aid = "ManageSieveTlsState",
+                        Compute = ComputeManageSieveTlsState_
+                     }
                   }
                });
                cards_.Add(new CardDef
@@ -1932,6 +2313,20 @@ namespace hMailServer.ControlPanel.Views
                      new TextSetting { Key = "OAuth2UsernameClaim", Default = "email", Label = "Claim that holds the mailbox address", Placeholder = "email" },
                      new PathSetting { Key = "OAuth2PublicKeyFile", FileFilter = "PEM/key files (*.pem;*.crt;*.cer;*.key;*.pub)|*.pem;*.crt;*.cer;*.key;*.pub|All files (*.*)|*.*", Label = "RSA/EC public key file (PEM, for RS*/ES* tokens)", Placeholder = "Path to the issuer's public key" },
                      new SecretSetting { Key = "OAuth2HmacSecret", Label = "Shared HMAC secret (only for HS256/384/512 tokens)", Hint = "Only needed for HS* algorithms" }
+                  },
+                  Warnings =
+                  {
+                     // Seven settings that only work as a set, and no way to see
+                     // whether the set is complete. Every one of them missing
+                     // produces the same symptom - a token that is rejected and a
+                     // log line saying only that a logon failed - so an incomplete
+                     // configuration reads to the administrator, and to the user
+                     // on the phone, as "the password is wrong".
+                     new WarningDef
+                     {
+                        Aid = "OAuth2CoherenceState",
+                        Compute = ComputeOAuth2State_
+                     }
                   }
                });
                cards_.Add(new CardDef

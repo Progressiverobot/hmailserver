@@ -210,6 +210,7 @@ namespace hMailServer.ControlPanel.Services
          new SettingEntry("Enable caching", "Cache.Enabled", "performance"),
          new SettingEntry("Enable message indexing", "MessageIndexing.Enabled", "performance"),
          new SettingEntry("Full re-index interval (minutes)", "IndexerFullMinutes", "performance"),
+         new SettingEntry("Hit rate and memory in use, per cache", "Cache.HitRates", "performance"),
          new SettingEntry("Max asynchronous task threads", "MaxAsynchronousThreads", "performance"),
          new SettingEntry("Max delivery threads", "MaxDeliveryThreads", "performance"),
          new SettingEntry("Max parallel external POP3 fetch threads (restart required)", "MaxNumberOfExternalFetchThreads", "performance"),

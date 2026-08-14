@@ -654,6 +654,61 @@ namespace hMailServer.ControlPanel.Views
          }
       }
 
+      /// <summary>
+      /// A read-only line of live server state, next to the settings that produce it.
+      ///
+      /// Not an editor and not a button: some things an administrator needs from a
+      /// settings page are neither. The cache TTLs are only adjustable with
+      /// judgement if the hit rate they produce is visible, and a page of four
+      /// numbers with no feedback is a page you can only tune by guessing.
+      /// </summary>
+      private class ComStat : ComSetting, INotPersisted
+      {
+         /// <summary>Produces the text, or throws - which is reported in place of it.</summary>
+         public Func<string> Read;
+
+         public override bool WantsInitialValue => false;
+
+         public override FrameworkElement CreateEditor(object value)
+         {
+            var panel = new StackPanel();
+
+            if (!string.IsNullOrEmpty(Label))
+               panel.Children.Add(new TextBlock { Text = Label, FontSize = 13, Margin = new Thickness(0, 0, 0, 4) });
+
+            string text;
+            try
+            {
+               text = Read();
+            }
+            catch (Exception ex)
+            {
+               text = "This could not be read from the server: " + ServerSession.DescribeComError(ex);
+            }
+
+            var line = new TextBlock
+            {
+               Text = text,
+               FontSize = 13,
+               TextWrapping = TextWrapping.Wrap,
+               MaxWidth = 620,
+               HorizontalAlignment = HorizontalAlignment.Left
+            };
+            Describe(line, Path);
+            panel.Children.Add(line);
+            Annotate(line, panel);
+            return panel;
+         }
+
+         /// <summary>Nothing to read back: this row edits nothing.</summary>
+         public override object ReadEditor() => null;
+
+         /// <summary>Nothing to write. Marked so Save_Click does not count it.</summary>
+         public override void Write(object owner, string property)
+         {
+         }
+      }
+
       /// <summary>A non-persistent action button (e.g. "Test connection") with a result line.</summary>
       private class ComAction : ComSetting
       {
@@ -1740,6 +1795,27 @@ namespace hMailServer.ControlPanel.Views
          cache.Settings.Add(new ComText { Path = "Cache.DistributionListCacheMaxSizeKb", Label = "Distribution-list cache max size (KB, resets at service restart)", Numeric = true, Blurb = SettingClaims.NoteFor("Cache.DistributionListCacheMaxSizeKb") });
          Tab("Cache").Cards.Add(cache);
 
+         // Four TTLs and four size caps, and until now no way to see what any of
+         // them achieved. The server has counted hits and misses per cache all
+         // along and exposes the rate over COM; without it on the page, the only
+         // way to tune a TTL was to change it and hope. Read-only, and read fresh
+         // on every visit to this page.
+         var cacheStats = Card("How the caches are performing",
+            "Live, from the running server. The hit rate is the share of lookups answered from memory since the "
+            + "counters last reset - which they do when the service restarts, when a cache is switched off, and "
+            + "when its TTL is changed, so a rate right after any of those describes a very short sample.");
+         cacheStats.Settings.Add(new ComStat
+         {
+            Path = "Cache.HitRates",
+            Label = "Hit rate and memory in use, per cache",
+            Read = () => DescribeCaches_(),
+            Blurb = "A low rate on a busy server usually means the TTL is shorter than the interval between lookups "
+                    + "of the same object; a rate of 0% with no memory in use means nothing has been looked up yet, "
+                    + "which is not the same thing. Memory in use is measured against the size caps above, and a "
+                    + "cache at its cap is evicting entries it would otherwise have kept."
+         });
+         Tab("Cache").Cards.Add(cacheStats);
+
          var index = Card("Message indexing", "Builds a search index so IMAP SEARCH and the web client are faster.");
          index.Settings.Add(new ComBool { Path = "MessageIndexing.Enabled", Label = "Enable message indexing" });
          // Tuning lives with the feature it tunes: a tab holding a single on/off
@@ -2129,6 +2205,85 @@ namespace hMailServer.ControlPanel.Views
             ServerSession.Release((object) antispam);
          }
       }
+
+      // ---- live cache statistics ---------------------------------------------
+
+      /// <summary>
+      /// One line per cache: hit rate, memory in use, and its cap.
+      ///
+      /// Two things are stated rather than left to be inferred, because both would
+      /// otherwise be read wrongly. Cache&lt;T&gt;::GetHitRate returns 0 when there
+      /// have been no hits at all, which covers both "every lookup missed" and "no
+      /// lookup has happened" - so a cache with no memory in use is called out as
+      /// idle instead of as failing. And the counters are reset by SetTTL and by
+      /// SetEnabled, not only by a restart, so the sample after any settings change
+      /// on this page starts from zero.
+      /// </summary>
+      private static string DescribeCaches_()
+      {
+         dynamic cache = ServerSession.Current.Application.Settings.Cache;
+         try
+         {
+            if (!(bool) cache.Enabled)
+            {
+               return "Caching is switched off, so every domain, account, alias and distribution-list lookup goes to "
+                      + "the database. There are no hit rates to report.";
+            }
+
+            var lines = new List<string>();
+
+            foreach ((string name, string rateProperty, string sizeProperty, string capProperty) in new[]
+            {
+               ("Domains", "DomainHitRate", "DomainCacheSizeKb", "DomainCacheMaxSizeKb"),
+               ("Accounts", "AccountHitRate", "AccountCacheSizeKb", "AccountCacheMaxSizeKb"),
+               ("Aliases", "AliasHitRate", "AliasCacheSizeKb", "AliasCacheMaxSizeKb"),
+               ("Distribution lists", "DistributionListHitRate", "DistributionListCacheSizeKb", "DistributionListCacheMaxSizeKb")
+            })
+            {
+               int rate = (int) ComProperty_(cache, rateProperty);
+               int sizeKb = (int) ComProperty_(cache, sizeProperty);
+               int capKb = (int) ComProperty_(cache, capProperty);
+
+               string line = name + ": ";
+
+               if (rate == 0 && sizeKb == 0)
+               {
+                  line += "nothing cached yet - no lookup has been made since the counters were reset.";
+               }
+               else
+               {
+                  line += rate + "% of lookups answered from memory, using "
+                          + sizeKb.ToString("N0", System.Globalization.CultureInfo.CurrentCulture) + " KB";
+
+                  if (capKb > 0)
+                  {
+                     line += " of " + capKb.ToString("N0", System.Globalization.CultureInfo.CurrentCulture) + " KB";
+                     if (sizeKb >= capKb)
+                        line += " - at its cap, so entries are being evicted";
+                  }
+
+                  line += ".";
+               }
+
+               lines.Add(line);
+            }
+
+            return string.Join("\r\n", lines);
+         }
+         finally
+         {
+            ServerSession.Release((object) cache);
+         }
+      }
+
+      /// <summary>
+      /// Reads one property off a COM object by name. Late-bound because the four
+      /// caches differ only by the property name, and writing sixteen dynamic reads
+      /// out longhand is where a copy-paste error puts the domain cache's hit rate
+      /// beside the account cache's size.
+      /// </summary>
+      private static object ComProperty_(object owner, string name)
+         => owner.GetType().InvokeMember(name, BindingFlags.GetProperty, null, owner, null);
 
       // ---- message index actions ---------------------------------------------
       //
