@@ -11,6 +11,7 @@
 #include "../BO/ServerMessages.h"
 #include "../BO/SSLCertificates.h"
 #include "../Application/Property.h"
+#include "../Application/IniSettingStore.h"
 #include "../Cache/CacheContainer.h"
 #include "../Application/ObjectCache.h"
 #include "..\Scripting\ScriptServer.h"
@@ -718,6 +719,15 @@ namespace HM
       if (!property_set_->XMLStore(pBackupNode))
          return false;
 
+      // hMailServer.INI's [Settings] section, which is in the database from schema
+      // 6011 precisely so that it can be here. Before that it was in no backup at
+      // all: an operator who restored onto replacement hardware got their domains,
+      // accounts and mail back and none of their server settings, and nothing said
+      // so.
+      IniSettingStore iniSettings;
+      if (!iniSettings.XMLStore(pBackupNode))
+         return false;
+
       // SECURITY RANGES
       SecurityRanges securityRanges;
       securityRanges.Refresh();
@@ -760,6 +770,14 @@ namespace HM
    {
       // PROPERTIES
       if (!property_set_->XMLLoad(pBackupNode))
+         return false;
+
+      // [Settings]. Absent from an archive taken before schema 6011, in which case
+      // this does nothing - it must not clear the table, because an old archive
+      // carries no evidence about settings either way and wiping them would be a
+      // silent loss on a restore that appeared to succeed.
+      IniSettingStore iniSettings;
+      if (!iniSettings.XMLLoad(pBackupNode))
          return false;
 
       // SECURITY RANGES

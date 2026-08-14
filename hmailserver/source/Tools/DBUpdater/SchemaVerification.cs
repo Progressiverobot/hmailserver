@@ -109,7 +109,36 @@ namespace DBUpdater
          // probe is still needed: the MSSQL/CE/MySQL scripts carry [IGNORE-ERRORS], so
          // without it a failed ALTER would be swallowed and the version stamped anyway.
          new SchemaProbe(6009, "hm_sslcertificates.sslprivatekeypassword",
-                         "update hm_sslcertificates set sslprivatekeypassword = sslprivatekeypassword where 1 = 0")
+                         "update hm_sslcertificates set sslprivatekeypassword = sslprivatekeypassword where 1 = 0"),
+
+         // Upgrade6010to6011* - a whole new table, hm_inisettings, which holds the
+         // [Settings] section of hMailServer.INI so that it reaches backups and can be
+         // administered remotely.
+         //
+         // One probe per COLUMN even though a CREATE TABLE cannot half-apply the way a
+         // multi-column ALTER can. Two reasons it is still right here. The step is not
+         // one statement: on MSSQL and SQL CE the table is created and then two
+         // constraints are added by separate ALTERs, and SQL CE commits each of those as
+         // it executes, so "the table exists" does not mean "the step finished". And a
+         // probe naming a column is what rule 7 of check-schema-versions.ps1 uses to
+         // confirm the same column exists in all three CreateTables scripts - which is
+         // the check that catches a new table added to the upgrade path but forgotten in
+         // the fresh-install path, leaving new installations without it.
+         //
+         // There is deliberately NO probe for inisettingid. Every probe is an UPDATE of
+         // a column to itself, and inisettingid is an identity column: SQL Server and
+         // SQL Server Compact reject "cannot update identity column" when the statement
+         // is compiled, before "where 1 = 0" is ever evaluated. The probe would fail on
+         // a perfectly correct database, VerifyUpgradedSchema would read that as the
+         // step having failed, and the upgrade would roll back - on the two backends
+         // most installations use. Every pre-existing probe names a plain data column
+         // for the same reason.
+         new SchemaProbe(6011, "hm_inisettings.inisettingname",
+                         "update hm_inisettings set inisettingname = inisettingname where 1 = 0"),
+         new SchemaProbe(6011, "hm_inisettings.inisettingvalue",
+                         "update hm_inisettings set inisettingvalue = inisettingvalue where 1 = 0"),
+         new SchemaProbe(6011, "hm_inisettings.inisettingfilevalue",
+                         "update hm_inisettings set inisettingfilevalue = inisettingfilevalue where 1 = 0")
       };
 
       /// <summary>

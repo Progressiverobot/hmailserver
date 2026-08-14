@@ -13,6 +13,8 @@ select hm_drop_table('hm_imapfolders');
 
 select hm_drop_table('hm_settings');
 
+select hm_drop_table('hm_inisettings');
+
 select hm_drop_table('hm_accounts');
 
 select hm_drop_table('hm_aliases');
@@ -207,6 +209,14 @@ create table hm_settings
 	settingname varchar (30) not null unique,
 	settingstring varchar (4000) not null ,
 	settinginteger int not null
+);
+
+create table hm_inisettings
+(
+	inisettingid bigserial not null primary key,
+	inisettingname varchar (100) not null unique,
+	inisettingvalue text not null,
+	inisettingfilevalue text not null
 );
 
 create table hm_dbversion 
@@ -828,4 +838,4 @@ insert into hm_tcpipports (portprotocol, portnumber, portaddress1, portaddress2,
 
 insert into hm_tcpipports (portprotocol, portnumber, portaddress1, portaddress2, portconnectionsecurity, portsslcertificateid) values (5, 143, 0, NULL, 0, 0);
 
-insert into hm_dbversion values (6010);
+insert into hm_dbversion values (6011);

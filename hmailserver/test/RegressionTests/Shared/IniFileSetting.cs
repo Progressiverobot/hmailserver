@@ -26,6 +26,11 @@ namespace RegressionTests.Shared
       [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
       private static extern bool WritePrivateProfileString(string section, string key, string value, string filePath);
 
+      [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+      private static extern uint GetPrivateProfileString(string section, string key, string defaultValue,
+                                                         System.Text.StringBuilder returnedString, uint size,
+                                                         string filePath);
+
       /// <summary>
       ///    Every directory an hMailServer.ini may live in for this install. Both are
       ///    tried because the server looks in its own folder and in Bin, and which one
@@ -71,6 +76,65 @@ namespace RegressionTests.Shared
          }
 
          Assert.IsTrue(wroteAny, "Could not locate an existing hMailServer.ini to update.");
+      }
+
+      /// <summary>
+      ///    Reads one [Settings] value back, through the same API the server reads it
+      ///    with. An absent key returns an empty string, which is what the server sees
+      ///    for one too - so "absent" and "present but empty" are deliberately not
+      ///    distinguished here, because they are not distinguished by any reader.
+      ///
+      ///    The first ini that exists wins, matching the order Write uses.
+      /// </summary>
+      public static string Read(string key)
+      {
+         foreach (string directory in CandidateDirectories())
+         {
+            string iniPath = Path.Combine(directory, "hMailServer.ini");
+
+            if (!File.Exists(iniPath))
+               continue;
+
+            var buffer = new System.Text.StringBuilder(4096);
+            GetPrivateProfileString("Settings", key, string.Empty, buffer, (uint) buffer.Capacity, iniPath);
+
+            return buffer.ToString();
+         }
+
+         Assert.Fail("Could not locate an existing hMailServer.ini to read.");
+         return string.Empty;
+      }
+
+      /// <summary>
+      ///    Removes one [Settings] key from every hMailServer.ini that exists.
+      ///
+      ///    Removing a key is not the same as setting it to an empty string: it is how
+      ///    a setting is returned to its default, and the database mirror behind these
+      ///    settings has to see the difference. Passing a null value to
+      ///    WritePrivateProfileString is what deletes the line rather than leaving
+      ///    "Key=" behind, so the null here is load-bearing.
+      /// </summary>
+      public static void Delete(string key)
+      {
+         bool deletedAny = false;
+
+         foreach (string directory in CandidateDirectories())
+         {
+            string iniPath = Path.Combine(directory, "hMailServer.ini");
+
+            if (!File.Exists(iniPath))
+               continue;
+
+            Assert.IsTrue(
+               WritePrivateProfileString("Settings", key, null, iniPath),
+               "Failed to delete " + key + " from " + iniPath + ".");
+
+            WritePrivateProfileString(null, null, null, iniPath);
+
+            deletedAny = true;
+         }
+
+         Assert.IsTrue(deletedAny, "Could not locate an existing hMailServer.ini to update.");
       }
    }
 }

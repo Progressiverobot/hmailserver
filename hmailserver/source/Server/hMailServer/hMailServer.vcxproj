@@ -213,6 +213,7 @@ EXIT 0
     <ClCompile Include="..\Common\Application\ExceptionHandler.cpp" />
     <ClCompile Include="..\Common\Application\FolderManager.cpp" />
     <ClCompile Include="..\Common\Application\IniFileSettings.cpp" />
+    <ClCompile Include="..\Common\Application\IniSettingStore.cpp" />
     <ClCompile Include="..\Common\Application\Logger.cpp" />
     <ClCompile Include="..\Common\Application\NcsaLogFormatter.cpp" />
     <ClCompile Include="..\Common\Application\SqlLogDevice.cpp" />
@@ -755,6 +756,7 @@ EXIT 0
     <ClInclude Include="..\Common\Application\ExceptionHandler.h" />
     <ClInclude Include="..\Common\Application\FolderManager.h" />
     <ClInclude Include="..\Common\Application\IniFileSettings.h" />
+    <ClInclude Include="..\Common\Application\IniSettingStore.h" />
     <ClInclude Include="..\Common\Application\Logger.h" />
     <ClInclude Include="..\Common\Application\NcsaLogFormatter.h" />
     <ClInclude Include="..\Common\Application\SqlLogDevice.h" />

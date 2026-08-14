@@ -14,9 +14,11 @@ if exists (select * from sysobjects where id = object_id('hm_messages') and obje
 
 if exists (select * from sysobjects where id = object_id('hm_message_metadata') and objectproperty(id, 'isusertable') = 1) drop table hm_message_metadata 
 
-if exists (select * from sysobjects where id = object_id('hm_settings') and objectproperty(id, 'isusertable') = 1) drop table hm_settings 
+if exists (select * from sysobjects where id = object_id('hm_settings') and objectproperty(id, 'isusertable') = 1) drop table hm_settings
 
-if exists (select * from sysobjects where id = object_id('hm_dbversion') and objectproperty(id, 'isusertable') = 1) drop table hm_dbversion 
+if exists (select * from sysobjects where id = object_id('hm_inisettings') and objectproperty(id, 'isusertable') = 1) drop table hm_inisettings
+
+if exists (select * from sysobjects where id = object_id('hm_dbversion') and objectproperty(id, 'isusertable') = 1) drop table hm_dbversion
 
 if exists (select * from sysobjects where id = object_id('hm_routes') and objectproperty(id, 'isusertable') = 1) drop table hm_routes 
 
@@ -308,7 +310,19 @@ create table hm_settings (
 
 ALTER TABLE hm_settings ADD CONSTRAINT hm_settings_pk PRIMARY KEY NONCLUSTERED (settingid) 
 
-ALTER TABLE hm_settings ADD CONSTRAINT u_settingname UNIQUE NONCLUSTERED (settingname) 
+ALTER TABLE hm_settings ADD CONSTRAINT u_settingname UNIQUE NONCLUSTERED (settingname)
+
+create table hm_inisettings
+(
+	inisettingid int identity (1, 1) not null,
+	inisettingname nvarchar(100) not null,
+	inisettingvalue ntext not null,
+	inisettingfilevalue ntext not null
+)
+
+ALTER TABLE hm_inisettings ADD CONSTRAINT hm_inisettings_pk PRIMARY KEY NONCLUSTERED (inisettingid)
+
+ALTER TABLE hm_inisettings ADD CONSTRAINT u_inisettingname UNIQUE NONCLUSTERED (inisettingname)
 
 create table hm_dbversion (
 	value int not null
@@ -986,4 +1000,4 @@ insert into hm_tcpipports (portprotocol, portnumber, portaddress1, portaddress2,
 
 insert into hm_tcpipports (portprotocol, portnumber, portaddress1, portaddress2, portconnectionsecurity, portsslcertificateid) values (5, 143, 0, NULL, 0, 0) 
 
-insert into hm_dbversion values (6010)
+insert into hm_dbversion values (6011)

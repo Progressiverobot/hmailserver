@@ -17,6 +17,37 @@ namespace HM
 
       void LoadSettings();
 
+      /// <summary>
+      /// Reconciles the [Settings] section with the hm_inisettings table and makes
+      /// the result the source for the next LoadSettings(). Call once, after the
+      /// database is open AND its schema version has been accepted - the table only
+      /// exists at schema 6011, and querying it on an older database would replace
+      /// the clear "run DBUpdater" message with a SQL error.
+      ///
+      /// Nothing else needs to change to benefit: the values are reconciled INTO the
+      /// ini file as well as out of it, so every reader that goes to the file
+      /// directly - the two DAV redirects in WebServicesServer, UseLanguage, the
+      /// Control Panel, hmconfig.ps1, hMailServer.exe /Register, which runs with no
+      /// database at all - keeps seeing the right value.
+      /// </summary>
+      void LoadDatabaseSettings();
+
+      /// <summary>
+      /// Forgets the reconciled values, so the next LoadSettings() reads the file
+      /// alone. Used when the process is torn down and rebuilt in place
+      /// (Application::Reinitialize), where the previous cycle's map would otherwise
+      /// outlive the database connection it came from.
+      /// </summary>
+      void ForgetDatabaseSettings();
+
+      /// <summary>
+      /// Records a [Settings] value in the database as well as in the file, so a
+      /// change made through the COM API is not lost from the mirror - and therefore
+      /// from the backup - until the next restart. Silent no-op before
+      /// LoadDatabaseSettings has run.
+      /// </summary>
+      void SaveDatabaseSetting(const String &key, const String &value);
+
       bool CheckSettings(String &sErrorMessage);
 
       static String GetInitializationFile();
@@ -396,6 +427,23 @@ namespace HM
       void WriteIniSetting_(const String &sSection, const String &sKey, int Value);
       String ReadIniSettingString_(const String &sSection, const String &sKey, const String &sDefault);
       int ReadIniSettingInteger_(const String &sSection, const String &sKey, int iDefault);
+
+      /// <summary>
+      /// The reconciled [Settings] values, or empty before LoadDatabaseSettings has
+      /// run. Consulted ONLY for the [Settings] section: the keys that are needed to
+      /// reach the database in the first place - everything in [Database],
+      /// [Directories] and the administrator password - can never be overridden from
+      /// the database, which is the ordering answer and the security answer at once.
+      ///
+      /// Guarded because the two readers are called from LoadSettings, which runs on
+      /// the startup thread and again on a COM thread (get_Directories,
+      /// CreateInternalDatabase). Recursive because Synchronize writes the map's
+      /// source while holding nothing, and the house type for this is
+      /// boost::recursive_mutex.
+      /// </summary>
+      std::map<String, String> database_settings_;
+      bool database_settings_loaded_;
+      mutable boost::recursive_mutex database_settings_mutex_;
 
       String database_server_;
       String database_name_;

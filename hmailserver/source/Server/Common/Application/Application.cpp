@@ -151,6 +151,24 @@ namespace HM
          return false;
       }
 
+      /*
+         The second settings load, and it has to be exactly here.
+
+         AFTER OnDatabaseConnected, because that is what proves the schema is the
+         version this build requires. hm_inisettings only exists from 6011, so
+         reading it on an older database would raise a SQL error in place of the
+         "run DBUpdater" message that tells the operator what to actually do.
+
+         BEFORE Configuration::Load below, and therefore before every server object
+         built afterwards, so that nothing latches a value from the file that the
+         database was going to change.
+
+         The first load at the top of this function stays file-only and is what the
+         bootstrap runs on: it is how the server finds the database at all.
+      */
+      IniFileSettings::Instance()->LoadDatabaseSettings();
+      IniFileSettings::Instance()->LoadSettings();
+
       LOG_DEBUG("Application::InitInstance - Loading configuration...");
       if (!Configuration::Instance()->Load())
          return false;
@@ -797,6 +815,14 @@ namespace HM
    {
       StopServers();
       ExitInstance();
+
+      // The reconciled [Settings] map belongs to the database connection that has
+      // just been closed, and InitInstance's first LoadSettings is meant to be the
+      // file-only bootstrap. Leaving the previous cycle's map in place would make
+      // that first load read through a mirror of a database this process is no
+      // longer connected to - which matters most in the one case Reinitialize
+      // exists for, restoring a backup, where the rows are about to change.
+      IniFileSettings::Instance()->ForgetDatabaseSettings();
 
       String sErrorMessage;
       if (!InitInstance(sErrorMessage))

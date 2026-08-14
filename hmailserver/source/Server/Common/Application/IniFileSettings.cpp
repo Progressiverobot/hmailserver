@@ -5,6 +5,7 @@
 #include "stdafx.h"
 #include "IniFileSettings.h"
 
+#include "IniSettingStore.h"
 #include "../Util/Crypt.h"
 #include "../Util/Utilities.h"
 
@@ -18,6 +19,7 @@ namespace HM
    String IniFileSettings::ini_file_;
   
    IniFileSettings::IniFileSettings() :
+      database_settings_loaded_(false),
       is_internal_database_(false),
       dbport_(0),
       no_of_dbconnections_(0),
@@ -474,9 +476,73 @@ namespace HM
       WritePrivateProfileString(sSection, sKey, sValue, GetInitializationFile() );
    }
 
-   String 
+   void
+   IniFileSettings::LoadDatabaseSettings()
+   {
+      IniSettingStore store;
+
+      std::map<String, String> resolved;
+
+      if (!store.Synchronize(resolved))
+      {
+         // Synchronize has already reported why. Carry on with the file alone rather
+         // than refusing to start: a server that will not boot because a settings
+         // MIRROR is unavailable is worse than one running on the configuration
+         // sitting in front of it.
+         return;
+      }
+
+      boost::lock_guard<boost::recursive_mutex> guard(database_settings_mutex_);
+
+      database_settings_ = resolved;
+      database_settings_loaded_ = true;
+   }
+
+   void
+   IniFileSettings::ForgetDatabaseSettings()
+   {
+      boost::lock_guard<boost::recursive_mutex> guard(database_settings_mutex_);
+
+      database_settings_.clear();
+      database_settings_loaded_ = false;
+   }
+
+   void
+   IniFileSettings::SaveDatabaseSetting(const String &key, const String &value)
+   {
+      {
+         boost::lock_guard<boost::recursive_mutex> guard(database_settings_mutex_);
+
+         if (!database_settings_loaded_)
+            return;
+
+         database_settings_[key] = value;
+      }
+
+      IniSettingStore store;
+      store.Save(key, value);
+   }
+
+   String
    IniFileSettings::ReadIniSettingString_(const String &sSection, const String &sKey, const String &sDefault)
    {
+      // [Settings] only, and only once the reconciliation has run. Every other
+      // section is read from the file and nowhere else, because those are the
+      // sections that say where the database IS - so a value from the database could
+      // never be needed to reach it, and allowing one would be a way to point a
+      // server at a different database by writing to the one it already has.
+      if (sSection.CompareNoCase(_T("Settings")) == 0)
+      {
+         boost::lock_guard<boost::recursive_mutex> guard(database_settings_mutex_);
+
+         if (database_settings_loaded_)
+         {
+            auto found = database_settings_.find(sKey);
+            if (found != database_settings_.end())
+               return (*found).second;
+         }
+      }
+
       // The buffer must be large enough for the longest value we may store. Most
       // settings are short, but a DPAPI-protected secret (e.g. the database
       // password, OAuth2 HMAC secret or password pepper) is a base64 envelope that
@@ -490,9 +556,29 @@ namespace HM
       return Value;
    }
 
-   int 
+   int
    IniFileSettings::ReadIniSettingInteger_(const String &sSection, const String &sKey, int iDefault)
    {
+      if (sSection.CompareNoCase(_T("Settings")) == 0)
+      {
+         boost::lock_guard<boost::recursive_mutex> guard(database_settings_mutex_);
+
+         if (database_settings_loaded_)
+         {
+            auto found = database_settings_.find(sKey);
+            if (found != database_settings_.end())
+            {
+               // Deliberately mirrors GetPrivateProfileInt rather than being
+               // stricter than it: that function stops at the first character that
+               // is not part of a number and yields 0 for a value that does not
+               // start with one, so "5x" is 5 and "x" is 0. _ttoi does the same.
+               // A reconciled value that parses differently from the file it came
+               // from would be a difference nobody could see.
+               return _ttoi((*found).second.c_str());
+            }
+         }
+      }
+
       int iValue = GetPrivateProfileInt( sSection, sKey, iDefault, GetInitializationFile() );
       return iValue;
    }
@@ -583,6 +669,13 @@ namespace HM
    IniFileSettings::SetUserInterfaceLanguage(String sLanguage)
    {
       WritePrivateProfileString(_T("Settings"), _T("UseLanguage"), sLanguage, GetInitializationFile());
+
+      // UseLanguage is the one [Settings] key that is neither loaded by
+      // LoadSettings nor cached in a member - GetUserInterfaceLanguage reads the
+      // file on every call - so it is not served from the reconciled map and does
+      // not need to be. It is mirrored anyway so that it reaches backups, which is
+      // the whole point of the table.
+      SaveDatabaseSetting(_T("UseLanguage"), sLanguage);
    }
 
    int 
@@ -808,6 +901,11 @@ namespace HM
    {
       rewrite_envelope_from_when_forwarding_ = value;
       WriteIniSetting_("Settings", "RewriteEnvelopeFromWhenForwarding", value ? 1 : 0);
+
+      // And into the mirror, or the change would be absent from the next backup and
+      // would look to the reconciliation on the next start like a file-side edit -
+      // correct in the end, but only by accident.
+      SaveDatabaseSetting("RewriteEnvelopeFromWhenForwarding", value ? _T("1") : _T("0"));
    }
 
    String

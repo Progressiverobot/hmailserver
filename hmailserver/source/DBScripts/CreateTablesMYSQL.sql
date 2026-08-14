@@ -2,6 +2,8 @@ drop table if exists hm_imapfolders;
 
 drop table if exists hm_settings;
 
+drop table if exists hm_inisettings;
+
 drop table if exists hm_accounts;
 
 drop table if exists hm_aliases;
@@ -193,6 +195,14 @@ create table hm_settings
 	settingname varchar (30) not null, unique(`settingname`),
 	settingstring varchar (4000) not null ,
 	settinginteger int not null
+) DEFAULT CHARSET=utf8;
+
+create table hm_inisettings
+(
+	inisettingid int auto_increment not null, primary key(`inisettingid`), unique(`inisettingid`),
+	inisettingname varchar (100) not null, unique(`inisettingname`),
+	inisettingvalue text not null,
+	inisettingfilevalue text not null
 ) DEFAULT CHARSET=utf8;
 
 create table hm_dbversion 
@@ -812,4 +822,4 @@ insert into hm_tcpipports (portprotocol, portnumber, portaddress1, portaddress2,
 
 insert into hm_tcpipports (portprotocol, portnumber, portaddress1, portaddress2, portconnectionsecurity, portsslcertificateid) values (5, 143, 0, NULL, 0, 0);
 
-insert into hm_dbversion values (6010);
+insert into hm_dbversion values (6011);
