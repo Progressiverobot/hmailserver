@@ -31,6 +31,25 @@
     <Compile Include="..\ControlPanel\Services\ChartDataTable.cs" />
     <Compile Include="..\ControlPanel\Services\StatusSemantics.cs" />
     <Compile Include="..\ControlPanel\Services\SpamPipeline.cs" />
+    <!-- Same arrangement, for the same reason: the account comparison and the
+         command-line parsing behind the service-account check are pure, and both
+         drive a sentence shown to an administrator, so both are worth testing
+         without a WPF page around them. -->
+    <Compile Include="..\ControlPanel\Services\WindowsServiceInfo.cs" />
+    <!-- The REST API key store. Every rule in it - the token's shape, the digest,
+         what makes a label, a domain list or a source restriction acceptable - has
+         to agree with RestApiServer, and a disagreement produces a key that is
+         written successfully and authenticates nothing. That is exactly the class
+         of bug a test catches and a green build does not. IniFeatureStore comes
+         with it because ApiKeyStore locates the store file through it. -->
+    <Compile Include="..\ControlPanel\Services\ApiKeyStore.cs" />
+    <Compile Include="..\ControlPanel\Services\IniFeatureStore.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- WindowsServiceInfo queries Win32_Service; the app gets this through its
+         own reference and the test assembly needs its own. -->
+    <PackageReference Include="System.Management" Version="10.0.11" />
   </ItemGroup>
 
   <ItemGroup>

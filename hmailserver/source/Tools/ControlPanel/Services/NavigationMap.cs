@@ -389,7 +389,16 @@ namespace hMailServer.ControlPanel.Services
                Page("api", "API & monitoring",
                   "The REST API, Prometheus metrics and health endpoints an outside monitoring system reads.",
                   aliases: "REST|Prometheus|Grafana|Metrics|Health endpoint|Nagios|Zabbix|Webhooks|Automation",
-                  seeAlso: "logging|status|webservices")),
+                  seeAlso: "apikeys|logging|status|webservices"),
+
+               // Its own page rather than a card on API & monitoring: keys are a
+               // list of objects with their own lifecycle, and the page has to be
+               // usable while the REST listener is switched off - which is the
+               // state every installation is in when it first comes here.
+               Page("apikeys", "REST API keys",
+                  "Scoped, expiring credentials for the REST API, so automation does not have to carry the administrator password.",
+                  aliases: "API key|Bearer token|Access token|Credential|Service account for the API|Revoke a key|hmapi|Automation credential|Read-only key",
+                  seeAlso: "api|adminaccess")),
 
             Group("Accounts & domains",
                "The people and the domains this server carries mail for.",

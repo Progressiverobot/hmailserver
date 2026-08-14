@@ -119,6 +119,7 @@ namespace hMailServer.ControlPanel
          pageFactories_["security"] = () => new FeatureSettingsView(FeatureSettingsView.Section.Security);
          pageFactories_["acme"] = () => new FeatureSettingsView(FeatureSettingsView.Section.Automation);
          pageFactories_["api"] = () => new FeatureSettingsView(FeatureSettingsView.Section.Integration);
+         pageFactories_["apikeys"] = () => new ApiKeysView();
          pageFactories_["hardening"] = () => new FeatureSettingsView(FeatureSettingsView.Section.Hardening);
          pageFactories_["authentication"] = () => new FeatureSettingsView(FeatureSettingsView.Section.Authentication);
          pageFactories_["dns"] = () => new FeatureSettingsView(FeatureSettingsView.Section.Dns);

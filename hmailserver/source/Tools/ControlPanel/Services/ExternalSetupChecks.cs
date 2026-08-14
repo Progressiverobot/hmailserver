@@ -196,11 +196,7 @@ namespace hMailServer.ControlPanel.Services
       /// would answer a question nobody asked - so those checks honestly degrade
       /// to "Cannot tell" instead.
       /// </summary>
-      private static bool IsLocalServer()
-      {
-         string host = ServerSession.Current != null ? ServerSession.Current.Host : null;
-         return string.IsNullOrWhiteSpace(host) || host == "localhost" || host == "127.0.0.1" || host == "::1";
-      }
+      private static bool IsLocalServer() => ServerSession.IsLocalSession;
 
       private T Read<T>(Func<T> read)
       {
@@ -479,10 +475,120 @@ namespace hMailServer.ControlPanel.Services
             AcmeItem(ini, iniReadable, iniExcuse),
             ClientCertificatesItem(local, iniExcuse),
             OAuth2Item(ini, iniReadable, iniExcuse, local),
-            AutoconfigItem(ini, iniReadable, iniExcuse)
+            AutoconfigItem(ini, iniReadable, iniExcuse),
+            ServiceAccountItem(ini, iniReadable, iniExcuse, local)
          };
 
          return items;
+      }
+
+      /// <summary>
+      /// The Windows account the service logs on as.
+      ///
+      /// It belongs on this checklist for the reason the checklist exists: saving
+      /// ServiceAccountName changes nothing by itself. The value is read once, by
+      /// ServiceManager::RegisterService, which runs only from
+      /// <c>hMailServer.exe /Register</c> - so between saving it and running that
+      /// command, elevated, the configuration and the machine disagree and the
+      /// machine wins. The account also needs a privilege and a set of file rights
+      /// that are granted in Windows, not here.
+      ///
+      /// The state is read from the Service Control Manager rather than inferred,
+      /// so this reports what the service IS running as, not what was asked for.
+      /// </summary>
+      private SetupItem ServiceAccountItem(IniFeatureStore ini, bool iniReadable, string iniExcuse, bool local)
+      {
+         var item = new SetupItem
+         {
+            Title = "Windows service account - a least-privilege account needs granting outside hMailServer",
+            Purpose = "By default the service runs as LocalSystem, the most privileged account on the machine, so anything reachable through SMTP, IMAP or POP3 is reachable with full control of the computer. A dedicated account contains that.",
+            Action = "Set an account on the Server limits & expert settings page - NT SERVICE\\hMailServer needs no password - then, from an elevated "
+                     + "Command Prompt, run hMailServer.exe /Register and restart the service. Grant that account \"Log on as a service\" "
+                     + "(secpol.msc > Local Policies > User Rights Assignment), read access to the program folder, and full control of the data, "
+                     + "log and database folders. An external database needs a login for it as well.",
+            Page = "hardening"
+         };
+
+         if (!local)
+         {
+            item.Add(SetupItemState.CannotTell, "The service account cannot be read: " + iniExcuse);
+            item.AggregateFromFindings();
+            return item;
+         }
+
+         WindowsServiceInfo service = WindowsServiceInfo.Query();
+
+         if (!service.Exists)
+         {
+            item.Add(SetupItemState.CannotTell,
+               service.Error != null
+                  ? "The Service Control Manager could not be queried, so the account the service runs as is unknown: " + service.Error
+                  : "Windows does not report an hMailServer service on this machine, so there is no service to re-register yet.");
+            item.AggregateFromFindings();
+            return item;
+         }
+
+         string configured = iniReadable ? ini.Read("ServiceAccountName", "").Trim() : "";
+         bool runningAsLocalSystem = string.Equals(
+            WindowsServiceInfo.Canonical(service.StartName, Environment.MachineName), "localsystem",
+            StringComparison.OrdinalIgnoreCase);
+
+         if (!iniReadable)
+         {
+            // The SCM half is still knowable and is the half that matters, so this
+            // degrades to a partial answer rather than to nothing at all.
+            item.Add(runningAsLocalSystem ? SetupItemState.ActionNeeded : SetupItemState.Done,
+               "The service is running as " + WindowsServiceInfo.DescribeAccount(service.StartName)
+               + ". The requested account could not be read: " + iniExcuse);
+            item.AggregateFromFindings();
+            return item;
+         }
+
+         if (configured.Length == 0)
+         {
+            if (runningAsLocalSystem)
+            {
+               item.Add(SetupItemState.ActionNeeded,
+                  "The service is running as " + WindowsServiceInfo.DescribeAccount(service.StartName)
+                  + ", and no other account is requested. This is the default and it works; it is on this list because "
+                  + "moving to a dedicated account is the single largest reduction in what a compromise of the mail "
+                  + "server is worth, and it cannot be done from inside hMailServer.");
+            }
+            else
+            {
+               item.Add(SetupItemState.Done,
+                  "The service is running as " + service.StartName + ", which is not LocalSystem, so it is already "
+                  + "contained. No account is requested in hMailServer.INI, so re-registering the service would leave "
+                  + "that unchanged.");
+            }
+         }
+         else if (WindowsServiceInfo.SameAccount(configured, service.StartName, Environment.MachineName))
+         {
+            item.Add(SetupItemState.Done,
+               "The service is running as " + service.StartName + ", which is the account configured in "
+               + "hMailServer.INI. The registration step has been done.");
+         }
+         else
+         {
+            item.Add(SetupItemState.ActionNeeded,
+               "Not applied. hMailServer.INI asks for " + configured + " but the service is running as "
+               + WindowsServiceInfo.DescribeAccount(service.StartName) + ". This setting is read only when the service "
+               + "is registered, so it will not take effect on a restart - run hMailServer.exe /Register from an "
+               + "elevated Command Prompt, then restart the service.");
+         }
+
+         if (configured.Length > 0 && ini.Read("ServiceAccountPassword", "").Trim().Length > 0)
+         {
+            // Only emptiness is tested; the value is never read into the UI.
+            item.Add(SetupItemState.CannotTell,
+               "A service account password is stored in hMailServer.INI in plain text - the DPAPI setting does not "
+               + "cover it, because the registration step has nowhere else to read it from. Once the service has been "
+               + "registered, Windows keeps its own copy and the value here can be cleared. A virtual account "
+               + "(NT SERVICE\\hMailServer) or a group managed service account avoids the question entirely.");
+         }
+
+         item.AggregateFromFindings();
+         return item;
       }
 
       /// <summary>

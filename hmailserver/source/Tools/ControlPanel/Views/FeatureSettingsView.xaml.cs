@@ -672,27 +672,28 @@ namespace hMailServer.ControlPanel.Views
       }
 
       /// <summary>
-      /// A row for a setting that used to be on this page and is now somewhere
-      /// better, with a button that goes there.
+      /// A row that names something edited on another page, and goes there.
       ///
-      /// A setting that moves is a link an administrator has already followed once
-      /// and a note in somebody's runbook, and neither survives a silent relocation:
-      /// the page opens, the setting is not on it, and the reasonable conclusion is
-      /// that the feature was removed. This row is the alternative - it says where
-      /// the setting went and takes you there in one click.
+      /// Two uses, both the same shape. A setting that has MOVED is a link an
+      /// administrator has already followed once and a note in somebody's runbook,
+      /// and neither survives a silent relocation: the page opens, the setting is
+      /// not on it, and the reasonable conclusion is that the feature was removed.
+      /// And a setting that has always been elsewhere - the API keys, beside the
+      /// listener they authenticate - is worth naming where it will be looked for
+      /// rather than only where it lives.
       ///
       /// Deliberately not persisted, and deliberately carries no Key, so that the
       /// settings-index generator cannot index it: the Ctrl+K palette must send
-      /// somebody searching for "session tickets" to the page that now owns the
-      /// setting, not back here to a signpost.
+      /// somebody searching for "session tickets" to the page that owns the
+      /// setting, not to a signpost pointing at it.
       /// </summary>
-      private class MovedSetting : Setting
+      private class ElsewhereSetting : Setting
       {
          private readonly string page_;
 
-         /// <param name="page">Nav key of the page that owns the setting now.</param>
-         /// <param name="caption">What moved, in the administrator's words.</param>
-         public MovedSetting(string page, string caption)
+         /// <param name="page">Nav key of the page that owns the setting.</param>
+         /// <param name="caption">What is over there, in the administrator's words.</param>
+         public ElsewhereSetting(string page, string caption)
          {
             page_ = page;
             Label = caption;
@@ -731,7 +732,7 @@ namespace hMailServer.ControlPanel.Views
                ToolTip = "Open " + destination
             };
             System.Windows.Automation.AutomationProperties.SetName(button, "Open " + destination + ", which now has " + Label);
-            SetAid(button, "moved-to-" + page_);
+            SetAid(button, "elsewhere-" + page_);
             button.Click += (s, e) => (Application.Current?.MainWindow as MainWindow)?.NavigateTo(page_);
             row.Children.Add(button);
 
@@ -844,6 +845,101 @@ namespace hMailServer.ControlPanel.Views
 
          return !string.IsNullOrEmpty(store_.Read(key, "").Trim());
       }
+
+      /// <summary>
+      /// The service account line: what Windows is running the service as, against
+      /// what the INI asks for.
+      ///
+      /// This is the "show the state, not the switch" rule applied to the one
+      /// setting on the page whose effect is not the server's to deliver.
+      /// ServiceAccountName is consumed by ServiceManager::RegisterService and
+      /// never read again, so an administrator who types an account here, saves,
+      /// and restarts the service gets no change and no error - the service simply
+      /// keeps logging on as whoever it logged on as before. Only the Service
+      /// Control Manager knows the truth, so the truth is what is reported, in
+      /// every case including the ones where it cannot be determined.
+      /// </summary>
+      private WarningState ComputeServiceAccountState_()
+      {
+         // Reading the local SCM only describes this machine, and the settings
+         // being edited belong to whichever host the session is connected to.
+         if (!ServerSession.IsLocalSession)
+         {
+            return new WarningState
+            {
+               Level = StatusLevel.Information,
+               Text = "The Control Panel is connected to another host, so the account ITS service runs as cannot be read "
+                      + "from here. Open the Control Panel on the server itself to see it."
+            };
+         }
+
+         WindowsServiceInfo service = serviceInfo_ ??= WindowsServiceInfo.Query();
+         string configured = LiveText_("ServiceAccountName", "").Trim();
+
+         if (!service.Exists)
+         {
+            return new WarningState
+            {
+               Level = StatusLevel.Information,
+               Text = service.Error != null
+                  ? "The Service Control Manager could not be queried, so the account the service runs as is unknown: "
+                    + service.Error
+                  : "Windows does not report an hMailServer service on this machine, so there is nothing for this "
+                    + "setting to apply to yet. It is read when the service is registered."
+            };
+         }
+
+         string running = WindowsServiceInfo.DescribeAccount(service.StartName);
+         string register = "\"" + WindowsServiceInfo.ExecutableFrom(service.PathName) + "\" /Register";
+         string howToApply = "To apply it, open an elevated Command Prompt and run:  " + register
+                             + "   - then restart the hMailServer service. Registering an already-registered service "
+                             + "reconfigures it in place; it does not create a second one and it does not touch your mail.";
+
+         if (configured.Length == 0)
+         {
+            // Nothing requested. Whether that is fine depends entirely on what the
+            // service is already running as, so the answer is about the SCM value.
+            bool localSystem = string.Equals(
+               WindowsServiceInfo.Canonical(service.StartName, Environment.MachineName), "localsystem",
+               StringComparison.OrdinalIgnoreCase);
+
+            return new WarningState
+            {
+               Level = localSystem ? StatusLevel.Information : StatusLevel.Good,
+               Text = localSystem
+                  ? "The service is running as " + running + ". That is the default and it works, but every part of "
+                    + "hMailServer that faces the network runs with it. Naming an account above - NT SERVICE\\hMailServer "
+                    + "needs no password - and then re-registering the service is what changes it."
+                  : "The service is running as " + service.StartName + ". Nothing is requested above, so re-registering "
+                    + "the service would leave that account unchanged."
+            };
+         }
+
+         if (WindowsServiceInfo.SameAccount(configured, service.StartName, Environment.MachineName))
+         {
+            return new WarningState
+            {
+               Level = StatusLevel.Good,
+               Text = "The service is running as " + service.StartName + ", which is the account requested above. "
+                      + "Nothing further is needed."
+            };
+         }
+
+         return new WarningState
+         {
+            Level = StatusLevel.Warning,
+            Text = "Not applied yet. The service is running as " + running + ", while this page asks for "
+                   + configured + ". This setting is read only when the service is registered, so saving it here "
+                   + "changes nothing on its own - not even after a restart. " + howToApply
+         };
+      }
+
+      /// <summary>
+      /// Queried once per page instance. The SCM lookup goes through WMI, which is
+      /// slow enough that running it on every keystroke - which is what a computed
+      /// warning does - would be felt while typing.
+      /// </summary>
+      private WindowsServiceInfo serviceInfo_;
 
       /// <summary>[Directories] DataFolder, or "" when it cannot be read.</summary>
       private string DataFolder_()
@@ -1228,9 +1324,13 @@ namespace hMailServer.ControlPanel.Views
                {
                   Title = "REST administration API + Web Control Deck",
                   Blurb = "JSON API under /api/v1 plus the browser-based Control Deck at the listener root. " +
-                          "HTTP Basic authentication with the administrator password; TLS required unless bound to 127.0.0.1.",
+                          "Authenticated with the administrator password, or with a scoped API key - a key can be " +
+                          "read-only, limited to named domains and source addresses, given an expiry and revoked on " +
+                          "its own, none of which the administrator password can. Keys are managed on the REST API " +
+                          "keys page. TLS is required unless the listener is bound to 127.0.0.1.",
                   Settings =
                   {
+                     new ElsewhereSetting("apikeys", "Creating and revoking API keys"),
                      new TextSetting { Key = "RestApiPort", Default = "0", Label = "Port (0 = disabled)", Placeholder = "8045" },
                      new TextSetting { Key = "RestApiBindAddress", Default = "127.0.0.1", Label = "Bind address" },
                      new PathSetting { Key = "RestApiCertificateFile", FileFilter = "PEM/certificate files (*.pem;*.crt;*.cer)|*.pem;*.crt;*.cer|All files (*.*)|*.*", Label = "TLS certificate file (PEM, optional)", Placeholder = "Falls back to the ACME certificate" },
@@ -1684,12 +1784,113 @@ namespace hMailServer.ControlPanel.Views
                });
                cards_.Add(new CardDef
                {
+                  // The blurb this replaces claimed that "sensitive values in
+                  // hMailServer.INI (database password, OAuth/SRS/BATV secrets,
+                  // password pepper) are encrypted with Windows DPAPI on the next
+                  // service start". Read against the source, that was wrong three
+                  // times over: nothing rewrites hMailServer.INI at start-up at
+                  // all; Crypt::ProtectSecret is called only from Property::Save,
+                  // PersistentRoute, PersistentFetchAccount and
+                  // PersistentSSLCertificate, all of which write to the DATABASE;
+                  // and OAuth2HmacSecret, SRSSecret, BATVSecret and PasswordPepper
+                  // are each read with a plain ReadIniSettingString_, so this
+                  // switch has never touched one of them. The database password is
+                  // the only INI value it governs, and only at the moment it is
+                  // set, through IniFileSettings::SetPassword.
                   Title = "Stored secret protection",
-                  Blurb = "When enabled, sensitive values in hMailServer.INI (database password, OAuth/SRS/BATV secrets, password pepper) are encrypted with Windows DPAPI on the next service start. " +
-                          "(The password pepper itself is on the Authentication page.)",
+                  Blurb = "Chooses the envelope hMailServer puts around the secrets it stores for its own use: machine-scoped " +
+                          "Windows DPAPI, which cannot be decrypted on any other machine, or the legacy Blowfish scheme, " +
+                          "which can. Turn it off only to restore a backup onto a different machine - values written under " +
+                          "either scheme stay readable, so switching back and forth loses nothing.",
                   Settings =
                   {
-                     new BoolSetting { Key = "ProtectStoredSecretsWithDPAPI", Default = true, Label = "Protect stored secrets with Windows DPAPI" }
+                     new BoolSetting
+                     {
+                        Key = "ProtectStoredSecretsWithDPAPI",
+                        Default = true,
+                        Label = "Protect stored secrets with Windows DPAPI",
+                        Blurb = "It covers exactly five things, and each is re-enveloped only when it is next saved rather " +
+                                "than at start-up: the database password in hMailServer.INI, the SMTP relayer password, " +
+                                "each route's authentication password, each external fetch account's password, and each " +
+                                "SSL certificate's private-key passphrase. It does NOT cover the other secrets in " +
+                                "hMailServer.INI - the SRS and BATV secrets, the OAuth2 HMAC secret, the password pepper, " +
+                                "the metrics bearer token and the Windows service account password are all stored as you " +
+                                "typed them. Protecting those is the file's own permissions: hMailServer.INI should be " +
+                                "readable only by Administrators and by the account the service runs as."
+                     }
+                  }
+               });
+               cards_.Add(new CardDef
+               {
+                  // The clearest case on this page of the rule that a setting whose
+                  // effect happens outside the program has to say so. These two are
+                  // read once, by ServiceManager::RegisterService, and the running
+                  // service never looks at them again - so between saving here and
+                  // running the registration, this page and the Service Control
+                  // Manager disagree, and only one of them is what the machine
+                  // actually does. Hence the live readout of the SCM below, and the
+                  // exact command rather than a description of one.
+                  Title = "Windows service account",
+                  Blurb = "Which Windows account the hMailServer service logs on as. By default that is LocalSystem - the " +
+                          "most privileged account on the machine - so a flaw reachable through SMTP, IMAP or POP3 is " +
+                          "reachable with full control of the computer. Running the service as a dedicated account is the " +
+                          "single largest reduction in what a compromise is worth, and the recommended one is the " +
+                          "password-less virtual account NT SERVICE\\hMailServer.",
+                  Settings =
+                  {
+                     new TextSetting
+                     {
+                        Key = "ServiceAccountName",
+                        Label = "Account for the service to log on as (empty = LocalSystem)",
+                        Placeholder = "NT SERVICE\\hMailServer",
+                        Blurb = "Saving this does not move the service. It is read once, when the service is registered, " +
+                                "so it takes effect only after the registration command below has been run. The status " +
+                                "line under this card says which account the service is running as right now."
+                     },
+                     new SecretSetting
+                     {
+                        Key = "ServiceAccountPassword",
+                        Label = "Password for that account (leave empty for NT SERVICE\\ and gMSA accounts)",
+                        Hint = "Not needed for a virtual or managed account",
+                        Blurb = "Stored in hMailServer.INI exactly as typed - the DPAPI switch above does not cover it, " +
+                                "and there is nowhere else for the Service Control Manager's registration step to read " +
+                                "it from. That is the strongest reason to use NT SERVICE\\hMailServer or a group managed " +
+                                "service account instead: neither has a password to store. If you do set one here, clear " +
+                                "it again once the registration has been run - the SCM keeps its own copy from then on."
+                     }
+                  },
+                  Warnings =
+                  {
+                     new WarningDef
+                     {
+                        Aid = "ServiceAccountStatus",
+                        Compute = ComputeServiceAccountState_
+                     },
+                     new WarningDef
+                     {
+                        Aid = "ServiceAccountGrants",
+                        Compute = () =>
+                        {
+                           // Only worth saying once an account has been named: for
+                           // LocalSystem none of it applies, and a permanent notice
+                           // about work that is not needed is noise.
+                           if (string.IsNullOrWhiteSpace(LiveText_("ServiceAccountName", "")))
+                              return null;
+
+                           return new WarningState
+                           {
+                              Level = StatusLevel.Information,
+                              Text = "Three things have to be true of that account before the service will start under it, "
+                                     + "and none of them can be done from here. It needs the \"Log on as a service\" right "
+                                     + "(secpol.msc > Local Policies > User Rights Assignment, or your domain policy). It "
+                                     + "needs read access to the hMailServer program folder and full control of the data "
+                                     + "folder, the log folder and - for the built-in database - the database folder. And "
+                                     + "for an external database it needs whatever that server requires, which for MSSQL "
+                                     + "with integrated security means a login of its own. A service that cannot log on "
+                                     + "reports error 1069 in the Windows event log and does not start."
+                           };
+                        }
+                     }
                   }
                });
                cards_.Add(new CardDef
@@ -1701,12 +1902,12 @@ namespace hMailServer.ControlPanel.Views
                           "its own feature. Nothing was removed and no value changed; only the page it is edited on.",
                   Settings =
                   {
-                     new MovedSetting("antispam", "Greylisting record expiration, and SpamAssassin move-vs-copy"),
-                     new MovedSetting("protocols", "IMAP search time and size limits, and the eight per-protocol idle timeouts"),
-                     new MovedSetting("tls", "TLS session tickets, session cache size, resumption lifetime and ticket-key rotation"),
-                     new MovedSetting("delivery", "Extra delivery attempts per additional MX host"),
-                     new MovedSetting("performance", "Max parallel external POP3 fetch threads"),
-                     new MovedSetting("security", "SRS, BATV and the plain envelope-sender rewrite for forwarded mail")
+                     new ElsewhereSetting("antispam", "Greylisting record expiration, and SpamAssassin move-vs-copy"),
+                     new ElsewhereSetting("protocols", "IMAP search time and size limits, and the eight per-protocol idle timeouts"),
+                     new ElsewhereSetting("tls", "TLS session tickets, session cache size, resumption lifetime and ticket-key rotation"),
+                     new ElsewhereSetting("delivery", "Extra delivery attempts per additional MX host"),
+                     new ElsewhereSetting("performance", "Max parallel external POP3 fetch threads"),
+                     new ElsewhereSetting("security", "SRS, BATV and the plain envelope-sender rewrite for forwarded mail")
                   }
                });
                break;

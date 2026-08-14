@@ -297,8 +297,22 @@ namespace hMailServer.ControlPanel.Services
          }
       }
 
-      private static bool IsLocalHost(string host) =>
-         string.IsNullOrWhiteSpace(host) || host == "localhost" || host == "127.0.0.1";
+      /// <summary>
+      /// True when the named host is this machine.
+      ///
+      /// Public because more than one page has to ask it. Anything that inspects
+      /// the local disk, the local registry or the local Service Control Manager
+      /// is only describing the SERVER while this is true; connected elsewhere,
+      /// the same check answers a question nobody asked, and the honest result is
+      /// "cannot tell from here" rather than a confident report about the wrong
+      /// machine.
+      /// </summary>
+      public static bool IsLocalHost(string host) =>
+         string.IsNullOrWhiteSpace(host) || host == "localhost" || host == "127.0.0.1" || host == "::1";
+
+      /// <summary>True when the current session is against this machine, including
+      /// when there is no session yet - in which case nothing remote is in play.</summary>
+      public static bool IsLocalSession => IsLocalHost(Current?.Host);
 
       /// <summary>
       /// True once the server has finished starting - ServerState only turns
