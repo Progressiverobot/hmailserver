@@ -9,11 +9,12 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <StackPanel>
             <TextBlock Text="SSL certificates" Style="{StaticResource PageTitle}" />
-            <TextBlock Text="Certificates available for TLS ports. With ACME enabled, Let's Encrypt certificates appear here automatically."
+            <TextBlock Text="Certificates available for TLS ports, with what this machine can verify about each: the files, the expiry date, and whether the key belongs to the certificate. With ACME enabled, Let's Encrypt certificates appear here automatically."
                        Style="{StaticResource PageSubtitle}" />
             <ui:TextBox x:Name="SearchBox" PlaceholderText="Search certificates..." Width="300"
                         HorizontalAlignment="Left" Margin="0,10,0,0" TextChanged="Search_TextChanged"
@@ -24,14 +25,35 @@
 
         <Border Grid.Row="1" Style="{StaticResource Card}" Padding="6">
             <Grid>
+            <!-- Row virtualization is off: the status cells are built in code at
+                 Loaded time (the badge needs theme-following brushes a XAML
+                 binding cannot express), and container recycling would re-fire
+                 Loaded against a different row's data. Certificate lists are a
+                 handful of rows, so nothing is lost. -->
             <DataGrid x:Name="CertGrid" AutoGenerateColumns="False" IsReadOnly="True"
                       HeadersVisibility="Column" GridLinesVisibility="None"
-                      Background="Transparent" BorderThickness="0" RowHeight="34"
-                      SelectionMode="Single">
+                      Background="Transparent" BorderThickness="0"
+                      EnableRowVirtualization="False"
+                      SelectionMode="Single" SelectionChanged="CertGrid_SelectionChanged"
+                      AutomationProperties.Name="SSL certificates">
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="220" />
+                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="170" />
                     <DataGridTextColumn Header="Certificate file" Binding="{Binding CertificateFile}" Width="*" />
                     <DataGridTextColumn Header="Private key file" Binding="{Binding PrivateKeyFile}" Width="*" />
+                    <DataGridTemplateColumn Header="Certificate" Width="210" SortMemberPath="CertificateState">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <ContentControl Loaded="CertificateBadge_Loaded" IsTabStop="False" Focusable="False" />
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTemplateColumn Header="Private key" Width="210" SortMemberPath="PrivateKeyState">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <ContentControl Loaded="KeyBadge_Loaded" IsTabStop="False" Focusable="False" />
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
                 </DataGrid.Columns>
             </DataGrid>
             <TextBlock x:Name="EmptyStatus" Visibility="Collapsed"
@@ -41,7 +63,29 @@
             </Grid>
         </Border>
 
-        <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,12,0,0">
+        <!-- The selected certificate, in full sentences: what was verified, what
+             could not be, and the one secret this page can write but will never
+             read back - the private key passphrase. -->
+        <Border Grid.Row="2" x:Name="DetailsCard" Style="{StaticResource Card}" Margin="0,12,0,0" Visibility="Collapsed">
+            <StackPanel>
+                <TextBlock x:Name="DetailsTitle" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,8" />
+                <StackPanel x:Name="DetailsLines" />
+
+                <TextBlock Text="Private key passphrase" FontSize="13.5" FontWeight="SemiBold" Margin="0,12,0,4" />
+                <TextBlock FontSize="12" Opacity="0.75" TextWrapping="Wrap" Margin="0,0,0,8"
+                           Text="Only needed when the key file is encrypted: with an encrypted key and no passphrase, the key does not load (server error 6170) and every TLS port using this certificate does not start - inbound mail on those ports stops. The passphrase is a secret: it is stored protected on the server and never displayed here again, and saving a new one replaces whatever was stored before." />
+                <StackPanel Orientation="Horizontal">
+                    <ui:PasswordBox x:Name="PassphraseBox" Width="280" PlaceholderText="New passphrase"
+                                    AutomationProperties.Name="New private key passphrase for the selected certificate" />
+                    <ui:Button Content="Save passphrase" Appearance="Primary" Margin="8,0,0,0" Click="SavePassphrase_Click"
+                               AutomationProperties.Name="Save the private key passphrase for the selected certificate" />
+                    <ui:Button Content="Remove stored passphrase" Margin="8,0,0,0" Click="ClearPassphrase_Click"
+                               AutomationProperties.Name="Remove the stored private key passphrase from the selected certificate" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Row="3" Style="{StaticResource Card}" Margin="0,12,0,0">
             <StackPanel>
                 <TextBlock Text="Add certificate" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,12" />
                 <Grid>
@@ -54,13 +98,36 @@
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <ui:TextBox x:Name="NewCertName" PlaceholderText="Name" Margin="0,0,8,0" />
-                    <ui:TextBox x:Name="NewCertFile" Grid.Column="1" PlaceholderText="Certificate file (PEM)" Margin="0,0,4,0" />
-                    <ui:Button Grid.Column="2" Content="..." Click="BrowseCert_Click" Margin="0,0,8,0" />
-                    <ui:TextBox x:Name="NewKeyFile" Grid.Column="3" PlaceholderText="Private key file (PEM)" Margin="0,0,4,0" />
-                    <ui:Button Grid.Column="4" Content="..." Click="BrowseKey_Click" Margin="0,0,8,0" />
-                    <ui:Button Grid.Column="5" Content="Add" Appearance="Primary" Click="Add_Click" Margin="0,0,8,0" />
-                    <ui:Button Grid.Column="6" Content="Delete selected" Appearance="Danger" Click="Delete_Click" />
+                    <ui:TextBox x:Name="NewCertName" PlaceholderText="Name" Margin="0,0,8,0"
+                                AutomationProperties.Name="Name for the new certificate" />
+                    <ui:TextBox x:Name="NewCertFile" Grid.Column="1" PlaceholderText="Certificate file (PEM)" Margin="0,0,4,0"
+                                AutomationProperties.Name="Certificate file for the new certificate" />
+                    <ui:Button Grid.Column="2" Content="..." Click="BrowseCert_Click" Margin="0,0,8,0"
+                               AutomationProperties.Name="Browse for the certificate file" />
+                    <ui:TextBox x:Name="NewKeyFile" Grid.Column="3" PlaceholderText="Private key file (PEM)" Margin="0,0,4,0"
+                                AutomationProperties.Name="Private key file for the new certificate" />
+                    <ui:Button Grid.Column="4" Content="..." Click="BrowseKey_Click" Margin="0,0,8,0"
+                               AutomationProperties.Name="Browse for the private key file" />
+                    <ui:Button Grid.Column="5" Content="Add" Appearance="Primary" Click="Add_Click" Margin="0,0,8,0"
+                               AutomationProperties.Name="Add the certificate" />
+                    <ui:Button Grid.Column="6" Content="Delete selected" Appearance="Danger" Click="Delete_Click"
+                               AutomationProperties.Name="Delete the selected certificate" />
+                </Grid>
+                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                    <ui:PasswordBox x:Name="NewKeyPassphrase" Width="280"
+                                    PlaceholderText="Key passphrase (only for an encrypted key)"
+                                    AutomationProperties.Name="Private key passphrase for the certificate being added" />
+                </StackPanel>
+                <!-- Filled in by code when the picked key file turns out to be
+                     encrypted: that is knowable from the file itself, and saying
+                     it now is cheaper than error 6170 after the next restart. -->
+                <Grid x:Name="AddHintRow" Margin="0,6,0,0" Visibility="Collapsed">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Path x:Name="AddHintMark" Width="11" Height="11" Stretch="Fill" Margin="0,3,8,0" VerticalAlignment="Top" />
+                    <TextBlock x:Name="AddHintText" Grid.Column="1" FontSize="12" TextWrapping="Wrap" />
                 </Grid>
             </StackPanel>
         </Border>

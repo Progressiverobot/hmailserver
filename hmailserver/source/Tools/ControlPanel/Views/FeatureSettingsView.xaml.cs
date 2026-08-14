@@ -1,10 +1,21 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using System.ServiceProcess;
+using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Shapes;
+
+// System.Windows.Documents (imported above for Run/Inlines) declares a Typography
+// of its own, so the unqualified name is ambiguous. Aliased to the Control Panel's
+// type scale rather than dropping the import - the same fix ExternalSetupView and
+// SslCertificatesView already carry.
+using Typography = hMailServer.ControlPanel.Services.Typography;
 using hMailServer.ControlPanel.Services;
 using System.Linq;
 
@@ -53,6 +64,22 @@ namespace hMailServer.ControlPanel.Views
 
          public abstract FrameworkElement CreateEditor(IniFeatureStore store);
          public abstract void Save(IniFeatureStore store);
+
+         /// <summary>
+         /// The value currently sitting in the editor, as the INI would spell it
+         /// ("1"/"0" for booleans), or null before the editor has been built.
+         /// The computed warnings read this so they react while the administrator
+         /// is still typing, instead of only after a save and a page reload.
+         /// </summary>
+         public virtual string LiveValue => null;
+
+         /// <summary>
+         /// Calls <paramref name="handler"/> whenever the editor's value changes.
+         /// No-op for editors that never take part in a computed warning.
+         /// </summary>
+         public virtual void OnEditorChanged(Action handler)
+         {
+         }
 
          protected static void SetAid(FrameworkElement element, string id)
          {
@@ -137,6 +164,17 @@ namespace hMailServer.ControlPanel.Views
 
          public override void Save(IniFeatureStore store)
             => store.WriteBool(Key, box_.IsChecked == true);
+
+         public override string LiveValue
+            => box_ == null ? null : (box_.IsChecked == true ? "1" : "0");
+
+         public override void OnEditorChanged(Action handler)
+         {
+            if (box_ == null || handler == null)
+               return;
+            box_.Checked += (s, e) => handler();
+            box_.Unchecked += (s, e) => handler();
+         }
       }
 
       private class TextSetting : Setting
@@ -171,6 +209,14 @@ namespace hMailServer.ControlPanel.Views
 
          public override void Save(IniFeatureStore store)
             => store.Write(Key, box_.Text.Trim());
+
+         public override string LiveValue => box_?.Text;
+
+         public override void OnEditorChanged(Action handler)
+         {
+            if (box_ != null && handler != null)
+               box_.TextChanged += (s, e) => handler();
+         }
       }
 
       /// <summary>
@@ -243,6 +289,14 @@ namespace hMailServer.ControlPanel.Views
 
          public override void Save(IniFeatureStore store)
             => store.Write(Key, box_.Text.Trim());
+
+         public override string LiveValue => box_?.Text;
+
+         public override void OnEditorChanged(Action handler)
+         {
+            if (box_ != null && handler != null)
+               box_.TextChanged += (s, e) => handler();
+         }
       }
 
       private class ChoiceSetting : Setting
@@ -285,6 +339,15 @@ namespace hMailServer.ControlPanel.Views
             int value = combo_.SelectedItem is ComboBoxItem cbi ? (int) cbi.Tag : Default;
             store.Write(Key, value.ToString());
          }
+
+         public override string LiveValue
+            => combo_?.SelectedItem is ComboBoxItem cbi ? ((int) cbi.Tag).ToString() : null;
+
+         public override void OnEditorChanged(Action handler)
+         {
+            if (combo_ != null && handler != null)
+               combo_.SelectionChanged += (s, e) => handler();
+         }
       }
 
       /// <summary>
@@ -303,15 +366,38 @@ namespace hMailServer.ControlPanel.Views
          /// </summary>
          public string Hint = "";
 
+         /// <summary>
+         /// Adds a "Generate" button that fills the box with a strong random value
+         /// from <see cref="PasswordGenerator"/>. For the server-wide secrets (SRS,
+         /// BATV, the metrics bearer token) whose only requirement is randomness:
+         /// without the button, "enter a secret" quietly invites a weak one.
+         /// </summary>
+         public bool OfferGenerate;
+
          private Wpf.Ui.Controls.PasswordBox box_;
+         private bool hasStored_;
+
+         /// <summary>
+         /// True when a secret is effectively configured: one is stored in the INI,
+         /// or the administrator has typed one into the editor. What the computed
+         /// warnings ask, since a blank box keeps the stored value.
+         /// </summary>
+         public bool IsConfigured(IniFeatureStore store)
+         {
+            if (box_ != null && !string.IsNullOrEmpty(box_.Password))
+               return true;
+            if (box_ != null)
+               return hasStored_;
+            return !string.IsNullOrEmpty(store.Read(Key, "").Trim());
+         }
 
          public override FrameworkElement CreateEditor(IniFeatureStore store)
          {
             var panel = new StackPanel();
             panel.Children.Add(new TextBlock { Text = Label, FontSize = 13, Margin = new Thickness(0, 0, 0, 4) });
 
-            bool hasExisting = !string.IsNullOrEmpty(store.Read(Key, "").Trim());
-            string placeholder = hasExisting
+            hasStored_ = !string.IsNullOrEmpty(store.Read(Key, "").Trim());
+            string placeholder = hasStored_
                ? "A secret is configured — leave blank to keep it"
                : (string.IsNullOrEmpty(Hint) ? "Enter a secret" : Hint);
 
@@ -319,9 +405,7 @@ namespace hMailServer.ControlPanel.Views
             {
                PlaceholderText = placeholder,
                FontSize = 13,
-               MaxWidth = 520,
-               MinWidth = 320,
-               HorizontalAlignment = HorizontalAlignment.Left
+               HorizontalAlignment = HorizontalAlignment.Stretch
             };
             Describe(box_, Key);
 
@@ -333,7 +417,40 @@ namespace hMailServer.ControlPanel.Views
             System.Windows.Automation.AutomationProperties.SetHelpText(box_,
                string.IsNullOrEmpty(Blurb) ? placeholder : placeholder + " " + Blurb);
 
-            panel.Children.Add(box_);
+            if (OfferGenerate)
+            {
+               var row = new Grid { Width = 520, HorizontalAlignment = HorizontalAlignment.Left };
+               row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+               row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+               Grid.SetColumn(box_, 0);
+               row.Children.Add(box_);
+
+               var generate = new Wpf.Ui.Controls.Button
+               {
+                  Content = "Generate",
+                  Margin = new Thickness(8, 0, 0, 0),
+                  VerticalAlignment = VerticalAlignment.Bottom,
+                  ToolTip = "Fill in a strong random secret"
+               };
+               SetAid(generate, Key + "Generate");
+               // The visible content is the same word on every secret that offers
+               // it, so the accessible name says which secret this one fills.
+               System.Windows.Automation.AutomationProperties.SetName(generate,
+                  "Generate a random value for " + (AccessibleName ?? Label ?? "this secret"));
+               generate.Click += (s, e) => box_.Password = PasswordGenerator.Generate(32);
+               Grid.SetColumn(generate, 1);
+               row.Children.Add(generate);
+
+               panel.Children.Add(row);
+            }
+            else
+            {
+               box_.MaxWidth = 520;
+               box_.MinWidth = 320;
+               box_.HorizontalAlignment = HorizontalAlignment.Left;
+               panel.Children.Add(box_);
+            }
 
             // Annotate would overwrite the help text set just above, so only the
             // printed caption is wanted here.
@@ -359,6 +476,221 @@ namespace hMailServer.ControlPanel.Views
                store.Write(Key, entered);
             // Blank = keep the existing secret.
          }
+
+         public override string LiveValue => box_?.Password;
+
+         public override void OnEditorChanged(Action handler)
+         {
+            // Wpf.Ui's PasswordBox derives from TextBox, so TextChanged fires as
+            // the (masked) text changes - including when Generate fills it in.
+            if (box_ != null && handler != null)
+               box_.TextChanged += (s, e) => handler();
+         }
+      }
+
+      /// <summary>
+      /// Direct reads and writes of hMailServer.INI sections other than [Settings],
+      /// which is all <see cref="IniFeatureStore"/> speaks. Used by the sending-limit
+      /// editors ([SendingLimits] / [SendingLimitsOverrides]) and by the computed
+      /// warnings that need [Directories] DataFolder to locate the ACME certificate.
+      /// </summary>
+      private static class IniDirect
+      {
+         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+         private static extern int GetPrivateProfileString(string section, string key, string defaultValue,
+            StringBuilder result, int size, string filePath);
+
+         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+         private static extern bool WritePrivateProfileString(string section, string key, string value, string filePath);
+
+         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+         private static extern int GetPrivateProfileSection(string section, char[] result, int size, string filePath);
+
+         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+         private static extern bool WritePrivateProfileSection(string section, string value, string filePath);
+
+         public static string ReadValue(string iniPath, string section, string key, string defaultValue)
+         {
+            if (string.IsNullOrEmpty(iniPath))
+               return defaultValue;
+            var buffer = new StringBuilder(4096);
+            GetPrivateProfileString(section, key, defaultValue, buffer, buffer.Capacity, iniPath);
+            return buffer.ToString();
+         }
+
+         public static void WriteValue(string iniPath, string section, string key, string value)
+         {
+            if (string.IsNullOrEmpty(iniPath))
+               throw new InvalidOperationException("hMailServer.INI was not found on this machine.");
+            WritePrivateProfileString(section, key, value, iniPath);
+         }
+
+         /// <summary>The key=value lines of one section, in file order.</summary>
+         public static List<string> ReadSectionLines(string iniPath, string section)
+         {
+            var lines = new List<string>();
+            if (string.IsNullOrEmpty(iniPath))
+               return lines;
+
+            // 32767 characters is the documented ceiling for this API.
+            var buffer = new char[32767];
+            int copied = GetPrivateProfileSection(section, buffer, buffer.Length, iniPath);
+
+            int start = 0;
+            for (int i = 0; i < copied; i++)
+            {
+               if (buffer[i] != '\0')
+                  continue;
+               if (i > start)
+                  lines.Add(new string(buffer, start, i - start));
+               start = i + 1;
+            }
+
+            return lines;
+         }
+
+         /// <summary>Replaces one section's lines wholesale (empty list clears it).</summary>
+         public static void WriteSectionLines(string iniPath, string section, IReadOnlyList<string> lines)
+         {
+            if (string.IsNullOrEmpty(iniPath))
+               throw new InvalidOperationException("hMailServer.INI was not found on this machine.");
+
+            // The API wants "line\0line\0\0"; the marshaller appends one
+            // terminator, so an explicit trailing '\0' completes the pair. An
+            // empty section is a lone '\0', which the marshaller turns into the
+            // required double terminator.
+            string joined = lines.Count == 0 ? "\0" : string.Join("\0", lines) + "\0";
+            WritePrivateProfileSection(section, joined, iniPath);
+         }
+      }
+
+      /// <summary>
+      /// A text setting stored in an hMailServer.INI section other than [Settings].
+      /// Same editor as <see cref="TextSetting"/>; only the section differs.
+      /// </summary>
+      private class SectionTextSetting : Setting
+      {
+         public string Section;
+         public string Default = "";
+         public string Placeholder = "";
+         private Wpf.Ui.Controls.TextBox box_;
+
+         public override FrameworkElement CreateEditor(IniFeatureStore store)
+         {
+            var panel = new StackPanel();
+            panel.Children.Add(new TextBlock
+            {
+               Text = Label,
+               FontSize = 13,
+               Margin = new Thickness(0, 0, 0, 4)
+            });
+            box_ = new Wpf.Ui.Controls.TextBox
+            {
+               Text = IniDirect.ReadValue(store.IniPath, Section, Key, Default),
+               PlaceholderText = Placeholder,
+               FontSize = 13,
+               MaxWidth = 520,
+               MinWidth = 320,
+               HorizontalAlignment = HorizontalAlignment.Left
+            };
+            Describe(box_, Key);
+            panel.Children.Add(box_);
+            Annotate(box_, panel);
+            return panel;
+         }
+
+         public override void Save(IniFeatureStore store)
+            => IniDirect.WriteValue(store.IniPath, Section, Key, box_.Text.Trim());
+
+         public override string LiveValue => box_?.Text;
+
+         public override void OnEditorChanged(Action handler)
+         {
+            if (box_ != null && handler != null)
+               box_.TextChanged += (s, e) => handler();
+         }
+      }
+
+      /// <summary>
+      /// Edits a whole INI section as lines, one entry per line. Built for
+      /// [SendingLimitsOverrides], whose entries are per-address values rather than
+      /// fixed keys. Reads the section back on every build (so it never misreports
+      /// its own state) and only rewrites the section when the text was actually
+      /// changed, so merely opening and saving the page cannot disturb the file.
+      /// </summary>
+      private class SectionLinesSetting : Setting
+      {
+         public string Section;
+         public string Placeholder = "";
+         private Wpf.Ui.Controls.TextBox box_;
+         private string loaded_;
+
+         private static string Normalize(IEnumerable<string> lines)
+            => string.Join("\n", lines.Select(l => l.Trim()).Where(l => l.Length > 0));
+
+         public override FrameworkElement CreateEditor(IniFeatureStore store)
+         {
+            var panel = new StackPanel();
+            panel.Children.Add(new TextBlock
+            {
+               Text = Label,
+               FontSize = 13,
+               Margin = new Thickness(0, 0, 0, 4)
+            });
+
+            loaded_ = Normalize(IniDirect.ReadSectionLines(store.IniPath, Section));
+
+            box_ = new Wpf.Ui.Controls.TextBox
+            {
+               Text = loaded_,
+               PlaceholderText = Placeholder,
+               FontSize = 13,
+               MaxWidth = 520,
+               MinWidth = 320,
+               MinHeight = 88,
+               AcceptsReturn = true,
+               TextWrapping = TextWrapping.NoWrap,
+               VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+               HorizontalAlignment = HorizontalAlignment.Left
+            };
+            Describe(box_, Key);
+            panel.Children.Add(box_);
+            Annotate(box_, panel);
+            return panel;
+         }
+
+         public override void Save(IniFeatureStore store)
+         {
+            string current = Normalize(box_.Text.Split('\n'));
+            if (current == loaded_)
+               return;
+
+            IniDirect.WriteSectionLines(store.IniPath, Section,
+               current.Length == 0 ? new string[0] : current.Split('\n'));
+            loaded_ = current;
+         }
+      }
+
+      /// <summary>What one computed warning has decided to say, or null for nothing.</summary>
+      private class WarningState
+      {
+         public StatusLevel Level;
+         public string Text;
+      }
+
+      /// <summary>
+      /// A computed warning printed inside a card, under the settings it is about.
+      /// <see cref="Compute"/> runs against the live editors (falling back to the
+      /// INI for values on other pages) and returns null when there is nothing to
+      /// say. Each carries a colour, a shape AND a word via StatusSemantics, so the
+      /// meaning survives greyscale, colour blindness and High Contrast.
+      /// </summary>
+      private class WarningDef
+      {
+         /// <summary>AutomationId of the warning row, so tests can find it.</summary>
+         public string Aid;
+
+         public Func<WarningState> Compute;
       }
 
       private class CardDef
@@ -366,11 +698,135 @@ namespace hMailServer.ControlPanel.Views
          public string Title;
          public string Blurb;
          public List<Setting> Settings = new();
+         public List<WarningDef> Warnings = new();
       }
 
       private readonly Section section_;
       private readonly IniFeatureStore store_ = new();
       private List<CardDef> cards_;
+
+      /// <summary>One built warning row: the definition and the WPF pieces it drives.</summary>
+      private class WarningRow
+      {
+         public WarningDef Def;
+         public Grid Row;
+         public System.Windows.Shapes.Path Mark;
+         public TextBlock Text;
+      }
+
+      private readonly List<WarningRow> warningRows_ = new();
+
+      // ---- inputs for the computed warnings -----------------------------------
+      //
+      // Each reads the live editor when the setting is on this page (so a warning
+      // reacts while the administrator types) and falls back to the INI file for
+      // settings that live on another page. The fallback default must match the
+      // server's own default in IniFileSettings.cpp, or the warning would reason
+      // about a configuration the server does not run.
+
+      private Setting FindSetting_(string key)
+      {
+         if (cards_ == null)
+            return null;
+
+         foreach (CardDef card in cards_)
+         foreach (Setting setting in card.Settings)
+         {
+            if (string.Equals(setting.Key, key, StringComparison.OrdinalIgnoreCase))
+               return setting;
+         }
+
+         return null;
+      }
+
+      private string LiveText_(string key, string fallbackDefault)
+      {
+         Setting setting = FindSetting_(key);
+         string live = setting?.LiveValue;
+         return live ?? store_.Read(key, fallbackDefault);
+      }
+
+      private bool LiveBool_(string key, bool fallbackDefault)
+      {
+         Setting setting = FindSetting_(key);
+         string live = setting?.LiveValue;
+         return live != null ? live == "1" : store_.ReadBool(key, fallbackDefault);
+      }
+
+      private int LiveInt_(string key, int fallbackDefault)
+      {
+         return int.TryParse(LiveText_(key, fallbackDefault.ToString()).Trim(), out int value)
+            ? value
+            : fallbackDefault;
+      }
+
+      /// <summary>
+      /// Whether a write-only secret is effectively set: typed into the editor, or
+      /// already stored in the INI (a blank box keeps the stored value).
+      /// </summary>
+      private bool SecretConfigured_(string key)
+      {
+         if (FindSetting_(key) is SecretSetting secret)
+            return secret.IsConfigured(store_);
+
+         return !string.IsNullOrEmpty(store_.Read(key, "").Trim());
+      }
+
+      /// <summary>[Directories] DataFolder, or "" when it cannot be read.</summary>
+      private string DataFolder_()
+         => IniDirect.ReadValue(store_.IniPath, "Directories", "DataFolder", "").Trim();
+
+      /// <summary>
+      /// Where the server looks for an issued ACME certificate: the configured
+      /// output folder, else Data\ACME - the exact fallback in
+      /// AcmeClient::GetCertificateDirectory. "" when neither can be determined.
+      /// </summary>
+      private string AcmeCertificateFolder_()
+      {
+         string configured = store_.Read("AcmeCertificateDirectory", "").Trim();
+         if (configured.Length > 0)
+            return configured;
+
+         string dataFolder = DataFolder_();
+         return dataFolder.Length > 0 ? dataFolder + "\\ACME" : "";
+      }
+
+      /// <summary>True when both halves of the issued ACME pair exist on disk.</summary>
+      private bool AcmeCertificateExists_()
+      {
+         string folder = AcmeCertificateFolder_();
+         return folder.Length > 0
+            && System.IO.File.Exists(folder + "\\fullchain.pem")
+            && System.IO.File.Exists(folder + "\\privkey.pem");
+      }
+
+      /// <summary>
+      /// Strict dotted-quad parse, mirroring the inet_pton call in
+      /// MetricsServer::Start - IPAddress.TryParse would accept "127.1" and IPv6,
+      /// both of which the listener itself refuses.
+      /// </summary>
+      private static bool TryParseIpv4_(string text, out byte firstOctet)
+      {
+         firstOctet = 0;
+         if (string.IsNullOrWhiteSpace(text))
+            return false;
+
+         string[] parts = text.Trim().Split('.');
+         if (parts.Length != 4)
+            return false;
+
+         var octets = new byte[4];
+         for (int i = 0; i < 4; i++)
+         {
+            if (parts[i].Length == 0 || parts[i].Length > 3 || !parts[i].All(char.IsDigit))
+               return false;
+            if (!byte.TryParse(parts[i], out octets[i]))
+               return false;
+         }
+
+         firstOctet = octets[0];
+         return true;
+      }
 
       public FeatureSettingsView(Section section)
       {
@@ -428,7 +884,16 @@ namespace hMailServer.ControlPanel.Views
                cards_.Add(new CardDef
                {
                   Title = "ARC sealing",
-                  Blurb = "Adds ARC seals to forwarded mail so downstream servers can trust original authentication results (RFC 8617).",
+                  // The prerequisite sentence is stated rather than checked here:
+                  // whether a hosted domain has a DKIM selector and key file lives
+                  // in the database, behind the COM API, and this page works from
+                  // hMailServer.INI alone - it must keep telling the truth when no
+                  // COM session exists. The External setup page holds the live
+                  // check and walks the actual domains.
+                  Blurb = "Adds ARC seals to forwarded mail so downstream servers can trust original authentication results (RFC 8617). " +
+                          "Sealing borrows the forwarding domain's DKIM selector and private key, so it needs at least one hosted " +
+                          "domain with DKIM signing configured - without that the switch reads enabled and seals nothing, with only " +
+                          "a debug log line to say so. The External setup page checks your domains for this.",
                   Settings =
                   {
                      new BoolSetting { Key = "ArcSealingEnabled", Default = false, Label = "Seal forwarded messages with the domain's DKIM key" }
@@ -499,6 +964,30 @@ namespace hMailServer.ControlPanel.Views
                         Label = "Clock-drift tolerance in seconds when checking an expiry",
                         Blurb = "Allows for this server's clock differing from the signer's. Without it, a clock running " +
                                 "a few minutes fast turns other people's valid mail into DKIM failures."
+                     }
+                  }
+               });
+               cards_.Add(new CardDef
+               {
+                  // Defaults verified against IniFileSettings.cpp (empty = off) and
+                  // DKIM::InitializeOversigning_ for the length cap, the invalid-name
+                  // handling and the automatic From.
+                  Title = "DKIM oversigning",
+                  Blurb = "Oversigning (RFC 6376 5.4) lists a header field name in the signature's h= tag once more often " +
+                          "than the field occurs, which makes ADDING another one - a second From:, an injected Subject: - " +
+                          "break the signature. Off by default: oversigning a field that a mailing list or forwarder " +
+                          "legitimately adds costs those messages their DKIM pass.",
+                  Settings =
+                  {
+                     new TextSetting
+                     {
+                        Key = "DkimOversignHeaders",
+                        Label = "Header fields to oversign in outbound DKIM signatures (comma separated, empty = off)",
+                        Placeholder = "From, Subject, Reply-To",
+                        Blurb = "From is included automatically whenever this list is non-empty - a prepended second From: " +
+                                "is the attack oversigning exists for. Names must be printable ASCII without a colon; an " +
+                                "invalid name is dropped with an error log entry, and a value longer than 256 characters " +
+                                "is ignored entirely, also with an error entry, because h= has to fit on one unfolded line."
                      }
                   }
                });
@@ -621,7 +1110,65 @@ namespace hMailServer.ControlPanel.Views
                   Settings =
                   {
                      new TextSetting { Key = "MetricsServerPort", Default = "0", Label = "Metrics port (0 = disabled)", Placeholder = "9090" },
-                     new TextSetting { Key = "MetricsServerBindAddress", Default = "127.0.0.1", Label = "Metrics bind address" },
+                     new TextSetting
+                     {
+                        Key = "MetricsServerBindAddress",
+                        Default = "127.0.0.1",
+                        Label = "Metrics bind address",
+                        Blurb = "An IPv4 address, and the credential gate: anywhere in 127.0.0.0/8 the endpoints are open " +
+                                "to this machine without authentication, exactly as before. On any other address /metrics " +
+                                "answers 503 until a credential below is set - the exposition includes queue depth, " +
+                                "session counts and version numbers, so it must not be network-readable unauthenticated."
+                     },
+                     // Access control and TLS for the exposition. All five default to
+                     // empty (verified in IniFileSettings.cpp), which on a loopback
+                     // bind is the old behaviour exactly: plain unauthenticated HTTP.
+                     new SecretSetting
+                     {
+                        Key = "MetricsServerAuthToken",
+                        OfferGenerate = true,
+                        Label = "Bearer token for /metrics (empty = none)",
+                        Hint = "A random token Prometheus will present on every scrape",
+                        Blurb = "Presented as \"Authorization: Bearer ...\" - in Prometheus, the scrape config's " +
+                                "bearer_token. Leading and trailing spaces are trimmed. The health probes /livez, /readyz " +
+                                "and /healthz never require it, so load balancers keep working."
+                     },
+                     new TextSetting
+                     {
+                        Key = "MetricsServerAuthUsername",
+                        Label = "HTTP Basic user name for /metrics (empty = Basic off)",
+                        Placeholder = "metrics",
+                        Blurb = "The alternative to the bearer token, for scrapers that only speak HTTP Basic. The user " +
+                                "name and the password must BOTH be set: with only one of them the server logs a warning " +
+                                "at startup and behaves as if neither were set."
+                     },
+                     new SecretSetting
+                     {
+                        Key = "MetricsServerAuthPassword",
+                        OfferGenerate = true,
+                        Label = "HTTP Basic password for /metrics",
+                        Hint = "Only used together with the user name above",
+                        Blurb = "The user name is trimmed of surrounding spaces; the password deliberately is not, " +
+                                "because whitespace is legitimate inside a password."
+                     },
+                     new PathSetting
+                     {
+                        Key = "MetricsServerCertificateFile",
+                        FileFilter = "PEM/certificate files (*.pem;*.crt;*.cer)|*.pem;*.crt;*.cer|All files (*.*)|*.*",
+                        Label = "TLS certificate file for the metrics listener (PEM)",
+                        Placeholder = "Leave both empty for plain HTTP"
+                     },
+                     new PathSetting
+                     {
+                        Key = "MetricsServerPrivateKeyFile",
+                        FileFilter = "PEM/key files (*.pem;*.key)|*.pem;*.key|All files (*.*)|*.*",
+                        Label = "TLS private key file for the metrics listener (PEM)",
+                        Blurb = "Certificate and key must BOTH be set to serve HTTPS; with only one of them TLS is NOT " +
+                                "enabled and the server logs it. Unlike the REST API listener there is no fall-back to " +
+                                "the ACME certificate here. If TLS is configured but cannot be prepared (an unreadable " +
+                                "file, a key that does not match), the health probes stay on plain HTTP and /metrics " +
+                                "answers 503 rather than serving the exposition in the clear."
+                     },
                      // JsonLogging moved to the Logging page, with the other log settings.
                      new TextSetting
                      {
@@ -632,6 +1179,136 @@ namespace hMailServer.ControlPanel.Views
                      },
                      new TextSetting { Key = "OtelServiceName", Default = "hmailserver", Label = "OpenTelemetry service name" },
                      new TextSetting { Key = "SlowQueryLogMilliseconds", Default = "0", Label = "Log database queries slower than N ms (0 = off)", Placeholder = "250" }
+                  },
+                  Warnings =
+                  {
+                     // Behaviour verified in MetricsServer::Start: an invalid bind
+                     // address is refused outright; a non-loopback bind without a
+                     // credential serves 503 on /metrics; half a Basic pair and
+                     // half a TLS pair are each discarded with a log line; and a
+                     // credential without TLS crosses the network in clear text.
+                     new WarningDef
+                     {
+                        Aid = "MetricsBindAddressInvalidWarning",
+                        Compute = () =>
+                        {
+                           if (LiveInt_("MetricsServerPort", 0) <= 0)
+                              return null;
+                           if (TryParseIpv4_(LiveText_("MetricsServerBindAddress", "127.0.0.1"), out _))
+                              return null;
+                           return new WarningState
+                           {
+                              Level = StatusLevel.Warning,
+                              Text = "The metrics bind address is not a plain IPv4 address (host names and IPv6 are not " +
+                                     "accepted here), so the metrics listener will not start at all."
+                           };
+                        }
+                     },
+                     new WarningDef
+                     {
+                        Aid = "MetricsNeedsCredentialWarning",
+                        Compute = () =>
+                        {
+                           if (LiveInt_("MetricsServerPort", 0) <= 0)
+                              return null;
+                           if (!TryParseIpv4_(LiveText_("MetricsServerBindAddress", "127.0.0.1"), out byte firstOctet))
+                              return null;
+                           if (firstOctet == 127)
+                              return null;
+
+                           bool tokenSet = SecretConfigured_("MetricsServerAuthToken");
+                           bool basicSet = LiveText_("MetricsServerAuthUsername", "").Trim().Length > 0
+                                        && SecretConfigured_("MetricsServerAuthPassword");
+                           if (tokenSet || basicSet)
+                              return null;
+
+                           return new WarningState
+                           {
+                              Level = StatusLevel.Warning,
+                              Text = "The bind address is not a loopback address and no credential is set, so /metrics " +
+                                     "answers 503 (Service Unavailable) to every scrape. Set a bearer token, or both " +
+                                     "HTTP Basic fields, or bind to 127.0.0.1. The health probes keep answering either way."
+                           };
+                        }
+                     },
+                     new WarningDef
+                     {
+                        Aid = "MetricsHalfBasicWarning",
+                        Compute = () =>
+                        {
+                           if (LiveInt_("MetricsServerPort", 0) <= 0)
+                              return null;
+
+                           bool userSet = LiveText_("MetricsServerAuthUsername", "").Trim().Length > 0;
+                           bool passSet = SecretConfigured_("MetricsServerAuthPassword");
+                           if (userSet == passSet)
+                              return null;
+
+                           return new WarningState
+                           {
+                              Level = StatusLevel.Warning,
+                              Text = "HTTP Basic needs both the user name and the password. Only " +
+                                     (userSet ? "the user name" : "the password") +
+                                     " is set, so Basic authentication is NOT enabled - the server logs this and behaves " +
+                                     "as if neither were set."
+                           };
+                        }
+                     },
+                     new WarningDef
+                     {
+                        Aid = "MetricsHalfTlsWarning",
+                        Compute = () =>
+                        {
+                           if (LiveInt_("MetricsServerPort", 0) <= 0)
+                              return null;
+
+                           bool certSet = LiveText_("MetricsServerCertificateFile", "").Trim().Length > 0;
+                           bool keySet = LiveText_("MetricsServerPrivateKeyFile", "").Trim().Length > 0;
+                           if (certSet == keySet)
+                              return null;
+
+                           return new WarningState
+                           {
+                              Level = StatusLevel.Warning,
+                              Text = "TLS for the metrics listener needs both the certificate and the private key. Only " +
+                                     (certSet ? "the certificate" : "the private key") +
+                                     " is set, so TLS is NOT enabled and scrapes stay plain HTTP."
+                           };
+                        }
+                     },
+                     new WarningDef
+                     {
+                        Aid = "MetricsClearTextCredentialWarning",
+                        Compute = () =>
+                        {
+                           if (LiveInt_("MetricsServerPort", 0) <= 0)
+                              return null;
+                           if (!TryParseIpv4_(LiveText_("MetricsServerBindAddress", "127.0.0.1"), out byte firstOctet))
+                              return null;
+                           if (firstOctet == 127)
+                              return null;
+
+                           bool tokenSet = SecretConfigured_("MetricsServerAuthToken");
+                           bool basicSet = LiveText_("MetricsServerAuthUsername", "").Trim().Length > 0
+                                        && SecretConfigured_("MetricsServerAuthPassword");
+                           if (!tokenSet && !basicSet)
+                              return null;
+
+                           bool tlsSet = LiveText_("MetricsServerCertificateFile", "").Trim().Length > 0
+                                      && LiveText_("MetricsServerPrivateKeyFile", "").Trim().Length > 0;
+                           if (tlsSet)
+                              return null;
+
+                           return new WarningState
+                           {
+                              Level = StatusLevel.Warning,
+                              Text = "A credential is set but the listener has no TLS, so the credential crosses the " +
+                                     "network in clear text on every scrape and can be replayed by anyone on the path. " +
+                                     "Set the certificate and key files, or bind to 127.0.0.1. The server still starts - " +
+                                     "it logs this same warning."
+                           };
+                        }
+                     }
                   }
                });
                cards_.Add(new CardDef
@@ -713,13 +1390,119 @@ namespace hMailServer.ControlPanel.Views
                cards_.Add(new CardDef
                {
                   Title = "Sender rewriting & bounce protection (SRS / BATV)",
-                  Blurb = "SRS rewrites the envelope sender when forwarding so SPF still passes at the next hop; BATV tags outbound envelope senders so forged bounces can be rejected. Both use a server-wide secret.",
+                  Blurb = "SRS rewrites the envelope sender when forwarding so SPF still passes at the next hop; BATV tags outbound envelope senders so forged bounces can be rejected. Both use a server-wide secret and do nothing at all until one is set.",
                   Settings =
                   {
                      new BoolSetting { Key = "SRSEnabled", Default = false, Label = "Enable Sender Rewriting Scheme (SRS) on forwarded mail" },
-                     new SecretSetting { Key = "SRSSecret", Label = "SRS signing secret", Hint = "A random server-wide secret" },
+                     new SecretSetting { Key = "SRSSecret", OfferGenerate = true, Label = "SRS signing secret", Hint = "A random server-wide secret" },
                      new BoolSetting { Key = "BATVEnabled", Default = false, Label = "Tag outbound envelope senders with BATV and validate returning bounces" },
-                     new SecretSetting { Key = "BATVSecret", Label = "BATV signing secret", Hint = "A random server-wide secret" }
+                     new SecretSetting { Key = "BATVSecret", OfferGenerate = true, Label = "BATV signing secret", Hint = "A random server-wide secret" }
+                  },
+                  Warnings =
+                  {
+                     // Verified in SMTPForwarding.cpp: SRS::Forward returns nothing
+                     // when the secret is empty, and the RewriteEnvelopeFrom...
+                     // fallback sits in an "else if" behind SRSEnabled - so SRS-on
+                     // with no secret rewrites nothing AND suppresses the fallback.
+                     new WarningDef
+                     {
+                        Aid = "SrsSecretMissingWarning",
+                        Compute = () =>
+                        {
+                           if (!LiveBool_("SRSEnabled", false) || SecretConfigured_("SRSSecret"))
+                              return null;
+                           return new WarningState
+                           {
+                              Level = StatusLevel.Warning,
+                              Text = "SRS is switched on but no secret is set, so no envelope sender is rewritten - and " +
+                                     "while SRS is on, the 'Rewrite the envelope sender when forwarding' fallback in the " +
+                                     "Other card above is skipped as well. This is strictly worse than switching SRS off. " +
+                                     "Generate or enter a secret."
+                           };
+                        }
+                     },
+                     new WarningDef
+                     {
+                        Aid = "BatvSecretMissingWarning",
+                        Compute = () =>
+                        {
+                           if (!LiveBool_("BATVEnabled", false) || SecretConfigured_("BATVSecret"))
+                              return null;
+                           return new WarningState
+                           {
+                              Level = StatusLevel.Warning,
+                              Text = "BATV is switched on but no secret is set, so outbound senders are not tagged and " +
+                                     "returning bounces are not validated - the switch reads enabled while it does " +
+                                     "nothing. Generate or enter a secret."
+                           };
+                        }
+                     }
+                  }
+               });
+               cards_.Add(new CardDef
+               {
+                  // Defaults and the reload behaviour verified in RateLimiter.cpp:
+                  // LoadSettings_ reads [SendingLimits]/[SendingLimitsOverrides]
+                  // directly and MaybeRefreshSettings_ stats the INI every couple
+                  // of seconds, so unlike everything else on this page these apply
+                  // without a service restart.
+                  Title = "Per-account sending limits",
+                  Blurb = "Ceilings on what one authenticated account may submit over a rolling period - the brake on a " +
+                          "compromised account being used to spam. Counted per account at SMTP submission: messages and " +
+                          "envelope recipients separately, and a message refused by the limit gets a temporary error so " +
+                          "a real client retries later. Unlike the rest of this page these live in the [SendingLimits] " +
+                          "and [SendingLimitsOverrides] sections of hMailServer.INI and are re-read within a couple of " +
+                          "seconds of the file changing - saving here applies them WITHOUT a service restart. Counters " +
+                          "survive a restart via a state file in the data directory.",
+                  Settings =
+                  {
+                     new SectionTextSetting
+                     {
+                        Key = "MaxMessagesPerAccountPerPeriod",
+                        Section = "SendingLimits",
+                        Default = "0",
+                        Label = "Max messages per account per period (0 = no limit)",
+                        Placeholder = "500"
+                     },
+                     new SectionTextSetting
+                     {
+                        Key = "MaxRecipientsPerAccountPerPeriod",
+                        Section = "SendingLimits",
+                        Default = "0",
+                        Label = "Max recipients per account per period (0 = no limit)",
+                        Placeholder = "2000",
+                        Blurb = "Recipients are the stricter measure: one message to two thousand addresses is two " +
+                                "thousand recipients."
+                     },
+                     new SectionTextSetting
+                     {
+                        Key = "PeriodHours",
+                        Section = "SendingLimits",
+                        Default = "24",
+                        Label = "Period length in hours (default 24)",
+                        Blurb = "Clamped to 1-168 by the server: a value outside that range is not an error, it is " +
+                                "quietly pulled to the nearest bound."
+                     },
+                     new SectionTextSetting
+                     {
+                        Key = "StateSaveIntervalSeconds",
+                        Section = "SendingLimits",
+                        Default = "10",
+                        Label = "Save the counters to disk every N seconds (default 10)",
+                        Blurb = "How much sending history a crash can forget. Clamped to 1-3600; a value below 1 falls " +
+                                "back to the default of 10."
+                     },
+                     new SectionLinesSetting
+                     {
+                        Key = "SendingLimitsOverrides",
+                        Section = "SendingLimitsOverrides",
+                        Label = "Per-address overrides, one per line: address=messages:recipients[:hours]",
+                        Placeholder = "newsletter@yourdomain.com=5000:50000\nceo@yourdomain.com=0:0",
+                        Blurb = "An override replaces the global ceilings for that address; 0:0 exempts it entirely. " +
+                                "Without the optional :hours the override uses the global period. A malformed line is " +
+                                "ignored with a log entry and the global limit still applies to that account. Comment " +
+                                "lines in this INI section are not shown here and are dropped if the list is saved."
+                     }
                   }
                });
                cards_.Add(new CardDef
@@ -1053,6 +1836,7 @@ namespace hMailServer.ControlPanel.Views
       private void BuildUi()
       {
          CardsPanel.Children.Clear();
+         warningRows_.Clear();
 
          AssignAccessibleNames();
 
@@ -1097,11 +1881,97 @@ namespace hMailServer.ControlPanel.Views
             if (lastEditor != null)
                lastEditor.Margin = new Thickness(0, 0, 0, 2);
 
+            foreach (WarningDef def in card.Warnings)
+               panel.Children.Add(BuildWarningRow_(def));
+
             border.Child = panel;
             CardsPanel.Children.Add(border);
          }
 
+         // Wire every editor to the warnings AFTER all the editors exist, because
+         // a warning may read a setting on a later card than its own.
+         foreach (CardDef card in cards_)
+         foreach (Setting setting in card.Settings)
+            setting.OnEditorChanged(RefreshWarnings_);
+
+         RefreshWarnings_();
+
          StatusText.Text = "Editing " + store_.IniPath;
+      }
+
+      /// <summary>
+      /// One (initially collapsed) warning row: the shape mark and the text beside
+      /// it, in the same three channels - colour, shape and word - as the dashboard
+      /// and Spam overview badges, so none of the three is load-bearing alone.
+      /// </summary>
+      private FrameworkElement BuildWarningRow_(WarningDef def)
+      {
+         var row = new Grid { Margin = new Thickness(0, 10, 0, 2), Visibility = Visibility.Collapsed };
+         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+         row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+         if (!string.IsNullOrEmpty(def.Aid))
+            System.Windows.Automation.AutomationProperties.SetAutomationId(row, def.Aid);
+
+         var mark = new System.Windows.Shapes.Path
+         {
+            Width = 11,
+            Height = 11,
+            Stretch = Stretch.Fill,
+            Margin = new Thickness(0, 4, 8, 0),
+            VerticalAlignment = VerticalAlignment.Top
+         };
+         row.Children.Add(mark);
+
+         var text = new TextBlock
+         {
+            FontSize = Typography.Caption,
+            TextWrapping = TextWrapping.Wrap
+         };
+         Grid.SetColumn(text, 1);
+         row.Children.Add(text);
+
+         warningRows_.Add(new WarningRow { Def = def, Row = row, Mark = mark, Text = text });
+         return row;
+      }
+
+      /// <summary>
+      /// Re-evaluates every computed warning on the page against the editors as
+      /// they stand. Runs once after the page is built and again on every editor
+      /// change, so ticking a switch that makes a configuration inert says so
+      /// immediately - not after a save, a restart and a support thread.
+      /// </summary>
+      private void RefreshWarnings_()
+      {
+         foreach (WarningRow row in warningRows_)
+         {
+            WarningState state;
+            try
+            {
+               state = row.Def.Compute();
+            }
+            catch
+            {
+               // A warning must never take the page down; a state it cannot
+               // evaluate is a state it does not report.
+               state = null;
+            }
+
+            if (state == null)
+            {
+               row.Row.Visibility = Visibility.Collapsed;
+               continue;
+            }
+
+            StatusPresentation presentation = StatusSemantics.For(state.Level);
+            ShapeMarkVisuals.ApplyMark(row.Mark, presentation.Shape, presentation.BrushKey);
+
+            row.Text.Inlines.Clear();
+            row.Text.Inlines.Add(new Run(presentation.SeverityWord + ": ") { FontWeight = FontWeights.SemiBold });
+            row.Text.Inlines.Add(new Run(state.Text));
+
+            row.Row.Visibility = Visibility.Visible;
+         }
       }
 
       private void Reload_Click(object sender, RoutedEventArgs e)

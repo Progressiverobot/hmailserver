@@ -566,6 +566,14 @@ namespace hMailServer.ControlPanel.Services
                   aliases: "Password hashing|bcrypt|Argon2|OAuth2|XOAUTH2|Modern authentication|Microsoft 365|Google|SASL|CRAM-MD5|APOP|Two-factor|Pepper",
                   seeAlso: "adminaccess|autoban|ipranges|protocols"),
 
+               // Directory authentication is how accounts prove who they are, so it
+               // belongs beside Authentication - not filed under "advanced INI" because
+               // that happens to be where its settings are stored.
+               Page("ldap", "Directory authentication (LDAP)",
+                  "Authenticate accounts against Active Directory or any LDAP directory, so users sign in with their domain password.",
+                  aliases: "LDAP|Active Directory|AD|Directory|Domain password|Bind|LDAPS|StartTLS|Single sign-on|Domain accounts|DC",
+                  seeAlso: "authentication|adminaccess|domains"),
+
                Page("adminaccess", "Administrative access",
                   "The server administration password, and who is allowed to use these tools at all.",
                   aliases: "Admin password|Administrator password|Change the admin password|Remote administration|COM API access",

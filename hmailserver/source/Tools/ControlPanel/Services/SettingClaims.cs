@@ -137,6 +137,31 @@ namespace hMailServer.ControlPanel.Services
          };
 
       /// <summary>
+      /// Shown under each of the four Cache.*MaxSizeKb editors on the Performance
+      /// page.
+      ///
+      /// Verified against the server: InterfaceCache::put_*CacheMaxSizeKb calls
+      /// CacheContainer::Set*CacheMaxSize, which sets the limit on the live
+      /// Cache&lt;T&gt; singleton and nothing else - unlike the TTLs and the enable
+      /// switch beside them, there is no property row behind it and no arm in
+      /// CacheContainer::OnPropertyChanged for it. The CacheContainer constructor
+      /// hard-codes every limit to 10 MB at startup, so the value genuinely takes
+      /// effect the moment it is saved and genuinely evaporates at the next
+      /// service restart.
+      ///
+      /// The editors stay editable rather than being made inert, because this is
+      /// the opposite of WorkerThreadPriority: the server really does act on the
+      /// value, and the getter reads the same live value back, so the control
+      /// reports its own state truthfully. What it must not do is pass itself off
+      /// as a persistent setting - that is this note's one job.
+      /// </summary>
+      public const string CacheMaxSizeIsSessionOnly =
+         "Takes effect immediately, but is held in memory only: nothing stores this value, so every service "
+         + "restart resets it to the built-in 10240 KB (10 MB). To keep a different limit it must be set again "
+         + "after each restart, for example from a startup script through the COM API. The TTLs and the enable "
+         + "switch on this card are stored and do survive restarts.";
+
+      /// <summary>
       /// Shown on the JSON-lines checkbox while NCSA is selected. Logger::Render_
       /// checks the format setting first, so NCSA wins and the JSON switch has no
       /// effect - a precedence that was previously visible nowhere.
@@ -179,6 +204,17 @@ namespace hMailServer.ControlPanel.Services
             + "instead and the server says so in the application log - nothing is discarded."),
 
          new SettingClaim("JsonLogging", ClaimKind.Conditional, JsonOverriddenByNcsa),
+
+         // The four in-memory cache size limits. Honoured - the server applies
+         // the value immediately and the getter reads the live value back - but
+         // runtime-only: see CacheMaxSizeIsSessionOnly for the verification.
+         // Without the note these are the "looks configured, does nothing"
+         // defect in slow motion: configured today, silently gone at the next
+         // restart, and nothing anywhere says why.
+         new SettingClaim("Cache.DomainCacheMaxSizeKb", ClaimKind.Honoured, CacheMaxSizeIsSessionOnly),
+         new SettingClaim("Cache.AccountCacheMaxSizeKb", ClaimKind.Honoured, CacheMaxSizeIsSessionOnly),
+         new SettingClaim("Cache.AliasCacheMaxSizeKb", ClaimKind.Honoured, CacheMaxSizeIsSessionOnly),
+         new SettingClaim("Cache.DistributionListCacheMaxSizeKb", ClaimKind.Honoured, CacheMaxSizeIsSessionOnly),
 
          new SettingClaim("OtelEndpoint", ClaimKind.Honoured,
             "Traces only. The exporter posts to /v1/traces; there is no metrics or logs exporter, so a collector "

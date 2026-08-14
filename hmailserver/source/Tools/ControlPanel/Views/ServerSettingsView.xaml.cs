@@ -1464,10 +1464,19 @@ namespace hMailServer.ControlPanel.Views
          cache.Settings.Add(new ComText { Path = "Cache.AccountCacheTTL", Label = "Account cache TTL (seconds)", Numeric = true });
          cache.Settings.Add(new ComText { Path = "Cache.AliasCacheTTL", Label = "Alias cache TTL (seconds)", Numeric = true });
          cache.Settings.Add(new ComText { Path = "Cache.DistributionListCacheTTL", Label = "Distribution-list cache TTL (seconds)", Numeric = true });
-         cache.Settings.Add(new ComText { Path = "Cache.DomainCacheMaxSizeKb", Label = "Domain cache max size (KB)", Numeric = true });
-         cache.Settings.Add(new ComText { Path = "Cache.AccountCacheMaxSizeKb", Label = "Account cache max size (KB)", Numeric = true });
-         cache.Settings.Add(new ComText { Path = "Cache.AliasCacheMaxSizeKb", Label = "Alias cache max size (KB)", Numeric = true });
-         cache.Settings.Add(new ComText { Path = "Cache.DistributionListCacheMaxSizeKb", Label = "Distribution-list cache max size (KB)", Numeric = true });
+         // The four max-size limits are the one thing on this card that does NOT
+         // survive a restart. Verified in InterfaceCache/CacheContainer: the
+         // setters adjust the live Cache<T> and nothing else - no property row,
+         // no OnPropertyChanged arm - and the constructor hard-codes 10 MB at
+         // startup. Kept editable because the server honours the value
+         // immediately and the getter reads the live value back; labelled and
+         // noted as session-only because the label is what the Ctrl+K palette
+         // shows, and an administrator must be told before they type, not after
+         // the next restart quietly discards it.
+         cache.Settings.Add(new ComText { Path = "Cache.DomainCacheMaxSizeKb", Label = "Domain cache max size (KB, resets at service restart)", Numeric = true, Blurb = SettingClaims.NoteFor("Cache.DomainCacheMaxSizeKb") });
+         cache.Settings.Add(new ComText { Path = "Cache.AccountCacheMaxSizeKb", Label = "Account cache max size (KB, resets at service restart)", Numeric = true, Blurb = SettingClaims.NoteFor("Cache.AccountCacheMaxSizeKb") });
+         cache.Settings.Add(new ComText { Path = "Cache.AliasCacheMaxSizeKb", Label = "Alias cache max size (KB, resets at service restart)", Numeric = true, Blurb = SettingClaims.NoteFor("Cache.AliasCacheMaxSizeKb") });
+         cache.Settings.Add(new ComText { Path = "Cache.DistributionListCacheMaxSizeKb", Label = "Distribution-list cache max size (KB, resets at service restart)", Numeric = true, Blurb = SettingClaims.NoteFor("Cache.DistributionListCacheMaxSizeKb") });
          Tab("Cache").Cards.Add(cache);
 
          var index = Card("Message indexing", "Builds a search index so IMAP SEARCH and the web client are faster.");

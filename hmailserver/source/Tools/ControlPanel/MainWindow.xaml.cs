@@ -127,6 +127,7 @@ namespace hMailServer.ControlPanel
          pageFactories_["mxquery"] = () => new MxQueryView();
          pageFactories_["sendout"] = () => new SendoutView();
          pageFactories_["diagnostics"] = () => new DiagnosticsView();
+         pageFactories_["ldap"] = () => new LdapSettingsView();
          pageFactories_["externalsetup"] = () => new ExternalSetupView();
          pageFactories_["dnsrecords"] = () => new DnsRecordsView();
          pageFactories_["about"] = () => new AboutView();

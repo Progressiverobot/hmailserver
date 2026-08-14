@@ -1,3 +1,7 @@
+using System.Windows;
+using System.Windows.Automation;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using hMailServer.ControlPanel.Services;
 using static hMailServer.ControlPanel.Views.CollectionEditorView;
 
@@ -84,10 +88,19 @@ namespace hMailServer.ControlPanel.Views
          }
       });
 
-      public static CollectionEditorView Groups() => new(new CollectionSpec
+      /// <summary>
+      /// The Groups page. Not a bare <see cref="CollectionEditorView"/> like its
+      /// neighbours, because a group is more than its name: it is a member list,
+      /// and without a way to edit that list here a group could be created and
+      /// granted folder permissions but never actually cover anyone - the feature
+      /// only worked over the COM API.
+      /// </summary>
+      public static UserControl Groups() => new GroupsPageView(new CollectionSpec
       {
          Title = "Groups",
-         Subtitle = "Security groups used to grant shared-folder (IMAP ACL) permissions to several accounts at once.",
+         Subtitle = "Security groups used to grant shared-folder (IMAP ACL) permissions to several accounts at once. " +
+                    "A group's permissions cover exactly the accounts on its member list - select a group and choose " +
+                    "Members to edit that list.",
          ItemNoun = "group",
          GetCollection = () => Settings.Groups,
          Fields =
@@ -198,5 +211,118 @@ namespace hMailServer.ControlPanel.Views
             new FieldSpec { Prop = "Name", Label = "Rule name", Default = "" }
          }
       }, embedded: true);
+   }
+
+   /// <summary>
+   /// The Groups page: the generic collection editor for the list itself, plus the
+   /// one thing the generic editor cannot offer - a way into the selected group's
+   /// member list (<see cref="GroupMembersDialog"/>).
+   ///
+   /// The selection is observed through the DataGrid's bubbling SelectionChanged
+   /// event rather than by reaching into the editor's internals, so the editor
+   /// stays a black box; the grid's rows are <see cref="CollectionEditorView.Row"/>
+   /// instances, which carry the group's database ID and name.
+   /// </summary>
+   public sealed class GroupsPageView : UserControl, IPageLifecycle
+   {
+      private const string HintNoSelection =
+         "Select a group to edit which accounts are members of it.";
+
+      private readonly CollectionEditorView editor_;
+      private readonly Wpf.Ui.Controls.Button membersButton_;
+      private readonly TextBlock membersHint_;
+
+      private int selectedGroupId_ = -1;
+      private string selectedGroupName_ = "";
+
+      public GroupsPageView(CollectionSpec spec)
+      {
+         // The page chrome (title and subtitle) is drawn here so the members row
+         // can sit inside the same page layout; the editor is hosted in its
+         // embedded form, which draws no chrome of its own. The subtitle is taken
+         // off the spec so the embedded editor does not repeat it as its hint.
+         string subtitle = spec.Subtitle;
+         spec.Subtitle = null;
+
+         editor_ = new CollectionEditorView(spec, embedded: true);
+
+         var root = new Grid { Margin = new Thickness(26, 20, 26, 20) };
+         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+         var head = new StackPanel();
+         head.Children.Add(new TextBlock { Text = spec.Title, Style = (Style) FindResource("PageTitle") });
+         head.Children.Add(new TextBlock { Text = subtitle, Style = (Style) FindResource("PageSubtitle") });
+         root.Children.Add(head);
+
+         Grid.SetRow(editor_, 1);
+         root.Children.Add(editor_);
+
+         var membersRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 12, 0, 0) };
+
+         membersButton_ = new Wpf.Ui.Controls.Button
+         {
+            Content = "Members…",
+            MinWidth = 110,
+            IsEnabled = false
+         };
+         AutomationProperties.SetName(membersButton_, "Edit the members of the selected group");
+         membersButton_.Click += (_, _) => OpenMembers();
+         membersRow.Children.Add(membersButton_);
+
+         membersHint_ = new TextBlock
+         {
+            Text = HintNoSelection,
+            FontSize = 12,
+            TextWrapping = TextWrapping.Wrap,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(10, 0, 0, 0)
+         };
+         membersHint_.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
+         membersRow.Children.Add(membersHint_);
+
+         Grid.SetRow(membersRow, 2);
+         root.Children.Add(membersRow);
+
+         Content = root;
+
+         // handledEventsToo, in case a future DataGrid template handles the event
+         // on its way up; today it arrives unhandled.
+         AddHandler(Selector.SelectionChangedEvent, new SelectionChangedEventHandler(OnSelectionChanged), true);
+      }
+
+      private void OnSelectionChanged(object sender, SelectionChangedEventArgs e)
+      {
+         if (e.OriginalSource is not DataGrid grid)
+            return;
+
+         if (grid.SelectedItem is Row row && row.Id > 0)
+         {
+            selectedGroupId_ = row.Id;
+            selectedGroupName_ = row.Display("Name");
+            membersButton_.IsEnabled = true;
+            membersHint_.Text = "Open the member list of '" + selectedGroupName_ + "'.";
+         }
+         else
+         {
+            selectedGroupId_ = -1;
+            selectedGroupName_ = "";
+            membersButton_.IsEnabled = false;
+            membersHint_.Text = HintNoSelection;
+         }
+      }
+
+      private void OpenMembers()
+      {
+         if (selectedGroupId_ <= 0)
+            return;
+
+         var dialog = new GroupMembersDialog(Window.GetWindow(this), selectedGroupId_, selectedGroupName_);
+         dialog.ShowDialog();
+      }
+
+      public void OnEnter() => editor_.OnEnter();
+      public void OnLeave() => editor_.OnLeave();
    }
 }

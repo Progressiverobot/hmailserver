@@ -39,6 +39,68 @@
                 </StackPanel>
             </Border>
 
+            <Border Style="{StaticResource Card}" Margin="0,0,12,12">
+                <StackPanel>
+                    <TextBlock Text="Scheduled backups" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,10" />
+
+                    <!-- State first: whether a schedule exists and how old the newest archive is.
+                         Colour, shape AND word (StatusSemantics), so no channel is load-bearing alone. -->
+                    <Grid MaxWidth="520" HorizontalAlignment="Left" Margin="0,0,0,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Path x:Name="ScheduleMark" Width="11" Height="11" Stretch="Fill" Margin="0,4,8,0" VerticalAlignment="Top" />
+                        <TextBlock x:Name="ScheduleStatusText" Grid.Column="1" FontSize="13" TextWrapping="Wrap" />
+                    </Grid>
+                    <Grid MaxWidth="520" HorizontalAlignment="Left" Margin="0,0,0,14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Path x:Name="LastBackupMark" Width="11" Height="11" Stretch="Fill" Margin="0,4,8,0" VerticalAlignment="Top" />
+                        <TextBlock x:Name="LastBackupStatusText" Grid.Column="1" FontSize="13" TextWrapping="Wrap" />
+                    </Grid>
+
+                    <TextBlock Text="Daily backup time (24-hour HH:MM, empty = off)" FontSize="13" Margin="0,0,0,4" />
+                    <ui:TextBox x:Name="ScheduleTimeBox" Width="200" HorizontalAlignment="Left"
+                                AutomationProperties.Name="Daily backup time (24-hour HH:MM, empty = off)" />
+                    <TextBlock MaxWidth="520" HorizontalAlignment="Left"
+                               Text="At most one backup per calendar day, taken at the first check at or after this time (the server's local time). If an interval is also set below, the daily time wins."
+                               FontSize="12" Opacity="0.65" TextWrapping="Wrap" Margin="0,4,0,12" />
+
+                    <TextBlock Text="Backup interval in minutes (0 = off)" FontSize="13" Margin="0,0,0,4" />
+                    <ui:TextBox x:Name="IntervalBox" Width="200" HorizontalAlignment="Left"
+                                AutomationProperties.Name="Backup interval in minutes (0 = off)" />
+                    <TextBlock MaxWidth="520" HorizontalAlignment="Left"
+                               Text="Used when no daily time is set. The interval is measured against the newest archive in the destination, so it survives service restarts; if the destination holds no backup at all, the first one is taken about a minute after the service starts."
+                               FontSize="12" Opacity="0.65" TextWrapping="Wrap" Margin="0,4,0,12" />
+
+                    <TextBlock Text="Retention" FontSize="13.5" FontWeight="SemiBold" Margin="0,2,0,8" />
+                    <TextBlock Text="Archives to keep (0 = keep all)" FontSize="13" Margin="0,0,0,4" />
+                    <ui:TextBox x:Name="KeepCountBox" Width="200" HorizontalAlignment="Left"
+                                AutomationProperties.Name="Archives to keep (0 = keep all)" />
+                    <TextBlock Text="Delete archives older than this many days (0 = keep all)" FontSize="13" Margin="0,8,0,4" />
+                    <ui:TextBox x:Name="MaxAgeBox" Width="200" HorizontalAlignment="Left"
+                                AutomationProperties.Name="Delete archives older than this many days (0 = keep all)" />
+                    <TextBlock MaxWidth="520" HorizontalAlignment="Left"
+                               Text="0 means archives are never deleted. Retention runs on the server after every backup into this folder - scheduled or started by hand with Start backup now - and only once the new archive has been written and verified readable, so a failed backup never deletes anything. The newest archive is never deleted, the age limit always leaves the two newest alone, and only this server's own HMBackup archives are counted - other files in the folder are never touched."
+                               FontSize="12" Opacity="0.65" TextWrapping="Wrap" Margin="0,6,0,8" />
+                    <TextBlock MaxWidth="520" HorizontalAlignment="Left"
+                               Text="Keeping several generations of messages needs compression: without 'Compress destination files (zip)' every backup writes its message files into the same DataBackup folder, overwriting the previous run's, so retention can only keep generations of the small settings-and-domains archives."
+                               FontSize="12" Opacity="0.65" TextWrapping="Wrap" Margin="0,0,0,8" />
+                    <TextBlock MaxWidth="520" HorizontalAlignment="Left"
+                               Text="Stored in hMailServer.ini as ScheduledBackupTime, ScheduledBackupIntervalMinutes, ScheduledBackupKeepCount and ScheduledBackupMaxAgeDays. The service reads them when it starts, so changes here apply after a service restart."
+                               FontSize="12" Opacity="0.65" TextWrapping="Wrap" Margin="0,0,0,12" />
+
+                    <StackPanel Orientation="Horizontal">
+                        <ui:Button x:Name="SaveScheduleButton" Content="Save schedule" Click="SaveSchedule_Click" Margin="0,0,8,0" />
+                        <ui:Button Content="Re-check status" Click="RefreshScheduleStatus_Click"
+                                   ToolTip="Re-read the schedule from hMailServer.ini and look at the destination folder again" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
             <Border Style="{StaticResource Card}" Margin="0,0,12,0">
                 <StackPanel>
                     <TextBlock Text="Restore" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,4" />
