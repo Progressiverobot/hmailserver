@@ -55,7 +55,7 @@ strong and where it is thin far more honestly than any prose summary.
 | **The capability matrix** | | | | |
 | [SMTP and ESMTP](#smtp-and-esmtp) | 24 | – | 4 | – |
 | [Transport security and deliverability](#transport-security-and-deliverability) | 43 | – | 4 | 1 |
-| [IMAP](#imap) | 57 | – | 18 | 3 |
+| [IMAP](#imap) | 58 | – | 17 | 3 |
 | [POP3](#pop3) | 21 | – | 6 | – |
 | [Sieve, ManageSieve and rules](#sieve-managesieve-and-rules) | 48 | 0 | 16 | – |
 | [Authentication and cryptography](#authentication-and-cryptography) | 57 | 0 | 18 | – |
@@ -72,7 +72,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 2 | – | 4 | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 5 | 1 | 2 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 4 | 1 | 4 | – |
-| **Total** | **621** | **12** | **147** | **14** |
+| **Total** | **622** | **12** | **146** | **14** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage and the administration surface are the best-covered areas**, and the
@@ -329,7 +329,7 @@ the source, not from documentation.
 
 ### IMAP
 
-57 shipped · 0 underway · 18 not started · 3 deferred
+58 shipped · 0 underway · 17 not started · 3 deferred
 
 | | Capability | Detail |
 |:-:|---|---|
@@ -407,7 +407,7 @@ the source, not from documentation.
 | ⬜ | REPLACE (RFC 8508) | Not implemented and not advertised; there is no REPLACE or UID REPLACE command, so clients must emulate draft updates with APPEND + STORE \Deleted + EXPUNGE. |
 | ⬜ | RFC 9208 QUOTA (QUOTA=RES-STORAGE / RES-MESSAGE, SETQUOTA) | Not implemented. The bare "QUOTA" capability atom is advertised rather than the RFC 9208 QUOTA=RES-* form, there is no SETQUOTA, no per-mailbox quota roots and no OVERQUOTA response code. Listed in the roadmap's IMAP-extension backlog. |
 | ⬜ | SAVEDATE (RFC 8514) | Not implemented. No SAVEDATE FETCH item and no SAVEDATE/SAVEDBEFORE/SAVEDSINCE/SAVEDATESUPPORTED search keys. Listed in the roadmap's IMAP-extension backlog. |
-| ⬜ | THREAD (RFC 5256) | Not implemented and not advertised. No THREAD command in the dispatch table and no reference anywhere in the source. SORT ships from the same RFC but THREAD does not… |
+| ✅ | THREAD (RFC 5256) | **Shipped 15 August 2026, both algorithms.** `THREAD` and `UID THREAD` advertise `THREAD=ORDEREDSUBJECT THREAD=REFERENCES` and ride the same bounded search machinery as SORT. REFERENCES is the full RFC algorithm rather than a subject approximation wearing its name: containers are linked by `Message-ID`/`References`/`In-Reply-To` (falling back to In-Reply-To only when References is absent), a message's own References line authoritatively breaks a parent another message asserted, cycles are refused, dummies are pruned except at the root where they hold orphaned siblings together, threads are then grouped by RFC 2.1 base subject - the full step machine, so `[fwd: Re: [list] x]` reduces the way the RFC says - and sorted by sent date with the INTERNALDATE fallback. **An adversarial pass found three defects the 11 passing tests did not.** A deep reply chain overflowed the 1MB worker stack: `Prune_` and `SortChildrenRecursively_` recurse per level, and a probe compiled against those exact frames survived 6000 levels and died with `STATUS_STACK_OVERFLOW` at 8000 - a whole-service crash any authenticated user could reach by mailing themselves a long enough chain, now bounded by a 512 depth cap at link time. The header pass was uninterruptible, so `IMAPSearchTimeout` could only disown a result the connection thread had already spent minutes producing; the ceiling is now handed in and stops the pass before the next file opens. And a Date header that was present but unparseable fell through to the 1899 OLE epoch and sorted to the FRONT of its thread, because the comparator reads the raw value and not the validity flag - RFC 5256 2.2's INTERNALDATE fallback now covers unparseable as well as absent. 13 tests assert exact trees. **Two pre-existing weaknesses of the same shape are recorded, not silently inherited:** SORT checks its ceiling only after its own uninterruptible header pass, and `IMAPSort::CacheHeaderFields_` tests the Date header for emptiness rather than validity. |
 | ⬜ | UNAUTHENTICATE (RFC 8437) | Not implemented and not advertised; there is no way to return an authenticated session to the not-authenticated state for connection reuse. |
 | ⬜ | URLAUTH (RFC 4467) / BURL | Not implemented and not advertised; no GENURLAUTH, URLFETCH or RESETKEY commands and no IMAP URL parser. |
 | ✅ | WITHIN (RFC 5032) OLDER / YOUNGER search keys | Implemented and advertised. Both compare the message's internal date against (now - n seconds) using the whole timestamp rather than the calendar date, which is the point of the extension and what makes "YOUNGER 3600" answerable at all; relative-age searches no longer have to be rewritten as absolute BEFORE/SINCE. The interval is validated as an nz-number and clamped at a century, so a zero, negative or non-numeric interval is BAD instead of silently becoming "0 seconds ago". |

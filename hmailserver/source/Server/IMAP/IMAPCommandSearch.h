@@ -18,7 +18,7 @@ namespace HM
    class IMAPCommandSEARCH : public IMAPCommand
    {
    public:
-	   IMAPCommandSEARCH(bool bIsSort);
+	   IMAPCommandSEARCH(IMAPSearchCommandMode mode);
 	   virtual ~IMAPCommandSEARCH();
 
       void SetIsUID() { is_uid_ = true; }
@@ -57,6 +57,7 @@ namespace HM
       std::shared_ptr<MimeHeader> mime_header_;
 
       bool is_sort_;
+      bool is_thread_;
       bool is_uid_;
 
       // RFC 4731 (ESEARCH) result-option state, parsed from a "RETURN (...)" clause.
@@ -91,5 +92,10 @@ namespace HM
 
       // Which ceiling was passed, and by how much, for the application log entry.
       String bound_reason_;
+
+      // The rendered RFC 5256 tree for a THREAD command, built where SORT sorts and
+      // consumed where the response is assembled. Cleared by ResetSearchState_,
+      // because the handler is reused across commands on a connection.
+      String thread_response_body_;
    };
 }

@@ -128,13 +128,25 @@ namespace HM
    };
 
 
-   class IMAPSearchParser  
+   // Which command's grammar the criteria are wrapped in. An enum rather than the
+   // bool it grew from, because THREAD made three of them and ParseCommand(pArg,
+   // true) says nothing about which prefix "true" buys: SORT's prefix is a
+   // parenthesised sort-key list then a charset, THREAD's is a bare algorithm atom
+   // then a charset, and SEARCH has no prefix at all.
+   enum IMAPSearchCommandMode
+   {
+      IMAPSearchModeSearch = 0,
+      IMAPSearchModeSort = 1,
+      IMAPSearchModeThread = 2
+   };
+
+   class IMAPSearchParser
    {
    public:
 	   IMAPSearchParser();
 	   virtual ~IMAPSearchParser();
 
-      IMAPResult ParseCommand(std::shared_ptr<IMAPCommandArgument> pArgument, bool bIsSort);
+      IMAPResult ParseCommand(std::shared_ptr<IMAPCommandArgument> pArgument, IMAPSearchCommandMode mode);
 
       // RFC 5182 (SEARCHRES): the UIDs saved by an earlier SEARCH RETURN (SAVE), so the
       // "$" search key can be resolved during parsing. Must be set before ParseCommand.
@@ -142,6 +154,12 @@ namespace HM
 
       std::shared_ptr<IMAPSearchCriteria>  GetCriteria() {return result_criteria_;}
       std::shared_ptr<IMAPSortParser> GetSortParser() {return sort_parser_; }
+
+      // The algorithm atom a THREAD command led with, exactly as the client sent
+      // it. Stored rather than validated here: the parser's job is the grammar,
+      // and naming an algorithm this server does not implement is the command's
+      // BAD to give, with IMAPThread::ParseAlgorithm as the authority.
+      String GetThreadAlgorithm() const { return thread_algorithm_; }
 
       String GetCharsetName() 
       {
@@ -162,6 +180,7 @@ namespace HM
       IMAPResult ParseWord_(std::shared_ptr<IMAPSimpleCommandParser> pSimpleParser, std::shared_ptr<IMAPSearchCriteria> pNewCriteria, int &iCurrentWord);
 
       std::shared_ptr<IMAPSortParser> sort_parser_;
+      String thread_algorithm_;
       std::shared_ptr<IMAPSearchCriteria> result_criteria_;
 
       String charset_name_;

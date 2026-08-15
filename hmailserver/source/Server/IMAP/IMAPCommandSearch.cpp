@@ -7,6 +7,7 @@
 #include "IMAPCommandSEARCH.h"
 #include "IMAPConnection.h"
 #include "IMAPSort.h"
+#include "IMAPThread.h"
 #include "IMAPConfiguration.h"
 #include "IMAPListLookup.h"
 
@@ -27,8 +28,9 @@
 
 namespace HM
 {
-   IMAPCommandSEARCH::IMAPCommandSEARCH(bool bIsSort) :
-      is_sort_(bIsSort),
+   IMAPCommandSEARCH::IMAPCommandSEARCH(IMAPSearchCommandMode mode) :
+      is_sort_(mode == IMAPSearchModeSort),
+      is_thread_(mode == IMAPSearchModeThread),
       is_uid_(false),
       is_esearch_(false),
       esearch_min_(false),
@@ -93,8 +95,9 @@ namespace HM
 
       // RFC 4731 (ESEARCH): an optional "RETURN (...)" result-options clause may
       // follow the SEARCH keyword. Detect and consume it before criteria parsing.
-      // (RETURN with SORT is ESORT/RFC 5267 and is intentionally not handled here.)
-      if (!is_sort_)
+      // (RETURN with SORT is ESORT/RFC 5267 and is intentionally not handled here,
+      // and RFC 5267's THREAD variant likewise.)
+      if (!is_sort_ && !is_thread_)
       {
          String sTrimmed = pArgument->Command();
          sTrimmed.TrimLeft();
@@ -132,7 +135,7 @@ namespace HM
       // RFC 9051 (IMAP4rev2): once the client has enabled IMAP4rev2, a SEARCH (or UID
       // SEARCH) without an explicit RETURN clause still returns its results in an
       // ESEARCH response (with the ALL result option), not the legacy "* SEARCH" line.
-      if (!is_sort_ && !is_esearch_ && pConnection->GetImap4Rev2Enabled())
+      if (!is_sort_ && !is_thread_ && !is_esearch_ && pConnection->GetImap4Rev2Enabled())
       {
          is_esearch_ = true;
          esearch_all_ = true;
@@ -143,12 +146,22 @@ namespace HM
       // RFC 5182 (SEARCHRES): the parser resolves a "$" search key against this.
       pParser->SetSavedSearchResult(pConnection->GetSavedSearchResult());
 
-      IMAPResult result = pParser->ParseCommand(pArgument, is_sort_);
+      IMAPResult result = pParser->ParseCommand(pArgument,
+         is_thread_ ? IMAPSearchModeThread : (is_sort_ ? IMAPSearchModeSort : IMAPSearchModeSearch));
       if (result.GetResult() != IMAPResult::ResultOK)
          return result;
 
       if (is_sort_ && !pParser->GetSortParser())
          return IMAPResult(IMAPResult::ResultBad, "Incorrect search commands.");
+
+      // RFC 5256: naming an algorithm the server did not advertise is a protocol
+      // error. BAD rather than a silent fallback, because a client that asked for
+      // REFERENCES and silently got ORDEREDSUBJECT would render wrong conversation
+      // trees with no way to know it.
+      IMAPThread::Algorithm threadAlgorithm = IMAPThread::AlgorithmReferences;
+
+      if (is_thread_ && !IMAPThread::ParseAlgorithm(pParser->GetThreadAlgorithm(), threadAlgorithm))
+         return IMAPResult(IMAPResult::ResultBad, "Unsupported threading algorithm.");
 
       // Mails in current box
       std::shared_ptr<IMAPFolder> pCurFolder =  pConnection->GetCurrentFolder();
@@ -212,6 +225,26 @@ namespace HM
             // from here, so the ceiling is re-checked once it returns. Without this a
             // SORT could report a result produced long past the ceiling it was given.
             if (BoundExceeded_())
+               return AbortSearch_(pConnection, message_count_);
+         }
+
+         if (is_thread_)
+         {
+            // Threading reads a header per matching message, and the ceiling is
+            // handed IN rather than checked afterwards. SORT above does the latter,
+            // and the difference matters: a post-hoc check can only disown a result
+            // the connection thread has already spent minutes producing, whereas
+            // this stops before the next file is opened. On a folder large enough
+            // for the timeout to bite, that is the difference between a bounded
+            // command and a bounded-looking one.
+            IMAPThread oThreader;
+
+            const bool completed = oThreader.BuildThreads(pConnection, vecMatchingMessages, is_uid_,
+                                                          threadAlgorithm,
+                                                          [this]() { return BoundExceeded_(); },
+                                                          thread_response_body_);
+
+            if (!completed || BoundExceeded_())
                return AbortSearch_(pConnection, message_count_);
          }
 
@@ -284,6 +317,12 @@ namespace HM
       }
       else if (is_sort_)
          sResponse = "* SORT" + sMatching + "\r\n";
+      else if (is_thread_)
+      {
+         // The body carries its own leading space when there is one - an empty
+         // result is a bare "* THREAD", not "* THREAD ".
+         sResponse = "* THREAD" + thread_response_body_ + "\r\n";
+      }
       else
       {
          sResponse = "* SEARCH" + sMatching;
@@ -677,6 +716,10 @@ namespace HM
       search_start_tick_ = GetTickCount64();
       bytes_examined_ = 0;
       bound_reason_.Empty();
+
+      // The handler is reused per connection like everything else here, so a THREAD
+      // that matched nothing must not answer with the PREVIOUS thread's tree.
+      thread_response_body_.Empty();
 
       // Read once, here. If they were read per message a configuration reload
       // during a long search could raise the ceiling out from under it.

@@ -168,8 +168,9 @@ namespace HM
    {
       mapCommandHandlers[IMAP_UID] = std::shared_ptr<IMAPCommandUID>(new IMAPCommandUID());
       mapCommandHandlers[IMAP_APPEND] = std::shared_ptr<IMAPCommandAppend>(new IMAPCommandAppend());
-      mapCommandHandlers[IMAP_SEARCH] = std::shared_ptr<IMAPCommandSEARCH>(new IMAPCommandSEARCH(false));
-      mapCommandHandlers[IMAP_SORT] = std::shared_ptr<IMAPCommandSEARCH>(new IMAPCommandSEARCH(true));
+      mapCommandHandlers[IMAP_SEARCH] = std::shared_ptr<IMAPCommandSEARCH>(new IMAPCommandSEARCH(IMAPSearchModeSearch));
+      mapCommandHandlers[IMAP_SORT] = std::shared_ptr<IMAPCommandSEARCH>(new IMAPCommandSEARCH(IMAPSearchModeSort));
+      mapCommandHandlers[IMAP_THREAD] = std::shared_ptr<IMAPCommandSEARCH>(new IMAPCommandSEARCH(IMAPSearchModeThread));
       mapCommandHandlers[IMAP_IDLE] = std::shared_ptr<IMAPCommandIdle>(new IMAPCommandIdle(std::dynamic_pointer_cast<IMAPConnection>(shared_from_this())));
 
       mapStaticHandlers = StaticIMAPCommandHandlers::Instance()->GetStaticHandlers();
@@ -685,6 +686,8 @@ namespace HM
          return IMAP_IDLE;
       else if (sCommand == _T("SORT"))
          return IMAP_SORT;
+      else if (sCommand == _T("THREAD"))
+         return IMAP_THREAD;
       else if (sCommand == _T("NAMESPACE"))
          return IMAP_NAMESPACE;
       else if (sCommand == _T("MYRIGHTS"))
@@ -868,10 +871,15 @@ namespace HM
       command.
       */
 
+      // RFC 5256 carries SORT's rule over verbatim: untagged EXPUNGE responses are
+      // not permitted while responding to THREAD, but are permitted during a UID
+      // THREAD - and active_command is IMAP_UID in the UID case, so the exclusion
+      // below covers exactly the non-UID form, which is the required behaviour.
       bool send_expunge = active_command != IMAP_FETCH &&
                           active_command != IMAP_STORE &&
                           active_command != IMAP_SEARCH &&
-                          active_command != IMAP_SORT;
+                          active_command != IMAP_SORT &&
+                          active_command != IMAP_THREAD;
 
       notification_client_->SendCachedNotifications(send_expunge);
    }

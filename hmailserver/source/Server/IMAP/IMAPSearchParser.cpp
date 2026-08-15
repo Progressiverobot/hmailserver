@@ -126,13 +126,13 @@ namespace HM
 
    }
 
-   IMAPResult 
-   IMAPSearchParser::ParseCommand(std::shared_ptr<IMAPCommandArgument> pArgument, bool bIsSort)
+   IMAPResult
+   IMAPSearchParser::ParseCommand(std::shared_ptr<IMAPCommandArgument> pArgument, IMAPSearchCommandMode mode)
    {
       // Replace literals in the command.
       std::shared_ptr<IMAPSimpleCommandParser> pSimpleParser = std::shared_ptr<IMAPSimpleCommandParser> (new IMAPSimpleCommandParser);
 
-      if (bIsSort)
+      if (mode == IMAPSearchModeSort || mode == IMAPSearchModeThread)
       {
          pSimpleParser->Parse(pArgument);
          pSimpleParser->UnliteralData();
@@ -150,23 +150,59 @@ namespace HM
             return IMAPResult(IMAPResult::ResultBad, "SearchCharacter set must be specified.");
          }
 
-         std::shared_ptr<IMAPSimpleWord> pSort = pSimpleParser->Word(0);
-         if (pSort->Paranthezied())
+         if (mode == IMAPSearchModeSort)
          {
-            sort_parser_ = std::shared_ptr<IMAPSortParser>(new IMAPSortParser);
-            sort_parser_->Parse(pSort->Value());
+            std::shared_ptr<IMAPSimpleWord> pSort = pSimpleParser->Word(0);
+            if (pSort->Paranthezied())
+            {
+               sort_parser_ = std::shared_ptr<IMAPSortParser>(new IMAPSortParser);
+               sort_parser_->Parse(pSort->Value());
+            }
+         }
+         else
+         {
+            // RFC 5256: THREAD leads with a bare algorithm atom, not a
+            // parenthesised list - "THREAD REFERENCES UTF-8 ALL". A parenthesised
+            // word here is a malformed command, and it is refused rather than
+            // unwrapped because unwrapping would make this server accept syntax no
+            // other server accepts, which a client author then ships against.
+            std::shared_ptr<IMAPSimpleWord> pAlgorithm = pSimpleParser->Word(0);
+
+            // Clammerized is the literal form ("{10}\r\nREFERENCES"). Refused with
+            // the others not only because it is absurd for an atom, but because the
+            // prefix trim below cuts the algorithm's own text off the command
+            // string - a literal leaves "{10}" standing there instead, and the
+            // criteria parser would then eat a brace token as a search key.
+            if (pAlgorithm->Paranthezied() || pAlgorithm->Quoted() || pAlgorithm->Clammerized() ||
+                pAlgorithm->Value().IsEmpty())
+               return IMAPResult(IMAPResult::ResultBad, "Thread algorithm must be specified.");
+
+            thread_algorithm_ = pAlgorithm->Value();
          }
 
          charset_name_ = pSimpleParser->Word(1)->Value();
          if (!IsValidCharset_(charset_name_))
             return BadCharsetResult_();
 
-         // Trim away the SORT part of the SEARCH expresson
-         // since we only care about SEARCH below.
+         // Trim away the SORT/THREAD prefix of the expression, since only the
+         // search criteria matter below.
          String tempString = pArgument->Command();
 
-         if (tempString.Find(_T(")")) > 0)
-            tempString = tempString.Mid(tempString.Find(_T(")"))+2);
+         if (mode == IMAPSearchModeSort)
+         {
+            if (tempString.Find(_T(")")) > 0)
+               tempString = tempString.Mid(tempString.Find(_T(")"))+2);
+         }
+         else
+         {
+            // The algorithm atom is the first word of the remaining command string
+            // and cannot be quoted or a literal (both were refused above), so
+            // cutting its own length off the front is exact.
+            tempString.TrimLeft();
+
+            if (tempString.Mid(0, thread_algorithm_.GetLength()).CompareNoCase(thread_algorithm_) == 0)
+               tempString = tempString.Mid(thread_algorithm_.GetLength());
+         }
 
          // The charset has already been taken into charset_name_ above, and it is not a
          // search key, so it has to come out of the string the criteria parser sees.

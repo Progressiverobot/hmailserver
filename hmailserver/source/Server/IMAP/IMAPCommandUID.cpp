@@ -192,7 +192,7 @@ namespace HM
       }
       else if (sTypeOfUID.CompareNoCase(_T("SEARCH")) == 0)
       {
-         std::shared_ptr<IMAPCommandSEARCH> pCommand = std::shared_ptr<IMAPCommandSEARCH> (new IMAPCommandSEARCH(false));
+         std::shared_ptr<IMAPCommandSEARCH> pCommand = std::shared_ptr<IMAPCommandSEARCH> (new IMAPCommandSEARCH(IMAPSearchModeSearch));
          pCommand->SetIsUID();
          IMAPResult result = pCommand->ExecuteCommand(pConnection, pArgument);
 
@@ -203,10 +203,23 @@ namespace HM
       }
       else if (sTypeOfUID.CompareNoCase(_T("SORT")) == 0)
       {
-         std::shared_ptr<IMAPCommandSEARCH> pCommand = std::shared_ptr<IMAPCommandSEARCH> (new IMAPCommandSEARCH(true));
+         std::shared_ptr<IMAPCommandSEARCH> pCommand = std::shared_ptr<IMAPCommandSEARCH> (new IMAPCommandSEARCH(IMAPSearchModeSort));
          pCommand->SetIsUID();
          IMAPResult result = pCommand->ExecuteCommand(pConnection, pArgument);
-         
+
+         if (result.GetResult() == IMAPResult::ResultOK)
+            pConnection->SendAsciiData(sTag + " OK UID completed\r\n");
+
+         return result;
+      }
+      else if (sTypeOfUID.CompareNoCase(_T("THREAD")) == 0)
+      {
+         // RFC 5256: UID THREAD is THREAD with UIDs in the tree instead of
+         // sequence numbers. Same shape as UID SORT above.
+         std::shared_ptr<IMAPCommandSEARCH> pCommand = std::shared_ptr<IMAPCommandSEARCH> (new IMAPCommandSEARCH(IMAPSearchModeThread));
+         pCommand->SetIsUID();
+         IMAPResult result = pCommand->ExecuteCommand(pConnection, pArgument);
+
          if (result.GetResult() == IMAPResult::ResultOK)
             pConnection->SendAsciiData(sTag + " OK UID completed\r\n");
 

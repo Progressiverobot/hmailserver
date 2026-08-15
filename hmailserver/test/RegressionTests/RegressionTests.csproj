@@ -457,6 +457,7 @@
     <Compile Include="API\Links.cs" />
     <Compile Include="Stress\ContentStressTest.cs" />
     <Compile Include="IMAP\Sort.cs" />
+    <Compile Include="IMAP\ThreadCommand.cs" />
     <Compile Include="POP3\Fetching\Basics.cs" />
     <Compile Include="Shared\Pop3ServerSimulator.cs" />
     <Compile Include="Security\DirectorySyncPreflight.cs" />

@@ -653,6 +653,7 @@ EXIT 0
     <ClCompile Include="..\Imap\IMAPSearchParser.cpp" />
     <ClCompile Include="..\Imap\IMAPSimpleCommandParser.cpp" />
     <ClCompile Include="..\Imap\IMAPSort.cpp" />
+    <ClCompile Include="..\Imap\IMAPThread.cpp" />
     <ClCompile Include="..\Imap\IMAPSortParser.cpp" />
     <ClCompile Include="..\Imap\IMAPStore.cpp" />
     <ClCompile Include="..\IMAP\MessagesContainer.cpp" />
@@ -1211,6 +1212,7 @@ EXIT 0
     <ClInclude Include="..\Imap\IMAPSearchParser.h" />
     <ClInclude Include="..\Imap\IMAPSimpleCommandParser.h" />
     <ClInclude Include="..\Imap\IMAPSort.h" />
+    <ClInclude Include="..\Imap\IMAPThread.h" />
     <ClInclude Include="..\Imap\IMAPSortParser.h" />
     <ClInclude Include="..\Imap\IMAPStore.h" />
     <ClInclude Include="..\IMAP\MessagesContainer.h" />

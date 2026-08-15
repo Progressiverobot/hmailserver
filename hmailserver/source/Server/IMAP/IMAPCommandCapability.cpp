@@ -32,6 +32,13 @@ namespace HM
       if (pConfig->GetUseIMAPSort())
          sResponse += " SORT";
 
+      // RFC 5256. Unconditional where SORT is gated, and deliberately so: the work
+      // is bounded by the same per-command ceilings as SEARCH and SORT, and a gate
+      // would cost a seeded settings row on every backend plus a schema bump - see
+      // the reasoning on IMAPThread. ORDEREDSUBJECT is required of any server that
+      // advertises THREAD at all; REFERENCES is the one clients actually want.
+      sResponse += " THREAD=ORDEREDSUBJECT THREAD=REFERENCES";
+
       if (pConfig->GetUseIMAPACL())
          sResponse += " ACL";
 
