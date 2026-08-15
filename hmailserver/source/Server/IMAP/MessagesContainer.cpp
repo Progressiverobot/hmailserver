@@ -59,21 +59,7 @@ namespace HM
 
       size_t estimated_size_after = cached_messages->GetEstimatedCachingSize();
 
-      bool increased_size = false;
-      size_t size_change = 0;
-
-      if (estimated_size_after > estimated_size_before)
-      {
-         increased_size = true;
-         size_change = estimated_size_after - estimated_size_before;
-      }
-      else
-      {
-         increased_size = false;
-         size_change = estimated_size_before - estimated_size_after;
-      }
-      
-      messages_cache_.AdjustEstimatedSize(increased_size, size_change);
+      messages_cache_.AdjustEstimatedSize((__int64) estimated_size_after - (__int64) estimated_size_before);
 
       // Collected under the collection's own lock. Iterating GetVector() here
       // raced with another session erasing from the same shared vector, which

@@ -44,7 +44,7 @@ namespace HM
       void SetEnabled(bool bEnabled);
       void Clear();
 
-      void AdjustEstimatedSize(bool increase, size_t size_change);
+      void AdjustEstimatedSize(__int64 size_delta);
 
       void SetMaxSize(size_t max_size);
       size_t GetMaxSize();
@@ -56,6 +56,23 @@ namespace HM
 
       void ResetEstimatedSizeIfEmpty_();
 
+      // Every removal decrements by the object's LIVE size
+      // (GetEstimatedCachingSize()), never the snapshot CachedObject took at
+      // construction. The two can differ by the whole object: the message cache
+      // inserts a CachedMessages BEFORE its first database refresh, so its snapshot
+      // is permanently zero and everything it later grows by arrives through
+      // AdjustEstimatedSize. Decrementing the stale snapshot on removal - or, on
+      // the TTL-expiry path, decrementing nothing at all - left those grown bytes
+      // in the total forever, a ratchet that only Clear() reset. A counter that
+      // only ever grows eventually exceeds any cap, at which point every Add pays
+      // the eviction walk for nothing.
+      void DecreaseEstimatedSize_(size_t amount)
+      {
+         if (current_estimated_size_ >= amount)
+            current_estimated_size_ -= amount;
+         else
+            current_estimated_size_ = 0;
+      }
 
       template<typename Tag, typename MultiIndexContainer, typename TagValue>
       std::shared_ptr<T> GetItemBy_(const MultiIndexContainer& s, TagValue value)
@@ -72,13 +89,15 @@ namespace HM
                return cached_object.object_;
             }
 
+            DecreaseEstimatedSize_(cached_object.object_->GetEstimatedCachingSize());
             items.erase(item);
+            ResetEstimatedSizeIfEmpty_();
          }
 
          std::shared_ptr<T> empty;
          return empty;
       }
-      
+
       template<typename Tag, typename MultiIndexContainer, typename TagValue>
       void RemoveBy_(const MultiIndexContainer& s, TagValue value)
       {
@@ -91,9 +110,8 @@ namespace HM
          {
             auto item = (*item_iter);
 
-            if (current_estimated_size_ >= item.GetEstimatedSize())
-               current_estimated_size_ -= item.GetEstimatedSize();
-            
+            DecreaseEstimatedSize_(item.object_->GetEstimatedCachingSize());
+
             items.erase(item_iter);
          }
 
@@ -320,14 +338,18 @@ namespace HM
 
             auto item = (*item_iter);
 
-            // An entry that reports no size cannot bring the total down, so
-            // evicting further entries would empty the whole cache without ever
-            // reaching the target. Stop instead of purging everything.
-            if (item.GetEstimatedSize() == 0)
-               break;
-
-            if (current_estimated_size_ >= item.GetEstimatedSize())
-               current_estimated_size_ -= item.GetEstimatedSize();
+            // Evicted by LIVE size. The previous version read the construction-time
+            // snapshot and BROKE on a zero - which, in the message cache, is every
+            // entry (they are inserted before their first refresh), so the 512 MB
+            // cap never evicted anything at all. With live sizes a zero means an
+            // actually-empty entry (an empty folder, say): it is erased and the walk
+            // continues, because letting it sit at the front of the timestamp index
+            // would block eviction of everything younger for as long as it lives.
+            // The walk still terminates - each pass erases exactly one entry - and
+            // it can no longer purge a healthy cache by mistake, because when the
+            // accounting is truthful, a total above the target implies entries with
+            // real size ahead.
+            DecreaseEstimatedSize_(item.object_->GetEstimatedCachingSize());
 
             items.erase(item_iter);
          }
@@ -336,8 +358,12 @@ namespace HM
       }
 
       no_of_misses_++;
-      current_estimated_size_ += object.GetEstimatedSize();
-      items.insert(object);
+
+      // Counted only when the insert actually happened: the id index is
+      // hashed_unique, so a racing second Add of the same object is a silent no-op
+      // insert - and counting its bytes anyway leaks phantom size into the total.
+      if (items.insert(object).second)
+         current_estimated_size_ += object.GetEstimatedSize();
    }
 
    template <class T> 
@@ -366,36 +392,150 @@ namespace HM
 
    }
 
+   // Deterministic tests for the size accounting. Wired into ClassTester::DoTests,
+   // reachable via hMailServer.exe /Test. They pin the invariant the eviction cap
+   // depends on: the counter equals the sum of the entries' LIVE sizes, through
+   // grow-after-insert, removal, TTL expiry, duplicate Add and eviction.
+   class CacheAccountingTester
+   {
+   private:
+      // The shape of CachedMessages, reduced: inserted at one size (zero, like an
+      // unrefreshed folder), grown afterwards, with the growth reported through
+      // AdjustEstimatedSize.
+      class Dummy
+      {
+      public:
+         Dummy(__int64 id, const String &name, size_t size) : id_(id), name_(name), size_(size) {}
+         __int64 GetID() { return id_; }
+         String GetName() { return name_; }
+         size_t GetEstimatedCachingSize() { return size_; }
+         void SetEstimatedCachingSize(size_t size) { size_ = size; }
+      private:
+         __int64 id_;
+         String name_;
+         size_t size_;
+      };
+
+   public:
+      void Test()
+      {
+         // Grow-after-insert, then removal: the counter must come back to zero.
+         // With the old snapshot-based removal it stayed at 1000 forever - the
+         // ratchet that eventually put every cache permanently "over" its cap.
+         {
+            Cache<Dummy> cache;
+            cache.SetEnabled(true);
+            cache.SetTTL(3600);
+
+            auto grown = std::make_shared<Dummy>(1, _T("grown"), 0);
+            cache.Add(grown);
+            if (cache.GetSize() != 0)
+               throw 0;
+
+            grown->SetEstimatedCachingSize(1000);
+            cache.AdjustEstimatedSize(1000);
+            if (cache.GetSize() != 1000)
+               throw 0;
+
+            cache.RemoveObject((__int64) 1);
+            if (cache.GetSize() != 0)
+               throw 0;
+
+            // The decrease guard: an oversized negative delta clamps at zero
+            // rather than wrapping the unsigned total.
+            cache.AdjustEstimatedSize(-500);
+            if (cache.GetSize() != 0)
+               throw 0;
+         }
+
+         // A duplicate Add of the same id is a silent no-op insert and must not
+         // count its bytes twice.
+         {
+            Cache<Dummy> cache;
+            cache.SetEnabled(true);
+            cache.SetTTL(3600);
+
+            auto once = std::make_shared<Dummy>(6, _T("once"), 100);
+            cache.Add(once);
+            cache.Add(once);
+            if (cache.GetSize() != 100)
+               throw 0;
+         }
+
+         // TTL expiry erases through the lookup path, which previously removed the
+         // entry without touching the counter at all.
+         {
+            Cache<Dummy> cache;
+            cache.SetEnabled(true);
+            cache.SetTTL(0); // everything is already expired
+
+            cache.Add(std::make_shared<Dummy>(7, _T("expired"), 200));
+            if (cache.GetSize() != 200)
+               throw 0;
+
+            if (cache.GetObject((__int64) 7) != nullptr)
+               throw 0;
+            if (cache.GetSize() != 0)
+               throw 0;
+         }
+
+         // Eviction: a zero-size entry at the front of the timestamp index is
+         // erased and walked past - the old code stopped dead on it, which in the
+         // message cache meant the cap never evicted anything - and eviction
+         // proceeds oldest-first until the total is under target.
+         {
+            Cache<Dummy> cache;
+            cache.SetEnabled(true);
+            cache.SetTTL(3600);
+            cache.SetMaxSize(3000);
+
+            cache.Add(std::make_shared<Dummy>(2, _T("empty-folder"), 0));
+            cache.Add(std::make_shared<Dummy>(3, _T("a"), 1500));
+            cache.Add(std::make_shared<Dummy>(4, _T("b"), 1500));
+            if (cache.GetSize() != 3000)
+               throw 0;
+
+            // Pushes past the cap: the zero-size entry and then the oldest real
+            // one must go; the two younger entries stay.
+            cache.Add(std::make_shared<Dummy>(5, _T("c"), 1500));
+
+            if (cache.GetObject((__int64) 2) != nullptr)
+               throw 0;
+            if (cache.GetObject((__int64) 3) != nullptr)
+               throw 0;
+            if (cache.GetObject((__int64) 4) == nullptr)
+               throw 0;
+            if (cache.GetObject((__int64) 5) == nullptr)
+               throw 0;
+            if (cache.GetSize() != 3000)
+               throw 0;
+         }
+      }
+   };
+
    template <class T>
    void
-   Cache<T>::AdjustEstimatedSize(bool increase, size_t size_change)
+   Cache<T>::AdjustEstimatedSize(__int64 size_delta)
    {
       // Public, and called from outside this class - MessagesContainer adjusts the
       // message cache from the IMAP path - so it runs on protocol threads while
       // other protocol threads are reading and writing the same total under the
-      // lock. It was the one public mutator that did not take it.
+      // lock.
       //
-      // A lost or torn update here does not corrupt memory, it corrupts the
-      // accounting that the size cap is computed from, and the size cap is what
-      // bounds how much memory this cache is allowed to hold. The read-modify-write
-      // below is exactly the shape that loses updates without one.
+      // A signed delta rather than the previous (bool increase, size_t change)
+      // pair, whose one caller computed direction and magnitude in a mirrored
+      // if/else - the shape that produced the inverted-branch bug this function
+      // has already carried once. The caller now subtracts two sizes and passes
+      // the result; the sign logic lives in exactly one place.
       boost::lock_guard<boost::recursive_mutex> guard(_mutex);
 
-      if (increase)
+      if (size_delta >= 0)
       {
-         current_estimated_size_ += size_change;
+         current_estimated_size_ += (size_t) size_delta;
       }
       else
       {
-         // The two branches were inverted: an oversized decrease underflowed the
-         // unsigned total to an enormous value, while every ordinary decrease
-         // reset it to zero - so the accounting never reflected reality and the
-         // size cap could not do its job.
-         if (size_change > current_estimated_size_)
-            current_estimated_size_ = 0;
-         else
-            current_estimated_size_ -= size_change;
+         DecreaseEstimatedSize_((size_t) (-size_delta));
       }
-
    }
 }
