@@ -50,7 +50,19 @@ namespace hMailServer.ControlPanel.Views
 
       private static Wpf.Ui.Controls.Button Tile(Wpf.Ui.Controls.SymbolRegular icon, string heading, string subtitle, string navKey)
       {
-         var icn = new Wpf.Ui.Controls.SymbolIcon { Symbol = icon, FontSize = 24, Margin = new Thickness(0, 0, 0, 10) };
+         // Centred across the WHOLE tile, which needs the stack below to be
+         // stretched: with the stack sized to its content, "centre" meant the centre
+         // of the widest line of text, so every tile put its icon somewhere
+         // different - above the middle of "Domains & accounts" in one and much
+         // further left above "Live logs" in another. Six tiles, six positions, none
+         // of them chosen. Reported as issue #30.
+         var icn = new Wpf.Ui.Controls.SymbolIcon
+         {
+            Symbol = icon,
+            FontSize = 24,
+            Margin = new Thickness(0, 0, 0, 10),
+            HorizontalAlignment = HorizontalAlignment.Center
+         };
          icn.Foreground = Services.ThemeTokens.Brand;
 
          var stack = new StackPanel();
@@ -77,7 +89,11 @@ namespace hMailServer.ControlPanel.Views
             Margin = new Thickness(0, 0, 12, 12),
             Padding = new Thickness(16, 14, 16, 14),
             HorizontalAlignment = HorizontalAlignment.Stretch,
-            HorizontalContentAlignment = HorizontalAlignment.Left,
+            // Stretch rather than Left: the content stack then spans the tile, which
+            // is what lets the icon centre on the TILE and leaves the two text
+            // blocks left-aligned exactly where they already were (a TextBlock in a
+            // stretched vertical StackPanel still draws its text from the left).
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
             VerticalContentAlignment = VerticalAlignment.Top,
             Height = 128,
             Cursor = System.Windows.Input.Cursors.Hand
