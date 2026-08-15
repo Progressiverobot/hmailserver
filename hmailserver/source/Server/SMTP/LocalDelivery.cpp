@@ -274,8 +274,25 @@ namespace HM
       // (a discard, or a redirect with no keep).
       String sieveFolder;
       bool sieveDrop = false;
-      EvaluateSieveScript_(account, accountLevelMessage, sOriginalAddress, sieveFolder, sieveDrop);
+      bool sieveFlagsGiven = false;
+      std::vector<String> sieveFlags;
+      EvaluateSieveScript_(account, accountLevelMessage, sOriginalAddress, sieveFolder, sieveDrop,
+                           sieveFlagsGiven, sieveFlags);
 
+      // Applied here, before the caller's PersistentMessage::SaveObject, which is the
+      // only reason a flag set by a script survives at all.
+      //
+      // Until 15 August 2026 this did not happen: the evaluator filled SieveResult's
+      // flags, ManageSieve accepted `require "imap4flags"`, setflag/addflag/removeflag
+      // parsed and ran and reported success in the action summary - and delivery read
+      // `redirects`, `vacation`, `fileInto` and `keepLocal` and never looked at
+      // `flags`. A script marking its own automated mail \Seen was accepted, ran, and
+      // changed nothing, which is the worst shape a feature can have: not missing, so
+      // nobody adds it, and not working, so nobody can rely on it.
+      //
+      // Placed before the sieveDrop return on purpose. A discarded message is not
+      // stored, so there is nothing to flag - and doing this first would write flags
+      // onto an object about to be thrown away.
       if (sieveDrop)
       {
          String sMessage = Formatter::Format("SMTPDeliverer - Message {0}: not kept locally by the Sieve script for {1}.",
@@ -284,9 +301,12 @@ namespace HM
          return false;
       }
 
+      if (sieveFlagsGiven)
+         ApplySieveFlags_(account, accountLevelMessage, sieveFlags);
+
       //
       // Move to IMAP folder. This must be done after we've executed account level rules
-      // since the account level rules may override the folders. 
+      // since the account level rules may override the folders.
       //
       __int64 iDestinationFolderID = accountLevelMessage->GetFolderID();
       __int64 iDestinationAccountID = account->GetID();
@@ -324,10 +344,88 @@ namespace HM
    }
 
    void
-   LocalDelivery::EvaluateSieveScript_(std::shared_ptr<const Account> account, std::shared_ptr<Message> message, const String &sOriginalAddress, String &sieveFolder, bool &sieveDrop)
+   LocalDelivery::ApplySieveFlags_(std::shared_ptr<const Account> account, std::shared_ptr<Message> message,
+                                   const std::vector<String> &sieveFlags)
+   {
+      // The five the store can hold. They are exactly the five SELECT advertises in
+      // PERMANENTFLAGS, and exactly the five SieveParser::SplitFlagList canonicalises,
+      // so an exact comparison is right here and a case-insensitive one would only
+      // hide a parser change.
+      //
+      // \Recent is deliberately absent. It is the server's to set - it means "arrived
+      // since this mailbox was last selected", not anything a filter decided - and
+      // clearing it here because a script's flag list did not mention it would make
+      // every filtered message arrive looking already-seen-by-a-client. The same goes
+      // for the internal VirusScan and Spam bits, which share the bitmask and are not
+      // IMAP flags at all.
+      const bool seen = ListContains_(sieveFlags, _T("\\Seen"));
+      const bool answered = ListContains_(sieveFlags, _T("\\Answered"));
+      const bool flagged = ListContains_(sieveFlags, _T("\\Flagged"));
+      const bool deleted = ListContains_(sieveFlags, _T("\\Deleted"));
+      const bool draft = ListContains_(sieveFlags, _T("\\Draft"));
+
+      // Set from the whole list rather than only setting the ones present, because
+      // RFC 5232's flag variable holds the FINAL set: "removeflag" leaving a flag out
+      // is as much an instruction as "addflag" putting one in. A newly delivered
+      // message has none of these set anyway, so in practice only the true cases do
+      // anything - but writing it this way is what makes a future :flags on a message
+      // that already carries flags behave the way the RFC says.
+      message->SetFlagSeen(seen);
+      message->SetFlagAnswered(answered);
+      message->SetFlagFlagged(flagged);
+      message->SetFlagDeleted(deleted);
+      message->SetFlagDraft(draft);
+
+      // Anything else is a keyword, and this server cannot store one: messageflags is
+      // a fixed 8-bit bitmask and SELECT advertises PERMANENTFLAGS without \*, so
+      // there is nowhere to put it and no way for a client to see it.
+      //
+      // Said out loud rather than dropped. Silently discarding half of what a script
+      // asked for is precisely the failure this whole change exists to end, and an
+      // administrator whose "filed and tagged" rule only files needs to be told which
+      // half worked. One line per delivery that uses keywords, naming them.
+      std::vector<String> unsupported;
+
+      for (const String &flag : sieveFlags)
+      {
+         if (flag.Compare(_T("\\Seen")) == 0 || flag.Compare(_T("\\Answered")) == 0 ||
+             flag.Compare(_T("\\Flagged")) == 0 || flag.Compare(_T("\\Deleted")) == 0 ||
+             flag.Compare(_T("\\Draft")) == 0)
+            continue;
+
+         unsupported.push_back(flag);
+      }
+
+      if (!unsupported.empty())
+      {
+         LOG_APPLICATION(Formatter::Format("SMTPDeliverer - The Sieve script for {0} set the flag(s) {1}, which this "
+            "server cannot store: only \\Seen, \\Answered, \\Flagged, \\Deleted and \\Draft are held against a "
+            "message. The rest of the script was applied.",
+            account->GetAddress(), StringParser::JoinVector(unsupported, _T(" "))));
+      }
+   }
+
+   bool
+   LocalDelivery::ListContains_(const std::vector<String> &values, const String &value)
+   {
+      for (const String &candidate : values)
+      {
+         if (candidate.Compare(value) == 0)
+            return true;
+      }
+
+      return false;
+   }
+
+   void
+   LocalDelivery::EvaluateSieveScript_(std::shared_ptr<const Account> account, std::shared_ptr<Message> message,
+                                       const String &sOriginalAddress, String &sieveFolder, bool &sieveDrop,
+                                       bool &sieveFlagsGiven, std::vector<String> &sieveFlags)
    {
       sieveFolder = _T("");
       sieveDrop = false;
+      sieveFlagsGiven = false;
+      sieveFlags.clear();
 
       String script = SieveStorage::GetActiveScript(account->GetAddress());
       if (script.IsEmpty())
@@ -384,6 +482,13 @@ namespace HM
 
       if (!sieveResult.fileInto.IsEmpty())
          sieveFolder = sieveResult.fileInto;
+
+      // Carried out whole rather than interpreted here. The evaluator has already
+      // resolved setflag/addflag/removeflag and any :flags on the storing action into
+      // ONE final set - RFC 5232's flag variable - so there is nothing left to decide;
+      // reinterpreting it at delivery is how the two representations would drift.
+      sieveFlagsGiven = sieveResult.flagsGiven;
+      sieveFlags = sieveResult.flags;
 
       // When the script kept neither an explicit nor implicit local copy (a discard,
       // or a redirect that cancels the implicit keep), drop it locally.

@@ -223,6 +223,24 @@ namespace RegressionTests.Sieve
                StringAssert.Contains("IMPLEMENTATION", greeting);
                StringAssert.Contains("SIEVE", greeting);
 
+               // Every ManageSieve client builds its filter UI from this line, so a name
+               // on it is a promise that using the extension does something. The rule in
+               // ManageSieveServer.cpp is that a name is added in the same commit as its
+               // delivery-side step; this asserts the two halves stayed together for
+               // imap4flags, whose step (LocalDelivery::ApplySieveFlags_) landed on
+               // 15 August 2026 with SieveFlagDelivery.cs behind it.
+               //
+               // The inverse is the failure worth catching: an extension advertised here
+               // and inert in delivery puts a control in front of the user that quietly
+               // does nothing, which is exactly what imap4flags was for months.
+               StringAssert.Contains("imap4flags", greeting);
+               StringAssert.Contains("vacation", greeting);
+
+               // Still absent on purpose: envelope is implemented and evaluated, and is
+               // held back until a test proves the envelope TEST command itself works.
+               // If somebody adds it here, that test should exist first.
+               StringAssert.DoesNotContain("envelope", greeting);
+
                // CAPABILITY before auth is allowed.
                string capability = session.SendCommand("CAPABILITY");
                StringAssert.Contains("SASL", capability);

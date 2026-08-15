@@ -169,8 +169,6 @@ namespace HM
       // engine also implements "vacation", "imap4flags" and "envelope", and each
       // needs exactly one more step in the delivery path before it is real:
       //
-      //   imap4flags  ... must act on the "flags:" summary token when it stores
-      //               the local copy of the message.
       //   envelope    ... must pass the SMTP envelope into the evaluator, so that
       //               envelope "to" works without the Delivered-To header, which
       //               is off in the shipped configuration. LocalDelivery now does
@@ -195,7 +193,23 @@ namespace HM
       // and RFC 6131 requires the capability to be advertised separately; a client
       // that offers a seconds-granularity control it cannot rely on is the same
       // defect in the other direction.
-      const char *AdvertisedSieveExtensions = "fileinto copy relational subaddress vacation vacation-seconds";
+      //
+      // imap4flags moved in on 15 August 2026, under the same rule. Its delivery-side
+      // step is LocalDelivery::ApplySieveFlags_, which writes the flags the evaluator
+      // decided onto the message before it is saved - taken from the structured
+      // SieveResult rather than from the summary token this comment used to name,
+      // because re-parsing a ';'-joined string at delivery is how the two
+      // representations drift. Six end-to-end tests in SieveFlagDelivery.cs assert on
+      // what a FETCH returns rather than on what the evaluator reported, and the fix
+      // was disabled once to confirm that four of them fail without it.
+      //
+      // One honest limit, which does not disqualify it: only the five system flags can
+      // be stored, because messageflags is a fixed 8-bit bitmask and SELECT advertises
+      // PERMANENTFLAGS without the \* that would promise keywords. A keyword is stored
+      // nowhere and reported in the application log rather than dropped in silence. A
+      // client reading this line gets a working setflag/addflag/removeflag for the
+      // flags it can actually see, which is what the rule above protects.
+      const char *AdvertisedSieveExtensions = "fileinto copy relational subaddress vacation vacation-seconds imap4flags";
 
       AnsiString EscapeQuoted(const String &value)
       {

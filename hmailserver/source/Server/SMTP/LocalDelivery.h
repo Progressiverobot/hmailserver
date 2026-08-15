@@ -37,7 +37,30 @@ namespace HM
       // It is the SMTP envelope recipient the evaluator needs for "envelope" tests
       // and for the RFC 5230 4.5 check that refuses to auto-reply to a message the
       // user was not actually a recipient of.
-      void EvaluateSieveScript_(std::shared_ptr<const Account> account, std::shared_ptr<Message> message, const String &sOriginalAddress, String &sieveFolder, bool &sieveDrop);
+      // sieveFlagsGiven is true when the script set the local copy's IMAP flags -
+      // through :flags on the keep/fileinto, or through setflag/addflag/removeflag -
+      // and sieveFlags is then the final set it decided on, canonicalised by
+      // SieveParser::SplitFlagList. Empty-and-given is meaningful and different from
+      // not-given: "removeflag" that cleared everything is an instruction, and a
+      // script that never mentioned flags is not.
+      void EvaluateSieveScript_(std::shared_ptr<const Account> account, std::shared_ptr<Message> message,
+                                const String &sOriginalAddress, String &sieveFolder, bool &sieveDrop,
+                                bool &sieveFlagsGiven, std::vector<String> &sieveFlags);
+
+      // Writes the flags a script decided onto the message that is about to be saved.
+      //
+      // Separate from the evaluation for the same reason sieveFolder and sieveDrop are
+      // out-parameters rather than actions: the evaluator decides and the delivery
+      // acts, so there is one place to look for what a script actually did to a
+      // message.
+      static void ApplySieveFlags_(std::shared_ptr<const Account> account, std::shared_ptr<Message> message,
+                                   const std::vector<String> &sieveFlags);
+
+      // Exact, case-sensitive membership. The flag names reaching here have already
+      // been canonicalised by SieveParser::SplitFlagList, so a case-insensitive test
+      // would compare values that cannot differ in case and would quietly go on
+      // working if that canonicalisation were ever removed.
+      static bool ListContains_(const std::vector<String> &values, const String &value);
 
       std::shared_ptr<Message>  CreateAccountLevelMessage_(std::shared_ptr<Message> pOriginalMessage, std::shared_ptr<const Account> pRecipientAccount, bool reuseMessage, const String &sOriginalAddress);
 
