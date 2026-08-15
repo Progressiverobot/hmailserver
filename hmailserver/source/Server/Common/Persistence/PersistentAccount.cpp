@@ -34,6 +34,7 @@
 #include "../../SMTP/SMTPVacationMessageCreator.h"
 
 #include "PreSaveLimitationsCheck.h"
+#include "../Sieve/SieveStorage.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -136,6 +137,15 @@ namespace HM
             String sAccountFolder = IniFileSettings::Instance()->GetDataDirectory() + "\\" + sDomainName + "\\" + sMailbox;
             FileUtilities::DeleteDirectory(sAccountFolder, false);
          }
+
+         // The Sieve tree is not under the mailbox directory, so removing the
+         // mailbox left the account's filter on disk. Recreating that address
+         // later - a returning customer, a rebuilt test domain - silently
+         // reactivated the previous holder's script for the new owner's mail,
+         // redirects included, with nothing in the interface or the logs
+         // mentioning that a filter existed at all. Forced, because the tree
+         // holds the scripts directory and the vacation store as well.
+         FileUtilities::DeleteDirectory(SieveStorage::GetAccountDirectory(pAccount->GetAddress()), true);
       }
       else
       {

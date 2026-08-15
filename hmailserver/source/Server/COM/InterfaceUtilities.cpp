@@ -68,12 +68,25 @@ STDMETHODIMP InterfaceUtilities::ResolveMXRecords(BSTR DomainName, BSTR *Result)
       std::vector<HM::HostNameAndIpAddress> hosts;
 
       HM::DNSResolver oDNSResolver;
-      oDNSResolver.GetEmailServers(sDomainName, hosts);
+      bool lookupSucceeded = oDNSResolver.GetEmailServers(sDomainName, hosts);
 
-      // Hostname and address per line, in the server's own preference order -
-      // GetEmailServers has already sorted by MX preference and randomised equal
-      // preferences, exactly as delivery does. A tab separates the two so a caller
-      // can split them apart without guessing at the hostname's own characters.
+      // "The lookup failed" and "this domain has no mail servers" are different
+      // answers and must not arrive as the same empty string. The resolver already
+      // distinguishes them - false means the MX query itself failed, or every
+      // address lookup for the exchange hosts did - and the server's own bounce
+      // text keeps them apart too. Collapsing both into an empty result told an
+      // administrator whose custom DNS server was unreachable that the RECIPIENT's
+      // domain has no mail servers, which is the wrong diagnosis in exactly the
+      // scenario this method was added for (issue #29).
+      if (!lookupSucceeded && hosts.empty())
+         return COMError::GenerateError("The DNS lookup failed, so where mail for this domain would go could not be determined. This is a failure of the lookup itself - the domain may well have mail servers. Check the server's DNS configuration (a custom DNSServer in hMailServer.ini, if set, must be reachable) and the DNS entries in the server log.");
+
+      // Hostname and address per line, in the order delivery would try them:
+      // GetEmailServers sorts by MX preference. It does NOT randomise among equal
+      // preferences - RFC 5321 5.1 asks for that and this server has never done it,
+      // so saying otherwise here would misdescribe both this tool and delivery.
+      // A tab separates the two so a caller can split them apart without guessing
+      // at the hostname's own characters.
       HM::String sResult;
 
       for (size_t i = 0; i < hosts.size(); i++)

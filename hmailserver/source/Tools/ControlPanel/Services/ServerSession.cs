@@ -417,7 +417,25 @@ namespace hMailServer.ControlPanel.Services
       {
          try
          {
-            return (int) app_.ServerState == StateRunning;
+            // The VALUE does not matter - only that the out-of-process server
+            // answered. A paused engine (Status page, or Application.Stop over COM)
+            // reports Stopped while the service, the COM object and this link are
+            // all perfectly healthy. Treating that as a dead link sent the panel
+            // into a permanent false-reconnect loop for as long as the pause
+            // lasted: a "reconnected after the service restarted" toast and a
+            // second of frozen UI every few seconds, five COM objects created and
+            // thrown away each time, and the current page reloaded underneath the
+            // administrator - while the Pause confirmation promised the panel would
+            // stay connected.
+            //
+            // ServerState is still the right question to ask, for the reason below:
+            // it is an in-memory read that a shutting-down server stops answering,
+            // where Version keeps returning a static string long after the database
+            // has gone. What changed is that "it answered" is the liveness signal,
+            // not "it answered Running". Readiness after a service RESTART is a
+            // different question and is still asked separately by IsServerReady.
+            int ignored = (int) app_.ServerState;
+            return true;
          }
          catch (Exception ex)
          {

@@ -90,6 +90,10 @@ namespace hMailServer.ControlPanel.Views
       private readonly ListBox folderList_ = new() { Height = 220, FontSize = 13, Margin = new Thickness(0, 0, 0, 10) };
       private readonly TextBlock folderStatus_ = new() { FontSize = 12, Margin = new Thickness(0, 4, 0, 0) };
 
+      // What Load() read from the server, so Save can write the Sieve file only on
+      // a real edit. Null until Load runs.
+      private string loadedSieveScript_;
+
       public AccountDialog(Window owner, string domainName, string address)
       {
          domainName_ = domainName;
@@ -653,6 +657,10 @@ namespace hMailServer.ControlPanel.Views
             // SieveScript is a file-backed property added in 6.x; tolerate older servers.
             try { sieveScript_.Text = (string) a.SieveScript ?? ""; } catch { sieveScript_.Text = ""; }
 
+            // Remembered so Save can tell an edited script from an untouched one and
+            // write the file only when it actually changed - see the note there.
+            loadedSieveScript_ = sieveScript_.Text;
+
             isAd_.IsChecked = (bool) a.IsAD;
             adDomain_.Text = (string) a.ADDomain ?? "";
             adUser_.Text = (string) a.ADUsername ?? "";
@@ -768,14 +776,33 @@ namespace hMailServer.ControlPanel.Views
             a.SignaturePlainText = signaturePlain_.Text;
             a.SignatureHTML = signatureHtml_.Text;
 
-            // File-backed property (written immediately); tolerate older servers.
-            try { a.SieveScript = sieveScript_.Text ?? ""; } catch { }
-
             a.IsAD = isAd_.IsChecked == true;
             a.ADDomain = adDomain_.Text.Trim();
             a.ADUsername = adUser_.Text.Trim();
 
             a.Save();
+
+            // AFTER Save, and only when it actually changed. SieveScript is not an
+            // in-memory property: the setter writes the file immediately, keyed on
+            // the account object's CURRENT address. Written before Save during a
+            // rename, it landed on the NEW address - so a rename the server then
+            // REFUSED (a duplicate address, or an installation that still needs
+            // Data Directory Synchronizer) had already overwritten the script of
+            // whoever holds that address, or, with an empty editor, deleted it
+            // along with their vacation state. Nothing said so: the dialog only
+            // reported that the account could not be saved.
+            //
+            // Writing it unconditionally was the other half. Opening an account and
+            // pressing Save with the Sieve tab untouched rewrote the file, so a
+            // script edited elsewhere (ManageSieve) was replaced by whatever this
+            // dialog happened to have loaded.
+            string sieveText = sieveScript_.Text ?? "";
+            if (sieveText != (loadedSieveScript_ ?? ""))
+            {
+               // Tolerate older servers, which do not have this property at all.
+               try { a.SieveScript = sieveText; } catch { }
+            }
+
             ServerSession.Release(a);
             Close();
          }

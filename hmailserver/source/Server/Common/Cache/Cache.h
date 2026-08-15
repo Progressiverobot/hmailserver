@@ -74,6 +74,28 @@ namespace HM
             current_estimated_size_ = 0;
       }
 
+      // The truth: what the cached objects say they occupy right now. Callers hold
+      // _mutex. See the note at the eviction check for why the running total alone
+      // cannot be trusted to make that decision.
+      void RecomputeEstimatedSize_()
+      {
+         size_t total = 0;
+
+         for (auto item = objects_.begin(); item != objects_.end(); item++)
+            total += LiveSizeOf_(*item);
+
+         current_estimated_size_ = total;
+      }
+
+      // An entry's size as the object reports it NOW, rather than the snapshot
+      // taken when it was cached - the two differ by the whole object for anything
+      // that is cached before it is filled. Null-checked because a
+      // default-constructed CachedObject carries no object at all.
+      static size_t LiveSizeOf_(const CachedObject<T> &item)
+      {
+         return item.object_ ? item.object_->GetEstimatedCachingSize() : 0;
+      }
+
       template<typename Tag, typename MultiIndexContainer, typename TagValue>
       std::shared_ptr<T> GetItemBy_(const MultiIndexContainer& s, TagValue value)
       {
@@ -89,7 +111,7 @@ namespace HM
                return cached_object.object_;
             }
 
-            DecreaseEstimatedSize_(cached_object.object_->GetEstimatedCachingSize());
+            DecreaseEstimatedSize_(LiveSizeOf_(cached_object));
             items.erase(item);
             ResetEstimatedSizeIfEmpty_();
          }
@@ -110,7 +132,7 @@ namespace HM
          {
             auto item = (*item_iter);
 
-            DecreaseEstimatedSize_(item.object_->GetEstimatedCachingSize());
+            DecreaseEstimatedSize_(LiveSizeOf_(item));
 
             items.erase(item_iter);
          }
@@ -325,6 +347,24 @@ namespace HM
 
       CachedObject<T> object(pObject);
 
+      // Recomputed from the entries themselves before any eviction decision, rather
+      // than trusted from the running total. The total is maintained by deltas, and
+      // the delta stream is NOT symmetric: MessagesContainer reports growth around
+      // a refresh, but every path that SHRINKS a cached collection - EXPUNGE, UID
+      // EXPUNGE, MOVE, CLOSE, folder delete - erases from the collection directly
+      // and tells the cache nothing. So the total only ever ran ahead of reality,
+      // permanently, by the size of everything ever expunged.
+      //
+      // That drift was harmless while the cap never evicted; it is not harmless now
+      // that it does. An inflated total shrinks the effective capacity toward zero
+      // and then evicts live entries on every Add - eventually walking the whole
+      // container and purging a healthy cache, which is worse than the never-evict
+      // behaviour this replaced. One pass over the entries costs a size read each
+      // (a vector length), on a container holding one entry per cached folder, and
+      // only on the miss path that is already about to hit the database.
+      if (max_size_ > 0)
+         RecomputeEstimatedSize_();
+
       if (max_size_ > 0 && current_estimated_size_ + object.GetEstimatedSize() > max_size_)
       {
          // We've reached the cache max size. Remove items until we're 10% free.
@@ -349,7 +389,7 @@ namespace HM
             // it can no longer purge a healthy cache by mistake, because when the
             // accounting is truthful, a total above the target implies entries with
             // real size ahead.
-            DecreaseEstimatedSize_(item.object_->GetEstimatedCachingSize());
+            DecreaseEstimatedSize_(LiveSizeOf_(item));
 
             items.erase(item_iter);
          }
@@ -476,6 +516,40 @@ namespace HM
             if (cache.GetObject((__int64) 7) != nullptr)
                throw 0;
             if (cache.GetSize() != 0)
+               throw 0;
+         }
+
+         // A cached collection that SHRANK without telling the cache - every
+         // EXPUNGE, MOVE, CLOSE and folder delete does exactly that - must not
+         // leave phantom bytes behind. Before the eviction check recomputed from
+         // the entries, the counter kept the expunged size for good: the cache's
+         // usable capacity shrank with every expunge on the server, and once the
+         // phantom total passed the cap every Add evicted live entries until the
+         // container was empty.
+         {
+            Cache<Dummy> cache;
+            cache.SetEnabled(true);
+            cache.SetTTL(3600);
+            cache.SetMaxSize(100000);
+
+            auto folder = std::make_shared<Dummy>(8, _T("folder"), 0);
+            cache.Add(folder);
+
+            folder->SetEstimatedCachingSize(50000);      // filled by a refresh
+            cache.AdjustEstimatedSize(50000);
+            if (cache.GetSize() != 50000)
+               throw 0;
+
+            // Everything in it is expunged. Nothing tells the cache.
+            folder->SetEstimatedCachingSize(0);
+
+            // The next Add must see the truth rather than the stale 50000.
+            cache.Add(std::make_shared<Dummy>(9, _T("other"), 1000));
+            if (cache.GetSize() != 1000)
+               throw 0;
+
+            // And the shrunk entry is still cached - recomputing must not evict.
+            if (cache.GetObject((__int64) 8) == nullptr)
                throw 0;
          }
 

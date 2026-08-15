@@ -144,15 +144,20 @@ namespace RegressionTests.Infrastructure
 
             LogHandler.DeleteCurrentDefaultLog();
 
-            string result = _application.Utilities.ResolveMXRecords("mx-probe.example.invalid");
+            // Nothing answers at TEST-NET-1, so the lookup FAILS - and failing is a
+            // different answer from "this domain has no mail servers", which is the
+            // distinction the method is required to keep (an administrator whose own
+            // DNS server is unreachable must not be told the recipient's domain has
+            // no MX). Asserting the failure shape rather than merely an empty string
+            // is what pins that: an implementation that swallowed the resolver's
+            // verdict would return empty here and pass a weaker test.
+            var lookupFailure = Assert.Throws<System.Runtime.InteropServices.COMException>(
+               () => { string ignored = _application.Utilities.ResolveMXRecords("mx-probe.example.invalid"); },
+               "A dead DNS server did not produce a lookup failure. Either the query did not go where " +
+               "DNSServer points, or the failure was reported as 'no mail servers'.");
 
-            // Nothing answers at TEST-NET-1, so the honest result is empty - and the
-            // log is what proves the query was SENT there rather than answered from
-            // the system resolver, which would return NXDOMAIN for .invalid instantly
-            // and never time out.
-            Assert.IsTrue(string.IsNullOrEmpty(result),
-               "A dead DNS server produced MX records, so the lookup did not go where DNSServer points. " +
-               "Result: " + result);
+            StringAssert.Contains("lookup failed", lookupFailure.Message,
+               "The failure was raised, but not as a DNS lookup failure: " + lookupFailure.Message);
 
             var log = LogHandler.ReadCurrentDefaultLog();
 
@@ -261,6 +266,15 @@ namespace RegressionTests.Infrastructure
             }
             catch (SocketException ex)
             {
+               // Close whatever DID bind before failing. The ordinary shape here is
+               // UDP/53 free while TCP/53 is held by something else: without this the
+               // Assert.Fail threw out of the constructor, the caller's using never
+               // received an instance, Dispose never ran, and the bound UDP socket
+               // survived to make every later run in this process fail to bind for a
+               // reason that has nothing to do with the server under test.
+               udp_?.Close();
+               tcp_?.Stop();
+
                Assert.Fail("Could not bind 127.0.0.1:53 for the fake DNS server - something on this " +
                            "machine is already serving DNS on loopback (WSL? a local resolver?): " + ex.Message);
             }
@@ -438,8 +452,9 @@ namespace RegressionTests.Infrastructure
                   m.Add(127); m.Add(0); m.Add(0); m.Add(99);
                   return m.ToArray();
 
-               default:
-                  // AAAA and anything else: NODATA - NOERROR with no answers and the
+               case 28:
+               case 5:
+                  // AAAA and CNAME: NODATA - NOERROR with no answers and the
                   // zone's SOA in the AUTHORITY section, per RFC 2308. The SOA is not
                   // decoration. Measured with a probe harness: the identical
                   // empty-NOERROR bytes WITHOUT it are answered 9501 (no records,
@@ -464,6 +479,13 @@ namespace RegressionTests.Infrastructure
                   m.AddRange(soa);
                   return m.ToArray();
             }
+
+            // A query type this fake does not know how to answer. Returning null
+            // rather than a catch-all NODATA is what gives UnansweredTcpQueries
+            // something to count: with every switch arm returning bytes, that
+            // counter could never move and the assertion on it in the test was
+            // structurally incapable of failing.
+            return null;
          }
       }
 

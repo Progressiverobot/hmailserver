@@ -13,6 +13,7 @@
 #include "../BO/DistributionListRecipient.h"
 
 #include "PersistentDistributionListRecipient.h"
+#include "../Sieve/SieveStorage.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -167,7 +168,16 @@ namespace HM
       String oldDirectoryName = FileUtilities::Combine(domainDirectory, oldMailboxName);
       String newDirectoryName = FileUtilities::Combine(domainDirectory, newMailboxName);
 
-      return RenameDirectory_(oldDirectoryName, newDirectoryName, errorMessage);
+      if (!RenameDirectory_(oldDirectoryName, newDirectoryName, errorMessage))
+         return false;
+
+      // The account's Sieve state does not live under its mailbox directory - it
+      // has its own tree - so renaming the mailbox alone left the filter behind at
+      // the old address, where nothing would ever read it again. The user's mail
+      // then stopped being filed, discarded or redirected, silently.
+      return RenameDirectory_(SieveStorage::GetAccountDirectory(oldAccountName),
+                              SieveStorage::GetAccountDirectory(pAccount->GetAddress()),
+                              errorMessage);
    }
 
    bool 
@@ -177,7 +187,17 @@ namespace HM
       String oldDirectory = FileUtilities::Combine(IniFileSettings::Instance()->GetDataDirectory(), oldDomainName);
       String newDirectory = FileUtilities::Combine(IniFileSettings::Instance()->GetDataDirectory(), newDomainName);
 
-      return RenameDirectory_(oldDirectory, newDirectory, errorMessage);
+      if (!RenameDirectory_(oldDirectory, newDirectory, errorMessage))
+         return false;
+
+      // And the domain's Sieve tree, which lives outside the mailbox tree. Without
+      // this a domain rename moved every mailbox and left every account's filter
+      // behind: delivery looked the script up under the new domain, found nothing,
+      // and delivered to INBOX everything the user had arranged to file, discard
+      // or redirect - with no error and no log line.
+      return RenameDirectory_(SieveStorage::GetDomainDirectory(oldDomainName),
+                              SieveStorage::GetDomainDirectory(newDomainName),
+                              errorMessage);
    }
 
    bool 

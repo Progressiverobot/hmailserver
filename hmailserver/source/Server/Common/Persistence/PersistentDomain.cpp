@@ -26,6 +26,7 @@
 
 #include "PreSaveLimitationsCheck.h"
 #include "PersistenceMode.h"
+#include "../Sieve/SieveStorage.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -371,6 +372,14 @@ namespace HM
          {
             String sDomainFolder = IniFileSettings::Instance()->GetDataDirectory() + "\\" + pDomain->GetName();
             FileUtilities::DeleteDirectory(sDomainFolder, false);
+
+            // The domain's Sieve tree lives outside that directory, so it survived
+            // the delete - and recreating the domain and any of its addresses later
+            // silently reactivated the previous holders' filters for whoever now
+            // owns those addresses. The per-account deletes above remove their own
+            // Sieve directories; this removes the domain directory itself, and
+            // anything left in it by an account whose row had already gone.
+            FileUtilities::DeleteDirectory(SieveStorage::GetDomainDirectory(pDomain->GetName()), true);
          }
 
          return true;

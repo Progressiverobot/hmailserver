@@ -113,6 +113,16 @@ namespace HM
 
       std::vector<std::pair<bool,String> > vecSortTypes = pParser->GetSortTypes();
 
+      // The skip-to-last walk below starts by evaluating begin() + 1, which on an
+      // EMPTY vector is one past a null end() - the comparison never matches, the
+      // iterator runs away, and the loop never terminates. In a release build
+      // (_ITERATOR_DEBUG_LEVEL 0) that is an unkillable connection thread at 100%
+      // of a core rather than a crash. The command layer now refuses an empty sort
+      // list outright; this guard stays because the hang is severe and the cost of
+      // being certain is one comparison.
+      if (vecSortTypes.empty())
+         return true;
+
       auto iterSortType = vecSortTypes.begin();
       // Skip to the last.
       while (iterSortType + 1 != vecSortTypes.end())

@@ -33,6 +33,9 @@ namespace HM
       writes_completed_(0)
    {
       buffer_ = std::shared_ptr<ByteBuffer>(new ByteBuffer);
+
+      flushed_tail_[0] = '\r';
+      flushed_tail_[1] = '\n';
    }
 
    TransparentTransmissionBuffer::~TransparentTransmissionBuffer(void)
@@ -40,12 +43,31 @@ namespace HM
 
    }
 
+   // POP3Connection and SMTPClientConnection hold one of these for the life of the
+   // session and re-Initialize it per message, so anything carried between chunks
+   // has to be reset here or it leaks from one transfer into the next: a carry
+   // left saying "mid-line" would make the first byte of the NEXT message look
+   // like a continuation, and a line-leading dot there would go out unstuffed.
+   void
+   TransparentTransmissionBuffer::ResetPerTransferState_()
+   {
+      data_sent_ = 0;
+      transmission_ended_ = false;
+      ended_on_non_standard_marker_ = false;
+      surplus_after_terminator_.reset();
+      previous_chunk_ended_with_newline_ = true;
+      previous_chunk_ended_with_carriage_return_ = false;
+      last_send_ended_with_newline_ = false;
+      flushed_tail_[0] = '\r';
+      flushed_tail_[1] = '\n';
+   }
+
    bool
    TransparentTransmissionBuffer::Initialize(std::weak_ptr<TCPConnection> pTCPConnection)
    {
       tcp_connection_ = pTCPConnection;
 
-      data_sent_ = 0;
+      ResetPerTransferState_();
 
       return true;
    }
@@ -64,9 +86,9 @@ namespace HM
          ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5075, "TransparentTransmissionBuffer::SaveToFile_", sErrorMessage);
 
          return false;
-      } 
+      }
 
-      data_sent_ = 0;
+      ResetPerTransferState_();
 
       return true;
    }
@@ -147,23 +169,31 @@ namespace HM
          size_t terminatorLength = 0;   // the dot plus the newline that follows it
          bool nonStandardMarker = false;
 
+         // The byte `offset` positions before `index`, reaching into the tail of
+         // what Flush already removed when the index runs off the front of the
+         // buffer. Without this the first two positions had to be guessed, and
+         // guessing "CRLF" turned a bare-LF marker whose newline had just been
+         // flushed away into a standard one - accepted where policy forbids it,
+         // and with its trailing bytes handed to the command parser.
+         auto byteBefore = [&](size_t index, size_t offset) -> char
+         {
+            if (index >= offset)
+               return pCharBuffer[index - offset];
+
+            return (offset - index == 1) ? flushed_tail_[1] : flushed_tail_[0];
+         };
+
          for (size_t i = scanFrom; i < iSize && terminatorLength == 0; i++)
          {
             if (pCharBuffer[i] != '.')
                continue;
 
-            // Left context. Start-of-buffer counts as a line boundary: the
-            // preceding flush ended exactly on the newline, which is no longer
-            // here. Otherwise the dot must follow a newline - CRLF, or bare LF
-            // under the setting.
-            bool leftIsBare = false;
-            if (i > 0)
-            {
-               if (pCharBuffer[i - 1] != '\n')
-                  continue;
+            // Left context: the dot must start a line - follow a newline, either
+            // CRLF or (under the setting) a bare LF.
+            if (byteBefore(i, 1) != '\n')
+               continue;
 
-               leftIsBare = i < 2 || pCharBuffer[i - 2] != '\r';
-            }
+            const bool leftIsBare = byteBefore(i, 2) != '\r';
 
             // Right context: CRLF, or bare LF under the setting.
             const bool rightIsCrlf = i + 2 < iSize &&
@@ -217,6 +247,14 @@ namespace HM
             // it go; the body keeps its own final line ending, which sits BEFORE
             // dotPosition.
             buffer_->DecreaseSize(iSize - dotPosition);
+
+            // GetSize() answers "how big is this message", and the size limits are
+            // enforced from it. The marker and any pipelined commands behind it are
+            // not message content - a relay that pipelines its next transaction
+            // behind the dot would otherwise push a message that fits over the
+            // configured maximum and earn it a 552.
+            const size_t notMessageContent = terminatorLength + surplusLength;
+            data_sent_ = data_sent_ > notMessageContent ? data_sent_ - notMessageContent : 0;
 
             transmission_ended_ = true;
             ended_on_non_standard_marker_ = nonStandardMarker;
@@ -306,10 +344,15 @@ namespace HM
 
       // Start in the end and move 'back' MAX_LINE_LENGTH characters.
       size_t searchEndPos = 0;
-      
-      if (bufferSize == 0)
-         return dataProcessed;
 
+      // An empty buffer used to return here, which skipped the end-of-transmission
+      // block at the bottom of this function - so the spool file was left OPEN,
+      // with up to a CRT buffer of the message tail unwritten, while the accept
+      // stage read it, rewrote it and recorded its size. The file is opened in
+      // append mode, so those bytes then landed after the rewritten content at
+      // close. The search loop below is already a no-op on an empty buffer
+      // (current_position starts at 0), so falling through costs nothing and the
+      // close and its fsync always run.
       if (bufferSize > maxLineLength)
          searchEndPos = bufferSize - maxLineLength;
       else
@@ -333,6 +376,21 @@ namespace HM
 
             std::shared_ptr<ByteBuffer> pOutBuffer = std::shared_ptr<ByteBuffer>(new ByteBuffer);
             pOutBuffer->Add(buffer_->GetBuffer(), bytes_to_copy);
+
+            // Remember what the bytes leaving the buffer ended with, so the next
+            // end-of-data scan can ask what precedes the new index 0 instead of
+            // assuming it was a CRLF. Order matters: read before Empty() shifts
+            // the buffer.
+            if (bytes_to_copy >= 2)
+            {
+               flushed_tail_[0] = pBuffer[bytes_to_copy - 2];
+               flushed_tail_[1] = pBuffer[bytes_to_copy - 1];
+            }
+            else if (bytes_to_copy == 1)
+            {
+               flushed_tail_[0] = flushed_tail_[1];
+               flushed_tail_[1] = pBuffer[0];
+            }
 
             // Remove it from the old buffer
             size_t remaining_bytes = buffer_->GetSize() - bytes_to_copy;

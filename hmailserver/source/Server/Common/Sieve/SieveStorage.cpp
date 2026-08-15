@@ -60,6 +60,21 @@ namespace HM
    }
 
    String
+   SieveStorage::GetAccountDirectory(const String &accountAddress)
+   {
+      return GetAccountDirectory_(accountAddress);
+   }
+
+   String
+   SieveStorage::GetDomainDirectory(const String &domainName)
+   {
+      String dataDirectory = IniFileSettings::Instance()->GetDataDirectory();
+      String sieveRoot = FileUtilities::Combine(dataDirectory, _T("Sieve"));
+
+      return FileUtilities::Combine(sieveRoot, SanitizeComponent_(domainName));
+   }
+
+   String
    SieveStorage::GetActiveScriptPath_(const String &accountAddress)
    {
       return FileUtilities::Combine(GetAccountDirectory_(accountAddress), _T("active.sieve"));

@@ -117,6 +117,10 @@ namespace HM
       void InsertTransmissionPeriod_(std::shared_ptr<ByteBuffer> pIn);
       void RemoveTransmissionPeriod_(std::shared_ptr<ByteBuffer> pIn);
 
+      // Clears everything that describes one transfer, so a buffer reused for the
+      // next message (POP3 RETR, SMTP client delivery) starts as a fresh one would.
+      void ResetPerTransferState_();
+
       void ReportFlushFailure_();
 
       std::shared_ptr<ByteBuffer> buffer_;
@@ -153,6 +157,17 @@ namespace HM
       // forced mid-line split put a non-line-start dot at index 0, which was stuffed
       // (send) or stripped (receive) as though it began a line.
       bool previous_chunk_ended_with_newline_;
+
+      // The last two bytes Flush() removed from buffer_, most recent last. The
+      // end-of-data scan needs them because buffer index 0 is NOT necessarily the
+      // start of a line: Flush cuts at the last '\n' in the buffer, so the residual
+      // can be a lone "." whose preceding newline has already gone - and that
+      // newline may have been a BARE LF, or (after a forced mid-line cut for an
+      // over-long line) not a newline at all. Assuming CRLF there classified a
+      // bare-LF marker as the standard one, which both bypassed the tail-only rule
+      // that exists for CVE-2023-51764 and let the bytes behind it be parsed as
+      // commands. Initialised to CRLF because a message starts at a line start.
+      char flushed_tail_[2];
 
       bool ended_on_non_standard_marker_;
 

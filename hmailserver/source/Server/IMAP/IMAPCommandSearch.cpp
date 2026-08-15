@@ -7,6 +7,7 @@
 #include "IMAPCommandSEARCH.h"
 #include "IMAPConnection.h"
 #include "IMAPSort.h"
+#include "IMAPSortParser.h"
 #include "IMAPThread.h"
 #include "IMAPConfiguration.h"
 #include "IMAPListLookup.h"
@@ -153,6 +154,17 @@ namespace HM
 
       if (is_sort_ && !pParser->GetSortParser())
          return IMAPResult(IMAPResult::ResultBad, "Incorrect search commands.");
+
+      // RFC 5256's sort-criteria list is 1*sort-criterion, so an empty one is a
+      // protocol error rather than "sort by nothing". Rejected here as well as
+      // guarded inside IMAPSort::Sort, because the two commands that produce an
+      // empty list - "SORT () US-ASCII ALL" and a bare "SORT (REVERSE) ..." whose
+      // REVERSE has no key after it - parse cleanly up to this point and used to
+      // reach a loop that walked an iterator past the end of an empty vector and
+      // never terminated, burning a core and holding the connection thread for
+      // good. Any authenticated user could send it.
+      if (is_sort_ && pParser->GetSortParser()->GetSortTypes().empty())
+         return IMAPResult(IMAPResult::ResultBad, "The SORT command requires at least one sort criterion.");
 
       // RFC 5256: naming an algorithm the server did not advertise is a protocol
       // error. BAD rather than a silent fallback, because a client that asked for

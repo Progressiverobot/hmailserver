@@ -48,6 +48,21 @@ namespace HM
       // part that must not be reimplemented.
       static String GetVacationStorePath(const String &accountAddress);
 
+      // Where an account's and a domain's Sieve state lives on disk. Public so that
+      // the rename and delete paths can move or remove it WITHOUT reimplementing
+      // the sanitisation above - a second copy of that logic is how a rename ends
+      // up moving the wrong directory, or none.
+      //
+      // These exist because the Sieve tree is the one part of an account that does
+      // not live under {DataDirectory}\{domain}\{mailbox}: renaming a domain moved
+      // every mailbox and left every Sieve script behind, so filters silently
+      // stopped applying and mail that was being filed or discarded went to INBOX
+      // instead, with nothing logged. Deleting a domain left them on disk, where
+      // recreating an address later would silently reactivate the previous
+      // holder's filter - including a redirect to an address they chose.
+      static String GetAccountDirectory(const String &accountAddress);
+      static String GetDomainDirectory(const String &domainName);
+
    private:
       static String GetAccountDirectory_(const String &accountAddress);
       static String GetActiveScriptPath_(const String &accountAddress);

@@ -36,7 +36,13 @@ namespace HM
 
       size_t GetEstimatedCachingSize()
       {
-         return 1024 * messages_->GetCount();
+         // 64-bit unsigned throughout. As int arithmetic this overflowed past
+         // ~2.1M messages in one folder and, converted to size_t, became a value
+         // near 2^64 - which as a cache decrement clamps the whole total to zero
+         // and switches the size cap off until the next clear.
+         const int count = messages_->GetCount();
+
+         return count > 0 ? (size_t) 1024 * (size_t) count : 0;
       }
 
       std::shared_ptr<Messages> GetMessages(bool update_recent_flags) 

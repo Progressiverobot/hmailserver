@@ -36,7 +36,19 @@ namespace HM
       std::vector<std::shared_ptr<T> > &GetVector() {return vecObjects; }
       const std::vector<std::shared_ptr<T> > &GetConstVector() const {return vecObjects; }
 
-      int GetCount() const {return (int) vecObjects.size(); }
+      // Locked like every other accessor here. It used to read vecObjects.size()
+      // bare, which was survivable while callers were on the collection's own
+      // threads; the message cache now reads it from OUTSIDE (to size an entry
+      // while deciding what to evict), concurrently with AddToCollection's
+      // reserve() reallocating the vector. size() is computed from two pointers
+      // that reserve rewrites separately, so an unlocked reader could compute the
+      // difference between the old end and the new start - a garbage count, which
+      // as a cache size becomes a garbage eviction decision.
+      int GetCount() const
+      {
+         boost::lock_guard<boost::recursive_mutex> guard(_mutex);
+         return (int) vecObjects.size();
+      }
 
 
    protected:

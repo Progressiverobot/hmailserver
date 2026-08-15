@@ -1134,7 +1134,7 @@ interface IInterfaceUtilities : IDispatch{
    // the tool can disagree, and it is the server's view that decides where mail
    // actually goes. This runs inside the server, on the same resolver delivery
    // uses.
-   [id(22), helpstring("Resolves the MX records for a domain using the server's own resolver (honouring a configured custom DNS server), one 'hostname<TAB>ip-address' line per delivery target, in the server's preference order. Empty when the domain has no mail servers.")] HRESULT ResolveMXRecords([in] BSTR DomainName, [out, retval] BSTR *Result);
+   [id(22), helpstring("Resolves the MX records for a domain using the server's own resolver (honouring a configured custom DNS server), one 'hostname<TAB>ip-address' line per delivery target, ordered by MX preference as delivery orders them. Empty when the domain has no mail servers; raises an error when the lookup itself failed.")] HRESULT ResolveMXRecords([in] BSTR DomainName, [out, retval] BSTR *Result);
 };
 
 [
