@@ -74,6 +74,71 @@ namespace RegressionTests.Sieve
       }
 
       /// <summary>
+      ///    Every Sieve construct this server does not implement must be refused at
+      ///    upload rather than parsed and quietly skipped at delivery.
+      ///
+      ///    This is the single property the roadmap's whole Sieve section leans on,
+      ///    and it had already been false once: the parser used to accept `reject`,
+      ///    report the script valid, and then keep the mail the author believed was
+      ///    being refused. The allowlists in SieveParser fixed that, and nothing
+      ///    pinned the fix beyond the one `reject` case - so adding any of these
+      ///    names to a known-command or known-test list without implementing it
+      ///    would silently re-create the hazard, with no test failing.
+      ///
+      ///    The list is deliberately the same set the roadmap names as not
+      ///    implemented. When one of them IS implemented, its line moves out of here
+      ///    and into a fixture that proves it works end to end - which is the same
+      ///    rule the ManageSieve capability line follows.
+      /// </summary>
+      [Test]
+      [Description("Every unimplemented Sieve construct is refused at upload, so no script can silently do nothing.")]
+      public void UnimplementedConstructsAreRefusedRatherThanIgnored()
+      {
+         // Commands. Each is written the way a script would actually use it.
+         var commands = new[]
+         {
+            "reject \"go away\";",
+            "ereject \"go away\";",
+            "notify \"mailto:someone@example.test\";",
+            "addheader \"X-Test\" \"value\";",
+            "deleteheader \"X-Test\";",
+            "include \"other\";",
+            "return;",
+            "set \"name\" \"value\";",
+         };
+
+         foreach (string command in commands)
+         {
+            Assert.IsNotEmpty(CheckSyntax(command),
+               "The command '" + command + "' was accepted. It is not implemented, so a script using it " +
+               "would report success at upload and then do nothing at delivery - the exact failure the " +
+               "allowlist in SieveParser exists to prevent.");
+         }
+
+         // Tests, each inside the smallest script that can carry it.
+         var tests = new[]
+         {
+            "date :is \"date\" \"year\" \"2026\"",
+            "currentdate :is \"year\" \"2026\"",
+            "duplicate",
+            "ihave \"variables\"",
+            "environment :is \"name\" \"value\"",
+            "mailboxexists \"INBOX\"",
+            "string :is \"a\" \"a\"",
+            "spamtest :is \"5\"",
+         };
+
+         foreach (string test in tests)
+         {
+            string script = "if " + test + " {\r\n  keep;\r\n}";
+
+            Assert.IsNotEmpty(CheckSyntax(script),
+               "The test '" + test + "' was accepted. It is not implemented, so it would evaluate false " +
+               "at delivery and send every script using it down the wrong branch, silently.");
+         }
+      }
+
+      /// <summary>
       ///    The parser is recursive descent, once per level, and a Sieve script is
       ///    supplied by an authenticated user through ManageSieve PUTSCRIPT or
       ///    CHECKSCRIPT. Both recursions were unbounded, and the script size limit is
