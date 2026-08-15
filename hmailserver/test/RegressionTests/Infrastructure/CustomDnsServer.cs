@@ -1,7 +1,11 @@
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Net;
+using System.Net.Sockets;
+using System.Threading;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
 using RegressionTests.Shared;
@@ -164,6 +168,302 @@ namespace RegressionTests.Infrastructure
             SetIniSetting("DNSServer", null);
             SetIniSetting("DNSQueryTimeout", null);
             RestartServerAndReacquireCom();
+         }
+      }
+
+      /// <summary>
+      ///    A DNS server whose UDP path emits structurally broken responses - RDLENGTH
+      ///    overrunning the packet - must not end the lookup: the resolver retries the
+      ///    query over TCP, where the same server answers correctly.
+      ///
+      ///    This is a field failure, not a hypothetical. A 5.7 user reported DKIM
+      ///    validation of outlook.com mail failing on 6.x with DNS status 9502
+      ///    (DNS_ERROR_BAD_PACKET) against a local DNS server that 5.7 handled fine.
+      ///    The failing record is the large multi-string DKIM TXT key - the answer
+      ///    big enough to expose a server that assembles such responses wrongly over
+      ///    UDP. Probed against a deliberately misbehaving server, exactly two
+      ///    malformations produce status 9502 - RDLENGTH past the packet end, and a
+      ///    compression pointer past the packet end - and both resolve correctly when
+      ///    the same question is asked over TCP. That measurement is what this fake
+      ///    server replays.
+      ///
+      ///    The lookup is driven through Utilities.ResolveMXRecords because it is the
+      ///    shortest COM path into the server's resolver, and because it exercises the
+      ///    retry TWICE: once for the MX query, once for the A query of the exchange
+      ///    host it returns.
+      /// </summary>
+      [Test]
+      [Description("A structurally broken UDP response (status 9502) is retried over TCP rather than failing the lookup")]
+      public void AMalformedUdpResponseIsRetriedOverTcp()
+      {
+         using (var fakeDns = new MalformedUdpDnsServer())
+         {
+            SetIniSetting("DNSServer", "127.0.0.1");
+            SetIniSetting("DNSQueryTimeout", "5");
+
+            try
+            {
+               RestartServerAndReacquireCom();
+
+               LogHandler.DeleteCurrentDefaultLog();
+
+               string result = _application.Utilities.ResolveMXRecords("dnsfix.example.test");
+
+               Assert.IsTrue(result.Contains("mail.dnsfix.example.test"),
+                  "The MX lookup did not survive the malformed UDP response, so the TCP retry " +
+                  "either did not happen or did not work. Result: '" + result + "'");
+
+               Assert.IsTrue(result.Contains("127.0.0.99"),
+                  "The MX host did not resolve to the address the TCP path serves, so the A-record " +
+                  "retry failed. Result: '" + result + "'");
+
+               var log = LogHandler.ReadCurrentDefaultLog();
+
+               StringAssert.Contains("retrying the query over TCP", log,
+                  "The result arrived but the log has no retry line - so it did not come through " +
+                  "the 9502-retry path this test exists to cover.");
+
+               Assert.AreEqual(0, fakeDns.UnansweredTcpQueries,
+                  "The fake server saw TCP queries it did not answer.");
+            }
+            finally
+            {
+               SetIniSetting("DNSServer", null);
+               SetIniSetting("DNSQueryTimeout", null);
+               RestartServerAndReacquireCom();
+            }
+         }
+      }
+
+      /// <summary>
+      ///    UDP: every response is malformed in the way measured to produce status 9502
+      ///    (RDLENGTH = 512 with 11 bytes of RDATA in the packet). TCP: correct answers.
+      ///    Binds 127.0.0.1:53 - which the DNS client uses implicitly, since a custom
+      ///    server entry must not name a port at all (see the port-zero comment in
+      ///    DNSResolverWinApi.cpp).
+      /// </summary>
+      private sealed class MalformedUdpDnsServer : IDisposable
+      {
+         private readonly UdpClient udp_;
+         private readonly TcpListener tcp_;
+         private volatile bool stopping_;
+         private int unansweredTcpQueries_;
+
+         public int UnansweredTcpQueries => unansweredTcpQueries_;
+
+         public MalformedUdpDnsServer()
+         {
+            try
+            {
+               udp_ = new UdpClient(new IPEndPoint(IPAddress.Loopback, 53));
+               tcp_ = new TcpListener(IPAddress.Loopback, 53);
+               tcp_.Start();
+            }
+            catch (SocketException ex)
+            {
+               Assert.Fail("Could not bind 127.0.0.1:53 for the fake DNS server - something on this " +
+                           "machine is already serving DNS on loopback (WSL? a local resolver?): " + ex.Message);
+            }
+
+            new Thread(ServeUdp_) { IsBackground = true }.Start();
+            new Thread(ServeTcp_) { IsBackground = true }.Start();
+         }
+
+         public void Dispose()
+         {
+            stopping_ = true;
+            udp_.Close();
+            tcp_.Stop();
+         }
+
+         private void ServeUdp_()
+         {
+            while (!stopping_)
+            {
+               try
+               {
+                  var remote = new IPEndPoint(IPAddress.Any, 0);
+                  byte[] query = udp_.Receive(ref remote);
+                  byte[] response = BuildMalformedResponse_(query);
+                  udp_.Send(response, response.Length, remote);
+               }
+               catch (SocketException)
+               {
+                  // Close() from Dispose lands here; anything else and the test's
+                  // assertions report the lookup that never completed.
+               }
+               catch (ObjectDisposedException)
+               {
+               }
+            }
+         }
+
+         private void ServeTcp_()
+         {
+            while (!stopping_)
+            {
+               try
+               {
+                  using (TcpClient client = tcp_.AcceptTcpClient())
+                  using (NetworkStream stream = client.GetStream())
+                  {
+                     byte[] lengthPrefix = ReadExactly_(stream, 2);
+                     int queryLength = (lengthPrefix[0] << 8) | lengthPrefix[1];
+                     byte[] query = ReadExactly_(stream, queryLength);
+
+                     byte[] response = BuildValidResponse_(query);
+                     if (response == null)
+                     {
+                        Interlocked.Increment(ref unansweredTcpQueries_);
+                        continue;
+                     }
+
+                     stream.Write(new[] { (byte)(response.Length >> 8), (byte)(response.Length & 0xFF) }, 0, 2);
+                     stream.Write(response, 0, response.Length);
+                     stream.Flush();
+                  }
+               }
+               catch (SocketException)
+               {
+               }
+               catch (ObjectDisposedException)
+               {
+               }
+               catch (IOException)
+               {
+               }
+            }
+         }
+
+         private static byte[] ReadExactly_(NetworkStream stream, int count)
+         {
+            var buffer = new byte[count];
+            int read = 0;
+            while (read < count)
+            {
+               int n = stream.Read(buffer, read, count - read);
+               if (n <= 0)
+                  throw new IOException("Peer closed mid-message.");
+               read += n;
+            }
+            return buffer;
+         }
+
+         private static int QuestionEnd_(byte[] query)
+         {
+            int i = 12;
+            while (query[i] != 0)
+               i += query[i] + 1;
+            return i + 5; // zero byte + QTYPE(2) + QCLASS(2)
+         }
+
+         private static int QueryType_(byte[] query)
+         {
+            int zero = 12;
+            while (query[zero] != 0)
+               zero += query[zero] + 1;
+            return (query[zero + 1] << 8) | query[zero + 2];
+         }
+
+         private static void WriteHeaderAndQuestion_(List<byte> m, byte[] query, int answerCount, int authorityCount = 0)
+         {
+            int questionEnd = QuestionEnd_(query);
+            m.Add(query[0]); m.Add(query[1]);            // ID
+            m.Add(0x81); m.Add(0x80);                    // QR|RD|RA, NOERROR
+            m.Add(0); m.Add(1);                          // QDCOUNT
+            m.Add(0); m.Add((byte)answerCount);          // ANCOUNT
+            m.Add(0); m.Add((byte)authorityCount);       // NSCOUNT
+            m.Add(0); m.Add(0);                          // ARCOUNT
+            for (int i = 12; i < questionEnd; i++)
+               m.Add(query[i]);
+         }
+
+         private static void WriteName_(List<byte> m, string name)
+         {
+            foreach (string label in name.Split('.'))
+            {
+               m.Add((byte)label.Length);
+               foreach (char c in label)
+                  m.Add((byte)c);
+            }
+            m.Add(0);
+         }
+
+         /// <summary>
+         ///    The 9502 shape: answer record claims RDLENGTH 512 while the packet holds
+         ///    11 bytes of RDATA. Measured to return DNS_ERROR_BAD_PACKET from DnsQueryEx
+         ///    for every query type tried; see the fixture comment.
+         /// </summary>
+         private static byte[] BuildMalformedResponse_(byte[] query)
+         {
+            var m = new List<byte>();
+            WriteHeaderAndQuestion_(m, query, 1);
+            m.Add(0xC0); m.Add(0x0C);                    // name: pointer to the question
+            m.Add((byte)(QueryType_(query) >> 8)); m.Add((byte)(QueryType_(query) & 0xFF));
+            m.Add(0); m.Add(1);                          // CLASS IN
+            m.Add(0); m.Add(0); m.Add(0); m.Add(60);     // TTL
+            m.Add(2); m.Add(0);                          // RDLENGTH = 512...
+            m.Add(10);                                   // ...but only 11 bytes follow
+            for (int i = 0; i < 10; i++)
+               m.Add((byte)'B');
+            return m.ToArray();
+         }
+
+         private static byte[] BuildValidResponse_(byte[] query)
+         {
+            var m = new List<byte>();
+
+            switch (QueryType_(query))
+            {
+               case 15: // MX
+                  WriteHeaderAndQuestion_(m, query, 1);
+                  m.Add(0xC0); m.Add(0x0C);
+                  m.Add(0); m.Add(15);
+                  m.Add(0); m.Add(1);
+                  m.Add(0); m.Add(0); m.Add(0); m.Add(60);
+                  var exchange = new List<byte>();
+                  exchange.Add(0); exchange.Add(10);     // preference 10
+                  WriteName_(exchange, "mail.dnsfix.example.test");
+                  m.Add((byte)(exchange.Count >> 8)); m.Add((byte)(exchange.Count & 0xFF));
+                  m.AddRange(exchange);
+                  return m.ToArray();
+
+               case 1: // A
+                  WriteHeaderAndQuestion_(m, query, 1);
+                  m.Add(0xC0); m.Add(0x0C);
+                  m.Add(0); m.Add(1);
+                  m.Add(0); m.Add(1);
+                  m.Add(0); m.Add(0); m.Add(0); m.Add(60);
+                  m.Add(0); m.Add(4);
+                  m.Add(127); m.Add(0); m.Add(0); m.Add(99);
+                  return m.ToArray();
+
+               default:
+                  // AAAA and anything else: NODATA - NOERROR with no answers and the
+                  // zone's SOA in the AUTHORITY section, per RFC 2308. The SOA is not
+                  // decoration. Measured with a probe harness: the identical
+                  // empty-NOERROR bytes WITHOUT it are answered 9501 (no records,
+                  // benign) when they arrive over UDP and 9502 (DNS_ERROR_BAD_PACKET)
+                  // when they arrive over TCP - the TCP response parser demands at
+                  // least one record beyond the question. Omit this and every AAAA
+                  // lookup "fails" in a way that has nothing to do with the code under
+                  // test.
+                  WriteHeaderAndQuestion_(m, query, 0, 1);
+                  m.Add(0xC0); m.Add(0x0C);              // owner: the queried name
+                  m.Add(0); m.Add(6);                    // TYPE SOA
+                  m.Add(0); m.Add(1);                    // CLASS IN
+                  m.Add(0); m.Add(0); m.Add(0); m.Add(60);
+                  var soa = new List<byte>();
+                  WriteName_(soa, "ns.dnsfix.example.test");
+                  WriteName_(soa, "hostmaster.dnsfix.example.test");
+                  for (int f = 0; f < 5; f++)            // serial/refresh/retry/expire/minimum
+                  {
+                     soa.Add(0); soa.Add(0); soa.Add(0); soa.Add(60);
+                  }
+                  m.Add((byte)(soa.Count >> 8)); m.Add((byte)(soa.Count & 0xFF));
+                  m.AddRange(soa);
+                  return m.ToArray();
+            }
          }
       }
 

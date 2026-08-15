@@ -20,6 +20,8 @@ namespace HM
 
    private:
 
+      bool RunQuery_(const String &query, int resourceType, unsigned long fOptions, std::vector<DNSRecord> &foundRecords, int &dnsStatus);
+
       bool IsDNSError_(int iErrorMessage);
    };
 

@@ -163,8 +163,47 @@ namespace HM
 
       if (!IniFileSettings::Instance()->GetUseDNSCache())
       {
-         fOptions += DNS_QUERY_BYPASS_CACHE;
+         fOptions |= DNS_QUERY_BYPASS_CACHE;
       }
+
+      int dnsStatus = 0;
+
+      if (RunQuery_(query, resourceType, fOptions, foundRecords, dnsStatus))
+         return true;
+
+      // DNS_ERROR_BAD_PACKET (9502): the server sent a response the resolver could
+      // not parse. Measured against a deliberately misbehaving server: a UDP answer
+      // whose RDLENGTH overruns the packet, or whose name compression points past
+      // the end of it, produces exactly this status - and the same server, asked
+      // the same question over TCP, answers correctly whenever only its UDP path is
+      // broken. Large multi-string TXT records (DKIM public keys) are where this
+      // shows up in the field, because those are the answers that outgrow what such
+      // servers assemble properly. Retrying over TCP is what a full resolver does
+      // here. A timeout is deliberately NOT retried: against an unreachable server
+      // that would double every failed lookup's wait, and a server that says
+      // nothing has not demonstrated a working TCP path to try.
+      if (dnsStatus == DNS_ERROR_BAD_PACKET)
+      {
+         LOG_DEBUG(Formatter::Format(
+            "DNS - Malformed response (status {0}); retrying the query over TCP. Query: {1}, type {2}.",
+            dnsStatus, query, resourceType));
+
+         // foundRecords is NOT cleared here, and that is load-bearing. Callers
+         // accumulate several queries into one vector - GetIpAddressesRecursive_
+         // runs A and then AAAA into the same list - so clearing on the AAAA
+         // retry throws away the A records that already succeeded. A failed
+         // RunQuery_ never adds records (every false path returns before the
+         // record loop), so there is nothing of the failed attempt to remove.
+         return RunQuery_(query, resourceType, fOptions | DNS_QUERY_USE_TCP_ONLY, foundRecords, dnsStatus);
+      }
+
+      return false;
+   }
+
+   bool
+   DNSResolverWinApi::RunQuery_(const String &query, int resourceType, unsigned long fOptions, std::vector<DNSRecord> &foundRecords, int &dnsStatus)
+   {
+      dnsStatus = 0;
 
       AsyncDnsQuery *pAsyncQuery = new AsyncDnsQuery();
 
@@ -233,9 +272,9 @@ namespace HM
 
             pAsyncQuery->Request.pDnsServerList = &pAsyncQuery->ServerList;
 
-            // We need this if not using system dns servers
-            if (fOptions != DNS_QUERY_BYPASS_CACHE)
-               fOptions += DNS_QUERY_BYPASS_CACHE;
+            // A custom server list is only honoured together with BYPASS_CACHE.
+            // OR, not +=: the flag may already be set, and these are bit flags.
+            fOptions |= DNS_QUERY_BYPASS_CACHE;
          }
       }
 
@@ -275,6 +314,7 @@ namespace HM
             sMessage.Format(_T("DNS - Query timed out. Query: %s, Type: %d, Timeout: %d ms."), query.c_str(), resourceType, static_cast<int>(timeoutMilliseconds));
             LOG_TCPIP(sMessage);
 
+            dnsStatus = WAIT_TIMEOUT;
             return false;
          }
 
@@ -322,6 +362,8 @@ namespace HM
          bool bDNSError = IsDNSError_(nDnsStatus);
 
          _ReleaseAsyncDnsQuery(pAsyncQuery);
+
+         dnsStatus = nDnsStatus;
 
          if (bDNSError)
          {
