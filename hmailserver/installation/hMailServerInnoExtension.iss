@@ -65,8 +65,12 @@ const
   // END .NET INSTALLER
 
   // FindFirst matches files as well as directories, and the .NET shared framework
-  // marks a version with a directory - so DotNetDesktopMissing has to test this.
-  FILE_ATTRIBUTE_DIRECTORY    = $10;
+  // marks a version with a directory - so DotNetDesktopMissing tests
+  // FILE_ATTRIBUTE_DIRECTORY. That constant is NOT declared here: Inno Setup 6
+  // predefines it (value $10) for its own FindFirst/TFindRec support, and a local
+  // declaration is a duplicate-identifier compile error - which is exactly how the
+  // 6.2.19 installer build failed on 2026-08-15, the first ISCC run since the
+  // declaration was added.
 
   // Burn/msiexec exit codes that mean "installed", not "failed".
   ERROR_SUCCESS_REBOOT_REQUIRED = 3010;
