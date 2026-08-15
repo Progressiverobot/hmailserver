@@ -78,11 +78,47 @@ jobs:
           # and mask the failure. The admin password comes from a wizard page that
           # silent mode skips, so it is not set here and the checks below do not
           # assume one.
+          #
+          # /LOG and the timeout below both exist because of what happened on
+          # 15 August 2026: the 6.2.19 installer hung in this step and the job sat
+          # for 90 minutes and then had to be cancelled by hand, having produced no
+          # evidence whatsoever about WHERE it stopped. The same test against 6.2.18
+          # had finished in 33 seconds. A hang that reports nothing is barely better
+          # than no test, so this step now bounds itself and keeps the log either
+          # way - Inno's own log names the last [Run] entry or [Code] call it
+          # reached, which is the one thing needed to tell an installer that is slow
+          # from one that is stuck.
+          $log = Join-Path $env:RUNNER_TEMP 'hmailserver-install.log'
+          "install_log=$log" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
           $p = Start-Process -FilePath $exe `
-            -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/TYPE=full' `
-            -Wait -PassThru
+            -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/TYPE=full',"/LOG=$log" `
+            -PassThru
+
+          # Ten minutes is far above the 33 seconds a healthy install of this
+          # product takes, including the bundled .NET runtime, and far below the
+          # six-hour job ceiling that made the last hang so expensive.
+          if (-not $p.WaitForExit(10 * 60 * 1000)) {
+            Write-Host "::error::The installer did not finish within 10 minutes - treating it as hung."
+            try { $p.Kill() } catch { }
+            if (Test-Path $log) {
+              Write-Host "----- last 80 lines of the install log -----"
+              Get-Content $log -Tail 80 | ForEach-Object { Write-Host $_ }
+            } else {
+              Write-Host "No install log was produced at $log."
+            }
+            throw "Installer hung."
+          }
+
           Write-Host "Installer exit code: $($p.ExitCode)"
-          if ($p.ExitCode -ne 0) { throw "Installer returned a non-zero exit code." }
+          if ($p.ExitCode -ne 0) {
+            if (Test-Path $log) {
+              Write-Host "----- last 80 lines of the install log -----"
+              Get-Content $log -Tail 80 | ForEach-Object { Write-Host $_ }
+            }
+            throw "Installer returned a non-zero exit code."
+          }
+        id: install
 
       - name: The service is registered and points at the installed binary
         shell: pwsh
@@ -117,6 +153,17 @@ jobs:
           $app = New-Object -ComObject hMailServer.Application
           if ($null -eq $app) { throw "Could not instantiate the hMailServer.Application COM object." }
           Write-Host "COM object created; server product string: $($app.Product)"
+
+      # Kept whatever happened. On a green run it is a few KB nobody reads; on a
+      # hang or a failure it is the only record of how far the installer got, and
+      # the runner it was written on is discarded minutes later.
+      - name: Keep the install log
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: install-log
+          path: ${{ runner.temp }}/hmailserver-install.log
+          if-no-files-found: warn
 
       - name: Uninstall cleanly
         if: ${{ always() }}
