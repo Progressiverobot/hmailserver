@@ -65,7 +65,21 @@ namespace hMailServer.ControlPanel.Views
       };
 
       // Active Directory
-      private readonly CheckBox isAd_ = new() { Content = "This account is linked to Active Directory", FontSize = 13 };
+      // "or a local Windows account" is not padding. The tab is titled Active Directory
+      // throughout, and an empty domain quietly means "a local Windows account on this
+      // computer" - which is the only form of this feature available to anyone with no
+      // domain at all, and was undiscoverable from the interface.
+      private readonly CheckBox isAd_ = new() { Content = "Check this password against Windows (Active Directory, or a local Windows account)", FontSize = 13 };
+
+      // What the values below actually do, restated as a sentence. Updated as the
+      // domain box is typed in, because the difference between the two behaviours is
+      // an empty box rather than anything the reader can see.
+      private readonly TextBlock directoryEffect_ = new()
+      {
+         FontSize = 12,
+         TextWrapping = TextWrapping.Wrap,
+         Margin = new Thickness(0, 0, 0, 8)
+      };
       private readonly TextBox adDomain_ = NewInput();
       private readonly TextBox adUser_ = NewInput();
 
@@ -253,13 +267,46 @@ namespace hMailServer.ControlPanel.Views
          return Scroll(panel);
       }
 
+      /// <summary>
+      ///    The Directory tab, which used to be a checkbox and two unexplained boxes.
+      ///
+      ///    Three things decide whether this account can ever log in, and none of them
+      ///    was stated anywhere the administrator could see:
+      ///
+      ///    1. An EMPTY domain does not mean "no directory". SSPIValidation treats an
+      ///       empty domain - and "." and this computer's own name - as "validate a
+      ///       LOCAL Windows account". That is a legitimate and useful way to run the
+      ///       server for anyone who has no Active Directory at all, and it was
+      ///       completely undiscoverable: nothing on this tab, which is titled Active
+      ///       Directory throughout, hints that local Windows accounts are an option.
+      ///    2. A REAL domain requires the SERVER's host to be domain-joined, because
+      ///       LogonUser does. On a workgroup host every attempt returns
+      ///       ERROR_LOGON_FAILURE - measured as 1326 for a nonexistent domain, a real
+      ///       but unreachable one, and a wrong password alike - so the account cannot
+      ///       log in and cannot be told why.
+      ///    3. There is a way round (2), and it is on a different page entirely: LDAP
+      ///       directory authentication binds to the directory over the network and
+      ///       needs no domain join.
+      ///
+      ///    The domain-join state deliberately is NOT asserted here. It is the SERVER's
+      ///    host that must be joined, and this Control Panel may be running somewhere
+      ///    else - claiming otherwise would be the same mistake the LDAP test card is
+      ///    careful to disclose about itself.
+      /// </summary>
       private ScrollViewer BuildDirectory()
       {
          var panel = TabPanel();
          panel.Children.Add(isAd_);
-         panel.Children.Add(Label("Active Directory domain"));
+
+         panel.Children.Add(Note(
+            "With this on, the password is not stored here at all - Windows is asked to check it. Leave it off "
+            + "and the account uses the password on the Account tab."));
+
+         panel.Children.Add(Label("Windows domain (leave empty for a local Windows account)"));
          panel.Children.Add(Input(adDomain_));
-         panel.Children.Add(Label("Active Directory user name"));
+         panel.Children.Add(directoryEffect_);
+
+         panel.Children.Add(Label("Windows user name"));
          panel.Children.Add(Input(adUser_));
 
          var browse = new Wpf.Ui.Controls.Button
@@ -270,7 +317,53 @@ namespace hMailServer.ControlPanel.Views
          browse.Click += (s, e) => BrowseActiveDirectory();
          panel.Children.Add(browse);
 
+         panel.Children.Add(Note(
+            "A domain name here needs the SERVER's own computer to be joined to that domain, because Windows "
+            + "validates it with LogonUser. From a computer that is not joined, every attempt fails as though the "
+            + "password were wrong - including when the domain name is simply misspelt - so a mailbox configured "
+            + "this way on an unjoined server can never log in and never says why. If the server is not "
+            + "domain-joined, use LDAP directory authentication on the Directory authentication page instead: it "
+            + "binds to the directory over the network and needs no domain join."));
+
+         adDomain_.TextChanged += (s, e) => RefreshDirectoryEffect_();
+         isAd_.Checked += (s, e) => RefreshDirectoryEffect_();
+         isAd_.Unchecked += (s, e) => RefreshDirectoryEffect_();
+
+         RefreshDirectoryEffect_();
+
          return Scroll(panel);
+      }
+
+      /// <summary>
+      ///    Says, in plain words, which of the two things the values above actually do -
+      ///    because "Active Directory domain: (empty)" reads as "not configured" and is
+      ///    in fact a working configuration with completely different behaviour.
+      /// </summary>
+      private void RefreshDirectoryEffect_()
+      {
+         if (isAd_.IsChecked != true)
+         {
+            directoryEffect_.Text = "";
+            return;
+         }
+
+         string domain = adDomain_.Text.Trim();
+
+         // The same three forms SSPIValidation treats as "this computer". The local
+         // computer name compared here is the one the CONTROL PANEL is running on,
+         // which is why it is only used to recognise the intent - the sentence below
+         // says "the server's own computer", not this one.
+         bool local = domain.Length == 0
+            || domain == "."
+            || string.Equals(domain, Environment.MachineName, StringComparison.OrdinalIgnoreCase);
+
+         directoryEffect_.Text = local
+            ? "This validates against a LOCAL Windows account on the server's own computer, not against a domain. "
+              + "That is the right setting when there is no Active Directory."
+            : "This validates against the domain \"" + domain + "\". The server's own computer must be joined to it.";
+
+         directoryEffect_.SetResourceReference(Control.ForegroundProperty,
+            local ? "TextFillColorSecondaryBrush" : "TextFillColorSecondaryBrush");
       }
 
       private void BrowseActiveDirectory()
@@ -688,6 +781,24 @@ namespace hMailServer.ControlPanel.Views
          TextWrapping = TextWrapping.Wrap,
          VerticalScrollBarVisibility = ScrollBarVisibility.Auto
       };
+
+      /// <summary>
+      ///    Explanatory prose beside a control, for the cases where the control's own
+      ///    label cannot carry the consequence of setting it.
+      /// </summary>
+      private static TextBlock Note(string text)
+      {
+         var t = new TextBlock
+         {
+            Text = text,
+            FontSize = 12,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 4, 0, 8),
+            Opacity = 0.75
+         };
+         t.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
+         return t;
+      }
 
       private static TextBlock Label(string text)
       {
