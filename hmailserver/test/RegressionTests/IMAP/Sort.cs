@@ -96,6 +96,60 @@ namespace RegressionTests.IMAP
          simulator.Disconnect();
       }
 
+      /// <summary>
+      ///    A Date header that is PRESENT but unparseable must sort by INTERNALDATE,
+      ///    not by the 1899 OLE epoch.
+      ///
+      ///    TestDateSortOrderNonexistantDate covers a MISSING date, and that is
+      ///    exactly how the defect survived: GetDateTimeFromMimeHeader answers an
+      ///    invalid DateTime for garbage, whose raw value stringifies to a perfectly
+      ///    non-empty 1899 timestamp, so the emptiness fallback never fired and the
+      ///    most malformed message in the mailbox sorted to the front. The fix tests
+      ///    validity. Found by the adversarial pass over THREAD, which had inherited
+      ///    the same shape from this code.
+      ///
+      ///    Discrimination is by construction: the malformed message carries the
+      ///    LATEST internaldate, so the fixed code sorts it last and the broken code
+      ///    sorts it first - there is no order both produce.
+      /// </summary>
+      [Test]
+      public void TestDateSortOrderUnparseableDate()
+      {
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "imapsort@example.test", "test");
+         var simulator = new ImapClientSimulator();
+
+         simulator.Connect();
+         simulator.LogonWithLiteral("imapsort@example.test", "test");
+         Assert.IsTrue(simulator.SelectFolder("Inbox"));
+
+         // Message 1: valid Date in 2020.
+         string msg1 = "Date: Sat, 15 Aug 2020 10:00:00 +0000\r\nSubject: a\r\n\r\nBody";
+         var response = simulator.SendSingleCommandWithLiteral(
+            "A01 APPEND INBOX \"01-Jan-2019 10:00:00 +0000\" {" + msg1.Length + "}", msg1);
+         Assert.IsTrue(response.Contains("* 1 EXISTS"), response);
+
+         // Message 2: GARBAGE Date, internaldate mid-2025 - the latest of the three.
+         string msg2 = "Date: not-a-date-at-all\r\nSubject: b\r\n\r\nBody";
+         response = simulator.SendSingleCommandWithLiteral(
+            "A02 APPEND INBOX \"01-Jun-2025 10:00:00 +0000\" {" + msg2.Length + "}", msg2);
+         Assert.IsTrue(response.Contains("* 2 EXISTS"), response);
+
+         // Message 3: valid Date in 2010.
+         string msg3 = "Date: Sun, 15 Aug 2010 10:00:00 +0000\r\nSubject: c\r\n\r\nBody";
+         response = simulator.SendSingleCommandWithLiteral(
+            "A03 APPEND INBOX \"01-Jan-2019 11:00:00 +0000\" {" + msg3.Length + "}", msg3);
+         Assert.IsTrue(response.Contains("* 3 EXISTS"), response);
+
+         string sortResponse = simulator.SendSingleCommand("A04 SORT (DATE) US-ASCII ALL");
+
+         // Fixed: 2010, 2020, then the malformed one by its 2025 internaldate.
+         // Broken: the malformed one first, at the 1899 epoch.
+         Assert.IsTrue(sortResponse.Contains("* SORT 3 1 2"),
+            "A message with an unparseable Date did not sort by its INTERNALDATE. Response: " + sortResponse);
+
+         simulator.Disconnect();
+      }
+
       [Test]
       [Description("Issue 168 - IMAP: Search for message with specific UID fails. ")]
       public void TestSearchSpecficUID()

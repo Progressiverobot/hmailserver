@@ -217,14 +217,17 @@ namespace HM
 
          if (is_sort_)
          {
+            // The ceiling is handed in, exactly as THREAD's is below: a post-hoc
+            // check can only disown a result the connection thread already spent
+            // the time producing, whereas this stops the header pass before the
+            // next file is opened.
             IMAPSort oSorter;
-            oSorter.Sort(pConnection, vecMatchingMessages, pParser->GetCharsetName(), pParser->GetSortParser());
-            // Sort the message vector
 
-            // Sorting reads a header per matching message and cannot be interrupted
-            // from here, so the ceiling is re-checked once it returns. Without this a
-            // SORT could report a result produced long past the ceiling it was given.
-            if (BoundExceeded_())
+            const bool sortCompleted = oSorter.Sort(pConnection, vecMatchingMessages,
+                                                    pParser->GetCharsetName(), pParser->GetSortParser(),
+                                                    [this]() { return BoundExceeded_(); });
+
+            if (!sortCompleted || BoundExceeded_())
                return AbortSearch_(pConnection, message_count_);
          }
 

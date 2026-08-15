@@ -105,8 +105,9 @@ namespace HM
   
 
 
-   void 
-   IMAPSort::Sort(std::shared_ptr<IMAPConnection> pConnection, std::vector<std::pair<int, std::shared_ptr<Message> > > &vecMessages, String character_set, std::shared_ptr<IMAPSortParser> pParser)
+   bool
+   IMAPSort::Sort(std::shared_ptr<IMAPConnection> pConnection, std::vector<std::pair<int, std::shared_ptr<Message> > > &vecMessages, String character_set, std::shared_ptr<IMAPSortParser> pParser,
+                  const std::function<bool()> &abortRequested)
    {
       // Sort messages according to the sort criteria
 
@@ -152,7 +153,8 @@ namespace HM
              sortField == To ||
              sortField == Date)
          {
-            CacheHeaderFields_(pConnection, vecMessages, databaseMetaData, sortField, mapHeaderFields);
+            if (!CacheHeaderFields_(pConnection, vecMessages, databaseMetaData, sortField, mapHeaderFields, abortRequested))
+               return false;
          }
          
          if (sortField == Arrival) 
@@ -232,9 +234,11 @@ namespace HM
 
          iterSortType++;
       }
+
+      return true;
    }
 
-   IMAPSort::SortField 
+   IMAPSort::SortField
    IMAPSort::GetSortField_(AnsiString sHeaderField)
    {
       SortField sortField;
@@ -262,12 +266,13 @@ namespace HM
    }
 
 
-   void 
+   bool
    IMAPSort::CacheHeaderFields_(std::shared_ptr<IMAPConnection> pConnection,
                                 const std::vector<std::pair<int, std::shared_ptr<Message> > > &vecMessages, 
                                 const std::map<__int64, String > &databaseMetaData, 
                                 SortField &sortField,
-                                std::map<__int64, String> &mapHeaderFields)
+                                std::map<__int64, String> &mapHeaderFields,
+                                const std::function<bool()> &abortRequested)
    {
       mapHeaderFields.clear();
 
@@ -300,6 +305,11 @@ namespace HM
 
       for (; iter != iterEnd; iter++)
       {
+         // Asked BEFORE the read, so the caller's ceiling stops the next file
+         // rather than being consulted once every file has already been read.
+         if (abortRequested && abortRequested())
+            return false;
+
          // Fetch message.
          const std::shared_ptr<Message> p1 = (*iter).second;
 
@@ -320,7 +330,19 @@ namespace HM
             if (sortField == Date)
             {
                DateTime dt = Time::GetDateTimeFromMimeHeader(sFieldValue);
-               sFieldValue = Time::GetTimeStampFromDateTime(dt);
+
+               // Validity, not emptiness. The comment further down has claimed
+               // "missing or cannot be parsed" since 2010, and the code only ever
+               // handled missing: an unparseable Date comes back as an INVALID
+               // DateTime whose raw value is the 1899 OLE epoch, which stringifies
+               // to a perfectly non-empty timestamp - so the fallback never fired
+               // and the most malformed message in the mailbox sorted to the very
+               // front. Found by the adversarial pass over THREAD, which inherited
+               // exactly this shape and fixed it; this brings SORT level.
+               if (dt.GetStatus() != DateTime::valid)
+                  sFieldValue = p1->GetCreateTime();
+               else
+                  sFieldValue = Time::GetTimeStampFromDateTime(dt);
             }
          }
          else
@@ -352,5 +374,7 @@ namespace HM
          // Cache the header
          mapHeaderFields[p1->GetID()] = sFieldValue;
       }
+
+      return true;
    }
 }
