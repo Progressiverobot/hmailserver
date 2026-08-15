@@ -63,6 +63,23 @@ namespace RegressionTests.Shared
       public void RestartServiceAndReacquire()
       {
          RunServiceCommand("stop");
+
+         // Wait for the OLD process to actually exit before starting the new one.
+         // "net stop" returns when the Service Control Manager reports Stopped, and
+         // the process object can outlive that by a moment while teardown finishes -
+         // so two rapid restarts can overlap, and ServiceRestartDetector then fails
+         // whatever fixture happens to run next with "Multiple hMailServer.exe
+         // processes are running". One restarting test in a fixture never showed it;
+         // the second restarting test in CustomDnsServer made it reproducible, six
+         // fixtures downstream from the fixture that caused it.
+         var drainDeadline = DateTime.UtcNow.AddSeconds(30);
+
+         while (DateTime.UtcNow < drainDeadline &&
+                System.Diagnostics.Process.GetProcessesByName("hmailserver").Length > 0)
+         {
+            Thread.Sleep(250);
+         }
+
          RunServiceCommand("start");
 
          // Wait for the thing actually needed - an authenticated COM object - rather than
