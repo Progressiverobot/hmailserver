@@ -61,7 +61,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Authentication and cryptography](#authentication-and-cryptography) | 57 | 0 | 18 | – |
 | [Anti-spam, anti-virus and content control](#anti-spam-anti-virus-and-content-control) | 54 | – | 13 | – |
 | [Storage, accounts and data model](#storage-accounts-and-data-model) | 86 | – | 10 | – |
-| [Routing, queue and delivery](#routing-queue-and-delivery) | 19 | – | 4 | 1 |
+| [Routing, queue and delivery](#routing-queue-and-delivery) | 20 | – | 3 | 2 |
 | [Administration, API and Control Panel](#administration-api-and-control-panel) | 62 | – | 7 | – |
 | [Observability and diagnostics](#observability-and-diagnostics) | 32 | – | 7 | 1 |
 | [Extensibility and scripting](#extensibility-and-scripting) | 37 | – | 3 | – |
@@ -72,7 +72,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 2 | – | 4 | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 5 | 1 | 2 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 4 | 1 | 4 | – |
-| **Total** | **622** | **12** | **146** | **14** |
+| **Total** | **623** | **12** | **145** | **15** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage and the administration surface are the best-covered areas**, and the
@@ -778,7 +778,7 @@ the source, not from documentation.
 
 ### Routing, queue and delivery
 
-19 shipped · 0 underway · 4 not started · 1 deferred
+20 shipped · 0 underway · 3 not started · 2 deferred
 
 | | Capability | Detail |
 |:-:|---|---|
@@ -804,7 +804,8 @@ the source, not from documentation.
 | ⏸️ | hm_message_events message-trace table | Designed in detail in the roadmap — append-only table with trace id plus RFC Message-ID, event type, sender, recipient, remote IP, subject prefix, size, SMTP code, duration… |
 | ⬜ | Moderation, self-subscribe, per-list bounce handling | hm_distributionlists stores only address, enabled, requireauth, requireaddress and mode; there is no moderator queue, no subscribe/unsubscribe workflow and no per-list VERP or bounce processing. |
 | ⬜ | No post-delivery history table at all | On successful delivery the queue row is simply deleted (or, for a single local recipient, repurposed into the mailbox row); nothing records that the delivery happened… |
-| ⬜ | RFC 2369 List-* headers and RFC 8058 one-click unsubscribe | No List-Id, List-Unsubscribe, List-Post, List-Help, List-Owner, List-Archive or List-Unsubscribe-Post is ever emitted. Those header names occur in exactly one place in the tree: the DKIM oversigning "recommended headers" list. |
+| ✅ | RFC 2369 / RFC 2919 List-* headers | Done — `DistributionListSender::AddListHeaders`, called from the SMTP accept path for postings to a local distribution list: List-Id (RFC 2919, derived from the list address), List-Post, List-Help, List-Owner, and a List-Unsubscribe whose mailto points at the list's owner address with the list named in the subject — an address a person actually reads, because there is no automated unsubscribe workflow to point at (see the moderation row). Headers a message already carries are never duplicated; a posting arriving with its own List-Id is left untouched per RFC 2919's one-List-Id rule. |
+| ⏸️ | RFC 8058 one-click unsubscribe (List-Unsubscribe-Post) | Deferred with a measured reason, 2026-08-15: one-click requires the HTTPS URI in List-Unsubscribe to identify the individual member (the mail client POSTs to it blindly, carrying no identity), which means a per-member token in the header — and this server stores ONE message file shared by every recipient (single-instance storage), so per-member headers are impossible without per-member message copies. Revisit together with the list moderation/self-subscribe row, which needs per-member processing anyway. The infrastructure that is NOT the blocker already exists: WebServicesServer routes HTTPS requests and could serve the POST endpoint tomorrow. |
 | ⬜ | RFC 3464 machine-readable DSN format | Bounces are human-readable text only. No message/delivery-status part, no Final-Recipient / Action / Status / Diagnostic-Code fields, no message/rfc822 attachment of the original honouring the RET=FULL\|HDRS the server accepts at MAIL… |
 
 ### Administration, API and Control Panel
