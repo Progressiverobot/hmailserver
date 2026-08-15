@@ -240,21 +240,59 @@ namespace hMailServer.ControlPanel.Views
 
          try
          {
-            var psi = new ProcessStartInfo("nslookup", "-type=mx " + domain)
+            // Through the server, deliberately - issue #29. This tool used to shell
+            // out to nslookup, which asks the OPERATING SYSTEM's resolver; the server
+            // resolves through its own, honouring the DNSServer setting in
+            // hMailServer.ini. The two disagree exactly when it matters - a custom
+            // internal DNS server - and it is the server's answer that decides where
+            // mail actually goes. Utilities.ResolveMXRecords runs the same resolver
+            // path SMTP delivery uses.
+            string result = await Task.Run(() =>
             {
-               RedirectStandardOutput = true,
-               RedirectStandardError = true,
-               UseShellExecute = false,
-               CreateNoWindow = true
-            };
-            using var process = Process.Start(psi);
-            string stdout = await process.StandardOutput.ReadToEndAsync();
-            await process.WaitForExitAsync();
-            output_.Text = stdout.Trim();
+               dynamic utilities = null;
+
+               try
+               {
+                  utilities = ServerSession.Current.Application.Utilities;
+                  return (string) utilities.ResolveMXRecords(domain);
+               }
+               finally
+               {
+                  ServerSession.Release((object) utilities);
+               }
+            });
+
+            if (string.IsNullOrEmpty(result))
+            {
+               output_.Text = "The server found no mail servers for " + domain + ".\r\n\r\n"
+                  + "This is the server's own resolver answering - the same one SMTP delivery uses, including any "
+                  + "custom DNSServer configured in hMailServer.INI - so mail sent to this domain from this server "
+                  + "would not be deliverable right now.";
+               return;
+            }
+
+            var report = new System.Text.StringBuilder();
+            report.AppendLine("Mail servers for " + domain + ", in the order this server would try them:");
+            report.AppendLine();
+
+            foreach (string line in result.Split(new[] { "\r\n" }, StringSplitOptions.RemoveEmptyEntries))
+            {
+               int tab = line.IndexOf('\t');
+               if (tab > 0)
+                  report.AppendLine("  " + line.Substring(0, tab) + "  (" + line.Substring(tab + 1) + ")");
+               else
+                  report.AppendLine("  " + line);
+            }
+
+            report.AppendLine();
+            report.Append("Resolved by the server itself, so a custom DNSServer in hMailServer.INI is honoured - "
+               + "this is where mail actually goes, which an nslookup from this workstation cannot promise.");
+
+            output_.Text = report.ToString();
          }
          catch (Exception ex)
          {
-            output_.Text = "Query failed: " + ex.Message;
+            output_.Text = "Query failed: " + ServerSession.DescribeComError(ex);
          }
       }
 

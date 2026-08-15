@@ -115,6 +115,58 @@ namespace RegressionTests.Infrastructure
          File.WriteAllLines(path, lines);
       }
 
+      /// <summary>
+      ///    Utilities.ResolveMXRecords resolves through the SERVER's resolver, not the
+      ///    operating system's - which is the whole of issue #29: the Control Panel's
+      ///    MX-query tool used to shell out to nslookup, and on any installation with
+      ///    a custom DNSServer the tool and the server disagreed about where mail goes.
+      ///
+      ///    Same design as the test below: the configured server is TEST-NET-1, which
+      ///    answers nothing, so a TIMEOUT in the resolver's log is the proof the query
+      ///    went where the setting points. The old nslookup path never touched this
+      ///    process, wrote nothing to this log, and answered from the system resolver.
+      /// </summary>
+      [Test]
+      [Description("Issue 29: Utilities.ResolveMXRecords honours the configured DNS server rather than asking " +
+                   "the operating system's resolver")]
+      public void ResolveMXRecordsUsesTheConfiguredDnsServer()
+      {
+         SetIniSetting("DNSServer", UnreachableButValidServer);
+         SetIniSetting("DNSQueryTimeout", "2");
+
+         try
+         {
+            RestartServerAndReacquireCom();
+
+            LogHandler.DeleteCurrentDefaultLog();
+
+            string result = _application.Utilities.ResolveMXRecords("mx-probe.example.invalid");
+
+            // Nothing answers at TEST-NET-1, so the honest result is empty - and the
+            // log is what proves the query was SENT there rather than answered from
+            // the system resolver, which would return NXDOMAIN for .invalid instantly
+            // and never time out.
+            Assert.IsTrue(string.IsNullOrEmpty(result),
+               "A dead DNS server produced MX records, so the lookup did not go where DNSServer points. " +
+               "Result: " + result);
+
+            var log = LogHandler.ReadCurrentDefaultLog();
+
+            var dispatched = log.Contains("DNS - Result.") || log.Contains("DNS - Query timed out.");
+
+            Assert.IsTrue(dispatched,
+               "ResolveMXRecords produced neither a result line nor a timeout line in the server's log, " +
+               "so it did not resolve through the server's resolver at all - which is the defect this " +
+               "test exists to catch. Log:\r\n" + log);
+         }
+         finally
+         {
+            SetIniSetting("DNSServer", null);
+            SetIniSetting("DNSQueryTimeout", null);
+            RestartServerAndReacquireCom();
+         }
+      }
+
       [Test]
       [Description("A configured DNS server is accepted by the resolver rather than rejected as a malformed request")]
       public void AConfiguredDnsServerProducesADnsAnswerRatherThanARejectedRequest()

@@ -44,6 +44,58 @@ STDMETHODIMP InterfaceUtilities::InterfaceSupportsErrorInfo(REFIID riid)
    }
 }
 
+STDMETHODIMP InterfaceUtilities::ResolveMXRecords(BSTR DomainName, BSTR *Result)
+{
+   try
+   {
+      if (!Result)
+         return COMError::GenerateGenericMessage();
+
+      *Result = nullptr;
+
+      HM::String sDomainName(DomainName);
+      sDomainName.Trim();
+
+      if (sDomainName.IsEmpty())
+         return COMError::GenerateError("No domain name was given.");
+
+      // The server's own resolver, which is the point of the method - issue #29 was
+      // the Control Panel's MX-query tool shelling out to nslookup, whose answer
+      // comes from the OPERATING SYSTEM's resolver and disagrees with the server
+      // whenever hMailServer.ini names a custom DNSServer. This is the same path
+      // SMTP delivery resolves through, so what it reports is where mail will
+      // actually go, from this server, today.
+      std::vector<HM::HostNameAndIpAddress> hosts;
+
+      HM::DNSResolver oDNSResolver;
+      oDNSResolver.GetEmailServers(sDomainName, hosts);
+
+      // Hostname and address per line, in the server's own preference order -
+      // GetEmailServers has already sorted by MX preference and randomised equal
+      // preferences, exactly as delivery does. A tab separates the two so a caller
+      // can split them apart without guessing at the hostname's own characters.
+      HM::String sResult;
+
+      for (size_t i = 0; i < hosts.size(); i++)
+      {
+         if (i > 0)
+            sResult += _T("\r\n");
+
+         sResult += hosts[i].GetHostName();
+         sResult += _T("\t");
+         sResult += hosts[i].GetIpAddress();
+      }
+
+      *Result = sResult.AllocSysString();
+
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
 STDMETHODIMP InterfaceUtilities::GetMailServer(BSTR EMailAddress, BSTR *MailServer)
 {
    try

@@ -68,6 +68,7 @@ public:
    STDMETHOD(PerformMaintenance)(/*[in]*/ eMaintenanceOperation operation);
    STDMETHOD(CheckSieveSyntax)(/*[in]*/ BSTR Script, /*[out, retval]*/ BSTR *Result);
    STDMETHOD(EvaluateSieveScript)(/*[in]*/ BSTR Script, /*[in]*/ BSTR RawMessage, /*[out, retval]*/ BSTR *Result);
+   STDMETHOD(ResolveMXRecords)(/*[in]*/ BSTR DomainName, /*[out, retval]*/ BSTR *Result);
 };
 
 OBJECT_ENTRY_AUTO(__uuidof(Utilities), InterfaceUtilities)

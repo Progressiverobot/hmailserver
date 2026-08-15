@@ -1128,6 +1128,13 @@ interface IInterfaceUtilities : IDispatch{
    [id(19), helpstring("Performs maintenance operations in the database.")] HRESULT PerformMaintenance([in] eMaintenanceOperation operation);
    [id(20), helpstring("Checks the syntax of a Sieve (RFC 5228) script. Returns an empty string when valid, otherwise the error.")] HRESULT CheckSieveSyntax([in] BSTR Script, [out, retval] BSTR *Result);
    [id(21), helpstring("Evaluates a Sieve (RFC 5228) script against a raw message and returns the resulting action summary.")] HRESULT EvaluateSieveScript([in] BSTR Script, [in] BSTR RawMessage, [out, retval] BSTR *Result);
+   // Added for issue #29. An administration tool that answers "where does mail to
+   // this domain go" with the OPERATING SYSTEM's resolver answers the wrong
+   // question whenever hMailServer.ini names a custom DNSServer: the server and
+   // the tool can disagree, and it is the server's view that decides where mail
+   // actually goes. This runs inside the server, on the same resolver delivery
+   // uses.
+   [id(22), helpstring("Resolves the MX records for a domain using the server's own resolver (honouring a configured custom DNS server), one 'hostname<TAB>ip-address' line per delivery target, in the server's preference order. Empty when the domain has no mail servers.")] HRESULT ResolveMXRecords([in] BSTR DomainName, [out, retval] BSTR *Result);
 };
 
 [
