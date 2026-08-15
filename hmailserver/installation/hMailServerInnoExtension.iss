@@ -59,7 +59,17 @@ const
 	SERVICE_PAUSE_PENDING       = $6;
 	SERVICE_PAUSED              = $7;
 
-  // BEGIN .NET INSTALLER	
+  // Every dialog in this script is a SuppressibleMsgBox, and the reason is the
+// 6.2.19 release: the database setup failed on a clean machine, the failure
+// raised a plain MsgBox, and /VERYSILENT /SUPPRESSMSGBOXES only suppresses the
+// SUPPRESSIBLE kind - so the silent install did not fail, it waited on a dialog
+// with nobody at the keyboard, for ninety minutes, in CI, and would have waited
+// forever on a real unattended deployment. Under /SUPPRESSMSGBOXES these now
+// take their default button and the installer carries on to its exit code,
+// which is what a script deploying it can actually read. Interactive installs
+// see exactly the dialogs they always saw.
+
+// BEGIN .NET INSTALLER	
   mdacURL = 'http://download.microsoft.com/download/4/a/a/4aafff19-9d21-4d35-ae81-02c48dcbbbff/MDAC_TYP.EXE';
   dotnet20URL = 'http://download.microsoft.com/download/5/6/7/567758a3-759e-473e-bf8f-52154438565a/dotnetfx.exe';
   // END .NET INSTALLER
@@ -135,10 +145,10 @@ begin
 	if UsingWinNT() = true then begin
 		Result := OpenSCManager('','ServicesActive',SC_MANAGER_ALL_ACCESS);
 		if Result = 0 then
-			MsgBox('the servicemanager is not available', mbError, MB_OK)
+			SuppressibleMsgBox('the servicemanager is not available', mbError, MB_OK, IDOK)
 	end
 	else begin
-			MsgBox('only nt based systems support services', mbError, MB_OK)
+			SuppressibleMsgBox('only nt based systems support services', mbError, MB_OK, IDOK)
 			Result := 0;
 	end
 end;
@@ -329,10 +339,10 @@ begin
 
    if (IsServiceStopped('hMailServer') = false) then
    begin
-      MsgBox('The hMailServer service did not stop within ' + IntToStr(budgetMs div 1000) + ' seconds.' + #13#10#13#10 +
+      SuppressibleMsgBox('The hMailServer service did not stop within ' + IntToStr(budgetMs div 1000) + ' seconds.' + #13#10#13#10 +
              'Setup cannot continue: replacing the program files while the service is running would leave the old ' +
              'server binary installed alongside an upgraded database, and hMailServer would then refuse to start at all.' + #13#10#13#10 +
-             'Stop the hMailServer service manually (services.msc), then run this installation again.', mbError, MB_OK);
+             'Stop the hMailServer service manually (services.msc), then run this installation again.', mbError, MB_OK, IDOK);
       Result := false;
    end;
 end;
@@ -421,8 +431,8 @@ begin
 
 	if (Exec(ExpandConstant('{tmp}\{#DOTNET_RUNTIME_FILE}'), '/install /quiet /norestart', '', SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode) = False) then
 	begin
-		MsgBox('The .NET {#DOTNET_MAJOR} Desktop Runtime could not be installed. The database setup tools will not work until it is installed.' + #13#10 +
-		       SysErrorMessage(ResultCode), mbError, MB_OK);
+		SuppressibleMsgBox('The .NET {#DOTNET_MAJOR} Desktop Runtime could not be installed. The database setup tools will not work until it is installed.' + #13#10 +
+		       SysErrorMessage(ResultCode), mbError, MB_OK, IDOK);
 		Exit;
 	end;
 
@@ -433,10 +443,10 @@ begin
 	// matters is whether the runtime is present now.
 	if (ResultCode <> 0) and (ResultCode <> ERROR_SUCCESS_REBOOT_REQUIRED) and DotNetDesktopMissing() then
 	begin
-		MsgBox('The .NET {#DOTNET_MAJOR} Desktop Runtime installation failed with exit code ' + IntToStr(ResultCode) + '.' + #13#10 +
+		SuppressibleMsgBox('The .NET {#DOTNET_MAJOR} Desktop Runtime installation failed with exit code ' + IntToStr(ResultCode) + '.' + #13#10 +
 		       'The database setup tools will not work until the runtime is installed. ' +
 		       'Install it manually from ' + DOTNET_DOWNLOAD_URL + ' and then run ' +
-		       'DBSetupQuick.exe from the hMailServer Bin folder.', mbError, MB_OK);
+		       'DBSetupQuick.exe from the hMailServer Bin folder.', mbError, MB_OK, IDOK);
 	end;
 end;
 
@@ -640,14 +650,14 @@ begin
 
 	if (Length(g_szAdminPassword) > 0) and (Length(g_szAdminPassword) < 5) then
 	begin
-		MsgBox('The password given with /adminpassword must be at least 5 characters long.', mbError, MB_OK);
+		SuppressibleMsgBox('The password given with /adminpassword must be at least 5 characters long.', mbError, MB_OK, IDOK);
 		Result := false;
 		Exit;
 	end;
 
 	if (FindWindowByWindowName('hMailServer Control Panel') > 0) then
 	begin
-		MsgBox('hMailServer Control Panel is started. You must close down this application before starting the installation.',mbInformation, MB_OK);	
+		SuppressibleMsgBox('hMailServer Control Panel is started. You must close down this application before starting the installation.',mbInformation, MB_OK, IDOK);	
 		Result := false;
 		Exit;
 	end;
@@ -656,7 +666,7 @@ begin
 	// still running (it is no longer shipped, but may linger on upgrades).
 	if (FindWindowByWindowName('hMailServer Administrator') > 0) then
 	begin
-		MsgBox('hMailServer Administrator is started. You must close down this application before starting the installation.',mbInformation, MB_OK);	
+		SuppressibleMsgBox('hMailServer Administrator is started. You must close down this application before starting the installation.',mbInformation, MB_OK, IDOK);	
 		Result := false;
 		Exit;
 	end;
@@ -665,7 +675,7 @@ begin
 	begin
 		if (FindWindowByWindowName('hMailServer Database Setup') > 0) then
 		begin
-			MsgBox('hMailServer Database Setup is started. You must close down this application before starting the installation.',mbInformation, MB_OK);	
+			SuppressibleMsgBox('hMailServer Database Setup is started. You must close down this application before starting the installation.',mbInformation, MB_OK, IDOK);	
 			Result := false;
 			Exit;
 		end;	
@@ -675,7 +685,7 @@ begin
 	begin
 		if (FindWindowByWindowName('hMailServer Database Upgrader') > 0) then
 		begin
-			MsgBox('hMailServer Database Upgrader is started. You must close down this application before starting the installation.',mbInformation, MB_OK);	
+			SuppressibleMsgBox('hMailServer Database Upgrader is started. You must close down this application before starting the installation.',mbInformation, MB_OK, IDOK);	
 			Result := false;
 			Exit;			
 		end;	
@@ -685,7 +695,7 @@ begin
 	begin
 		if (FindWindowByWindowName('DBSetup') > 0) then
 		begin
-			MsgBox('hMailServer DBSetup is started. You must close down this application before starting the installation.',mbInformation, MB_OK);	
+			SuppressibleMsgBox('hMailServer DBSetup is started. You must close down this application before starting the installation.',mbInformation, MB_OK, IDOK);	
 			Result := false;
 			Exit;			
 		end;	
@@ -701,7 +711,7 @@ begin
 			// The hMailServer isn't running, but someone is blocking the ports.
 			//
 			sMessage := 'The hMailServer Setup has detected that one or several of the TCP/IP ports 25, 110 and 143 are already in use.' + Chr(13) + Chr(10) + 'This indicates that there already is an email server running on this computer.' + Chr(13) + Chr(10) + 'If you plan to use any of these ports with hMailServer, the already existing server must be stopped.';
-			MsgBox(sMessage, mbInformation, MB_OK);	
+			SuppressibleMsgBox(sMessage, mbInformation, MB_OK, IDOK);	
 		end;
 	end;	
 
@@ -724,14 +734,14 @@ begin
    // COM API silently did not work, with a successful-looking wizard.
    if (Exec(ExpandConstant('{app}\Bin\hMailServer.exe'), '/RegisterTypeLib', '',  SW_HIDE, ewWaitUntilTerminated, ResultCode) = False) then
    begin
-      MsgBox('The hMailServer COM API could not be registered.' + #13#10 + SysErrorMessage(ResultCode), mbError, MB_OK);
+      SuppressibleMsgBox('The hMailServer COM API could not be registered.' + #13#10 + SysErrorMessage(ResultCode), mbError, MB_OK, IDOK);
       Result := false;
    end
    else if (ResultCode <> 0) then
    begin
-      MsgBox('The hMailServer COM API could not be registered (hMailServer.exe /RegisterTypeLib returned ' + IntToStr(ResultCode) + ').' + #13#10#13#10 +
+      SuppressibleMsgBox('The hMailServer COM API could not be registered (hMailServer.exe /RegisterTypeLib returned ' + IntToStr(ResultCode) + ').' + #13#10#13#10 +
              'Scripts and remote administration tools will not be able to connect until it is. ' +
-             'Run "hMailServer.exe /RegisterTypeLib" as an administrator from the hMailServer Bin folder to retry.', mbError, MB_OK);
+             'Run "hMailServer.exe /RegisterTypeLib" as an administrator from the hMailServer Bin folder to retry.', mbError, MB_OK, IDOK);
       Result := false;
    end;
 end;
@@ -785,16 +795,16 @@ begin
 	// hMailServer" failed too, and its result was ignored as well.
 	if (Exec(ExpandConstant('{app}\Bin\hMailServer.exe'), '/Register', '',  SW_HIDE, ewWaitUntilTerminated, ResultCode) = False) then
 	begin
-		MsgBox('The hMailServer service could not be created.' + #13#10 + SysErrorMessage(ResultCode), mbError, MB_OK);
+		SuppressibleMsgBox('The hMailServer service could not be created.' + #13#10 + SysErrorMessage(ResultCode), mbError, MB_OK, IDOK);
 		Result := false;
 		Exit;
 	end;
 
 	if (ResultCode <> 0) then
 	begin
-		MsgBox('The hMailServer service could not be created (hMailServer.exe /Register returned ' + IntToStr(ResultCode) + ').' + #13#10#13#10 +
+		SuppressibleMsgBox('The hMailServer service could not be created (hMailServer.exe /Register returned ' + IntToStr(ResultCode) + ').' + #13#10#13#10 +
 		       'Check the hMailServer error log, then run "hMailServer.exe /Register" as an administrator from the ' +
-		       'hMailServer Bin folder to retry.', mbError, MB_OK);
+		       'hMailServer Bin folder to retry.', mbError, MB_OK, IDOK);
 		Result := false;
 		Exit;
 	end;
@@ -848,9 +858,9 @@ begin
 
    if (ShellExec('', 'msiexec', szParams, '', SW_SHOW, ewWaitUntilTerminated, ResultCode) = False) then
    begin
-      MsgBox('The SQL Server Compact 4.0 runtime could not be installed.' + #13#10 +
+      SuppressibleMsgBox('The SQL Server Compact 4.0 runtime could not be installed.' + #13#10 +
              SysErrorMessage(ResultCode) + #13#10#13#10 +
-             'hMailServer cannot use its built-in database until it is installed.', mbError, MB_OK);
+             'hMailServer cannot use its built-in database until it is installed.', mbError, MB_OK, IDOK);
       Result := false;
       Exit;
    end;
@@ -865,10 +875,10 @@ begin
       (ResultCode <> ERROR_SUCCESS_REBOOT_REQUIRED) and
       (ResultCode <> ERROR_PRODUCT_VERSION) then
    begin
-      MsgBox('The SQL Server Compact 4.0 runtime installation failed (msiexec returned ' + IntToStr(ResultCode) + ').' + #13#10#13#10 +
+      SuppressibleMsgBox('The SQL Server Compact 4.0 runtime installation failed (msiexec returned ' + IntToStr(ResultCode) + ').' + #13#10#13#10 +
              'hMailServer cannot use its built-in database until it is installed. The installer is ' +
              'SSCERuntime_x64-ENU.msi; install it by hand and then run DBSetupQuick.exe from the ' +
-             'hMailServer Bin folder.', mbError, MB_OK);
+             'hMailServer Bin folder.', mbError, MB_OK, IDOK);
       Result := false;
    end;
 end;
@@ -947,13 +957,13 @@ begin
          begin
             if (Exec(ExpandConstant('{app}\Bin\DBSetupQuick.exe'), szParameters, '', SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode) = False) then
             begin
-               MsgBox(SysErrorMessage(ResultCode), mbError, MB_OK);
+               SuppressibleMsgBox(SysErrorMessage(ResultCode), mbError, MB_OK, IDOK);
                Result := false;
             end
             else if (ResultCode <> 0) then
             begin
-               MsgBox('The hMailServer database could not be created or upgraded (exit code ' + IntToStr(ResultCode) + ').' #13#13
-                      'The hMailServer service may not work until the database has been upgraded. Run DBSetupQuick.exe from the hMailServer Bin folder to retry.', mbError, MB_OK);
+               SuppressibleMsgBox('The hMailServer database could not be created or upgraded (exit code ' + IntToStr(ResultCode) + ').' #13#13
+                      'The hMailServer service may not work until the database has been upgraded. Run DBSetupQuick.exe from the hMailServer Bin folder to retry.', mbError, MB_OK, IDOK);
                Result := false;
             end;
          end
@@ -961,13 +971,13 @@ begin
          begin
             if (Exec(ExpandConstant('{app}\Bin\DBSetup.exe'), szParameters, '', SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode) = False) then
             begin
-               MsgBox(SysErrorMessage(ResultCode), mbError, MB_OK);
+               SuppressibleMsgBox(SysErrorMessage(ResultCode), mbError, MB_OK, IDOK);
                Result := false;
             end
             else if (ResultCode <> 0) then
             begin
-               MsgBox('The hMailServer database setup did not complete (exit code ' + IntToStr(ResultCode) + ').' #13#13
-                      'The hMailServer service may not work until the database has been set up. Run DBSetup.exe from the hMailServer Bin folder to retry.', mbError, MB_OK);
+               SuppressibleMsgBox('The hMailServer database setup did not complete (exit code ' + IntToStr(ResultCode) + ').' #13#13
+                      'The hMailServer service may not work until the database has been set up. Run DBSetup.exe from the hMailServer Bin folder to retry.', mbError, MB_OK, IDOK);
                Result := false;
             end;
          end;
@@ -989,14 +999,14 @@ begin
          begin
             if (Exec(ExpandConstant('{sys}\net.exe'), 'START hMailServer', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) = False) then
             begin
-               MsgBox('The hMailServer service could not be started.' + #13#10 + SysErrorMessage(ResultCode), mbError, MB_OK);
+               SuppressibleMsgBox('The hMailServer service could not be started.' + #13#10 + SysErrorMessage(ResultCode), mbError, MB_OK, IDOK);
                Result := false;
             end
             else if (IsServiceRunning('hMailServer') = false) then
             begin
-               MsgBox('The hMailServer service was installed but did not start.' + #13#10#13#10 +
+               SuppressibleMsgBox('The hMailServer service was installed but did not start.' + #13#10#13#10 +
                       'Check hMailServer.log and the ERROR log in the hMailServer Logs folder, then start the ' +
-                      'service from services.msc or with "net start hMailServer".', mbError, MB_OK);
+                      'service from services.msc or with "net start hMailServer".', mbError, MB_OK, IDOK);
                Result := false;
             end;
          end
@@ -1012,9 +1022,9 @@ begin
          // an exception escaping from here abandons the wizard with the files
          // installed and - depending on how far it got - no service, no database and
          // nothing on screen saying which step failed or what to run by hand.
-         MsgBox('A post-installation step failed:' + #13#10 + GetExceptionMessage + #13#10#13#10 +
+         SuppressibleMsgBox('A post-installation step failed:' + #13#10 + GetExceptionMessage + #13#10#13#10 +
                 'The hMailServer program files are installed. To finish by hand, from the hMailServer Bin folder: ' +
-                'run "hMailServer.exe /Register", then DBSetup.exe, then start the hMailServer service.', mbError, MB_OK);
+                'run "hMailServer.exe /Register", then DBSetup.exe, then start the hMailServer service.', mbError, MB_OK, IDOK);
          Result := false;
       end;
    finally
@@ -1101,7 +1111,7 @@ begin
                        'The latest hMailServer 4 version will upgrade MySQL to an version' + #13 +
                        'which is compatible with hMailServer 5.'
 
-  		  	MsgBox(szMessage, mbError, MB_OK)
+  		  	SuppressibleMsgBox(szMessage, mbError, MB_OK, IDOK)
           Result := true;
        end;
     end
@@ -1122,7 +1132,7 @@ begin
                        'directory and then run this installation program again. Using this method, your configuration' + #13 +
                        'and email messages will be lost.';
 
-  		  	MsgBox(szMessage, mbError, MB_OK)
+  		  	SuppressibleMsgBox(szMessage, mbError, MB_OK, IDOK)
           Result := true;
     end;
 
@@ -1170,7 +1180,7 @@ begin
 			// Check that passwords matches.
 			if (Length(g_pageAccessKey.Values[0]) < 5) or (g_pageAccessKey.Values[0] <> g_pageAccessKey.Values[1]) then
 			begin
-				MsgBox('The two passwords must match and be at least 5 characters long.', mbError, MB_OK)
+				SuppressibleMsgBox('The two passwords must match and be at least 5 characters long.', mbError, MB_OK, IDOK)
 				Result := false;
 			end;
 

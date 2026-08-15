@@ -939,7 +939,9 @@ insert into hm_settings (settingname, settingstring, settinginteger) values ('AS
 insert into hm_settings (settingname, settingstring, settinginteger) values ('ASDKIMVerificationFailureScore', '', 5)
 
 insert into hm_settings (settingname, settingstring, settinginteger) values ('ASDMARCEnabled', '', 1)
+
 insert into hm_settings (settingname, settingstring, settinginteger) values ('ASArcFilteringEnabled', '', 0)
+
 insert into hm_settings (settingname, settingstring, settinginteger) values ('ASArcTrustedSealers', '', 0)
 
 insert into hm_settings (settingname, settingstring, settinginteger) values ('ASDMARCFailureScore', '', 5)

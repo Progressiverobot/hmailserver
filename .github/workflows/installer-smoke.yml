@@ -120,6 +120,50 @@ jobs:
           }
         id: install
 
+      # Runs only when the install step failed, and it is the diagnostic that
+      # matters: the installer's message box says merely "exit code 1", while
+      # DBSetupQuick writes the real reason - the SQL error, the missing script,
+      # the permission - to stderr, where nobody was reading it. The files are
+      # already on disk by the time the box appears (Inno logs "Installation
+      # process succeeded" first), so the tool can simply be run again here.
+      - name: Why did the database setup fail
+        if: ${{ failure() }}
+        shell: pwsh
+        run: |
+          $tool = Get-ChildItem 'C:\Program Files*\hMailServer\Bin\DBSetupQuick.exe' -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+
+          if (-not $tool) {
+            Write-Host 'DBSetupQuick.exe is not installed - the failure was earlier than the database step.'
+            exit 0
+          }
+
+          $out = Join-Path $env:RUNNER_TEMP 'dbsetup-stdout.txt'
+          $err = Join-Path $env:RUNNER_TEMP 'dbsetup-stderr.txt'
+
+          $p = Start-Process -FilePath $tool.FullName -ArgumentList '/silent' -PassThru `
+            -RedirectStandardOutput $out -RedirectStandardError $err
+
+          if (-not $p.WaitForExit(3 * 60 * 1000)) {
+            try { $p.Kill() } catch { }
+            Write-Host 'DBSetupQuick did not finish within three minutes.'
+          } else {
+            Write-Host "DBSetupQuick exit code: $($p.ExitCode)"
+          }
+
+          foreach ($f in @($out, $err)) {
+            if ((Test-Path $f) -and (Get-Item $f).Length -gt 0) {
+              Write-Host "----- $(Split-Path $f -Leaf) -----"
+              Get-Content $f | ForEach-Object { Write-Host $_ }
+            }
+          }
+
+          $ini = 'C:\Program Files\hMailServer\Bin\hMailServer.INI'
+          if (Test-Path $ini) {
+            Write-Host '----- [Database] section as the installer left it -----'
+            Get-Content $ini | Select-String -Pattern '^\[Database\]' -Context 0,12 | ForEach-Object { Write-Host $_ }
+          }
+
       - name: The service is registered and points at the installed binary
         shell: pwsh
         run: |
