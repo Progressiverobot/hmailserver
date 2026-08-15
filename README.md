@@ -146,7 +146,7 @@ The installer is Inno Setup, so it takes the standard switches, plus one of its 
 Example:
 
 ```bat
-hMailServer-6.2.19-x64.exe /VERYSILENT /SUPPRESSMSGBOXES /LOG="C:\Temp\hmail-install.log" ^
+hMailServer-6.2.20-x64.exe /VERYSILENT /SUPPRESSMSGBOXES /LOG="C:\Temp\hmail-install.log" ^
    /COMPONENTS="server,controlpanel" /useinternaldbms=true
 ```
 

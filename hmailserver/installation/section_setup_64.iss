@@ -1,7 +1,7 @@
 [Setup]
-OutputBaseFilename=hMailServer-6.2.19-x64
-AppVerName=hMailServer 6.2.19-x64
+OutputBaseFilename=hMailServer-6.2.20-x64
+AppVerName=hMailServer 6.2.20-x64
 ArchitecturesInstallIn64BitMode=x64
 ArchitecturesAllowed=x64
-AppVersion=6.2.19
-VersionInfoVersion=6.2.19.0
+AppVersion=6.2.20
+VersionInfoVersion=6.2.20.0
