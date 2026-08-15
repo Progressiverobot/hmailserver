@@ -2267,7 +2267,7 @@ namespace hMailServer.ControlPanel.Views
                           "change where mail is routed.",
                   Settings =
                   {
-                     new TextSetting { Key = "DaemonAddressDomain", Label = "Domain for the mailer-daemon sender address (empty = server host name)", Placeholder = "yourdomain.com" }
+                     new TextSetting { Key = "DaemonAddressDomain", Label = "Domain for the mailer-daemon sender address (empty = host name, else the message's local domain, else the machine name)", Placeholder = "yourdomain.com" }
                   }
                });
                cards_.Add(new CardDef
@@ -2554,12 +2554,18 @@ namespace hMailServer.ControlPanel.Views
                cards_.Add(new CardDef
                {
                   Title = "DNS cache",
-                  Blurb = "Keeps DNS answers in memory for their TTL so repeated lookups for the same host do not go out to " +
-                          "the network again. It only reduces the number of lookups — it is not a substitute for a local " +
-                          "caching resolver on a busy server. Setting an override DNS server above always bypasses the cache.",
+                  // Corrected 2026-08-15: the previous text described an in-process cache that
+                  // keeps answers "in memory for their TTL". There is no such cache anywhere in
+                  // the server. The setting toggles DNS_QUERY_BYPASS_CACHE on the DnsQueryEx
+                  // call - i.e. whether WINDOWS' resolver cache is consulted - and a custom DNS
+                  // server forces the bypass regardless, because the system cache would answer
+                  // from the wrong resolver.
+                  Blurb = "Whether lookups may be answered from the Windows DNS resolver cache. Off, every lookup goes to " +
+                          "the network. Ignored when an override DNS server is set above — those lookups always bypass " +
+                          "the system cache, because its answers would come from the wrong resolver.",
                   Settings =
                   {
-                     new BoolSetting { Key = "UseDNSCache", Default = true, Label = "Cache DNS lookup results in memory" }
+                     new BoolSetting { Key = "UseDNSCache", Default = true, Label = "Answer from the Windows DNS resolver cache when possible" }
                   }
                });
                cards_.Add(new CardDef
