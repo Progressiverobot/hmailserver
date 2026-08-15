@@ -80,6 +80,13 @@ namespace HM
       // end-of-data. See #18.
       bool FinalizationDeadlineExceeded_(ULONGLONG elapsedMs);
 
+      // Leaves binary (DATA) mode and re-arms command reading, first handing back
+      // any bytes the client pipelined behind the standard end-of-data marker so
+      // they are parsed as the commands they are. Every post-DATA continuation
+      // path must use this rather than SetReceiveBinary(false)+EnqueueRead(),
+      // or a pipelined QUIT / next MAIL FROM silently disappears.
+      void ResumeCommandModeAfterData_();
+
       virtual void InternalParseData(const AnsiString &sRequest);
 
       enum SpamProtectionType
@@ -298,6 +305,12 @@ namespace HM
       // data-done timeout at this instant, so this is the clock the accept path
       // races - used for the queue-wait log and the finalization deadline.
       ULONGLONG finalization_enqueued_tick_ = 0;
+
+      // Bytes the client pipelined behind the standard end-of-data marker, captured
+      // from the transmission buffer the moment the marker was recognised and
+      // injected back into the read stream when command mode resumes. Postfix puts
+      // QUIT - or the next MAIL FROM - there routinely.
+      std::shared_ptr<ByteBuffer> pipelined_input_after_data_;
 
       size_t max_message_size_kb_;
       // Maximum message size in KB.

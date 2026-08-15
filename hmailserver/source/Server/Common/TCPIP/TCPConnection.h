@@ -70,6 +70,16 @@ namespace HM
       // wait for the reply after end-of-data, so a well-behaved sender has nothing in
       // flight at this point.
       void DiscardBufferedInput();
+
+      // Puts bytes at the disposal of the next read as though they had just arrived
+      // from the socket. This exists for pipelined input that a protocol layer had
+      // to withhold: commands a client legitimately sent behind the STANDARD SMTP
+      // end-of-data marker in the same segment as the message (Postfix pipelines
+      // QUIT, or the next MAIL FROM, that way routinely). Call only while no read
+      // is armed - between a protocol phase ending and the EnqueueRead that starts
+      // the next one - because it writes the shared receive buffer.
+      void InjectPipelinedBytes(const BYTE *bytes, size_t count);
+
       void EnqueueShutdownSend();
       void EnqueueDisconnect();
       void EnqueueHandshake();

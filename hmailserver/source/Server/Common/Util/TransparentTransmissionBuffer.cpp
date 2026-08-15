@@ -102,102 +102,123 @@ namespace HM
       // Add the new data to the buffer.
       buffer_->Add(pBuffer, iBufferSize);
 
-      // Check if we have received the entire buffer.
-      if (buffer_->GetSize() >= 3 && !is_sending_ && !binary_mode_)
+      // Check if we have received the entire message.
+      if (buffer_->GetSize() >= 2 && !is_sending_ && !binary_mode_)
       {
-         // If receiving, we should check for end-of-data
+         // If receiving, we should check for end-of-data.
+         //
+         // The marker is SEARCHED FOR rather than checked at the end of the buffer,
+         // and the difference is a hang that shipped twice. The first version
+         // required \r\n.\r\n literally at the buffer's end, so a message whose
+         // final line ended with a bare LF was never seen to end (the 6.2.18 fix
+         // widened the spellings). But the widened checks still only looked at the
+         // END of the buffer - and a pipelining client puts bytes BEHIND the
+         // marker in the same segment. Postfix sends "...\r\n.\r\nQUIT\r\n" as one
+         // write whenever it has nothing further for the connection, and the next
+         // MAIL FROM instead when it has more mail queued. Whenever those bytes
+         // arrived in the same read as the marker, the marker was mid-buffer, no
+         // tail check could ever match, and the session hung: all data received,
+         // no reply ever sent, "timed out while sending end of data" on the peer.
+         //
+         // Measured against a real Postfix 3.10 on 2026-08-15, which is also what
+         // exposed why the original reporter's PIPELINING workaround "worked":
+         // without pipelining the client waits for the 250 before QUIT, so the
+         // marker IS the tail. Whether the hang struck was pure TCP segmentation
+         // luck - which is why a same-host relay hit it every time and internet
+         // senders almost never did.
          size_t iSize = buffer_->GetSize();
          const char *pCharBuffer = buffer_->GetCharBuffer();
 
-         // Whether a bare LF is accepted where the standard requires CRLF. This is the
-         // existing "Allow incorrect line endings" setting, and until now it was honoured
-         // everywhere EXCEPT the one place where getting it wrong hangs the session.
-         //
-         // The old test for end-of-data required, literally, \r\n.\r\n at the end of the
-         // buffer. So a message whose final body line ended with a bare LF arrived as
-         // ...text\n.\r\n - and the byte five back is 't', not '\r', so end-of-data was
-         // never recognised. The other test only fires when the dot is the first byte in
-         // the buffer, which happens only when the preceding flush ended exactly on a
-         // newline, so it does not cover this either. The result is not a rejection but a
-         // HANG: every byte of the message has arrived, the server goes on waiting for a
-         // terminator that has already been and gone, the sending MTA waits for a reply
-         // that will never come, and the spool file is left at zero bytes. That is
-         // discussion #18's exact signature - "no external receiving is possible", with
-         // the log stopping dead after 354 - and it is why the reporter's workaround of
-         // disabling PIPELINING appeared to help: it changed how the data was segmented.
-         //
-         // Gated on the setting rather than always allowed, because RFC 5321 is specific
-         // that the terminator is <CRLF>.<CRLF>, and a server should not invent
-         // tolerances it was not asked for. A server that WAS asked for them should not
-         // then refuse in the one case that matters.
+         // Whether a bare LF is accepted where the standard requires CRLF - the
+         // "Allow incorrect line endings" setting. Gated, because RFC 5321 is
+         // specific that the terminator is <CRLF>.<CRLF>, and a server should not
+         // invent tolerances it was not asked for.
          const bool allowBareLineFeed =
             Configuration::Instance()->GetSMTPConfiguration()->GetAllowIncorrectLineEndings();
 
-         // How many bytes the terminator occupies, so the right number are removed. The
-         // old code always removed three, which is correct for ".\r\n" and one byte too
-         // many for ".\n" - and one byte too many means the last character of the message
-         // body is silently eaten.
-         size_t terminatorLength = 0;
+         // Only bytes appended by THIS call can complete a marker, but a marker can
+         // straddle the boundary: the longest spelling is five bytes, so start four
+         // bytes before the new data.
+         const size_t previousSize = iSize - iBufferSize;
+         const size_t scanFrom = previousSize > 4 ? previousSize - 4 : 0;
 
-         // A dot alone on a line, at the start of the buffer: the preceding flush ended
-         // on the line boundary, so the newline before the dot is no longer here.
-         if (pCharBuffer[0] == '.' && pCharBuffer[1] == '\r' && pCharBuffer[2] == '\n')
-            terminatorLength = 3;
-         else if (allowBareLineFeed && iSize >= 2 && pCharBuffer[0] == '.' && pCharBuffer[1] == '\n')
+         size_t dotPosition = 0;
+         size_t terminatorLength = 0;   // the dot plus the newline that follows it
+         bool nonStandardMarker = false;
+
+         for (size_t i = scanFrom; i < iSize && terminatorLength == 0; i++)
          {
-            terminatorLength = 2;
-            ended_on_non_standard_marker_ = true;
-         }
+            if (pCharBuffer[i] != '.')
+               continue;
 
-         if (terminatorLength == 0 && iSize >= 5 &&
-             pCharBuffer[iSize - 5] == '\r' && pCharBuffer[iSize - 4] == '\n' &&
-             pCharBuffer[iSize - 3] == '.' &&
-             pCharBuffer[iSize - 2] == '\r' && pCharBuffer[iSize - 1] == '\n')
-         {
-            terminatorLength = 3;
-         }
+            // Left context. Start-of-buffer counts as a line boundary: the
+            // preceding flush ended exactly on the newline, which is no longer
+            // here. Otherwise the dot must follow a newline - CRLF, or bare LF
+            // under the setting.
+            bool leftIsBare = false;
+            if (i > 0)
+            {
+               if (pCharBuffer[i - 1] != '\n')
+                  continue;
 
-         // Everything matched up to this point is the standard marker. Anything matched
-         // below it is not, and the distinction is carried out to the caller rather than
-         // being forgotten here: a non-standard marker means anything the peer has already
-         // pipelined behind it has to be thrown away instead of parsed as SMTP commands.
-         // Honouring those bytes is the CVE-2023-51764 smuggling primitive - a relay
-         // upstream that does not recognise the marker forwards one message, and a server
-         // that recognises it AND executes what follows has been made to accept a second
-         // message nobody authorised.
-         if (terminatorLength == 0 && allowBareLineFeed)
-         {
-            // The four spellings a sender with bare-LF line endings can produce. Each is
-            // checked against the end of the buffer, and each removes only the dot and
-            // the newline that follows it, leaving the body's own line ending in place.
-            const bool crlfDotLf = iSize >= 4 &&
-               pCharBuffer[iSize - 4] == '\r' && pCharBuffer[iSize - 3] == '\n' &&
-               pCharBuffer[iSize - 2] == '.'  && pCharBuffer[iSize - 1] == '\n';
+               leftIsBare = i < 2 || pCharBuffer[i - 2] != '\r';
+            }
 
-            const bool lfDotCrlf = iSize >= 4 &&
-               pCharBuffer[iSize - 4] == '\n' && pCharBuffer[iSize - 3] == '.' &&
-               pCharBuffer[iSize - 2] == '\r' && pCharBuffer[iSize - 1] == '\n';
+            // Right context: CRLF, or bare LF under the setting.
+            const bool rightIsCrlf = i + 2 < iSize &&
+               pCharBuffer[i + 1] == '\r' && pCharBuffer[i + 2] == '\n';
+            const bool rightIsBareLf = !rightIsCrlf &&
+               i + 1 < iSize && pCharBuffer[i + 1] == '\n';
 
-            const bool lfDotLf = iSize >= 3 &&
-               pCharBuffer[iSize - 3] == '\n' && pCharBuffer[iSize - 2] == '.' &&
-               pCharBuffer[iSize - 1] == '\n';
+            if (!rightIsCrlf && !rightIsBareLf)
+               continue;
 
-            if (lfDotCrlf)
-               terminatorLength = 3;
-            else if (crlfDotLf || lfDotLf)
-               terminatorLength = 2;
+            const bool isBare = leftIsBare || rightIsBareLf;
+            if (isBare && !allowBareLineFeed)
+               continue;
 
-            if (terminatorLength > 0)
-               ended_on_non_standard_marker_ = true;
+            // A bare-LF spelling counts only at the very END of everything received
+            // so far - never mid-buffer. This is deliberate and is pinned by the
+            // smuggling test: in the CVE-2023-51764 shape, an upstream relay did NOT
+            // treat "\n.\r\n" as end-of-data and forwarded everything as one message
+            // body, so a server that honours it mid-stream delivers a silently
+            // TRUNCATED message (or worse, executes what follows). Mid-buffer, a
+            // bare marker is body text. The STANDARD marker carries no such
+            // ambiguity - every conformant relay agrees where the message ends - so
+            // it alone is recognised anywhere, which is what un-hangs a pipelining
+            // client whose QUIT rides behind the dot.
+            const size_t candidateLength = rightIsCrlf ? (size_t) 3 : (size_t) 2;
+            if (isBare && i + candidateLength != iSize)
+               continue;
+
+            dotPosition = i;
+            terminatorLength = candidateLength;
+            nonStandardMarker = isBare;
          }
 
          if (terminatorLength > 0)
          {
-            // Remove the transmission-end characters, leaving the message body and its
-            // own final line ending.
-            buffer_->DecreaseSize(terminatorLength);
+            // Whatever follows the marker is the client's next pipelined input -
+            // legitimate SMTP, because only the STANDARD marker is ever recognised
+            // mid-buffer and every conformant relay agrees where a standard-marked
+            // message ends. Preserved for the caller to feed back through command
+            // parsing. (A bare marker is tail-only, so it can have no surplus.)
+            const size_t surplusStart = dotPosition + terminatorLength;
+            const size_t surplusLength = iSize - surplusStart;
+
+            if (surplusLength > 0)
+            {
+               surplus_after_terminator_ = std::shared_ptr<ByteBuffer>(new ByteBuffer);
+               surplus_after_terminator_->Add((const BYTE *) pCharBuffer + surplusStart, surplusLength);
+            }
+
+            // Trim to the message content alone: the marker and everything behind
+            // it go; the body keeps its own final line ending, which sits BEFORE
+            // dotPosition.
+            buffer_->DecreaseSize(iSize - dotPosition);
 
             transmission_ended_ = true;
+            ended_on_non_standard_marker_ = nonStandardMarker;
          }
       }
    }

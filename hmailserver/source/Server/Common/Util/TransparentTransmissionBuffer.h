@@ -56,6 +56,14 @@ namespace HM
       // non-standard marker must be discarded rather than parsed as commands - that is
       // the CVE-2023-51764 smuggling primitive.
       bool GetEndedOnNonStandardMarker() const { return ended_on_non_standard_marker_; }
+
+      // Bytes that arrived in the same reads as the message but BEHIND the standard
+      // end-of-data marker: a pipelining client's next commands. Postfix sends
+      // "...\r\n.\r\nQUIT\r\n" in one segment as a matter of course, and with several
+      // queued messages the next MAIL FROM rides there instead. Null when there were
+      // none - and always null after a NON-standard marker, because those bytes are
+      // discarded inside Append (the CVE-2023-51764 rule above).
+      std::shared_ptr<ByteBuffer> GetSurplusAfterTerminator() const { return surplus_after_terminator_; }
       
       std::shared_ptr<ByteBuffer> GetBuffer() 
       {
@@ -124,7 +132,10 @@ namespace HM
       bool previous_chunk_ended_with_carriage_return_;
 
       bool ended_on_non_standard_marker_;
-      
+
+      // See GetSurplusAfterTerminator().
+      std::shared_ptr<ByteBuffer> surplus_after_terminator_;
+
       // Output types
       File file_;
       std::weak_ptr<TCPConnection> tcp_connection_;

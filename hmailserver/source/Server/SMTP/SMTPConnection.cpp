@@ -1399,6 +1399,15 @@ namespace HM
       // client to wait for the reply after end-of-data.
       if (transmission_buffer_->GetEndedOnNonStandardMarker())
          DiscardBufferedInput();
+      else
+      {
+         // Behind the STANDARD marker, bytes in the same read are the client's next
+         // pipelined commands - Postfix sends "...\r\n.\r\nQUIT\r\n" in one segment as
+         // a matter of course. Captured here, before the async accept stage can reset
+         // the transmission buffer, and handed back to the parser when command mode
+         // resumes.
+         pipelined_input_after_data_ = transmission_buffer_->GetSurplusAfterTerminator();
+      }
 
       // Since this may be a time-consuming task, do it asynchronously
       finalization_enqueued_tick_ = GetTickCount64();
@@ -1475,8 +1484,7 @@ namespace HM
          LogAwstatsMessageRejected_();
 
          ResetCurrentMessage_();
-         SetReceiveBinary(false);
-         EnqueueRead();
+         ResumeCommandModeAfterData_();
          return;
       }
 
@@ -1691,7 +1699,26 @@ namespace HM
 
       LogFinalizationStage_("script/save", saveTick);
 
+      ResumeCommandModeAfterData_();
+   }
+
+   void
+   SMTPConnection::ResumeCommandModeAfterData_()
+   {
       SetReceiveBinary(false);
+
+      if (pipelined_input_after_data_ && pipelined_input_after_data_->GetSize() > 0)
+      {
+         // The injection happens between two reads - none is armed until the
+         // EnqueueRead below - so the receive buffer is exclusively ours here, and
+         // ordering is preserved: these bytes arrived before anything the socket
+         // still holds.
+         InjectPipelinedBytes(pipelined_input_after_data_->GetBuffer(),
+            pipelined_input_after_data_->GetSize());
+      }
+
+      pipelined_input_after_data_.reset();
+
       EnqueueRead();
    }
 
@@ -1736,8 +1763,7 @@ namespace HM
 
       LogAwstatsMessageRejected_();
       ResetCurrentMessage_();
-      SetReceiveBinary(false);
-      EnqueueRead();
+      ResumeCommandModeAfterData_();
 
       return true;
    }

@@ -249,6 +249,131 @@ namespace RegressionTests.SMTP
             "The injected commands are not in the message body, so it cannot be shown that they were treated as data.");
       }
 
+      /// <summary>
+      ///    A pipelining client puts its next input BEHIND the end-of-data marker in
+      ///    the same segment. Postfix does this routinely: "...\r\n.\r\nQUIT\r\n" in one
+      ///    write when nothing further is queued for the connection, and the next MAIL
+      ///    FROM there instead when something is. The 6.2.18 fix widened the marker
+      ///    spellings but every check still looked only at the END of the received
+      ///    buffer - so whenever the marker arrived mid-buffer, it was never seen, and
+      ///    the session hung with all data received and no reply ever sent. Whether a
+      ///    given sender hit it was TCP segmentation luck, which is why a same-host
+      ///    relay (the discussion #18 reporter's Proxmox front end) hit it every time
+      ///    while internet senders almost never did.
+      ///
+      ///    Found by running a real Postfix 3.10 against this server on 2026-08-15 and
+      ///    watching four deliveries hang; fixed by searching for the STANDARD marker
+      ///    anywhere in the buffer and handing what follows back to command parsing.
+      /// </summary>
+      [Test]
+      [Description("A pipelined QUIT behind the standard end-of-data marker neither hangs the session nor disappears")]
+      public void APipelinedQuitBehindTheStandardTerminatorIsAccepted()
+      {
+         // Deliberately with the tolerance OFF: the standard marker must be found
+         // mid-buffer regardless of any leniency setting, because the pipelining
+         // client sending it is fully conformant (RFC 2920 permits QUIT there).
+         _settings.AllowIncorrectLineEndings = false;
+
+         var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "pipequit@example.test", "test");
+
+         using (var client = new TcpClient())
+         {
+            client.Connect("localhost", 25);
+            client.ReceiveTimeout = 20000;
+
+            using (var stream = client.GetStream())
+            {
+               ReadReply(stream);                                    // 220
+               WriteAscii(stream, "HELO test\r\n"); ReadReply(stream);
+               WriteAscii(stream, "MAIL FROM:<sender@external.test>\r\n"); ReadReply(stream);
+               WriteAscii(stream, "RCPT TO:<" + account.Address + ">\r\n"); ReadReply(stream);
+               WriteAscii(stream, "DATA\r\n"); ReadReply(stream);    // 354
+
+               // Message, terminator and QUIT in ONE write - the exact bytes a real
+               // Postfix was captured sending. Without the fix the server never sees
+               // the marker and ReadReply times out.
+               WriteAscii(stream,
+                  "From: sender@external.test\r\n" +
+                  "Subject: pipelined quit\r\n" +
+                  "\r\n" +
+                  "Body line.\r\n" +
+                  ".\r\n" +
+                  "QUIT\r\n");
+
+               var dataReply = ReadReply(stream);
+               StringAssert.StartsWith("250", dataReply, "The message was not accepted: " + dataReply);
+
+               // And the pipelined QUIT must have been executed, not discarded: the
+               // client is conformant and deserves its 221. A server that swallowed
+               // it would leave Postfix waiting out another timeout.
+               var quitReply = ReadReply(stream);
+               StringAssert.StartsWith("221", quitReply,
+                  "The pipelined QUIT was not answered: " + quitReply);
+            }
+         }
+
+         Pop3ClientSimulator.AssertMessageCount(account.Address, "test", 1);
+
+         var message = Pop3ClientSimulator.AssertGetFirstMessageText(account.Address, "test");
+         StringAssert.Contains("Body line.", message, "The body was damaged.");
+         StringAssert.DoesNotContain("QUIT", message,
+            "The pipelined command leaked into the stored message body.");
+      }
+
+      [Test]
+      [Description("A complete second transaction pipelined behind the standard marker is executed as SMTP, delivering both messages")]
+      public void ASecondTransactionPipelinedBehindTheStandardTerminatorIsExecuted()
+      {
+         // Postfix with several queued messages for the same destination reuses the
+         // connection and pipelines the next MAIL FROM behind the previous message's
+         // terminator. Both transactions are fully conformant, so both must deliver.
+         _settings.AllowIncorrectLineEndings = false;
+
+         var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "pipetwo@example.test", "test");
+
+         using (var client = new TcpClient())
+         {
+            client.Connect("localhost", 25);
+            client.ReceiveTimeout = 20000;
+
+            using (var stream = client.GetStream())
+            {
+               ReadReply(stream);                                    // 220
+               WriteAscii(stream, "HELO test\r\n"); ReadReply(stream);
+               WriteAscii(stream, "MAIL FROM:<sender@external.test>\r\n"); ReadReply(stream);
+               WriteAscii(stream, "RCPT TO:<" + account.Address + ">\r\n"); ReadReply(stream);
+               WriteAscii(stream, "DATA\r\n"); ReadReply(stream);    // 354
+
+               // First message's tail, its terminator, and the ENTIRE second
+               // transaction in one write.
+               WriteAscii(stream,
+                  "Subject: first\r\n" +
+                  "\r\n" +
+                  "First body.\r\n" +
+                  ".\r\n" +
+                  "MAIL FROM:<sender@external.test>\r\n" +
+                  "RCPT TO:<" + account.Address + ">\r\n" +
+                  "DATA\r\n");
+
+               StringAssert.StartsWith("250", ReadReply(stream));    // first message queued
+               StringAssert.StartsWith("250", ReadReply(stream));    // MAIL
+               StringAssert.StartsWith("250", ReadReply(stream));    // RCPT
+               StringAssert.StartsWith("354", ReadReply(stream));    // DATA
+
+               WriteAscii(stream,
+                  "Subject: second\r\n" +
+                  "\r\n" +
+                  "Second body.\r\n" +
+                  ".\r\nQUIT\r\n");
+
+               StringAssert.StartsWith("250", ReadReply(stream));    // second message queued
+               StringAssert.StartsWith("221", ReadReply(stream));    // pipelined QUIT
+            }
+         }
+
+         Pop3ClientSimulator.AssertMessageCount(account.Address, "test", 2);
+      }
+
       [Test]
       [Description("With the setting off, a standards-conformant terminator still works and nothing else changes")]
       public void TheStandardTerminatorIsUnaffectedWhenBareLineFeedsAreNotAllowed()

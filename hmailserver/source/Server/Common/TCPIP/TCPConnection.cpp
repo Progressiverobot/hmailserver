@@ -696,6 +696,21 @@ namespace HM
    }
 
    void
+   TCPConnection::InjectPipelinedBytes(const BYTE *bytes, size_t count)
+   {
+      if (bytes == nullptr || count == 0)
+         return;
+
+      // Written to the FRONT of the logical stream in effect: nothing else can be
+      // in the buffer, because the caller holds the window between two reads (no
+      // read armed means the socket is not delivering into it). async_read_until
+      // checks the streambuf before touching the socket, so the next EnqueueRead
+      // completes against these bytes immediately.
+      std::ostream stream(&receive_buffer_);
+      stream.write(reinterpret_cast<const char *>(bytes), count);
+   }
+
+   void
    TCPConnection::AsyncRead(const AnsiString &delimitor)
    {
       UpdateAutoLogoutTimer();
