@@ -393,5 +393,82 @@ namespace RegressionTests.SMTP
 
          Pop3ClientSimulator.AssertMessageCount(account.Address, "test", 1);
       }
+
+      /// <summary>
+      ///    SMTP dot transparency (RFC 5321 4.5.2): a body line beginning with a dot is
+      ///    sent doubled and must be stored singled. The round trip is what matters -
+      ///    a client sends "..X", the server stores ".X", and POP3 RETR sends it back
+      ///    doubled again. This is the black-box guard for the chunk-boundary dot fix
+      ///    (the index-1/2 line-start cases are covered deterministically by the C++
+      ///    TransparentTransmissionBufferTester, which a socket cannot provoke); here
+      ///    the concern is that ordinary line-leading dots survive the whole path
+      ///    intact, including the one that matters most: a line that is a single dot,
+      ///    sent as "..", which if mis-handled becomes a premature end-of-data.
+      /// </summary>
+      [Test]
+      [Description("A body line starting with a dot round-trips through SMTP storage and POP3 retrieval intact")]
+      public void DotLeadingBodyLinesRoundTripIntact()
+      {
+         var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "dotstuff@example.test", "test");
+
+         using (var client = new TcpClient())
+         {
+            client.Connect("localhost", 25);
+            client.ReceiveTimeout = 20000;
+
+            using (var stream = client.GetStream())
+            {
+               ReadReply(stream);                                    // 220
+               WriteAscii(stream, "HELO test\r\n"); ReadReply(stream);
+               WriteAscii(stream, "MAIL FROM:<sender@external.test>\r\n"); ReadReply(stream);
+               WriteAscii(stream, "RCPT TO:<" + account.Address + ">\r\n"); ReadReply(stream);
+               WriteAscii(stream, "DATA\r\n"); ReadReply(stream);    // 354
+
+               // Every line-leading dot is doubled on the wire per the client's
+               // obligation. What must come back out is the single-dot form.
+               WriteAscii(stream,
+                  "From: sender@external.test\r\n" +
+                  "Subject: dot transparency\r\n" +
+                  "\r\n" +
+                  "Normal first line.\r\n" +
+                  "..a line that really begins with one dot\r\n" +
+                  "...two dots really\r\n" +
+                  "a.b mid-line dot stays\r\n" +
+                  "..\r\n" +                                          // a line that is a single dot
+                  "last line\r\n" +
+                  ".\r\n");
+
+               var reply = ReadReply(stream);
+               StringAssert.StartsWith("250", reply, "The message was not accepted: " + reply);
+               WriteAscii(stream, "QUIT\r\n");
+            }
+         }
+
+         // Exactly one message delivered - asserted BEFORE retrieval, because
+         // AssertGetFirstMessageText issues DELE and would leave nothing to count.
+         Pop3ClientSimulator.AssertMessageCount(account.Address, "test", 1);
+
+         var message = Pop3ClientSimulator.AssertGetFirstMessageText(account.Address, "test");
+
+         // RETR returns the raw wire bytes, re-stuffed on the way out. For a correctly
+         // handled line-leading dot, un-stuff then re-stuff is the identity, so each
+         // body line must appear on the wire exactly as it was sent - checked with its
+         // surrounding CRLFs so a shorter dot-prefix cannot satisfy a longer one (a
+         // stored-doubled bug would re-stuff to a TRIPLE dot and fail these).
+         StringAssert.Contains("\r\n..a line that really begins with one dot\r\n", message,
+            "A line beginning with one dot did not round-trip exactly.");
+         StringAssert.Contains("\r\n...two dots really\r\n", message,
+            "A line beginning with two dots did not round-trip exactly.");
+         StringAssert.Contains("\r\na.b mid-line dot stays\r\n", message,
+            "A mid-line dot was altered.");
+
+         // The one that matters: the single-dot body line (sent as "..") must survive
+         // as a body line immediately before "last line". If it had been read as a
+         // premature end-of-data, everything from it onward would be gone and this
+         // adjacency would not exist.
+         StringAssert.Contains("\r\n..\r\nlast line\r\n", message,
+            "The single-dot body line was mishandled - the message was truncated at it " +
+            "or the line was dropped.");
+      }
    }
 }

@@ -16,6 +16,7 @@
 
 #include "File.h"
 
+#include <string>
 #include <boost/function.hpp>
 #include "../TCPIP/TCPConnection.h"
 
@@ -25,8 +26,17 @@ namespace HM
    class SocketConnection;
    class IProtocolParser;
 
+   class TransparentTransmissionBufferTester;
+
    class TransparentTransmissionBuffer
    {
+      // Drives InsertTransmissionPeriod_/RemoveTransmissionPeriod_ directly with
+      // exact chunk boundaries. The line-start defect they carried only shows when
+      // a chunk begins one or two bytes before a line-leading dot, which cannot be
+      // provoked deterministically through a socket - the receive path only splits
+      // above 40000 bytes and both paths split where TCP reads happen to land.
+      friend class TransparentTransmissionBufferTester;
+
    public:
       TransparentTransmissionBuffer(bool bSending);
       ~TransparentTransmissionBuffer(void);
@@ -131,6 +141,19 @@ namespace HM
       // in front of it, corrupting the line the split fell inside.
       bool previous_chunk_ended_with_carriage_return_;
 
+      // Whether the previous chunk ended on a line feed, i.e. whether the NEXT chunk
+      // begins at the start of a line. Both dot-stuffing (send) and dot-unstuffing
+      // (receive) act only on a dot that starts a line, and Flush hands this class
+      // one chunk at a time - so "is index 0 a line start?" cannot be answered from
+      // the chunk alone and must be carried across the boundary. Initialised true: a
+      // message begins at the start of its first line. Without this a line-leading
+      // dot landing at chunk index 1 or 2 was left un-stuffed on send, which a
+      // receiver un-stuffs into a shorter line - or, for a lone ".", into a premature
+      // <CRLF>.<CRLF> end-of-data (truncation, and an injection primitive); and a
+      // forced mid-line split put a non-line-start dot at index 0, which was stuffed
+      // (send) or stripped (receive) as though it began a line.
+      bool previous_chunk_ended_with_newline_;
+
       bool ended_on_non_standard_marker_;
 
       // See GetSurplusAfterTerminator().
@@ -158,5 +181,19 @@ namespace HM
       {
          MAX_LINE_LENGTH = 100000
       };
+   };
+
+   // Deterministic tests for SMTP dot transparency across chunk boundaries. Wired
+   // into ClassTester::DoTests, reachable via hMailServer.exe /Test.
+   class TransparentTransmissionBufferTester
+   {
+   public:
+      void Test();
+
+   private:
+      // Runs one chunk through the private transform and returns the result as a
+      // std::string so exact bytes (including any embedded NUL) can be compared.
+      static std::string Stuff_(TransparentTransmissionBuffer &buffer, const std::string &chunk);
+      static std::string Unstuff_(TransparentTransmissionBuffer &buffer, const std::string &chunk);
    };
 }

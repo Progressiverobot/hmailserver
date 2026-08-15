@@ -25,6 +25,8 @@
 #include "SRS.h"
 #include "BATV.h"
 #include "RateLimiter.h"
+#include "TransparentTransmissionBuffer.h"
+#include "../Cache/Cache.h"
 #include "../Persistence/PersistentMessage.h"
 #include "../../SMTP/SPF/SPF.h"
 #include "../../SMTP/BLCheck.h"
@@ -309,6 +311,18 @@ namespace HM
             throw 0;
       }
 
+
+      OutputDebugString(_T("hMailServer: Testing TransparentTransmissionBuffer (SMTP dot transparency)\n"));
+      {
+         TransparentTransmissionBufferTester dotTester;
+         dotTester.Test();
+      }
+
+      OutputDebugString(_T("hMailServer: Testing Cache size accounting\n"));
+      {
+         CacheAccountingTester cacheTester;
+         cacheTester.Test();
+      }
 
       OutputDebugString(_T("hMailServer: Testing RegularExpressionTester\n"));
       RegularExpressionTester *pRegExTest = new RegularExpressionTester();

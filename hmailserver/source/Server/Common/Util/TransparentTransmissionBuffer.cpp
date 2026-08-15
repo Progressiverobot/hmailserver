@@ -24,6 +24,7 @@ namespace HM
       transmission_ended_(false),
       last_send_ended_with_newline_(false),
       previous_chunk_ended_with_carriage_return_(false),
+      previous_chunk_ended_with_newline_(true),
       ended_on_non_standard_marker_(false),
       data_sent_(0),
       max_size_kb_(0),
@@ -474,14 +475,27 @@ namespace HM
       for (size_t i = 0; i < iInBufferSize; i++)
       {
          char c = pInBuffer[i];
+
+         // A dot is doubled when it STARTS a line, and only then. At index 0 the
+         // preceding byte is in the previous chunk, so the answer is carried state
+         // rather than assumed.
+         //
+         // The two conditions this replaces were wrong in both directions. "i > 2 &&
+         // previous == '\n'" silently skipped a line-leading dot at index 1 or 2,
+         // which happens whenever a chunk boundary lands just before an empty line
+         // (Flush cuts at the last newline, so a chunk can begin "\r\n.", leaving the
+         // dot at index 2). The receiver then un-stuffs a dot that was never stuffed:
+         // ".X" arrives as "X", and a line that is a lone "." becomes <CRLF>.<CRLF> -
+         // the end-of-DATA marker - truncating the message there and handing whatever
+         // follows to the receiver's command parser. And the unconditional "i == 0"
+         // stuffed a dot that did NOT start a line, after a forced mid-line split.
          if (c == '.')
          {
-            if (i == 0)
-            {
-               *pOutBuffer = '.';
-               pOutBuffer++;
-            }
-            else if (i > 2 && pInBuffer[i-1] == '\n')
+            const bool atLineStart = (i == 0)
+               ? previous_chunk_ended_with_newline_
+               : pInBuffer[i - 1] == '\n';
+
+            if (atLineStart)
             {
                *pOutBuffer = '.';
                pOutBuffer++;
@@ -492,6 +506,8 @@ namespace HM
          *pOutBuffer = c;
          pOutBuffer++;
       }
+
+      previous_chunk_ended_with_newline_ = iInBufferSize > 0 && pInBuffer[iInBufferSize - 1] == '\n';
 
       // Clear the buffer and insert the new data
       size_t iOutBufferLen = pOutBuffer - pOutBufferStart;
@@ -539,11 +555,19 @@ namespace HM
       for (size_t i = 0; i < iInBufferSize; i++)
       {
          char c = pInBuffer[i];
+
+         // The mirror of the stuffing rule above, and it carried the same two
+         // defects: a line-leading dot at index 1 or 2 was left stuffed (so a sender's
+         // "..line" was stored as "..line" instead of ".line"), and after a forced
+         // mid-line split a dot at index 0 was stripped although it did not start a
+         // line - deleting a character out of the message body.
          if (c == '.')
          {
-            if (i == 0)
-               continue;
-            else if (i > 2 && pInBuffer[i-1] == '\n')
+            const bool atLineStart = (i == 0)
+               ? previous_chunk_ended_with_newline_
+               : pInBuffer[i - 1] == '\n';
+
+            if (atLineStart)
                continue;
          }
 
@@ -572,6 +596,7 @@ namespace HM
       }
 
       previous_chunk_ended_with_carriage_return_ = iInBufferSize > 0 && pInBuffer[iInBufferSize - 1] == '\r';
+      previous_chunk_ended_with_newline_ = iInBufferSize > 0 && pInBuffer[iInBufferSize - 1] == '\n';
 
       // Clear the buffer and insert the new data
       size_t iOutBufferLen = pOutBuffer - pOutBufferStart;
@@ -580,6 +605,115 @@ namespace HM
 
       // Free memory for the old buffer
       delete [] pOutBufferStart;
+   }
+
+   // ---- Tests ----------------------------------------------------------------
+
+   std::string
+   TransparentTransmissionBufferTester::Stuff_(TransparentTransmissionBuffer &buffer, const std::string &chunk)
+   {
+      auto pBuffer = std::shared_ptr<ByteBuffer>(new ByteBuffer);
+      if (!chunk.empty())
+         pBuffer->Add((const BYTE *) chunk.data(), chunk.size());
+
+      buffer.InsertTransmissionPeriod_(pBuffer);
+
+      return std::string((const char *) pBuffer->GetCharBuffer(), pBuffer->GetSize());
+   }
+
+   std::string
+   TransparentTransmissionBufferTester::Unstuff_(TransparentTransmissionBuffer &buffer, const std::string &chunk)
+   {
+      auto pBuffer = std::shared_ptr<ByteBuffer>(new ByteBuffer);
+      if (!chunk.empty())
+         pBuffer->Add((const BYTE *) chunk.data(), chunk.size());
+
+      buffer.RemoveTransmissionPeriod_(pBuffer);
+
+      return std::string((const char *) pBuffer->GetCharBuffer(), pBuffer->GetSize());
+   }
+
+   void
+   TransparentTransmissionBufferTester::Test()
+   {
+      // SEND side: a dot that starts a line is doubled; a dot mid-line is left alone.
+      {
+         TransparentTransmissionBuffer sender(true);
+
+         // Whole message in one chunk: first-line dot (index 0) and a later
+         // line-leading dot are both stuffed; the mid-line dot in "a.b" is not.
+         if (Stuff_(sender, ".hello\r\na.b\r\n.world\r\n") != "..hello\r\na.b\r\n..world\r\n")
+            throw 0;
+      }
+      {
+         // The defect the fix targets: a line-leading dot arriving at chunk index 1
+         // and index 2. A tail-only / "i > 2" test missed both. Each chunk here ends
+         // on a newline, so the following chunk begins at a line start.
+         TransparentTransmissionBuffer sender(true);
+         if (Stuff_(sender, "x\r\n") != "x\r\n")                 // sets "ended on newline"
+            throw 0;
+         if (Stuff_(sender, ".y\r\n") != "..y\r\n")              // dot at index 0 of a line start
+            throw 0;
+
+         TransparentTransmissionBuffer sender2(true);
+         if (Stuff_(sender2, "a\n") != "a\n")
+            throw 0;
+         if (Stuff_(sender2, "a\n.z\n") != "a\n..z\n")           // dot at index 2, preceded by \n
+            throw 0;
+      }
+      {
+         // Carry across the boundary: the previous chunk did NOT end on a newline,
+         // so a dot at index 0 of the next chunk is mid-line and must NOT be stuffed.
+         // This is the forced-mid-line-split case the old "i == 0" stuffed wrongly.
+         TransparentTransmissionBuffer sender(true);
+         if (Stuff_(sender, "partial line with no newline") != "partial line with no newline")
+            throw 0;
+         if (Stuff_(sender, ".still the same line\r\n") != ".still the same line\r\n")
+            throw 0;
+      }
+
+      // RECEIVE side: the exact inverse, so a stuffed stream round-trips.
+      {
+         TransparentTransmissionBuffer receiver(false);
+         if (Unstuff_(receiver, "..hello\r\na.b\r\n..world\r\n") != ".hello\r\na.b\r\n.world\r\n")
+            throw 0;
+      }
+      {
+         // Index-1 and index-2 line-leading stuffed dots across chunks: both must be
+         // un-stuffed, or a "..x" stays doubled in the stored message.
+         TransparentTransmissionBuffer receiver(false);
+         if (Unstuff_(receiver, "x\r\n") != "x\r\n")
+            throw 0;
+         if (Unstuff_(receiver, "..y\r\n") != ".y\r\n")
+            throw 0;
+
+         TransparentTransmissionBuffer receiver2(false);
+         if (Unstuff_(receiver2, "a\n") != "a\n")
+            throw 0;
+         if (Unstuff_(receiver2, "a\n..z\n") != "a\n.z\n")
+            throw 0;
+      }
+      {
+         // A mid-line dot at chunk index 0 after a mid-line split must NOT be stripped
+         // (the old "i == 0" continue deleted a body character here).
+         TransparentTransmissionBuffer receiver(false);
+         if (Unstuff_(receiver, "partial line with no newline") != "partial line with no newline")
+            throw 0;
+         if (Unstuff_(receiver, ".still the same line\r\n") != ".still the same line\r\n")
+            throw 0;
+      }
+      {
+         // The security case in miniature: a sender that correctly stuffs a lone-dot
+         // line produces "..", and a receiver that fails to un-stuff a boundary-split
+         // ".." would turn a doubled dot back into a bare ".", which downstream is the
+         // DATA terminator. Prove the round trip holds when the marker-ish line lands
+         // at a chunk start.
+         TransparentTransmissionBuffer receiver(false);
+         if (Unstuff_(receiver, "body\r\n") != "body\r\n")
+            throw 0;
+         if (Unstuff_(receiver, "..\r\nmore\r\n") != ".\r\nmore\r\n")
+            throw 0;
+      }
    }
 
 }
