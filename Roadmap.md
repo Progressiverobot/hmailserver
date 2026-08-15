@@ -38,7 +38,7 @@ as ⬜, not ✅.
 
 ### Contents and totals
 
-794 items. The counts are the point of this table — they say where the fork is
+795 items. The counts are the point of this table — they say where the fork is
 strong and where it is thin far more honestly than any prose summary.
 
 | Section | ✅ | 🔄 | ⬜ | ⏸️ |
