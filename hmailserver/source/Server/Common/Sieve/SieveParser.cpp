@@ -28,7 +28,8 @@ namespace HM
                 lowerTag == _T("subject") ||
                 lowerTag == _T("handle") ||
                 lowerTag == _T("from") ||
-                lowerTag == _T("addresses");
+                lowerTag == _T("addresses") ||
+                lowerTag == _T("content");
       }
 
       bool IsRelation(const String &relation)
@@ -90,6 +91,7 @@ namespace HM
          L"fileinto",
          L"envelope",
          L"imap4flags",
+         L"body",
          L"vacation",
          // RFC 6131. Naming it separately from "vacation" is the point of the
          // extension: a script that says ":seconds" must be refused outright by a
@@ -255,6 +257,12 @@ namespace HM
             {
                result.mime = true;
             }
+            else if (tag == _T("raw") || tag == _T("text"))
+            {
+               // body (RFC 5173) transforms that carry no argument.
+               result.bodyTransform = tag;
+               result.bodyTransformGiven = true;
+            }
 
             continue;
          }
@@ -332,6 +340,13 @@ namespace HM
             result.addresses = value->strings;
             result.addressesGiven = true;
          }
+         else if (tag == _T("content"))
+         {
+            // body :content (RFC 5173): the MIME types whose parts are looked at.
+            result.bodyTransform = _T("content");
+            result.bodyTransformGiven = true;
+            result.contentTypes = value->strings;
+         }
 
          i++;
       }
@@ -367,7 +382,7 @@ namespace HM
       static const wchar_t *known[] =
       {
          L"address", L"allof", L"anyof", L"exists", L"false", L"header",
-         L"not", L"size", L"true", L"envelope", L"hasflag"
+         L"not", L"size", L"true", L"envelope", L"hasflag", L"body"
       };
 
       for (const wchar_t *candidate : known)
@@ -796,7 +811,8 @@ namespace HM
    }
 
    bool
-   SieveParser::ValidateMatchArguments_(const SieveArgumentSet &set, const String &context, int line, String &errorMessage)
+   SieveParser::ValidateMatchArguments_(const SieveArgumentSet &set, const String &context, int line, String &errorMessage,
+                                        size_t expectedStringLists)
    {
       if (set.comparatorGiven)
       {
@@ -848,9 +864,13 @@ namespace HM
             return false;
       }
 
-      if (set.stringLists.size() != 2)
+      if (set.stringLists.size() != expectedStringLists)
       {
-         errorMessage.Format(_T("Line %d: %s takes a header/part list and a key list."), line, context.c_str());
+         if (expectedStringLists == 1)
+            errorMessage.Format(_T("Line %d: %s takes one list of keys."), line, context.c_str());
+         else
+            errorMessage.Format(_T("Line %d: %s takes a header/part list and a key list."), line, context.c_str());
+
          return false;
       }
 
@@ -1238,6 +1258,37 @@ namespace HM
                   test->line, part.c_str());
                return false;
             }
+         }
+
+         return true;
+      }
+
+      if (name == _T("body"))
+      {
+         if (!NeedExtension_(_T("body"), _T("the 'body' test"), test->line, errorMessage))
+            return false;
+
+         if (!CheckTags_(set, _T("comparator is contains matches value count raw text content"),
+                         _T("'body'"), errorMessage))
+            return false;
+
+         if (!ValidateMatchArguments_(set, _T("'body'"), test->line, errorMessage, 1))
+            return false;
+
+         // RFC 5173 5: the transforms are mutually exclusive. Accepting two would
+         // mean silently honouring one of them, and the author has no way to see
+         // which.
+         int transforms = 0;
+         for (const String &tag : set.tags)
+         {
+            if (tag == _T("raw") || tag == _T("text") || tag == _T("content"))
+               transforms++;
+         }
+
+         if (transforms > 1)
+         {
+            errorMessage.Format(_T("Line %d: 'body' takes at most one of ':raw', ':text' and ':content'."), test->line);
+            return false;
          }
 
          return true;

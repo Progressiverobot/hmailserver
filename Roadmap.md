@@ -57,7 +57,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Transport security and deliverability](#transport-security-and-deliverability) | 43 | – | 4 | 1 |
 | [IMAP](#imap) | 58 | – | 17 | 3 |
 | [POP3](#pop3) | 21 | – | 6 | – |
-| [Sieve, ManageSieve and rules](#sieve-managesieve-and-rules) | 48 | 0 | 16 | – |
+| [Sieve, ManageSieve and rules](#sieve-managesieve-and-rules) | 49 | 0 | 15 | – |
 | [Authentication and cryptography](#authentication-and-cryptography) | 57 | 0 | 18 | – |
 | [Anti-spam, anti-virus and content control](#anti-spam-anti-virus-and-content-control) | 54 | – | 13 | – |
 | [Storage, accounts and data model](#storage-accounts-and-data-model) | 86 | – | 10 | – |
@@ -72,7 +72,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 2 | – | 4 | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 5 | 1 | 2 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 4 | 1 | 4 | – |
-| **Total** | **623** | **12** | **145** | **15** |
+| **Total** | **624** | **12** | **144** | **15** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage and the administration surface are the best-covered areas**, and the
@@ -448,7 +448,7 @@ the source, not from documentation.
 
 ### Sieve, ManageSieve and rules
 
-48 shipped · 0 underway · 16 not started · 0 deferred
+49 shipped · 0 underway · 15 not started · 0 deferred
 
 | | Capability | Detail |
 |:-:|---|---|
@@ -500,7 +500,7 @@ the source, not from documentation.
 | ⬜ | duplicate (RFC 7352) | Not implemented; no duplicate test and no tracking store for :handle/:uniqueid seen-values |
 | ⬜ | editheader (RFC 5293) | Not implemented. addheader/deleteheader are not even in the known-command list, so a script using them fails CHECKSCRIPT with "unknown command" |
 | ⬜ | enotify (RFC 5435) | Not implemented. `notify` parses as a known command and no-ops; there are no notification methods, no valid_notify_method test and no NOTIFY capability advertised over ManageSieve |
-| ⬜ | envelope (RFC 5228 §5.4) and body (RFC 5173) | Not implemented and this is the most user-visible gap: the SMTP envelope is never passed to the evaluator (SieveMessage is built from the raw file only)… **Half shipped in dc9301a: `envelope` is implemented, `body` is not.** This row bundles two extensions and is deliberately left unticked for that reason - the SMTP envelope now reaches the script, and there is still no way to test the message body. |
+| ✅ | envelope (RFC 5228 §5.4) and body (RFC 5173) | **Both shipped.** `envelope` landed in dc9301a (the SMTP envelope reaches the evaluator, so `envelope "to"` works without the Delivered-To header). `body` landed 15 August 2026 with all three RFC 5173 transforms: `:raw` (the undecoded body, MIME structure ignored), `:text` (the default - the decoded text of every text/* part) and `:content` (the decoded parts whose MIME type matches, where "image" matches every subtype and "" matches every part). Transfer encoding and charset are decoded before matching, which is the point: a filter written against plain text keeps working when the sender's client base64-encodes the part. The MIME walk is depth-capped at 20 because it runs on the delivery thread. Advertised in the ManageSieve capability line under the standing rule - only once the delivery-side step exists - with seven end-to-end tests in `SieveBodyDelivery.cs` asserting **where a delivered message was filed** rather than what the evaluator reported, two of them negative controls (a non-matching body must stay in INBOX; a message with no body must match nothing, not even the empty key). |
 | ⬜ | ihave (RFC 5463) and environment (RFC 5183) | Not implemented. Both parse as known tests and evaluate false — which is actively wrong for ihave, whose whole purpose is capability probing, and means an ihave-guarded fallback script silently takes the wrong branch |
 | ✅ | imap4flags (RFC 5232) | Not implemented. setflag/addflag/removeflag parse and no-op; the hasflag test parses and evaluates false; there is no :flags tagged argument on keep/fileinto **Shipped in dc9301a.** `ExecuteFlagCommand_` genuinely mutates the flag set; the "parse and no-op" description was true before that commit. |
 | ⬜ | include (RFC 6609) | Not implemented. include, return and global parse as known commands and no-op; there is no personal/global script namespace in SieveStorage to include from |

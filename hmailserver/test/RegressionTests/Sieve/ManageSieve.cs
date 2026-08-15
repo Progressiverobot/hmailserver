@@ -236,6 +236,11 @@ namespace RegressionTests.Sieve
                StringAssert.Contains("imap4flags", greeting);
                StringAssert.Contains("vacation", greeting);
 
+               // body followed on 15 August 2026, with SieveBodyDelivery.cs behind it -
+               // seven end-to-end tests that assert where a delivered message was FILED,
+               // two of them negative controls.
+               StringAssert.Contains("body", greeting);
+
                // Still absent on purpose: envelope is implemented and evaluated, and is
                // held back until a test proves the envelope TEST command itself works.
                // If somebody adds it here, that test should exist first.

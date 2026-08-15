@@ -209,7 +209,21 @@ namespace HM
       // nowhere and reported in the application log rather than dropped in silence. A
       // client reading this line gets a working setflag/addflag/removeflag for the
       // flags it can actually see, which is what the rule above protects.
-      const char *AdvertisedSieveExtensions = "fileinto copy relational subaddress vacation vacation-seconds imap4flags";
+      // body moved in on 15 August 2026, under the same rule. Its delivery-side step
+      // is that the evaluator now reads the message itself rather than only its
+      // headers: SieveMessage keeps the raw message and returns the values for each
+      // RFC 5173 transform - ":raw" the undecoded body, ":text" the decoded text of
+      // the text parts, ":content" the decoded parts of the named MIME types.
+      // Seven end-to-end tests in SieveBodyDelivery.cs assert on WHERE THE MESSAGE
+      // WAS FILED after a real SMTP delivery, never on what the evaluator reported,
+      // and two of them are negative controls: a body test that does not match must
+      // leave the message in INBOX, and a message with no body must match nothing at
+      // all - without those two, an implementation that filed everything would pass.
+      // The decisive one is the base64 test: the phrase the script looks for appears
+      // nowhere in the transmitted bytes, so it can only match if the part was
+      // decoded first, which is the whole difference between ":text" and a substring
+      // search over the file.
+      const char *AdvertisedSieveExtensions = "fileinto copy relational subaddress vacation vacation-seconds imap4flags body";
 
       AnsiString EscapeQuoted(const String &value)
       {

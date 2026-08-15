@@ -107,7 +107,7 @@ namespace HM
 
    private:
       // Where the values a test compares against come from.
-      enum class ValueSource { Header, Address, Envelope, Flags };
+      enum class ValueSource { Header, Address, Envelope, Flags, Body };
 
       void ExecuteCommands_(const std::vector<std::shared_ptr<SieveCommand>> &commands, const SieveMessage &message);
       void ExecuteCommand_(const std::shared_ptr<SieveCommand> &command, const SieveMessage &message);

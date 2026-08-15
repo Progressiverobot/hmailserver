@@ -805,6 +805,9 @@ namespace HM
       if (name == _T("hasflag"))
          return EvaluateComparisonTest_(test, message, ValueSource::Flags);
 
+      if (name == _T("body"))
+         return EvaluateComparisonTest_(test, message, ValueSource::Body);
+
       if (name == _T("exists"))
          return EvaluateExists_(test, message);
 
@@ -823,8 +826,9 @@ namespace HM
       if (!SieveParser::SplitArguments(test->arguments, set, ignored))
          return false;
 
-      // "hasflag" takes only the key list; the others take a name list first.
-      size_t expected = (source == ValueSource::Flags) ? 1u : 2u;
+      // "hasflag" and "body" take only the key list; the others take a name list
+      // first (the header or envelope-part names to look at).
+      size_t expected = (source == ValueSource::Flags || source == ValueSource::Body) ? 1u : 2u;
       if (set.stringLists.size() < expected)
          return false;
 
@@ -875,6 +879,12 @@ namespace HM
       if (source == ValueSource::Flags)
       {
          values = flags_;
+         return;
+      }
+
+      if (source == ValueSource::Body)
+      {
+         values = message.GetBodyValues(set.bodyTransform, set.contentTypes);
          return;
       }
 

@@ -105,6 +105,12 @@ namespace HM
       std::vector<String> addresses;
       bool mime = false;
 
+      // body (RFC 5173). The transform is ":text" unless the script says
+      // otherwise; ":content" additionally carries the MIME types to look at.
+      String bodyTransform = _T("text");
+      bool bodyTransformGiven = false;
+      std::vector<String> contentTypes;
+
       // Positional string-list arguments, in order.
       std::vector<std::vector<String>> stringLists;
    };
@@ -167,7 +173,11 @@ namespace HM
       bool ValidateCommands_(const std::vector<std::shared_ptr<SieveCommand>> &commands, String &errorMessage);
       bool ValidateCommand_(const std::shared_ptr<SieveCommand> &command, String &errorMessage);
       bool ValidateTest_(const std::shared_ptr<SieveTest> &test, String &errorMessage);
-      bool ValidateMatchArguments_(const SieveArgumentSet &set, const String &context, int line, String &errorMessage);
+      // expectedStringLists is how many positional lists the test takes: two for
+      // header/address/envelope (the names, then the keys) and one for body, which
+      // has no name list because its subject is the message itself.
+      bool ValidateMatchArguments_(const SieveArgumentSet &set, const String &context, int line, String &errorMessage,
+                                   size_t expectedStringLists = 2);
       bool ValidateFlagList_(const std::vector<String> &flags, int line, String &errorMessage);
 
       bool HasExtension_(const String &extension) const;
