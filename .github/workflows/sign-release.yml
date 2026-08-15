@@ -72,6 +72,12 @@ jobs:
       - name: Download the release assets
         env:
           GH_TOKEN: ${{ github.token }}
+          # There is no checkout in this job - it signs assets, it does not need the
+          # source - and without a git directory `gh` cannot infer the repository, so
+          # it must be told. Omitting this is exactly how the first run of this
+          # workflow failed, on the 6.2.19 release: "failed to run git: fatal: not a
+          # git repository".
+          GH_REPO: ${{ github.repository }}
           TAG: ${{ steps.tag.outputs.tag }}
         run: |
           mkdir -p assets
@@ -130,6 +136,8 @@ jobs:
       - name: Attach the signatures to the release
         env:
           GH_TOKEN: ${{ github.token }}
+          # Same reason as the download step: no checkout, so no inferred repo.
+          GH_REPO: ${{ github.repository }}
           TAG: ${{ steps.tag.outputs.tag }}
         run: |
           set -euo pipefail
