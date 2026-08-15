@@ -33,5 +33,20 @@
 # #define -> constexpr, and some comment typos. Semantically identical; taking
 # them would only reduce future textual merge friction.
 #
+# Triaged 2026-08-15: one commit since the previous baseline.
+#
+#   - a998b528f9ba (link libpq to OpenSSL, #531/#538) ALREADY PRESENT: a
+#     README-only build-recipe change. Upstream adds a config.pl openssl entry to
+#     their libpq 15 build so the DLL can make encrypted PostgreSQL connections;
+#     our README has built libpq 18.x through meson with -Dssl=openssl (plus the
+#     same Dependencies-tool verification tip) since the recipe was written.
+#
+# The same pass re-verified, content-first, a sample of the pre-baseline batch
+# against our tree: route+catch-all duplication (#200) early return, IMAP STATUS
+# escaping (#85), the Mime FindString/trailing-newline rewrite, BODY[X.MIME]
+# (#459) show_body_mime_/loadEncapsulated, the auto-reply cache clear (#268),
+# the full-scan line-ending check, DKIM-sign-aliases and the spam-flag
+# reply/forward suppression. All present, as the 2026-08-12 triage recorded.
+#
 # Update this SHA (and only this SHA) when a batch has been triaged.
-5ce853685dec262b27676d45513eabf660eef933
+a998b528f9ba0949c1fc0a704f9929e8762509ea
