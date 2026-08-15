@@ -742,6 +742,39 @@ interface IInterfaceSettings : IDispatch{
    [id(112), helpstring("Reads the LDAP directory using the [LDAP] settings and reports the users an account source would see. Read-only.")]
       HRESULT TestLdapDirectory([in] long MaxUsers, [out] BSTR *ResultText, [out, retval] VARIANT_BOOL *pResult);
 
+   // The directory as an account source.
+   //
+   // Preview changes nothing and reports what Apply would do; they share one decider,
+   // so a preview cannot describe an action the apply would not take. Run the preview
+   // first - always - because the shape of a directory is rarely what anyone expects
+   // and the skip reasons are where the surprises are.
+   //
+   // DomainName restricts the run to one hMailServer domain; empty means every domain
+   // that has an Active Directory domain name set. Only such domains take part at all:
+   // that field is what links a mail domain to a directory, and requiring it keeps a
+   // search base pointed one level too high from provisioning into unrelated hosted
+   // domains.
+   //
+   // NEITHER OF THESE TWO METHODS DELETES AN ACCOUNT OR ANY MAIL. The most either does
+   // is clear Active, which leaves every message in place and is undone by setting it
+   // back. That is a statement about these two calls, not a protection: Accounts.Delete
+   // and everything else on this interface work on a directory-provisioned account
+   // exactly as they do on any other.
+   //
+   // DisableMissing marks accounts whose directory entry has gone as inactive, and
+   // nothing is disabled at all when the enumeration was truncated or returned nothing,
+   // because in both of those an account that still exists is indistinguishable from
+   // one that was deleted.
+   // DisableMissing is on the PREVIEW too, and must be passed the same value the apply
+   // will be given. Without it a preview could never show a disable - it would report
+   // every missing account as "left alone because disabling was not requested" and the
+   // apply would then disable them, which is exactly the preview/apply disagreement the
+   // shared decider exists to make impossible.
+   [id(113), helpstring("Reports which accounts the LDAP directory says should exist, changing nothing. Pass the same DisableMissing the apply will use, or the preview will not show what it is going to do.")]
+      HRESULT PreviewDirectorySync([in] BSTR DomainName, [in] VARIANT_BOOL DisableMissing, [out] BSTR *ResultText, [out, retval] VARIANT_BOOL *pResult);
+   [id(114), helpstring("Creates and updates accounts to match the LDAP directory. This call never deletes an account or its mail; the most it does is mark one inactive.")]
+      HRESULT ApplyDirectorySync([in] BSTR DomainName, [in] VARIANT_BOOL DisableMissing, [out] BSTR *ResultText, [out, retval] VARIANT_BOOL *pResult);
+
 };
 
 

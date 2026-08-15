@@ -90,6 +90,21 @@ namespace HM
       // by allocating until the process dies.
       int sync_max_users = 5000;
 
+      // How often an unattended synchronisation runs, in minutes. Zero - the default -
+      // means no schedule at all, so an installation that upgrades into this build
+      // gains no unattended behaviour it did not ask for. That default is not
+      // conservatism for its own sake: a schedule is the only way this code creates
+      // accounts with nobody watching, and it should be switched on by somebody who
+      // has run a preview and read it.
+      //
+      // Clamped rather than trusted. Below the floor the server would spend more time
+      // reading the directory than serving mail, and a directory administrator would
+      // see a search every few seconds from a host they may not administer; above the
+      // ceiling the value is almost certainly a units mistake - somebody typing the
+      // number of minutes in a week and meaning days - and a schedule that runs twice
+      // a year is one nobody will notice has stopped.
+      int sync_schedule_minutes = 0;
+
       // 636 for LDAPS and 389 otherwise, unless Port says otherwise. Derived rather
       // than defaulted to 389 because a configuration that sets Security=2 and
       // forgets Port would otherwise attempt TLS against the cleartext port, which

@@ -614,7 +614,18 @@ namespace hMailServer.ControlPanel.Services
                Page("ldap", "Directory authentication (LDAP)",
                   "Authenticate accounts against Active Directory or any LDAP directory, so users sign in with their domain password.",
                   aliases: "LDAP|Active Directory|AD|Directory|Domain password|Bind|LDAPS|StartTLS|Single sign-on|Domain accounts|DC",
-                  seeAlso: "authentication|adminaccess|domains"),
+                  seeAlso: "authentication|adminaccess|domains|directorysync"),
+
+               // Beside directory authentication, and deliberately not folded into it.
+               // The two answer different questions: that page is about whether somebody
+               // who already has a mailbox can log into it, this one about which people
+               // have a mailbox at all. Somebody arriving to bulk-create accounts from
+               // the directory is not looking for a bind method, and somebody debugging
+               // a logon does not want a provisioning run one click away.
+               Page("directorysync", "Directory synchronisation",
+                  "Create and update mailboxes to match an LDAP directory - preview first, then apply.",
+                  aliases: "Directory sync|Provisioning|Provision accounts|Account source|Bulk create accounts|Import users|Sync users|LDAP sync|AD sync|Create accounts from Active Directory|Onboarding|Leavers",
+                  seeAlso: "ldap|domains"),
 
                Page("adminaccess", "Administrative access",
                   "The server administration password, and who is allowed to use these tools at all.",

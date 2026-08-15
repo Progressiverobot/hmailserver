@@ -63,6 +63,7 @@
 #include "MessageStoreConsistencyTask.h"
 #include "WorkQueueHealthTask.h"
 #include "BackupScheduleTask.h"
+#include "../LDAP/DirectorySyncTask.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -679,6 +680,38 @@ namespace HM
          backupScheduleTask->SetReoccurance(ScheduledTask::RunInfinitely);
          backupScheduleTask->SetMinutesBetweenRun(1);
          scheduler_->ScheduleTask(backupScheduleTask);
+      }
+
+      // Unattended directory synchronisation. Registered only when [LDAP] is switched
+      // on AND SyncScheduleMinutes is set, so a default installation - and every
+      // installation that upgrades into this build - gets no task at all and no
+      // account is ever created without somebody having asked for it.
+      //
+      // Registered twice, like log retention and the consistency check: once promptly
+      // at start-up, then at the configured interval. The start-up run is what makes
+      // the schedule survive restarts. ScheduledTask computes its next run as "now
+      // plus the interval" each time the scheduler is built, so a daily interval on a
+      // server that is restarted every morning would otherwise never fire once - the
+      // trap BackupScheduleTask avoids by ticking every minute against the wall clock.
+      // A synchronisation is cheap and idempotent, so it can buy the same property
+      // much more simply, by just running one.
+      const int directorySyncMinutes = DirectorySyncScheduleTask::ScheduleMinutes();
+
+      if (directorySyncMinutes > 0)
+      {
+         std::shared_ptr<DirectorySyncScheduleTask> directorySyncStartupTask =
+            std::shared_ptr<DirectorySyncScheduleTask>(new DirectorySyncScheduleTask);
+         directorySyncStartupTask->SetReoccurance(ScheduledTask::RunOnce);
+         scheduler_->ScheduleTask(directorySyncStartupTask);
+
+         std::shared_ptr<DirectorySyncScheduleTask> directorySyncTask =
+            std::shared_ptr<DirectorySyncScheduleTask>(new DirectorySyncScheduleTask);
+         directorySyncTask->SetReoccurance(ScheduledTask::RunInfinitely);
+         directorySyncTask->SetMinutesBetweenRun(directorySyncMinutes);
+         scheduler_->ScheduleTask(directorySyncTask);
+
+         LOG_APPLICATION(Formatter::Format("DirectorySync: unattended synchronisation is scheduled every {0} "
+            "minute(s). It creates and updates accounts; it does not disable them.", directorySyncMinutes));
       }
 
       // Automatic certificate renewal via ACME (Let's Encrypt).

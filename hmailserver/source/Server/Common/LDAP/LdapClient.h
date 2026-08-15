@@ -44,16 +44,78 @@ namespace HM
       String dn;
       std::map<String, std::vector<String> > attributes;
 
-      // The first value of an attribute, or an empty string when the entry does not
-      // carry it. For the single-valued cases, which is most of them.
-      String First(const String &name) const
+      // The one value of an attribute worth acting on, or an empty string when the
+      // entry does not carry it.
+      //
+      // Deliberately NOT "the first one the directory sent". LDAP guarantees no
+      // ordering of the values within an attribute, and a directory is free to answer
+      // two identical searches in two different orders. Acting on values.front()
+      // therefore makes a re-run able to choose a different address for the same
+      // person - which provisions a second mailbox and makes the first one look as
+      // though it had been deleted from the directory. A synchronisation that
+      // flip-flops is worse than one that picks the wrong value consistently, so the
+      // choice here is made to be stable rather than to be first.
+      //
+      // The rule: an Exchange-style directory marks the primary address in
+      // proxyAddresses by capitalising its scheme - "SMTP:" primary, "smtp:" alias -
+      // so that value wins when present. Failing that, the lexicographically smallest
+      // wins, which is arbitrary but identical on every run and every server.
+      String Preferred(const String &name) const
       {
          auto found = attributes.find(name);
 
          if (found == attributes.end() || found->second.empty())
             return String();
 
-         return found->second.front();
+         const std::vector<String> &values = found->second;
+
+         if (values.size() == 1)
+            return values.front();
+
+         // Case-sensitive on purpose: "SMTP:" is the primary and "smtp:" is an alias,
+         // and the whole point of the convention is that the two differ only in case.
+         for (const String &value : values)
+         {
+            if (value.size() > 5 && wcsncmp(value.c_str(), _T("SMTP:"), 5) == 0)
+               return value;
+         }
+
+         const String *smallest = &values.front();
+
+         for (const String &value : values)
+         {
+            if (value.CompareNoCase(*smallest) < 0)
+               smallest = &value;
+         }
+
+         return *smallest;
+      }
+
+      // Preferred(), with the scheme an Exchange-style proxyAddresses value carries
+      // taken off. This is what every caller that wants a MAIL ADDRESS must use.
+      //
+      // Only "smtp:" is removed, and only from the front. The same attribute holds
+      // "x500:" and "sip:" values, and an X.500 or SIP address is not a mailbox
+      // address - stripping the scheme off those would turn a value that ought to be
+      // refused into one that looks provisionable, which is how a directory ends up
+      // with a mailbox named after somebody's SIP URI. Anything else is handed back
+      // untouched, keeps its colon, and fails address validation, which is the outcome
+      // that reports the truth.
+      String PreferredAddress(const String &name) const
+      {
+         String value = Preferred(name);
+
+         value.Trim();
+
+         const int colon = value.Find(_T(":"));
+
+         if (colon < 0)
+            return value;
+
+         if (value.Mid(0, colon).CompareNoCase(_T("smtp")) != 0)
+            return value;
+
+         return value.Mid(colon + 1);
       }
    };
 

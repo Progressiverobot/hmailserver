@@ -66,6 +66,15 @@ namespace HM
    // the answer is worth.
    static const int kMaxSyncMaxUsers = 100000;
 
+   // The schedule floor and ceiling. Fifteen minutes because a directory read is a
+   // network round trip plus a full enumeration, and anything faster is load on a
+   // server somebody else administers for a set of people that changes a few times a
+   // month. A week because a value larger than that is almost always a units mistake,
+   // and clamping it to something that visibly runs is more useful than honouring a
+   // schedule nobody will observe firing.
+   static const int kMinSyncScheduleMinutes = 15;
+   static const int kMaxSyncScheduleMinutes = 7 * 24 * 60;
+
    int
    LdapConfiguration::EffectivePort() const
    {
@@ -300,6 +309,30 @@ namespace HM
 
       if (loaded.sync_max_users > kMaxSyncMaxUsers)
          loaded.sync_max_users = kMaxSyncMaxUsers;
+
+      // Read UNSIGNED and clamped before it is ever an int, which is not fussiness.
+      // GetPrivateProfileInt returns a UINT, so ReadInteger_'s cast wraps for anything
+      // above INT_MAX: SyncScheduleMinutes=2592000000 - a plausible units mistake,
+      // milliseconds in a month - arrives as -1702967296. The signed reading would then
+      // hit the "<= 0 means off" branch below and SILENTLY DISABLE the schedule, which
+      // is the exact opposite of what the ceiling exists to do, and it would do it
+      // without a word to an administrator who has just asked for a schedule.
+      const unsigned int rawScheduleMinutes =
+         GetPrivateProfileInt(kLdapSection, _T("SyncScheduleMinutes"), 0, iniFile.c_str());
+
+      // Zero means "no schedule". A value the ini cannot express as a positive number
+      // at all - a negative sign, a word - is read by GetPrivateProfileInt as 0 and
+      // means the same thing, and that is the safe reading of a mistake in the one
+      // setting that creates accounts unattended: do nothing, rather than start running
+      // every fifteen minutes because a character was wrong.
+      if (rawScheduleMinutes == 0)
+         loaded.sync_schedule_minutes = 0;
+      else if (rawScheduleMinutes < (unsigned int) kMinSyncScheduleMinutes)
+         loaded.sync_schedule_minutes = kMinSyncScheduleMinutes;
+      else if (rawScheduleMinutes > (unsigned int) kMaxSyncScheduleMinutes)
+         loaded.sync_schedule_minutes = kMaxSyncScheduleMinutes;
+      else
+         loaded.sync_schedule_minutes = (int) rawScheduleMinutes;
 
       {
          boost::lock_guard<boost::mutex> guard(settings_mutex_);

@@ -15,6 +15,7 @@
 #include "../Common/Application/IniSettingStore.h"
 #include "../Common/LDAP/LdapClient.h"
 #include "../Common/LDAP/LdapSettings.h"
+#include "../Common/LDAP/DirectorySync.h"
 #include "../Common/BO/TCPIPPorts.h"
 #include "../Common/BO/SSLCertificates.h"
 #include "../Common/BO/IncomingRelays.h"
@@ -2891,9 +2892,14 @@ STDMETHODIMP InterfaceSettings::TestLdapDirectory(long MaxUsers, BSTR *ResultTex
 
       for (const HM::LdapDirectoryEntry &entry : entries)
       {
-         const HM::String address = entry.First(configuration.sync_mail_attribute);
-         const HM::String username = entry.First(configuration.sync_username_attribute);
-         const HM::String display = entry.First(configuration.sync_display_name_attribute);
+         // Preferred, not first, and for a reason beyond determinism: this card exists to
+         // show an administrator which addresses provisioning would use, so it has to
+         // choose the value by the same rule DirectorySync does. Reading the first value
+         // here while the sync reads the preferred one would make the card advertise one
+         // address and the apply create another.
+         const HM::String address = entry.PreferredAddress(configuration.sync_mail_attribute);
+         const HM::String username = entry.Preferred(configuration.sync_username_attribute);
+         const HM::String display = entry.Preferred(configuration.sync_display_name_attribute);
 
          if (address.IsEmpty())
             withoutAddress++;
@@ -2923,4 +2929,121 @@ STDMETHODIMP InterfaceSettings::TestLdapDirectory(long MaxUsers, BSTR *ResultTex
    {
       return COMError::GenerateGenericMessage();
    }
+}
+
+HRESULT InterfaceSettings::RunDirectorySync_(BSTR DomainName, bool apply, bool disableMissing,
+   BSTR *ResultText, VARIANT_BOOL *pResult)
+{
+   try
+   {
+      if (!config_)
+         return GetAccessDenied();
+
+      if (!ResultText || !pResult)
+         return COMError::GenerateGenericMessage();
+
+      *pResult = VARIANT_FALSE;
+
+      HM::DirectorySyncOptions options;
+      options.mode = apply ? HM::DirectorySyncMode::ModeApply : HM::DirectorySyncMode::ModePreview;
+      // NOT gated on apply. A preview asked to show a disabling run must show it,
+      // otherwise the preview and the apply are answering different questions - which
+      // is the one thing the shared decider is there to prevent.
+      options.disable_missing = disableMissing;
+      options.domain_name = HM::String(DomainName);
+      options.domain_name.Trim();
+
+      const HM::DirectorySyncResult result = HM::DirectorySync::Run(options);
+
+      // The summary first, because it is the sentence an administrator reads, and
+      // then a line per entry - which is the part that turns "22 skipped" into
+      // something anyone can act on.
+      HM::String report = result.Summary();
+
+      if (!result.entries.empty())
+      {
+         report += _T("\r\n\r\n");
+
+         for (const HM::DirectorySyncEntry &entry : result.entries)
+         {
+            // A FOURTH field, carrying what became of this row, and it is not
+            // decoration. Without it the action word is all a caller has, and after an
+            // apply "create" means both "this account was created" and "this account
+            // was going to be created and the database refused" - which are the two
+            // outcomes an administrator most needs to tell apart. The Control Panel
+            // counted the second as a success and could print "nothing here needs a
+            // decision" over a run in which nothing was created at all.
+            //
+            // "planned" for a preview, where applied is false for every row and means
+            // nothing. Written for both modes rather than only for apply, so a reader -
+            // human or machine - never has to know which call produced the text in
+            // order to know what the fourth column means.
+            //
+            // Only the three ACTED-ON actions can be "done" or "failed". Apply_ has no
+            // case for unchanged, skip or no-longer-in-the-directory: it does nothing
+            // to them by design, so their applied flag stays false and reading it as
+            // failure would report every correctly-skipped entry as an error. On a
+            // directory where most accounts already match, that is almost every row.
+            const bool actedOn =
+               entry.action == HM::DirectorySyncAction::ActionCreate ||
+               entry.action == HM::DirectorySyncAction::ActionUpdate ||
+               entry.action == HM::DirectorySyncAction::ActionDisable;
+
+            HM::String state = _T("planned");
+
+            if (options.mode == HM::DirectorySyncMode::ModeApply)
+            {
+               if (!actedOn)
+                  state = _T("noop");
+               else
+                  state = entry.applied ? HM::String(_T("done")) : HM::String(_T("failed"));
+            }
+
+            report += HM::Formatter::Format("{0}\t{1}\t{2}\t{3}\r\n",
+               entry.address.IsEmpty() ? HM::String("(no address)") : entry.address,
+               HM::DirectorySync::DescribeAction(entry.action),
+               entry.error.IsEmpty() ? entry.detail : entry.error,
+               state);
+         }
+      }
+
+      // The breakdown of WHY things were skipped. Reported separately from the entry
+      // list because on a large directory the list is long and the counts are what
+      // gets read - and "22 in a domain that is not on this server" is the difference
+      // between a puzzle and a fix.
+      if (result.skipped > 0)
+      {
+         report += _T("\r\nSkipped, by reason:\r\n");
+
+         for (auto iter = result.skip_reasons.begin(); iter != result.skip_reasons.end(); iter++)
+         {
+            if ((*iter).second <= 0)
+               continue;
+
+            report += HM::Formatter::Format("  {0}\t{1}\r\n",
+               (*iter).second, HM::DirectorySync::DescribeSkipReason((*iter).first));
+         }
+      }
+
+      *ResultText = report.AllocSysString();
+      *pResult = result.succeeded ? VARIANT_TRUE : VARIANT_FALSE;
+
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceSettings::PreviewDirectorySync(BSTR DomainName, VARIANT_BOOL DisableMissing,
+   BSTR *ResultText, VARIANT_BOOL *pResult)
+{
+   return RunDirectorySync_(DomainName, false, DisableMissing == VARIANT_TRUE, ResultText, pResult);
+}
+
+STDMETHODIMP InterfaceSettings::ApplyDirectorySync(BSTR DomainName, VARIANT_BOOL DisableMissing,
+   BSTR *ResultText, VARIANT_BOOL *pResult)
+{
+   return RunDirectorySync_(DomainName, true, DisableMissing == VARIANT_TRUE, ResultText, pResult);
 }

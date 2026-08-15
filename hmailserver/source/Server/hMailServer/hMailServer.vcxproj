@@ -470,6 +470,8 @@ EXIT 0
     <ClCompile Include="..\Common\Util\PasswordGenerator.cpp" />
     <ClCompile Include="..\Common\Util\PasswordRemover.cpp" />
     <ClCompile Include="..\Common\Util\PasswordValidator.cpp" />
+    <ClCompile Include="..\Common\LDAP\DirectorySync.cpp" />
+    <ClCompile Include="..\Common\LDAP\DirectorySyncTask.cpp" />
     <ClCompile Include="..\Common\LDAP\LdapClient.cpp" />
     <ClCompile Include="..\Common\LDAP\LdapDirectoryAuthenticator.cpp" />
     <ClCompile Include="..\Common\LDAP\LdapSettings.cpp" />
@@ -1027,6 +1029,8 @@ EXIT 0
     <ClInclude Include="..\Common\Util\PasswordGenerator.h" />
     <ClInclude Include="..\Common\Util\PasswordRemover.h" />
     <ClInclude Include="..\Common\Util\PasswordValidator.h" />
+    <ClInclude Include="..\Common\LDAP\DirectorySync.h" />
+    <ClInclude Include="..\Common\LDAP\DirectorySyncTask.h" />
     <ClInclude Include="..\Common\LDAP\LdapClient.h" />
     <ClInclude Include="..\Common\LDAP\LdapDirectoryAuthenticator.h" />
     <ClInclude Include="..\Common\LDAP\LdapSettings.h" />

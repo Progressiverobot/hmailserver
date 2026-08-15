@@ -256,6 +256,17 @@ END_COM_MAP()
 
    STDMETHOD(TestLdapDirectory)(/*[in]*/ long MaxUsers, /*[out]*/ BSTR *ResultText, /*[out, retval]*/ VARIANT_BOOL *pResult);
 
+   STDMETHOD(PreviewDirectorySync)(/*[in]*/ BSTR DomainName, /*[in]*/ VARIANT_BOOL DisableMissing, /*[out]*/ BSTR *ResultText, /*[out, retval]*/ VARIANT_BOOL *pResult);
+   STDMETHOD(ApplyDirectorySync)(/*[in]*/ BSTR DomainName, /*[in]*/ VARIANT_BOOL DisableMissing, /*[out]*/ BSTR *ResultText, /*[out, retval]*/ VARIANT_BOOL *pResult);
+
+private:
+
+   // Shared by both, so the two cannot report the same run differently. The only thing
+   // the callers decide is the mode and whether missing accounts are disabled.
+   HRESULT RunDirectorySync_(BSTR DomainName, bool apply, bool disableMissing, BSTR *ResultText, VARIANT_BOOL *pResult);
+
+public:
+
    bool LoadSettings();
 
 private:

@@ -59,6 +59,12 @@
          StatusSemantics above precisely so that it does not. -->
     <Compile Include="..\ControlPanel\Services\VirusPipeline.cs" />
     <Compile Include="..\ControlPanel\Services\TlsPosture.cs" />
+
+    <!-- The report a directory synchronisation returns is one tab-separated string.
+         Turning it into rows a page can count and sort is the only logic in that
+         feature that does not need a directory, a server or a dispatcher, so it lives
+         here on its own and is tested here on its own. -->
+    <Compile Include="..\ControlPanel\Services\DirectorySyncReport.cs" />
   </ItemGroup>
 
   <ItemGroup>

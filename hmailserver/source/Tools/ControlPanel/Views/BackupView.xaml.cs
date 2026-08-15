@@ -384,7 +384,14 @@ namespace hMailServer.ControlPanel.Views
                TimeSpan age = DateTime.Now - newestTime;
                string described = "Last backup: " + DescribeAge(age) + " (" + newestName + ").";
 
-               if (scheduleConfigured && expectedMinutes > 0 && age.TotalMinutes > expectedMinutes * 2)
+               // 2.0 rather than 2, so the doubling happens in floating point. As an
+               // int multiply this overflows for any expectedMinutes above
+               // int.MaxValue / 2 - reachable, because ScheduledBackupIntervalMinutes
+               // is read from the INI and nothing bounds it - and an overflow lands
+               // NEGATIVE. age.TotalMinutes > (negative) is then true for every backup,
+               // so the card would announce that backups are failing on a server whose
+               // backups are fine, which is the one thing a status card must not do.
+               if (scheduleConfigured && expectedMinutes > 0 && age.TotalMinutes > expectedMinutes * 2.0)
                {
                   lastLevel = StatusLevel.Critical;
                   lastText = described + " That is older than the schedule allows, so runs are failing or " +

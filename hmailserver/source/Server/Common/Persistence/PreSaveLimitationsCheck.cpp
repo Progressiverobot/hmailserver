@@ -57,10 +57,33 @@ namespace HM
    bool
    PreSaveLimitationsCheck::IsValidAccountAddress_(const String &sEmailAddress)
    {
-      // Stricter than general email validation: additionally forbids \ / ? * |
+      // Stricter than general email validation: additionally forbids \ / ? * | :
       // in the local part because hMailServer uses the account address to build
       // filesystem paths for message storage, and these characters are illegal
       // in Windows file/directory names.
+      //
+      // The colon was missing from that set until 15 August 2026, and it belongs there
+      // for exactly the same reason as the other five rather than a special one. The
+      // local part becomes a DIRECTORY component - PersistentMessage::GetFileName
+      // builds <data>\<domain>\<local part>\<2 guid chars>\<guid>.eml - and
+      // CreateDirectory refuses a name containing a colon outright ("The directory name
+      // is invalid"), measured on Windows 11 rather than assumed. So an account at
+      // "a:b@example.com" saves, appears in every list, accepts mail at RCPT TO, and
+      // then cannot have its folder created when the message is filed. It is a mailbox
+      // that can never work, created without complaint.
+      //
+      // Worth being exact about one thing this does NOT do, because the colon's other
+      // reputation invites the mistake: it is not stopping an alternate-data-stream
+      // trick. A colon opens an ADS only where the component is a FILE name; here it is
+      // an intermediate directory, two components above the file, so the failure is a
+      // plain refusal rather than a hidden stream.
+      //
+      // PersistenceModeRestore and PersistenceModeRename return before this is reached,
+      // so an installation that somehow holds such an address can still be restored and
+      // renamed. Anything else is now refused - not only creating a new one, but SAVING
+      // an existing one, because a normal save revalidates the address. That is the
+      // right trade (the account cannot receive mail either way) but it does mean such
+      // an account must be renamed rather than edited.
 
       const int maxEmailAddressLength = 254;
       if (sEmailAddress.GetLength() > maxEmailAddressLength)
@@ -70,13 +93,27 @@ namespace HM
       // intentionally do not enforce this to maintain backwards compatibility with
       // existing accounts that have longer local parts.
       //
-      // Original: ^(("[^<>@\\/\?\*|]+")|(?!\.|.*\.(\.|@))[^<> @\\/"\?\*|]+)@(\[([0-9]{1,3}\.){3}[0-9]{1,3}\]|\[IPv6:(?:[A-Fa-f0-9]{1,4}:){7}[A-Fa-f0-9]{1,4}\]|(?=.{1,255}$)((?!-|\.)[a-zA-Z0-9-]{0,62}[a-zA-Z0-9])(|\.(?!-|\.)[a-zA-Z0-9-]{0,62}[a-zA-Z0-9]){1,126})$
+      // Original: ^(("[^<>@\\/\?\*|:]+")|(?!\.|.*\.(\.|@))[^<> @\\/"\?\*|:]+)@(\[([0-9]{1,3}\.){3}[0-9]{1,3}\]|\[IPv6:(?:[A-Fa-f0-9]{1,4}:){7}[A-Fa-f0-9]{1,4}\]|(?=.{1,255}$)((?!-|\.)[a-zA-Z0-9-]{0,62}[a-zA-Z0-9])(|\.(?!-|\.)[a-zA-Z0-9-]{0,62}[a-zA-Z0-9]){1,126})$
+      //
+      // The colon is excluded from the two LOCAL-PART classes only. It still appears
+      // twice in the domain alternation - once in the "[IPv6:" literal and once in the
+      // group matching the address itself - and must stay there, or an IPv6 address
+      // literal would stop being a legal domain.
+      //
+      // That is a deliberate narrowing, not an oversight, and it is worth naming the
+      // gap it leaves: the domain DOES reach the store path (GetFileName's first
+      // component is the domain name), so an account in a domain literally named
+      // "[IPv6:...]" would hit the same unbuildable-path problem. It cannot arise here,
+      // because CheckLimitations already requires the account's domain to match the
+      // owning hMailServer domain and IsValidDomainName refuses bracketed literals for
+      // a domain object - so there is no path by which such an account exists to be
+      // saved. If domain creation ever loosens, this is the second place to look.
       //
       // Conversion:
       // 1) Replace \ with \\
       // 2) Replace " with \"
 
-      String regularExpression = "^((\"[^<>@\\\\/\\?\\*|]+\")|(?!\\.|.*\\.(\\.|@))[^<> @\\\\/\"\\?\\*|]+)@(\\[([0-9]{1,3}\\.){3}[0-9]{1,3}\\]|\\[IPv6:(?:[A-Fa-f0-9]{1,4}:){7}[A-Fa-f0-9]{1,4}\\]|(?=.{1,255}$)((?!-|\\.)[a-zA-Z0-9-]{0,62}[a-zA-Z0-9])(|\\.(?!-|\\.)[a-zA-Z0-9-]{0,62}[a-zA-Z0-9]){1,126})$";
+      String regularExpression = "^((\"[^<>@\\\\/\\?\\*|:]+\")|(?!\\.|.*\\.(\\.|@))[^<> @\\\\/\"\\?\\*|:]+)@(\\[([0-9]{1,3}\\.){3}[0-9]{1,3}\\]|\\[IPv6:(?:[A-Fa-f0-9]{1,4}:){7}[A-Fa-f0-9]{1,4}\\]|(?=.{1,255}$)((?!-|\\.)[a-zA-Z0-9-]{0,62}[a-zA-Z0-9])(|\\.(?!-|\\.)[a-zA-Z0-9-]{0,62}[a-zA-Z0-9]){1,126})$";
 
       RegularExpression regexpEvaluator;
       return regexpEvaluator.TestExactMatch(regularExpression, sEmailAddress);
