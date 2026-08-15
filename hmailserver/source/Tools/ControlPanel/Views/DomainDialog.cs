@@ -15,6 +15,7 @@ namespace hMailServer.ControlPanel.Views
 
       // General
       private readonly CheckBox active_ = new() { Content = "Domain enabled", FontSize = 13 };
+      private readonly TextBox name_ = NewInput();
       private readonly TextBox postmaster_ = NewInput();
       private readonly TextBox adDomain_ = NewInput();
 
@@ -157,6 +158,8 @@ namespace hMailServer.ControlPanel.Views
       {
          var panel = TabPanel();
          panel.Children.Add(active_);
+         panel.Children.Add(Label("Domain name (changing it renames the domain and moves every account, alias and list with it)"));
+         panel.Children.Add(Input(name_));
          panel.Children.Add(Label("Postmaster address (mail to unknown recipients is redirected here)"));
          panel.Children.Add(Input(postmaster_));
          panel.Children.Add(Label("Active Directory domain (for AD-synchronised domains; optional)"));
@@ -898,6 +901,7 @@ namespace hMailServer.ControlPanel.Views
          {
             dynamic d = domains.ItemByName[domainName_];
             active_.IsChecked = (bool) d.Active;
+            name_.Text = (string) d.Name ?? domainName_;
             postmaster_.Text = (string) d.Postmaster ?? "";
             adDomain_.Text = (string) d.ADDomainName ?? "";
 
@@ -969,10 +973,34 @@ namespace hMailServer.ControlPanel.Views
          }
          status_.Text = "";
 
+         string newName = name_.Text.Trim();
+         if (newName.Length == 0 || !newName.Contains('.'))
+         {
+            status_.Text = "Enter a valid domain name.";
+            return;
+         }
+
+         // Renaming asks first, because it is not a label edit: the server renames
+         // every account, alias and distribution list, rewrites references held by
+         // OTHER domains (forwards, alias targets, list members), and moves the
+         // message directories. The old admin did all of this silently on Save,
+         // which is exactly how domains got renamed by accident.
+         bool renaming = !string.Equals(newName, domainName_, StringComparison.OrdinalIgnoreCase);
+         if (renaming &&
+             MessageBox.Show(
+                "Rename " + domainName_ + " to " + newName + "?\n\nEvery account, alias and distribution " +
+                "list moves to the new name, and forwards or memberships in other domains that point at " +
+                domainName_ + " addresses are updated to match. Mail sent to the old name will no longer " +
+                "be accepted.",
+                "Control Panel", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            return;
+
          dynamic domains = ServerSession.Current.Application.Domains;
          try
          {
             dynamic d = domains.ItemByName[domainName_];
+            if (renaming)
+               d.Name = newName;
             d.Active = active_.IsChecked == true;
             d.Postmaster = postmaster_.Text.Trim();
             d.ADDomainName = adDomain_.Text.Trim();

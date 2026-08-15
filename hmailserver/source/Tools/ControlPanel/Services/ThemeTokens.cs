@@ -209,6 +209,21 @@ namespace hMailServer.ControlPanel.Services
          Set(LogApp, logApp);
          Set(LogError, logError);
 
+         // App.xaml declares "BrandBrush" as a fixed dark-theme blue (#2F81F7), and
+         // every StaticResource reference to it - the sidebar pill, the tab
+         // underline, the per-page icons - kept that blue on a light surface, where
+         // it reads washed-out. The declared instance is mutated IN PLACE rather
+         // than replaced, and the difference is load order: a StaticResource
+         // resolves to an instance once, when its view loads, so replacing the
+         // dictionary entry only reaches views loaded afterwards - and the App
+         // constructor (where Initialize runs) executes before App.xaml's
+         // resources even exist. Mutating the declared brush updates every
+         // consumer that ever resolved it, whenever the theme changes. XAML
+         // resource brushes are not frozen unless marked so; the guard keeps a
+         // future Freeze from becoming a crash here.
+         if (Application.Current?.Resources["BrandBrush"] is SolidColorBrush declaredBrand && !declaredBrand.IsFrozen)
+            declaredBrand.Color = brand;
+
          // Channel 2: publish fresh brushes for XAML DynamicResource consumers.
          Publish("AppBrandBrush", brand);
          Publish("AppSuccessBrush", success);

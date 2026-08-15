@@ -19,9 +19,34 @@ namespace hMailServer.ControlPanel.Views
       {
       }
 
+      /// <summary>
+      /// A domain in the left-hand list. The template dims an inactive domain and
+      /// appends the word "inactive"; ToString carries the same word to a screen
+      /// reader, because a ListViewItem's accessible name falls back to ToString()
+      /// on the bound object.
+      /// </summary>
+      public class DomainRow
+      {
+         public string Name { get; set; }
+         public bool Active { get; set; }
+         public override string ToString() => Active ? Name : Name + " (inactive)";
+      }
+
+      /// <summary>Same shape for the account list.</summary>
+      public class AccountRow
+      {
+         public string Address { get; set; }
+         public bool Active { get; set; }
+         public override string ToString() => Active ? Address : Address + " (inactive)";
+      }
+
+      private string SelectedDomainName() => (DomainList.SelectedItem as DomainRow)?.Name;
+
       private void ReloadDomains()
       {
-         var names = new List<string>();
+         string previousSelection = SelectedDomainName();
+
+         var rows = new List<DomainRow>();
          dynamic domains = ServerSession.Current.Application.Domains;
          try
          {
@@ -29,7 +54,7 @@ namespace hMailServer.ControlPanel.Views
             for (int i = 0; i < count; i++)
             {
                dynamic domain = domains.Item[i];
-               names.Add((string) domain.Name);
+               rows.Add(new DomainRow { Name = (string) domain.Name, Active = (bool) domain.Active });
                ServerSession.Release(domain);
             }
          }
@@ -38,9 +63,16 @@ namespace hMailServer.ControlPanel.Views
             ServerSession.Release(domains);
          }
 
-         DomainList.ItemsSource = names;
+         DomainList.ItemsSource = rows;
          ListSearch.Apply(DomainList, DomainSearch.Text);
-         if (names.Count > 0 && DomainList.SelectedIndex < 0)
+
+         // Replacing ItemsSource clears the selection; put it back on the same
+         // domain when it still exists, so a reload does not yank the accounts
+         // pane over to whatever happens to be first.
+         if (previousSelection != null)
+            DomainList.SelectedItem = rows.Find(r => r.Name == previousSelection);
+
+         if (rows.Count > 0 && DomainList.SelectedIndex < 0)
             DomainList.SelectedIndex = 0;
       }
 
@@ -72,7 +104,7 @@ namespace hMailServer.ControlPanel.Views
 
       private dynamic OpenSelectedDomain(dynamic domains)
       {
-         string domainName = DomainList.SelectedItem as string;
+         string domainName = SelectedDomainName();
          return domainName == null ? null : domains.ItemByName[domainName];
       }
 
@@ -269,7 +301,7 @@ namespace hMailServer.ControlPanel.Views
       private void EditRecipients_Click(object sender, RoutedEventArgs e)
       {
          string address = (sender as FrameworkElement)?.Tag as string;
-         string domainName = DomainList.SelectedItem as string;
+         string domainName = SelectedDomainName();
          if (address == null || domainName == null)
             return;
 
@@ -279,7 +311,7 @@ namespace hMailServer.ControlPanel.Views
       private void EditDistList_Click(object sender, RoutedEventArgs e)
       {
          string address = (sender as FrameworkElement)?.Tag as string;
-         string domainName = DomainList.SelectedItem as string;
+         string domainName = SelectedDomainName();
          if (address == null || domainName == null)
             return;
 
@@ -331,7 +363,7 @@ namespace hMailServer.ControlPanel.Views
 
       private void ReloadAccounts()
       {
-         string domainName = DomainList.SelectedItem as string;
+         string domainName = SelectedDomainName();
          if (domainName == null)
          {
             AccountsHeader.Text = "Select a domain";
@@ -342,7 +374,7 @@ namespace hMailServer.ControlPanel.Views
          AccountsHeader.Text = domainName + " - accounts";
          NewAccountBox.Text = "user@" + domainName;
 
-         var addresses = new List<string>();
+         var rows = new List<AccountRow>();
          dynamic domains = ServerSession.Current.Application.Domains;
          try
          {
@@ -352,7 +384,7 @@ namespace hMailServer.ControlPanel.Views
             for (int i = 0; i < count; i++)
             {
                dynamic account = accounts.Item[i];
-               addresses.Add((string) account.Address);
+               rows.Add(new AccountRow { Address = (string) account.Address, Active = (bool) account.Active });
                ServerSession.Release(account);
             }
             ServerSession.Release(accounts);
@@ -363,7 +395,7 @@ namespace hMailServer.ControlPanel.Views
             ServerSession.Release(domains);
          }
 
-         AccountList.ItemsSource = addresses;
+         AccountList.ItemsSource = rows;
          ListSearch.Apply(AccountList, AccountSearch.Text);
       }
 
@@ -374,6 +406,59 @@ namespace hMailServer.ControlPanel.Views
             return;
 
          new DomainDialog(Window.GetWindow(this), name).ShowDialog();
+         ReloadDomains();
+      }
+
+      /// <summary>
+      /// Deletes a domain and everything under it. The confirmation counts what is
+      /// about to go, because "Delete example.com?" reads as removing a list row,
+      /// and what actually happens is that every mailbox and every stored message
+      /// in the domain is destroyed.
+      /// </summary>
+      private void DeleteDomain_Click(object sender, RoutedEventArgs e)
+      {
+         string name = (sender as FrameworkElement)?.Tag as string;
+         if (name == null)
+            return;
+
+         dynamic domains = ServerSession.Current.Application.Domains;
+         try
+         {
+            int accountCount;
+            int domainId;
+            dynamic domain = domains.ItemByName[name];
+            try
+            {
+               domainId = (int) domain.ID;
+               dynamic accounts = domain.Accounts;
+               accountCount = (int) accounts.Count;
+               ServerSession.Release(accounts);
+            }
+            finally
+            {
+               ServerSession.Release(domain);
+            }
+
+            string counted = accountCount == 1 ? "its 1 account" : "its " + accountCount + " accounts";
+
+            if (MessageBox.Show(
+                   "Delete the domain " + name + "?\n\nThis permanently removes " + counted + ", every " +
+                   "message stored in them, and all of the domain's aliases and distribution lists. " +
+                   "There is no undo.",
+                   "Control Panel", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+               return;
+
+            domains.DeleteByDBID(domainId);
+         }
+         catch (Exception ex)
+         {
+            MessageBox.Show("Could not delete the domain: " + ex.Message, "Control Panel");
+         }
+         finally
+         {
+            ServerSession.Release(domains);
+         }
+
          ReloadDomains();
       }
 
@@ -395,6 +480,13 @@ namespace hMailServer.ControlPanel.Views
             domain.Save();
             ServerSession.Release(domain);
          }
+         catch (Exception ex)
+         {
+            // Without this, a duplicate name - the likeliest failure - took the
+            // whole window down instead of saying so.
+            MessageBox.Show("Could not create the domain: " + ex.Message, "Control Panel");
+            return;
+         }
          finally
          {
             ServerSession.Release(domains);
@@ -414,7 +506,7 @@ namespace hMailServer.ControlPanel.Views
 
       private void AddAccount_Click(object sender, RoutedEventArgs e)
       {
-         string domainName = DomainList.SelectedItem as string;
+         string domainName = SelectedDomainName();
          string address = NewAccountBox.Text.Trim();
          string password = NewAccountPassword.Password;
 
@@ -455,7 +547,7 @@ namespace hMailServer.ControlPanel.Views
       private void EditAccount_Click(object sender, RoutedEventArgs e)
       {
          string address = (sender as FrameworkElement)?.Tag as string;
-         string domainName = DomainList.SelectedItem as string;
+         string domainName = SelectedDomainName();
          if (address == null || domainName == null)
             return;
 
@@ -466,7 +558,7 @@ namespace hMailServer.ControlPanel.Views
       private void DeleteAccount_Click(object sender, RoutedEventArgs e)
       {
          string address = (sender as FrameworkElement)?.Tag as string;
-         string domainName = DomainList.SelectedItem as string;
+         string domainName = SelectedDomainName();
          if (address == null || domainName == null)
             return;
 

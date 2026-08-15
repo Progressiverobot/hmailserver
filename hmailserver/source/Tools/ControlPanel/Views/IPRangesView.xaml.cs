@@ -210,6 +210,41 @@ namespace hMailServer.ControlPanel.Views
          Reload();
       }
 
+      /// <summary>
+      /// Settings.SecurityRanges.SetDefault() over COM: every range is replaced with
+      /// the standard two - "My computer" (127.0.0.1, priority 30) and "Internet"
+      /// (0.0.0.0-255.255.255.255, priority 10). Another classic-Administrator action
+      /// that lost its button when that tool was retired. The server's failure text
+      /// is shown verbatim; it explains that the old ranges are gone even when
+      /// writing the new ones failed, which is the state an administrator most needs
+      /// to know about.
+      /// </summary>
+      private void RestoreDefaults_Click(object sender, RoutedEventArgs e)
+      {
+         if (MessageBox.Show(
+                "Replace ALL IP ranges with the defaults?\n\nEvery custom range - including any auto-ban " +
+                "entries - will be removed and replaced with 'My computer' (127.0.0.1) and 'Internet' " +
+                "(everything else). This changes who may connect and relay, immediately.",
+                "Control Panel", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            return;
+
+         dynamic ranges = ServerSession.Current.Application.Settings.SecurityRanges;
+         try
+         {
+            ranges.SetDefault();
+         }
+         catch (Exception ex)
+         {
+            MessageBox.Show(ex.Message, "Control Panel", MessageBoxButton.OK, MessageBoxImage.Error);
+         }
+         finally
+         {
+            ServerSession.Release(ranges);
+         }
+
+         Reload();
+      }
+
       private void Delete_Click(object sender, RoutedEventArgs e)
       {
          if (RangeGrid.SelectedItem is not RangeRow row)

@@ -282,6 +282,40 @@ namespace hMailServer.ControlPanel.Views
          Reload();
       }
 
+      /// <summary>
+      /// Settings.TCPIPPorts.SetDefault() over COM: every configured port is replaced
+      /// with SMTP 25 + 587, POP3 110 and IMAP 143, no connection security. The COM
+      /// call exists since the classic Administrator; this button went missing when
+      /// that tool was retired. The failure text from the server is shown verbatim -
+      /// it is written for exactly this situation (the old ports are gone even when
+      /// writing the new ones failed).
+      /// </summary>
+      private void RestoreDefaults_Click(object sender, RoutedEventArgs e)
+      {
+         if (MessageBox.Show(
+                "Replace ALL configured ports with the defaults?\n\nSMTP 25 and 587, POP3 110, IMAP 143 - " +
+                "without connection security. TLS ports and custom bindings will be removed. The change takes " +
+                "effect when the server is restarted.",
+                "Control Panel", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            return;
+
+         dynamic ports = ServerSession.Current.Application.Settings.TCPIPPorts;
+         try
+         {
+            ports.SetDefault();
+         }
+         catch (Exception ex)
+         {
+            MessageBox.Show(ex.Message, "Control Panel", MessageBoxButton.OK, MessageBoxImage.Error);
+         }
+         finally
+         {
+            ServerSession.Release(ports);
+         }
+
+         Reload();
+      }
+
       private void Delete_Click(object sender, RoutedEventArgs e)
       {
          if (PortGrid.SelectedItem is not PortRow row)

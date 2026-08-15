@@ -16,9 +16,16 @@
                 <TextBlock x:Name="SubtitleText" Text="Server, database and health overview."
                            Style="{StaticResource PageSubtitle}" />
             </StackPanel>
-            <ui:Button Content="Refresh" Click="Refresh_Click" HorizontalAlignment="Right" VerticalAlignment="Top">
-                <ui:Button.Icon><ui:SymbolIcon Symbol="ArrowClockwise24" /></ui:Button.Icon>
-            </ui:Button>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+                <ui:Button x:Name="PauseButton" Content="Pause" Click="PauseResume_Click" IsEnabled="False"
+                           Margin="0,0,8,0"
+                           ToolTip="Stops the mail server engine while the Windows service keeps running: no new connections are accepted and nothing is delivered until it is resumed.">
+                    <ui:Button.Icon><ui:SymbolIcon Symbol="Pause24" /></ui:Button.Icon>
+                </ui:Button>
+                <ui:Button Content="Refresh" Click="Refresh_Click">
+                    <ui:Button.Icon><ui:SymbolIcon Symbol="ArrowClockwise24" /></ui:Button.Icon>
+                </ui:Button>
+            </StackPanel>
         </Grid>
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,4,0,0">

@@ -24,6 +24,7 @@ namespace hMailServer.ControlPanel.Views
 
       // General
       private readonly CheckBox active_ = new() { Content = "Account enabled", FontSize = 13 };
+      private readonly TextBox addressBox_ = NewInput();
       private readonly ComboBox adminLevel_ = new();
       private readonly TextBox quota_ = NewInput();
       private readonly TextBox firstName_ = NewInput();
@@ -168,6 +169,8 @@ namespace hMailServer.ControlPanel.Views
 
          var panel = TabPanel();
          panel.Children.Add(active_);
+         panel.Children.Add(Label("Address (changing it renames the mailbox; it must stay in this domain)"));
+         panel.Children.Add(Input(addressBox_));
          panel.Children.Add(Label("Administration level"));
          panel.Children.Add(adminLevel_);
          panel.Children.Add(Label("Quota (MB, 0 = unlimited)"));
@@ -621,6 +624,7 @@ namespace hMailServer.ControlPanel.Views
          {
             dynamic a = OpenAccount(domains);
             active_.IsChecked = (bool) a.Active;
+            addressBox_.Text = (string) a.Address ?? address_;
             SelectCombo(adminLevel_, (int) a.AdminLevel);
             quota_.Text = ((int) a.MaxSize).ToString();
             firstName_.Text = (string) a.PersonFirstName ?? "";
@@ -709,10 +713,34 @@ namespace hMailServer.ControlPanel.Views
             }
          }
 
+         // An account rename stays inside its domain: the row keeps its domain id,
+         // so an address in another domain would produce an account the server can
+         // no longer find. The server moves the message directory itself.
+         string newAddress = addressBox_.Text.Trim();
+         bool renaming = !string.Equals(newAddress, address_, StringComparison.OrdinalIgnoreCase);
+         if (renaming)
+         {
+            if (!newAddress.ToLowerInvariant().EndsWith("@" + domainName_.ToLowerInvariant()) ||
+                newAddress.IndexOf('@') <= 0)
+            {
+               status_.Text = "The address must be a name followed by @" + domainName_ + ".";
+               return;
+            }
+
+            if (MessageBox.Show(
+                   "Rename " + address_ + " to " + newAddress + "?\n\nThe mailbox and its messages move to " +
+                   "the new address. Mail sent to the old address will no longer reach this account unless " +
+                   "an alias is created for it.",
+                   "Control Panel", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+               return;
+         }
+
          dynamic domains = ServerSession.Current.Application.Domains;
          try
          {
             dynamic a = OpenAccount(domains);
+            if (renaming)
+               a.Address = newAddress;
             a.Active = active_.IsChecked == true;
             int lvl = ComboValue(adminLevel_, -1);
             if (lvl >= 0) a.AdminLevel = lvl;

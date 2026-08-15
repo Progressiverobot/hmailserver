@@ -89,6 +89,7 @@
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <ComboBox x:Name="NewProtocol" SelectedIndex="0" Margin="0,0,8,0">
                         <ComboBoxItem Content="SMTP" />
@@ -106,7 +107,9 @@
                     <ui:Button Grid.Column="4" Content="Add" Appearance="Primary" Click="Add_Click" Margin="0,0,8,0" />
                     <ui:Button Grid.Column="5" Content="Properties" Click="Edit_Click" Margin="0,0,8,0" />
                     <ui:Button Grid.Column="6" Content="Delete selected" Appearance="Secondary"
-                               Foreground="{DynamicResource AppDangerBrush}" Click="Delete_Click" />
+                               Foreground="{DynamicResource AppDangerBrush}" Click="Delete_Click" Margin="0,0,8,0" />
+                    <ui:Button Grid.Column="7" Content="Restore defaults" Click="RestoreDefaults_Click"
+                               ToolTip="Replaces every port with the standard set: SMTP 25 and 587, POP3 110, IMAP 143, all without connection security." />
                 </Grid>
             </StackPanel>
         </Border>

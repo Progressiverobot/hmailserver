@@ -47,13 +47,44 @@
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
+                                    <!-- An inactive domain is dimmed AND says so in words: opacity
+                                         alone does not survive High Contrast, a projector, or a
+                                         screen reader, and the word alone is easy to scan past. -->
                                     <StackPanel Orientation="Horizontal">
+                                        <StackPanel.Style>
+                                            <Style TargetType="StackPanel">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Active}" Value="False">
+                                                        <Setter Property="Opacity" Value="0.55" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </StackPanel.Style>
                                         <ui:SymbolIcon Symbol="Globe24" Foreground="{StaticResource BrandBrush}" />
-                                        <TextBlock Text="{Binding}" Margin="10,0,0,0" FontSize="14" VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding Name}" Margin="10,0,0,0" FontSize="14" VerticalAlignment="Center" />
+                                        <TextBlock Text="inactive" FontSize="11" FontStyle="Italic" Margin="8,0,0,0"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Active}" Value="False">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
                                     </StackPanel>
-                                    <ui:Button Grid.Column="1" Content="Properties" FontSize="11" Padding="8,3"
-                                               Tag="{Binding}" Click="EditDomain_Click" />
+                                    <ui:Button Grid.Column="1" Content="Properties" FontSize="11" Padding="8,3" Margin="0,0,6,0"
+                                               Tag="{Binding Name}" Click="EditDomain_Click" />
+                                    <ui:Button Grid.Column="2" Content="✕" FontSize="10" Padding="6,3"
+                                               ToolTip="Delete domain" AutomationProperties.Name="Delete domain"
+                                               Foreground="{DynamicResource AppDangerBrush}"
+                                               Tag="{Binding Name}" Click="DeleteDomain_Click" />
                                 </Grid>
                             </DataTemplate>
                         </ListView.ItemTemplate>
@@ -95,14 +126,37 @@
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Orientation="Horizontal">
+                                        <StackPanel.Style>
+                                            <Style TargetType="StackPanel">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Active}" Value="False">
+                                                        <Setter Property="Opacity" Value="0.55" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </StackPanel.Style>
                                         <ui:SymbolIcon Symbol="Person24" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                        <TextBlock Text="{Binding}" Margin="10,0,0,0" FontSize="13.5" VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding Address}" Margin="10,0,0,0" FontSize="13.5" VerticalAlignment="Center" />
+                                        <TextBlock Text="inactive" FontSize="11" FontStyle="Italic" Margin="8,0,0,0"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Active}" Value="False">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
                                     </StackPanel>
                                     <ui:Button Grid.Column="1" Content="Edit" FontSize="11" Padding="8,3" Margin="0,0,6,0"
-                                               Tag="{Binding}" Click="EditAccount_Click" />
+                                               Tag="{Binding Address}" Click="EditAccount_Click" />
                                     <ui:Button Grid.Column="2" Content="Delete" Appearance="Secondary" FontSize="11"
                                                Foreground="{DynamicResource AppDangerBrush}"
-                                               Padding="8,3" Tag="{Binding}" Click="DeleteAccount_Click" />
+                                               Padding="8,3" Tag="{Binding Address}" Click="DeleteAccount_Click" />
                                 </Grid>
                             </DataTemplate>
                         </ListView.ItemTemplate>

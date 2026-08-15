@@ -33,6 +33,75 @@ namespace hMailServer.ControlPanel.Views
 
       private void Refresh_Click(object sender, RoutedEventArgs e) => Reload();
 
+      /// <summary>
+      /// Pause and resume are Application.Stop()/Start() over COM - the engine stops
+      /// while the Windows SERVICE keeps running, which is what the classic
+      /// Administrator's pause did (its ucStatus button called exactly these). This
+      /// went missing when that tool was retired: the Control Panel only offered a
+      /// service-level restart, so "stop accepting mail for a moment without killing
+      /// the process" stopped being possible from any UI.
+      /// </summary>
+      private void PauseResume_Click(object sender, RoutedEventArgs e)
+      {
+         dynamic app = ServerSession.Current?.Application;
+         if (app == null)
+            return;
+
+         try
+         {
+            int state = (int) app.ServerState;
+
+            if (state == ServerStateRunning_)
+            {
+               if (MessageBox.Show(
+                      "Pause the mail server?\n\nNo new connections will be accepted and no mail will be " +
+                      "delivered until it is resumed. The Windows service keeps running, so this Control " +
+                      "Panel stays connected.",
+                      "Control Panel", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                  return;
+
+               app.Stop();
+            }
+            else if (state == ServerStateStopped_)
+            {
+               app.Start();
+            }
+         }
+         catch (Exception ex)
+         {
+            // The likeliest failure is rights: pausing requires an administrator-level
+            // COM session. Said outright rather than as a raw HRESULT.
+            MessageBox.Show("The server state could not be changed: " + ex.Message,
+               "Control Panel", MessageBoxButton.OK, MessageBoxImage.Error);
+         }
+
+         Reload();
+      }
+
+      private const int ServerStateStopped_ = 1;
+      private const int ServerStateRunning_ = 3;
+
+      private void UpdatePauseButton_(int state)
+      {
+         switch (state)
+         {
+            case ServerStateRunning_:
+               PauseButton.Content = "Pause";
+               PauseButton.IsEnabled = true;
+               break;
+            case ServerStateStopped_:
+               PauseButton.Content = "Resume";
+               PauseButton.IsEnabled = true;
+               break;
+            default:
+               // Starting or stopping: a transition is already in progress.
+               PauseButton.IsEnabled = false;
+               break;
+         }
+
+         AutomationProperties.SetName(PauseButton, (string) PauseButton.Content + " the mail server engine");
+      }
+
       private static string DatabaseTypeName(int type) => type switch
       {
          1 => "MySQL / MariaDB",
@@ -65,8 +134,17 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception) { SetValue_(VersionValue, "Version", "-"); }
 
-         try { SetValue_(StateValue, "State", ServerStateName((int) app.ServerState)); }
-         catch (Exception) { SetValue_(StateValue, "State", "-"); }
+         try
+         {
+            int state = (int) app.ServerState;
+            SetValue_(StateValue, "State", ServerStateName(state));
+            UpdatePauseButton_(state);
+         }
+         catch (Exception)
+         {
+            SetValue_(StateValue, "State", "-");
+            PauseButton.IsEnabled = false;
+         }
 
          try
          {
