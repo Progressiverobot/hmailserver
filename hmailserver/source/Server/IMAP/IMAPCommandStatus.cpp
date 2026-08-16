@@ -5,6 +5,7 @@
 #include "stdafx.h"
 #include "IMAPCommandStatus.h"
 
+#include "IMAPCommandAppend.h"
 #include "IMAPConnection.h"
 #include "IMAPSimpleCommandParser.h"
 #include "../Common/BO/IMAPFolders.h"
@@ -167,6 +168,24 @@ namespace HM
          // RFC 7162 (CONDSTORE/QRESYNC): the mailbox highest mod-sequence.
          String sTemp;
          sTemp.Format(_T("HIGHESTMODSEQ %I64d"), pTheFolder->GetCurrentModSeq());
+
+         if (bAddSpace)
+            sResponse += " ";
+         else
+            bAddSpace = true;
+
+         sResponse += sTemp;
+      }
+
+      if (sFlags.FindNoCase(_T("APPENDLIMIT")) >= 0)
+      {
+         // RFC 7889: the pre-authentication capability is the bare APPENDLIMIT
+         // form, and a server advertising that form must answer this item. The
+         // number is per-account rather than per-mailbox here, so every mailbox
+         // reports the same limit APPEND will actually enforce.
+         String sTemp;
+         sTemp.Format(_T("APPENDLIMIT %I64d"),
+            IMAPCommandAppend::GetEffectiveAppendLimitBytes(pConnection->GetAccount()));
 
          if (bAddSpace)
             sResponse += " ";

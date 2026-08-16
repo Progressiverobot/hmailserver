@@ -4,6 +4,7 @@
 
 #include "stdafx.h"
 #include "IMAPCommandCapability.h"
+#include "IMAPCommandAppend.h"
 #include "IMAPConnection.h"
 #include "IMAPConfiguration.h"
 #include "../common/BO/SecurityRange.h"
@@ -115,6 +116,25 @@ namespace HM
       // SEARCH parser started refusing keys it does not know, sending one unannounced
       // would have been answered with BAD rather than silently ignored.
       sResponse += " NAMESPACE RIGHTS=texk MOVE ID SPECIAL-USE CREATE-SPECIAL-USE UNSELECT UIDPLUS ENABLE STATUS=SIZE ESEARCH CONDSTORE QRESYNC LIST-EXTENDED SEARCHRES WITHIN UTF8=ACCEPT";
+
+      // RFC 7889: the APPEND size limit is discoverable instead of found by
+      // uploading and failing. Once authenticated the number is exact - every
+      // mailbox this connection can APPEND to shares the account's effective
+      // limit - so the valued form is used. Before authentication the limit is
+      // not yet known (it depends on the account's domain), so the bare form is
+      // advertised; the bare form obliges the server to answer STATUS
+      // (APPENDLIMIT), which IMAPCommandStatus does.
+      if (pConnection->IsAuthenticated())
+      {
+         String appendLimit;
+         appendLimit.Format(_T(" APPENDLIMIT=%I64d"),
+            IMAPCommandAppend::GetEffectiveAppendLimitBytes(pConnection->GetAccount()));
+         sResponse += appendLimit;
+      }
+      else
+      {
+         sResponse += " APPENDLIMIT";
+      }
 
       sResponse += "\r\n";
       sResponse += pArgument->Tag() + " OK CAPABILITY completed\r\n";

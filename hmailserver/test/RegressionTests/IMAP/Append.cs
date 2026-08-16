@@ -112,7 +112,7 @@ namespace RegressionTests.IMAP
             message.ToString());
          imapSim.Logout();
 
-         Assert.IsFalse(result.StartsWith("A01 NO Message size exceeds fixed maximum message size."));
+         Assert.IsFalse(result.StartsWith("A01 NO [TOOBIG]"));
       }
 
       [Test]
@@ -134,7 +134,7 @@ namespace RegressionTests.IMAP
             message.ToString());
          imapSim.Logout();
 
-         Assert.IsTrue(result.StartsWith("A01 NO Message size exceeds fixed maximum message size."));
+         Assert.IsTrue(result.StartsWith("A01 NO [TOOBIG] Message size exceeds fixed maximum message size."));
       }
 
       [Test]
@@ -155,7 +155,7 @@ namespace RegressionTests.IMAP
             message.ToString());
          imapSim.Logout();
 
-         Assert.IsFalse(result.StartsWith("A01 NO Message size exceeds fixed maximum message size."));
+         Assert.IsFalse(result.StartsWith("A01 NO [TOOBIG]"));
       }
 
       [Test]
@@ -176,7 +176,7 @@ namespace RegressionTests.IMAP
             message.ToString());
          imapSim.Logout();
 
-         Assert.IsTrue(result.StartsWith("A01 NO Message size exceeds fixed maximum message size."));
+         Assert.IsTrue(result.StartsWith("A01 NO [TOOBIG] Message size exceeds fixed maximum message size."));
       }
 
 

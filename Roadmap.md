@@ -55,7 +55,7 @@ strong and where it is thin far more honestly than any prose summary.
 | **The capability matrix** | | | | |
 | [SMTP and ESMTP](#smtp-and-esmtp) | 27 | – | 2 | – |
 | [Transport security and deliverability](#transport-security-and-deliverability) | 43 | – | 4 | 1 |
-| [IMAP](#imap) | 59 | – | 16 | 3 |
+| [IMAP](#imap) | 60 | – | 15 | 3 |
 | [POP3](#pop3) | 21 | – | 6 | – |
 | [Sieve, ManageSieve and rules](#sieve-managesieve-and-rules) | 64 | 0 | 1 | – |
 | [Authentication and cryptography](#authentication-and-cryptography) | 57 | 0 | 18 | – |
@@ -72,7 +72,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 2 | – | 4 | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 5 | 1 | 2 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 4 | 1 | 4 | – |
-| **Total** | **644** | **12** | **126** | **15** |
+| **Total** | **645** | **12** | **125** | **15** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage and the administration surface are the best-covered areas**, and the
@@ -330,7 +330,7 @@ the source, not from documentation.
 
 ### IMAP
 
-59 shipped · 0 underway · 16 not started · 3 deferred
+60 shipped · 0 underway · 15 not started · 3 deferred
 
 | | Capability | Detail |
 |:-:|---|---|
@@ -393,7 +393,7 @@ the source, not from documentation.
 | ⏸️ | ESORT (RFC 5267) — SORT RETURN (...) | Explicitly not handled: the RETURN result-option parser is gated on !is_sort_, with an in-code comment stating ESORT is intentionally out of scope. |
 | ⏸️ | NOTIFY (RFC 5465) | Not implemented. Explicitly placed under the roadmap's "Not planned" heading, with the reasoning that iOS Mail does not do push for generic IMAP at all and IDLE is the portable answer. |
 | ⏸️ | SEARCH=FUZZY (RFC 6203) | Not implemented, not advertised, and explicitly declined in the roadmap on the grounds that Dovecot does not have it either. |
-| ⬜ | APPENDLIMIT (RFC 7889) | Not advertised, though the limit exists: APPEND enforces the SMTP max message size, the per-domain max size and a hard 2 GB ceiling. Clients cannot discover any of it, so oversized uploads fail only after the data is sent. |
+| ✅ | APPENDLIMIT (RFC 7889) | **Shipped 16 August 2026.** The limit was always enforced - the SMTP max message size, tightened per-domain, capped at a hard 2 GB - but undiscoverable, so oversized uploads failed only after the data was sent. Now CAPABILITY advertises the bare APPENDLIMIT form before login (the number depends on the account's domain, not yet known) and the exact APPENDLIMIT=n form after; STATUS answers the APPENDLIMIT item, which the bare form obliges a server to do; and both oversize refusals carry the TOOBIG response code (RFC 4469) so a client knows the literal itself was the problem and does not retry the same message. The advertised number is computed by the same merge the enforcement uses, and the unlimited configuration advertises the 2 GB ceiling rather than 0 - which would mean "no APPEND accepted at all". Four fixtures: bare pre-login, exact value post-login, domain-tightened value with STATUS agreeing, and the unlimited-to-ceiling control. |
 | ⬜ | BINARY (RFC 3516) | Not implemented. No BINARY[], BINARY.PEEK[] or BINARY.SIZE[] FETCH items, no APPEND with a binary literal, and BINARY is not advertised. Listed in the roadmap's IMAP-extension backlog. |
 | ⬜ | CATENATE (RFC 4469) | Not implemented and not advertised; APPEND accepts only a literal, with no CATENATE (TEXT/URL ...) part list. Requires URLAUTH-style URL resolution, which is also absent. |
 | ⬜ | COMPRESS=DEFLATE (RFC 4978) | Not implemented and not advertised; no COMPRESS command and no deflate stream layer in the IMAP connection. Listed in the roadmap's IMAP-extension backlog. |

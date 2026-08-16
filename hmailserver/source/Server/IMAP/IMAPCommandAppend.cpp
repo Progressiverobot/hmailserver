@@ -114,10 +114,13 @@ namespace HM
          return IMAPResult(IMAPResult::ResultBad, "Empty message not permitted.");
 
       // Absolute ceiling independent of the configured maximum, so an "unlimited"
-      // (0) max message size cannot translate into an unbounded APPEND.
+      // (0) max message size cannot translate into an unbounded APPEND. TOOBIG
+      // (RFC 4469, required alongside the RFC 7889 APPENDLIMIT advertisement)
+      // tells the client the literal itself was the problem, so it does not
+      // retry the same message.
       const __int64 absoluteMaxMessageBytes = (__int64) 2 * 1024 * 1024 * 1024; // 2 GB
       if (declaredSize > absoluteMaxMessageBytes)
-         return IMAPResult(IMAPResult::ResultNo, "Message size exceeds the maximum permitted size.");
+         return IMAPResult(IMAPResult::ResultNo, "[TOOBIG] Message size exceeds the maximum permitted size.");
 
       // Add an extra two bytes since we expect a <newline> in the end.
       bytes_left_to_receive_ = (size_t) declaredSize + 2;
@@ -125,11 +128,11 @@ namespace HM
       std::shared_ptr<const Domain> domain = CacheContainer::Instance()->GetDomain(pConnection->GetAccount()->GetDomainID());
       size_t maxMessageSizeKB = GetMaxMessageSize_(domain);
 
-      if (maxMessageSizeKB > 0 && 
+      if (maxMessageSizeKB > 0 &&
           bytes_left_to_receive_ / 1024 > maxMessageSizeKB)
       {
          String sMessage;
-         sMessage.Format(_T("Message size exceeds fixed maximum message size. Size: %d KB, Max size: %d KB"), 
+         sMessage.Format(_T("[TOOBIG] Message size exceeds fixed maximum message size. Size: %d KB, Max size: %d KB"),
             bytes_left_to_receive_ / 1024, maxMessageSizeKB);
 
          return IMAPResult(IMAPResult::ResultNo, sMessage);
@@ -405,14 +408,14 @@ namespace HM
       current_message_.reset();
    }
 
-   int 
+   int
    IMAPCommandAppend::GetMaxMessageSize_(std::shared_ptr<const Domain> pDomain)
    {
       int iMaxMessageSizeKB = Configuration::Instance()->GetSMTPConfiguration()->GetMaxMessageSize();
 
       if (pDomain)
       {
-         int iDomainMaxSizeKB = pDomain->GetMaxMessageSize(); 
+         int iDomainMaxSizeKB = pDomain->GetMaxMessageSize();
          if (iDomainMaxSizeKB > 0)
          {
             if (iMaxMessageSizeKB == 0 || iMaxMessageSizeKB > iDomainMaxSizeKB)
@@ -421,6 +424,37 @@ namespace HM
       }
 
       return iMaxMessageSizeKB;
+   }
+
+   // static
+   __int64
+   IMAPCommandAppend::GetEffectiveAppendLimitBytes(std::shared_ptr<const Account> pAccount)
+   {
+      // The same merge ExecuteCommand enforces: the global maximum, tightened by
+      // the account's domain, capped by the 2 GB absolute ceiling. Advertising a
+      // number the enforcement would not honour is worse than advertising none.
+      const __int64 absoluteMaxMessageBytes = (__int64) 2 * 1024 * 1024 * 1024; // 2 GB
+
+      int maxMessageSizeKB = Configuration::Instance()->GetSMTPConfiguration()->GetMaxMessageSize();
+
+      if (pAccount)
+      {
+         std::shared_ptr<const Domain> domain = CacheContainer::Instance()->GetDomain(pAccount->GetDomainID());
+         if (domain)
+         {
+            int domainMaxSizeKB = domain->GetMaxMessageSize();
+            if (domainMaxSizeKB > 0 &&
+                (maxMessageSizeKB == 0 || maxMessageSizeKB > domainMaxSizeKB))
+               maxMessageSizeKB = domainMaxSizeKB;
+         }
+      }
+
+      __int64 limitBytes = (__int64) maxMessageSizeKB * 1024;
+
+      if (limitBytes <= 0 || limitBytes > absoluteMaxMessageBytes)
+         limitBytes = absoluteMaxMessageBytes;
+
+      return limitBytes;
    }
 
 }

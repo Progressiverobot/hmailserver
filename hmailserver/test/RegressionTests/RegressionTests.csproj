@@ -521,6 +521,7 @@
     <Compile Include="API\Utilities.cs" />
     <Compile Include="API\Permissions.cs" />
     <Compile Include="IMAP\Append.cs" />
+    <Compile Include="IMAP\AppendLimit.cs" />
     <Compile Include="IMAP\Examine.cs" />
     <Compile Include="IMAP\Fetch.cs" />
     <Compile Include="IMAP\PartialFetchChunking.cs" />

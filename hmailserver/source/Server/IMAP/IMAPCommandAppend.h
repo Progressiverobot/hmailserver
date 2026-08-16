@@ -9,11 +9,12 @@
 
 namespace HM
 {
+   class Account;
    class ByteBuffer;
    class IMAPFolder;
    class Domain;
 
-   class IMAPCommandAppend : public IMAPCommand  
+   class IMAPCommandAppend : public IMAPCommand
    {
    public:
 	   IMAPCommandAppend();
@@ -21,7 +22,13 @@ namespace HM
 
       virtual IMAPResult ExecuteCommand(std::shared_ptr<IMAPConnection> pConnection, std::shared_ptr<IMAPCommandArgument> pArgument);
       void ParseBinary(std::shared_ptr<IMAPConnection> pConnection, std::shared_ptr<ByteBuffer> pBuf);
-      
+
+      // The largest APPEND this account will be allowed, in bytes - the number
+      // CAPABILITY advertises as APPENDLIMIT= and STATUS reports (RFC 7889).
+      // Never zero: an "unlimited" configuration still has the hard 2 GB
+      // ceiling, and advertising 0 would mean "no APPEND accepted at all".
+      static __int64 GetEffectiveAppendLimitBytes(std::shared_ptr<const Account> pAccount);
+
 
    private:
 
