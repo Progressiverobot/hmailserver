@@ -6,6 +6,7 @@
 #include <vector>
 #include <memory>
 #include <functional>
+#include <map>
 
 #include "SieveParser.h"
 #include "SieveMessage.h"
@@ -199,6 +200,30 @@ namespace HM
       // The match tail shared by every comparison-shaped test: :count against the
       // number of values, otherwise every value against every key.
       bool MatchValuesAgainstKeys_(const SieveArgumentSet &set, const std::vector<String> &values, const std::vector<String> &keys);
+
+      // variables (RFC 5229). Expansion happens HERE, at evaluation, on the
+      // arguments as each command or test consumes them - never in the parser,
+      // where ${name} is just text and must stay storable.
+      void ExecuteSetCommand_(const std::shared_ptr<SieveCommand> &command);
+      String ExpandString_(const String &input) const;
+      void ExpandArgumentSet_(SieveArgumentSet &set) const;
+
+      // Wildcard match with RFC 5228 2.7.1 semantics - backslash escapes a
+      // following *, ? or backslash - and, on success, the spans each * and ?
+      // consumed, in order, for RFC 5229's match variables (${1}..). ${0} is the
+      // whole value. Case folds unless caseSensitive.
+      static bool WildcardMatchWithCaptures_(const String &pattern, const String &value,
+                                             bool caseSensitive, std::vector<String> &captures);
+
+      // The variables (RFC 5229) state: script variables set by "set" and the
+      // match variables the most recent successful :matches recorded. Names are
+      // stored lowercased - RFC 5229 3 makes them case-insensitive. The enabled
+      // flag records whether the script required "variables": without it, "${a}"
+      // has no special meaning (RFC 5229 3) and must pass through verbatim, so
+      // every expansion site is gated on it.
+      bool variables_enabled_ = false;
+      std::map<String, String> variables_;
+      std::vector<String> match_variables_;
       bool EvaluateComparisonTest_(const std::shared_ptr<SieveTest> &test, const SieveMessage &message, ValueSource source);
       bool EvaluateExists_(const std::shared_ptr<SieveTest> &test, const SieveMessage &message);
       bool EvaluateSize_(const std::shared_ptr<SieveTest> &test, const SieveMessage &message);
@@ -228,8 +253,12 @@ namespace HM
       // header check misses.
       static bool IsAutomatedSenderAddress_(const String &sender);
 
-      static bool MatchValue_(const String &matchType, bool caseSensitive, const String &value, const String &key);
-      static bool MatchWithArguments_(const SieveArgumentSet &set, const String &value, const String &key);
+      // An instance member since variables (RFC 5229): a successful :matches
+      // records what its wildcards consumed into match_variables_.
+      bool MatchValue_(const String &matchType, bool caseSensitive, const String &value, const String &key);
+      // Non-static since variables (RFC 5229): a :matches inside records its
+      // captures on the instance.
+      bool MatchWithArguments_(const SieveArgumentSet &set, const String &value, const String &key);
       static bool CompareRelational_(const String &comparator, const String &relation, const String &value, const String &key);
       static bool ApplyAddressPart_(const String &address, const String &addressPart, String &part);
       static String StripAngleBrackets_(const String &value);

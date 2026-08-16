@@ -280,6 +280,11 @@ namespace RegressionTests.Sieve
                // protected at upload.
                StringAssert.Contains("editheader", greeting);
 
+               // variables followed, with SieveVariablesDelivery.cs behind it -
+               // a fileinto folder NAMED BY a :matches capture, and the scoping
+               // control that ${} stays verbatim without the require.
+               StringAssert.Contains("variables", greeting);
+
                // Still absent on purpose: envelope is implemented and evaluated, and is
                // held back until a test proves the envelope TEST command itself works.
                // If somebody adds it here, that test should exist first.

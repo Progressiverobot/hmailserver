@@ -180,6 +180,10 @@ namespace HM
          // RFC 5293: addheader / deleteheader. Received and Return-Path are
          // protected - a script cannot edit the trace of how a message got here.
          L"editheader",
+         // RFC 5229: set, ${} expansion at evaluation, match variables from
+         // :matches, and the string test. Expansion is scoped to scripts that
+         // require this name - without it "${a}" stays verbatim, as the RFC says.
+         L"variables",
          L"comparator-i;ascii-casemap",
          L"comparator-i;octet",
          L"comparator-i;ascii-numeric"
@@ -497,7 +501,8 @@ namespace HM
          L"require", L"if", L"elsif", L"else", L"stop", L"keep", L"discard",
          L"fileinto", L"redirect", L"vacation",
          L"setflag", L"addflag", L"removeflag",
-         L"addheader", L"deleteheader"
+         L"addheader", L"deleteheader",
+         L"set"
       };
 
       for (const wchar_t *candidate : known)
@@ -517,7 +522,7 @@ namespace HM
          L"address", L"allof", L"anyof", L"exists", L"false", L"header",
          L"not", L"size", L"true", L"envelope", L"hasflag", L"body",
          L"mailboxexists", L"ihave", L"environment", L"date", L"currentdate",
-         L"spamtest", L"duplicate"
+         L"spamtest", L"duplicate", L"string"
       };
 
       for (const wchar_t *candidate : known)
@@ -1187,6 +1192,69 @@ namespace HM
       if (!isControl && name != _T("require") && !SplitArguments(command->arguments, set, errorMessage))
          return false;
 
+      if (name == _T("set"))
+      {
+         if (!NeedExtension_(_T("variables"), _T("'set'"), command->line, errorMessage))
+            return false;
+
+         if (!CheckTags_(set, _T("lower upper lowerfirst upperfirst quotewildcard length"),
+                         _T("'set'"), errorMessage))
+            return false;
+
+         // RFC 5229 4.1: two modifiers of the same precedence cannot combine.
+         bool hasLower = false, hasUpper = false, hasLowerFirst = false, hasUpperFirst = false;
+         for (const String &tag : set.tags)
+         {
+            if (tag == _T("lower")) hasLower = true;
+            else if (tag == _T("upper")) hasUpper = true;
+            else if (tag == _T("lowerfirst")) hasLowerFirst = true;
+            else if (tag == _T("upperfirst")) hasUpperFirst = true;
+         }
+
+         if ((hasLower && hasUpper) || (hasLowerFirst && hasUpperFirst))
+         {
+            errorMessage.Format(_T("Line %d: ':lower'/':upper' and ':lowerfirst'/':upperfirst' contradict each other."), command->line);
+            return false;
+         }
+
+         if (set.stringLists.size() != 2 || set.stringLists[0].size() != 1 || set.stringLists[1].size() != 1)
+         {
+            errorMessage.Format(_T("Line %d: 'set' takes a variable name and a value."), command->line);
+            return false;
+         }
+
+         // RFC 5229 3: a name is alphanumerics and underscores; an all-digit name
+         // is a MATCH variable and cannot be set, and a '.' would name a
+         // namespace this server does not have.
+         const String &variableName = set.stringLists[0][0];
+
+         bool allDigits = !variableName.IsEmpty();
+         for (int i = 0; i < variableName.GetLength(); i++)
+         {
+            wchar_t ch = variableName[i];
+
+            if (ch >= L'0' && ch <= L'9')
+               continue;
+
+            allDigits = false;
+
+            bool nameChar = (ch >= L'a' && ch <= L'z') || (ch >= L'A' && ch <= L'Z') || ch == L'_';
+            if (!nameChar)
+            {
+               errorMessage.Format(_T("Line %d: '%s' is not a legal variable name."), command->line, variableName.c_str());
+               return false;
+            }
+         }
+
+         if (variableName.IsEmpty() || allDigits)
+         {
+            errorMessage.Format(_T("Line %d: a match variable cannot be set; 'set' needs a named variable."), command->line);
+            return false;
+         }
+
+         return true;
+      }
+
       if (name == _T("addheader") || name == _T("deleteheader"))
       {
          bool isAdd = name == _T("addheader");
@@ -1669,6 +1737,20 @@ namespace HM
          }
 
          return true;
+      }
+
+      if (name == _T("string"))
+      {
+         if (!NeedExtension_(_T("variables"), _T("the 'string' test"), test->line, errorMessage))
+            return false;
+
+         if (!CheckTags_(set, _T("comparator is contains matches value count regex"),
+                         _T("'string'"), errorMessage))
+            return false;
+
+         // Two lists - sources and keys - like header, but the "names" here are
+         // the values themselves, so no single-entry restriction applies.
+         return ValidateMatchArguments_(set, _T("'string'"), test->line, errorMessage);
       }
 
       if (name == _T("spamtest"))

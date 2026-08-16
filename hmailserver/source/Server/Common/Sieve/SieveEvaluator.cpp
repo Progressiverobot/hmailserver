@@ -196,6 +196,9 @@ namespace HM
       pinnedFlags_.clear();
       pinnedFlagsGiven_ = false;
       vacationDecided_ = false;
+      variables_enabled_ = false;
+      variables_.clear();
+      match_variables_.clear();
 
       envelope_ = envelope;
       result_ = &result;
@@ -325,6 +328,9 @@ namespace HM
             return;
          }
 
+         if (variables_enabled_)
+            ExpandArgumentSet_(set);
+
          if (set.flagsGiven)
          {
             pinnedFlags_ = set.flags;
@@ -371,6 +377,9 @@ namespace HM
                _T("A Sieve redirect passed validation but could not be split into arguments: ") + ignored);
             return;
          }
+
+         if (variables_enabled_)
+            ExpandArgumentSet_(set);
 
          String target = FirstString_(set);
          actions_.push_back(_T("redirect:") + target);
@@ -421,6 +430,9 @@ namespace HM
          if (!SieveParser::SplitArguments(command->arguments, set, ignored))
             return;
 
+         if (variables_enabled_)
+            ExpandArgumentSet_(set);
+
          SieveHeaderEdit edit;
          edit.isAdd = name == _T("addheader");
 
@@ -459,7 +471,31 @@ namespace HM
          return;
       }
 
-      // "require" carries no run-time behaviour.
+      if (name == _T("set"))
+      {
+         ExecuteSetCommand_(command);
+         return;
+      }
+
+      if (name == _T("require"))
+      {
+         // Almost no run-time behaviour - except that RFC 5229 3 gives "${a}" its
+         // meaning ONLY under require "variables", so the one thing evaluation
+         // needs from a require line is whether that name is on it.
+         for (const SieveArgument &argument : command->arguments)
+         {
+            if (argument.kind != SieveArgument::Kind::StringList)
+               continue;
+
+            for (const String &extension : argument.strings)
+            {
+               if (extension.CompareNoCase(_T("variables")) == 0)
+                  variables_enabled_ = true;
+            }
+         }
+
+         return;
+      }
    }
 
    void
@@ -469,6 +505,9 @@ namespace HM
       String ignored;
       if (!SieveParser::SplitArguments(command->arguments, set, ignored) || set.stringLists.empty())
          return;
+
+      if (variables_enabled_)
+         ExpandArgumentSet_(set);
 
       std::vector<String> given = SieveParser::SplitFlagList(set.stringLists[0]);
 
@@ -525,6 +564,9 @@ namespace HM
             _T("A Sieve vacation action passed validation but could not be split into arguments: ") + ignored);
          return;
       }
+
+      if (variables_enabled_)
+         ExpandArgumentSet_(set);
 
       if (set.stringLists.empty() || set.stringLists[0].empty())
          return;
@@ -972,6 +1014,25 @@ namespace HM
       if (name == _T("spamtest"))
          return EvaluateSpamTest_(test, message);
 
+      if (name == _T("string"))
+      {
+         // The string test (RFC 5229 5): sources against keys with the ordinary
+         // match machinery. Both lists expand - comparing "${subject}" against a
+         // pattern is the test's entire purpose.
+         SieveArgumentSet set;
+         String ignored;
+         if (!SieveParser::SplitArguments(test->arguments, set, ignored))
+            return false;
+
+         if (variables_enabled_)
+            ExpandArgumentSet_(set);
+
+         if (set.stringLists.size() != 2)
+            return false;
+
+         return MatchValuesAgainstKeys_(set, set.stringLists[0], set.stringLists[1]);
+      }
+
       if (name == _T("duplicate"))
       {
          // RFC 7352. The identifier is source-tagged before it reaches the store,
@@ -984,6 +1045,9 @@ namespace HM
          String ignored;
          if (!SieveParser::SplitArguments(test->arguments, set, ignored))
             return false;
+
+         if (variables_enabled_)
+            ExpandArgumentSet_(set);
 
          String identifier;
 
@@ -1042,6 +1106,9 @@ namespace HM
          if (!SieveParser::SplitArguments(test->arguments, set, ignored))
             return false;
 
+         if (variables_enabled_)
+            ExpandArgumentSet_(set);
+
          if (set.stringLists.size() != 1 || set.stringLists[0].empty())
             return false;
 
@@ -1071,6 +1138,9 @@ namespace HM
       String ignored;
       if (!SieveParser::SplitArguments(test->arguments, set, ignored))
          return false;
+
+      if (variables_enabled_)
+         ExpandArgumentSet_(set);
 
       // "hasflag" and "body" take only the key list; the others take a name list
       // first (the header or envelope-part names to look at).
@@ -1325,6 +1395,9 @@ namespace HM
       if (!SieveParser::SplitArguments(test->arguments, set, ignored))
          return false;
 
+      if (variables_enabled_)
+         ExpandArgumentSet_(set);
+
       if (set.stringLists.size() != 1 || set.stringLists[0].empty())
          return false;
 
@@ -1363,6 +1436,9 @@ namespace HM
       String ignored;
       if (!SieveParser::SplitArguments(test->arguments, set, ignored))
          return false;
+
+      if (variables_enabled_)
+         ExpandArgumentSet_(set);
 
       size_t expected = currentDate ? 2u : 3u;
       if (set.stringLists.size() != expected)
@@ -1433,6 +1509,259 @@ namespace HM
       }
 
       return MatchValuesAgainstKeys_(set, values, keys);
+   }
+
+   String
+   SieveEvaluator::ExpandString_(const String &input) const
+   {
+      // RFC 5229 3: "${name}" becomes the variable's value, an unset variable
+      // becomes the empty string, and text that LOOKS like a reference but is not
+      // a valid one stays verbatim. "${1}".."${9}" and "${0}" are the match
+      // variables of the most recent successful :matches.
+      if (input.Find(_T("${")) < 0)
+         return input;
+
+      String output;
+      int length = input.GetLength();
+
+      for (int i = 0; i < length; i++)
+      {
+         if (input[i] != L'$' || i + 1 >= length || input[i + 1] != L'{')
+         {
+            output += input[i];
+            continue;
+         }
+
+         int close = input.Find(_T("}"), i + 2);
+         if (close < 0)
+         {
+            output += input[i];
+            continue;
+         }
+
+         String name = input.Mid(i + 2, close - (i + 2));
+
+         bool validName = !name.IsEmpty();
+         bool allDigits = true;
+         for (int n = 0; n < name.GetLength() && validName; n++)
+         {
+            wchar_t ch = name[n];
+            if (ch >= L'0' && ch <= L'9')
+               continue;
+
+            allDigits = false;
+
+            bool nameChar = (ch >= L'a' && ch <= L'z') || (ch >= L'A' && ch <= L'Z') || ch == L'_';
+            if (!nameChar)
+               validName = false;
+         }
+
+         if (!validName)
+         {
+            // Not a variable reference; the text stays as written.
+            output += input[i];
+            continue;
+         }
+
+         if (allDigits)
+         {
+            // A match variable. Leading zeroes are legal ("${01}" is "${1}").
+            int index = _ttoi(name.c_str());
+            if (index >= 0 && static_cast<size_t>(index) < match_variables_.size())
+               output += match_variables_[index];
+         }
+         else
+         {
+            String lowerName = name;
+            lowerName.ToLower();
+
+            auto found = variables_.find(lowerName);
+            if (found != variables_.end())
+               output += found->second;
+         }
+
+         i = close;
+      }
+
+      return output;
+   }
+
+   void
+   SieveEvaluator::ExpandArgumentSet_(SieveArgumentSet &set) const
+   {
+      for (std::vector<String> &list : set.stringLists)
+      {
+         for (String &value : list)
+            value = ExpandString_(value);
+      }
+
+      // The tag values that carry user text. Deliberately NOT the zone (an offset
+      // is not prose), the comparator or the match type (grammar, not data).
+      set.subject = ExpandString_(set.subject);
+      set.handle = ExpandString_(set.handle);
+      set.fromAddress = ExpandString_(set.fromAddress);
+      set.uniqueId = ExpandString_(set.uniqueId);
+      set.duplicateHeader = ExpandString_(set.duplicateHeader);
+
+      for (String &address : set.addresses)
+         address = ExpandString_(address);
+
+      for (String &flag : set.flags)
+         flag = ExpandString_(flag);
+   }
+
+   bool
+   SieveEvaluator::WildcardMatchWithCaptures_(const String &pattern, const String &value,
+                                              bool caseSensitive, std::vector<String> &captures)
+   {
+      // Greedy descent with backtracking, recording the span each * and ? consumed.
+      // Small and iterative-recursive: patterns come from scripts, and the
+      // backtracking is linear in practice because '*' segments are anchored by the
+      // literal text between them.
+      String p = pattern;
+      String v = value;
+
+      if (!caseSensitive)
+      {
+         p.ToLower();
+         v.ToLower();
+      }
+
+      struct Frame
+      {
+         int patternIndex;
+         int valueIndex;
+         size_t capturesSize;
+      };
+
+      std::vector<std::pair<int, int>> spans; // wildcard position in pattern -> [start,end) in value
+
+      std::function<bool(int, int)> matchFrom = [&](int pi, int vi) -> bool
+      {
+         while (pi < p.GetLength())
+         {
+            wchar_t pc = p[pi];
+
+            if (pc == L'\\' && pi + 1 < p.GetLength())
+            {
+               // RFC 5228 2.7.1: a backslash makes the next character literal.
+               if (vi >= v.GetLength() || v[vi] != p[pi + 1])
+                  return false;
+               pi += 2;
+               vi += 1;
+               continue;
+            }
+
+            if (pc == L'?')
+            {
+               if (vi >= v.GetLength())
+                  return false;
+               spans.push_back(std::make_pair(vi, vi + 1));
+               if (matchFrom(pi + 1, vi + 1))
+                  return true;
+               spans.pop_back();
+               return false;
+            }
+
+            if (pc == L'*')
+            {
+               // Try the longest tail first: RFC 5229 3.1 wants the match variables
+               // from the greedy ("leftmost-longest") interpretation.
+               for (int take = v.GetLength() - vi; take >= 0; take--)
+               {
+                  spans.push_back(std::make_pair(vi, vi + take));
+                  if (matchFrom(pi + 1, vi + take))
+                     return true;
+                  spans.pop_back();
+               }
+               return false;
+            }
+
+            if (vi >= v.GetLength() || v[vi] != pc)
+               return false;
+
+            pi++;
+            vi++;
+         }
+
+         return vi == v.GetLength();
+      };
+
+      spans.clear();
+      if (!matchFrom(0, 0))
+         return false;
+
+      // Captures come from the ORIGINAL (unfolded) value, so a script that files
+      // into "${1}" sees the text as it arrived, not lowercased.
+      captures.clear();
+      captures.push_back(value);
+      for (const std::pair<int, int> &span : spans)
+         captures.push_back(value.Mid(span.first, span.second - span.first));
+
+      return true;
+   }
+
+   void
+   SieveEvaluator::ExecuteSetCommand_(const std::shared_ptr<SieveCommand> &command)
+   {
+      SieveArgumentSet set;
+      String ignored;
+      if (!SieveParser::SplitArguments(command->arguments, set, ignored))
+         return;
+
+      if (set.stringLists.size() != 2 || set.stringLists[0].size() != 1 || set.stringLists[1].size() != 1)
+         return;
+
+      String name = set.stringLists[0][0];
+      name.ToLower();
+
+      // The value is expanded first - "set "b" "${a}"" copies - then the modifiers
+      // apply in RFC 5229 4.1's precedence order, highest first.
+      String value = ExpandString_(set.stringLists[1][0]);
+
+      bool wantsLower = false, wantsUpper = false, wantsLowerFirst = false,
+           wantsUpperFirst = false, wantsQuoteWildcard = false, wantsLength = false;
+
+      for (const String &tag : set.tags)
+      {
+         if (tag == _T("lower")) wantsLower = true;
+         else if (tag == _T("upper")) wantsUpper = true;
+         else if (tag == _T("lowerfirst")) wantsLowerFirst = true;
+         else if (tag == _T("upperfirst")) wantsUpperFirst = true;
+         else if (tag == _T("quotewildcard")) wantsQuoteWildcard = true;
+         else if (tag == _T("length")) wantsLength = true;
+      }
+
+      if (wantsLower)
+         value.ToLower();
+      else if (wantsUpper)
+         value.ToUpper();
+
+      if (!value.IsEmpty())
+      {
+         if (wantsLowerFirst)
+            value.SetAt(0, towlower(value[0]));
+         else if (wantsUpperFirst)
+            value.SetAt(0, towupper(value[0]));
+      }
+
+      if (wantsQuoteWildcard)
+      {
+         String quoted;
+         for (int i = 0; i < value.GetLength(); i++)
+         {
+            wchar_t ch = value[i];
+            if (ch == L'*' || ch == L'?' || ch == L'\\')
+               quoted += L'\\';
+            quoted += ch;
+         }
+         value = quoted;
+      }
+
+      if (wantsLength)
+         value = StringParser::IntToString(static_cast<__int64>(value.GetLength()));
+
+      variables_[name] = value;
    }
 
    bool
@@ -1619,6 +1948,9 @@ namespace HM
       if (!SieveParser::SplitArguments(test->arguments, set, ignored) || set.stringLists.empty())
          return false;
 
+      if (variables_enabled_)
+         ExpandArgumentSet_(set);
+
       const std::vector<String> &headerNames = set.stringLists[0];
       if (headerNames.empty())
          return false;
@@ -1742,8 +2074,19 @@ namespace HM
 
       if (matchType == _T("matches"))
       {
-         // The default comparator (i;ascii-casemap) is case-insensitive.
-         return StringParser::WildcardMatchNoCase(key, value);
+         // The capturing matcher honours RFC 5228 2.7.1's backslash escapes -
+         // which StringParser::WildcardMatchNoCase never did - and records what
+         // each wildcard consumed for RFC 5229's ${1}.. match variables. The
+         // recording is gated: without require "variables" the captures have no
+         // reader and RFC 5229 3.1 scopes the behaviour to the extension.
+         std::vector<String> captures;
+         if (!WildcardMatchWithCaptures_(key, value, caseSensitive, captures))
+            return false;
+
+         if (variables_enabled_)
+            match_variables_ = captures;
+
+         return true;
       }
 
       // ":is" (the default): an exact match.

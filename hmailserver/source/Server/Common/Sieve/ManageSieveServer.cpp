@@ -289,7 +289,16 @@ namespace HM
       // upload: the trace of how a message travelled is not a script's to edit.
       // End-to-end tests in SieveEditheaderDelivery.cs read the delivered message
       // over POP3 and assert on its actual bytes.
-      const char *AdvertisedSieveExtensions = "fileinto copy relational subaddress vacation vacation-seconds imap4flags body mailbox regex ihave environment date index spamtest spamtestplus duplicate editheader";
+      // variables (RFC 5229) moved in on 16 August 2026, under the same rule. Its
+      // delivery-side step is expansion AT EVALUATION in every argument a command
+      // or test consumes - gated on the script requiring "variables", because
+      // without the require "${a}" has no special meaning and must stay verbatim -
+      // plus match variables captured by :matches (through a wildcard matcher that
+      // also honours RFC 5228 2.7.1's backslash escapes, which the old one never
+      // did), the set modifiers in precedence order, and the string test.
+      // End-to-end tests in SieveVariablesDelivery.cs file into a folder NAMED BY
+      // a capture, which only works if capture, storage and expansion all hold.
+      const char *AdvertisedSieveExtensions = "fileinto copy relational subaddress vacation vacation-seconds imap4flags body mailbox regex ihave environment date index spamtest spamtestplus duplicate editheader variables";
 
       AnsiString EscapeQuoted(const String &value)
       {

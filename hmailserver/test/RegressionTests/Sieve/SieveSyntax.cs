@@ -63,6 +63,10 @@ namespace RegressionTests.Sieve
          // environment under its require.
          Assert.IsEmpty(CheckSyntax("require \"environment\";\r\nif environment :is \"name\" \"hMailServer\" {\r\n  keep;\r\n}"));
 
+         // variables under its require: set with modifiers, and the string test.
+         Assert.IsEmpty(CheckSyntax("require \"variables\";\r\nset \"a\" \"b\";\r\nif string :is \"${a}\" \"b\" {\r\n  keep;\r\n}"));
+         Assert.IsEmpty(CheckSyntax("require \"variables\";\r\nset :length :upper \"n\" \"abc\";"));
+
          // editheader under its require.
          Assert.IsEmpty(CheckSyntax("require \"editheader\";\r\naddheader \"X-Note\" \"v\";\r\ndeleteheader :contains \"X-Old\" \"x\";"));
 
@@ -146,6 +150,14 @@ namespace RegressionTests.Sieve
          Assert.IsNotEmpty(CheckSyntax("if ihave \"fileinto\" {\r\n  keep;\r\n}"));
          Assert.IsNotEmpty(CheckSyntax("if environment :is \"name\" \"x\" {\r\n  keep;\r\n}"));
 
+         // variables: contradictory modifiers, an all-digit (match-variable)
+         // name, an illegal name, and the missing require.
+         Assert.IsNotEmpty(CheckSyntax("require \"variables\";\r\nset :lower :upper \"a\" \"b\";"));
+         Assert.IsNotEmpty(CheckSyntax("require \"variables\";\r\nset \"1\" \"b\";"));
+         Assert.IsNotEmpty(CheckSyntax("require \"variables\";\r\nset \"bad name\" \"b\";"));
+         Assert.IsNotEmpty(CheckSyntax("set \"a\" \"b\";"));
+         Assert.IsNotEmpty(CheckSyntax("if string :is \"a\" \"a\" {\r\n  keep;\r\n}"));
+
          // editheader: the trace headers are protected, the field name must be
          // legal, and the require is needed at all.
          Assert.IsNotEmpty(CheckSyntax("require \"editheader\";\r\ndeleteheader \"Received\";"));
@@ -205,7 +217,8 @@ namespace RegressionTests.Sieve
             // in SieveEditheaderDelivery.cs.
             "include \"other\";",
             "return;",
-            "set \"name\" \"value\";",
+            // set and string moved out on 16 August 2026 - the variables
+            // extension shipped, proven end to end in SieveVariablesDelivery.cs.
          };
 
          foreach (string command in commands)
@@ -227,7 +240,6 @@ namespace RegressionTests.Sieve
             // and SieveEnvironmentDelivery.cs, which prove them end to end.
             // spamtest moved out on 16 August 2026 - SieveSpamtestDelivery.cs
             // proves it end to end, spoofing control included.
-            "string :is \"a\" \"a\"",
          };
 
          foreach (string test in tests)
