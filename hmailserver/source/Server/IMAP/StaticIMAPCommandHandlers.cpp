@@ -85,6 +85,7 @@ namespace HM
       mapCommandHandlers[IMAPConnection::IMAP_STARTTLS] = std::shared_ptr<IMAPCommandStartTls>(new IMAPCommandStartTls());
       mapCommandHandlers[IMAPConnection::IMAP_UNSELECT] = std::shared_ptr<IMAPCommandUNSELECT>(new IMAPCommandUNSELECT());
       mapCommandHandlers[IMAPConnection::IMAP_ENABLE] = std::shared_ptr<IMAPCommandENABLE>(new IMAPCommandENABLE());
+      mapCommandHandlers[IMAPConnection::IMAP_UNAUTHENTICATE] = std::shared_ptr<IMAPCommandUNAUTHENTICATE>(new IMAPCommandUNAUTHENTICATE());
    }
 
 
@@ -106,6 +107,22 @@ namespace HM
 
       return IMAPResult();
    
+   }
+
+   IMAPResult
+   IMAPCommandUNAUTHENTICATE::ExecuteCommand(std::shared_ptr<IMAPConnection> pConnection, std::shared_ptr<IMAPCommandArgument> pArgument)
+   {
+      // RFC 8437 section 3: valid only in the authenticated or selected state;
+      // in the not-authenticated state the answer is BAD, like any other
+      // command that does not belong there.
+      if (!pConnection->IsAuthenticated())
+         return IMAPResult(IMAPResult::ResultBad, "UNAUTHENTICATE is only valid after authentication.");
+
+      pConnection->Unauthenticate();
+
+      pConnection->SendAsciiData(pArgument->Tag() + " OK UNAUTHENTICATE completed\r\n");
+
+      return IMAPResult();
    }
 
    IMAPResult

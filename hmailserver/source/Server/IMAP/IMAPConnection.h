@@ -85,7 +85,8 @@ namespace HM
          IMAP_ID = 137,
          IMAP_UNSELECT = 138,
          IMAP_ENABLE = 139,
-         IMAP_THREAD = 140
+         IMAP_THREAD = 140,
+         IMAP_UNAUTHENTICATE = 141
       };
 
       void ParseData(const AnsiString &Request);
@@ -158,6 +159,11 @@ namespace HM
 
       void Login(std::shared_ptr<const Account> account);
       void Logout(const String &goodbyeMessage);
+
+      // RFC 8437: returns the session to the not-authenticated state without
+      // disconnecting - every trace of the user discarded, TLS and the ENABLEd
+      // extensions kept.
+      void Unauthenticate();
 
       // Defense-in-depth brute-force protection: counts failed authentication
       // attempts on this single connection and returns true once the hard cap

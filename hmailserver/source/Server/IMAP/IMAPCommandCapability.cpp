@@ -121,6 +121,13 @@ namespace HM
       // inline, one round trip instead of one per mailbox at client startup.
       sResponse += " LIST-STATUS";
 
+      // RFC 8437: an authenticated session can return to the not-authenticated
+      // state for connection reuse. Advertised only once authenticated - that is
+      // the only state where the command is valid, and the RFC's requirement is
+      // for the authenticated and selected states.
+      if (pConnection->IsAuthenticated())
+         sResponse += " UNAUTHENTICATE";
+
       // RFC 7888: {n+} literals are accepted without a continuation round trip.
       // The LITERAL- variant is advertised rather than LITERAL+, deliberately:
       // it tells clients to keep non-synchronizing literals at or under 4096

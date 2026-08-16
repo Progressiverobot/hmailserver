@@ -608,6 +608,26 @@ namespace HM
    }
 
    void
+   IMAPConnection::Unauthenticate()
+   {
+      // RFC 8437: back to not-authenticated with every trace of the user gone -
+      // the mailbox released without expunge, both folder trees, the saved
+      // SEARCH result, any half-done SCRAM conversation and the account itself.
+      // What deliberately survives: the TLS layer, the ENABLEd extensions (the
+      // RFC keeps both across the boundary) and the per-connection
+      // authentication-failure counter, so the command cannot be used to reset
+      // the brute-force cap.
+      CloseCurrentFolder();
+
+      account_.reset();
+      imap_folders_.reset();
+      public_imap_folders_.reset();
+      recent_messages_.clear();
+      saved_search_result_.clear();
+      scram_session_.reset();
+   }
+
+   void
    IMAPConnection::Disconnect_()
    {
       pending_disconnect_ = true;
@@ -724,6 +744,8 @@ namespace HM
          return IMAP_UNSELECT;
       else if (sCommand == _T("ENABLE"))
          return IMAP_ENABLE;
+      else if (sCommand == _T("UNAUTHENTICATE"))
+         return IMAP_UNAUTHENTICATE;
 
       return IMAP_UNKNOWN;
    }

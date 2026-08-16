@@ -48,6 +48,13 @@ namespace HM
       virtual IMAPResult ExecuteCommand(std::shared_ptr<HM::IMAPConnection> pConnection, std::shared_ptr<IMAPCommandArgument> pArgument);
    };
 
+   // RFC 8437: returns an authenticated session to the not-authenticated state
+   // for connection reuse, without disconnecting.
+   class IMAPCommandUNAUTHENTICATE : public IMAPCommand
+   {
+      virtual IMAPResult ExecuteCommand(std::shared_ptr<HM::IMAPConnection> pConnection, std::shared_ptr<IMAPCommandArgument> pArgument);
+   };
+
 
 
 }
