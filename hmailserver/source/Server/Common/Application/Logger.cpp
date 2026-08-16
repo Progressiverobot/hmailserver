@@ -687,7 +687,23 @@ namespace HM
       }
 
       if (!keepFileOpen)
+      {
          file->Close();
+      }
+      else
+      {
+         // KeepFilesOpen skips the close whose side effect was the flush, so
+         // without this the line just written sits in the C runtime's buffer -
+         // about 4 KB - until enough LATER lines arrive to push it out. On a
+         // quiet server that is unbounded: a session's tail stayed invisible,
+         // cut mid-line at the buffer boundary, for as long as nothing else
+         // happened (40 minutes in the report - issue #33). Flushing per line
+         // keeps the setting's actual saving, which is the open/close per line,
+         // and hands the bytes to the OS where every reader can see them; it is
+         // NOT a physical disk sync.
+         if (!file->Flush())
+            ReportWriteFailure_(file->GetName());
+      }
    }
 
    void

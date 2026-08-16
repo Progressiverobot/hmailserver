@@ -45,6 +45,11 @@ namespace HM
       // Returns false if the file is not open or the flush fails.
       bool FlushToDisk();
 
+      // Pushes the C runtime buffer to the operating system (fflush only), which
+      // makes the bytes visible to anyone reading the file. Not a durability
+      // barrier - see FlushToDisk for that.
+      bool Flush();
+
       void Write_(void *buffer, int item_size, int item_count);
 
       // The size of the open file, 0 if it is not open or cannot be stat'ed. The

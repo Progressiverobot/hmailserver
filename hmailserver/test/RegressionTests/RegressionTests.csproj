@@ -588,6 +588,7 @@
     <Compile Include="Shared\TlsHandshakeProbe.cs" />
     <Compile Include="MIME\FuzzHarness.cs" />
     <Compile Include="Infrastructure\LogDeviceAndFormat.cs" />
+    <Compile Include="Infrastructure\LogFlushing.cs" />
     <Compile Include="Infrastructure\MetricsSecurity.cs" />
     <Compile Include="Infrastructure\ScheduledBackup.cs" />
   </ItemGroup>

@@ -65,6 +65,20 @@ namespace HM
    }
 
    bool
+   File::Flush()
+   {
+      // Visibility, not durability: fflush hands the C runtime buffer to the
+      // operating system, at which point every reader of the file sees the
+      // bytes. Deliberately no _commit - that forces the OS cache to physical
+      // storage, and a caller flushing per log line must not pay a disk sync
+      // per log line.
+      if (file_ == nullptr)
+         return false;
+
+      return fflush(file_) == 0;
+   }
+
+   bool
    File::Open(const String &sFilename, OpenType ot)
    {
       if (IsOpen())
