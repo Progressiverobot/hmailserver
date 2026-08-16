@@ -244,7 +244,18 @@ namespace HM
       // SieveRegexDelivery.cs include the one that matters for the breaker: a
       // message whose crafted subject makes the pattern catastrophic is still
       // DELIVERED, to INBOX, with the pattern suspended rather than the thread lost.
-      const char *AdvertisedSieveExtensions = "fileinto copy relational subaddress vacation vacation-seconds imap4flags body mailbox regex";
+      // ihave and environment moved in on 16 August 2026, under the same rule.
+      // ihave's delivery-side step is the evaluator answering from the SAME list
+      // require validates against (SieveParser::IsSupportedExtension), plus the
+      // validator grant that lets an ihave-guarded block use what it tested for -
+      // without which the test is a trap: it would report an extension available
+      // that the block could not then use. environment's step is
+      // GetEnvironmentItem_: name/version/location/phase/host/domain answered
+      // truthfully, remote-* honestly absent because the sending client's identity
+      // does not reach the evaluator. End-to-end tests in
+      // SieveEnvironmentDelivery.cs file real deliveries on both tests' answers,
+      // with unknown-item and unavailable-extension negative controls.
+      const char *AdvertisedSieveExtensions = "fileinto copy relational subaddress vacation vacation-seconds imap4flags body mailbox regex ihave environment";
 
       AnsiString EscapeQuoted(const String &value)
       {

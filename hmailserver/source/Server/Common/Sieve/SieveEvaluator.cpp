@@ -7,6 +7,8 @@
 
 #include "../Util/Parsing/StringParser.h"
 #include "../Rules/RuleGuard.h"
+#include "../Application/Application.h"
+#include "../Application/Configuration.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -91,6 +93,70 @@ namespace HM
    SieveEvaluator::SetMailboxExists(std::function<bool(const String &)> callback)
    {
       mailbox_exists_ = callback;
+   }
+
+   bool
+   SieveEvaluator::GetEnvironmentItem_(const String &name, String &value)
+   {
+      // Item names are the RFC 5183 registry's, matched exactly: the RFC defines
+      // them in lower case and a name is not header-like text.
+      if (name == _T("name"))
+      {
+         value = _T("hMailServer");
+         return true;
+      }
+
+      if (name == _T("version"))
+      {
+         value = Application::Instance()->GetVersionNumber();
+         return true;
+      }
+
+      if (name == _T("location"))
+      {
+         // Scripts run in LocalDelivery, after final-delivery routing: the Mail
+         // Delivery Agent role in RFC 5183 3's vocabulary.
+         value = _T("MDA");
+         return true;
+      }
+
+      if (name == _T("phase"))
+      {
+         // Likewise: evaluation happens while the message is being delivered,
+         // neither before ("pre") nor from a stored mailbox afterwards ("post").
+         value = _T("during");
+         return true;
+      }
+
+      if (name == _T("host"))
+      {
+         String hostName = Configuration::Instance()->GetHostName();
+         if (hostName.IsEmpty())
+            return false;
+
+         value = hostName;
+         return true;
+      }
+
+      if (name == _T("domain"))
+      {
+         // The host name with its first label removed, per the RFC's example
+         // (host "beta.example.com", domain "example.com"). A single-label host
+         // has no meaningful domain to report, and an unanswerable item must be
+         // absent rather than empty.
+         String hostName = Configuration::Instance()->GetHostName();
+         int firstDot = hostName.Find(_T("."));
+         if (firstDot < 0 || firstDot + 1 >= hostName.GetLength())
+            return false;
+
+         value = hostName.Mid(firstDot + 1);
+         return true;
+      }
+
+      // remote-host, remote-ip and anything future: the sending client's identity
+      // is not carried into the evaluator, so these are honestly unknown rather
+      // than guessed at.
+      return false;
    }
 
    String
@@ -815,6 +881,31 @@ namespace HM
       if (name == _T("body"))
          return EvaluateComparisonTest_(test, message, ValueSource::Body);
 
+      if (name == _T("ihave"))
+      {
+         // True only when EVERY listed extension is implemented (RFC 5463). The
+         // answer comes from the same list `require` validates against, so the two
+         // can never disagree about what this server has.
+         SieveArgumentSet set;
+         String ignored;
+         if (!SieveParser::SplitArguments(test->arguments, set, ignored))
+            return false;
+
+         if (set.stringLists.size() != 1 || set.stringLists[0].empty())
+            return false;
+
+         for (const String &extension : set.stringLists[0])
+         {
+            if (!SieveParser::IsSupportedExtension(extension))
+               return false;
+         }
+
+         return true;
+      }
+
+      if (name == _T("environment"))
+         return EvaluateComparisonTest_(test, message, ValueSource::Environment);
+
       if (name == _T("mailboxexists"))
       {
          // RFC 5490 3.1: true only when EVERY listed mailbox exists and can be
@@ -918,6 +1009,21 @@ namespace HM
       if (source == ValueSource::Body)
       {
          values = message.GetBodyValues(set.bodyTransform, set.contentTypes);
+         return;
+      }
+
+      if (source == ValueSource::Environment)
+      {
+         // RFC 5183: one value per known item; an item this server cannot answer
+         // contributes NOTHING, so the test is false for it - including against
+         // the empty key, which scripts use to ask "is this item known at all".
+         for (const String &name : names)
+         {
+            String value;
+            if (GetEnvironmentItem_(name, value))
+               values.push_back(value);
+         }
+
          return;
       }
 

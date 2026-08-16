@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
-// http://www.hmailserver.com
+// http://www.progrssiverobot.com
 
 #include "StdAfx.h"
 
@@ -127,6 +127,12 @@ namespace HM
          // for. The evaluation runs under the same budget-and-suspend breaker the
          // legacy rules engine's regex criterion uses (RuleGuard).
          L"regex",
+         // RFC 5463: capability probing as a test, so one script can serve servers
+         // with different feature sets. Its validator grant (an ihave-guarded block
+         // may use what it tested for) is in NeedExtension_/CollectIhaveGrants_.
+         L"ihave",
+         // RFC 5183: which server, where, and at what phase a script is running.
+         L"environment",
          L"comparator-i;ascii-casemap",
          L"comparator-i;octet",
          L"comparator-i;ascii-numeric"
@@ -415,7 +421,7 @@ namespace HM
       {
          L"address", L"allof", L"anyof", L"exists", L"false", L"header",
          L"not", L"size", L"true", L"envelope", L"hasflag", L"body",
-         L"mailboxexists"
+         L"mailboxexists", L"ihave", L"environment"
       };
 
       for (const wchar_t *candidate : known)
@@ -439,8 +445,49 @@ namespace HM
       if (HasExtension_(extension))
          return true;
 
+      // An enclosing "if ihave ..." naming the extension is as good as a require
+      // for the block being validated (RFC 5463): the block only runs when the
+      // extension was reported available.
+      for (const String &granted : ihave_granted_)
+      {
+         if (granted.CompareNoCase(extension) == 0)
+            return true;
+      }
+
       errorMessage.Format(_T("Line %d: %s requires require \"%s\"."), line, feature.c_str(), extension.c_str());
       return false;
+   }
+
+   void
+   SieveParser::CollectIhaveGrants_(const std::shared_ptr<SieveTest> &test, std::vector<String> &granted)
+   {
+      if (!test)
+         return;
+
+      String name = test->name;
+      name.ToLower();
+
+      if (name == _T("ihave"))
+      {
+         SieveArgumentSet set;
+         String ignored;
+         if (SieveParser::SplitArguments(test->arguments, set, ignored) && set.stringLists.size() == 1)
+         {
+            for (const String &extension : set.stringLists[0])
+               granted.push_back(extension);
+         }
+
+         return;
+      }
+
+      // Only allof: every conjunct must have been true for the block to run. A
+      // name inside anyof can be false while the block still runs, and inside
+      // not it is true precisely when the block does NOT run.
+      if (name == _T("allof"))
+      {
+         for (const std::shared_ptr<SieveTest> &child : test->tests)
+            CollectIhaveGrants_(child, granted);
+      }
    }
 
    bool
@@ -1196,11 +1243,19 @@ namespace HM
          return true;
       }
 
-      // if / elsif / else: validate the test and the block.
+      // if / elsif / else: validate the test and the block, with any ihave grants
+      // from the test in scope for the block only.
       if (command->test && !ValidateTest_(command->test, errorMessage))
          return false;
 
-      return ValidateCommands_(command->block, errorMessage);
+      size_t grantedBefore = ihave_granted_.size();
+      if (command->test)
+         CollectIhaveGrants_(command->test, ihave_granted_);
+
+      bool blockValid = ValidateCommands_(command->block, errorMessage);
+
+      ihave_granted_.resize(grantedBefore);
+      return blockValid;
    }
 
    bool
@@ -1321,6 +1376,48 @@ namespace HM
                   test->line, part.c_str());
                return false;
             }
+         }
+
+         return true;
+      }
+
+      if (name == _T("ihave"))
+      {
+         if (!NeedExtension_(_T("ihave"), _T("the 'ihave' test"), test->line, errorMessage))
+            return false;
+
+         if (!CheckTags_(set, _T(""), _T("'ihave'"), errorMessage))
+            return false;
+
+         if (set.stringLists.size() != 1 || set.stringLists[0].empty())
+         {
+            errorMessage.Format(_T("Line %d: 'ihave' takes one list of extension names."), test->line);
+            return false;
+         }
+
+         // Deliberately NOT checked against IsSupportedExtension: testing for an
+         // extension this server lacks is the command's whole purpose, and it
+         // evaluates false rather than failing the upload.
+         return true;
+      }
+
+      if (name == _T("environment"))
+      {
+         if (!NeedExtension_(_T("environment"), _T("the 'environment' test"), test->line, errorMessage))
+            return false;
+
+         if (!CheckTags_(set, _T("comparator is contains matches value count regex"),
+                         _T("'environment'"), errorMessage))
+            return false;
+
+         if (!ValidateMatchArguments_(set, _T("'environment'"), test->line, errorMessage))
+            return false;
+
+         // RFC 5183's grammar takes a single item name, then the key list.
+         if (set.stringLists[0].size() != 1)
+         {
+            errorMessage.Format(_T("Line %d: 'environment' takes one item name and a list of keys."), test->line);
+            return false;
          }
 
          return true;

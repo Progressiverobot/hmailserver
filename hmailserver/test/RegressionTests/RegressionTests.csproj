@@ -349,6 +349,7 @@
     <Compile Include="Infrastructure\ShutdownDrain.cs" />
     <Compile Include="Sieve\SieveBodyDelivery.cs" />
     <Compile Include="Sieve\SieveFlagDelivery.cs" />
+    <Compile Include="Sieve\SieveEnvironmentDelivery.cs" />
     <Compile Include="Sieve\SieveMailboxDelivery.cs" />
     <Compile Include="Sieve\SieveRegexDelivery.cs" />
     <Compile Include="Sieve\SieveVacationDelivery.cs" />

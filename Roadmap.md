@@ -57,7 +57,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Transport security and deliverability](#transport-security-and-deliverability) | 43 | – | 4 | 1 |
 | [IMAP](#imap) | 58 | – | 17 | 3 |
 | [POP3](#pop3) | 21 | – | 6 | – |
-| [Sieve, ManageSieve and rules](#sieve-managesieve-and-rules) | 52 | 0 | 12 | – |
+| [Sieve, ManageSieve and rules](#sieve-managesieve-and-rules) | 53 | 0 | 11 | – |
 | [Authentication and cryptography](#authentication-and-cryptography) | 57 | 0 | 18 | – |
 | [Anti-spam, anti-virus and content control](#anti-spam-anti-virus-and-content-control) | 54 | – | 13 | – |
 | [Storage, accounts and data model](#storage-accounts-and-data-model) | 86 | – | 10 | – |
@@ -72,7 +72,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 2 | – | 4 | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 5 | 1 | 2 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 4 | 1 | 4 | – |
-| **Total** | **627** | **12** | **141** | **15** |
+| **Total** | **628** | **12** | **140** | **15** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage and the administration surface are the best-covered areas**, and the
@@ -448,7 +448,7 @@ the source, not from documentation.
 
 ### Sieve, ManageSieve and rules
 
-52 shipped · 0 underway · 12 not started · 0 deferred
+53 shipped · 0 underway · 11 not started · 0 deferred
 
 | | Capability | Detail |
 |:-:|---|---|
@@ -501,7 +501,7 @@ the source, not from documentation.
 | ⬜ | editheader (RFC 5293) | Not implemented. addheader/deleteheader are not even in the known-command list, so a script using them fails CHECKSCRIPT with "unknown command" |
 | ⬜ | enotify (RFC 5435) | Not implemented, and refused rather than ignored: `notify` is not in the known-command allowlist, so a script using it fails at upload with "unknown command". There are no notification methods, no valid_notify_method test and no NOTIFY capability advertised over ManageSieve. |
 | ✅ | envelope (RFC 5228 §5.4) and body (RFC 5173) | **Both shipped.** `envelope` landed in dc9301a (the SMTP envelope reaches the evaluator, so `envelope "to"` works without the Delivered-To header). `body` landed 15 August 2026 with all three RFC 5173 transforms: `:raw` (the undecoded body, MIME structure ignored), `:text` (the default - the decoded text of every text/* part) and `:content` (the decoded parts whose MIME type matches, where "image" matches every subtype and "" matches every part). Transfer encoding and charset are decoded before matching, which is the point: a filter written against plain text keeps working when the sender's client base64-encodes the part. The MIME walk is depth-capped at 20 because it runs on the delivery thread. Advertised in the ManageSieve capability line under the standing rule - only once the delivery-side step exists - with seven end-to-end tests in `SieveBodyDelivery.cs` asserting **where a delivered message was filed** rather than what the evaluator reported, two of them negative controls (a non-matching body must stay in INBOX; a message with no body must match nothing, not even the empty key). |
-| ⬜ | ihave (RFC 5463) and environment (RFC 5183) | Not implemented, and refused rather than ignored: neither is in the known-test allowlist, so a script using them fails at upload with "unknown test". For `ihave` that is the right failure mode as things stand - its purpose is capability probing, and a server that accepted it and evaluated it false would send every ihave-guarded script down its fallback branch while claiming support. |
+| ✅ | ihave (RFC 5463) and environment (RFC 5183) | **Both shipped 16 August 2026.** `ihave` answers from the SAME list `require` validates against (`SieveParser::IsSupportedExtension`), so the two can never disagree - and its dangerous half is handled: an ihave-guarded block may USE the extensions it tested for without a require line (`CollectIhaveGrants_`, scoped to the block, flowing through `allof` but deliberately not `anyof` or `not`, whose truth proves nothing about the block running). Without that grant the test is a trap - reporting an extension available that the script cannot then use. Testing for an extension this server lacks is legal at upload and evaluates false, which is the command's whole purpose. `environment` answers name/version/location(MDA)/phase(during)/host/domain truthfully and reports remote-host/remote-ip as honestly UNKNOWN - the sending client's identity does not reach the evaluator - and an unknown item matches nothing, not even the empty key. End-to-end in `SieveEnvironmentDelivery.cs`, including the grant proven by a script whose guarded block uses the body test with no require for it. |
 | ✅ | imap4flags (RFC 5232) | Not implemented. setflag/addflag/removeflag parse and no-op; the hasflag test parses and evaluates false; there is no :flags tagged argument on keep/fileinto **Shipped in dc9301a.** `ExecuteFlagCommand_` genuinely mutates the flag set; the "parse and no-op" description was true before that commit. |
 | ⬜ | include (RFC 6609) | Not implemented, and refused rather than ignored: `include`, `return` and `global` are not in the known-command allowlist, so a script using them fails at upload with "unknown command". There is no personal/global script namespace in SieveStorage to include from. |
 | ✅ | mailbox / mboxmetadata (RFC 5490) | **The mailbox extension shipped 16 August 2026**: the `mailboxexists` test and `fileinto :create`. mailboxexists is the first test in this engine answered from outside the message - the delivery path hands the evaluator a callback over the recipient's real folder list, using the same lookup fileinto itself uses (`MessageUtilities::FolderExistsForDelivery`, kept beside `MoveToIMAPFolder` so the two cannot drift), and for a public folder the same insert-permission gate, because RFC 5490 3.1 defines "exists" as exists-and-deliverable. A caller with no store to ask (the COM test evaluator) gets false for every name - the safe answer. `:create` was already this server's behaviour - MoveToIMAPFolder has always created missing account folders - so the tag is accepted under its require and the semantics were proven rather than added: an end-to-end test SELECTs the folder the delivery created, over IMAP, from a real client session. Advertised over ManageSieve under the standing rule. Still absent from RFC 5490: the mboxmetadata half (METADATA is not implemented in the IMAP server at all). |

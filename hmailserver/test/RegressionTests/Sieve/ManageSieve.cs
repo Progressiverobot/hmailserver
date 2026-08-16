@@ -252,6 +252,12 @@ namespace RegressionTests.Sieve
                // evaluation and a suspension, never the message.
                StringAssert.Contains("regex", greeting);
 
+               // ihave and environment followed, with SieveEnvironmentDelivery.cs
+               // behind them - including the ihave grant, proven by a script whose
+               // guarded block uses fileinto with no require for it.
+               StringAssert.Contains("ihave", greeting);
+               StringAssert.Contains("environment", greeting);
+
                // Still absent on purpose: envelope is implemented and evaluated, and is
                // held back until a test proves the envelope TEST command itself works.
                // If somebody adds it here, that test should exist first.

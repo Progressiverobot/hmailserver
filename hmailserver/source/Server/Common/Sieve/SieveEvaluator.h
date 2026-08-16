@@ -116,7 +116,7 @@ namespace HM
 
    private:
       // Where the values a test compares against come from.
-      enum class ValueSource { Header, Address, Envelope, Flags, Body };
+      enum class ValueSource { Header, Address, Envelope, Flags, Body, Environment };
 
       void ExecuteCommands_(const std::vector<std::shared_ptr<SieveCommand>> &commands, const SieveMessage &message);
       void ExecuteCommand_(const std::shared_ptr<SieveCommand> &command, const SieveMessage &message);
@@ -124,6 +124,11 @@ namespace HM
       void ExecuteVacation_(const std::shared_ptr<SieveCommand> &command, const SieveMessage &message);
 
       bool EvaluateTest_(const std::shared_ptr<SieveTest> &test, const SieveMessage &message);
+
+      // The "environment" items (RFC 5183) this server can answer. Returns false
+      // for an item it cannot - the caller then contributes no value, making any
+      // match against that item false, which is the RFC's unknown-item behaviour.
+      static bool GetEnvironmentItem_(const String &name, String &value);
       bool EvaluateComparisonTest_(const std::shared_ptr<SieveTest> &test, const SieveMessage &message, ValueSource source);
       bool EvaluateExists_(const std::shared_ptr<SieveTest> &test, const SieveMessage &message);
       bool EvaluateSize_(const std::shared_ptr<SieveTest> &test, const SieveMessage &message);

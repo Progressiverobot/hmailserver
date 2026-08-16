@@ -47,6 +47,22 @@ namespace RegressionTests.Sieve
          // The regex extension (draft-ietf-sieve-regex) under its require.
          Assert.IsEmpty(CheckSyntax("require \"regex\";\r\nif header :regex \"Subject\" \"^inv[o0]ice #[0-9]+\" {\r\n  discard;\r\n}"));
 
+         // The ihave grant (RFC 5463): the guarded block uses the body TEST with no
+         // require "body" anywhere, because the guard is the availability check.
+         // This passing is what makes ihave a feature rather than a trap. The
+         // granted feature must be one the validator actually gates on require -
+         // the require-gated features are tests and tagged arguments; implemented
+         // COMMANDS such as fileinto have always been accepted leniently without
+         // their require, so they cannot exercise the grant.
+         Assert.IsEmpty(CheckSyntax("require \"ihave\";\r\nif ihave \"body\" {\r\n  if body :contains \"x\" {\r\n    keep;\r\n  }\r\n}"));
+
+         // The grant flows through allof, whose every conjunct must have been true
+         // for the block to run.
+         Assert.IsEmpty(CheckSyntax("require \"ihave\";\r\nif allof(ihave \"body\", true) {\r\n  if body :contains \"x\" {\r\n    keep;\r\n  }\r\n}"));
+
+         // environment under its require.
+         Assert.IsEmpty(CheckSyntax("require \"environment\";\r\nif environment :is \"name\" \"hMailServer\" {\r\n  keep;\r\n}"));
+
          // A comment plus a multi-name require of extensions that ARE implemented.
          // This line used to require "reject", which the parser accepted and then
          // silently ignored - so the script was reported valid and the reject never
@@ -100,6 +116,18 @@ namespace RegressionTests.Sieve
          // The numeric comparator only defines equality; a regex under it is
          // meaningless.
          Assert.IsNotEmpty(CheckSyntax("require [\"regex\", \"comparator-i;ascii-numeric\"];\r\nif header :regex :comparator \"i;ascii-numeric\" \"Subject\" \"^x\" {\r\n  keep;\r\n}"));
+
+         // The ihave grant is scoped to the guarded block: the same body test
+         // outside it still needs its require.
+         Assert.IsNotEmpty(CheckSyntax("require \"ihave\";\r\nif ihave \"body\" {\r\n  keep;\r\n}\r\nif body :contains \"x\" {\r\n  keep;\r\n}"));
+
+         // anyof does not grant - the block can run while the ihave conjunct is
+         // false, so nothing about availability is proven inside it.
+         Assert.IsNotEmpty(CheckSyntax("require \"ihave\";\r\nif anyof(ihave \"body\", true) {\r\n  if body :contains \"x\" {\r\n    keep;\r\n  }\r\n}"));
+
+         // ihave and environment without their requires.
+         Assert.IsNotEmpty(CheckSyntax("if ihave \"fileinto\" {\r\n  keep;\r\n}"));
+         Assert.IsNotEmpty(CheckSyntax("if environment :is \"name\" \"x\" {\r\n  keep;\r\n}"));
       }
 
       /// <summary>
@@ -150,11 +178,10 @@ namespace RegressionTests.Sieve
             "date :is \"date\" \"year\" \"2026\"",
             "currentdate :is \"year\" \"2026\"",
             "duplicate",
-            "ihave \"variables\"",
-            "environment :is \"name\" \"value\"",
-            // mailboxexists moved out of this list on 16 August 2026 when the
-            // mailbox extension was implemented - it now lives in
-            // SieveMailboxDelivery.cs, which proves it end to end.
+            // mailboxexists, ihave and environment moved out of this list on
+            // 16 August 2026 when their extensions were implemented - they now
+            // live in SieveMailboxDelivery.cs and SieveEnvironmentDelivery.cs,
+            // which prove them end to end.
             "string :is \"a\" \"a\"",
             "spamtest :is \"5\"",
          };

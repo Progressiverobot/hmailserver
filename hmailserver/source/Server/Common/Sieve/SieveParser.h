@@ -186,6 +186,16 @@ namespace HM
       bool HasExtension_(const String &extension) const;
       bool NeedExtension_(const String &extension, const String &feature, int line, String &errorMessage) const;
 
+      // RFC 5463: extensions named by an "ihave" test are usable inside that
+      // branch's block as if they had been required, because the block only runs
+      // when the test - "are these available" - was true. Grants are collected
+      // from a branch's test (the test itself, or any conjunct of an enclosing
+      // "allof"; a name inside "anyof" or "not" guarantees nothing about the
+      // block and grants nothing) and are scoped to the block by the caller
+      // truncating the vector back afterwards.
+      static void CollectIhaveGrants_(const std::shared_ptr<SieveTest> &test, std::vector<String> &granted);
+      std::vector<String> ihave_granted_;
+
       static bool CheckTags_(const SieveArgumentSet &set, const String &allowed, const String &context, String &errorMessage);
 
       const std::vector<SieveToken> *tokens_;
