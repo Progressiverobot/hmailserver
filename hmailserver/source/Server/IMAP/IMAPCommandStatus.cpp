@@ -45,12 +45,21 @@ namespace HM
       if (!pConnection->CheckPermission(pTheFolder, ACLPermission::PermissionRead))
          return IMAPResult(IMAPResult::ResultBad, "ACL: Read permission denied (Required for STATUS command).");
 
-      // Check if ther user has access to read this folder.
-      if (!pConnection->CheckPermission(pTheFolder, ACLPermission::PermissionRead))
-         return IMAPResult(IMAPResult::ResultBad, "ACL: Read permission denied.");
+      String sResponse = CreateStatusLine(pConnection, pTheFolder, sFolderName, sFlags);
 
+      sResponse += pArgument->Tag() + " OK Status completed\r\n";
+
+      pConnection->SendAsciiData(sResponse);
+
+      return IMAPResult();
+   }
+
+   // static
+   String
+   IMAPCommandSTATUS::CreateStatusLine(std::shared_ptr<HM::IMAPConnection> pConnection, std::shared_ptr<IMAPFolder> pTheFolder, String sFolderName, const String &sFlags)
+   {
       std::shared_ptr<Messages> pMessages = pTheFolder->GetMessages();
-      
+
       String sResponse = "";
 
       bool bAddSpace = false;
@@ -198,10 +207,6 @@ namespace HM
 
       sResponse+= ")\r\n";
 
-      sResponse += pArgument->Tag() + " OK Status completed\r\n";
-
-      pConnection->SendAsciiData(sResponse);   
-
-      return IMAPResult();
-   }  
+      return sResponse;
+   }
 }

@@ -117,6 +117,10 @@ namespace HM
       // would have been answered with BAD rather than silently ignored.
       sResponse += " NAMESPACE RIGHTS=texk MOVE ID SPECIAL-USE CREATE-SPECIAL-USE UNSELECT UIDPLUS ENABLE STATUS=SIZE ESEARCH CONDSTORE QRESYNC LIST-EXTENDED SEARCHRES WITHIN UTF8=ACCEPT";
 
+      // RFC 5819: LIST RETURN (STATUS ...) answers each listed mailbox's STATUS
+      // inline, one round trip instead of one per mailbox at client startup.
+      sResponse += " LIST-STATUS";
+
       // RFC 7888: {n+} literals are accepted without a continuation round trip.
       // The LITERAL- variant is advertised rather than LITERAL+, deliberately:
       // it tells clients to keep non-synchronizing literals at or under 4096

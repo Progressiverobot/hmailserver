@@ -24,6 +24,11 @@ namespace HM
       // True when the parenthesised selection/return option list contains sOption as a
       // whole, case-insensitive token.
       static bool HasOption_(const String &sParenContent, const String &sOption);
+
+      // RFC 5819 (LIST-STATUS): builds the "* STATUS ..." line that follows one
+      // "* LIST ..." line, or "" for mailboxes that get none (\Noselect, no read
+      // permission, lookup failure).
+      static String CreateListStatusLine_(std::shared_ptr<IMAPConnection> pConnection, const String &sListLine, const String &sStatusItems);
    };
 
 }

@@ -4,9 +4,12 @@
 
 #include "stdafx.h"
 #include "IMAPCommandList.h"
+#include "IMAPCommandStatus.h"
 #include "IMAPConnection.h"
 #include "IMAPSimpleCommandParser.h"
 #include "../Common/BO/Account.h"
+#include "../Common/BO/ACLPermission.h"
+#include "../Common/BO/IMAPFolder.h"
 #include "../Common/BO/IMAPFolders.h"
 
 #include "FolderListCreator.h"
@@ -87,6 +90,7 @@ namespace HM
 
       // Optional trailing "RETURN (<options>)".
       bool bAnnotateSubscribed = false;
+      String sStatusItems;
       if (iIdx < iWordCount && pParser->Word(iIdx)->Value().CompareNoCase(_T("RETURN")) == 0)
       {
          iIdx++;
@@ -96,6 +100,22 @@ namespace HM
 
             if (HasOption_(sReturn, _T("SUBSCRIBED")))
                bAnnotateSubscribed = true;
+
+            // RFC 5819 (LIST-STATUS): "STATUS (<items>)" asks for a STATUS
+            // response after each selectable listed mailbox, saving the client
+            // one round trip per mailbox at startup. The ABNF puts a space
+            // between STATUS and its item list, so the whole-token check works.
+            if (HasOption_(sReturn, _T("STATUS")))
+            {
+               int iStatusPos = sReturn.FindNoCase(_T("STATUS"));
+               int iItemsStart = sReturn.Find(_T("("), iStatusPos);
+               int iItemsEnd = iItemsStart >= 0 ? sReturn.Find(_T(")"), iItemsStart) : -1;
+
+               if (iItemsStart < 0 || iItemsEnd < 0)
+                  return IMAPResult(IMAPResult::ResultBad, "STATUS return option requires an item list.");
+
+               sStatusItems = sReturn.Mid(iItemsStart + 1, iItemsEnd - iItemsStart - 1);
+            }
 
             // CHILDREN is always reported (\HasChildren / \HasNoChildren), so it needs
             // no flag.
@@ -162,6 +182,10 @@ namespace HM
                continue;
             seenLines.push_back(sLine);
             sResult += sLine + "\r\n";
+
+            // RFC 5819: the STATUS response follows the LIST line it belongs to.
+            if (!sStatusItems.IsEmpty())
+               sResult += CreateListStatusLine_(pConnection, sLine, sStatusItems);
          }
       }
 
@@ -182,6 +206,71 @@ namespace HM
       pConnection->SendAsciiData(sResult);   
 
       return IMAPResult();
+   }
+
+   String
+   IMAPCommandLIST::CreateListStatusLine_(std::shared_ptr<IMAPConnection> pConnection, const String &sListLine, const String &sStatusItems)
+   {
+      // RFC 5819 section 2: no STATUS for a mailbox that cannot be selected. The
+      // attributes sit in the parenthesised list right after "* LIST", and no
+      // attribute name contains ')', so the first one closes the list.
+      int iAttrEnd = sListLine.Find(_T(")"));
+      if (iAttrEnd < 0)
+         return "";
+
+      String sAttributes = sListLine.Mid(0, iAttrEnd);
+      if (sAttributes.FindNoCase(_T("\\Noselect")) >= 0 ||
+          sAttributes.FindNoCase(_T("\\NonExistent")) >= 0)
+         return "";
+
+      // The line ends '... "delimiter" "escaped name"' - both always quoted, the
+      // name with " and \ backslash-escaped. Walk past the delimiter's quotes to
+      // the name's opening quote, then read to its closing quote honouring the
+      // escapes.
+      int iDelimStart = sListLine.Find(_T("\""), iAttrEnd);
+      if (iDelimStart < 0)
+         return "";
+
+      int iDelimEnd = sListLine.Find(_T("\""), iDelimStart + 1);
+      if (iDelimEnd < 0)
+         return "";
+
+      int iNameStart = sListLine.Find(_T("\""), iDelimEnd + 1);
+      if (iNameStart < 0)
+         return "";
+
+      String sEscapedName;
+      for (int i = iNameStart + 1; i < sListLine.GetLength(); i++)
+      {
+         wchar_t ch = sListLine.GetAt(i);
+
+         if (ch == '\\' && i + 1 < sListLine.GetLength())
+         {
+            sEscapedName += ch;
+            i++;
+            sEscapedName += sListLine.GetAt(i);
+            continue;
+         }
+
+         if (ch == '"')
+            break;
+
+         sEscapedName += ch;
+      }
+
+      String sFolderName = sEscapedName;
+      IMAPFolder::UnescapeFolderString(sFolderName);
+
+      std::shared_ptr<IMAPFolder> pFolder = pConnection->GetFolderByFullPath(sFolderName);
+      if (!pFolder)
+         return "";
+
+      // A mailbox the user may not read is still listed, just not STATUSed - one
+      // off-limits folder must not fail the whole LIST.
+      if (!pConnection->CheckPermission(pFolder, ACLPermission::PermissionRead))
+         return "";
+
+      return IMAPCommandSTATUS::CreateStatusLine(pConnection, pFolder, sFolderName, sStatusItems);
    }
 
    bool

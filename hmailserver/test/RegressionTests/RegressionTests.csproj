@@ -523,6 +523,7 @@
     <Compile Include="IMAP\Append.cs" />
     <Compile Include="IMAP\AppendLimit.cs" />
     <Compile Include="IMAP\NonSynchronizingLiterals.cs" />
+    <Compile Include="IMAP\ListStatus.cs" />
     <Compile Include="IMAP\Examine.cs" />
     <Compile Include="IMAP\Fetch.cs" />
     <Compile Include="IMAP\PartialFetchChunking.cs" />
