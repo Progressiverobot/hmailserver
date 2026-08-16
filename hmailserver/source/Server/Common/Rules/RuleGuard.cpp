@@ -330,6 +330,75 @@ namespace HM
       return false;
    }
 
+   bool
+   RuleGuard::SieveRegexMatches(const String &pattern, const String &subject, bool caseSensitive)
+   {
+      if (PatternIsSuspended_(pattern))
+         return false;
+
+      bool compiled = false;
+
+      try
+      {
+         // Perl syntax, as for a rule criterion; icase is what the script's default
+         // comparator (i;ascii-casemap) means, and i;octet turns it off.
+         boost::wregex expression(pattern,
+            caseSensitive ? boost::regex::normal : (boost::regex::normal | boost::regex::icase));
+         compiled = true;
+
+         const ULONGLONG startTick = ::GetTickCount64();
+
+         // regex_search, not regex_match: draft-ietf-sieve-regex matches anywhere in
+         // the value, and the script anchors with ^ and $ when it means the whole.
+         const bool matched = boost::regex_search(subject, expression);
+
+         const ULONGLONG elapsed = ::GetTickCount64() - startTick;
+
+         if (elapsed >= static_cast<ULONGLONG>(EvaluationBudgetMilliseconds) &&
+             SuspendPatternAndClaimReport_(pattern))
+         {
+            String errorMessage = Formatter::Format("A Sieve ':regex' match took {0} ms against a {1} character value, over the {2} ms budget, and will not be evaluated again for {3} seconds. Any sender can make this cost recur once per message, so it is being paid once per pattern instead. Pattern begins: {4}",
+               elapsed, subject.GetLength(), EvaluationBudgetMilliseconds, SuspensionSeconds, DescribePattern_(pattern));
+
+            ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6043, "RuleGuard::SieveRegexMatches", errorMessage);
+         }
+
+         return matched;
+      }
+      catch (const std::runtime_error &)
+      {
+         if (!compiled)
+         {
+            // Upload validation compiles every ':regex' key, so reaching this means a
+            // script stored before that check existed, or edited on disk. Saying so
+            // matters for the same reason it does for a rule: a test that can never
+            // match looks exactly like a test that happens not to.
+            if (SuspendPatternAndClaimReport_(pattern))
+            {
+               String errorMessage = Formatter::Format("A Sieve ':regex' key is not a valid regular expression and can never match. The script containing it is active and that test is doing nothing. Pattern: {0}",
+                  DescribePattern_(pattern));
+
+               ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6042, "RuleGuard::SieveRegexMatches", errorMessage);
+            }
+
+            return false;
+         }
+
+         if (SuspendPatternAndClaimReport_(pattern))
+         {
+            String errorMessage = Formatter::Format("A Sieve ':regex' match was abandoned as too complex against a {0} character value, and will not be evaluated again for {1} seconds. Treated as no match. Pattern begins: {2}",
+               subject.GetLength(), SuspensionSeconds, DescribePattern_(pattern));
+
+            ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6043, "RuleGuard::SieveRegexMatches", errorMessage);
+         }
+
+         return false;
+      }
+
+      // Unreachable, for the same /WX reason as in RegexCriteriaMatches.
+      return false;
+   }
+
    void
    RuleGuard::ReportActionFailed(const String &actionName, const String &detail)
    {

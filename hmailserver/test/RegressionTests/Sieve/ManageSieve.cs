@@ -247,6 +247,11 @@ namespace RegressionTests.Sieve
                // delivery created.
                StringAssert.Contains("mailbox", greeting);
 
+               // regex followed the same day, with SieveRegexDelivery.cs behind it -
+               // including the breaker test: a catastrophic pattern costs a bounded
+               // evaluation and a suspension, never the message.
+               StringAssert.Contains("regex", greeting);
+
                // Still absent on purpose: envelope is implemented and evaluated, and is
                // held back until a test proves the envelope TEST command itself works.
                // If somebody adds it here, that test should exist first.

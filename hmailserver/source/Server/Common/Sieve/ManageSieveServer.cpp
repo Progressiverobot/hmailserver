@@ -234,7 +234,17 @@ namespace HM
       // delivered message was filed, with the negative control being a
       // mailboxexists on a folder that is absent: the message must stay in INBOX,
       // which an implementation answering "true" for everything cannot pass.
-      const char *AdvertisedSieveExtensions = "fileinto copy relational subaddress vacation vacation-seconds imap4flags body mailbox";
+      // regex moved in on 16 August 2026, under the same rule. Its delivery-side
+      // step is MatchValue_'s dispatch into RuleGuard::SieveRegexMatches - the same
+      // budget-and-suspend breaker the legacy rules engine's regex criterion runs
+      // under, so a catastrophic pattern costs one 250 ms evaluation per five-minute
+      // window rather than one per message, and delivery always continues. Keys are
+      // compiled at upload, so a pattern that cannot compile is refused with a line
+      // number instead of silently never matching. End-to-end tests in
+      // SieveRegexDelivery.cs include the one that matters for the breaker: a
+      // message whose crafted subject makes the pattern catastrophic is still
+      // DELIVERED, to INBOX, with the pattern suspended rather than the thread lost.
+      const char *AdvertisedSieveExtensions = "fileinto copy relational subaddress vacation vacation-seconds imap4flags body mailbox regex";
 
       AnsiString EscapeQuoted(const String &value)
       {

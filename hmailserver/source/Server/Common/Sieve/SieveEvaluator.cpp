@@ -6,6 +6,7 @@
 #include "SieveEvaluator.h"
 
 #include "../Util/Parsing/StringParser.h"
+#include "../Rules/RuleGuard.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -1132,6 +1133,15 @@ namespace HM
    bool
    SieveEvaluator::MatchValue_(const String &matchType, bool caseSensitive, const String &value, const String &key)
    {
+      if (matchType == _T("regex"))
+      {
+         // draft-ietf-sieve-regex: a search, case-folded under the default
+         // comparator. Runs under RuleGuard's budget-and-suspend breaker, because a
+         // script author is exactly as able to write a catastrophic pattern as a
+         // rule author, and this is the delivery thread.
+         return RuleGuard::SieveRegexMatches(key, value, caseSensitive);
+      }
+
       if (matchType == _T("contains"))
       {
          if (caseSensitive)

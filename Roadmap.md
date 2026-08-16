@@ -57,7 +57,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Transport security and deliverability](#transport-security-and-deliverability) | 43 | – | 4 | 1 |
 | [IMAP](#imap) | 58 | – | 17 | 3 |
 | [POP3](#pop3) | 21 | – | 6 | – |
-| [Sieve, ManageSieve and rules](#sieve-managesieve-and-rules) | 50 | 0 | 14 | – |
+| [Sieve, ManageSieve and rules](#sieve-managesieve-and-rules) | 51 | 0 | 13 | – |
 | [Authentication and cryptography](#authentication-and-cryptography) | 57 | 0 | 18 | – |
 | [Anti-spam, anti-virus and content control](#anti-spam-anti-virus-and-content-control) | 54 | – | 13 | – |
 | [Storage, accounts and data model](#storage-accounts-and-data-model) | 86 | – | 10 | – |
@@ -72,7 +72,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 2 | – | 4 | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 5 | 1 | 2 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 4 | 1 | 4 | – |
-| **Total** | **625** | **12** | **143** | **15** |
+| **Total** | **626** | **12** | **142** | **15** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage and the administration surface are the best-covered areas**, and the
@@ -448,7 +448,7 @@ the source, not from documentation.
 
 ### Sieve, ManageSieve and rules
 
-50 shipped · 0 underway · 14 not started · 0 deferred
+51 shipped · 0 underway · 13 not started · 0 deferred
 
 | | Capability | Detail |
 |:-:|---|---|
@@ -506,7 +506,7 @@ the source, not from documentation.
 | ⬜ | include (RFC 6609) | Not implemented, and refused rather than ignored: `include`, `return` and `global` are not in the known-command allowlist, so a script using them fails at upload with "unknown command". There is no personal/global script namespace in SieveStorage to include from. |
 | ✅ | mailbox / mboxmetadata (RFC 5490) | **The mailbox extension shipped 16 August 2026**: the `mailboxexists` test and `fileinto :create`. mailboxexists is the first test in this engine answered from outside the message - the delivery path hands the evaluator a callback over the recipient's real folder list, using the same lookup fileinto itself uses (`MessageUtilities::FolderExistsForDelivery`, kept beside `MoveToIMAPFolder` so the two cannot drift), and for a public folder the same insert-permission gate, because RFC 5490 3.1 defines "exists" as exists-and-deliverable. A caller with no store to ask (the COM test evaluator) gets false for every name - the safe answer. `:create` was already this server's behaviour - MoveToIMAPFolder has always created missing account folders - so the tag is accepted under its require and the semantics were proven rather than added: an end-to-end test SELECTs the folder the delivery created, over IMAP, from a real client session. Advertised over ManageSieve under the standing rule. Still absent from RFC 5490: the mboxmetadata half (METADATA is not implemented in the IMAP server at all). |
 | ⬜ | Out-of-office scheduling and scope | Only an end date exists — there is no start date, so a future absence cannot be scheduled and must be switched on manually. There is also no domain-level or server-level auto-reply, no separate internal/external message… |
-| ⬜ | regex (draft-ietf-sieve-regex) | Not implemented as a Sieve match type, even though the server already carries a regex engine used by the legacy rules engine (RuleCriteria::MatchesRegEx). Wiring it into MatchValue_ would be small |
+| ✅ | regex (draft-ietf-sieve-regex) | **Shipped 16 August 2026** as the `:regex` match type on header/address/envelope/body/hasflag, advertised as "regex" over ManageSieve. Never became an RFC, but Dovecot implements it and clients offer it. A search (anchor with `^`/`$` to mean the whole value), case-folded under the default comparator and case-sensitive under `i;octet`; `i;ascii-numeric` with `:regex` is refused. Two protections, both tested end to end: every key is COMPILED AT UPLOAD, so a pattern that cannot compile is refused with its line number instead of silently never matching (the failure mode the legacy rules engine had for years); and evaluation runs under the same RuleGuard budget-and-suspend breaker as the legacy regex criterion - a deliberately parallel sibling sharing the suspension table and error codes - so a catastrophic pattern costs one bounded evaluation per five-minute window, never the message. The breaker test delivers a crafted subject against `(a+)+…$` and asserts the message ARRIVES in INBOX with the suspension reported. |
 | ⬜ | reject / ereject (RFC 5429) | Not implemented. **The hazard this row used to describe is gone and the correction matters more than the gap:** neither is in the known-command allowlist and `require "reject"` is refused, so a script that tries to reject mail is rejected AT UPLOAD with a message naming the unsupported extension. The author is told; mail is not silently kept while they believe it is being refused. `SieveSyntax.cs` asserts exactly that script is refused. Implementing them means an SMTP-time refusal for `ereject` and an RFC 3834 bounce for `reject`. |
 | ✅ | relational (RFC 5231) | Not implemented. No :count or :value match types, and no i;ascii-numeric comparator to make them meaningful — SplitArguments recognises only is/contains/matches **Shipped in dc9301a.** |
 | ⬜ | RENAMESCRIPT and UNAUTHENTICATE | Neither implemented; both fall through to NO "Unknown command." A client renaming a script must GETSCRIPT/PUTSCRIPT/DELETESCRIPT by hand |

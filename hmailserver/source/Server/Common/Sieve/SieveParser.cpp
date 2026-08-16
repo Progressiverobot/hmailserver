@@ -5,6 +5,10 @@
 
 #include "SieveParser.h"
 
+// For the upload-time compile check on ':regex' keys. The evaluator matches with
+// Boost too (through RuleGuard), so what compiles here is what will run there.
+#include <boost/regex.hpp>
+
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
 #define new DEBUG_NEW
@@ -47,6 +51,22 @@ namespace HM
          return comparator.Compare(_T("i;ascii-casemap")) == 0 ||
                 comparator.Compare(_T("i;octet")) == 0 ||
                 comparator.Compare(_T("i;ascii-numeric")) == 0;
+      }
+
+      // Whether a ':regex' key compiles, using the same construction the evaluator
+      // will use (Boost, Perl syntax). Called at upload validation so a bad pattern
+      // is refused with a line number instead of silently never matching.
+      bool RegexKeyCompiles_(const String &key)
+      {
+         try
+         {
+            boost::wregex expression(key);
+            return true;
+         }
+         catch (const std::runtime_error &)
+         {
+            return false;
+         }
       }
    }
 
@@ -102,6 +122,11 @@ namespace HM
          L"copy",
          L"relational",
          L"subaddress",
+         // draft-ietf-sieve-regex. Never became an RFC, but Dovecot's Pigeonhole
+         // implements it and clients offer it, which is what a capability name is
+         // for. The evaluation runs under the same budget-and-suspend breaker the
+         // legacy rules engine's regex criterion uses (RuleGuard).
+         L"regex",
          L"comparator-i;ascii-casemap",
          L"comparator-i;octet",
          L"comparator-i;ascii-numeric"
@@ -229,7 +254,8 @@ namespace HM
 
          if (!TagTakesValue(tag))
          {
-            if (tag == _T("is") || tag == _T("contains") || tag == _T("matches"))
+            if (tag == _T("is") || tag == _T("contains") || tag == _T("matches") ||
+                tag == _T("regex"))
             {
                result.matchType = tag;
                result.matchTypeGiven = true;
@@ -857,12 +883,36 @@ namespace HM
          }
       }
       else if (set.comparatorGiven && set.comparator.Compare(_T("i;ascii-numeric")) == 0 &&
-               (set.matchType == _T("contains") || set.matchType == _T("matches")))
+               (set.matchType == _T("contains") || set.matchType == _T("matches") ||
+                set.matchType == _T("regex")))
       {
          // i;ascii-numeric only defines equality (RFC 4790 9.1.1).
          errorMessage.Format(_T("Line %d: the \"i;ascii-numeric\" comparator cannot be used with ':%s'."),
             line, set.matchType.c_str());
          return false;
+      }
+
+      if (set.matchType == _T("regex"))
+      {
+         if (!NeedExtension_(_T("regex"), _T("':regex'"), line, errorMessage))
+            return false;
+
+         // Compile every key NOW, so the author hears about a bad pattern at upload
+         // rather than the test silently never matching at delivery. The keys are
+         // the last positional list; the earlier one, when there are two, is the
+         // header/part names, which are not patterns.
+         if (!set.stringLists.empty())
+         {
+            for (const String &key : set.stringLists.back())
+            {
+               if (!RegexKeyCompiles_(key))
+               {
+                  errorMessage.Format(_T("Line %d: ':regex' key '%s' is not a valid regular expression."),
+                     line, key.c_str());
+                  return false;
+               }
+            }
+         }
       }
 
       if (set.addressPart == _T("user") || set.addressPart == _T("detail"))
@@ -1241,7 +1291,7 @@ namespace HM
 
       if (name == _T("header"))
       {
-         if (!CheckTags_(set, _T("comparator is contains matches value count"), _T("'header'"), errorMessage))
+         if (!CheckTags_(set, _T("comparator is contains matches value count regex"), _T("'header'"), errorMessage))
             return false;
 
          return ValidateMatchArguments_(set, _T("'header'"), test->line, errorMessage);
@@ -1253,7 +1303,7 @@ namespace HM
              !NeedExtension_(_T("envelope"), _T("the 'envelope' test"), test->line, errorMessage))
             return false;
 
-         if (!CheckTags_(set, _T("comparator is contains matches value count all localpart domain user detail"),
+         if (!CheckTags_(set, _T("comparator is contains matches value count regex all localpart domain user detail"),
                          _T("'") + name + _T("'"), errorMessage))
             return false;
 
@@ -1300,7 +1350,7 @@ namespace HM
          if (!NeedExtension_(_T("body"), _T("the 'body' test"), test->line, errorMessage))
             return false;
 
-         if (!CheckTags_(set, _T("comparator is contains matches value count raw text content"),
+         if (!CheckTags_(set, _T("comparator is contains matches value count regex raw text content"),
                          _T("'body'"), errorMessage))
             return false;
 
@@ -1331,7 +1381,7 @@ namespace HM
          if (!NeedExtension_(_T("imap4flags"), _T("the 'hasflag' test"), test->line, errorMessage))
             return false;
 
-         if (!CheckTags_(set, _T("comparator is contains matches value count"), _T("'hasflag'"), errorMessage))
+         if (!CheckTags_(set, _T("comparator is contains matches value count regex"), _T("'hasflag'"), errorMessage))
             return false;
 
          if (set.comparatorGiven && !IsKnownComparator(set.comparator))

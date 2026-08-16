@@ -139,6 +139,22 @@ namespace HM
       // this into a log flood of its own.
       static bool RegexCriteriaMatches(const String &pattern, const String &subject);
 
+      // The same breaker for the Sieve ":regex" match type (draft-ietf-sieve-regex),
+      // which differs from a rule criterion in exactly two ways: it is a SEARCH
+      // (the pattern may hit anywhere in the value; a rule criterion must match the
+      // whole value), and its case behaviour follows the script's comparator
+      // (i;ascii-casemap folds case, i;octet does not) rather than being fixed.
+      //
+      // Deliberately a parallel sibling of RegexCriteriaMatches rather than a shared
+      // core: the two share the suspension table, the budget and the error codes
+      // (HM6042/HM6043), but each keeps its own exact log wording, and the rules
+      // path stays character-for-character what it was. If you change one, look at
+      // the other. Suspension is keyed on the pattern text alone, so a pattern
+      // suspended by a rule is also suspended for scripts and vice versa - the
+      // breaker's question is "is this pattern affordable", which does not depend
+      // on who asked.
+      static bool SieveRegexMatches(const String &pattern, const String &subject, bool caseSensitive);
+
       // A rule action failed and may have left the message file in a state nobody
       // chose.
       //

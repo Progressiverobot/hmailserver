@@ -44,6 +44,9 @@ namespace RegressionTests.Sieve
          // are valid under their require.
          Assert.IsEmpty(CheckSyntax("require [\"mailbox\", \"fileinto\"];\r\nif mailboxexists \"Archive\" {\r\n  fileinto :create \"Archive\";\r\n}"));
 
+         // The regex extension (draft-ietf-sieve-regex) under its require.
+         Assert.IsEmpty(CheckSyntax("require \"regex\";\r\nif header :regex \"Subject\" \"^inv[o0]ice #[0-9]+\" {\r\n  discard;\r\n}"));
+
          // A comment plus a multi-name require of extensions that ARE implemented.
          // This line used to require "reject", which the parser accepted and then
          // silently ignored - so the script was reported valid and the reject never
@@ -85,6 +88,18 @@ namespace RegressionTests.Sieve
          // :create is a fileinto tag; on keep it is an error even with the
          // extension required.
          Assert.IsNotEmpty(CheckSyntax("require [\"mailbox\", \"fileinto\"];\r\nkeep :create;"));
+
+         // :regex without its require.
+         Assert.IsNotEmpty(CheckSyntax("if header :regex \"Subject\" \"^x\" {\r\n  keep;\r\n}"));
+
+         // A ':regex' key that cannot compile must be refused AT UPLOAD with the
+         // line named, not stored and silently never matched at delivery - the
+         // exact failure mode the legacy rules engine had for years (HM6042).
+         Assert.IsNotEmpty(CheckSyntax("require \"regex\";\r\nif header :regex \"Subject\" \"(unclosed\" {\r\n  keep;\r\n}"));
+
+         // The numeric comparator only defines equality; a regex under it is
+         // meaningless.
+         Assert.IsNotEmpty(CheckSyntax("require [\"regex\", \"comparator-i;ascii-numeric\"];\r\nif header :regex :comparator \"i;ascii-numeric\" \"Subject\" \"^x\" {\r\n  keep;\r\n}"));
       }
 
       /// <summary>
