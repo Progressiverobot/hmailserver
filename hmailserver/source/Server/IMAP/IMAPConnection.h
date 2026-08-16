@@ -216,7 +216,7 @@ namespace HM
       bool AskForLiteralData_(const String &sInput);
 
       void EndIdleMode_();
-      int GetLiteralSize_(const String &sCommand);
+      int GetLiteralSize_(const String &sCommand, bool *nonSynchronizing = nullptr);
 
       bool AnswerCommand(std::shared_ptr<IMAPClientCommand> command);
       std::shared_ptr<const Account> account_;
@@ -246,6 +246,10 @@ namespace HM
 
       int literal_data_to_receive_;
       String literal_buffer_;
+
+      // RFC 7888 (LITERAL-): the literal currently being received was sent as
+      // {n+}, so the client is not waiting and no continuation may be sent.
+      bool current_literal_is_nonsync_ = false;
 
       bool pending_disconnect_;
 

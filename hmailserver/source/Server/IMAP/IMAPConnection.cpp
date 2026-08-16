@@ -263,8 +263,10 @@ namespace HM
 
          if (literal_buffer_.GetLength() < literal_data_to_receive_)
          {
-            // Tell the client that we expects more data.
-            SendAsciiData("+ Ready for additional command text.\r\n");
+            // Tell the client that we expects more data - but never mid-literal
+            // for the {n+} form, where the client is not reading for it.
+            if (!current_literal_is_nonsync_)
+               SendAsciiData("+ Ready for additional command text.\r\n");
             return true;
          }
          else
@@ -339,14 +341,20 @@ namespace HM
    // retnn true
    //---------------------------------------------------------------------------()
    {
-      literal_data_to_receive_ = GetLiteralSize_(sInput);
+      bool nonSynchronizing = false;
+      literal_data_to_receive_ = GetLiteralSize_(sInput, &nonSynchronizing);
 
       if (literal_data_to_receive_ > 0)
       {
-         // Tell the client that we are accepting data.
-         SendAsciiData("+ Ready for additional command text.\r\n");
+         current_literal_is_nonsync_ = nonSynchronizing;
 
-         return true;  
+         // Tell the client that we are accepting data - unless the literal was
+         // the {n+} form (RFC 7888), where the octets are already on their way
+         // and a continuation would be an answer to a question never asked.
+         if (!nonSynchronizing)
+            SendAsciiData("+ Ready for additional command text.\r\n");
+
+         return true;
       }
 
       return false;
@@ -451,7 +459,7 @@ namespace HM
    }
 
    int
-   IMAPConnection::GetLiteralSize_(const String &sCommand)
+   IMAPConnection::GetLiteralSize_(const String &sCommand, bool *nonSynchronizing)
    //---------------------------------------------------------------------------()
    // DESCRIPTION:
    // Returns the size of the literal specified in the client command.
@@ -497,9 +505,15 @@ namespace HM
 
       String sSize = sCommand.Mid(iParStart, iParLength);
 
-      // IMAP permits a trailing '+' for non-synchronizing literals ({n+}).
+      // IMAP permits a trailing '+' for non-synchronizing literals ({n+},
+      // RFC 7888). The caller needs to know: no continuation may be sent for one.
       if (sSize.Right(1) == _T("+"))
+      {
          sSize = sSize.Mid(0, sSize.GetLength() - 1);
+
+         if (nonSynchronizing)
+            *nonSynchronizing = true;
+      }
 
       // The literal length must be a plain, non-negative integer. Reject anything
       // else: an unvalidated value fed to _ttoi can overflow, and an unbounded

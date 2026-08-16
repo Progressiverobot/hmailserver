@@ -93,9 +93,15 @@ namespace HM
 
       AnsiString literalSize = pWord->Value();
 
-      // Strip a trailing '+' (non-synchronizing literal) before validating.
+      // Strip a trailing '+' (non-synchronizing literal, RFC 7888) before
+      // validating - and remember it: the client is not waiting for a
+      // continuation before it sends the message octets.
+      bool nonSynchronizingLiteral = false;
       if (literalSize.GetLength() > 0 && literalSize.GetAt(literalSize.GetLength() - 1) == '+')
+      {
          literalSize = literalSize.Mid(0, literalSize.GetLength() - 1);
+         nonSynchronizingLiteral = true;
+      }
 
       // The octet count must be a plain non-negative integer; reject anything else
       // so atoi cannot overflow into a bogus (possibly enormous) size_t value.
@@ -193,9 +199,12 @@ namespace HM
 
       message_file_name_ = PersistentMessage::GetFileName(pMessageOwner, current_message_);
 
-      String sResponse = "+ Ready for literal data\r\n";
       pConnection->SetReceiveBinary(true);
-      pConnection->SendAsciiData(sResponse);    
+
+      // The continuation is the synchronizing half of the protocol; a {n+}
+      // literal's octets are already on their way (RFC 7888).
+      if (!nonSynchronizingLiteral)
+         pConnection->SendAsciiData("+ Ready for literal data\r\n");
 
       return IMAPResult();
    }
