@@ -35,6 +35,13 @@ namespace HM
       static bool PutScript(const String &accountAddress, const String &name, const String &content);
       static bool DeleteScript(const String &accountAddress, const String &name);
 
+      // RFC 5804 2.11: rename, with the active script KEEPING its active status
+      // under the new name - the reason this cannot be left to a client doing
+      // GETSCRIPT/PUTSCRIPT/DELETESCRIPT by hand, which loses that status (and,
+      // for the active script, is refused outright at the delete). Fails when the
+      // source does not exist or the target name is already taken.
+      static bool RenameScript(const String &accountAddress, const String &oldName, const String &newName);
+
       // The name of the active script ("" when none is active).
       static String GetActiveScriptName(const String &accountAddress);
       // Activates the named script (mirroring its content to active.sieve). An

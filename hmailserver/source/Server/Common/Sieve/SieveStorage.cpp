@@ -257,6 +257,34 @@ namespace HM
       return FileUtilities::DeleteFile(path);
    }
 
+   bool
+   SieveStorage::RenameScript(const String &accountAddress, const String &oldName, const String &newName)
+   {
+      if (!IsValidScriptName(oldName) || !IsValidScriptName(newName))
+         return false;
+
+      String oldPath = GetScriptPath_(accountAddress, oldName);
+      if (!FileUtilities::Exists(oldPath))
+         return false;
+
+      String newPath = GetScriptPath_(accountAddress, newName);
+      if (FileUtilities::Exists(newPath))
+         return false;
+
+      // Read the active name BEFORE the move: after it, an active-name file
+      // naming the old script refers to nothing, and that window should be as
+      // small as the code can make it.
+      bool wasActive = GetActiveScriptName(accountAddress).CompareNoCase(oldName) == 0;
+
+      if (!FileUtilities::Move(oldPath, newPath))
+         return false;
+
+      if (wasActive)
+         SetActiveScriptName(accountAddress, newName);
+
+      return true;
+   }
+
    String
    SieveStorage::GetActiveScriptName(const String &accountAddress)
    {

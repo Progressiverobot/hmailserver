@@ -279,6 +279,7 @@ namespace RegressionTests.Sieve
                session.SendCommand("SETACTIVE \"\"");
                session.SendCommand("DELETESCRIPT \"primary\"");
                session.SendCommand("DELETESCRIPT \"scratch\"");
+               session.SendCommand("DELETESCRIPT \"renamed\"");
 
                const string scriptBody =
                   "require \"fileinto\";\r\n" +
@@ -330,6 +331,52 @@ namespace RegressionTests.Sieve
 
                string listAfterDelete = session.SendCommand("LISTSCRIPTS");
                Assert.IsFalse(listAfterDelete.Contains("\"scratch\""), "scratch should be gone. Got: " + listAfterDelete);
+
+               // RENAMESCRIPT (RFC 5804 2.11). Renaming the ACTIVE script is the case
+               // that justifies the command existing: the manual
+               // GETSCRIPT/PUTSCRIPT/DELETESCRIPT route cannot do it at all, because
+               // the active script refuses deletion. The active status must follow
+               // the new name.
+               string renameMissing = session.SendCommand("RENAMESCRIPT \"no-such-script\" \"anything\"");
+               StringAssert.StartsWith("NO", renameMissing.TrimStart());
+
+               string rename = session.SendCommand("RENAMESCRIPT \"primary\" \"renamed\"");
+               StringAssert.StartsWith("OK", rename.TrimStart());
+
+               string listAfterRename = session.SendCommand("LISTSCRIPTS");
+               StringAssert.Contains("\"renamed\" ACTIVE", listAfterRename);
+               Assert.IsFalse(listAfterRename.Contains("\"primary\""),
+                  "The old name should be gone after the rename. Got: " + listAfterRename);
+
+               // The renamed script's content round-trips unchanged.
+               string fetchedAfterRename = session.GetScript("renamed");
+               Assert.AreEqual(scriptBody, fetchedAfterRename, "RENAMESCRIPT must move the content untouched.");
+
+               // Renaming onto a taken name is refused rather than overwriting.
+               string putBlocker = session.SendWithLiteral("PUTSCRIPT \"scratch\"", "keep;\r\n");
+               StringAssert.StartsWith("OK", putBlocker.TrimStart());
+               string renameOntoTaken = session.SendCommand("RENAMESCRIPT \"renamed\" \"scratch\"");
+               StringAssert.StartsWith("NO", renameOntoTaken.TrimStart());
+               session.SendCommand("DELETESCRIPT \"scratch\"");
+
+               // UNAUTHENTICATE (RFC 5804 2.14.1): advertised in the greeting, drops
+               // the session to the unauthenticated state without losing the
+               // connection, after which script commands are refused until a fresh
+               // AUTHENTICATE - which must then work, because reusing the session is
+               // the command's purpose.
+               StringAssert.Contains("UNAUTHENTICATE", greeting);
+
+               string unauth = session.SendCommand("UNAUTHENTICATE");
+               StringAssert.StartsWith("OK", unauth.TrimStart());
+
+               string listUnauthenticated = session.SendCommand("LISTSCRIPTS");
+               StringAssert.StartsWith("NO", listUnauthenticated.TrimStart());
+
+               string reAuth = session.Authenticate(address, password);
+               StringAssert.StartsWith("OK", reAuth.TrimStart());
+
+               string listReauthenticated = session.SendCommand("LISTSCRIPTS");
+               StringAssert.Contains("\"renamed\" ACTIVE", listReauthenticated);
 
                string logout = session.SendCommand("LOGOUT");
                StringAssert.StartsWith("OK", logout.TrimStart());

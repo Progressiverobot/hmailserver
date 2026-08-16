@@ -57,7 +57,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Transport security and deliverability](#transport-security-and-deliverability) | 43 | – | 4 | 1 |
 | [IMAP](#imap) | 58 | – | 17 | 3 |
 | [POP3](#pop3) | 21 | – | 6 | – |
-| [Sieve, ManageSieve and rules](#sieve-managesieve-and-rules) | 51 | 0 | 13 | – |
+| [Sieve, ManageSieve and rules](#sieve-managesieve-and-rules) | 52 | 0 | 12 | – |
 | [Authentication and cryptography](#authentication-and-cryptography) | 57 | 0 | 18 | – |
 | [Anti-spam, anti-virus and content control](#anti-spam-anti-virus-and-content-control) | 54 | – | 13 | – |
 | [Storage, accounts and data model](#storage-accounts-and-data-model) | 86 | – | 10 | – |
@@ -72,7 +72,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 2 | – | 4 | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 5 | 1 | 2 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 4 | 1 | 4 | – |
-| **Total** | **626** | **12** | **142** | **15** |
+| **Total** | **627** | **12** | **141** | **15** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage and the administration surface are the best-covered areas**, and the
@@ -448,7 +448,7 @@ the source, not from documentation.
 
 ### Sieve, ManageSieve and rules
 
-51 shipped · 0 underway · 13 not started · 0 deferred
+52 shipped · 0 underway · 12 not started · 0 deferred
 
 | | Capability | Detail |
 |:-:|---|---|
@@ -509,7 +509,7 @@ the source, not from documentation.
 | ✅ | regex (draft-ietf-sieve-regex) | **Shipped 16 August 2026** as the `:regex` match type on header/address/envelope/body/hasflag, advertised as "regex" over ManageSieve. Never became an RFC, but Dovecot implements it and clients offer it. A search (anchor with `^`/`$` to mean the whole value), case-folded under the default comparator and case-sensitive under `i;octet`; `i;ascii-numeric` with `:regex` is refused. Two protections, both tested end to end: every key is COMPILED AT UPLOAD, so a pattern that cannot compile is refused with its line number instead of silently never matching (the failure mode the legacy rules engine had for years); and evaluation runs under the same RuleGuard budget-and-suspend breaker as the legacy regex criterion - a deliberately parallel sibling sharing the suspension table and error codes - so a catastrophic pattern costs one bounded evaluation per five-minute window, never the message. The breaker test delivers a crafted subject against `(a+)+…$` and asserts the message ARRIVES in INBOX with the suspension reported. |
 | ⬜ | reject / ereject (RFC 5429) | Not implemented. **The hazard this row used to describe is gone and the correction matters more than the gap:** neither is in the known-command allowlist and `require "reject"` is refused, so a script that tries to reject mail is rejected AT UPLOAD with a message naming the unsupported extension. The author is told; mail is not silently kept while they believe it is being refused. `SieveSyntax.cs` asserts exactly that script is refused. Implementing them means an SMTP-time refusal for `ereject` and an RFC 3834 bounce for `reject`. |
 | ✅ | relational (RFC 5231) | Not implemented. No :count or :value match types, and no i;ascii-numeric comparator to make them meaningful — SplitArguments recognises only is/contains/matches **Shipped in dc9301a.** |
-| ⬜ | RENAMESCRIPT and UNAUTHENTICATE | Neither implemented; both fall through to NO "Unknown command." A client renaming a script must GETSCRIPT/PUTSCRIPT/DELETESCRIPT by hand |
+| ✅ | RENAMESCRIPT and UNAUTHENTICATE | **Both shipped 16 August 2026.** RENAMESCRIPT was owed rather than optional: the capability response has always claimed VERSION "1.0", which promises the core RFC 5804 commands, and this one was answered with NO "Unknown command". The case that justifies it existing is renaming the ACTIVE script - the manual GETSCRIPT/PUTSCRIPT/DELETESCRIPT route cannot do that at all, because the active script refuses deletion - and the active status follows the new name (`SieveStorage::RenameScript` reads the active name before the move and rewrites it after). Renaming onto a taken name is refused rather than overwriting. UNAUTHENTICATE (RFC 5804 2.14.1) drops the session to the unauthenticated state keeping the connection and is now advertised; the auth-failure counter deliberately carries over so the command is not a way to reset auto-ban bookkeeping mid-connection. Both proven in the round-trip test, including a fresh AUTHENTICATE after UNAUTHENTICATE finding the renamed script still active. |
 | ⬜ | spamtest / spamtestplus / virustest (RFC 5235) | Not implemented, and again the underlying data exists: messages already carry a spam flag and SpamAssassin/AV scores from the antispam pipeline, but no Sieve test can read them |
 | ⬜ | Structured response codes | Partial. `(QUOTA/MAXSIZE)` is emitted by HAVESPACE, PUTSCRIPT and CHECKSCRIPT when a script exceeds the 1 MB limit, and `(ENCRYPT-NEEDED)` by AUTHENTICATE when the connecting range requires TLS on a cleartext connection. Still missing: (WARNINGS), (QUOTA/MAXSCRIPTS), (NONEXISTENT), (ALREADYEXISTS), (TAG), (REFERRAL) and the BYE response codes, so most refusals are still a bare NO with a quoted human string that a client can only show verbatim.
 | ✅ | subaddress (RFC 5233) | Not implemented. Address parts stop at :all/:localpart/:domain; :user and :detail are not recognised, so plus-addressing cannot be filtered on **Shipped in dc9301a.** |

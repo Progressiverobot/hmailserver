@@ -850,6 +850,12 @@ namespace HM
       else
          Send_(connection, "\"SASL\" \"PLAIN\"\r\n");
 
+      // RFC 5804 2.14.1: UNAUTHENTICATE is optional and a client discovers it from
+      // this line. VERSION "1.0" below already promises the core commands -
+      // including RENAMESCRIPT, which is why implementing it was owed rather than
+      // optional: the capability line had been claiming it all along.
+      Send_(connection, "\"UNAUTHENTICATE\"\r\n");
+
       Send_(connection, "\"VERSION\" \"1.0\"\r\n");
    }
 
@@ -1187,6 +1193,19 @@ namespace HM
             continue;
          }
 
+         if (command == _T("UNAUTHENTICATE"))
+         {
+            // RFC 5804 2.14.1: back to the unauthenticated state, keeping the
+            // connection - and the TLS layer, when one is up - so an admin tool can
+            // manage several accounts' scripts over one session. The failure
+            // counter deliberately carries over: this command must not be a way to
+            // reset the auto-ban bookkeeping mid-connection.
+            authenticated = false;
+            accountAddress = _T("");
+            Send_(connection, "OK\r\n");
+            continue;
+         }
+
          if (command == _T("LISTSCRIPTS"))
          {
             std::vector<String> names = SieveStorage::ListScriptNames(accountAddress);
@@ -1317,6 +1336,35 @@ namespace HM
                Send_(connection, "OK\r\n");
             else
                Send_(connection, "NO \"The active script cannot be deleted.\"\r\n");
+            continue;
+         }
+
+         if (command == _T("RENAMESCRIPT"))
+         {
+            String oldName;
+            if (!ParseToken(line, pos, oldName) || !SieveStorage::ScriptExists(accountAddress, oldName))
+            {
+               Send_(connection, "NO \"There is no script by that name.\"\r\n");
+               continue;
+            }
+
+            String newName;
+            if (!ParseToken(line, pos, newName) || !SieveStorage::IsValidScriptName(newName))
+            {
+               Send_(connection, "NO \"Invalid script name.\"\r\n");
+               continue;
+            }
+
+            if (SieveStorage::ScriptExists(accountAddress, newName))
+            {
+               Send_(connection, "NO \"A script by that name already exists.\"\r\n");
+               continue;
+            }
+
+            if (SieveStorage::RenameScript(accountAddress, oldName, newName))
+               Send_(connection, "OK\r\n");
+            else
+               Send_(connection, "NO \"The script could not be renamed.\"\r\n");
             continue;
          }
 
