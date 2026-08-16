@@ -1167,6 +1167,59 @@ namespace hMailServer.ControlPanel.Views
          relay.Settings.Add(new ComPassword { Path = "SetSMTPRelayerPassword", MethodName = "SetSMTPRelayerPassword", Label = "Password (leave empty to keep current)" });
          Tab("Relayer").Cards.Add(relay);
 
+         var oauth = Card("OAuth2 for the relay (Microsoft 365)",
+            "Microsoft 365 turns Basic authentication for SMTP AUTH off at the end of December 2026. " +
+            "When the relay host below is listed here, hMailServer authenticates with an OAuth2 bearer " +
+            "token (XOAUTH2) instead of the password - fetched from your tenant's token endpoint with " +
+            "the client credentials of an app registration that has the SMTP.SendAsApp permission. The " +
+            "user name above stays: it is the mailbox being relayed as.");
+         oauth.Settings.Add(new IniText
+         {
+            Path = "OutboundOAuth2Hosts",
+            Label = "Relay hosts that use OAuth2 (comma separated; empty = none)",
+            Placeholder = "smtp.office365.com",
+            Blurb = "Only destinations named here get a bearer token; every other relay keeps password " +
+                    "authentication. This is deliberate - a token presented to the wrong relay is a leaked token.",
+            IniStore = iniStore_
+         });
+         oauth.Settings.Add(new IniText
+         {
+            Path = "OutboundOAuth2TokenUrl",
+            Label = "Token endpoint (https)",
+            Placeholder = "https://login.microsoftonline.com/<tenant-id>/oauth2/v2.0/token",
+            IniStore = iniStore_
+         });
+         oauth.Settings.Add(new IniText
+         {
+            Path = "OutboundOAuth2ClientId",
+            Label = "Application (client) ID",
+            IniStore = iniStore_
+         });
+         oauth.Settings.Add(new IniText
+         {
+            Path = "OutboundOAuth2ClientSecret",
+            Label = "Client secret",
+            Blurb = "Stored in hMailServer.ini on the server. The token it buys is cached in memory until " +
+                    "80% of its lifetime has passed and refetched automatically.",
+            IniStore = iniStore_
+         });
+         oauth.Settings.Add(new IniText
+         {
+            Path = "OutboundOAuth2Scope",
+            Label = "Scope (empty = the Microsoft default)",
+            Placeholder = "https://outlook.office365.com/.default",
+            IniStore = iniStore_
+         });
+         oauth.Settings.Add(new IniText
+         {
+            Path = "OutboundOAuth2FixedToken",
+            Label = "Fixed token (advanced; used verbatim instead of fetching)",
+            Blurb = "For tokens obtained outside this server. Leave empty in normal use - fixed tokens " +
+                    "expire and nothing here will refresh them.",
+            IniStore = iniStore_
+         });
+         Tab("Relayer").Cards.Add(oauth);
+
          var rules = Card("Rules");
          rules.Settings.Add(new ComText { Path = "RuleLoopLimit", Label = "Rule loop limit", Numeric = true });
          Tab("Rules").Cards.Add(rules);
