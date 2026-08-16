@@ -54,7 +54,8 @@ namespace HM
                              SieveResult &result,
                              std::function<bool(const String &)> mailboxExists = nullptr,
                              bool classifiedAsSpam = false,
-                             std::function<bool(const String &, const String &, __int64, bool)> duplicateCheck = nullptr);
+                             std::function<bool(const String &, const String &, __int64, bool)> duplicateCheck = nullptr,
+                             std::function<String(const String &, bool)> includeFetch = nullptr);
 
    private:
       std::vector<std::shared_ptr<SieveCommand>> commands_;

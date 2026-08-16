@@ -13,6 +13,10 @@
 // so a zone the evaluator cannot parse is refused at upload.
 #include "../Util/Time.h"
 
+// For the script-name check on 'include' (SieveStorage::IsValidScriptName), the
+// same rule PUTSCRIPT applies - a name the store would refuse cannot be included.
+#include "SieveStorage.h"
+
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
 #define new DEBUG_NEW
@@ -190,6 +194,11 @@ namespace HM
          // (and guards) as a quota refusal.
          L"reject",
          L"ereject",
+         // RFC 6609: include/return/global. Personal scripts are the account's
+         // own ManageSieve scripts; global ones are the administrator's, in
+         // <data>\Sieve\_global\. Nesting is capped at three levels, so a cycle
+         // costs three fetches rather than a stack.
+         L"include",
          L"comparator-i;ascii-casemap",
          L"comparator-i;octet",
          L"comparator-i;ascii-numeric"
@@ -509,7 +518,8 @@ namespace HM
          L"setflag", L"addflag", L"removeflag",
          L"addheader", L"deleteheader",
          L"set",
-         L"reject", L"ereject"
+         L"reject", L"ereject",
+         L"include", L"return", L"global"
       };
 
       for (const wchar_t *candidate : known)
@@ -1198,6 +1208,73 @@ namespace HM
       SieveArgumentSet set;
       if (!isControl && name != _T("require") && !SplitArguments(command->arguments, set, errorMessage))
          return false;
+
+      if (name == _T("include"))
+      {
+         if (!NeedExtension_(_T("include"), _T("'include'"), command->line, errorMessage))
+            return false;
+
+         if (!CheckTags_(set, _T("personal global once optional"), _T("'include'"), errorMessage))
+            return false;
+
+         bool personalGiven = false, globalGiven = false;
+         for (const String &tag : set.tags)
+         {
+            if (tag == _T("personal")) personalGiven = true;
+            else if (tag == _T("global")) globalGiven = true;
+         }
+
+         if (personalGiven && globalGiven)
+         {
+            errorMessage.Format(_T("Line %d: ':personal' and ':global' contradict each other."), command->line);
+            return false;
+         }
+
+         if (set.stringLists.size() != 1 || set.stringLists[0].size() != 1 ||
+             !SieveStorage::IsValidScriptName(set.stringLists[0][0]))
+         {
+            errorMessage.Format(_T("Line %d: 'include' takes one script name."), command->line);
+            return false;
+         }
+
+         return true;
+      }
+
+      if (name == _T("return"))
+      {
+         if (!NeedExtension_(_T("include"), _T("'return'"), command->line, errorMessage))
+            return false;
+
+         if (!set.stringLists.empty() || !set.tags.empty())
+         {
+            errorMessage.Format(_T("Line %d: 'return' takes no arguments."), command->line);
+            return false;
+         }
+
+         return true;
+      }
+
+      if (name == _T("global"))
+      {
+         // RFC 6609 3.4 needs both halves: include for the namespace to exist,
+         // variables for a variable to be worth sharing.
+         if (!NeedExtension_(_T("include"), _T("'global'"), command->line, errorMessage))
+            return false;
+
+         if (!NeedExtension_(_T("variables"), _T("'global'"), command->line, errorMessage))
+            return false;
+
+         if (!CheckTags_(set, _T(""), _T("'global'"), errorMessage))
+            return false;
+
+         if (set.stringLists.size() != 1 || set.stringLists[0].empty())
+         {
+            errorMessage.Format(_T("Line %d: 'global' takes one list of variable names."), command->line);
+            return false;
+         }
+
+         return true;
+      }
 
       if (name == _T("reject") || name == _T("ereject"))
       {

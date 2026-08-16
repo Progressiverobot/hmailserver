@@ -494,8 +494,15 @@ namespace HM
             duplicateAccount, identifier, handle, windowSeconds, refreshOnSeen);
       };
 
+      // include (RFC 6609): personal scripts are the recipient's own named
+      // ManageSieve scripts, global ones the administrator's shared directory.
+      auto includeFetch = [duplicateAccount](const String &scriptName, bool global) -> String
+      {
+         return SieveStorage::GetIncludedScript(duplicateAccount, scriptName, global);
+      };
+
       SieveResult sieveResult;
-      String actions = SieveScript::Evaluate(script, rawMessage, envelope, sieveResult, mailboxExists, message->GetFlagSpam(), duplicateCheck);
+      String actions = SieveScript::Evaluate(script, rawMessage, envelope, sieveResult, mailboxExists, message->GetFlagSpam(), duplicateCheck, includeFetch);
 
       // A script that fails to parse must never break delivery; fall through to a
       // normal keep. (The structured result is already at its defaults in that case,

@@ -63,6 +63,10 @@ namespace RegressionTests.Sieve
          // environment under its require.
          Assert.IsEmpty(CheckSyntax("require \"environment\";\r\nif environment :is \"name\" \"hMailServer\" {\r\n  keep;\r\n}"));
 
+         // include, return and global under their requires.
+         Assert.IsEmpty(CheckSyntax("require \"include\";\r\ninclude :personal :once \"helper\";\r\nreturn;"));
+         Assert.IsEmpty(CheckSyntax("require [\"include\", \"variables\"];\r\nglobal \"shared\";\r\nset \"shared\" \"v\";"));
+
          // reject and ereject under their requires.
          Assert.IsEmpty(CheckSyntax("require \"reject\";\r\nreject \"go away\";"));
          Assert.IsEmpty(CheckSyntax("require \"ereject\";\r\nereject \"refused\";"));
@@ -154,6 +158,13 @@ namespace RegressionTests.Sieve
          Assert.IsNotEmpty(CheckSyntax("if ihave \"fileinto\" {\r\n  keep;\r\n}"));
          Assert.IsNotEmpty(CheckSyntax("if environment :is \"name\" \"x\" {\r\n  keep;\r\n}"));
 
+         // include: contradictory placement tags, a bad script name, global
+         // without variables, and the missing require.
+         Assert.IsNotEmpty(CheckSyntax("require \"include\";\r\ninclude :personal :global \"x\";"));
+         Assert.IsNotEmpty(CheckSyntax("require \"include\";\r\ninclude \"../escape\";"));
+         Assert.IsNotEmpty(CheckSyntax("require \"include\";\r\nglobal \"shared\";"));
+         Assert.IsNotEmpty(CheckSyntax("include \"x\";"));
+
          // reject without its require, and with a stray tag.
          Assert.IsNotEmpty(CheckSyntax("reject \"go away\";"));
          Assert.IsNotEmpty(CheckSyntax("require \"reject\";\r\nreject :copy \"go away\";"));
@@ -224,8 +235,8 @@ namespace RegressionTests.Sieve
             // addheader and deleteheader moved out on 16 August 2026 - the
             // editheader extension shipped, proven end to end on delivered bytes
             // in SieveEditheaderDelivery.cs.
-            "include \"other\";",
-            "return;",
+            // include and return moved out on 16 August 2026 - RFC 6609 shipped,
+            // proven end to end in SieveIncludeDelivery.cs.
             // set and string moved out on 16 August 2026 - the variables
             // extension shipped, proven end to end in SieveVariablesDelivery.cs.
          };

@@ -309,7 +309,17 @@ namespace HM
       // cancelled and logged. End-to-end tests in SieveRejectDelivery.cs assert
       // the sender RECEIVES the report with the script's reason in it, and that
       // the recipient's mailbox stays empty.
-      const char *AdvertisedSieveExtensions = "fileinto copy relational subaddress vacation vacation-seconds imap4flags body mailbox regex ihave environment date index spamtest spamtestplus duplicate editheader variables reject ereject";
+      // include (RFC 6609) moved in on 16 August 2026, under the same rule. Its
+      // delivery-side step is the fetch callback LocalDelivery binds to the
+      // recipient (SieveStorage::GetIncludedScript): :personal reaches the
+      // account's own named ManageSieve scripts, :global the administrator's
+      // <data>\Sieve\_global directory. Each included script runs in its own
+      // variable scope with "global" as the shared-namespace escape (RFC 6609
+      // 3.4), "return" unwinds exactly one level, :once and :optional behave as
+      // named, and nesting caps at three levels so a cycle costs three fetches
+      // rather than a stack - this runs on the delivery thread. End-to-end tests
+      // in SieveIncludeDelivery.cs file real deliveries through included scripts.
+      const char *AdvertisedSieveExtensions = "fileinto copy relational subaddress vacation vacation-seconds imap4flags body mailbox regex ihave environment date index spamtest spamtestplus duplicate editheader variables reject ereject include";
 
       AnsiString EscapeQuoted(const String &value)
       {

@@ -7,6 +7,7 @@
 #include <memory>
 #include <functional>
 #include <map>
+#include <set>
 
 #include "SieveParser.h"
 #include "SieveMessage.h"
@@ -168,6 +169,12 @@ namespace HM
       // mail.
       void SetDuplicateCheck(std::function<bool(const String &, const String &, __int64, bool)> callback);
 
+      // How "include" (RFC 6609) fetches a named stored script: (name, global) ->
+      // the script text, empty when there is no such script. The delivery path
+      // binds the recipient's account; with no callback every include is a
+      // missing script.
+      void SetIncludeFetch(std::function<String(const String &, bool)> callback);
+
    private:
       // Where the values a test compares against come from.
       enum class ValueSource { Header, Address, Envelope, Flags, Body, Environment };
@@ -224,15 +231,34 @@ namespace HM
       static bool WildcardMatchWithCaptures_(const String &pattern, const String &value,
                                              bool caseSensitive, std::vector<String> &captures);
 
-      // The variables (RFC 5229) state: script variables set by "set" and the
-      // match variables the most recent successful :matches recorded. Names are
+      // The variables (RFC 5229) state, scoped per script level because of
+      // include (RFC 6609): a variable is PRIVATE to the script that set it
+      // unless that script declared the name "global", in which case it lives in
+      // the shared namespace. Match variables are always level-private. Names are
       // stored lowercased - RFC 5229 3 makes them case-insensitive. The enabled
-      // flag records whether the script required "variables": without it, "${a}"
-      // has no special meaning (RFC 5229 3) and must pass through verbatim, so
-      // every expansion site is gated on it.
+      // flag records whether the TOP script required "variables": without it,
+      // "${a}" has no special meaning and must pass through verbatim, so every
+      // expansion site is gated on it.
+      struct VariableScope
+      {
+         std::map<String, String> privateVariables;
+         std::set<String> globalNames;
+         std::vector<String> matchVariables;
+      };
+
       bool variables_enabled_ = false;
-      std::map<String, String> variables_;
-      std::vector<String> match_variables_;
+      std::vector<VariableScope> scopes_;
+      std::map<String, String> global_variables_;
+
+      // include (RFC 6609): how the evaluator fetches a named stored script -
+      // bound to the recipient account by the delivery path - plus the recursion
+      // depth, the :once ledger, and the per-level "return" flag.
+      std::function<String(const String &, bool)> include_fetch_;
+      int include_depth_ = 0;
+      std::set<String> included_once_;
+      bool returned_ = false;
+
+      void ExecuteIncludeCommand_(const std::shared_ptr<SieveCommand> &command, const SieveMessage &message);
       bool EvaluateComparisonTest_(const std::shared_ptr<SieveTest> &test, const SieveMessage &message, ValueSource source);
       bool EvaluateExists_(const std::shared_ptr<SieveTest> &test, const SieveMessage &message);
       bool EvaluateSize_(const std::shared_ptr<SieveTest> &test, const SieveMessage &message);

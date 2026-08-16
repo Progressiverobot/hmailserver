@@ -93,6 +93,35 @@ namespace HM
    }
 
    String
+   SieveStorage::GetIncludedScript(const String &accountAddress, const String &name, bool global)
+   {
+      if (!IsValidScriptName(name))
+         return _T("");
+
+      // Personal scripts are the account's own named ManageSieve scripts; global
+      // ones live in a shared directory beside the domain directories, named with
+      // a leading underscore no sanitised domain can produce, and are the
+      // administrator's to place - nothing uploads into it.
+      String path;
+      if (global)
+      {
+         String dataDirectory = IniFileSettings::Instance()->GetDataDirectory();
+         String sieveRoot = FileUtilities::Combine(dataDirectory, _T("Sieve"));
+         String globalDirectory = FileUtilities::Combine(sieveRoot, _T("_global"));
+         path = FileUtilities::Combine(globalDirectory, name + _T(".sieve"));
+      }
+      else
+      {
+         path = GetScriptPath_(accountAddress, name);
+      }
+
+      if (!FileUtilities::Exists(path))
+         return _T("");
+
+      return FileUtilities::ReadCompleteTextFile(path);
+   }
+
+   String
    SieveStorage::GetActiveScript(const String &accountAddress)
    {
       String path = GetActiveScriptPath_(accountAddress);

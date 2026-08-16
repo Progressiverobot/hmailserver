@@ -291,6 +291,11 @@ namespace RegressionTests.Sieve
                StringAssert.Contains("reject", greeting);
                StringAssert.Contains("ereject", greeting);
 
+               // include followed, with SieveIncludeDelivery.cs behind it -
+               // deliveries filed by included personal and global scripts,
+               // variable scoping proven in both directions.
+               StringAssert.Contains("include", greeting);
+
                // Still absent on purpose: envelope is implemented and evaluated, and is
                // held back until a test proves the envelope TEST command itself works.
                // If somebody adds it here, that test should exist first.

@@ -72,7 +72,8 @@ namespace HM
                          SieveResult &result,
                          std::function<bool(const String &)> mailboxExists,
                          bool classifiedAsSpam,
-                         std::function<bool(const String &, const String &, __int64, bool)> duplicateCheck)
+                         std::function<bool(const String &, const String &, __int64, bool)> duplicateCheck,
+                         std::function<String(const String &, bool)> includeFetch)
    {
       String errorMessage;
 
@@ -92,6 +93,7 @@ namespace HM
       evaluator.SetMailboxExists(mailboxExists);
       evaluator.SetClassifiedAsSpam(classifiedAsSpam);
       evaluator.SetDuplicateCheck(duplicateCheck);
+      evaluator.SetIncludeFetch(includeFetch);
       return evaluator.Evaluate(sieveScript.GetCommands(), message, envelope, result);
    }
 }

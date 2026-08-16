@@ -11,6 +11,7 @@
 #include "../Application/Configuration.h"
 #include "../Util/Time.h"
 #include "../AntiSpam/AntiSpamConfiguration.h"
+#include "SieveScript.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -109,6 +110,12 @@ namespace HM
       duplicate_check_ = callback;
    }
 
+   void
+   SieveEvaluator::SetIncludeFetch(std::function<String(const String &, bool)> callback)
+   {
+      include_fetch_ = callback;
+   }
+
    bool
    SieveEvaluator::GetEnvironmentItem_(const String &name, String &value)
    {
@@ -197,8 +204,12 @@ namespace HM
       pinnedFlagsGiven_ = false;
       vacationDecided_ = false;
       variables_enabled_ = false;
-      variables_.clear();
-      match_variables_.clear();
+      scopes_.clear();
+      scopes_.push_back(VariableScope());
+      global_variables_.clear();
+      include_depth_ = 0;
+      included_once_.clear();
+      returned_ = false;
 
       envelope_ = envelope;
       result_ = &result;
@@ -257,7 +268,7 @@ namespace HM
       size_t i = 0;
       while (i < commands.size())
       {
-         if (stopped_)
+         if (stopped_ || returned_)
             return;
 
          const std::shared_ptr<SieveCommand> &command = commands[i];
@@ -535,6 +546,46 @@ namespace HM
 
          localDecided_ = true;
          actions_.push_back(_T("reject"));
+         return;
+      }
+
+      if (name == _T("include"))
+      {
+         ExecuteIncludeCommand_(command, message);
+         return;
+      }
+
+      if (name == _T("return"))
+      {
+         // RFC 6609 3.2: stop the CURRENT script. Inside an include, control goes
+         // back to the including script; at the top level it behaves like stop.
+         if (include_depth_ > 0)
+            returned_ = true;
+         else
+            stopped_ = true;
+
+         return;
+      }
+
+      if (name == _T("global"))
+      {
+         // RFC 6609 3.4: the listed names refer to the shared namespace in THIS
+         // script. Declaration only - values arrive via set.
+         SieveArgumentSet set;
+         String ignored;
+         if (!SieveParser::SplitArguments(command->arguments, set, ignored))
+            return;
+
+         if (set.stringLists.size() == 1 && !scopes_.empty())
+         {
+            for (const String &variableName : set.stringLists[0])
+            {
+               String lowerName = variableName;
+               lowerName.ToLower();
+               scopes_.back().globalNames.insert(lowerName);
+            }
+         }
+
          return;
       }
 
@@ -1626,19 +1677,32 @@ namespace HM
 
          if (allDigits)
          {
-            // A match variable. Leading zeroes are legal ("${01}" is "${1}").
+            // A match variable, always private to the current script level.
+            // Leading zeroes are legal ("${01}" is "${1}").
             int index = _ttoi(name.c_str());
-            if (index >= 0 && static_cast<size_t>(index) < match_variables_.size())
-               output += match_variables_[index];
+            if (!scopes_.empty() && index >= 0 &&
+                static_cast<size_t>(index) < scopes_.back().matchVariables.size())
+               output += scopes_.back().matchVariables[index];
          }
-         else
+         else if (!scopes_.empty())
          {
             String lowerName = name;
             lowerName.ToLower();
 
-            auto found = variables_.find(lowerName);
-            if (found != variables_.end())
-               output += found->second;
+            // A name this level declared "global" reads from the shared
+            // namespace; anything else is the level's own (RFC 6609 3.4).
+            if (scopes_.back().globalNames.count(lowerName) > 0)
+            {
+               auto found = global_variables_.find(lowerName);
+               if (found != global_variables_.end())
+                  output += found->second;
+            }
+            else
+            {
+               auto found = scopes_.back().privateVariables.find(lowerName);
+               if (found != scopes_.back().privateVariables.end())
+                  output += found->second;
+            }
          }
 
          i = close;
@@ -1763,6 +1827,85 @@ namespace HM
    }
 
    void
+   SieveEvaluator::ExecuteIncludeCommand_(const std::shared_ptr<SieveCommand> &command, const SieveMessage &message)
+   {
+      SieveArgumentSet set;
+      String ignored;
+      if (!SieveParser::SplitArguments(command->arguments, set, ignored))
+         return;
+
+      if (set.stringLists.size() != 1 || set.stringLists[0].size() != 1)
+         return;
+
+      String scriptName = set.stringLists[0][0];
+
+      bool global = false, once = false, optional = false;
+      for (const String &tag : set.tags)
+      {
+         if (tag == _T("global")) global = true;
+         else if (tag == _T("once")) once = true;
+         else if (tag == _T("optional")) optional = true;
+      }
+
+      // Three levels is past what any real script layering needs, and this
+      // recursion runs on the delivery thread; a pair of scripts including each
+      // other must cost three fetches, not a stack.
+      if (include_depth_ >= 3)
+      {
+         LOG_APPLICATION(_T("Sieve: an include was skipped because scripts are nested more than three deep - a cycle, most likely."));
+         return;
+      }
+
+      String onceKey = (global ? _T("g:") : _T("p:")) + scriptName;
+      if (once && included_once_.count(onceKey) > 0)
+         return;
+
+      String scriptText = include_fetch_ ? include_fetch_(scriptName, global) : String(_T(""));
+
+      if (scriptText.IsEmpty())
+      {
+         // RFC 6609 3.1: a missing script is an error - unless :optional says it
+         // is expected. The fail-safe spelling of "error" at delivery time is the
+         // same as for an unparsable active script: say so and carry on, so a
+         // renamed helper cannot stop mail.
+         if (!optional)
+            LOG_APPLICATION(_T("Sieve: the included script \"") + scriptName + _T("\" does not exist; the include was skipped."));
+
+         return;
+      }
+
+      SieveScript includedScript;
+      String errorMessage;
+      if (!includedScript.Parse(scriptText, errorMessage))
+      {
+         LOG_APPLICATION(_T("Sieve: the included script \"") + scriptName + _T("\" no longer parses and was skipped: ") + errorMessage);
+         return;
+      }
+
+      if (once)
+         included_once_.insert(onceKey);
+
+      // The included script runs in its own variable scope (RFC 6609 3.4): its
+      // variables are private unless it declares them global, and its match
+      // variables never leak into the includer. "return" unwinds exactly one
+      // level.
+      scopes_.push_back(VariableScope());
+      include_depth_++;
+
+      // Whether "${a}" means anything is per script (RFC 5229 3): a child's
+      // require "variables" must not switch expansion on for the parent's
+      // remaining commands, so the flag is restored on the way out.
+      bool parentVariablesEnabled = variables_enabled_;
+
+      ExecuteCommands_(includedScript.GetCommands(), message);
+
+      variables_enabled_ = parentVariablesEnabled;
+      include_depth_--;
+      scopes_.pop_back();
+      returned_ = false;
+   }
+
+   void
    SieveEvaluator::ExecuteSetCommand_(const std::shared_ptr<SieveCommand> &command)
    {
       SieveArgumentSet set;
@@ -1822,7 +1965,13 @@ namespace HM
       if (wantsLength)
          value = StringParser::IntToString(static_cast<__int64>(value.GetLength()));
 
-      variables_[name] = value;
+      if (scopes_.empty())
+         return;
+
+      if (scopes_.back().globalNames.count(name) > 0)
+         global_variables_[name] = value;
+      else
+         scopes_.back().privateVariables[name] = value;
    }
 
    bool
@@ -2144,8 +2293,8 @@ namespace HM
          if (!WildcardMatchWithCaptures_(key, value, caseSensitive, captures))
             return false;
 
-         if (variables_enabled_)
-            match_variables_ = captures;
+         if (variables_enabled_ && !scopes_.empty())
+            scopes_.back().matchVariables = captures;
 
          return true;
       }

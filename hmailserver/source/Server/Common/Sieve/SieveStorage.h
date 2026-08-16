@@ -56,6 +56,12 @@ namespace HM
       static String GetVacationStorePath(const String &accountAddress);
       static String GetDuplicateStorePath(const String &accountAddress);
 
+      // The text of a script "include" names (RFC 6609), or empty when it does
+      // not exist. Personal scripts are the account's own named ManageSieve
+      // scripts; global ones live in <data>\Sieve\_global\, placed there by an
+      // administrator - nothing uploads into that directory.
+      static String GetIncludedScript(const String &accountAddress, const String &name, bool global);
+
       // Where an account's and a domain's Sieve state lives on disk. Public so that
       // the rename and delete paths can move or remove it WITHOUT reimplementing
       // the sanitisation above - a second copy of that logic is how a rename ends
