@@ -119,31 +119,6 @@ namespace HM
       if (declaredSize <= 0)
          return IMAPResult(IMAPResult::ResultBad, "Empty message not permitted.");
 
-      // Absolute ceiling independent of the configured maximum, so an "unlimited"
-      // (0) max message size cannot translate into an unbounded APPEND. TOOBIG
-      // (RFC 4469, required alongside the RFC 7889 APPENDLIMIT advertisement)
-      // tells the client the literal itself was the problem, so it does not
-      // retry the same message.
-      const __int64 absoluteMaxMessageBytes = (__int64) 2 * 1024 * 1024 * 1024; // 2 GB
-      if (declaredSize > absoluteMaxMessageBytes)
-         return IMAPResult(IMAPResult::ResultNo, "[TOOBIG] Message size exceeds the maximum permitted size.");
-
-      // Add an extra two bytes since we expect a <newline> in the end.
-      bytes_left_to_receive_ = (size_t) declaredSize + 2;
-
-      std::shared_ptr<const Domain> domain = CacheContainer::Instance()->GetDomain(pConnection->GetAccount()->GetDomainID());
-      size_t maxMessageSizeKB = GetMaxMessageSize_(domain);
-
-      if (maxMessageSizeKB > 0 &&
-          bytes_left_to_receive_ / 1024 > maxMessageSizeKB)
-      {
-         String sMessage;
-         sMessage.Format(_T("[TOOBIG] Message size exceeds fixed maximum message size. Size: %d KB, Max size: %d KB"),
-            bytes_left_to_receive_ / 1024, maxMessageSizeKB);
-
-         return IMAPResult(IMAPResult::ResultNo, sMessage);
-      }
-
       // Locate the parameter containing the date to set.
       // Can't use pParser->QuotedWord() since there may
       // be many quoted words in the command.
@@ -168,36 +143,22 @@ namespace HM
       if (!destination_folder_)
          return IMAPResult(IMAPResult::ResultNo, "[TRYCREATE] Folder could not be found.");
 
-      if (!destination_folder_->IsPublicFolder())
-      {
-         // Make sure that this message fits in the mailbox.
-         std::shared_ptr<const Account> pAccount = CacheContainer::Instance()->GetAccount(pConnection->GetAccount()->GetID());
-         
-         if (!pAccount)
-            return IMAPResult(IMAPResult::ResultNo, "Account could not be fetched.");
-
-         if (!pAccount->SpaceAvailable(bytes_left_to_receive_))
-            return IMAPResult(IMAPResult::ResultNo, "[OVERQUOTA] Your quota has been exceeded.");
-      }
-
       if (!pConnection->CheckPermission(destination_folder_, ACLPermission::PermissionInsert))
          return IMAPResult(IMAPResult::ResultBad, "ACL: Insert permission denied (Required for APPEND command).");
 
+      // A fresh command: forget everything a previous APPEND on this connection
+      // left behind.
+      pending_messages_.clear();
+      command_failed_ = false;
+      failure_response_.Empty();
+      continuation_line_.Empty();
+      receive_state_ = ReceivingLiteral;
+      write_failed_ = false;
+      append_buffer_.Empty();
 
-
-      __int64 lFolderID = destination_folder_->GetID();
-
-      current_message_ = std::shared_ptr<Message>(new Message);
-      current_message_->SetAccountID(destination_folder_->GetAccountID());
-      current_message_->SetFolderID(lFolderID);
-
-      // Construct a file name which we'll write the message to.
-      // Should we connect this message to an account? Yes, if this is not a public folder.
-      std::shared_ptr<const Account> pMessageOwner;
-      if (!destination_folder_->IsPublicFolder())
-         pMessageOwner = pConnection->GetAccount();
-
-      message_file_name_ = PersistentMessage::GetFileName(pMessageOwner, current_message_);
+      IMAPResult prepareResult = ValidateAndPrepareMessage_(pConnection, declaredSize);
+      if (prepareResult.GetResult() != IMAPResult::ResultOK)
+         return prepareResult;
 
       pConnection->SetReceiveBinary(true);
 
@@ -209,37 +170,169 @@ namespace HM
       return IMAPResult();
    }
 
+   IMAPResult
+   IMAPCommandAppend::ValidateAndPrepareMessage_(std::shared_ptr<IMAPConnection> pConnection, __int64 declaredSize)
+   //---------------------------------------------------------------------------
+   // DESCRIPTION:
+   // Everything one message of an APPEND must pass before its octets are
+   // accepted - shared between the first message (parsed by ExecuteCommand) and
+   // every later one in a MULTIAPPEND (parsed from a continuation line).
+   //---------------------------------------------------------------------------
+   {
+      // Absolute ceiling independent of the configured maximum, so an "unlimited"
+      // (0) max message size cannot translate into an unbounded APPEND. TOOBIG
+      // (RFC 4469, required alongside the RFC 7889 APPENDLIMIT advertisement)
+      // tells the client the literal itself was the problem, so it does not
+      // retry the same message.
+      const __int64 absoluteMaxMessageBytes = (__int64) 2 * 1024 * 1024 * 1024; // 2 GB
+      if (declaredSize > absoluteMaxMessageBytes)
+         return IMAPResult(IMAPResult::ResultNo, "[TOOBIG] Message size exceeds the maximum permitted size.");
+
+      // The literal is exactly the message; the CRLF after it belongs to the
+      // command line and is handled as continuation text.
+      bytes_left_to_receive_ = (size_t) declaredSize;
+
+      std::shared_ptr<const Domain> domain = CacheContainer::Instance()->GetDomain(pConnection->GetAccount()->GetDomainID());
+      size_t maxMessageSizeKB = GetMaxMessageSize_(domain);
+
+      if (maxMessageSizeKB > 0 &&
+          bytes_left_to_receive_ / 1024 > maxMessageSizeKB)
+      {
+         String sMessage;
+         sMessage.Format(_T("[TOOBIG] Message size exceeds fixed maximum message size. Size: %d KB, Max size: %d KB"),
+            bytes_left_to_receive_ / 1024, maxMessageSizeKB);
+
+         return IMAPResult(IMAPResult::ResultNo, sMessage);
+      }
+
+      if (!destination_folder_->IsPublicFolder())
+      {
+         // Make sure that this message fits in the mailbox - counting the
+         // messages of this same command that are received but, because a
+         // MULTIAPPEND is atomic, not yet saved and so not yet in the account's
+         // size. Without this, N-1 messages of headroom could be overshot.
+         size_t pendingBytes = 0;
+         for (const PendingMessage &pending : pending_messages_)
+            pendingBytes += (size_t) pending.message->GetSize();
+
+         std::shared_ptr<const Account> pAccount = CacheContainer::Instance()->GetAccount(pConnection->GetAccount()->GetID());
+
+         if (!pAccount)
+            return IMAPResult(IMAPResult::ResultNo, "Account could not be fetched.");
+
+         if (!pAccount->SpaceAvailable(bytes_left_to_receive_ + pendingBytes))
+            return IMAPResult(IMAPResult::ResultNo, "[OVERQUOTA] Your quota has been exceeded.");
+      }
+
+      current_message_ = std::shared_ptr<Message>(new Message);
+      current_message_->SetAccountID(destination_folder_->GetAccountID());
+      current_message_->SetFolderID(destination_folder_->GetID());
+
+      // Construct a file name which we'll write the message to.
+      // Should we connect this message to an account? Yes, if this is not a public folder.
+      std::shared_ptr<const Account> pMessageOwner;
+      if (!destination_folder_->IsPublicFolder())
+         pMessageOwner = pConnection->GetAccount();
+
+      message_file_name_ = PersistentMessage::GetFileName(pMessageOwner, current_message_);
+
+      return IMAPResult();
+   }
+
    void
    IMAPCommandAppend::ParseBinary(std::shared_ptr<IMAPConnection> pConnection, std::shared_ptr<ByteBuffer> pBuf)
    {
       append_buffer_.Add(pBuf);
-   
-      if (append_buffer_.GetSize() >= bytes_left_to_receive_)
+
+      // The connection stays in binary mode from the first literal to the final
+      // CRLF of the command. Between literals the bytes are the rest of the
+      // command line (RFC 3502 MULTIAPPEND: another flags/date/{size} group, or
+      // nothing before the terminating CRLF), so one received buffer can span a
+      // literal's end, the following line and the next literal's start - hence a
+      // loop rather than one step per read.
+      while (true)
       {
-         // Write only the number of bytes still expected for this literal; never
-         // spill trailing bytes that belong to a following command into the
-         // stored message (which would corrupt it and desync the parser).
-         size_t writeLen = bytes_left_to_receive_;
-         if (writeLen > append_buffer_.GetSize())
-            writeLen = append_buffer_.GetSize();
+         if (receive_state_ == ReceivingLiteral)
+         {
+            if (append_buffer_.GetSize() < bytes_left_to_receive_)
+            {
+               TruncateBuffer_(pConnection);
 
-         WriteData_(pConnection, append_buffer_.GetBuffer(), writeLen);
+               pConnection->EnqueueRead("");
+               return;
+            }
 
-         pConnection->SetReceiveBinary(false);
-   
+            // Write only the number of bytes still expected for this literal;
+            // never spill trailing bytes - they are the continuation of the
+            // command line - into the stored message.
+            size_t writeLen = bytes_left_to_receive_;
+
+            // A failed command still consumes its literals to keep the protocol
+            // in step, but stores nothing.
+            if (!command_failed_)
+               WriteData_(pConnection, append_buffer_.GetBuffer(), writeLen);
+
+            size_t remaining = append_buffer_.GetSize() - writeLen;
+            append_buffer_.Empty(remaining);
+            bytes_left_to_receive_ = 0;
+
+            CompleteCurrentMessage_(pConnection);
+
+            continuation_line_.Empty();
+            receive_state_ = ReceivingContinuationLine;
+            continue;
+         }
+
+         // ReceivingContinuationLine: accumulate up to the next CRLF. Everything
+         // is appended to the line buffer first and the CRLF searched for there,
+         // so a pair split across two reads is still found.
+         continuation_line_.append((const char*) append_buffer_.GetBuffer(), append_buffer_.GetSize());
          append_buffer_.Empty();
 
-         Finish_(pConnection);
+         size_t lineEnd = continuation_line_.find("\r\n");
 
+         if (lineEnd == std::string::npos)
+         {
+            // A between-literals line is a flags list, a date and a size - tiny.
+            // Anything growing past this is not an APPEND continuation, and
+            // buffering it forever would hand an authenticated client a memory
+            // sink.
+            const size_t maxContinuationLine = 4096;
+
+            if (continuation_line_.size() > maxContinuationLine)
+            {
+               CleanupPendingMessages_();
+               KillCurrentMessage_();
+
+               pConnection->SetReceiveBinary(false);
+               pConnection->SendAsciiData(current_tag_ + " BAD APPEND continuation line is too long.\r\n");
+               pConnection->EnqueueRead();
+               return;
+            }
+
+            pConnection->EnqueueRead("");
+            return;
+         }
+
+         AnsiString line = continuation_line_.substr(0, lineEnd);
+         AnsiString residue = continuation_line_.substr(lineEnd + 2);
+         continuation_line_.Empty();
+
+         // Bytes after the CRLF are the next literal's octets (or, after the
+         // final CRLF, pipelined data the finalize path discards with the
+         // buffer, exactly as the single-message APPEND always has).
+         if (!residue.empty())
+            append_buffer_.Add((const BYTE*) residue.c_str(), residue.size());
+
+         ParseContinuationLine_(pConnection, line);
+
+         if (receive_state_ == ReceivingLiteral && bytes_left_to_receive_ > 0)
+            continue;
+
+         // The command completed (or failed terminally): back to line mode.
          pConnection->EnqueueRead();
+         return;
       }
-      else
-      {
-         TruncateBuffer_(pConnection);
-
-         pConnection->EnqueueRead("");
-      }
-
    }
    
    bool
@@ -295,33 +388,48 @@ namespace HM
    }
 
    void
-   IMAPCommandAppend::Finish_(std::shared_ptr<IMAPConnection> pConnection)
+   IMAPCommandAppend::CompleteCurrentMessage_(std::shared_ptr<IMAPConnection> pConnection)
+   //---------------------------------------------------------------------------
+   // DESCRIPTION:
+   // One message's octets have all arrived. Its flags and date are applied and
+   // it joins the received-but-unsaved list; nothing touches the database until
+   // the whole command has succeeded, because a multi-message APPEND is atomic
+   // (RFC 3502) - all stored or none.
+   //---------------------------------------------------------------------------
    {
-      if (!current_message_)
-         return;
-
-      if (write_failed_)
+      if (command_failed_ || !current_message_)
       {
-         // The message data never reached disk. Discard the partial file and
-         // fail the command: reporting OK here silently lost Sent Items copies,
-         // drafts and migration uploads while the client believed they were saved.
-         ErrorManager::Instance()->ReportError(ErrorManager::High, 5211, "IMAPCommandAppend::Finish_",
-            "APPEND failed because the message file could not be written: " + message_file_name_);
-
-         KillCurrentMessage_();
-
-         write_failed_ = false;
-
-         String sFailure = current_tag_ + " NO [SERVERBUG] APPEND failed - the message could not be stored on the server.\r\n";
-         pConnection->SendAsciiData(sFailure);
-
-         // No database row was created yet, so dropping the handles is enough.
-         destination_folder_.reset();
          current_message_.reset();
          return;
       }
 
-      // Add this message to the folder.
+      // The stored file ends with CRLF, exactly as it always has: the
+      // pre-MULTIAPPEND code consumed the command's terminating CRLF in binary
+      // mode and wrote it into the file, and consumers of message files rely on
+      // the terminator - header parsing of a headers-only message included,
+      // which is how its absence was caught (the SORT-by-Date fixture).
+      if (!write_failed_)
+      {
+         const BYTE crlfTerminator[2] = { '\r', '\n' };
+         WriteData_(pConnection, crlfTerminator, 2);
+      }
+
+      if (write_failed_)
+      {
+         // The message data never reached disk. Fail the whole command:
+         // reporting OK here silently lost Sent Items copies, drafts and
+         // migration uploads while the client believed they were saved.
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 5211, "IMAPCommandAppend::CompleteCurrentMessage_",
+            "APPEND failed because the message file could not be written: " + message_file_name_);
+
+         KillCurrentMessage_();
+         write_failed_ = false;
+         current_message_.reset();
+
+         FailCommand_(current_tag_ + " NO [SERVERBUG] APPEND failed - the message could not be stored on the server.\r\n");
+         return;
+      }
+
       current_message_->SetSize(FileUtilities::FileSize(message_file_name_));
       current_message_->SetState(Message::Delivered);
 
@@ -331,13 +439,13 @@ namespace HM
       bool bDraft = (flags_to_set_.FindNoCase(_T("\\Draft")) >= 0);
       bool bAnswered = (flags_to_set_.FindNoCase(_T("\\Answered")) >= 0);
       bool bFlagged = (flags_to_set_.FindNoCase(_T("\\Flagged")) >= 0);
-      
+
       if (bSeen)
       {
          // ACL: If user tries to set the Seen flag, check that he has permission to do so.
          if (!pConnection->CheckPermission(destination_folder_, ACLPermission::PermissionWriteSeen))
          {
-            // User does not have permission to set the Seen flag. 
+            // User does not have permission to set the Seen flag.
             bSeen = false;
          }
       }
@@ -347,8 +455,7 @@ namespace HM
       current_message_->SetFlagDraft(bDraft);
       current_message_->SetFlagAnswered(bAnswered);
       current_message_->SetFlagFlagged(bFlagged);
-    
-         
+
       // Set the create time
       if (!create_time_to_set_.IsEmpty())
       {
@@ -357,37 +464,240 @@ namespace HM
          current_message_->SetCreateTime(create_time_to_set_);
       }
 
-      // The save that makes an APPEND real, and its result was discarded - so a
-      // database failure here answered the client "OK [APPENDUID ...] APPEND
-      // completed" for a message that had not been stored, having first inserted
-      // whatever GetID() happened to be into the recent set and told the folder it
-      // had changed. The client believes it is safe to delete its copy, and for a
-      // migration tool moving a mailbox into this server over IMAP - which is the
-      // main thing APPEND is used for at volume - that is the copy that mattered.
-      //
-      // NO rather than BAD: the command was well formed, the server could not do it.
-      // The file is removed so it is not left on disk with no row referring to it.
-      if (!PersistentMessage::SaveObject(current_message_))
+      PendingMessage pending;
+      pending.message = current_message_;
+      pending.fileName = message_file_name_;
+      pending_messages_.push_back(pending);
+
+      current_message_.reset();
+   }
+
+   void
+   IMAPCommandAppend::ParseContinuationLine_(std::shared_ptr<IMAPConnection> pConnection, const AnsiString &line)
+   //---------------------------------------------------------------------------
+   // DESCRIPTION:
+   // The command-line text following a completed literal: empty means the
+   // command's terminating CRLF, anything else must be another RFC 3502
+   // "[flags] [date] {size}" group.
+   //---------------------------------------------------------------------------
+   {
+      String continuation = line;
+      continuation.Trim();
+
+      if (continuation.IsEmpty())
       {
-         // The file this wrote is the one KillCurrentMessage_ already knows how to
-         // remove, and it is what every other abandoned APPEND in this class uses.
-         KillCurrentMessage_();
-
-         ErrorManager::Instance()->ReportError(ErrorManager::High, 6091, "IMAPCommandAppend::Finish_",
-            "An APPEND could not be saved and has been refused. The message file has been removed rather than left on disk with nothing referring to it.");
-
-         pConnection->SendAsciiData(current_tag_ + " NO APPEND failed: the message could not be saved.\r\n");
-
-         destination_folder_.reset();
-         current_message_.reset();
+         FinalizeCommand_(pConnection);
          return;
       }
 
-      pConnection->GetRecentMessages().insert(current_message_->GetID());
+      // Another message follows. Parse its optional flags list, optional quoted
+      // date and mandatory literal size.
+      flags_to_set_ = "";
+      create_time_to_set_ = "";
+
+      if (continuation.GetLength() > 0 && continuation.GetAt(0) == '(')
+      {
+         int flagsEnd = continuation.Find(_T(")"));
+         if (flagsEnd < 0)
+         {
+            TerminateWithProtocolError_(pConnection, " BAD APPEND flag list is not closed.\r\n");
+            return;
+         }
+
+         flags_to_set_ = continuation.Mid(1, flagsEnd - 1);
+         continuation = continuation.Mid(flagsEnd + 1);
+         continuation.Trim();
+      }
+
+      if (continuation.GetLength() > 0 && continuation.GetAt(0) == '"')
+      {
+         int dateEnd = continuation.Find(_T("\""), 1);
+         if (dateEnd < 0)
+         {
+            TerminateWithProtocolError_(pConnection, " BAD APPEND date is not closed.\r\n");
+            return;
+         }
+
+         create_time_to_set_ = continuation.Mid(1, dateEnd - 1);
+         create_time_to_set_.TrimLeft();
+         continuation = continuation.Mid(dateEnd + 1);
+         continuation.Trim();
+      }
+
+      if (continuation.GetLength() < 3 ||
+          continuation.GetAt(0) != '{' ||
+          continuation.Right(1) != _T("}"))
+      {
+         TerminateWithProtocolError_(pConnection, " BAD APPEND continuation must be a literal.\r\n");
+         return;
+      }
+
+      String literalSize = continuation.Mid(1, continuation.GetLength() - 2);
+
+      bool nonSynchronizingLiteral = false;
+      if (literalSize.Right(1) == _T("+"))
+      {
+         literalSize = literalSize.Mid(0, literalSize.GetLength() - 1);
+         nonSynchronizingLiteral = true;
+      }
+
+      if (literalSize.IsEmpty())
+      {
+         TerminateWithProtocolError_(pConnection, " BAD Invalid literal size.\r\n");
+         return;
+      }
+
+      for (int i = 0; i < literalSize.GetLength(); i++)
+      {
+         wchar_t ch = literalSize.GetAt(i);
+         if (ch < '0' || ch > '9')
+         {
+            TerminateWithProtocolError_(pConnection, " BAD Invalid literal size.\r\n");
+            return;
+         }
+      }
+
+      __int64 declaredSize = _ttoi64(literalSize.c_str());
+      if (declaredSize <= 0)
+      {
+         TerminateWithProtocolError_(pConnection, " BAD Empty message not permitted.\r\n");
+         return;
+      }
+
+      IMAPResult prepareResult = command_failed_
+         ? IMAPResult()
+         : ValidateAndPrepareMessage_(pConnection, declaredSize);
+
+      if (prepareResult.GetResult() != IMAPResult::ResultOK)
+      {
+         if (!nonSynchronizingLiteral)
+         {
+            // The client is waiting for a continuation; the tagged refusal can
+            // take its place and nothing more will be sent (RFC 3502 section 2:
+            // refusing any message means storing none).
+            CleanupPendingMessages_();
+            KillCurrentMessage_();
+            current_message_.reset();
+
+            pConnection->SetReceiveBinary(false);
+
+            String refusal = prepareResult.GetResult() == IMAPResult::ResultBad ? _T(" BAD ") : _T(" NO ");
+            pConnection->SendAsciiData(current_tag_ + refusal + prepareResult.GetMessage() + _T("\r\n"));
+            return;
+         }
+
+         // The octets are already on their way ({n+}); consume them to keep the
+         // protocol in step, store nothing, and answer at the command's end.
+         String refusal = prepareResult.GetResult() == IMAPResult::ResultBad ? _T(" BAD ") : _T(" NO ");
+         FailCommand_(current_tag_ + refusal + prepareResult.GetMessage() + _T("\r\n"));
+
+         bytes_left_to_receive_ = (size_t) declaredSize;
+         current_message_.reset();
+         receive_state_ = ReceivingLiteral;
+         return;
+      }
+
+      if (command_failed_)
+         bytes_left_to_receive_ = (size_t) declaredSize;
+
+      receive_state_ = ReceivingLiteral;
+
+      if (!nonSynchronizingLiteral)
+         pConnection->SendAsciiData("+ Ready for literal data\r\n");
+   }
+
+   void
+   IMAPCommandAppend::TerminateWithProtocolError_(std::shared_ptr<IMAPConnection> pConnection, const String &responseAfterTag)
+   {
+      CleanupPendingMessages_();
+      KillCurrentMessage_();
+      current_message_.reset();
+      append_buffer_.Empty();
+
+      pConnection->SetReceiveBinary(false);
+      pConnection->SendAsciiData(current_tag_ + responseAfterTag);
+   }
+
+   void
+   IMAPCommandAppend::FailCommand_(const String &response)
+   {
+      // The first failure is the one reported; later ones are consequences.
+      if (!command_failed_)
+      {
+         command_failed_ = true;
+         failure_response_ = response;
+      }
+   }
+
+   void
+   IMAPCommandAppend::CleanupPendingMessages_()
+   {
+      // None of these have database rows yet, so removing the files is the
+      // whole rollback.
+      for (const PendingMessage &pending : pending_messages_)
+      {
+         if (FileUtilities::Exists(pending.fileName))
+            FileUtilities::DeleteFile(pending.fileName);
+      }
+
+      pending_messages_.clear();
+   }
+
+   void
+   IMAPCommandAppend::FinalizeCommand_(std::shared_ptr<IMAPConnection> pConnection)
+   //---------------------------------------------------------------------------
+   // DESCRIPTION:
+   // The command's terminating CRLF has arrived. Save every received message,
+   // or - if anything failed along the way - none of them (RFC 3502).
+   //---------------------------------------------------------------------------
+   {
+      append_buffer_.Empty();
+      pConnection->SetReceiveBinary(false);
+
+      if (command_failed_)
+      {
+         CleanupPendingMessages_();
+         pConnection->SendAsciiData(failure_response_);
+
+         command_failed_ = false;
+         failure_response_.Empty();
+         destination_folder_.reset();
+         return;
+      }
+
+      // The saves that make an APPEND real. A database failure part-way rolls
+      // back the rows already created - the command promised atomicity.
+      //
+      // NO rather than BAD: the command was well formed, the server could not
+      // do it. The files are removed so none is left on disk with no row
+      // referring to it.
+      std::vector<__int64> savedUids;
+      std::vector<std::shared_ptr<Message> > savedMessages;
+
+      for (const PendingMessage &pending : pending_messages_)
+      {
+         if (!PersistentMessage::SaveObject(pending.message))
+         {
+            for (std::shared_ptr<Message> savedMessage : savedMessages)
+               PersistentMessage::DeleteObject(savedMessage);
+
+            CleanupPendingMessages_();
+
+            ErrorManager::Instance()->ReportError(ErrorManager::High, 6091, "IMAPCommandAppend::FinalizeCommand_",
+               "An APPEND could not be saved and has been refused. The message files have been removed rather than left on disk with nothing referring to them.");
+
+            pConnection->SendAsciiData(current_tag_ + " NO APPEND failed: the message could not be saved.\r\n");
+
+            destination_folder_.reset();
+            return;
+         }
+
+         savedMessages.push_back(pending.message);
+         savedUids.push_back((__int64) pending.message->GetUID());
+         pConnection->GetRecentMessages().insert(pending.message->GetID());
+      }
 
       MessagesContainer::Instance()->SetFolderNeedsRefresh(destination_folder_->GetID());
-
-
 
       String sResponse;
       if (pConnection->GetCurrentFolder() &&
@@ -399,22 +709,25 @@ namespace HM
       }
 
       // RFC 4315 (UIDPLUS): report the destination folder's UIDVALIDITY and the
-      // UID assigned to the appended message so the client can reference it
-      // without performing a search.
+      // UIDs assigned, so the client can reference the messages without a
+      // search. With several messages (RFC 3502) the response carries the
+      // uid-set, in the order the messages were appended.
       String sAppendUid;
-      sAppendUid.Format(_T("[APPENDUID %d %u] "), destination_folder_->GetCreationTime().ToInt(), current_message_->GetUID());
+      sAppendUid.Format(_T("[APPENDUID %d %s] "),
+         destination_folder_->GetCreationTime().ToInt(),
+         IMAPConnection::CompactUidSet(savedUids).c_str());
 
       // Send the OK response to the client.
       sResponse += current_tag_ + " OK " + sAppendUid + "APPEND completed\r\n";
       pConnection->SendAsciiData(sResponse);
 
-      // Notify the mailbox notifier that the mailbox contents have changed. 
-      std::shared_ptr<ChangeNotification> pNotification = 
+      // Notify the mailbox notifier that the mailbox contents have changed.
+      std::shared_ptr<ChangeNotification> pNotification =
          std::shared_ptr<ChangeNotification>(new ChangeNotification(destination_folder_->GetAccountID(), destination_folder_->GetID(), ChangeNotification::NotificationMessageAdded));
       Application::Instance()->GetNotificationServer()->SendNotification(pConnection->GetNotificationClient(), pNotification);
 
+      pending_messages_.clear();
       destination_folder_.reset();
-      current_message_.reset();
    }
 
    int

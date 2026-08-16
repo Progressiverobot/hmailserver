@@ -130,6 +130,10 @@ namespace HM
       // client can render its message list without fetching any bodies.
       sResponse += " PREVIEW";
 
+      // RFC 3502: several messages in one APPEND, atomically - all stored or
+      // none. Migration tools filling a mailbox are the main beneficiary.
+      sResponse += " MULTIAPPEND";
+
       // RFC 8437: an authenticated session can return to the not-authenticated
       // state for connection reuse. Advertised only once authenticated - that is
       // the only state where the command is valid, and the RFC's requirement is

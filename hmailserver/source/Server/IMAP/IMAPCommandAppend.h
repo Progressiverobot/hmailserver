@@ -32,11 +32,35 @@ namespace HM
 
    private:
 
-      void Finish_(std::shared_ptr<IMAPConnection> pConnection);
+      // RFC 3502 (MULTIAPPEND): one received-but-unsaved message. Database rows
+      // are created only when the whole command has succeeded, because a
+      // multi-message APPEND is atomic - all stored or none.
+      struct PendingMessage
+      {
+         std::shared_ptr<Message> message;
+         String fileName;
+      };
+
+      // The command stays in binary mode from the first literal to the final
+      // CRLF; between literals the bytes are the rest of the command line.
+      enum ReceiveState
+      {
+         ReceivingLiteral,
+         ReceivingContinuationLine
+      };
+
+      void CompleteCurrentMessage_(std::shared_ptr<IMAPConnection> pConnection);
+      void ParseContinuationLine_(std::shared_ptr<IMAPConnection> pConnection, const AnsiString &line);
+      void TerminateWithProtocolError_(std::shared_ptr<IMAPConnection> pConnection, const String &responseAfterTag);
+      IMAPResult ValidateAndPrepareMessage_(std::shared_ptr<IMAPConnection> pConnection, __int64 declaredSize);
+      void FinalizeCommand_(std::shared_ptr<IMAPConnection> pConnection);
+      void FailCommand_(const String &response);
+      void CleanupPendingMessages_();
+
       bool TruncateBuffer_(const std::shared_ptr<IMAPConnection> pConnection );
       bool WriteData_(const std::shared_ptr<IMAPConnection> pConnection, const BYTE *pBuf, size_t WriteLen);
       void KillCurrentMessage_();
-      
+
       int GetMaxMessageSize_(std::shared_ptr<const Domain> pDomain);
 
       String current_tag_;
@@ -51,11 +75,24 @@ namespace HM
       // must then fail instead of reporting OK for a message that was lost.
       bool write_failed_ = false;
 
+      ReceiveState receive_state_ = ReceivingLiteral;
+
+      // Bytes of the between-literals command line received so far.
+      AnsiString continuation_line_;
+
+      // When the command has already failed (a write error, an oversized later
+      // message), the remaining literals are consumed to keep the protocol in
+      // step but discarded, and this holds the response to send at the end.
+      bool command_failed_ = false;
+      String failure_response_;
+
+      std::vector<PendingMessage> pending_messages_;
+
       ByteBuffer append_buffer_;
       std::shared_ptr<IMAPFolder> destination_folder_;
       std::shared_ptr<Message> current_message_;
 
-      
+
    };
 
 }

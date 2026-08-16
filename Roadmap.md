@@ -55,7 +55,7 @@ strong and where it is thin far more honestly than any prose summary.
 | **The capability matrix** | | | | |
 | [SMTP and ESMTP](#smtp-and-esmtp) | 27 | – | 2 | – |
 | [Transport security and deliverability](#transport-security-and-deliverability) | 43 | – | 4 | 1 |
-| [IMAP](#imap) | 65 | – | 10 | 3 |
+| [IMAP](#imap) | 66 | – | 9 | 3 |
 | [POP3](#pop3) | 21 | – | 6 | – |
 | [Sieve, ManageSieve and rules](#sieve-managesieve-and-rules) | 64 | 0 | 1 | – |
 | [Authentication and cryptography](#authentication-and-cryptography) | 57 | 0 | 18 | – |
@@ -72,7 +72,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 2 | – | 4 | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 5 | 1 | 2 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 4 | 1 | 4 | – |
-| **Total** | **650** | **12** | **120** | **15** |
+| **Total** | **651** | **12** | **119** | **15** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage and the administration surface are the best-covered areas**, and the
@@ -330,7 +330,7 @@ the source, not from documentation.
 
 ### IMAP
 
-65 shipped · 0 underway · 10 not started · 3 deferred
+66 shipped · 0 underway · 9 not started · 3 deferred
 
 | | Capability | Detail |
 |:-:|---|---|
@@ -402,7 +402,7 @@ the source, not from documentation.
 | ✅ | LITERAL- (RFC 7888) | **Shipped 16 August 2026.** The parsers always tolerated the {n+} form - both the connection-level literal reader and APPEND stripped the '+' - but the server still answered every literal with a continuation the client never reads, and never advertised the capability, so no client used the form. Now the continuation is suppressed exactly when the literal was non-synchronizing (all three send sites: the initial ask, the mid-literal re-ask and APPEND's "Ready for literal data"), and CAPABILITY advertises LITERAL- rather than LITERAL+, deliberately: the minus variant tells clients to keep non-synchronizing literals at or under 4096 bytes and use the synchronizing form beyond, which preserves the server's chance to refuse an oversized APPEND with TOOBIG before the data moves - the round trips saved are on the small literals (folder names, LOGIN arguments, SEARCH strings), not the message upload. Fixtures: a LOGIN sent entirely as {n+} literals in one write with the tagged OK as the first thing the server says, an APPEND riding a {n+} literal that lands in the mailbox, the LITERAL- advertisement, and the control - the synchronizing {n} form still gets its continuation, or every client that never saw the capability would deadlock. |
 | ✅ | LOGINDISABLED (RFC 3501) | **Shipped 13 August 2026, and this row was stale until 16 August.** CAPABILITY advertises LOGINDISABLED whenever LOGIN would be refused on the connection - which is two cases, not one: the port being STARTTLS-required, and the connecting IP range setting RequireTLSForAuth; the second used to be invisible. The same commit stopped offering AUTH=PLAIN in both cases, because advertising a mechanism and then refusing it means the password has already crossed the wire in the clear by the time the client learns the connection was unacceptable. Fixtures in CapabilityAuthAdvertisement assert both directions: cleartext CAPABILITY carries LOGINDISABLED and no AUTH= mechanism, and the same connection after STARTTLS carries the mechanisms and no LOGINDISABLED. |
 | ⬜ | METADATA (RFC 5464) / ANNOTATE | Not implemented and not advertised; no GETMETADATA or SETMETADATA commands and no annotation store. Roadmap flags it as a prerequisite for some Sieve extensions. |
-| ⬜ | MULTIAPPEND (RFC 3502) | Not implemented and not advertised. APPEND handles exactly one message literal per command and finishes the command as soon as that literal is complete. |
+| ✅ | MULTIAPPEND (RFC 3502) | **Shipped 16 August 2026.** Several messages travel in one APPEND - the shape migration tools want when filling a mailbox - and the command is atomic: database rows are created only when the whole command has succeeded, so refusing any message means storing none, which is the entire difference from issuing N separate APPENDs. The connection stays in binary mode from the first literal to the final CRLF; between literals the bytes are the rest of the command line (another flags/date/size group, or the terminating CRLF), so no connection-level routing changed - the risky part of the feature stayed inside the APPEND handler. Composes with LITERAL-: a whole multi-message APPEND lands in one round trip. With UIDPLUS the single APPENDUID response carries the whole uid-set. A mid-command refusal (an oversized later message, a failed write) is answered in the sync case in place of the continuation, and in the non-sync case the remaining literals are consumed to keep the protocol in step, stored nowhere, and answered at the command's end. Quota is checked cumulatively across the command's unsaved messages, not per message. Five fixtures: the two-message append with the APPENDUID uid-set, ATOMICITY (a valid first message is discarded when the second is refused - the test an implementation that saved per-message would fail), the one-round-trip non-sync form, per-message flags, and the capability advertisement. |
 | ⬜ | OBJECTID (RFC 8474) — EMAILID / THREADID / MAILBOXID | Not implemented and not advertised; no EMAILID or THREADID FETCH item and no MAILBOXID in the LIST/STATUS paths. Listed in the roadmap's IMAP-extension backlog. |
 | ✅ | PREVIEW (RFC 8970) | **Shipped 16 August 2026.** The PREVIEW FETCH item hands the client a server-generated body snippet, so a message list renders without fetching any bodies. The snippet comes from the same body-part selection MessageData uses - the one place that already knows how to walk multipart/alternative and decode part charsets - so the preview and the body can never disagree; an HTML-only message gets its tags stripped and a handful of entities decoded, because a preview is a glance, not a rendering. Whitespace runs collapse to single spaces, the text is cut at 200 characters and again at the RFC's 256-octet ceiling on a UTF-8 boundary, and it is emitted as a literal since previews are UTF-8 by definition. The LAZY modifier is accepted and answered like the plain form, which the RFC permits - LAZY lets a server answer NIL to avoid expensive generation, it does not oblige it to. Five fixtures: the collapsed plain-text snippet, LAZY, the HTML strip, the octet ceiling on a long body, and the capability advertisement. |
 | ⬜ | REPLACE (RFC 8508) | Not implemented and not advertised; there is no REPLACE or UID REPLACE command, so clients must emulate draft updates with APPEND + STORE \Deleted + EXPUNGE. |
