@@ -37,6 +37,7 @@ namespace HM
       set_seen_ = false;
       show_body_structure_NonExtensible = false;
       show_modseq_ = false;
+      show_preview_ = false;
       has_changedsince_ = false;
       changedsince_ = 0;
    }
@@ -191,6 +192,19 @@ namespace HM
    {
       String sStringToParse = sCommand;
 
+      // RFC 8970: "PREVIEW (LAZY)" is the only data item that carries a
+      // parenthesised modifier list, and this parser tokenizes on whitespace, so
+      // the modifier is folded into the plain form before parsing. Treating LAZY
+      // as the plain form is permitted: it lets a server answer NIL to avoid
+      // expensive generation, it does not oblige it to.
+      long lPreviewLazy = sStringToParse.FindNoCase(_T("PREVIEW (LAZY)"));
+      if (lPreviewLazy >= 0)
+      {
+         String sBefore = sStringToParse.Mid(0, lPreviewLazy);
+         String sAfter = sStringToParse.Mid(lPreviewLazy + (long) wcslen(_T("PREVIEW (LAZY)")));
+         sStringToParse = sBefore + _T("PREVIEW") + sAfter;
+      }
+
       // RFC 7162 (CONDSTORE): an optional "(CHANGEDSINCE <modseq> [VANISHED])" FETCH modifier
       // may accompany the data items. Consume it before normal item parsing and switch on
       // MODSEQ output (CHANGEDSINCE implicitly enables CONDSTORE responses for this command).
@@ -265,6 +279,12 @@ namespace HM
             case MODSEQ:
             {
                show_modseq_ = true;
+               break;
+            }
+
+            case PREVIEW:
+            {
+               show_preview_ = true;
                break;
             }
 
@@ -594,7 +614,10 @@ namespace HM
          return FLAGS;  
 
       if (sPart.CompareNoCase(_T("MODSEQ")) == 0)
-         return MODSEQ;  
+         return MODSEQ;
+
+      if (sPart.CompareNoCase(_T("PREVIEW")) == 0)
+         return PREVIEW;  
 
       if (sPart.CompareNoCase(_T("INTERNALDATE")) == 0)
          return INTERNALDATE;  

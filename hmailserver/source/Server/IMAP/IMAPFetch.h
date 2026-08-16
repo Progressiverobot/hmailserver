@@ -42,6 +42,9 @@ namespace HM
 
       void ReportCriticalError_(const String &messageFileName, const String &sMessage);
 
+      // RFC 8970: the glance-sized body snippet the PREVIEW data item carries.
+      String CreatePreviewText_(std::shared_ptr<IMAPConnection> pConnection, std::shared_ptr<Message> pMessage);
+
       void AppendOutput_(String &sOutput, const String &sAppend);
       void SendAndReset_(std::shared_ptr<IMAPConnection> pConnection, String &sOutput);
 

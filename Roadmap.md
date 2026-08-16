@@ -55,7 +55,7 @@ strong and where it is thin far more honestly than any prose summary.
 | **The capability matrix** | | | | |
 | [SMTP and ESMTP](#smtp-and-esmtp) | 27 | – | 2 | – |
 | [Transport security and deliverability](#transport-security-and-deliverability) | 43 | – | 4 | 1 |
-| [IMAP](#imap) | 64 | – | 11 | 3 |
+| [IMAP](#imap) | 65 | – | 10 | 3 |
 | [POP3](#pop3) | 21 | – | 6 | – |
 | [Sieve, ManageSieve and rules](#sieve-managesieve-and-rules) | 64 | 0 | 1 | – |
 | [Authentication and cryptography](#authentication-and-cryptography) | 57 | 0 | 18 | – |
@@ -72,7 +72,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 2 | – | 4 | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 5 | 1 | 2 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 4 | 1 | 4 | – |
-| **Total** | **649** | **12** | **121** | **15** |
+| **Total** | **650** | **12** | **120** | **15** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage and the administration surface are the best-covered areas**, and the
@@ -330,7 +330,7 @@ the source, not from documentation.
 
 ### IMAP
 
-64 shipped · 0 underway · 11 not started · 3 deferred
+65 shipped · 0 underway · 10 not started · 3 deferred
 
 | | Capability | Detail |
 |:-:|---|---|
@@ -404,7 +404,7 @@ the source, not from documentation.
 | ⬜ | METADATA (RFC 5464) / ANNOTATE | Not implemented and not advertised; no GETMETADATA or SETMETADATA commands and no annotation store. Roadmap flags it as a prerequisite for some Sieve extensions. |
 | ⬜ | MULTIAPPEND (RFC 3502) | Not implemented and not advertised. APPEND handles exactly one message literal per command and finishes the command as soon as that literal is complete. |
 | ⬜ | OBJECTID (RFC 8474) — EMAILID / THREADID / MAILBOXID | Not implemented and not advertised; no EMAILID or THREADID FETCH item and no MAILBOXID in the LIST/STATUS paths. Listed in the roadmap's IMAP-extension backlog. |
-| ⬜ | PREVIEW (RFC 8970) | Not implemented and not advertised; no PREVIEW FETCH item and no snippet generation. Listed in the roadmap's IMAP-extension backlog. |
+| ✅ | PREVIEW (RFC 8970) | **Shipped 16 August 2026.** The PREVIEW FETCH item hands the client a server-generated body snippet, so a message list renders without fetching any bodies. The snippet comes from the same body-part selection MessageData uses - the one place that already knows how to walk multipart/alternative and decode part charsets - so the preview and the body can never disagree; an HTML-only message gets its tags stripped and a handful of entities decoded, because a preview is a glance, not a rendering. Whitespace runs collapse to single spaces, the text is cut at 200 characters and again at the RFC's 256-octet ceiling on a UTF-8 boundary, and it is emitted as a literal since previews are UTF-8 by definition. The LAZY modifier is accepted and answered like the plain form, which the RFC permits - LAZY lets a server answer NIL to avoid expensive generation, it does not oblige it to. Five fixtures: the collapsed plain-text snippet, LAZY, the HTML strip, the octet ceiling on a long body, and the capability advertisement. |
 | ⬜ | REPLACE (RFC 8508) | Not implemented and not advertised; there is no REPLACE or UID REPLACE command, so clients must emulate draft updates with APPEND + STORE \Deleted + EXPUNGE. |
 | ✅ | RFC 9208 QUOTA (QUOTA=RES-STORAGE, OVERQUOTA, SETQUOTA) | **Shipped 16 August 2026.** CAPABILITY now advertises QUOTA=RES-STORAGE beside the bare atom - storage is the only quota this server enforces, so RES-MESSAGE is deliberately not promised. All three quota refusals (APPEND, COPY, MOVE) carry the OVERQUOTA response code, so a client can tell "mailbox full" from every other NO without parsing prose. SETQUOTA is recognised and refused with an explanation rather than falling through to "unknown command" - the quota is the account's maximum size, administered by the server administrator, and RFC 9208 permits refusing changes outright. Also fixed while here: an account without a quota used to be answered "* QUOTA \"\" (STORAGE)" - a bare resource name the RFC's grammar does not permit (each listed resource is a name-usage-limit triple); it is now the empty list. The single "" quota root covering the whole account is the model the RFC allows and the one that matches how the limit actually works; per-mailbox roots would advertise granularity nothing enforces. Four fixtures: the RES-STORAGE atom with the quota-disabled control, an over-quota APPEND carrying [OVERQUOTA], the SETQUOTA refusal text, and the empty-list answer for an unlimited account. |
 | ⬜ | SAVEDATE (RFC 8514) | Not implemented. No SAVEDATE FETCH item and no SAVEDATE/SAVEDBEFORE/SAVEDSINCE/SAVEDATESUPPORTED search keys. Listed in the roadmap's IMAP-extension backlog. |

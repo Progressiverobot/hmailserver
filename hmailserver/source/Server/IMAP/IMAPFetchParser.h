@@ -31,8 +31,9 @@ namespace HM
          RFC822HEADER = 213,
          RFC822TEXT = 214,
          BODYSTRUCTURENONEXTENSIBLE = 215,
-         MODSEQ = 216
-            
+         MODSEQ = 216,
+         PREVIEW = 217
+
       };
 
       class BodyPart
@@ -125,6 +126,12 @@ namespace HM
       // RFC 7162 (CONDSTORE/QRESYNC): the MODSEQ FETCH data item.
       bool GetShowModSeq() { return show_modseq_; }
 
+      // RFC 8970: the PREVIEW FETCH data item - a short server-generated snippet
+      // of the message body. The LAZY modifier is accepted and treated as the
+      // plain form, which the RFC permits: LAZY lets a server answer NIL to
+      // avoid expensive generation, it does not oblige it to.
+      bool GetShowPreview() { return show_preview_; }
+
       // RFC 7162 (CONDSTORE): the "(CHANGEDSINCE <modseq>)" FETCH modifier. When present,
       // only messages whose mod-sequence is greater than this value are returned.
       bool GetHasChangedSince() { return has_changedsince_; }
@@ -156,6 +163,7 @@ namespace HM
       bool show_body_structure_;
       bool show_body_structure_NonExtensible;
       bool show_modseq_;
+      bool show_preview_;
 
       bool has_changedsince_;
       __int64 changedsince_;

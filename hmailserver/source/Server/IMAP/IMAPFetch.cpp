@@ -10,8 +10,10 @@
 #include "../Common/Application/FolderManager.h"
 #include "../Common/BO/IMAPFolder.h"
 #include "../Common/BO/Message.h"
+#include "../Common/BO/MessageData.h"
 #include "../Common/Util/Charset.h"
 #include "../Common/Util/Time.h"
+#include "../Common/Util/Unicode.h"
 #include "../Common/Util/Parsing/AddressListParser.h"
 #include "../Common/Util/ByteBuffer.h"
 #include "../Common/BO/ACLPermission.h"
@@ -87,6 +89,7 @@ namespace HM
          parser_->GetShowEnvelope() ||
          parser_->GetShowBodyStructure() ||
          parser_->GetShowBodyStructureNonExtensible()||
+         parser_->GetShowPreview() ||
          parser_->GetPartsToLookAt().size() > 0;
 
       if (willReadMessageFile)
@@ -193,7 +196,41 @@ namespace HM
          String sTemp;
          sTemp = "ENVELOPE " + CreateEnvelopeStructure_(oMimeHeader);
          AppendOutput_(sOutput, sTemp);
-         
+
+      }
+
+      // RFC 8970: a server-generated snippet of the message body, so a client
+      // can render its message list without fetching any bodies.
+      if (parser_->GetShowPreview())
+      {
+         String previewText = CreatePreviewText_(pConnection, pMessage);
+
+         AnsiString previewUtf8;
+         Unicode::WideToMultiByte(previewText, previewUtf8);
+
+         // RFC 8970 section 5: at most 256 octets. The character truncation in
+         // CreatePreviewText_ keeps it short; this keeps it LEGAL for messages
+         // whose characters are several UTF-8 octets each, cutting on a
+         // character boundary so the last kept character stays whole.
+         const size_t maxPreviewOctets = 256;
+         if (previewUtf8.size() > maxPreviewOctets)
+         {
+            size_t cut = maxPreviewOctets;
+            while (cut > 0 && (static_cast<unsigned char>(previewUtf8.c_str()[cut]) & 0xC0) == 0x80)
+               cut--;
+            previewUtf8 = previewUtf8.substr(0, cut);
+         }
+
+         // Emitted as a literal: the preview is UTF-8 by definition (RFC 8970
+         // section 5) and an IMAP quoted string cannot safely carry that.
+         String sTemp;
+         sTemp.Format(_T("PREVIEW {%Iu}\r\n"), previewUtf8.size());
+         AppendOutput_(sOutput, sTemp);
+         SendAndReset_(pConnection, sOutput);
+
+         std::shared_ptr<ByteBuffer> pPreviewBuffer = std::shared_ptr<ByteBuffer>(new ByteBuffer);
+         pPreviewBuffer->Add((const BYTE*) previewUtf8.c_str(), previewUtf8.size());
+         pConnection->EnqueueWrite(pPreviewBuffer);
       }
 
 
@@ -1238,6 +1275,95 @@ namespace HM
       }
 
       return true;
+   }
+
+   String
+   IMAPFetch::CreatePreviewText_(std::shared_ptr<IMAPConnection> pConnection, std::shared_ptr<Message> pMessage)
+   //---------------------------------------------------------------------------
+   // DESCRIPTION:
+   // RFC 8970: a short plain-text snippet of the message body.
+   //
+   // MessageData rather than the already-loaded MimeBody, deliberately: its
+   // body-part selection is the one place that already knows how to walk
+   // multipart/alternative and decode part charsets, and a second,
+   // subtly-different traversal here would disagree with it on exactly the
+   // messages where it matters. The plain-text part wins; a HTML-only message
+   // gets its tags stripped and a handful of entities decoded - a preview is a
+   // glance, not a rendering.
+   //---------------------------------------------------------------------------
+   {
+      MessageData messageData;
+      if (!messageData.LoadFromMessage(pConnection->GetAccount(), pMessage))
+         return "";
+
+      String text = messageData.GetBody();
+
+      if (text.Trim().IsEmpty())
+      {
+         String html = messageData.GetHTMLBody();
+
+         String stripped;
+         stripped.reserve(html.GetLength());
+
+         bool insideTag = false;
+         for (int i = 0; i < html.GetLength(); i++)
+         {
+            wchar_t character = html[i];
+
+            if (character == '<')
+               insideTag = true;
+            else if (character == '>')
+            {
+               insideTag = false;
+               stripped += ' ';
+            }
+            else if (!insideTag)
+               stripped += character;
+         }
+
+         stripped.Replace(_T("&nbsp;"), _T(" "));
+         stripped.Replace(_T("&amp;"), _T("&"));
+         stripped.Replace(_T("&lt;"), _T("<"));
+         stripped.Replace(_T("&gt;"), _T(">"));
+         stripped.Replace(_T("&quot;"), _T("\""));
+
+         text = stripped;
+      }
+
+      // One glance-sized line: every whitespace run - including the line
+      // structure of the original - becomes a single space.
+      String collapsed;
+      collapsed.reserve(text.GetLength());
+
+      bool lastWasSpace = true;
+      for (int i = 0; i < text.GetLength(); i++)
+      {
+         wchar_t character = text[i];
+
+         if (character == ' ' || character == '\t' || character == '\r' || character == '\n')
+         {
+            if (!lastWasSpace)
+            {
+               collapsed += ' ';
+               lastWasSpace = true;
+            }
+         }
+         else
+         {
+            collapsed += character;
+            lastWasSpace = false;
+         }
+      }
+
+      collapsed.TrimRight();
+
+      // Short of the RFC's 256-octet ceiling; the octet-boundary cut at the
+      // emission site enforces the ceiling itself for multi-octet characters.
+      const int maxPreviewCharacters = 200;
+      if (collapsed.GetLength() > maxPreviewCharacters)
+         collapsed = collapsed.Mid(0, maxPreviewCharacters);
+
+      return collapsed;
    }
 
    void

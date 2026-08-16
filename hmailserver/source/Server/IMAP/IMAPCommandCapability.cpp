@@ -126,6 +126,10 @@ namespace HM
       // inline, one round trip instead of one per mailbox at client startup.
       sResponse += " LIST-STATUS";
 
+      // RFC 8970: the PREVIEW FETCH item - a server-generated body snippet, so a
+      // client can render its message list without fetching any bodies.
+      sResponse += " PREVIEW";
+
       // RFC 8437: an authenticated session can return to the not-authenticated
       // state for connection reuse. Advertised only once authenticated - that is
       // the only state where the command is valid, and the RFC's requirement is
