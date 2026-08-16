@@ -52,6 +52,11 @@ namespace RegressionTests.Shared
       public bool ServerSupportsEhlo { get; set; }
       public bool ServerSupportsHelo { get; set; }
 
+      // RFC 1870: what EHLO advertises about SIZE. null = not advertised (the
+      // default, matching the pre-existing behaviour of every test), 0 =
+      // advertised without a limit, >0 = the maximum accepted message size.
+      public long? EhloSizeAdvertisement { get; set; }
+
       public int RcptTosReceived { get; set; }
 
       public int QuitResult
@@ -132,6 +137,11 @@ namespace RegressionTests.Shared
             if (_connectionSecurity == eConnectionSecurity.eCSSTARTTLSRequired ||
                 _connectionSecurity == eConnectionSecurity.eCSSTARTTLSOptional)
                response.AppendLine("250-STARTTLS");
+
+            if (EhloSizeAdvertisement.HasValue)
+               response.AppendLine(EhloSizeAdvertisement.Value > 0
+                  ? "250-SIZE " + EhloSizeAdvertisement.Value
+                  : "250-SIZE");
 
             response.AppendLine("250 AUTH LOGIN PLAIN");
 

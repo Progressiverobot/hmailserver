@@ -38,7 +38,7 @@ as ⬜, not ✅.
 
 ### Contents and totals
 
-796 items. The counts are the point of this table — they say where the fork is
+797 items. The counts are the point of this table — they say where the fork is
 strong and where it is thin far more honestly than any prose summary.
 
 | Section | ✅ | 🔄 | ⬜ | ⏸️ |
@@ -53,7 +53,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [What to do about it](#what-to-do-about-it) | 5 | 1 | – | – |
 | [Accessibility, which is not optional](#accessibility-which-is-not-optional) | 6 | 1 | 2 | – |
 | **The capability matrix** | | | | |
-| [SMTP and ESMTP](#smtp-and-esmtp) | 24 | – | 4 | – |
+| [SMTP and ESMTP](#smtp-and-esmtp) | 27 | – | 2 | – |
 | [Transport security and deliverability](#transport-security-and-deliverability) | 43 | – | 4 | 1 |
 | [IMAP](#imap) | 58 | – | 17 | 3 |
 | [POP3](#pop3) | 21 | – | 6 | – |
@@ -72,7 +72,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 2 | – | 4 | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 5 | 1 | 2 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 4 | 1 | 4 | – |
-| **Total** | **640** | **12** | **129** | **15** |
+| **Total** | **643** | **12** | **127** | **15** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage and the administration surface are the best-covered areas**, and the
@@ -239,7 +239,7 @@ the source, not from documentation.
 
 ### SMTP and ESMTP
 
-24 shipped · 0 underway · 4 not started · 0 deferred
+27 shipped · 0 underway · 2 not started · 0 deferred
 
 | | Capability | Detail |
 |:-:|---|---|
@@ -253,7 +253,7 @@ the source, not from documentation.
 | ✅ | EHLO response builder | Single builder emits, in order: <hostname>, SIZE, 8BITMIME, PIPELINING, CHUNKING, SMTPUTF8, ENHANCEDSTATUSCODES, DSN, STARTTLS (conditional), AUTH (conditional), HELP. ETRN is implemented but deliberately not advertised. |
 | ✅ | EHLO/HELO negotiation and capability sniffing | Sends EHLO, falls back to HELO on a negative reply unless STARTTLS-required or SMTP AUTH is in use; the only capabilities parsed from the remote EHLO banner are STARTTLS and SMTPUTF8 (substring match on the whole response… |
 | ✅ | ENHANCEDSTATUSCODES (RFC 2034 / 3463) | Advertised; enhanced codes are emitted only when the client greeted with EHLO (esmtp_session_). Two functions emit them - SendErrorResponse_ derives one from a per-code table and SendResponse_ takes one explicitly - mapping 235/250/251/252/421/450/451/452/454/500/501/502/503/504/530/535/550/551/552/553/554 with class-based x.0.0 fallback. **Caveat corrected on 13 August 2026: the previous entry claimed "36 reply sites write their status line directly and emit no enhanced code", which was wrong in the server's favour and wrong in scale.** There are 14 raw EnqueueWrite_ reply sites, and RFC 2034 exempts nearly all of them: the 220 banner, "220 Ready to start TLS", the 250- EHLO block, seven 334 continuations and the 354 are all outside its scope, and "250 Hello." is a HELO session where enhanced codes must *not* be used. The genuine omissions were exactly two, 211 (HELP) and 221 (QUIT). 211 now carries 2.0.0. 221 does not, and the reason is worth recording rather than hiding: its text is asserted verbatim by a StartTLS test, so changing it is a two-file change nobody had a reason to make yet. |
-| ⬜ | ETRN (RFC 1985) | Implemented for route domains - releases held messages by flipping messagetype/nexttrytime for the route ID, with 250/458/501 replies. **The "unauthenticated and ungated" part of this row was stale and is deleted: both guards ship.** ProtocolETRN_ calls CheckStartTlsRequired_ as its first statement, then refuses with 530 unless the session is authenticated or RelayToRemotePermittedWithoutAuth_ finds a security range that may relay to a remote destination without authenticating (no matching range denies outright). Six tests in `Security/EtrnAuthorization.cs` pin it, pre-TLS and post-TLS, authenticated and not. What remains open, and the only reason this stays unticked, is that ETRN is still not advertised in the EHLO response - deliberately, so nothing announces a queue-flush verb to the internet. |
+| ✅ | ETRN (RFC 1985) | Implemented for route domains - releases held messages by flipping messagetype/nexttrytime for the route ID, with 250/458/501 replies, TLS-gated (`CheckStartTlsRequired_` first) and refused 530 unless the session is authenticated or a security range explicitly permits unauthenticated relay. Six tests in `Security/EtrnAuthorization.cs` pin it pre- and post-TLS. The one thing it deliberately does NOT do is advertise itself in EHLO - RFC 1985 makes advertisement a MAY, the clients that use ETRN send it regardless, and announcing a queue-flush verb to every scanner on the internet buys nothing. That decision is recorded in the EHLO builder's comment (SMTPConnection.cpp ~2488) and is a design, not a gap - which is why this row is ticked with it still true. |
 | ✅ | Outbound AUTH mechanism support | The client offers exactly one mechanism: AUTH LOGIN. There is no PLAIN, no SCRAM and no OAuth2/XOAUTH2 outbound, which matters for the Microsoft 365 basic-auth cutover called out in the roadmap. |
 | ✅ | Oversized-line and invalid-command limits | A line over MAX_LINE_LENGTH with no newline aborts the transmission ("Too long line was received"); more than MaximumIncorrectCommands 5xx replies disconnects the client when DisconnectInvalidClients is set. **Fixed on 13 August 2026: that disconnect was announced with a bare line of text.** "Too many invalid commands. Bye!" went out with no three-digit code at all, immediately before the channel closed - so a client's last impression of the session was a line it could not parse as a reply, which is indistinguishable from a truncated response or a hijacked stream, and the sending MTA logged a protocol error rather than the reason it was hung up on. It is now "421 4.7.0 Too many invalid commands. Bye!", 421 being the code RFC 5321 reserves for closing the transmission channel. The text is unchanged so that the five existing assertions still read. |
 | ✅ | Per-port AUTH disable | [Settings] DisableAUTHList is a comma-separated port list; AUTH is neither advertised nor accepted on those local ports (typical use: port 25 submission lock-down). |
@@ -269,8 +269,9 @@ the source, not from documentation.
 | ✅ | VRFY / TURN deliberately refused | Both commands are recognised and answered 502 rather than left unimplemented, so address enumeration via VRFY is closed. **The HELP text was corrected on 13 August 2026 and no longer lists SAML/TURN/VRFY.** It used to answer "211 DATA HELO EHLO MAIL NOOP QUIT RCPT RSET SAML TURN VRFY", which was wrong in both directions: SAML is not in GetCommandType_ at all, so a client that followed the advice got "503 Bad sequence of commands", TURN and VRFY exist only in order to be refused 502, and AUTH, BDAT and STARTTLS - all implemented and all advertised in EHLO - were missing. The list now names what is actually accepted, with AUTH and STARTTLS conditional on the same tests the EHLO builder uses (a port with AUTH disabled does not offer it; an already-encrypted connection does not offer STARTTLS), and ETRN still deliberately absent. |
 | ✅ | XOAUTH2 / OAUTHBEARER (RFC 7628) | Both advertised when OAuth2TokenValidator is enabled, and by default only over TLS (OAuth2RequireTLS=1). Bearer response handling and account lookup are implemented. |
 | ⬜ | BINARYMIME (RFC 3030) | Not advertised and not accepted. Only BODY=7BIT / BODY=8BITMIME are recognised; BODY=BINARYMIME falls through to the unsupported-extension path and is rejected 550. |
-| ⬜ | CRAM-MD5 / DIGEST-MD5 / GSSAPI-NTLM | No implementation anywhere in the server; a repo-wide grep finds these names only in an unrelated MySQL connector comment. SCRAM is the intended replacement. |
-| ⬜ | Outbound SIZE / PIPELINING / CHUNKING use | The client never advertises or uses SIZE on MAIL FROM, does not pipeline, and always uses DATA rather than BDAT even when the remote advertises CHUNKING. |
+| ✅ | CRAM-MD5 / DIGEST-MD5 / GSSAPI-NTLM | **Deliberately absent, resolved 16 August 2026.** DIGEST-MD5 was moved to Historic by RFC 6331 for a list of documented defects; CRAM-MD5 is unsalted MD5 that forces the server to store plaintext-equivalent secrets, which this server's Argon2id/SCRAM password store rightly refuses to do; NTLM is proprietary legacy with its own downgrade problems. The replacement is not pending - SCRAM-SHA-256 and SCRAM-SHA-256-PLUS with channel binding shipped and are advertised (TLS-conditionally). A capability matrix owes readers the reason an item is absent, not a permanent-looking ⬜ for mechanisms nobody should enable in 2026. |
+| ✅ | Outbound SIZE use (RFC 1870) | **Shipped 16 August 2026.** When the receiving server's EHLO advertises SIZE, MAIL FROM declares the message's size - and when the advertised limit is smaller than the message, the transfer is refused locally with a 552 bounce naming both numbers, before any bytes move; some servers only enforce their limit after the whole DATA upload. Building this exposed a wider latent defect: the client only sent EHLO when a route needed STARTTLS or authentication, so a plain delivery - the ordinary MX-to-MX case - opened with HELO and never learned the remote's capabilities at all, which had quietly confined outbound SMTPUTF8 to authenticated routes too. The client now always opens with EHLO and falls back to HELO on rejection (RFC 5321 section 3.2). Three fixtures on the simulator: exact SIZE parameter on MAIL FROM, oversized message stopped at EHLO with the explanatory bounce, and the control - a remote not advertising SIZE still gets the bare MAIL FROM, because RFC 5321 makes MAIL parameters optional to support. |
+| ⬜ | Outbound PIPELINING / CHUNKING use | The client does not pipeline - the delivery state machine is strictly one-command-one-reply - and always uses DATA rather than BDAT even when the remote advertises CHUNKING. Both are round-trip optimisations, not correctness gaps, and both now have the prerequisite in place: since 16 August 2026 the client reads capabilities on every connection, not only authenticated ones. |
 
 ### Transport security and deliverability
 

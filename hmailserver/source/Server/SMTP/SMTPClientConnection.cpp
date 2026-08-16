@@ -264,23 +264,15 @@ namespace HM
    void
    SMTPClientConnection::ProtocolStateHELOEHLO_(const AnsiString &request)
    {
-      bool use_esmtp  = GetConnectionSecurity() == CSSTARTTLSRequired ||
-                        GetConnectionSecurity() == CSSTARTTLSOptional ||
-                        use_smtpauth_;
+      // Always open with EHLO (RFC 5321 section 3.2): a plain delivery that
+      // opened with HELO never learned the remote's capabilities, so SIZE,
+      // SMTPUTF8 and the rest were only ever used on routes needing TLS or
+      // authentication - the ordinary MX-to-MX case got none of them. A server
+      // that rejects EHLO gets the HELO fallback in ProtocolEHLOSent_.
+      String computer_name = Utilities::ComputerName();
 
-      String computer_name = Utilities::ComputerName(); 
-
-      if (use_esmtp)
-      {
-         EnqueueWrite_("EHLO " + computer_name);
-         SetState_(EHLOSENT);
-      }
-      else
-      {
-         EnqueueWrite_("HELO " + computer_name);
-         SetState_(HELOSENT);
-      }
-         
+      EnqueueWrite_("EHLO " + computer_name);
+      SetState_(EHLOSENT);
    }
 
    void
@@ -379,6 +371,24 @@ namespace HM
       // Remember whether the remote server can accept internationalized (UTF-8)
       // envelope addresses (RFC 6531), so MAIL FROM can carry the SMTPUTF8 mark.
       remote_supports_smtputf8_ = request.Contains("SMTPUTF8");
+
+      // RFC 1870: remember the remote's SIZE advertisement, so MAIL FROM can
+      // declare this message's size and an oversized message can be refused
+      // BEFORE its bytes are transferred rather than after.
+      remote_size_limit_ = -1;
+      std::vector<AnsiString> ehloLines = StringParser::SplitString(request, "\r\n");
+      for (const AnsiString &line : ehloLines)
+      {
+         // A capability line is "250-SIZE 52428800" or "250 SIZE" - four digits,
+         // one separator, then the keyword.
+         if (line.GetLength() < 8 || line.Mid(4, 4).CompareNoCase("SIZE") != 0)
+            continue;
+
+         AnsiString value = line.Mid(8);
+         value.TrimLeft();
+         remote_size_limit_ = value.IsEmpty() ? 0 : _atoi64(value.c_str());
+         break;
+      }
 
       if (GetConnectionSecurity() == CSSTARTTLSRequired || 
           GetConnectionSecurity() == CSSTARTTLSOptional)
@@ -479,6 +489,30 @@ namespace HM
       // the remote server advertised SMTPUTF8, mark the transaction accordingly.
       if (remote_supports_smtputf8_ && EnvelopeRequiresSmtpUtf8_())
          sData += " SMTPUTF8";
+
+      // RFC 1870: declare the size when the remote advertised SIZE - and when it
+      // also advertised a limit this message exceeds, do not send the message at
+      // all. Failing here costs one round trip; failing after DATA costs the
+      // whole transfer, and some servers only enforce their limit at that point.
+      if (remote_size_limit_ >= 0)
+      {
+         __int64 messageSize = delivery_message_->GetSize();
+
+         if (remote_size_limit_ > 0 && messageSize > remote_size_limit_)
+         {
+            String errorMessage;
+            errorMessage.Format(_T("The message is %I64d bytes and the receiving server accepts at most %I64d (its EHLO SIZE limit). It was not transferred."),
+               messageSize, remote_size_limit_);
+
+            UpdateAllRecipientsWithError_(552, errorMessage, false);
+            SendQUIT_();
+            return;
+         }
+
+         String sizeParameter;
+         sizeParameter.Format(_T(" SIZE=%I64d"), messageSize);
+         sData += sizeParameter;
+      }
 
       EnqueueWrite_(sData);
       current_state_ = MAILFROMSENT;

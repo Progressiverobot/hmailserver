@@ -992,6 +992,11 @@ namespace RegressionTests.SMTP
          var smtpServerPort = TestSetup.GetNextFreePort();
          using (var server = new SmtpServerSimulator(1, smtpServerPort))
          {
+            // Since the client learned to always open with EHLO (falling back to
+            // HELO on rejection), a server refusing only HELO is deliverable via
+            // EHLO. The failure this test guards - no acceptable greeting at all,
+            // ending on HELO's rejection - needs both refused.
+            server.ServerSupportsEhlo = false;
             server.ServerSupportsHelo = false;
             server.AddRecipientResult(deliveryResults);
             server.StartListen();

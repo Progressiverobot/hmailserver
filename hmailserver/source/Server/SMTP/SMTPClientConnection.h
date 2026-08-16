@@ -125,6 +125,10 @@ namespace HM
       // so an internationalized envelope address can be sent with the SMTPUTF8 mark.
       bool remote_supports_smtputf8_;
 
+      // What the remote's EHLO said about SIZE (RFC 1870): -1 = not advertised,
+      // 0 = advertised with no fixed limit, >0 = the advertised maximum.
+      __int64 remote_size_limit_ = -1;
+
       String username_;
       String password_;
       String oauth_bearer_;
