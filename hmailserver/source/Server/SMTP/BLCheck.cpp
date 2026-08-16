@@ -1,5 +1,5 @@
 // Copyright (c) 2010 Martin Knafve / hMailServer.com.  
-// http://www.hmailserver.com
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 
 #include "stdafx.h"
@@ -69,7 +69,7 @@ namespace HM
 
       // If a message is rejected, it's good to mention in the log which DNSBL
       // caused the rejection...
-      // http://www.hmailserver.com/forum/viewtopic.php?f=10&t=16221
+      // https://www.progressiverobot.com/forum/viewtopic.php?f=10&t=16221
       //
       String foundAddressesJoined = StringParser::JoinVector(foundAddresses, ", ");
       if (foundAddressesJoined.IsEmpty())

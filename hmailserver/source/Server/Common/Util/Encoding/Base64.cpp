@@ -1,5 +1,5 @@
 // Copyright (c) 2010 Martin Knafve / hMailServer.com.  
-// http://www.hmailserver.com
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 
 #include "StdAfx.h"
@@ -44,7 +44,7 @@ namespace HM
       AnsiString sEncodedValue;
       decoder.GetOutput(sEncodedValue);
 
-      // Disabled crlf replace due to facebook dkim issue http://www.hmailserver.com/forum/viewtopic.php?f=7&t=24232
+      // Disabled crlf replace due to facebook dkim issue https://www.progressiverobot.com/forum/viewtopic.php?f=7&t=24232
       // Should the replace be removed for encode as well?
       return sEncodedValue;
    }

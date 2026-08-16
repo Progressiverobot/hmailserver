@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
-// http://www.hmailserver.com
+// https://www.progressiverobot.com
 //
 // RFC 8601 Authentication-Results and RFC 7208 section 9.1 Received-SPF.
 //

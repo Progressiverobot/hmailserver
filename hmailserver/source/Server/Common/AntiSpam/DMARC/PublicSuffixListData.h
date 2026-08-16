@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
-// http://www.hmailserver.com
+// https://www.progressiverobot.com
 //
 // GENERATED FILE - DO NOT EDIT BY HAND.
 // Regenerate with build\generate-public-suffix-list.ps1, which also documents

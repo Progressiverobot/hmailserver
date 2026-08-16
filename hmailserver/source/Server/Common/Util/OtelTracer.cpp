@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
-// http://www.hmailserver.com
+// https://www.progressiverobot.com
 // Dependency-free OpenTelemetry tracing. See OtelTracer.h.
 
 #include "StdAfx.h"

@@ -514,7 +514,7 @@ procedure moreInfoLink_Click(Sender: TObject);
 var
   ErrorCode: Integer;
 begin
-  ShellExec('', 'http://www.hmailserver.com/documentation/?page=choosing_database_engine', '', '', SW_SHOW, ewNoWait, ErrorCode);
+  ShellExec('', 'https://www.progressiverobot.com/documentation/?page=choosing_database_engine', '', '', SW_SHOW, ewNoWait, ErrorCode);
 
 end;
 

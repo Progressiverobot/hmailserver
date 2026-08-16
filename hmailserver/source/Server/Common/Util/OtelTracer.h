@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
-// http://www.hmailserver.com
+// https://www.progressiverobot.com
 //
 // Dependency-free OpenTelemetry tracing. Spans are emitted at the points already
 // instrumented for metrics (per-command dispatch in TCPConnection, the database

@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
-// http://www.hmailserver.com
+// https://www.progressiverobot.com
 
 #include "StdAfx.h"
 

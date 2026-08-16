@@ -1,5 +1,5 @@
 // Copyright (c) 2005 Martin Knafve / hMailServer.com.  
-// http://www.hmailserver.com
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // Created 2005-07-21
 #include "StdAfx.h"

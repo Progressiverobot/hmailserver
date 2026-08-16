@@ -219,7 +219,7 @@ namespace HM
 
          // We want the char before = NOT char after param name
          // to detect encoding per RFC 2231 4.1
-         // http://www.hmailserver.com/forum/viewtopic.php?f=10&t=21417
+         // https://www.progressiverobot.com/forum/viewtopic.php?f=10&t=21417
          char characterBeforeEquals = value[valuePos - 1];
 
          if (characterBeforeEquals == '*')

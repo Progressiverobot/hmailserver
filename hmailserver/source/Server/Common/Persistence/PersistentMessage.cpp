@@ -1,5 +1,5 @@
 // Copyright (c) 2005 Martin Knafve / hMailServer.com.  
-// http://www.hmailserver.com
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 
 #include "stdafx.h"
@@ -361,7 +361,7 @@ namespace HM
 
          // Update message ID in memory.
          // ONLY if not already set or dupe emails issue
-         // http://www.hmailserver.com/forum/viewtopic.php?f=10&t=21404
+         // https://www.progressiverobot.com/forum/viewtopic.php?f=10&t=21404
          if (pRecipient->GetMessageID() == 0) 
             pRecipient->SetMessageID(pMessage->GetID());
 

@@ -1,5 +1,5 @@
 // Copyright (c) 2010 Martin Knafve / hMailServer.com.  
-// http://www.hmailserver.com
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 
 #include "StdAfx.h"
@@ -657,7 +657,7 @@ namespace HM
       if (iCurrProcessCount >= iMaxAllowed)
          return false;
 
-      // bChkAutoSubmit - Fix for google calendar loop http://www.hmailserver.com/forum/viewtopic.php?f=7&t=24423
+      // bChkAutoSubmit - Fix for google calendar loop https://www.progressiverobot.com/forum/viewtopic.php?f=7&t=24423
       if (bChkAutoSubmit && pMsgData->IsAutoSubmitted())
          return false;
 

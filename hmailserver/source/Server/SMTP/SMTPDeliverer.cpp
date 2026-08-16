@@ -1,5 +1,5 @@
 // Copyright (c) 2006 Martin Knafve / hMailServer.com.  
-// http://www.hmailserver.com
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 
 #include "stdafx.h"
@@ -351,7 +351,7 @@ namespace HM
       sErrMsg.Replace(_T("%MACRO_SUBJECT%"), pMsgData->GetSubject());
 
       // Ability to include original headers in undeliverable message
-      // http://www.hmailserver.com/forum/viewtopic.php?f=2&t=19635
+      // https://www.progressiverobot.com/forum/viewtopic.php?f=2&t=19635
       sErrMsg.Replace(_T("%MACRO_ORIGINAL_HEADER%"), pMsgData->GetHeader());      
 
       String sCollectedErrors;

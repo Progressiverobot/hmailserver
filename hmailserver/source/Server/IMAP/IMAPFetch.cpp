@@ -1,5 +1,5 @@
 // Copyright (c) 2010 Martin Knafve / hMailServer.com.  
-// http://www.hmailserver.com
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 
 #include "stdafx.h"
@@ -971,7 +971,7 @@ namespace HM
 
       // RFC 3501 states 7bit should have quotes
       // Missing quotes around 7bit causes problems with Thunderbird
-      // http://www.hmailserver.com/forum/viewtopic.php?f=10&t=22887
+      // https://www.progressiverobot.com/forum/viewtopic.php?f=10&t=22887
       if (sEncoding.IsEmpty())
          sResult += " \"7bit\"";
       else

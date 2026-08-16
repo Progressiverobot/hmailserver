@@ -1,5 +1,5 @@
 // Copyright (c) 2010 Martin Knafve / hMailServer.com.  
-// http://www.hmailserver.com
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 
 #include "StdAfx.h"
@@ -525,7 +525,7 @@ namespace HM
       if (!Configuration::Instance()->GetUseScriptServer())
          return;
 
-	  // JDR: stores the name of the method that is fired in the script. http://www.hmailserver.com/forum/viewtopic.php?f=2&t=25497
+	  // JDR: stores the name of the method that is fired in the script. https://www.progressiverobot.com/forum/viewtopic.php?f=2&t=25497
 	  String event_name = _T("Unknown");
 
       String script_language;

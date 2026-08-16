@@ -1,5 +1,5 @@
 // Copyright (c) 2007 Martin Knafve / hMailServer.com.  
-// http://www.hmailserver.com
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 //
 // Contains mapping between character sets and code pages

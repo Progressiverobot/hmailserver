@@ -1,5 +1,5 @@
 // Copyright (c) 2010 Martin Knafve / hMailServer.com.  
-// http://www.hmailserver.com
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 
 #include "stdafx.h"
@@ -392,7 +392,7 @@ namespace HM
    POP3Connection::OnConnectionTimeout()
    {
       // Fix for mailbox remailing locked even after timeout
-      // http://www.hmailserver.com/forum/viewtopic.php?f=7&t=22361
+      // https://www.progressiverobot.com/forum/viewtopic.php?f=7&t=22361
       UnlockMailbox_();
 
       String sMessage = "-ERR Autologout; idle too long\r\n";
