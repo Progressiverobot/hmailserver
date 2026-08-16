@@ -50,6 +50,14 @@ namespace HM
          return CTSentBefore;
       else if (sTmp == _T("sentsince"))
          return CTSentSince;
+      else if (sTmp == _T("savedbefore"))
+         return CTSavedBefore;
+      else if (sTmp == _T("savedon"))
+         return CTSavedOn;
+      else if (sTmp == _T("savedsince"))
+         return CTSavedSince;
+      else if (sTmp == _T("savedatesupported"))
+         return CTSavedateSupported;
       else if (sTmp == _T("since"))
          return CTSince;
       else if (sTmp == _T("deleted"))
@@ -455,6 +463,9 @@ namespace HM
          ct == IMAPSearchCriteria::CTSentOn ||
          ct == IMAPSearchCriteria::CTSentBefore ||
          ct == IMAPSearchCriteria::CTSentSince ||
+         ct == IMAPSearchCriteria::CTSavedBefore ||
+         ct == IMAPSearchCriteria::CTSavedOn ||
+         ct == IMAPSearchCriteria::CTSavedSince ||
          ct == IMAPSearchCriteria::CTBody ||
          ct == IMAPSearchCriteria::CTSubject ||
          ct == IMAPSearchCriteria::CTTo ||
@@ -554,6 +565,7 @@ namespace HM
          ct == IMAPSearchCriteria::CTUnanswered ||
          ct == IMAPSearchCriteria::CTUndraft ||
          ct == IMAPSearchCriteria::CTUnflagged ||
+         ct == IMAPSearchCriteria::CTSavedateSupported ||
          ct == IMAPSearchCriteria::CTAll)
       {
          pNewCriteria->SetType(ct);

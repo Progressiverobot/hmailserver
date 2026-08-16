@@ -164,6 +164,7 @@ create table hm_messages
 	messagenexttrytime datetime not null,
 	messageflags tinyint unsigned not null,
 	messagecreatetime datetime not null,
+	messagesavedate datetime not null,
 	messagelocked tinyint not null,
    messageuid bigint not null,
    messagemodseq bigint not null default 1
@@ -825,4 +826,4 @@ insert into hm_tcpipports (portprotocol, portnumber, portaddress1, portaddress2,
 
 insert into hm_tcpipports (portprotocol, portnumber, portaddress1, portaddress2, portconnectionsecurity, portsslcertificateid) values (5, 143, 0, NULL, 0, 0);
 
-insert into hm_dbversion values (6012);
+insert into hm_dbversion values (6013);

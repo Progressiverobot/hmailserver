@@ -138,6 +138,11 @@ namespace HM
       // STORE \Deleted + EXPUNGE dance - the shape draft saving wants.
       sResponse += " REPLACE";
 
+      // RFC 8514: the SAVEDATE FETCH item and the SAVEDBEFORE/SAVEDON/
+      // SAVEDSINCE/SAVEDATESUPPORTED search keys, backed by the
+      // messagesavedate column schema 6013 added.
+      sResponse += " SAVEDATE";
+
       // RFC 8437: an authenticated session can return to the not-authenticated
       // state for connection reuse. Advertised only once authenticated - that is
       // the only state where the command is valid, and the RFC's requirement is

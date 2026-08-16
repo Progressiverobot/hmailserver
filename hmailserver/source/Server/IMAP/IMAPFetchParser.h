@@ -32,7 +32,8 @@ namespace HM
          RFC822TEXT = 214,
          BODYSTRUCTURENONEXTENSIBLE = 215,
          MODSEQ = 216,
-         PREVIEW = 217
+         PREVIEW = 217,
+         SAVEDATE = 218
 
       };
 
@@ -132,6 +133,10 @@ namespace HM
       // avoid expensive generation, it does not oblige it to.
       bool GetShowPreview() { return show_preview_; }
 
+      // RFC 8514: the SAVEDATE FETCH data item - when the message was saved
+      // into this mailbox.
+      bool GetShowSaveDate() { return show_savedate_; }
+
       // RFC 7162 (CONDSTORE): the "(CHANGEDSINCE <modseq>)" FETCH modifier. When present,
       // only messages whose mod-sequence is greater than this value are returned.
       bool GetHasChangedSince() { return has_changedsince_; }
@@ -164,6 +169,7 @@ namespace HM
       bool show_body_structure_NonExtensible;
       bool show_modseq_;
       bool show_preview_;
+      bool show_savedate_;
 
       bool has_changedsince_;
       __int64 changedsince_;

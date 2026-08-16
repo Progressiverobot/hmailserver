@@ -148,7 +148,13 @@ namespace DBUpdater
          new SchemaProbe(6012, "hm_rule_criterias.criteriamatchvalue",
                          "update hm_rule_criterias set criteriamatchvalue = criteriamatchvalue where 1 = 0"),
          new SchemaProbe(6012, "hm_accounts.accountvacationbegindate",
-                         "update hm_accounts set accountvacationbegindate = accountvacationbegindate where 1 = 0")
+                         "update hm_accounts set accountvacationbegindate = accountvacationbegindate where 1 = 0"),
+
+         // Upgrade6012to6013* - the message save date (RFC 8514 SAVEDATE): when
+         // the message was saved into its current mailbox, distinct from
+         // messagecreatetime, which IMAP COPY must preserve as INTERNALDATE.
+         new SchemaProbe(6013, "hm_messages.messagesavedate",
+                         "update hm_messages set messagesavedate = messagesavedate where 1 = 0")
       };
 
       /// <summary>

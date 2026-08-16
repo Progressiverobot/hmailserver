@@ -180,6 +180,24 @@ namespace HM
          AppendOutput_(sOutput, sTemp);
       }
 
+      // RFC 8514: when the message was saved into this mailbox - a fresh date
+      // on COPY, unlike INTERNALDATE, which COPY must preserve.
+      if (parser_->GetShowSaveDate())
+      {
+         String sTemp = "SAVEDATE \"";
+
+         String sSaveDate = pMessage->GetSaveDate();
+
+         if (!Time::SeemsToBeValidYear(sSaveDate))
+            sSaveDate = pMessage->GetCreateTime();
+         if (!Time::SeemsToBeValidYear(sSaveDate))
+            sSaveDate = Time::GetCurrentDateTime();
+
+         sTemp += Time::GetIMAPInternalDate(sSaveDate) + "\"";
+
+         AppendOutput_(sOutput, sTemp);
+      }
+
       
       AnsiString sMessageHeader;
 

@@ -230,6 +230,7 @@ namespace HM
       pMessage->SetState((Message::State) pRS->GetLongValue("messagetype"));
       pMessage->SetFromAddress(pRS->GetStringValue("messagefrom"));
       pMessage->SetCreateTime(pRS->GetStringValue("messagecreatetime"));
+      pMessage->SetSaveDate(pRS->GetStringValue("messagesavedate"));
       pMessage->SetSize(pRS->GetLongValue("messagesize"));
       pMessage->SetNoOfRetries((unsigned short) pRS->GetLongValue("messagecurnooftries"));
       pMessage->SetFolderID(pRS->GetLongValue("messagefolderid"));
@@ -697,6 +698,14 @@ namespace HM
 
          oStatement.AddColumn("messagelocked", bRecipientsExists ? 1 : 0);
          oStatement.AddColumn("messagecreatetime", sCreateTime);
+
+         // RFC 8514: a new row IS a save into a mailbox, so the save date is
+         // now - never the client-supplied APPEND date, which only shapes the
+         // create time / INTERNALDATE. CreateCopy_ deliberately does not carry
+         // this field, so a COPY's row gets a fresh save date here too.
+         String sSaveDate = Time::GetCurrentDateTime();
+         pMessage->SetSaveDate(sSaveDate);
+         oStatement.AddColumn("messagesavedate", sSaveDate);
          oStatement.AddColumn("messagecurnooftries", 0);
          oStatement.AddColumn("messagenexttrytime",  "1901-01-01");
       }

@@ -43,6 +43,10 @@ namespace HM
 
       message_size_ = other.message_size_;
       create_time_ = other.create_time_;
+      // Every new member must be copied here by hand or it silently vanishes
+      // on copy - which is exactly how the save date went missing on the
+      // SEARCH path while the freshly-loaded FETCH path still had it.
+      save_date_ = other.save_date_;
       filename_ = other.filename_;
       from_address_ = other.from_address_;
 

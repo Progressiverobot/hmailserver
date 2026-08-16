@@ -72,6 +72,13 @@ namespace HM
          CTOlder = 43,
          CTYounger = 44,
 
+         // RFC 8514 (SAVEDATE): date keys measured against the save date - when
+         // the message was saved into this mailbox - not the internal date.
+         CTSavedBefore = 45,
+         CTSavedOn = 46,
+         CTSavedSince = 47,
+         CTSavedateSupported = 48,
+
          CTSubCriteria = 100
       };
 

@@ -559,6 +559,32 @@ namespace HM
                   bMessageIsMatchingCriteria = false;
                break;
             }
+         case IMAPSearchCriteria::CTSavedBefore:
+            {
+               if (!MatchesSAVEDBEFORECriteria_(pMessage, pCriteria))
+                  bMessageIsMatchingCriteria = false;
+               break;
+            }
+         case IMAPSearchCriteria::CTSavedOn:
+            {
+               if (!MatchesSAVEDONCriteria_(pMessage, pCriteria))
+                  bMessageIsMatchingCriteria = false;
+               break;
+            }
+         case IMAPSearchCriteria::CTSavedSince:
+            {
+               if (!MatchesSAVEDSINCECriteria_(pMessage, pCriteria))
+                  bMessageIsMatchingCriteria = false;
+               break;
+            }
+         case IMAPSearchCriteria::CTSavedateSupported:
+            {
+               // RFC 8514: matches every message in a mailbox that records save
+               // dates - which, after schema 6013, is every mailbox.
+               if (!pCriteria->GetPositive())
+                  bMessageIsMatchingCriteria = false;
+               break;
+            }
          case IMAPSearchCriteria::CTAnswered:
             {
                if (pCriteria->GetPositive() && !pMessage->GetFlagAnswered() ||
@@ -971,6 +997,47 @@ namespace HM
       DateTime dtCriteria = Time::GetDateFromIMAP(pCriteria->GetText());
 
       if (dtSentDate >= dtCriteria)
+         return pCriteria->GetPositive();
+      else
+         return !pCriteria->GetPositive();
+   }
+
+   bool
+   IMAPCommandSEARCH::MatchesSAVEDBEFORECriteria_(std::shared_ptr<Message> pMessage, std::shared_ptr<IMAPSearchCriteria> pCriteria)
+   {
+      // RFC 8514: strictly earlier than the given date, by save date.
+      DateTime dtSaveDate = Time::GetDateFromSystemDate(pMessage->GetSaveDate());
+      DateTime dtCriteria = Time::GetDateFromIMAP(pCriteria->GetText());
+
+      if (dtSaveDate < dtCriteria)
+         return pCriteria->GetPositive();
+      else
+         return !pCriteria->GetPositive();
+   }
+
+   bool
+   IMAPCommandSEARCH::MatchesSAVEDONCriteria_(std::shared_ptr<Message> pMessage, std::shared_ptr<IMAPSearchCriteria> pCriteria)
+   {
+      // RFC 8514: within the given date, by save date.
+      DateTime dtSaveDate = Time::GetDateFromSystemDate(pMessage->GetSaveDate());
+      DateTime dtCriteria = Time::GetDateFromIMAP(pCriteria->GetText());
+
+      if (dtSaveDate.GetYear() == dtCriteria.GetYear() &&
+          dtSaveDate.GetMonth() == dtCriteria.GetMonth() &&
+          dtSaveDate.GetDay() == dtCriteria.GetDay())
+         return pCriteria->GetPositive();
+      else
+         return !pCriteria->GetPositive();
+   }
+
+   bool
+   IMAPCommandSEARCH::MatchesSAVEDSINCECriteria_(std::shared_ptr<Message> pMessage, std::shared_ptr<IMAPSearchCriteria> pCriteria)
+   {
+      // RFC 8514: within or later than the given date, by save date.
+      DateTime dtSaveDate = Time::GetDateFromSystemDate(pMessage->GetSaveDate());
+      DateTime dtCriteria = Time::GetDateFromIMAP(pCriteria->GetText());
+
+      if (dtSaveDate >= dtCriteria)
          return pCriteria->GetPositive();
       else
          return !pCriteria->GetPositive();

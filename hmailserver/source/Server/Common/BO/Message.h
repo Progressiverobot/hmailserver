@@ -96,6 +96,12 @@ namespace HM
       void SetCreateTime(const String &sCreateTime) {create_time_ = sCreateTime; }
       String GetCreateTime() const {return create_time_; }
 
+      // RFC 8514 (SAVEDATE): when the message was saved into its current
+      // mailbox. Distinct from the create time, which IMAP COPY must preserve
+      // as INTERNALDATE; a copy gets a fresh save date.
+      void SetSaveDate(const String &sSaveDate) {save_date_ = sSaveDate; }
+      String GetSaveDate() const {return save_date_; }
+
       std::shared_ptr<MessageRecipients> GetRecipients();
 
       bool XMLStore(XNode *pParentNode, int iOptions);
@@ -107,6 +113,7 @@ namespace HM
       int message_size_;
 
       AnsiString create_time_;
+      AnsiString save_date_;
       AnsiString filename_;
       AnsiString from_address_;
       

@@ -38,6 +38,7 @@ namespace HM
       show_body_structure_NonExtensible = false;
       show_modseq_ = false;
       show_preview_ = false;
+      show_savedate_ = false;
       has_changedsince_ = false;
       changedsince_ = 0;
    }
@@ -285,6 +286,12 @@ namespace HM
             case PREVIEW:
             {
                show_preview_ = true;
+               break;
+            }
+
+            case SAVEDATE:
+            {
+               show_savedate_ = true;
                break;
             }
 
@@ -617,7 +624,10 @@ namespace HM
          return MODSEQ;
 
       if (sPart.CompareNoCase(_T("PREVIEW")) == 0)
-         return PREVIEW;  
+         return PREVIEW;
+
+      if (sPart.CompareNoCase(_T("SAVEDATE")) == 0)
+         return SAVEDATE;  
 
       if (sPart.CompareNoCase(_T("INTERNALDATE")) == 0)
          return INTERNALDATE;  
