@@ -164,6 +164,13 @@ namespace HM
          // registration, though they ship together.
          L"date",
          L"index",
+         // RFC 3685 / RFC 5235: the server's own spam verdict as a graded value.
+         // virustest is deliberately absent - this server's antivirus pipeline
+         // blocks or strips infected mail before delivery, so a message reaching a
+         // script has no virus verdict to report, and a test that always answered
+         // "not scanned" would be advertised and inert.
+         L"spamtest",
+         L"spamtestplus",
          L"comparator-i;ascii-casemap",
          L"comparator-i;octet",
          L"comparator-i;ascii-numeric"
@@ -342,6 +349,11 @@ namespace HM
                // :index :last (RFC 5260 6): count from the end.
                result.lastGiven = true;
             }
+            else if (tag == _T("percent"))
+            {
+               // spamtest :percent (RFC 5235).
+               result.percentGiven = true;
+            }
 
             continue;
          }
@@ -482,7 +494,8 @@ namespace HM
       {
          L"address", L"allof", L"anyof", L"exists", L"false", L"header",
          L"not", L"size", L"true", L"envelope", L"hasflag", L"body",
-         L"mailboxexists", L"ihave", L"environment", L"date", L"currentdate"
+         L"mailboxexists", L"ihave", L"environment", L"date", L"currentdate",
+         L"spamtest"
       };
 
       for (const wchar_t *candidate : known)
@@ -1534,6 +1547,25 @@ namespace HM
          }
 
          if (!ValidateIndexArguments_(set, test->line, errorMessage))
+            return false;
+
+         return true;
+      }
+
+      if (name == _T("spamtest"))
+      {
+         if (!NeedExtension_(_T("spamtest"), _T("the 'spamtest' test"), test->line, errorMessage))
+            return false;
+
+         if (!CheckTags_(set, _T("comparator is contains matches value count regex percent"),
+                         _T("'spamtest'"), errorMessage))
+            return false;
+
+         if (set.percentGiven &&
+             !NeedExtension_(_T("spamtestplus"), _T("':percent'"), test->line, errorMessage))
+            return false;
+
+         if (!ValidateMatchArguments_(set, _T("'spamtest'"), test->line, errorMessage, 1))
             return false;
 
          return true;

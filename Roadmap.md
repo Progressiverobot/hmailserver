@@ -57,7 +57,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Transport security and deliverability](#transport-security-and-deliverability) | 43 | – | 4 | 1 |
 | [IMAP](#imap) | 58 | – | 17 | 3 |
 | [POP3](#pop3) | 21 | – | 6 | – |
-| [Sieve, ManageSieve and rules](#sieve-managesieve-and-rules) | 54 | 0 | 10 | – |
+| [Sieve, ManageSieve and rules](#sieve-managesieve-and-rules) | 55 | 0 | 9 | – |
 | [Authentication and cryptography](#authentication-and-cryptography) | 57 | 0 | 18 | – |
 | [Anti-spam, anti-virus and content control](#anti-spam-anti-virus-and-content-control) | 54 | – | 13 | – |
 | [Storage, accounts and data model](#storage-accounts-and-data-model) | 86 | – | 10 | – |
@@ -72,7 +72,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 2 | – | 4 | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 5 | 1 | 2 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 4 | 1 | 4 | – |
-| **Total** | **629** | **12** | **139** | **15** |
+| **Total** | **630** | **12** | **138** | **15** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage and the administration surface are the best-covered areas**, and the
@@ -448,7 +448,7 @@ the source, not from documentation.
 
 ### Sieve, ManageSieve and rules
 
-54 shipped · 0 underway · 10 not started · 0 deferred
+55 shipped · 0 underway · 9 not started · 0 deferred
 
 | | Capability | Detail |
 |:-:|---|---|
@@ -510,7 +510,7 @@ the source, not from documentation.
 | ⬜ | reject / ereject (RFC 5429) | Not implemented. **The hazard this row used to describe is gone and the correction matters more than the gap:** neither is in the known-command allowlist and `require "reject"` is refused, so a script that tries to reject mail is rejected AT UPLOAD with a message naming the unsupported extension. The author is told; mail is not silently kept while they believe it is being refused. `SieveSyntax.cs` asserts exactly that script is refused. Implementing them means an SMTP-time refusal for `ereject` and an RFC 3834 bounce for `reject`. |
 | ✅ | relational (RFC 5231) | Not implemented. No :count or :value match types, and no i;ascii-numeric comparator to make them meaningful — SplitArguments recognises only is/contains/matches **Shipped in dc9301a.** |
 | ✅ | RENAMESCRIPT and UNAUTHENTICATE | **Both shipped 16 August 2026.** RENAMESCRIPT was owed rather than optional: the capability response has always claimed VERSION "1.0", which promises the core RFC 5804 commands, and this one was answered with NO "Unknown command". The case that justifies it existing is renaming the ACTIVE script - the manual GETSCRIPT/PUTSCRIPT/DELETESCRIPT route cannot do that at all, because the active script refuses deletion - and the active status follows the new name (`SieveStorage::RenameScript` reads the active name before the move and rewrites it after). Renaming onto a taken name is refused rather than overwriting. UNAUTHENTICATE (RFC 5804 2.14.1) drops the session to the unauthenticated state keeping the connection and is now advertised; the auth-failure counter deliberately carries over so the command is not a way to reset auto-ban bookkeeping mid-connection. Both proven in the round-trip test, including a fresh AUTHENTICATE after UNAUTHENTICATE finding the renamed script still active. |
-| ⬜ | spamtest / spamtestplus / virustest (RFC 5235) | Not implemented, and again the underlying data exists: messages already carry a spam flag and SpamAssassin/AV scores from the antispam pipeline, but no Sieve test can read them |
+| ✅ | spamtest / spamtestplus / virustest (RFC 3685 / RFC 5235) | **spamtest and spamtestplus shipped 16 August 2026; virustest deliberately not.** The verdict comes from the message's spam FLAG alone, handed into the evaluator by the delivery path (`Message::GetFlagSpam`) - NOT from the X-hMailServer verdict headers, which a sender can write into their own message and inbound mail is not stripped of; a test reading them would let senders steer recipients' filters in both directions, including downgrading a real verdict with a forged low score. The spoofing control in `SieveSpamtestDelivery.cs` delivers exactly that forgery and asserts it files nothing - the same test that caught a stale binary still trusting headers during development. Grounding on the flag also fixes the granularity honestly: the pipeline persists no score for unclassified mail (`AddSpamScoreHeaders` runs only on classification), so the values are 0 (no verdict) and 10 (classified; 100 under `:percent`), nothing between - a graded midrange would be derived from nothing real. End-to-end verdicts in the fixture come from the REAL antispam pipeline via the SURBL permanent test point, with every verdict-header option off. virustest stays absent and refused at upload: infected mail is blocked or stripped before delivery, so a script never sees a message with a virus verdict, and a test that always answered "not scanned" would be advertised and inert - the exact trap the capability rule exists to prevent. |
 | ⬜ | Structured response codes | Partial. `(QUOTA/MAXSIZE)` is emitted by HAVESPACE, PUTSCRIPT and CHECKSCRIPT when a script exceeds the 1 MB limit, and `(ENCRYPT-NEEDED)` by AUTHENTICATE when the connecting range requires TLS on a cleartext connection. Still missing: (WARNINGS), (QUOTA/MAXSCRIPTS), (NONEXISTENT), (ALREADYEXISTS), (TAG), (REFERRAL) and the BYE response codes, so most refusals are still a bare NO with a quoted human string that a client can only show verbatim.
 | ✅ | subaddress (RFC 5233) | Not implemented. Address parts stop at :all/:localpart/:domain; :user and :detail are not recognised, so plus-addressing cannot be filtered on **Shipped in dc9301a.** |
 | ✅ | TLS | STARTTLS (RFC 5804 2.2) is offered whenever a TLS certificate is available on an IMAP, POP3 or SMTP port, and the SSL context comes from `SslContextInitializer` - the same function, cipher list, TLS version floor and key-exchange groups (including the hybrid post-quantum KEMs) as SMTP/POP3/IMAP, so this listener cannot drift from them. It can now also be *required* before a password: the per-IP-range `RequireTLSForAuth` that POP3, IMAP and SMTP already honour is read in `IsConnectionAllowed_`, and on a cleartext connection from such a range the capability line advertises `"SASL" ""` and `AUTHENTICATE` is answered `NO (ENCRYPT-NEEDED)` before the mechanism is validated, before the inline response is parsed and before a literal is read - so the password never crosses the wire, and the connection is dropped rather than desynchronized if a literal was announced. With no certificate the requirement fails closed (no STARTTLS, no mechanism) and is explained once per service start in the application log. Declared gap: no implicit-TLS variant - RFC 5804 defines no such port and no client asks for one, so that is deliberate rather than pending. Covered end to end by `Sieve/ManageSieveTls.cs`.

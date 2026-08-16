@@ -456,7 +456,7 @@ namespace HM
       };
 
       SieveResult sieveResult;
-      String actions = SieveScript::Evaluate(script, rawMessage, envelope, sieveResult, mailboxExists);
+      String actions = SieveScript::Evaluate(script, rawMessage, envelope, sieveResult, mailboxExists, message->GetFlagSpam());
 
       // A script that fails to parse must never break delivery; fall through to a
       // normal keep. (The structured result is already at its defaults in that case,

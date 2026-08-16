@@ -70,7 +70,8 @@ namespace HM
                          const String &rawMessage,
                          const SieveEnvelope &envelope,
                          SieveResult &result,
-                         std::function<bool(const String &)> mailboxExists)
+                         std::function<bool(const String &)> mailboxExists,
+                         bool classifiedAsSpam)
    {
       String errorMessage;
 
@@ -88,6 +89,7 @@ namespace HM
       SieveMessage message(rawMessage);
       SieveEvaluator evaluator;
       evaluator.SetMailboxExists(mailboxExists);
+      evaluator.SetClassifiedAsSpam(classifiedAsSpam);
       return evaluator.Evaluate(sieveScript.GetCommands(), message, envelope, result);
    }
 }

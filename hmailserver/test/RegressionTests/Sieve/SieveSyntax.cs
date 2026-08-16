@@ -63,6 +63,10 @@ namespace RegressionTests.Sieve
          // environment under its require.
          Assert.IsEmpty(CheckSyntax("require \"environment\";\r\nif environment :is \"name\" \"hMailServer\" {\r\n  keep;\r\n}"));
 
+         // spamtest under its require, with :percent under spamtestplus.
+         Assert.IsEmpty(CheckSyntax("require \"spamtest\";\r\nif spamtest :is \"0\" {\r\n  keep;\r\n}"));
+         Assert.IsEmpty(CheckSyntax("require [\"spamtest\", \"spamtestplus\"];\r\nif spamtest :percent :is \"100\" {\r\n  keep;\r\n}"));
+
          // date, currentdate and :index under their requires.
          Assert.IsEmpty(CheckSyntax("require \"date\";\r\nif currentdate :is \"weekday\" \"0\" {\r\n  keep;\r\n}"));
          Assert.IsEmpty(CheckSyntax("require \"date\";\r\nif date :zone \"+0200\" \"date\" \"hour\" \"15\" {\r\n  keep;\r\n}"));
@@ -134,6 +138,11 @@ namespace RegressionTests.Sieve
          Assert.IsNotEmpty(CheckSyntax("if ihave \"fileinto\" {\r\n  keep;\r\n}"));
          Assert.IsNotEmpty(CheckSyntax("if environment :is \"name\" \"x\" {\r\n  keep;\r\n}"));
 
+         // :percent needs spamtestplus, not just spamtest; and spamtest needs
+         // its require at all.
+         Assert.IsNotEmpty(CheckSyntax("require \"spamtest\";\r\nif spamtest :percent :is \"100\" {\r\n  keep;\r\n}"));
+         Assert.IsNotEmpty(CheckSyntax("if spamtest :is \"0\" {\r\n  keep;\r\n}"));
+
          // The date tests: unknown date part, malformed zone, :originalzone on
          // currentdate (which has no original), :last without :index, and :index
          // without its require - each refused at upload with the reason named.
@@ -196,8 +205,9 @@ namespace RegressionTests.Sieve
             // 16 August 2026 when their extensions were implemented - they now
             // live in SieveMailboxDelivery.cs and SieveEnvironmentDelivery.cs,
             // which prove them end to end.
+            // spamtest moved out on 16 August 2026 - SieveSpamtestDelivery.cs
+            // proves it end to end, spoofing control included.
             "string :is \"a\" \"a\"",
-            "spamtest :is \"5\"",
          };
 
          foreach (string test in tests)

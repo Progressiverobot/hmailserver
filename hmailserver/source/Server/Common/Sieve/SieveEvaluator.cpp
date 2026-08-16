@@ -10,6 +10,7 @@
 #include "../Application/Application.h"
 #include "../Application/Configuration.h"
 #include "../Util/Time.h"
+#include "../AntiSpam/AntiSpamConfiguration.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -94,6 +95,12 @@ namespace HM
    SieveEvaluator::SetMailboxExists(std::function<bool(const String &)> callback)
    {
       mailbox_exists_ = callback;
+   }
+
+   void
+   SieveEvaluator::SetClassifiedAsSpam(bool classified)
+   {
+      classified_as_spam_ = classified;
    }
 
    bool
@@ -907,6 +914,9 @@ namespace HM
       if (name == _T("environment"))
          return EvaluateComparisonTest_(test, message, ValueSource::Environment);
 
+      if (name == _T("spamtest"))
+         return EvaluateSpamTest_(test, message);
+
       if (name == _T("date"))
          return EvaluateDateTest_(test, message, false);
 
@@ -1200,6 +1210,45 @@ namespace HM
       String selected = set.lastGiven ? values[values.size() - index] : values[index - 1];
       values.clear();
       values.push_back(selected);
+   }
+
+   bool
+   SieveEvaluator::EvaluateSpamTest_(const std::shared_ptr<SieveTest> &test, const SieveMessage &message)
+   {
+      SieveArgumentSet set;
+      String ignored;
+      if (!SieveParser::SplitArguments(test->arguments, set, ignored))
+         return false;
+
+      if (set.stringLists.size() != 1 || set.stringLists[0].empty())
+         return false;
+
+      // The verdict comes from the message's spam FLAG alone, handed in by the
+      // delivery path. The verdict HEADERS are deliberately not consulted: a
+      // sender can write X-hMailServer-Spam and X-hMailServer-Reason-Score into
+      // their own message, and inbound mail is not stripped of them - so a test
+      // reading them would let senders steer recipients' filters in both
+      // directions, including downgrading a real verdict with a forged low score.
+      // The flag cannot be forged from outside; it exists only in this process.
+      //
+      // This also decides the granularity honestly: the pipeline persists no
+      // score for mail it did NOT classify (AddSpamScoreHeaders runs only on
+      // classification), so a graded 2..9 midrange has nothing real to be
+      // derived from. The answer is 10 (100 under :percent) for classified mail
+      // and "0" - the RFC's "no information" - for everything else, including
+      // tested-but-clean, which the pipeline records nowhere.
+      String value;
+      if (!classified_as_spam_)
+         value = _T("0");
+      else if (set.percentGiven)
+         value = _T("100");
+      else
+         value = _T("10");
+
+      std::vector<String> values;
+      values.push_back(value);
+
+      return MatchValuesAgainstKeys_(set, values, set.stringLists[0]);
    }
 
    bool

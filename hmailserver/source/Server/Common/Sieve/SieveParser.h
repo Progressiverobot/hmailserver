@@ -126,6 +126,9 @@ namespace HM
       bool indexGiven = false;
       bool lastGiven = false;
 
+      // spamtest :percent (RFC 5235).
+      bool percentGiven = false;
+
       // Positional string-list arguments, in order.
       std::vector<std::vector<String>> stringLists;
    };

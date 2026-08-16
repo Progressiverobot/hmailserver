@@ -115,6 +115,12 @@ namespace HM
       // through to their non-conditional branches rather than acting on a guess.
       void SetMailboxExists(std::function<bool(const String &)> callback);
 
+      // The server's own spam classification for the message being delivered, from
+      // the delivery path (Message::GetFlagSpam). The spamtest value can also be
+      // derived from the verdict headers when the administrator has them on; this
+      // flag is the channel that works when they are off.
+      void SetClassifiedAsSpam(bool classified);
+
    private:
       // Where the values a test compares against come from.
       enum class ValueSource { Header, Address, Envelope, Flags, Body, Environment };
@@ -130,6 +136,9 @@ namespace HM
       // for an item it cannot - the caller then contributes no value, making any
       // match against that item false, which is the RFC's unknown-item behaviour.
       static bool GetEnvironmentItem_(const String &name, String &value);
+
+      // spamtest (RFC 3685 / RFC 5235).
+      bool EvaluateSpamTest_(const std::shared_ptr<SieveTest> &test, const SieveMessage &message);
 
       // date / currentdate (RFC 5260).
       bool EvaluateDateTest_(const std::shared_ptr<SieveTest> &test, const SieveMessage &message, bool currentDate);
@@ -212,5 +221,6 @@ namespace HM
       SieveResult *result_;
 
       std::function<bool(const String &)> mailbox_exists_;
+      bool classified_as_spam_ = false;
    };
 }

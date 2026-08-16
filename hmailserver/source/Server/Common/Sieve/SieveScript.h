@@ -52,7 +52,8 @@ namespace HM
                              const String &rawMessage,
                              const SieveEnvelope &envelope,
                              SieveResult &result,
-                             std::function<bool(const String &)> mailboxExists = nullptr);
+                             std::function<bool(const String &)> mailboxExists = nullptr,
+                             bool classifiedAsSpam = false);
 
    private:
       std::vector<std::shared_ptr<SieveCommand>> commands_;

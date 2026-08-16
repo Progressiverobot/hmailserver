@@ -264,6 +264,12 @@ namespace RegressionTests.Sieve
                StringAssert.Contains("date", greeting);
                StringAssert.Contains("index", greeting);
 
+               // spamtest/spamtestplus followed, with SieveSpamtestDelivery.cs
+               // behind them - verdicts from the real antispam pipeline, spoofed
+               // sender-written verdict headers proven inert.
+               StringAssert.Contains("spamtest", greeting);
+               StringAssert.Contains("spamtestplus", greeting);
+
                // Still absent on purpose: envelope is implemented and evaluated, and is
                // held back until a test proves the envelope TEST command itself works.
                // If somebody adds it here, that test should exist first.

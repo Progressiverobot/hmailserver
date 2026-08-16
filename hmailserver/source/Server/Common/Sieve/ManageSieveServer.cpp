@@ -263,7 +263,17 @@ namespace HM
       // it), and :index/:last select among repeated header fields for the header,
       // address and date tests. End-to-end tests in SieveDateDelivery.cs include
       // zone conversion proven by filing on an hour the raw header does not state.
-      const char *AdvertisedSieveExtensions = "fileinto copy relational subaddress vacation vacation-seconds imap4flags body mailbox regex ihave environment date index";
+      // spamtest and spamtestplus moved in on 16 August 2026, under the same rule.
+      // The delivery-side step is twofold: LocalDelivery passes the message's own
+      // spam FLAG into the evaluator (so the test works with every header option
+      // off), and the graded value is derived from the verdict headers when the
+      // administrator writes them, anchored on the mark threshold - at the score
+      // that classifies a message, the answer is 10 (or 100 under :percent).
+      // virustest is deliberately NOT here: infected mail is blocked or stripped
+      // before delivery, so a script never sees a message with a virus verdict,
+      // and advertising a test that always answers "not scanned" is the inert-
+      // capability trap this list exists to prevent.
+      const char *AdvertisedSieveExtensions = "fileinto copy relational subaddress vacation vacation-seconds imap4flags body mailbox regex ihave environment date index spamtest spamtestplus";
 
       AnsiString EscapeQuoted(const String &value)
       {
