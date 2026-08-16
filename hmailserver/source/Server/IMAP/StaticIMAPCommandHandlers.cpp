@@ -86,6 +86,7 @@ namespace HM
       mapCommandHandlers[IMAPConnection::IMAP_UNSELECT] = std::shared_ptr<IMAPCommandUNSELECT>(new IMAPCommandUNSELECT());
       mapCommandHandlers[IMAPConnection::IMAP_ENABLE] = std::shared_ptr<IMAPCommandENABLE>(new IMAPCommandENABLE());
       mapCommandHandlers[IMAPConnection::IMAP_UNAUTHENTICATE] = std::shared_ptr<IMAPCommandUNAUTHENTICATE>(new IMAPCommandUNAUTHENTICATE());
+      mapCommandHandlers[IMAPConnection::IMAP_SETQUOTA] = std::shared_ptr<IMAPCommandSETQUOTA>(new IMAPCommandSETQUOTA());
    }
 
 
@@ -123,6 +124,20 @@ namespace HM
       pConnection->SendAsciiData(pArgument->Tag() + " OK UNAUTHENTICATE completed\r\n");
 
       return IMAPResult();
+   }
+
+   IMAPResult
+   IMAPCommandSETQUOTA::ExecuteCommand(std::shared_ptr<IMAPConnection> pConnection, std::shared_ptr<IMAPCommandArgument> pArgument)
+   {
+      if (!pConnection->IsAuthenticated())
+         return IMAPResult(IMAPResult::ResultNo, "Authenticate first");
+
+      // RFC 9208 permits a server to refuse quota changes outright. Here the
+      // quota is the account's maximum size, set by an administrator; a mailbox
+      // owner raising their own limit over IMAP would make the setting
+      // meaningless. Recognised rather than left to fall through to "unknown
+      // command", so the refusal explains itself.
+      return IMAPResult(IMAPResult::ResultNo, "Quotas are administered by the server administrator and cannot be changed over IMAP.");
    }
 
    IMAPResult

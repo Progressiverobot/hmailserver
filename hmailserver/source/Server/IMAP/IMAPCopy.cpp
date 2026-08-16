@@ -60,7 +60,7 @@ namespace HM
       if (!pFolder->IsPublicFolder())
       {
          if (!pAccount->SpaceAvailable(pOldMessage->GetSize()))
-            return IMAPResult(IMAPResult::ResultNo, "Your quota has been exceeded.");
+            return IMAPResult(IMAPResult::ResultNo, "[OVERQUOTA] Your quota has been exceeded.");
       }
 
       // Check if the user has permission to copy to this destination folder

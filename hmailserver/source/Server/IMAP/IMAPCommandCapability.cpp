@@ -27,8 +27,13 @@ namespace HM
       if (pConfig->GetUseIMAPIdle())
          sResponse += " IDLE";
 
+      // RFC 9208 keeps the bare QUOTA atom and adds one QUOTA=RES-* atom per
+      // resource the server understands. Storage is the only quota this server
+      // enforces (per-account maximum size), so RES-STORAGE is the only one
+      // advertised - claiming RES-MESSAGE would promise a message-count quota
+      // that nothing enforces.
       if (pConfig->GetUseIMAPQuota())
-         sResponse += " QUOTA";
+         sResponse += " QUOTA QUOTA=RES-STORAGE";
 
       if (pConfig->GetUseIMAPSort())
          sResponse += " SORT";

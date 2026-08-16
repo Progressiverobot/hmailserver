@@ -177,7 +177,7 @@ namespace HM
             return IMAPResult(IMAPResult::ResultNo, "Account could not be fetched.");
 
          if (!pAccount->SpaceAvailable(bytes_left_to_receive_))
-            return IMAPResult(IMAPResult::ResultNo, "Your quota has been exceeded.");
+            return IMAPResult(IMAPResult::ResultNo, "[OVERQUOTA] Your quota has been exceeded.");
       }
 
       if (!pConnection->CheckPermission(destination_folder_, ACLPermission::PermissionInsert))

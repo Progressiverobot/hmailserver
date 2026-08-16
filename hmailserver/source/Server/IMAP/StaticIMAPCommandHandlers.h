@@ -55,6 +55,13 @@ namespace HM
       virtual IMAPResult ExecuteCommand(std::shared_ptr<HM::IMAPConnection> pConnection, std::shared_ptr<IMAPCommandArgument> pArgument);
    };
 
+   // RFC 9208: recognised and refused - quotas here are administrative
+   // configuration, not something a mailbox owner sets on themselves.
+   class IMAPCommandSETQUOTA : public IMAPCommand
+   {
+      virtual IMAPResult ExecuteCommand(std::shared_ptr<HM::IMAPConnection> pConnection, std::shared_ptr<IMAPCommandArgument> pArgument);
+   };
+
 
 
 }

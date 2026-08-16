@@ -57,9 +57,12 @@ namespace HM
       }
       else
       {
-         // NO QUOTA DEFINED
-         sResponse.Format(_T("* QUOTA \"\" (STORAGE)\r\n")
-            _T("%s OK GETQUOTA completed\r\n"), 
+         // No quota defined. RFC 9208's grammar makes each listed resource a
+         // name-usage-limit triple, so a bare "(STORAGE)" - what this used to
+         // send - parses in no client; an account without a quota gets the
+         // empty list.
+         sResponse.Format(_T("* QUOTA \"\" ()\r\n")
+            _T("%s OK GETQUOTA completed\r\n"),
             pArgument->Tag().c_str());
 
       }

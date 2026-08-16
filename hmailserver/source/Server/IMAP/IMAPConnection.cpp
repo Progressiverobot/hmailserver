@@ -746,6 +746,8 @@ namespace HM
          return IMAP_ENABLE;
       else if (sCommand == _T("UNAUTHENTICATE"))
          return IMAP_UNAUTHENTICATE;
+      else if (sCommand == _T("SETQUOTA"))
+         return IMAP_SETQUOTA;
 
       return IMAP_UNKNOWN;
    }
