@@ -55,7 +55,7 @@ strong and where it is thin far more honestly than any prose summary.
 | **The capability matrix** | | | | |
 | [SMTP and ESMTP](#smtp-and-esmtp) | 27 | – | 2 | – |
 | [Transport security and deliverability](#transport-security-and-deliverability) | 43 | – | 4 | 1 |
-| [IMAP](#imap) | 58 | – | 17 | 3 |
+| [IMAP](#imap) | 59 | – | 16 | 3 |
 | [POP3](#pop3) | 21 | – | 6 | – |
 | [Sieve, ManageSieve and rules](#sieve-managesieve-and-rules) | 64 | 0 | 1 | – |
 | [Authentication and cryptography](#authentication-and-cryptography) | 57 | 0 | 18 | – |
@@ -72,7 +72,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 2 | – | 4 | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 5 | 1 | 2 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 4 | 1 | 4 | – |
-| **Total** | **643** | **12** | **127** | **15** |
+| **Total** | **644** | **12** | **126** | **15** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage and the administration surface are the best-covered areas**, and the
@@ -330,7 +330,7 @@ the source, not from documentation.
 
 ### IMAP
 
-58 shipped · 0 underway · 17 not started · 3 deferred
+59 shipped · 0 underway · 16 not started · 3 deferred
 
 | | Capability | Detail |
 |:-:|---|---|
@@ -400,7 +400,7 @@ the source, not from documentation.
 | ⬜ | I18NLEVEL (RFC 5255) | Not implemented and not advertised; no LANGUAGE command, no COMPARATOR support, no translated response text. |
 | ⬜ | LIST-STATUS (RFC 5819) | Not implemented and not advertised. The LIST RETURN parser handles only SUBSCRIBED, so clients must issue one STATUS per mailbox at startup. Roadmap ranks it second by value and notes it is expected alongside IMAP4rev2. |
 | ⬜ | LITERAL+ / LITERAL- (RFC 7888) | Neither is advertised. A trailing '+' in a literal count is tolerated and stripped in both the connection-level and APPEND parsers, but the server still sends a "+ Ready for literal data" continuation… |
-| ⬜ | LOGINDISABLED (RFC 3501) not advertised | When connection security is CSSTARTTLSRequired the LOGIN command is refused with "STARTTLS is required", but LOGINDISABLED never appears in the capability string, so a conformant client cannot tell in advance… |
+| ✅ | LOGINDISABLED (RFC 3501) | **Shipped 13 August 2026, and this row was stale until 16 August.** CAPABILITY advertises LOGINDISABLED whenever LOGIN would be refused on the connection - which is two cases, not one: the port being STARTTLS-required, and the connecting IP range setting RequireTLSForAuth; the second used to be invisible. The same commit stopped offering AUTH=PLAIN in both cases, because advertising a mechanism and then refusing it means the password has already crossed the wire in the clear by the time the client learns the connection was unacceptable. Fixtures in CapabilityAuthAdvertisement assert both directions: cleartext CAPABILITY carries LOGINDISABLED and no AUTH= mechanism, and the same connection after STARTTLS carries the mechanisms and no LOGINDISABLED. |
 | ⬜ | METADATA (RFC 5464) / ANNOTATE | Not implemented and not advertised; no GETMETADATA or SETMETADATA commands and no annotation store. Roadmap flags it as a prerequisite for some Sieve extensions. |
 | ⬜ | MULTIAPPEND (RFC 3502) | Not implemented and not advertised. APPEND handles exactly one message literal per command and finishes the command as soon as that literal is complete. |
 | ⬜ | OBJECTID (RFC 8474) — EMAILID / THREADID / MAILBOXID | Not implemented and not advertised; no EMAILID or THREADID FETCH item and no MAILBOXID in the LIST/STATUS paths. Listed in the roadmap's IMAP-extension backlog. |
