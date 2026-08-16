@@ -154,7 +154,12 @@ namespace DBUpdater
          // the message was saved into its current mailbox, distinct from
          // messagecreatetime, which IMAP COPY must preserve as INTERNALDATE.
          new SchemaProbe(6013, "hm_messages.messagesavedate",
-                         "update hm_messages set messagesavedate = messagesavedate where 1 = 0")
+                         "update hm_messages set messagesavedate = messagesavedate where 1 = 0"),
+
+         // Upgrade6013to6014* - the RFC 5464 METADATA store: annotations on
+         // mailboxes (accountid + folderid) and on the server (0 + 0).
+         new SchemaProbe(6014, "hm_imap_metadata.metadatavalue",
+                         "update hm_imap_metadata set metadatavalue = metadatavalue where 1 = 0")
       };
 
       /// <summary>

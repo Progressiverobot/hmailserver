@@ -143,6 +143,10 @@ namespace HM
       // messagesavedate column schema 6013 added.
       sResponse += " SAVEDATE";
 
+      // RFC 5464: annotations on mailboxes and the server, over the
+      // hm_imap_metadata table schema 6014 added.
+      sResponse += " METADATA";
+
       // RFC 8437: an authenticated session can return to the not-authenticated
       // state for connection reuse. Advertised only once authenticated - that is
       // the only state where the command is valid, and the RFC's requirement is

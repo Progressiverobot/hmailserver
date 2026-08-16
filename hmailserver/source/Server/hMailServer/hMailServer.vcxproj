@@ -609,6 +609,8 @@ EXIT 0
     <ClCompile Include="..\Imap\IMAPCommandAppend.cpp" />
     <ClCompile Include="..\Imap\IMAPCommandAuthenticate.cpp" />
     <ClCompile Include="..\Imap\IMAPCommandCapability.cpp" />
+    <ClCompile Include="..\Imap\IMAPCommandMetadata.cpp" />
+    <ClCompile Include="..\Imap\IMAPMetadataStore.cpp" />
     <ClCompile Include="..\Imap\IMAPCommandCheck.cpp" />
     <ClCompile Include="..\Imap\IMAPCommandClose.cpp" />
     <ClCompile Include="..\Imap\IMAPCommandCopy.cpp" />
@@ -1171,6 +1173,8 @@ EXIT 0
     <ClInclude Include="..\Imap\IMAPCommandAppend.h" />
     <ClInclude Include="..\Imap\IMAPCommandAuthenticate.h" />
     <ClInclude Include="..\Imap\IMAPCommandCapability.h" />
+    <ClInclude Include="..\Imap\IMAPCommandMetadata.h" />
+    <ClInclude Include="..\Imap\IMAPMetadataStore.h" />
     <ClInclude Include="..\Imap\IMAPCommandCheck.h" />
     <ClInclude Include="..\Imap\IMAPCommandClose.h" />
     <ClInclude Include="..\Imap\IMAPCommandCopy.h" />

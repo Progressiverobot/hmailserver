@@ -773,6 +773,10 @@ namespace HM
          return IMAP_SETQUOTA;
       else if (sCommand == _T("REPLACE"))
          return IMAP_REPLACE;
+      else if (sCommand == _T("GETMETADATA"))
+         return IMAP_GETMETADATA;
+      else if (sCommand == _T("SETMETADATA"))
+         return IMAP_SETMETADATA;
 
       return IMAP_UNKNOWN;
    }

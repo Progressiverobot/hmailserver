@@ -842,4 +842,14 @@ insert into hm_tcpipports (portprotocol, portnumber, portaddress1, portaddress2,
 
 insert into hm_tcpipports (portprotocol, portnumber, portaddress1, portaddress2, portconnectionsecurity, portsslcertificateid) values (5, 143, 0, NULL, 0, 0);
 
-insert into hm_dbversion values (6013);
+create table hm_imap_metadata
+(
+	metadataid bigserial not null primary key,
+	metadataaccountid bigint not null,
+	metadatafolderid bigint not null,
+	metadataentryname varchar(255) not null,
+	metadatavalue varchar(2048) not null,
+	unique(metadataaccountid, metadatafolderid, metadataentryname)
+);
+
+insert into hm_dbversion values (6014);

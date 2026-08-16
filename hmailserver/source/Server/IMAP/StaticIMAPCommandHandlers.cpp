@@ -34,6 +34,7 @@
 #include "IMAPCommandSetAcl.h"
 #include "IMAPCommandListRights.h"
 #include "IMAPCommandStartTls.h"
+#include "IMAPCommandMetadata.h"
 
 // IMAP QUOTA EXTENSION
 #include "IMAPCommandGetQuota.h"
@@ -87,6 +88,8 @@ namespace HM
       mapCommandHandlers[IMAPConnection::IMAP_ENABLE] = std::shared_ptr<IMAPCommandENABLE>(new IMAPCommandENABLE());
       mapCommandHandlers[IMAPConnection::IMAP_UNAUTHENTICATE] = std::shared_ptr<IMAPCommandUNAUTHENTICATE>(new IMAPCommandUNAUTHENTICATE());
       mapCommandHandlers[IMAPConnection::IMAP_SETQUOTA] = std::shared_ptr<IMAPCommandSETQUOTA>(new IMAPCommandSETQUOTA());
+      mapCommandHandlers[IMAPConnection::IMAP_GETMETADATA] = std::shared_ptr<IMAPCommandGETMETADATA>(new IMAPCommandGETMETADATA());
+      mapCommandHandlers[IMAPConnection::IMAP_SETMETADATA] = std::shared_ptr<IMAPCommandSETMETADATA>(new IMAPCommandSETMETADATA());
    }
 
 

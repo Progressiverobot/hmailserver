@@ -1004,4 +1004,17 @@ insert into hm_tcpipports (portprotocol, portnumber, portaddress1, portaddress2,
 
 insert into hm_tcpipports (portprotocol, portnumber, portaddress1, portaddress2, portconnectionsecurity, portsslcertificateid) values (5, 143, 0, NULL, 0, 0) 
 
-insert into hm_dbversion values (6013)
+create table hm_imap_metadata
+(
+   metadataid bigint identity(1,1) not null,
+   metadataaccountid bigint not null,
+   metadatafolderid bigint not null,
+   metadataentryname nvarchar(255) not null,
+   metadatavalue nvarchar(2048) not null
+)
+
+ALTER TABLE hm_imap_metadata ADD CONSTRAINT hm_imap_metadata_pk PRIMARY KEY NONCLUSTERED (metadataid)
+
+ALTER TABLE hm_imap_metadata ADD CONSTRAINT hm_imap_metadata_unique UNIQUE (metadataaccountid, metadatafolderid, metadataentryname)
+
+insert into hm_dbversion values (6014)

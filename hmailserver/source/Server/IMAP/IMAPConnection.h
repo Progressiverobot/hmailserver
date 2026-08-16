@@ -89,7 +89,9 @@ namespace HM
          IMAP_THREAD = 140,
          IMAP_UNAUTHENTICATE = 141,
          IMAP_SETQUOTA = 142,
-         IMAP_REPLACE = 143
+         IMAP_REPLACE = 143,
+         IMAP_GETMETADATA = 144,
+         IMAP_SETMETADATA = 145
       };
 
       void ParseData(const AnsiString &Request);

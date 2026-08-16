@@ -530,6 +530,7 @@
     <Compile Include="IMAP\MultiAppend.cs" />
     <Compile Include="IMAP\Replace.cs" />
     <Compile Include="IMAP\SaveDate.cs" />
+    <Compile Include="IMAP\Metadata.cs" />
     <Compile Include="IMAP\Examine.cs" />
     <Compile Include="IMAP\Fetch.cs" />
     <Compile Include="IMAP\PartialFetchChunking.cs" />
