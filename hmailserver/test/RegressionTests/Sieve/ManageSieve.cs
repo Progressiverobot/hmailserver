@@ -339,9 +339,12 @@ namespace RegressionTests.Sieve
                string listActive = session.SendCommand("LISTSCRIPTS");
                StringAssert.Contains("\"primary\" ACTIVE", listActive);
 
-               // The active script cannot be deleted (RFC 5804).
+               // The active script cannot be deleted (RFC 5804) - and the refusal
+               // carries its machine-readable response code, so a client can offer
+               // "deactivate first?" instead of parroting an English sentence.
                string deleteActive = session.SendCommand("DELETESCRIPT \"primary\"");
                StringAssert.StartsWith("NO", deleteActive.TrimStart());
+               StringAssert.Contains("(ACTIVE)", deleteActive);
 
                // A non-active script can be deleted.
                string deleteScratch = session.SendCommand("DELETESCRIPT \"scratch\"");
@@ -357,6 +360,7 @@ namespace RegressionTests.Sieve
                // the new name.
                string renameMissing = session.SendCommand("RENAMESCRIPT \"no-such-script\" \"anything\"");
                StringAssert.StartsWith("NO", renameMissing.TrimStart());
+               StringAssert.Contains("(NONEXISTENT)", renameMissing);
 
                string rename = session.SendCommand("RENAMESCRIPT \"primary\" \"renamed\"");
                StringAssert.StartsWith("OK", rename.TrimStart());
@@ -375,6 +379,7 @@ namespace RegressionTests.Sieve
                StringAssert.StartsWith("OK", putBlocker.TrimStart());
                string renameOntoTaken = session.SendCommand("RENAMESCRIPT \"renamed\" \"scratch\"");
                StringAssert.StartsWith("NO", renameOntoTaken.TrimStart());
+               StringAssert.Contains("(ALREADYEXISTS)", renameOntoTaken);
                session.SendCommand("DELETESCRIPT \"scratch\"");
 
                // UNAUTHENTICATE (RFC 5804 2.14.1): advertised in the greeting, drops

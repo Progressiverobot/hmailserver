@@ -1315,7 +1315,7 @@ namespace HM
             String name;
             if (!ParseToken(line, pos, name) || !SieveStorage::ScriptExists(accountAddress, name))
             {
-               Send_(connection, "NO \"There is no script by that name.\"\r\n");
+               Send_(connection, "NO (NONEXISTENT) \"There is no script by that name.\"\r\n");
                continue;
             }
 
@@ -1343,7 +1343,7 @@ namespace HM
 
             if (!SieveStorage::ScriptExists(accountAddress, name))
             {
-               Send_(connection, "NO \"There is no script by that name.\"\r\n");
+               Send_(connection, "NO (NONEXISTENT) \"There is no script by that name.\"\r\n");
                continue;
             }
 
@@ -1357,14 +1357,14 @@ namespace HM
             String name;
             if (!ParseToken(line, pos, name) || !SieveStorage::ScriptExists(accountAddress, name))
             {
-               Send_(connection, "NO \"There is no script by that name.\"\r\n");
+               Send_(connection, "NO (NONEXISTENT) \"There is no script by that name.\"\r\n");
                continue;
             }
 
             if (SieveStorage::DeleteScript(accountAddress, name))
                Send_(connection, "OK\r\n");
             else
-               Send_(connection, "NO \"The active script cannot be deleted.\"\r\n");
+               Send_(connection, "NO (ACTIVE) \"The active script cannot be deleted.\"\r\n");
             continue;
          }
 
@@ -1373,7 +1373,7 @@ namespace HM
             String oldName;
             if (!ParseToken(line, pos, oldName) || !SieveStorage::ScriptExists(accountAddress, oldName))
             {
-               Send_(connection, "NO \"There is no script by that name.\"\r\n");
+               Send_(connection, "NO (NONEXISTENT) \"There is no script by that name.\"\r\n");
                continue;
             }
 
@@ -1386,7 +1386,7 @@ namespace HM
 
             if (SieveStorage::ScriptExists(accountAddress, newName))
             {
-               Send_(connection, "NO \"A script by that name already exists.\"\r\n");
+               Send_(connection, "NO (ALREADYEXISTS) \"A script by that name already exists.\"\r\n");
                continue;
             }
 
