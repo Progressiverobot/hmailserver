@@ -11,6 +11,7 @@
 #include "../Mime/MimeTester.h"
 #include "../Util/Utilities.h"
 #include "../Util/MessageUtilities.h"
+#include "../Util/AcmeClient.h"
 #include "../Util/Charset.h"
 #include "../Util/RegularExpression.h"
 #include "../TCPIP/LocalIPAddresses.h"
@@ -332,6 +333,52 @@ namespace HM
       OutputDebugString(_T("hMailServer: Testing Base64\n"));
       Base64Tester base64Tester;
       base64Tester.Test();
+
+      OutputDebugString(_T("hMailServer: Testing the ACME challenge locator\n"));
+      {
+         // Boulder pretty-prints its JSON - '"type": "http-01"', space included -
+         // so the compact-form search this locator replaced never matched a real
+         // Let's Encrypt response and every issuance failed (issue #34). The
+         // pretty shape below is the real CA's, byte for byte in the ways that
+         // matter.
+         AnsiString pretty =
+            "{\n"
+            "  \"identifier\": {\n"
+            "    \"type\": \"dns\",\n"
+            "    \"value\": \"mta-sts.example.com\"\n"
+            "  },\n"
+            "  \"status\": \"pending\",\n"
+            "  \"challenges\": [\n"
+            "    {\n"
+            "      \"type\": \"tls-alpn-01\",\n"
+            "      \"url\": \"https://ca.example/chall/1\",\n"
+            "      \"token\": \"alpntoken\"\n"
+            "    },\n"
+            "    {\n"
+            "      \"type\": \"http-01\",\n"
+            "      \"url\": \"https://ca.example/chall/2\",\n"
+            "      \"token\": \"httptoken\"\n"
+            "    }\n"
+            "  ]\n"
+            "}";
+         if (AcmeClient::FindChallengeOfType(pretty, "http-01") < 0)
+            throw 0;
+
+         // The compact form stays accepted - simulators and other CAs emit it.
+         AnsiString compact = "{\"challenges\":[{\"type\":\"http-01\",\"url\":\"u\",\"token\":\"t\"}]}";
+         if (AcmeClient::FindChallengeOfType(compact, "http-01") < 0)
+            throw 0;
+
+         // A wildcard authorization offers dns-01 only: not-found is the answer.
+         AnsiString dnsOnly = "{\"challenges\": [{\"type\": \"dns-01\", \"url\": \"u\", \"token\": \"t\"}]}";
+         if (AcmeClient::FindChallengeOfType(dnsOnly, "http-01") >= 0)
+            throw 0;
+
+         // The type string appearing as some OTHER key's value must not count.
+         AnsiString decoy = "{\"failedChallenge\": \"http-01\", \"challenges\": []}";
+         if (AcmeClient::FindChallengeOfType(decoy, "http-01") >= 0)
+            throw 0;
+      }
 
       OutputDebugString(_T("hMailServer: Testing Base64\n"));
       ModifiedUTF7Tester modifiedUTF7Tester;

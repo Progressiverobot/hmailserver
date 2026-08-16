@@ -35,6 +35,14 @@ namespace HM
       // Runs the full issuance flow. Returns true on success.
       bool RequestCertificate();
 
+      // Finds a challenge whose "type" is the given value, tolerating the
+      // whitespace boulder's pretty-printed JSON puts around the colon - the
+      // compact-form search this replaces never matched a real Let's Encrypt
+      // response (issue #34). Returns the position of the type value, inside
+      // the challenge object, or -1. Public and static so the self-test can
+      // pin the real CA's response shape.
+      static int FindChallengeOfType(const AnsiString &json, const AnsiString &challengeType);
+
    private:
 
       struct HttpResponse

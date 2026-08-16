@@ -397,6 +397,48 @@ namespace HM
       return Base64Url_((const unsigned char*) data.c_str(), data.GetLength());
    }
 
+   // static
+   int
+   AcmeClient::FindChallengeOfType(const AnsiString &json, const AnsiString &challengeType)
+   {
+      // Accepts '"type":"http-01"', '"type": "http-01"' and any other amount
+      // of whitespace around the colon. A bare mention of the type string
+      // elsewhere - an error detail, some other key's value - does not count:
+      // the value must be preceded, across whitespace, by a colon and the
+      // "type" key.
+      AnsiString typeValue = "\"" + challengeType + "\"";
+      const AnsiString typeKey = "\"type\"";
+
+      int searchFrom = 0;
+      for (;;)
+      {
+         int valuePosition = json.Find(typeValue, searchFrom);
+         if (valuePosition < 0)
+            return -1;
+
+         int position = valuePosition - 1;
+
+         while (position >= 0 && (json[position] == ' ' || json[position] == '\t' ||
+                                  json[position] == '\r' || json[position] == '\n'))
+            position--;
+
+         if (position >= 0 && json[position] == ':')
+         {
+            position--;
+
+            while (position >= 0 && (json[position] == ' ' || json[position] == '\t' ||
+                                     json[position] == '\r' || json[position] == '\n'))
+               position--;
+
+            int keyStart = position - typeKey.GetLength() + 1;
+            if (keyStart >= 0 && json.Mid(keyStart, typeKey.GetLength()) == typeKey)
+               return valuePosition;
+         }
+
+         searchFrom = valuePosition + 1;
+      }
+   }
+
    AnsiString
    AcmeClient::JsonStringValue_(const AnsiString &json, const AnsiString &key, int searchFrom)
    {
@@ -683,15 +725,32 @@ namespace HM
          return false;
       }
 
+      // The identifier this authorization is for, so every message below can
+      // say WHICH domain failed - the log used to leave an administrator with
+      // three configured hostnames and no way to tell them apart (issue #34).
+      // The identifier object is the first thing in the authorization, so the
+      // first "value" key is its value.
+      String domain = String(JsonStringValue_(authorizationResponse.body, "value"));
+      if (domain.IsEmpty())
+         domain = _T("(unknown)");
+
       AnsiString status = JsonStringValue_(authorizationResponse.body, "status");
       if (status == "valid")
          return true;
 
-      // Locate the http-01 challenge object.
-      int challengePosition = authorizationResponse.body.Find("\"type\":\"http-01\"");
+      // Locate the http-01 challenge object. Whitespace-tolerantly: boulder
+      // pretty-prints its JSON ('"type": "http-01"', with a space), so the
+      // compact-form search this replaces never matched a real Let's Encrypt
+      // response - every issuance failed right here with a message that blamed
+      // the CA (issue #34).
+      int challengePosition = FindChallengeOfType(authorizationResponse.body, "http-01");
       if (challengePosition < 0)
       {
-         LOG_APPLICATION("ACME: Authorization offers no http-01 challenge.");
+         // The raw response is the only evidence of what the CA actually
+         // offered; the reporter of issue #34 could not root-cause from the log
+         // precisely because it was not included.
+         LOG_APPLICATION(Formatter::Format("ACME: Authorization for {0} offers no http-01 challenge. Response: {1}",
+            domain, String(authorizationResponse.body.Mid(0, 500))));
          return false;
       }
 
@@ -702,7 +761,7 @@ namespace HM
 
       if (challengeUrl.IsEmpty() || token.IsEmpty())
       {
-         LOG_APPLICATION("ACME: The http-01 challenge carried no url or no token, so it cannot be answered.");
+         LOG_APPLICATION(Formatter::Format("ACME: The http-01 challenge for {0} carried no url or no token, so it cannot be answered.", domain));
          return false;
       }
 
@@ -733,7 +792,7 @@ namespace HM
       HttpResponse challengeResponse;
       if (!SignedPost_(challengeUrl, "{}", challengeResponse))
       {
-         LOG_APPLICATION("ACME: Could not ask the CA to validate the http-01 challenge.");
+         LOG_APPLICATION(Formatter::Format("ACME: Could not ask the CA to validate the http-01 challenge for {0}.", domain));
          return false;
       }
 
@@ -760,12 +819,12 @@ namespace HM
 
          if (status == "invalid")
          {
-            LOG_APPLICATION("ACME: Challenge validation failed: " + String(pollResponse.body.Mid(0, 500)));
+            LOG_APPLICATION(Formatter::Format("ACME: Challenge validation failed for {0}: {1}", domain, String(pollResponse.body.Mid(0, 500))));
             return false;
          }
       }
 
-      LOG_APPLICATION("ACME: Timed out waiting for challenge validation.");
+      LOG_APPLICATION(Formatter::Format("ACME: Timed out waiting for challenge validation of {0}.", domain));
       return false;
    }
 
