@@ -5,6 +5,7 @@
 
 #include <vector>
 #include <memory>
+#include <functional>
 
 #include "SieveParser.h"
 #include "SieveMessage.h"
@@ -105,6 +106,14 @@ namespace HM
                       const SieveEnvelope &envelope,
                       SieveResult &result);
 
+      // How the "mailboxexists" test (RFC 5490) asks the mail store a question the
+      // Sieve engine cannot answer itself. The delivery path supplies a callback
+      // over the recipient's real folder list; a caller that supplies none - the
+      // COM test evaluator, which has no account - gets the safe answer: with no
+      // way to know, every mailbox is reported as not existing, so scripts fall
+      // through to their non-conditional branches rather than acting on a guess.
+      void SetMailboxExists(std::function<bool(const String &)> callback);
+
    private:
       // Where the values a test compares against come from.
       enum class ValueSource { Header, Address, Envelope, Flags, Body };
@@ -172,5 +181,7 @@ namespace HM
 
       SieveEnvelope envelope_;
       SieveResult *result_;
+
+      std::function<bool(const String &)> mailbox_exists_;
    };
 }

@@ -57,7 +57,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Transport security and deliverability](#transport-security-and-deliverability) | 43 | – | 4 | 1 |
 | [IMAP](#imap) | 58 | – | 17 | 3 |
 | [POP3](#pop3) | 21 | – | 6 | – |
-| [Sieve, ManageSieve and rules](#sieve-managesieve-and-rules) | 49 | 0 | 15 | – |
+| [Sieve, ManageSieve and rules](#sieve-managesieve-and-rules) | 50 | 0 | 14 | – |
 | [Authentication and cryptography](#authentication-and-cryptography) | 57 | 0 | 18 | – |
 | [Anti-spam, anti-virus and content control](#anti-spam-anti-virus-and-content-control) | 54 | – | 13 | – |
 | [Storage, accounts and data model](#storage-accounts-and-data-model) | 86 | – | 10 | – |
@@ -72,7 +72,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 2 | – | 4 | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 5 | 1 | 2 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 4 | 1 | 4 | – |
-| **Total** | **624** | **12** | **144** | **15** |
+| **Total** | **625** | **12** | **143** | **15** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage and the administration surface are the best-covered areas**, and the
@@ -448,7 +448,7 @@ the source, not from documentation.
 
 ### Sieve, ManageSieve and rules
 
-49 shipped · 0 underway · 15 not started · 0 deferred
+50 shipped · 0 underway · 14 not started · 0 deferred
 
 | | Capability | Detail |
 |:-:|---|---|
@@ -504,7 +504,7 @@ the source, not from documentation.
 | ⬜ | ihave (RFC 5463) and environment (RFC 5183) | Not implemented, and refused rather than ignored: neither is in the known-test allowlist, so a script using them fails at upload with "unknown test". For `ihave` that is the right failure mode as things stand - its purpose is capability probing, and a server that accepted it and evaluated it false would send every ihave-guarded script down its fallback branch while claiming support. |
 | ✅ | imap4flags (RFC 5232) | Not implemented. setflag/addflag/removeflag parse and no-op; the hasflag test parses and evaluates false; there is no :flags tagged argument on keep/fileinto **Shipped in dc9301a.** `ExecuteFlagCommand_` genuinely mutates the flag set; the "parse and no-op" description was true before that commit. |
 | ⬜ | include (RFC 6609) | Not implemented, and refused rather than ignored: `include`, `return` and `global` are not in the known-command allowlist, so a script using them fails at upload with "unknown command". There is no personal/global script namespace in SieveStorage to include from. |
-| ⬜ | mailbox / mboxmetadata (RFC 5490) | Not implemented. No :create tag on fileinto and no mailboxexists test — a fileinto naming a folder that does not exist relies on whatever MoveToIMAPFolder does rather than declared Sieve semantics |
+| ✅ | mailbox / mboxmetadata (RFC 5490) | **The mailbox extension shipped 16 August 2026**: the `mailboxexists` test and `fileinto :create`. mailboxexists is the first test in this engine answered from outside the message - the delivery path hands the evaluator a callback over the recipient's real folder list, using the same lookup fileinto itself uses (`MessageUtilities::FolderExistsForDelivery`, kept beside `MoveToIMAPFolder` so the two cannot drift), and for a public folder the same insert-permission gate, because RFC 5490 3.1 defines "exists" as exists-and-deliverable. A caller with no store to ask (the COM test evaluator) gets false for every name - the safe answer. `:create` was already this server's behaviour - MoveToIMAPFolder has always created missing account folders - so the tag is accepted under its require and the semantics were proven rather than added: an end-to-end test SELECTs the folder the delivery created, over IMAP, from a real client session. Advertised over ManageSieve under the standing rule. Still absent from RFC 5490: the mboxmetadata half (METADATA is not implemented in the IMAP server at all). |
 | ⬜ | Out-of-office scheduling and scope | Only an end date exists — there is no start date, so a future absence cannot be scheduled and must be switched on manually. There is also no domain-level or server-level auto-reply, no separate internal/external message… |
 | ⬜ | regex (draft-ietf-sieve-regex) | Not implemented as a Sieve match type, even though the server already carries a regex engine used by the legacy rules engine (RuleCriteria::MatchesRegEx). Wiring it into MatchValue_ would be small |
 | ⬜ | reject / ereject (RFC 5429) | Not implemented. **The hazard this row used to describe is gone and the correction matters more than the gap:** neither is in the known-command allowlist and `require "reject"` is refused, so a script that tries to reject mail is rejected AT UPLOAD with a message naming the unsupported extension. The author is told; mail is not silently kept while they believe it is being refused. `SieveSyntax.cs` asserts exactly that script is refused. Implementing them means an SMTP-time refusal for `ereject` and an RFC 3834 bounce for `reject`. |

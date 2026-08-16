@@ -223,7 +223,18 @@ namespace HM
       // nowhere in the transmitted bytes, so it can only match if the part was
       // decoded first, which is the whole difference between ":text" and a substring
       // search over the file.
-      const char *AdvertisedSieveExtensions = "fileinto copy relational subaddress vacation vacation-seconds imap4flags body";
+      // mailbox moved in on 16 August 2026, under the same rule. Its delivery-side
+      // steps are the mailboxExists callback LocalDelivery hands the evaluator -
+      // built over the recipient's REAL folder list, with the same lookup and the
+      // same public-folder insert-permission gate MoveToIMAPFolder applies, because
+      // RFC 5490 3.1 defines "exists" as "exists and can be delivered into" - and
+      // fileinto's create-if-missing behaviour, which MoveToIMAPFolder has always
+      // had, making ":create" the semantics this server already implements rather
+      // than a promise. End-to-end tests in SieveMailboxDelivery.cs assert where a
+      // delivered message was filed, with the negative control being a
+      // mailboxexists on a folder that is absent: the message must stay in INBOX,
+      // which an implementation answering "true" for everything cannot pass.
+      const char *AdvertisedSieveExtensions = "fileinto copy relational subaddress vacation vacation-seconds imap4flags body mailbox";
 
       AnsiString EscapeQuoted(const String &value)
       {

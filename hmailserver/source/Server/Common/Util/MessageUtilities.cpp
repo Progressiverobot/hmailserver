@@ -45,6 +45,46 @@ namespace HM
    }
 
 	bool
+	MessageUtilities::FolderExistsForDelivery(__int64 iAccountID, const String &sFolderName)
+	{
+      String sTempFolderName = sFolderName;
+      CleanIMAPFolderRuleString(sTempFolderName);
+
+      if (sTempFolderName.IsEmpty())
+         return false;
+
+      std::vector<String> vecFolderPath = StringParser::SplitString(sTempFolderName, Configuration::Instance()->GetIMAPConfiguration()->GetHierarchyDelimiter());
+
+      std::shared_ptr<IMAPFolders> pFolders;
+      if (IMAPFolderUtilities::IsPublicFolder(vecFolderPath))
+      {
+         pFolders = IMAPFolderContainer::Instance()->GetPublicFolders();
+         vecFolderPath.erase(vecFolderPath.begin());
+      }
+      else
+      {
+         pFolders = IMAPFolderContainer::Instance()->GetFoldersForAccount(iAccountID);
+      }
+
+      if (!pFolders)
+         return false;
+
+      std::shared_ptr<IMAPFolder> pFolder = pFolders->GetFolderByFullPath(vecFolderPath);
+      if (!pFolder)
+         return false;
+
+      if (pFolder->IsPublicFolder())
+      {
+         ACLManager aclManager;
+         std::shared_ptr<ACLPermission> pPermission = aclManager.GetPermissionForFolder(iAccountID, pFolder);
+         if (!pPermission || !pPermission->GetAllow((ACLPermission::ePermission) ACLPermission::PermissionInsert))
+            return false;
+      }
+
+      return true;
+	}
+
+   bool
 	MessageUtilities::MoveToIMAPFolder(std::shared_ptr<Message> pMessage, __int64 iAccountID, const String &sFolderName, bool bAutoSubscribe, bool bSetByGlobalRule, __int64 &iResultAccount, __int64 &iResultFolder)
    //---------------------------------------------------------------------------()
    // DESCRIPTION:

@@ -86,6 +86,12 @@ namespace HM
    {
    }
 
+   void
+   SieveEvaluator::SetMailboxExists(std::function<bool(const String &)> callback)
+   {
+      mailbox_exists_ = callback;
+   }
+
    String
    SieveEvaluator::Evaluate(const std::vector<std::shared_ptr<SieveCommand>> &commands, const SieveMessage &message)
    {
@@ -807,6 +813,32 @@ namespace HM
 
       if (name == _T("body"))
          return EvaluateComparisonTest_(test, message, ValueSource::Body);
+
+      if (name == _T("mailboxexists"))
+      {
+         // RFC 5490 3.1: true only when EVERY listed mailbox exists and can be
+         // delivered into. Without a way to ask - no callback - the answer is
+         // false for the same reason an unreadable store would give false: acting
+         // on "probably exists" files mail into a guess.
+         if (!mailbox_exists_)
+            return false;
+
+         SieveArgumentSet set;
+         String ignored;
+         if (!SieveParser::SplitArguments(test->arguments, set, ignored))
+            return false;
+
+         if (set.stringLists.size() != 1 || set.stringLists[0].empty())
+            return false;
+
+         for (const String &mailbox : set.stringLists[0])
+         {
+            if (!mailbox_exists_(mailbox))
+               return false;
+         }
+
+         return true;
+      }
 
       if (name == _T("exists"))
          return EvaluateExists_(test, message);

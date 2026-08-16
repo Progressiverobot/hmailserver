@@ -69,7 +69,8 @@ namespace HM
    SieveScript::Evaluate(const String &script,
                          const String &rawMessage,
                          const SieveEnvelope &envelope,
-                         SieveResult &result)
+                         SieveResult &result,
+                         std::function<bool(const String &)> mailboxExists)
    {
       String errorMessage;
 
@@ -86,6 +87,7 @@ namespace HM
 
       SieveMessage message(rawMessage);
       SieveEvaluator evaluator;
+      evaluator.SetMailboxExists(mailboxExists);
       return evaluator.Evaluate(sieveScript.GetCommands(), message, envelope, result);
    }
 }

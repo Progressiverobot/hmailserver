@@ -111,6 +111,9 @@ namespace HM
       bool bodyTransformGiven = false;
       std::vector<String> contentTypes;
 
+      // fileinto :create (RFC 5490).
+      bool mailboxCreate = false;
+
       // Positional string-list arguments, in order.
       std::vector<std::vector<String>> stringLists;
    };

@@ -241,6 +241,12 @@ namespace RegressionTests.Sieve
                // two of them negative controls.
                StringAssert.Contains("body", greeting);
 
+               // mailbox followed on 16 August 2026, with SieveMailboxDelivery.cs
+               // behind it: mailboxexists answered from the recipient's real folder
+               // list, fileinto :create proven by a client SELECTing the folder the
+               // delivery created.
+               StringAssert.Contains("mailbox", greeting);
+
                // Still absent on purpose: envelope is implemented and evaluated, and is
                // held back until a test proves the envelope TEST command itself works.
                // If somebody adds it here, that test should exist first.

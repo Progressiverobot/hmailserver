@@ -32,7 +32,15 @@ namespace HM
       static String GetSendersIP(std::shared_ptr<Message> pMessage);
 
       static bool CopyToIMAPFolder(std::shared_ptr<Message> pMessage, int iDestinationFolderID);
-         
+
+      // Whether a folder named the way a rule or Sieve script names it exists and
+      // can be delivered into by this account. Kept HERE, beside MoveToIMAPFolder,
+      // because the two must agree: same name cleaning, same hierarchy split, and
+      // for a public folder the same insert-permission gate. RFC 5490 3.1 defines
+      // "exists" for the mailboxexists test as exists-and-deliverable, which is
+      // why a public folder without insert permission answers false.
+      static bool FolderExistsForDelivery(__int64 iAccountID, const String &sFolderName);
+
    private:
 
       static void CleanIMAPFolderRuleString(String &sIMAPFolder);

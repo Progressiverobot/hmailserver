@@ -446,8 +446,17 @@ namespace HM
       envelope.from = message->GetFromAddress();
       envelope.to = sOriginalAddress.IsEmpty() ? account->GetAddress() : sOriginalAddress;
 
+      // Answers the "mailboxexists" test (RFC 5490) against the recipient's real
+      // folders. The lookup lives beside MoveToIMAPFolder so the test and the
+      // fileinto that follows it cannot disagree about what a name refers to.
+      __int64 accountID = account->GetID();
+      auto mailboxExists = [accountID](const String &mailboxName) -> bool
+      {
+         return MessageUtilities::FolderExistsForDelivery(accountID, mailboxName);
+      };
+
       SieveResult sieveResult;
-      String actions = SieveScript::Evaluate(script, rawMessage, envelope, sieveResult);
+      String actions = SieveScript::Evaluate(script, rawMessage, envelope, sieveResult, mailboxExists);
 
       // A script that fails to parse must never break delivery; fall through to a
       // normal keep. (The structured result is already at its defaults in that case,

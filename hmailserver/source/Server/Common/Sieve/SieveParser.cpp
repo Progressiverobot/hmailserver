@@ -92,6 +92,7 @@ namespace HM
          L"envelope",
          L"imap4flags",
          L"body",
+         L"mailbox",
          L"vacation",
          // RFC 6131. Naming it separately from "vacation" is the point of the
          // extension: a script that says ":seconds" must be refused outright by a
@@ -263,6 +264,11 @@ namespace HM
                result.bodyTransform = tag;
                result.bodyTransformGiven = true;
             }
+            else if (tag == _T("create"))
+            {
+               // fileinto :create (RFC 5490).
+               result.mailboxCreate = true;
+            }
 
             continue;
          }
@@ -382,7 +388,8 @@ namespace HM
       static const wchar_t *known[] =
       {
          L"address", L"allof", L"anyof", L"exists", L"false", L"header",
-         L"not", L"size", L"true", L"envelope", L"hasflag", L"body"
+         L"not", L"size", L"true", L"envelope", L"hasflag", L"body",
+         L"mailboxexists"
       };
 
       for (const wchar_t *candidate : known)
@@ -963,8 +970,14 @@ namespace HM
 
       if (name == _T("keep") || name == _T("fileinto"))
       {
-         if (!CheckTags_(set, name == _T("fileinto") ? _T("copy flags") : _T("flags"), _T("'") + name + _T("'"), errorMessage))
+         if (!CheckTags_(set, name == _T("fileinto") ? _T("copy flags create") : _T("flags"), _T("'") + name + _T("'"), errorMessage))
             return false;
+
+         if (set.mailboxCreate)
+         {
+            if (!NeedExtension_(_T("mailbox"), _T("':create'"), command->line, errorMessage))
+               return false;
+         }
 
          if (set.flagsGiven)
          {
@@ -1258,6 +1271,25 @@ namespace HM
                   test->line, part.c_str());
                return false;
             }
+         }
+
+         return true;
+      }
+
+      if (name == _T("mailboxexists"))
+      {
+         if (!NeedExtension_(_T("mailbox"), _T("the 'mailboxexists' test"), test->line, errorMessage))
+            return false;
+
+         // No tags at all: mailboxexists is not a match test, so a comparator or
+         // match type on it is an error rather than something to ignore.
+         if (!CheckTags_(set, _T(""), _T("'mailboxexists'"), errorMessage))
+            return false;
+
+         if (set.stringLists.size() != 1 || set.stringLists[0].empty())
+         {
+            errorMessage.Format(_T("Line %d: 'mailboxexists' takes one list of mailbox names."), test->line);
+            return false;
          }
 
          return true;

@@ -40,6 +40,10 @@ namespace RegressionTests.Sieve
          Assert.IsEmpty(CheckSyntax("if size :over 100K {\r\n  discard;\r\n} else {\r\n  keep;\r\n}"));
          Assert.IsEmpty(CheckSyntax("if anyof (header :is \"From\" \"a@b.com\", exists \"X-Spam\") {\r\n  redirect \"x@y.com\";\r\n}"));
 
+         // The mailbox extension (RFC 5490): mailboxexists and fileinto :create
+         // are valid under their require.
+         Assert.IsEmpty(CheckSyntax("require [\"mailbox\", \"fileinto\"];\r\nif mailboxexists \"Archive\" {\r\n  fileinto :create \"Archive\";\r\n}"));
+
          // A comment plus a multi-name require of extensions that ARE implemented.
          // This line used to require "reject", which the parser accepted and then
          // silently ignored - so the script was reported valid and the reject never
@@ -71,6 +75,16 @@ namespace RegressionTests.Sieve
          // while the reject never happened, so mail the user believed was being
          // refused was quietly kept instead.
          Assert.IsNotEmpty(CheckSyntax("require [\"fileinto\", \"reject\"];\r\nif not exists \"Date\" {\r\n  reject \"no date\";\r\n}"));
+
+         // The mailbox extension's pieces without its require line. Both must name
+         // the missing extension rather than pass: a script written for a server
+         // that has it must fail HERE at upload, not change meaning.
+         Assert.IsNotEmpty(CheckSyntax("if mailboxexists \"Archive\" {\r\n  keep;\r\n}"));
+         Assert.IsNotEmpty(CheckSyntax("require \"fileinto\";\r\nfileinto :create \"Archive\";"));
+
+         // :create is a fileinto tag; on keep it is an error even with the
+         // extension required.
+         Assert.IsNotEmpty(CheckSyntax("require [\"mailbox\", \"fileinto\"];\r\nkeep :create;"));
       }
 
       /// <summary>
@@ -123,7 +137,9 @@ namespace RegressionTests.Sieve
             "duplicate",
             "ihave \"variables\"",
             "environment :is \"name\" \"value\"",
-            "mailboxexists \"INBOX\"",
+            // mailboxexists moved out of this list on 16 August 2026 when the
+            // mailbox extension was implemented - it now lives in
+            // SieveMailboxDelivery.cs, which proves it end to end.
             "string :is \"a\" \"a\"",
             "spamtest :is \"5\"",
          };

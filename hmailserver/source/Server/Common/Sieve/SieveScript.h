@@ -45,10 +45,14 @@ namespace HM
       // summary is joined with), and the SMTP envelope has to go in for "envelope"
       // tests and the RFC 5230 4.5 recipient check to mean anything - the fallback
       // trace header (Delivered-To) is off in a default install.
+      // mailboxExists answers the "mailboxexists" test (RFC 5490) against the
+      // recipient's real folder list; pass nothing and that test is false for
+      // every mailbox, which is the safe answer when there is no store to ask.
       static String Evaluate(const String &script,
                              const String &rawMessage,
                              const SieveEnvelope &envelope,
-                             SieveResult &result);
+                             SieveResult &result,
+                             std::function<bool(const String &)> mailboxExists = nullptr);
 
    private:
       std::vector<std::shared_ptr<SieveCommand>> commands_;
