@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0-windows</TargetFramework>
@@ -13,7 +13,7 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <RootNamespace>Shared</RootNamespace>
     <AssemblyName>Shared</AssemblyName>
-    <Version>6.2.21</Version>
+    <Version>6.2.22</Version>
     <Product>hMailServer Shared Tools Library</Product>
     <Company>Progressive Robot Ltd</Company>
     <Copyright>Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd</Copyright>
