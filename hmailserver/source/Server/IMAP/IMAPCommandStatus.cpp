@@ -186,6 +186,20 @@ namespace HM
          sResponse += sTemp;
       }
 
+      if (sFlags.FindNoCase(_T("MAILBOXID")) >= 0)
+      {
+         // RFC 8474: the folder's database id - stable across RENAME.
+         String sTemp;
+         sTemp.Format(_T("MAILBOXID (F%I64d)"), pTheFolder->GetID());
+
+         if (bAddSpace)
+            sResponse += " ";
+         else
+            bAddSpace = true;
+
+         sResponse += sTemp;
+      }
+
       if (sFlags.FindNoCase(_T("APPENDLIMIT")) >= 0)
       {
          // RFC 7889: the pre-authentication capability is the bare APPENDLIMIT

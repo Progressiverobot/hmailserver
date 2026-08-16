@@ -577,6 +577,21 @@ namespace HM
                   bMessageIsMatchingCriteria = false;
                break;
             }
+         case IMAPSearchCriteria::CTEmailId:
+            {
+               // RFC 8474: exact match on the stable email id.
+               bool matches = String(pMessage->GetEmailId()).CompareNoCase(pCriteria->GetText()) == 0;
+               if (matches != pCriteria->GetPositive())
+                  bMessageIsMatchingCriteria = false;
+               break;
+            }
+         case IMAPSearchCriteria::CTThreadId:
+            {
+               // No thread ids exist, so no message has the one asked for.
+               if (pCriteria->GetPositive())
+                  bMessageIsMatchingCriteria = false;
+               break;
+            }
          case IMAPSearchCriteria::CTSavedateSupported:
             {
                // RFC 8514: matches every message in a mailbox that records save

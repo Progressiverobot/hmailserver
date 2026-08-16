@@ -58,6 +58,10 @@ namespace HM
          return CTSavedSince;
       else if (sTmp == _T("savedatesupported"))
          return CTSavedateSupported;
+      else if (sTmp == _T("emailid"))
+         return CTEmailId;
+      else if (sTmp == _T("threadid"))
+         return CTThreadId;
       else if (sTmp == _T("since"))
          return CTSince;
       else if (sTmp == _T("deleted"))
@@ -466,6 +470,8 @@ namespace HM
          ct == IMAPSearchCriteria::CTSavedBefore ||
          ct == IMAPSearchCriteria::CTSavedOn ||
          ct == IMAPSearchCriteria::CTSavedSince ||
+         ct == IMAPSearchCriteria::CTEmailId ||
+         ct == IMAPSearchCriteria::CTThreadId ||
          ct == IMAPSearchCriteria::CTBody ||
          ct == IMAPSearchCriteria::CTSubject ||
          ct == IMAPSearchCriteria::CTTo ||

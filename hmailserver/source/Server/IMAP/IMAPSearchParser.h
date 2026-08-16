@@ -79,6 +79,12 @@ namespace HM
          CTSavedSince = 47,
          CTSavedateSupported = 48,
 
+         // RFC 8474 (OBJECTID): match by the stable email id. THREADID exists
+         // as a key so it parses, and matches nothing - this server has no
+         // thread ids.
+         CTEmailId = 49,
+         CTThreadId = 50,
+
          CTSubCriteria = 100
       };
 

@@ -147,6 +147,11 @@ namespace HM
       // hm_imap_metadata table schema 6014 added.
       sResponse += " METADATA";
 
+      // RFC 8474: stable object ids - EMAILID survives COPY (unlike the UID),
+      // MAILBOXID survives RENAME. THREADID is answered NIL, which the RFC
+      // provides for servers without thread ids.
+      sResponse += " OBJECTID";
+
       // RFC 8437: an authenticated session can return to the not-authenticated
       // state for connection reuse. Advertised only once authenticated - that is
       // the only state where the command is valid, and the RFC's requirement is

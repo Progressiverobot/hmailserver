@@ -33,7 +33,9 @@ namespace HM
          BODYSTRUCTURENONEXTENSIBLE = 215,
          MODSEQ = 216,
          PREVIEW = 217,
-         SAVEDATE = 218
+         SAVEDATE = 218,
+         EMAILID = 219,
+         THREADID = 220
 
       };
 
@@ -137,6 +139,12 @@ namespace HM
       // into this mailbox.
       bool GetShowSaveDate() { return show_savedate_; }
 
+      // RFC 8474 (OBJECTID): the EMAILID and THREADID FETCH data items. This
+      // server has no thread ids, so THREADID is answered NIL - which the RFC
+      // provides for exactly this case.
+      bool GetShowEmailId() { return show_emailid_; }
+      bool GetShowThreadId() { return show_threadid_; }
+
       // RFC 7162 (CONDSTORE): the "(CHANGEDSINCE <modseq>)" FETCH modifier. When present,
       // only messages whose mod-sequence is greater than this value are returned.
       bool GetHasChangedSince() { return has_changedsince_; }
@@ -170,6 +178,8 @@ namespace HM
       bool show_modseq_;
       bool show_preview_;
       bool show_savedate_;
+      bool show_emailid_;
+      bool show_threadid_;
 
       bool has_changedsince_;
       __int64 changedsince_;

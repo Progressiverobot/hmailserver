@@ -25,6 +25,7 @@
 #include "../BO/IMAPFolder.h"
 #include "../Util/File.h"
 #include "../Util/Time.h"
+#include "../Util/GUIDCreator.h"
 #include "../Cache/CacheContainer.h"
 #include "../Cache/AccountSizeCache.h"
 #include "..\Util\FolderManipulationLock.h"
@@ -231,6 +232,7 @@ namespace HM
       pMessage->SetFromAddress(pRS->GetStringValue("messagefrom"));
       pMessage->SetCreateTime(pRS->GetStringValue("messagecreatetime"));
       pMessage->SetSaveDate(pRS->GetStringValue("messagesavedate"));
+      pMessage->SetEmailId(pRS->GetStringValue("messageemailid"));
       pMessage->SetSize(pRS->GetLongValue("messagesize"));
       pMessage->SetNoOfRetries((unsigned short) pRS->GetLongValue("messagecurnooftries"));
       pMessage->SetFolderID(pRS->GetLongValue("messagefolderid"));
@@ -519,6 +521,11 @@ namespace HM
       pTo->SetFromAddress(sourceMessage->GetFromAddress());
       pTo->SetState(sourceMessage->GetState());
       pTo->SetCreateTime(sourceMessage->GetCreateTime());
+
+      // RFC 8474: a copy is the same message content, so it keeps the EMAILID -
+      // the exact opposite of the save date, which a copy gets fresh.
+      pTo->SetEmailId(sourceMessage->GetEmailId());
+
       pTo->SetFlags(sourceMessage->GetFlags());
 
       return pTo;
@@ -706,6 +713,21 @@ namespace HM
          String sSaveDate = Time::GetCurrentDateTime();
          pMessage->SetSaveDate(sSaveDate);
          oStatement.AddColumn("messagesavedate", sSaveDate);
+
+         // RFC 8474: the email id is stamped once, at the first save, and kept
+         // for the row's life. CreateCopy_ carries it into copies on purpose -
+         // the same content keeps the same EMAILID - so only a message that
+         // does not have one yet gets one here.
+         if (pMessage->GetEmailId().IsEmpty())
+         {
+            String emailId = _T("M") + GUIDCreator::GetGUID();
+            emailId.Replace(_T("{"), _T(""));
+            emailId.Replace(_T("}"), _T(""));
+            emailId.Replace(_T("-"), _T(""));
+            pMessage->SetEmailId(emailId);
+         }
+
+         oStatement.AddColumn("messageemailid", pMessage->GetEmailId());
          oStatement.AddColumn("messagecurnooftries", 0);
          oStatement.AddColumn("messagenexttrytime",  "1901-01-01");
       }

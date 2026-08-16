@@ -198,6 +198,27 @@ namespace HM
          AppendOutput_(sOutput, sTemp);
       }
 
+      // RFC 8474: the stable email id - the same across COPY, unlike the UID.
+      if (parser_->GetShowEmailId())
+      {
+         String sTemp;
+
+         String sEmailId = pMessage->GetEmailId();
+         if (sEmailId.IsEmpty())
+            sTemp = "EMAILID NIL";
+         else
+            sTemp.Format(_T("EMAILID (%s)"), sEmailId.c_str());
+
+         AppendOutput_(sOutput, sTemp);
+      }
+
+      // RFC 8474 section 5: a server without thread ids answers NIL rather
+      // than inventing one.
+      if (parser_->GetShowThreadId())
+      {
+         AppendOutput_(sOutput, _T("THREADID NIL"));
+      }
+
       
       AnsiString sMessageHeader;
 

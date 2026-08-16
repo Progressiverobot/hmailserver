@@ -39,6 +39,8 @@ namespace HM
       show_modseq_ = false;
       show_preview_ = false;
       show_savedate_ = false;
+      show_emailid_ = false;
+      show_threadid_ = false;
       has_changedsince_ = false;
       changedsince_ = 0;
    }
@@ -292,6 +294,18 @@ namespace HM
             case SAVEDATE:
             {
                show_savedate_ = true;
+               break;
+            }
+
+            case EMAILID:
+            {
+               show_emailid_ = true;
+               break;
+            }
+
+            case THREADID:
+            {
+               show_threadid_ = true;
                break;
             }
 
@@ -627,7 +641,13 @@ namespace HM
          return PREVIEW;
 
       if (sPart.CompareNoCase(_T("SAVEDATE")) == 0)
-         return SAVEDATE;  
+         return SAVEDATE;
+
+      if (sPart.CompareNoCase(_T("EMAILID")) == 0)
+         return EMAILID;
+
+      if (sPart.CompareNoCase(_T("THREADID")) == 0)
+         return THREADID;  
 
       if (sPart.CompareNoCase(_T("INTERNALDATE")) == 0)
          return INTERNALDATE;  

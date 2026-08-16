@@ -273,6 +273,7 @@ create table hm_messages (
 	messageflags tinyint not null,
 	messagecreatetime datetime not null,
 	messagesavedate datetime not null,
+	messageemailid nvarchar(48) not null,
 	messagelocked tinyint not null,
    messageuid bigint not null,
    messagemodseq bigint not null
@@ -1017,4 +1018,4 @@ ALTER TABLE hm_imap_metadata ADD CONSTRAINT hm_imap_metadata_pk PRIMARY KEY NONC
 
 ALTER TABLE hm_imap_metadata ADD CONSTRAINT hm_imap_metadata_unique UNIQUE (metadataaccountid, metadatafolderid, metadataentryname)
 
-insert into hm_dbversion values (6014)
+insert into hm_dbversion values (6015)

@@ -145,7 +145,13 @@ namespace HM
             return designateResult;
       }
 
-      String sResponse = pArgument->Tag() + " OK CREATE Completed\r\n";
+      // RFC 8474 (OBJECTID): the tagged OK carries the new mailbox's id.
+      String sResponse;
+      std::shared_ptr<IMAPFolder> pCreatedFolder = pConnection->GetFolderByFullPath(sFolderName);
+      if (pCreatedFolder)
+         sResponse.Format(_T("%s OK [MAILBOXID (F%I64d)] CREATE Completed\r\n"), pArgument->Tag().c_str(), pCreatedFolder->GetID());
+      else
+         sResponse = pArgument->Tag() + " OK CREATE Completed\r\n";
 
       pConnection->SendAsciiData(sResponse);
 

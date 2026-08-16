@@ -130,6 +130,12 @@ namespace HM
       sRespTemp.Format(_T("* OK [UIDNEXT %d] next uid\r\n"), pSelectedFolder->GetCurrentUID()+1);
       sResponse += sRespTemp;
 
+      // RFC 8474 (OBJECTID): the mailbox id is the folder's database id, which
+      // is exactly the stability the RFC wants - it survives RENAME, and a
+      // deleted-then-recreated folder gets a different one.
+      sRespTemp.Format(_T("* OK [MAILBOXID (F%I64d)] mailbox id\r\n"), pSelectedFolder->GetID());
+      sResponse += sRespTemp;
+
       // RFC 7162 (CONDSTORE/QRESYNC): report the mailbox HIGHESTMODSEQ once CONDSTORE is enabled.
       if (pConnection->GetCondstoreEnabled())
       {

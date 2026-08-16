@@ -159,7 +159,13 @@ namespace DBUpdater
          // Upgrade6013to6014* - the RFC 5464 METADATA store: annotations on
          // mailboxes (accountid + folderid) and on the server (0 + 0).
          new SchemaProbe(6014, "hm_imap_metadata.metadatavalue",
-                         "update hm_imap_metadata set metadatavalue = metadatavalue where 1 = 0")
+                         "update hm_imap_metadata set metadatavalue = metadatavalue where 1 = 0"),
+
+         // Upgrade6014to6015* - the RFC 8474 OBJECTID email id: stable for a
+         // message across COPY, unlike the row id, which is why it is its own
+         // column stamped at first save and carried by copies.
+         new SchemaProbe(6015, "hm_messages.messageemailid",
+                         "update hm_messages set messageemailid = messageemailid where 1 = 0")
       };
 
       /// <summary>

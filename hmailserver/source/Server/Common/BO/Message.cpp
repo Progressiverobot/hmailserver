@@ -47,6 +47,7 @@ namespace HM
       // on copy - which is exactly how the save date went missing on the
       // SEARCH path while the freshly-loaded FETCH path still had it.
       save_date_ = other.save_date_;
+      email_id_ = other.email_id_;
       filename_ = other.filename_;
       from_address_ = other.from_address_;
 

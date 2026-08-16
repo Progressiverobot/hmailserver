@@ -102,6 +102,12 @@ namespace HM
       void SetSaveDate(const String &sSaveDate) {save_date_ = sSaveDate; }
       String GetSaveDate() const {return save_date_; }
 
+      // RFC 8474 (OBJECTID): the stable email id. Stamped at first save and -
+      // the opposite of the save date - deliberately carried by copies: the
+      // same message content keeps the same EMAILID wherever it goes.
+      void SetEmailId(const String &sEmailId) {email_id_ = sEmailId; }
+      String GetEmailId() const {return email_id_; }
+
       std::shared_ptr<MessageRecipients> GetRecipients();
 
       bool XMLStore(XNode *pParentNode, int iOptions);
@@ -114,6 +120,7 @@ namespace HM
 
       AnsiString create_time_;
       AnsiString save_date_;
+      AnsiString email_id_;
       AnsiString filename_;
       AnsiString from_address_;
       

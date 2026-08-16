@@ -165,6 +165,7 @@ create table hm_messages
 	messageflags tinyint unsigned not null,
 	messagecreatetime datetime not null,
 	messagesavedate datetime not null,
+	messageemailid varchar(48) not null,
 	messagelocked tinyint not null,
    messageuid bigint not null,
    messagemodseq bigint not null default 1
@@ -836,4 +837,4 @@ create table hm_imap_metadata
 	unique(metadataaccountid, metadatafolderid, metadataentryname)
 ) DEFAULT CHARSET=utf8;
 
-insert into hm_dbversion values (6014);
+insert into hm_dbversion values (6015);
