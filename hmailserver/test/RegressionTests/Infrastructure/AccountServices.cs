@@ -163,6 +163,112 @@ namespace RegressionTests.Infrastructure
          account2.Save();
       }
 
+      /// <summary>
+      ///    The scheduled absence (schema 6012): an auto-reply whose begin date is
+      ///    in the future is configured but not yet active, and one whose begin
+      ///    date has passed replies normally. Crossing the begin date activates
+      ///    without touching the stored on-flag - there is nothing to run at
+      ///    midnight - which is why the future case must leave the flag ON and
+      ///    still stay silent.
+      /// </summary>
+      [Test]
+      [Category("Accounts")]
+      [Description("An auto-reply with a future begin date is silent until the date arrives.")]
+      public void TestAutoReplyBeginDate()
+      {
+         var sender = SingletonProvider<TestSetup>.Instance.AddAccount(_domain,
+            TestSetup.UniqueString() + "@example.test", "test");
+         var away = SingletonProvider<TestSetup>.Instance.AddAccount(_domain,
+            TestSetup.UniqueString() + "@example.test", "test");
+
+         // Scheduled to start tomorrow: no reply today.
+         away.VacationMessageIsOn = true;
+         away.VacationMessage = "I will be away";
+         away.VacationSubject = "Scheduled absence";
+         away.VacationMessageBeginDate = System.DateTime.Now.AddDays(1).ToString("yyyy-MM-dd");
+         away.Save();
+
+         var smtp = new SmtpClientSimulator();
+         smtp.Send(sender.Address, away.Address, "Before the absence", "Body");
+
+         Pop3ClientSimulator.AssertMessageCount(away.Address, "test", 1);
+         Pop3ClientSimulator.AssertMessageCount(sender.Address, "test", 0);
+
+         // The begin date arrives (set to yesterday): the reply activates with the
+         // stored flag untouched.
+         away.VacationMessageBeginDate = System.DateTime.Now.AddDays(-1).ToString("yyyy-MM-dd");
+         away.Save();
+
+         smtp.Send(sender.Address, away.Address, "During the absence", "Body");
+
+         Pop3ClientSimulator.AssertMessageCount(away.Address, "test", 2);
+         Pop3ClientSimulator.AssertMessageCount(sender.Address, "test", 1);
+
+         var reply = new Pop3ClientSimulator().GetFirstMessageText(sender.Address, "test");
+         Assert.IsTrue(reply.Contains("Scheduled absence"),
+            "The reply that arrived after the begin date does not carry the configured subject.");
+
+         away.VacationMessageIsOn = false;
+         away.Save();
+      }
+
+      /// <summary>
+      ///    The criteria value column was widened from 255 to 2000 in schema 6012,
+      ///    because a longer regular expression was silently truncated or refused
+      ///    depending on backend - and a truncated regex usually still compiles,
+      ///    matching something other than what was typed. Over the new limit the
+      ///    save now fails WITH THE NUMBER in the message; at 1900 characters it
+      ///    saves, which also proves the column is genuinely wider.
+      /// </summary>
+      [Test]
+      [Category("Accounts")]
+      [Description("A rule criterion longer than 2000 characters is refused with the limit named; 1900 saves.")]
+      public void TestRuleCriterionLengthLimit()
+      {
+         var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain,
+            TestSetup.UniqueString() + "@example.test", "test");
+
+         var rule = account.Rules.Add();
+         rule.Name = "Length limit";
+         rule.Active = true;
+
+         var criterion = rule.Criterias.Add();
+         criterion.UsePredefined = false;
+         criterion.HeaderField = "Subject";
+         criterion.MatchType = eRuleMatchType.eMTRegExMatch;
+         criterion.MatchValue = new string('a', 1900);
+         criterion.Save();
+
+         var action = rule.Actions.Add();
+         action.Type = eRuleActionType.eRADeleteEmail;
+         action.Save();
+
+         rule.Save();
+
+         // A freshly LOADED rule object, so its criteria collection carries the
+         // real rule id and a criterion save goes to the database immediately -
+         // the flow every admin tool uses when editing an existing rule. The
+         // Refresh matters: the in-memory Rule created above cached its criteria
+         // collection before the first save, with rule id 0, and a collection in
+         // that state defers persistence to the next rule save - which is why the
+         // plain cascade path enforces the same bound.
+         account.Rules.Refresh();
+         var savedRule = account.Rules.get_ItemByDBID(rule.ID);
+
+         var tooLong = savedRule.Criterias.Add();
+         tooLong.UsePredefined = false;
+         tooLong.HeaderField = "Subject";
+         tooLong.MatchType = eRuleMatchType.eMTRegExMatch;
+         tooLong.MatchValue = new string('b', 2001);
+
+         var ex = Assert.Throws<System.Runtime.InteropServices.COMException>(() => tooLong.Save(),
+            "A 2001-character criterion was accepted; the database stores 2000 and the excess would be " +
+            "truncated into a regex that still compiles and matches the wrong things.");
+
+         Assert.IsTrue(ex.Message.Contains("2000"),
+            "The refusal does not name the limit, so the administrator cannot know what to shorten to. Got: " + ex.Message);
+      }
+
       [Test]
       [Category("Accounts")]
       [Description("Test account reply when spam flagged")]

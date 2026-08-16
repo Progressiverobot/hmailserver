@@ -46,6 +46,7 @@ namespace hMailServer.ControlPanel.Views
       private readonly TextBox vacationBody_ = NewMemo();
       private readonly CheckBox vacationExpires_ = new() { Content = "Stop sending replies after a date", FontSize = 13 };
       private readonly DatePicker vacationExpiresDate_ = new();
+      private readonly DatePicker vacationBeginDate_ = new();
       private readonly CheckBox vacationAbortSpam_ = new() { Content = "Do not reply to messages flagged as spam", FontSize = 13 };
 
       // Signature
@@ -237,6 +238,12 @@ namespace hMailServer.ControlPanel.Views
          panel.Children.Add(Label("Reply message"));
          panel.Children.Add(vacationBody_);
          panel.Children.Add(Separator());
+         panel.Children.Add(Label("Start date"));
+         vacationBeginDate_.HorizontalAlignment = HorizontalAlignment.Left;
+         vacationBeginDate_.MinWidth = 160;
+         vacationBeginDate_.Margin = new Thickness(0, 0, 0, 8);
+         panel.Children.Add(vacationBeginDate_);
+
          panel.Children.Add(vacationExpires_);
          panel.Children.Add(Label("Expiry date"));
          vacationExpiresDate_.HorizontalAlignment = HorizontalAlignment.Left;
@@ -648,6 +655,15 @@ namespace hMailServer.ControlPanel.Views
             string expiryText = (string) a.VacationMessageExpiresDate ?? "";
             vacationExpiresDate_.SelectedDate =
                DateTime.TryParse(expiryText, out DateTime expiry) ? expiry : (DateTime?) null;
+
+            // Added alongside schema 6012; tolerate a server that predates it.
+            try
+            {
+               string beginText = (string) a.VacationMessageBeginDate ?? "";
+               vacationBeginDate_.SelectedDate =
+                  DateTime.TryParse(beginText, out DateTime begin) ? begin : (DateTime?) null;
+            }
+            catch { vacationBeginDate_.SelectedDate = null; }
             vacationAbortSpam_.IsChecked = (bool) a.VacationMessageAbortSpamFlagged;
 
             signatureOn_.IsChecked = (bool) a.SignatureEnabled;
@@ -770,6 +786,12 @@ namespace hMailServer.ControlPanel.Views
             a.VacationMessageExpires = vacationExpires_.IsChecked == true;
             if (vacationExpiresDate_.SelectedDate.HasValue)
                a.VacationMessageExpiresDate = vacationExpiresDate_.SelectedDate.Value.ToString("yyyy-MM-dd");
+            try
+            {
+               if (vacationBeginDate_.SelectedDate.HasValue)
+                  a.VacationMessageBeginDate = vacationBeginDate_.SelectedDate.Value.ToString("yyyy-MM-dd");
+            }
+            catch { /* a server without schema 6012 has nowhere to put it */ }
             a.VacationMessageAbortSpamFlagged = vacationAbortSpam_.IsChecked == true;
 
             a.SignatureEnabled = signatureOn_.IsChecked == true;

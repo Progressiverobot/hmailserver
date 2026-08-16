@@ -58,13 +58,35 @@ namespace HM
    bool
    PersistentRuleCriteria::SaveObject(std::shared_ptr<RuleCriteria> pRuleCriteria, String &errorMessage, PersistenceMode mode)
    {
-      // errorMessage - not supported yet.
+      // The column is 2000 characters (widened from 255 in schema 6012, where a
+      // long regular expression was silently truncated or refused depending on
+      // backend - and a truncated regex usually still compiles, matching
+      // something other than what was typed). The limit is enforced HERE so the
+      // administrator is told, with the number, instead of the driver deciding.
+      if (pRuleCriteria->GetMatchValue().GetLength() > 2000)
+      {
+         errorMessage = _T("The criterion's value is longer than 2000 characters, which is the most the database stores. Shorten the value; it has not been saved.");
+         return false;
+      }
+
       return SaveObject(pRuleCriteria);
    }
 
    bool
    PersistentRuleCriteria::SaveObject(std::shared_ptr<RuleCriteria> pRuleCriteria)
    {
+      // The same 2000-character bound as the overload above, enforced HERE as
+      // well because this plain path is what a rule-save cascade calls - a
+      // criterion added before its rule was first saved never passes through the
+      // overload at all. This path has no message channel, so the refusal is
+      // reported rather than returned; either way the value is never truncated.
+      if (pRuleCriteria->GetMatchValue().GetLength() > 2000)
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5903, "PersistentRuleCriteria::SaveObject",
+            "A rule criterion's value is longer than 2000 characters, which is the most the database stores. It has not been saved.");
+         return false;
+      }
+
       SQLStatement oStatement;
       oStatement.SetTable("hm_rule_criterias");
 

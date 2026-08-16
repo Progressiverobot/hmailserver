@@ -138,7 +138,17 @@ namespace DBUpdater
          new SchemaProbe(6011, "hm_inisettings.inisettingvalue",
                          "update hm_inisettings set inisettingvalue = inisettingvalue where 1 = 0"),
          new SchemaProbe(6011, "hm_inisettings.inisettingfilevalue",
-                         "update hm_inisettings set inisettingfilevalue = inisettingfilevalue where 1 = 0")
+                         "update hm_inisettings set inisettingfilevalue = inisettingfilevalue where 1 = 0"),
+
+         // Upgrade6011to6012* - the rule-criteria value column widened to 2000
+         // (probing the column proves it exists, not its width; the width is the
+         // upgrade script's to get right) and the vacation begin date on
+         // accounts. One probe per column, as ever: SQL CE commits each ALTER
+         // implicitly, so a two-column step can half-apply.
+         new SchemaProbe(6012, "hm_rule_criterias.criteriamatchvalue",
+                         "update hm_rule_criterias set criteriamatchvalue = criteriamatchvalue where 1 = 0"),
+         new SchemaProbe(6012, "hm_accounts.accountvacationbegindate",
+                         "update hm_accounts set accountvacationbegindate = accountvacationbegindate where 1 = 0")
       };
 
       /// <summary>

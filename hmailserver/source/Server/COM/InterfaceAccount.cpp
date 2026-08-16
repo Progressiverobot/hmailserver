@@ -652,7 +652,53 @@ STDMETHODIMP InterfaceAccount::put_VacationMessageExpiresDate(BSTR newVal)
          return COMError::GenerateError("Invalid auto-reply expiry date");
    
       object_->SetVacationExpiresDate(string);
-   
+
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceAccount::get_VacationMessageBeginDate(BSTR *pVal)
+{
+   try
+   {
+      if (!object_)
+         return GetAccessDenied();
+
+      *pVal = object_->GetVacationBeginDate().AllocSysString();
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceAccount::put_VacationMessageBeginDate(BSTR newVal)
+{
+   try
+   {
+      if (!object_)
+         return GetAccessDenied();
+
+      HM::String string = newVal;
+
+      // The same validation the expiry date gets: an empty or zeroed value means
+      // "from today", which is the no-scheduling behaviour every account had
+      // before this property existed.
+      if (string.Left(4) == _T("0000"))
+         string = "";
+
+      if (string.GetLength() == 0)
+         string = Time::GetCurrentDate();
+      else if (string.GetLength() != 10 || !Time::IsValidSystemDate(string))
+         return COMError::GenerateError("Invalid auto-reply begin date");
+
+      object_->SetVacationBeginDate(string);
+
       return S_OK;
    }
    catch (...)

@@ -37,9 +37,16 @@ STDMETHODIMP InterfaceRuleCriteria::Save()
 
       if (parent_collection_->GetRuleID() > 0)
       {
-         if (!HM::PersistentRuleCriteria::SaveObject(object_))
+         // Through the overload that can SAY why - the length check refuses
+         // over-long criteria values with the number in the message, and an
+         // administrator staring at "see the error log" for a validation error
+         // is the silence the check exists to end.
+         HM::String errorMessage;
+         if (!HM::PersistentRuleCriteria::SaveObject(object_, errorMessage, HM::PersistenceModeNormal))
          {
-            // Saving failed.
+            if (!errorMessage.IsEmpty())
+               return COMError::GenerateError(errorMessage);
+
             return COMError::GenerateError("Failed to save object. See hMailServer error log.");
          }
       }

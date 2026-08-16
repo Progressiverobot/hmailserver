@@ -958,6 +958,8 @@ interface IInterfaceAccount : IDispatch
   
    [propget, id(34), helpstring("The vacation message expires this date")] HRESULT VacationMessageExpiresDate([out, retval] BSTR *pVal);
    [propput, id(34), helpstring("The vacation message expires this date")] HRESULT VacationMessageExpiresDate([in] BSTR pVal);
+   [propget, id(41), helpstring("The vacation message does not activate before this date, so an absence can be scheduled in advance")] HRESULT VacationMessageBeginDate([out, retval] BSTR *pVal);
+   [propput, id(41), helpstring("The vacation message does not activate before this date, so an absence can be scheduled in advance")] HRESULT VacationMessageBeginDate([in] BSTR pVal);
    
 	[propget, id(35), helpstring("First name of the account holder.")] HRESULT PersonFirstName([out, retval] BSTR *pVal);
 	[propput, id(35), helpstring("First name of the account holder.")] HRESULT PersonFirstName([in] BSTR newVal);

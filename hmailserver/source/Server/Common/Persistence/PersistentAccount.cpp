@@ -227,6 +227,10 @@ namespace HM
       if (sVacationExpiresDate.Left(4) != _T("0000"))
          pAccount->SetVacationExpiresDate(sVacationExpiresDate);
 
+      String sVacationBeginDate = pRS->GetStringValue("accountvacationbegindate");
+      if (sVacationBeginDate.Left(4) != _T("0000"))
+         pAccount->SetVacationBeginDate(sVacationBeginDate);
+
       pAccount->SetForwardEnabled(pRS->GetLongValue("accountforwardenabled") ? true : false);
       pAccount->SetForwardAddress(pRS->GetStringValue("accountforwardaddress"));
       pAccount->SetForwardKeepOriginal(pRS->GetLongValue("accountforwardkeeporiginal") ? true : false);
@@ -409,6 +413,7 @@ namespace HM
       oStatement.AddColumn("accountvacationsubject", pAccount->GetVacationSubject());
       oStatement.AddColumn("accountvacationexpires", pAccount->GetVacationExpires());
       oStatement.AddColumn("accountvacationexpiredate", pAccount->GetVacationExpiresDate());
+      oStatement.AddColumn("accountvacationbegindate", pAccount->GetVacationBeginDate());
       oStatement.AddColumn("accountvacationabortspamflagged", pAccount->GetVacationAbortSpamFlagged());
 
       oStatement.AddColumn("accountpwencryption", pAccount->GetPasswordEncryption());
@@ -556,6 +561,19 @@ namespace HM
    PersistentAccount::GetIsVacationMessageOn(std::shared_ptr<const Account> pAccount)
    {
       if (!pAccount->GetVacationMessageIsOn())
+         return false;
+
+      // A scheduled absence: before the begin date the message is configured
+      // but not yet active. Distinct from expiry in mechanism as well as
+      // direction - crossing the begin date activates the reply without
+      // touching the stored on-flag, so nothing has to run at midnight, while
+      // crossing the expiry date switches the flag off in the database. An
+      // unparsable begin date fails open (active), the same choice the expiry
+      // path makes below.
+      DateTime dtBeginNow = DateTime::GetCurrentTime();
+      DateTime dtBegin = Time::GetDateFromSystemDate(pAccount->GetVacationBeginDate());
+      if (dtBeginNow.status_ != DateTime::invalid && dtBegin.status_ != DateTime::invalid &&
+          dtBeginNow < dtBegin)
          return false;
 
       // Vacation message is switched on. We could simply return true here,

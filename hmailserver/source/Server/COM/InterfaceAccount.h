@@ -108,6 +108,8 @@ public:
    STDMETHOD(put_VacationMessageExpires)(/*[in]*/ VARIANT_BOOL newVal);
    STDMETHOD(get_VacationMessageExpiresDate)(/*[out, retval]*/ BSTR *pVal);
    STDMETHOD(put_VacationMessageExpiresDate)(/*[in]*/ BSTR newVal);
+   STDMETHOD(get_VacationMessageBeginDate)(/*[out, retval]*/ BSTR *pVal);
+   STDMETHOD(put_VacationMessageBeginDate)(/*[in]*/ BSTR newVal);
    STDMETHOD(get_VacationMessageAbortSpamFlagged)(/*[out, retval]*/ VARIANT_BOOL *pVal);
    STDMETHOD(put_VacationMessageAbortSpamFlagged)(/*[in]*/ VARIANT_BOOL newVal);
 

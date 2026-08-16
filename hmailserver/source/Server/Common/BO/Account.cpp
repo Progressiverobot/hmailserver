@@ -65,6 +65,7 @@ namespace HM
    {
       last_logon_time_ = Time::GetCurrentDateTime();
       vacation_expires_date_ = Time::GetCurrentDate();
+      vacation_begin_date_ = Time::GetCurrentDate();
    }
 
 
@@ -89,6 +90,7 @@ namespace HM
       vacation_subject_ = oldAccount.vacation_subject_;
       vacation_expires_ = oldAccount.vacation_expires_;
       vacation_expires_date_ = oldAccount.vacation_expires_date_;
+      vacation_begin_date_ = oldAccount.vacation_begin_date_;
       vacation_abort_spam_flagged_ = oldAccount.vacation_abort_spam_flagged_;
       signature_plain_text_ = oldAccount.signature_plain_text_;
       signature_html_ = oldAccount.signature_html_;
@@ -299,6 +301,7 @@ namespace HM
       pNode->AppendAttr(_T("VacationSubject"), vacation_subject_);
       pNode->AppendAttr(_T("VacationExpires"), vacation_expires_ ? _T("1") : _T("0"));
       pNode->AppendAttr(_T("VacationExpireDate"), vacation_expires_date_);
+      pNode->AppendAttr(_T("VacationBeginDate"), vacation_begin_date_);
       pNode->AppendAttr(_T("VacationAbortSpamFlagged"), vacation_abort_spam_flagged_ ? _T("1") : _T("0"));
       pNode->AppendAttr(_T("AdminLevel"), StringParser::IntToString(admin_level_));
       
@@ -353,6 +356,7 @@ namespace HM
       vacation_subject_ = pAccountNode->GetAttrValue(_T("VacationSubject"));
       vacation_expires_ = (pAccountNode->GetAttrValue(_T("VacationExpires")) == _T("1"));
       vacation_expires_date_ = pAccountNode->GetAttrValue(_T("VacationExpireDate"));
+      vacation_begin_date_ = pAccountNode->GetAttrValue(_T("VacationBeginDate"));
       vacation_abort_spam_flagged_ = (pAccountNode->GetAttrValue(_T("VacationAbortSpamFlagged")) == _T("1"));
 
       admin_level_ = (AdminLevel) _ttoi(pAccountNode->GetAttrValue(_T("AdminLevel")));

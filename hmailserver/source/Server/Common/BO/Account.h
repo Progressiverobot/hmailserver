@@ -72,6 +72,12 @@ namespace HM
       String GetVacationExpiresDate() const{return vacation_expires_date_; }
       void SetVacationExpiresDate(const String &sNewVal) {vacation_expires_date_ = sNewVal;}
 
+      // The other end of the window: no auto-reply before this date, so an
+      // absence can be set up in advance. Reaching the date activates the reply
+      // without touching the stored on-flag, so nothing has to run at midnight.
+      String GetVacationBeginDate() const{return vacation_begin_date_; }
+      void SetVacationBeginDate(const String &sNewVal) {vacation_begin_date_ = sNewVal;}
+
       bool GetVacationAbortSpamFlagged() const { return vacation_abort_spam_flagged_; }
       void SetVacationAbortSpamFlagged(bool bNewVal) { vacation_abort_spam_flagged_ = bNewVal; }
 
@@ -145,6 +151,7 @@ namespace HM
       String vacation_subject_;
       bool vacation_expires_;
       String vacation_expires_date_;
+      String vacation_begin_date_;
       bool vacation_abort_spam_flagged_;
       
       String signature_plain_text_;

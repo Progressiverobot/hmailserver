@@ -191,6 +191,7 @@ create table hm_accounts (
 	accountlastlogontime datetime not null,
 	accountvacationexpires tinyint not null,
 	accountvacationexpiredate datetime not null,
+	accountvacationbegindate datetime not null,
 	accountpersonfirstname nvarchar(60) not null,
 	accountpersonlastname nvarchar(60) not null,
 	accountvacationabortspamflagged tinyint not null,
@@ -519,7 +520,7 @@ create table hm_rule_criterias
 	criteriapredefinedfield tinyint not null,
 	criteriaheadername nvarchar(255) not null,
 	criteriamatchtype tinyint not null,
-	criteriamatchvalue nvarchar(255) not null
+	criteriamatchvalue nvarchar(2000) not null
 	
 ) 
 
@@ -1002,4 +1003,4 @@ insert into hm_tcpipports (portprotocol, portnumber, portaddress1, portaddress2,
 
 insert into hm_tcpipports (portprotocol, portnumber, portaddress1, portaddress2, portconnectionsecurity, portsslcertificateid) values (5, 143, 0, NULL, 0, 0) 
 
-insert into hm_dbversion values (6011)
+insert into hm_dbversion values (6012)
