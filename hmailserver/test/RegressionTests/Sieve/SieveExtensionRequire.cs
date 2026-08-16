@@ -50,10 +50,13 @@ namespace RegressionTests.Sieve
          // now that was not an error.
          Assert.IsNotEmpty(CheckSyntax("require \"frobnicate\";\r\nkeep;"));
 
-         // "reject" is the interesting case: it is a real, well-known extension
-         // that this server does not implement. Accepting it means accepting a
-         // script whose whole purpose - bouncing the message - will not happen.
-         Assert.IsNotEmpty(CheckSyntax("require \"reject\";\r\nkeep;"));
+         // "reject" was the interesting case for years: real, well-known, and not
+         // implemented - accepting its require meant accepting a script whose
+         // whole purpose would silently not happen. It SHIPPED on 16 August 2026
+         // (SieveRejectDelivery.cs proves the report arrives), so the sentinel
+         // duty passes to enotify, which is still genuinely absent.
+         Assert.IsEmpty(CheckSyntax("require \"reject\";\r\nkeep;"));
+         Assert.IsNotEmpty(CheckSyntax("require \"enotify\";\r\nkeep;"));
 
          // A list where only one entry is unsupported still fails.
          Assert.IsNotEmpty(CheckSyntax("require [\"fileinto\", \"notify\"];\r\nkeep;"));

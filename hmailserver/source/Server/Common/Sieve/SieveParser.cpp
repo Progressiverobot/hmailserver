@@ -184,6 +184,12 @@ namespace HM
          // :matches, and the string test. Expansion is scoped to scripts that
          // require this name - without it "${a}" stays verbatim, as the RFC says.
          L"variables",
+         // RFC 5429. Both refuse-by-report: scripts run after the SMTP
+         // transaction accepted the message, so the RFC's DSN fallback is the
+         // only honest spelling of either, and it rides the same bounce machinery
+         // (and guards) as a quota refusal.
+         L"reject",
+         L"ereject",
          L"comparator-i;ascii-casemap",
          L"comparator-i;octet",
          L"comparator-i;ascii-numeric"
@@ -502,7 +508,8 @@ namespace HM
          L"fileinto", L"redirect", L"vacation",
          L"setflag", L"addflag", L"removeflag",
          L"addheader", L"deleteheader",
-         L"set"
+         L"set",
+         L"reject", L"ereject"
       };
 
       for (const wchar_t *candidate : known)
@@ -1191,6 +1198,23 @@ namespace HM
       SieveArgumentSet set;
       if (!isControl && name != _T("require") && !SplitArguments(command->arguments, set, errorMessage))
          return false;
+
+      if (name == _T("reject") || name == _T("ereject"))
+      {
+         if (!NeedExtension_(name, _T("'") + name + _T("'"), command->line, errorMessage))
+            return false;
+
+         if (!CheckTags_(set, _T(""), _T("'") + name + _T("'"), errorMessage))
+            return false;
+
+         if (set.stringLists.size() != 1 || set.stringLists[0].size() != 1)
+         {
+            errorMessage.Format(_T("Line %d: '%s' takes one reason string."), command->line, name.c_str());
+            return false;
+         }
+
+         return true;
+      }
 
       if (name == _T("set"))
       {

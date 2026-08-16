@@ -63,6 +63,10 @@ namespace RegressionTests.Sieve
          // environment under its require.
          Assert.IsEmpty(CheckSyntax("require \"environment\";\r\nif environment :is \"name\" \"hMailServer\" {\r\n  keep;\r\n}"));
 
+         // reject and ereject under their requires.
+         Assert.IsEmpty(CheckSyntax("require \"reject\";\r\nreject \"go away\";"));
+         Assert.IsEmpty(CheckSyntax("require \"ereject\";\r\nereject \"refused\";"));
+
          // variables under its require: set with modifiers, and the string test.
          Assert.IsEmpty(CheckSyntax("require \"variables\";\r\nset \"a\" \"b\";\r\nif string :is \"${a}\" \"b\" {\r\n  keep;\r\n}"));
          Assert.IsEmpty(CheckSyntax("require \"variables\";\r\nset :length :upper \"n\" \"abc\";"));
@@ -110,11 +114,11 @@ namespace RegressionTests.Sieve
          // Unterminated quoted string.
          Assert.IsNotEmpty(CheckSyntax("redirect \"unterminated;"));
          // An extension this server does not implement must be refused at upload,
-         // not accepted and then silently ignored at delivery. "reject" (RFC 5429)
-         // is the case that matters: a script requiring it used to be reported valid
-         // while the reject never happened, so mail the user believed was being
-         // refused was quietly kept instead.
-         Assert.IsNotEmpty(CheckSyntax("require [\"fileinto\", \"reject\"];\r\nif not exists \"Date\" {\r\n  reject \"no date\";\r\n}"));
+         // not accepted and then silently ignored at delivery. "reject" was the
+         // case that proved this rule (a script requiring it was once reported
+         // valid while the reject never happened); reject SHIPPED on 16 August
+         // 2026, so the sentinel here is an extension still genuinely absent.
+         Assert.IsNotEmpty(CheckSyntax("require [\"fileinto\", \"enotify\"];\r\nif not exists \"Date\" {\r\n  keep;\r\n}"));
 
          // The mailbox extension's pieces without its require line. Both must name
          // the missing extension rather than pass: a script written for a server
@@ -149,6 +153,10 @@ namespace RegressionTests.Sieve
          // ihave and environment without their requires.
          Assert.IsNotEmpty(CheckSyntax("if ihave \"fileinto\" {\r\n  keep;\r\n}"));
          Assert.IsNotEmpty(CheckSyntax("if environment :is \"name\" \"x\" {\r\n  keep;\r\n}"));
+
+         // reject without its require, and with a stray tag.
+         Assert.IsNotEmpty(CheckSyntax("reject \"go away\";"));
+         Assert.IsNotEmpty(CheckSyntax("require \"reject\";\r\nreject :copy \"go away\";"));
 
          // variables: contradictory modifiers, an all-digit (match-variable)
          // name, an illegal name, and the missing require.
@@ -209,8 +217,9 @@ namespace RegressionTests.Sieve
          // Commands. Each is written the way a script would actually use it.
          var commands = new[]
          {
-            "reject \"go away\";",
-            "ereject \"go away\";",
+            // reject and ereject moved out on 16 August 2026 - RFC 5429 shipped
+            // with the DSN fallback, proven end to end on BOTH mailboxes in
+            // SieveRejectDelivery.cs.
             "notify \"mailto:someone@example.test\";",
             // addheader and deleteheader moved out on 16 August 2026 - the
             // editheader extension shipped, proven end to end on delivered bytes

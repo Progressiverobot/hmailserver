@@ -337,6 +337,16 @@ namespace HM
             pinnedFlagsGiven_ = true;
          }
 
+         // The other half of RFC 5429 2.1.1's incompatibility rule: a delivery
+         // action after a reject wins over it. "Delivered but also bounced" tells
+         // the sender their mail did not arrive when it did.
+         if (result_->rejectGiven)
+         {
+            LOG_APPLICATION(_T("Sieve: a reject was cancelled because the script then delivered the message - RFC 5429 forbids combining them."));
+            result_->rejectGiven = false;
+            result_->rejectReason.Empty();
+         }
+
          if (name == _T("keep"))
          {
             actions_.push_back(_T("keep"));
@@ -384,6 +394,16 @@ namespace HM
          String target = FirstString_(set);
          actions_.push_back(_T("redirect:") + target);
          result_->redirects.push_back(target);
+
+         // As in keep/fileinto: a delivery action after a reject cancels the
+         // reject (RFC 5429 2.1.1's incompatibility, resolved in the direction
+         // that never misleads the sender about whether their mail went through).
+         if (result_->rejectGiven)
+         {
+            LOG_APPLICATION(_T("Sieve: a reject was cancelled because the script then redirected the message - RFC 5429 forbids combining them."));
+            result_->rejectGiven = false;
+            result_->rejectReason.Empty();
+         }
 
          // RFC 3894: ":copy" means "in addition to", so it leaves the implicit
          // keep alone. Without it a redirect cancels the local copy - but only
@@ -474,6 +494,47 @@ namespace HM
       if (name == _T("set"))
       {
          ExecuteSetCommand_(command);
+         return;
+      }
+
+      if (name == _T("reject") || name == _T("ereject"))
+      {
+         // RFC 5429. The two commands differ in HOW a refusal should happen -
+         // ereject prefers the SMTP protocol level - but by the time a script
+         // runs, the transaction has long since been accepted, and the RFC's
+         // fallback for both is the same: a non-delivery report, and no local
+         // copy. RFC 5429 2.1.1 makes combining a reject with a delivery action
+         // an error; the safe half of that rule is implemented here - a reject
+         // AFTER the script already stored the message somewhere is ignored, and
+         // a delivery action after a reject wins over it (both logged), because
+         // "delivered but also bounced" misleads the sender, while "delivered
+         // despite the script's contradiction" loses nothing.
+         if (localDecided_)
+         {
+            LOG_APPLICATION(_T("Sieve: a reject was ignored because the script had already delivered the message - RFC 5429 forbids combining them."));
+            return;
+         }
+
+         SieveArgumentSet set;
+         String ignored;
+         if (!SieveParser::SplitArguments(command->arguments, set, ignored))
+            return;
+
+         if (variables_enabled_)
+            ExpandArgumentSet_(set);
+
+         if (set.stringLists.size() != 1 || set.stringLists[0].size() != 1)
+            return;
+
+         if (result_)
+         {
+            result_->rejectGiven = true;
+            result_->rejectReason = set.stringLists[0][0];
+            result_->keepLocal = false;
+         }
+
+         localDecided_ = true;
+         actions_.push_back(_T("reject"));
          return;
       }
 

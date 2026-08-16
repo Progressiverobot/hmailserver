@@ -298,7 +298,18 @@ namespace HM
       // did), the set modifiers in precedence order, and the string test.
       // End-to-end tests in SieveVariablesDelivery.cs file into a folder NAMED BY
       // a capture, which only works if capture, storage and expansion all hold.
-      const char *AdvertisedSieveExtensions = "fileinto copy relational subaddress vacation vacation-seconds imap4flags body mailbox regex ihave environment date index spamtest spamtestplus duplicate editheader variables";
+      // reject and ereject (RFC 5429) moved in on 16 August 2026, under the same
+      // rule. Their delivery-side step is the reject reason flowing out of
+      // EvaluateSieveScript_ into the SAME non-delivery-report machinery a quota
+      // refusal uses - so its guards (no bounce to a bounce, to a null sender, to
+      // auto-submitted mail; the RFC 3461 NOTIFY opt-out) apply unchanged, and the
+      // local copy is dropped with the same file cleanup as any pre-process
+      // refusal. RFC 5429's incompatibility with delivery actions resolves in the
+      // direction that never misleads the sender: delivery wins, the reject is
+      // cancelled and logged. End-to-end tests in SieveRejectDelivery.cs assert
+      // the sender RECEIVES the report with the script's reason in it, and that
+      // the recipient's mailbox stays empty.
+      const char *AdvertisedSieveExtensions = "fileinto copy relational subaddress vacation vacation-seconds imap4flags body mailbox regex ihave environment date index spamtest spamtestplus duplicate editheader variables reject ereject";
 
       AnsiString EscapeQuoted(const String &value)
       {

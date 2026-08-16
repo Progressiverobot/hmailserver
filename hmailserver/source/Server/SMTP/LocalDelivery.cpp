@@ -160,7 +160,7 @@ namespace HM
          return;
       }
 
-      if (!LocalDeliveryPreProcess_(account, accountLevelMessage, sOriginalAddress, saErrorMessages))
+      if (!LocalDeliveryPreProcess_(account, accountLevelMessage, sOriginalAddress, saErrorMessages, suppressFailureDsn))
       {
          FileUtilities::DeleteFile(PersistentMessage::GetFileName(account, accountLevelMessage));
 
@@ -249,7 +249,7 @@ namespace HM
    Returns true if message should be delivered, false if it should be aborted.
    */
    bool 
-   LocalDelivery::LocalDeliveryPreProcess_(std::shared_ptr<const Account> account, std::shared_ptr<Message> accountLevelMessage, const String &sOriginalAddress, std::vector<String> &saErrorMessages)
+   LocalDelivery::LocalDeliveryPreProcess_(std::shared_ptr<const Account> account, std::shared_ptr<Message> accountLevelMessage, const String &sOriginalAddress, std::vector<String> &saErrorMessages, bool suppressFailureDsn)
    {
       SendAutoReplyMessage_(account, original_message_);
 
@@ -281,8 +281,30 @@ namespace HM
       bool sieveDrop = false;
       bool sieveFlagsGiven = false;
       std::vector<String> sieveFlags;
+      String sieveRejectReason;
       EvaluateSieveScript_(account, accountLevelMessage, sOriginalAddress, sieveFolder, sieveDrop,
-                           sieveFlagsGiven, sieveFlags);
+                           sieveFlagsGiven, sieveFlags, sieveRejectReason);
+
+      if (!sieveRejectReason.IsEmpty())
+      {
+         // reject / ereject (RFC 5429): no local copy, and the sender is told why
+         // through the same non-delivery report a quota refusal produces - whose
+         // guards (no bounce to a bounce, to a null sender, or to auto-submitted
+         // mail) apply on the way out. The DSN NOTIFY=NEVER opt-out is honoured
+         // exactly as the quota path honours it.
+         if (!suppressFailureDsn)
+         {
+            String sRejectText;
+            sRejectText.Format(_T("%s\r\n   Error Type: SMTP\r\n   Error Description: Message rejected\r\n   Additional information: The recipient's mail filter rejected the message: %s\r\n\r\n"),
+               String(account->GetAddress()).c_str(), sieveRejectReason.c_str());
+            saErrorMessages.push_back(sRejectText);
+         }
+
+         String sMessage = Formatter::Format("SMTPDeliverer - Message {0}: rejected by the Sieve script for {1}.",
+                                                original_message_->GetID(), account->GetAddress());
+         LOG_APPLICATION(sMessage);
+         return false;
+      }
 
       // Applied here, before the caller's PersistentMessage::SaveObject, which is the
       // only reason a flag set by a script survives at all.
@@ -425,12 +447,14 @@ namespace HM
    void
    LocalDelivery::EvaluateSieveScript_(std::shared_ptr<const Account> account, std::shared_ptr<Message> message,
                                        const String &sOriginalAddress, String &sieveFolder, bool &sieveDrop,
-                                       bool &sieveFlagsGiven, std::vector<String> &sieveFlags)
+                                       bool &sieveFlagsGiven, std::vector<String> &sieveFlags,
+                                       String &sieveRejectReason)
    {
       sieveFolder = _T("");
       sieveDrop = false;
       sieveFlagsGiven = false;
       sieveFlags.clear();
+      sieveRejectReason.Empty();
 
       String script = SieveStorage::GetActiveScript(account->GetAddress());
       if (script.IsEmpty())
@@ -523,6 +547,11 @@ namespace HM
       // or a redirect that cancels the implicit keep), drop it locally.
       if (!sieveResult.keepLocal)
          sieveDrop = true;
+
+      // reject / ereject: the caller drops the copy AND reports back to the
+      // sender. A non-empty reason is the whole signal.
+      if (sieveResult.rejectGiven)
+         sieveRejectReason = sieveResult.rejectReason.IsEmpty() ? String(_T("Message refused by the recipient's mail filter.")) : sieveResult.rejectReason;
    }
 
    void

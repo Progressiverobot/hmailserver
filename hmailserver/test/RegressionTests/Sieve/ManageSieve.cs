@@ -285,6 +285,12 @@ namespace RegressionTests.Sieve
                // control that ${} stays verbatim without the require.
                StringAssert.Contains("variables", greeting);
 
+               // reject and ereject followed, with SieveRejectDelivery.cs behind
+               // them - the sender RECEIVES the report with the script's reason,
+               // and the recipient's mailbox stays empty.
+               StringAssert.Contains("reject", greeting);
+               StringAssert.Contains("ereject", greeting);
+
                // Still absent on purpose: envelope is implemented and evaluated, and is
                // held back until a test proves the envelope TEST command itself works.
                // If somebody adds it here, that test should exist first.

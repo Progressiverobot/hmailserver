@@ -22,7 +22,9 @@ namespace HM
    private:
       
       void DeliverToLocalAccount_(std::shared_ptr<const Account> account, size_t iNoOfRecipients, std::vector<String> &saErrorMessages, const String &sOriginalAddress, bool &messageReused, bool suppressFailureDsn);
-      bool LocalDeliveryPreProcess_(std::shared_ptr<const Account> account, std::shared_ptr<Message> accountLevelMessage, const String &sOriginalAddress, std::vector<String> &saErrorMessages);
+      // suppressFailureDsn is the recipient's RFC 3461 NOTIFY opt-out, threaded
+      // through because a Sieve reject sends its non-delivery report from here.
+      bool LocalDeliveryPreProcess_(std::shared_ptr<const Account> account, std::shared_ptr<Message> accountLevelMessage, const String &sOriginalAddress, std::vector<String> &saErrorMessages, bool suppressFailureDsn);
       bool AddTraceHeaders_(std::shared_ptr<const Account> account, std::shared_ptr<Message> pMessage, const String &sOriginalAddress);
       void SendAutoReplyMessage_(std::shared_ptr<const Account> pAccount, std::shared_ptr<Message> pMessage);
       bool RunAccountRules_(std::shared_ptr<const Account> pAccount, std::shared_ptr<Message> pMessage, RuleResult &accountRuleResult);
@@ -45,9 +47,14 @@ namespace HM
       // SieveParser::SplitFlagList. Empty-and-given is meaningful and different from
       // not-given: "removeflag" that cleared everything is an instruction, and a
       // script that never mentioned flags is not.
+      // sieveRejectReason is non-empty when the script refused the message with
+      // reject/ereject (RFC 5429): the caller then drops the local copy AND sends
+      // a non-delivery report carrying the reason, through the same machinery as
+      // a quota bounce.
       void EvaluateSieveScript_(std::shared_ptr<const Account> account, std::shared_ptr<Message> message,
                                 const String &sOriginalAddress, String &sieveFolder, bool &sieveDrop,
-                                bool &sieveFlagsGiven, std::vector<String> &sieveFlags);
+                                bool &sieveFlagsGiven, std::vector<String> &sieveFlags,
+                                String &sieveRejectReason);
 
       // Writes the flags a script decided onto the message that is about to be saved.
       //

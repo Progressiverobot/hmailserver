@@ -106,6 +106,15 @@ namespace HM
       std::vector<String> redirects; // addresses to send a copy to
       std::vector<SieveHeaderEdit> headerEdits; // editheader (RFC 5293), in script order
       SieveVacationDecision vacation;
+
+      // reject / ereject (RFC 5429). Evaluation runs after the SMTP transaction
+      // accepted the message, so a protocol-level refusal is no longer possible;
+      // the RFC's mandated fallback is a non-delivery report, which the delivery
+      // path sends through the same machinery as a quota bounce - with that
+      // machinery's guards (no bounce to a bounce, none to a null or
+      // auto-submitted sender) applying unchanged.
+      bool rejectGiven = false;
+      String rejectReason;
    };
 
    // Evaluates a parsed Sieve AST against a message and produces the resulting
