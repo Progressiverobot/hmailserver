@@ -103,6 +103,12 @@ namespace HM
       classified_as_spam_ = classified;
    }
 
+   void
+   SieveEvaluator::SetDuplicateCheck(std::function<bool(const String &, const String &, __int64, bool)> callback)
+   {
+      duplicate_check_ = callback;
+   }
+
    bool
    SieveEvaluator::GetEnvironmentItem_(const String &name, String &value)
    {
@@ -916,6 +922,56 @@ namespace HM
 
       if (name == _T("spamtest"))
          return EvaluateSpamTest_(test, message);
+
+      if (name == _T("duplicate"))
+      {
+         // RFC 7352. The identifier is source-tagged before it reaches the store,
+         // because the RFC requires that a ":uniqueid" value and a Message-ID of
+         // the same text do not collide.
+         if (!duplicate_check_)
+            return false;
+
+         SieveArgumentSet set;
+         String ignored;
+         if (!SieveParser::SplitArguments(test->arguments, set, ignored))
+            return false;
+
+         String identifier;
+
+         if (set.uniqueIdGiven)
+         {
+            identifier = _T("uid:") + set.uniqueId;
+         }
+         else if (set.duplicateHeaderGiven)
+         {
+            std::vector<String> values = message.GetHeaderValues(set.duplicateHeader);
+            if (values.empty() || values[0].IsEmpty())
+               return false;
+
+            String headerName = set.duplicateHeader;
+            headerName.ToLower();
+            identifier = _T("hdr:") + headerName + _T(":") + values[0];
+         }
+         else
+         {
+            std::vector<String> values = message.GetHeaderValues(_T("Message-ID"));
+            if (values.empty() || values[0].IsEmpty())
+            {
+               // No Message-ID: never a duplicate, nothing tracked (RFC 7352 3).
+               return false;
+            }
+
+            identifier = _T("mid:") + values[0];
+         }
+
+         // Seven days unless the script narrows it - the window most
+         // implementations default to, long enough to catch a mailing-list
+         // duplicate arriving via two routes, short enough that the store turns
+         // over.
+         __int64 window = set.secondsGiven ? set.seconds : 7LL * 86400LL;
+
+         return duplicate_check_(identifier, set.handleGiven ? set.handle : String(_T("")), window, set.lastGiven);
+      }
 
       if (name == _T("date"))
          return EvaluateDateTest_(test, message, false);

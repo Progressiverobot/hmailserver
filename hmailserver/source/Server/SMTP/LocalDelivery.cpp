@@ -31,6 +31,7 @@
 #include "../common/Sieve/SieveStorage.h"
 #include "../common/Sieve/SieveScript.h"
 #include "../common/Sieve/SieveVacationResponder.h"
+#include "../common/Sieve/SieveDuplicateTracker.h"
 
 #include "../IMAP/MessagesContainer.h"
 
@@ -455,8 +456,18 @@ namespace HM
          return MessageUtilities::FolderExistsForDelivery(accountID, mailboxName);
       };
 
+      // The "duplicate" test's seen-store, bound to this recipient's account. The
+      // check and the recording are one operation inside the tracker.
+      String duplicateAccount = account->GetAddress();
+      auto duplicateCheck = [duplicateAccount](const String &identifier, const String &handle,
+                                               __int64 windowSeconds, bool refreshOnSeen) -> bool
+      {
+         return SieveDuplicateTracker::Instance()->CheckAndRecord(
+            duplicateAccount, identifier, handle, windowSeconds, refreshOnSeen);
+      };
+
       SieveResult sieveResult;
-      String actions = SieveScript::Evaluate(script, rawMessage, envelope, sieveResult, mailboxExists, message->GetFlagSpam());
+      String actions = SieveScript::Evaluate(script, rawMessage, envelope, sieveResult, mailboxExists, message->GetFlagSpam(), duplicateCheck);
 
       // A script that fails to parse must never break delivery; fall through to a
       // normal keep. (The structured result is already at its defaults in that case,

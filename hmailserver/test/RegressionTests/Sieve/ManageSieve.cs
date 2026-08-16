@@ -270,6 +270,11 @@ namespace RegressionTests.Sieve
                StringAssert.Contains("spamtest", greeting);
                StringAssert.Contains("spamtestplus", greeting);
 
+               // duplicate followed, with SieveDuplicateDelivery.cs behind it - the
+               // same Message-ID delivered twice, only the second filed as a
+               // duplicate, and a fail-OPEN seen-store.
+               StringAssert.Contains("duplicate", greeting);
+
                // Still absent on purpose: envelope is implemented and evaluated, and is
                // held back until a test proves the envelope TEST command itself works.
                // If somebody adds it here, that test should exist first.

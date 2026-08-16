@@ -232,6 +232,7 @@ EXIT 0
     <ClCompile Include="..\Common\Sieve\SieveParser.cpp" />
     <ClCompile Include="..\Common\Sieve\SieveScript.cpp" />
     <ClCompile Include="..\Common\Sieve\SieveStorage.cpp" />
+    <ClCompile Include="..\Common\Sieve\SieveDuplicateTracker.cpp" />
     <ClCompile Include="..\Common\Sieve\SieveVacationTracker.cpp" />
     <ClCompile Include="..\Common\Sieve\SieveVacationResponder.cpp" />
     <ClCompile Include="..\Common\Rules\RuleGuard.cpp" />
@@ -778,6 +779,7 @@ EXIT 0
     <ClInclude Include="..\Common\Sieve\SieveParser.h" />
     <ClInclude Include="..\Common\Sieve\SieveScript.h" />
     <ClInclude Include="..\Common\Sieve\SieveStorage.h" />
+    <ClInclude Include="..\Common\Sieve\SieveDuplicateTracker.h" />
     <ClInclude Include="..\Common\Sieve\SieveVacationTracker.h" />
     <ClInclude Include="..\Common\Sieve\SieveVacationResponder.h" />
     <ClInclude Include="..\Common\Rules\RuleGuard.h" />

@@ -273,7 +273,15 @@ namespace HM
       // before delivery, so a script never sees a message with a virus verdict,
       // and advertising a test that always answers "not scanned" is the inert-
       // capability trap this list exists to prevent.
-      const char *AdvertisedSieveExtensions = "fileinto copy relational subaddress vacation vacation-seconds imap4flags body mailbox regex ihave environment date index spamtest spamtestplus";
+      // duplicate (RFC 7352) moved in on 16 August 2026, under the same rule. Its
+      // delivery-side step is the seen-store callback LocalDelivery binds to the
+      // recipient's account (SieveDuplicateTracker - fail-OPEN, the opposite
+      // direction to the vacation tracker, because the common script discards on
+      // "duplicate" and a wrong "duplicate" destroys mail where a wrong "new"
+      // delivers a copy twice). End-to-end tests in SieveDuplicateDelivery.cs
+      // deliver the same Message-ID twice and assert the first lands in INBOX and
+      // the second where the script files duplicates.
+      const char *AdvertisedSieveExtensions = "fileinto copy relational subaddress vacation vacation-seconds imap4flags body mailbox regex ihave environment date index spamtest spamtestplus duplicate";
 
       AnsiString EscapeQuoted(const String &value)
       {

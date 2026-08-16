@@ -63,6 +63,11 @@ namespace RegressionTests.Sieve
          // environment under its require.
          Assert.IsEmpty(CheckSyntax("require \"environment\";\r\nif environment :is \"name\" \"hMailServer\" {\r\n  keep;\r\n}"));
 
+         // duplicate under its require, in all three identifier spellings.
+         Assert.IsEmpty(CheckSyntax("require \"duplicate\";\r\nif duplicate {\r\n  discard;\r\n}"));
+         Assert.IsEmpty(CheckSyntax("require \"duplicate\";\r\nif duplicate :header \"X-Token\" :seconds 3600 :last {\r\n  discard;\r\n}"));
+         Assert.IsEmpty(CheckSyntax("require \"duplicate\";\r\nif duplicate :uniqueid \"tok\" :handle \"w\" {\r\n  discard;\r\n}"));
+
          // spamtest under its require, with :percent under spamtestplus.
          Assert.IsEmpty(CheckSyntax("require \"spamtest\";\r\nif spamtest :is \"0\" {\r\n  keep;\r\n}"));
          Assert.IsEmpty(CheckSyntax("require [\"spamtest\", \"spamtestplus\"];\r\nif spamtest :percent :is \"100\" {\r\n  keep;\r\n}"));
@@ -138,6 +143,12 @@ namespace RegressionTests.Sieve
          Assert.IsNotEmpty(CheckSyntax("if ihave \"fileinto\" {\r\n  keep;\r\n}"));
          Assert.IsNotEmpty(CheckSyntax("if environment :is \"name\" \"x\" {\r\n  keep;\r\n}"));
 
+         // duplicate: :header and :uniqueid contradict each other, positionals are
+         // not part of its grammar, and the require is needed at all.
+         Assert.IsNotEmpty(CheckSyntax("require \"duplicate\";\r\nif duplicate :header \"X\" :uniqueid \"y\" {\r\n  discard;\r\n}"));
+         Assert.IsNotEmpty(CheckSyntax("require \"duplicate\";\r\nif duplicate \"stray\" {\r\n  discard;\r\n}"));
+         Assert.IsNotEmpty(CheckSyntax("if duplicate {\r\n  discard;\r\n}"));
+
          // :percent needs spamtestplus, not just spamtest; and spamtest needs
          // its require at all.
          Assert.IsNotEmpty(CheckSyntax("require \"spamtest\";\r\nif spamtest :percent :is \"100\" {\r\n  keep;\r\n}"));
@@ -200,11 +211,10 @@ namespace RegressionTests.Sieve
          {
             "date :is \"date\" \"year\" \"2026\"",
             "currentdate :is \"year\" \"2026\"",
-            "duplicate",
-            // mailboxexists, ihave and environment moved out of this list on
-            // 16 August 2026 when their extensions were implemented - they now
-            // live in SieveMailboxDelivery.cs and SieveEnvironmentDelivery.cs,
-            // which prove them end to end.
+            // duplicate, mailboxexists, ihave and environment moved out of this
+            // list on 16 August 2026 when their extensions were implemented -
+            // they now live in SieveDuplicateDelivery.cs, SieveMailboxDelivery.cs
+            // and SieveEnvironmentDelivery.cs, which prove them end to end.
             // spamtest moved out on 16 August 2026 - SieveSpamtestDelivery.cs
             // proves it end to end, spoofing control included.
             "string :is \"a\" \"a\"",

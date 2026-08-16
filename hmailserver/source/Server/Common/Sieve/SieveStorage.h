@@ -54,6 +54,7 @@ namespace HM
       // sanitisation that stops an unusual local-part escaping that directory is the
       // part that must not be reimplemented.
       static String GetVacationStorePath(const String &accountAddress);
+      static String GetDuplicateStorePath(const String &accountAddress);
 
       // Where an account's and a domain's Sieve state lives on disk. Public so that
       // the rename and delete paths can move or remove it WITHOUT reimplementing

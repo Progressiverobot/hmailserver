@@ -121,6 +121,14 @@ namespace HM
       // flag is the channel that works when they are off.
       void SetClassifiedAsSpam(bool classified);
 
+      // How the "duplicate" test (RFC 7352) asks its seen-store a question and
+      // records the answer's premise: (identifier, handle, windowSeconds,
+      // refreshOnSeen) -> was it seen before. The delivery path binds the
+      // recipient account's store; a caller that supplies none - the COM test
+      // evaluator - gets false for everything, the direction that cannot discard
+      // mail.
+      void SetDuplicateCheck(std::function<bool(const String &, const String &, __int64, bool)> callback);
+
    private:
       // Where the values a test compares against come from.
       enum class ValueSource { Header, Address, Envelope, Flags, Body, Environment };
@@ -222,5 +230,6 @@ namespace HM
 
       std::function<bool(const String &)> mailbox_exists_;
       bool classified_as_spam_ = false;
+      std::function<bool(const String &, const String &, __int64, bool)> duplicate_check_;
    };
 }

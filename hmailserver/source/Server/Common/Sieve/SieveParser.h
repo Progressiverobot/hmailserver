@@ -129,6 +129,13 @@ namespace HM
       // spamtest :percent (RFC 5235).
       bool percentGiven = false;
 
+      // duplicate (RFC 7352): which identifier the test tracks - a named header's
+      // value under :header, a literal under :uniqueid, Message-ID by default.
+      String duplicateHeader;
+      bool duplicateHeaderGiven = false;
+      String uniqueId;
+      bool uniqueIdGiven = false;
+
       // Positional string-list arguments, in order.
       std::vector<std::vector<String>> stringLists;
    };

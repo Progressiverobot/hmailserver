@@ -87,6 +87,12 @@ namespace HM
    }
 
    String
+   SieveStorage::GetDuplicateStorePath(const String &accountAddress)
+   {
+      return FileUtilities::Combine(GetAccountDirectory_(accountAddress), _T("duplicate.seen"));
+   }
+
+   String
    SieveStorage::GetActiveScript(const String &accountAddress)
    {
       String path = GetActiveScriptPath_(accountAddress);

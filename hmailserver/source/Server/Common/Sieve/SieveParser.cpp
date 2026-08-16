@@ -39,7 +39,9 @@ namespace HM
                 lowerTag == _T("addresses") ||
                 lowerTag == _T("content") ||
                 lowerTag == _T("zone") ||
-                lowerTag == _T("index");
+                lowerTag == _T("index") ||
+                lowerTag == _T("header") ||
+                lowerTag == _T("uniqueid");
       }
 
       bool IsRelation(const String &relation)
@@ -171,6 +173,10 @@ namespace HM
          // "not scanned" would be advertised and inert.
          L"spamtest",
          L"spamtestplus",
+         // RFC 7352: has a message with this identifier been seen before. The
+         // seen-store fails OPEN - see SieveDuplicateTracker for why that is the
+         // opposite of the vacation tracker's direction.
+         L"duplicate",
          L"comparator-i;ascii-casemap",
          L"comparator-i;octet",
          L"comparator-i;ascii-numeric"
@@ -458,6 +464,18 @@ namespace HM
             result.zone = value->strings[0];
             result.zoneGiven = true;
          }
+         else if (tag == _T("header"))
+         {
+            // duplicate :header (RFC 7352).
+            result.duplicateHeader = value->strings[0];
+            result.duplicateHeaderGiven = true;
+         }
+         else if (tag == _T("uniqueid"))
+         {
+            // duplicate :uniqueid (RFC 7352).
+            result.uniqueId = value->strings[0];
+            result.uniqueIdGiven = true;
+         }
 
          i++;
       }
@@ -495,7 +513,7 @@ namespace HM
          L"address", L"allof", L"anyof", L"exists", L"false", L"header",
          L"not", L"size", L"true", L"envelope", L"hasflag", L"body",
          L"mailboxexists", L"ihave", L"environment", L"date", L"currentdate",
-         L"spamtest"
+         L"spamtest", L"duplicate"
       };
 
       for (const wchar_t *candidate : known)
@@ -1548,6 +1566,33 @@ namespace HM
 
          if (!ValidateIndexArguments_(set, test->line, errorMessage))
             return false;
+
+         return true;
+      }
+
+      if (name == _T("duplicate"))
+      {
+         if (!NeedExtension_(_T("duplicate"), _T("the 'duplicate' test"), test->line, errorMessage))
+            return false;
+
+         if (!CheckTags_(set, _T("handle header uniqueid seconds last"), _T("'duplicate'"), errorMessage))
+            return false;
+
+         // RFC 7352 3.1: the two identifier sources are mutually exclusive - a
+         // script naming both has two different messages in mind and the parser
+         // cannot pick for it.
+         if (set.duplicateHeaderGiven && set.uniqueIdGiven)
+         {
+            errorMessage.Format(_T("Line %d: 'duplicate' takes ':header' or ':uniqueid', not both."), test->line);
+            return false;
+         }
+
+         // No positional arguments at all: everything is tagged.
+         if (!set.stringLists.empty())
+         {
+            errorMessage.Format(_T("Line %d: 'duplicate' takes no positional arguments."), test->line);
+            return false;
+         }
 
          return true;
       }
