@@ -63,6 +63,10 @@ namespace RegressionTests.Sieve
          // environment under its require.
          Assert.IsEmpty(CheckSyntax("require \"environment\";\r\nif environment :is \"name\" \"hMailServer\" {\r\n  keep;\r\n}"));
 
+         // notify and its tests under their require, mailto being the one method.
+         Assert.IsEmpty(CheckSyntax("require \"enotify\";\r\nnotify :importance \"1\" :message \"hi\" \"mailto:a@example.test\";"));
+         Assert.IsEmpty(CheckSyntax("require \"enotify\";\r\nif valid_notify_method \"mailto:a@example.test\" {\r\n  keep;\r\n}"));
+
          // include, return and global under their requires.
          Assert.IsEmpty(CheckSyntax("require \"include\";\r\ninclude :personal :once \"helper\";\r\nreturn;"));
          Assert.IsEmpty(CheckSyntax("require [\"include\", \"variables\"];\r\nglobal \"shared\";\r\nset \"shared\" \"v\";"));
@@ -122,7 +126,7 @@ namespace RegressionTests.Sieve
          // case that proved this rule (a script requiring it was once reported
          // valid while the reject never happened); reject SHIPPED on 16 August
          // 2026, so the sentinel here is an extension still genuinely absent.
-         Assert.IsNotEmpty(CheckSyntax("require [\"fileinto\", \"enotify\"];\r\nif not exists \"Date\" {\r\n  keep;\r\n}"));
+         Assert.IsNotEmpty(CheckSyntax("require [\"fileinto\", \"vnd.example.absent\"];\r\nif not exists \"Date\" {\r\n  keep;\r\n}"));
 
          // The mailbox extension's pieces without its require line. Both must name
          // the missing extension rather than pass: a script written for a server
@@ -157,6 +161,12 @@ namespace RegressionTests.Sieve
          // ihave and environment without their requires.
          Assert.IsNotEmpty(CheckSyntax("if ihave \"fileinto\" {\r\n  keep;\r\n}"));
          Assert.IsNotEmpty(CheckSyntax("if environment :is \"name\" \"x\" {\r\n  keep;\r\n}"));
+
+         // notify: a scheme this server cannot notify by is refused with the
+         // scheme named; a bad importance; the missing require.
+         Assert.IsNotEmpty(CheckSyntax("require \"enotify\";\r\nnotify \"xmpp:a@example.test\";"));
+         Assert.IsNotEmpty(CheckSyntax("require \"enotify\";\r\nnotify :importance \"4\" \"mailto:a@example.test\";"));
+         Assert.IsNotEmpty(CheckSyntax("notify \"mailto:a@example.test\";"));
 
          // include: contradictory placement tags, a bad script name, global
          // without variables, and the missing require.
@@ -225,20 +235,17 @@ namespace RegressionTests.Sieve
       [Description("Every unimplemented Sieve construct is refused at upload, so no script can silently do nothing.")]
       public void UnimplementedConstructsAreRefusedRatherThanIgnored()
       {
-         // Commands. Each is written the way a script would actually use it.
+         // HISTORY: this list once held reject, ereject, notify, addheader,
+         // deleteheader, include, return, set, string, duplicate, mailboxexists,
+         // ihave, environment, spamtest, date and currentdate. Every one of them
+         // SHIPPED on 15-16 August 2026, each moving out into a fixture that
+         // proves it end to end - which is this test's own documented rule. What
+         // remains is the general property those names were instances of: a
+         // construct outside the allowlists is refused, never parsed-and-ignored.
          var commands = new[]
          {
-            // reject and ereject moved out on 16 August 2026 - RFC 5429 shipped
-            // with the DSN fallback, proven end to end on BOTH mailboxes in
-            // SieveRejectDelivery.cs.
-            "notify \"mailto:someone@example.test\";",
-            // addheader and deleteheader moved out on 16 August 2026 - the
-            // editheader extension shipped, proven end to end on delivered bytes
-            // in SieveEditheaderDelivery.cs.
-            // include and return moved out on 16 August 2026 - RFC 6609 shipped,
-            // proven end to end in SieveIncludeDelivery.cs.
-            // set and string moved out on 16 August 2026 - the variables
-            // extension shipped, proven end to end in SieveVariablesDelivery.cs.
+            "frobnicate_command \"x\";",
+            "vnd_example_absent;",
          };
 
          foreach (string command in commands)
@@ -249,17 +256,15 @@ namespace RegressionTests.Sieve
                "allowlist in SieveParser exists to prevent.");
          }
 
-         // Tests, each inside the smallest script that can carry it.
+         // Tests, each inside the smallest script that can carry it. The date and
+         // currentdate lines that used to sit here also shipped (16 August 2026,
+         // SieveDateDelivery.cs) - they were being refused for the require they
+         // lacked by then, not for being unknown, which is the trap of leaving a
+         // shipped name in this list.
          var tests = new[]
          {
-            "date :is \"date\" \"year\" \"2026\"",
-            "currentdate :is \"year\" \"2026\"",
-            // duplicate, mailboxexists, ihave and environment moved out of this
-            // list on 16 August 2026 when their extensions were implemented -
-            // they now live in SieveDuplicateDelivery.cs, SieveMailboxDelivery.cs
-            // and SieveEnvironmentDelivery.cs, which prove them end to end.
-            // spamtest moved out on 16 August 2026 - SieveSpamtestDelivery.cs
-            // proves it end to end, spoofing control included.
+            "frobnicate_test \"x\"",
+            "vnd_example_absent \"x\"",
          };
 
          foreach (string test in tests)

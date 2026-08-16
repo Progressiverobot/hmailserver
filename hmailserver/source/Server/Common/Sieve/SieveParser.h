@@ -129,6 +129,12 @@ namespace HM
       // spamtest :percent (RFC 5235).
       bool percentGiven = false;
 
+      // notify (RFC 5435): the notification subject (:message) and importance.
+      String notifyMessage;
+      bool notifyMessageGiven = false;
+      int importance = 2;
+      bool importanceGiven = false;
+
       // duplicate (RFC 7352): which identifier the test tracks - a named header's
       // value under :header, a literal under :uniqueid, Message-ID by default.
       String duplicateHeader;

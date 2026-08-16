@@ -11,6 +11,7 @@
 
 #include "SieveParser.h"
 #include "SieveMessage.h"
+#include "SieveNotifyResponder.h"
 #include "../Util/VariantDateTime.h"
 
 namespace HM
@@ -106,6 +107,7 @@ namespace HM
       std::vector<String> flags;     // those flags, canonicalised and de-duplicated
       std::vector<String> redirects; // addresses to send a copy to
       std::vector<SieveHeaderEdit> headerEdits; // editheader (RFC 5293), in script order
+      std::vector<SieveNotifyDecision> notifications; // notify (RFC 5435), mailto method
       SieveVacationDecision vacation;
 
       // reject / ereject (RFC 5429). Evaluation runs after the SMTP transaction

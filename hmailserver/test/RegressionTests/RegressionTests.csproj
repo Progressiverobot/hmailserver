@@ -355,6 +355,7 @@
     <Compile Include="Sieve\SieveEnvironmentDelivery.cs" />
     <Compile Include="Sieve\SieveIncludeDelivery.cs" />
     <Compile Include="Sieve\SieveMailboxDelivery.cs" />
+    <Compile Include="Sieve\SieveNotifyDelivery.cs" />
     <Compile Include="Sieve\SieveRegexDelivery.cs" />
     <Compile Include="Sieve\SieveRejectDelivery.cs" />
     <Compile Include="Sieve\SieveSpamtestDelivery.cs" />

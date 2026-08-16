@@ -45,7 +45,9 @@ namespace HM
                 lowerTag == _T("zone") ||
                 lowerTag == _T("index") ||
                 lowerTag == _T("header") ||
-                lowerTag == _T("uniqueid");
+                lowerTag == _T("uniqueid") ||
+                lowerTag == _T("message") ||
+                lowerTag == _T("importance");
       }
 
       bool IsRelation(const String &relation)
@@ -199,6 +201,11 @@ namespace HM
          // <data>\Sieve\_global\. Nesting is capped at three levels, so a cycle
          // costs three fetches rather than a stack.
          L"include",
+         // RFC 5435, with RFC 5436's mailto as the one method - the only
+         // transport a mail server inherently has is mail. Notifications go out
+         // with a null return path and Auto-Submitted: auto-notified, and a
+         // message that is itself auto-submitted is never notified about.
+         L"enotify",
          L"comparator-i;ascii-casemap",
          L"comparator-i;octet",
          L"comparator-i;ascii-numeric"
@@ -498,6 +505,18 @@ namespace HM
             result.uniqueId = value->strings[0];
             result.uniqueIdGiven = true;
          }
+         else if (tag == _T("message"))
+         {
+            // notify :message (RFC 5435).
+            result.notifyMessage = value->strings[0];
+            result.notifyMessageGiven = true;
+         }
+         else if (tag == _T("importance"))
+         {
+            // notify :importance (RFC 5435 3.2): "1", "2" or "3" as a string.
+            result.importance = _ttoi(value->strings[0].c_str());
+            result.importanceGiven = true;
+         }
 
          i++;
       }
@@ -519,7 +538,8 @@ namespace HM
          L"addheader", L"deleteheader",
          L"set",
          L"reject", L"ereject",
-         L"include", L"return", L"global"
+         L"include", L"return", L"global",
+         L"notify"
       };
 
       for (const wchar_t *candidate : known)
@@ -539,7 +559,8 @@ namespace HM
          L"address", L"allof", L"anyof", L"exists", L"false", L"header",
          L"not", L"size", L"true", L"envelope", L"hasflag", L"body",
          L"mailboxexists", L"ihave", L"environment", L"date", L"currentdate",
-         L"spamtest", L"duplicate", L"string"
+         L"spamtest", L"duplicate", L"string",
+         L"valid_notify_method", L"notify_method_capability"
       };
 
       for (const wchar_t *candidate : known)
@@ -1091,7 +1112,7 @@ namespace HM
          if (expectedStringLists == 1)
             errorMessage.Format(_T("Line %d: %s takes one list of keys."), line, context.c_str());
          else if (expectedStringLists == 3)
-            errorMessage.Format(_T("Line %d: %s takes a header name, a date part and a key list."), line, context.c_str());
+            errorMessage.Format(_T("Line %d: %s takes two names and a key list."), line, context.c_str());
          else
             errorMessage.Format(_T("Line %d: %s takes a header/part list and a key list."), line, context.c_str());
 
@@ -1208,6 +1229,42 @@ namespace HM
       SieveArgumentSet set;
       if (!isControl && name != _T("require") && !SplitArguments(command->arguments, set, errorMessage))
          return false;
+
+      if (name == _T("notify"))
+      {
+         if (!NeedExtension_(_T("enotify"), _T("'notify'"), command->line, errorMessage))
+            return false;
+
+         // ":options" is deliberately not in the list: RFC 5436's mailto method
+         // defines no options, so accepting the tag would accept an instruction
+         // with no meaning here - and the refusal names it.
+         if (!CheckTags_(set, _T("from importance message"), _T("'notify'"), errorMessage))
+            return false;
+
+         if (set.importanceGiven && (set.importance < 1 || set.importance > 3))
+         {
+            errorMessage.Format(_T("Line %d: ':importance' is \"1\", \"2\" or \"3\"."), command->line);
+            return false;
+         }
+
+         if (set.stringLists.size() != 1 || set.stringLists[0].size() != 1)
+         {
+            errorMessage.Format(_T("Line %d: 'notify' takes one method URI."), command->line);
+            return false;
+         }
+
+         // The one method this server can perform is mail. A URI scheme it
+         // cannot notify by is refused with the scheme named, at upload, rather
+         // than accepted and skipped at delivery - the allowlist rule again.
+         String method = set.stringLists[0][0];
+         if (method.Mid(0, 7).CompareNoCase(_T("mailto:")) != 0 || method.GetLength() <= 7)
+         {
+            errorMessage.Format(_T("Line %d: the only notification method this server supports is \"mailto:\"."), command->line);
+            return false;
+         }
+
+         return true;
+      }
 
       if (name == _T("include"))
       {
@@ -1834,6 +1891,44 @@ namespace HM
          if (!set.stringLists.empty())
          {
             errorMessage.Format(_T("Line %d: 'duplicate' takes no positional arguments."), test->line);
+            return false;
+         }
+
+         return true;
+      }
+
+      if (name == _T("valid_notify_method"))
+      {
+         if (!NeedExtension_(_T("enotify"), _T("the 'valid_notify_method' test"), test->line, errorMessage))
+            return false;
+
+         if (!CheckTags_(set, _T(""), _T("'valid_notify_method'"), errorMessage))
+            return false;
+
+         if (set.stringLists.size() != 1 || set.stringLists[0].empty())
+         {
+            errorMessage.Format(_T("Line %d: 'valid_notify_method' takes one list of method URIs."), test->line);
+            return false;
+         }
+
+         return true;
+      }
+
+      if (name == _T("notify_method_capability"))
+      {
+         if (!NeedExtension_(_T("enotify"), _T("the 'notify_method_capability' test"), test->line, errorMessage))
+            return false;
+
+         if (!CheckTags_(set, _T("comparator is contains matches value count regex"),
+                         _T("'notify_method_capability'"), errorMessage))
+            return false;
+
+         if (!ValidateMatchArguments_(set, _T("'notify_method_capability'"), test->line, errorMessage, 3))
+            return false;
+
+         if (set.stringLists[0].size() != 1 || set.stringLists[1].size() != 1)
+         {
+            errorMessage.Format(_T("Line %d: 'notify_method_capability' takes a URI, a capability name and a key list."), test->line);
             return false;
          }
 

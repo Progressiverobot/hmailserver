@@ -555,6 +555,69 @@ namespace HM
          return;
       }
 
+      if (name == _T("notify"))
+      {
+         // RFC 5435 8's loop rule, applied at the source: a message that is
+         // itself auto-generated is never notified about, or two servers
+         // notifying each other's notification addresses ping-pong for ever.
+         std::vector<String> autoSubmitted = message.GetHeaderValues(_T("Auto-Submitted"));
+         if (!autoSubmitted.empty() && autoSubmitted[0].CompareNoCase(_T("no")) != 0)
+         {
+            LOG_APPLICATION(_T("Sieve: a notify was skipped because the message is itself auto-submitted."));
+            return;
+         }
+
+         SieveArgumentSet set;
+         String ignored;
+         if (!SieveParser::SplitArguments(command->arguments, set, ignored))
+            return;
+
+         if (variables_enabled_)
+            ExpandArgumentSet_(set);
+
+         if (set.stringLists.size() != 1 || set.stringLists[0].size() != 1)
+            return;
+
+         String method = set.stringLists[0][0];
+         if (method.Mid(0, 7).CompareNoCase(_T("mailto:")) != 0)
+            return;
+
+         SieveNotifyDecision decision;
+
+         // The address is the URI's path; RFC 6068 hfields ("?subject=...") are
+         // deliberately not interpreted - ":message" is the RFC 5435 way to name
+         // the subject, and silently honouring both invites contradictions.
+         String target = method.Mid(7);
+         int query = target.Find(_T("?"));
+         if (query >= 0)
+            target = target.Mid(0, query);
+
+         decision.to = target;
+         decision.from = set.fromGiven ? set.fromAddress : String(_T(""));
+         decision.importance = set.importanceGiven ? set.importance : 2;
+
+         std::vector<String> fromValues = message.GetHeaderValues(_T("From"));
+         std::vector<String> subjectValues = message.GetHeaderValues(_T("Subject"));
+         decision.originalFrom = fromValues.empty() ? String(_T("")) : fromValues[0];
+         decision.originalSubject = subjectValues.empty() ? String(_T("")) : subjectValues[0];
+
+         decision.subject = set.notifyMessageGiven && !set.notifyMessage.IsEmpty()
+            ? set.notifyMessage
+            : _T("New message: ") + decision.originalSubject;
+
+         // The generated-mail loop counter, carried the same way the vacation
+         // decision carries it.
+         std::vector<String> loopCounts = message.GetHeaderValues(_T("X-hMailServer-LoopCount"));
+         if (!loopCounts.empty())
+            decision.loopCount = _wtoi(loopCounts[0].c_str());
+
+         if (result_)
+            result_->notifications.push_back(decision);
+
+         actions_.push_back(_T("notify:") + decision.to);
+         return;
+      }
+
       if (name == _T("return"))
       {
          // RFC 6609 3.2: stop the CURRENT script. Inside an include, control goes
@@ -1125,6 +1188,57 @@ namespace HM
 
       if (name == _T("spamtest"))
          return EvaluateSpamTest_(test, message);
+
+      if (name == _T("valid_notify_method"))
+      {
+         // RFC 5435 5: true when every listed URI is a method this server could
+         // notify by - here, a mailto with a non-empty address.
+         SieveArgumentSet set;
+         String ignored;
+         if (!SieveParser::SplitArguments(test->arguments, set, ignored))
+            return false;
+
+         if (variables_enabled_)
+            ExpandArgumentSet_(set);
+
+         if (set.stringLists.size() != 1 || set.stringLists[0].empty())
+            return false;
+
+         for (const String &uri : set.stringLists[0])
+         {
+            if (uri.Mid(0, 7).CompareNoCase(_T("mailto:")) != 0 || uri.GetLength() <= 7)
+               return false;
+         }
+
+         return true;
+      }
+
+      if (name == _T("notify_method_capability"))
+      {
+         // RFC 5435 6: the one registered item is "online", and mailto's honest
+         // answer is "maybe" - a mail server cannot know whether the notified
+         // mailbox's owner is looking at it.
+         SieveArgumentSet set;
+         String ignored;
+         if (!SieveParser::SplitArguments(test->arguments, set, ignored))
+            return false;
+
+         if (variables_enabled_)
+            ExpandArgumentSet_(set);
+
+         if (set.stringLists.size() != 3 || set.stringLists[0].size() != 1 || set.stringLists[1].size() != 1)
+            return false;
+
+         const String &uri = set.stringLists[0][0];
+         if (uri.Mid(0, 7).CompareNoCase(_T("mailto:")) != 0)
+            return false;
+
+         std::vector<String> values;
+         if (set.stringLists[1][0].CompareNoCase(_T("online")) == 0)
+            values.push_back(_T("maybe"));
+
+         return MatchValuesAgainstKeys_(set, values, set.stringLists[2]);
+      }
 
       if (name == _T("string"))
       {

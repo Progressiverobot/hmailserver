@@ -319,7 +319,16 @@ namespace HM
       // named, and nesting caps at three levels so a cycle costs three fetches
       // rather than a stack - this runs on the delivery thread. End-to-end tests
       // in SieveIncludeDelivery.cs file real deliveries through included scripts.
-      const char *AdvertisedSieveExtensions = "fileinto copy relational subaddress vacation vacation-seconds imap4flags body mailbox regex ihave environment date index spamtest spamtestplus duplicate editheader variables reject ereject include";
+      // enotify (RFC 5435) moved in on 16 August 2026, under the same rule, with
+      // RFC 5436's mailto as the one method - the only transport a mail server
+      // inherently has. The delivery-side step is SieveNotifyResponder: a real
+      // generated message with a null return path and Auto-Submitted:
+      // auto-notified, and the evaluator refuses to notify about a message that
+      // is itself auto-submitted - the loop rule applied at the source. A URI
+      // scheme this server cannot notify by is refused at upload with the scheme
+      // named. End-to-end tests in SieveNotifyDelivery.cs assert the notification
+      // ARRIVES in the target mailbox with the loop markers on it.
+      const char *AdvertisedSieveExtensions = "fileinto copy relational subaddress vacation vacation-seconds imap4flags body mailbox regex ihave environment date index spamtest spamtestplus duplicate editheader variables reject ereject include enotify";
 
       AnsiString EscapeQuoted(const String &value)
       {

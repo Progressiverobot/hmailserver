@@ -54,9 +54,10 @@ namespace RegressionTests.Sieve
          // implemented - accepting its require meant accepting a script whose
          // whole purpose would silently not happen. It SHIPPED on 16 August 2026
          // (SieveRejectDelivery.cs proves the report arrives), so the sentinel
-         // duty passes to enotify, which is still genuinely absent.
+         // duty passes to a vendor name that can never ship, so this test stops
+         // needing an edit every time an extension lands.
          Assert.IsEmpty(CheckSyntax("require \"reject\";\r\nkeep;"));
-         Assert.IsNotEmpty(CheckSyntax("require \"enotify\";\r\nkeep;"));
+         Assert.IsNotEmpty(CheckSyntax("require \"vnd.example.absent\";\r\nkeep;"));
 
          // A list where only one entry is unsupported still fails.
          Assert.IsNotEmpty(CheckSyntax("require [\"fileinto\", \"notify\"];\r\nkeep;"));

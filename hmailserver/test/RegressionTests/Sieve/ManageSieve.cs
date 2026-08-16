@@ -296,6 +296,11 @@ namespace RegressionTests.Sieve
                // variable scoping proven in both directions.
                StringAssert.Contains("include", greeting);
 
+               // enotify followed, with SieveNotifyDelivery.cs behind it - the
+               // notification ARRIVES with its loop markers, and an
+               // auto-submitted trigger is never notified about.
+               StringAssert.Contains("enotify", greeting);
+
                // Still absent on purpose: envelope is implemented and evaluated, and is
                // held back until a test proves the envelope TEST command itself works.
                // If somebody adds it here, that test should exist first.

@@ -32,6 +32,7 @@
 #include "../common/Sieve/SieveScript.h"
 #include "../common/Sieve/SieveVacationResponder.h"
 #include "../common/Sieve/SieveDuplicateTracker.h"
+#include "../common/Sieve/SieveNotifyResponder.h"
 #include "../common/Mime/Mime.h"
 #include "../common/Mime/MimeCode.h"
 #include "../common/Util/Charset.h"
@@ -533,6 +534,12 @@ namespace HM
          SMTPForwarding forwarder;
          forwarder.RedirectToAddress(account, message, target);
       }
+
+      // notify (RFC 5435): each notification is its own generated message with a
+      // null return path and Auto-Submitted: auto-notified; a failure to send one
+      // never affects the delivery it describes.
+      for (const SieveNotifyDecision &notification : sieveResult.notifications)
+         SieveNotifyResponder::Instance()->Send(account, notification);
 
       // Fire the RFC 5230 vacation auto-reply, if the script asked for one and it
       // survived every loop-prevention check the evaluator could apply. The responder
