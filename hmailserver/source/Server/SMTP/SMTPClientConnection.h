@@ -31,6 +31,11 @@ namespace HM
       int SetDelivery(std::shared_ptr<Message> pDelMsg, std::vector<std::shared_ptr<MessageRecipient> > &vecRecipients);
            
       void SetAuthInfo(const String &sUsername, const String &sPassword);
+
+      // Makes the AUTH step XOAUTH2 with this bearer token instead of LOGIN with
+      // the password. The username still comes from SetAuthInfo - it is the
+      // account being relayed as; the token replaces only the proof.
+      void SetOAuthBearer(const String &token);
    protected:
 
       virtual void OnConnected();
@@ -95,7 +100,8 @@ namespace HM
          SENDINGDATA = 13,
          DATASENT = 8,
          QUITSENT = 14,
-         STARTTLSSENT = 15
+         STARTTLSSENT = 15,
+         XOAUTH2SENT = 16
       };
 
       void SetState_(ConnectionState eCurState);
@@ -121,6 +127,7 @@ namespace HM
 
       String username_;
       String password_;
+      String oauth_bearer_;
 
       unsigned int cur_recipient_;
 

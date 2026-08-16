@@ -23,6 +23,9 @@
 
 #include "../Common/Util/AWstats.h"
 #include "../common/Util/ServerInfo.h"
+#include "../common/Util/OutboundOAuth2TokenClient.h"
+#include "../common/Util/Parsing/StringParser.h"
+#include "../common/Application/IniFileSettings.h"
 #include "../Common/Util/TlsRptStore.h"
 #include "../Common/Util/RateLimiter.h"
 
@@ -586,7 +589,57 @@ namespace HM
       pClientConnection->SetDelivery(original_message_, vecRecipients);
 
       if (!serverInfo->GetUsername().IsEmpty())
+      {
          pClientConnection->SetAuthInfo(serverInfo->GetUsername(), serverInfo->GetPassword());
+
+         // Outbound XOAUTH2 (the Microsoft 365 Basic-auth cutover): when this
+         // destination is one the administrator configured OAuth for, the AUTH
+         // step presents a bearer token instead of the password. The token is
+         // fetched (or served from cache) HERE, on the delivery thread, the same
+         // place the MTA-STS policy fetch already lives. A fetch failure is
+         // reported and the delivery proceeds with LOGIN - which the provider
+         // will refuse VISIBLY, putting the real error in front of the
+         // administrator instead of a silent stall.
+         String oauthHosts = IniFileSettings::Instance()->GetOutboundOAuth2Hosts();
+         String destinationHost = serverInfo->GetHostName();
+
+         bool oauthApplies = false;
+         std::vector<String> hosts = StringParser::SplitString(oauthHosts, ",");
+         for (String host : hosts)
+         {
+            host.TrimLeft();
+            host.TrimRight();
+            if (!host.IsEmpty() && host.CompareNoCase(destinationHost) == 0)
+            {
+               oauthApplies = true;
+               break;
+            }
+         }
+
+         if (oauthApplies)
+         {
+            String fixedToken = IniFileSettings::Instance()->GetOutboundOAuth2FixedToken();
+
+            if (!fixedToken.IsEmpty())
+            {
+               pClientConnection->SetOAuthBearer(fixedToken);
+            }
+            else if (!IniFileSettings::Instance()->GetOutboundOAuth2TokenUrl().IsEmpty())
+            {
+               String token, tokenError;
+               if (OutboundOAuth2TokenClient::Instance()->GetToken(token, tokenError))
+               {
+                  pClientConnection->SetOAuthBearer(token);
+               }
+               else
+               {
+                  ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5904, "ExternalDelivery::InitiateExternalConnection",
+                     "Could not obtain an OAuth2 token for " + destinationHost + ": " + tokenError +
+                     " The delivery will be attempted with password authentication, which this provider is expected to refuse.");
+               }
+            }
+         }
+      }
 
       // Determine what local IP address to use.
       IPAddress localAddress = GetLocalAddress_();

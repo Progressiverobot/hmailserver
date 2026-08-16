@@ -72,6 +72,10 @@ namespace RegressionTests.Shared
       // address and any parameters), so tests can assert the transmitted sender.
       public string MailFromCommand { get; private set; } = "";
 
+      // The raw base64 blob from "AUTH XOAUTH2 <blob>", empty when the client
+      // authenticated some other way.
+      public string XOAuth2Blob { get; private set; } = "";
+
       public void AddRecipientResult(Dictionary<string, int> result)
       {
          _recipientResults.Add(result);
@@ -153,6 +157,16 @@ namespace RegressionTests.Shared
 
             Send("334 VXNlcm5hbWU6\r\n");
             _expectingUsername = true;
+            return false;
+         }
+
+         if (command.ToUpper().StartsWith("AUTH XOAUTH2"))
+         {
+            // The Microsoft-style one-round-trip bearer login: the blob rides on
+            // the AUTH line itself. Recorded raw so a test can decode it and
+            // assert on the exact user and token the client presented.
+            XOAuth2Blob = command.Substring("AUTH XOAUTH2".Length).Trim();
+            Send("235 2.7.0 Authentication successful\r\n");
             return false;
          }
 

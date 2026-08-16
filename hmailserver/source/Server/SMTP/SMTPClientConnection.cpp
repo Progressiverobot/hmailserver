@@ -10,6 +10,7 @@
 #include "../common/Util/File.h"
 #include "../common/Util/ByteBuffer.h"
 #include "../Common/Util/TransparentTransmissionBuffer.h"
+#include "../Common/Util/OutboundOAuth2TokenClient.h"
 #include "../Common/Util/BATV.h"
 #include "../Common/Util/SRS.h"
 #include "../Common/Persistence/PersistentMessage.h"
@@ -178,12 +179,13 @@ namespace HM
       sFirstWordTemp.MakeUpper();
       int iCode = atoi(sFirstWordTemp);
    
-      bool ifFailureFailAllRecipientsAndQuit = 
+      bool ifFailureFailAllRecipientsAndQuit =
          current_state_ == HELO ||
          current_state_ == HELOSENT ||
          current_state_ == AUTHLOGINSENT ||
-         current_state_ == USERNAMESENT || 
+         current_state_ == USERNAMESENT ||
          current_state_ == PASSWORDSENT ||
+         current_state_ == XOAUTH2SENT ||
          current_state_ == MAILFROMSENT ||
          current_state_ == DATACOMMANDSENT ||
          current_state_ == DATASENT ||
@@ -193,6 +195,16 @@ namespace HM
       {
          if (!IsPositiveCompletion(iCode))
          {
+            // A refused XOAUTH2 drops the cached token before the retry logic
+            // ever sees this delivery again: a revoked token and one expired by
+            // clock skew both look like this, and both are cured by fetching,
+            // not by presenting the same token to the same refusal. (M365's
+            // 334-with-error-JSON challenge also lands here - 334 is not a
+            // completion - and the JSON, base64 in the reply, travels into the
+            // recipient error where an administrator can read it.)
+            if (current_state_ == XOAUTH2SENT)
+               OutboundOAuth2TokenClient::Instance()->Invalidate();
+
             UpdateAllRecipientsWithError_(iCode, Request, false);
             SendQUIT_();
             return true;
@@ -220,6 +232,11 @@ namespace HM
          ProtocolSendPassword_();
          return true;
       case PASSWORDSENT:
+         ProtocolSendMailFrom_();
+         return true;
+      case XOAUTH2SENT:
+         // 235: authenticated in one round trip - the initial response carried
+         // everything.
          ProtocolSendMailFrom_();
          return true;
       case MAILFROMSENT:
@@ -389,9 +406,29 @@ namespace HM
 
       if (use_smtpauth_)
       {
-         // Ask the server to initiate login process.
-         EnqueueWrite_("AUTH LOGIN");
-         SetState_(AUTHLOGINSENT);
+         if (!oauth_bearer_.IsEmpty())
+         {
+            // XOAUTH2 (the Microsoft variant - Exchange Online implements this
+            // and not RFC 7628 OAUTHBEARER), with the initial response on the
+            // AUTH line: base64 of "user=<user>^Aauth=Bearer <token>^A^A". The
+            // password is deliberately not a fallback; a provider configured
+            // for OAuth has Basic auth off, and a quiet downgrade would send a
+            // password to a server that no longer wants one.
+            String blob = _T("user=") + username_ + _T("\x01") +
+                          _T("auth=Bearer ") + oauth_bearer_ + _T("\x01\x01");
+
+            String encoded;
+            StringParser::Base64Encode(blob, encoded);
+
+            EnqueueWrite_("AUTH XOAUTH2 " + encoded);
+            SetState_(XOAUTH2SENT);
+         }
+         else
+         {
+            // Ask the server to initiate login process.
+            EnqueueWrite_("AUTH LOGIN");
+            SetState_(AUTHLOGINSENT);
+         }
       }
       else
       {
@@ -633,6 +670,13 @@ namespace HM
    {
       username_ = sUsername;
       password_ = sPassword;
+      use_smtpauth_ = true;
+   }
+
+   void
+   SMTPClientConnection::SetOAuthBearer(const String &token)
+   {
+      oauth_bearer_ = token;
       use_smtpauth_ = true;
    }
    

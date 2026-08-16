@@ -156,6 +156,19 @@ namespace HM
       String GetOAuth2HmacSecret() {return oauth2_hmac_secret_;}
       String GetOAuth2RsaPublicKeyFile() {return oauth2_rsa_public_key_file_;}
       String GetOAuth2Issuer() {return oauth2_issuer_;}
+
+      // Outbound XOAUTH2 (relaying through a provider that has switched Basic
+      // auth off, Microsoft 365 first among them). TokenUrl/ClientId/Secret/
+      // Scope drive the client_credentials fetch; Hosts is the comma-separated
+      // list of relay hosts the token is presented to; FixedToken, when set, is
+      // used verbatim instead of fetching - for tokens obtained outside this
+      // server, and for tests.
+      String GetOutboundOAuth2TokenUrl() {return outbound_oauth2_token_url_;}
+      String GetOutboundOAuth2ClientId() {return outbound_oauth2_client_id_;}
+      String GetOutboundOAuth2ClientSecret() {return outbound_oauth2_client_secret_;}
+      String GetOutboundOAuth2Scope() {return outbound_oauth2_scope_;}
+      String GetOutboundOAuth2Hosts() {return outbound_oauth2_hosts_;}
+      String GetOutboundOAuth2FixedToken() {return outbound_oauth2_fixed_token_;}
       String GetOAuth2Audience() {return oauth2_audience_;}
       String GetOAuth2UsernameClaim() {return oauth2_username_claim_;}
       bool GetProtectStoredSecretsWithDPAPI() {return protect_stored_secrets_with_dpapi_;}
@@ -523,6 +536,12 @@ namespace HM
 
       bool oauth2_enabled_;
       bool oauth2_require_tls_;
+      String outbound_oauth2_token_url_;
+      String outbound_oauth2_client_id_;
+      String outbound_oauth2_client_secret_;
+      String outbound_oauth2_scope_;
+      String outbound_oauth2_hosts_;
+      String outbound_oauth2_fixed_token_;
       String oauth2_allowed_algorithms_;
       String oauth2_hmac_secret_;
       String oauth2_rsa_public_key_file_;

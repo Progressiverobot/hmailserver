@@ -178,6 +178,13 @@ namespace HM
       // the configured signing key(s); the mechanism is TLS-gated by default.
       oauth2_enabled_ = ReadIniSettingInteger_("Settings", "OAuth2Enabled", 0) == 1;
       oauth2_require_tls_ = ReadIniSettingInteger_("Settings", "OAuth2RequireTLS", 1) == 1;
+      outbound_oauth2_token_url_ = ReadIniSettingString_("Settings", "OutboundOAuth2TokenUrl", "");
+      outbound_oauth2_client_id_ = ReadIniSettingString_("Settings", "OutboundOAuth2ClientId", "");
+      outbound_oauth2_client_secret_ = ReadIniSettingString_("Settings", "OutboundOAuth2ClientSecret", "");
+      // The .default scope is what Exchange Online's client-credentials flow expects.
+      outbound_oauth2_scope_ = ReadIniSettingString_("Settings", "OutboundOAuth2Scope", "https://outlook.office365.com/.default");
+      outbound_oauth2_hosts_ = ReadIniSettingString_("Settings", "OutboundOAuth2Hosts", "smtp.office365.com");
+      outbound_oauth2_fixed_token_ = ReadIniSettingString_("Settings", "OutboundOAuth2FixedToken", "");
       // Comma-separated allow-list of accepted JWT "alg" values (e.g. "RS256,HS256").
       // "none" is never accepted regardless of this list.
       oauth2_allowed_algorithms_ = ReadIniSettingString_("Settings", "OAuth2AllowedAlgorithms", "RS256");
