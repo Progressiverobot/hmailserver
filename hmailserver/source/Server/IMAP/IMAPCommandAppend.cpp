@@ -65,23 +65,87 @@ namespace HM
          return IMAPResult(IMAPResult::ResultNo, "Authenticate first");
       
       current_tag_ = pArgument->Tag();
-      
+
       // Reset these two so we don't re-use old values.
       flags_to_set_ = "";
       create_time_to_set_ = "";
+
+      // RFC 8508 (REPLACE): the same machinery as APPEND with a target message
+      // parameter in front, and the target's removal on success. The UID form
+      // arrives via the UID command handler, which sets replace_uid_mode_ for
+      // exactly one command.
+      bool replaceUsesUid = replace_uid_mode_;
+      replace_uid_mode_ = false;
+      replace_mode_ = false;
+      replace_target_.reset();
 
       std::shared_ptr<IMAPSimpleCommandParser> pParser = std::shared_ptr<IMAPSimpleCommandParser>(new IMAPSimpleCommandParser());
 
       pParser->Parse(pArgument);
 
-      if (pParser->WordCount() < 3)
-         return IMAPResult(IMAPResult::ResultBad, "APPEND Command requires at least 2 parameter.");
-      
+      if (pParser->WordCount() < 1)
+         return IMAPResult(IMAPResult::ResultBad, "Command requires parameters.");
+
+      bool isReplace = pParser->Word(0)->Value().CompareNoCase(_T("REPLACE")) == 0;
+
+      // The folder name's position shifts by one when a target parameter
+      // precedes it.
+      size_t folderWordIndex = isReplace ? 2 : 1;
+      size_t folderParamIndex = isReplace ? 1 : 0;
+
+      if (pParser->WordCount() < folderWordIndex + 2)
+         return IMAPResult(IMAPResult::ResultBad, isReplace
+            ? "REPLACE Command requires at least 3 parameters."
+            : "APPEND Command requires at least 2 parameter.");
+
+      if (isReplace)
+      {
+         std::shared_ptr<IMAPFolder> pCurrentFolder = pConnection->GetCurrentFolder();
+         if (!pCurrentFolder)
+            return IMAPResult(IMAPResult::ResultBad, "REPLACE is only valid in the selected state.");
+
+         if (pConnection->GetCurrentFolderReadOnly())
+            return IMAPResult(IMAPResult::ResultNo, "REPLACE command on read-only folder.");
+
+         // Removing the replaced message needs the same permission EXPUNGE does.
+         if (!pConnection->CheckPermission(pCurrentFolder, ACLPermission::PermissionExpunge))
+            return IMAPResult(IMAPResult::ResultBad, "ACL: Expunge permission denied (Required for REPLACE command).");
+
+         String sTarget = pParser->Word(1)->Value();
+
+         for (int i = 0; i < sTarget.GetLength(); i++)
+         {
+            wchar_t ch = sTarget.GetAt(i);
+            if (ch < '0' || ch > '9')
+               return IMAPResult(IMAPResult::ResultBad, "REPLACE target must be a message number.");
+         }
+
+         __int64 target = _ttoi64(sTarget.c_str());
+         if (target <= 0)
+            return IMAPResult(IMAPResult::ResultBad, "REPLACE target must be a message number.");
+
+         auto currentMessages = MessagesContainer::Instance()->GetMessages(pCurrentFolder->GetAccountID(), pCurrentFolder->GetID());
+
+         if (replaceUsesUid)
+         {
+            replace_target_ = currentMessages->GetItemByUID((unsigned int) target);
+         }
+         else
+         {
+            std::vector<std::shared_ptr<Message>> messageList = currentMessages->GetCopy();
+            if (target <= (__int64) messageList.size())
+               replace_target_ = messageList[(size_t) target - 1];
+         }
+
+         if (!replace_target_)
+            return IMAPResult(IMAPResult::ResultNo, "No such message.");
+      }
+
          // Create a new mailbox
-      String sFolderName = pParser->GetParamValue(pArgument, 0);
-      if (!pParser->Word(1)->Clammerized())
+      String sFolderName = pParser->GetParamValue(pArgument, (int) folderParamIndex);
+      if (!pParser->Word(folderWordIndex)->Clammerized())
          IMAPFolder::UnescapeFolderString(sFolderName);
-     
+
       if (pParser->ParantheziedWord())
          flags_to_set_ = pParser->ParantheziedWord()->Value();
 
@@ -121,9 +185,9 @@ namespace HM
 
       // Locate the parameter containing the date to set.
       // Can't use pParser->QuotedWord() since there may
-      // be many quoted words in the command.
-      
-      for (size_t i = 2; i < pParser->WordCount(); i++)
+      // be many quoted words in the command. Start past the folder name, which
+      // may itself be quoted.
+      for (size_t i = folderWordIndex + 1; i < pParser->WordCount(); i++)
       {
          std::shared_ptr<IMAPSimpleWord> pWord = pParser->Word(i);
 
@@ -155,6 +219,7 @@ namespace HM
       receive_state_ = ReceivingLiteral;
       write_failed_ = false;
       append_buffer_.Empty();
+      replace_mode_ = isReplace;
 
       IMAPResult prepareResult = ValidateAndPrepareMessage_(pConnection, declaredSize);
       if (prepareResult.GetResult() != IMAPResult::ResultOK)
@@ -490,6 +555,14 @@ namespace HM
          return;
       }
 
+      // RFC 8508: REPLACE takes exactly one message - its grammar has no
+      // MULTIAPPEND extension.
+      if (replace_mode_)
+      {
+         TerminateWithProtocolError_(pConnection, " BAD REPLACE takes exactly one message.\r\n");
+         return;
+      }
+
       // Another message follows. Parse its optional flags list, optional quoted
       // date and mandatory literal size.
       flags_to_set_ = "";
@@ -706,6 +779,65 @@ namespace HM
          std::shared_ptr<Messages> messages = destination_folder_->GetMessages();
          sResponse += IMAPNotificationClient::GenerateExistsString(messages->GetCount());
          sResponse += IMAPNotificationClient::GenerateRecentString((int) pConnection->GetRecentMessages().size());
+      }
+
+      // RFC 8508 (REPLACE): the replacement is safely stored, so the replaced
+      // message leaves the selected mailbox now - reported before the tagged OK.
+      if (replace_mode_ && replace_target_)
+      {
+         std::shared_ptr<IMAPFolder> selectedFolder = pConnection->GetCurrentFolder();
+         if (selectedFolder)
+         {
+            __int64 targetId = replace_target_->GetID();
+            __int64 targetUid = (__int64) replace_target_->GetUID();
+
+            std::vector<__int64> expungedIndexes;
+            std::function<bool(int, std::shared_ptr<Message>)> filter =
+               [targetId, &expungedIndexes](int index, std::shared_ptr<Message> message)
+            {
+               if (message->GetID() == targetId)
+               {
+                  expungedIndexes.push_back(index);
+                  return true;
+               }
+
+               return false;
+            };
+
+            auto selectedMessages = MessagesContainer::Instance()->GetMessages(selectedFolder->GetAccountID(), selectedFolder->GetID());
+            selectedMessages->DeleteMessages(filter);
+
+            if (!expungedIndexes.empty())
+            {
+               if (pConnection->GetQResyncEnabled())
+               {
+                  std::vector<__int64> vanished;
+                  vanished.push_back(targetUid);
+
+                  String sVanished;
+                  sVanished.Format(_T("* VANISHED %s\r\n"), IMAPConnection::CompactUidSet(vanished).c_str());
+                  sResponse += sVanished;
+               }
+               else
+               {
+                  String sExpunge;
+                  sExpunge.Format(_T("* %d EXPUNGE\r\n"), (int) expungedIndexes[0]);
+                  sResponse += sExpunge;
+               }
+
+               auto &recentMessages = pConnection->GetRecentMessages();
+               auto recentIterator = recentMessages.find(targetId);
+               if (recentIterator != recentMessages.end())
+                  recentMessages.erase(recentIterator);
+
+               std::shared_ptr<ChangeNotification> pDeleteNotification =
+                  std::shared_ptr<ChangeNotification>(new ChangeNotification(selectedFolder->GetAccountID(), selectedFolder->GetID(), ChangeNotification::NotificationMessageDeleted, expungedIndexes));
+               Application::Instance()->GetNotificationServer()->SendNotification(pConnection->GetNotificationClient(), pDeleteNotification);
+            }
+         }
+
+         replace_target_.reset();
+         replace_mode_ = false;
       }
 
       // RFC 4315 (UIDPLUS): report the destination folder's UIDVALIDITY and the

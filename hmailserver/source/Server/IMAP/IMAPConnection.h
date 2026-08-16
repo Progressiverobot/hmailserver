@@ -15,6 +15,7 @@ namespace HM
 {
 
    class IMAPCommand;
+   class IMAPCommandAppend;
    class IMAPFolders;
    class IMAPFolder;
    class IMAPCommandArgument;
@@ -87,7 +88,8 @@ namespace HM
          IMAP_ENABLE = 139,
          IMAP_THREAD = 140,
          IMAP_UNAUTHENTICATE = 141,
-         IMAP_SETQUOTA = 142
+         IMAP_SETQUOTA = 142,
+         IMAP_REPLACE = 143
       };
 
       void ParseData(const AnsiString &Request);
@@ -187,6 +189,10 @@ namespace HM
 
 
       void SetCommandBuffer(const String &sval);
+
+      // The connection-local APPEND handler - the UID command hands UID REPLACE
+      // to it (RFC 8508), the same way ParseData hands it binary literal data.
+      std::shared_ptr<IMAPCommandAppend> GetAppendCommandHandler();
 
 
    protected:

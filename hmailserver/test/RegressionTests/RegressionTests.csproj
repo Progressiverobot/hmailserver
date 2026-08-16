@@ -528,6 +528,7 @@
     <Compile Include="IMAP\QuotaResourceTypes.cs" />
     <Compile Include="IMAP\Preview.cs" />
     <Compile Include="IMAP\MultiAppend.cs" />
+    <Compile Include="IMAP\Replace.cs" />
     <Compile Include="IMAP\Examine.cs" />
     <Compile Include="IMAP\Fetch.cs" />
     <Compile Include="IMAP\PartialFetchChunking.cs" />

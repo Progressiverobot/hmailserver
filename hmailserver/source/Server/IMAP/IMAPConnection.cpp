@@ -173,10 +173,22 @@ namespace HM
       mapCommandHandlers[IMAP_THREAD] = std::shared_ptr<IMAPCommandSEARCH>(new IMAPCommandSEARCH(IMAPSearchModeThread));
       mapCommandHandlers[IMAP_IDLE] = std::shared_ptr<IMAPCommandIdle>(new IMAPCommandIdle(std::dynamic_pointer_cast<IMAPConnection>(shared_from_this())));
 
+      // RFC 8508: REPLACE is APPEND with a target parameter and the target's
+      // removal on success, so it shares the (stateful, connection-local)
+      // APPEND handler rather than duplicating the literal state machine.
+      mapCommandHandlers[IMAP_REPLACE] = mapCommandHandlers[IMAP_APPEND];
+
       mapStaticHandlers = StaticIMAPCommandHandlers::Instance()->GetStaticHandlers();
 
       notification_client_ = std::shared_ptr<IMAPNotificationClient>(new IMAPNotificationClient());
       notification_client_->SetConnection(std::dynamic_pointer_cast<IMAPConnection>(shared_from_this()));
+   }
+
+   std::shared_ptr<IMAPCommandAppend>
+   IMAPConnection::GetAppendCommandHandler()
+   {
+      auto iterCommandHandler = mapCommandHandlers.find(IMAP_APPEND);
+      return std::static_pointer_cast<IMAPCommandAppend>((*iterCommandHandler).second);
    }
 
    void 
@@ -492,6 +504,17 @@ namespace HM
             return 0;
          }
       }
+
+      // RFC 8508: REPLACE and UID REPLACE end in the same message literal
+      // APPEND does, handled by the same handler in binary mode - so the
+      // connection-level literal machinery must leave it alone here too, or it
+      // answers the literal with its own continuation and then waits for
+      // message octets as command text: the deadlock that caught this.
+      if (command_buffer_.FindNoCase(_T("REPLACE")) == iFullCommandStartPos ||
+          command_buffer_.FindNoCase(_T("UID REPLACE")) == iFullCommandStartPos)
+      {
+         return 0;
+      }
       
       if (sCommand.Right(1) != _T("}"))
          return 0;
@@ -748,6 +771,8 @@ namespace HM
          return IMAP_UNAUTHENTICATE;
       else if (sCommand == _T("SETQUOTA"))
          return IMAP_SETQUOTA;
+      else if (sCommand == _T("REPLACE"))
+         return IMAP_REPLACE;
 
       return IMAP_UNKNOWN;
    }

@@ -23,6 +23,11 @@ namespace HM
       virtual IMAPResult ExecuteCommand(std::shared_ptr<IMAPConnection> pConnection, std::shared_ptr<IMAPCommandArgument> pArgument);
       void ParseBinary(std::shared_ptr<IMAPConnection> pConnection, std::shared_ptr<ByteBuffer> pBuf);
 
+      // RFC 8508 (REPLACE): the next REPLACE this handler executes names its
+      // target by UID rather than by message sequence number. Set by the UID
+      // command handler, consumed by the one ExecuteCommand that follows.
+      void SetReplaceUidMode(bool value) { replace_uid_mode_ = value; }
+
       // The largest APPEND this account will be allowed, in bytes - the number
       // CAPABILITY advertises as APPENDLIMIT= and STATUS reports (RFC 7889).
       // Never zero: an "unlimited" configuration still has the hard 2 GB
@@ -85,6 +90,13 @@ namespace HM
       // step but discarded, and this holds the response to send at the end.
       bool command_failed_ = false;
       String failure_response_;
+
+      // RFC 8508 (REPLACE): the message the command replaces. Removed from the
+      // selected mailbox only after the replacement is safely stored - a failed
+      // append leaves it untouched.
+      bool replace_mode_ = false;
+      bool replace_uid_mode_ = false;
+      std::shared_ptr<Message> replace_target_;
 
       std::vector<PendingMessage> pending_messages_;
 

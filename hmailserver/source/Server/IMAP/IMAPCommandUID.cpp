@@ -4,6 +4,7 @@
 
 #include "stdafx.h"
 #include "IMAPCommandUID.h"
+#include "IMAPCommandAppend.h"
 #include "IMAPConnection.h"
 #include "IMAPSimpleCommandParser.h"
 
@@ -224,6 +225,27 @@ namespace HM
             pConnection->SendAsciiData(sTag + " OK UID completed\r\n");
 
          return result;
+      }
+      else if (sTypeOfUID.CompareNoCase(_T("REPLACE")) == 0)
+      {
+         // RFC 8508: UID REPLACE <uid> <mailbox> <append-data>. The APPEND
+         // handler owns the whole flow - literal state machine, atomic save,
+         // the target's removal - and only needs to know the target parameter
+         // is a UID rather than a message sequence number.
+         std::shared_ptr<IMAPCommandAppend> pAppendHandler = pConnection->GetAppendCommandHandler();
+         pAppendHandler->SetReplaceUidMode(true);
+
+         // Strip the leading "UID " so the handler sees the same command shape
+         // the sequence form has.
+         String sFullCommand = pArgument->Command();
+         int iReplacePos = sFullCommand.FindNoCase(_T("REPLACE"));
+
+         std::shared_ptr<IMAPCommandArgument> pReplaceArgument = std::shared_ptr<IMAPCommandArgument>(new IMAPCommandArgument);
+         pReplaceArgument->Command(sFullCommand.Mid(iReplacePos));
+         pReplaceArgument->Tag(pArgument->Tag());
+         pReplaceArgument->Literals(pArgument->Literals());
+
+         return pAppendHandler->ExecuteCommand(pConnection, pReplaceArgument);
       }
       else if (sTypeOfUID.CompareNoCase(_T("EXPUNGE")) == 0)
       {

@@ -134,6 +134,10 @@ namespace HM
       // none. Migration tools filling a mailbox are the main beneficiary.
       sResponse += " MULTIAPPEND";
 
+      // RFC 8508: replace a message in one command instead of the APPEND +
+      // STORE \Deleted + EXPUNGE dance - the shape draft saving wants.
+      sResponse += " REPLACE";
+
       // RFC 8437: an authenticated session can return to the not-authenticated
       // state for connection reuse. Advertised only once authenticated - that is
       // the only state where the command is valid, and the RFC's requirement is
