@@ -32,6 +32,10 @@
 #include "../common/Sieve/SieveScript.h"
 #include "../common/Sieve/SieveVacationResponder.h"
 #include "../common/Sieve/SieveDuplicateTracker.h"
+#include "../common/Mime/Mime.h"
+#include "../common/Mime/MimeCode.h"
+#include "../common/Util/Charset.h"
+#include "../common/Rules/RuleGuard.h"
 
 #include "../IMAP/MessagesContainer.h"
 
@@ -488,6 +492,11 @@ namespace HM
       // the keep/fileinto decision came from the other is precisely how the two drift
       // apart. The summary is still what the COM diagnostic and the tests read, so it
       // is not going away - it just is not what delivery acts on.
+      // Header edits first (RFC 5293 2: an edit affects all subsequent actions),
+      // so the redirected copies below carry them.
+      if (!sieveResult.headerEdits.empty())
+         ApplySieveHeaderEdits_(account, message, sieveResult.headerEdits);
+
       for (const String &target : sieveResult.redirects)
       {
          SMTPForwarding forwarder;
@@ -516,7 +525,134 @@ namespace HM
          sieveDrop = true;
    }
 
-   bool 
+   void
+   LocalDelivery::ApplySieveHeaderEdits_(std::shared_ptr<const Account> account, std::shared_ptr<Message> message,
+                                         const std::vector<SieveHeaderEdit> &edits)
+   {
+      String fileName = PersistentMessage::GetFileName(account, message);
+
+      MimeBody mail;
+      if (mail.LoadFromFile(fileName) != MimeLoadResult::Loaded)
+      {
+         // Unopenable or half-parsed: writing edits back onto either would be
+         // worse than the edits not happening.
+         RuleGuard::ReportActionFailed(_T("Sieve editheader"), fileName);
+         return;
+      }
+
+      for (const SieveHeaderEdit &edit : edits)
+      {
+         AnsiString fieldName = edit.name;
+
+         if (edit.isAdd)
+         {
+            // Encoded the way MimeHeader::SetUnicodeFieldValue encodes, because a
+            // value is arbitrary script text; built as a field directly so an
+            // instance is ADDED rather than the first existing one replaced.
+            AnsiString multiByte = Charset::ToMultiByte(edit.value, "utf-8");
+
+            FieldCodeBase *coder = MimeEnvironment::CreateFieldCoder(fieldName.c_str());
+            coder->SetInput(multiByte, multiByte.GetLength(), true);
+            coder->SetCharset("utf-8");
+
+            AnsiString encodedValue;
+            coder->GetOutput(encodedValue);
+            delete coder;
+
+            MimeField field;
+            field.SetName(fieldName.c_str());
+            field.SetValue(encodedValue.c_str());
+
+            // RFC 5293 4: at the top unless ":last" says the bottom.
+            if (edit.addLast)
+               mail.Fields().push_back(field);
+            else
+               mail.Fields().insert(mail.Fields().begin(), field);
+
+            continue;
+         }
+
+         // deleteheader: walk this name's instances in order, decide per instance.
+         std::vector<size_t> instances;
+         for (size_t i = 0; i < mail.Fields().size(); i++)
+         {
+            AnsiString name = mail.Fields()[i].GetName();
+            if (name.CompareNoCase(fieldName.c_str()) == 0)
+               instances.push_back(i);
+         }
+
+         if (edit.indexGiven)
+         {
+            size_t position = static_cast<size_t>(edit.index);
+            if (position < 1 || position > instances.size())
+               continue;
+
+            size_t selected = edit.indexFromEnd
+               ? instances[instances.size() - position]
+               : instances[position - 1];
+            instances.assign(1, selected);
+         }
+
+         std::vector<size_t> doomed;
+         for (size_t instance : instances)
+         {
+            if (edit.patternsGiven)
+            {
+               // Matched against the field's stored value. For the plain-ASCII
+               // headers scripts actually filter on this equals the decoded text;
+               // an RFC 2047-encoded value is compared in its encoded form, which
+               // can only make a delete NOT happen - the safe direction.
+               String value = String(mail.Fields()[instance].GetValue());
+
+               bool matched = false;
+               for (const String &pattern : edit.patterns)
+               {
+                  if (edit.matchType == _T("contains"))
+                  {
+                     if (edit.caseSensitive ? value.Find(pattern) >= 0
+                                            : String(value).ToLower().Find(String(pattern).ToLower()) >= 0)
+                        matched = true;
+                  }
+                  else if (edit.matchType == _T("matches"))
+                  {
+                     if (StringParser::WildcardMatchNoCase(pattern, value))
+                        matched = true;
+                  }
+                  else
+                  {
+                     if (edit.caseSensitive ? value.Compare(pattern) == 0
+                                            : value.CompareNoCase(pattern) == 0)
+                        matched = true;
+                  }
+
+                  if (matched)
+                     break;
+               }
+
+               if (!matched)
+                  continue;
+            }
+
+            doomed.push_back(instance);
+         }
+
+         // Erase back-to-front so the earlier indices stay valid.
+         for (auto it = doomed.rbegin(); it != doomed.rend(); ++it)
+            mail.Fields().erase(mail.Fields().begin() + *it);
+      }
+
+      if (!mail.SaveAllToFile(fileName))
+      {
+         RuleGuard::ReportActionFailed(_T("Sieve editheader"), fileName);
+         return;
+      }
+
+      // The file changed size; the record the caller is about to save must agree
+      // with it, as the trace-header step above this one already does.
+      message->SetSize(FileUtilities::FileSize(fileName));
+   }
+
+   bool
    LocalDelivery::CheckAccountQuotas_(std::shared_ptr<const Account> pCheckAccount, std::vector<String> &saErrorMessages, bool suppressFailureDsn)
    //---------------------------------------------------------------------------()
    // DESCRIPTION:

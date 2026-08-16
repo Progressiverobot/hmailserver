@@ -66,6 +66,34 @@ namespace HM
       int loopCount = 0;
    };
 
+   // One addheader or deleteheader (RFC 5293), in script order. Order matters:
+   // "deleteheader X" then "addheader X" is a replace, the other way round is a
+   // no-op plus an add, and the RFC has both meanings.
+   struct SieveHeaderEdit
+   {
+      bool isAdd = false;
+
+      String name;
+
+      // addheader: the value to add; :last appends below existing instances
+      // instead of prepending above them.
+      String value;
+      bool addLast = false;
+
+      // deleteheader: which instances go. indexGiven selects the nth (from the
+      // end under indexFromEnd); with patterns given, only instances whose value
+      // matches one of them (with the recorded match type / comparator / case
+      // rules already resolved to a simple triple here, so the delivery side does
+      // not need the evaluator).
+      bool indexGiven = false;
+      int index = 0;
+      bool indexFromEnd = false;
+      bool patternsGiven = false;
+      std::vector<String> patterns;
+      String matchType;              // "is", "contains" or "matches"
+      bool caseSensitive = false;    // i;octet
+   };
+
    // Everything a script decided, for callers that need more than the ';'-joined
    // summary string.
    struct SieveResult
@@ -75,6 +103,7 @@ namespace HM
       bool flagsGiven = false;       // the script set the local copy's IMAP flags
       std::vector<String> flags;     // those flags, canonicalised and de-duplicated
       std::vector<String> redirects; // addresses to send a copy to
+      std::vector<SieveHeaderEdit> headerEdits; // editheader (RFC 5293), in script order
       SieveVacationDecision vacation;
    };
 

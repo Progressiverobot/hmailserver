@@ -275,6 +275,11 @@ namespace RegressionTests.Sieve
                // duplicate, and a fail-OPEN seen-store.
                StringAssert.Contains("duplicate", greeting);
 
+               // editheader followed, with SieveEditheaderDelivery.cs behind it -
+               // edits asserted on the delivered bytes over POP3, trace headers
+               // protected at upload.
+               StringAssert.Contains("editheader", greeting);
+
                // Still absent on purpose: envelope is implemented and evaluated, and is
                // held back until a test proves the envelope TEST command itself works.
                // If somebody adds it here, that test should exist first.

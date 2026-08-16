@@ -63,6 +63,9 @@ namespace RegressionTests.Sieve
          // environment under its require.
          Assert.IsEmpty(CheckSyntax("require \"environment\";\r\nif environment :is \"name\" \"hMailServer\" {\r\n  keep;\r\n}"));
 
+         // editheader under its require.
+         Assert.IsEmpty(CheckSyntax("require \"editheader\";\r\naddheader \"X-Note\" \"v\";\r\ndeleteheader :contains \"X-Old\" \"x\";"));
+
          // duplicate under its require, in all three identifier spellings.
          Assert.IsEmpty(CheckSyntax("require \"duplicate\";\r\nif duplicate {\r\n  discard;\r\n}"));
          Assert.IsEmpty(CheckSyntax("require \"duplicate\";\r\nif duplicate :header \"X-Token\" :seconds 3600 :last {\r\n  discard;\r\n}"));
@@ -143,6 +146,12 @@ namespace RegressionTests.Sieve
          Assert.IsNotEmpty(CheckSyntax("if ihave \"fileinto\" {\r\n  keep;\r\n}"));
          Assert.IsNotEmpty(CheckSyntax("if environment :is \"name\" \"x\" {\r\n  keep;\r\n}"));
 
+         // editheader: the trace headers are protected, the field name must be
+         // legal, and the require is needed at all.
+         Assert.IsNotEmpty(CheckSyntax("require \"editheader\";\r\ndeleteheader \"Received\";"));
+         Assert.IsNotEmpty(CheckSyntax("require \"editheader\";\r\naddheader \"Bad Name\" \"v\";"));
+         Assert.IsNotEmpty(CheckSyntax("addheader \"X-Note\" \"v\";"));
+
          // duplicate: :header and :uniqueid contradict each other, positionals are
          // not part of its grammar, and the require is needed at all.
          Assert.IsNotEmpty(CheckSyntax("require \"duplicate\";\r\nif duplicate :header \"X\" :uniqueid \"y\" {\r\n  discard;\r\n}"));
@@ -191,8 +200,9 @@ namespace RegressionTests.Sieve
             "reject \"go away\";",
             "ereject \"go away\";",
             "notify \"mailto:someone@example.test\";",
-            "addheader \"X-Test\" \"value\";",
-            "deleteheader \"X-Test\";",
+            // addheader and deleteheader moved out on 16 August 2026 - the
+            // editheader extension shipped, proven end to end on delivered bytes
+            // in SieveEditheaderDelivery.cs.
             "include \"other\";",
             "return;",
             "set \"name\" \"value\";",

@@ -177,6 +177,9 @@ namespace HM
          // seen-store fails OPEN - see SieveDuplicateTracker for why that is the
          // opposite of the vacation tracker's direction.
          L"duplicate",
+         // RFC 5293: addheader / deleteheader. Received and Return-Path are
+         // protected - a script cannot edit the trace of how a message got here.
+         L"editheader",
          L"comparator-i;ascii-casemap",
          L"comparator-i;octet",
          L"comparator-i;ascii-numeric"
@@ -493,7 +496,8 @@ namespace HM
       {
          L"require", L"if", L"elsif", L"else", L"stop", L"keep", L"discard",
          L"fileinto", L"redirect", L"vacation",
-         L"setflag", L"addflag", L"removeflag"
+         L"setflag", L"addflag", L"removeflag",
+         L"addheader", L"deleteheader"
       };
 
       for (const wchar_t *candidate : known)
@@ -1182,6 +1186,76 @@ namespace HM
       SieveArgumentSet set;
       if (!isControl && name != _T("require") && !SplitArguments(command->arguments, set, errorMessage))
          return false;
+
+      if (name == _T("addheader") || name == _T("deleteheader"))
+      {
+         bool isAdd = name == _T("addheader");
+
+         if (!NeedExtension_(_T("editheader"), _T("'") + name + _T("'"), command->line, errorMessage))
+            return false;
+
+         if (!CheckTags_(set,
+                         isAdd ? _T("last") : _T("index last comparator is contains matches"),
+                         _T("'") + name + _T("'"), errorMessage))
+            return false;
+
+         size_t lists = set.stringLists.size();
+
+         if (isAdd)
+         {
+            if (lists != 2 || set.stringLists[0].size() != 1 || set.stringLists[1].size() != 1)
+            {
+               errorMessage.Format(_T("Line %d: 'addheader' takes a field name and a value."), command->line);
+               return false;
+            }
+         }
+         else
+         {
+            if (lists < 1 || lists > 2 || set.stringLists[0].size() != 1)
+            {
+               errorMessage.Format(_T("Line %d: 'deleteheader' takes a field name and optionally a list of value patterns."), command->line);
+               return false;
+            }
+
+            if (!ValidateIndexArguments_(set, command->line, errorMessage))
+               return false;
+
+            if (set.comparatorGiven && set.comparator.Compare(_T("i;ascii-numeric")) == 0)
+            {
+               errorMessage.Format(_T("Line %d: the \"i;ascii-numeric\" comparator cannot be used with 'deleteheader'."), command->line);
+               return false;
+            }
+         }
+
+         // The field name must be a legal header name, and the trace of how the
+         // message got here is not a script's to edit (RFC 5293 7).
+         const String &fieldName = set.stringLists[0][0];
+
+         if (fieldName.IsEmpty())
+         {
+            errorMessage.Format(_T("Line %d: the field name cannot be empty."), command->line);
+            return false;
+         }
+
+         for (int i = 0; i < fieldName.GetLength(); i++)
+         {
+            wchar_t ch = fieldName[i];
+            if (ch <= L' ' || ch >= 127 || ch == L':')
+            {
+               errorMessage.Format(_T("Line %d: '%s' is not a legal header field name."), command->line, fieldName.c_str());
+               return false;
+            }
+         }
+
+         if (fieldName.CompareNoCase(_T("Received")) == 0 || fieldName.CompareNoCase(_T("Return-Path")) == 0)
+         {
+            errorMessage.Format(_T("Line %d: the %s header records how a message travelled and cannot be edited by a script."),
+               command->line, fieldName.c_str());
+            return false;
+         }
+
+         return true;
+      }
 
       if (name == _T("keep") || name == _T("fileinto"))
       {

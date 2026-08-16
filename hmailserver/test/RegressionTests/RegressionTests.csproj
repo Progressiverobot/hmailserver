@@ -351,6 +351,7 @@
     <Compile Include="Sieve\SieveFlagDelivery.cs" />
     <Compile Include="Sieve\SieveDateDelivery.cs" />
     <Compile Include="Sieve\SieveDuplicateDelivery.cs" />
+    <Compile Include="Sieve\SieveEditheaderDelivery.cs" />
     <Compile Include="Sieve\SieveEnvironmentDelivery.cs" />
     <Compile Include="Sieve\SieveMailboxDelivery.cs" />
     <Compile Include="Sieve\SieveRegexDelivery.cs" />

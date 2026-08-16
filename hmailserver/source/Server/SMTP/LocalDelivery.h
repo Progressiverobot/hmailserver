@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "../Common/Sieve/SieveEvaluator.h"
+
 namespace HM
 {
    class Message;
@@ -55,6 +57,15 @@ namespace HM
       // message.
       static void ApplySieveFlags_(std::shared_ptr<const Account> account, std::shared_ptr<Message> message,
                                    const std::vector<String> &sieveFlags);
+
+      // Rewrites the stored message file with the addheader/deleteheader edits a
+      // script decided (RFC 5293), in script order, and refreshes the message's
+      // recorded size. Runs BEFORE redirects are queued, so a redirected copy
+      // carries the edits - RFC 5293 2: an edit affects all subsequent actions.
+      // A failed write is reported through RuleGuard::ReportActionFailed, the
+      // same visibility the rules engine's header rewriting gets.
+      static void ApplySieveHeaderEdits_(std::shared_ptr<const Account> account, std::shared_ptr<Message> message,
+                                         const std::vector<SieveHeaderEdit> &edits);
 
       // Exact, case-sensitive membership. The flag names reaching here have already
       // been canonicalised by SieveParser::SplitFlagList, so a case-insensitive test

@@ -281,7 +281,15 @@ namespace HM
       // delivers a copy twice). End-to-end tests in SieveDuplicateDelivery.cs
       // deliver the same Message-ID twice and assert the first lands in INBOX and
       // the second where the script files duplicates.
-      const char *AdvertisedSieveExtensions = "fileinto copy relational subaddress vacation vacation-seconds imap4flags body mailbox regex ihave environment date index spamtest spamtestplus duplicate";
+      // editheader (RFC 5293) moved in on 16 August 2026, under the same rule. Its
+      // delivery-side step is LocalDelivery::ApplySieveHeaderEdits_, which rewrites
+      // the stored file with the script's addheader/deleteheader edits in script
+      // order, BEFORE redirects are queued so forwarded copies carry them, and
+      // refreshes the recorded size. Received and Return-Path are protected at
+      // upload: the trace of how a message travelled is not a script's to edit.
+      // End-to-end tests in SieveEditheaderDelivery.cs read the delivered message
+      // over POP3 and assert on its actual bytes.
+      const char *AdvertisedSieveExtensions = "fileinto copy relational subaddress vacation vacation-seconds imap4flags body mailbox regex ihave environment date index spamtest spamtestplus duplicate editheader";
 
       AnsiString EscapeQuoted(const String &value)
       {

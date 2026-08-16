@@ -410,6 +410,55 @@ namespace HM
          return;
       }
 
+      if (name == _T("addheader") || name == _T("deleteheader"))
+      {
+         // editheader (RFC 5293). The evaluator only DECIDES; the delivery path
+         // rewrites the stored file, in script order, from these records. With no
+         // structured result - the COM diagnostic path - the summary token below
+         // is still produced, so a test evaluation shows what would happen.
+         SieveArgumentSet set;
+         String ignored;
+         if (!SieveParser::SplitArguments(command->arguments, set, ignored))
+            return;
+
+         SieveHeaderEdit edit;
+         edit.isAdd = name == _T("addheader");
+
+         if (edit.isAdd)
+         {
+            if (set.stringLists.size() != 2 || set.stringLists[0].size() != 1 || set.stringLists[1].size() != 1)
+               return;
+
+            edit.name = set.stringLists[0][0];
+            edit.value = set.stringLists[1][0];
+            edit.addLast = set.lastGiven;
+         }
+         else
+         {
+            if (set.stringLists.empty() || set.stringLists[0].size() != 1)
+               return;
+
+            edit.name = set.stringLists[0][0];
+            edit.indexGiven = set.indexGiven;
+            edit.index = set.indexValue;
+            edit.indexFromEnd = set.lastGiven && set.indexGiven;
+
+            if (set.stringLists.size() >= 2)
+            {
+               edit.patternsGiven = true;
+               edit.patterns = set.stringLists[1];
+               edit.matchType = set.matchTypeGiven ? set.matchType : _T("is");
+               edit.caseSensitive = set.comparatorGiven && set.comparator.Compare(_T("i;octet")) == 0;
+            }
+         }
+
+         if (result_)
+            result_->headerEdits.push_back(edit);
+
+         actions_.push_back(name + _T(":") + edit.name);
+         return;
+      }
+
       // "require" carries no run-time behaviour.
    }
 
