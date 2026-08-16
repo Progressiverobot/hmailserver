@@ -114,6 +114,18 @@ namespace HM
       // fileinto :create (RFC 5490).
       bool mailboxCreate = false;
 
+      // date / currentdate (RFC 5260): the zone the extracted parts are expressed
+      // in. zone is a "+hhmm"/"-hhmm" string; originalzone (date only) means the
+      // header's own zone.
+      String zone;
+      bool zoneGiven = false;
+      bool originalZone = false;
+
+      // :index / :last (RFC 5260 6), for selecting among repeated header fields.
+      int indexValue = 0;
+      bool indexGiven = false;
+      bool lastGiven = false;
+
       // Positional string-list arguments, in order.
       std::vector<std::vector<String>> stringLists;
    };
@@ -182,6 +194,10 @@ namespace HM
       bool ValidateMatchArguments_(const SieveArgumentSet &set, const String &context, int line, String &errorMessage,
                                    size_t expectedStringLists = 2);
       bool ValidateFlagList_(const std::vector<String> &flags, int line, String &errorMessage);
+
+      // :index/:last (RFC 5260 6), shared by the header, address and date tests:
+      // :index needs its extension and counts from 1; :last rides on :index.
+      bool ValidateIndexArguments_(const SieveArgumentSet &set, int line, String &errorMessage);
 
       bool HasExtension_(const String &extension) const;
       bool NeedExtension_(const String &extension, const String &feature, int line, String &errorMessage) const;

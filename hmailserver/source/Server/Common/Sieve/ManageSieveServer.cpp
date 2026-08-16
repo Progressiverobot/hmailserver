@@ -255,7 +255,15 @@ namespace HM
       // does not reach the evaluator. End-to-end tests in
       // SieveEnvironmentDelivery.cs file real deliveries on both tests' answers,
       // with unknown-item and unavailable-extension negative controls.
-      const char *AdvertisedSieveExtensions = "fileinto copy relational subaddress vacation vacation-seconds imap4flags body mailbox regex ihave environment";
+      // date and index (RFC 5260) moved in on 16 August 2026, under the same rule.
+      // The delivery-side step is EvaluateDateTest_ and the index selection in
+      // CollectValues_: date/currentdate extract RFC 5260 date-parts with real zone
+      // arithmetic (the header's wall clock and its zone are kept separate, so
+      // :originalzone and :zone re-express the same instant rather than mangling
+      // it), and :index/:last select among repeated header fields for the header,
+      // address and date tests. End-to-end tests in SieveDateDelivery.cs include
+      // zone conversion proven by filing on an hour the raw header does not state.
+      const char *AdvertisedSieveExtensions = "fileinto copy relational subaddress vacation vacation-seconds imap4flags body mailbox regex ihave environment date index";
 
       AnsiString EscapeQuoted(const String &value)
       {

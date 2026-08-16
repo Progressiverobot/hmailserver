@@ -258,6 +258,12 @@ namespace RegressionTests.Sieve
                StringAssert.Contains("ihave", greeting);
                StringAssert.Contains("environment", greeting);
 
+               // date and index followed, with SieveDateDelivery.cs behind them -
+               // including zone conversion proven by filing on an hour the raw
+               // header never states.
+               StringAssert.Contains("date", greeting);
+               StringAssert.Contains("index", greeting);
+
                // Still absent on purpose: envelope is implemented and evaluated, and is
                // held back until a test proves the envelope TEST command itself works.
                // If somebody adds it here, that test should exist first.

@@ -9,6 +9,7 @@
 #include "../Rules/RuleGuard.h"
 #include "../Application/Application.h"
 #include "../Application/Configuration.h"
+#include "../Util/Time.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -906,6 +907,12 @@ namespace HM
       if (name == _T("environment"))
          return EvaluateComparisonTest_(test, message, ValueSource::Environment);
 
+      if (name == _T("date"))
+         return EvaluateDateTest_(test, message, false);
+
+      if (name == _T("currentdate"))
+         return EvaluateDateTest_(test, message, true);
+
       if (name == _T("mailboxexists"))
       {
          // RFC 5490 3.1: true only when EVERY listed mailbox exists and can be
@@ -965,6 +972,318 @@ namespace HM
       std::vector<String> values;
       CollectValues_(source, set, names, message, values);
 
+      return MatchValuesAgainstKeys_(set, values, keys);
+   }
+
+   namespace
+   {
+      // Shifts a wall time by a signed number of minutes. DateTimeSpan's fields
+      // are taken as written, so the sign is applied by choosing the operator.
+      DateTime ShiftMinutes(const DateTime &wall, int minutes)
+      {
+         DateTimeSpan span;
+         span.SetDateTimeSpan(0, 0, minutes < 0 ? -minutes : minutes, 0);
+
+         return minutes < 0 ? wall - span : wall + span;
+      }
+
+      // Modified Julian Day of a civil date, by the standard integer formula.
+      // MJD 0 is 1858-11-17, which this reproduces.
+      __int64 ModifiedJulianDay(int year, int month, int day)
+      {
+         __int64 a = (14 - month) / 12;
+         __int64 y = year + 4800 - a;
+         __int64 m = month + 12 * a - 3;
+
+         __int64 julianDayNumber = day + (153 * m + 2) / 5 + 365 * y + y / 4 - y / 100 + y / 400 - 32045;
+
+         return julianDayNumber - 2400001;
+      }
+
+      String ZoneString(int zoneMinutes)
+      {
+         int magnitude = zoneMinutes < 0 ? -zoneMinutes : zoneMinutes;
+
+         String zone;
+         zone.Format(_T("%c%02d%02d"), zoneMinutes < 0 ? _T('-') : _T('+'), magnitude / 60, magnitude % 60);
+         return zone;
+      }
+   }
+
+   bool
+   SieveEvaluator::ParseHeaderDateTime_(const String &headerValue, DateTime &wall, int &zoneMinutes)
+   {
+      // Tokenised the way Time::GetDateTimeFromMimeHeader does, and tolerant the
+      // same way; the difference is that the zone stays SEPARATE from the wall
+      // time instead of being folded into it, because the caller needs to
+      // re-express the instant in another zone.
+      String date = headerValue;
+      date.Replace(_T("  "), _T(" "));
+      date.TrimLeft();
+
+      std::vector<String> parts = StringParser::SplitString(date, " ");
+      if (parts.size() < 3)
+         return false;
+
+      size_t index = 0;
+      if (parts[0].Find(_T(",")) >= 0 || Time::GetMonthIndex(parts.size() > 1 ? parts[1] : _T("")) > 0)
+      {
+         // A day-of-week name leads (with or without its comma); skip it. The
+         // second condition catches "Tue 05 Aug ..." where the comma was dropped:
+         // if the SECOND token is a month name, the first cannot be the day.
+         if (!iswdigit(parts[0].GetLength() > 0 ? parts[0][0] : L'x'))
+            index++;
+      }
+
+      if (index + 2 >= parts.size())
+         return false;
+
+      int day = _ttoi(parts[index].c_str());
+      int month = static_cast<int>(Time::GetMonthIndex(parts[index + 1]));
+      int year = _ttoi(parts[index + 2].c_str());
+
+      if (day < 1 || day > 31 || month < 1 || month > 12)
+         return false;
+
+      if (year >= 50 && year <= 99)
+         year += 1900;
+      else if (year >= 0 && year <= 49)
+         year += 2000;
+
+      int hour = 0, minute = 0, second = 0;
+      if (index + 3 < parts.size())
+      {
+         std::vector<String> time = StringParser::SplitString(parts[index + 3], ":");
+         if (time.size() >= 2)
+         {
+            hour = _ttoi(time[0].c_str());
+            minute = _ttoi(time[1].c_str());
+            second = time.size() >= 3 ? _ttoi(time[2].c_str()) : 0;
+         }
+      }
+
+      if (wall.SetDateTime(year, month, day, hour, minute, second) != 0)
+         return false;
+
+      // The zone, when one is stated and parseable. A header without one is read
+      // as server-local time: the least surprising reading for the mail this
+      // server actually stores, and the one the legacy date handling also takes.
+      int zoneHours = 0, zoneMinutesPart = 0;
+      if (index + 4 < parts.size() && Time::GetTimeAdjustForTimezone(parts[index + 4], zoneHours, zoneMinutesPart))
+      {
+         // GetTimeAdjustForTimezone answers "what do I ADD to reach UTC" - the
+         // NEGATED zone, with both components carrying that flipped sign ("+0230"
+         // comes back as -2,-30). The zone offset as the header states it is the
+         // negation of their sum. Learned the empirical way: the first build
+         // reported "+0200" as "-0200" and converted 15:30 the wrong direction.
+         zoneMinutes = -(zoneHours * 60 + zoneMinutesPart);
+      }
+      else
+      {
+         zoneMinutes = Time::GetUTCRelationMinutes();
+      }
+
+      return true;
+   }
+
+   bool
+   SieveEvaluator::FormatDatePart_(const DateTime &wall, int zoneMinutes, const String &part, String &value)
+   {
+      if (part.CompareNoCase(_T("year")) == 0)
+      {
+         value.Format(_T("%04d"), wall.GetYear());
+         return true;
+      }
+
+      if (part.CompareNoCase(_T("month")) == 0)
+      {
+         value.Format(_T("%02d"), wall.GetMonth());
+         return true;
+      }
+
+      if (part.CompareNoCase(_T("day")) == 0)
+      {
+         value.Format(_T("%02d"), wall.GetDay());
+         return true;
+      }
+
+      if (part.CompareNoCase(_T("date")) == 0)
+      {
+         value.Format(_T("%04d-%02d-%02d"), wall.GetYear(), wall.GetMonth(), wall.GetDay());
+         return true;
+      }
+
+      if (part.CompareNoCase(_T("julian")) == 0)
+      {
+         value = StringParser::IntToString(ModifiedJulianDay(wall.GetYear(), wall.GetMonth(), wall.GetDay()));
+         return true;
+      }
+
+      if (part.CompareNoCase(_T("hour")) == 0)
+      {
+         value.Format(_T("%02d"), wall.GetHour());
+         return true;
+      }
+
+      if (part.CompareNoCase(_T("minute")) == 0)
+      {
+         value.Format(_T("%02d"), wall.GetMinute());
+         return true;
+      }
+
+      if (part.CompareNoCase(_T("second")) == 0)
+      {
+         value.Format(_T("%02d"), wall.GetSecond());
+         return true;
+      }
+
+      if (part.CompareNoCase(_T("time")) == 0)
+      {
+         value.Format(_T("%02d:%02d:%02d"), wall.GetHour(), wall.GetMinute(), wall.GetSecond());
+         return true;
+      }
+
+      if (part.CompareNoCase(_T("zone")) == 0)
+      {
+         value = ZoneString(zoneMinutes);
+         return true;
+      }
+
+      if (part.CompareNoCase(_T("weekday")) == 0)
+      {
+         // GetDayOfWeek is 1=Sunday..7=Saturday; RFC 5260 wants 0=Sunday..6.
+         value = StringParser::IntToString(wall.GetDayOfWeek() - 1);
+         return true;
+      }
+
+      if (part.CompareNoCase(_T("iso8601")) == 0)
+      {
+         int magnitude = zoneMinutes < 0 ? -zoneMinutes : zoneMinutes;
+         value.Format(_T("%04d-%02d-%02dT%02d:%02d:%02d%c%02d:%02d"),
+            wall.GetYear(), wall.GetMonth(), wall.GetDay(),
+            wall.GetHour(), wall.GetMinute(), wall.GetSecond(),
+            zoneMinutes < 0 ? _T('-') : _T('+'), magnitude / 60, magnitude % 60);
+         return true;
+      }
+
+      if (part.CompareNoCase(_T("std11")) == 0)
+      {
+         static const wchar_t *dayNames[] = { L"Sun", L"Mon", L"Tue", L"Wed", L"Thu", L"Fri", L"Sat" };
+         static const wchar_t *monthNames[] = { L"Jan", L"Feb", L"Mar", L"Apr", L"May", L"Jun",
+                                                L"Jul", L"Aug", L"Sep", L"Oct", L"Nov", L"Dec" };
+
+         value.Format(_T("%s, %02d %s %04d %02d:%02d:%02d %s"),
+            dayNames[wall.GetDayOfWeek() - 1], wall.GetDay(), monthNames[wall.GetMonth() - 1],
+            wall.GetYear(), wall.GetHour(), wall.GetMinute(), wall.GetSecond(),
+            ZoneString(zoneMinutes).c_str());
+         return true;
+      }
+
+      return false;
+   }
+
+   void
+   SieveEvaluator::ApplyIndex_(const SieveArgumentSet &set, std::vector<String> &values)
+   {
+      if (!set.indexGiven)
+         return;
+
+      size_t index = static_cast<size_t>(set.indexValue);
+
+      if (index < 1 || index > values.size())
+      {
+         // No nth instance: the test has nothing to match, not even "".
+         values.clear();
+         return;
+      }
+
+      String selected = set.lastGiven ? values[values.size() - index] : values[index - 1];
+      values.clear();
+      values.push_back(selected);
+   }
+
+   bool
+   SieveEvaluator::EvaluateDateTest_(const std::shared_ptr<SieveTest> &test, const SieveMessage &message, bool currentDate)
+   {
+      SieveArgumentSet set;
+      String ignored;
+      if (!SieveParser::SplitArguments(test->arguments, set, ignored))
+         return false;
+
+      size_t expected = currentDate ? 2u : 3u;
+      if (set.stringLists.size() != expected)
+         return false;
+
+      for (size_t listIndex = 0; listIndex + 1 < expected; listIndex++)
+      {
+         if (set.stringLists[listIndex].size() != 1)
+            return false;
+      }
+
+      const String &part = set.stringLists[expected - 2][0];
+      const std::vector<String> &keys = set.stringLists[expected - 1];
+
+      int localZone = Time::GetUTCRelationMinutes();
+
+      int targetZone = localZone;
+      if (set.zoneGiven)
+      {
+         int hours = 0, minutes = 0;
+         if (!Time::GetTimeAdjustForTimezone(set.zone, hours, minutes))
+            return false;
+
+         // Negated for the same reason as in ParseHeaderDateTime_: the helper
+         // answers "what do I add to reach UTC", not the offset as written.
+         targetZone = -(hours * 60 + minutes);
+      }
+
+      std::vector<String> values;
+
+      if (currentDate)
+      {
+         // The current LOCAL wall time, re-expressed in the requested zone.
+         DateTime wall = DateTime::GetCurrentTime();
+         wall = ShiftMinutes(wall, targetZone - localZone);
+
+         String value;
+         if (FormatDatePart_(wall, targetZone, part, value))
+            values.push_back(value);
+      }
+      else
+      {
+         const String &headerName = set.stringLists[0][0];
+
+         std::vector<String> headerValues = message.GetHeaderValues(headerName);
+         ApplyIndex_(set, headerValues);
+
+         for (const String &headerValue : headerValues)
+         {
+            DateTime wall;
+            int headerZone = 0;
+            if (!ParseHeaderDateTime_(headerValue, wall, headerZone))
+               continue;
+
+            int expressedZone = headerZone;
+            if (!set.originalZone)
+            {
+               // Default and :zone both re-express the instant; :originalzone
+               // keeps the header's own wall clock.
+               expressedZone = targetZone;
+               wall = ShiftMinutes(wall, expressedZone - headerZone);
+            }
+
+            String value;
+            if (FormatDatePart_(wall, expressedZone, part, value))
+               values.push_back(value);
+         }
+      }
+
+      return MatchValuesAgainstKeys_(set, values, keys);
+   }
+
+   bool
+   SieveEvaluator::MatchValuesAgainstKeys_(const SieveArgumentSet &set, const std::vector<String> &values, const std::vector<String> &keys)
+   {
       if (set.matchType == _T("count"))
       {
          // RFC 5231 4.2: the count is compared numerically. The comparator is
@@ -1032,6 +1351,10 @@ namespace HM
          for (const String &name : names)
          {
             std::vector<String> headerValues = message.GetHeaderValues(name);
+
+            // :index/:last (RFC 5260 6) select among THIS name's instances.
+            ApplyIndex_(set, headerValues);
+
             for (const String &headerValue : headerValues)
                values.push_back(headerValue);
          }
@@ -1044,6 +1367,9 @@ namespace HM
          for (const String &name : names)
          {
             std::vector<String> headerValues = message.GetHeaderValues(name);
+
+            ApplyIndex_(set, headerValues);
+
             for (const String &headerValue : headerValues)
             {
                std::vector<String> addresses = SieveMessage::ExtractAddresses(headerValue, _T("all"));

@@ -9,6 +9,7 @@
 
 #include "SieveParser.h"
 #include "SieveMessage.h"
+#include "../Util/VariantDateTime.h"
 
 namespace HM
 {
@@ -129,6 +130,29 @@ namespace HM
       // for an item it cannot - the caller then contributes no value, making any
       // match against that item false, which is the RFC's unknown-item behaviour.
       static bool GetEnvironmentItem_(const String &name, String &value);
+
+      // date / currentdate (RFC 5260).
+      bool EvaluateDateTest_(const std::shared_ptr<SieveTest> &test, const SieveMessage &message, bool currentDate);
+
+      // Splits an RFC 5322 date header into the WALL time it states and the zone
+      // it states it in, kept apart because the two date tests need to re-express
+      // the same instant in a different zone - which Time::GetDateTimeFromMimeHeader
+      // cannot do, having already folded its zone into the value. A header with no
+      // usable zone is read as server-local time.
+      static bool ParseHeaderDateTime_(const String &headerValue, DateTime &wall, int &zoneMinutes);
+
+      // One RFC 5260 4.1 date-part of a wall time in a zone. False for a part
+      // this code does not know, which the validator should have refused.
+      static bool FormatDatePart_(const DateTime &wall, int zoneMinutes, const String &part, String &value);
+
+      // Applies :index/:last (RFC 5260 6) to the values collected for one header
+      // name: the nth instance, counted from the front or the back, or nothing at
+      // all when there is no nth - a missing instance must not match even "".
+      static void ApplyIndex_(const SieveArgumentSet &set, std::vector<String> &values);
+
+      // The match tail shared by every comparison-shaped test: :count against the
+      // number of values, otherwise every value against every key.
+      bool MatchValuesAgainstKeys_(const SieveArgumentSet &set, const std::vector<String> &values, const std::vector<String> &keys);
       bool EvaluateComparisonTest_(const std::shared_ptr<SieveTest> &test, const SieveMessage &message, ValueSource source);
       bool EvaluateExists_(const std::shared_ptr<SieveTest> &test, const SieveMessage &message);
       bool EvaluateSize_(const std::shared_ptr<SieveTest> &test, const SieveMessage &message);

@@ -57,7 +57,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Transport security and deliverability](#transport-security-and-deliverability) | 43 | – | 4 | 1 |
 | [IMAP](#imap) | 58 | – | 17 | 3 |
 | [POP3](#pop3) | 21 | – | 6 | – |
-| [Sieve, ManageSieve and rules](#sieve-managesieve-and-rules) | 53 | 0 | 11 | – |
+| [Sieve, ManageSieve and rules](#sieve-managesieve-and-rules) | 54 | 0 | 10 | – |
 | [Authentication and cryptography](#authentication-and-cryptography) | 57 | 0 | 18 | – |
 | [Anti-spam, anti-virus and content control](#anti-spam-anti-virus-and-content-control) | 54 | – | 13 | – |
 | [Storage, accounts and data model](#storage-accounts-and-data-model) | 86 | – | 10 | – |
@@ -72,7 +72,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 2 | – | 4 | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 5 | 1 | 2 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 4 | 1 | 4 | – |
-| **Total** | **628** | **12** | **140** | **15** |
+| **Total** | **629** | **12** | **139** | **15** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage and the administration surface are the best-covered areas**, and the
@@ -448,7 +448,7 @@ the source, not from documentation.
 
 ### Sieve, ManageSieve and rules
 
-53 shipped · 0 underway · 11 not started · 0 deferred
+54 shipped · 0 underway · 10 not started · 0 deferred
 
 | | Capability | Detail |
 |:-:|---|---|
@@ -496,7 +496,7 @@ the source, not from documentation.
 | ✅ | Unimplemented constructs are refused at upload, not silently ignored | **Corrected 15 August 2026 — this row used to describe the opposite, as a shipped "real hazard", and had been false for some time.** `IsKnownCommand_` and `IsKnownTest_` are strict allowlists (commands: require/if/elsif/else/stop/keep/discard/fileinto/redirect/vacation/setflag/addflag/removeflag; tests: address/allof/anyof/exists/false/header/not/size/true/envelope/hasflag/body), and `require` refuses any extension this server does not implement. Anything outside those sets fails CHECKSCRIPT and PUTSCRIPT with "unknown command"/"unknown test" rather than parsing and quietly doing nothing at delivery. That is the property the rest of this section depends on: an author is told at upload that a construct is unsupported, instead of believing a filter is running that is not. `SieveSyntax.cs` pins it, including the case that mattered most — a script requiring "reject" is refused, where it was once reported valid while the reject never happened. |
 | ✅ | Vacation expiry with auto-disable | Optional expiry date; on the first delivery after it passes the flag is switched off in the database rather than merely being ignored. An unparsable date fails open (vacation stays on) |
 | ✅ | copy (RFC 3894) | Not implemented. There is no :copy tag on fileinto or redirect, so a redirect always cancels the implicit keep unless an explicit keep is also written **Shipped in dc9301a** - the row above described the state before it. |
-| ⬜ | date and index (RFC 5260) | Not implemented, and refused rather than ignored: `date`/`currentdate` are not in the known-test allowlist, so a script using them fails at upload with "unknown test". There is no :index/:last tagged argument for selecting among repeated header fields. |
+| ✅ | date and index (RFC 5260) | **Both shipped 16 August 2026**, advertised as "date" and "index" over ManageSieve. `date` and `currentdate` extract all thirteen RFC 5260 4.1 date-parts (year through weekday, including julian as Modified Julian Day and the composed iso8601/std11 forms), with real zone arithmetic: the header's wall clock and its zone are parsed SEPARATELY - `Time::GetDateTimeFromMimeHeader` folds them together and cannot express `:originalzone` - so `:zone` re-expresses the same instant and `:originalzone` keeps the header's own clock. The decisive test files on an hour the raw header never states (15:30 +0200 matched as hour 13 under :zone "+0000"), with the negative control that the unconverted hour must NOT also match. One trap found on the way, now recorded in the code: `Time::GetTimeAdjustForTimezone` answers "what do I add to reach UTC" - the NEGATED zone - and the first build shipped "+0200" as "-0200" until the end-to-end test caught it. An unknown date-part and a malformed :zone are refused at upload. `:index`/`:last` select among repeated header fields on the header, address and date tests (not envelope, which has nothing to index into); a missing nth instance matches nothing, not even "". |
 | ⬜ | duplicate (RFC 7352) | Not implemented; no duplicate test and no tracking store for :handle/:uniqueid seen-values |
 | ⬜ | editheader (RFC 5293) | Not implemented. addheader/deleteheader are not even in the known-command list, so a script using them fails CHECKSCRIPT with "unknown command" |
 | ⬜ | enotify (RFC 5435) | Not implemented, and refused rather than ignored: `notify` is not in the known-command allowlist, so a script using it fails at upload with "unknown command". There are no notification methods, no valid_notify_method test and no NOTIFY capability advertised over ManageSieve. |

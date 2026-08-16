@@ -63,6 +63,11 @@ namespace RegressionTests.Sieve
          // environment under its require.
          Assert.IsEmpty(CheckSyntax("require \"environment\";\r\nif environment :is \"name\" \"hMailServer\" {\r\n  keep;\r\n}"));
 
+         // date, currentdate and :index under their requires.
+         Assert.IsEmpty(CheckSyntax("require \"date\";\r\nif currentdate :is \"weekday\" \"0\" {\r\n  keep;\r\n}"));
+         Assert.IsEmpty(CheckSyntax("require \"date\";\r\nif date :zone \"+0200\" \"date\" \"hour\" \"15\" {\r\n  keep;\r\n}"));
+         Assert.IsEmpty(CheckSyntax("require \"index\";\r\nif header :index 2 :last :is \"Received\" \"x\" {\r\n  keep;\r\n}"));
+
          // A comment plus a multi-name require of extensions that ARE implemented.
          // This line used to require "reject", which the parser accepted and then
          // silently ignored - so the script was reported valid and the reject never
@@ -128,6 +133,15 @@ namespace RegressionTests.Sieve
          // ihave and environment without their requires.
          Assert.IsNotEmpty(CheckSyntax("if ihave \"fileinto\" {\r\n  keep;\r\n}"));
          Assert.IsNotEmpty(CheckSyntax("if environment :is \"name\" \"x\" {\r\n  keep;\r\n}"));
+
+         // The date tests: unknown date part, malformed zone, :originalzone on
+         // currentdate (which has no original), :last without :index, and :index
+         // without its require - each refused at upload with the reason named.
+         Assert.IsNotEmpty(CheckSyntax("require \"date\";\r\nif currentdate :is \"dayofweek\" \"0\" {\r\n  keep;\r\n}"));
+         Assert.IsNotEmpty(CheckSyntax("require \"date\";\r\nif currentdate :zone \"UTC+2\" \"hour\" \"15\" {\r\n  keep;\r\n}"));
+         Assert.IsNotEmpty(CheckSyntax("require \"date\";\r\nif currentdate :originalzone \"hour\" \"15\" {\r\n  keep;\r\n}"));
+         Assert.IsNotEmpty(CheckSyntax("require \"index\";\r\nif header :last :is \"Received\" \"x\" {\r\n  keep;\r\n}"));
+         Assert.IsNotEmpty(CheckSyntax("if header :index 2 :is \"Received\" \"x\" {\r\n  keep;\r\n}"));
       }
 
       /// <summary>

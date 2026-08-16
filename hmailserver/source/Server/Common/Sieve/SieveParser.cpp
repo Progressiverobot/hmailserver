@@ -9,6 +9,10 @@
 // Boost too (through RuleGuard), so what compiles here is what will run there.
 #include <boost/regex.hpp>
 
+// For the ':zone' offset check on the date tests (Time::GetTimeAdjustForTimezone),
+// so a zone the evaluator cannot parse is refused at upload.
+#include "../Util/Time.h"
+
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
 #define new DEBUG_NEW
@@ -33,7 +37,9 @@ namespace HM
                 lowerTag == _T("handle") ||
                 lowerTag == _T("from") ||
                 lowerTag == _T("addresses") ||
-                lowerTag == _T("content");
+                lowerTag == _T("content") ||
+                lowerTag == _T("zone") ||
+                lowerTag == _T("index");
       }
 
       bool IsRelation(const String &relation)
@@ -51,6 +57,26 @@ namespace HM
          return comparator.Compare(_T("i;ascii-casemap")) == 0 ||
                 comparator.Compare(_T("i;octet")) == 0 ||
                 comparator.Compare(_T("i;ascii-numeric")) == 0;
+      }
+
+      // The date-parts RFC 5260 4.1 defines. Refusing an unknown part at upload is
+      // the same courtesy as refusing an unknown extension: "dayofweek" would
+      // otherwise be stored and silently never match.
+      bool IsKnownDatePart(const String &part)
+      {
+         static const wchar_t *known[] =
+         {
+            L"year", L"month", L"day", L"date", L"julian", L"hour", L"minute",
+            L"second", L"time", L"iso8601", L"std11", L"zone", L"weekday"
+         };
+
+         for (const wchar_t *candidate : known)
+         {
+            if (part.CompareNoCase(candidate) == 0)
+               return true;
+         }
+
+         return false;
       }
 
       // Whether a ':regex' key compiles, using the same construction the evaluator
@@ -133,6 +159,11 @@ namespace HM
          L"ihave",
          // RFC 5183: which server, where, and at what phase a script is running.
          L"environment",
+         // RFC 5260: the date/currentdate tests, and :index/:last for selecting
+         // among repeated header fields. Two capability names by that RFC's own
+         // registration, though they ship together.
+         L"date",
+         L"index",
          L"comparator-i;ascii-casemap",
          L"comparator-i;octet",
          L"comparator-i;ascii-numeric"
@@ -301,6 +332,16 @@ namespace HM
                // fileinto :create (RFC 5490).
                result.mailboxCreate = true;
             }
+            else if (tag == _T("originalzone"))
+            {
+               // date (RFC 5260): parts expressed in the header's own zone.
+               result.originalZone = true;
+            }
+            else if (tag == _T("last"))
+            {
+               // :index :last (RFC 5260 6): count from the end.
+               result.lastGiven = true;
+            }
 
             continue;
          }
@@ -332,6 +373,20 @@ namespace HM
 
             result.seconds = value->number;
             result.secondsGiven = true;
+            i++;
+            continue;
+         }
+
+         if (tag == _T("index"))
+         {
+            if (value == nullptr || value->kind != SieveArgument::Kind::Number)
+            {
+               errorMessage.Format(_T("Line %d: ':index' must be followed by a number."), argument.line);
+               return false;
+            }
+
+            result.indexValue = static_cast<int>(value->number);
+            result.indexGiven = true;
             i++;
             continue;
          }
@@ -385,6 +440,12 @@ namespace HM
             result.bodyTransformGiven = true;
             result.contentTypes = value->strings;
          }
+         else if (tag == _T("zone"))
+         {
+            // date / currentdate (RFC 5260).
+            result.zone = value->strings[0];
+            result.zoneGiven = true;
+         }
 
          i++;
       }
@@ -421,7 +482,7 @@ namespace HM
       {
          L"address", L"allof", L"anyof", L"exists", L"false", L"header",
          L"not", L"size", L"true", L"envelope", L"hasflag", L"body",
-         L"mailboxexists", L"ihave", L"environment"
+         L"mailboxexists", L"ihave", L"environment", L"date", L"currentdate"
       };
 
       for (const wchar_t *candidate : known)
@@ -972,9 +1033,35 @@ namespace HM
       {
          if (expectedStringLists == 1)
             errorMessage.Format(_T("Line %d: %s takes one list of keys."), line, context.c_str());
+         else if (expectedStringLists == 3)
+            errorMessage.Format(_T("Line %d: %s takes a header name, a date part and a key list."), line, context.c_str());
          else
             errorMessage.Format(_T("Line %d: %s takes a header/part list and a key list."), line, context.c_str());
 
+         return false;
+      }
+
+      return true;
+   }
+
+   bool
+   SieveParser::ValidateIndexArguments_(const SieveArgumentSet &set, int line, String &errorMessage)
+   {
+      if (set.indexGiven)
+      {
+         if (!NeedExtension_(_T("index"), _T("':index'"), line, errorMessage))
+            return false;
+
+         if (set.indexValue < 1)
+         {
+            errorMessage.Format(_T("Line %d: ':index' counts from 1."), line);
+            return false;
+         }
+      }
+
+      if (set.lastGiven && !set.indexGiven)
+      {
+         errorMessage.Format(_T("Line %d: ':last' is only meaningful together with ':index'."), line);
          return false;
       }
 
@@ -1346,7 +1433,10 @@ namespace HM
 
       if (name == _T("header"))
       {
-         if (!CheckTags_(set, _T("comparator is contains matches value count regex"), _T("'header'"), errorMessage))
+         if (!CheckTags_(set, _T("comparator is contains matches value count regex index last"), _T("'header'"), errorMessage))
+            return false;
+
+         if (!ValidateIndexArguments_(set, test->line, errorMessage))
             return false;
 
          return ValidateMatchArguments_(set, _T("'header'"), test->line, errorMessage);
@@ -1358,8 +1448,17 @@ namespace HM
              !NeedExtension_(_T("envelope"), _T("the 'envelope' test"), test->line, errorMessage))
             return false;
 
-         if (!CheckTags_(set, _T("comparator is contains matches value count regex all localpart domain user detail"),
+         // :index/:last on address but not envelope: RFC 5260 6 extends header,
+         // address and date - an envelope has one from and one to, so there is
+         // nothing to index into.
+         if (!CheckTags_(set,
+                         name == _T("address")
+                            ? _T("comparator is contains matches value count regex all localpart domain user detail index last")
+                            : _T("comparator is contains matches value count regex all localpart domain user detail"),
                          _T("'") + name + _T("'"), errorMessage))
+            return false;
+
+         if (name == _T("address") && !ValidateIndexArguments_(set, test->line, errorMessage))
             return false;
 
          if (!ValidateMatchArguments_(set, _T("'") + name + _T("'"), test->line, errorMessage))
@@ -1377,6 +1476,65 @@ namespace HM
                return false;
             }
          }
+
+         return true;
+      }
+
+      if (name == _T("date") || name == _T("currentdate"))
+      {
+         bool isDate = name == _T("date");
+
+         if (!NeedExtension_(_T("date"), _T("the '") + name + _T("' test"), test->line, errorMessage))
+            return false;
+
+         if (!CheckTags_(set,
+                         isDate ? _T("comparator is contains matches value count regex zone originalzone index last")
+                                : _T("comparator is contains matches value count regex zone"),
+                         _T("'") + name + _T("'"), errorMessage))
+            return false;
+
+         size_t expectedLists = isDate ? 3u : 2u;
+         if (!ValidateMatchArguments_(set, _T("'") + name + _T("'"), test->line, errorMessage, expectedLists))
+            return false;
+
+         // The header name (date only) and the date-part are single strings in the
+         // grammar, arriving here as one-element lists.
+         for (size_t listIndex = 0; listIndex + 1 < expectedLists; listIndex++)
+         {
+            if (set.stringLists[listIndex].size() != 1)
+            {
+               errorMessage.Format(isDate
+                  ? _T("Line %d: 'date' takes a header name, a date part and a list of keys.")
+                  : _T("Line %d: 'currentdate' takes a date part and a list of keys."), test->line);
+               return false;
+            }
+         }
+
+         const String &part = set.stringLists[expectedLists - 2][0];
+         if (!IsKnownDatePart(part))
+         {
+            errorMessage.Format(_T("Line %d: '%s' is not a date part this server knows."), test->line, part.c_str());
+            return false;
+         }
+
+         if (set.zoneGiven)
+         {
+            if (set.originalZone)
+            {
+               errorMessage.Format(_T("Line %d: ':zone' and ':originalzone' contradict each other."), test->line);
+               return false;
+            }
+
+            int hours = 0, minutes = 0;
+            if (!Time::GetTimeAdjustForTimezone(set.zone, hours, minutes))
+            {
+               errorMessage.Format(_T("Line %d: ':zone' needs an offset of the form \"+hhmm\" or \"-hhmm\"."), test->line);
+               return false;
+            }
+         }
+
+         if (!ValidateIndexArguments_(set, test->line, errorMessage))
+            return false;
 
          return true;
       }
