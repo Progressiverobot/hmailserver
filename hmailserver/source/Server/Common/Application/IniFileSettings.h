@@ -1,5 +1,5 @@
 // Copyright (c) 2010 Martin Knafve / hMailServer.com.  
-// http://www.hmailserver.com
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 
 #pragma once
@@ -169,6 +169,11 @@ namespace HM
       String GetOutboundOAuth2Scope() {return outbound_oauth2_scope_;}
       String GetOutboundOAuth2Hosts() {return outbound_oauth2_hosts_;}
       String GetOutboundOAuth2FixedToken() {return outbound_oauth2_fixed_token_;}
+
+      // The POP3-fetch counterpart of OutboundOAuth2Hosts: external accounts
+      // whose server is listed here authenticate with XOAUTH2 using the same
+      // token client and credentials as the outbound relay.
+      String GetFetchOAuth2Hosts() {return fetch_oauth2_hosts_;}
       String GetOAuth2Audience() {return oauth2_audience_;}
       String GetOAuth2UsernameClaim() {return oauth2_username_claim_;}
       bool GetProtectStoredSecretsWithDPAPI() {return protect_stored_secrets_with_dpapi_;}
@@ -542,6 +547,7 @@ namespace HM
       String outbound_oauth2_scope_;
       String outbound_oauth2_hosts_;
       String outbound_oauth2_fixed_token_;
+      String fetch_oauth2_hosts_;
       String oauth2_allowed_algorithms_;
       String oauth2_hmac_secret_;
       String oauth2_rsa_public_key_file_;

@@ -1,5 +1,5 @@
 // Copyright (c) 2010 Martin Knafve / hMailServer.com.  
-// http://www.hmailserver.com
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 
 #include "StdAfx.h"
@@ -15,6 +15,8 @@
 #include "../Common/BO/Account.h"
 #include "../Common/Persistence/PersistentMessage.h"
 #include "../Common/Util/ByteBuffer.h"
+#include "../Common/Util/OutboundOAuth2TokenClient.h"
+#include "../Common/Application/IniFileSettings.h"
 #include "../SMTP/RecipientParser.h"
 #include "../Common/Util/Parsing/AddressListParser.h"
 #include "../Common/Util/Utilities.h"
@@ -235,6 +237,14 @@ namespace HM
          case StatePasswordSent:
             ParsePasswordSent_(sRequest);
             return true;
+         case StateXOAuth2Sent:
+            // +OK continues exactly as a password success does; -ERR drops the
+            // cached token before quitting, since a revoked token and clock skew
+            // both look like this and both are cured by fetching a fresh one.
+            if (!CommandIsSuccessfull_(sRequest))
+               OutboundOAuth2TokenClient::Instance()->Invalidate();
+            ParsePasswordSent_(sRequest);
+            return true;
          case StateUIDLRequestSent:
             ParseUIDLResponse_(sRequest);
             return true;
@@ -320,6 +330,52 @@ namespace HM
    void
    POP3ClientConnection::SendUserName_()
    {
+      // XOAUTH2 first when this server is configured for it (the Microsoft 365
+      // Basic-auth cutover: collecting from outlook.office365.com with USER/PASS
+      // has been off since 2022). One line, one round trip, same blob shape as
+      // the outbound SMTP client's. The password is not a fallback here either -
+      // a host on the OAuth list has Basic auth off, and USER/PASS against it is
+      // a guaranteed, slower failure.
+      String fetchHosts = IniFileSettings::Instance()->GetFetchOAuth2Hosts();
+      String serverAddress = account_->GetServerAddress();
+
+      bool oauthApplies = false;
+      std::vector<String> hosts = StringParser::SplitString(fetchHosts, ",");
+      for (String host : hosts)
+      {
+         host.TrimLeft();
+         host.TrimRight();
+         if (!host.IsEmpty() && host.CompareNoCase(serverAddress) == 0)
+         {
+            oauthApplies = true;
+            break;
+         }
+      }
+
+      if (oauthApplies)
+      {
+         String token = IniFileSettings::Instance()->GetOutboundOAuth2FixedToken();
+         String tokenError;
+
+         if (token.IsEmpty() && !OutboundOAuth2TokenClient::Instance()->GetToken(token, tokenError))
+         {
+            ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5905, "POP3ClientConnection::SendUserName_",
+               "Could not obtain an OAuth2 token for fetching from " + serverAddress + ": " + tokenError);
+            QuitNow_();
+            return;
+         }
+
+         String blob = _T("user=") + account_->GetUsername() + _T("\x01") +
+                       _T("auth=Bearer ") + token + _T("\x01\x01");
+
+         String encoded;
+         StringParser::Base64Encode(blob, encoded);
+
+         EnqueueWrite_(_T("AUTH XOAUTH2 ") + encoded);
+         current_state_ = StateXOAuth2Sent;
+         return;
+      }
+
       // We have connected successfully.
       // Time to send the username.
 

@@ -1,5 +1,5 @@
 // Copyright (c) 2010 Martin Knafve / hMailServer.com.  
-// http://www.hmailserver.com
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 
 #include "stdafx.h"
@@ -185,6 +185,7 @@ namespace HM
       outbound_oauth2_scope_ = ReadIniSettingString_("Settings", "OutboundOAuth2Scope", "https://outlook.office365.com/.default");
       outbound_oauth2_hosts_ = ReadIniSettingString_("Settings", "OutboundOAuth2Hosts", "smtp.office365.com");
       outbound_oauth2_fixed_token_ = ReadIniSettingString_("Settings", "OutboundOAuth2FixedToken", "");
+      fetch_oauth2_hosts_ = ReadIniSettingString_("Settings", "FetchOAuth2Hosts", "outlook.office365.com");
       // Comma-separated allow-list of accepted JWT "alg" values (e.g. "RS256,HS256").
       // "none" is never accepted regardless of this list.
       oauth2_allowed_algorithms_ = ReadIniSettingString_("Settings", "OAuth2AllowedAlgorithms", "RS256");

@@ -1,5 +1,5 @@
 // Copyright (c) 2010 Martin Knafve / hMailServer.com.  
-// http://www.hmailserver.com
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 
 using System;
@@ -41,6 +41,12 @@ namespace RegressionTests.Shared
       public List<int> DeletedMessages { get; set; }
       public List<int> RetrievedMessages { get; set; }
       public bool SupportsUIDL { get; set; }
+
+      // The raw base64 blob from "AUTH XOAUTH2 <blob>", and whether a USER
+      // command arrived - between them a test can tell which login the fetcher
+      // chose.
+      public string XOAuth2Blob { get; private set; } = "";
+      public bool UserCommandReceived { get; private set; }
       public bool DisconnectAfterRetrCompletion { get; set; }
       public BufferMode SendBufferMode { get; set; }
 
@@ -80,7 +86,17 @@ namespace RegressionTests.Shared
 
          if (command.ToLower().StartsWith("user"))
          {
+            UserCommandReceived = true;
             Send("+OK\r\n");
+            return true;
+         }
+
+         if (command.ToUpper().StartsWith("AUTH XOAUTH2"))
+         {
+            // The Microsoft-style one-line bearer login. Recorded raw so a test
+            // can decode it and assert on the exact user and token presented.
+            XOAuth2Blob = command.Substring("AUTH XOAUTH2".Length).Trim();
+            Send("+OK Logged in.\r\n");
             return true;
          }
 
