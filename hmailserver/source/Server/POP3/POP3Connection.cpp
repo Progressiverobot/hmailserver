@@ -481,6 +481,20 @@ namespace HM
       // a client is not entitled to interpret the bracketed text unless this is present.
       capabilities+="RESP-CODES\r\n";
 
+      // RFC 3206: authentication failures carry [AUTH] and system failures [SYS/TEMP],
+      // so a client can tell "your password is wrong" (reprompt the user) from "the
+      // server is having trouble" (retry silently later) without parsing prose. The
+      // distinction matters most to clients polling on a schedule: without it, a
+      // transient database problem makes them nag the user for a password that was
+      // never wrong.
+      capabilities+="AUTH-RESP-CODE\r\n";
+
+      // RFC 2449 section 6.9. Deliberately without a version: the string exists so an
+      // implementation-specific workaround can be keyed on it, which the name alone
+      // enables, while the exact patch level would hand an attacker a lookup key into
+      // fixed-in-version security advisories for the cost of one CAPA command.
+      capabilities+="IMPLEMENTATION hMailServer\r\n";
+
       // RFC 6856: advertise UTF-8 support so clients may issue the UTF8 command.
       capabilities+="UTF8\r\n";
 
@@ -650,7 +664,7 @@ namespace HM
 
       if (disconnect)
       {
-         EnqueueWrite_("-ERR Invalid user name or password. Too many invalid logon attempts.");
+         EnqueueWrite_("-ERR [AUTH] Invalid user name or password. Too many invalid logon attempts.");
          return ResultDisconnect;
       }
 
@@ -666,14 +680,14 @@ namespace HM
          authentication_failure_count_++;
          if (authentication_failure_count_ >= 10)
          {
-            EnqueueWrite_("-ERR Invalid user name or password. Too many invalid logon attempts.");
+            EnqueueWrite_("-ERR [AUTH] Invalid user name or password. Too many invalid logon attempts.");
             return ResultDisconnect;
          }
 
          if (username_.Find(_T("@")) == -1)
-            EnqueueWrite_("-ERR Invalid user name or password. Please use full email address as user name.");
+            EnqueueWrite_("-ERR [AUTH] Invalid user name or password. Please use full email address as user name.");
          else
-            EnqueueWrite_("-ERR Invalid user name or password.");
+            EnqueueWrite_("-ERR [AUTH] Invalid user name or password.");
 
          return ResultNormalResponse;
       }
@@ -706,7 +720,7 @@ namespace HM
       {
          // "-ERR" is the only failure indicator in POP3; "+ERR" was read as
          // success by clients that only test the leading character.
-         EnqueueWrite_("-ERR Server error: Failed to fetch messages in Inbox.");
+         EnqueueWrite_("-ERR [SYS/TEMP] Server error: Failed to fetch messages in Inbox.");
          return ResultNormalResponse;
       }
 
@@ -924,11 +938,11 @@ namespace HM
          authentication_failure_count_++;
          if (disconnect || authentication_failure_count_ >= 10)
          {
-            EnqueueWrite_("-ERR Invalid authentication token. Too many invalid logon attempts.");
+            EnqueueWrite_("-ERR [AUTH] Invalid authentication token. Too many invalid logon attempts.");
             return ResultDisconnect;
          }
 
-         EnqueueWrite_("-ERR Invalid authentication token.");
+         EnqueueWrite_("-ERR [AUTH] Invalid authentication token.");
          return ResultNormalResponse;
       }
 
@@ -1077,11 +1091,11 @@ namespace HM
       // Per-connection brute-force cap (effective even when auto-ban is disabled).
       if (disconnect || authentication_failure_count_ >= 10)
       {
-         EnqueueWrite_("-ERR Invalid user name or password. Too many invalid logon attempts.");
+         EnqueueWrite_("-ERR [AUTH] Invalid user name or password. Too many invalid logon attempts.");
          return ResultDisconnect;
       }
 
-      EnqueueWrite_("-ERR Invalid user name or password.");
+      EnqueueWrite_("-ERR [AUTH] Invalid user name or password.");
       return ResultNormalResponse;
    }
 

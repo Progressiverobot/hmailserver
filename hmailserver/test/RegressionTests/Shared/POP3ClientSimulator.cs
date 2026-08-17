@@ -292,8 +292,11 @@ namespace RegressionTests.Shared
          sData = _tcpConnection.ReadUntil("+OK Send your password");
 
          _tcpConnection.Send("PASS " + sPassword + "\r\n");
+         // The failure needle carries [AUTH] since AUTH-RESP-CODE (RFC 3206)
+         // shipped: without the code in the needle a wrong password would sit
+         // out the read timeout instead of failing fast with the reply text.
          sData = _tcpConnection.ReadUntil(new List<string>
-            { "+OK Mailbox locked and ready", "-ERR Invalid user name or password." });
+            { "+OK Mailbox locked and ready", "-ERR [AUTH] Invalid user name or password." });
          Assert.IsTrue(sData.Contains("+OK Mailbox locked and ready"), sData);
 
          _tcpConnection.Send("LIST\r\n");

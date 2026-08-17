@@ -38,7 +38,7 @@ as ⬜, not ✅.
 
 ### Contents and totals
 
-797 items. The counts are the point of this table — they say where the fork is
+798 items. The counts are the point of this table — they say where the fork is
 strong and where it is thin far more honestly than any prose summary.
 
 | Section | ✅ | 🔄 | ⬜ | ⏸️ |
@@ -56,7 +56,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [SMTP and ESMTP](#smtp-and-esmtp) | 27 | – | 2 | – |
 | [Transport security and deliverability](#transport-security-and-deliverability) | 46 | – | 1 | 1 |
 | [IMAP](#imap) | 71 | – | 4 | 3 |
-| [POP3](#pop3) | 21 | – | 6 | – |
+| [POP3](#pop3) | 23 | – | 5 | – |
 | [Sieve, ManageSieve and rules](#sieve-managesieve-and-rules) | 64 | 0 | 1 | – |
 | [Authentication and cryptography](#authentication-and-cryptography) | 57 | 0 | 18 | – |
 | [Anti-spam, anti-virus and content control](#anti-spam-anti-virus-and-content-control) | 54 | – | 13 | – |
@@ -72,7 +72,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 2 | – | 4 | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 5 | 1 | 2 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 4 | 1 | 4 | – |
-| **Total** | **659** | **12** | **111** | **15** |
+| **Total** | **661** | **12** | **110** | **15** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage and the administration surface are the best-covered areas**, and the
@@ -415,12 +415,12 @@ the source, not from documentation.
 
 ### POP3
 
-21 shipped · 0 underway · 6 not started · 0 deferred
+23 shipped · 0 underway · 5 not started · 0 deferred
 
 | | Capability | Detail |
 |:-:|---|---|
 | ✅ | AUTH command with mechanism listing (RFC 5034) | Bare AUTH returns a dot-terminated mechanism list; the list is TLS-conditional (SCRAM-PLUS only on TLS) and OAuth-conditional |
-| ✅ | POP3 conformance and pre-authentication hygiene | Seven defects closed on 13 August 2026, each with a test, after every row of this section was verified against `POP3Connection`. Two were more than conformance. `CAPA` advertised `USER` and `SASL` on a cleartext connection whose IP range sets `RequireTLSForAuth`, so a client taking up the SASL offer sent `AUTH PLAIN <base64 authcid NUL password>` and was refused only afterwards — the password had already crossed the wire in the clear. And `PASS` with no preceding `USER` ran a full logon against an empty user name: it fired `OnClientLogon` with a blank identity, registered a failed login against the client's IP (feeding auto-ban) and spent one of the ten per-connection attempts; it now answers `-ERR Send USER first.` with none of those side effects. The rest: `DELE` of an already-deleted message answered `+OK` twice and now refuses; `USER` with an empty or whitespace-only argument was answered `+OK Send your password`; `CAPA` advertised `STLS` after TLS was already active, on the very `CAPA` a client re-issues after the handshake; a locked maildrop now answers `-ERR [IN-USE]` with `RESP-CODES` declared, so clients stop reporting a lock collision as a wrong password; and `TOP` with a negative or non-numeric line count is refused before the maildrop is touched. Every response keeps its existing literal text where a shared test helper matches on it. AUTH-RESP-CODE (RFC 3206) is verified genuinely open and deliberately left, because emitting `-ERR [AUTH] ...` breaks that helper — a change to make deliberately rather than as a side effect. |
+| ✅ | POP3 conformance and pre-authentication hygiene | Seven defects closed on 13 August 2026, each with a test, after every row of this section was verified against `POP3Connection`. Two were more than conformance. `CAPA` advertised `USER` and `SASL` on a cleartext connection whose IP range sets `RequireTLSForAuth`, so a client taking up the SASL offer sent `AUTH PLAIN <base64 authcid NUL password>` and was refused only afterwards — the password had already crossed the wire in the clear. And `PASS` with no preceding `USER` ran a full logon against an empty user name: it fired `OnClientLogon` with a blank identity, registered a failed login against the client's IP (feeding auto-ban) and spent one of the ten per-connection attempts; it now answers `-ERR Send USER first.` with none of those side effects. The rest: `DELE` of an already-deleted message answered `+OK` twice and now refuses; `USER` with an empty or whitespace-only argument was answered `+OK Send your password`; `CAPA` advertised `STLS` after TLS was already active, on the very `CAPA` a client re-issues after the handshake; a locked maildrop now answers `-ERR [IN-USE]` with `RESP-CODES` declared, so clients stop reporting a lock collision as a wrong password; and `TOP` with a negative or non-numeric line count is refused before the maildrop is touched. Every response keeps its existing literal text where a shared test helper matches on it. AUTH-RESP-CODE (RFC 3206) was verified genuinely open and deliberately left at the time, because emitting `-ERR [AUTH] ...` breaks that helper; it shipped 17 August 2026 as its own change, helper needle moved in the same commit - see its row below. |
 | ✅ | Brute-force containment | Ten failed attempts on one connection force a disconnect regardless of the auto-ban setting, and every failure path (PASS, SCRAM, bearer) also calls AccountLogon::RegisterFailedLogin to feed the per-IP auto-ban |
 | ✅ | CAPA (RFC 2449) | Advertises exactly: UIDL, TOP, USER, SASL <mechs>, STLS (only in STARTTLS modes and only before TLS is active), RESP-CODES, UTF8. USER/SASL are suppressed when STARTTLS is required and TLS is not yet active, and on a cleartext connection whose IP range requires TLS for authentication. |
 | ✅ | Core command set | USER, PASS, QUIT, STAT, LIST (both forms), RETR, DELE, NOOP, RSET all implemented; STAT/LIST use __int64 totals so mailboxes over 2 GB report correctly |
@@ -440,10 +440,11 @@ the source, not from documentation.
 | ✅ | UTF8 command (RFC 6856) | Partial: the UTF8 command is accepted in AUTHORIZATION state and sets a session flag, and UTF8 is advertised in CAPA — but the flag changes no behaviour (message bytes were already passed through verbatim)… |
 | ✅ | XOAUTH2 / OAUTHBEARER (RFC 7628) | Bearer-token login gated on OAuth2TokenValidator::IsEnabled() and, by default, TLS; the token's username claim is the login identity and a client-asserted user= must match it. Feeds the same failure accounting as password login |
 | ⬜ | APOP | Not implemented; the string APOP does not occur anywhere in the server source. Deliberate in effect (it requires a cleartext-equivalent stored secret), but no comment says so |
-| ⬜ | AUTH-RESP-CODE (RFC 3206) | No [AUTH] / [SYS/TEMP] / [SYS/PERM] response codes on authentication failures; all failures are plain -ERR strings |
+| ✅ | AUTH-RESP-CODE (RFC 3206) | Shipped 17 August 2026, made deliberately rather than as a side effect - which is exactly how the 13 August conformance pass said it should happen, because a shared test helper matched the refusal's literal text (the helper's needle moved in the same commit). Every credential refusal carries [AUTH]: the USER/PASS path's four variants, the OAuth2 bearer token's two, and SCRAM's final verdict pair - so a client can reprompt for a password knowing the password was the problem. The failed inbox load at login carries [SYS/TEMP]: the credentials were right, the server was having trouble, retry silently later - the distinction that stops a scheduled poller nagging its user over a transient database problem. Protocol-state refusals (TLS required, malformed SASL, cancellation) deliberately carry no code: they are not credential verdicts. CAPA advertises AUTH-RESP-CODE, which is what entitles a client to interpret the brackets. Four fixtures, including the negative control that a success and an ordinary transaction error carry no code, and the disconnecting tenth failure carrying the code on the way out. |
 | ⬜ | CRAM-MD5, DIGEST-MD5, EXTERNAL, GSSAPI, NTLM | None offered; any other mechanism gets "-ERR Unsupported authentication mechanism." CRAM-MD5/DIGEST-MD5 are omitted for the same reason as APOP (they need reversible secrets)… |
 | ⬜ | EXPIRE and LOGIN-DELAY (RFC 2449) | Neither capability is advertised and neither policy exists: no server-declared message retention period for POP3 clients and no minimum interval between logins |
-| ⬜ | IMPLEMENTATION (RFC 2449) and LANG (RFC 6856) | Neither advertised. Server identity is only carried in the freeform greeting banner (configurable welcome message), and there is no response-language negotiation |
+| ✅ | IMPLEMENTATION (RFC 2449) | Shipped 17 August 2026: CAPA advertises `IMPLEMENTATION hMailServer` - the name and deliberately nothing else. The capability exists so an implementation-specific client workaround can be keyed on it, which the name alone enables; the patch level would hand an attacker a lookup key into fixed-in-version security advisories for the cost of one anonymous CAPA command, and the fixture pins that nothing follows the name. |
+| ⬜ | LANG (RFC 6856) | Not advertised and no response-language negotiation exists; server replies are English-only and the greeting is the configurable welcome message. A real LANG needs a message catalogue and per-connection language state - a project, not a capability line. |
 | ⬜ | PIPELINING (RFC 2449) | Not advertised. The connection issues one EnqueueRead per response, so batched commands are not a declared capability even if buffering sometimes tolerates them |
 | ✅ | RESP-CODES (RFC 2449) | Advertised in CAPA, and a locked maildrop answers `-ERR [IN-USE] Your mailbox is already locked`, so a client no longer reports a lock collision as a wrong password. `[IN-USE]` is the only code emitted — `[AUTH]` and `[SYS/…]` are still absent, left deliberately because a shared test helper matches on the bare `-ERR` text. |
 
