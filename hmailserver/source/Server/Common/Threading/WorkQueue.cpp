@@ -749,7 +749,22 @@ namespace HM
    // that runs to the timeout and then abandons live threads on a dying object.
    //---------------------------------------------------------------------------
    {
-      const int interval_ms = 250;
+      // The retry interval is what an interrupted-but-not-yet-exited worker
+      // costs, and it used to be 250ms - paid almost every time, because the
+      // timed_join below waits only 1ms and a thread woken from a condition
+      // wait rarely reaches its exit within one millisecond of the interrupt.
+      // Every queue then missed its first pass and slept the full 250ms, so a
+      // server with seven queues took ~1.9 seconds to stop while completely
+      // idle - measured, and measurably dependent on nothing but scheduler
+      // wakeup latency, which the machine's timer state changes from day to
+      // day. 25ms keeps the wait bounded by when the threads actually leave
+      // rather than by the penalty for asking too early.
+      const int interval_ms = 25;
+
+      // The diagnostic line keeps its old once-a-second cadence: at the new
+      // interval it would otherwise repeat forty times a second into the
+      // debug log of every slow shutdown it exists to explain.
+      const int passes_per_log = 1000 / interval_ms;
 
       int attempt_count = max_wait_ms / interval_ms;
 
@@ -783,22 +798,25 @@ namespace HM
          if (workerThreads_.empty())
             return true;
 
-         String first_task;
-
+         if (i % passes_per_log == passes_per_log - 1)
          {
-            boost::lock_guard<boost::recursive_mutex> guard(runningTasksMutex_);
+            String first_task;
 
-            auto iter = runningTasks_.begin();
+            {
+               boost::lock_guard<boost::recursive_mutex> guard(runningTasksMutex_);
 
-            if (iter != runningTasks_.end())
-               first_task = (*iter).second.name;
+               auto iter = runningTasks_.begin();
+
+               if (iter != runningTasks_.end())
+                  first_task = (*iter).second.name;
+            }
+
+            if (first_task.IsEmpty())
+               first_task = _T("<Unknown>");
+
+            LOG_DEBUG(Formatter::Format("Still {0} remaining threads in queue {1}. First task: {2}",
+                                        workerThreads_.size(), queue_name_, first_task));
          }
-
-         if (first_task.IsEmpty())
-            first_task = _T("<Unknown>");
-
-         LOG_DEBUG(Formatter::Format("Still {0} remaining threads in queue {1}. First task: {2}",
-                                     workerThreads_.size(), queue_name_, first_task));
 
          Sleep(interval_ms);
       }
