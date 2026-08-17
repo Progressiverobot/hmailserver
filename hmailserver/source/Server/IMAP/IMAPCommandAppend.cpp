@@ -152,10 +152,35 @@ namespace HM
       // last word.
       std::shared_ptr<IMAPSimpleWord> pWord = pParser->Word(pParser->WordCount()-1);
 
-      if (!pWord || !pWord->Clammerized())
+      if (!pWord)
          return IMAPResult(IMAPResult::ResultBad, "Missing literal");
 
-      AnsiString literalSize = pWord->Value();
+      AnsiString literalSize;
+
+      if (pWord->Clammerized())
+      {
+         literalSize = pWord->Value();
+      }
+      else
+      {
+         // RFC 3516 (BINARY): the literal8 form "~{n}" marks content that may
+         // contain NUL octets. The simple parser reads it as a plain word, so
+         // it is recognised here and treated exactly like a literal marker -
+         // the binary receive path stores bytes as bytes either way.
+         String sWordValue = pWord->Value();
+
+         if (sWordValue.GetLength() > 3 &&
+             sWordValue.GetAt(0) == '~' &&
+             sWordValue.GetAt(1) == '{' &&
+             sWordValue.Right(1) == _T("}"))
+         {
+            literalSize = sWordValue.Mid(2, sWordValue.GetLength() - 3);
+         }
+         else
+         {
+            return IMAPResult(IMAPResult::ResultBad, "Missing literal");
+         }
+      }
 
       // Strip a trailing '+' (non-synchronizing literal, RFC 7888) before
       // validating - and remember it: the client is not waiting for a
@@ -596,6 +621,10 @@ namespace HM
          continuation = continuation.Mid(dateEnd + 1);
          continuation.Trim();
       }
+
+      // RFC 3516: the literal8 form "~{n}" is accepted wherever a literal is.
+      if (continuation.GetLength() > 0 && continuation.GetAt(0) == '~')
+         continuation = continuation.Mid(1);
 
       if (continuation.GetLength() < 3 ||
           continuation.GetAt(0) != '{' ||

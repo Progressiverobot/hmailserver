@@ -152,6 +152,10 @@ namespace HM
       // provides for servers without thread ids.
       sResponse += " OBJECTID";
 
+      // RFC 3516: FETCH BINARY[]/BINARY.SIZE[] decode a part's transfer
+      // encoding server-side, and APPEND accepts the literal8 form.
+      sResponse += " BINARY";
+
       // RFC 8437: an authenticated session can return to the not-authenticated
       // state for connection reuse. Advertised only once authenticated - that is
       // the only state where the command is valid, and the RFC's requirement is

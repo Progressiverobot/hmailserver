@@ -333,6 +333,24 @@ namespace HM
                parts_to_look_at_.push_back(oPart);
                break;
             }
+            case BINARYITEM:
+            {
+               IMAPFetchParser::BodyPart oPart = ParseBINARY_(sPart, false, false);
+               parts_to_look_at_.push_back(oPart);
+               break;
+            }
+            case BINARYPEEK:
+            {
+               IMAPFetchParser::BodyPart oPart = ParseBINARY_(sPart, true, false);
+               parts_to_look_at_.push_back(oPart);
+               break;
+            }
+            case BINARYSIZE:
+            {
+               IMAPFetchParser::BodyPart oPart = ParseBINARY_(sPart, true, true);
+               parts_to_look_at_.push_back(oPart);
+               break;
+            }
             case RFC822:
             {
                // Same as:
@@ -607,9 +625,94 @@ namespace HM
 
 
    
+   IMAPFetchParser::BodyPart
+   IMAPFetchParser::ParseBINARY_(const String &sString, bool isPeek, bool isSize)
+   //---------------------------------------------------------------------------
+   // DESCRIPTION:
+   // RFC 3516: BINARY[section], BINARY.PEEK[section] and BINARY.SIZE[section] -
+   // the section's content with its Content-Transfer-Encoding decoded, or the
+   // decoded size. The section is a plain numeric part path; the partial-range
+   // suffix works as it does for BODY[], against the DECODED bytes.
+   //---------------------------------------------------------------------------
+   {
+      BodyPart oPart;
+
+      String sNewName = sString;
+      sNewName.ReplaceNoCase(_T("BINARY.PEEK["), _T("BINARY["));
+
+      oPart.SetDescription(sNewName);
+
+      long lSectionStart = sNewName.Find(_T("[")) + 1;
+      long lSectionEnd = sNewName.Find(_T("]"), lSectionStart) - 1;
+
+      // Partial range, "<start.count>" after the closing bracket.
+      if (sNewName.Find(_T("<"), lSectionEnd) == lSectionEnd + 2)
+      {
+         int iStart = lSectionEnd + 3;
+         int iEnd = sNewName.Find(_T(">"), iStart);
+
+         if (iEnd < 0)
+         {
+            oPart.SetDescription(sNewName.Mid(0, iStart - 1));
+         }
+         else
+         {
+            String sPartial = sNewName.Mid(iStart, iEnd - iStart);
+            int iDotPos = sPartial.Find(_T("."));
+
+            if (iDotPos >= 0)
+            {
+               oPart.octet_start_ = _ttoi(sPartial.Mid(0, iDotPos));
+               oPart.octet_count_ = _ttoi(sPartial.Mid(iDotPos + 1));
+            }
+            else
+            {
+               oPart.octet_start_ = _ttoi(sPartial);
+               oPart.octet_count_ = 0x7FFFFFFF;
+            }
+
+            if (oPart.octet_start_ < 0)
+               oPart.octet_start_ = 0;
+            if (oPart.octet_count_ < 0)
+               oPart.octet_count_ = 0;
+
+            // The response echoes only the origin, like BODY[]<start>.
+            String sBefore = sNewName.Mid(0, iStart - 1);
+            String sAfter = sNewName.Mid(iEnd + 1);
+            oPart.SetDescription(sBefore + sAfter);
+         }
+      }
+
+      long lSectionLen = lSectionEnd - lSectionStart + 1;
+      String sSection = sNewName.Mid(lSectionStart, lSectionLen);
+
+      oPart.SetName(sSection);
+
+      if (isSize)
+         oPart.SetShowBinarySize(true);
+      else
+         oPart.SetShowBinaryContent(true);
+
+      // Fetching binary content without .PEEK sets \Seen, exactly as BODY[]
+      // does; SIZE and PEEK do not.
+      if (!isPeek && !isSize)
+         set_seen_ = true;
+
+      return oPart;
+   }
+
    IMAPFetchParser::ePartType
    IMAPFetchParser::GetPartType_(const String &sPart)
    {
+      if (sPart.FindNoCase(_T("BINARY.SIZE")) >= 0)
+         return BINARYSIZE;
+
+      if (sPart.FindNoCase(_T("BINARY.PEEK")) >= 0)
+         return BINARYPEEK;
+
+      if (sPart.FindNoCase(_T("BINARY[")) >= 0)
+         return BINARYITEM;
+
       if (sPart.FindNoCase(_T("BODY.PEEK")) >= 0)
          return BODYPEEK;
 

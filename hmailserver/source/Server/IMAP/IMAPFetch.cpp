@@ -11,6 +11,7 @@
 #include "../Common/BO/IMAPFolder.h"
 #include "../Common/BO/Message.h"
 #include "../Common/BO/MessageData.h"
+#include "../Common/Mime/MimeCode.h"
 #include "../Common/Util/Charset.h"
 #include "../Common/Util/Time.h"
 #include "../Common/Util/Unicode.h"
@@ -315,6 +316,17 @@ namespace HM
                // RFC 3501: a partial response echoes only the origin octet.
                sPartIdentifier.Format(_T("%s<%d>"), oPart.GetDescription().c_str(), iOctetStart);
 
+            // RFC 3516: BINARY.SIZE answers a number, not a literal.
+            if (oPart.GetShowBinarySize())
+            {
+               String sTemp;
+               sTemp.Format(_T("%s %Iu"), oPart.GetDescription().c_str(), pBuffer->GetSize());
+               AppendOutput_(sOutput, sTemp);
+
+               iter++;
+               continue;
+            }
+
             if (pBuffer->GetSize() > 0)
             {
                // Send part size information
@@ -478,6 +490,38 @@ namespace HM
       {
          // No body provided. We'll have to return
          // an empty buffer.
+         return pOutBuf;
+      }
+
+      // RFC 3516 (BINARY): the section's content with its transfer encoding
+      // decoded - what an attachment save has always done, applied to FETCH.
+      // An empty section means the whole (single-part) body. Encodings the MIME
+      // code has no decoder for come back as-is, which is also what identity
+      // encodings (7bit, 8bit, binary) do.
+      if (oPart.GetShowBinaryContent() || oPart.GetShowBinarySize())
+      {
+         std::shared_ptr<MimeBody> pBinaryPart = pBodyPart;
+
+         if (!oPart.GetName().IsEmpty())
+            pBinaryPart = GetBodyPartByRecursiveIdentifier_(pBodyPart, oPart.GetName());
+
+         if (pBinaryPart)
+         {
+            std::unique_ptr<MimeCodeBase> pCoder(MimeEnvironment::CreateCoder(pBinaryPart->GetTransferEncoding()));
+            pCoder->SetInput(pBinaryPart->GetContent(), pBinaryPart->GetContentLength(), false);
+
+            AnsiString decoded;
+            pCoder->GetOutput(decoded);
+
+            // The partial range applies to the DECODED bytes - that is the
+            // point of asking for BINARY rather than BODY.
+            int iByteStart = 0;
+            int iByteCount = 0;
+            GetBytesToSend_(decoded.GetLength(), oPart, iByteStart, iByteCount);
+
+            pOutBuf->Add((const BYTE*) decoded.c_str() + iByteStart, iByteCount);
+         }
+
          return pOutBuf;
       }
 

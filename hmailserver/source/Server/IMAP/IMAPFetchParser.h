@@ -35,7 +35,10 @@ namespace HM
          PREVIEW = 217,
          SAVEDATE = 218,
          EMAILID = 219,
-         THREADID = 220
+         THREADID = 220,
+         BINARYITEM = 221,
+         BINARYPEEK = 222,
+         BINARYSIZE = 223
 
       };
 
@@ -90,10 +93,18 @@ namespace HM
          void SetDescription(const String &sDescription ) {description_ = sDescription; }
          String &GetDescription() {return description_; }
 
+         // RFC 3516 (BINARY): the section's content with its transfer encoding
+         // decoded, or just the decoded size.
+         bool GetShowBinaryContent() { return show_binary_content_; }
+         bool GetShowBinarySize() { return show_binary_size_; }
+         void SetShowBinaryContent(bool bValue) {show_binary_content_ = bValue; }
+         void SetShowBinarySize(bool bValue) {show_binary_size_ = bValue; }
+
          bool GetBodyTextNeeded()
          {
             // Returns true if we need to load the entire body part, false otherwise.
-            return show_body_text_ || show_body_full_ || show_body_content_;
+            return show_body_text_ || show_body_full_ || show_body_content_ ||
+                   show_binary_content_ || show_binary_size_;
          }
 
       private:
@@ -107,6 +118,8 @@ namespace HM
          bool show_body_text_;
          bool show_body_full_;
          bool show_body_content_;
+         bool show_binary_content_ = false;
+         bool show_binary_size_ = false;
 
          std::vector<String> header_fields_;
          std::vector<String> header_fields_NOT;
@@ -167,6 +180,7 @@ namespace HM
       // structure than just single words.
       BodyPart ParseBODY_(const String &sString);
       BodyPart ParseBODY_PEEK(const String &sString);
+      BodyPart ParseBINARY_(const String &sString, bool isPeek, bool isSize);
 
       bool show_envelope_;
       bool show_rfcsize_;
