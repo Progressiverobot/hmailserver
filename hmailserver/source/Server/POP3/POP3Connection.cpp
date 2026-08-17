@@ -857,6 +857,17 @@ namespace HM
          return ResultNormalResponse;
       }
 
+      // Everything else is refused on purpose, and the roster of absentees is a
+      // set of decisions rather than a backlog. APOP and CRAM-MD5 both require
+      // the server to hold a cleartext-equivalent secret (APOP hashes the
+      // password with a banner timestamp; CRAM-MD5 HMACs it), which this
+      // server's Argon2id/SCRAM password store rightly cannot produce.
+      // DIGEST-MD5 was moved to Historic by RFC 6331 for its documented
+      // defects. NTLM is proprietary legacy with its own downgrade problems.
+      // EXTERNAL could not work today: the inbound TLS contexts do not request
+      // a client certificate. The modern replacements are all above this line -
+      // SCRAM-SHA-256(-PLUS) and the OAuth2 bearers - so a mechanism arriving
+      // here is one nobody should enable in 2026, not one waiting for code.
       EnqueueWrite_("-ERR Unsupported authentication mechanism.");
       return ResultNormalResponse;
    }

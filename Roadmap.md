@@ -56,7 +56,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [SMTP and ESMTP](#smtp-and-esmtp) | 27 | – | 2 | – |
 | [Transport security and deliverability](#transport-security-and-deliverability) | 46 | – | 1 | 1 |
 | [IMAP](#imap) | 71 | – | 4 | 3 |
-| [POP3](#pop3) | 23 | – | 5 | – |
+| [POP3](#pop3) | 25 | – | 3 | – |
 | [Sieve, ManageSieve and rules](#sieve-managesieve-and-rules) | 64 | 0 | 1 | – |
 | [Authentication and cryptography](#authentication-and-cryptography) | 57 | 0 | 18 | – |
 | [Anti-spam, anti-virus and content control](#anti-spam-anti-virus-and-content-control) | 54 | – | 13 | – |
@@ -72,7 +72,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 2 | – | 4 | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 5 | 1 | 2 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 4 | 1 | 4 | – |
-| **Total** | **661** | **12** | **110** | **15** |
+| **Total** | **663** | **12** | **108** | **15** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage and the administration surface are the best-covered areas**, and the
@@ -415,7 +415,7 @@ the source, not from documentation.
 
 ### POP3
 
-23 shipped · 0 underway · 5 not started · 0 deferred
+25 shipped · 0 underway · 3 not started · 0 deferred
 
 | | Capability | Detail |
 |:-:|---|---|
@@ -439,9 +439,9 @@ the source, not from documentation.
 | ✅ | UIDL | Both the scan-listing and single-message forms; the UID is the persistent numeric message UID. Deleted-flagged messages are omitted from both forms, per RFC 1939. |
 | ✅ | UTF8 command (RFC 6856) | Partial: the UTF8 command is accepted in AUTHORIZATION state and sets a session flag, and UTF8 is advertised in CAPA — but the flag changes no behaviour (message bytes were already passed through verbatim)… |
 | ✅ | XOAUTH2 / OAUTHBEARER (RFC 7628) | Bearer-token login gated on OAuth2TokenValidator::IsEnabled() and, by default, TLS; the token's username claim is the login identity and a client-asserted user= must match it. Feeds the same failure accounting as password login |
-| ⬜ | APOP | Not implemented; the string APOP does not occur anywhere in the server source. Deliberate in effect (it requires a cleartext-equivalent stored secret), but no comment says so |
+| ✅ | APOP | **Deliberately absent, resolved 17 August 2026** - the row's own complaint was that the decision was nowhere written down, and now it is, in the code at the mechanism dispatch where the next maintainer will actually look. APOP hashes the cleartext password with a banner timestamp, so implementing it requires the server to store a cleartext-equivalent secret - which the Argon2id/SCRAM password store rightly cannot produce, and which would weaken every account to serve a mechanism from 1996. The replacements are not pending: SCRAM-SHA-256(-PLUS) and the OAuth2 bearers are advertised, and STLS protects the USER/PASS fallback. |
 | ✅ | AUTH-RESP-CODE (RFC 3206) | Shipped 17 August 2026, made deliberately rather than as a side effect - which is exactly how the 13 August conformance pass said it should happen, because a shared test helper matched the refusal's literal text (the helper's needle moved in the same commit). Every credential refusal carries [AUTH]: the USER/PASS path's four variants, the OAuth2 bearer token's two, and SCRAM's final verdict pair - so a client can reprompt for a password knowing the password was the problem. The failed inbox load at login carries [SYS/TEMP]: the credentials were right, the server was having trouble, retry silently later - the distinction that stops a scheduled poller nagging its user over a transient database problem. Protocol-state refusals (TLS required, malformed SASL, cancellation) deliberately carry no code: they are not credential verdicts. CAPA advertises AUTH-RESP-CODE, which is what entitles a client to interpret the brackets. Four fixtures, including the negative control that a success and an ordinary transaction error carry no code, and the disconnecting tenth failure carrying the code on the way out. |
-| ⬜ | CRAM-MD5, DIGEST-MD5, EXTERNAL, GSSAPI, NTLM | None offered; any other mechanism gets "-ERR Unsupported authentication mechanism." CRAM-MD5/DIGEST-MD5 are omitted for the same reason as APOP (they need reversible secrets)… |
+| ✅ | CRAM-MD5, DIGEST-MD5, EXTERNAL, GSSAPI, NTLM | **Deliberately absent, resolved 17 August 2026**, with the roster-of-decisions comment now at the dispatch site in the code. CRAM-MD5 needs a cleartext-equivalent stored secret the Argon2id/SCRAM store cannot produce; DIGEST-MD5 was moved to Historic by RFC 6331 for its documented defects; NTLM is proprietary legacy with its own downgrade problems; EXTERNAL could not work today because the inbound TLS contexts never request a client certificate (its prerequisite is tracked in the security section); GSSAPI/Kerberos SSO is likewise tracked there as a real absence, not restated here as a POP3 one. A capability matrix owes readers the reason an item is absent, not a permanent-looking ⬜ for mechanisms nobody should enable in 2026 - the same resolution the SMTP section's row received on 16 August. |
 | ⬜ | EXPIRE and LOGIN-DELAY (RFC 2449) | Neither capability is advertised and neither policy exists: no server-declared message retention period for POP3 clients and no minimum interval between logins |
 | ✅ | IMPLEMENTATION (RFC 2449) | Shipped 17 August 2026: CAPA advertises `IMPLEMENTATION hMailServer` - the name and deliberately nothing else. The capability exists so an implementation-specific client workaround can be keyed on it, which the name alone enables; the patch level would hand an attacker a lookup key into fixed-in-version security advisories for the cost of one anonymous CAPA command, and the fixture pins that nothing follows the name. |
 | ⬜ | LANG (RFC 6856) | Not advertised and no response-language negotiation exists; server replies are English-only and the greeting is the configurable welcome message. A real LANG needs a message catalogue and per-connection language state - a project, not a capability line. |

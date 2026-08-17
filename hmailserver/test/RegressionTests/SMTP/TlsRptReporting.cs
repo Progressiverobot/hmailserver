@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // https://www.progressiverobot.com
 
 using System;
