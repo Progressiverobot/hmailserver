@@ -16,6 +16,7 @@
 #include "../Common/util/PasswordGenerator.h"
 #include "../SMTP/RuleApplier.h"
 #include "../SMTP/DeliveryQueue.h"
+#include "../SMTP/TlsRptReporterTask.h"
 #include "../Common/Persistence/PersistentMessage.h"
 #include "../Common/Persistence/Maintenance/Maintenance.h"
 #include "../Common/Util/Parsing/StringParser.h"
@@ -100,6 +101,40 @@ STDMETHODIMP InterfaceUtilities::ResolveMXRecords(BSTR DomainName, BSTR *Result)
       }
 
       *Result = sResult.AllocSysString();
+
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceUtilities::SendTlsRptReports(VARIANT_BOOL IncludeCurrentDay, long *ReportCount)
+{
+   try
+   {
+      if (!ReportCount)
+         return COMError::GenerateGenericMessage();
+
+      *ReportCount = 0;
+
+      // Sends mail to third parties, so it is an administrator's call to make.
+      if (!authentication_->GetIsServerAdmin())
+         return authentication_->GetAccessDenied();
+
+      // Refused rather than run: SendReportsNow POPS each day's statistics, and
+      // with no sender address it can only discard what it popped. A diagnostic
+      // that destroys the data it was asked to show - silently, returning 0 as
+      // if there were simply nothing to send - would be worse than no
+      // diagnostic. The hourly task keeps its discard behaviour, which is what
+      // bounds the store's memory on an unconfigured server; this entry point
+      // exists for an administrator who believes reporting is set up, so tell
+      // them when it is not.
+      if (HM::IniFileSettings::Instance()->GetTlsRptFromAddress().IsEmpty())
+         return COMError::GenerateError("TlsRptFromAddress is not set in the [Settings] section of hMailServer.ini, so no report can be sent. The collected statistics have been preserved.");
+
+      *ReportCount = HM::TlsRptReporterTask::SendReportsNow(IncludeCurrentDay != VARIANT_FALSE);
 
       return S_OK;
    }

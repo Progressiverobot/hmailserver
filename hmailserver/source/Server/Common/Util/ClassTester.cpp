@@ -31,6 +31,7 @@
 #include "../Persistence/PersistentMessage.h"
 #include "../../SMTP/SPF/SPF.h"
 #include "../../SMTP/BLCheck.h"
+#include "../../SMTP/TlsRptReporterTask.h"
 #include "../Application/BackupManager.h"
 #include "../Util/Encoding/Base64.h"
 #include "../Util/Encoding/ModifiedUTF7.h"
@@ -377,6 +378,89 @@ namespace HM
          // The type string appearing as some OTHER key's value must not count.
          AnsiString decoy = "{\"failedChallenge\": \"http-01\", \"challenges\": []}";
          if (AcmeClient::FindChallengeOfType(decoy, "http-01") >= 0)
+            throw 0;
+      }
+
+      OutputDebugString(_T("hMailServer: Testing the TLS-RPT record parser and report builder\n"));
+      {
+         // The shape RFC 8460 section 3 gives, with two mailto targets and the
+         // URI parameter a real-world record carries.
+         std::vector<String> addresses;
+         if (!TlsRptReporterTask::ParseTlsRptRecord(
+                "v=TLSRPTv1; rua=mailto:reports@example.com,mailto:backup@example.net?subject=tls", addresses))
+            throw 0;
+         if (addresses.size() != 2)
+            throw 0;
+         if (addresses[0] != _T("reports@example.com"))
+            throw 0;
+         // The ?subject parameter is part of the URI, not the mailbox.
+         if (addresses[1] != _T("backup@example.net"))
+            throw 0;
+
+         // A policy whose rua names only https endpoints is a valid TLSRPTv1
+         // record this implementation cannot deliver to: recognized, zero
+         // addresses. The distinction matters - "not a policy" would make the
+         // caller keep scanning TXT records that will never match.
+         addresses.clear();
+         if (!TlsRptReporterTask::ParseTlsRptRecord(
+                "v=TLSRPTv1;rua=https://reporting.example.com/v1/tlsrpt", addresses))
+            throw 0;
+         if (!addresses.empty())
+            throw 0;
+
+         // An unrelated TXT record at the same name (an SPF policy, say) is not
+         // a TLSRPT record at all.
+         addresses.clear();
+         if (TlsRptReporterTask::ParseTlsRptRecord("v=spf1 mx -all", addresses))
+            throw 0;
+         if (!addresses.empty())
+            throw 0;
+
+         // The report body: RFC 8460 section 4's required members, the counts,
+         // the failure detail, and JSON escaping of a quote in a value that
+         // reaches the report verbatim (the organization name is the
+         // administrator's own text).
+         TlsRptStore::DomainBucket bucket;
+         bucket.policy_type = "no-policy-found";
+         bucket.successful_sessions = 3;
+
+         TlsRptStore::FailureDetail failure;
+         failure.result_type = "validation-failure";
+         failure.receiving_mx = "mx1.example.org";
+         failure.count = 2;
+         bucket.failures.push_back(failure);
+
+         AnsiString json = TlsRptReporterTask::BuildReportJson(
+            "2026-08-16", _T("example.org"), bucket, "report-id-1", _T("postmaster@sender.test"), "Acme \"Mail\" Ltd");
+
+         if (json.Find("\"start-datetime\":\"2026-08-16T00:00:00Z\"") < 0)
+            throw 0;
+         if (json.Find("\"end-datetime\":\"2026-08-16T23:59:59Z\"") < 0)
+            throw 0;
+         if (json.Find("\"policy-domain\":\"example.org\"") < 0)
+            throw 0;
+         if (json.Find("\"policy-type\":\"no-policy-found\"") < 0)
+            throw 0;
+         if (json.Find("\"total-successful-session-count\":3") < 0)
+            throw 0;
+         if (json.Find("\"total-failure-session-count\":2") < 0)
+            throw 0;
+         if (json.Find("\"result-type\":\"validation-failure\"") < 0)
+            throw 0;
+         if (json.Find("\"receiving-mx-hostname\":\"mx1.example.org\"") < 0)
+            throw 0;
+         if (json.Find("\"failed-session-count\":2") < 0)
+            throw 0;
+         if (json.Find("\"organization-name\":\"Acme \\\"Mail\\\" Ltd\"") < 0)
+            throw 0;
+         if (json.Find("\"contact-info\":\"postmaster@sender.test\"") < 0)
+            throw 0;
+         if (json.Find("\"report-id\":\"report-id-1\"") < 0)
+            throw 0;
+
+         // An empty policy_string must not emit an empty policy-string array -
+         // the member is simply absent.
+         if (json.Find("policy-string") >= 0)
             throw 0;
       }
 

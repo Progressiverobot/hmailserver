@@ -54,7 +54,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Accessibility, which is not optional](#accessibility-which-is-not-optional) | 6 | 1 | 2 | – |
 | **The capability matrix** | | | | |
 | [SMTP and ESMTP](#smtp-and-esmtp) | 27 | – | 2 | – |
-| [Transport security and deliverability](#transport-security-and-deliverability) | 44 | – | 3 | 1 |
+| [Transport security and deliverability](#transport-security-and-deliverability) | 45 | – | 2 | 1 |
 | [IMAP](#imap) | 71 | – | 4 | 3 |
 | [POP3](#pop3) | 21 | – | 6 | – |
 | [Sieve, ManageSieve and rules](#sieve-managesieve-and-rules) | 64 | 0 | 1 | – |
@@ -72,7 +72,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 2 | – | 4 | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 5 | 1 | 2 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 4 | 1 | 4 | – |
-| **Total** | **657** | **12** | **113** | **15** |
+| **Total** | **658** | **12** | **112** | **15** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage and the administration surface are the best-covered areas**, and the
@@ -275,7 +275,7 @@ the source, not from documentation.
 
 ### Transport security and deliverability
 
-44 shipped · 0 underway · 3 not started · 1 deferred
+45 shipped · 0 underway · 2 not started · 1 deferred
 
 | | Capability | Detail |
 |:-:|---|---|
@@ -309,7 +309,7 @@ the source, not from documentation.
 | ✅ | TLS 1.2 and TLS 1.3 enabled by default | `SslVersions` bitmask ships as 24 (= TlsVersion12 8 \| TlsVersion13 16), so TLS 1.0 and 1.1 are off unless explicitly re-enabled. SSLv2 and SSLv3 are hard-disabled in code and cannot be turned on. |
 | ✅ | TLS on the auxiliary HTTP listeners | The REST API, Web Services HTTPS and metrics listeners each take their context from `SslContextInitializer::InitServer` — the same call `TCPServer` makes for SMTP, POP3 and IMAP — so `SslVersions`, `SslCipherList`, `TlsOptions`, the DH parameters and the key-exchange groups all reach them; `SSL_CTX_new` appears nowhere in the server. Each then re-applies `SSL_CTX_set_min_proto_version(TLS1_2_VERSION)` afterwards, so it can only tighten. **Caveat:** if `SslVersions` permits only TLS 1.0/1.1 that floor leaves those three listeners with no negotiable version at all — they bind and fail every handshake with nothing logged. [See the defects list](#defects-found-by-the-audit). |
 | ✅ | TLS version, cipher and group control | SSLv2/SSLv3 always off and not enableable; TLS 1.0/1.1/1.2/1.3 individually disableable via `SSL_OP_NO_TLSv1*`; administrator-supplied cipher list applied with `SSL_CTX_set_cipher_list` (TLS ≤1.2 only — see the TLS 1.3 ciphersuite row); key-exchange groups configurable via `TlsKeyExchangeGroups`. Since 13 Aug 2026, clearing *all four* version bits — which used to bind every listener and then fail every handshake with "no protocols available", silently — is reported as HM5990 and falls back to TLS 1.2 + 1.3. Turning TLS off is a per-port `ConnectionSecurity` decision, so "TLS with no version" is not a configuration anyone can mean. |
-| ⬜ | TLS-RPT (RFC 8460) report generation and submission | **Inert by default**: the reporter task returns immediately when `TlsRptFromAddress` is empty, which it is out of the box, so reports are aggregated and never sent. Otherwise: Per-UTC-day, per-domain success/failure aggregation; scheduled task reads _smtp._tls TXT, extracts rua= mailto: targets, builds the RFC 8460 JSON report and mails it as multipart/report with application/tlsrpt+json… |
+| ✅ | TLS-RPT (RFC 8460) report generation and submission | Verified end to end on 17 August 2026, and the one structural gap closed. What ships: per-UTC-day, per-destination-domain aggregation of outbound TLS session outcomes recorded during real MX-path deliveries (successes, opportunistic-STARTTLS downgrades as `validation-failure`, MTA-STS policy-fetch and host-mismatch failures, DANE DNSSEC failures); an hourly task that, for each completed day, reads the domain's `_smtp._tls` TXT record, extracts the `rua=` mailto targets (https endpoints are recognised but unsupported), builds the RFC 8460 JSON and mails it as multipart/report with application/tlsrpt+json. Inert until `TlsRptFromAddress` is set - a mail server should not start mailing third parties because someone enabled MTA-STS - and since the startup notice shipped, visibly so rather than silently. The gap that made the send path untestable was also the gap that made it unverifiable for an administrator: the task fires hourly and only mails days that are OVER, so nobody could see a report without waiting until tomorrow. `Utilities.SendTlsRptReports(IncludeCurrentDay)` (COM, server-admin only) now sends what has been collected on demand, refusing - with the statistics preserved - when `TlsRptFromAddress` is unset, since running anyway could only pop-and-discard the data it was asked to show. The end-to-end fixture drives the whole chain: a fixture DNS server answers the MX with 127.0.0.1, our own port 25 (temporarily STARTTLS-required) plays the remote, the forgiven self-signed handshake lands a session in the store, and the report is discovered via `_smtp._tls`, built, mailed and asserted on in the rua mailbox - plus self-tests pinning the record parser and the exact JSON shape. Honest caveats: the store is in-memory, so a restart loses unsent statistics (RFC 8460 reports are best-effort observability, not a ledger); rua delivery is mailto-only; fixed routes and the SMTP relayer are deliberately outside the accounting, since the policies the report describes (MTA-STS, DANE) govern MX-path delivery. |
 | ✅ | TLSA record generation for own certificate | AcmeClient::GetCertificateTlsa computes the DANE "3 1 1" payload (SHA-256 over SubjectPublicKeyInfo) from the issued PEM, so the operator can publish a matching TLSA record. Publishing itself is manual. |
 | ⏸️ | OCSP stapling | Not implemented — no OCSP callback, no `SSL_CTX_set_tlsext_status_cb`, no must-staple handling. Consciously postponed to the documented-but-unscheduled tier. |
 | ✅ | AEAD-only cipher policy | Shipped as a named preset rather than a string an administrator has to get right: setting `SslCipherList` to the token `AEAD-ONLY` (case-insensitive) expands to a vetted ECDHE/DHE + AES-GCM/ChaCha20-Poly1305 list, most-preferred first. It excludes every CBC construction and with them the Lucky13 padding-oracle family, and static-RSA key exchange. The cost is stated rather than hidden: nothing below TLS 1.2 can connect at all, since GCM and ChaCha20 need 1.2, so CBC-only TLS 1.2 stacks of the Windows 7 / Java 6 era are shut out. TLS 1.3 is untouched - its suites are AEAD by construction and live in `TlsCipherSuites13`. A misspelled preset is not silently ignored: it reaches OpenSSL, is rejected, and HM5511 names the string. The shipped default cipher list is unchanged. |

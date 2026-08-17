@@ -69,6 +69,7 @@ public:
    STDMETHOD(CheckSieveSyntax)(/*[in]*/ BSTR Script, /*[out, retval]*/ BSTR *Result);
    STDMETHOD(EvaluateSieveScript)(/*[in]*/ BSTR Script, /*[in]*/ BSTR RawMessage, /*[out, retval]*/ BSTR *Result);
    STDMETHOD(ResolveMXRecords)(/*[in]*/ BSTR DomainName, /*[out, retval]*/ BSTR *Result);
+   STDMETHOD(SendTlsRptReports)(/*[in]*/ VARIANT_BOOL IncludeCurrentDay, /*[out, retval]*/ long *ReportCount);
 };
 
 OBJECT_ENTRY_AUTO(__uuidof(Utilities), InterfaceUtilities)

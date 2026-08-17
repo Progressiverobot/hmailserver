@@ -1137,6 +1137,15 @@ interface IInterfaceUtilities : IDispatch{
    // actually goes. This runs inside the server, on the same resolver delivery
    // uses.
    [id(22), helpstring("Resolves the MX records for a domain using the server's own resolver (honouring a configured custom DNS server), one 'hostname<TAB>ip-address' line per delivery target, ordered by MX preference as delivery orders them. Empty when the domain has no mail servers; raises an error when the lookup itself failed.")] HRESULT ResolveMXRecords([in] BSTR DomainName, [out, retval] BSTR *Result);
+   // The RFC 8460 reporter runs hourly and only mails days that are over, so an
+   // administrator who has just configured TlsRptFromAddress has nothing to look
+   // at until tomorrow. This sends what has been collected right now - including
+   // today's still-accumulating statistics when IncludeCurrentDay is set, which
+   // RFC 8460 permits (a day may be covered by more than one report). Requires
+   // server-admin rights, and refuses - preserving the collected statistics -
+   // when TlsRptFromAddress is not configured, because running anyway could only
+   // discard the data it was asked to send.
+   [id(23), helpstring("Sends the aggregate SMTP TLS reports (RFC 8460) collected so far to the domains that request them, rather than waiting for the hourly schedule. Set IncludeCurrentDay to also report today's still-accumulating statistics. Returns the number of reports submitted. Raises an error when TlsRptFromAddress is not configured; requires server administrator rights.")] HRESULT SendTlsRptReports([in] VARIANT_BOOL IncludeCurrentDay, [out, retval] long *ReportCount);
 };
 
 [

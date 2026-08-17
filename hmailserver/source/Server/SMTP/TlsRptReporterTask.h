@@ -24,13 +24,41 @@ namespace HM
 
       virtual void DoWork();
 
+      // The send pass itself, callable outside the schedule. Pops each completed
+      // day - and, when includeCurrentDay is set, today's still-accumulating
+      // bucket as well - and mails one report per domain that requests them.
+      // Returns the number of reports submitted.
+      //
+      // includeCurrentDay exists for COM's SendTlsRptReports: an administrator
+      // who has just configured TlsRptFromAddress should be able to see a report
+      // arrive now, not tomorrow. RFC 8460 permits more than one report for a
+      // day, so sessions recorded after the pop simply form a later report.
+      //
+      // With no TlsRptFromAddress configured the popped data is DISCARDED, which
+      // is what bounds the store's memory on an unconfigured server. A caller
+      // acting for an administrator must therefore check the setting first and
+      // refuse, rather than let a diagnostic destroy the data it was asked to
+      // show - the COM layer does exactly that.
+      static int SendReportsNow(bool includeCurrentDay);
+
+      // Parses one TXT record. Returns true when the record is a TLSRPTv1
+      // policy, in which case the mailto: rua targets (parameters stripped) are
+      // appended to addresses - possibly none, since a policy whose rua names
+      // only https endpoints is valid but unusable here. Public and static so
+      // the self-tests can pin the parse without a DNS server.
+      static bool ParseTlsRptRecord(const AnsiString &record, std::vector<String> &addresses);
+
+      // Builds the RFC 8460 report body. Everything is a parameter - including
+      // the organization name, which the production caller reads from the ini -
+      // so the self-tests can pin the exact JSON.
+      static AnsiString BuildReportJson(const AnsiString &dayKey, const String &domain,
+                                        const TlsRptStore::DomainBucket &bucket, const AnsiString &reportId,
+                                        const String &contactInfo, const AnsiString &organizationName);
+
    private:
 
-      void SendReportForDomain_(const AnsiString &dayKey, const String &domain, const TlsRptStore::DomainBucket &bucket);
+      static bool SendReportForDomain_(const AnsiString &dayKey, const String &domain, const TlsRptStore::DomainBucket &bucket);
       static bool GetReportingAddresses_(const String &domain, std::vector<String> &addresses);
-      static AnsiString BuildReportJson_(const AnsiString &dayKey, const String &domain,
-                                         const TlsRptStore::DomainBucket &bucket, const AnsiString &reportId,
-                                         const String &contactInfo);
       static AnsiString JsonEscape_(const AnsiString &value);
    };
 }

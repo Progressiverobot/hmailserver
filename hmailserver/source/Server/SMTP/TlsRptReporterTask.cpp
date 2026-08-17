@@ -60,14 +60,31 @@ namespace HM
    void
    TlsRptReporterTask::DoWork()
    {
+      SendReportsNow(false);
+   }
+
+   int
+   TlsRptReporterTask::SendReportsNow(bool includeCurrentDay)
+   {
       // Collect the day buckets that are complete (yesterday and older).
-      std::vector<AnsiString> completedDays = TlsRptStore::Instance()->GetCompletedDays();
-      if (completedDays.empty())
-         return;
+      std::vector<AnsiString> days = TlsRptStore::Instance()->GetCompletedDays();
+
+      // Today's bucket is deliberately absent from GetCompletedDays - a day is
+      // reported once it can no longer grow. The on-demand caller asks for it
+      // anyway: an administrator verifying their setup has sessions from today
+      // and none from yesterday, and RFC 8460 allows a day to be covered by
+      // more than one report.
+      if (includeCurrentDay)
+         days.push_back(TlsRptStore::GetCurrentDayKey());
+
+      if (days.empty())
+         return 0;
 
       String fromAddress = IniFileSettings::Instance()->GetTlsRptFromAddress();
 
-      for (const AnsiString &dayKey : completedDays)
+      int reportsSent = 0;
+
+      for (const AnsiString &dayKey : days)
       {
          std::map<String, TlsRptStore::DomainBucket> domains = TlsRptStore::Instance()->PopDay(dayKey);
 
@@ -78,9 +95,53 @@ namespace HM
 
          for (auto iter = domains.begin(); iter != domains.end(); ++iter)
          {
-            SendReportForDomain_(dayKey, iter->first, iter->second);
+            if (SendReportForDomain_(dayKey, iter->first, iter->second))
+               reportsSent++;
          }
       }
+
+      return reportsSent;
+   }
+
+   bool
+   TlsRptReporterTask::ParseTlsRptRecord(const AnsiString &record, std::vector<String> &addresses)
+   {
+      AnsiString narrow = record;
+      narrow.Trim();
+
+      if (!narrow.StartsWith("v=TLSRPTv1"))
+         return false;
+
+      // Locate the rua= field and extract mailto: addresses.
+      std::vector<AnsiString> parts = StringParser::SplitString(narrow, ";");
+      for (AnsiString part : parts)
+      {
+         part.Trim();
+         if (!part.StartsWith("rua="))
+            continue;
+
+         std::vector<AnsiString> uris = StringParser::SplitString(part.Mid(4), ",");
+         for (AnsiString uri : uris)
+         {
+            uri.Trim();
+
+            if (!uri.StartsWith("mailto:"))
+               continue; // https reporting endpoints are not supported.
+
+            AnsiString address = uri.Mid(7);
+
+            // Strip any URI parameters.
+            int parameterPosition = address.Find("?");
+            if (parameterPosition >= 0)
+               address = address.Mid(0, parameterPosition);
+
+            address.Trim();
+            if (!address.IsEmpty())
+               addresses.push_back(String(address));
+         }
+      }
+
+      return true;
    }
 
    bool
@@ -94,53 +155,19 @@ namespace HM
 
       for (const String &record : txtRecords)
       {
-         AnsiString narrow = record;
-         narrow.Trim();
-
-         if (!narrow.StartsWith("v=TLSRPTv1"))
-            continue;
-
-         // Locate the rua= field and extract mailto: addresses.
-         std::vector<AnsiString> parts = StringParser::SplitString(narrow, ";");
-         for (AnsiString part : parts)
-         {
-            part.Trim();
-            if (!part.StartsWith("rua="))
-               continue;
-
-            std::vector<AnsiString> uris = StringParser::SplitString(part.Mid(4), ",");
-            for (AnsiString uri : uris)
-            {
-               uri.Trim();
-
-               if (!uri.StartsWith("mailto:"))
-                  continue; // https reporting endpoints are not supported.
-
-               AnsiString address = uri.Mid(7);
-
-               // Strip any URI parameters.
-               int parameterPosition = address.Find("?");
-               if (parameterPosition >= 0)
-                  address = address.Mid(0, parameterPosition);
-
-               address.Trim();
-               if (!address.IsEmpty())
-                  addresses.push_back(String(address));
-            }
-         }
-
-         return !addresses.empty();
+         if (ParseTlsRptRecord(AnsiString(record), addresses))
+            return !addresses.empty();
       }
 
       return false;
    }
 
-   void
+   bool
    TlsRptReporterTask::SendReportForDomain_(const AnsiString &dayKey, const String &domain, const TlsRptStore::DomainBucket &bucket)
    {
       std::vector<String> reportingAddresses;
       if (!GetReportingAddresses_(domain, reportingAddresses))
-         return; // Domain does not request TLS reports.
+         return false; // Domain does not request TLS reports.
 
       String fromAddress = IniFileSettings::Instance()->GetTlsRptFromAddress();
       String submitter = StringParser::ExtractDomain(fromAddress);
@@ -148,7 +175,8 @@ namespace HM
       AnsiString reportId;
       reportId.Format("%hs.%I64d@%hs", dayKey.c_str(), static_cast<__int64>(time(nullptr)), AnsiString(submitter).c_str());
 
-      AnsiString reportJson = BuildReportJson_(dayKey, domain, bucket, reportId, fromAddress);
+      AnsiString reportJson = BuildReportJson(dayKey, domain, bucket, reportId, fromAddress,
+         IniFileSettings::Instance()->GetTlsRptOrganizationName());
 
       // Build the report mail (multipart/report, RFC 8460 section 5.3).
       AnsiString narrowDomain = domain;
@@ -202,7 +230,7 @@ namespace HM
       if (!FileUtilities::WriteToFile(fileName, mailContent))
       {
          LOG_APPLICATION("TLSRPT: Failed to write report message file for domain " + domain + ".");
-         return;
+         return false;
       }
 
       reportMessage->SetSize(FileUtilities::FileSize(fileName));
@@ -217,7 +245,7 @@ namespace HM
       if (reportMessage->GetRecipients()->GetCount() == 0)
       {
          FileUtilities::DeleteFile(fileName);
-         return;
+         return false;
       }
 
       // Unchecked, and the log line below ran either way - so a failed save wrote
@@ -232,21 +260,22 @@ namespace HM
          ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6111, "TlsRptReporterTask::SendReportForDomain_",
             "TLSRPT: the aggregate TLS report for " + domain + " could not be saved and has NOT been sent.");
 
-         return;
+         return false;
       }
 
       Application::Instance()->SubmitPendingEmail();
 
       LOG_APPLICATION("TLSRPT: Sent aggregate TLS report for " + domain + " covering " + String(dayKey) + ".");
+
+      return true;
    }
 
    AnsiString
-   TlsRptReporterTask::BuildReportJson_(const AnsiString &dayKey, const String &domain,
-                                        const TlsRptStore::DomainBucket &bucket, const AnsiString &reportId,
-                                        const String &contactInfo)
+   TlsRptReporterTask::BuildReportJson(const AnsiString &dayKey, const String &domain,
+                                       const TlsRptStore::DomainBucket &bucket, const AnsiString &reportId,
+                                       const String &contactInfo, const AnsiString &organizationName)
    {
       AnsiString narrowDomain = domain;
-      AnsiString organizationName = IniFileSettings::Instance()->GetTlsRptOrganizationName();
 
       int totalFailures = 0;
       for (const TlsRptStore::FailureDetail &failure : bucket.failures)
