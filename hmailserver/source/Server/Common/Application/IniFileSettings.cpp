@@ -411,6 +411,17 @@ namespace HM
       dmarc_rpt_from_address_ = ReadIniSettingString_("Settings", "DmarcRptFromAddress", "");
       dmarc_rpt_organization_name_ = ReadIniSettingString_("Settings", "DmarcRptOrganizationName", "hMailServer");
 
+      // Per-name authentication lockout (see AccountLockout.h). Threshold 0 -
+      // the default - disables the whole mechanism; the windows only matter
+      // once it is on.
+      account_lockout_threshold_ = ReadIniSettingInteger_("Settings", "AccountLockoutThreshold", 0);
+      account_lockout_window_minutes_ = ReadIniSettingInteger_("Settings", "AccountLockoutWindowMinutes", 30);
+      account_lockout_minutes_ = ReadIniSettingInteger_("Settings", "AccountLockoutMinutes", 30);
+      if (account_lockout_window_minutes_ < 1)
+         account_lockout_window_minutes_ = 30;
+      if (account_lockout_minutes_ < 1)
+         account_lockout_minutes_ = 30;
+
       // Hybrid post-quantum key exchange first, classical curves after it. The
       // list is only a preference order - the group actually used is negotiated,
       // so a peer that does not implement the ML-KEM hybrids picks X25519 or one

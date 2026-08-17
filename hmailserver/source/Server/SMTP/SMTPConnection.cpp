@@ -12,6 +12,7 @@
 #include "../common/Cache/CacheContainer.h"
 #include "../common/Util/PasswordValidator.h"
 #include "../common/Util/AccountLogon.h"
+#include "../common/Util/AccountLockout.h"
 #include "../common/Util/OAuth2TokenValidator.h"
 #include "../common/Util/Crypt.h"
 #include "../common/Util/Hashing/ScramSha256.h"
@@ -3372,10 +3373,13 @@ namespace HM
          return;
       }
 
-      // Feed the per-IP auto-ban accounting, then apply the per-connection cap.
+      // Feed the per-IP auto-ban accounting, then apply the per-connection cap -
+      // deliberately not the per-name lockout: a bearer token is not guessable,
+      // and a client looping on an expired one would lock its own user out of
+      // every password-based client. See AccountLogon.h.
       AccountLogon accountLogon;
       bool disconnect = false;
-      accountLogon.RegisterFailedLogin(GetRemoteEndpointAddress(), sLoginName, disconnect);
+      accountLogon.RegisterFailedLogin(GetRemoteEndpointAddress(), sLoginName, disconnect, false);
 
       authentication_failure_count_++;
 
@@ -3621,6 +3625,12 @@ namespace HM
 
       isAuthenticated_ = true;
 
+      // The name authenticated, so its failure counters go - the same clearing
+      // AccountLogon::Logon performs on the PLAIN/LOGIN path. Without it a user
+      // who mistypes twice and then succeeds over SCRAM carries those failures
+      // for ever, and one later slip locks them out.
+      AccountLockout::Instance()->RecordSuccess(sUsername);
+
       FireOnClientLogon_(sUsername, true);
 
       SendResponse_(235, _T("2.7.0"), _T("authenticated."));
@@ -3631,12 +3641,32 @@ namespace HM
    SMTPConnection::ScramAuthFailed_()
    {
       String sUsername = scram_session_ ? String(scram_session_->GetUsername()) : username_;
+
+      // Whether there was ever a key to verify against. When the helper returned
+      // no account - an unknown name, an Argon2id or Active Directory account, a
+      // hash policy that excludes PBKDF2, or a name already locked - the exchange
+      // was a forced failure that no password could have passed, so it is not a
+      // password guess and must not count towards the per-name lockout. See the
+      // fuller note in POP3Connection::ScramAuthFailed_.
+      const bool verifiableAccount = scram_session_ && scram_session_->GetAccount() != nullptr;
+
       scram_session_.reset();
 
-      // Feed the per-IP auto-ban accounting (parity with the LOGIN/PLAIN path).
-      AccountLogon accountLogon;
+      // Feed the per-IP auto-ban accounting (parity with the LOGIN/PLAIN path) -
+      // unless the exchange was doomed by the lock itself, in which case nothing
+      // is reported, exactly as AccountLogon::Logon's locked branch does: the
+      // owner retrying a locked name with the CORRECT password must not get their
+      // address banned for everyone behind it. Not extended to the other
+      // forced-failure causes (unknown name, Argon2id/AD account, hash policy),
+      // which would let an attacker spray names over SCRAM for free. See the
+      // fuller note in POP3Connection::ScramAuthFailed_.
       bool disconnect = false;
-      accountLogon.RegisterFailedLogin(GetRemoteEndpointAddress(), sUsername, disconnect);
+
+      if (!AccountLockout::Instance()->IsLockedOut(sUsername))
+      {
+         AccountLogon accountLogon;
+         accountLogon.RegisterFailedLogin(GetRemoteEndpointAddress(), sUsername, disconnect, verifiableAccount);
+      }
 
       authentication_failure_count_++;
 
@@ -3659,6 +3689,15 @@ namespace HM
       std::shared_ptr<DomainAliases> pDA = ObjectCache::Instance()->GetDomainAliases();
       String sAccountAddress = pDA->ApplyAliasesOnAddress(sAddress);
       sAccountAddress = DefaultDomain::ApplyDefaultDomain(sAccountAddress);
+
+      // A locked name is treated exactly as an account that cannot serve SCRAM:
+      // the empty handle runs the forced-failure exchange documented at the call
+      // site, so the lock is enforced here without a second refusal shape for an
+      // attacker to tell apart. Without it the lock bound only the PLAIN/LOGIN
+      // path, so an attacker chose SCRAM and guessed freely while their attempts
+      // still locked the victim out of every password client.
+      if (AccountLockout::Instance()->IsLockedOut(sAccountAddress))
+         return std::shared_ptr<const Account>();
 
       std::shared_ptr<const Account> pAccount = CacheContainer::Instance()->GetAccount(sAccountAddress);
       if (!pAccount || !pAccount->GetActive())

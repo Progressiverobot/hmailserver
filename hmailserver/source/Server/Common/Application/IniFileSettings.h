@@ -395,6 +395,9 @@ namespace HM
       String GetTlsRptOrganizationName() const { return tls_rpt_organization_name_; }
       String GetDmarcRptFromAddress() const { return dmarc_rpt_from_address_; }
       String GetDmarcRptOrganizationName() const { return dmarc_rpt_organization_name_; }
+      int GetAccountLockoutThreshold() const { return account_lockout_threshold_; }
+      int GetAccountLockoutWindowMinutes() const { return account_lockout_window_minutes_; }
+      int GetAccountLockoutMinutes() const { return account_lockout_minutes_; }
       // TLS key-exchange groups, in OpenSSL group-list syntax, most preferred
       // first. The default puts the hybrid post-quantum KEMs ahead of the
       // classical curves: a PQC-capable peer then gets a quantum-resistant
@@ -656,6 +659,9 @@ namespace HM
       String tls_rpt_organization_name_;
       String dmarc_rpt_from_address_;
       String dmarc_rpt_organization_name_;
+      int account_lockout_threshold_ = 0;
+      int account_lockout_window_minutes_ = 30;
+      int account_lockout_minutes_ = 30;
       String tls_key_exchange_groups_;
       String tls_cipher_suites13_;
       bool tls_session_tickets_enabled_ = true;

@@ -1237,7 +1237,14 @@ namespace HM
          AccountLogon accountLogon;
          bool disconnect = false;
 
-         accountLogon.RegisterFailedLogin(peer_address, _T("REST API"), disconnect);
+         // The per-name lockout is deliberately not fed here. The credential this
+         // listener accepts is the administrator password from the ini, not a
+         // mailbox name, so "REST API" is a label for the per-IP accounting and
+         // never a name anybody authenticates as - counting it could only lock a
+         // string nobody uses, while logging a line that claims a control acted.
+         // Brute force against this listener is answered by the per-IP auto-ban
+         // and the refused-source set above. See AccountLogon.h.
+         accountLogon.RegisterFailedLogin(peer_address, _T("REST API"), disconnect, false);
 
          // 'disconnect' is set exactly when this failure was the one that
          // tripped the ban. The connection carrying it is closed after its one

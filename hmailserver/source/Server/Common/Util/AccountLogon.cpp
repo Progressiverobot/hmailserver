@@ -5,6 +5,7 @@
 #include "StdAfx.h"
 
 #include "AccountLogon.h"
+#include "AccountLockout.h"
 #include "PasswordValidator.h"
 #include "../Persistence/PersistentLogonFailure.h"
 #include "../Persistence/PersistentAccount.h"
@@ -47,10 +48,42 @@ namespace HM
    {
       disconnect = false;
 
+      // Per-name lockout, checked BEFORE the password: a locked name is refused
+      // without spending an Argon2id verification on it, and the refusal is the
+      // ordinary invalid-credentials reply (see AccountLockout.h for what timing
+      // still reveals).
+      //
+      // The refusal is deliberately NOT reported to RegisterFailedLogin, so it
+      // reaches neither the per-name counters nor the per-IP auto-ban.
+      //
+      // The per-IP half is the one that matters, and it is a real hazard rather
+      // than tidiness. Once a name is locked, the person most likely to keep
+      // trying is its owner, with the CORRECT password - and charging those
+      // attempts to their address is how a lockout caused by a botnet gets an
+      // innocent office NAT, or the loopback address of a co-hosted webmail
+      // front end, banned from SMTP, IMAP and POP3 for everybody behind it by a
+      // priority-100 deny-everything range. An attack on one mailbox must not
+      // become an outage for unrelated users at the victim's address.
+      //
+      // Nothing is lost in the other direction: an attacker who reaches this
+      // branch has already been charged for the failures that caused the lock,
+      // and further attempts against a name that can no longer be verified tell
+      // them nothing, so declining to count them removes no pressure that was
+      // doing any work. The per-connection attempt caps and
+      // OnAuthenticationFailed still see every attempt.
+      if (AccountLockout::Instance()->IsLockedOut(username))
+      {
+         ServerStatus::Instance()->OnAuthenticationFailed();
+
+         std::shared_ptr<Account> empty;
+         return empty;
+      }
+
       std::shared_ptr<const Account> account = PasswordValidator::ValidatePassword(masqname, username, password);
       if (account)
       {
          PersistentAccount::UpdateLastLogonTime(account);
+         AccountLockout::Instance()->RecordSuccess(username);
          ServerStatus::Instance()->OnAuthenticationSucceeded();
          return account;
       }
@@ -64,9 +97,17 @@ namespace HM
    }
 
    void
-   AccountLogon::RegisterFailedLogin(const IPAddress &ipaddress, const String &username, bool &disconnect)
+   AccountLogon::RegisterFailedLogin(const IPAddress &ipaddress, const String &username, bool &disconnect,
+                                     bool countTowardsAccountLockout)
    {
       disconnect = false;
+
+      // The per-name half, independent of the per-IP auto-ban below and of its
+      // enablement: each closes a hole the other cannot see - one address
+      // spraying many names, and many addresses converging on one name. See the
+      // header for the failures that deliberately do not count.
+      if (countTowardsAccountLockout)
+         AccountLockout::Instance()->RecordFailure(username);
 
       // is auto banning enabled?
       int maxInvalidLogonAttempts = Configuration::Instance()->GetMaxInvalidLogonAttempts();

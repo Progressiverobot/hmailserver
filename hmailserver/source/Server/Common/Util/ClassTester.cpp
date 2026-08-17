@@ -25,6 +25,7 @@
 #include "DataProtector.h"
 #include "SRS.h"
 #include "BATV.h"
+#include "AccountLockout.h"
 #include "RateLimiter.h"
 #include "TransparentTransmissionBuffer.h"
 #include "../Cache/Cache.h"
@@ -572,6 +573,97 @@ namespace HM
          // The raw SPF result, distinct from the aligned fail above it.
          if (xml.Find("<spf><domain>bounce.example.org</domain><result>pass</result></spf>") < 0)
             throw 0;
+      }
+
+      OutputDebugString(_T("hMailServer: Testing AccountLockout\n"));
+      {
+         // Config travels as parameters (the /Test ini has no lockout keys),
+         // clock as an explicit epoch - the TryConsumeAt pattern. Threshold 3,
+         // ten-minute window, five-minute lockout.
+         AccountLockout *lockout = AccountLockout::Instance();
+         const time_t t0 = 1000000;
+
+         // Two failures do not lock; the third does, and the lock expires on
+         // schedule rather than early or never.
+         lockout->RecordFailureAt(_T("selftest-a@x.test"), t0, 3, 600, 300);
+         lockout->RecordFailureAt(_T("selftest-a@x.test"), t0 + 1, 3, 600, 300);
+         if (lockout->IsLockedOutAt(_T("selftest-a@x.test"), t0 + 2, 300))
+            throw 0;
+         lockout->RecordFailureAt(_T("selftest-a@x.test"), t0 + 2, 3, 600, 300);
+         if (!lockout->IsLockedOutAt(_T("selftest-a@x.test"), t0 + 3, 300))
+            throw 0;
+         if (!lockout->IsLockedOutAt(_T("SELFTEST-A@X.TEST"), t0 + 3, 300))
+            throw 0; // the name is one identity whatever its case
+         if (lockout->IsLockedOutAt(_T("selftest-a@x.test"), t0 + 2 + 300, 300))
+            throw 0;
+
+         // Failures outside the window have aged out: two stale plus one
+         // fresh is not three.
+         lockout->RecordFailureAt(_T("selftest-b@x.test"), t0, 3, 600, 300);
+         lockout->RecordFailureAt(_T("selftest-b@x.test"), t0 + 1, 3, 600, 300);
+         lockout->RecordFailureAt(_T("selftest-b@x.test"), t0 + 700, 3, 600, 300);
+         if (lockout->IsLockedOutAt(_T("selftest-b@x.test"), t0 + 701, 300))
+            throw 0;
+
+         // A successful logon clears the groundwork an attacker laid.
+         lockout->RecordFailureAt(_T("selftest-c@x.test"), t0, 3, 600, 300);
+         lockout->RecordFailureAt(_T("selftest-c@x.test"), t0 + 1, 3, 600, 300);
+         lockout->RecordSuccess(_T("selftest-c@x.test"));
+         lockout->RecordFailureAt(_T("selftest-c@x.test"), t0 + 2, 3, 600, 300);
+         if (lockout->IsLockedOutAt(_T("selftest-c@x.test"), t0 + 3, 300))
+            throw 0;
+
+         // A clock that stepped backwards after the lock was set must not
+         // extend it past its nominal duration.
+         lockout->RecordFailureAt(_T("selftest-d@x.test"), t0, 1, 600, 300);
+         if (!lockout->IsLockedOutAt(_T("selftest-d@x.test"), t0 - 10000, 300))
+            throw 0;
+         if (lockout->IsLockedOutAt(_T("selftest-d@x.test"), t0 - 10000 + 301, 300))
+            throw 0;
+
+         // Attempts made WHILE locked are not counted, and the window restarts
+         // when the lock expires - so a re-lock costs a fresh threshold rather
+         // than one guess. Without both halves an attacker holding a trickle of
+         // guesses on a name kept it locked for ever, which is a denial of
+         // service against the mailbox the feature exists to protect.
+         // Threshold 3, window 600, lock 300.
+         lockout->RecordFailureAt(_T("selftest-e@x.test"), t0, 3, 600, 300);
+         lockout->RecordFailureAt(_T("selftest-e@x.test"), t0 + 1, 3, 600, 300);
+         lockout->RecordFailureAt(_T("selftest-e@x.test"), t0 + 2, 3, 600, 300);
+         if (!lockout->IsLockedOutAt(_T("selftest-e@x.test"), t0 + 3, 300))
+            throw 0;
+
+         // Twenty attempts across the whole lock, all refused without the password
+         // being checked and therefore all uncounted.
+         for (int i = 0; i < 20; i++)
+            lockout->RecordFailureAt(_T("selftest-e@x.test"), t0 + 10 + (i * 10), 3, 600, 300);
+
+         // The lock still ends when it was always going to end...
+         if (!lockout->IsLockedOutAt(_T("selftest-e@x.test"), t0 + 2 + 299, 300))
+            throw 0;
+         if (lockout->IsLockedOutAt(_T("selftest-e@x.test"), t0 + 2 + 300, 300))
+            throw 0;
+
+         // ...and the first two failures afterwards do not re-lock it, which is
+         // the assertion that fails if either half of the fix is removed.
+         lockout->RecordFailureAt(_T("selftest-e@x.test"), t0 + 400, 3, 600, 300);
+         if (lockout->IsLockedOutAt(_T("selftest-e@x.test"), t0 + 401, 300))
+            throw 0;
+         lockout->RecordFailureAt(_T("selftest-e@x.test"), t0 + 402, 3, 600, 300);
+         if (lockout->IsLockedOutAt(_T("selftest-e@x.test"), t0 + 403, 300))
+            throw 0;
+
+         // The third does.
+         lockout->RecordFailureAt(_T("selftest-e@x.test"), t0 + 404, 3, 600, 300);
+         if (!lockout->IsLockedOutAt(_T("selftest-e@x.test"), t0 + 405, 300))
+            throw 0;
+
+         lockout->RecordSuccess(_T("selftest-e@x.test"));
+
+         lockout->RecordSuccess(_T("selftest-a@x.test"));
+         lockout->RecordSuccess(_T("selftest-b@x.test"));
+         lockout->RecordSuccess(_T("selftest-c@x.test"));
+         lockout->RecordSuccess(_T("selftest-d@x.test"));
       }
 
       OutputDebugString(_T("hMailServer: Testing Base64\n"));

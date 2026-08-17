@@ -66,6 +66,15 @@ namespace HM
       }
       else
       {
+         // Deliberately outside the per-name authentication lockout (see
+         // AccountLockout.h) and, as it always has been, outside the per-IP
+         // auto-ban. This is the administration API: the Control Panel logs on
+         // through it, so a lockout reachable from here would mean that guessing
+         // at an administrator's mailbox name from the internet - over IMAP, POP3
+         // or SMTP, where the lockout DOES apply - could also lock them out of the
+         // tool they need in order to respond. Administration stays available on
+         // purpose; DCOM access is itself an authenticated Windows privilege, not
+         // an anonymous mail port.
          account_ = HM::PasswordValidator::ValidatePassword(sUsername, sPassword);
       }
 
