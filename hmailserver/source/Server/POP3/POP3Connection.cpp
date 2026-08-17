@@ -495,6 +495,15 @@ namespace HM
       // fixed-in-version security advisories for the cost of one CAPA command.
       capabilities+="IMPLEMENTATION hMailServer\r\n";
 
+      // RFC 2449 section 6.6, advertised only after it was proved rather than assumed:
+      // the fixture drives batched commands through single TCP segments, across the
+      // authentication boundary and around a multi-line RETR, and the parse loop
+      // drains its buffer correctly. The one dangerous interaction - cleartext
+      // commands pipelined ahead of STLS - was already closed: TCPConnection clears
+      // the receive buffer when the handshake completes and ProtocolSTLS_ wipes any
+      // parsed credentials, so an injected prefix neither executes nor lingers.
+      capabilities+="PIPELINING\r\n";
+
       // RFC 6856: advertise UTF-8 support so clients may issue the UTF8 command.
       capabilities+="UTF8\r\n";
 

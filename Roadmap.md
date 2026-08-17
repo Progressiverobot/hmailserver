@@ -56,7 +56,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [SMTP and ESMTP](#smtp-and-esmtp) | 27 | – | 2 | – |
 | [Transport security and deliverability](#transport-security-and-deliverability) | 46 | – | 1 | 1 |
 | [IMAP](#imap) | 71 | – | 4 | 3 |
-| [POP3](#pop3) | 25 | – | 3 | – |
+| [POP3](#pop3) | 26 | – | 2 | – |
 | [Sieve, ManageSieve and rules](#sieve-managesieve-and-rules) | 64 | 0 | 1 | – |
 | [Authentication and cryptography](#authentication-and-cryptography) | 57 | 0 | 18 | – |
 | [Anti-spam, anti-virus and content control](#anti-spam-anti-virus-and-content-control) | 54 | – | 13 | – |
@@ -72,7 +72,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 2 | – | 4 | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 5 | 1 | 2 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 4 | 1 | 4 | – |
-| **Total** | **663** | **12** | **108** | **15** |
+| **Total** | **664** | **12** | **107** | **15** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage and the administration surface are the best-covered areas**, and the
@@ -415,7 +415,7 @@ the source, not from documentation.
 
 ### POP3
 
-25 shipped · 0 underway · 3 not started · 0 deferred
+26 shipped · 0 underway · 2 not started · 0 deferred
 
 | | Capability | Detail |
 |:-:|---|---|
@@ -445,7 +445,7 @@ the source, not from documentation.
 | ⬜ | EXPIRE and LOGIN-DELAY (RFC 2449) | Neither capability is advertised and neither policy exists: no server-declared message retention period for POP3 clients and no minimum interval between logins |
 | ✅ | IMPLEMENTATION (RFC 2449) | Shipped 17 August 2026: CAPA advertises `IMPLEMENTATION hMailServer` - the name and deliberately nothing else. The capability exists so an implementation-specific client workaround can be keyed on it, which the name alone enables; the patch level would hand an attacker a lookup key into fixed-in-version security advisories for the cost of one anonymous CAPA command, and the fixture pins that nothing follows the name. |
 | ⬜ | LANG (RFC 6856) | Not advertised and no response-language negotiation exists; server replies are English-only and the greeting is the configurable welcome message. A real LANG needs a message catalogue and per-connection language state - a project, not a capability line. |
-| ⬜ | PIPELINING (RFC 2449) | Not advertised. The connection issues one EnqueueRead per response, so batched commands are not a declared capability even if buffering sometimes tolerates them |
+| ✅ | PIPELINING (RFC 2449) | Advertised 17 August 2026 - after it was proved rather than assumed, which is what this row always required. The fixture drives batched commands through single TCP segments, across the authentication boundary (USER+PASS+STAT+QUIT in one write) and around a multi-line RETR in mid-batch, and the parse loop drains its buffer correctly in both states. The one dangerous interaction, cleartext commands pipelined ahead of STLS, was already closed before the capability was claimed: TCPConnection clears the receive buffer when the handshake completes and ProtocolSTLS_ wipes parsed credentials, so an injected prefix neither executes nor lingers - the RFC 2595 injection defence a PIPELINING claim would otherwise weaponise. |
 | ✅ | RESP-CODES (RFC 2449) | Advertised in CAPA, and a locked maildrop answers `-ERR [IN-USE] Your mailbox is already locked`, so a client no longer reports a lock collision as a wrong password. `[IN-USE]` is the only code emitted — `[AUTH]` and `[SYS/…]` are still absent, left deliberately because a shared test helper matches on the bare `-ERR` text. |
 
 ### Sieve, ManageSieve and rules
