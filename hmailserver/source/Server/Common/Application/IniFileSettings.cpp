@@ -404,6 +404,13 @@ namespace HM
       tls_rpt_from_address_ = ReadIniSettingString_("Settings", "TlsRptFromAddress", "");
       tls_rpt_organization_name_ = ReadIniSettingString_("Settings", "TlsRptOrganizationName", "hMailServer");
 
+      // DMARC aggregate reporting (RFC 7489 7.2), the exact shape of the two
+      // TLS-RPT keys above: an empty sender address means statistics are
+      // collected and discarded, never sent - a mail server must not start
+      // mailing third parties because someone turned DMARC checking on.
+      dmarc_rpt_from_address_ = ReadIniSettingString_("Settings", "DmarcRptFromAddress", "");
+      dmarc_rpt_organization_name_ = ReadIniSettingString_("Settings", "DmarcRptOrganizationName", "hMailServer");
+
       // Hybrid post-quantum key exchange first, classical curves after it. The
       // list is only a preference order - the group actually used is negotiated,
       // so a peer that does not implement the ML-KEM hybrids picks X25519 or one

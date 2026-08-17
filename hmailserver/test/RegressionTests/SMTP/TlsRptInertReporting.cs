@@ -84,10 +84,12 @@ namespace RegressionTests.SMTP
 
             // Said once, not once per hourly run: the notice lives in the task
             // constructor precisely so it cannot become a recurring entry. The
-            // phrase counted here occurs once in the message, unlike the setting
-            // name, which the message deliberately repeats.
+            // needle carries the setting name because the shorter phrase it
+            // used to count ("will never send a report") is deliberately shared
+            // with the DMARC reporter's sibling notice - two inert reporters
+            // announce themselves per start, and this test counts only its own.
             Assert.AreEqual(1,
-               defaultLog.Split(new[] { "will never send a report" }, System.StringSplitOptions.None).Length - 1,
+               defaultLog.Split(new[] { "will never send a report: TlsRptFromAddress" }, System.StringSplitOptions.None).Length - 1,
                "The notice should appear exactly once per start. Log: " + defaultLog);
 
             // The critical half. This is the default configuration, so it must

@@ -32,6 +32,7 @@
 #include "../../SMTP/SPF/SPF.h"
 #include "../../SMTP/BLCheck.h"
 #include "../../SMTP/TlsRptReporterTask.h"
+#include "../../SMTP/DmarcRptReporterTask.h"
 #include "../Application/BackupManager.h"
 #include "../Util/Encoding/Base64.h"
 #include "../Util/Encoding/ModifiedUTF7.h"
@@ -461,6 +462,115 @@ namespace HM
          // An empty policy_string must not emit an empty policy-string array -
          // the member is simply absent.
          if (json.Find("policy-string") >= 0)
+            throw 0;
+      }
+
+      OutputDebugString(_T("hMailServer: Testing the DMARC rua parser and report builder\n"));
+      {
+         // The rua tag with two mailto targets, one carrying the RFC 7489 6.2
+         // size suffix and one a URI parameter: neither is part of the mailbox.
+         std::vector<String> addresses;
+         if (!DmarcRptReporterTask::ParseRuaTargets(
+                "v=DMARC1; p=reject; rua=mailto:agg@example.com!10m,mailto:second@example.net?x=1", addresses))
+            throw 0;
+         if (addresses.size() != 2)
+            throw 0;
+         if (addresses[0] != _T("agg@example.com"))
+            throw 0;
+         if (addresses[1] != _T("second@example.net"))
+            throw 0;
+
+         // https-only rua: a recognized policy with zero deliverable targets.
+         addresses.clear();
+         if (!DmarcRptReporterTask::ParseRuaTargets(
+                "v=DMARC1;p=none;rua=https://collector.example/dmarc", addresses))
+            throw 0;
+         if (!addresses.empty())
+            throw 0;
+
+         // An SPF record at the same name is not a DMARC policy at all.
+         addresses.clear();
+         if (DmarcRptReporterTask::ParseRuaTargets("v=spf1 mx -all", addresses))
+            throw 0;
+
+         // RFC 7489 7.1 draws the external-destination line at the
+         // organizational domain: a report mailbox on another host of the same
+         // registrant needs no consent record; anywhere else does.
+         if (DmarcRptReporterTask::IsExternalDestination(_T("mail.example.com"), _T("example.com")))
+            throw 0;
+         if (!DmarcRptReporterTask::IsExternalDestination(_T("example.com"), _T("collector.example")))
+            throw 0;
+
+         // The report body: RFC 7489 Appendix C's members, and XML escaping of
+         // a value the administrator controls.
+         DmarcRptStore::DomainBucket bucket;
+         bucket.policy_domain = "example.org";
+         bucket.adkim = "s";
+         bucket.p = "quarantine";
+         bucket.pct = 50;
+
+         DmarcRptStore::Row row;
+         row.source_ip = "192.0.2.7";
+         row.disposition = "quarantine";
+         row.dkim = "fail";
+         row.spf = "fail";
+         row.header_from = "example.org";
+         row.envelope_from_domain = "bounce.example.org";
+         row.spf_passed = true;
+         row.dkim_passing_domains.push_back("other.example");
+         row.count = 3;
+         bucket.rows.push_back(row);
+
+         AnsiString xml = DmarcRptReporterTask::BuildReportXml(
+            "2026-08-16", bucket, "rpt-1", _T("postmaster@sender.test"), "A & B <Ltd>");
+
+         // The day's epoch range, computed the same way the builder computes
+         // it rather than hand-derived, so the assertion cannot drift from a
+         // timezone or leap assumption.
+         tm dayStart = {};
+         dayStart.tm_year = 2026 - 1900;
+         dayStart.tm_mon = 7;
+         dayStart.tm_mday = 16;
+         __int64 expectedBegin = _mkgmtime64(&dayStart);
+
+         AnsiString expectedRange;
+         expectedRange.Format("<date_range><begin>%I64d</begin><end>%I64d</end></date_range>",
+            expectedBegin, expectedBegin + 86399);
+         if (xml.Find(expectedRange) < 0)
+            throw 0;
+
+         if (xml.Find("<org_name>A &amp; B &lt;Ltd&gt;</org_name>") < 0)
+            throw 0;
+         if (xml.Find("<email>postmaster@sender.test</email>") < 0)
+            throw 0;
+         if (xml.Find("<report_id>rpt-1</report_id>") < 0)
+            throw 0;
+         if (xml.Find("<domain>example.org</domain>") < 0)
+            throw 0;
+         if (xml.Find("<adkim>s</adkim>") < 0)
+            throw 0;
+         // aspf was not published; the default is reported explicitly.
+         if (xml.Find("<aspf>r</aspf>") < 0)
+            throw 0;
+         if (xml.Find("<p>quarantine</p>") < 0)
+            throw 0;
+         // No sp tag published: the member is absent, not empty.
+         if (xml.Find("<sp>") >= 0)
+            throw 0;
+         if (xml.Find("<pct>50</pct>") < 0)
+            throw 0;
+         if (xml.Find("<source_ip>192.0.2.7</source_ip>") < 0)
+            throw 0;
+         if (xml.Find("<count>3</count>") < 0)
+            throw 0;
+         if (xml.Find("<disposition>quarantine</disposition>") < 0)
+            throw 0;
+         if (xml.Find("<header_from>example.org</header_from>") < 0)
+            throw 0;
+         if (xml.Find("<dkim><domain>other.example</domain><result>pass</result></dkim>") < 0)
+            throw 0;
+         // The raw SPF result, distinct from the aligned fail above it.
+         if (xml.Find("<spf><domain>bounce.example.org</domain><result>pass</result></spf>") < 0)
             throw 0;
       }
 

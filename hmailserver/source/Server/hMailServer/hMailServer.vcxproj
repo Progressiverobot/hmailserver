@@ -488,6 +488,7 @@ EXIT 0
     <ClCompile Include="..\Common\Util\OtelTracer.cpp" />
     <ClCompile Include="..\Common\Util\RestApiServer.cpp" />
     <ClCompile Include="..\Common\Util\WebServicesServer.cpp" />
+    <ClCompile Include="..\Common\Util\DmarcRptStore.cpp" />
     <ClCompile Include="..\Common\Util\TlsRptStore.cpp" />
     <ClCompile Include="..\Common\Util\ServiceManager.cpp" />
     <ClCompile Include="..\Common\Util\SignatureAdder.cpp" />
@@ -672,6 +673,7 @@ EXIT 0
     <ClCompile Include="..\SMTP\ExternalDelivery.cpp" />
     <ClCompile Include="..\SMTP\TlsPolicy.cpp" />
     <ClCompile Include="..\SMTP\GreyListCleanerTask.cpp" />
+    <ClCompile Include="..\SMTP\DmarcRptReporterTask.cpp" />
     <ClCompile Include="..\SMTP\TlsRptReporterTask.cpp" />
     <ClCompile Include="..\SMTP\GreyListing.cpp" />
     <ClCompile Include="..\SMTP\LocalDelivery.cpp" />
@@ -1052,6 +1054,7 @@ EXIT 0
     <ClInclude Include="..\Common\Util\OtelTracer.h" />
     <ClInclude Include="..\Common\Util\RestApiServer.h" />
     <ClInclude Include="..\Common\Util\WebServicesServer.h" />
+    <ClInclude Include="..\Common\Util\DmarcRptStore.h" />
     <ClInclude Include="..\Common\Util\TlsRptStore.h" />
     <ClInclude Include="..\Common\Util\ServerStatus.h" />
     <ClInclude Include="..\Common\Util\SecureCompare.h" />
@@ -1237,6 +1240,7 @@ EXIT 0
     <ClInclude Include="..\SMTP\ExternalDeliveryServerResult.h" />
     <ClInclude Include="..\SMTP\TlsPolicy.h" />
     <ClInclude Include="..\SMTP\GreyListCleanerTask.h" />
+    <ClInclude Include="..\SMTP\DmarcRptReporterTask.h" />
     <ClInclude Include="..\SMTP\TlsRptReporterTask.h" />
     <ClInclude Include="..\SMTP\GreyListing.h" />
     <ClInclude Include="..\SMTP\LocalDelivery.h" />

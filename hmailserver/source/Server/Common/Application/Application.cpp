@@ -47,6 +47,7 @@
 
 #include "../../SMTP/GreyListCleanerTask.h"
 #include "../../SMTP/TlsRptReporterTask.h"
+#include "../../SMTP/DmarcRptReporterTask.h"
 #include "../Util/AcmeClient.h"
 #include "../Util/FileUtilities.h"
 #include "../Util/RestApiServer.h"
@@ -617,6 +618,14 @@ namespace HM
       tlsRptTask->SetReoccurance(ScheduledTask::RunInfinitely);
       tlsRptTask->SetMinutesBetweenRun(60);
       scheduler_->ScheduleTask(tlsRptTask);
+
+      // DMARC aggregate reporting (RFC 7489). Same shape as the TLS-RPT task
+      // above: the task always runs so collected statistics are flushed;
+      // reports are only sent when DmarcRptFromAddress is configured.
+      std::shared_ptr<DmarcRptReporterTask> dmarcRptTask = std::shared_ptr<DmarcRptReporterTask>(new DmarcRptReporterTask);
+      dmarcRptTask->SetReoccurance(ScheduledTask::RunInfinitely);
+      dmarcRptTask->SetMinutesBetweenRun(60);
+      scheduler_->ScheduleTask(dmarcRptTask);
 
       // Log retention: prune date-stamped log files older than LogDeleteDays.
       // The task itself no-ops when LogDeleteDays <= 0 (retention disabled).

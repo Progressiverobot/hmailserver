@@ -317,7 +317,8 @@ namespace HM
    DMARC::Verify(const String &fromHeaderDomain,
                  const String &envelopeFromDomain,
                  bool spfPassed,
-                 const std::vector<AnsiString> &dkimPassingDomains)
+                 const std::vector<AnsiString> &dkimPassingDomains,
+                 Evaluation *evaluation)
    {
       if (fromHeaderDomain.IsEmpty())
          return PermError;
@@ -330,6 +331,7 @@ namespace HM
       String policyRecord;
       bool dnsError = false;
       bool isSubdomainPolicy = false;
+      String policyDomain = fromDomain;
 
       if (!RetrievePolicy_(fromDomain, policyRecord, dnsError))
       {
@@ -344,18 +346,42 @@ namespace HM
             return dnsError ? TempError : NoPolicy;
 
          isSubdomainPolicy = true;
+         policyDomain = organizationalDomain;
+      }
+
+      // The published tags are parsed up front - including on the pass path,
+      // which used to return before touching p= at all - because the aggregate
+      // reporter's policy_published block needs them for every message, passes
+      // included. The parse is the only thing moved; which tag governs a
+      // failure, and the pct sampling, are applied further down exactly as
+      // before.
+      String aspfTag;
+      ParseTagValue_(policyRecord, _T("aspf"), aspfTag);
+
+      String adkimTag;
+      ParseTagValue_(policyRecord, _T("adkim"), adkimTag);
+
+      String pTag;
+      ParseTagValue_(policyRecord, _T("p"), pTag);
+
+      String spTag;
+      ParseTagValue_(policyRecord, _T("sp"), spTag);
+
+      int pct = 100;
+      String tagValue;
+      if (ParseTagValue_(policyRecord, _T("pct"), tagValue))
+      {
+         if (StringParser::IsNumeric(tagValue))
+         {
+            pct = _ttoi(tagValue.c_str());
+            if (pct < 0) pct = 0;
+            if (pct > 100) pct = 100;
+         }
       }
 
       // Parse alignment modes. Default is relaxed for both.
-      AlignmentMode spfAlignment = Relaxed;
-      AlignmentMode dkimAlignment = Relaxed;
-
-      String tagValue;
-      if (ParseTagValue_(policyRecord, _T("aspf"), tagValue) && tagValue.CompareNoCase(_T("s")) == 0)
-         spfAlignment = Strict;
-
-      if (ParseTagValue_(policyRecord, _T("adkim"), tagValue) && tagValue.CompareNoCase(_T("s")) == 0)
-         dkimAlignment = Strict;
+      AlignmentMode spfAlignment = aspfTag.CompareNoCase(_T("s")) == 0 ? Strict : Relaxed;
+      AlignmentMode dkimAlignment = adkimTag.CompareNoCase(_T("s")) == 0 ? Strict : Relaxed;
 
       // Evaluate identifier alignment (RFC 7489, section 3.1).
       bool spfAligned = spfPassed && DomainsAligned_(envelopeFromDomain, fromDomain, spfAlignment);
@@ -371,37 +397,31 @@ namespace HM
          }
       }
 
+      if (evaluation)
+      {
+         evaluation->policy_found = true;
+         evaluation->policy_domain = policyDomain;
+         evaluation->adkim = adkimTag;
+         evaluation->aspf = aspfTag;
+         evaluation->p = pTag;
+         evaluation->sp = spTag;
+         evaluation->pct = pct;
+         evaluation->spf_aligned = spfAligned;
+         evaluation->dkim_aligned = dkimAligned;
+      }
+
       if (spfAligned || dkimAligned)
          return Pass;
 
-      // The message failed DMARC. Determine the requested policy.
-      String policy;
-      if (isSubdomainPolicy)
-      {
-         // For subdomains the sp= tag takes precedence if present.
-         if (!ParseTagValue_(policyRecord, _T("sp"), policy))
-            ParseTagValue_(policyRecord, _T("p"), policy);
-      }
-      else
-      {
-         ParseTagValue_(policyRecord, _T("p"), policy);
-      }
+      // The message failed DMARC. Determine the requested policy: for
+      // subdomains the sp= tag takes precedence if present.
+      String policy = (isSubdomainPolicy && !spTag.IsEmpty()) ? spTag : pTag;
 
       if (policy.IsEmpty())
          return PermError;
 
       // Apply pct sampling (RFC 7489, section 6.6.4). Messages outside the
       // sample have the next-less-strict policy applied.
-      int pct = 100;
-      if (ParseTagValue_(policyRecord, _T("pct"), tagValue))
-      {
-         if (StringParser::IsNumeric(tagValue))
-         {
-            pct = _ttoi(tagValue.c_str());
-            if (pct < 0) pct = 0;
-            if (pct > 100) pct = 100;
-         }
-      }
 
       bool inSample = true;
       if (pct < 100)

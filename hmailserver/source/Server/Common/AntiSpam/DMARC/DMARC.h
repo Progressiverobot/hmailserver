@@ -34,14 +34,35 @@ namespace HM
          PermError = 6
       };
 
+      // Everything the aggregate reporter (RFC 7489 section 7.2) needs to know
+      // about one evaluation, filled by Verify when the caller asks. The
+      // policy_domain is the domain the record was FOUND at - the From domain,
+      // or its organizational domain after the section 6.6.3 fallback - which
+      // is where the report must be addressed and what its policy_published
+      // block must name.
+      struct Evaluation
+      {
+         bool policy_found = false;
+         String policy_domain;
+         String adkim;                 // as published; empty means the default (r)
+         String aspf;
+         String p;
+         String sp;                    // empty when the record carries none
+         int pct = 100;
+         bool spf_aligned = false;
+         bool dkim_aligned = false;
+      };
+
       // fromHeaderDomain  - domain of the RFC5322.From address.
       // envelopeFromDomain- domain of the RFC5321.MailFrom address (SPF identity).
       // spfPassed         - whether SPF evaluation returned Pass.
       // dkimPassingDomains- d= domains of DKIM signatures that verified.
+      // evaluation        - optional; filled for the aggregate reporter.
       Result Verify(const String &fromHeaderDomain,
                     const String &envelopeFromDomain,
                     bool spfPassed,
-                    const std::vector<AnsiString> &dkimPassingDomains);
+                    const std::vector<AnsiString> &dkimPassingDomains,
+                    Evaluation *evaluation = nullptr);
 
       // Extracts the email address part from a From-header value, e.g.
       // "Display Name <user@example.com>" -> "user@example.com".

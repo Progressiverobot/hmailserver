@@ -17,6 +17,7 @@
 
 #include "../../BO/MessageData.h"
 #include "../../Persistence/PersistentMessage.h"
+#include "../../Util/DmarcRptStore.h"
 #include "../../Util/Parsing/StringParser.h"
 #include "../../../SMTP/SPF/SPF.h"
 
@@ -124,7 +125,48 @@ namespace HM
       }
 
       DMARC dmarc;
-      DMARC::Result result = dmarc.Verify(fromDomain, envelopeFromDomain, spfPassed, dkimPassingDomains);
+      DMARC::Evaluation evaluation;
+      DMARC::Result result = dmarc.Verify(fromDomain, envelopeFromDomain, spfPassed, dkimPassingDomains, &evaluation);
+
+      // Aggregate reporting (RFC 7489 section 7.2): every message evaluated
+      // against a published policy is counted, passes included - a report that
+      // only carried failures would tell a domain owner nothing about whether
+      // their legitimate mail aligns. TempError and PermError are excluded:
+      // section 7.2 reports applied policy, and neither reached a verdict.
+      //
+      // The disposition recorded is the POLICY-EVALUATED one - what the
+      // published policy asked for - not this server's eventual action, which
+      // is decided later by the score threshold across every spam test.
+      if (evaluation.policy_found &&
+          (result == DMARC::Pass || result == DMARC::FailNone ||
+           result == DMARC::FailQuarantine || result == DMARC::FailReject))
+      {
+         AnsiString disposition;
+         switch (result)
+         {
+         case DMARC::FailReject:
+            disposition = "reject";
+            break;
+         case DMARC::FailQuarantine:
+            disposition = "quarantine";
+            break;
+         default:
+            // Pass, and FailNone: the policy requested no action.
+            disposition = "none";
+            break;
+         }
+
+         AnsiString sourceIp = originatingAddress.IsAny() ? AnsiString("0.0.0.0") : AnsiString(originatingAddress.ToString());
+
+         DmarcRptStore::Instance()->Record(
+            AnsiString(evaluation.policy_domain),
+            AnsiString(evaluation.adkim), AnsiString(evaluation.aspf),
+            AnsiString(evaluation.p), AnsiString(evaluation.sp), evaluation.pct,
+            sourceIp, disposition,
+            evaluation.dkim_aligned, evaluation.spf_aligned,
+            AnsiString(fromDomain),
+            AnsiString(envelopeFromDomain), spfPassed, dkimPassingDomains);
+      }
 
       AntiSpamConfiguration &config = Configuration::Instance()->GetAntiSpamConfiguration();
 

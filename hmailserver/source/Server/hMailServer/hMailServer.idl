@@ -1146,6 +1146,10 @@ interface IInterfaceUtilities : IDispatch{
    // when TlsRptFromAddress is not configured, because running anyway could only
    // discard the data it was asked to send.
    [id(23), helpstring("Sends the aggregate SMTP TLS reports (RFC 8460) collected so far to the domains that request them, rather than waiting for the hourly schedule. Set IncludeCurrentDay to also report today's still-accumulating statistics. Returns the number of reports submitted. Raises an error when TlsRptFromAddress is not configured; requires server administrator rights.")] HRESULT SendTlsRptReports([in] VARIANT_BOOL IncludeCurrentDay, [out, retval] long *ReportCount);
+   // The DMARC sibling of SendTlsRptReports, for the same reason: the hourly
+   // reporter only mails days that are over, so an administrator who has just
+   // configured DmarcRptFromAddress has nothing to look at until tomorrow.
+   [id(24), helpstring("Sends the DMARC aggregate reports (RFC 7489) collected so far to the domains that request them, rather than waiting for the hourly schedule. Set IncludeCurrentDay to also report today's still-accumulating statistics. Returns the number of reports submitted. Raises an error when DmarcRptFromAddress is not configured; requires server administrator rights.")] HRESULT SendDmarcReports([in] VARIANT_BOOL IncludeCurrentDay, [out, retval] long *ReportCount);
 };
 
 [

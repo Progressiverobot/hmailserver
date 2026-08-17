@@ -17,6 +17,7 @@
 #include "../SMTP/RuleApplier.h"
 #include "../SMTP/DeliveryQueue.h"
 #include "../SMTP/TlsRptReporterTask.h"
+#include "../SMTP/DmarcRptReporterTask.h"
 #include "../Common/Persistence/PersistentMessage.h"
 #include "../Common/Persistence/Maintenance/Maintenance.h"
 #include "../Common/Util/Parsing/StringParser.h"
@@ -135,6 +136,36 @@ STDMETHODIMP InterfaceUtilities::SendTlsRptReports(VARIANT_BOOL IncludeCurrentDa
          return COMError::GenerateError("TlsRptFromAddress is not set in the [Settings] section of hMailServer.ini, so no report can be sent. The collected statistics have been preserved.");
 
       *ReportCount = HM::TlsRptReporterTask::SendReportsNow(IncludeCurrentDay != VARIANT_FALSE);
+
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceUtilities::SendDmarcReports(VARIANT_BOOL IncludeCurrentDay, long *ReportCount)
+{
+   try
+   {
+      if (!ReportCount)
+         return COMError::GenerateGenericMessage();
+
+      *ReportCount = 0;
+
+      // Sends mail to third parties, so it is an administrator's call to make.
+      if (!authentication_->GetIsServerAdmin())
+         return authentication_->GetAccessDenied();
+
+      // Refused for the same reason SendTlsRptReports refuses: the send pass
+      // POPS each day's statistics, and with no sender address it can only
+      // discard what it popped. A diagnostic that destroys the data it was
+      // asked to show would be worse than none.
+      if (HM::IniFileSettings::Instance()->GetDmarcRptFromAddress().IsEmpty())
+         return COMError::GenerateError("DmarcRptFromAddress is not set in the [Settings] section of hMailServer.ini, so no report can be sent. The collected statistics have been preserved.");
+
+      *ReportCount = HM::DmarcRptReporterTask::SendReportsNow(IncludeCurrentDay != VARIANT_FALSE);
 
       return S_OK;
    }

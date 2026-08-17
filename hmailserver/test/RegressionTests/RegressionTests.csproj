@@ -580,6 +580,7 @@
     <Compile Include="SMTP\DistributionListHeaders.cs" />
     <Compile Include="SMTP\TlsRptInertReporting.cs" />
     <Compile Include="SMTP\TlsRptReporting.cs" />
+    <Compile Include="AntiSpam\DmarcRptReporting.cs" />
     <Compile Include="Security\AccountSendingLimits.cs" />
     <Compile Include="Security\PasswordHashUpgrade.cs" />
     <Compile Include="Sieve\SieveExtensionActions.cs" />
