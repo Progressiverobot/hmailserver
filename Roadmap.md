@@ -38,7 +38,7 @@ as ⬜, not ✅.
 
 ### Contents and totals
 
-799 items. The counts are the point of this table — they say where the fork is
+800 items. The counts are the point of this table — they say where the fork is
 strong and where it is thin far more honestly than any prose summary.
 
 | Section | ✅ | 🔄 | ⬜ | ⏸️ |
@@ -58,7 +58,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [IMAP](#imap) | 71 | – | 4 | 3 |
 | [POP3](#pop3) | 26 | – | 2 | – |
 | [Sieve, ManageSieve and rules](#sieve-managesieve-and-rules) | 64 | 0 | 1 | – |
-| [Authentication and cryptography](#authentication-and-cryptography) | 58 | 0 | 18 | – |
+| [Authentication and cryptography](#authentication-and-cryptography) | 60 | 0 | 17 | – |
 | [Anti-spam, anti-virus and content control](#anti-spam-anti-virus-and-content-control) | 54 | – | 13 | – |
 | [Storage, accounts and data model](#storage-accounts-and-data-model) | 86 | – | 10 | – |
 | [Routing, queue and delivery](#routing-queue-and-delivery) | 20 | – | 3 | 2 |
@@ -72,7 +72,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 2 | – | 4 | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 5 | 1 | 2 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 4 | 1 | 4 | – |
-| **Total** | **665** | **12** | **107** | **15** |
+| **Total** | **667** | **12** | **106** | **15** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage and the administration surface are the best-covered areas**, and the
@@ -522,7 +522,7 @@ the source, not from documentation.
 
 ### Authentication and cryptography
 
-58 shipped · 0 underway · 18 not started · 0 deferred
+60 shipped · 0 underway · 17 not started · 0 deferred
 
 | | Capability | Detail |
 |:-:|---|---|
@@ -585,8 +585,9 @@ the source, not from documentation.
 | ⬜ | ANONYMOUS (RFC 4505) | Not implemented, and deliberately so — empty passwords are rejected outright by the password validator. |
 | ⬜ | App passwords and per-account 2FA | TOTP covers only the Control Panel logon. There is no app-password mechanism, so account-level 2FA is structurally impossible for IMAP/POP3/SMTP clients that cannot present a code — and app passwords are the stated prerequisite for per… |
 | ⬜ | bcrypt / scrypt | Not implemented; the strong-KDF menu is PBKDF2 and Argon2id only. |
-| ⬜ | Client-side OAuth2 for outbound relay | Not implemented. The outbound SMTP client only ever issues `AUTH LOGIN` — no PLAIN, no XOAUTH2, no token cache. Roadmap flags this as the most time-sensitive gap given Microsoft's Basic-auth deprecation for SMTP AUTH at end of 2026. |
-| ⬜ | Client-side OAuth2 for the external account fetcher | Not implemented. The POP3 fetcher authenticates with `USER`/`PASS` and can only upgrade the channel with `STLS`; there is no IMAP fetcher and no bearer path, so Microsoft 365 / Gmail mailboxes cannot be collected. |
+| ✅ | Client-side OAuth2 for outbound relay | Shipped 16 August 2026; this row simply had not been updated - the dated forcing-function row was, and carries the full description. When a route's destination host is on `OutboundOAuth2Hosts` (default `smtp.office365.com`) the AUTH step presents a bearer token in Microsoft's exact XOAUTH2 shape, one round trip, from `OutboundOAuth2TokenClient`: a client_credentials POST to `OutboundOAuth2TokenUrl` built like the MTA-STS fetcher (certificate verification, bounded timeouts), cached to 80% of the token's lifetime and invalidated the moment a relay refuses one. `OutboundOAuth2FixedToken` passes a token obtained outside this server verbatim. Host-gated deliberately, with a negative-control test: a client that presented bearers to every relay would leak tokens to all of them. There is no silent downgrade to a password - a provider configured for OAuth has Basic auth off, so a token fetch failure is reported (HM5904) and the refusal that follows is visible rather than a stall. [See the dated item](#dated-items--the-forcing-functions). |
+| ✅ | Client-side OAuth2 for the external account fetcher | Shipped 16 August 2026 alongside the outbound half, and likewise left un-ticked here. An external account whose server is on `FetchOAuth2Hosts` (default `outlook.office365.com`) authenticates with `AUTH XOAUTH2` carrying a bearer from the same token client, so Microsoft 365 mailboxes can be collected again - collecting from them with `USER`/`PASS` has been impossible since 2022. Asserted on the bytes the POP3 server actually receives, with the unlisted-host control that `USER`/`PASS` is untouched everywhere else, and on the messages arriving afterwards, since a login that succeeds and fetches nothing is not a login worth having (`FetchXOAuth2.cs`). |
+| ⬜ | IMAP fetching of external accounts | Only POP3 fetching exists, so a mailbox that must stay intact on the far side cannot be collected: POP3 either leaves every message to be re-fetched or deletes it. This is the reason the OAuth2 rows above stop at POP3 - there is no IMAP fetcher to give a bearer token to. A real one needs a client-side IMAP session, per-folder UID state to know what has already been collected, and a decision about whether it mirrors folders or flattens them into the inbox. |
 | ⬜ | CRAM-MD5 (RFC 2195) | Not implemented anywhere — not advertised, not accepted. Would in any case be impossible against the PBKDF2/Argon2id stores since it needs a reversible or MD5-equivalent secret. |
 | ⬜ | DIGEST-MD5 (RFC 2831) | Not implemented. Obsoleted by RFC 6331; SCRAM-SHA-256 is the replacement that is shipped. |
 | ⬜ | ES256 tokens | Recognised but explicitly refused with a clear diagnostic, because JWS carries ECDSA as raw R\|\|S while OpenSSL expects X9.62 DER and the transcode was never written. The Control Panel still offers "RS256… |
