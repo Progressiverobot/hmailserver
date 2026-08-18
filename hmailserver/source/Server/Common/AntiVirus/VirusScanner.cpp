@@ -177,8 +177,11 @@ namespace HM
    }
 
    bool
-   VirusScanner::Scan(std::shared_ptr<Message> pMessage, String &virusName)
+   VirusScanner::Scan(std::shared_ptr<Message> pMessage, String &virusName, bool *scannerFailed)
    {
+      if (scannerFailed)
+         *scannerFailed = false;
+
       AntiVirusConfiguration &antiVirusConfig = Configuration::Instance()->GetAntiVirusConfiguration();
 
       int iMaxVirusScanSizeKB = antiVirusConfig.GetVirusScanMaxSize();
@@ -207,12 +210,19 @@ namespace HM
       // First scan the entire file.
       String sLongFilename = PersistentMessage::GetFileName(pMessage);
 
-      VirusScanningResult result = ScanFile_(sLongFilename);
+      bool scannerError = false;
+
+      VirusScanningResult result = ScanFile_(sLongFilename, scannerError);
       if (result.GetVirusFound())
       {
          virusName = result.GetDetails();
          return true;
       }
+
+      // A scanner that errored on the whole message file means this message has
+      // not been examined, whatever the per-attachment pass below goes on to say.
+      if (scannerError && scannerFailed)
+         *scannerFailed = true;
 
 
       // Read message, extract attachments,
@@ -262,13 +272,18 @@ namespace HM
             continue;
          }
 
-         VirusScanningResult result = ScanFile_(sLongFilename);
+         bool attachmentScannerError = false;
+
+         VirusScanningResult result = ScanFile_(sLongFilename, attachmentScannerError);
          if (result.GetVirusFound())
          {
             virusName = result.GetDetails();
             FileUtilities::DeleteFile(sLongFilename);
             return true;
          }
+
+         if (attachmentScannerError && scannerFailed)
+            *scannerFailed = true;
 
          FileUtilities::DeleteFile(sLongFilename);
          iter++;
@@ -345,8 +360,10 @@ namespace HM
    }
 
    VirusScanningResult
-   VirusScanner::ScanFile_(const String &fileName)
+   VirusScanner::ScanFile_(const String &fileName, bool &scannerError)
    {
+      scannerError = false;
+
       AntiVirusConfiguration &antiVirusConfig = Configuration::Instance()->GetAntiVirusConfiguration();
 
       if (antiVirusConfig.ClamWinEnabled())
@@ -356,7 +373,10 @@ namespace HM
          if (result.GetVirusFound())
             return result;
          else if (result.GetErrorOccured())
+         {
+            scannerError = true;
             ReportScanningError_(result);
+         }
       }
 
       if (antiVirusConfig.GetCustomScannerEnabled())
@@ -366,19 +386,28 @@ namespace HM
          if (result.GetVirusFound())
             return result;
          else if (result.GetErrorOccured())
+         {
+            scannerError = true;
             ReportScanningError_(result);
+         }
       }
 
       if (antiVirusConfig.GetClamAVEnabled())
       {
          VirusScanningResult result = ClamAVVirusScanner::Scan(fileName);
-         
+
          if (result.GetVirusFound())
             return result;
          else if (result.GetErrorOccured())
+         {
+            scannerError = true;
             ReportScanningError_(result);
+         }
       }
 
+      // No virus found - but if any enabled scanner errored above, that verdict
+      // rests on the scanners that did answer, and possibly on none at all. The
+      // flag is what lets the delivery path tell the two apart.
       return VirusScanningResult(VirusScanningResult::NoVirusFound, "");
    }
 

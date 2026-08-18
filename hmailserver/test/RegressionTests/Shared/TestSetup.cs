@@ -182,8 +182,20 @@ namespace RegressionTests.Shared
             restartRequired = true;
          }
 
+         // All three, not just POP3. IMAP/Basics and SMTP/Basics each set their
+         // own welcome text and do not put it back, so a run left the server
+         // greeting every later connection with "* OK HOWDYHO IMAP" - harmless to
+         // the suite, but it is the first thing anybody sees when probing the
+         // server by hand, and it cost real time to identify as leftover test
+         // state rather than a defect.
          if (!string.IsNullOrEmpty(_settings.WelcomePOP3))
             _settings.WelcomePOP3 = string.Empty;
+
+         if (!string.IsNullOrEmpty(_settings.WelcomeIMAP))
+            _settings.WelcomeIMAP = string.Empty;
+
+         if (!string.IsNullOrEmpty(_settings.WelcomeSMTP))
+            _settings.WelcomeSMTP = string.Empty;
 
          if (_settings.AutoBanOnLogonFailure)
             _settings.AutoBanOnLogonFailure = false;

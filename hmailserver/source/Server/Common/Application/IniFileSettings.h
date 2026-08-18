@@ -395,6 +395,34 @@ namespace HM
       String GetTlsRptOrganizationName() const { return tls_rpt_organization_name_; }
       String GetDmarcRptFromAddress() const { return dmarc_rpt_from_address_; }
       String GetDmarcRptOrganizationName() const { return dmarc_rpt_organization_name_; }
+      // 0 = deliver a message the scanner could not examine (the shipped default,
+      // and what this server has always done); 1 = hold it, retry on the ordinary
+      // schedule, and bounce it if the scanner is still unreachable when the retry
+      // budget runs out. See SMTPDeliverer::HandleUnscannableMessage_.
+      int GetAVFailAction() const { return av_fail_action_; }
+
+      // How long a held message waits before the next scan attempt, and how many
+      // such attempts it gets before it is returned to the sender. Both are the
+      // hold's own settings rather than the SMTP delivery retry budget, because
+      // `smtpnooftries` ships as 0: borrowing it would make AVFailAction=1 bounce
+      // on the first scanner blip and never hold at all, so the feature would not
+      // do what its name says on any stock installation.
+      int GetAVFailRetryMinutes() const { return av_fail_retry_minutes_; }
+
+      // Counted in ATTEMPTS, deliberately not in elapsed time. An earlier version
+      // bounded the hold by the message's age, which is anchored to its ARRIVAL:
+      // any message already older than the window - a backlog released after an
+      // outage, an ETRN batch, POP3-fetched mail carrying an upstream Received
+      // date - would then have had its whole budget spent before the scanner ever
+      // failed, and would be bounced on the first attempt with no hold at all.
+      // Restarting a server whose scanner takes a minute longer to come up than
+      // the mail queue does would have mass-bounced the entire backlog. Attempts
+      // are something this policy itself advances, so they cannot already be
+      // spent, and a future-dated arrival time cannot make the hold unbounded.
+      //
+      // 0 means do not hold at all - tell the sender immediately. A legitimate
+      // choice for an operator who never wants unscanned mail sitting in a queue.
+      int GetAVFailMaxHolds() const { return av_fail_max_holds_; }
       int GetAccountLockoutThreshold() const { return account_lockout_threshold_; }
       int GetAccountLockoutWindowMinutes() const { return account_lockout_window_minutes_; }
       int GetAccountLockoutMinutes() const { return account_lockout_minutes_; }
@@ -659,6 +687,9 @@ namespace HM
       String tls_rpt_organization_name_;
       String dmarc_rpt_from_address_;
       String dmarc_rpt_organization_name_;
+      int av_fail_action_ = 0;
+      int av_fail_retry_minutes_ = 15;
+      int av_fail_max_holds_ = 16;
       int account_lockout_threshold_ = 0;
       int account_lockout_window_minutes_ = 30;
       int account_lockout_minutes_ = 30;

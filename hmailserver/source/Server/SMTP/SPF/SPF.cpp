@@ -80,19 +80,50 @@ namespace HM
    }
 
    void SPFTester::Test()
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // Evaluates a REAL policy over live DNS, which makes this as much a test of
+   // somebody else's zone as of this code - and on 17 August 2026 that zone
+   // stopped resolving: hmailserver.com answers SERVFAIL, so the evaluator
+   // correctly returned Neutral, the old code threw, and hMailServer.exe /Test
+   // terminated on an unhandled exception before it reached any of the tests
+   // after this one. A build machine with no network did the same thing.
+   //
+   // The evaluator cannot distinguish "no policy" from "could not fetch the
+   // policy" - it only reports Pass, Fail and Neutral (see the roadmap row on
+   // SPF checking) - so Neutral is exactly what an unreachable zone produces. The
+   // assertions therefore run when the policy is actually reachable, and the test
+   // stands down when it is not, rather than failing the entire self-test suite
+   // for a reason that has nothing to do with this server.
+   //
+   // The two bare `throw;` statements are gone as well. Outside a catch block
+   // that is a rethrow with no active exception, which calls std::terminate - so
+   // even a genuine SPF regression was reported as a crash rather than as the
+   // assertion failure it is. The rest of this suite uses `throw 0`.
+   //---------------------------------------------------------------------------()
    {
       String sExplanation;
-      
-      if (SPF::Instance()->Test("185.216.75.37", "example@hmailserver.com", "mail.hmailserver.com", sExplanation) != SPF::Pass)
+
+      const SPF::Result permittedSender =
+         SPF::Instance()->Test("185.216.75.37", "example@hmailserver.com", "mail.hmailserver.com", sExplanation);
+
+      if (permittedSender == SPF::Neutral)
       {
-         // Should be allowed. 
-         throw;
+         // No policy came back. Nothing here is testable without one.
+         OutputDebugString(_T("hMailServer: SPF self-test stood down - the policy for hmailserver.com could not be resolved.\n"));
+         return;
+      }
+
+      if (permittedSender != SPF::Pass)
+      {
+         // A published policy that does not permit its own sender: a real failure.
+         throw 0;
       }
 
       if (SPF::Instance()->Test("1.2.3.4", "example@hmailserver.com", "mail.hmailserver.com", sExplanation) != SPF::Fail)
       {
          // Should not be allowed.
-         throw;
+         throw 0;
       }
    }
 

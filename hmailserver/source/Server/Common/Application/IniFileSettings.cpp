@@ -411,6 +411,34 @@ namespace HM
       dmarc_rpt_from_address_ = ReadIniSettingString_("Settings", "DmarcRptFromAddress", "");
       dmarc_rpt_organization_name_ = ReadIniSettingString_("Settings", "DmarcRptOrganizationName", "hMailServer");
 
+      // What happens to a message the virus scanner could not examine. 0, the
+      // shipped default, delivers it - the fail-open posture this server has
+      // always had, now at least named and documented rather than implicit. 1
+      // holds the message and retries it on the ordinary queue schedule, and
+      // bounces it to the sender if the scanner is still unreachable when the
+      // retry budget runs out; it never delivers unscanned mail and never holds
+      // a message silently for ever. Kept in the ini rather than the settings
+      // table deliberately: a new settings row would report HM5015 on every read
+      // until every database in the field had been upgraded, and this is one
+      // integer.
+      av_fail_action_ = ReadIniSettingInteger_("Settings", "AVFailAction", 0);
+      if (av_fail_action_ < 0 || av_fail_action_ > 1)
+         av_fail_action_ = 0;
+
+      // The hold's own schedule, deliberately independent of the SMTP delivery
+      // retry budget - see the getters for why borrowing `smtpnooftries` (which
+      // ships as 0) would have made the whole policy bounce on the first blip.
+      av_fail_retry_minutes_ = ReadIniSettingInteger_("Settings", "AVFailRetryMinutes", 15);
+      if (av_fail_retry_minutes_ < 1)
+         av_fail_retry_minutes_ = 15;
+
+      // Sixteen attempts at the default fifteen-minute interval is about four
+      // hours of holding, which is the intended window - expressed in attempts
+      // because attempts are what this policy advances itself. See the getter.
+      av_fail_max_holds_ = ReadIniSettingInteger_("Settings", "AVFailMaxHolds", 16);
+      if (av_fail_max_holds_ < 0)
+         av_fail_max_holds_ = 16;
+
       // Per-name authentication lockout (see AccountLockout.h). Threshold 0 -
       // the default - disables the whole mechanism; the windows only matter
       // once it is on.

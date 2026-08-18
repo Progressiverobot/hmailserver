@@ -156,15 +156,33 @@ namespace HM
       }
       otelDelivery.AddEvent("delivery.start");
 
-      if (!PreprocessMessage_(pMessage, globalRuleResult, preprocessingFailureReason))
+      bool deferDelivery = false;
+
+      if (!PreprocessMessage_(pMessage, globalRuleResult, preprocessingFailureReason, deferDelivery))
       {
+         if (deferDelivery)
+         {
+            // Not an abort: the message is being KEPT for a later attempt, so
+            // nothing here may delete it. Reached only when AVFailAction is 1 and
+            // the scanner could not examine the message.
+            otelDelivery.AddEvent("delivery.deferred");
+            ServerStatus::Instance()->OnMessageDeferred();
+            HandleUnscannableMessage_(pMessage);
+            return;
+         }
+
          // Message delivery was aborted during preprocessing.
+         ForgetUnscannableHold_(messageID);
          otelDelivery.AddEvent("delivery.aborted");
          otelDelivery.SetOk(false);
          LogAwstatsMessageRejected_(sSendersIP, pMessage, preprocessingFailureReason);
          DeleteQueuedMessageOrReport(pMessage, "It was rejected during preprocessing, so it will be reconsidered on every pass until the row is removed.");
          return;
       }
+
+      // Past scanning: whatever this message's AV hold history was, it is spent
+      // and the entry can go rather than sitting in the table until a restart.
+      ForgetUnscannableHold_(messageID);
 
       otelDelivery.AddEvent("delivery.preprocessed");
 
@@ -240,9 +258,10 @@ namespace HM
    // Returns true if delivery should continue. False if it should be aborted.
    //---------------------------------------------------------------------------()
    bool
-   SMTPDeliverer::PreprocessMessage_(std::shared_ptr<Message> pMessage, RuleResult &globalRuleResult, String &preprocessingFailureReason)
+   SMTPDeliverer::PreprocessMessage_(std::shared_ptr<Message> pMessage, RuleResult &globalRuleResult, String &preprocessingFailureReason, bool &deferDelivery)
    {
       preprocessingFailureReason = "";
+      deferDelivery = false;
 
       // Create recipient list.
       String sRecipientList = pMessage->GetRecipients()->GetCommaSeperatedRecipientList();
@@ -263,9 +282,11 @@ namespace HM
       }
 
       // Run virus protection.
-      if (!RunVirusProtection_(pMessage))
+      if (!RunVirusProtection_(pMessage, deferDelivery))
       {
-         preprocessingFailureReason = "Message delivery cancelled during virus scanning";
+         preprocessingFailureReason = deferDelivery
+            ? "Message held: the virus scanner could not examine it"
+            : "Message delivery cancelled during virus scanning";
          return false;
       }
 
@@ -497,8 +518,236 @@ namespace HM
       return false;
    }
 
-   bool 
-   SMTPDeliverer::RunVirusProtection_(std::shared_ptr<Message> pMessage)
+   namespace
+   {
+      // How many times AVFailAction has held each message, kept here rather than
+      // in the message's own try counter.
+      //
+      // The try counter would have been the obvious place, and it is wrong: the
+      // DKIM signing and mirroring steps in PreprocessMessage_ run only when
+      // GetNoOfRetries() == 0 - they act once, on the first pass - so a hold that
+      // incremented it would make the pass that finally scans the message skip
+      // signing entirely, and the message would go out UNSIGNED and fail DMARC at
+      // every receiver that checks. A security feature that silently disables
+      // another security feature is worse than the gap it closes.
+      //
+      // In memory, like the other policy counters in this server. The limit that
+      // buys is worth stating rather than glossing: a restart resets the counts
+      // while everything else about the message persists, so an administrator who
+      // configures a hold window LONGER than the interval between their restarts
+      // (say AVFailRetryMinutes 180 x AVFailMaxHolds 16, a 48-hour window, on a
+      // host that reboots nightly) has a message that is held again and again and
+      // never reaches its budget, so its sender is never told. Nothing is lost -
+      // the message is intact, it is delivered on the first pass where any scanner
+      // answers, and every hold is logged with the message id and the hold number
+      // - but at the shipped defaults (16 x 15 minutes, four hours) a nightly
+      // restart cannot reach this, and persisting the count means a schema change
+      // that this one integer does not justify yet.
+      boost::mutex av_hold_mutex_;
+      std::map<__int64, int> av_hold_counts_;
+      time_t av_hold_full_reported_at_ = 0;
+
+      const size_t kMaxTrackedAvHolds = 100000;
+      const time_t kAvHoldFullReportIntervalSeconds = 3600;
+
+      // Returns the number of holds already recorded for this message, or -1 when
+      // the table is full and this message is not one of the tracked ones.
+      int TakeAvHold_(__int64 messageID, bool &reportTableFull)
+      {
+         reportTableFull = false;
+
+         boost::lock_guard<boost::mutex> guard(av_hold_mutex_);
+
+         auto existing = av_hold_counts_.find(messageID);
+         if (existing != av_hold_counts_.end())
+            return existing->second;
+
+         if (av_hold_counts_.size() >= kMaxTrackedAvHolds)
+         {
+            // An earlier version cleared the WHOLE table here, on the reasoning
+            // that a fresh budget for everyone beats an arbitrary eviction. That
+            // was wrong in a way an adversarial review had to point out: with the
+            // held set above the cap the clear recurs every retry cycle, so no
+            // tracked message's count ever climbs to its budget and the bound
+            // stops bounding for every message rather than for the overflow.
+            //
+            // The tracked counts are kept. This message is held WITHOUT being
+            // counted, which is the fail-safe direction - it holds rather than
+            // bounces - and it is reported, repeatedly rather than once, because a
+            // condition that persists needs to stay visible.
+            const time_t now = time(nullptr);
+
+            if (av_hold_full_reported_at_ == 0 ||
+                av_hold_full_reported_at_ > now ||
+                now - av_hold_full_reported_at_ >= kAvHoldFullReportIntervalSeconds)
+            {
+               av_hold_full_reported_at_ = now;
+               reportTableFull = true;
+            }
+
+            return -1;
+         }
+
+         return 0;
+      }
+
+      void RecordAvHold_(__int64 messageID, int holds)
+      {
+         boost::lock_guard<boost::mutex> guard(av_hold_mutex_);
+         av_hold_counts_[messageID] = holds;
+      }
+
+      void ForgetAvHolds_(__int64 messageID)
+      {
+         boost::lock_guard<boost::mutex> guard(av_hold_mutex_);
+         av_hold_counts_.erase(messageID);
+      }
+   }
+
+   void
+   SMTPDeliverer::ForgetUnscannableHold_(__int64 messageID)
+   {
+      ForgetAvHolds_(messageID);
+   }
+
+   void
+   SMTPDeliverer::HandleUnscannableMessage_(std::shared_ptr<Message> pMessage)
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // AVFailAction 1: the scanner could not examine this message, and the
+   // administrator has said such a message must not be delivered.
+   //
+   // Held and retried on ITS OWN schedule - AVFailRetryMinutes apart, at most
+   // AVFailMaxHolds times - then bounced. Not held for ever, because a message
+   // nobody is told about is the failure mode this server keeps finding in its own
+   // history; and not delivered at the end either, because delivering it
+   // eventually is just fail-open with extra steps - the administrator asked for
+   // the opposite.
+   //
+   // The bound is a COUNT OF HOLDS THIS POLICY KEEPS ITSELF, and the three things
+   // it is not are all versions this was written as first:
+   //
+   //   - Not the SMTP delivery retry budget. `smtpnooftries` ships as 0, so
+   //     borrowing it would have made this policy bounce on the very first
+   //     scanner blip and never hold at all on a stock installation.
+   //   - Not the message's age. That is anchored to ARRIVAL, so any message
+   //     already older than the window would have had its entire budget spent
+   //     before the scanner ever failed: a backlog released after an outage, an
+   //     ETRN batch, or POP3-fetched mail carrying an upstream Received date
+   //     would be bounced on the first attempt with no hold whatsoever.
+   //     Restarting a server whose scanner comes up a minute later than its mail
+   //     queue would have mass-bounced the whole backlog.
+   //   - Not the message's own try counter either, which is what "a count this
+   //     policy advances" first became: PreprocessMessage_ signs with DKIM and
+   //     mirrors only while GetNoOfRetries() == 0, so incrementing it here would
+   //     have meant the pass that finally scanned the message skipped signing,
+   //     and it went out UNSIGNED to fail DMARC at every receiver that checks.
+   //
+   // So the count lives in this file, in memory, and the try counter is left
+   // exactly as the rest of the delivery core expects to find it.
+   //
+   // The caller has already counted the deferral and must NOT delete the message
+   // on this path.
+   //---------------------------------------------------------------------------()
+   {
+      const int retryMinutes = IniFileSettings::Instance()->GetAVFailRetryMinutes();
+      const int maxHolds = IniFileSettings::Instance()->GetAVFailMaxHolds();
+
+      bool reportHoldTableFull = false;
+      const int holdsSoFar = TakeAvHold_(pMessage->GetID(), reportHoldTableFull);
+
+      // -1 means the hold table is full and this message is not tracked, so its
+      // holds cannot be counted. It is held anyway rather than bounced.
+      const bool counted = holdsSoFar >= 0;
+
+      if (reportHoldTableFull)
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6195, "SMTPDeliverer::HandleUnscannableMessage_",
+            "100,000 messages are already being held because the virus scanner cannot examine them, which is as many as this server tracks hold counts for. Messages beyond that are still held - never delivered unscanned - but their holds are not counted, so they will not be returned to their senders while this lasts. The scanner needs attention.");
+      }
+
+      // maxHolds == 0 is "never queue unscanned mail", and it means that even when
+      // the hold table is full: an administrator who asked for no holds does not
+      // get one because this server ran out of counters.
+      if (maxHolds > 0 && (!counted || holdsSoFar < maxHolds))
+      {
+         String holdProgress;
+         if (counted)
+         {
+            RecordAvHold_(pMessage->GetID(), holdsSoFar + 1);
+            holdProgress.Format(_T("this was hold %d of %d before it is returned to the sender"), holdsSoFar + 1, maxHolds);
+         }
+         else
+         {
+            holdProgress = _T("its holds are not being counted because the hold table is full, so it will keep being held rather than returned to the sender - see HM6195");
+         }
+
+         LOG_APPLICATION(Formatter::Format("SMTPDeliverer - Message {0}: The virus scanner could not examine this message, and AVFailAction is 1, so it has NOT been delivered. Holding it for another attempt in {1} minute(s); {2}.",
+            pMessage->GetID(), retryMinutes, holdProgress));
+
+         // bUpdateNoOfTries is false on purpose - see the DKIM note above. The
+         // result is checked like every other write on the mail path: a failed
+         // update leaves the old next-try time, so the message stays queued and is
+         // reconsidered sooner than intended, which is the safe direction and the
+         // reason this reports rather than deletes.
+         if (!PersistentMessage::SetNextTryTime(pMessage->GetID(), false, retryMinutes))
+         {
+            ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6192, "SMTPDeliverer::HandleUnscannableMessage_",
+               Formatter::Format("The next-try time of held message {0} could not be updated. It stays queued and will be retried, but sooner and more often than AVFailAction intends.", pMessage->GetID()));
+         }
+
+         if (!PersistentMessage::UnlockObject(pMessage))
+         {
+            ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6193, "SMTPDeliverer::HandleUnscannableMessage_",
+               Formatter::Format("Held message {0} could not be unlocked, so no delivery thread will pick it up until the server restarts.", pMessage->GetID()));
+         }
+
+         return;
+      }
+
+      // The hold window is spent and the scanner is still not answering. Tell the
+      // sender, using the same error-log/DSN machinery every other permanent
+      // delivery failure uses, and then let the queue row go.
+      //
+      // SubmitErrorLog_ declines to report to a mailer-daemon address, to an empty
+      // sender, or for a message carrying Auto-Submitted - so for those the
+      // message is discarded here with nobody notified, and the log line says so
+      // rather than claiming a report that was never raised. Discarding is the
+      // right answer and not merely the convenient one: delivering unscanned mail
+      // whenever a report cannot be raised would make `MAIL FROM:<>` a one-line
+      // bypass of this entire policy.
+      ForgetAvHolds_(pMessage->GetID());
+
+      LOG_APPLICATION(Formatter::Format("SMTPDeliverer - Message {0}: The virus scanner has not been able to examine this message in {1} hold(s). AVFailAction is 1, so it is not being delivered. A non-delivery report is raised for its sender; a message with no reportable sender - a bounce, or one marked Auto-Submitted - is discarded here instead, never delivered unscanned.",
+         pMessage->GetID(), maxHolds));
+
+      // The two cases SubmitErrorLog_ declines outright are known here, so the
+      // one outcome that must never be quiet - mail destroyed with NOBODY
+      // notified - is reported rather than left as a log line an operator has to
+      // go looking for. (Its third case, an Auto-Submitted message or a spent
+      // rule-loop count, reports HM4404 itself.) The alternative to discarding is
+      // delivering, and that would make an empty envelope sender a one-line
+      // bypass of the whole policy, so this reports instead of relenting.
+      const String fromAddress = pMessage->GetFromAddress();
+
+      if (fromAddress.IsEmpty() || MailerDaemonAddressDeterminer::IsMailerDaemonAddress(fromAddress))
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6194, "SMTPDeliverer::HandleUnscannableMessage_",
+            Formatter::Format("Message {0} could not be virus scanned within the AVFailAction hold window and has been DISCARDED: it has no sender that a non-delivery report can be addressed to (an empty envelope sender or a mailer-daemon address), and AVFailAction is 1, so delivering it unscanned was not an option. Recipients: {1}",
+               pMessage->GetID(), pMessage->GetRecipients()->GetCommaSeperatedRecipientList()));
+      }
+
+      std::vector<String> errorMessages;
+      errorMessages.push_back(Formatter::Format("{0}\r\n   Error Type: SMTP\r\n   Error Description: Delivery failed\r\n   Additional information: The message could not be checked for viruses - the scanner did not respond on any delivery attempt - and this server is configured not to deliver unscanned mail. The server administrator should check the hMailServer error log.\r\n\r\n",
+         pMessage->GetRecipients()->GetCommaSeperatedRecipientList()));
+
+      SubmitErrorLog_(pMessage, errorMessages);
+
+      DeleteQueuedMessageOrReport(pMessage, "It has been returned to the sender because it could not be virus scanned, so it will be bounced again on every pass until the row is removed.");
+   }
+
+   bool
+   SMTPDeliverer::RunVirusProtection_(std::shared_ptr<Message> pMessage, bool &deferDelivery)
    //---------------------------------------------------------------------------()
    // DESCRIPTION:
    // Runs virus scanning. If a virus is found, it's handled according to the
@@ -521,14 +770,31 @@ namespace HM
 
       // Virus scanning
       String virusName;
-      if (VirusScanner::Scan(pMessage, virusName))
+      bool scannerFailed = false;
+
+      if (VirusScanner::Scan(pMessage, virusName, &scannerFailed))
       {
          // Virus found.
          ServerStatus::Instance()->OnVirusRemoved();
 
          if (!HandleInfectedMessage_(pMessage, virusName))
             return false;
-      }      
+
+         return true;
+      }
+
+      // No virus found - but if no scanner actually managed to look, then "no
+      // virus found" is not a verdict, and what happens next is the
+      // administrator's policy rather than this server's guess. The default
+      // remains what it has always been: deliver, having reported the scanner
+      // error (HM5406). Note the ordering - a virus FOUND is acted on above even
+      // if another scanner errored, because a positive result from one scanner is
+      // not made less true by a second one being down.
+      if (scannerFailed && IniFileSettings::Instance()->GetAVFailAction() == 1)
+      {
+         deferDelivery = true;
+         return false;
+      }
 
       return true;
 

@@ -51,7 +51,23 @@ namespace HM
 
 
       static bool GetVirusScanningEnabled();
-      static bool Scan(std::shared_ptr<Message> pMessage, String &virusName);
+
+      // Returns true when a virus was found. scannerFailed is set when an enabled
+      // scanner could not complete - it could not be launched, the socket to it
+      // failed, it answered nothing usable - which is the difference between "this
+      // message is clean" and "nobody looked". Callers that only care about the
+      // verdict may pass nullptr, but the delivery path must not: for years a
+      // scanner outage was indistinguishable from a clean result, so mail went out
+      // unexamined and the only trace was one HM5406 in the error log.
+      //
+      // Deliberately NOT set for the two partial-scan cases the function reports
+      // itself (HM6001, a message that could not be parsed for the per-attachment
+      // pass, and HM6002, one attachment that could not be written out): the whole
+      // message file was still scanned in both, and treating a transient file lock
+      // as a scanner outage would hold ordinary mail. Nor for the max-size skip or
+      // the scanner-slot give-up, which are policy and a wait respectively, not
+      // failures.
+      static bool Scan(std::shared_ptr<Message> pMessage, String &virusName, bool *scannerFailed = nullptr);
       static void BlockAttachments(std::shared_ptr<Message> message);
 
       static void ResetCounter();
@@ -65,7 +81,9 @@ namespace HM
       static bool WaitForFreeScanner_();
       static void DecreaseCounter();
       static void ReportVirusFound(std::shared_ptr<Message> pMessage);
-      static VirusScanningResult ScanFile_(const String &fileName);
+      // scannerError is set when any enabled scanner reported an error for this
+      // file, whether or not a later scanner then answered.
+      static VirusScanningResult ScanFile_(const String &fileName, bool &scannerError);
 
       static void ReportScanningError_(const VirusScanningResult &scanningResult);
    };
