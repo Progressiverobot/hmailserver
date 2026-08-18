@@ -79,6 +79,12 @@ namespace HM
       static bool SendReportForDomain_(const AnsiString &dayKey, const DmarcRptStore::DomainBucket &bucket);
       static bool GetReportingAddresses_(const String &policyDomain, std::vector<String> &addresses);
       static bool ExternalDestinationAuthorized_(const String &policyDomain, const String &targetDomain);
+      // The policy tags come from somebody else's DNS record and are emitted into
+      // a schema-validated document, so they are mapped onto the enumerations RFC
+      // 7489 Appendix C actually allows rather than passed through.
+      static AnsiString NormalizeDisposition_(const AnsiString &value);
+      static AnsiString NormalizeAlignment_(const AnsiString &value);
+
       static AnsiString XmlEscape_(const AnsiString &value);
    };
 }

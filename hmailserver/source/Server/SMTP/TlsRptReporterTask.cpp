@@ -172,8 +172,13 @@ namespace HM
       String fromAddress = IniFileSettings::Instance()->GetTlsRptFromAddress();
       String submitter = StringParser::ExtractDomain(fromAddress);
 
+      // The reported domain belongs in the id: two domains reported in the same
+      // second otherwise share a report-id and a Message-ID, and a receiver that
+      // dedupes on them keeps only the first. Same flaw, same fix, as the DMARC
+      // reporter - they were written from the same template.
       AnsiString reportId;
-      reportId.Format("%hs.%I64d@%hs", dayKey.c_str(), static_cast<__int64>(time(nullptr)), AnsiString(submitter).c_str());
+      reportId.Format("%hs.%hs.%I64d@%hs", dayKey.c_str(), AnsiString(domain).c_str(),
+         static_cast<__int64>(time(nullptr)), AnsiString(submitter).c_str());
 
       AnsiString reportJson = BuildReportJson(dayKey, domain, bucket, reportId, fromAddress,
          IniFileSettings::Instance()->GetTlsRptOrganizationName());

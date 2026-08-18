@@ -75,14 +75,24 @@ strong and where it is thin far more honestly than any prose summary.
 | **Total** | **670** | **12** | **104** | **15** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
-**Storage and the administration surface are the best-covered areas**, and the
-core protocol layer is in good shape. **Sieve is the thinnest** — 16 not-started
-against 48 shipped, and most of what is missing is one standard extension set.
-And **transport security has the widest gap between reputation and reality**:
-it is the area this fork is best known for, yet 16 items are outstanding and
-four of the audit defects live there. And the forward-looking sections are no longer all ⬜: post-quantum key exchange,
-the .NET 10 migration and the supply-chain work shipped this month, which is what
-progress on a roadmap is supposed to look like.
+**Storage, the administration surface and the core protocol layer are the
+best-covered areas** — POP3 and Sieve are effectively complete, and IMAP and
+transport security have one or two honest remainders each, most of them
+subsystems rather than gaps. **Authentication and cryptography is now the
+thinnest** — 17 not-started against 60 shipped — and it is thin in a specific
+way: what is missing is a chain, not a list. App passwords are the prerequisite
+for per-account 2FA, which is the prerequisite for enforcing a second factor
+anywhere a mail client connects, and none of the three exists yet.
+**Anti-spam and anti-virus is the next thinnest** at 11, where the missing
+pieces are a quarantine anybody can review and a way to put an external engine
+in the path. And the forward-looking sections are no longer all ⬜:
+post-quantum key exchange, the .NET 10 migration and the supply-chain work
+shipped this month, which is what progress on a roadmap is supposed to look
+like.
+
+These three sentences restate the table above, so they go stale the moment it
+moves — as they had, by 48 items in one section, before the 6.2.22-pre2 review
+caught them. Re-read them against the table whenever the totals change.
 
 Dated items — the forcing functions
 -----------------------------------
@@ -394,7 +404,7 @@ the source, not from documentation.
 | ⏸️ | NOTIFY (RFC 5465) | Not implemented. Explicitly placed under the roadmap's "Not planned" heading, with the reasoning that iOS Mail does not do push for generic IMAP at all and IDLE is the portable answer. |
 | ⏸️ | SEARCH=FUZZY (RFC 6203) | Not implemented, not advertised, and explicitly declined in the roadmap on the grounds that Dovecot does not have it either. |
 | ✅ | APPENDLIMIT (RFC 7889) | **Shipped 16 August 2026.** The limit was always enforced - the SMTP max message size, tightened per-domain, capped at a hard 2 GB - but undiscoverable, so oversized uploads failed only after the data was sent. Now CAPABILITY advertises the bare APPENDLIMIT form before login (the number depends on the account's domain, not yet known) and the exact APPENDLIMIT=n form after; STATUS answers the APPENDLIMIT item, which the bare form obliges a server to do; and both oversize refusals carry the TOOBIG response code (RFC 4469) so a client knows the literal itself was the problem and does not retry the same message. The advertised number is computed by the same merge the enforcement uses, and the unlimited configuration advertises the 2 GB ceiling rather than 0 - which would mean "no APPEND accepted at all". Four fixtures: bare pre-login, exact value post-login, domain-tightened value with STATUS agreeing, and the unlimited-to-ceiling control. |
-| ✅ | BINARY (RFC 3516) | **Shipped 17 August 2026.** FETCH BINARY[section], BINARY.PEEK[section] and BINARY.SIZE[section] hand the client a part's content with its Content-Transfer-Encoding already decoded - the same decode an attachment save has always done, applied to FETCH - so a client saving an attachment stops downloading base64 it must immediately decode itself. The partial-range suffix applies to the DECODED bytes, which is the point of asking for BINARY rather than BODY, and fetching without .PEEK sets \Seen exactly as BODY[] does. APPEND accepts the literal8 form (~{n}), including in MULTIAPPEND continuations - the binary receive path has always stored bytes as bytes. Encodings the MIME code has no decoder for pass through as-is, which is also what the identity encodings do. Five fixtures: decoded-vs-encoded contrast against BODY[] on the same part, the decoded SIZE without the bytes, the partial range on decoded bytes with the origin echoed, the literal8 APPEND, and the capability advertisement. |
+| ✅ | BINARY (RFC 3516) | **Shipped 17 August 2026.** FETCH BINARY[section], BINARY.PEEK[section] and BINARY.SIZE[section] hand the client a part's content with its Content-Transfer-Encoding already decoded - the same decode an attachment save has always done, applied to FETCH - so a client saving an attachment stops downloading base64 it must immediately decode itself. The partial-range suffix applies to the DECODED bytes, which is the point of asking for BINARY rather than BODY, and fetching without .PEEK sets \Seen exactly as BODY[] does. APPEND accepts the literal8 form (~{n}), including in MULTIAPPEND continuations - the binary receive path has always stored bytes as bytes. Encodings the MIME code has no decoder for pass through as-is, which is also what the identity encodings do. Five fixtures: decoded-vs-encoded contrast against BODY[] on the same part, the decoded SIZE without the bytes, the partial range on decoded bytes with the origin echoed, the literal8 APPEND, and the capability advertisement. **Known limit, found by the pre-release review on 18 August 2026 and not yet fixed:** the decode path serves a part's raw entity text, which is right for a leaf part - the attachment case BINARY exists for, and the one the fixtures cover - and wrong for a COMPOSITE section. `MimeBody::Load` truncates a multipart entity's text at the first boundary, so `BINARY[]` for a whole message, a section naming a multipart part, and a section naming a message/rfc822 part all return the MIME preamble, which is normally zero bytes; `BINARY.SIZE` agrees with them, so a client is told the part is empty rather than being given something inconsistent. The fix is to treat those sections as identity-encoded and serve exactly what the BODY path serves (their transfer encoding is multipart or message/rfc822, which is not an encoding at all), and it belongs with the partial-fetch code rather than in a release cut. Until then a client that asks for `BINARY[]` gets an empty literal where it should get the message. |
 | ⬜ | CATENATE (RFC 4469) | Not implemented and not advertised; APPEND accepts only a literal, with no CATENATE (TEXT/URL ...) part list. Requires URLAUTH-style URL resolution, which is also absent. |
 | ⬜ | COMPRESS=DEFLATE (RFC 4978) | Not implemented and not advertised; no COMPRESS command and no deflate stream layer in the IMAP connection. Listed in the roadmap's IMAP-extension backlog. |
 | ⬜ | I18NLEVEL (RFC 5255) | Not implemented and not advertised - and assessed 17 August 2026 as staying that way until it can be claimed honestly. Advertising even I18NLEVEL=1 asserts that SEARCH compares strings with i;unicode-casemap, and this server's comparator is Windows towlower-based case folding, which agrees with unicode-casemap on ASCII and disagrees on enough of Unicode to make the claim false. Implementing it properly is a comparator project with fixture proof across scripts, not a capability-line edit; claiming it without that would be exactly the "exists but inert" overclaim the August capability audit existed to catch. |

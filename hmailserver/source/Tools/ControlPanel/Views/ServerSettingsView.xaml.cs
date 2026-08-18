@@ -506,15 +506,27 @@ namespace hMailServer.ControlPanel.Views
          public string Placeholder = "";
          public bool BrowseFolder;
          public IniFeatureStore IniStore;
+
+         /// <summary>
+         /// What the SERVER uses when the key is absent from the ini - not a
+         /// suggestion, and not necessarily empty. Without it this editor showed a
+         /// blank box for a key the server defaults to a real value, which is a
+         /// false statement about the running configuration; and because saving a
+         /// page writes every field on it, the blank was then written back and the
+         /// default silently lost. Both OAuth2 host lists default to a Microsoft
+         /// host, so that is exactly the shape it bit.
+         /// </summary>
+         public string Default = "";
+
          private TextBox box_;
 
          public override bool WantsInitialValue => false;
 
          public override FrameworkElement CreateEditor(object value)
          {
-            string current = "";
+            string current = Default;
             if (IniStore != null && IniStore.IsAvailable)
-               current = IniStore.Read(Path, "");
+               current = IniStore.Read(Path, Default);
 
             var panel = new StackPanel();
             panel.Children.Add(new TextBlock { Text = Label, FontSize = 13, Margin = new Thickness(0, 0, 0, 4) });
@@ -1176,7 +1188,8 @@ namespace hMailServer.ControlPanel.Views
          oauth.Settings.Add(new IniText
          {
             Path = "OutboundOAuth2Hosts",
-            Label = "Relay hosts that use OAuth2 (comma separated; empty = none)",
+            Label = "Relay hosts that use OAuth2 (comma separated; blank this to use none)",
+            Default = "smtp.office365.com",
             Placeholder = "smtp.office365.com",
             Blurb = "Only destinations named here get a bearer token; every other relay keeps password " +
                     "authentication. This is deliberate - a token presented to the wrong relay is a leaked token.",
@@ -1226,7 +1239,8 @@ namespace hMailServer.ControlPanel.Views
          oauth.Settings.Add(new IniText
          {
             Path = "FetchOAuth2Hosts",
-            Label = "External-account hosts to FETCH from with OAuth2 (comma separated; empty = none)",
+            Label = "External-account hosts to FETCH from with OAuth2 (comma separated; blank this to use none)",
+            Default = "outlook.office365.com",
             Placeholder = "outlook.office365.com",
             Blurb = "External accounts whose server is named here log in with a bearer token from the same token " +
                     "endpoint above; every other external account keeps USER/PASS. Collecting from Microsoft 365 " +

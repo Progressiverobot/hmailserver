@@ -234,8 +234,15 @@ namespace HM
       String fromAddress = IniFileSettings::Instance()->GetDmarcRptFromAddress();
       String submitter = StringParser::ExtractDomain(fromAddress);
 
+      // The policy domain is part of the id, not just the day and the second.
+      // Two domains reported in the same second otherwise get identical
+      // report_id values - and identical Message-IDs, since that is built from
+      // the same string - so a shared report processor that keys duplicate
+      // suppression on org_name + report_id (RFC 7489 7.2.1.1 requires the id to
+      // be unique) discards all but the first, while the log says both were sent.
       AnsiString reportId;
-      reportId.Format("%hs.%I64d@%hs", dayKey.c_str(), static_cast<__int64>(time(nullptr)), AnsiString(submitter).c_str());
+      reportId.Format("%hs.%hs.%I64d@%hs", dayKey.c_str(), bucket.policy_domain.c_str(),
+         static_cast<__int64>(time(nullptr)), AnsiString(submitter).c_str());
 
       AnsiString reportXml = BuildReportXml(dayKey, bucket, reportId, fromAddress,
          IniFileSettings::Instance()->GetDmarcRptOrganizationName());
@@ -375,12 +382,14 @@ namespace HM
       xml += "  </report_metadata>\r\n";
       xml += "  <policy_published>\r\n";
       xml += "    <domain>" + XmlEscape_(bucket.policy_domain) + "</domain>\r\n";
-      xml += "    <adkim>" + XmlEscape_(bucket.adkim.IsEmpty() ? AnsiString("r") : bucket.adkim) + "</adkim>\r\n";
-      xml += "    <aspf>" + XmlEscape_(bucket.aspf.IsEmpty() ? AnsiString("r") : bucket.aspf) + "</aspf>\r\n";
-      xml += "    <p>" + XmlEscape_(bucket.p) + "</p>\r\n";
+      xml += "    <adkim>" + XmlEscape_(NormalizeAlignment_(bucket.adkim)) + "</adkim>\r\n";
+      xml += "    <aspf>" + XmlEscape_(NormalizeAlignment_(bucket.aspf)) + "</aspf>\r\n";
+      xml += "    <p>" + XmlEscape_(NormalizeDisposition_(bucket.p)) + "</p>\r\n";
 
+      // sp is optional in the schema, so an absent one is omitted rather than
+      // invented - but a PRESENT one still has to be a legal value.
       if (!bucket.sp.IsEmpty())
-         xml += "    <sp>" + XmlEscape_(bucket.sp) + "</sp>\r\n";
+         xml += "    <sp>" + XmlEscape_(NormalizeDisposition_(bucket.sp)) + "</sp>\r\n";
 
       AnsiString pct;
       pct.Format("    <pct>%d</pct>\r\n", bucket.pct);
@@ -438,6 +447,57 @@ namespace HM
       xml += "</feedback>\r\n";
 
       return xml;
+   }
+
+   AnsiString
+   DmarcRptReporterTask::NormalizeDisposition_(const AnsiString &value)
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // RFC 7489 Appendix C types p and sp as DispositionType - a closed, lowercase
+   // enumeration of none/quarantine/reject. The value here comes from somebody
+   // else's DNS record, so it arrives in whatever case they typed and is not
+   // guaranteed to be one of the three at all: a record with no p= tag at all
+   // reaches the store, and "p=None" is common in the wild.
+   //
+   // Emitted verbatim, either produced an empty <p></p> or a value outside the
+   // enumeration, and a report that fails schema validation is discarded whole by
+   // every receiver that validates - so the feature looked like it was working
+   // (the mail was sent, the log said so) while the reports were being thrown
+   // away at the far end.
+   //
+   // Anything unrecognised becomes "none", which is the schema's own default and
+   // the weakest claim: it says this server made no assertion about what the
+   // domain asked for, rather than inventing a stricter one.
+   //---------------------------------------------------------------------------()
+   {
+      AnsiString normalized = value;
+      normalized.Trim();
+      normalized.MakeLower();
+
+      if (normalized == "quarantine" || normalized == "reject" || normalized == "none")
+         return normalized;
+
+      return "none";
+   }
+
+   AnsiString
+   DmarcRptReporterTask::NormalizeAlignment_(const AnsiString &value)
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // The same for adkim and aspf, which the schema types as AlignmentType: "r" or
+   // "s" and nothing else. "relaxed"/"strict" spelled out, or an empty tag when
+   // the record omitted it, both fail validation. Relaxed is the RFC's default
+   // for both, so that is what an unrecognised value becomes.
+   //---------------------------------------------------------------------------()
+   {
+      AnsiString normalized = value;
+      normalized.Trim();
+      normalized.MakeLower();
+
+      if (normalized == "s" || normalized == "strict")
+         return "s";
+
+      return "r";
    }
 
    AnsiString
