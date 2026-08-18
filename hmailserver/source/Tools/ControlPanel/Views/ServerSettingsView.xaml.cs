@@ -1218,6 +1218,21 @@ namespace hMailServer.ControlPanel.Views
                     "expire and nothing here will refresh them.",
             IniStore = iniStore_
          });
+         // The collecting half of the same Microsoft 365 story, and it was the one
+         // setting of the pair with no field: an administrator could configure
+         // sending through M365 here and had to hand-edit the ini to configure
+         // fetching from it, which is the same credential problem in the other
+         // direction.
+         oauth.Settings.Add(new IniText
+         {
+            Path = "FetchOAuth2Hosts",
+            Label = "External-account hosts to FETCH from with OAuth2 (comma separated; empty = none)",
+            Placeholder = "outlook.office365.com",
+            Blurb = "External accounts whose server is named here log in with a bearer token from the same token " +
+                    "endpoint above; every other external account keeps USER/PASS. Collecting from Microsoft 365 " +
+                    "with a password has not been possible since 2022.",
+            IniStore = iniStore_
+         });
          Tab("Relayer").Cards.Add(oauth);
 
          var rules = Card("Rules");
@@ -1377,6 +1392,43 @@ namespace hMailServer.ControlPanel.Views
          general.Settings.Add(new ComText { Path = "AntiVirus.MaximumMessageSize", Label = "Max message size to virus-scan (KB, 0 = unlimited)", Numeric = true });
          general.Settings.Add(new ComBool { Path = "AntiVirus.EnableAttachmentBlocking", Label = "Enable attachment blocking (manage list on the Blocked attachments page)" });
          Tab("General").Cards.Add(general);
+
+         // The posture question the rest of this page cannot answer: what happens
+         // to a message when the scanner is switched on and cannot run. Until
+         // AVFailAction existed the answer was "delivered, with one line in the
+         // error log", which is indistinguishable from "scanned and found clean" -
+         // so it belongs here, next to the scanners it applies to, rather than in
+         // an ini file the people who care about it will never open.
+         var failure = Card("When a scanner cannot run",
+            "A scan that errors, times out or cannot reach its engine is not a clean verdict - nobody looked. " +
+            "The shipped behaviour is to deliver the message anyway, which is what this server has always done; " +
+            "holding it instead is the stricter choice and the one to make deliberately.");
+         failure.Settings.Add(new IniNumber
+         {
+            Path = "AVFailAction",
+            Label = "If a message cannot be scanned: 0 = deliver it, 1 = hold it and eventually return it",
+            Default = 0,
+            Blurb = "0 is the shipped default and preserves today's behaviour exactly. 1 never delivers unscanned mail.",
+            IniStore = iniStore_
+         });
+         failure.Settings.Add(new IniNumber
+         {
+            Path = "AVFailRetryMinutes",
+            Label = "Minutes between scan attempts while held",
+            Default = 15,
+            IniStore = iniStore_
+         });
+         failure.Settings.Add(new IniNumber
+         {
+            Path = "AVFailMaxHolds",
+            Label = "How many times to hold before returning it to the sender",
+            Default = 16,
+            Blurb = "16 holds at 15 minutes is about four hours. 0 means never queue unscanned mail at all - tell the " +
+                    "sender immediately. A held message is delivered as soon as any scanner answers; the count is kept " +
+                    "in memory, so a service restart gives a held message a fresh budget.",
+            IniStore = iniStore_
+         });
+         Tab("General").Cards.Add(failure);
 
          var clamav = Card("ClamAV (network daemon)");
          clamav.Settings.Add(new ComBool { Path = "AntiVirus.ClamAVEnabled", Label = "Scan with clamd" });
@@ -1626,6 +1678,7 @@ namespace hMailServer.ControlPanel.Views
             Numeric = true,
             Blurb = "0 means the connection is dropped but no range is created, so the address is not actually banned."
          });
+
          ban.Settings.Add(new ComAction
          {
             Path = "AutoBanOnLogonFailure",
@@ -1649,6 +1702,44 @@ namespace hMailServer.ControlPanel.Views
             }
          });
          Tab("Auto-ban").Cards.Add(ban);
+
+         // The other half of the same subject, and the reason it is on this page:
+         // auto-ban counts per ADDRESS, so a distributed attack that spends a few
+         // guesses per address against one mailbox never trips it. This counts per
+         // NAME, which is the one thing such an attack cannot vary. An
+         // administrator reading a page called "Auto-ban" is entitled to find both.
+         var lockout = Card("Per-name lockout",
+            "Counted per user name rather than per address, across every protocol that authenticates, so a botnet " +
+            "spreading its guesses over thousands of addresses still locks the mailbox it is guessing at. A locked " +
+            "name is refused with the ordinary invalid-credentials reply and cannot be unlocked by typing the right " +
+            "password - the lock is checked first - so the ceiling is worth setting with the cost in mind. Failures " +
+            "against a name that does not exist lock that name too, deliberately: doing otherwise would let an " +
+            "attacker use the lockout to discover which accounts are real.");
+         lockout.Settings.Add(new IniNumber
+         {
+            Path = "AccountLockoutThreshold",
+            Label = "Lock a name after this many failures (0 = off)",
+            Default = 0,
+            Blurb = "0 is the shipped default and disables the whole mechanism.",
+            IniStore = iniStore_
+         });
+         lockout.Settings.Add(new IniNumber
+         {
+            Path = "AccountLockoutWindowMinutes",
+            Label = "...counted within (minutes)",
+            Default = 30,
+            IniStore = iniStore_
+         });
+         lockout.Settings.Add(new IniNumber
+         {
+            Path = "AccountLockoutMinutes",
+            Label = "Lockout duration (minutes)",
+            Default = 30,
+            Blurb = "A successful logon clears the name's counters, and attempts made while it is locked are not " +
+                    "counted - so an attacker cannot hold a mailbox locked indefinitely with a trickle of guesses.",
+            IniStore = iniStore_
+         });
+         Tab("Auto-ban").Cards.Add(lockout);
       }
 
       private void BuildLogging()

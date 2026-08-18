@@ -1686,8 +1686,30 @@ namespace hMailServer.ControlPanel.Views
                   Blurb = "Sends daily aggregate reports about TLS connection failures to recipient domains (RFC 8460).",
                   Settings =
                   {
-                     new TextSetting { Key = "TlsRptFromAddress", Label = "Report sender address (empty = disabled)", Placeholder = "tlsrpt@yourdomain.com" },
-                     new TextSetting { Key = "TlsRptOrganizationName", Default = "hMailServer", Label = "Organization name in reports" }
+                     // Named "TLS report..." rather than "Report..." since DMARC
+                     // reporting joined this page: two identically-labelled fields
+                     // on one page are ambiguous to anyone who cannot see which
+                     // card they are in, and AccessibleNamesTests fails on it.
+                     new TextSetting { Key = "TlsRptFromAddress", Label = "TLS report sender address (empty = disabled)", Placeholder = "tlsrpt@yourdomain.com" },
+                     new TextSetting { Key = "TlsRptOrganizationName", Default = "hMailServer", Label = "Organization name in TLS reports" }
+                  }
+               });
+               // The same shape as TLS reporting above and deliberately beside it:
+               // both are reports this server sends to other domains about their
+               // own mail, both are inert until a sender address is set, and an
+               // administrator who has just switched one on is the person most
+               // likely to want the other.
+               cards_.Add(new CardDef
+               {
+                  Title = "DMARC aggregate reporting (rua)",
+                  Blurb = "Sends the daily aggregate reports that domains ask for with a rua= tag in their DMARC record " +
+                          "(RFC 7489) - who sent mail claiming to be them, and whether it passed. Reports only go to an " +
+                          "address outside the policy domain when that address's own DNS says it wants them, so a " +
+                          "domain cannot use its DMARC record to aim this server's reports at somebody else.",
+                  Settings =
+                  {
+                     new TextSetting { Key = "DmarcRptFromAddress", Label = "DMARC report sender address (empty = disabled)", Placeholder = "dmarc@yourdomain.com" },
+                     new TextSetting { Key = "DmarcRptOrganizationName", Default = "hMailServer", Label = "Organization name in DMARC reports" }
                   }
                });
                // Moved here from the catch-all INI page. This is the same subject as
