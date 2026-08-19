@@ -74,8 +74,8 @@ namespace RegressionTests.IMAP
          imapSim.SendRaw("A02 FETCH 1 (BINARY.PEEK[2])\r\n");
          var binary = imapSim.ReceiveUntil("A02 ");
 
-         StringAssert.Contains("BINARY[2] {" + DecodedText.Length + "}", binary,
-            "The literal must carry the DECODED size. Got: " + binary);
+         StringAssert.Contains("BINARY[2] ~{" + DecodedText.Length + "}", binary,
+            "The literal must carry the DECODED size, announced with literal8 (~{n}) as RFC 3516 4.3 requires - decoded bytes may contain NUL, which a plain literal cannot carry. Got: " + binary);
          StringAssert.Contains(DecodedText, binary,
             "The content must arrive decoded. Got: " + binary);
 
@@ -114,8 +114,8 @@ namespace RegressionTests.IMAP
          imapSim.SendRaw("A02 FETCH 1 (BINARY.PEEK[2]<0.5>)\r\n");
          var response = imapSim.ReceiveUntil("A02 ");
 
-         StringAssert.Contains("BINARY[2]<0> {5}", response,
-            "Five decoded bytes from the origin, with the origin echoed. Got: " + response);
+         StringAssert.Contains("BINARY[2]<0> ~{5}", response,
+            "Five decoded bytes from the origin, the origin echoed, in a literal8. Got: " + response);
          StringAssert.Contains("Hello", response,
             "And they are the DECODED first five. Got: " + response);
 
@@ -147,6 +147,100 @@ namespace RegressionTests.IMAP
          var fetch = imapSim.ReceiveUntil("A02 ");
          StringAssert.Contains("Stored via literal8.", fetch,
             "And the message must be intact. Got: " + fetch);
+
+         imapSim.Disconnect();
+      }
+
+      [Test]
+      [Description("BINARY[] returns the whole message, not an empty literal - the composite-section defect shipped in 6.2.22-pre2")]
+      public void BinaryOnTheWholeMessageReturnsTheWholeMessage()
+      {
+         var imapSim = LogonWithBase64Message();
+
+         imapSim.SendRaw("A02 FETCH 1 (BINARY.PEEK[])\r\n");
+         var response = imapSim.ReceiveUntil("A02 ");
+
+         // The defect this pins: a multipart entity's own text stops at the first
+         // boundary, so serving it as "the section's content" answered with the
+         // MIME preamble - nothing. A client asking for the message was told the
+         // message was empty.
+         ClassicAssert.IsFalse(Regex.IsMatch(response, @"BINARY\[\] ~?\{0\}"),
+            "BINARY[] must not answer with an empty literal. Got: " + response);
+         StringAssert.Contains("Subject: binary test", response,
+            "BINARY[] is the entire message, headers included. Got: " + response);
+         StringAssert.Contains("Plain part.", response,
+            "...and its parts. Got: " + response);
+
+         imapSim.Disconnect();
+      }
+
+      [Test]
+      [Description("BINARY on a multipart section returns that part's sub-parts rather than an empty literal")]
+      public void BinaryOnAMultipartSectionReturnsItsSubParts()
+      {
+         var imapSim = new ImapClientSimulator();
+         imapSim.Connect();
+         imapSim.Logon(_account.Address, "test");
+         imapSim.SelectFolder("INBOX");
+
+         // Part 1 is itself a multipart/alternative, so BINARY[1] names a
+         // composite section - the shape that used to come back empty.
+         string message =
+            "From: binary@example.test\r\n" +
+            "Subject: nested\r\n" +
+            "MIME-Version: 1.0\r\n" +
+            "Content-Type: multipart/mixed; boundary=\"outer\"\r\n" +
+            "\r\n" +
+            "--outer\r\n" +
+            "Content-Type: multipart/alternative; boundary=\"inner\"\r\n" +
+            "\r\n" +
+            "--inner\r\n" +
+            "Content-Type: text/plain\r\n" +
+            "\r\n" +
+            "The plain alternative.\r\n" +
+            "--inner\r\n" +
+            "Content-Type: text/html\r\n" +
+            "\r\n" +
+            "<p>The html alternative.</p>\r\n" +
+            "--inner--\r\n" +
+            "--outer--\r\n";
+
+         imapSim.SendRaw("A01 APPEND INBOX {" + message.Length + "+}\r\n" + message + "\r\n");
+         StringAssert.Contains("A01 OK", imapSim.ReceiveUntil("A01 "));
+
+         imapSim.SendRaw("A02 SELECT INBOX\r\n");
+         imapSim.ReceiveUntil("A02 ");
+
+         imapSim.SendRaw("A03 FETCH * (BINARY.PEEK[1])\r\n");
+         var response = imapSim.ReceiveUntil("A03 ");
+
+         ClassicAssert.IsFalse(Regex.IsMatch(response, @"BINARY\[1\] ~?\{0\}"),
+            "A multipart section must not answer with an empty literal. Got: " + response);
+         StringAssert.Contains("The plain alternative.", response,
+            "A multipart part's content is its sub-parts, raw - there is no transfer encoding to undo. Got: " + response);
+
+         imapSim.Disconnect();
+      }
+
+      [Test]
+      [Description("BINARY.SIZE agrees with the octets BINARY delivers - a client sizes its buffer from it")]
+      public void BinarySizeAgreesWithTheOctetsDelivered()
+      {
+         var imapSim = LogonWithBase64Message();
+
+         imapSim.SendRaw("A02 FETCH 1 (BINARY.SIZE[])\r\n");
+         var sizeResponse = imapSim.ReceiveUntil("A02 ");
+         var size = Regex.Match(sizeResponse, @"BINARY\.SIZE\[\] (\d+)");
+         ClassicAssert.IsTrue(size.Success, "No BINARY.SIZE[] in the response. Got: " + sizeResponse);
+
+         imapSim.SendRaw("A03 FETCH 1 (BINARY.PEEK[])\r\n");
+         var contentResponse = imapSim.ReceiveUntil("A03 ");
+         var literal = Regex.Match(contentResponse, @"BINARY\[\] ~?\{(\d+)\}");
+         ClassicAssert.IsTrue(literal.Success, "No BINARY[] literal in the response. Got: " + contentResponse);
+
+         ClassicAssert.AreEqual(size.Groups[1].Value, literal.Groups[1].Value,
+            "BINARY.SIZE and the BINARY literal must agree: a chunking client computes its last " +
+            "request as size-minus-offset, so a disagreement truncates the final chunk.");
 
          imapSim.Disconnect();
       }

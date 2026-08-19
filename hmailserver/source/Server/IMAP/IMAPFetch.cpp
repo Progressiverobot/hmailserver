@@ -329,9 +329,19 @@ namespace HM
 
             if (pBuffer->GetSize() > 0)
             {
+               // RFC 3516 section 4.3: BINARY content is announced with literal8
+               // (~{n}), not the plain literal. It matters for exactly the content
+               // BINARY exists to deliver - decoded bytes can contain NUL, which a
+               // plain literal is not permitted to carry, so a client reading
+               // strictly would be entitled to treat the response as malformed.
+               // Only BINARY uses it; BODY[] keeps the plain literal, and a client
+               // only sees literal8 in reply to a command that announced BINARY
+               // support by using it.
+               const String literalPrefix = oPart.GetShowBinaryContent() ? _T("~{") : _T("{");
+
                // Send part size information
                String sTemp;
-               sTemp.Format(_T("%s {%Iu}\r\n"), sPartIdentifier.c_str(), pBuffer->GetSize()); // Add 2 for trailing newline.
+               sTemp.Format(_T("%s %s%Iu}\r\n"), sPartIdentifier.c_str(), literalPrefix.c_str(), pBuffer->GetSize()); // Add 2 for trailing newline.
                
                AppendOutput_(sOutput, sTemp);
                SendAndReset_(pConnection, sOutput);
@@ -495,32 +505,96 @@ namespace HM
 
       // RFC 3516 (BINARY): the section's content with its transfer encoding
       // decoded - what an attachment save has always done, applied to FETCH.
-      // An empty section means the whole (single-part) body. Encodings the MIME
-      // code has no decoder for come back as-is, which is also what identity
-      // encodings (7bit, 8bit, binary) do.
+      //
+      // Only a LEAF part has a transfer encoding to undo. The first cut decoded
+      // whatever the section resolved to and served the entity's raw text, which
+      // is right for a leaf and silently wrong for everything else: MimeBody::Load
+      // truncates a multipart entity's text at the first boundary, so BINARY[] for
+      // a whole message, a section naming a multipart part, and a section naming a
+      // message/rfc822 part all answered with the MIME preamble - normally zero
+      // bytes. A client asking for BINARY[] was told the message was empty. That
+      // shipped in 6.2.22-pre2 as a documented limitation; this is the fix.
+      //
+      // The identity cases are served exactly as their BODY equivalents, because
+      // multipart and message/rfc822 have no content transfer encoding to speak
+      // of - "the encoding is identity" is not an approximation there, it is what
+      // the MIME grammar says.
       if (oPart.GetShowBinaryContent() || oPart.GetShowBinarySize())
       {
+         // Navigate WITHOUT loading an encapsulated message, like the BODY[N] path
+         // below: loading it here would make a message/rfc822 section answer with
+         // the inner message's parsed body rather than the section's own bytes.
          std::shared_ptr<MimeBody> pBinaryPart = pBodyPart;
 
          if (!oPart.GetName().IsEmpty())
-            pBinaryPart = GetBodyPartByRecursiveIdentifier_(pBodyPart, oPart.GetName());
+            pBinaryPart = GetBodyPartByRecursiveIdentifier_(pBodyPart, oPart.GetName(), false);
 
-         if (pBinaryPart)
+         if (!pBinaryPart)
+            return pOutBuf;
+
+         AnsiString content;
+
+         if (oPart.GetName().IsEmpty())
+         {
+            // BINARY[] - the entire message, headers included, from the file, the
+            // same source BODY[] is served from. A top-level entity is 7bit, 8bit,
+            // binary or multipart in practice, all of which are identity; a
+            // single-part message whose own Content-Transfer-Encoding is base64 is
+            // the one shape this still hands back encoded, and that is the
+            // remaining half of the UNKNOWN-CTE work rather than something this
+            // path can decide.
+            const int fileSize = FileUtilities::FileSize(messageFileName);
+
+            int iWholeStart = 0;
+            int iWholeCount = 0;
+            GetBytesToSend_(fileSize, oPart, iWholeStart, iWholeCount);
+
+            if (iWholeCount > 0)
+            {
+               std::vector<BYTE> buffer((size_t) iWholeCount);
+               FileUtilities::ReadFileToBuf(messageFileName, &buffer[0], iWholeStart, iWholeCount);
+               pOutBuf->Add(&buffer[0], iWholeCount);
+            }
+
+            return pOutBuf;
+         }
+
+         if (pBinaryPart->IsEncapsulatedRFC822Message())
+         {
+            // The "content" of a message/rfc822 part is the whole inner message,
+            // headers and all - Store with headers, as BODY[N] does.
+            try
+            {
+               std::shared_ptr<MimeBody> pEncapsulated = pBinaryPart->LoadEncapsulatedMessage();
+               pEncapsulated->Store(content, true);
+            }
+            catch (...)
+            {
+               ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5060, "IMAPFetch::GetByteBufferByBodyPart_",
+                  "Error loading encapsulated message for a BINARY fetch.");
+               return pOutBuf;
+            }
+         }
+         else if (pBinaryPart->IsMultiPart())
+         {
+            // A multipart's content is its sub-parts, raw and undecoded.
+            pBinaryPart->Store(content, false);
+         }
+         else
          {
             std::unique_ptr<MimeCodeBase> pCoder(MimeEnvironment::CreateCoder(pBinaryPart->GetTransferEncoding()));
             pCoder->SetInput(pBinaryPart->GetContent(), pBinaryPart->GetContentLength(), false);
-
-            AnsiString decoded;
-            pCoder->GetOutput(decoded);
-
-            // The partial range applies to the DECODED bytes - that is the
-            // point of asking for BINARY rather than BODY.
-            int iByteStart = 0;
-            int iByteCount = 0;
-            GetBytesToSend_(decoded.GetLength(), oPart, iByteStart, iByteCount);
-
-            pOutBuf->Add((const BYTE*) decoded.c_str() + iByteStart, iByteCount);
+            pCoder->GetOutput(content);
          }
+
+         // The partial range applies to the DECODED bytes - that is the
+         // point of asking for BINARY rather than BODY.
+         int iByteStart = 0;
+         int iByteCount = 0;
+         GetBytesToSend_(content.GetLength(), oPart, iByteStart, iByteCount);
+
+         if (iByteCount > 0)
+            pOutBuf->Add((const BYTE*) content.c_str() + iByteStart, iByteCount);
 
          return pOutBuf;
       }
