@@ -203,7 +203,8 @@ if (Test-Path $serverIni) {
     $leftoverKeys = 'DNSServer', 'Pop3LoginDelaySeconds', 'PasswordPolicyMinimumLength',
                     'PasswordPolicyRequireMixedCase', 'PasswordPolicyRequireDigit',
                     'PasswordPolicyRequireNonAlphanumeric', 'PasswordPolicyRejectCommon',
-                    'QuarantineEnabled'
+                    'QuarantineEnabled', 'PasswordPolicyHistoryCount',
+                    'PasswordPolicyMaximumAgeDays'
 
     $iniLines = @(Get-Content -LiteralPath $serverIni)
     $pattern = '^\s*(' + ($leftoverKeys -join '|') + ')\s*='

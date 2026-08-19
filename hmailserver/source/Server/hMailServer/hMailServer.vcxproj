@@ -493,6 +493,7 @@ EXIT 0
     <ClCompile Include="..\Common\Util\WebServicesServer.cpp" />
     <ClCompile Include="..\Common\AntiSpam\QuarantineStore.cpp" />
     <ClCompile Include="..\Common\Util\Totp.cpp" />
+    <ClCompile Include="..\Common\Util\PasswordHistory.cpp" />
     <ClCompile Include="..\Common\Util\PasswordPolicy.cpp" />
     <ClCompile Include="..\Common\Util\Pop3LoginDelay.cpp" />
     <ClCompile Include="..\Common\Util\AccountLockout.cpp" />
@@ -1071,6 +1072,7 @@ EXIT 0
     <ClInclude Include="..\Common\Util\WebServicesServer.h" />
     <ClInclude Include="..\Common\AntiSpam\QuarantineStore.h" />
     <ClInclude Include="..\Common\Util\Totp.h" />
+    <ClInclude Include="..\Common\Util\PasswordHistory.h" />
     <ClInclude Include="..\Common\Util\PasswordPolicy.h" />
     <ClInclude Include="..\Common\Util\Pop3LoginDelay.h" />
     <ClInclude Include="..\Common\Util\AccountLockout.h" />

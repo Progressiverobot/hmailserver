@@ -2304,6 +2304,38 @@ namespace hMailServer.ControlPanel.Views
          });
          Tab("Password").Cards.Add(policy);
 
+         // Separate from the complexity card above, because the two carry very
+         // different risks and putting them under one heading would hide that.
+         var ageing = Card("Reuse and expiry",
+            "These belong together: expiry without history teaches people to alternate between two passwords, "
+          + "which is worse than not expiring at all. History only ever refuses a CHANGE, at the moment somebody "
+          + "is able to pick something else, so nobody is locked out by it. Expiry refuses a LOGON - read its "
+          + "description before turning it on.");
+         ageing.Settings.Add(new IniNumber
+         {
+            Path = "PasswordPolicyHistoryCount",
+            Label = "Remember this many previous passwords (0 = no history)",
+            Default = 0,
+            Blurb = "The current password counts as the most recent one, so setting a password to itself is "
+                  + "refused too - the repeat somebody is most likely to try.",
+            IniStore = iniStore_
+         });
+         ageing.Settings.Add(new IniNumber
+         {
+            Path = "PasswordPolicyMaximumAgeDays",
+            Label = "Expire passwords after (days; 0 = never)",
+            Default = 0,
+            Blurb = "READ THIS FIRST: hMailServer has no self-service password change - IMAP, POP3 and SMTP "
+                  + "have no mechanism for it and there is no web page for users - so an expired password can "
+                  + "only be reset by an administrator. Turning this on means someone has to be available to do "
+                  + "that. Existing app passwords keep working, which is the one way an affected person can still "
+                  + "collect mail; Active Directory accounts are exempt, because their password lives in the "
+                  + "directory and expires by its policy, not this one. The clock started when this server was "
+                  + "upgraded, so nobody is expired the moment you set this.",
+            IniStore = iniStore_
+         });
+         Tab("Password").Cards.Add(ageing);
+
          var twoFactor = Card("Two-factor authentication",
             "An optional one-time code, asked for after the password when signing in to this Control Panel. The secret " +
             "is stored per machine under HKLM, so enabling or disabling it needs local administrator rights. It does " +

@@ -262,6 +262,15 @@ namespace HM
       bool GetPasswordPolicyRequireDigit() const { return password_policy_require_digit_; }
       bool GetPasswordPolicyRequireNonAlphanumeric() const { return password_policy_require_non_alphanumeric_; }
       bool GetPasswordPolicyRejectCommon() const { return password_policy_reject_common_; }
+
+      // Reuse history and maximum age. Both 0 (off) by default.
+      //
+      // Expiry has a consequence worth stating where it is read as well as where it
+      // is set: this server has no self-service password change, so an expired
+      // password must be reset by an administrator. History has no such catch - it
+      // only ever refuses a CHANGE, at the moment somebody can pick something else.
+      int GetPasswordPolicyHistoryCount() const { return password_policy_history_count_; }
+      int GetPasswordPolicyMaximumAgeDays() const { return password_policy_maximum_age_days_; }
       bool GetUseDNSCache() const { return use_dns_cache_; }
       String GetDNSServer() const { return dns_server_; }
 
@@ -672,6 +681,8 @@ namespace HM
       bool password_policy_require_digit_;
       bool password_policy_require_non_alphanumeric_;
       bool password_policy_reject_common_;
+      int password_policy_history_count_;
+      int password_policy_maximum_age_days_;
       int max_outbound_per_destination_per_minute_;
       bool use_dns_cache_;
       String dns_server_;

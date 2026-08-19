@@ -13,6 +13,8 @@
 #include "../common/BO/Accounts.h"
 #include "../Common/Util/Math.h"
 #include "../Common/Util/PasswordPolicy.h"
+#include "../Common/Util/PasswordHistory.h"
+#include "../Common/Util/Time.h"
 #include "../Common/Util/Totp.h"
 #include "../Common/Util/PasswordValidator.h"
 #include "../Common/Util/Crypt.h"
@@ -350,12 +352,28 @@ STDMETHODIMP InterfaceAccount::put_Password(BSTR newVal)
       if (!HM::PasswordPolicy::IsAcceptable(object_->GetAddress(), newVal, policyFailure))
          return COMError::GenerateError(policyFailure);
 
+      // Reuse is checked against the CURRENT password and the last N, and refuses
+      // the change rather than anything else - nobody is ever locked out by this,
+      // they are standing there able to pick something different.
+      if (HM::PasswordHistory::IsReuse(object_, newVal))
+         return COMError::GenerateError("This password has been used recently on this account. Choose one that has not.");
+
+      // Recorded BEFORE the new hash replaces the old one, because the thing being
+      // recorded IS the old one.
+      HM::PasswordHistory::Record(object_);
+
       // The password isn't encrypted. Encrypt it now using MD5.
       int preferredHashAlgorithm = HM::IniFileSettings::Instance()->GetPreferredHashAlgorithm();
       String sPassword = HM::Crypt::Instance()->EnCrypt(newVal, (HM::Crypt::EncryptionType) preferredHashAlgorithm);
    
       object_->SetPassword(sPassword);
       object_->SetPasswordEncryption(preferredHashAlgorithm);
+
+      // The age clock starts here, at the one place a password is chosen. Not on
+      // the paths that re-hash an existing password to a stronger scheme: an upgrade
+      // of the STORAGE is not a change of the SECRET, and treating it as one would
+      // quietly reset everybody's expiry the first time they logged in.
+      object_->SetPasswordChanged(HM::Time::GetCurrentDateTime());
    
       return S_OK;
    }

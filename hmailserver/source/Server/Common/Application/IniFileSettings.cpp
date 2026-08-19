@@ -511,6 +511,8 @@ namespace HM
       password_policy_require_digit_ = ReadIniSettingInteger_("Settings", "PasswordPolicyRequireDigit", 0) == 1;
       password_policy_require_non_alphanumeric_ = ReadIniSettingInteger_("Settings", "PasswordPolicyRequireNonAlphanumeric", 0) == 1;
       password_policy_reject_common_ = ReadIniSettingInteger_("Settings", "PasswordPolicyRejectCommon", 0) == 1;
+      password_policy_history_count_ = ReadIniSettingInteger_("Settings", "PasswordPolicyHistoryCount", 0);
+      password_policy_maximum_age_days_ = ReadIniSettingInteger_("Settings", "PasswordPolicyMaximumAgeDays", 0);
       max_outbound_per_destination_per_minute_ = ReadIniSettingInteger_("Settings", "MaxOutboundPerDestinationPerMinute", 0);
       m_sDisableAUTHList = ReadIniSettingString_("Settings", "DisableAUTHList", "");
    }

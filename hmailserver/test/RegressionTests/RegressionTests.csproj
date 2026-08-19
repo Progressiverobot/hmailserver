@@ -590,6 +590,7 @@
     <Compile Include="POP3\Pipelining.cs" />
     <Compile Include="Security\AppPasswords.cs" />
     <Compile Include="Security\PasswordPolicyTests.cs" />
+    <Compile Include="Security\PasswordExpiryTests.cs" />
     <Compile Include="Security\TwoFactorAuthentication.cs" />
     <Compile Include="Security\AccountLockoutTests.cs" />
     <Compile Include="AntiVirus\ScannerFailurePolicy.cs" />

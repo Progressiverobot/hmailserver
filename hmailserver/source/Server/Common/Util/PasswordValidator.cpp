@@ -22,6 +22,7 @@
 #include "../Util/Crypt.h"
 #include "../Scripting/Result.h"
 #include "../Scripting/Events.h"
+#include "PasswordHistory.h"
 
 #include <set>
 
@@ -189,7 +190,23 @@ namespace HM
       if (!requiresSecondFactor || secondFactorSatisfied)
       {
          if (ValidateAccountPassword_(pAccount, sPassword))
-            return true;
+         {
+            // Correct, and then aged out. Checked AFTER the comparison so that a
+            // wrong guess against an expired account is indistinguishable from a
+            // wrong guess against any other - and so the log line below is only
+            // written for somebody who actually knows the password and is being
+            // refused by policy, which is the person an administrator needs to
+            // hear about.
+            //
+            // App passwords are deliberately unaffected. They are separate
+            // credentials with their own lifecycle, and expiring them with the
+            // account password would break every configured mail client at the
+            // moment the account holder least expects it.
+            if (!PasswordHistory::HasExpired(pAccount))
+               return true;
+
+            PasswordHistory::ReportExpired(pAccount);
+         }
       }
 
       // The account's own password did not match. An app password might.

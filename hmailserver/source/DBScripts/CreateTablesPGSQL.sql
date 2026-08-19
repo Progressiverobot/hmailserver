@@ -110,7 +110,8 @@ create table hm_accounts
 	accountpersonlastname varchar(60) not null,	
 	accountvacationabortspamflagged smallint not null,
 	accountforwardabortspamflagged smallint not null,
-	accounttotpsecret varchar(255) not null default ''
+	accounttotpsecret varchar(255) not null default '',
+	accountpasswordchanged timestamp not null default '2000-01-01'
 );
 
 
@@ -883,4 +884,15 @@ create table hm_quarantine
 
 CREATE INDEX idx_hm_quarantine_created ON hm_quarantine (quarantinecreated);
 
-insert into hm_dbversion values (6018);
+create table hm_passwordhistory
+(
+	phid bigserial not null primary key,
+	phaccountid int not null,
+	phhash varchar(255) not null,
+	phencryption int not null,
+	phchanged timestamp not null
+);
+
+CREATE INDEX idx_hm_passwordhistory ON hm_passwordhistory (phaccountid);
+
+insert into hm_dbversion values (6019);

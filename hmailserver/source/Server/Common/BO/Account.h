@@ -91,6 +91,13 @@ namespace HM
       // every account until an administrator enrols one - so this single value is
       // the feature's on/off switch, and its emptiness is load-bearing rather than
       // incidental.
+      // When the password was last SET, not last used. Stamped by the one place a
+      // password is chosen, and by the 6019 upgrade for every account that already
+      // existed - so enabling expiry starts everybody's clock from that upgrade
+      // rather than expiring every mailbox at once.
+      String GetPasswordChanged() const { return password_changed_; }
+      void SetPasswordChanged(const String &newVal) { password_changed_ = newVal; }
+
       String GetTotpSecret() const { return totp_secret_; }
       void SetTotpSecret(const String &newVal) { totp_secret_ = newVal; }
       long GetPasswordEncryption() const {return password_encryption_; }
@@ -149,6 +156,7 @@ namespace HM
       AnsiString address_;
       AnsiString password_;
       String totp_secret_;
+      String password_changed_;
       String addomain_;
       String adusername_;
 

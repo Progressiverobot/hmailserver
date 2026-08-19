@@ -16,6 +16,7 @@
 #include "PersistentMessage.h"
 #include "PersistentGroupMember.h"
 #include "PersistentAppPassword.h"
+#include "../Util/PasswordHistory.h"
 #include "PersistenceMode.h"
 
 #include "../Util/File.h"
@@ -105,6 +106,11 @@ namespace HM
       // nobody will ever think to revoke, and account ids are reissued.
       if (!PersistentAppPassword::DeleteByAccountID(iID))
          orphans.push_back(_T("its app passwords"));
+
+      // Its password reuse history. Account ids are reissued, so leaving these
+      // behind would let a NEW account inherit a stranger's history and be refused
+      // a password for a reason nobody could explain.
+      PasswordHistory::DeleteByAccountID(iID);
 
       // Delete references from groups...
       if (!PersistentGroupMember::DeleteByAccount(iID))
@@ -250,6 +256,7 @@ namespace HM
 
       pAccount->SetLastLogonTime(pRS->GetStringValue("accountlastlogontime"));
       pAccount->SetTotpSecret(pRS->GetStringValue("accounttotpsecret"));
+      pAccount->SetPasswordChanged(pRS->GetStringValue("accountpasswordchanged"));
 
       pAccount->SetPersonFirstName(pRS->GetStringValue("accountpersonfirstname"));
       pAccount->SetPersonLastName(pRS->GetStringValue("accountpersonlastname"));
@@ -437,6 +444,21 @@ namespace HM
 
       oStatement.AddColumn("accountlastlogontime", pAccount->GetLastLogonTime());
       oStatement.AddColumn("accounttotpsecret", pAccount->GetTotpSecret());
+      // accountpasswordchanged is NOT NULL, and AddColumnDate writes NULL for a date
+      // it cannot parse - so an account created by any path that does not set a
+      // password through InterfaceAccount::put_Password (the REST API, a restore, a
+      // script) failed the insert with a constraint error rather than an
+      // explanation. Exactly the trap apcreated carries, met a second time.
+      //
+      // Stamped rather than defaulted to something old: an account whose password
+      // was set now IS a password set now, and pretending otherwise would expire it
+      // the moment expiry was switched on.
+      String passwordChanged = pAccount->GetPasswordChanged();
+
+      if (passwordChanged.GetLength() < 19)
+         passwordChanged = Time::GetCurrentDateTime();
+
+      oStatement.AddColumnDate("accountpasswordchanged", Time::GetDateFromSystemDate(passwordChanged));
       
       oStatement.AddColumn("accountpersonfirstname", pAccount->GetPersonFirstName());
       oStatement.AddColumn("accountpersonlastname", pAccount->GetPersonLastName());

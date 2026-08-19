@@ -106,6 +106,7 @@ namespace HM
       admin_level_ = oldAccount.admin_level_;
       last_logon_time_ = oldAccount.last_logon_time_;
       totp_secret_ = oldAccount.totp_secret_;
+      password_changed_ = oldAccount.password_changed_;
    }
 
    std::shared_ptr<Messages>
@@ -321,6 +322,7 @@ namespace HM
       // the second factor off for every enrolled account, which is a downgrade nobody
       // would be told about.
       pNode->AppendAttr(_T("TotpSecret"), String(totp_secret_));
+      pNode->AppendAttr(_T("PasswordChanged"), String(password_changed_));
 
       // Store fetch accounts
       std::shared_ptr<HM::FetchAccounts> pFetchAccounts = std::shared_ptr<HM::FetchAccounts>(new HM::FetchAccounts(id_));
@@ -392,6 +394,7 @@ namespace HM
 
       last_logon_time_ = pAccountNode->GetAttrValue(_T("LastLogonTime"));
       totp_secret_ = pAccountNode->GetAttrValue(_T("TotpSecret"));
+      password_changed_ = pAccountNode->GetAttrValue(_T("PasswordChanged"));
 
       return true;
    }

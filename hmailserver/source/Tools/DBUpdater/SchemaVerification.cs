@@ -193,7 +193,17 @@ namespace DBUpdater
          new SchemaProbe(6018, "hm_quarantine.quarantinerecipients",
                          "update hm_quarantine set quarantinerecipients = quarantinerecipients where 1 = 0"),
          new SchemaProbe(6018, "hm_quarantine.quarantinecreated",
-                         "update hm_quarantine set quarantinecreated = quarantinecreated where 1 = 0")
+                         "update hm_quarantine set quarantinecreated = quarantinecreated where 1 = 0"),
+
+         // Upgrade6018to6019* - password age and reuse history. The column is on an
+         // existing table and the history is a new one, so a half-applied step is
+         // exactly the shape these probes exist to catch.
+         new SchemaProbe(6019, "hm_accounts.accountpasswordchanged",
+                         "update hm_accounts set accountpasswordchanged = accountpasswordchanged where 1 = 0"),
+         new SchemaProbe(6019, "hm_passwordhistory.phhash",
+                         "update hm_passwordhistory set phhash = phhash where 1 = 0"),
+         new SchemaProbe(6019, "hm_passwordhistory.phchanged",
+                         "update hm_passwordhistory set phchanged = phchanged where 1 = 0")
       };
 
       /// <summary>

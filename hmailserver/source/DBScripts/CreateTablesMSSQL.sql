@@ -198,7 +198,8 @@ create table hm_accounts (
 	accountpersonlastname nvarchar(60) not null,
 	accountvacationabortspamflagged tinyint not null,
 	accountforwardabortspamflagged tinyint not null,
-	accounttotpsecret nvarchar(255) not null
+	accounttotpsecret nvarchar(255) not null,
+	accountpasswordchanged datetime not null
 ) 
 
 ALTER TABLE hm_accounts ADD CONSTRAINT hm_accounts_pk PRIMARY KEY NONCLUSTERED (accountid) 
@@ -1054,4 +1055,17 @@ ALTER TABLE hm_quarantine ADD CONSTRAINT hm_quarantine_pk PRIMARY KEY NONCLUSTER
 
 CREATE CLUSTERED INDEX idx_hm_quarantine_created ON hm_quarantine (quarantinecreated)
 
-insert into hm_dbversion values (6018)
+create table hm_passwordhistory
+(
+	phid int identity(1,1) not null,
+	phaccountid int not null,
+	phhash nvarchar(255) not null,
+	phencryption int not null,
+	phchanged datetime not null
+)
+
+ALTER TABLE hm_passwordhistory ADD CONSTRAINT hm_passwordhistory_pk PRIMARY KEY NONCLUSTERED (phid)
+
+CREATE CLUSTERED INDEX idx_hm_passwordhistory ON hm_passwordhistory (phaccountid)
+
+insert into hm_dbversion values (6019)
