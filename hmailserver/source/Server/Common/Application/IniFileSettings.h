@@ -244,6 +244,17 @@ namespace HM
       // leave between logins for one account, advertised in CAPA and enforced. 0
       // (the default) advertises nothing and enforces nothing.
       int GetPop3LoginDelaySeconds() const { return pop3_login_delay_seconds_; }
+
+      // Password policy, enforced where a password is CHOSEN (Account.Password over
+      // COM) and never where one is verified or re-hashed. All off at 0/false, which
+      // is what an existing installation gets until an administrator decides
+      // otherwise - a policy applied retroactively locks people out of their own
+      // mailboxes without warning.
+      int GetPasswordPolicyMinimumLength() const { return password_policy_minimum_length_; }
+      bool GetPasswordPolicyRequireMixedCase() const { return password_policy_require_mixed_case_; }
+      bool GetPasswordPolicyRequireDigit() const { return password_policy_require_digit_; }
+      bool GetPasswordPolicyRequireNonAlphanumeric() const { return password_policy_require_non_alphanumeric_; }
+      bool GetPasswordPolicyRejectCommon() const { return password_policy_reject_common_; }
       bool GetUseDNSCache() const { return use_dns_cache_; }
       String GetDNSServer() const { return dns_server_; }
 
@@ -647,6 +658,11 @@ namespace HM
       String batv_secret_;
       int max_submissions_per_ip_per_minute_;
       int pop3_login_delay_seconds_;
+      int password_policy_minimum_length_;
+      bool password_policy_require_mixed_case_;
+      bool password_policy_require_digit_;
+      bool password_policy_require_non_alphanumeric_;
+      bool password_policy_reject_common_;
       int max_outbound_per_destination_per_minute_;
       bool use_dns_cache_;
       String dns_server_;

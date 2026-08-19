@@ -2224,6 +2224,57 @@ namespace hMailServer.ControlPanel.Views
          });
          Tab("Password").Cards.Add(password);
 
+         // The policy applies to MAILBOX passwords, and it sits on the same page as the
+         // administrator password because "Password" is where somebody looks for it -
+         // not because the two are related. Everything here is off by default, and the
+         // card says why that matters rather than leaving it to be discovered.
+         var policy = Card("Policy for mailbox passwords",
+            "Applied when a password is CHOSEN - here, in the account editor, by a script or by the API - and never "
+          + "when one is checked at logon. That distinction is the whole design: an account whose password predates "
+          + "the policy keeps working, because locking people out of mailboxes they can open today is a worse outcome "
+          + "than the weak password it would be correcting. Tightening these settings therefore affects the next "
+          + "password each person sets, not the one they have. Everything is off until you turn it on, so an upgrade "
+          + "never starts refusing passwords on its own.");
+         policy.Settings.Add(new IniNumber
+         {
+            Path = "PasswordPolicyMinimumLength",
+            Label = "Minimum length (0 = no minimum)",
+            Default = 0,
+            Blurb = "Length is the requirement that buys the most, and the one people mind least.",
+            IniStore = iniStore_
+         });
+         policy.Settings.Add(new IniBool
+         {
+            Path = "PasswordPolicyRequireMixedCase",
+            Label = "Require both upper and lower case",
+            IniStore = iniStore_
+         });
+         policy.Settings.Add(new IniBool
+         {
+            Path = "PasswordPolicyRequireDigit",
+            Label = "Require at least one digit",
+            IniStore = iniStore_
+         });
+         policy.Settings.Add(new IniBool
+         {
+            Path = "PasswordPolicyRequireNonAlphanumeric",
+            Label = "Require at least one character that is not a letter or digit",
+            Blurb = "Anything that is not a letter or a digit counts, rather than a fixed list of punctuation, "
+                  + "so a keyboard layout you do not have cannot make the rule unsatisfiable.",
+            IniStore = iniStore_
+         });
+         policy.Settings.Add(new IniBool
+         {
+            Path = "PasswordPolicyRejectCommon",
+            Label = "Reject the most commonly used passwords",
+            Blurb = "A short built-in list - \"password\", \"123456\", \"changeme\" and about thirty more - compared "
+                  + "without regard to case. It is deliberately not a \"top 10000\" list, which would need a data file "
+                  + "and an update path; it catches the passwords that get typed while setting up a mailbox nobody "
+                  + "comes back to.",
+            IniStore = iniStore_
+         });
+         Tab("Password").Cards.Add(policy);
+
          var twoFactor = Card("Two-factor authentication",
             "An optional one-time code, asked for after the password when signing in to this Control Panel. The secret " +
             "is stored per machine under HKLM, so enabling or disabling it needs local administrator rights. It does " +

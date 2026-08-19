@@ -7,6 +7,7 @@
 #include "../Common/BO/AppPasswords.h"
 #include "../Common/Persistence/PersistentAppPassword.h"
 #include "../Common/Util/Time.h"
+#include "../Common/Util/PasswordPolicy.h"
 
 #include "COMError.h"
 
@@ -181,8 +182,29 @@ STDMETHODIMP InterfaceAppPassword::SetPassword(BSTR Password)
       // A generated one is 20 characters. A chosen one is typed into a client once and
       // then never again, so there is no usability argument for a short one - and it
       // authenticates a mailbox exactly as the account password does.
+      //
+      // Twelve is this credential's own floor, independent of the server's password
+      // policy: an installation with no policy configured still must not be handed a
+      // four-character app password.
       if (clearText.GetLength() < 12)
          return COMError::GenerateError("An app password must be at least 12 characters. It is typed into a client once and then lives for years, and it opens the mailbox exactly as the account password does; use Generate unless there is a reason not to.");
+
+      // ...and the configured policy applies on top, because an app password opens the
+      // mailbox exactly as the account password does. Without this, a server requiring
+      // sixteen characters of mixed case would accept a twelve-character lower-case app
+      // password for the same mailbox - a policy with a documented way round it is not
+      // a policy.
+      //
+      // The account name is passed empty, which skips the "must not contain the
+      // account name" rule: this object holds an account id rather than an address, and
+      // resolving one here would put a cache lookup on a path that does not otherwise
+      // need one. It is the least valuable rule of the set for a credential that is
+      // normally generated rather than typed, and claiming to apply it while silently
+      // passing the wrong name would be worse than not applying it.
+      HM::String policyFailure;
+
+      if (!HM::PasswordPolicy::IsAcceptable(_T(""), clearText, policyFailure))
+         return COMError::GenerateError(policyFailure);
 
       object_->SetPassword(clearText);
 

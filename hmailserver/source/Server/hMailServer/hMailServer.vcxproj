@@ -491,6 +491,7 @@ EXIT 0
     <ClCompile Include="..\Common\Util\OtelTracer.cpp" />
     <ClCompile Include="..\Common\Util\RestApiServer.cpp" />
     <ClCompile Include="..\Common\Util\WebServicesServer.cpp" />
+    <ClCompile Include="..\Common\Util\PasswordPolicy.cpp" />
     <ClCompile Include="..\Common\Util\Pop3LoginDelay.cpp" />
     <ClCompile Include="..\Common\Util\AccountLockout.cpp" />
     <ClCompile Include="..\Common\Util\DmarcRptStore.cpp" />
@@ -1064,6 +1065,7 @@ EXIT 0
     <ClInclude Include="..\Common\Util\OtelTracer.h" />
     <ClInclude Include="..\Common\Util\RestApiServer.h" />
     <ClInclude Include="..\Common\Util\WebServicesServer.h" />
+    <ClInclude Include="..\Common\Util\PasswordPolicy.h" />
     <ClInclude Include="..\Common\Util\Pop3LoginDelay.h" />
     <ClInclude Include="..\Common\Util\AccountLockout.h" />
     <ClInclude Include="..\Common\Util\DmarcRptStore.h" />

@@ -12,6 +12,7 @@
 #include "../common/Persistence/PersistentAccount.h"
 #include "../common/BO/Accounts.h"
 #include "../Common/Util/Math.h"
+#include "../Common/Util/PasswordPolicy.h"
 #include "../Common/Util/PasswordValidator.h"
 #include "../Common/Util/Crypt.h"
 #include "../Common/Util/Time.h"
@@ -257,6 +258,20 @@ STDMETHODIMP InterfaceAccount::put_Password(BSTR newVal)
    {
       if (!object_)
          return GetAccessDenied();
+
+      // The one place an account password is CHOSEN, so the one place the policy is
+      // enforced. Every route here goes through this property - the Control Panel,
+      // DBSetup, scripts and the API - and none of the paths that merely verify or
+      // re-hash an existing password come near it, which is deliberate: refusing a
+      // password that already works would lock people out of mailboxes they can open
+      // today, in the name of making them safer.
+      //
+      // Off by default, so an existing installation sees no change until an
+      // administrator configures one.
+      HM::String policyFailure;
+
+      if (!HM::PasswordPolicy::IsAcceptable(object_->GetAddress(), newVal, policyFailure))
+         return COMError::GenerateError(policyFailure);
 
       // The password isn't encrypted. Encrypt it now using MD5.
       int preferredHashAlgorithm = HM::IniFileSettings::Instance()->GetPreferredHashAlgorithm();

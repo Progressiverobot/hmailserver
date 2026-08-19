@@ -196,7 +196,11 @@ if (Test-Path $serverIni) {
     # it either.
     #   DNSServer              - points the resolver at a fake nothing is serving
     #   Pop3LoginDelaySeconds  - refuses the second POP3 logon of every test
-    $leftoverKeys = 'DNSServer', 'Pop3LoginDelaySeconds'
+    #   PasswordPolicy*        - refuses the password every fixture creates its accounts with,
+    #                            so the whole suite fails in setup rather than anywhere useful
+    $leftoverKeys = 'DNSServer', 'Pop3LoginDelaySeconds', 'PasswordPolicyMinimumLength',
+                    'PasswordPolicyRequireMixedCase', 'PasswordPolicyRequireDigit',
+                    'PasswordPolicyRequireNonAlphanumeric', 'PasswordPolicyRejectCommon'
 
     $iniLines = @(Get-Content -LiteralPath $serverIni)
     $pattern = '^\s*(' + ($leftoverKeys -join '|') + ')\s*='

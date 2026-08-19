@@ -504,6 +504,11 @@ namespace HM
       batv_secret_ = ReadIniSettingString_("Settings", "BATVSecret", "");
       max_submissions_per_ip_per_minute_ = ReadIniSettingInteger_("Settings", "MaxSubmissionsPerIPPerMinute", 0);
       pop3_login_delay_seconds_ = ReadIniSettingInteger_("Settings", "Pop3LoginDelaySeconds", 0);
+      password_policy_minimum_length_ = ReadIniSettingInteger_("Settings", "PasswordPolicyMinimumLength", 0);
+      password_policy_require_mixed_case_ = ReadIniSettingInteger_("Settings", "PasswordPolicyRequireMixedCase", 0) == 1;
+      password_policy_require_digit_ = ReadIniSettingInteger_("Settings", "PasswordPolicyRequireDigit", 0) == 1;
+      password_policy_require_non_alphanumeric_ = ReadIniSettingInteger_("Settings", "PasswordPolicyRequireNonAlphanumeric", 0) == 1;
+      password_policy_reject_common_ = ReadIniSettingInteger_("Settings", "PasswordPolicyRejectCommon", 0) == 1;
       max_outbound_per_destination_per_minute_ = ReadIniSettingInteger_("Settings", "MaxOutboundPerDestinationPerMinute", 0);
       m_sDisableAUTHList = ReadIniSettingString_("Settings", "DisableAUTHList", "");
    }
