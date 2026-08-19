@@ -60,11 +60,25 @@ namespace HM
 
       static OAuth2Config LoadConfig();
 
+      // JWS carries an ECDSA signature as the raw fixed-width R||S pair (RFC 7515
+      // section 3.4); OpenSSL verifies X9.62 DER. Converting between them is the whole
+      // reason ES256 was refused rather than merely broken. Public for the self-test,
+      // because a transcode verified only through its own round trip proves that the
+      // encoder agrees with the decoder and nothing more.
+      static bool RawEcdsaSignatureToDer_(const AnsiString &raw, AnsiString &der);
+
    private:
       static bool Base64UrlDecode_(const AnsiString &sInput, AnsiString &sOutput);
       static bool IsAlgorithmAllowed_(const AnsiString &sAllowList, const AnsiString &sAlg);
       static bool VerifyHs256_(const AnsiString &sSigningInput, const AnsiString &sSignature, const AnsiString &sSecret);
-      static bool VerifyWithPublicKey_(const AnsiString &sSigningInput, const AnsiString &sSignature, const String &sKeyFile);
+      // expectedKeyType is an EVP_PKEY_* id the loaded key must actually be. It is not
+      // decoration: without it an EC public key configured against alg=RS256 - or the
+      // reverse - reaches OpenSSL and fails with 'signature verification failed',
+      // which describes the symptom of an algorithm-confusion attempt rather than the
+      // cause.
+      static bool VerifyWithPublicKey_(const AnsiString &sSigningInput, const AnsiString &sSignature,
+                                       const String &sKeyFile, int expectedKeyType);
+
       static bool ConstantTimeEquals_(const AnsiString &a, const AnsiString &b);
    };
 

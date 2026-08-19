@@ -58,7 +58,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [IMAP](#imap) | 71 | – | 4 | 3 |
 | [POP3](#pop3) | 27 | 0 | 1 | – |
 | [Sieve, ManageSieve and rules](#sieve-managesieve-and-rules) | 64 | 0 | 1 | – |
-| [Authentication and cryptography](#authentication-and-cryptography) | 63 | 0 | 15 | – |
+| [Authentication and cryptography](#authentication-and-cryptography) | 64 | 0 | 14 | – |
 | [Anti-spam, anti-virus and content control](#anti-spam-anti-virus-and-content-control) | 56 | – | 11 | – |
 | [Storage, accounts and data model](#storage-accounts-and-data-model) | 86 | – | 10 | – |
 | [Routing, queue and delivery](#routing-queue-and-delivery) | 20 | – | 3 | 2 |
@@ -72,7 +72,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 2 | – | 4 | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 5 | 1 | 2 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 4 | 1 | 4 | – |
-| **Total** | **675** | **13** | **101** | **15** |
+| **Total** | **676** | **13** | **100** | **15** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage, the administration surface and the core protocol layer are the
@@ -534,7 +534,7 @@ the source, not from documentation.
 
 ### Authentication and cryptography
 
-63 shipped · 0 underway · 15 not started · 0 deferred
+64 shipped · 0 underway · 14 not started · 0 deferred
 
 | | Capability | Detail |
 |:-:|---|---|
@@ -603,7 +603,7 @@ the source, not from documentation.
 | ⬜ | IMAP fetching of external accounts | Only POP3 fetching exists, so a mailbox that must stay intact on the far side cannot be collected: POP3 either leaves every message to be re-fetched or deletes it. This is the reason the OAuth2 rows above stop at POP3 - there is no IMAP fetcher to give a bearer token to. A real one needs a client-side IMAP session, per-folder UID state to know what has already been collected, and a decision about whether it mirrors folders or flattens them into the inbox. |
 | ⬜ | CRAM-MD5 (RFC 2195) | Not implemented anywhere — not advertised, not accepted. Would in any case be impossible against the PBKDF2/Argon2id stores since it needs a reversible or MD5-equivalent secret. |
 | ⬜ | DIGEST-MD5 (RFC 2831) | Not implemented. Obsoleted by RFC 6331; SCRAM-SHA-256 is the replacement that is shipped. |
-| ⬜ | ES256 tokens | Recognised but explicitly refused with a clear diagnostic, because JWS carries ECDSA as raw R\|\|S while OpenSSL expects X9.62 DER and the transcode was never written. The Control Panel still offers "RS256… |
+| ✅ | ES256 tokens | Implemented 19 August 2026. The obstacle was a format mismatch, not a missing algorithm: JWS carries an ECDSA signature as the raw fixed-width **R||S** pair (RFC 7515 section 3.4) and OpenSSL verifies **X9.62 DER**, so ES256 could only ever have reported "signature verification failed" - which describes nothing and sends whoever hits it looking at their key, their clock and their provider. It was therefore refused by name rather than left to fail, and the transcode is what has now been written. The DER rules are where this goes wrong quietly: an INTEGER is signed and minimally encoded, so leading zeros are dropped and a leading octet with the high bit set needs a `0x00` in front. Getting either wrong still produces a structurally valid signature that OpenSSL rejects for roughly **half** of all real inputs, which presents as an intermittent fault rather than a broken encoder. So the transcode is pinned in the server's self-tests **against OpenSSL's own `i2d_ECDSA_SIG`**, case by case - high bit set, high bit clear, leading zeros to strip, and the boundary - because a transcode checked by round-tripping through its own decoder proves only that it agrees with itself. Three regression tests then take the other half: a token minted the way a real provider mints one (.NET's `ECDsa.SignData` emits exactly the raw R||S form, asserted at 64 octets) travelling the real SASL path. Two things came with it. The public key is now checked to actually **be** the kind the algorithm names - an EC key configured against RS256, or an RSA key against ES256, is refused on the key type rather than surfacing as a signature failure, which is the difference between reporting an algorithm-confusion attempt and reporting its symptom. And implementing an algorithm deliberately does **not** enable it: a valid ES256 token is still refused while the allow-list omits it, which has its own test. The Control Panel's readiness check, which used to report ES256 as unusable, was updated with it. |
 | ⬜ | EXTERNAL (client-certificate SASL) | Not implemented, and could not work today: the inbound TLS contexts never request a client certificate (verify_none on the server side). |
 | ⬜ | GSSAPI / Kerberos | Not implemented as a SASL mechanism. Active Directory accounts authenticate by replaying the plaintext password to `LogonUser`, which is password-based, not Kerberos SSO. |
 | ⬜ | JWKS fetch with key rotation | Not implemented. The validator never contacts the identity provider; a static PEM or shared secret is the only key source, so provider key rotation requires manual re-configuration. |

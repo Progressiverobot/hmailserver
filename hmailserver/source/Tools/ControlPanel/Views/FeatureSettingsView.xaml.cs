@@ -1315,17 +1315,17 @@ namespace hMailServer.ControlPanel.Views
          if (!LiveBool_("OAuth2Enabled", false))
             return null;
 
-         // The server implements exactly two algorithms, and nothing else. Reading
-         // ValidateWithConfig: "HS256" and "RS256" have verifiers; "ES256" is
-         // refused by name with "not supported by this server; use RS256 or HS256"
-         // because JWS carries an ECDSA signature as a raw R||S pair while OpenSSL
-         // wants X9.62 DER; and every other value falls into the final else and is
-         // refused as unsupported.
+         // The server implements exactly three algorithms, and nothing else. Reading
+         // ValidateWithConfig: HS256, RS256 and - since 19 August 2026 - ES256 have
+         // verifiers, and every other value falls into the final else and is refused
+         // as unsupported. ES256 used to be refused by name, because JWS carries an
+         // ECDSA signature as a raw R||S pair while OpenSSL wants X9.62 DER; the
+         // transcode now exists, so this page must stop reporting it as unusable.
          //
-         // So a family test - "does the list contain RS" - is not good enough:
-         // RS512 and PS256 pass it and are refused by the server, and the page
-         // would have called that configuration complete. The list is matched
-         // against the two names that exist.
+         // A family test - "does the list contain RS" - is still not good enough:
+         // RS512 and PS256 pass it and are refused by the server, and the page would
+         // have called that configuration complete. The list is matched against the
+         // three names that exist.
          string algorithmSetting = LiveText_("OAuth2AllowedAlgorithms", "RS256").Trim();
 
          var named = algorithmSetting
@@ -1336,21 +1336,26 @@ namespace hMailServer.ControlPanel.Views
 
          bool allowsRs256 = named.Contains("RS256");
          bool allowsHs256 = named.Contains("HS256");
-         List<string> unusable = named.Where(a => a != "RS256" && a != "HS256").ToList();
+         bool allowsEs256 = named.Contains("ES256");
+         List<string> unusable = named.Where(a => a != "RS256" && a != "HS256" && a != "ES256").ToList();
 
          var blocking = new List<string>();
 
-         if (allowsRs256 && LiveText_("OAuth2PublicKeyFile", "").Trim().Length == 0)
-            blocking.Add("the issuer's public key file, which RS256 tokens are verified against");
+         // RS256 and ES256 share OAuth2PublicKeyFile - one holds an RSA key, the other
+         // an EC one, and the server checks that the key is actually the kind the
+         // algorithm names rather than letting a mismatch surface as a signature
+         // failure. Either being allowed makes the file mandatory.
+         if ((allowsRs256 || allowsEs256) && LiveText_("OAuth2PublicKeyFile", "").Trim().Length == 0)
+            blocking.Add("the issuer's public key file, which RS256 and ES256 tokens are verified against");
 
          if (allowsHs256 && !SecretConfigured_("OAuth2HmacSecret"))
             blocking.Add("the shared HMAC secret, which HS256 tokens are verified against");
 
-         if (!allowsRs256 && !allowsHs256)
+         if (!allowsRs256 && !allowsHs256 && !allowsEs256)
          {
-            blocking.Add("any algorithm this server can verify - it implements RS256 and HS256 only, and \""
-                         + algorithmSetting + "\" names neither, so every token is refused whatever key material "
-                         + "is installed");
+            blocking.Add("any algorithm this server can verify - it implements RS256, ES256 and HS256 only, and \""
+                         + algorithmSetting + "\" names none of them, so every token is refused whatever key "
+                         + "material is installed");
          }
 
          if (blocking.Count > 0)

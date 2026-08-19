@@ -24,7 +24,7 @@ namespace RegressionTests.Security
    ///    are also supported by the server but are not exercised here.
    /// </summary>
    [TestFixture]
-   public class OAuth2Bearer : TestFixtureBase
+   public partial class OAuth2Bearer : TestFixtureBase
    {
       [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
       private static extern bool WritePrivateProfileString(string section, string key, string value, string filePath);

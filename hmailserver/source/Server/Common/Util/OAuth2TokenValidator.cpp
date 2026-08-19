@@ -22,6 +22,8 @@
 #include <openssl/bio.h>
 #include <openssl/crypto.h>
 #include <openssl/hmac.h>
+#include <openssl/ecdsa.h>
+#include <openssl/bn.h>
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -213,15 +215,23 @@ namespace HM
       if (algUpper == "HS256")
          signatureValid = VerifyHs256_(signingInput, signature, config.hmac_secret);
       else if (algUpper == "RS256")
-         signatureValid = VerifyWithPublicKey_(signingInput, signature, config.rsa_public_key_file);
+         signatureValid = VerifyWithPublicKey_(signingInput, signature, config.rsa_public_key_file, EVP_PKEY_RSA);
       else if (algUpper == "ES256")
       {
-         // JWS carries an ECDSA signature as the raw R||S pair, while OpenSSL
-         // expects X9.62 DER, so this never verified - it only ever produced a
-         // misleading "signature verification failed". Reject it explicitly
-         // until the transcode is implemented and tested, so the cause is clear.
-         out_error = "JWT algorithm ES256 is not supported by this server; use RS256 or HS256.";
-         return false;
+         // JWS carries an ECDSA signature as the raw R||S pair while OpenSSL verifies
+         // X9.62 DER, which is why this used to be refused outright rather than merely
+         // failing: without the transcode it could only ever produce a misleading
+         // "signature verification failed". The same PEM setting holds the key, which
+         // is now required to actually BE an EC key.
+         AnsiString der;
+
+         if (!RawEcdsaSignatureToDer_(signature, der))
+         {
+            out_error = "JWT ES256 signature is not the 64-octet R||S pair RFC 7515 requires.";
+            return false;
+         }
+
+         signatureValid = VerifyWithPublicKey_(signingInput, der, config.rsa_public_key_file, EVP_PKEY_EC);
       }
       else
       {
@@ -398,7 +408,67 @@ namespace HM
    }
 
    bool
-   OAuth2TokenValidator::VerifyWithPublicKey_(const AnsiString &sSigningInput, const AnsiString &sSignature, const String &sKeyFile)
+   OAuth2TokenValidator::RawEcdsaSignatureToDer_(const AnsiString &raw, AnsiString &der)
+   {
+      // RFC 7515 section 3.4: for ES256 the signature is exactly 64 octets, R then S,
+      // each left-padded to 32. The fixed width is the point - it is what makes the
+      // JWS form unambiguous without a length prefix - so a signature of any other
+      // length is not an ES256 signature and is refused rather than interpreted.
+      const int coordinateSize = 32;
+
+      if (raw.GetLength() != coordinateSize * 2)
+         return false;
+
+      const unsigned char *bytes = (const unsigned char *) raw.c_str();
+
+      std::vector<unsigned char> body;
+
+      for (int half = 0; half < 2; half++)
+      {
+         const unsigned char *value = bytes + half * coordinateSize;
+
+         // DER INTEGER is signed and minimally encoded: leading zero octets are
+         // dropped, and a leading octet with the high bit set needs a 0x00 in front
+         // or it reads as negative. Getting either wrong produces a structurally
+         // valid signature that OpenSSL rejects for roughly half of all inputs -
+         // which is the failure mode that makes a broken transcode look intermittent.
+         int offset = 0;
+         while (offset < coordinateSize - 1 && value[offset] == 0)
+            offset++;
+
+         const int length = coordinateSize - offset;
+         const bool needsPadding = (value[offset] & 0x80) != 0;
+
+         body.push_back(0x02);                                       // INTEGER
+         body.push_back((unsigned char) (length + (needsPadding ? 1 : 0)));
+
+         if (needsPadding)
+            body.push_back(0x00);
+
+         body.insert(body.end(), value + offset, value + coordinateSize);
+      }
+
+      // A P-256 signature body is at most 2 * (2 + 33) = 70 octets, so the SEQUENCE
+      // length always fits in the short form. Asserted rather than assumed, because
+      // the long form would need a different header and this loop would silently
+      // produce a malformed one.
+      if (body.size() > 127)
+         return false;
+
+      std::vector<unsigned char> encoded;
+      encoded.push_back(0x30);                                       // SEQUENCE
+      encoded.push_back((unsigned char) body.size());
+      encoded.insert(encoded.end(), body.begin(), body.end());
+
+      der = AnsiString();
+      der.append((const char *) &encoded[0], encoded.size());
+
+      return true;
+   }
+
+   bool
+   OAuth2TokenValidator::VerifyWithPublicKey_(const AnsiString &sSigningInput, const AnsiString &sSignature,
+                                              const String &sKeyFile, int expectedKeyType)
    {
       if (sKeyFile.IsEmpty())
          return false;
@@ -414,6 +484,16 @@ namespace HM
       BIO_free(bio);
       if (pkey == nullptr)
          return false;
+
+      // The configured key must be the kind the algorithm names. Without this an EC
+      // key configured against alg=RS256 - or an RSA key against ES256 - reaches
+      // OpenSSL and fails as "signature verification failed", which reports the
+      // symptom of an algorithm-confusion attempt and hides the cause.
+      if (expectedKeyType != 0 && EVP_PKEY_base_id(pkey) != expectedKeyType)
+      {
+         EVP_PKEY_free(pkey);
+         return false;
+      }
 
       bool result = false;
       EVP_MD_CTX *ctx = EVP_MD_CTX_new();
@@ -572,6 +652,85 @@ namespace HM
          wrongSecret.hmac_secret = "a-different-secret-value";
          String u; AnsiString e;
          if (OAuth2TokenValidator::ValidateWithConfig(wrongSecret, validToken, u, e)) throw 0;
+      }
+
+      // --- ES256: the raw R||S to DER transcode ---
+      //
+      // Checked against OpenSSL's OWN encoder rather than by round-tripping through
+      // this file's decoder. A transcode tested against itself proves the encoder
+      // agrees with the encoder; the failure that matters is disagreeing with the
+      // library that will actually verify the signature.
+      {
+         struct Case { const char *description; unsigned char rFill; unsigned char sFill; };
+
+         // The interesting cases are all about DER INTEGER's sign rules: a high bit
+         // set needs a 0x00 in front, and leading zeros must be dropped. A transcode
+         // that gets either wrong still produces a structurally valid signature, and
+         // fails for roughly half of all real inputs - which looks intermittent.
+         const Case cases[] =
+         {
+            { "high bit set in both halves",  0xFF, 0xFF },
+            { "high bit clear in both",       0x01, 0x02 },
+            { "leading zeros to strip",       0x00, 0x00 },
+            { "boundary value",               0x80, 0x7F },
+         };
+
+         for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++)
+         {
+            unsigned char rawBytes[64];
+            memset(rawBytes, cases[i].rFill, 32);
+            memset(rawBytes + 32, cases[i].sFill, 32);
+
+            // An all-zero half is still a valid INTEGER (zero), and its minimal
+            // encoding is a single 0x00 octet - the case a naive strip-all-zeros
+            // loop turns into an empty INTEGER.
+            if (cases[i].rFill == 0x00)
+               rawBytes[31] = 0x00;
+
+            AnsiString raw;
+            raw.append((const char *) rawBytes, sizeof(rawBytes));
+
+            AnsiString der;
+            if (!OAuth2TokenValidator::RawEcdsaSignatureToDer_(raw, der))
+               throw 0;
+
+            // Build the same signature through OpenSSL and compare the bytes.
+            BIGNUM *r = BN_bin2bn(rawBytes, 32, nullptr);
+            BIGNUM *sv = BN_bin2bn(rawBytes + 32, 32, nullptr);
+            ECDSA_SIG *sig = ECDSA_SIG_new();
+
+            if (r == nullptr || sv == nullptr || sig == nullptr)
+               throw 0;
+
+            // Takes ownership of r and sv.
+            if (ECDSA_SIG_set0(sig, r, sv) != 1)
+               throw 0;
+
+            unsigned char *expected = nullptr;
+            int expectedLength = i2d_ECDSA_SIG(sig, &expected);
+
+            const bool matches =
+               expectedLength == der.GetLength() &&
+               memcmp(expected, der.c_str(), expectedLength) == 0;
+
+            OPENSSL_free(expected);
+            ECDSA_SIG_free(sig);
+
+            if (!matches)
+               throw 0;
+         }
+
+         // Anything that is not exactly 64 octets is not an ES256 signature.
+         AnsiString der;
+         AnsiString tooShort;
+         tooShort.append(std::string(63, 'A').c_str(), 63);
+         if (OAuth2TokenValidator::RawEcdsaSignatureToDer_(tooShort, der)) throw 0;
+
+         AnsiString tooLong;
+         tooLong.append(std::string(65, 'A').c_str(), 65);
+         if (OAuth2TokenValidator::RawEcdsaSignatureToDer_(tooLong, der)) throw 0;
+
+         if (OAuth2TokenValidator::RawEcdsaSignatureToDer_(AnsiString(), der)) throw 0;
       }
    }
 }
