@@ -1083,6 +1083,28 @@ namespace hMailServer.ControlPanel.Views
          pop3.Settings.Add(new ComText { Path = "WelcomePOP3", Label = "Welcome banner (empty = default)" });
          Tab("POP3").Cards.Add(pop3);
 
+         // RFC 2449 LOGIN-DELAY. On the POP3 page rather than the ini page because
+         // that is where the question is asked, and next to the connection ceiling it
+         // is the gentler alternative to.
+         var pop3Polling = Card("How often a client may check for mail",
+            "POP3 has no way for the server to tell a client that mail has arrived, so clients that want to look " +
+            "responsive poll - and some poll every few seconds. Each poll is a new connection, a TLS handshake and a " +
+            "password verification, which with Argon2id is deliberately expensive, so a handful of eager clients can " +
+            "cost more than the mail does. Setting a delay tells clients the interval in the server's capability " +
+            "list and refuses logins that arrive early with a code the client understands as \"slow down\" rather " +
+            "than as a wrong password. Applies after a service restart.");
+         pop3Polling.Settings.Add(new IniNumber
+         {
+            Path = "Pop3LoginDelaySeconds",
+            Label = "Minimum seconds between logins to one account (0 = no limit)",
+            Default = 0,
+            Blurb = "Counted per account from the last login that was allowed, so a refused attempt does not push the " +
+                    "next one further away. It is advertised only while it is set, because announcing a limit that is " +
+                    "not enforced is worse than announcing nothing.",
+            IniStore = iniStore_
+         });
+         Tab("POP3").Cards.Add(pop3Polling);
+
          // The idle timeouts follow the same reasoning as the IMAP search limits
          // above: they are per-protocol settings that sat on the INI page because
          // of where they are stored. They get a tab rather than being split three

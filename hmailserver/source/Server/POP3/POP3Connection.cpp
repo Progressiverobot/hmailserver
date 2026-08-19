@@ -10,6 +10,7 @@
 #include "../common/util/file.h"
 #include "../common/Util/AccountLogon.h"
 #include "../common/Util/AccountLockout.h"
+#include "../common/Util/Pop3LoginDelay.h"
 #include "../common/util/ByteBuffer.h"
 #include "../common/Util/Crypt.h"
 #include "../common/Util/Hashing/ScramSha256.h"
@@ -508,6 +509,29 @@ namespace HM
       // RFC 6856: advertise UTF-8 support so clients may issue the UTF8 command.
       capabilities+="UTF8\r\n";
 
+      // RFC 2449 section 6.4. This server has no maildrop retention policy at all -
+      // nothing anywhere deletes a delivered message because of its age - so the
+      // honest answer is NEVER, and NEVER is a real answer rather than a placeholder:
+      // it tells a client that leaving mail on the server leaves it there for good,
+      // which is exactly what an administrator needs a "leave mail on server" client
+      // to understand. Advertising a number with nothing to enforce it would be the
+      // one thing RFC 2449 section 5 forbids.
+      capabilities+="EXPIRE NEVER\r\n";
+
+      // RFC 2449 section 6.5, advertised only when it is actually enforced - the same
+      // rule. POP3 has no idle notification, so a client that wants to look responsive
+      // polls, and each poll costs a TCP connection, a TLS handshake and an Argon2id
+      // verification. This is the standard way to ask a client to slow down rather
+      // than simply absorbing it.
+      int loginDelaySeconds = IniFileSettings::Instance()->GetPop3LoginDelaySeconds();
+
+      if (loginDelaySeconds > 0)
+      {
+         String loginDelay;
+         loginDelay.Format(_T("LOGIN-DELAY %d\r\n"), loginDelaySeconds);
+         capabilities += loginDelay;
+      }
+
       String response = "+OK CAPA list follows\r\n" + capabilities + ".";
       EnqueueWrite_(response);
    }
@@ -708,6 +732,43 @@ namespace HM
    POP3Connection::ParseResult
    POP3Connection::HandleSuccessfulLogin_()
    {
+      // RFC 2449 section 6.5. The credentials were correct; this account has simply
+      // come back too soon.
+      //
+      // Checked HERE, after authentication and before the maildrop is locked,
+      // because that is what makes it a rate limit rather than a lockout: the
+      // account is known, so the refusal cannot be used to probe which names exist,
+      // and a client that fails to authenticate never reaches it and so cannot fill
+      // the table.
+      //
+      // [LOGIN-DELAY] is what a conforming client backs off from. Without the code
+      // this reply is indistinguishable from a rejected password, and the client
+      // asks its user to retype a password that was never wrong - the same failure
+      // [IN-USE] and [AUTH] exist to prevent.
+      int delayRemaining = Pop3LoginDelay::Instance()->SecondsRemaining(account_->GetAddress());
+
+      if (delayRemaining > 0)
+      {
+         // The reference is dropped for the same reason as the [IN-USE] path below:
+         // no lock was taken, so the disconnect path must not release one.
+         String address = account_->GetAddress();
+         account_.reset();
+
+         String message;
+         message.Format(_T("-ERR [LOGIN-DELAY] Logging in too frequently. Try again in %d seconds."), delayRemaining);
+         EnqueueWrite_(message);
+
+         LOG_DEBUG(Formatter::Format("POP3 login for {0} refused for another {1} seconds by the configured login delay.",
+            address, delayRemaining));
+
+         return ResultNormalResponse;
+      }
+
+      // Recorded on the login being ALLOWED, not on every attempt: a refused early
+      // login must not push the next permitted one further away, or a client
+      // polling every second would never get in again.
+      Pop3LoginDelay::Instance()->RecordLogin(account_->GetAddress());
+
       // Try to lock mailbox.
       if (!POP3Sessions::Instance()->Lock(account_->GetID()))
       {

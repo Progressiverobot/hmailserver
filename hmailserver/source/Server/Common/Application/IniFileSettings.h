@@ -240,6 +240,10 @@ namespace HM
       // Rate shaping (0 = unlimited / disabled).
       int GetMaxSubmissionsPerIPPerMinute() const { return max_submissions_per_ip_per_minute_; }
       int GetMaxOutboundPerDestinationPerMinute() const { return max_outbound_per_destination_per_minute_; }
+      // RFC 2449 LOGIN-DELAY: the minimum number of seconds a POP3 client should
+      // leave between logins for one account, advertised in CAPA and enforced. 0
+      // (the default) advertises nothing and enforces nothing.
+      int GetPop3LoginDelaySeconds() const { return pop3_login_delay_seconds_; }
       bool GetUseDNSCache() const { return use_dns_cache_; }
       String GetDNSServer() const { return dns_server_; }
 
@@ -642,6 +646,7 @@ namespace HM
       bool batv_enabled_;
       String batv_secret_;
       int max_submissions_per_ip_per_minute_;
+      int pop3_login_delay_seconds_;
       int max_outbound_per_destination_per_minute_;
       bool use_dns_cache_;
       String dns_server_;

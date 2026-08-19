@@ -503,6 +503,7 @@ namespace HM
       batv_enabled_ = ReadIniSettingInteger_("Settings", "BATVEnabled", 0) == 1;
       batv_secret_ = ReadIniSettingString_("Settings", "BATVSecret", "");
       max_submissions_per_ip_per_minute_ = ReadIniSettingInteger_("Settings", "MaxSubmissionsPerIPPerMinute", 0);
+      pop3_login_delay_seconds_ = ReadIniSettingInteger_("Settings", "Pop3LoginDelaySeconds", 0);
       max_outbound_per_destination_per_minute_ = ReadIniSettingInteger_("Settings", "MaxOutboundPerDestinationPerMinute", 0);
       m_sDisableAUTHList = ReadIniSettingString_("Settings", "DisableAUTHList", "");
    }

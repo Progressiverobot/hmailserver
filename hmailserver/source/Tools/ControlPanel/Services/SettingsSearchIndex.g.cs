@@ -251,6 +251,7 @@ namespace hMailServer.ControlPanel.Services
          new SettingEntry("Max simultaneous connections (0 = unlimited)", "MaxSMTPConnections", "protocols"),
          new SettingEntry("Maximum message content read for one IMAP search (MB; 0 = no limit)", "IMAPSearchMaxMegabytes", "protocols"),
          new SettingEntry("Maximum time for one IMAP search (seconds; 0 = no limit)", "IMAPSearchTimeout", "protocols"),
+         new SettingEntry("Minimum seconds between logins to one account (0 = no limit)", "Pop3LoginDelaySeconds", "protocols"),
          new SettingEntry("POP3 client maximum timeout (s)", "POP3CMaxTimeout", "protocols"),
          new SettingEntry("POP3 client minimum timeout (s)", "POP3CMinTimeout", "protocols"),
          new SettingEntry("POP3 server", "ServicePOP3", "protocols"),

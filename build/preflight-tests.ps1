@@ -194,8 +194,9 @@ if (Test-Path $serverIni) {
     # They are listed together because the failure they cause is the same shape every
     # time: tests that never mention the setting fail for reasons that never mention
     # it either.
-    #   DNSServer - points the resolver at a fake that nothing is serving
-    $leftoverKeys = @('DNSServer')
+    #   DNSServer              - points the resolver at a fake nothing is serving
+    #   Pop3LoginDelaySeconds  - refuses the second POP3 logon of every test
+    $leftoverKeys = 'DNSServer', 'Pop3LoginDelaySeconds'
 
     $iniLines = @(Get-Content -LiteralPath $serverIni)
     $pattern = '^\s*(' + ($leftoverKeys -join '|') + ')\s*='
