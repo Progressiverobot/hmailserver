@@ -320,6 +320,37 @@ STDMETHODIMP InterfaceApplication::Connect()
    }
 }
 
+STDMETHODIMP InterfaceApplication::AuthenticateWithCode(BSTR sUsername, BSTR sPassword, BSTR sCode, IInterfaceAccount **pVal)
+{
+   try
+   {
+      // The one entry point that can satisfy a second factor. An account with one
+      // enrolled is refused by Authenticate above, and by every mail protocol, because
+      // none of them has anywhere to present a code - which is what app passwords are
+      // for. See PasswordValidator::ValidatePassword.
+      std::shared_ptr<const HM::Account> pAccount = authentication_->Authenticate(sUsername, sPassword, sCode);
+
+      if (pAccount)
+      {
+         std::shared_ptr<HM::Account> accountCopy = std::shared_ptr<HM::Account>(new HM::Account(*pAccount.get()));
+
+         CComObject<InterfaceAccount>* pAccountInt = new CComObject<InterfaceAccount>();
+
+         pAccountInt->AttachItem(accountCopy);
+         pAccountInt->SetAuthentication(authentication_);
+         pAccountInt->AddRef();
+
+         *pVal = pAccountInt;
+      }
+
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
 STDMETHODIMP InterfaceApplication::Authenticate(BSTR sUsername, BSTR sPassword, IInterfaceAccount **pVal)
 {
    try

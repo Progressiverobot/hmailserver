@@ -13,6 +13,7 @@
 #include "../common/BO/Accounts.h"
 #include "../Common/Util/Math.h"
 #include "../Common/Util/PasswordPolicy.h"
+#include "../Common/Util/Totp.h"
 #include "../Common/Util/PasswordValidator.h"
 #include "../Common/Util/Crypt.h"
 #include "../Common/Util/Time.h"
@@ -244,6 +245,82 @@ STDMETHODIMP InterfaceAccount::get_Password(BSTR *pVal)
          return GetAccessDenied();
 
       *pVal = object_->GetPassword().AllocSysString();
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceAccount::get_TOTPEnabled(VARIANT_BOOL *pVal)
+{
+   try
+   {
+      if (!object_)
+         return GetAccessDenied();
+
+      // The secret's presence IS the switch. There is no separate enabled flag,
+      // because two sources of truth for "is the second factor on" is how a feature
+      // ends up enforced in one place and not another.
+      *pVal = object_->GetTotpSecret().IsEmpty() ? VARIANT_FALSE : VARIANT_TRUE;
+
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceAccount::EnrolTOTP(BSTR *pVal)
+{
+   try
+   {
+      if (!object_)
+         return GetAccessDenied();
+
+      if (!authentication_->GetIsDomainAdmin())
+         return authentication_->GetAccessDenied();
+
+      HM::AnsiString secret = HM::Totp::GenerateSecret();
+
+      if (secret.IsEmpty())
+         return COMError::GenerateError("The random number generator failed, so no second factor was enrolled. Nothing has been stored. See the hMailServer error log.");
+
+      object_->SetTotpSecret(secret);
+
+      // The URI carries the secret, and this is the only moment it leaves the server:
+      // there is no property that reads it back, because the point of a second factor
+      // is that possessing the account does not yield it. Whoever enrols has to
+      // capture it now - which is exactly what scanning the QR code does.
+      *pVal = HM::String(HM::Totp::BuildOtpAuthUri(HM::AnsiString(object_->GetAddress()), secret)).AllocSysString();
+
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceAccount::DisableTOTP()
+{
+   try
+   {
+      if (!object_)
+         return GetAccessDenied();
+
+      if (!authentication_->GetIsDomainAdmin())
+         return authentication_->GetAccessDenied();
+
+      // App passwords are deliberately left alone. They are separately revocable
+      // credentials that were valid before the second factor was enrolled and remain
+      // valid after it is removed; silently deleting them here would break every
+      // client the account holder had set up, as a side effect of an unrelated
+      // administrative action.
+      object_->SetTotpSecret("");
+
       return S_OK;
    }
    catch (...)

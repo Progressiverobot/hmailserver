@@ -105,6 +105,7 @@ namespace HM
       enable_signature_ = oldAccount.enable_signature_;
       admin_level_ = oldAccount.admin_level_;
       last_logon_time_ = oldAccount.last_logon_time_;
+      totp_secret_ = oldAccount.totp_secret_;
    }
 
    std::shared_ptr<Messages>
@@ -316,6 +317,10 @@ namespace HM
       pNode->AppendAttr(_T("SignatureHTML"), signature_html_);
 
       pNode->AppendAttr(_T("LastLogonTime"), String(last_logon_time_));
+      // Carried by backup and restore: a restore that dropped it would silently turn
+      // the second factor off for every enrolled account, which is a downgrade nobody
+      // would be told about.
+      pNode->AppendAttr(_T("TotpSecret"), String(totp_secret_));
 
       // Store fetch accounts
       std::shared_ptr<HM::FetchAccounts> pFetchAccounts = std::shared_ptr<HM::FetchAccounts>(new HM::FetchAccounts(id_));
@@ -386,6 +391,7 @@ namespace HM
       signature_html_ = pAccountNode->GetAttrValue(_T("SignatureHTML"));
 
       last_logon_time_ = pAccountNode->GetAttrValue(_T("LastLogonTime"));
+      totp_secret_ = pAccountNode->GetAttrValue(_T("TotpSecret"));
 
       return true;
    }

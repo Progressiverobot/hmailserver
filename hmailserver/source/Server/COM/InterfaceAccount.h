@@ -75,6 +75,9 @@ public:
    STDMETHOD(get_Messages)(/*[out, retval]*/ IInterfaceMessages* *pVal);
    STDMETHOD(get_FetchAccounts)(/*[out, retval]*/ IInterfaceFetchAccounts * *pVal);
    STDMETHOD(get_AppPasswords)(/*[out, retval]*/ IInterfaceAppPasswords * *pVal);
+   STDMETHOD(get_TOTPEnabled)(VARIANT_BOOL *pVal);
+   STDMETHOD(EnrolTOTP)(BSTR *pVal);
+   STDMETHOD(DisableTOTP)();
    STDMETHOD(Delete)(); 
 
    STDMETHOD(DeleteMessages)();

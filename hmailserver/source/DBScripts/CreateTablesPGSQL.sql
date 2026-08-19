@@ -109,7 +109,8 @@ create table hm_accounts
 	accountpersonfirstname varchar(60) not null,
 	accountpersonlastname varchar(60) not null,	
 	accountvacationabortspamflagged smallint not null,
-	accountforwardabortspamflagged smallint not null
+	accountforwardabortspamflagged smallint not null,
+	accounttotpsecret varchar(255) not null default ''
 );
 
 
@@ -867,4 +868,4 @@ create table hm_imap_metadata
 	unique(metadataaccountid, metadatafolderid, metadataentryname)
 );
 
-insert into hm_dbversion values (6016);
+insert into hm_dbversion values (6017);

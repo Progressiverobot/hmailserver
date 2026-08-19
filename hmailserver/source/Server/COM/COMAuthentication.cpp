@@ -7,6 +7,7 @@
 #include ".\COMAuthentication.h"
 #include "..\Common\BO\Account.h"
 #include "..\Common\Util\PasswordValidator.h"
+#include "..\Common\Util\Totp.h"
 #include "..\Common\Util\Crypt.h"
 
 #include "COMError.h"
@@ -77,6 +78,38 @@ namespace HM
          // an anonymous mail port.
          account_ = HM::PasswordValidator::ValidatePassword(sUsername, sPassword);
       }
+
+      return account_;
+   }
+
+   std::shared_ptr<const HM::Account>
+   COMAuthentication::Authenticate(const String &sUsername, const String &sPassword, const String &sCode)
+   {
+      // The administrator is not a mailbox account and has no per-account second
+      // factor - the Control Panel's own TOTP protects that logon, client-side, and
+      // is a separate mechanism. Delegated unchanged so this overload is a drop-in.
+      if (sUsername.CompareNoCase(_T("administrator")) == 0)
+         return Authenticate(sUsername, sPassword);
+
+      account_.reset();
+
+      std::shared_ptr<const HM::Account> pAccount = HM::PasswordValidator::LookupAccount(sUsername);
+
+      if (!pAccount)
+      {
+         // No account, so nothing to verify a code against. Deliberately still runs
+         // the ordinary path rather than returning early, so that an unknown name and
+         // a wrong password remain indistinguishable from out here.
+         account_ = HM::PasswordValidator::ValidatePassword(sUsername, sPassword);
+         return account_;
+      }
+
+      const bool secondFactorSatisfied =
+         !pAccount->GetTotpSecret().IsEmpty() &&
+         HM::Totp::VerifyCode(AnsiString(pAccount->GetTotpSecret()), AnsiString(sCode));
+
+      if (HM::PasswordValidator::ValidatePassword(pAccount, sPassword, secondFactorSatisfied))
+         account_ = pAccount;
 
       return account_;
    }

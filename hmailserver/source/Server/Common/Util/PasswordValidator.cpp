@@ -47,6 +47,30 @@ namespace HM
    }
 
    std::shared_ptr<const Account>
+   PasswordValidator::LookupAccount(const String &sUsername)
+   {
+      std::shared_ptr<Account> pEmpty;
+
+      std::shared_ptr<DomainAliases> pDA = ObjectCache::Instance()->GetDomainAliases();
+      String sAccountAddress = pDA->ApplyAliasesOnAddress(sUsername);
+
+      sAccountAddress = DefaultDomain::ApplyDefaultDomain(sAccountAddress);
+
+      std::shared_ptr<const Account> pAccount = CacheContainer::Instance()->GetAccount(sAccountAddress);
+
+      if (!pAccount || !pAccount->GetActive())
+         return pEmpty;
+
+      String sDomain = StringParser::ExtractDomain(sAccountAddress);
+      std::shared_ptr<const Domain> pDomain = CacheContainer::Instance()->GetDomain(sDomain);
+
+      if (!pDomain || !pDomain->GetIsActive())
+         return pEmpty;
+
+      return pAccount;
+   }
+
+   std::shared_ptr<const Account>
    PasswordValidator::ValidatePassword(const String &sMasqname, const String &sUsername, const String &sPassword)
    {
       std::shared_ptr<Account> pEmpty;
@@ -116,7 +140,7 @@ namespace HM
    }
 
    bool 
-   PasswordValidator::ValidatePassword(std::shared_ptr<const Account> pAccount, const String &sPassword)
+   PasswordValidator::ValidatePassword(std::shared_ptr<const Account> pAccount, const String &sPassword, bool secondFactorSatisfied)
    {
       // Let a script override the password validation
       auto eventResult = Events::FireOnClientValidatePassword(pAccount, sPassword);
@@ -142,8 +166,31 @@ namespace HM
          return false;
       }
 
-      if (ValidateAccountPassword_(pAccount, sPassword))
-         return true;
+      // A second factor turns the account's own password off HERE, in every client
+      // that cannot present a code - which is every mail client there is.
+      //
+      // This is the point of the whole chain. TOTP has existed in this product for
+      // years and protected only the admin tool, because IMAP, POP3 and SMTP have
+      // nowhere to type a code: an account required to present one could not be
+      // opened at all. App passwords are what make refusing the account password
+      // survivable, so the rule is simply that once a secret is enrolled, the
+      // account password stops being a mailbox credential and an app password
+      // becomes the only one.
+      //
+      // secondFactorSatisfied is passed by the callers that CAN present a code - the
+      // COM authentication path, which the Control Panel uses - and by nothing else.
+      // The default is false, so a new call site is safe by omission rather than
+      // dangerous by it.
+      //
+      // Skipped rather than compared-and-refused: there is no reason to spend an
+      // Argon2id verification on a password that cannot be accepted whatever it says.
+      const bool requiresSecondFactor = !pAccount->GetTotpSecret().IsEmpty();
+
+      if (!requiresSecondFactor || secondFactorSatisfied)
+      {
+         if (ValidateAccountPassword_(pAccount, sPassword))
+            return true;
+      }
 
       // The account's own password did not match. An app password might.
       //

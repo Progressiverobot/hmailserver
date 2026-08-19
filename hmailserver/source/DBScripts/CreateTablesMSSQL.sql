@@ -197,7 +197,8 @@ create table hm_accounts (
 	accountpersonfirstname nvarchar(60) not null,
 	accountpersonlastname nvarchar(60) not null,
 	accountvacationabortspamflagged tinyint not null,
-	accountforwardabortspamflagged tinyint not null
+	accountforwardabortspamflagged tinyint not null,
+	accounttotpsecret nvarchar(255) not null
 ) 
 
 ALTER TABLE hm_accounts ADD CONSTRAINT hm_accounts_pk PRIMARY KEY NONCLUSTERED (accountid) 
@@ -1036,4 +1037,4 @@ ALTER TABLE hm_imap_metadata ADD CONSTRAINT hm_imap_metadata_pk PRIMARY KEY NONC
 
 ALTER TABLE hm_imap_metadata ADD CONSTRAINT hm_imap_metadata_unique UNIQUE (metadataaccountid, metadatafolderid, metadataentryname)
 
-insert into hm_dbversion values (6016)
+insert into hm_dbversion values (6017)

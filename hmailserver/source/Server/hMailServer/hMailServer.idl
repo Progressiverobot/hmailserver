@@ -977,6 +977,9 @@ interface IInterfaceAccount : IDispatch
     [propget, id(40), helpstring("The account's active Sieve (RFC 5228) filter script.")] HRESULT SieveScript([out, retval] BSTR *pVal);
     [propput, id(40), helpstring("The account's active Sieve (RFC 5228) filter script.")] HRESULT SieveScript([in] BSTR newVal);
     [propget, id(42), helpstring("Application-specific passwords for this account: separately revocable credentials for clients that cannot present a second factor.")] HRESULT AppPasswords([out, retval] IInterfaceAppPasswords** pVal);
+    [propget, id(43), helpstring("True when this account has a second factor enrolled. While it is, the account password no longer authenticates a mail client and an app password is the only credential that does.")] HRESULT TOTPEnabled([out, retval] VARIANT_BOOL* pVal);
+    [id(44), helpstring("Enrols a second factor and returns the otpauth:// URI to show as a QR code. The secret is inside that URI and is not retrievable afterwards. Call Save to keep it.")] HRESULT EnrolTOTP([out, retval] BSTR* pVal);
+    [id(45), helpstring("Removes this account's second factor. Call Save to keep the change.")] HRESULT DisableTOTP();
 };
 
 
@@ -1612,6 +1615,7 @@ interface IInterfaceApplication : IDispatch{
    [propget, id(15), helpstring("Gets the backup manager.")] HRESULT BackupManager([out, retval] IInterfaceBackupManager **pVal);
    [propget, id(16), helpstring("Gets the global objects object.")] HRESULT GlobalObjects([out, retval] IInterfaceGlobalObjects **pVal);
    [id(17), helpstring("Authenticate the client.")] HRESULT Authenticate([in] BSTR Username, [in] BSTR Password, [out, retval] IInterfaceAccount** pAccount);
+   [id(21), helpstring("Authenticate the client, presenting a TOTP code. An account with a second factor enrolled cannot be authenticated by password alone - a mail client has nowhere to type a code, which is what app passwords exist for, and this is the one path that can.")] HRESULT AuthenticateWithCode([in] BSTR Username, [in] BSTR Password, [in] BSTR Code, [out, retval] IInterfaceAccount** pAccount);
    [propget, id(18), helpstring("Quick links to access objects")] HRESULT Links([out, retval] IInterfaceLinks **pVal);
    [propget, id(19), helpstring("Gets a diagnostics object.")] HRESULT Diagnostics([out, retval] IInterfaceDiagnostics **pVal);
 

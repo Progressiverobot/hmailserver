@@ -26,6 +26,7 @@
 #include "SRS.h"
 #include "BATV.h"
 #include "AccountLockout.h"
+#include "Totp.h"
 #include "RateLimiter.h"
 #include "TransparentTransmissionBuffer.h"
 #include "../Cache/Cache.h"
@@ -155,6 +156,12 @@ namespace HM
       {
          OAuth2TokenValidatorTester oauth2Tester;
          oauth2Tester.Test();
+      }
+
+      OutputDebugString(_T("hMailServer: Testing TOTP against the RFC 6238 vectors\n"));
+      {
+         TotpTester totpTester;
+         totpTester.Test();
       }
 
       OutputDebugString(_T("hMailServer: Testing SRS\n"));

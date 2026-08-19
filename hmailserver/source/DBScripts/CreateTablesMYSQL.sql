@@ -97,7 +97,8 @@ create table hm_accounts
 	accountpersonfirstname varchar(60) not null,
 	accountpersonlastname varchar(60) not null,
 	accountvacationabortspamflagged tinyint not null,
-	accountforwardabortspamflagged tinyint not null
+	accountforwardabortspamflagged tinyint not null,
+	accounttotpsecret varchar(255) not null default ''
 ) DEFAULT CHARSET=utf8;
 
 CREATE INDEX idx_hm_accounts ON hm_accounts (accountaddress);
@@ -851,4 +852,4 @@ create table hm_imap_metadata
 	unique(metadataaccountid, metadatafolderid, metadataentryname)
 ) DEFAULT CHARSET=utf8;
 
-insert into hm_dbversion values (6016);
+insert into hm_dbversion values (6017);

@@ -15,11 +15,25 @@ namespace HM
       ~PasswordValidator(void);
 
       static std::shared_ptr<const Account> ValidatePassword(const String &sUsername, const String &sPassword);
+
+      // Resolves a login name to an account WITHOUT checking any credential - domain
+      // aliases and the default domain applied exactly as the validation paths apply
+      // them, and the same active-account and active-domain rules. Exists for the one
+      // caller that must know something about the account before it can validate: the
+      // COM path needs the TOTP secret in order to check the code that decides whether
+      // the password may be tried at all.
+      static std::shared_ptr<const Account> LookupAccount(const String &sUsername);
       static std::shared_ptr<const Account> ValidatePassword(const String &sMasqname, const String &sUsername, const String &sPassword);
 
       // Validates the user password. Return the account if validation is OK. 
 
-      static bool ValidatePassword(std::shared_ptr<const Account> pAccount, const String &sPassword);
+      // secondFactorSatisfied says the CALLER has already verified a TOTP code for
+      // this account. Only the COM authentication path can - a mail client has
+      // nowhere to type one - so it defaults to false and every protocol leaves it
+      // alone: an account with a second factor enrolled authenticates in a mail
+      // client through an app password and not through its own password.
+      static bool ValidatePassword(std::shared_ptr<const Account> pAccount, const String &sPassword,
+                                   bool secondFactorSatisfied = false);
 
       // Validates the user password. Return true if the password is correct.
 

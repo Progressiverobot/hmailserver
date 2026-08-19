@@ -86,6 +86,13 @@ namespace HM
       void SetAdminLevel(AdminLevel iNewVal) {admin_level_ = iNewVal; }
 
       void SetPasswordEncryption(int iNewVal) {password_encryption_ = iNewVal; }
+
+      // The account's TOTP secret, base32. Empty means no second factor, which is
+      // every account until an administrator enrols one - so this single value is
+      // the feature's on/off switch, and its emptiness is load-bearing rather than
+      // incidental.
+      String GetTotpSecret() const { return totp_secret_; }
+      void SetTotpSecret(const String &newVal) { totp_secret_ = newVal; }
       long GetPasswordEncryption() const {return password_encryption_; }
 
       std::shared_ptr<Messages> GetMessages();
@@ -141,6 +148,7 @@ namespace HM
 
       AnsiString address_;
       AnsiString password_;
+      String totp_secret_;
       String addomain_;
       String adusername_;
 

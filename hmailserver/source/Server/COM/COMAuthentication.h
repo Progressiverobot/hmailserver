@@ -16,6 +16,13 @@ namespace HM
 
       std::shared_ptr<const Account> Authenticate(const String &sUsername, const String &sPassword);
 
+      // As above, with a TOTP code. This is the ONLY path that can satisfy a second
+      // factor: a mail client has nowhere to type one, which is precisely why an
+      // account with a factor enrolled authenticates there through an app password
+      // instead. An empty code is not a shortcut - an enrolled account still needs a
+      // valid one.
+      std::shared_ptr<const HM::Account> Authenticate(const String &sUsername, const String &sPassword, const String &sCode);
+
       void AttempAnonymousAuthentication();
 
       bool GetIsAuthenticated() const;

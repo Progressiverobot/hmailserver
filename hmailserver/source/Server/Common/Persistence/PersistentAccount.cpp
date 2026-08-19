@@ -249,6 +249,7 @@ namespace HM
       pAccount->SetSignatureHTML(pRS->GetStringValue("accountsignaturehtml"));
 
       pAccount->SetLastLogonTime(pRS->GetStringValue("accountlastlogontime"));
+      pAccount->SetTotpSecret(pRS->GetStringValue("accounttotpsecret"));
 
       pAccount->SetPersonFirstName(pRS->GetStringValue("accountpersonfirstname"));
       pAccount->SetPersonLastName(pRS->GetStringValue("accountpersonlastname"));
@@ -435,6 +436,7 @@ namespace HM
       oStatement.AddColumn("accountsignaturehtml", pAccount->GetSignatureHTML());
 
       oStatement.AddColumn("accountlastlogontime", pAccount->GetLastLogonTime());
+      oStatement.AddColumn("accounttotpsecret", pAccount->GetTotpSecret());
       
       oStatement.AddColumn("accountpersonfirstname", pAccount->GetPersonFirstName());
       oStatement.AddColumn("accountpersonlastname", pAccount->GetPersonLastName());

@@ -50,6 +50,7 @@ public:
 
    STDMETHOD(Connect)();
    STDMETHOD(Authenticate)(BSTR sUsername, BSTR sPassword, IInterfaceAccount **pVal);
+   STDMETHOD(AuthenticateWithCode)(BSTR sUsername, BSTR sPassword, BSTR sCode, IInterfaceAccount **pVal);
    STDMETHOD(SubmitEMail)();
    STDMETHOD(Stop)();
    STDMETHOD(Start)();

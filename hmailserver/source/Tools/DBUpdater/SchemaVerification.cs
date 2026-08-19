@@ -177,7 +177,13 @@ namespace DBUpdater
          new SchemaProbe(6016, "hm_apppasswords.aplastused",
                          "update hm_apppasswords set aplastused = aplastused where 1 = 0"),
          new SchemaProbe(6016, "hm_apppasswords.apactive",
-                         "update hm_apppasswords set apactive = apactive where 1 = 0")
+                         "update hm_apppasswords set apactive = apactive where 1 = 0"),
+
+         // Upgrade6016to6017* - the per-account TOTP secret. Empty means the account
+         // has no second factor, which is every account until an administrator enrols
+         // one, so the column is the whole feature's on/off switch.
+         new SchemaProbe(6017, "hm_accounts.accounttotpsecret",
+                         "update hm_accounts set accounttotpsecret = accounttotpsecret where 1 = 0")
       };
 
       /// <summary>
