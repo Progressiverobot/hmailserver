@@ -38,7 +38,7 @@ as ⬜, not ✅.
 
 ### Contents and totals
 
-802 items. The counts are the point of this table — they say where the fork is
+803 items. The counts are the point of this table — they say where the fork is
 strong and where it is thin far more honestly than any prose summary.
 
 | Section | ✅ | 🔄 | ⬜ | ⏸️ |
@@ -56,7 +56,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [SMTP and ESMTP](#smtp-and-esmtp) | 27 | – | 2 | – |
 | [Transport security and deliverability](#transport-security-and-deliverability) | 46 | – | 1 | 1 |
 | [IMAP](#imap) | 71 | – | 4 | 3 |
-| [POP3](#pop3) | 26 | 1 | 1 | – |
+| [POP3](#pop3) | 27 | 0 | 1 | – |
 | [Sieve, ManageSieve and rules](#sieve-managesieve-and-rules) | 64 | 0 | 1 | – |
 | [Authentication and cryptography](#authentication-and-cryptography) | 61 | 0 | 16 | – |
 | [Anti-spam, anti-virus and content control](#anti-spam-anti-virus-and-content-control) | 56 | – | 11 | – |
@@ -65,34 +65,36 @@ strong and where it is thin far more honestly than any prose summary.
 | [Administration, API and Control Panel](#administration-api-and-control-panel) | 62 | – | 7 | – |
 | [Observability and diagnostics](#observability-and-diagnostics) | 32 | – | 7 | 1 |
 | [Extensibility and scripting](#extensibility-and-scripting) | 37 | – | 3 | – |
-| [Build, testing and supply chain](#build-testing-and-supply-chain) | 7 | 1 | 0 | – |
+| [Build, testing and supply chain](#build-testing-and-supply-chain) | 7 | 1 | 1 | – |
 | [Cross-cutting and platform](#cross-cutting-and-platform) | 8 | 3 | 1 | – |
 | **Forward-looking** | | | | |
 | [Planned work](#planned-work) | 4 | 4 | 10 | 2 |
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 2 | – | 4 | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 5 | 1 | 2 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 4 | 1 | 4 | – |
-| **Total** | **671** | **14** | **102** | **15** |
+| **Total** | **672** | **13** | **103** | **15** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage, the administration surface and the core protocol layer are the
-best-covered areas** — POP3 and Sieve are effectively complete, and IMAP and
-transport security have one or two honest remainders each, most of them
-subsystems rather than gaps. **Authentication and cryptography is now the
-thinnest** — 17 not-started against 60 shipped — and it is thin in a specific
-way: what is missing is a chain, not a list. App passwords are the prerequisite
-for per-account 2FA, which is the prerequisite for enforcing a second factor
-anywhere a mail client connects, and none of the three exists yet.
-**Anti-spam and anti-virus is the next thinnest** at 11, where the missing
-pieces are a quarantine anybody can review and a way to put an external engine
-in the path. And the forward-looking sections are no longer all ⬜:
-post-quantum key exchange, the .NET 10 migration and the supply-chain work
-shipped this month, which is what progress on a roadmap is supposed to look
-like.
+best-covered areas** — Sieve, SMTP and transport security have one honest
+remainder each, and IMAP's four are subsystems rather than gaps. **Authentication
+and cryptography is still the thinnest** — 16 not-started against 61 shipped —
+but it is thin in a better way than it was, because the chain that made it thin
+has started. App passwords shipped on 19 August 2026, which is the prerequisite
+for per-account 2FA, which is what enforcing a second factor anywhere a mail
+client connects depends on: two of the three now exist. What remains there is
+mostly a menu of mechanisms nobody has asked for — NTLM, GSSAPI, DIGEST-MD5 —
+plus two that would be genuinely useful: token introspection, so a stolen OAuth2
+token stops working before it expires, and a password policy the server actually
+enforces rather than an advisory helper nothing calls. **Anti-spam and anti-virus
+is the next thinnest** at 11, where the missing pieces are a quarantine anybody
+can review and a way to put an external engine in the path.
 
 These three sentences restate the table above, so they go stale the moment it
 moves — as they had, by 48 items in one section, before the 6.2.22-pre2 review
-caught them. Re-read them against the table whenever the totals change.
+caught them, and again days later when app passwords shipped while this paragraph
+still said none of that chain existed. Re-read them against the table whenever
+the totals change.
 
 Dated items — the forcing functions
 -----------------------------------
@@ -425,7 +427,7 @@ the source, not from documentation.
 
 ### POP3
 
-26 shipped · 1 underway · 1 not started · 0 deferred
+27 shipped · 0 underway · 1 not started · 0 deferred
 
 | | Capability | Detail |
 |:-:|---|---|
@@ -452,7 +454,7 @@ the source, not from documentation.
 | ✅ | APOP | **Deliberately absent, resolved 17 August 2026** - the row's own complaint was that the decision was nowhere written down, and now it is, in the code at the mechanism dispatch where the next maintainer will actually look. APOP hashes the cleartext password with a banner timestamp, so implementing it requires the server to store a cleartext-equivalent secret - which the Argon2id/SCRAM password store rightly cannot produce, and which would weaken every account to serve a mechanism from 1996. The replacements are not pending: SCRAM-SHA-256(-PLUS) and the OAuth2 bearers are advertised, and STLS protects the USER/PASS fallback. |
 | ✅ | AUTH-RESP-CODE (RFC 3206) | Shipped 17 August 2026, made deliberately rather than as a side effect - which is exactly how the 13 August conformance pass said it should happen, because a shared test helper matched the refusal's literal text (the helper's needle moved in the same commit). Every credential refusal carries [AUTH]: the USER/PASS path's four variants, the OAuth2 bearer token's two, and SCRAM's final verdict pair - so a client can reprompt for a password knowing the password was the problem. The failed inbox load at login carries [SYS/TEMP]: the credentials were right, the server was having trouble, retry silently later - the distinction that stops a scheduled poller nagging its user over a transient database problem. Protocol-state refusals (TLS required, malformed SASL, cancellation) deliberately carry no code: they are not credential verdicts. CAPA advertises AUTH-RESP-CODE, which is what entitles a client to interpret the brackets. Four fixtures, including the negative control that a success and an ordinary transaction error carry no code, and the disconnecting tenth failure carrying the code on the way out. |
 | ✅ | CRAM-MD5, DIGEST-MD5, EXTERNAL, GSSAPI, NTLM | **Deliberately absent, resolved 17 August 2026**, with the roster-of-decisions comment now at the dispatch site in the code. CRAM-MD5 needs a cleartext-equivalent stored secret the Argon2id/SCRAM store cannot produce; DIGEST-MD5 was moved to Historic by RFC 6331 for its documented defects; NTLM is proprietary legacy with its own downgrade problems; EXTERNAL could not work today because the inbound TLS contexts never request a client certificate (its prerequisite is tracked in the security section); GSSAPI/Kerberos SSO is likewise tracked there as a real absence, not restated here as a POP3 one. A capability matrix owes readers the reason an item is absent, not a permanent-looking ⬜ for mechanisms nobody should enable in 2026 - the same resolution the SMTP section's row received on 16 August. |
-| 🔄 | EXPIRE and LOGIN-DELAY (RFC 2449) | Both now answered, and each only as far as it is true. **EXPIRE is NEVER**, which is this server's actual retention policy rather than a placeholder: nothing anywhere deletes a delivered message because of its age. A client configured to leave mail on the server is entitled to know that what it leaves stays for good, and RFC 2449 section 5 forbids advertising a number with nothing to enforce it. **LOGIN-DELAY** declares and enforces a minimum interval between logins for one account, off by default (`Pop3LoginDelaySeconds`) and advertised only when set. It exists because POP3 has no idle notification, so a client that wants to look responsive polls - and each poll costs a TCP connection, a TLS handshake and an Argon2id verification, which is deliberately expensive. A login that arrives early is refused with `-ERR [LOGIN-DELAY]`, the code a conforming client backs off from; without it the reply is indistinguishable from a rejected password and the client asks its user to retype one that was never wrong. The check sits **after** authentication and before the maildrop is locked, which is what makes it a rate limit rather than a lockout: the account is already resolved, so the refusal is not an existence oracle, a failed logon never reaches it and so cannot fill the table, and a refused early login does not restart the clock - otherwise a client polling every second would never get in again. In memory, so a restart lets everyone straight back in, which is the right direction to fail. |
+| ✅ | EXPIRE and LOGIN-DELAY (RFC 2449) | Both now answered, and each only as far as it is true. **EXPIRE is NEVER**, which is this server's actual retention policy rather than a placeholder: nothing anywhere deletes a delivered message because of its age. A client configured to leave mail on the server is entitled to know that what it leaves stays for good, and RFC 2449 section 5 forbids advertising a number with nothing to enforce it. **LOGIN-DELAY** declares and enforces a minimum interval between logins for one account, off by default (`Pop3LoginDelaySeconds`) and advertised only when set. It exists because POP3 has no idle notification, so a client that wants to look responsive polls - and each poll costs a TCP connection, a TLS handshake and an Argon2id verification, which is deliberately expensive. A login that arrives early is refused with `-ERR [LOGIN-DELAY]`, the code a conforming client backs off from; without it the reply is indistinguishable from a rejected password and the client asks its user to retype one that was never wrong. The check sits **after** authentication and before the maildrop is locked, which is what makes it a rate limit rather than a lockout: the account is already resolved, so the refusal is not an existence oracle, a failed logon never reaches it and so cannot fill the table, and a refused early login does not restart the clock - otherwise a client polling every second would never get in again. In memory, so a restart lets everyone straight back in, which is the right direction to fail. Seven tests, green in the full suite at 1671/1671 on 19 August 2026, and a Control Panel field on the POP3 page rather than the ini page - beside the connection ceiling it is the gentler alternative to. |
 | ✅ | IMPLEMENTATION (RFC 2449) | Shipped 17 August 2026: CAPA advertises `IMPLEMENTATION hMailServer` - the name and deliberately nothing else. The capability exists so an implementation-specific client workaround can be keyed on it, which the name alone enables; the patch level would hand an attacker a lookup key into fixed-in-version security advisories for the cost of one anonymous CAPA command, and the fixture pins that nothing follows the name. |
 | ⬜ | LANG (RFC 6856) | Not advertised and no response-language negotiation exists; server replies are English-only and the greeting is the configurable welcome message. A real LANG needs a message catalogue and per-connection language state - a project, not a capability line. |
 | ✅ | PIPELINING (RFC 2449) | Advertised 17 August 2026 - after it was proved rather than assumed, which is what this row always required. The fixture drives batched commands through single TCP segments, across the authentication boundary (USER+PASS+STAT+QUIT in one write) and around a multi-line RETR in mid-batch, and the parse loop drains its buffer correctly in both states. The one dangerous interaction, cleartext commands pipelined ahead of STLS, was already closed before the capability was claimed: TCPConnection clears the receive buffer when the handshake completes and ProtocolSTLS_ wipes parsed credentials, so an injected prefix neither executes nor lingers - the RFC 2595 injection defence a PIPELINING claim would otherwise weaponise. |
@@ -995,7 +997,7 @@ the source, not from documentation.
 
 ### Build, testing and supply chain
 
-7 shipped · 1 underway · 0 not started · 0 deferred
+7 shipped · 1 underway · 1 not started · 0 deferred
 
 | | Capability | Detail |
 |:-:|---|---|
@@ -1007,6 +1009,7 @@ the source, not from documentation.
 | ✅ | Regression coverage for the authentication surface | Dedicated NUnit suites exist for SCRAM-PLUS on IMAP/POP3/SMTP, TLS version and TLS option negotiation, OAuth2 bearer, hash policy, password pepper, secret protection, auto-ban, password masking and protocol fuzzing. |
 | ✅ | Architecture guide and docs index | ARCHITECTURE.md is published at the repository root, and hmailserver/docs/ has an index (README.md) over five guides — DiagnosingStalledMail, HighAvailabilityRunbook, Upgrading, RegulatoryScope and Fuzzing — plus the Grafana dashboard and the third-party licence texts. Every factual claim across all of them was verified against the code on 13 August 2026 and each page now carries a "Verified against the code" footer naming the functions it was checked against. The audit reported one remaining gap here — "there is no CONTRIBUTING.md" — and that was itself wrong, which is worth recording because it is the same failure the audit exists to catch, in the same week, in the other direction: **`.github/CONTRIBUTING.md` has been there since 7 August**, and the root README links to it correctly. Only the repository root was checked. The real defect was one relative path: the docs index pointed at `../../CONTRIBUTING.md` rather than `../../.github/CONTRIBUTING.md`, so the single link a first-time contributor would follow from the documentation was the one broken link in it. Fixed. |
 | 🔄 | The release gate does not depend on somebody else's DNS | Ten tests in the gate resolved live third-party names, and when the resolver was slow they failed and read as a regression in whatever change was being gated. Found across four consecutive gate runs on 19 August 2026, each one exposing more of them, while the change under test was in `IMAPFetch.cpp` and could not have touched any. **Nine are fixed.** `Shared/FakeDnsServer.cs` answers A, MX and TXT on 127.0.0.1 (UDP and TCP) and NODATA-with-SOA for everything else; `Shared/ServerIniFile.cs` points `DNSServer` at it and `TestFixtureBase.RestartServerAndReacquireCom()` makes that take effect, since the ini is cached at process start. Six fixtures now serve their own zone - `AntiSpam.DKIM.Verification`, `AntiSpam.Basics`, `AntiSpam.WhiteListing`, `AntiSpam.DmarcRptReporting`, `Infrastructure.TCPIP` and `POP3.Fetching.Basics` - needing five names between them, because everything those fixtures assert is a NEGATIVE answer and a lookup that never returned is indistinguishable from one that found nothing. The DKIM fixture went from **24-35 seconds per test to 7.2 seconds for the whole fixture**, and stopped depending on Microsoft not rotating a key, which nothing had written down. Its 437-character key does not fit one DNS character-string, so serving it as two also proves the RFC 6376 3.6.2 concatenation this suite had never tested. Two fixtures got **stronger** assertions rather than merely faster ones: `Infrastructure.TCPIP` and two `POP3.Fetching.Basics` tests used to compare the server's answer against a live lookup the TEST process made of the same name - two lookups that merely had to agree with each other - and now check an address the fixture chose, so an answer of the right shape for the wrong host is caught. `Rules.ActionBindToAddress` needed no fake at all: it delivered to gmail.com purely to reach a bind that fails first, and now uses a route, which resolves nothing. `Sieve.SieveSpamtestDelivery` was the tenth and got the same treatment: it grounds its verdict in the real anti-spam pipeline on purpose - so a sender cannot steer a recipient's filter with a forged header - which had the side effect of routing that verdict over the internet, and a slow lookup made it report "the flag is not reaching the evaluator through the delivery path". **All ten are now served locally** - and the next gate found four more, which is the finding that matters most here: `AntiSpam.Combinations.TestDeleteThresholdLowerThanMarkThreshold`, `AntiSpam.GreyListing.ItShouldBePossibleToBypassGreylistingOnMessagesArrivingFromMXorA`, `API.Events.TestOnDeliveryFailedJScript`, and `API.Events.TestOnDeliveryStart_SetHtmlBodyEmpty` (a knock-on from the previous one). Five consecutive full-suite runs each exposed a fresh set, so **this cannot be finished by pinning fixtures one at a time** - the population is larger than any single run reveals, and each round costs 35 minutes to discover four more. **The resolver was the answer, and the measurement found it in minutes where fixtures had taken a night.** Making 9.9.9.9 the machine's PRIMARY resolver (not its secondary - Windows falls through only when the primary does not answer at all, never merely because it is slow) took the suite straight to **1671/1671, nothing failed, nothing skipped**. Two cautions against reading that as solved. It is an ENVIRONMENT fix, so the four tests it rescued are still live-DNS-dependent and will fail again on a slow network - the ten pinned fixtures are the part that is actually durable, and they are kept rather than reverted because they are also faster and, in three cases, assert more than they used to. And one name fails on **every** resolver tried, including Quad9: `selector1._domainkey.outlook.com` answers **"Bad DNS packet"**, because its 437-character multi-string TXT record is mangled over UDP - the exact `DNS_ERROR_BAD_PACKET` case `DNSResolverWinApi` documents and retries over TCP for. Serving that key locally turned out to be right for a second reason nobody anticipated. The remaining direction, if this recurs: point the whole SUITE at one fake zone from TestSetup rather than fixture by fixture, since NODATA is the correct answer for almost everything it asks and only two names in the entire suite need a positive one. There is a third defect underneath, exposed by the fourth failure above: a test that leaves a message in the delivery queue poisons the NEXT test, because that test's setup deletes the recipient account and delivery then reports HM5165 during it. Clearing the ERROR log at teardown cannot fix that - the error genuinely belongs to the later test - so the queue needs draining too. One unrelated flake is recorded rather than left to be rediscovered: `AntiVirus.ScannerFailurePolicy.WithFailClosedTheMessageIsHeldAndNotLost`, the test that proves a held message is preserved rather than lost, failed twice in five full-suite runs that day and passes every time in isolation, taking 36 seconds before giving up on the forced retry. That is not DNS - it never was - so the resolver change does not explain it, and it did NOT recur on the 1671/1671 run. One clean run is not evidence that an intermittent is gone, so it stays recorded: the working hypothesis is the forced retry, where the test calls `DeliveryQueue.ResetDeliveryTime` and then `StartDelivery`, and a queue whose in-memory view of the next-try time is staler than the row just updated would skip the message - which matches both the ~36 second timeout and the intermittency. Untested. One constraint rules out the easy fix of pointing the machine at a public resolver: `multi.surbl.org` answers SERVFAIL to 1.1.1.1 by design (8.8.8.8 and 9.9.9.9 do answer). |
+| ⬜ | A test that leaves mail queued fails the next test | Distinct from the ERROR-log cascade above and not fixed by it. `TestFixtureBase.SetUp` recreates the test domain, which deletes its accounts - so a message still sitting in the delivery queue from the PREVIOUS test then has no recipient, `LocalDelivery` correctly reports **HM5165** ("the recipient account appears to have been deleted after the message was received"), and `AssertNoReportedError` fails the test that is running. Clearing the error log at the previous test's teardown cannot fix this one, because the error has not happened yet at that point and genuinely belongs to the later test: seen 19 August 2026 as `API.Events.TestOnDeliveryStart_SetHtmlBodyEmpty` failing on an HM5165 caused by `TestOnDeliveryFailedJScript` leaving one message queued. The fix is to drain the queue as well as the log when a test fails - `AntiVirus.ScannerFailurePolicy` already does exactly that in its own teardown (`DeliveryQueue.Clear()`), for exactly this reason, which is the argument for doing it in the base rather than once per fixture that happens to notice. |
 
 ### Cross-cutting and platform
 
