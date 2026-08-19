@@ -35,6 +35,44 @@ namespace RegressionTests.Sieve
 
       private static int accountSequence_;
 
+      // The SURBL listing that makes the message spam, served locally.
+      //
+      // Grounding the verdict in the real pipeline is what this fixture is for - see
+      // the class comment - but it meant the verdict arrived over the internet, and on
+      // 19 August 2026 a gate run reported "the flag is not reaching the evaluator
+      // through the delivery path" when what had actually happened was that the lookup
+      // had not come back. A spamtest fixture that fails when DNS is slow tests DNS.
+      //
+      // 127.0.0.2 is what a URI blacklist returns for a listed name; every other name
+      // answers NODATA, which is the "not listed" the clean half of each test wants.
+      private const string SurblTestPoint = "surbl-org-permanent-test-point.com.multi.surbl.org";
+
+      private FakeDnsServer dns_;
+
+      [OneTimeSetUp]
+      public void PointTheServerAtALocalResolver()
+      {
+         dns_ = new FakeDnsServer().WithA(SurblTestPoint, "127.0.0.2");
+
+         ServerIniFile.SetSetting("DNSServer", "127.0.0.1");
+
+         RestartServerAndReacquireCom();
+      }
+
+      [OneTimeTearDown]
+      public void RestoreTheSystemResolver()
+      {
+         try
+         {
+            ServerIniFile.SetSetting("DNSServer", null);
+            RestartServerAndReacquireCom();
+         }
+         finally
+         {
+            dns_?.Dispose();
+         }
+      }
+
       private static void SetScript(Account account, string script)
       {
          account.GetType().InvokeMember(
