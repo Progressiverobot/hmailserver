@@ -135,11 +135,33 @@ namespace RegressionTests.Shared
                // instant there is nothing to clear and a second later there is. That
                // is exactly how POP3ServerNotSupportingSSL failed on HM5165 raised by
                // the test before it.
+               // Drained BEFORE the log is settled, and that order is the point.
+               //
+               // A message left in the delivery queue is a delivery that has not
+               // happened yet, and the error it eventually raises belongs to a test
+               // that has not started: the next SetUp recreates the test domain,
+               // which deletes its accounts, so the queued message has no recipient
+               // and LocalDelivery correctly reports HM5165 - "the recipient account
+               // appears to have been deleted after the message was received". No
+               // amount of log-clearing here can pre-empt that, because at this
+               // moment the error does not exist. Seen 19 August 2026 as
+               // API.Events.TestOnDeliveryStart_SetHtmlBodyEmpty failing on an
+               // HM5165 caused by the test before it.
+               //
+               // AntiVirus.ScannerFailurePolicy has done this in its own teardown
+               // for the same reason since it was written, which is the argument for
+               // doing it here rather than once per fixture that happens to notice.
+               //
+               // Failed tests only, like the log: a test that PASSED and still left
+               // mail queued is a different defect, and hiding it here would remove
+               // the only signal that it exists.
+               _application.GlobalObjects.DeliveryQueue.Clear();
+
                LogHandler.ClearErrorLogUntilSettled();
             }
             catch (Exception ex)
             {
-               Console.WriteLine("Could not read the ERROR log to attribute it to this test: " + ex.Message);
+               Console.WriteLine("Could not clean up after this test's failure: " + ex.Message);
             }
          }
 
