@@ -334,6 +334,7 @@
     <Compile Include="AntiSpam\HostLiteralResolution.cs" />
     <Compile Include="AntiSpam\Combinations.cs" />
     <Compile Include="AntiSpam\Basics.cs" />
+    <Compile Include="AntiSpam\Quarantine.cs" />
     <Compile Include="AntiSpam\SpamAssassin.cs" />
     <Compile Include="API\Basics.cs" />
     <Compile Include="Infrastructure\Cache.cs" />

@@ -1,0 +1,24 @@
+HKCR
+{
+	hMailServer.Quarantine.1 = s 'Quarantine Class'
+	{
+		CLSID = s '{C0AFFA5D-DF25-485B-9832-C706E5156BCF}'
+	}
+	hMailServer.Quarantine = s 'Quarantine Class'
+	{
+		CLSID = s '{C0AFFA5D-DF25-485B-9832-C706E5156BCF}'
+		CurVer = s 'hMailServer.Quarantine.1'
+	}
+	NoRemove CLSID
+	{
+		ForceRemove {C0AFFA5D-DF25-485B-9832-C706E5156BCF} = s 'Quarantine Class'
+		{
+			ProgID = s 'hMailServer.Quarantine.1'
+			VersionIndependentProgID = s 'hMailServer.Quarantine'
+			ForceRemove 'Programmable'
+			LocalServer32 = s '%MODULE%'
+			val AppID = s '%APPID%'
+			'TypeLib' = s '{DB241B59-A1B1-4C59-98FC-8D101A2995F2}'
+		}
+	}
+}

@@ -1291,6 +1291,35 @@ namespace hMailServer.ControlPanel.Views
          general.Settings.Add(new ComText { Path = "AntiSpam.MaximumMessageSize", Label = "Max message size to spam-scan (KB, 0 = unlimited)", Numeric = true });
          Tab("General").Cards.Add(general);
 
+         // Directly under the delete threshold, because this setting changes what that
+         // threshold DOES rather than adding a feature beside it.
+         var quarantine = Card("Quarantine instead of refusing",
+            "Changes what happens at the delete threshold. Off, a message over it is refused during the SMTP "
+          + "conversation with a 550 and the sender is told. On, it is accepted with a 250 and held for review "
+          + "instead - the sender believes it was delivered and will not retry, which is what makes a false "
+          + "positive recoverable without bouncing to a return path that is probably forged, and also means the "
+          + "review queue becomes the only place that message exists. Applies to checks that run after the "
+          + "message body has been received; a verdict reached before that (a blacklisted connecting IP, a bad "
+          + "HELO) has no message to hold and stays a refusal. Applies after a service restart.");
+         quarantine.Settings.Add(new IniBool
+         {
+            Path = "QuarantineEnabled",
+            Label = "Hold messages for review instead of refusing them",
+            Blurb = "Off by default. Turning it on means the server starts storing mail it considers spam, so "
+                  + "watch the retention window below.",
+            IniStore = iniStore_
+         });
+         quarantine.Settings.Add(new IniNumber
+         {
+            Path = "QuarantineRetentionDays",
+            Label = "Delete quarantined messages after (days; 0 = never)",
+            Default = 30,
+            Blurb = "0 is a real answer, not a disabled one - it keeps everything, which is what an "
+                  + "administrator collecting evidence wants. Everything else is a promise to the disk.",
+            IniStore = iniStore_
+         });
+         Tab("General").Cards.Add(quarantine);
+
          var auth = Card("Sender authentication");
          auth.Settings.Add(new ComBool { Path = "AntiSpam.UseSPF", Label = "Check SPF" });
          auth.Settings.Add(new ComText { Path = "AntiSpam.UseSPFScore", Label = "SPF failure score", Numeric = true });

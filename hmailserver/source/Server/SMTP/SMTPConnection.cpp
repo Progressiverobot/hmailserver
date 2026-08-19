@@ -13,6 +13,7 @@
 #include "../common/Util/PasswordValidator.h"
 #include "../common/Util/AccountLogon.h"
 #include "../common/Util/AccountLockout.h"
+#include "../Common/AntiSpam/QuarantineStore.h"
 #include "../common/Util/OAuth2TokenValidator.h"
 #include "../common/Util/Crypt.h"
 #include "../common/Util/Hashing/ScramSha256.h"
@@ -1228,6 +1229,33 @@ namespace HM
 
          // Generate a text string to send to the client.
          String messageText = GetSpamTestResultMessage_(spam_test_results_);
+
+         // Quarantine, when it is switched on and there is actually a message to
+         // hold. A pre-transmission verdict is reached before DATA - there is no
+         // message yet - so those stay refusals, which is also strictly cheaper for
+         // both ends since the body never crosses the wire.
+         //
+         // The reply changes with the outcome, and that is the whole point rather
+         // than a detail: a refused message is answered 550/554 and the sender knows,
+         // while a quarantined one is answered 250 and the sender believes it was
+         // delivered. Accepting is what makes a false positive recoverable without
+         // backscatter, and it is also what makes the review queue the only place the
+         // message now exists - which is why a quarantine that fails to store falls
+         // through to refusing rather than accepting. Silently accepting mail that
+         // was not stored would turn a spam refusal into silent deletion.
+         if (spType == SPPostTransmission &&
+             QuarantineStore::GetEnabled() &&
+             QuarantineStore::Quarantine(current_message_, messageText, iTotalSpamScore))
+         {
+            SendResponse_(250, _T("2.0.0"), _T("Queued for delivery"));
+
+            String quarantineLog;
+            quarantineLog.Format(_T("hMailServer SpamProtection quarantined a message (Sender: %s, IP: %s, Score: %d, Reason: %s)"),
+               sFromAddress.c_str(), String(GetIPAddressString()).c_str(), iTotalSpamScore, messageText.c_str());
+            LOG_APPLICATION(quarantineLog);
+
+            return false;
+         }
 
          // 5.7.1 = delivery not authorized, message refused (RFC 3463).
          if (spType == SPPreTransmission)

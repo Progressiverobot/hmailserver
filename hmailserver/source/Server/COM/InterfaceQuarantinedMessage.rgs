@@ -1,0 +1,24 @@
+HKCR
+{
+	hMailServer.QuarantinedMessage.1 = s 'QuarantinedMessage Class'
+	{
+		CLSID = s '{E57809E8-69AA-4086-A063-35E3208FAFB0}'
+	}
+	hMailServer.QuarantinedMessage = s 'QuarantinedMessage Class'
+	{
+		CLSID = s '{E57809E8-69AA-4086-A063-35E3208FAFB0}'
+		CurVer = s 'hMailServer.QuarantinedMessage.1'
+	}
+	NoRemove CLSID
+	{
+		ForceRemove {E57809E8-69AA-4086-A063-35E3208FAFB0} = s 'QuarantinedMessage Class'
+		{
+			ProgID = s 'hMailServer.QuarantinedMessage.1'
+			VersionIndependentProgID = s 'hMailServer.QuarantinedMessage'
+			ForceRemove 'Programmable'
+			LocalServer32 = s '%MODULE%'
+			val AppID = s '%APPID%'
+			'TypeLib' = s '{DB241B59-A1B1-4C59-98FC-8D101A2995F2}'
+		}
+	}
+}

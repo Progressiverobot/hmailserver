@@ -74,7 +74,8 @@ public:
    STDMETHOD(put_SpamMarkThreshold)(/*[in]*/ long newVal);	
 
    STDMETHOD(get_SpamDeleteThreshold)(/*[out, retval]*/ long *pVal);
-   STDMETHOD(put_SpamDeleteThreshold)(/*[in]*/ long newVal);	
+   STDMETHOD(put_SpamDeleteThreshold)(/*[in]*/ long newVal);
+   STDMETHOD(get_Quarantine)(/*[out, retval]*/ IInterfaceQuarantine** pVal);	
 
 
    STDMETHOD(get_AddHeaderSpam)(/*[out, retval]*/ VARIANT_BOOL *pVal);

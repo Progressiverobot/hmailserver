@@ -3,6 +3,7 @@
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 
 #include "stdafx.h"
+#include "InterfaceQuarantine.h"
 #include "COMError.h"
 
 
@@ -221,6 +222,27 @@ STDMETHODIMP InterfaceAntiSpam::put_SpamMarkThreshold(long newVal)
 
       config_->GetAntiSpamConfiguration().SetSpamMarkThreshold(newVal);
    
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceAntiSpam::get_Quarantine(IInterfaceQuarantine** pVal)
+{
+   try
+   {
+      CComObject<InterfaceQuarantine>* pItem = new CComObject<InterfaceQuarantine>();
+      pItem->SetAuthentication(authentication_);
+      pItem->AddRef();
+
+      // Returned unrefreshed. Reading Count is the common case and costs one query;
+      // loading a page of rows is what Refresh is for, and doing it here would make
+      // merely touching the property expensive on the servers with most to hold.
+      *pVal = pItem;
+
       return S_OK;
    }
    catch (...)

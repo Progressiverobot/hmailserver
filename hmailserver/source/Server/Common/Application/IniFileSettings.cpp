@@ -504,6 +504,8 @@ namespace HM
       batv_secret_ = ReadIniSettingString_("Settings", "BATVSecret", "");
       max_submissions_per_ip_per_minute_ = ReadIniSettingInteger_("Settings", "MaxSubmissionsPerIPPerMinute", 0);
       pop3_login_delay_seconds_ = ReadIniSettingInteger_("Settings", "Pop3LoginDelaySeconds", 0);
+      quarantine_enabled_ = ReadIniSettingInteger_("Settings", "QuarantineEnabled", 0) == 1;
+      quarantine_retention_days_ = ReadIniSettingInteger_("Settings", "QuarantineRetentionDays", 30);
       password_policy_minimum_length_ = ReadIniSettingInteger_("Settings", "PasswordPolicyMinimumLength", 0);
       password_policy_require_mixed_case_ = ReadIniSettingInteger_("Settings", "PasswordPolicyRequireMixedCase", 0) == 1;
       password_policy_require_digit_ = ReadIniSettingInteger_("Settings", "PasswordPolicyRequireDigit", 0) == 1;

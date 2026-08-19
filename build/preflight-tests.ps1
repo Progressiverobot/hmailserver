@@ -198,9 +198,12 @@ if (Test-Path $serverIni) {
     #   Pop3LoginDelaySeconds  - refuses the second POP3 logon of every test
     #   PasswordPolicy*        - refuses the password every fixture creates its accounts with,
     #                            so the whole suite fails in setup rather than anywhere useful
+    #   QuarantineEnabled      - turns spam REFUSALS into acceptances, so every
+    #                            anti-spam test that expects a 550 sees a 250
     $leftoverKeys = 'DNSServer', 'Pop3LoginDelaySeconds', 'PasswordPolicyMinimumLength',
                     'PasswordPolicyRequireMixedCase', 'PasswordPolicyRequireDigit',
-                    'PasswordPolicyRequireNonAlphanumeric', 'PasswordPolicyRejectCommon'
+                    'PasswordPolicyRequireNonAlphanumeric', 'PasswordPolicyRejectCommon',
+                    'QuarantineEnabled'
 
     $iniLines = @(Get-Content -LiteralPath $serverIni)
     $pattern = '^\s*(' + ($leftoverKeys -join '|') + ')\s*='

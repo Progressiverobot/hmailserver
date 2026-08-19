@@ -212,13 +212,14 @@ namespace hMailServer.ControlPanel.Services
 
       /// <summary>
       /// Pages this overview links to. Every spam page in the navigation must be
-      /// reachable from here - an overview that leaves one of the five out sends
-      /// the reader back to hunting for it, which is the problem it was built to
-      /// remove.
+      /// reachable from here - an overview that leaves one out sends the reader
+      /// back to hunting for it, which is the problem it was built to remove.
+      /// A test asserts this list against the navigation group, which is how the
+      /// quarantine page was caught the moment it was added.
       /// </summary>
       public static IReadOnlyList<string> LinkedPages { get; } = new[]
       {
-         "antispam", "dnsbl", "surbl", "spamwhitelist", "greylistwhitelist"
+         "antispam", "dnsbl", "quarantine", "surbl", "spamwhitelist", "greylistwhitelist"
       };
 
       /// <summary>

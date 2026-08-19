@@ -96,6 +96,7 @@ namespace hMailServer.ControlPanel
          pageFactories_["routes"] = () => new RoutesView();
          pageFactories_["publicfolders"] = () => new PublicFoldersView();
          pageFactories_["spamoverview"] = () => new SpamOverviewView();
+         pageFactories_["quarantine"] = () => new QuarantineView();
          pageFactories_["antispam"] = () => new ServerSettingsView(ServerSettingsView.Section.AntiSpam);
          pageFactories_["surbl"] = () => CollectionSpecs.SurblServers();
          pageFactories_["dnsbl"] = () => CollectionSpecs.DnsBlackLists();

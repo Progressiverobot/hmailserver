@@ -474,6 +474,15 @@ namespace hMailServer.ControlPanel.Services
                   aliases: "Spam overview|Anti-spam overview|Spam pipeline|Spam summary|What is my spam configuration|Spam checks|Order of spam checks|Spam thresholds|Spam verdict|Why was this marked as spam",
                   seeAlso: "antispam|spamwhitelist|logs"),
 
+               // Placed next to the settings that fill it rather than under a
+               // diagnostics heading: the reason somebody opens this page is almost
+               // always that a threshold on the anti-spam page just caught something
+               // it should not have.
+               Page("quarantine", "Quarantine",
+                  "Messages held for review instead of being refused, and the two things you can do with each: release it to the recipient, or delete it.",
+                  aliases: "Quarantine|Held messages|Release a message|False positive|Review spam|Quarantined mail|Where did my email go|Blocked message|Recover a message|Spam review queue",
+                  seeAlso: "antispam|spamoverview|spamwhitelist"),
+
                Page("antispam", "Anti-spam settings",
                   "Scores and thresholds, SPF, DKIM and DMARC checks, greylisting, and SpamAssassin.",
                   aliases: "Spam filter|Stop spam|Score|Threshold|SPF|DKIM|DMARC|ARC|Greylisting|SpamAssassin|Junk mail|PTR|HELO check|Subject prefix",

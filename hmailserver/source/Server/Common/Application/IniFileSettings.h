@@ -245,6 +245,13 @@ namespace HM
       // (the default) advertises nothing and enforces nothing.
       int GetPop3LoginDelaySeconds() const { return pop3_login_delay_seconds_; }
 
+      // Spam quarantine. Off by default, and that default is load-bearing: turning
+      // it on changes a REFUSAL into an ACCEPTANCE, so a server that has been
+      // rejecting spam at the door starts storing it instead. Retention 0 means
+      // never sweep, which is a real answer for an administrator keeping evidence.
+      bool GetQuarantineEnabled() const { return quarantine_enabled_; }
+      int GetQuarantineRetentionDays() const { return quarantine_retention_days_; }
+
       // Password policy, enforced where a password is CHOSEN (Account.Password over
       // COM) and never where one is verified or re-hashed. All off at 0/false, which
       // is what an existing installation gets until an administrator decides
@@ -658,6 +665,8 @@ namespace HM
       String batv_secret_;
       int max_submissions_per_ip_per_minute_;
       int pop3_login_delay_seconds_;
+      bool quarantine_enabled_;
+      int quarantine_retention_days_;
       int password_policy_minimum_length_;
       bool password_policy_require_mixed_case_;
       bool password_policy_require_digit_;

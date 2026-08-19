@@ -40,6 +40,8 @@ interface IInterfaceRouteAddresses;
 interface IInterfaceFetchAccounts;
 interface IInterfaceFetchAccount;
 interface IInterfaceAppPasswords;
+interface IInterfaceQuarantinedMessage;
+interface IInterfaceQuarantine;
 interface IInterfaceAppPassword;
 interface IInterfaceScripting;
 interface IInterfaceDomainAliases;
@@ -1811,6 +1813,43 @@ interface IInterfaceAppPassword : IDispatch{
 };
 [
 	object,
+	uuid(310F1911-69A5-4696-B08F-D364598105E5),
+	dual,
+	nonextensible,
+	helpstring("One message held in the spam quarantine. It was ACCEPTED rather than refused, so the sender believes it was delivered - releasing it delivers it, and deleting it is the only other outcome."),
+	pointer_default(unique)
+]
+interface IInterfaceQuarantinedMessage : IDispatch{
+   [propget, id(1), helpstring("The database identifier.")] HRESULT ID([out, retval] LONG* pVal);
+   [propget, id(2), helpstring("The envelope sender.")] HRESULT Sender([out, retval] BSTR* pVal);
+   [propget, id(3), helpstring("The envelope recipients, comma separated - who it would be released to.")] HRESULT Recipients([out, retval] BSTR* pVal);
+   [propget, id(4), helpstring("The subject, read from the stored message.")] HRESULT Subject([out, retval] BSTR* pVal);
+   [propget, id(5), helpstring("Why it was quarantined - the spam test that decided.")] HRESULT Reason([out, retval] BSTR* pVal);
+   [propget, id(6), helpstring("The spam score it reached.")] HRESULT Score([out, retval] LONG* pVal);
+   [propget, id(7), helpstring("Size in bytes.")] HRESULT Size([out, retval] LONG* pVal);
+   [propget, id(8), helpstring("When it was quarantined.")] HRESULT CreatedTime([out, retval] BSTR* pVal);
+   [id(9), helpstring("Delivers this message to its original recipients and removes it from the quarantine. Named ReleaseMessage rather than Release because every COM interface already inherits IUnknown::Release. Delivery re-enters at the queue rather than at SMTP, so the filters that quarantined it do not run again.")] HRESULT ReleaseMessage();
+   [id(10), helpstring("Deletes this message and its stored file. There is no other copy.")] HRESULT Delete();
+};
+[
+	object,
+	uuid(5AFC3CED-1626-4612-B72E-D5C1C8090F1D),
+	dual,
+	nonextensible,
+	helpstring("The spam quarantine: messages held for review rather than refused."),
+	pointer_default(unique)
+]
+interface IInterfaceQuarantine : IDispatch{
+   [propget, id(1), helpstring("The number of messages currently held.")] HRESULT Count([out, retval] LONG* pVal);
+   [propget, id(2), helpstring("ItemByDBID")] HRESULT ItemByDBID([in] long DBID, [out, retval] IInterfaceQuarantinedMessage** pVal);
+   [propget, id(0), defaultbind, helpstring("Item")] HRESULT Item([in] long Index, [out, retval] IInterfaceQuarantinedMessage** pVal);
+   [id(5), helpstring("Reloads the list, newest first.")] HRESULT Refresh(void);
+   [id(6), helpstring("Releases the message with this identifier.")] HRESULT ReleaseByDBID(long DBID);
+   [id(7), helpstring("Deletes the message with this identifier.")] HRESULT DeleteByDBID(long DBID);
+   [id(8), helpstring("Deletes everything older than QuarantineRetentionDays and returns how many were removed. The scheduled sweep calls this; it is exposed so an administrator can run it now.")] HRESULT DeleteExpired([out, retval] LONG* pVal);
+};
+[
+	object,
 	uuid(7CD468C7-70DA-410E-B700-3D4B1AB2FEA8),
 	dual,
 	nonextensible,
@@ -2353,6 +2392,7 @@ interface IInterfaceSURBLServer : IDispatch
 ]
 interface IInterfaceAntiSpam : IDispatch
 {
+   [propget, id(43), helpstring("The spam quarantine: messages held for review instead of refused. Empty and inert unless QuarantineEnabled is set in hMailServer.ini.")] HRESULT Quarantine([out, retval] IInterfaceQuarantine** pVal);
    [propget, id(1), helpstring("Use grey listing.")] HRESULT GreyListingEnabled([out, retval] VARIANT_BOOL *pVal);
    [propput, id(1), helpstring("Use grey listing..")] HRESULT GreyListingEnabled([in] VARIANT_BOOL newVal);
    [propget, id(2), helpstring("GreyListing - Delay before accepting messages (minutes).")] HRESULT GreyListingInitialDelay([out, retval] long *pVal);
@@ -3332,6 +3372,22 @@ library hMailServer
 	coclass AppPasswords
 	{
 		[default] interface IInterfaceAppPasswords;
+	};
+	[
+		uuid(E57809E8-69AA-4086-A063-35E3208FAFB0),
+		helpstring("QuarantinedMessage Class")
+	]
+	coclass QuarantinedMessage
+	{
+		[default] interface IInterfaceQuarantinedMessage;
+	};
+	[
+		uuid(C0AFFA5D-DF25-485B-9832-C706E5156BCF),
+		helpstring("Quarantine Class")
+	]
+	coclass Quarantine
+	{
+		[default] interface IInterfaceQuarantine;
 	};
 	[
 		uuid(68A73A47-5B56-43A3-BC11-CFC436F3BA9E),

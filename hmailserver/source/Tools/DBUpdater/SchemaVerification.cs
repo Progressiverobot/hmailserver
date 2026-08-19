@@ -183,7 +183,17 @@ namespace DBUpdater
          // has no second factor, which is every account until an administrator enrols
          // one, so the column is the whole feature's on/off switch.
          new SchemaProbe(6017, "hm_accounts.accounttotpsecret",
-                         "update hm_accounts set accounttotpsecret = accounttotpsecret where 1 = 0")
+                         "update hm_accounts set accounttotpsecret = accounttotpsecret where 1 = 0"),
+
+         // Upgrade6017to6018* - the quarantine store. One probe per column that the
+         // server writes, because SQL CE commits each statement implicitly and a
+         // multi-column step can half-apply.
+         new SchemaProbe(6018, "hm_quarantine.quarantinefilename",
+                         "update hm_quarantine set quarantinefilename = quarantinefilename where 1 = 0"),
+         new SchemaProbe(6018, "hm_quarantine.quarantinerecipients",
+                         "update hm_quarantine set quarantinerecipients = quarantinerecipients where 1 = 0"),
+         new SchemaProbe(6018, "hm_quarantine.quarantinecreated",
+                         "update hm_quarantine set quarantinecreated = quarantinecreated where 1 = 0")
       };
 
       /// <summary>
