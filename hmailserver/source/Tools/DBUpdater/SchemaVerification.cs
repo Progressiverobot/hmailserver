@@ -165,7 +165,19 @@ namespace DBUpdater
          // message across COPY, unlike the row id, which is why it is its own
          // column stamped at first save and carried by copies.
          new SchemaProbe(6015, "hm_messages.messageemailid",
-                         "update hm_messages set messageemailid = messageemailid where 1 = 0")
+                         "update hm_messages set messageemailid = messageemailid where 1 = 0"),
+
+         // Upgrade6015to6016* - app passwords: a per-account credential that can
+         // be revoked on its own, which is what makes per-account 2FA possible for
+         // clients that have nowhere to type a code. One probe per column, because
+         // SQL CE commits each statement implicitly and a multi-column step can
+         // half-apply.
+         new SchemaProbe(6016, "hm_apppasswords.aphash",
+                         "update hm_apppasswords set aphash = aphash where 1 = 0"),
+         new SchemaProbe(6016, "hm_apppasswords.aplastused",
+                         "update hm_apppasswords set aplastused = aplastused where 1 = 0"),
+         new SchemaProbe(6016, "hm_apppasswords.apactive",
+                         "update hm_apppasswords set apactive = apactive where 1 = 0")
       };
 
       /// <summary>

@@ -265,6 +265,8 @@ EXIT 0
     <ClCompile Include="..\Common\Bo\Domains.cpp" />
     <ClCompile Include="..\Common\Bo\FetchAccount.cpp" />
     <ClCompile Include="..\Common\Bo\FetchAccounts.cpp" />
+    <ClCompile Include="..\Common\Bo\AppPassword.cpp" />
+    <ClCompile Include="..\Common\Bo\AppPasswords.cpp" />
     <ClCompile Include="..\Common\Bo\FetchAccountUID.cpp" />
     <ClCompile Include="..\Common\Bo\FetchAccountUIDs.cpp" />
     <ClCompile Include="..\Common\BO\GreyListingWhiteAddress.cpp" />
@@ -343,6 +345,7 @@ EXIT 0
     <ClCompile Include="..\Common\Persistence\PersistentDomain.cpp" />
     <ClCompile Include="..\Common\Persistence\PersistentDomainAlias.cpp" />
     <ClCompile Include="..\Common\Persistence\PersistentFetchAccount.cpp" />
+    <ClCompile Include="..\Common\Persistence\PersistentAppPassword.cpp" />
     <ClCompile Include="..\Common\Persistence\PersistentFetchAccountUID.cpp" />
     <ClCompile Include="..\Common\Persistence\PersistentGreyList.cpp" />
     <ClCompile Include="..\Common\Persistence\PersistentGreyListingWhiteAddress.cpp" />
@@ -541,6 +544,8 @@ EXIT 0
     <ClCompile Include="..\COM\InterfaceDomains.cpp" />
     <ClCompile Include="..\Com\InterfaceEventLog.cpp" />
     <ClCompile Include="..\COM\InterfaceFetchAccount.cpp" />
+    <ClCompile Include="..\COM\InterfaceAppPassword.cpp" />
+    <ClCompile Include="..\COM\InterfaceAppPasswords.cpp" />
     <ClCompile Include="..\COM\InterfaceFetchAccounts.cpp" />
     <ClCompile Include="..\COM\InterfaceGlobalObjects.cpp" />
     <ClCompile Include="..\COM\InterfaceGreyListingWhiteAddress.cpp" />
@@ -822,6 +827,8 @@ EXIT 0
     <ClInclude Include="..\Common\Bo\Domains.h" />
     <ClInclude Include="..\Common\Bo\FetchAccount.h" />
     <ClInclude Include="..\Common\Bo\FetchAccounts.h" />
+    <ClInclude Include="..\Common\Bo\AppPassword.h" />
+    <ClInclude Include="..\Common\Bo\AppPasswords.h" />
     <ClInclude Include="..\Common\Bo\FetchAccountUID.h" />
     <ClInclude Include="..\Common\Bo\FetchAccountUIDs.h" />
     <ClInclude Include="..\Common\BO\GreyListingWhiteAddress.h" />
@@ -905,6 +912,7 @@ EXIT 0
     <ClInclude Include="..\Common\Persistence\PersistentDomain.h" />
     <ClInclude Include="..\Common\Persistence\PersistentDomainAlias.h" />
     <ClInclude Include="..\Common\Persistence\PersistentFetchAccount.h" />
+    <ClInclude Include="..\Common\Persistence\PersistentAppPassword.h" />
     <ClInclude Include="..\Common\Persistence\PersistentFetchAccountUID.h" />
     <ClInclude Include="..\Common\Persistence\PersistentGreyList.h" />
     <ClInclude Include="..\Common\Persistence\PersistentGreyListingWhiteAddress.h" />
@@ -1114,6 +1122,8 @@ EXIT 0
     <ClInclude Include="..\COM\InterfaceDomains.h" />
     <ClInclude Include="..\Com\InterfaceEventLog.h" />
     <ClInclude Include="..\Com\InterfaceFetchAccount.h" />
+    <ClInclude Include="..\Com\InterfaceAppPassword.h" />
+    <ClInclude Include="..\Com\InterfaceAppPasswords.h" />
     <ClInclude Include="..\Com\InterfaceFetchAccounts.h" />
     <ClInclude Include="..\COM\InterfaceGlobalObjects.h" />
     <ClInclude Include="..\COM\InterfaceGreyListingWhiteAddress.h" />
@@ -1426,6 +1436,8 @@ EXIT 0
     <None Include="..\COM\InterfaceDomains.rgs" />
     <None Include="..\COM\InterfaceEventLog.rgs" />
     <None Include="..\COM\InterfaceFetchAccount.rgs" />
+    <None Include="..\COM\InterfaceAppPassword.rgs" />
+    <None Include="..\COM\InterfaceAppPasswords.rgs" />
     <None Include="..\COM\InterfaceFetchAccounts.rgs" />
     <None Include="..\COM\InterfaceGlobalObjects.rgs" />
     <None Include="..\COM\InterfaceGreyListingWhiteAddress.rgs" />

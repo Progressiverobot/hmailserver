@@ -87,6 +87,7 @@ namespace hMailServer.ControlPanel.Views
 
       // External (fetch) accounts, account rules, IMAP folders — embedded editors
       private CollectionEditorView fetchEditor_;
+      private AppPasswordsPanel appPasswords_;
       private RulesView accountRules_;
       private readonly ListBox folderList_ = new() { Height = 220, FontSize = 13, Margin = new Thickness(0, 0, 0, 10) };
       private readonly TextBlock folderStatus_ = new() { FontSize = 12, Margin = new Thickness(0, 4, 0, 0) };
@@ -132,6 +133,7 @@ namespace hMailServer.ControlPanel.Views
          tabs.Items.Add(new TabItem { Header = "Signature", Content = BuildSignature() });
          tabs.Items.Add(new TabItem { Header = "Sieve", Content = BuildSieve() });
          tabs.Items.Add(new TabItem { Header = "External", Content = BuildExternal() });
+         tabs.Items.Add(new TabItem { Header = "App passwords", Content = BuildAppPasswords() });
          tabs.Items.Add(new TabItem { Header = "Rules", Content = BuildRules() });
          tabs.Items.Add(new TabItem { Header = "Folders", Content = BuildFolders() });
          tabs.Items.Add(new TabItem { Header = "Directory", Content = BuildDirectory() });
@@ -397,6 +399,13 @@ namespace hMailServer.ControlPanel.Views
          fetchEditor_ = CollectionSpecs.FetchAccounts(domainName_, address_);
          fetchEditor_.Margin = new Thickness(4, 8, 4, 4);
          return fetchEditor_;
+      }
+
+      private FrameworkElement BuildAppPasswords()
+      {
+         appPasswords_ = new AppPasswordsPanel(domainName_, address_);
+         appPasswords_.Reload();
+         return appPasswords_;
       }
 
       private FrameworkElement BuildRules()

@@ -11,6 +11,8 @@
 #include "../Application/Logger.h"
 #include "../Cache/CacheContainer.h"
 #include "../BO/Account.h"
+#include "../BO/AppPasswords.h"
+#include "../Persistence/PersistentAppPassword.h"
 #include "../BO/Domain.h"
 #include "../BO/DomainAliases.h"
 #include "../Persistence/PersistentAccount.h"
@@ -20,6 +22,8 @@
 #include "../Util/Crypt.h"
 #include "../Scripting/Result.h"
 #include "../Scripting/Events.h"
+
+#include <set>
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -138,6 +142,29 @@ namespace HM
          return false;
       }
 
+      if (ValidateAccountPassword_(pAccount, sPassword))
+         return true;
+
+      // The account's own password did not match. An app password might.
+      //
+      // Tried second, and never first, because that ordering is the whole cost model:
+      // an app password is stored under the same deliberately-expensive hash as the
+      // account password, so checking five of them before the real one would add half
+      // a second of Argon2id to every ordinary logon. Checked here, the cost falls
+      // only on an attempt that has already failed - and on a server where no app
+      // password has ever been issued, AnyConfigured() answers from a cached flag and
+      // this costs one comparison.
+      //
+      // It runs for Active Directory accounts too. Those hold no local password hash,
+      // but an app password is local by definition, which is exactly what makes
+      // second-factor policy possible for a directory account whose clients cannot
+      // present a code.
+      return ValidateAppPassword_(pAccount, sPassword);
+   }
+
+   bool
+   PasswordValidator::ValidateAccountPassword_(std::shared_ptr<const Account> pAccount, const String &sPassword)
+   {
       // Check if this is an active directory account.
       if (pAccount->GetIsAD())
       {
@@ -295,6 +322,97 @@ namespace HM
       }
 
       return true;
+   }
+
+   namespace
+   {
+      boost::mutex unusable_app_password_mutex;
+      std::set<__int64> reported_unusable_app_passwords;
+   }
+
+   // True the first time it is asked about a given row since the server started.
+   bool
+   PasswordValidator::ReportUnusableAppPasswordOnce_(__int64 appPasswordID)
+   {
+      boost::lock_guard<boost::mutex> guard(unusable_app_password_mutex);
+
+      return reported_unusable_app_passwords.insert(appPasswordID).second;
+   }
+
+   bool
+   PasswordValidator::ValidateAppPassword_(std::shared_ptr<const Account> pAccount, const String &sPassword)
+   {
+      // Nothing has ever issued one: answer without touching the database. This is
+      // the case on essentially every server, so it is the case that has to be free.
+      if (!PersistentAppPassword::AnyConfigured())
+         return false;
+
+      AppPasswords passwords;
+      passwords.Refresh(pAccount->GetID());
+
+      const int minimumAcceptedHashAlgorithm = IniFileSettings::Instance()->GetMinimumAcceptedHashAlgorithm();
+
+      for (auto password : passwords.GetVector())
+      {
+         if (!password->GetActive())
+            continue;
+
+         Crypt::EncryptionType type = (Crypt::EncryptionType) password->GetEncryption();
+
+         // A row whose scheme is not a password hash is refused rather than compared.
+         // Nothing writes one - AppPassword::SetPassword forces a hashing scheme - so
+         // reaching this means the row was edited outside the server, and a
+         // clear-text or reversible comparison is not something to fall back to
+         // quietly on an authentication path.
+         if (type != Crypt::ETMD5 && type != Crypt::ETSHA256 &&
+             type != Crypt::ETPBKDF2 && type != Crypt::ETArgon2id)
+         {
+            // Reported once per row per server start, not once per attempt. This runs
+            // on a failed-authentication path, so an attempt-per-line message is a log
+            // an attacker can fill at will with wrong guesses; the condition is a
+            // property of the stored row and does not change between attempts, so
+            // saying it once says all of it.
+            if (ReportUnusableAppPasswordOnce_(password->GetID()))
+            {
+               String message;
+               message.Format(_T("App password %d for account %s has an unusable hash type (%d) and is being ignored. It cannot have been written by this server; check whether the row was edited directly."),
+                  (int) password->GetID(), pAccount->GetAddress().c_str(), (int) type);
+               LOG_APPLICATION(message);
+            }
+
+            continue;
+         }
+
+         if (!Crypt::Instance()->Validate(sPassword, password->GetHash(), type))
+            continue;
+
+         // The same hash-policy floor the account password is held to: an app password
+         // issued before the policy was raised must not become the weakly-hashed way in
+         // that the policy exists to close.
+         //
+         // Checked AFTER the comparison, and that ordering is the whole point of the
+         // log line. Checked before it, every wrong guess against an account holding
+         // one such row would write a line - so a password spray would fill the
+         // application log with a message about a credential nobody was using. Here it
+         // is written only when somebody presented the CORRECT app password and was
+         // refused anyway, which is precisely when an administrator needs to be told,
+         // and never in response to an attacker's traffic.
+         if (minimumAcceptedHashAlgorithm > 0 && (int) type < minimumAcceptedHashAlgorithm)
+         {
+            String message;
+            message.Format(_T("App password %d for account %s is stored with hash type %d, weaker than the configured minimum (%d), and was refused even though it was correct. Delete it and issue a new one."),
+               (int) password->GetID(), pAccount->GetAddress().c_str(), (int) type, minimumAcceptedHashAlgorithm);
+            LOG_APPLICATION(message);
+            continue;
+         }
+
+         // Recorded after the match, and throttled - see PersistentAppPassword.
+         PersistentAppPassword::RecordUse(password);
+
+         return true;
+      }
+
+      return false;
    }
 
    int

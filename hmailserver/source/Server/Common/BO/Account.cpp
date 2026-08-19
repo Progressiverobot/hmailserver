@@ -11,6 +11,7 @@
 #include "../Util/Time.h"
 
 #include "FetchAccounts.h"
+#include "AppPasswords.h"
 
 #include "../../SMTP/SMTPVacationMessageCreator.h"
 #include "../Persistence/PersistentAccount.h"
@@ -322,6 +323,14 @@ namespace HM
       if (!pFetchAccounts->XMLStore(pNode, iBackupOptions))
          return false;
 
+      // Store app passwords. Hashes, like the account password above - a backup
+      // that dropped them would silently revoke every client the account holder
+      // had set up, one restore at a time, with nothing saying so.
+      std::shared_ptr<HM::AppPasswords> appPasswords = std::shared_ptr<HM::AppPasswords>(new HM::AppPasswords());
+      appPasswords->Refresh(id_);
+      if (!appPasswords->XMLStore(pNode, iBackupOptions))
+         return false;
+
       // Store rules
       if (!GetRules()->XMLStore(pNode,iBackupOptions))
          return false;
@@ -388,6 +397,11 @@ namespace HM
       std::shared_ptr<HM::FetchAccounts> pFetchAccounts = std::shared_ptr<HM::FetchAccounts>(new HM::FetchAccounts(id_));
       pFetchAccounts->Refresh();
       if (!pFetchAccounts->XMLLoad(pAccountNode, iRestoreOptions))
+         return false;
+
+      std::shared_ptr<HM::AppPasswords> appPasswords = std::shared_ptr<HM::AppPasswords>(new HM::AppPasswords());
+      appPasswords->Refresh(id_);
+      if (!appPasswords->XMLLoad(pAccountNode, iRestoreOptions))
          return false;
 
       if (!GetRules()->XMLLoad(pAccountNode, iRestoreOptions))

@@ -38,6 +38,8 @@ if exists (select * from sysobjects where id = object_id('hm_fetchaccounts') and
 
 if exists (select * from sysobjects where id = object_id('hm_fetchaccounts_uids') and objectproperty(id, 'isusertable') = 1) drop table hm_fetchaccounts_uids 
 
+if exists (select * from sysobjects where id = object_id('hm_apppasswords') and objectproperty(id, 'isusertable') = 1) drop table hm_apppasswords
+
 if exists (select * from sysobjects where id = object_id('hm_rules') and objectproperty(id, 'isusertable') = 1) drop table hm_rules 
 
 if exists (select * from sysobjects where id = object_id('hm_rule_criterias') and objectproperty(id, 'isusertable') = 1) drop table hm_rule_criterias 
@@ -499,6 +501,22 @@ create table hm_fetchaccounts_uids
 ALTER TABLE hm_fetchaccounts_uids ADD CONSTRAINT hm_fetchaccounts_uids_pk PRIMARY KEY NONCLUSTERED (uidid) 
 
 CREATE CLUSTERED INDEX idx_hm_fetchaccounts_uids ON hm_fetchaccounts_uids (uidfaid)  
+
+create table hm_apppasswords
+(
+	apid int identity(1,1) not null,
+	apaccountid int not null,
+	apname nvarchar(255) not null,
+	aphash nvarchar(255) not null,
+	apencryption int not null,
+	apcreated datetime not null,
+	aplastused datetime null,
+	apactive tinyint not null
+) 
+
+ALTER TABLE hm_apppasswords ADD CONSTRAINT hm_apppasswords_pk PRIMARY KEY NONCLUSTERED (apid) 
+
+CREATE CLUSTERED INDEX idx_hm_apppasswords ON hm_apppasswords (apaccountid)  
 
 create table hm_rules
 (
@@ -1018,4 +1036,4 @@ ALTER TABLE hm_imap_metadata ADD CONSTRAINT hm_imap_metadata_pk PRIMARY KEY NONC
 
 ALTER TABLE hm_imap_metadata ADD CONSTRAINT hm_imap_metadata_unique UNIQUE (metadataaccountid, metadatafolderid, metadataentryname)
 
-insert into hm_dbversion values (6015)
+insert into hm_dbversion values (6016)

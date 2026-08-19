@@ -5,6 +5,7 @@
 #include "InterfaceAccount.h"
 #include "InterfaceMessages.h"
 #include "InterfaceFetchAccounts.h"
+#include "InterfaceAppPasswords.h"
 #include "InterfaceRules.h"
 #include "InterfaceIMAPFolders.h"
 
@@ -732,6 +733,32 @@ STDMETHODIMP InterfaceAccount::put_VacationMessageAbortSpamFlagged(VARIANT_BOOL 
 
       object_->SetVacationAbortSpamFlagged(newVal == VARIANT_TRUE);
       return S_OK;   
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceAccount::get_AppPasswords(IInterfaceAppPasswords **pVal)
+{
+   try
+   {
+      if (!object_)
+         return GetAccessDenied();
+
+      CComObject<InterfaceAppPasswords>* pItem = new CComObject<InterfaceAppPasswords>();
+      pItem->SetAuthentication(authentication_);
+
+      std::shared_ptr<HM::AppPasswords> passwords = std::shared_ptr<HM::AppPasswords>(new HM::AppPasswords());
+
+      passwords->Refresh(object_->GetID());
+
+      pItem->Attach(passwords, object_->GetID());
+      pItem->AddRef();
+      *pVal = pItem;
+
+      return S_OK;
    }
    catch (...)
    {

@@ -357,6 +357,20 @@ create table hm_fetchaccounts_uids
 
 CREATE INDEX idx_hm_fetchaccounts_uids ON hm_fetchaccounts_uids (uidfaid);
 
+create table hm_apppasswords
+(
+	apid int auto_increment not null, primary key(`apid`), unique(`apid`),
+	apaccountid int not null,
+	apname varchar(255) not null,
+	aphash varchar(255) not null,
+	apencryption int not null,
+	apcreated datetime not null,
+	aplastused datetime null,
+	apactive tinyint not null
+) DEFAULT CHARSET=utf8;
+
+CREATE INDEX idx_hm_apppasswords ON hm_apppasswords (apaccountid);
+
 create table hm_rules
 (
 	ruleid int auto_increment not null, primary key(`ruleid`), unique(`ruleid`),
@@ -837,4 +851,4 @@ create table hm_imap_metadata
 	unique(metadataaccountid, metadatafolderid, metadataentryname)
 ) DEFAULT CHARSET=utf8;
 
-insert into hm_dbversion values (6015);
+insert into hm_dbversion values (6016);

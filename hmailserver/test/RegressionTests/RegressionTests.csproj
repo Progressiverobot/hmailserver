@@ -585,6 +585,7 @@
     <Compile Include="AntiSpam\DmarcRptReporting.cs" />
     <Compile Include="POP3\AuthRespCode.cs" />
     <Compile Include="POP3\Pipelining.cs" />
+    <Compile Include="Security\AppPasswords.cs" />
     <Compile Include="Security\AccountLockoutTests.cs" />
     <Compile Include="AntiVirus\ScannerFailurePolicy.cs" />
     <Compile Include="Security\AccountSendingLimits.cs" />

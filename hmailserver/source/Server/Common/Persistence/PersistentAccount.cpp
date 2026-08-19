@@ -15,6 +15,7 @@
 #include "PersistentIMAPFolder.h"
 #include "PersistentMessage.h"
 #include "PersistentGroupMember.h"
+#include "PersistentAppPassword.h"
 #include "PersistenceMode.h"
 
 #include "../Util/File.h"
@@ -99,6 +100,11 @@ namespace HM
       // Delete fetch accounts connected to this account. This one returns void, so
       // there is nothing to check - noted rather than silently skipped.
       PersistentFetchAccount::DeleteByAccountID(iID);
+
+      // Its app passwords. A credential that outlives the mailbox it opens is one
+      // nobody will ever think to revoke, and account ids are reissued.
+      if (!PersistentAppPassword::DeleteByAccountID(iID))
+         orphans.push_back(_T("its app passwords"));
 
       // Delete references from groups...
       if (!PersistentGroupMember::DeleteByAccount(iID))

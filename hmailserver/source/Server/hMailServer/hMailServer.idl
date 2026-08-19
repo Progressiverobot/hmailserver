@@ -39,6 +39,8 @@ interface IInterfaceDNSBlackList;
 interface IInterfaceRouteAddresses;
 interface IInterfaceFetchAccounts;
 interface IInterfaceFetchAccount;
+interface IInterfaceAppPasswords;
+interface IInterfaceAppPassword;
 interface IInterfaceScripting;
 interface IInterfaceDomainAliases;
 interface IInterfaceDomainAlias;
@@ -974,6 +976,7 @@ interface IInterfaceAccount : IDispatch
     [propput, id(39), helpstring("Forwarding is set to be aborted on messages marked as spam.")] HRESULT ForwardAbortSpamFlagged([in] VARIANT_BOOL newVal);
     [propget, id(40), helpstring("The account's active Sieve (RFC 5228) filter script.")] HRESULT SieveScript([out, retval] BSTR *pVal);
     [propput, id(40), helpstring("The account's active Sieve (RFC 5228) filter script.")] HRESULT SieveScript([in] BSTR newVal);
+    [propget, id(42), helpstring("Application-specific passwords for this account: separately revocable credentials for clients that cannot present a second factor.")] HRESULT AppPasswords([out, retval] IInterfaceAppPasswords** pVal);
 };
 
 
@@ -1780,6 +1783,44 @@ interface IInterfaceFetchAccount : IDispatch{
 	[propput, id(23), helpstring("Connection security for this fetch account.")] HRESULT ConnectionSecurity([in] eConnectionSecurity newVal);
 	[propget, id(24), helpstring("Read message recipients from these MIME headers.")] HRESULT MIMERecipientHeaders([out, retval] BSTR* pVal);
 	[propput, id(24), helpstring("Read message recipients from these MIME headers.")] HRESULT MIMERecipientHeaders([in] BSTR newVal);
+};
+[
+	object,
+	uuid(C82DBCD9-FAF5-415F-9BC2-874D0304D78F),
+	dual,
+	nonextensible,
+	helpstring("An application-specific password: one revocable credential for one mail client. The secret itself is never readable - Generate returns it once, at the moment it is created, and only its hash is stored."),
+	pointer_default(unique)
+]
+interface IInterfaceAppPassword : IDispatch{
+   [propget, id(1), helpstring("The database identifier.")] HRESULT ID([out, retval] LONG* pVal);
+   [propget, id(2), helpstring("The label the account holder recognises this credential by.")] HRESULT Name([out, retval] BSTR* pVal);
+   [propput, id(2), helpstring("The label the account holder recognises this credential by.")] HRESULT Name([in] BSTR newVal);
+   [propget, id(3), helpstring("When this credential was issued.")] HRESULT CreatedTime([out, retval] BSTR* pVal);
+   [propget, id(4), helpstring("When this credential last authenticated, or empty if it never has. Recorded at most once an hour, so it is approximate by design.")] HRESULT LastUsedTime([out, retval] BSTR* pVal);
+   [propget, id(5), helpstring("Whether this credential may authenticate. Clearing it revokes without deleting, so it can be put back.")] HRESULT Active([out, retval] VARIANT_BOOL* pVal);
+   [propput, id(5), helpstring("Whether this credential may authenticate. Clearing it revokes without deleting, so it can be put back.")] HRESULT Active([in] VARIANT_BOOL newVal);
+   [id(6), helpstring("Generates a new secret, stores its hash and returns the clear text. This is the ONLY time the clear text exists - it is not stored and cannot be read back, so a caller that discards it must generate again.")] HRESULT Generate([out, retval] BSTR* pVal);
+   [id(7), helpstring("Sets the secret to a chosen value rather than a generated one. Stored as a hash like any other.")] HRESULT SetPassword([in] BSTR Password);
+   [id(8), helpstring("Saves the changes.")] HRESULT Save();
+   [id(9), helpstring("Deletes this credential.")] HRESULT Delete();
+};
+[
+	object,
+	uuid(7CD468C7-70DA-410E-B700-3D4B1AB2FEA8),
+	dual,
+	nonextensible,
+	helpstring("The app passwords issued for one hMailServer account."),
+	pointer_default(unique)
+]
+interface IInterfaceAppPasswords : IDispatch{
+   [propget, id(1), helpstring("Count")] HRESULT Count([out, retval] LONG* pVal);
+   [propget, id(2), helpstring("ItemByDBID")] HRESULT ItemByDBID([in] long DBID, [out, retval] IInterfaceAppPassword** pVal);
+   [propget, id(0), defaultbind, helpstring("Item")] HRESULT Item([in] long Index, [out, retval] IInterfaceAppPassword** pVal);
+   [id(5), helpstring("Refresh")] HRESULT Refresh(void);
+   [id(6), helpstring("Delete")] HRESULT Delete(long Index);
+   [id(7), helpstring("DeleteByDBID")] HRESULT DeleteByDBID(long DBID);
+   [id(8), helpstring("Adds a new app password to the collection. Call Generate on it, then Save.")] HRESULT Add([out, retval] IInterfaceAppPassword** pVal);
 };
 [
 	object,
@@ -3271,6 +3312,22 @@ library hMailServer
 	coclass FetchAccounts
 	{
 		[default] interface IInterfaceFetchAccounts;
+	};
+	[
+		uuid(CD6A3225-FC51-4BEC-8BC3-1433ACC26602),
+		helpstring("AppPassword Class")
+	]
+	coclass AppPassword
+	{
+		[default] interface IInterfaceAppPassword;
+	};
+	[
+		uuid(77AE52C8-884F-4044-9555-F28267C50A1A),
+		helpstring("AppPasswords Class")
+	]
+	coclass AppPasswords
+	{
+		[default] interface IInterfaceAppPasswords;
 	};
 	[
 		uuid(68A73A47-5B56-43A3-BC11-CFC436F3BA9E),

@@ -372,6 +372,20 @@ create table hm_fetchaccounts_uids
 
 CREATE INDEX idx_hm_fetchaccounts_uids ON hm_fetchaccounts_uids (uidfaid);
 
+create table hm_apppasswords
+(
+	apid bigserial not null primary key,
+	apaccountid int not null,
+	apname varchar(255) not null,
+	aphash varchar(255) not null,
+	apencryption int not null,
+	apcreated timestamp not null,
+	aplastused timestamp null,
+	apactive smallint not null
+);
+
+CREATE INDEX idx_hm_apppasswords ON hm_apppasswords (apaccountid);
+
 create table hm_rules
 (
 	ruleid bigserial not null primary key,
@@ -853,4 +867,4 @@ create table hm_imap_metadata
 	unique(metadataaccountid, metadatafolderid, metadataentryname)
 );
 
-insert into hm_dbversion values (6015);
+insert into hm_dbversion values (6016);
