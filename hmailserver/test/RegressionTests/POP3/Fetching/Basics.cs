@@ -15,6 +15,59 @@ namespace RegressionTests.POP3.Fetching
    [TestFixture]
    public class Basics : TestFixtureBase
    {
+      // This fixture's 21 tests needed five live names between them, and it showed:
+      // TestSpamProtectionPreTransmissionSPFDelete failed twice on 19 August 2026
+      // because openspf.org's policy had not come back - which says nothing about SPF
+      // handling - and TestFetchFromInvalidHostName gives a resolver ten seconds to
+      // answer NXDOMAIN. Served locally they are all deterministic.
+      //
+      // openspf.org publishes -all here, which is what the three SPF tests need: two
+      // expect a message from it to be blocked, and the third uses a domain with no
+      // policy at all and expects the opposite - which the fake answers as NODATA, the
+      // same "no policy" a real lookup of a domain without SPF returns.
+      //
+      // mail.hmailserver.com is given an address this fixture CHOOSES. It used to be
+      // whatever TestSetup.GethMailServerCOMIPaddress() resolved, embedded in a header
+      // the server then resolved for itself - two live lookups of one name that had to
+      // agree, and on 19 August 2026 the first of them threw SocketException 11001
+      // mid-gate. A constant cannot disagree with itself.
+      private const string HeloHost = "mail.hmailserver.com";
+      private const string HeloHostAddress = "192.0.2.30";
+
+      private FakeDnsServer dns_;
+
+      [OneTimeSetUp]
+      public void PointTheServerAtALocalResolver()
+      {
+         dns_ = new FakeDnsServer()
+            .WithA("localhost", "127.0.0.1")
+            .WithA(HeloHost, HeloHostAddress)
+            .WithTxt("openspf.org", "v=spf1 -all")
+            // TestSpamProtectionPostTransmission fetches a message carrying the SURBL
+            // project's permanent test point and expects it to be scored, so this is
+            // the fixture's one positive blacklist answer. 127.0.0.2 is what a URI
+            // blacklist returns for a listed name.
+            .WithA("surbl-org-permanent-test-point.com.multi.surbl.org", "127.0.0.2");
+
+         ServerIniFile.SetSetting("DNSServer", "127.0.0.1");
+
+         RestartServerAndReacquireCom();
+      }
+
+      [OneTimeTearDown]
+      public void RestoreTheSystemResolver()
+      {
+         try
+         {
+            ServerIniFile.SetSetting("DNSServer", null);
+            RestartServerAndReacquireCom();
+         }
+         finally
+         {
+            dns_?.Dispose();
+         }
+      }
+
       private static FetchAccount CreateFetchAccount(Account account, int port, bool antiSpam, bool antiVirus)
       {
          var fa = account.FetchAccounts.Add();
@@ -828,8 +881,8 @@ namespace RegressionTests.POP3.Fetching
 
          var messages = new List<string>();
 
-         var message = "Received: from mail.hmailserver.com (mail.hmailserver.com [" +
-                       TestSetup.GethMailServerCOMIPaddress() + "]) by mail.host.edu\r\n" +
+         var message = "Received: from " + HeloHost + " (" + HeloHost + " [" +
+                       HeloHostAddress + "]) by mail.host.edu\r\n" +
                        "From: spftest@openspf.org\r\n" +
                        "To: Martin@example.com\r\n" +
                        "Subject: Test\r\n" +
@@ -892,8 +945,8 @@ namespace RegressionTests.POP3.Fetching
          var messages = new List<string>();
 
          var message = "Received: from example.com (example.com [1.2.1.2]) by mail.host.edu\r\n" +
-                       "Received: from mail.hmailserver.com (mail.hmailserver.com [" +
-                       TestSetup.GethMailServerCOMIPaddress() + "]) by mail.host.edu\r\n" +
+                       "Received: from " + HeloHost + " (" + HeloHost + " [" +
+                       HeloHostAddress + "]) by mail.host.edu\r\n" +
                        "From: spftest@openspf.org\r\n" +
                        "To: Martin@example.com\r\n" +
                        "Subject: Test\r\n" +

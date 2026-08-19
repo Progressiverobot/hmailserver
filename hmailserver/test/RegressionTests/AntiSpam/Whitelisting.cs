@@ -16,6 +16,40 @@ namespace RegressionTests.AntiSpam
    [TestFixture]
    internal class WhiteListing : TestFixtureBase
    {
+      // The one name this fixture needs a POSITIVE answer for: TestEnabled proves that
+      // removing a whitelist entry lets the message be rejected again, which only
+      // demonstrates anything if the SURBL lookup actually matches. Served locally for
+      // the same reason as AntiSpam.Basics - a lookup that has not come back looks
+      // exactly like one that found nothing, so the test failed at random and reported
+      // it as a whitelisting fault.
+      private const string SurblTestPoint = "surbl-org-permanent-test-point.com.multi.surbl.org";
+
+      private FakeDnsServer dns_;
+
+      [OneTimeSetUp]
+      public void PointTheServerAtALocalResolver()
+      {
+         dns_ = new FakeDnsServer().WithA(SurblTestPoint, "127.0.0.2");
+
+         ServerIniFile.SetSetting("DNSServer", "127.0.0.1");
+
+         RestartServerAndReacquireCom();
+      }
+
+      [OneTimeTearDown]
+      public void RestoreTheSystemResolver()
+      {
+         try
+         {
+            ServerIniFile.SetSetting("DNSServer", null);
+            RestartServerAndReacquireCom();
+         }
+         finally
+         {
+            dns_?.Dispose();
+         }
+      }
+
       [SetUp]
       public new void SetUp()
       {

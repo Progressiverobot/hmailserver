@@ -82,11 +82,65 @@ namespace RegressionTests.Shared
          // Read before the assert below, because that one throws.
          var memorySafetyEvents = CrashOracleAsserts.GetMemorySafetyEvents();
 
-         if (TestContext.CurrentContext.Result.FailCount > 0 || memorySafetyEvents.Length > 0)
+         var testFailed = TestContext.CurrentContext.Result.FailCount > 0;
+
+         if (testFailed || memorySafetyEvents.Length > 0)
          {
             Console.WriteLine("hMailServer log:");
             Console.WriteLine(LogHandler.ReadCurrentDefaultLog());
             Console.WriteLine();
+         }
+
+         // A failing test's server-side error belongs to that test and to nothing else.
+         //
+         // PerformBasicSetup calls AssertNoReportedError, which fails a test if the
+         // server's ERROR log exists AT ALL. So an error provoked by a test that has
+         // already failed goes on to fail every test after it, in every fixture, on a
+         // line that has nothing to do with any of them - and the run reports hundreds of
+         // failures with one cause. That is not hypothetical: on 19 August 2026 a slow
+         // resolver failed one SPF test, its cleanup deleted the account while the
+         // message was still queued, the server correctly reported HM5165, and the run
+         // finished 995/1653 with 653 of the 658 failures quoting that single line.
+         //
+         // So when the test has already failed, the error log is printed WITH that
+         // failure - which is where it is diagnostically useful, next to the test that
+         // caused it - and then cleared. A test that PASSED is deliberately left alone,
+         // so the SetUp check still catches what it exists for: an error nobody noticed,
+         // because the test that provoked it never looked.
+         if (testFailed)
+         {
+            // Wrapped, because GetErrorLogFileName is a COM call to the server: a test
+            // that failed BECAUSE the server died would otherwise throw here, and an
+            // exception from TearDown replaces the real failure with a confusing one.
+            try
+            {
+               if (System.IO.File.Exists(LogHandler.GetErrorLogFileName()))
+               {
+                  Console.WriteLine("hMailServer ERROR log, reported against this test and then cleared");
+                  Console.WriteLine("so that it cannot fail every test after it:");
+                  Console.WriteLine(LogHandler.ReadErrorLog());
+                  Console.WriteLine();
+               }
+
+               // Cleared until it STAYS cleared, and UNCONDITIONALLY for a failed
+               // test - not only when a log already exists at this moment.
+               //
+               // Both halves were learned the same night. The errors a failing test
+               // provokes are frequently written by a background thread (a delivery
+               // worker retrying, a minidump writer finishing), so deleting the file
+               // once leaves the stragglers to recreate it and fail the NEXT test.
+               // And guarding the clear on the file existing HERE misses the case
+               // that matters most: a test whose failure is that a delivery never
+               // completed fails BEFORE the delivery thread reports it, so at this
+               // instant there is nothing to clear and a second later there is. That
+               // is exactly how POP3ServerNotSupportingSSL failed on HM5165 raised by
+               // the test before it.
+               LogHandler.ClearErrorLogUntilSettled();
+            }
+            catch (Exception ex)
+            {
+               Console.WriteLine("Could not read the ERROR log to attribute it to this test: " + ex.Message);
+            }
          }
 
          // Checked here as well as in SetUp, and this is the check that attributes the

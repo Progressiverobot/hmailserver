@@ -13,6 +13,53 @@ namespace RegressionTests.AntiSpam
    [TestFixture]
    public class Basics : TestFixtureBase
    {
+      // The URI blacklist this fixture tests against, served locally.
+      //
+      // Every assertion here except one wants a NEGATIVE answer - "0 addresses found,
+      // Match: False" - and a lookup that times out produces the same shape of
+      // non-answer as one that completes, so the fixture could pass while proving
+      // nothing. The one positive is the SURBL project's permanent test point, and it
+      // is the reason the fixture used to fail at random: on 19 August 2026
+      // TestMaxSizeNoLimit reported "Spam message not detected as spam" after ten
+      // seconds because the lookup had not come back, which says nothing about the
+      // size limit it is named for.
+      //
+      // 127.0.0.2 is what a URI blacklist returns for a listed name.
+      private const string SurblTestPoint = "surbl-org-permanent-test-point.com.multi.surbl.org";
+
+      private FakeDnsServer dns_;
+
+      [OneTimeSetUp]
+      public void PointTheServerAtALocalResolver()
+      {
+         dns_ = new FakeDnsServer()
+            .WithA(SurblTestPoint, "127.0.0.2")
+            // TestMissingMXRecord needs one domain that HAS an MX and one that does
+            // not, and it uses microsoft.com for the first. Served, because the
+            // negative half of that test only means something if the positive half
+            // reaches the server at all.
+            .WithMx("microsoft.com", 10, "mx.microsoft.test")
+            .WithA("mx.microsoft.test", "192.0.2.40");
+
+         ServerIniFile.SetSetting("DNSServer", "127.0.0.1");
+
+         RestartServerAndReacquireCom();
+      }
+
+      [OneTimeTearDown]
+      public void RestoreTheSystemResolver()
+      {
+         try
+         {
+            ServerIniFile.SetSetting("DNSServer", null);
+            RestartServerAndReacquireCom();
+         }
+         finally
+         {
+            dns_?.Dispose();
+         }
+      }
+
       [SetUp]
       public new void SetUp()
       {

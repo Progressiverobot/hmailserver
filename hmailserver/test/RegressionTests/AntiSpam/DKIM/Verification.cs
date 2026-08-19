@@ -11,6 +11,63 @@ namespace RegressionTests.AntiSpam.DKIM
    [TestFixture]
    public class Verification : TestFixtureBase
    {
+      // Both captured Outlook messages sign as d=outlook.com; s=selector1, and this is
+      // that selector's public key, served locally for the life of this fixture rather
+      // than fetched.
+      //
+      // The live record is a CNAME into protection.outlook.com, and it measures anywhere
+      // between 60 ms and 4 seconds depending on nothing a test can control. Against the
+      // server's 10-second query timeout that is a coin toss under load, and losing it is
+      // silent: a key that cannot be fetched is a TEMPORARY error, so the message is
+      // accepted and a test asserting it is rejected fails while reporting nothing about
+      // DKIM. On 19 August 2026 all three did exactly that, taking 24-35 seconds each.
+      //
+      // Serving it locally also removes a second dependency nobody had written down: the
+      // "valid signature" message verifies against whatever key Microsoft publishes
+      // today, so a key rotation there would break this suite for a reason that has
+      // nothing to do with this server.
+      //
+      // 437 characters, so it does not fit one DNS character-string. That is deliberate:
+      // RFC 6376 3.6.2 requires a verifier to concatenate the strings of a TXT record,
+      // and until now nothing here proved this one does.
+      private const string OutlookSelectorName = "selector1._domainkey.outlook.com";
+
+      private const string OutlookSelectorKey =
+         "v=DKIM1;k=rsa;p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvWyktrIL8DO/+UGvMbv7cPd/Xogpbs7pgVw8" +
+         "y9ldO6AAMmg8+ijENl/c7Fb1MfKM7uG3LMwAr0dVVKyM+mbkoX2k5L7lsROQr0Z9gGSpu7xrnZOa58+/pIhd2Xk/DFPpa5+T" +
+         "KbWodbsSZPRN8z0RY5x59jdzSclXlEyN9mEZdmOiKTsOP6A7vQxfSya9jg5N81dfNNvP7HnWejMMsKyIMrXptxOhIBuEYH67" +
+         "JDe98QgX14oHvGM2Uz53if/SW8MF09rYh9sp4ZsaWLIg6T343JzlbtrsGRGCDJ9JPpxRWZimtz+Up/BlKzT6sCCrBihb/Bi3" +
+         "pZiEBB4Ui/vruL5RCQIDAQAB;n=2048,1452627113,1468351913";
+
+      private FakeDnsServer dns_;
+
+      [OneTimeSetUp]
+      public void PointTheServerAtALocalResolver()
+      {
+         dns_ = new FakeDnsServer().WithTxt(OutlookSelectorName, OutlookSelectorKey);
+
+         // Every other name answers NODATA, which is what the rest of this fixture wants:
+         // "no key for signature" (RFC 6376 6.1.2) is a PERMANENT failure, so a selector
+         // that does not exist is a definite verdict rather than a lookup to wait for.
+         ServerIniFile.SetSetting("DNSServer", "127.0.0.1");
+
+         RestartServerAndReacquireCom();
+      }
+
+      [OneTimeTearDown]
+      public void RestoreTheSystemResolver()
+      {
+         try
+         {
+            ServerIniFile.SetSetting("DNSServer", null);
+            RestartServerAndReacquireCom();
+         }
+         finally
+         {
+            dns_?.Dispose();
+         }
+      }
+
       [SetUp]
       public new void SetUp()
       {

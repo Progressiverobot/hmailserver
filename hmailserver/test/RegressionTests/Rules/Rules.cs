@@ -206,10 +206,31 @@ namespace RegressionTests.Rules
          ruleAction.Save();
          rule.Save();
 
+         // Sent through a ROUTE rather than to a real external domain.
+         //
+         // This test is about the bind, and the message previously went to
+         // knafve@gmail.com - so reaching the bind at all meant an MX lookup of
+         // gmail.com first. That made a rules test depend on live DNS, and on
+         // 19 August 2026 it failed mid-gate for exactly that reason: the lookup
+         // did not complete, the message was deferred rather than failed, and the
+         // assertion below saw one message in the queue instead of none, 20 seconds
+         // later. A route resolves nothing.
+         //
+         // The route target is in TEST-NET-1 (RFC 5737) and is never contacted:
+         // TCPConnection::Connect binds before it connects, so the bind to
+         // 255.254.253.252 fails first, which is the whole point of the test.
+         var settings = SingletonProvider<TestSetup>.Instance.GetApp().Settings;
+         var route = settings.Routes.Add();
+         route.DomainName = "bindtest.test";
+         route.TargetSMTPHost = "192.0.2.10";
+         route.TargetSMTPPort = 25;
+         route.NumberOfTries = 1;
+         route.MinutesBetweenTry = 5;
+         route.Save();
+
          var smtpClientSimulator = new SmtpClientSimulator();
 
-         // Spam folder
-         smtpClientSimulator.Send("ruletest@example.test", "knafve@gmail.com", "SomeString",
+         smtpClientSimulator.Send("ruletest@example.test", "someone@bindtest.test", "SomeString",
             "This mail should not be delivered - Test ActionBindToAddress.");
 
          CustomAsserts.AssertRecipientsInDeliveryQueue(0);

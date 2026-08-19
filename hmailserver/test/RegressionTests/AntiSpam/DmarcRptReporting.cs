@@ -49,6 +49,8 @@ namespace RegressionTests.AntiSpam
       private const string ExternalUnverifiedPolicyDomain = "sender.no-authz.test";
       private const string ExternalVerifiedPolicyDomain = "sender.with-authz.test";
 
+      private const string DmarcPolicy = "v=DMARC1; p=none; rua=mailto:dmarcreports@example.test";
+
       [Test]
       [Description("SendDmarcReports refuses when DmarcRptFromAddress is not configured, naming the setting - running would discard the statistics it was asked to send")]
       public void SendDmarcReportsRefusesWhenUnconfigured()
@@ -69,7 +71,7 @@ namespace RegressionTests.AntiSpam
          {
             // The shipped default, made explicit: an earlier fixture could have
             // left a sender address behind.
-            SetIniSetting("DmarcRptFromAddress", null);
+            ServerIniFile.SetSetting("DmarcRptFromAddress", null);
 
             LogHandler.DeleteCurrentDefaultLog();
             LogHandler.DeleteErrorLog();
@@ -113,13 +115,20 @@ namespace RegressionTests.AntiSpam
          antiSpam.SpamDeleteThreshold = 1000;
          antiSpam.DMARCEnabled = true;
 
-         using (var fakeDns = new FakeDnsServer())
+         // The zone this test needs, served locally: each policy domain publishes
+         // p=none with a rua, and exactly one of the two external domains publishes the
+         // RFC 7489 7.1 consent record that authorizes reports to be sent to it.
+         using (var fakeDns = new FakeDnsServer()
+            .WithTxt("_dmarc." + InternalPolicyDomain, DmarcPolicy)
+            .WithTxt("_dmarc." + ExternalUnverifiedPolicyDomain, DmarcPolicy)
+            .WithTxt("_dmarc." + ExternalVerifiedPolicyDomain, DmarcPolicy)
+            .WithTxt(ExternalVerifiedPolicyDomain + "._report._dmarc.example.test", "v=DMARC1"))
          {
             try
             {
-               SetIniSetting("DNSServer", "127.0.0.1");
-               SetIniSetting("DNSQueryTimeout", "5");
-               SetIniSetting("DmarcRptFromAddress", "postmaster@example.test");
+               ServerIniFile.SetSetting("DNSServer", "127.0.0.1");
+               ServerIniFile.SetSetting("DNSQueryTimeout", "5");
+               ServerIniFile.SetSetting("DmarcRptFromAddress", "postmaster@example.test");
 
                RestartServerAndReacquireCom();
 
@@ -198,9 +207,9 @@ namespace RegressionTests.AntiSpam
             }
             finally
             {
-               SetIniSetting("DNSServer", null);
-               SetIniSetting("DNSQueryTimeout", null);
-               SetIniSetting("DmarcRptFromAddress", null);
+               ServerIniFile.SetSetting("DNSServer", null);
+               ServerIniFile.SetSetting("DNSQueryTimeout", null);
+               ServerIniFile.SetSetting("DmarcRptFromAddress", null);
 
                // Restart before any COM restore - proxies taken before the
                // mid-test restart point at the old process (the TLS-RPT
@@ -238,266 +247,5 @@ namespace RegressionTests.AntiSpam
          SmtpClientSimulator.StaticSendRaw("bounce@unaligned-envelope.test", "seedrcpt@example.test", message);
       }
 
-      // Writes a key into the FIRST [Settings] section of the ini the server
-      // binary reads. Same mechanics as CustomDnsServer, for the same reasons.
-      private static void SetIniSetting(string key, string value)
-      {
-         var path = IniPath();
-         var lines = new List<string>(File.ReadAllLines(path));
-
-         lines.RemoveAll(line => line.StartsWith(key + "=", StringComparison.OrdinalIgnoreCase));
-
-         var section = lines.FindIndex(line => line.Trim() == "[Settings]");
-
-         Assert.Greater(section, -1, "hMailServer.ini has no [Settings] section: " + path);
-
-         if (value != null)
-            lines.Insert(section + 1, key + "=" + value);
-
-         File.WriteAllLines(path, lines);
-      }
-
-      private static string IniPath()
-      {
-         var directory = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
-
-         while (directory != null)
-         {
-            var candidate = Path.Combine(directory.FullName,
-               @"source\Server\hMailServer\x64\Release\hMailServer.ini");
-
-            if (File.Exists(candidate))
-               return candidate;
-
-            directory = directory.Parent;
-         }
-
-         Assert.Fail("Could not locate the server's hMailServer.ini by searching upwards from " +
-                     AppDomain.CurrentDomain.BaseDirectory);
-         return null;
-      }
-
-      /// <summary>
-      ///    A DNS server for 127.0.0.1:53, UDP and TCP. Answers the _dmarc TXT
-      ///    of the three policy domains (all p=none, rua pointing at
-      ///    dmarcreports@example.test) and the _report._dmarc authorization
-      ///    record for the one external domain that consents. Everything else
-      ///    is NODATA with the zone's SOA in the AUTHORITY section - the RFC
-      ///    2308 shape; without the SOA the TCP response parser answers 9502
-      ///    and the lookup fails for a reason that has nothing to do with the
-      ///    code under test (measured; see CustomDnsServer).
-      /// </summary>
-      private sealed class FakeDnsServer : IDisposable
-      {
-         private readonly UdpClient udp_;
-         private readonly TcpListener tcp_;
-         private volatile bool stopping_;
-
-         public FakeDnsServer()
-         {
-            try
-            {
-               udp_ = new UdpClient(new IPEndPoint(IPAddress.Loopback, 53));
-               tcp_ = new TcpListener(IPAddress.Loopback, 53);
-               tcp_.Start();
-            }
-            catch (SocketException ex)
-            {
-               udp_?.Close();
-               tcp_?.Stop();
-
-               Assert.Fail("Could not bind 127.0.0.1:53 for the fake DNS server - something on this " +
-                           "machine is already serving DNS on loopback: " + ex.Message);
-            }
-
-            new Thread(ServeUdp_) { IsBackground = true }.Start();
-            new Thread(ServeTcp_) { IsBackground = true }.Start();
-         }
-
-         public void Dispose()
-         {
-            stopping_ = true;
-            udp_.Close();
-            tcp_.Stop();
-         }
-
-         private void ServeUdp_()
-         {
-            while (!stopping_)
-            {
-               try
-               {
-                  var remote = new IPEndPoint(IPAddress.Any, 0);
-                  byte[] query = udp_.Receive(ref remote);
-                  byte[] response = BuildResponse_(query);
-                  udp_.Send(response, response.Length, remote);
-               }
-               catch (SocketException)
-               {
-               }
-               catch (ObjectDisposedException)
-               {
-               }
-            }
-         }
-
-         private void ServeTcp_()
-         {
-            while (!stopping_)
-            {
-               try
-               {
-                  using (TcpClient client = tcp_.AcceptTcpClient())
-                  using (NetworkStream stream = client.GetStream())
-                  {
-                     byte[] lengthPrefix = ReadExactly_(stream, 2);
-                     int queryLength = (lengthPrefix[0] << 8) | lengthPrefix[1];
-                     byte[] query = ReadExactly_(stream, queryLength);
-
-                     byte[] response = BuildResponse_(query);
-                     stream.Write(new[] { (byte) (response.Length >> 8), (byte) (response.Length & 0xFF) }, 0, 2);
-                     stream.Write(response, 0, response.Length);
-                     stream.Flush();
-                  }
-               }
-               catch (SocketException)
-               {
-               }
-               catch (ObjectDisposedException)
-               {
-               }
-               catch (IOException)
-               {
-               }
-            }
-         }
-
-         private static byte[] ReadExactly_(NetworkStream stream, int count)
-         {
-            var buffer = new byte[count];
-            int read = 0;
-            while (read < count)
-            {
-               int n = stream.Read(buffer, read, count - read);
-               if (n <= 0)
-                  throw new IOException("Peer closed mid-message.");
-               read += n;
-            }
-            return buffer;
-         }
-
-         private static string QueryName_(byte[] query)
-         {
-            var name = new StringBuilder();
-            int i = 12;
-            while (query[i] != 0)
-            {
-               if (name.Length > 0)
-                  name.Append('.');
-               for (int c = 1; c <= query[i]; c++)
-                  name.Append((char) query[i + c]);
-               i += query[i] + 1;
-            }
-            return name.ToString().ToLowerInvariant();
-         }
-
-         private static int QueryType_(byte[] query)
-         {
-            int zero = 12;
-            while (query[zero] != 0)
-               zero += query[zero] + 1;
-            return (query[zero + 1] << 8) | query[zero + 2];
-         }
-
-         private static int QuestionEnd_(byte[] query)
-         {
-            int i = 12;
-            while (query[i] != 0)
-               i += query[i] + 1;
-            return i + 5;
-         }
-
-         private static void WriteHeaderAndQuestion_(List<byte> m, byte[] query, int answerCount, int authorityCount = 0)
-         {
-            int questionEnd = QuestionEnd_(query);
-            m.Add(query[0]); m.Add(query[1]);            // ID
-            m.Add(0x81); m.Add(0x80);                    // QR|RD|RA, NOERROR
-            m.Add(0); m.Add(1);                          // QDCOUNT
-            m.Add(0); m.Add((byte) answerCount);         // ANCOUNT
-            m.Add(0); m.Add((byte) authorityCount);      // NSCOUNT
-            m.Add(0); m.Add(0);                          // ARCOUNT
-            for (int i = 12; i < questionEnd; i++)
-               m.Add(query[i]);
-         }
-
-         private static void WriteName_(List<byte> m, string name)
-         {
-            foreach (string label in name.Split('.'))
-            {
-               m.Add((byte) label.Length);
-               foreach (char c in label)
-                  m.Add((byte) c);
-            }
-            m.Add(0);
-         }
-
-         private static void WriteAnswerHeader_(List<byte> m, int recordType)
-         {
-            m.Add(0xC0); m.Add(0x0C);                    // owner: the queried name
-            m.Add((byte) (recordType >> 8)); m.Add((byte) (recordType & 0xFF));
-            m.Add(0); m.Add(1);                          // CLASS IN
-            m.Add(0); m.Add(0); m.Add(0); m.Add(60);     // TTL
-         }
-
-         private static byte[] TxtResponse_(byte[] query, string record)
-         {
-            var m = new List<byte>();
-            WriteHeaderAndQuestion_(m, query, 1);
-            WriteAnswerHeader_(m, 16);
-            var rdata = new List<byte> { (byte) record.Length };
-            foreach (char c in record)
-               rdata.Add((byte) c);
-            m.Add((byte) (rdata.Count >> 8)); m.Add((byte) (rdata.Count & 0xFF));
-            m.AddRange(rdata);
-            return m.ToArray();
-         }
-
-         private byte[] BuildResponse_(byte[] query)
-         {
-            string name = QueryName_(query);
-            int type = QueryType_(query);
-
-            if (type == 16)
-            {
-               const string policy = "v=DMARC1; p=none; rua=mailto:dmarcreports@example.test";
-
-               if (name == "_dmarc." + InternalPolicyDomain ||
-                   name == "_dmarc." + ExternalUnverifiedPolicyDomain ||
-                   name == "_dmarc." + ExternalVerifiedPolicyDomain)
-                  return TxtResponse_(query, policy);
-
-               // The consent record for the one external domain that grants it
-               // (RFC 7489 7.1). Its sibling deliberately has no such record.
-               if (name == ExternalVerifiedPolicyDomain + "._report._dmarc.example.test")
-                  return TxtResponse_(query, "v=DMARC1");
-            }
-
-            // Everything else: NODATA - NOERROR, no answers, the zone's SOA in
-            // the AUTHORITY section per RFC 2308. See the class comment.
-            var m = new List<byte>();
-            WriteHeaderAndQuestion_(m, query, 0, 1);
-            WriteAnswerHeader_(m, 6);
-            var soa = new List<byte>();
-            WriteName_(soa, "ns.example.test");
-            WriteName_(soa, "hostmaster.example.test");
-            for (int f = 0; f < 5; f++)
-            {
-               soa.Add(0); soa.Add(0); soa.Add(0); soa.Add(60);
-            }
-            m.Add((byte) (soa.Count >> 8)); m.Add((byte) (soa.Count & 0xFF));
-            m.AddRange(soa);
-            return m.ToArray();
-         }
-      }
    }
 }

@@ -175,6 +175,42 @@ if (Test-Path $csprojPath) {
         ("Not in RegressionTests.csproj, so never compiled or run: {0}" -f ($orphans -join ', '))
 }
 
+# 12. No leftover test-only settings in the server's ini.
+#
+#     Two fixtures point the server at a fake DNS server on 127.0.0.1 and put the
+#     setting back in their teardown - AntiSpam\DKIM\Verification and
+#     AntiSpam\DmarcRptReporting. Kill a run while either is in flight and the
+#     teardown never happens, so the setting survives into every later run with
+#     nothing listening on 127.0.0.1:53. Every lookup then waits for the query
+#     timeout and fails: SURBL, DNSBL, SPF, DKIM, DMARC and MX alike, in tests
+#     that have nothing to do with DNS and never mention it.
+#
+#     IniFileSettings caches the file at process start, so removing the key is
+#     only half the fix - the service has to be restarted afterwards.
+$serverIni = Join-Path $repoRoot 'hmailserver\source\Server\hMailServer\x64\Release\hMailServer.ini'
+if (Test-Path $serverIni) {
+    # Each of these is written by a fixture and removed by its teardown, so any of
+    # them surviving into the next run means a run was killed while it was in flight.
+    # They are listed together because the failure they cause is the same shape every
+    # time: tests that never mention the setting fail for reasons that never mention
+    # it either.
+    #   DNSServer - points the resolver at a fake that nothing is serving
+    $leftoverKeys = @('DNSServer')
+
+    $iniLines = @(Get-Content -LiteralPath $serverIni)
+    $pattern = '^\s*(' + ($leftoverKeys -join '|') + ')\s*='
+    $leftovers = $iniLines | Where-Object { $_ -match $pattern }
+
+    if ($leftovers -and $Clean) {
+        Set-Content -LiteralPath $serverIni -Value ($iniLines | Where-Object { $_ -notmatch $pattern })
+        Write-Host ('  CLEAN Removed leftover test settings from hMailServer.ini - restart the service: {0}' -f ($leftovers -join '; ')) -ForegroundColor Yellow
+        $leftovers = $null
+    }
+
+    Report (-not $leftovers) 'No leftover test-only ini settings' `
+        ("hMailServer.ini still has '{0}', left by an aborted fixture. Re-run with -Clean, then restart the service." -f ($leftovers -join '; '))
+}
+
 Write-Host ''
 if ($failures -eq 0) {
     Write-Host 'Pre-flight passed - safe to run the suite.' -ForegroundColor Green
