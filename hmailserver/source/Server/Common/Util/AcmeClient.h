@@ -22,8 +22,26 @@ namespace HM
       ~AcmeClient();
 
       // Returns true if the certificate in the configured directory is
-      // missing or expires within the renewal window.
+      // missing or has reached its renewal time.
       static bool RenewalNeeded();
+
+      // When a certificate with these dates should be renewed.
+      //
+      // A FRACTION of its lifetime rather than a fixed number of days, which is the
+      // whole point. Thirty days was right while certificates lasted ninety; it
+      // stops being right the moment they do not. Let us Encrypt defaults to 64 days
+      // from February 2027, the maximum falls to 100 days in March 2027 and to 47 in
+      // March 2029 - and a fixed 30-day window against a 47-day certificate starts
+      // renewing seventeen days after issuance and never stops, which is how an
+      // operator gets rate-limited by their own CA.
+      //
+      // Two thirds through the lifetime is what the ACME community settled on and
+      // what ARI suggested-windows approximate. It has the property that matters:
+      // whatever the lifetime, a third of it is left to notice a failure.
+      //
+      // Public and pure so the self-test can pin it against the lifetimes the
+      // industry is moving to, instead of waiting for a real certificate to age.
+      static time_t GetRenewalTime(time_t notBefore, time_t notAfter);
 
       // The directory holding account.key, fullchain.pem and privkey.pem.
       static String GetCertificateDirectory();

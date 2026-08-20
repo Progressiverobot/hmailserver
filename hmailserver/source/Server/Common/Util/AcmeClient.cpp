@@ -44,25 +44,35 @@ namespace HM
 {
    namespace
    {
-      const int RenewalWindowDays = 30;
       const int HttpsTimeoutMilliseconds = 30000;
       const size_t MaxResponseSize = 1024 * 1024;
       const int PollIntervalMilliseconds = 2000;
       const int MaxPollAttempts = 30;
 
       // How close to expiry a failed renewal stops being a log line and becomes a
-      // reported error. Renewal starts 30 days out, so a single failure usually has
-      // weeks of slack; an ERROR entry for that would teach an administrator to
-      // ignore the error log. Inside this window the certificate is about to stop
-      // working, which is a different thing entirely.
+      // reported error. Renewal now begins a third of the certificate's lifetime
+      // before it expires, so a single failure has weeks of slack on a 90-day
+      // certificate and days on a 47-day one; an ERROR entry for that would teach an
+      // administrator to ignore the error log. Inside this window the certificate is
+      // about to stop working, which is a different thing entirely.
+      //
+      // Fixed rather than proportional, unlike the renewal decision above it: this is
+      // about how long a human needs to react, and that does not shrink because
+      // certificates did.
       const int ImminentExpiryDays = 7;
 
       // Reads the notAfter of the first certificate in a PEM file as a time_t.
       // False when there is no file, it does not parse, or the date does not
       // convert - all of which callers treat as "no usable certificate" rather than
       // as a certificate with a known expiry.
-      bool ReadCertificateNotAfter(const String &certificateFile, time_t &notAfter)
+      // Both dates, because the renewal decision needs the certificate's LIFETIME
+      // and not just its expiry. notBefore is returned as 0 when it cannot be read,
+      // which the caller treats as "assume the historical 90-day lifetime" rather
+      // than as a failure - a certificate with an unreadable notBefore still has a
+      // perfectly good notAfter to renew against.
+      bool ReadCertificateDates(const String &certificateFile, time_t &notBefore, time_t &notAfter)
       {
+         notBefore = 0;
          notAfter = 0;
 
          if (!FileUtilities::Exists(certificateFile))
@@ -94,9 +104,27 @@ namespace HM
             }
          }
 
+         tm notBeforeTm = {};
+
+         if (ASN1_TIME_to_tm(X509_get0_notBefore(certificate), &notBeforeTm) == 1)
+         {
+            time_t converted = _mkgmtime(&notBeforeTm);
+
+            if (converted != -1)
+               notBefore = converted;
+         }
+
          X509_free(certificate);
 
          return parsed;
+      }
+
+      // Kept for the callers that only care when the certificate dies.
+      bool ReadCertificateNotAfter(const String &certificateFile, time_t &notAfter)
+      {
+         time_t ignoredNotBefore = 0;
+
+         return ReadCertificateDates(certificateFile, ignoredNotBefore, notAfter);
       }
 
       // Splits https://host[:port]/path into components.
@@ -225,21 +253,51 @@ namespace HM
       return directory;
    }
 
+   time_t
+   AcmeClient::GetRenewalTime(time_t notBefore, time_t notAfter)
+   {
+      if (notAfter <= 0)
+         return 0;
+
+      // An unreadable or nonsensical notBefore is treated as the 90-day lifetime
+      // this server has always assumed, rather than as a reason to refuse to renew.
+      time_t lifetime = (notBefore > 0 && notAfter > notBefore) ? (notAfter - notBefore)
+                                                               : static_cast<time_t>(90) * 86400;
+
+      // Two thirds through. The remaining third is the margin, and this server
+      // escalates a failing renewal to the error log well inside it.
+      time_t renewAt = notBefore > 0 ? notBefore + (lifetime / 3) * 2
+                                     : notAfter - lifetime / 3;
+
+      // A floor, for the very short lifetimes the industry is heading towards and
+      // for anything experimental below them: never leave less than a day, because a
+      // renewal that fails wants at least one more scheduled attempt before the
+      // certificate dies, and the task runs hourly.
+      time_t latest = notAfter - 86400;
+
+      if (renewAt > latest)
+         renewAt = latest;
+
+      // ...and a certificate whose whole life is shorter than that floor is renewed
+      // from the moment it is issued, which is the only honest answer.
+      if (renewAt < notBefore)
+         renewAt = notBefore;
+
+      return renewAt;
+   }
+
    bool
    AcmeClient::RenewalNeeded()
    {
-      // Unchanged behaviour: no certificate, an unreadable one or one whose date
-      // will not parse all mean "renew". The parsing itself moved into
-      // ReadCertificateNotAfter so that AcmeRenewalTask::DoWork can ask the same
-      // question about how much time is left when a renewal has just failed.
+      // No certificate, an unreadable one or one whose date will not parse all
+      // still mean "renew".
+      time_t notBefore = 0;
       time_t notAfter = 0;
 
-      if (!ReadCertificateNotAfter(GetCertificateDirectory() + _T("\\fullchain.pem"), notAfter))
+      if (!ReadCertificateDates(GetCertificateDirectory() + _T("\\fullchain.pem"), notBefore, notAfter))
          return true;
 
-      time_t cutoff = time(nullptr) + static_cast<time_t>(RenewalWindowDays) * 86400;
-
-      return notAfter <= cutoff;
+      return time(nullptr) >= GetRenewalTime(notBefore, notAfter);
    }
 
    bool

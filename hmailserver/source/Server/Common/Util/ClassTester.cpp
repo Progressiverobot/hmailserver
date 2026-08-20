@@ -397,6 +397,61 @@ namespace HM
             throw 0;
       }
 
+      OutputDebugString(_T("hMailServer: Testing the ACME renewal window against short certificate lifetimes\n"));
+      {
+         // The renewal decision is a fraction of the lifetime, not a fixed number of
+         // days, and these vectors are the reason. Certificate lifetimes are falling
+         // on a published schedule - Let us Encrypt to 64 days in February 2027, the
+         // maximum to 100 days in March 2027 and to 47 in March 2029 - and the fixed
+         // 30-day window this replaced is longer than half of the last of those.
+         const time_t day = 86400;
+         const time_t issued = 1800000000;
+
+         // 64 days and 47 days - Let us Encrypt's 2027 default and the 2029 maximum.
+         // Neither divides by three, so these assert the PROPERTY rather than
+         // restating the arithmetic: about a third of the lifetime is left when
+         // renewal begins. Restating it would pass against any implementation,
+         // including a wrong one copied from the same expression.
+         const time_t lifetimes[] = { 64 * day, 47 * day, 100 * day, 10 * day };
+
+         for (time_t lifetime : lifetimes)
+         {
+            time_t renewAt = AcmeClient::GetRenewalTime(issued, issued + lifetime);
+            time_t remaining = (issued + lifetime) - renewAt;
+
+            // A third, give or take the integer division.
+            if (remaining < lifetime / 3 || remaining > lifetime / 3 + day)
+               throw 0;
+
+            // And never so late that a failure has no room for another attempt.
+            if (remaining < day)
+               throw 0;
+         }
+
+         // The one exact vector, because it is the claim that nothing moved for
+         // anybody today: a 90-day certificate still renews with 30 days left.
+         if (AcmeClient::GetRenewalTime(issued, issued + 90 * day) != issued + 60 * day)
+            throw 0;
+
+
+         // The floor. A two-day certificate would otherwise be renewed with 16 hours
+         // left, and the renewal task runs hourly - one failed attempt and there is
+         // no certificate. A full day leaves room for two dozen attempts.
+         if (AcmeClient::GetRenewalTime(issued, issued + 2 * day) != issued + 1 * day)
+            throw 0;
+
+         // Shorter than the floor: renew immediately, which is the only honest
+         // answer for a certificate that cannot be given a day of margin.
+         if (AcmeClient::GetRenewalTime(issued, issued + 12 * 3600) != issued)
+            throw 0;
+
+         // An unreadable notBefore falls back to the 90-day assumption rather than
+         // refusing to renew - a certificate with a bad start date still has a
+         // perfectly good expiry to work back from.
+         if (AcmeClient::GetRenewalTime(0, issued + 90 * day) != issued + 60 * day)
+            throw 0;
+      }
+
       OutputDebugString(_T("hMailServer: Testing the TLS-RPT record parser and report builder\n"));
       {
          // The shape RFC 8460 section 3 gives, with two mailto targets and the
