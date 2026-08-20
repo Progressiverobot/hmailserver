@@ -278,6 +278,13 @@ namespace HM
       // the envelope sender was forged as.
       bool GetRejectFullMailboxAtRcpt() const { return reject_full_mailbox_at_rcpt_; }
 
+      // RFC 8301 removed rsa-sha1 from DKIM outright: a signer MUST NOT use it and
+      // a verifier MUST treat a signature that does as invalid. Off, so this server
+      // does neither. 1 restores both halves for an operator with a correspondent
+      // still signing that way, at the cost of trusting SHA-1 for the identity DMARC
+      // alignment is built on.
+      bool GetDkimAcceptSha1() const { return dkim_accept_sha1_; }
+
       // Password policy, enforced where a password is CHOSEN (Account.Password over
       // COM) and never where one is verified or re-hashed. All off at 0/false, which
       // is what an existing installation gets until an administrator decides
@@ -707,6 +714,7 @@ namespace HM
       bool dmarc_tree_walk_enabled_;
       int spf_void_lookup_limit_;
       bool reject_full_mailbox_at_rcpt_;
+      bool dkim_accept_sha1_;
       int password_policy_minimum_length_;
       bool password_policy_require_mixed_case_;
       bool password_policy_require_digit_;

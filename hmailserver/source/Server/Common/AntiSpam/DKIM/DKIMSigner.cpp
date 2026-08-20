@@ -220,6 +220,23 @@ namespace HM
       Canonicalization::CanonicalizeMethod bodyMethod = (Canonicalization::CanonicalizeMethod) pDomain->GetDKIMBodyCanonicalizationMethod();
       HashCreator::HashType algorithm = (HashCreator::HashType) pDomain->GetDKIMSigningAlgorithm();
 
+      // The other half of RFC 8301 3.1: a signer MUST NOT use rsa-sha1. A domain
+      // configured for it is signed with rsa-sha256 instead rather than left
+      // unsigned, because the choice between them is the domain owner's expression
+      // of "sign my mail", not of "sign it weakly" - and substituting the stronger
+      // hash can only make the signature more likely to be honoured. It is announced
+      // once per message rather than silently, since the configuration says one thing
+      // and the header will say another.
+      if (algorithm == HashCreator::SHA1 && !IniFileSettings::Instance()->GetDkimAcceptSha1())
+      {
+         algorithm = HashCreator::SHA256;
+
+         LOG_APPLICATION("DKIM: domain " + domain + " is configured to sign with rsa-sha1, which RFC 8301 "
+                         "removed from DKIM. Signing with rsa-sha256 instead. Change the domain's DKIM "
+                         "algorithm to SHA-256 to stop this notice, or set DkimAcceptSha1=1 to sign with "
+                         "SHA-1 anyway.");
+      }
+
       DKIM dkim;
       if (!dkim.Sign(message, header, domain, selector, privateKeyFile, algorithm, headerMethod, bodyMethod))
       {

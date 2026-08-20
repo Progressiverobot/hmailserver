@@ -14,6 +14,7 @@
 #include "../../MIME/MimeCode.h"
 #include "../../MIME/Mime.h"
 #include "../../TCPIP/DNSResolver.h"
+#include "../../Application/IniFileSettings.h"
 #include "../../Util/TraceHeaderWriter.h"
 #include "../../Util/FileUtilities.h"
 #include "../../Persistence/PersistentMessage.h"
@@ -249,6 +250,29 @@ namespace HM
       const unsigned char * publicKeyDataPointer = (const unsigned char*) publicKeyData.GetBuffer();
 
       EVP_PKEY *publicKey = d2i_PUBKEY(NULL, &publicKeyDataPointer, publicKeyData.GetLength());
+
+      if (publicKey == nullptr)
+         return nullptr;
+
+      // RFC 8301 section 3.2: a verifier MUST NOT consider an RSA key of fewer than
+      // 1024 bits valid. Nothing checked, so a domain publishing a 512-bit key - and
+      // several did, for years, because a smaller key fits more comfortably in a TXT
+      // record - had its signatures verified as normal. A 512-bit RSA key can be
+      // factored in hours on rented hardware, and once it is, anyone can sign as that
+      // domain and pass DMARC alignment with a signature this server would have
+      // called valid.
+      //
+      // Ed25519 has one size and is not measured here: EVP_PKEY_bits reports 253 for
+      // it, which is not a weakness and would be rejected by a bare numeric test.
+      if (EVP_PKEY_base_id(publicKey) == EVP_PKEY_RSA && EVP_PKEY_bits(publicKey) < 1024)
+      {
+         LOG_DEBUG(Formatter::Format("DKIM: The public key is {0} bits. RFC 8301 requires at least 1024 for RSA, so the signature is treated as invalid.",
+                                     EVP_PKEY_bits(publicKey)));
+
+         EVP_PKEY_free(publicKey);
+
+         return nullptr;
+      }
 
       return publicKey;
    }
@@ -912,6 +936,23 @@ namespace HM
       if (tagA != "rsa-sha1" && tagA != "rsa-sha256" && tagA != "ed25519-sha256")
       {
          LOG_DEBUG("DKIM: Header in message incomplete. Unsupported algorithm. Aborting DKIM test.");
+         return false;
+      }
+
+      // RFC 8301 section 3.1 removed rsa-sha1 from DKIM: a verifier MUST treat a
+      // signature that uses it as invalid. Not a formality - a DKIM signature is an
+      // assertion of identity, DMARC alignment is built on it, and SHA-1
+      // chosen-prefix collisions have been practical and getting cheaper since 2020.
+      // A signature nobody can forge is the entire value of the mechanism, so one
+      // that somebody can is worth less than none: it carries a domain's name into
+      // an Authentication-Results header and past an aligned DMARC check.
+      //
+      // Failing here rather than at the signature check is deliberate. This is a
+      // refusal to evaluate, not a computation that came out wrong, and the two
+      // should not look the same in a log.
+      if (tagA == "rsa-sha1" && !IniFileSettings::Instance()->GetDkimAcceptSha1())
+      {
+         LOG_DEBUG("DKIM: Signature uses rsa-sha1, which RFC 8301 removed from DKIM. Treating it as invalid. Set DkimAcceptSha1=1 to evaluate it anyway.");
          return false;
       }
 

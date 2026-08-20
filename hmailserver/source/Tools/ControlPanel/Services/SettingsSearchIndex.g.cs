@@ -33,6 +33,7 @@ namespace hMailServer.ControlPanel.Services
          new SettingEntry("Language (VBScript or JScript)", "Scripting.Language", "advanced"),
          new SettingEntry("Mirror address (empty = disabled)", "MirrorEMailAddress", "advanced"),
          new SettingEntry("Prefer IPv6 when delivering", "IPv6PreferredEnabled", "advanced"),
+         new SettingEntry("Accept DKIM signatures that use rsa-sha1", "DkimAcceptSha1", "antispam"),
          new SettingEntry("Add X-hMailServer-Reason header", "AntiSpam.AddHeaderReason", "antispam"),
          new SettingEntry("Add X-hMailServer-Spam header", "AntiSpam.AddHeaderSpam", "antispam"),
          new SettingEntry("Bypass on SPF success", "AntiSpam.BypassGreylistingOnSPFSuccess", "antispam"),

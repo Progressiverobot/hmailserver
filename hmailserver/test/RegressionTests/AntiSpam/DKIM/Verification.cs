@@ -101,11 +101,20 @@ namespace RegressionTests.AntiSpam.DKIM
          _antiSpam.DKIMVerificationEnabled = true;
          _antiSpam.DKIMVerificationFailureScore = 6;
 
+         // The header this test reads is written only when AddHeaderReason is on,
+         // and nothing in this fixture turned it on: the test passed because
+         // AntiSpam.Basics runs earlier in a full suite and leaves it set. Run
+         // alone it failed, and the delivered message came back with no spam
+         // headers at all - which reads as "the DKIM check did not fire" and sent
+         // one investigation after a DKIM change that was not responsible.
+         _antiSpam.AddHeaderReason = true;
+
          var account1 = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "test@example.test", "test");
          SmtpClientSimulator.StaticSendRaw(account1.Address, account1.Address, TestResources.MessageWithInvalidDkim);
          var text = Pop3ClientSimulator.AssertGetFirstMessageText(account1.Address, "test");
 
-         Assert.IsTrue(text.Contains("Rejected by DKIM. - (Score: 6)"));
+         Assert.IsTrue(text.Contains("Rejected by DKIM. - (Score: 6)"),
+            "The delivered message should carry the DKIM spam mark. Got: " + text);
       }
 
       [Test]

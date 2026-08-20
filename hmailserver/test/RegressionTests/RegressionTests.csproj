@@ -474,6 +474,7 @@
     <Compile Include="AntiSpam\DKIM\DualSelectorRotation.cs" />
     <Compile Include="AntiSpam\DKIM\Signing.cs" />
     <Compile Include="AntiSpam\DKIM\Verification.cs" />
+    <Compile Include="AntiSpam\DKIM\Sha1SignatureRejection.cs" />
     <Compile Include="API\Events.cs" />
     <Compile Include="API\Links.cs" />
     <Compile Include="Stress\ContentStressTest.cs" />

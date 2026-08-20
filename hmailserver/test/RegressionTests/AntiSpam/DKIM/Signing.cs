@@ -110,8 +110,8 @@ namespace RegressionTests.AntiSpam.DKIM
       }
 
       [Test]
-      [Description("Test usage of algorithm RSA-SHA1.")]
-      public void TestAlgorithmSHA1()
+      [Description("A domain configured for RSA-SHA1 is signed with RSA-SHA256 instead, because RFC 8301 removed rsa-sha1 from DKIM - and it is still signed, because the configuration says 'sign my mail', not 'sign it weakly'")]
+      public void TestAlgorithmSHA1IsUpgradedToSHA256()
       {
          _domain.DKIMPrivateKeyFile = GetPrivateKeyFile();
          _domain.DKIMSelector = "TestSelector";
@@ -120,7 +120,16 @@ namespace RegressionTests.AntiSpam.DKIM
          _domain.Save();
 
          var result = SendMessage();
-         Assert.IsTrue(result.ToLower().Contains("a=rsa-sha1"), result);
+
+         // This test used to assert the opposite - that the header said a=rsa-sha1 -
+         // and it was right to, until RFC 8301 said a signer MUST NOT use it.
+         Assert.IsFalse(result.ToLower().Contains("a=rsa-sha1"),
+            "A message must not go out signed rsa-sha1, whatever the domain is configured for. " + result);
+
+         Assert.IsTrue(result.ToLower().Contains("a=rsa-sha256"),
+            "The substitution must produce a real signature rather than leaving the message " +
+            "unsigned: a stronger hash than the one asked for can only make the signature more " +
+            "likely to be honoured. " + result);
       }
 
       [Test]

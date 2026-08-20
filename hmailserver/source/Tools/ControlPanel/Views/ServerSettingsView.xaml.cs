@@ -1355,6 +1355,21 @@ namespace hMailServer.ControlPanel.Views
          });
          auth.Settings.Add(new ComBool { Path = "AntiSpam.DKIMVerificationEnabled", Label = "Verify DKIM signatures" });
          auth.Settings.Add(new ComText { Path = "AntiSpam.DKIMVerificationFailureScore", Label = "DKIM failure score", Numeric = true });
+         auth.Settings.Add(new IniBool
+         {
+            Path = "DkimAcceptSha1",
+            Label = "Accept DKIM signatures that use rsa-sha1",
+            Blurb = "Off, and off is what RFC 8301 requires: it removed rsa-sha1 from DKIM outright, so a " +
+                    "signer must not use it and a verifier must treat a signature that does as invalid. A DKIM " +
+                    "signature is an assertion of identity and DMARC alignment is built on it, and SHA-1 " +
+                    "collisions have been practical since 2020 - a signature somebody can forge is worth less " +
+                    "than no signature at all, because it carries the signer's domain past an aligned DMARC " +
+                    "check. Turning this on restores both halves: signatures using it verify again, and a " +
+                    "domain configured to sign with it does so instead of being upgraded to rsa-sha256. Keys " +
+                    "shorter than 1024 bits are refused regardless, and this setting does not affect that. " +
+                    "Applies after a service restart.",
+            IniStore = iniStore_
+         });
          auth.Settings.Add(new ComBool { Path = "AntiSpam.DMARCEnabled", Label = "Evaluate DMARC policies" });
          auth.Settings.Add(new ComText { Path = "AntiSpam.DMARCFailureScore", Label = "DMARC failure score", Numeric = true });
          auth.Settings.Add(new IniBool
