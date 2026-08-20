@@ -161,10 +161,18 @@ namespace HM
 
          AnsiString sourceIp = originatingAddress.IsAny() ? AnsiString("0.0.0.0") : AnsiString(originatingAddress.ToString());
 
+         // RFC 9990 3.1.1.5 names exactly two values for discovery_method, and
+         // the mapping happens here rather than in the store so that the store
+         // stays a plain container - and so that the enum, which only the
+         // evaluator can produce, does not have to travel into Util.
+         AnsiString discoveryMethod =
+            evaluation.discovery_method == DMARC::DiscoveryTreeWalk ? "treewalk" : "psl";
+
          DmarcRptStore::Instance()->Record(
             AnsiString(evaluation.policy_domain),
             AnsiString(evaluation.adkim), AnsiString(evaluation.aspf),
-            AnsiString(evaluation.p), AnsiString(evaluation.sp), evaluation.pct,
+            AnsiString(evaluation.p), AnsiString(evaluation.sp), AnsiString(evaluation.np),
+            AnsiString(evaluation.t), evaluation.pct, discoveryMethod,
             sourceIp, disposition,
             evaluation.dkim_aligned, evaluation.spf_aligned,
             AnsiString(fromDomain),

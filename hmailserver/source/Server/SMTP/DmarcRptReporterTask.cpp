@@ -234,28 +234,48 @@ namespace HM
       String fromAddress = IniFileSettings::Instance()->GetDmarcRptFromAddress();
       String submitter = StringParser::ExtractDomain(fromAddress);
 
+      const int schemaVersion = IniFileSettings::Instance()->GetDmarcRptSchemaVersion();
+
+      // One clock reading for the whole report. The report_id, the Message-ID
+      // built from it and - in the 9990 form - the filename's unique-id all have
+      // to agree, and three separate time(nullptr) calls can straddle a second
+      // boundary.
+      const __int64 generatedAt = static_cast<__int64>(time(nullptr));
+
       // The policy domain is part of the id, not just the day and the second.
       // Two domains reported in the same second otherwise get identical
       // report_id values - and identical Message-IDs, since that is built from
       // the same string - so a shared report processor that keys duplicate
       // suppression on org_name + report_id (RFC 7489 7.2.1.1 requires the id to
       // be unique) discards all but the first, while the log says both were sent.
+      //
+      // The shape is unchanged for 9990: 3.5.1 types the Report-ID as
+      // dot-atom-text with an optional "@" domain, which this already is.
       AnsiString reportId;
       reportId.Format("%hs.%hs.%I64d@%hs", dayKey.c_str(), bucket.policy_domain.c_str(),
-         static_cast<__int64>(time(nullptr)), AnsiString(submitter).c_str());
+         generatedAt, AnsiString(submitter).c_str());
+
+      // RFC 9990 3.1.1.3's generator element: who to go to about a malformed
+      // report. Empty for the 7489 form, whose schema has no such element.
+      AnsiString generator;
+      if (schemaVersion == SchemaRfc9990)
+         generator = "hMailServer " + AnsiString(Application::Instance()->GetVersionNumber());
 
       AnsiString reportXml = BuildReportXml(dayKey, bucket, reportId, fromAddress,
-         IniFileSettings::Instance()->GetDmarcRptOrganizationName());
+         IniFileSettings::Instance()->GetDmarcRptOrganizationName(), schemaVersion, generator);
 
       AnsiString narrowDomain = bucket.policy_domain;
       AnsiString narrowSubmitter = submitter;
 
       AnsiString boundary;
-      boundary.Format("dmarcrpt-%I64d", static_cast<__int64>(time(nullptr)));
+      boundary.Format("dmarcrpt-%I64d", generatedAt);
 
-      // receiver "!" policy-domain "!" begin "!" end "." extension
-      // (RFC 7489 7.2.1.1). Plain .xml rather than .xml.gz: this server links
-      // no compression library, and the RFC's gzip is a SHOULD.
+      // receiver "!" policy-domain "!" begin "!" end [ "!" unique-id ] "."
+      // extension (RFC 7489 7.2.1.1, restated as RFC 9990 3.5.2). Plain .xml
+      // rather than .xml.gz: this server links no compression library, and the
+      // gzip is a SHOULD in both. The media type is text/xml for an uncompressed
+      // report in both too (9990 3.5.2 says so explicitly), so the MIME part
+      // below is the same whichever schema was built.
       __int64 rangeBegin = 0;
       {
          tm dayStart = {};
@@ -269,7 +289,35 @@ namespace HM
       const __int64 rangeEnd = rangeBegin + 86399;
 
       AnsiString attachmentName;
-      attachmentName.Format("%hs!%hs!%I64d!%I64d.xml", narrowSubmitter.c_str(), narrowDomain.c_str(), rangeBegin, rangeEnd);
+      if (schemaVersion == SchemaRfc9990)
+      {
+         // The optional unique-id, and it earns its place rather than being
+         // decoration. SendReportsNow(true) can report the SAME day for the SAME
+         // policy domain more than once - that is exactly what the on-demand
+         // diagnostic is for - and 3.5.2 tells a receiver that a repeated
+         // filename means "overwrite the original or discard this one", because
+         // a repeated filename is how a re-send is signalled. Without a unique
+         // id the second report of a day is legitimately thrown away, and the
+         // two reports are not duplicates: each covers only what was recorded
+         // since the previous destructive pop.
+         //
+         // 3.1.4 asks the Report-ID and the unique-id to be identical, which
+         // their two grammars make impossible in general - ridfmt is
+         // dot-atom-text with an optional "@" domain, unique-id is
+         // 1*(ALPHA / DIGIT) and admits neither "." nor "@". The seconds-since-
+         // epoch the Report-ID is built from satisfies both, so the same value
+         // appears in each, spelled the way each grammar allows.
+         attachmentName.Format("%hs!%hs!%I64d!%I64d!%I64d.xml", narrowSubmitter.c_str(), narrowDomain.c_str(),
+            rangeBegin, rangeEnd, generatedAt);
+      }
+      else
+      {
+         // Left exactly as it was. The 7489 form is what receivers parse today,
+         // and a filename is one of the two things a report processor keys on -
+         // changing it for every existing installation to fix a case only the
+         // on-demand diagnostic reaches is not a trade worth making.
+         attachmentName.Format("%hs!%hs!%I64d!%I64d.xml", narrowSubmitter.c_str(), narrowDomain.c_str(), rangeBegin, rangeEnd);
+      }
 
       String recipientList;
       for (size_t i = 0; i < reportingAddresses.size(); i++)
@@ -353,8 +401,16 @@ namespace HM
                                         const DmarcRptStore::DomainBucket &bucket,
                                         const AnsiString &reportId,
                                         const String &contactEmail,
-                                        const AnsiString &organizationName)
+                                        const AnsiString &organizationName,
+                                        int schemaVersion,
+                                        const AnsiString &generator)
    {
+      // Only an exact 2 selects the newer schema. Everything else - including a
+      // value that somehow got past the ini validation - is the 7489 form,
+      // because that is the one every report processor in the field parses and
+      // an unparseable report is indistinguishable from no report at all.
+      const bool rfc9990 = (schemaVersion == SchemaRfc9990);
+
       __int64 rangeBegin = 0;
       {
          tm dayStart = {};
@@ -369,7 +425,27 @@ namespace HM
 
       AnsiString xml;
       xml += "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n";
-      xml += "<feedback>\r\n";
+
+      if (rfc9990)
+      {
+         // RFC 9990 6.1 registers the namespace and Appendix A declares it as the
+         // schema's targetNamespace with elementFormDefault="qualified" - so every
+         // element in the document belongs to it, which a default xmlns on the root
+         // achieves without having to prefix any of them. RFC 7489's schema had no
+         // target namespace at all, which is why the form below carries none: the
+         // namespace IS how a consumer tells the two documents apart.
+         xml += "<feedback xmlns=\"urn:ietf:params:xml:ns:dmarc-2.0\">\r\n";
+
+         // 1.0, NOT 2.0, and this is the one thing in this schema that is easy to
+         // get wrong. RFC 9990 3.1.1.2 says the version element "MUST have the
+         // value 1.0", and the Appendix B sample - inside the dmarc-2.0 namespace -
+         // says 1.0 too. The 2.0 belongs to the namespace, which versions the
+         // SCHEMA; this element versions the report format, and it did not change.
+         xml += "  <version>1.0</version>\r\n";
+      }
+      else
+         xml += "<feedback>\r\n";
+
       xml += "  <report_metadata>\r\n";
       xml += "    <org_name>" + XmlEscape_(organizationName) + "</org_name>\r\n";
       xml += "    <email>" + XmlEscape_(AnsiString(contactEmail)) + "</email>\r\n";
@@ -379,21 +455,76 @@ namespace HM
       range.Format("    <date_range><begin>%I64d</begin><end>%I64d</end></date_range>\r\n", rangeBegin, rangeEnd);
       xml += range;
 
+      // report_metadata/generator is new in 9990 (3.1.1.3): "the name and version
+      // of the report generator; this can help the Report Consumer find out where
+      // to report bugs". Last in the element, which is the order of the RFC's own
+      // table - ReportMetadataType is an xs:all so any order validates, but a
+      // consumer written by reading the table down the page will expect this one.
+      if (rfc9990 && !generator.IsEmpty())
+         xml += "    <generator>" + XmlEscape_(generator) + "</generator>\r\n";
+
       xml += "  </report_metadata>\r\n";
       xml += "  <policy_published>\r\n";
       xml += "    <domain>" + XmlEscape_(bucket.policy_domain) + "</domain>\r\n";
-      xml += "    <adkim>" + XmlEscape_(NormalizeAlignment_(bucket.adkim)) + "</adkim>\r\n";
-      xml += "    <aspf>" + XmlEscape_(NormalizeAlignment_(bucket.aspf)) + "</aspf>\r\n";
-      xml += "    <p>" + XmlEscape_(NormalizeDisposition_(bucket.p)) + "</p>\r\n";
 
-      // sp is optional in the schema, so an absent one is omitted rather than
-      // invented - but a PRESENT one still has to be a legal value.
-      if (!bucket.sp.IsEmpty())
-         xml += "    <sp>" + XmlEscape_(NormalizeDisposition_(bucket.sp)) + "</sp>\r\n";
+      if (rfc9990)
+      {
+         // PolicyPublishedType is an xs:all, so ordering does not affect
+         // validation - which is just as well, because the RFC gives three
+         // different orders (Table 5, the Appendix A XSD, and the Appendix B
+         // sample). The XSD's declaration order is used here on the reasoning
+         // that a hand-written parser that assumes an order was most likely
+         // written from the schema.
+         xml += "    <p>" + XmlEscape_(NormalizeDisposition_(bucket.p)) + "</p>\r\n";
 
-      AnsiString pct;
-      pct.Format("    <pct>%d</pct>\r\n", bucket.pct);
-      xml += pct;
+         if (!bucket.sp.IsEmpty())
+            xml += "    <sp>" + XmlEscape_(NormalizeDisposition_(bucket.sp)) + "</sp>\r\n";
+
+         // np= has no home at all in the 7489 schema, so this is the first form of
+         // the report that can tell a domain owner what this server saw them
+         // publish for subdomains that do not exist. Omitted rather than defaulted
+         // when absent: unlike adkim/aspf, "no np" is not the same statement as
+         // "np=none" - the first means sp= or p= governed, the second means the
+         // owner deliberately chose the weakest policy for invented subdomains.
+         if (!bucket.np.IsEmpty())
+            xml += "    <np>" + XmlEscape_(NormalizeDisposition_(bucket.np)) + "</np>\r\n";
+
+         xml += "    <adkim>" + XmlEscape_(NormalizeAlignment_(bucket.adkim)) + "</adkim>\r\n";
+         xml += "    <aspf>" + XmlEscape_(NormalizeAlignment_(bucket.aspf)) + "</aspf>\r\n";
+
+         // Which mechanism ANSWERED, recorded per domain when the day's first
+         // message arrived. Omitted when the store holds neither value, which is
+         // what a bucket recorded by an older build or constructed by hand looks
+         // like - an absent optional element is honest, an invented one is not.
+         const AnsiString discoveryMethod = NormalizeDiscoveryMethod_(bucket.discovery_method);
+         if (!discoveryMethod.IsEmpty())
+            xml += "    <discovery_method>" + discoveryMethod + "</discovery_method>\r\n";
+
+         // testing is the t= tag. Emitted even when the record carried none,
+         // because 3.1.1.5 says unspecified tags have their default values and the
+         // default is n - the same reasoning that makes adkim/aspf explicit above.
+         xml += "    <testing>" + NormalizeTesting_(bucket.testing) + "</testing>\r\n";
+
+         // No <pct>. RFC 9990 removed it from the schema outright, along with the
+         // pct= tag itself in RFC 9989 - emitting it here would fail validation
+         // against the very namespace this document declares. bucket.pct is still
+         // recorded and still reported in the 7489 form below.
+      }
+      else
+      {
+         xml += "    <adkim>" + XmlEscape_(NormalizeAlignment_(bucket.adkim)) + "</adkim>\r\n";
+         xml += "    <aspf>" + XmlEscape_(NormalizeAlignment_(bucket.aspf)) + "</aspf>\r\n";
+         xml += "    <p>" + XmlEscape_(NormalizeDisposition_(bucket.p)) + "</p>\r\n";
+
+         // sp is optional in the schema, so an absent one is omitted rather than
+         // invented - but a PRESENT one still has to be a legal value.
+         if (!bucket.sp.IsEmpty())
+            xml += "    <sp>" + XmlEscape_(NormalizeDisposition_(bucket.sp)) + "</sp>\r\n";
+
+         AnsiString pct;
+         pct.Format("    <pct>%d</pct>\r\n", bucket.pct);
+         xml += pct;
+      }
 
       xml += "  </policy_published>\r\n";
 
@@ -407,14 +538,28 @@ namespace HM
          count.Format("      <count>%d</count>\r\n", row.count);
          xml += count;
 
+         AnsiString disposition = row.disposition;
+         if (rfc9990)
+            disposition = ActionDisposition_(row.disposition, row.dkim == "pass", row.spf == "pass");
+
          xml += "      <policy_evaluated>\r\n";
-         xml += "        <disposition>" + XmlEscape_(row.disposition) + "</disposition>\r\n";
+         xml += "        <disposition>" + XmlEscape_(disposition) + "</disposition>\r\n";
          xml += "        <dkim>" + XmlEscape_(row.dkim) + "</dkim>\r\n";
          xml += "        <spf>" + XmlEscape_(row.spf) + "</spf>\r\n";
          xml += "      </policy_evaluated>\r\n";
          xml += "    </row>\r\n";
          xml += "    <identifiers>\r\n";
          xml += "      <header_from>" + XmlEscape_(row.header_from) + "</header_from>\r\n";
+
+         // identifiers/envelope_from is optional in both schemas and has never
+         // been emitted in the 7489 form; adding it there would change what
+         // existing receivers get from a form that is not supposed to change.
+         // In the 9990 form it is emitted because the data is already in hand
+         // and the Appendix B sample carries it - it is what lets a reader see
+         // WHICH envelope the auth_results/spf domain below belongs to.
+         if (rfc9990 && !row.envelope_from_domain.IsEmpty())
+            xml += "      <envelope_from>" + XmlEscape_(row.envelope_from_domain) + "</envelope_from>\r\n";
+
          xml += "    </identifiers>\r\n";
          xml += "    <auth_results>\r\n";
 
@@ -422,14 +567,26 @@ namespace HM
          {
             xml += "      <dkim><domain>" + XmlEscape_(row.dkim_passing_domains[i]) + "</domain>";
 
-            // RFC 7489 Appendix C: selector is optional, so it is emitted only when
-            // the signature actually carried one. It is what turns "something of
-            // yours signed this" into "this key signed this", which is the
-            // difference between a report a domain owner can read and one they can
-            // act on - during a key rotation, or when working out which key a forger
-            // has got hold of.
-            if (i < row.dkim_passing_selectors.size() && !row.dkim_passing_selectors[i].IsEmpty())
-               xml += "<selector>" + XmlEscape_(row.dkim_passing_selectors[i]) + "</selector>";
+            AnsiString selector;
+            if (i < row.dkim_passing_selectors.size())
+               selector = row.dkim_passing_selectors[i];
+
+            // The selector is what turns "something of yours signed this" into
+            // "this key signed this", which is the difference between a report a
+            // domain owner can read and one they can act on - during a key
+            // rotation, or when working out which key a forger has got hold of.
+            //
+            // The two schemas differ on what to do when the signature's s= could
+            // not be read. 7489 makes the element optional, so it is left out
+            // rather than emitted empty, which a parser would read as a key named
+            // "". 9990 Appendix A makes it minOccurs="1" - REQUIRED, and Appendix
+            // C lists that as one of the deliberate changes - so leaving it out is
+            // not available: the choice is between an empty element and dropping
+            // the whole <dkim>, and dropping it would throw away the d= domain,
+            // which is the more useful half. An empty selector is at least
+            // schema-valid and says plainly that none was recoverable.
+            if (rfc9990 || !selector.IsEmpty())
+               xml += "<selector>" + XmlEscape_(selector) + "</selector>";
 
             xml += "<result>pass</result></dkim>\r\n";
          }
@@ -438,6 +595,11 @@ namespace HM
          // policy_evaluated: SPF can pass for an envelope domain that does not
          // align with the From header, and the report schema keeps the two
          // apart for exactly that case.
+         //
+         // scope is unchanged between the two forms and did not need to be:
+         // "mfrom" is the only value 9990's SPFDomainScope admits (7489 also
+         // allowed "helo", which this server never emitted because DMARC only
+         // ever evaluates the MAIL FROM identity).
          if (!row.envelope_from_domain.IsEmpty())
          {
             xml += "      <spf><domain>" + XmlEscape_(row.envelope_from_domain) + "</domain><scope>mfrom</scope><result>";
@@ -446,8 +608,10 @@ namespace HM
          }
          else
          {
-            // The schema requires at least one auth_results element; a message
-            // with no envelope sender (a bounce) evaluated SPF as none.
+            // A message with no envelope sender (a bounce) evaluated SPF as none.
+            // 7489 required an spf element in auth_results and 9990 made it
+            // optional, so this is mandatory in one form and merely accurate in
+            // the other - which is not a reason to start withholding it.
             xml += "      <spf><domain></domain><scope>mfrom</scope><result>none</result></spf>\r\n";
          }
 
@@ -509,6 +673,95 @@ namespace HM
          return "s";
 
       return "r";
+   }
+
+   AnsiString
+   DmarcRptReporterTask::NormalizeTesting_(const AnsiString &value)
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // RFC 9990 Appendix A types policy_published/testing as TestingType: "y" or "n"
+   // and nothing else. The value is whatever the domain owner typed after t=, so
+   // "Y", "yes" and a t= tag that was never published all arrive here.
+   //
+   // Only an explicit yes is reported as yes. RFC 9989 5.5.6 makes n the default,
+   // so an absent or unreadable tag is n - and erring that way is the safe
+   // direction to err: reporting "this domain is only testing" about a domain that
+   // is enforcing would tell its owner that failures they are seeing are harmless.
+   //---------------------------------------------------------------------------()
+   {
+      AnsiString normalized = value;
+      normalized.Trim();
+      normalized.MakeLower();
+
+      if (normalized == "y" || normalized == "yes")
+         return "y";
+
+      return "n";
+   }
+
+   AnsiString
+   DmarcRptReporterTask::NormalizeDiscoveryMethod_(const AnsiString &value)
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // RFC 9990 Appendix A types discovery_method as DiscoveryType: "psl" or
+   // "treewalk". Anything else - including the empty string a bucket recorded
+   // before this field existed carries - returns empty, and the caller then omits
+   // the element, which the schema allows (minOccurs="0").
+   //
+   // Omitting beats guessing here in a way it does not for adkim or aspf: those
+   // have RFC-defined defaults, so an explicit "r" restates the spec. Discovery
+   // has no default, and naming a mechanism this server cannot confirm was used
+   // would be inventing an answer to the one question this element exists to ask.
+   //---------------------------------------------------------------------------()
+   {
+      AnsiString normalized = value;
+      normalized.Trim();
+      normalized.MakeLower();
+
+      if (normalized == "psl" || normalized == "treewalk")
+         return normalized;
+
+      return "";
+   }
+
+   AnsiString
+   DmarcRptReporterTask::ActionDisposition_(const AnsiString &disposition, bool dkimAligned, bool spfAligned)
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // RFC 9990 Appendix A widens policy_evaluated/disposition from 7489's
+   // DispositionType to ActionDispositionType, whose extra member is "pass": "No
+   // action, passing DMARC w/enforcing policy".
+   //
+   // 7489 could not express that. It reused "none" both for a message that PASSED
+   // DMARC and for one that FAILED under p=none, and a report consumer had to
+   // infer which by reading the dkim and spf sub-elements - so the headline number
+   // in every 7489 report, "how many messages got disposition none", conflates a
+   // domain's own legitimate mail with the forgeries its policy is not yet strict
+   // enough to stop.
+   //
+   // This server can tell them apart without recording anything new, because the
+   // two aligned verdicts are already in the row and DMARC passes exactly when one
+   // of them passed (RFC 9989 4.4). Derived rather than stored deliberately: a
+   // second stored field could disagree with the verdicts beside it, and this
+   // cannot.
+   //
+   // A quarantine or reject disposition is never rewritten - by definition an
+   // action was taken - and a failure under p=none stays "none", which is what it
+   // has always meant when the alignment verdicts beside it are both fail.
+   //---------------------------------------------------------------------------()
+   {
+      // Normalized on the way out for the same reason p and sp are: the enumeration
+      // is closed, and an unexpected value fails the whole document at a validating
+      // receiver rather than just that record.
+      const AnsiString normalized = NormalizeDisposition_(disposition);
+
+      if (normalized != "none")
+         return normalized;
+
+      if (dkimAligned || spfAligned)
+         return "pass";
+
+      return "none";
    }
 
    AnsiString

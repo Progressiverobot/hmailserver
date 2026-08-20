@@ -615,7 +615,7 @@ namespace HM
             throw 0;
       }
 
-      OutputDebugString(_T("hMailServer: Testing the DMARC rua parser and report builder\n"));
+      OutputDebugString(_T("hMailServer: Testing the DMARC rua parser and the report builder in both schemas\n"));
       {
          // The rua tag with two mailto targets, one carrying the RFC 7489 6.2
          // size suffix and one a URI parameter: neither is part of the mailbox.
@@ -653,11 +653,21 @@ namespace HM
 
          // The report body: RFC 7489 Appendix C's members, and XML escaping of
          // a value the administrator controls.
+         //
+         // ONE bucket drives both schemas below. That is the point of it: with
+         // the same input on both sides, every difference between the two
+         // documents is attributable to the schema selection and nothing else.
          DmarcRptStore::DomainBucket bucket;
          bucket.policy_domain = "example.org";
          bucket.adkim = "s";
          bucket.p = "quarantine";
          bucket.pct = 50;
+
+         // Recorded whatever the configured schema is, and invisible in the 7489
+         // form, which has nowhere to put any of them.
+         bucket.np = "reject";
+         bucket.testing = "y";
+         bucket.discovery_method = "treewalk";
 
          DmarcRptStore::Row row;
          row.source_ip = "192.0.2.7";
@@ -681,8 +691,38 @@ namespace HM
          row.count = 3;
          bucket.rows.push_back(row);
 
+         // A message that PASSED DMARC, and one that failed under a policy asking
+         // for no action. Both are disposition "none" as this server records them,
+         // and telling them apart is the whole of what RFC 9990's extra "pass"
+         // member buys - so the pair has to be present in both documents for the
+         // difference to be visible at all.
+         DmarcRptStore::Row passingRow;
+         passingRow.source_ip = "192.0.2.8";
+         passingRow.disposition = "none";
+         passingRow.dkim = "pass";
+         passingRow.spf = "fail";
+         passingRow.header_from = "example.org";
+         passingRow.envelope_from_domain = "bounce.example.org";
+         passingRow.spf_passed = false;
+         passingRow.dkim_passing_domains.push_back("example.org");
+         passingRow.dkim_passing_selectors.push_back("keyA");
+         passingRow.count = 5;
+         bucket.rows.push_back(passingRow);
+
+         DmarcRptStore::Row failingRow;
+         failingRow.source_ip = "192.0.2.9";
+         failingRow.disposition = "none";
+         failingRow.dkim = "fail";
+         failingRow.spf = "fail";
+         failingRow.header_from = "example.org";
+         failingRow.envelope_from_domain = "bounce.example.org";
+         failingRow.spf_passed = false;
+         failingRow.count = 7;
+         bucket.rows.push_back(failingRow);
+
          AnsiString xml = DmarcRptReporterTask::BuildReportXml(
-            "2026-08-16", bucket, "rpt-1", _T("postmaster@sender.test"), "A & B <Ltd>");
+            "2026-08-16", bucket, "rpt-1", _T("postmaster@sender.test"), "A & B <Ltd>",
+            DmarcRptReporterTask::SchemaRfc7489, "ignored in this form");
 
          // The day's epoch range, computed the same way the builder computes
          // it rather than hand-derived, so the assertion cannot drift from a
@@ -743,6 +783,141 @@ namespace HM
          // scope that says which identity it was evaluated on - without it a reader
          // cannot tell an envelope-sender check from a HELO one.
          if (xml.Find("<spf><domain>bounce.example.org</domain><scope>mfrom</scope><result>pass</result></spf>") < 0)
+            throw 0;
+
+         // The DEFAULT form is this one, and the negative half is the half that
+         // matters: none of the DMARCbis-only members may appear in it. A schema
+         // that grew extra elements would be rejected whole by a receiver
+         // validating against RFC 7489's XSD, which is to say the reports would
+         // stop arriving while the log went on saying they were sent.
+         if (xml.Find("urn:ietf:params:xml:ns:dmarc-2.0") >= 0)
+            throw 0;
+         if (xml.Find("<version>") >= 0)
+            throw 0;
+         if (xml.Find("<np>") >= 0)
+            throw 0;
+         if (xml.Find("<testing>") >= 0)
+            throw 0;
+         if (xml.Find("<discovery_method>") >= 0)
+            throw 0;
+         if (xml.Find("<generator>") >= 0)
+            throw 0;
+         if (xml.Find("<envelope_from>") >= 0)
+            throw 0;
+
+         // 7489 has no "pass" disposition, so a message that passed DMARC and one
+         // that failed under p=none are both reported as "none" here. That is not
+         // a defect of this code - it is the limitation RFC 9990 exists to lift,
+         // and it is pinned so that the difference below is a real one.
+         if (xml.Find("<disposition>pass</disposition>") >= 0)
+            throw 0;
+
+         AnsiString rfc9990Xml = DmarcRptReporterTask::BuildReportXml(
+            "2026-08-16", bucket, "rpt-1", _T("postmaster@sender.test"), "A & B <Ltd>",
+            DmarcRptReporterTask::SchemaRfc9990, "hMailServer 6.2.22");
+
+         // The namespace is what identifies the document as the 2.0 schema, and it
+         // is declared as the default xmlns on the root so that every element
+         // inherits it - Appendix A sets elementFormDefault="qualified".
+         if (rfc9990Xml.Find("<feedback xmlns=\"urn:ietf:params:xml:ns:dmarc-2.0\">") < 0)
+            throw 0;
+
+         // 1.0, NOT 2.0. RFC 9990 3.1.1.2: the version element "MUST have the
+         // value 1.0", and the Appendix B sample agrees. The 2.0 is the
+         // namespace's, and writing it here is the single easiest way to produce
+         // a document that fails validation against the schema it claims.
+         if (rfc9990Xml.Find("<version>1.0</version>") < 0)
+            throw 0;
+         if (rfc9990Xml.Find("<version>2.0</version>") >= 0)
+            throw 0;
+
+         // pct is GONE from the 2.0 schema. Present in the 7489 form above, from
+         // the same bucket, so this is the setting choosing and not the data.
+         if (xml.Find("<pct>50</pct>") < 0)
+            throw 0;
+         if (rfc9990Xml.Find("<pct>") >= 0)
+            throw 0;
+
+         // The three additions to policy_published.
+         if (rfc9990Xml.Find("<np>reject</np>") < 0)
+            throw 0;
+         if (rfc9990Xml.Find("<testing>y</testing>") < 0)
+            throw 0;
+         if (rfc9990Xml.Find("<discovery_method>treewalk</discovery_method>") < 0)
+            throw 0;
+
+         // report_metadata/generator: who to complain to about a malformed report.
+         if (rfc9990Xml.Find("<generator>hMailServer 6.2.22</generator>") < 0)
+            throw 0;
+
+         // ActionDispositionType's extra member. The passing row becomes "pass",
+         // the p=none failure stays "none", and the quarantine is untouched -
+         // this server never took no action on the last of those.
+         if (rfc9990Xml.Find("<disposition>pass</disposition>") < 0)
+            throw 0;
+         if (rfc9990Xml.Find("<disposition>none</disposition>") < 0)
+            throw 0;
+         if (rfc9990Xml.Find("<disposition>quarantine</disposition>") < 0)
+            throw 0;
+
+         // selector is minOccurs="1" in 2.0 - required. A signature whose s= could
+         // not be read therefore carries an EMPTY one, which is the opposite of
+         // what the 7489 form does with the same row, because there the element is
+         // optional and an empty one would read as a key named "".
+         if (rfc9990Xml.Find("<dkim><domain>nosel.example</domain><selector></selector><result>pass</result></dkim>") < 0)
+            throw 0;
+         if (rfc9990Xml.Find("<dkim><domain>other.example</domain><selector>sel2026</selector><result>pass</result></dkim>") < 0)
+            throw 0;
+
+         // identifiers/envelope_from, which the 7489 form has never carried: it is
+         // what tells a reader which envelope the auth_results/spf domain came
+         // from rather than leaving them to assume.
+         if (rfc9990Xml.Find("<envelope_from>bounce.example.org</envelope_from>") < 0)
+            throw 0;
+
+         // mfrom is the ONLY scope 2.0 admits (helo is gone), and it is what this
+         // server has always emitted - DMARC evaluates no other identity.
+         if (rfc9990Xml.Find("<scope>mfrom</scope>") < 0)
+            throw 0;
+
+         // An out-of-range schema version produces the 7489 form rather than an
+         // empty document or a half-written one. The ini read rejects such values
+         // before they get here; this is the same decision made again at the point
+         // of use, because the safe fallback is the form every receiver parses.
+         AnsiString outOfRangeXml = DmarcRptReporterTask::BuildReportXml(
+            "2026-08-16", bucket, "rpt-1", _T("postmaster@sender.test"), "A & B <Ltd>",
+            7, "hMailServer 6.2.22");
+
+         if (!(outOfRangeXml == xml))
+            throw 0;
+
+         // A discovery_method the store never recorded - an older bucket, or one
+         // built by hand - omits the element rather than guessing a mechanism.
+         // Every other 2.0 member is unaffected, so the omission is local.
+         DmarcRptStore::DomainBucket unknownDiscovery = bucket;
+         unknownDiscovery.discovery_method = "";
+
+         AnsiString unknownDiscoveryXml = DmarcRptReporterTask::BuildReportXml(
+            "2026-08-16", unknownDiscovery, "rpt-1", _T("postmaster@sender.test"), "A & B <Ltd>",
+            DmarcRptReporterTask::SchemaRfc9990, "hMailServer 6.2.22");
+
+         if (unknownDiscoveryXml.Find("<discovery_method>") >= 0)
+            throw 0;
+         if (unknownDiscoveryXml.Find("<testing>y</testing>") < 0)
+            throw 0;
+
+         // A record with no t= tag reports the RFC's default rather than nothing:
+         // 3.1.1.5 says unspecified tags have their default values, and n is the
+         // default. Reporting "testing" for a domain that is enforcing would tell
+         // its owner the failures they are looking at are harmless.
+         DmarcRptStore::DomainBucket noTesting = bucket;
+         noTesting.testing = "";
+
+         AnsiString noTestingXml = DmarcRptReporterTask::BuildReportXml(
+            "2026-08-16", noTesting, "rpt-1", _T("postmaster@sender.test"), "A & B <Ltd>",
+            DmarcRptReporterTask::SchemaRfc9990, "hMailServer 6.2.22");
+
+         if (noTestingXml.Find("<testing>n</testing>") < 0)
             throw 0;
       }
 

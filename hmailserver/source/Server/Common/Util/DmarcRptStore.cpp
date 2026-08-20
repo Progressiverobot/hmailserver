@@ -44,7 +44,8 @@ namespace HM
    void
    DmarcRptStore::Record(const AnsiString &policyDomain,
                          const AnsiString &adkim, const AnsiString &aspf,
-                         const AnsiString &p, const AnsiString &sp, int pct,
+                         const AnsiString &p, const AnsiString &sp, const AnsiString &np,
+                         const AnsiString &testing, int pct, const AnsiString &discoveryMethod,
                          const AnsiString &sourceIp, const AnsiString &disposition,
                          bool dkimAligned, bool spfAligned,
                          const AnsiString &headerFrom,
@@ -78,6 +79,9 @@ namespace HM
          fresh.aspf = aspf;
          fresh.p = p;
          fresh.sp = sp;
+         fresh.np = np;
+         fresh.testing = testing;
+         fresh.discovery_method = discoveryMethod;
          fresh.pct = pct;
       }
 

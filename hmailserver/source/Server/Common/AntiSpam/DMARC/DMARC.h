@@ -34,6 +34,18 @@ namespace HM
          PermError = 6
       };
 
+      // How this server worked out an organizational domain. RFC 9990 3.1.1.5
+      // reports it in policy_published/discovery_method, where "psl" is the RFC
+      // 7489 method and "treewalk" is RFC 9989's - and it asks which one WAS
+      // USED, not which one is configured. Those differ: the tree walk falls
+      // back to the list when a lookup fails transiently, so a report naming the
+      // ini setting would describe the configuration rather than the message.
+      enum DiscoveryMethod
+      {
+         DiscoveryPublicSuffixList = 0,
+         DiscoveryTreeWalk = 1
+      };
+
       // Everything the aggregate reporter (RFC 7489 section 7.2) needs to know
       // about one evaluation, filled by Verify when the caller asks. The
       // policy_domain is the domain the record was FOUND at - the From domain,
@@ -49,7 +61,14 @@ namespace HM
          String p;
          String sp;
          String np;                    // empty when the record carries none
+         // The t= (testing) tag as published; empty when the record carries none.
+         // Parsed for the RFC 9990 report's policy_published/testing element and
+         // for nothing else: this server does not yet act on t=, and reporting
+         // what a domain published is a statement about the DNS record rather
+         // than about what the receiver did with it.
+         String t;
          int pct = 100;
+         DiscoveryMethod discovery_method = DiscoveryPublicSuffixList;
          bool spf_aligned = false;
          bool dkim_aligned = false;
       };
@@ -74,6 +93,13 @@ namespace HM
       // Public Suffix List (see PublicSuffixList.h). A domain that is itself
       // a public suffix is returned unchanged.
       static String GetOrganizationalDomain(const String &domain);
+
+      // The same answer, plus which mechanism produced it. Not derivable from
+      // the configuration by the caller: DmarcTreeWalkEnabled selects the walk,
+      // but the walk hands back to the Public Suffix List when a lookup fails
+      // transiently, and it is the mechanism that ANSWERED that RFC 9990's
+      // discovery_method reports. methodUsed is always written.
+      static String GetOrganizationalDomain(const String &domain, DiscoveryMethod &methodUsed);
 
    private:
 

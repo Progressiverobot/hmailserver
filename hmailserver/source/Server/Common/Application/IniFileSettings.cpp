@@ -433,6 +433,40 @@ namespace HM
       dmarc_rpt_from_address_ = ReadIniSettingString_("Settings", "DmarcRptFromAddress", "");
       dmarc_rpt_organization_name_ = ReadIniSettingString_("Settings", "DmarcRptOrganizationName", "hMailServer");
 
+      // Which schema the aggregate report itself is written in. 1 is RFC 7489
+      // Appendix C; 2 is RFC 9990 (DMARCbis), which changes the namespace, drops
+      // pct, adds np/testing/discovery_method and makes the DKIM selector
+      // mandatory.
+      //
+      // 1 is the default and has to be. A report is only worth sending if the
+      // domain it is addressed to can read it, and essentially every report
+      // processor deployed today parses 7489 and nothing else - so defaulting to
+      // 2 would mean the domains this server reports on quietly stopped being
+      // able to read their own reports. The value of shipping 2 at all is that
+      // an operator whose report consumers have caught up can switch, and that
+      // the day the balance tips the default is a one-line change rather than a
+      // feature to write.
+      dmarc_rpt_schema_version_ = ReadIniSettingInteger_("Settings", "DmarcRptSchemaVersion", 1);
+
+      // Anything else is a typo, and a typo must not decide what goes on the
+      // wire. Falling back to 1 rather than refusing to report: the value only
+      // selects a spelling of a report this server was going to send anyway, and
+      // the 7489 spelling is the one that is certain to be understood. Reported
+      // rather than corrected silently, because an administrator who asked for 2
+      // is owed the reason their reports are still going out as 7489 - and this
+      // cannot fire on a stock server, where the key is absent and the default
+      // is in range.
+      if (dmarc_rpt_schema_version_ != 1 && dmarc_rpt_schema_version_ != 2)
+      {
+         String message;
+         message.Format(_T("DmarcRptSchemaVersion is set to %d, which is not a DMARC aggregate report schema this server can write. Using 1 (RFC 7489 Appendix C) instead. Set it to 1, or to 2 for the RFC 9990 (DMARCbis) schema."),
+                        dmarc_rpt_schema_version_);
+
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6210, "IniFileSettings::LoadSettings", message);
+
+         dmarc_rpt_schema_version_ = 1;
+      }
+
       // What happens to a message the virus scanner could not examine. 0, the
       // shipped default, delivers it - the fail-open posture this server has
       // always had, now at least named and documented rather than implicit. 1

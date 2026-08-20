@@ -153,6 +153,20 @@ namespace HM
    String
    DMARC::GetOrganizationalDomain(const String &domain)
    {
+      DiscoveryMethod methodUsed = DiscoveryPublicSuffixList;
+      return GetOrganizationalDomain(domain, methodUsed);
+   }
+
+   String
+   DMARC::GetOrganizationalDomain(const String &domain, DiscoveryMethod &methodUsed)
+   {
+      // The configured mechanism stands until one of them actually answers
+      // below. It is the right answer for the early return too: a name of one
+      // label consults neither mechanism, and there is no third value to report.
+      methodUsed = IniFileSettings::Instance()->GetDmarcTreeWalkEnabled()
+         ? DiscoveryTreeWalk
+         : DiscoveryPublicSuffixList;
+
       String lowerDomain = domain;
       lowerDomain.MakeLower();
       lowerDomain.TrimRight(_T("."));
@@ -178,8 +192,18 @@ namespace HM
          String walked = DmarcTreeWalk::Instance()->GetOrganizationalDomain(lowerDomain, treeWalkDnsError);
 
          if (!treeWalkDnsError)
+         {
+            methodUsed = DiscoveryTreeWalk;
             return walked;
+         }
       }
+
+      // Either the walk is switched off or it could not complete, and the list
+      // is what answered. Recorded here rather than inferred from the setting,
+      // because on the transient-failure path the two disagree - and a report
+      // that named the setting would be telling the domain owner about this
+      // server's ini file instead of about their message.
+      methodUsed = DiscoveryPublicSuffixList;
 
       // The public suffix comes from the real Public Suffix List, compiled in
       // (see PublicSuffixList.h and build\generate-public-suffix-list.ps1).
@@ -380,12 +404,23 @@ namespace HM
       bool isSubdomainPolicy = false;
       String policyDomain = fromDomain;
 
+      // Which mechanism discovered the policy record, for RFC 9990's
+      // policy_published/discovery_method. A record found at the From domain
+      // itself is discovered by a single query for _dmarc.<from domain>, which
+      // is step one of BOTH algorithms - so nothing distinguished them and the
+      // one in force is the one that answered. Only the organizational-domain
+      // fallback below can tell them apart, and it overwrites this.
+      DiscoveryMethod discoveryMethod =
+         IniFileSettings::Instance()->GetDmarcTreeWalkEnabled()
+            ? DiscoveryTreeWalk
+            : DiscoveryPublicSuffixList;
+
       if (!RetrievePolicy_(fromDomain, policyRecord, dnsError))
       {
          if (dnsError)
             return TempError;
 
-         String organizationalDomain = GetOrganizationalDomain(fromDomain);
+         String organizationalDomain = GetOrganizationalDomain(fromDomain, discoveryMethod);
          if (organizationalDomain == fromDomain)
             return NoPolicy;
 
@@ -421,6 +456,14 @@ namespace HM
       // company cannot publish a record for a name it has never heard of.
       String npTag;
       ParseTagValue_(policyRecord, _T("np"), npTag);
+
+      // t= (RFC 9989 section 5.5.6): the domain owner is still testing and does not
+      // want the policy enforced. Read for the RFC 9990 report only - policy
+      // application below is deliberately unchanged, because honouring t= means
+      // overriding a disposition and emitting a policy_test_mode override reason,
+      // which is a separate decision from being able to REPORT what was published.
+      String tTag;
+      ParseTagValue_(policyRecord, _T("t"), tTag);
 
       int pct = 100;
       String tagValue;
@@ -461,7 +504,9 @@ namespace HM
          evaluation->p = pTag;
          evaluation->sp = spTag;
          evaluation->np = npTag;
+         evaluation->t = tTag;
          evaluation->pct = pct;
+         evaluation->discovery_method = discoveryMethod;
          evaluation->spf_aligned = spfAligned;
          evaluation->dkim_aligned = dkimAligned;
       }

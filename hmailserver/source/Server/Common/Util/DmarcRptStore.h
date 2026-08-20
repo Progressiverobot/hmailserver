@@ -48,6 +48,24 @@ namespace HM
          AnsiString aspf;               // "r" / "s"
          AnsiString p;
          AnsiString sp;                 // empty when the record has none
+
+         // The three below exist only for the RFC 9990 (DMARCbis) form of the
+         // report; the RFC 7489 Appendix C schema has nowhere to put any of
+         // them. They are recorded whatever the configured schema version is,
+         // because the setting is read when a day is REPORTED and the rows were
+         // recorded up to a day earlier - collecting only what today's setting
+         // needs would produce a report missing half its policy block for
+         // anybody who changed the setting.
+         AnsiString np;                 // empty when the record has none
+         AnsiString testing;            // the t= tag as published; empty when absent
+
+         // "psl" or "treewalk": which mechanism actually answered when this
+         // domain's policy was discovered, not which one is configured. See
+         // DMARC::DiscoveryMethod.
+         AnsiString discovery_method;
+
+         // Dropped by RFC 9990, which has no pct element at all. Still recorded
+         // and still reported in the 7489 form, which remains the default.
          int pct = 100;
 
          std::vector<Row> rows;
@@ -60,7 +78,8 @@ namespace HM
 
       void Record(const AnsiString &policyDomain,
                   const AnsiString &adkim, const AnsiString &aspf,
-                  const AnsiString &p, const AnsiString &sp, int pct,
+                  const AnsiString &p, const AnsiString &sp, const AnsiString &np,
+                  const AnsiString &testing, int pct, const AnsiString &discoveryMethod,
                   const AnsiString &sourceIp, const AnsiString &disposition,
                   bool dkimAligned, bool spfAligned,
                   const AnsiString &headerFrom,

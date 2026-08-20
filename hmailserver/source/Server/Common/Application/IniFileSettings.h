@@ -503,6 +503,11 @@ namespace HM
       String GetTlsRptOrganizationName() const { return tls_rpt_organization_name_; }
       String GetDmarcRptFromAddress() const { return dmarc_rpt_from_address_; }
       String GetDmarcRptOrganizationName() const { return dmarc_rpt_organization_name_; }
+
+      // 1 = RFC 7489 Appendix C (the shipped default, and the only form report
+      // processors in the field reliably parse); 2 = RFC 9990 / DMARCbis.
+      // Validated at load, so this only ever returns 1 or 2.
+      int GetDmarcRptSchemaVersion() const { return dmarc_rpt_schema_version_; }
       // 0 = deliver a message the scanner could not examine (the shipped default,
       // and what this server has always done); 1 = hold it, retry on the ordinary
       // schedule, and bounce it if the scanner is still unreachable when the retry
@@ -819,6 +824,7 @@ namespace HM
       String tls_rpt_organization_name_;
       String dmarc_rpt_from_address_;
       String dmarc_rpt_organization_name_;
+      int dmarc_rpt_schema_version_ = 1;
       int av_fail_action_ = 0;
       int av_fail_retry_minutes_ = 15;
       int av_fail_max_holds_ = 16;
