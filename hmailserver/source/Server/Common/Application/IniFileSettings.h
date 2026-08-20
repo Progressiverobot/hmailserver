@@ -258,6 +258,13 @@ namespace HM
       bool GetMessageTraceEnabled() const { return message_trace_enabled_; }
       int GetMessageTraceRetentionDays() const { return message_trace_retention_days_; }
 
+      // RFC 9989 replaces the Public Suffix List with a DNS tree walk for finding a
+      // domain's organizational domain. ON by default, because the RFC that made the
+      // list authoritative has been obsoleted and a PSL answer is now wrong rather
+      // than merely dated. 0 selects the compiled-in list, which stays as the escape
+      // hatch for a domain the walk handles worse during the transition.
+      bool GetDmarcTreeWalkEnabled() const { return dmarc_tree_walk_enabled_; }
+
       // Password policy, enforced where a password is CHOSEN (Account.Password over
       // COM) and never where one is verified or re-hashed. All off at 0/false, which
       // is what an existing installation gets until an administrator decides
@@ -684,6 +691,7 @@ namespace HM
       int quarantine_retention_days_;
       bool message_trace_enabled_;
       int message_trace_retention_days_;
+      bool dmarc_tree_walk_enabled_;
       int password_policy_minimum_length_;
       bool password_policy_require_mixed_case_;
       bool password_policy_require_digit_;

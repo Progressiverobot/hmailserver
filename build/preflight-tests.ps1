@@ -1,4 +1,4 @@
-# Verifies this machine is in the known-good state for running the hMailServer
+﻿# Verifies this machine is in the known-good state for running the hMailServer
 # regression suite, and names the exact fault when it is not. Every check here
 # corresponds to a failure mode that has actually burned a run:
 #   - the service pointing at a stray installer's copy instead of the repo build
@@ -204,7 +204,8 @@ if (Test-Path $serverIni) {
                     'PasswordPolicyRequireMixedCase', 'PasswordPolicyRequireDigit',
                     'PasswordPolicyRequireNonAlphanumeric', 'PasswordPolicyRejectCommon',
                     'QuarantineEnabled', 'PasswordPolicyHistoryCount',
-                    'PasswordPolicyMaximumAgeDays'
+                    'PasswordPolicyMaximumAgeDays', 'DmarcTreeWalkEnabled',
+                    'AuthenticationResultsEnabled', 'DNSQueryTimeout'
 
     $iniLines = @(Get-Content -LiteralPath $serverIni)
     $pattern = '^\s*(' + ($leftoverKeys -join '|') + ')\s*='

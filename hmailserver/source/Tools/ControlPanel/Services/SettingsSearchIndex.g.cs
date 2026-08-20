@@ -48,6 +48,7 @@ namespace hMailServer.ControlPanel.Services
          new SettingEntry("DMARC failure score", "AntiSpam.DMARCFailureScore", "antispam"),
          new SettingEntry("Enable greylisting", "AntiSpam.GreyListingEnabled", "antispam"),
          new SettingEntry("Evaluate DMARC policies", "AntiSpam.DMARCEnabled", "antispam"),
+         new SettingEntry("Find organizational domains by DNS tree walk (RFC 9989)", "DmarcTreeWalkEnabled", "antispam"),
          new SettingEntry("HELO check score", "AntiSpam.CheckHostInHeloScore", "antispam"),
          new SettingEntry("Hold messages for review instead of refusing them", "QuarantineEnabled", "antispam"),
          new SettingEntry("Host", "AntiSpam.SpamAssassinHost", "antispam"),

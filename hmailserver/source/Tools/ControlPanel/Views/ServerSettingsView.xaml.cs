@@ -1327,6 +1327,21 @@ namespace hMailServer.ControlPanel.Views
          auth.Settings.Add(new ComText { Path = "AntiSpam.DKIMVerificationFailureScore", Label = "DKIM failure score", Numeric = true });
          auth.Settings.Add(new ComBool { Path = "AntiSpam.DMARCEnabled", Label = "Evaluate DMARC policies" });
          auth.Settings.Add(new ComText { Path = "AntiSpam.DMARCFailureScore", Label = "DMARC failure score", Numeric = true });
+         auth.Settings.Add(new IniBool
+         {
+            Path = "DmarcTreeWalkEnabled",
+            Label = "Find organizational domains by DNS tree walk (RFC 9989)",
+            Blurb = "How the server decides that mail.example.com and example.com belong to the same organization, " +
+                    "which is what DMARC's default relaxed alignment compares. The old answer was the Public Suffix " +
+                    "List - a file of every registry's delegation rules, compiled in and refreshed at build time. " +
+                    "DMARCbis replaced it with a walk up the DNS asking each level whether it is an organizational " +
+                    "boundary, so a domain owner can state where their boundary is instead of petitioning a list. " +
+                    "Turning this off falls back to the compiled list, which is also what happens for any single " +
+                    "lookup the walk cannot complete because DNS was unavailable - a resolver outage must not " +
+                    "quietly turn relaxed alignment into strict. Costs up to eight DNS queries per domain, cached " +
+                    "for five minutes. Applies after a service restart.",
+            IniStore = iniStore_
+         });
          auth.Settings.Add(new ComBool
          {
             Path = "AntiSpam.ArcFilteringEnabled",

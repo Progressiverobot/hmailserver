@@ -38,7 +38,7 @@ as ⬜, not ✅.
 
 ### Contents and totals
 
-800 items. The counts are the point of this table — they say where the fork is
+801 items. The counts are the point of this table — they say where the fork is
 strong and where it is thin far more honestly than any prose summary.
 
 | Section | ✅ | 🔄 | ⬜ | ⏸️ |
@@ -69,10 +69,10 @@ strong and where it is thin far more honestly than any prose summary.
 | [Cross-cutting and platform](#cross-cutting-and-platform) | 8 | 3 | 1 | – |
 | **Forward-looking** | | | | |
 | [Planned work](#planned-work) | 4 | 4 | 8 | 2 |
-| [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 2 | – | 4 | 2 |
+| [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 3 | – | 4 | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 5 | 1 | 2 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 4 | 1 | 4 | – |
-| **Total** | **679** | **13** | **93** | **15** |
+| **Total** | **680** | **13** | **93** | **15** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage, the administration surface and the core protocol layer are the
@@ -1278,7 +1278,8 @@ Future-proofing: standards and protocols
 | | Item | Detail |
 |:-:|---|---|
 | ✅ | **Post-quantum key exchange — shipped 12 Aug 2026** | `SslContextInitializer` calls `SSL_CTX_set1_curves_list(ssl, "secp384r1:x25519:secp256r1")` unconditionally at context init. That **replaces** OpenSSL's default group list, which in 3.5+/4.x already contains `X25519MLKEM768`. So every SMTP, IMAP, POP3 and ManageSieve listener negotiated classical-only key exchange despite linking a PQC-capable library. Fixed: the list is now the setting `TlsKeyExchangeGroups`, defaulting to `X25519MLKEM768:SecP256r1MLKEM768:X25519:secp384r1:secp256r1`, with a fallback to the classical list if OpenSSL rejects the configured value — getting *that* wrong was the one way this change could have taken TLS down everywhere, so it is the part the regression tests cover hardest. **Scope note, updated 12 August 2026:** this now reaches every TLS listener in the server — SMTP, POP3, IMAP, ManageSieve, the REST API, the Web Services HTTPS listener and outbound delivery — because the two that built their own `SSL_CTX` were moved onto `SslContextInitializer`; see [Structural prerequisites](#structural-prerequisites). The metrics listener is not in the list because it serves plain HTTP and has no TLS at all. |
-| ⬜ | **DMARCbis: replace PSL lookups with the tree walk** | DMARCbis changes organisational-domain discovery from the Public Suffix List to a DNS tree walk, and adds a 2.0 report namespace. A PSL-based evaluator produces *wrong policy decisions*, not soft failures, on domains relying on tree-walk semantics. No hard date, but receivers publish tree-walk-shaped records through 2026-27. The highest-value pure-protocol item here. |
+| ✅ | **DMARCbis: organizational domains by DNS tree walk — shipped 20 Aug 2026** | DMARCbis is now published — RFC 9989, 9990 and 9991, obsoleting 7489 — and its section 4.10 replaces the Public Suffix List with a walk up the DNS: query `_dmarc.<name>` at each level, stop at a `psd=` tag, and select the organizational domain from what was found (4.10.2: `psd=n` **is** the boundary; `psd=y` anywhere but the starting domain puts it one label below; otherwise the fewest-labels record). `DmarcTreeWalk` implements it, `DMARC::GetOrganizationalDomain` consults it first, and the PSL stays underneath as the `DmarcTreeWalkEnabled=0` escape hatch **and** as the answer whenever a lookup fails transiently — a resolver outage must not silently turn relaxed alignment into strict. Bounded at eight queries per domain (4.10 step 4) and cached for five minutes, because DMARC needs an org domain for the author domain *and* every identifier aligned against it, so uncached this would be two dozen lookups a message. Two records at one name discard **both**, per 4.10 steps 2 and 6 — guessing would let anyone weaken a policy by publishing a second one beside it. The 4.10.2 selection rules are pinned by vectors in `DmarcTreeWalkTester` because they are pure and they are where a wrong answer becomes a wrong *policy* decision; the end-to-end fixture `DmarcTreeWalkResolution` publishes a zone through `FakeDnsServer` and asserts each verdict twice — once with the walk on and once with it off, because a case both mechanisms get right proves nothing about which one ran. **Not** in scope here: the DMARCbis 2.0 aggregate-report namespace, split out to its own row below. |
+| ⬜ | **DMARCbis 2.0 aggregate-report namespace** | The other half of the row above. RFC 9990 revises the aggregate report schema and its namespace; the reporter written here still emits the RFC 7489 Appendix C form, which every receiver still accepts. Lower value than the tree walk was, because a report in the older schema is read correctly — it is not a wrong policy decision, just an older document. |
 | ⬜ | **ACME renewal robustness and ARI** | Certificate lifetimes fall to 100 days (Mar 2027) and 47 days with 10-day validation reuse (Mar 2029); Let's Encrypt defaults to 64 days from Feb 2027. Renewal and reload must be unattended and bulletproof, and ARI (renewal-info) becomes worth implementing. Treat 2027 as the real deadline. |
 | ⬜ | **Legacy algorithm audit (RFC 9905)** | Audit for SHA-1, RSA-1024 and other deprecated primitives. No external deadline. TLS 1.2 has no sunset date and is not going anywhere soon — do not pre-emptively drop it. |
 | ⬜ | **SPF void lookup limit** | Cheap correctness item, already biting in the field. |

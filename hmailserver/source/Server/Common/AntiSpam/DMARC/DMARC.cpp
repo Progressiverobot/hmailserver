@@ -6,6 +6,8 @@
 
 #include "DMARC.h"
 #include "PublicSuffixList.h"
+#include "DmarcTreeWalk.h"
+#include "../../Application/IniFileSettings.h"
 
 #include "../../TCPIP/DNSResolver.h"
 #include "../../Util/Parsing/StringParser.h"
@@ -158,6 +160,26 @@ namespace HM
       std::vector<String> labels = StringParser::SplitString(lowerDomain, ".");
       if (labels.size() <= 1)
          return lowerDomain;
+
+      // RFC 9989 (DMARCbis, which obsoletes 7489) discovers this with a DNS tree
+      // walk instead of the Public Suffix List. The difference is not cosmetic:
+      // where a domain owner relies on tree-walk semantics, a PSL answer is a
+      // WRONG POLICY DECISION rather than a soft failure - in both directions.
+      //
+      // The PSL below is kept, and is not dead code: DmarcTreeWalkEnabled=0 selects
+      // it, which is the escape hatch for an operator who meets a domain the walk
+      // handles worse than the list did during the transition. It is also still the
+      // answer when the walk hits a transient DNS failure, because the alternative -
+      // the RFC fallback of "the domain is its own organizational domain" - silently
+      // turns relaxed alignment into strict for the duration of the outage.
+      if (IniFileSettings::Instance()->GetDmarcTreeWalkEnabled())
+      {
+         bool treeWalkDnsError = false;
+         String walked = DmarcTreeWalk::Instance()->GetOrganizationalDomain(lowerDomain, treeWalkDnsError);
+
+         if (!treeWalkDnsError)
+            return walked;
+      }
 
       // The public suffix comes from the real Public Suffix List, compiled in
       // (see PublicSuffixList.h and build\generate-public-suffix-list.ps1).

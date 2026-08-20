@@ -52,6 +52,14 @@ namespace RegressionTests.Shared
       private readonly TcpListener tcp_;
       private volatile bool stopping_;
 
+      // Every question the server was asked, in order. Recorded for the tests that
+      // care about the SHAPE of a lookup rather than its answer - the DMARC tree
+      // walk is bounded at eight queries however deep the name, and a bound can only
+      // be shown to hold by counting. Locked rather than concurrent because both
+      // serve threads write it and a test thread reads it.
+      private readonly List<string> queries_ = new List<string>();
+
+
       public FakeDnsServer()
       {
          try
@@ -316,10 +324,36 @@ namespace RegressionTests.Shared
          WriteRdata_(m, IPAddress.Parse(address).GetAddressBytes());
       }
 
+      /// <summary>
+      ///    The questions asked so far, oldest first, as "type/name". A snapshot: the
+      ///    serve threads keep appending to the real list.
+      /// </summary>
+      public List<string> Queries
+      {
+         get
+         {
+            lock (queries_)
+               return new List<string>(queries_);
+         }
+      }
+
+      /// <summary>
+      ///    Forgets every recorded question. Called at the point a test starts counting,
+      ///    so unrelated lookups made while the server was starting are not counted.
+      /// </summary>
+      public void ClearQueries()
+      {
+         lock (queries_)
+            queries_.Clear();
+      }
+
       private byte[] BuildResponse_(byte[] query)
       {
          string name = QueryName_(query);
          int type = QueryType_(query);
+
+         lock (queries_)
+            queries_.Add(Key_(type, name));
 
          if (answers_.TryGetValue(Key_(type, name), out List<string> values) && values.Count > 0)
          {

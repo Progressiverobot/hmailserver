@@ -27,6 +27,7 @@
 #include "BATV.h"
 #include "AccountLockout.h"
 #include "Totp.h"
+#include "../AntiSpam/DMARC/DmarcTreeWalk.h"
 #include "RateLimiter.h"
 #include "TransparentTransmissionBuffer.h"
 #include "../Cache/Cache.h"
@@ -162,6 +163,12 @@ namespace HM
       {
          TotpTester totpTester;
          totpTester.Test();
+      }
+
+      OutputDebugString(_T("hMailServer: Testing the DMARC tree walk (RFC 9989 4.10.2)\n"));
+      {
+         DmarcTreeWalkTester treeWalkTester;
+         treeWalkTester.Test();
       }
 
       OutputDebugString(_T("hMailServer: Testing SRS\n"));

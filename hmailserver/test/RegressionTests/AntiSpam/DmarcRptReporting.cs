@@ -119,6 +119,16 @@ namespace RegressionTests.AntiSpam
          // p=none with a rua, and exactly one of the two external domains publishes the
          // RFC 7489 7.1 consent record that authorizes reports to be sent to it.
          using (var fakeDns = new FakeDnsServer()
+            // example.test publishes a bare policy of its own, and it has to: under the
+            // RFC 9989 tree walk the organizational domain is the record found at the
+            // FEWEST labels, so with nothing published here sender-dom.example.test
+            // would be its own organizational domain - and its rua, which points at
+            // example.test, would become an EXTERNAL destination needing authorization.
+            // That is the correct DMARCbis reading rather than a quirk of the harness:
+            // publishing a record is how a name declares itself, and the internal case
+            // this fixture is built on only exists while a parent has declared one. A
+            // real org domain running DMARC publishes exactly this.
+            .WithTxt("_dmarc.example.test", "v=DMARC1; p=none")
             .WithTxt("_dmarc." + InternalPolicyDomain, DmarcPolicy)
             .WithTxt("_dmarc." + ExternalUnverifiedPolicyDomain, DmarcPolicy)
             .WithTxt("_dmarc." + ExternalVerifiedPolicyDomain, DmarcPolicy)

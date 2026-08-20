@@ -586,6 +586,7 @@
     <Compile Include="SMTP\TlsRptInertReporting.cs" />
     <Compile Include="SMTP\TlsRptReporting.cs" />
     <Compile Include="AntiSpam\DmarcRptReporting.cs" />
+    <Compile Include="AntiSpam\DmarcTreeWalkResolution.cs" />
     <Compile Include="POP3\LoginDelay.cs" />
     <Compile Include="POP3\AuthRespCode.cs" />
     <Compile Include="POP3\Pipelining.cs" />

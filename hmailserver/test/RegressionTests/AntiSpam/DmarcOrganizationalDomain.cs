@@ -18,12 +18,19 @@ namespace RegressionTests.AntiSpam
    ///    (PublicSuffixListData.h) that DMARC::GetOrganizationalDomain resolves
    ///    organizational domains against.
    ///
-   ///    The org-domain computation cannot be exercised end-to-end from this suite:
-   ///    it sits behind DMARC policy discovery, which needs a DNS server that
-   ///    answers TXT queries for domains the test controls, and the harness has no
-   ///    such server (CustomDnsServer.cs only proves a lookup is dispatched). What
-   ///    CAN be pinned down is the data the C++ binary-searches and the semantics
-   ///    that data is meant to produce - and the data is where the historical
+   ///    The org-domain computation could not be exercised end-to-end when this
+   ///    fixture was written: it sits behind DMARC policy discovery, which needs a
+   ///    DNS server that answers TXT queries for domains the test controls, and the
+   ///    harness had no such server (CustomDnsServer.cs only proves a lookup is
+   ///    dispatched). It has one now - FakeDnsServer - and DmarcTreeWalkResolution.cs
+   ///    uses it to drive the RFC 9989 tree walk that has since become the primary
+   ///    mechanism. This fixture keeps the OTHER half: the Public Suffix List is
+   ///    still what answers when the tree walk is switched off and, more importantly,
+   ///    whenever a lookup fails transiently - so its data is still load-bearing on
+   ///    every DMARC evaluation made during a resolver outage.
+   ///
+   ///    What is pinned here is that data - what the C++ binary-searches, and the
+   ///    semantics it is meant to produce - and the data is where the historical
    ///    defects lived, because it is regenerated wholesale from publicsuffix.org
    ///    (build\generate-public-suffix-list.ps1) and a bad regeneration would be
    ///    committed once and trusted for years.
