@@ -9,6 +9,7 @@ need - and emptying the trash folder afterwards - will free the space.
 
 hMailServer
 ')
+
 insert into hm_servermessages (smname, smtext) values ('QUOTA_WARNING_SUBJECT', 'Your mailbox is almost full')
 
 update hm_dbversion set value = 6022

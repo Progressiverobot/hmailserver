@@ -10,6 +10,7 @@ create table hm_messagetrace
 	mtstatuscode int not null,
 	mtdetail nvarchar(255) not null
 )
+
 ALTER TABLE hm_messagetrace ADD CONSTRAINT hm_messagetrace_pk PRIMARY KEY (mtid)
 
 CREATE INDEX idx_hm_messagetrace ON hm_messagetrace (mtoccurred)

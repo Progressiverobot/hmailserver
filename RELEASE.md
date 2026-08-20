@@ -29,29 +29,37 @@ already cost a release cycle or nearly shipped a defect.
    reconciles every tick box in `Roadmap.md` against the per-section counts
    and the contents table, because three hand-edited restatements of the same
    750 numbers drift — nine sections had drifted when the check was written.
-6. **Version stamp**: `Version.h` (version, numeric, build),
+6. **Check the database scripts build a database**: `build\check-db-scripts.ps1`.
+   It creates a throwaway SQL CE database from `CreateTablesMSSQL.sql` using the
+   same splitting rules the server uses, because nothing else here does - the
+   regression bench's database is upgraded out of band, so no local test takes
+   the CREATE path a fresh install takes. 6.2.22-pre4 shipped an installer whose
+   database could not be created at all, and the only symptom was a service that
+   started and did not listen.
+
+7. **Version stamp**: `Version.h` (version, numeric, build),
    `section_setup_64.iss`, all seven `.csproj` `<Version>` values. Verify
    nothing else still carries the old version: `git grep <old-version>`.
-7. **Build everything at the stamped version**: `build.ps1 -Configuration
+8. **Build everything at the stamped version**: `build.ps1 -Configuration
    Release`, `build-tools.ps1 -Configuration Release`, ControlPanel
    `dotnet publish` to its `publish\` folder (build-tools does not cover it),
    `build-tests.ps1`. Confirm the stamped `FileVersion` on
    `hMailServer.exe` and `publish\hMailCP.dll`.
-8. **Full regression suite on the stamped binary** — every test, nothing
+9. **Full regression suite on the stamped binary** — every test, nothing
    skipped. If *anything* changes after this run, the run is void: rebuild
    and re-run. Never abort a run; if one must be stopped, expect step 4 to
    fail and clean up before trusting any result.
-9. **README release notes** — every claim checked against the diff. "Fixed"
+10. **README release notes** — every claim checked against the diff. "Fixed"
    means reproduced-then-fixed or negative-control-tested; anything else is
    described as hardening or diagnostics. Unfixed known issues are named as
    unfixed.
-10. **Installer**: ISCC on `hMailServer64.iss`. Never run the installer on
+11. **Installer**: ISCC on `hMailServer64.iss`. Never run the installer on
    the dev machine — validation is the CI smoke-test workflow
    (`installer-smoke.yml`), which installs it on a throwaway runner.
-11. **Commit** (as chrisholloway5, no co-author trailers), **tag**
+12. **Commit** (as chrisholloway5, no co-author trailers), **tag**
     `vX.Y.Z`, push branch then tag, `gh release create` with the installer.
     The SBOM workflow attaches SPDX/CycloneDX automatically.
-12. **Close the loop**: answer every issue the release resolves (and close
+13. **Close the loop**: answer every issue the release resolves (and close
     them), update the ones it does not resolve saying so plainly.
 
 ## Standing rules
