@@ -265,12 +265,12 @@ namespace RegressionTests.AntiSpam
       ///    at run time so the fixture is testing the REPORT rather than a signer.
       /// </summary>
       private const string SignedSeed =
-            "DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=sender-dom.example.test; s=reportsel; h=from:to:subject:date; bh=UiW1Vq02S/LU/SLyPMpS2+090dMUxUOeE/rTgKpvR2E=; b=E2azn0KKCQj/gs1l8KO8dyBJndQbtqTT2XnB1I83hnsvTM5Sns7nESoLIEyg4wBH8otamGx0zhxmK2l2hT/wQc4tpPkcr5mcuzAXqX3wky62Jk/CpQBvRIFHmch2t2Z9lftVeHqzXxjub3X9R11ocr+lTnionM8fA+QlCOsv3JfoHxb/36O8gzfIeX/zOQgD2p7dy61EW/1QU6APPtwSaWYcEceHAgDM+ZOzInX8wonrinub3pKgJrng2gQXTzm1SPHekwLZUgKABoYSfCJzFKow8hamNziBKQQoKKuWsySgNWOl2w179/8I0exJ0wEhgTjDJ/DFLBpKDu8m39eCAQ==\r\n" +
-            "From: <user@sender-dom.example.test>\r\n" +
-            "To: <seedrcpt@example.test>\r\n" +
-            "Subject: dkim selector seed\r\n" +
-            "Date: Thu, 20 Aug 2026 10:00:00 +0000\r\n" +
-            "\r\n" +
+            "DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=sender-dom.example.test; s=reportsel; h=from:to:subject:date; bh=UiW1Vq02S/LU/SLyPMpS2+090dMUxUOeE/rTgKpvR2E=; b=E2azn0KKCQj/gs1l8KO8dyBJndQbtqTT2XnB1I83hnsvTM5Sns7nESoLIEyg4wBH8otamGx0zhxmK2l2hT/wQc4tpPkcr5mcuzAXqX3wky62Jk/CpQBvRIFHmch2t2Z9lftVeHqzXxjub3X9R11ocr+lTnionM8fA+QlCOsv3JfoHxb/36O8gzfIeX/zOQgD2p7dy61EW/1QU6APPtwSaWYcEceHAgDM+ZOzInX8wonrinub3pKgJrng2gQXTzm1SPHekwLZUgKABoYSfCJzFKow8hamNziBKQQoKKuWsySgNWOl2w179/8I0exJ0wEhgTjDJ/DFLBpKDu8m39eCAQ==\r\n" +
+            "From: <user@sender-dom.example.test>\r\n" +
+            "To: <seedrcpt@example.test>\r\n" +
+            "Subject: dkim selector seed\r\n" +
+            "Date: Thu, 20 Aug 2026 10:00:00 +0000\r\n" +
+            "\r\n" +
             "Signed so the aggregate report has a selector to name.\r\n";
 
       private static void SendSeed_(string fromDomain)
