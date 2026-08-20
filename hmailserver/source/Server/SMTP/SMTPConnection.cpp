@@ -1035,7 +1035,7 @@ namespace HM
          // undeliverable address.
          DatabaseUnavailableMarker::Scope databaseScope;
 
-         dp = recipientParser_.CheckDeliveryPossibility(isAuthenticated_, current_message_->GetFromAddress(), sRecipientAddress, sErrMsg, localDelivery, 0);
+         dp = recipientParser_.CheckDeliveryPossibility(isAuthenticated_, current_message_->GetFromAddress(), sRecipientAddress, sErrMsg, localDelivery, 0, true);
 
          if (dp != RecipientParser::DP_Possible && DatabaseUnavailableMarker::IsMarked())
          {
@@ -1046,6 +1046,22 @@ namespace HM
             SendResponse_(451, _T("4.3.2"), _T("Unable to verify the recipient at the moment. Please retry later."));
             return;
          }
+      }
+
+      // A full mailbox is a TEMPORARY refusal, and the distinction is the whole
+      // point of making it here. 452 with the enhanced code 4.2.2 (RFC 3463) tells
+      // the connecting server to hold the message and try again, so a legitimate
+      // sender's mail waits in ITS queue until the mailbox is emptied, and is
+      // eventually reported to the real sender by the machine that actually knows
+      // who that is. A 550 here would destroy the message on the spot; accepting it
+      // and bouncing, which is what happened before, sends a report to whatever the
+      // envelope sender claimed to be.
+      if (dp == RecipientParser::DP_MailboxFull)
+      {
+         AWStats::LogDeliveryFailure(GetIPAddressString(), current_message_->GetFromAddress(), sRecipientAddress, 452, current_message_->GetID());
+
+         SendResponse_(452, _T("4.2.2"), sErrMsg);
+         return;
       }
 
       if (dp != RecipientParser::DP_Possible)

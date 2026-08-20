@@ -271,6 +271,13 @@ namespace HM
       // correspondent whose policy is wrong in exactly this way.
       int GetSpfVoidLookupLimit() const { return spf_void_lookup_limit_; }
 
+      // Refuse a recipient at RCPT TO when its mailbox is already at or over quota,
+      // instead of accepting the message and answering it with a bounce. ON by
+      // default, unlike most switches added here, because the behaviour it replaces
+      // is not a conservative default - it makes this server send mail to whoever
+      // the envelope sender was forged as.
+      bool GetRejectFullMailboxAtRcpt() const { return reject_full_mailbox_at_rcpt_; }
+
       // Password policy, enforced where a password is CHOSEN (Account.Password over
       // COM) and never where one is verified or re-hashed. All off at 0/false, which
       // is what an existing installation gets until an administrator decides
@@ -699,6 +706,7 @@ namespace HM
       int message_trace_retention_days_;
       bool dmarc_tree_walk_enabled_;
       int spf_void_lookup_limit_;
+      bool reject_full_mailbox_at_rcpt_;
       int password_policy_minimum_length_;
       bool password_policy_require_mixed_case_;
       bool password_policy_require_digit_;

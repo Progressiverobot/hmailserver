@@ -205,7 +205,7 @@ if (Test-Path $serverIni) {
                     'PasswordPolicyRequireNonAlphanumeric', 'PasswordPolicyRejectCommon',
                     'QuarantineEnabled', 'PasswordPolicyHistoryCount',
                     'PasswordPolicyMaximumAgeDays', 'DmarcTreeWalkEnabled',
-                    'AuthenticationResultsEnabled', 'DNSQueryTimeout', 'SpfVoidLookupLimit'
+                    'AuthenticationResultsEnabled', 'DNSQueryTimeout', 'SpfVoidLookupLimit', 'RejectFullMailboxAtRcpt'
 
     $iniLines = @(Get-Content -LiteralPath $serverIni)
     $pattern = '^\s*(' + ($leftoverKeys -join '|') + ')\s*='

@@ -272,6 +272,7 @@ namespace hMailServer.ControlPanel.Services
          new SettingEntry("POP3 server minimum timeout (s)", "POP3DMinTimeout", "protocols"),
          new SettingEntry("Public folder name", "IMAPPublicFolderName", "protocols"),
          new SettingEntry("QUOTA", "IMAPQuotaEnabled", "protocols"),
+         new SettingEntry("Refuse a full mailbox during the conversation (452 4.2.2)", "RejectFullMailboxAtRcpt", "protocols"),
          new SettingEntry("Reject empty sender addresses (MAIL FROM:<>)", "DenyMailFromNull", "protocols"),
          new SettingEntry("SMTP client maximum timeout (s)", "SMTPCMaxTimeout", "protocols"),
          new SettingEntry("SMTP client minimum timeout (s)", "SMTPCMinTimeout", "protocols"),

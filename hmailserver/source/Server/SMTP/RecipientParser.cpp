@@ -53,7 +53,7 @@ namespace HM
    }
 
    RecipientParser::DeliveryPossibility
-   RecipientParser::CheckDeliveryPossibility(bool bSenderIsAuthed, String sSender, const String &sOriginalRecipient, String &sErrMsg, bool &bTreatSecurityAsLocal, int iRecursionLevel)
+   RecipientParser::CheckDeliveryPossibility(bool bSenderIsAuthed, String sSender, const String &sOriginalRecipient, String &sErrMsg, bool &bTreatSecurityAsLocal, int iRecursionLevel, bool checkRecipientQuota)
    {
       bool bDomainIsLocal = false;
       bTreatSecurityAsLocal = false;
@@ -159,6 +159,19 @@ namespace HM
                if (pAccount->GetActive())
                {
                   bDomainIsLocal = true;
+
+                  // The mailbox exists and is active, so the only remaining question
+                  // is whether anything will fit in it. Asked HERE, at RCPT time, and
+                  // not left to delivery - because a message accepted for a full
+                  // mailbox has to be answered with a non-delivery report, addressed
+                  // to an envelope sender that spam has almost always forged. That
+                  // makes this server the one sending mail to an innocent third
+                  // party: backscatter, and a reputation problem earned on somebody
+                  // else's behalf. Refusing during the SMTP conversation puts the
+                  // failure back in front of the machine that actually connected.
+                  if (checkRecipientQuota && IsMailboxFull_(pAccount, sErrMsg))
+                     return DP_MailboxFull;
+
                   return DP_Possible;
                }
                else
@@ -444,6 +457,44 @@ namespace HM
 
          AddRecipient_(pRecipients, NewRecipient);
       }
+   }
+
+   bool
+   RecipientParser::IsMailboxFull_(std::shared_ptr<const Account> account, String &sErrMsg)
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // Whether the account is ALREADY at or over its quota - not whether the message
+   // about to arrive would overflow it.
+   //
+   // That distinction is deliberate. The SIZE parameter (RFC 1870) is optional, so a
+   // check that depended on it would work only for senders that volunteer one, and
+   // would be absent for exactly the traffic least likely to declare anything. And
+   // the case that produces backscatter is not the message that tips a mailbox over
+   // the edge - it is the mailbox that has been sitting full for a week while several
+   // hundred messages arrive and are each answered with a bounce. That case is
+   // answerable without knowing any size at all.
+   //
+   // The marginal message that would overflow a mailbox with room left is still
+   // handled where it always was, in LocalDelivery::CheckAccountQuotas_, so nothing
+   // that used to be caught stops being caught.
+   //---------------------------------------------------------------------------()
+   {
+      if (!IniFileSettings::Instance()->GetRejectFullMailboxAtRcpt())
+         return false;
+
+      // Unlimited.
+      if (account->GetAccountMaxSize() == 0)
+         return false;
+
+      // One byte, not zero: SpaceAvailable(0) answers "is the mailbox at most exactly
+      // full", which would let a mailbox sitting precisely on its limit go on
+      // accepting mail that cannot be stored.
+      if (account->SpaceAvailable(1))
+         return false;
+
+      sErrMsg = "Mailbox is full.";
+
+      return true;
    }
 
    RecipientParser::DeliveryPossibility 

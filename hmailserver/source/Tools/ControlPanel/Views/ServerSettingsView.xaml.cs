@@ -1029,6 +1029,21 @@ namespace hMailServer.ControlPanel.Views
          smtp.Settings.Add(new ComText { Path = "WelcomeSMTP", Label = "Welcome banner (empty = default)" });
          smtp.Settings.Add(new ComBool { Path = "AllowSMTPAuthPlain", Label = "Allow plain-text authentication (AUTH PLAIN/LOGIN)" });
          smtp.Settings.Add(new ComBool { Path = "DenyMailFromNull", Label = "Reject empty sender addresses (MAIL FROM:<>)" });
+         smtp.Settings.Add(new IniBool
+         {
+            Path = "RejectFullMailboxAtRcpt",
+            Label = "Refuse a full mailbox during the conversation (452 4.2.2)",
+            Blurb = "On by default, and the one switch here whose default is not the cautious one. With it off, " +
+                    "a message for a mailbox that is already over quota is accepted and then answered with a " +
+                    "non-delivery report addressed to the envelope sender - which the traffic that fills " +
+                    "mailboxes fastest has forged. That report then goes from this server to somebody who sent " +
+                    "nothing, which is backscatter, and it is this server's reputation that pays for it. " +
+                    "Refusing at RCPT TO with a temporary 452 instead leaves the message in the sending " +
+                    "server's queue, so a legitimate sender's mail waits for the mailbox to be emptied and is " +
+                    "eventually reported by the machine that knows who the sender really is. Applies after a " +
+                    "service restart.",
+            IniStore = iniStore_
+         });
          smtp.Settings.Add(new ComBool { Path = "AllowIncorrectLineEndings", Label = "Allow incorrect line endings" });
          smtp.Settings.Add(new ComBool { Path = "DisconnectInvalidClients", Label = "Disconnect clients sending too many invalid commands" });
          smtp.Settings.Add(new ComText { Path = "MaxNumberOfInvalidCommands", Label = "Invalid command limit", Numeric = true });
