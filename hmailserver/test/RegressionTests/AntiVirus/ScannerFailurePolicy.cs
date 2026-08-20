@@ -143,9 +143,34 @@ namespace RegressionTests.AntiVirus
          // delivered, proving the hold preserved it rather than quietly dropping it.
          _settings.AntiVirus.CustomScannerEnabled = false;
 
-         var queue = _application.GlobalObjects.DeliveryQueue;
-         queue.ResetDeliveryTime(Convert.ToInt64(messageId.Groups[1].Value));
-         queue.StartDelivery();
+         // Forced more than once, and that is not belt-and-braces. The server runs
+         // its own retry pass, and if one lands between the assertions above and the
+         // reset below, it scans with the scanner still broken, takes another hold
+         // and stamps a fresh next-try time - 60 minutes away - OVER the reset. The
+         // test then waits out its timeout on a message that will not move until
+         // long after the suite has finished. That happened once, in a full-suite
+         // run and only there, because the window is a few milliseconds wide and it
+         // takes a loaded machine to land in it.
+         //
+         // Re-forcing costs nothing: the message is delivered on the first attempt
+         // that sees a working scanner, and each attempt that does not is a hold
+         // against a budget of 16 set above. So this loop either delivers or spends
+         // three of sixteen holds, and the assertion below still reads the delivered
+         // message rather than a retry count - the thing being proved is that the
+         // held message survived, not how many times it was poked.
+         long heldMessageId = Convert.ToInt64(messageId.Groups[1].Value);
+
+         for (int attempt = 0; attempt < 3; attempt++)
+         {
+            var queue = _application.GlobalObjects.DeliveryQueue;
+            queue.ResetDeliveryTime(heldMessageId);
+            queue.StartDelivery();
+
+            if (new Pop3ClientSimulator().GetMessageCount(_recipient.Address, "test") > 0)
+               break;
+
+            Thread.Sleep(1000);
+         }
 
          Pop3ClientSimulator.AssertMessageCount(_recipient.Address, "test", 1);
          string delivered = Pop3ClientSimulator.AssertGetFirstMessageText(_recipient.Address, "test");

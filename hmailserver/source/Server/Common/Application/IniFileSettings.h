@@ -265,6 +265,12 @@ namespace HM
       // hatch for a domain the walk handles worse during the transition.
       bool GetDmarcTreeWalkEnabled() const { return dmarc_tree_walk_enabled_; }
 
+      // RFC 7208 4.6.4: how many terms of an SPF policy may resolve to nothing
+      // before the evaluation is a permerror. The RFC says two and allows the limit
+      // to be configurable; 0 disables it, which is the escape hatch for a
+      // correspondent whose policy is wrong in exactly this way.
+      int GetSpfVoidLookupLimit() const { return spf_void_lookup_limit_; }
+
       // Password policy, enforced where a password is CHOSEN (Account.Password over
       // COM) and never where one is verified or re-hashed. All off at 0/false, which
       // is what an existing installation gets until an administrator decides
@@ -692,6 +698,7 @@ namespace HM
       bool message_trace_enabled_;
       int message_trace_retention_days_;
       bool dmarc_tree_walk_enabled_;
+      int spf_void_lookup_limit_;
       int password_policy_minimum_length_;
       bool password_policy_require_mixed_case_;
       bool password_policy_require_digit_;

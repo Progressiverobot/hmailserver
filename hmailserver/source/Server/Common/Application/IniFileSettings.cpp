@@ -509,6 +509,7 @@ namespace HM
       message_trace_enabled_ = ReadIniSettingInteger_("Settings", "MessageTraceEnabled", 0) == 1;
       message_trace_retention_days_ = ReadIniSettingInteger_("Settings", "MessageTraceRetentionDays", 30);
       dmarc_tree_walk_enabled_ = ReadIniSettingInteger_("Settings", "DmarcTreeWalkEnabled", 1) == 1;
+      spf_void_lookup_limit_ = ReadIniSettingInteger_("Settings", "SpfVoidLookupLimit", 2);
       password_policy_minimum_length_ = ReadIniSettingInteger_("Settings", "PasswordPolicyMinimumLength", 0);
       password_policy_require_mixed_case_ = ReadIniSettingInteger_("Settings", "PasswordPolicyRequireMixedCase", 0) == 1;
       password_policy_require_digit_ = ReadIniSettingInteger_("Settings", "PasswordPolicyRequireDigit", 0) == 1;

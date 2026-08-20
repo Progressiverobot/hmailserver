@@ -1323,6 +1323,21 @@ namespace hMailServer.ControlPanel.Views
          var auth = Card("Sender authentication");
          auth.Settings.Add(new ComBool { Path = "AntiSpam.UseSPF", Label = "Check SPF" });
          auth.Settings.Add(new ComText { Path = "AntiSpam.UseSPFScore", Label = "SPF failure score", Numeric = true });
+         auth.Settings.Add(new IniNumber
+         {
+            Path = "SpfVoidLookupLimit",
+            Label = "Void SPF lookups allowed before permerror (0 = no limit)",
+            Blurb = "RFC 7208 4.6.4. A \"void lookup\" is a term of a sender's SPF policy - an a:, mx: or " +
+                    "exists: - whose DNS query comes back with nothing at all. The separate limit of ten " +
+                    "DNS-querying terms bounds what a policy can ask this server to look up; it does not " +
+                    "bound what a policy can waste, and ten terms naming hosts that do not exist cost a " +
+                    "full resolution each for a record that can never match. Two is what the RFC says. It " +
+                    "also catches the ordinary case: a policy still listing hosts decommissioned years ago, " +
+                    "which its owner would rather be told about. Raising it is safe; 0 switches the limit " +
+                    "off, which is the setting for a correspondent whose policy is wrong in exactly this " +
+                    "way and whose mail you would rather take. Applies after a service restart.",
+            IniStore = iniStore_
+         });
          auth.Settings.Add(new ComBool { Path = "AntiSpam.DKIMVerificationEnabled", Label = "Verify DKIM signatures" });
          auth.Settings.Add(new ComText { Path = "AntiSpam.DKIMVerificationFailureScore", Label = "DKIM failure score", Numeric = true });
          auth.Settings.Add(new ComBool { Path = "AntiSpam.DMARCEnabled", Label = "Evaluate DMARC policies" });

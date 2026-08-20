@@ -6,6 +6,8 @@
 
 #include "SPF.h"
 #include "rmspf.h"
+#include "../../Common/Application/IniFileSettings.h"
+#include "../../Common/Application/ErrorManager.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -14,6 +16,17 @@
 
 namespace HM
 {
+   // Reached from RMSPF.cpp, which is C and knows nothing about this server's
+   // configuration - the same bridge shape DnssecTxtLookupIsBogus already uses.
+   // Kept here rather than in the library because the library is vendored, and a
+   // setting it read directly would be one more thing to reconcile the next time
+   // it is updated.
+   int
+   SpfVoidLookupLimit()
+   {
+      return IniFileSettings::Instance()->GetSpfVoidLookupLimit();
+   }
+
    SPF::SPF(void)
    {
       // Initialize. This is only done once.
@@ -79,6 +92,24 @@ namespace HM
       return Neutral;
    }
 
+   int
+   SPF::EvaluatePolicy(const String &sSenderIP, const String &sSenderEmail,
+                       const String &sHeloHost, const String &sPolicy)
+   {
+      USES_CONVERSION;
+
+      int family = sSenderIP.Find(_T(":")) >= 0 ? AF_INET6 : AF_INET;
+
+      char BinaryIP[100];
+      if (SPFStringToAddr(T2A(sSenderIP), family, BinaryIP) == NULL)
+         return SPF_PermError;
+
+      AnsiString policy = sPolicy;
+
+      return SPFQuery(family, BinaryIP, T2A(sSenderEmail), policy.c_str(),
+                      T2A(sHeloHost), NULL, NULL);
+   }
+
    void SPFTester::Test()
    //---------------------------------------------------------------------------()
    // DESCRIPTION:
@@ -125,6 +156,103 @@ namespace HM
          // Should not be allowed.
          throw 0;
       }
+
+      TestVoidLookupLimit_();
+   }
+
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // RFC 7208 4.6.4, the void lookup limit, pinned at its boundary.
+   //
+   // The existing limit of ten DNS-querying terms bounds what a policy can demand.
+   // It does not bound what a policy can WASTE, and those are different numbers:
+   // ten terms naming hosts that do not exist cost a full resolution each, for a
+   // record that cannot match anything. Two is the RFC's answer.
+   //
+   // Driven through a supplied policy rather than a published one, because the SPF
+   // library resolves through DnsQuery and not through this server's resolver - so
+   // the suite's DNS server cannot be placed in front of it, and the policy is the
+   // only part of the evaluation a test can control. The mechanism targets are
+   // resolved for real against .invalid, which RFC 2606 reserves precisely so that
+   // it never resolves.
+   //
+   // Both sides of the boundary are asserted. Only checking that three voids fail
+   // would pass on an implementation that rejects the FIRST one, which would turn
+   // every policy with one decommissioned host into a permerror and reject mail
+   // that every other receiver accepts.
+   //---------------------------------------------------------------------------()
+   void SPFTester::TestVoidLookupLimit_()
+   {
+      // Does .invalid actually not resolve here? A resolver that answers for
+      // everything - NXDOMAIN hijacking, still sold as a feature - would make these
+      // lookups non-void, and every assertion below would be about nothing. 'exists'
+      // matches on any A record at all, so this probe distinguishes "does not exist"
+      // from "answered anyway", which is the one thing the vectors cannot do for
+      // themselves.
+      if (SPF::Instance()->EvaluatePolicy("1.2.3.4", "test@spf-void.invalid", "spf-void.invalid",
+                                          "v=spf1 exists:probe.spf-void.invalid -all") != SPF_Fail)
+      {
+         OutputDebugString(_T("hMailServer: SPF void-lookup self-test stood down - this resolver does not return NXDOMAIN for .invalid.\n"));
+         return;
+      }
+
+      // The SAME name in every term, deliberately. Three different names meant three
+      // resolutions, and the first run of this test found the third one returning a
+      // temporary failure while the first two were clean NXDOMAINs - so the vector
+      // measured the resolver's mood rather than this code. One name is resolved
+      // once, negatively cached, and answered from that cache for every term after,
+      // which leaves the term COUNT as the only thing that varies. RFC 7208 4.6.4
+      // counts terms, not queries, so repeating a term is exactly the right shape.
+      const String voidTerm = "exists:probe.spf-void.invalid ";
+
+      // Two voids is within the limit, so evaluation reaches the ip4 term and passes.
+      // This is the assertion that stops the limit being made stricter than the RFC:
+      // a policy naming one host that was decommissioned years ago is ordinary, and
+      // rejecting it would refuse mail every other receiver accepts.
+      AssertPolicyResult_("v=spf1 " + voidTerm + voidTerm + "ip4:1.2.3.4 -all",
+                          SPF_Pass, "two void lookups are within the limit");
+
+      // Three is one too many, and the whole evaluation is a permerror - not a fail,
+      // and not a silent skip of the offending term while the rest of the policy
+      // carries on and passes.
+      AssertPolicyResult_("v=spf1 " + voidTerm + voidTerm + voidTerm + "ip4:1.2.3.4 -all",
+                          SPF_PermError, "three void lookups exceed the limit");
+   }
+
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // Evaluates one policy and throws unless it produced the expected result, naming
+   // the policy and both results first. A bare throw here would report only that
+   // "the class tests failed", and the whole point of a vector is to say WHICH one
+   // and by how much - a permerror where a pass was expected and a fail where a
+   // permerror was expected are different defects with different causes.
+   //---------------------------------------------------------------------------()
+   void SPFTester::AssertPolicyResult_(const String &policy, int expected, const String &what)
+   {
+      int actual = SPF::Instance()->EvaluatePolicy("1.2.3.4", "test@spf-void.invalid",
+                                                   "spf-void.invalid", policy);
+
+      if (actual == expected)
+         return;
+
+      // A temporary DNS failure is not a verdict about this code. The probe above
+      // has already shown the name answers NXDOMAIN, so a temperror here means the
+      // resolver stopped cooperating part-way through - and failing the whole
+      // self-test suite for that would be the same mistake the SPF test above this
+      // one was already fixed for.
+      if (actual == SPF_TempError)
+      {
+         OutputDebugString(_T("hMailServer: SPF void-lookup self-test stood down - the resolver returned a temporary failure.\n"));
+         return;
+      }
+
+      String message;
+      message.Format(_T("SPF self-test: %s. Policy '%s' produced result %d, expected %d."),
+                     what.c_str(), policy.c_str(), actual, expected);
+
+      ErrorManager::Instance()->ReportError(ErrorManager::High, 4404, "SPFTester::AssertPolicyResult_", message);
+
+      throw 0;
    }
 
 

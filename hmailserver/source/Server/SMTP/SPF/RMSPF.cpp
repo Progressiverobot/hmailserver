@@ -57,6 +57,7 @@
 
 // DNSSEC bridge implemented in Common/TCPIP/DnssecResolver.cpp.
 namespace HM { bool DnssecTxtLookupIsBogus(const char *name); }
+namespace HM { int SpfVoidLookupLimit(); }
 
 #ifdef DNSAPI_SUPP
 
@@ -139,6 +140,7 @@ static typIsamDelete* pIsamDelete;
 #define SPFNRECSIZE 1024 // size of buffer for data record with domain names
 #define SPFKEYSIZE 255 // size of buffer for search key
 #define SPFMAXLOOKUPS 10 // max number of lookups
+#define SPFMAXVOIDLOOKUPS 2 // RFC 7208 4.6.4: max terms that resolve to nothing
 
 #if defined(SPFFILECACHE) || defined(SPFMEMCACHE)
 #define SPFCACHE
@@ -209,6 +211,7 @@ typedef struct
 {
    int spf_level; // subquery counter (0x0101: include, 0x0100: redirect)
    int spf_lookups; // number of mechanisms that did a DNS lookup
+   int spf_voidlookups; // number of mechanisms whose lookup found nothing
    spfbool spf_ipv6; // IP address is IPv6
    spfbool spf_testhelo; // testing the HELO domain (because no sender)
    time_t spf_time; // current time (Unix time)
@@ -2745,6 +2748,44 @@ get_cidrlen(const char** cpp, spfbool second, int maxlen)
 }
 
 
+// RFC 7208 4.6.4: a term whose DNS query came back NXDOMAIN, or NOERROR with no
+// answers, is a "void lookup", and an implementation SHOULD stop after two of
+// them with a permerror.
+//
+// The limit that already exists here - ten DNS-querying terms - bounds the
+// lookups a policy can DEMAND. It does not bound the ones a policy can WASTE: ten
+// terms naming ten hosts that do not exist cost this server ten full resolutions,
+// every one of them a timeout away from the root, for a record that can never
+// match anything. Published against a domain an attacker can get mail addressed
+// to, that is an amplifier aimed at whoever receives it. Two is what the RFC
+// says, and it also catches the ordinary case the limit was written for: a policy
+// listing hosts that were decommissioned years ago, which is a misconfiguration
+// its owner would rather be told about than have quietly tolerated.
+//
+// Counted per TERM rather than per query, which is what 4.6.4 says: an 'mx' whose
+// MX records each fail to resolve is one void term, not one per host. Over-counting
+// here would turn a working policy into a permerror, which rejects real mail - the
+// error direction that matters.
+//
+// Returns SPF_PermError once the limit is passed, and -1 - the "no match, carry on"
+// value every caller already returns on this path - until then.
+static int
+voidlookup(spfrec* spfp)
+{
+   int limit = HM::SpfVoidLookupLimit();
+
+   spfp->spf_voidlookups++;
+
+   // Zero disables the limit, which is the escape hatch for an operator who meets
+   // a correspondent whose policy is wrong in this specific way and would rather
+   // take their mail than be right about it.
+   if (limit <= 0)
+      return -1;
+
+   return spfp->spf_voidlookups > limit ? SPF_PermError : -1;
+}
+
+
 // parse 'include' mechanism, return codes: -1: no match, >=0: result
 static int
 parse_include(spfrec* spfp, const char** cpp, int prefix, const char* domain)
@@ -2890,7 +2931,7 @@ parse_a(spfrec* spfp, const char** cpp, int prefix, const char* domain)
    if (datalen < 0)
    {
       if (datalen == -SPF_None || datalen == -SPF_PermError) // no records
-         return -1;
+         return voidlookup(spfp);
       return -datalen;
    }
 
@@ -3112,7 +3153,7 @@ parse_mx(spfrec* spfp, const char** cpp, int prefix, const char* domain)
       else
 #endif //SPFCACHE
          if (datalen == -SPF_PermError) // domain does not exist
-            result = -1;
+            result = voidlookup(spfp);
          else
             result = -datalen;
 }
@@ -3159,7 +3200,7 @@ parse_mx(spfrec* spfp, const char** cpp, int prefix, const char* domain)
    if (result == 0)
       return prefix;
    if (result == SPF_None)
-      return -1;
+      return voidlookup(spfp);
    return result;
  }
 
@@ -3228,7 +3269,7 @@ parse_exists(spfrec* spfp, const char** cpp, int prefix, const char* domain)
    {
       if (datalen == -SPF_TempError)
          return SPF_TempError;
-      return -1;
+      return voidlookup(spfp);
    }
    if (datap != (dnsrec*)data)
       spffree(datap);
@@ -4123,6 +4164,7 @@ const char** explain)
    spfdata.spf_expdom = NULL;
    spfdata.spf_level = 0;
    spfdata.spf_lookups = 0;
+   spfdata.spf_voidlookups = 0;
 
    // if there is a source routing, first try the leftmost domain
    if (*sender == '@' && (cp1 = strchr(sender, ':')) != NULL)
@@ -4151,6 +4193,7 @@ const char** explain)
       spfdata.spf_expdom = NULL;
       spfdata.spf_level = 0;
       spfdata.spf_lookups = 0;
+      spfdata.spf_voidlookups = 0;
    }
 
    spfdata.spf_domain = strchr(sender, '@');

@@ -73,6 +73,7 @@ namespace hMailServer.ControlPanel.Services
          new SettingEntry("Use ARC results from trusted forwarders to offset a DMARC failure", "AntiSpam.ArcFilteringEnabled", "antispam"),
          new SettingEntry("Use SpamAssassin", "AntiSpam.SpamAssassinEnabled", "antispam"),
          new SettingEntry("Verify DKIM signatures", "AntiSpam.DKIMVerificationEnabled", "antispam"),
+         new SettingEntry("Void SPF lookups allowed before permerror (0 = no limit)", "SpfVoidLookupLimit", "antispam"),
          new SettingEntry("clamscan.exe path", "AntiVirus.ClamWinExecutable", "antivirus"),
          new SettingEntry("Command line (use %FILE% for the scanned file)", "AntiVirus.CustomScannerExecutable", "antivirus"),
          new SettingEntry("Database folder", "AntiVirus.ClamWinDBFolder", "antivirus"),
