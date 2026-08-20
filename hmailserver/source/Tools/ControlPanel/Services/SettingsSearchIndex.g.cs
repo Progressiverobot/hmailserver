@@ -253,6 +253,7 @@ namespace hMailServer.ControlPanel.Services
          new SettingEntry("Allow SASL PLAIN authentication", "IMAPSASLPlainEnabled", "protocols"),
          new SettingEntry("Delete archived messages after (days; 0 = keep for ever)", "ArchiveRetentionDays", "protocols"),
          new SettingEntry("Disconnect clients sending too many invalid commands", "DisconnectInvalidClients", "protocols"),
+         new SettingEntry("Expose per-domain message counters on /metrics", "MetricsPerDomainEnabled", "protocols"),
          new SettingEntry("Folder hierarchy delimiter", "IMAPHierarchyDelimiter", "protocols"),
          new SettingEntry("Host name (HELO/EHLO greeting)", "HostName", "protocols"),
          new SettingEntry("IDLE (push mail)", "IMAPIdleEnabled", "protocols"),

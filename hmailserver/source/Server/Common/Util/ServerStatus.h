@@ -26,6 +26,24 @@ namespace HM
       void OnMessageProcessed();
       int GetNumberOfProcessedMessages()  const;
 
+      // The same two counts, split by the LOCAL domain the mail belonged to - the
+      // dimension that turns a number into an answer to "how much mail did this
+      // customer send last month".
+      //
+      // Cardinality is bounded by construction rather than by a cap. Only domains
+      // this server actually hosts are ever labelled, so the series count is the
+      // number of domains the operator configured; the sender or recipient domains
+      // of the wider internet, which are unbounded and attacker-chosen, never appear.
+      // That is why there is no "other" bucket and no truncation to explain.
+      //
+      // Unlike the counters above these are written from connection threads, so they
+      // are locked. The map is read whole when /metrics is scraped.
+      void OnDomainMessageReceived(const String &domain);
+      void OnDomainMessageSent(const String &domain);
+
+      std::map<String, __int64> GetDomainMessagesReceived() const;
+      std::map<String, __int64> GetDomainMessagesSent() const;
+
       void OnSpamMessageDetected();
       int GetNumberOfDetectedSpamMessages() const;
       
@@ -137,6 +155,10 @@ namespace HM
    private:
 
       int processed_messages_;
+
+      mutable boost::mutex domain_counter_mutex_;
+      std::map<String, __int64> domain_messages_received_;
+      std::map<String, __int64> domain_messages_sent_;
       int number_of_spam_messages_detected_;
       int number_of_viruses_removed_;
       int number_of_tls_handshakes_completed_;

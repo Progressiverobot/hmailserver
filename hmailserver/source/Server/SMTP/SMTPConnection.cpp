@@ -797,6 +797,58 @@ namespace HM
       return false;
    }
 
+   void
+   SMTPConnection::CountMessageAgainstLocalDomains_()
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // Counts one accepted message against the local domains it belongs to: the
+   // sender's domain if this server hosts it, and every local recipient domain.
+   //
+   // A message from one hosted domain to another counts once on each side, which is
+   // right - it is one message sent and one message received, and an operator
+   // reporting on either domain would expect to see it.
+   //---------------------------------------------------------------------------()
+   {
+      if (!IniFileSettings::Instance()->GetMetricsPerDomainEnabled())
+         return;
+
+      if (!current_message_)
+         return;
+
+      String senderDomain = StringParser::ExtractDomain(current_message_->GetFromAddress());
+      senderDomain.MakeLower();
+
+      // Only ever a domain this server hosts. That is what bounds the label set:
+      // the sender domain of an arbitrary inbound message is attacker-chosen and
+      // unbounded, and labelling it would let anyone create time series here.
+      if (!senderDomain.IsEmpty() && CacheContainer::Instance()->GetDomain(senderDomain))
+         ServerStatus::Instance()->OnDomainMessageSent(senderDomain);
+
+      std::set<String> countedRecipientDomains;
+
+      for (std::shared_ptr<MessageRecipient> recipient : current_message_->GetRecipients()->GetVector())
+      {
+         String recipientDomain = StringParser::ExtractDomain(recipient->GetAddress());
+         recipientDomain.MakeLower();
+
+         if (recipientDomain.IsEmpty())
+            continue;
+
+         // Once per domain, not once per recipient: a message to four people at one
+         // domain is one message that domain received, and counting it four times
+         // would make the number disagree with everything else the operator can see.
+         if (countedRecipientDomains.find(recipientDomain) != countedRecipientDomains.end())
+            continue;
+
+         if (!CacheContainer::Instance()->GetDomain(recipientDomain))
+            continue;
+
+         countedRecipientDomains.insert(recipientDomain);
+
+         ServerStatus::Instance()->OnDomainMessageReceived(recipientDomain);
+      }
+   }
+
    bool
    SMTPConnection::CheckAccountSendingQuotaAtMailFrom_()
    {
@@ -1681,6 +1733,13 @@ namespace HM
             // to the file.
             if (transmission_buffer_)
                transmission_buffer_.reset();
+
+            // Per-domain counters, before the message is released below. Counted
+            // here, at acceptance, rather than at delivery: this answers "how much
+            // mail did this domain handle", and a message that was accepted counts
+            // whether or not it later bounced - which is the same thing the global
+            // processed-messages counter has always meant.
+            CountMessageAgainstLocalDomains_();
 
             // Add this message to the delivery queue cache. This way,
             // we won't have to read it from the database.

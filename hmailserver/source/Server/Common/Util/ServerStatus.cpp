@@ -202,6 +202,40 @@ namespace HM
    }
 
    void
+   ServerStatus::OnDomainMessageReceived(const String &domain)
+   {
+      if (domain.IsEmpty())
+         return;
+
+      boost::lock_guard<boost::mutex> guard(domain_counter_mutex_);
+      domain_messages_received_[domain]++;
+   }
+
+   void
+   ServerStatus::OnDomainMessageSent(const String &domain)
+   {
+      if (domain.IsEmpty())
+         return;
+
+      boost::lock_guard<boost::mutex> guard(domain_counter_mutex_);
+      domain_messages_sent_[domain]++;
+   }
+
+   std::map<String, __int64>
+   ServerStatus::GetDomainMessagesReceived() const
+   {
+      boost::lock_guard<boost::mutex> guard(domain_counter_mutex_);
+      return domain_messages_received_;
+   }
+
+   std::map<String, __int64>
+   ServerStatus::GetDomainMessagesSent() const
+   {
+      boost::lock_guard<boost::mutex> guard(domain_counter_mutex_);
+      return domain_messages_sent_;
+   }
+
+   void
    ServerStatus::OnMessageProcessed()
    {
       // Called by SMTPDeliveryManger which is

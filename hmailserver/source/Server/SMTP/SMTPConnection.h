@@ -154,6 +154,8 @@ namespace HM
       // the account and its limits for the transaction about to start and consumes
       // one message from the budget. Returns false when the transaction must be
       // refused, having already answered the client.
+      void CountMessageAgainstLocalDomains_();
+
       bool CheckAccountSendingQuotaAtMailFrom_();
       // Consumes one envelope recipient from the same budget. Returns false when
       // the recipient must be refused, having already answered the client.

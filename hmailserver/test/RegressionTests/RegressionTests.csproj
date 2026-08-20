@@ -308,6 +308,7 @@
     <Compile Include="Infrastructure\IniSettingsMirror.cs" />
     <Compile Include="Infrastructure\IniSettingsOverCom.cs" />
     <Compile Include="IMAP\AppendInternalDate.cs" />
+    <Compile Include="Infrastructure\PerDomainMetrics.cs" />
     <Compile Include="Infrastructure\MetricsReadiness.cs" />
     <Compile Include="Installation\InstallerPackaging.cs" />
     <Compile Include="API\ComPropertyValidation.cs" />

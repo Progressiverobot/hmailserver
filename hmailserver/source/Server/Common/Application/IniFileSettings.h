@@ -298,6 +298,14 @@ namespace HM
       // it was told to keep.
       int GetArchiveRetentionDays() const { return archive_retention_days_; }
 
+      // Whether /metrics carries per-domain message counters. Off by default, and
+      // that is a cardinality decision rather than a cautious one: every label value
+      // is a separate time series in whatever scrapes this, and an operator hosting
+      // several thousand domains should choose to pay for that rather than discover
+      // it. The values themselves are safe - only domains this server hosts are ever
+      // labelled - so the cost is volume, not exposure.
+      bool GetMetricsPerDomainEnabled() const { return metrics_per_domain_enabled_; }
+
       // Password policy, enforced where a password is CHOSEN (Account.Password over
       // COM) and never where one is verified or re-hashed. All off at 0/false, which
       // is what an existing installation gets until an administrator decides
@@ -730,6 +738,7 @@ namespace HM
       bool dkim_accept_sha1_;
       int quota_warning_percent_;
       int archive_retention_days_;
+      bool metrics_per_domain_enabled_;
       int password_policy_minimum_length_;
       bool password_policy_require_mixed_case_;
       bool password_policy_require_digit_;

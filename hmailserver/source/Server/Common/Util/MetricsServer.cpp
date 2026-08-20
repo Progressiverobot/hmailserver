@@ -1490,6 +1490,35 @@ namespace HM
          body += line;
       }
 
+      // Per-domain message counters. Present only when MetricsPerDomainEnabled is
+      // set, because every label value here is a separate time series in whatever
+      // scrapes this - an operator hosting several thousand domains should choose to
+      // pay for that rather than find out. The label set is bounded by the domains
+      // this server hosts, never by what arrives: a sender domain nobody here hosts
+      // is not labelled, so no amount of inbound mail can create series.
+      if (IniFileSettings::Instance()->GetMetricsPerDomainEnabled())
+      {
+         body += "# HELP hmailserver_domain_messages_received_total Messages accepted for each locally hosted domain since start. Counted once per message per domain, not once per recipient.\n";
+         body += "# TYPE hmailserver_domain_messages_received_total counter\n";
+
+         for (const auto &entry : ServerStatus::Instance()->GetDomainMessagesReceived())
+         {
+            line.Format("hmailserver_domain_messages_received_total{domain=\"%s\"} %I64d\n",
+                        EscapeLabelValue_(entry.first).c_str(), entry.second);
+            body += line;
+         }
+
+         body += "# HELP hmailserver_domain_messages_sent_total Messages accepted from each locally hosted domain since start.\n";
+         body += "# TYPE hmailserver_domain_messages_sent_total counter\n";
+
+         for (const auto &entry : ServerStatus::Instance()->GetDomainMessagesSent())
+         {
+            line.Format("hmailserver_domain_messages_sent_total{domain=\"%s\"} %I64d\n",
+                        EscapeLabelValue_(entry.first).c_str(), entry.second);
+            body += line;
+         }
+      }
+
       // A start timestamp rather than an uptime counter, matching the
       // process_start_time_seconds convention every Prometheus client library
       // follows. Uptime is then time() - hmailserver_start_time_seconds, and a

@@ -1075,6 +1075,21 @@ namespace hMailServer.ControlPanel.Views
                     "twelve hours after. Applies after a service restart.",
             IniStore = iniStore_
          });
+
+         smtp.Settings.Add(new IniBool
+         {
+            Path = "MetricsPerDomainEnabled",
+            Label = "Expose per-domain message counters on /metrics",
+            Blurb = "Every counter the metrics endpoint exposes is server-wide, which is what stops metrics " +
+                    "becoming reporting: you can see how much mail the server handled, never how much any one " +
+                    "domain did. This adds a count of messages sent and received per hosted domain. Off by " +
+                    "default, and that is a cardinality decision rather than a cautious one - every label value " +
+                    "is a separate time series in whatever scrapes this, so an operator hosting several thousand " +
+                    "domains should choose to pay for that rather than find out. Only domains this server hosts " +
+                    "are ever labelled, so no amount of mail from strangers can create series. Applies after a " +
+                    "service restart.",
+            IniStore = iniStore_
+         });
          smtp.Settings.Add(new ComBool { Path = "AllowIncorrectLineEndings", Label = "Allow incorrect line endings" });
          smtp.Settings.Add(new ComBool { Path = "DisconnectInvalidClients", Label = "Disconnect clients sending too many invalid commands" });
          smtp.Settings.Add(new ComText { Path = "MaxNumberOfInvalidCommands", Label = "Invalid command limit", Numeric = true });
