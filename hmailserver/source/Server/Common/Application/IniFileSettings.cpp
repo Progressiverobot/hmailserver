@@ -161,8 +161,8 @@ namespace HM
       String sValidLanguages = ReadIniSettingString_("GUILanguages", "ValidLanguages", "");
       valid_languages_ = StringParser::SplitString(sValidLanguages, ",");
 
-      preferred_hash_algorithm_ = ReadIniSettingInteger_("Settings", "PreferredHashAlgorithm", 4);
-
+      preferred_hash_algorithm_ = ReadIniSettingInteger_("Settings", "PreferredHashAlgorithm", 4);
+
       // Crypt::EncryptionType: 0 None, 1 Blowfish, 2 MD5, 3 SHA256, 4 PBKDF2,
       // 5 Argon2id. The first three are not password hashes - None and Blowfish are
       // recoverable rather than hashed at all, and MD5 has not been a defensible
