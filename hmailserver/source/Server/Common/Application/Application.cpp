@@ -62,6 +62,7 @@
 #include "RemoveExpiredRecords.h"
 #include "LogRetentionTask.h"
 #include "ArchiveRetentionTask.h"
+#include "IMAPExpungeRetentionTask.h"
 #include "MessageStoreConsistencyTask.h"
 #include "WorkQueueHealthTask.h"
 #include "../Util/DiskSpace.h"
@@ -653,6 +654,24 @@ namespace HM
       archiveRetentionTask->SetReoccurance(ScheduledTask::RunInfinitely);
       archiveRetentionTask->SetMinutesBetweenRun(12 * 60);
       scheduler_->ScheduleTask(archiveRetentionTask);
+
+      // QRESYNC expunge records: cap hm_imapexpunged at IMAPExpungeRetentionRecords
+      // per mailbox and drop rows whose folder no longer exists. Same startup-plus-
+      // periodic shape as the two sweeps above, and twelve hours for the same
+      // reason - a table that has been growing since the installation was built is
+      // not going to be urgent on the day this ships.
+      //
+      // Registered unconditionally, unlike the greylist cleaner above, because the
+      // records are written whenever a message is expunged from a folder and not
+      // only when some feature is switched on.
+      std::shared_ptr<IMAPExpungeRetentionTask> expungeRetentionStartupTask = std::shared_ptr<IMAPExpungeRetentionTask>(new IMAPExpungeRetentionTask);
+      expungeRetentionStartupTask->SetReoccurance(ScheduledTask::RunOnce);
+      scheduler_->ScheduleTask(expungeRetentionStartupTask);
+
+      std::shared_ptr<IMAPExpungeRetentionTask> expungeRetentionTask = std::shared_ptr<IMAPExpungeRetentionTask>(new IMAPExpungeRetentionTask);
+      expungeRetentionTask->SetReoccurance(ScheduledTask::RunInfinitely);
+      expungeRetentionTask->SetMinutesBetweenRun(12 * 60);
+      scheduler_->ScheduleTask(expungeRetentionTask);
 
       // Message-store consistency: cross-check the message database against the
       // files on disk and publish the number of missing files. The task no-ops

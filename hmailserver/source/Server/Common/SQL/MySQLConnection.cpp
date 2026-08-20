@@ -23,6 +23,7 @@ namespace HM
       is_connected_ = false;
       dbconn_ = 0;
       supports_transactions_ = false;
+      timeout_variable_is_seconds_ = false;
    }
 
    MySQLConnection::~MySQLConnection()
@@ -151,6 +152,13 @@ namespace HM
          LoadSupportsTransactions_(sDatabase);
 
          is_connected_ = true;
+
+         // Both of these run statements, so they go after is_connected_. The
+         // mechanism is worked out once per connection and then applied; the session
+         // variable dies with the session, so Reconnect() - which calls Connect() -
+         // is what puts it back after a dropped connection.
+         LoadTimeoutMechanism_();
+         ApplyDefaultTimeout();
       }
       catch (...)
       {
@@ -540,7 +548,134 @@ namespace HM
       }
    }
 
-   std::shared_ptr<DALRecordset> 
+   bool
+   MySQLConnection::TrySetTimeoutVariable_(const String &variableName, const String &value)
+   {
+      String command;
+      command.Format(_T("SET SESSION %s = %s"), variableName.c_str(), value.c_str());
+
+      String errorMessage;
+
+      return TryExecute(SQLCommand(command), errorMessage, 0, 0) == DALConnection::DALSuccess;
+   }
+
+   void
+   MySQLConnection::LoadTimeoutMechanism_()
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // Decides which session variable this server uses to bound statement execution
+   // time, and in which unit. See the comment on MySQLConnection::SetTimeout.
+   //---------------------------------------------------------------------------()
+   {
+      timeout_variable_ = "";
+      timeout_variable_is_seconds_ = false;
+
+      // The fork is read from VERSION() rather than from
+      // mysql_get_server_version, on purpose. MariaDB still announces itself in the
+      // handshake as "5.5.5-<real version>-MariaDB" for the benefit of very old
+      // clients, and a client library that parses that literally reports MariaDB
+      // 10.6 as version 50505 - which would send this down the MySQL branch and pick
+      // the wrong unit. VERSION() is answered by the server itself and carries no
+      // such prefix.
+      bool is_maria_db = false;
+
+      MySQLRecordset rec;
+      if (rec.Open(shared_from_this(), SQLCommand("SELECT VERSION() AS serverversion")) && !rec.IsEOF())
+      {
+         String version = rec.GetStringValue("serverversion");
+         version.MakeLower();
+
+         is_maria_db = version.Find(_T("mariadb")) >= 0;
+      }
+      else
+      {
+         // Without an answer there is no safe choice: the two forks disagree about
+         // what "30" means for max_statement_time, so guessing is how every
+         // statement ends up being aborted after 30 milliseconds. No mechanism is
+         // the honest outcome.
+         LOG_APPLICATION("The MySQL server version could not be read, so no statement timeout has been "
+                         "set on this connection.");
+         return;
+      }
+
+      if (is_maria_db)
+      {
+         if (TrySetTimeoutVariable_(_T("max_statement_time"), _T("0")))
+         {
+            timeout_variable_ = _T("max_statement_time");
+            timeout_variable_is_seconds_ = true;
+            return;
+         }
+      }
+      else
+      {
+         if (TrySetTimeoutVariable_(_T("max_execution_time"), _T("0")))
+         {
+            timeout_variable_ = _T("max_execution_time");
+            timeout_variable_is_seconds_ = false;
+            return;
+         }
+
+         // MySQL 5.7.4 to 5.7.7 only. Milliseconds there too - this branch is never
+         // reached on MariaDB, which is the fork where the same name means seconds.
+         if (TrySetTimeoutVariable_(_T("max_statement_time"), _T("0")))
+         {
+            timeout_variable_ = _T("max_statement_time");
+            timeout_variable_is_seconds_ = false;
+            return;
+         }
+      }
+
+      // Not an error: MySQL before 5.7.4 and MariaDB before 10.1.1 simply do not
+      // have one, and hMailServer still supports them. Said once per connection so
+      // that an administrator wondering why DatabaseStatementTimeout has no effect
+      // can find out why.
+      LOG_APPLICATION("This MySQL server has no statement-timeout variable (MariaDB 10.1.1 or MySQL 5.7.4 "
+                      "and later have one), so DatabaseStatementTimeout does not apply to it.");
+   }
+
+   void
+   MySQLConnection::SetTimeout(int seconds)
+   {
+      if (dbconn_ == 0 || !is_connected_ || timeout_variable_.IsEmpty())
+         return;
+
+      // 0 is "no limit" for both variables, so a caller asking for no timeout gets
+      // the server's own behaviour rather than a very small one.
+      __int64 value = 0;
+
+      if (seconds > 0)
+      {
+         if (timeout_variable_is_seconds_)
+         {
+            value = seconds;
+         }
+         else
+         {
+            // Milliseconds, capped at what the variable can hold. MySQL's
+            // max_execution_time is an unsigned 32-bit value; 1800 seconds - what
+            // SQLScriptRunner asks for - is well inside it, and the cap is here for
+            // a nonsense value in the ini rather than for anything this server does.
+            const __int64 maximum_milliseconds = 4294967295LL;
+
+            value = (__int64) seconds * 1000;
+
+            if (value > maximum_milliseconds)
+               value = maximum_milliseconds;
+         }
+      }
+
+      String valueText;
+      valueText.Format(_T("%I64d"), value);
+
+      if (!TrySetTimeoutVariable_(timeout_variable_, valueText))
+      {
+         LOG_APPLICATION("The MySQL " + timeout_variable_ + " could not be set on this connection, so "
+                         "statements on it are not time-limited.");
+      }
+   }
+
+   std::shared_ptr<DALRecordset>
    MySQLConnection::CreateRecordset()
    {
       std::shared_ptr<MySQLRecordset> recordset = std::shared_ptr<MySQLRecordset>(new MySQLRecordset());

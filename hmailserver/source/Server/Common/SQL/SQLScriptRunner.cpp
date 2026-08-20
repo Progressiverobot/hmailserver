@@ -61,7 +61,16 @@ namespace HM
          {
             try
             {
-               connection_->SetTimeout(30);
+               // The server-wide limit, [Settings] DatabaseStatementTimeout, rather
+               // than the literal 30 this used to restore. 30 was never a considered
+               // number here: it is ADO's own default CommandTimeout, so on the two
+               // ADO backends restoring it happened to put the connection back where
+               // it started, and on PostgreSQL and MySQL - where SetTimeout did
+               // nothing at all - it was moot. Now that those two have a real
+               // statement timeout, a pooled connection handed back after a script
+               // has to carry the same limit as every other connection in the pool,
+               // and that limit is configurable.
+               connection_->ApplyDefaultTimeout();
             }
             catch (...)
             {

@@ -70,6 +70,12 @@ namespace HM
          }
 
          is_connected_ = true;
+
+         // statement_timeout is a session setting and this session has just been
+         // created, so it starts at whatever postgresql.conf says - normally no
+         // limit at all. Set after is_connected_, because SetTimeout runs a
+         // statement and declines to run one on a connection that is not up yet.
+         ApplyDefaultTimeout();
       }
       catch (...)
       {
@@ -283,7 +289,49 @@ namespace HM
       return TryExecute(SQLCommand("ROLLBACK TRANSACTION"), sErrorMessage, 0, 0) == DALSuccess;
    }
 
-   bool 
+   void
+   PGConnection::SetTimeout(int seconds)
+   {
+      // See the comment on the declaration. Nothing to do before the session
+      // exists; Connect() calls this again once it does.
+      if (dbconn_ == nullptr || !is_connected_)
+         return;
+
+      // statement_timeout is in milliseconds and its maximum is INT_MAX, so the
+      // multiplication is done in 64 bits and clamped rather than being allowed to
+      // wrap a caller's large "seconds" into a small - or negative - number of
+      // milliseconds. SQLScriptRunner asks for 1800 seconds, which is nowhere near
+      // the ceiling; an administrator who writes a nonsense value into the ini is
+      // the case this guards.
+      __int64 milliseconds = 0;
+
+      if (seconds > 0)
+      {
+         const __int64 maximum_milliseconds = 2147483647;
+
+         milliseconds = (__int64) seconds * 1000;
+
+         if (milliseconds > maximum_milliseconds)
+            milliseconds = maximum_milliseconds;
+      }
+
+      String sql;
+      sql.Format(_T("SET statement_timeout = %I64d"), milliseconds);
+
+      String errorMessage;
+
+      if (TryExecute(SQLCommand(sql), errorMessage, 0, 0) != DALConnection::DALSuccess)
+      {
+         // Logged rather than reported: the connection is usable, this is the one
+         // statement on it that failed, and a role that may not SET statement_timeout
+         // would otherwise report an error on every connection in the pool at every
+         // start. What it costs is the timeout, and the line below says so.
+         LOG_APPLICATION("The PostgreSQL statement_timeout could not be set on this connection, so "
+                         "statements on it are not time-limited. " + errorMessage);
+      }
+   }
+
+   bool
    PGConnection::CheckServerVersion(String &errorMessage)
    {
 

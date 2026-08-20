@@ -80,6 +80,19 @@ namespace HM
       virtual bool RollbackTransaction(String &sErrorMessage) = 0;
       virtual void SetTimeout(int seconds) = 0;
 
+      // Puts the connection back on the server-wide statement timeout, [Settings]
+      // DatabaseStatementTimeout.
+      //
+      // There has to be a "back to normal" for the same reason SQLScriptRunner has a
+      // scope guard: the timeout is a property of a POOLED connection on all four
+      // backends - ADO's CommandTimeout, and a session GUC/variable on PostgreSQL and
+      // MySQL - so whatever the last caller left it at is what the next unrelated
+      // statement inherits. SQLScriptRunner used to restore the literal 30, which was
+      // right only because 30 happens to be ADO's own default; with the value now
+      // configurable, and with PostgreSQL and MySQL having no default of their own,
+      // it has to come from one place.
+      void ApplyDefaultTimeout();
+
       void SetTryCount(int iTryCount) {try_count_ = iTryCount; }
       
 

@@ -36,9 +36,50 @@ namespace HM
       // later report it via "* VANISHED (EARLIER)" to clients resyncing after a disconnect.
       static bool AddExpunged(__int64 accountID, __int64 folderID, __int64 uid, __int64 modSeq);
       // Returns the UIDs expunged from the folder at a mod-sequence greater than sinceModSeq.
+      //
+      // Only meaningful when RemembersExpungesSince agrees: this reads the tombstone
+      // table, so once tombstones have been pruned it answers with what is left,
+      // which for an old enough sinceModSeq is a SHORT answer and not a wrong-looking
+      // one. Ask first.
       static std::vector<__int64> GetExpungedUIDsSince(__int64 folderID, __int64 sinceModSeq);
+
+      /*
+         Whether the tombstone table can still answer a client resynchronising from
+         sinceModSeq exactly.
+
+         RFC 7162 section 3.2.6:
+
+            "Note: A server that receives a mod-sequence smaller than <minmodseq>,
+            where <minmodseq> is the value of the smallest expunged mod-sequence it
+            remembers minus one, MUST behave as if it was requested to report all
+            expunged messages from the provided UID set parameter."
+
+         So this is that boundary, and when it returns false the caller MUST report
+         every UID in the requested set that the mailbox no longer holds, rather than
+         the rows that happen to be left. Reporting the rows that are left is the
+         silent-data-loss case: the client is told a subset vanished, believes the
+         rest are still there, and never asks again.
+
+         True when the folder has no tombstones at all. That is not a guess: the
+         retention sweep never removes a folder's newest record, so an empty result
+         means nothing was ever expunged from this folder rather than that everything
+         has been forgotten.
+      */
+      static bool RemembersExpungesSince(__int64 folderID, __int64 sinceModSeq);
+
       // Removes all expunge tombstones belonging to a folder (used when a folder is deleted).
       static bool DeleteExpungedForFolder(__int64 folderID);
+
+      // One (folder id, record count) pair for every folder that has tombstones.
+      static std::vector<std::pair<__int64, __int64>> GetExpungedRecordCounts();
+
+      // Prunes one folder's tombstones down to about keepRecords, oldest first,
+      // removing roughly batchRecords rows per statement. Returns how many rows went.
+      static __int64 PruneExpungedForFolder(__int64 folderID, __int64 recordCount, int keepRecords, int batchRecords);
+
+      // Removes tombstones whose folder no longer exists, given the folders that have
+      // tombstones. Returns how many rows went.
+      static __int64 DeleteOrphanedExpunged(const std::vector<std::pair<__int64, __int64>> &recordCounts);
 
       static __int64 GetUserInboxFolder(__int64 accountID);
 

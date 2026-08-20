@@ -298,6 +298,39 @@ namespace HM
       // it was told to keep.
       int GetArchiveRetentionDays() const { return archive_retention_days_; }
 
+      // How long a single database statement is allowed to run, in seconds. 0 means
+      // no limit.
+      //
+      // 30 is the default because that is what two of the four backends already did:
+      // ADO's CommandTimeout defaults to 30, and SQLScriptRunner has always restored
+      // exactly 30 after raising the limit for a schema script. PostgreSQL and MySQL
+      // had no statement timeout at all, which is what this setting exists to fix -
+      // on those two a statement blocked on a lock held its pooled connection until
+      // the network gave up, and the pool is fixed-size.
+      //
+      // Raising it is the safe direction. Lowering it below the time a legitimate
+      // maintenance statement needs - a domain removal, a backup sweep - makes that
+      // statement fail rather than merely be slow.
+      int GetDatabaseStatementTimeout() const { return database_statement_timeout_; }
+
+      // How many expunged-message records (hm_imapexpunged) are remembered per IMAP
+      // mailbox. 0 keeps every one of them.
+      //
+      // These are the QRESYNC tombstones: one row per message ever expunged, written
+      // so that a client reconnecting after a disconnect can be told which UIDs
+      // vanished while it was away. Nothing has ever removed them except deleting the
+      // whole folder, so the table grows for the life of the installation and the
+      // SELECT that reads it gets slower forever. RFC 7162 section 5.3 anticipates
+      // exactly this and says to cap the queue and expire the oldest records.
+      //
+      // Capping it is safe because of the rule in RFC 7162 section 3.2.6: a client
+      // asking about a mod-sequence older than the oldest record still held is told
+      // about every UID in the requested set that is no longer in the mailbox, rather
+      // than about nothing. So the cost of setting this low is a larger VANISHED
+      // response for a client that has been away a long time - never a client left
+      // believing a deleted message is still there.
+      int GetIMAPExpungeRetentionRecords() const { return imap_expunge_retention_records_; }
+
       // Whether /metrics carries per-domain message counters. Off by default, and
       // that is a cardinality decision rather than a cautious one: every label value
       // is a separate time series in whatever scrapes this, and an operator hosting
@@ -800,6 +833,8 @@ namespace HM
       bool dkim_accept_sha1_;
       int quota_warning_percent_;
       int archive_retention_days_;
+      int database_statement_timeout_;
+      int imap_expunge_retention_records_;
       bool metrics_per_domain_enabled_;
       String filter_hook_url_;
       int filter_hook_timeout_seconds_;

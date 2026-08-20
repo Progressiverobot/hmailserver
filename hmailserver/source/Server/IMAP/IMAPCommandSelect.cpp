@@ -148,11 +148,42 @@ namespace HM
       // RFC 7162 (QRESYNC): replay flag/MODSEQ changes since the client's mod-sequence.
       if (qresyncRequested)
       {
-         std::vector<__int64> vanished = PersistentIMAPFolder::GetExpungedUIDsSince(pSelectedFolder->GetID(), qresyncModSeq);
-         if (!vanished.empty())
+         String sVanishedSet;
+
+         if (PersistentIMAPFolder::RemembersExpungesSince(pSelectedFolder->GetID(), qresyncModSeq))
+         {
+            sVanishedSet = IMAPConnection::CompactUidSet(
+               PersistentIMAPFolder::GetExpungedUIDsSince(pSelectedFolder->GetID(), qresyncModSeq));
+         }
+         else
+         {
+            /*
+               The expunge records covering this client's mod-sequence have been
+               pruned (see IMAPExpungeRetentionTask), so the table can no longer say
+               which UIDs went. RFC 7162 section 3.2.6 says what to do instead:
+               "behave as if it was requested to report all expunged messages from
+               the provided UID set parameter".
+
+               The client did not provide a UID set - this server does not parse the
+               optional known-uids argument - and section 3.2.5.1 says what that
+               means: "If the client did not provide the list of UIDs, the server
+               acts as if the client has specified '1:<maxuid>', where <maxuid> is
+               the mailbox's UIDNEXT value minus 1."
+
+               Answering with the records that happen to be left instead would be the
+               one genuinely harmful outcome: the client would be told a subset
+               vanished and would go on believing the rest are still there.
+            */
+            std::vector<std::pair<unsigned int, unsigned int>> wholeMailbox;
+            wholeMailbox.push_back(std::make_pair((unsigned int) 1, pSelectedFolder->GetCurrentUID()));
+
+            sVanishedSet = IMAPConnection::CompactMissingUidSet(messages, wholeMailbox, pSelectedFolder->GetCurrentUID());
+         }
+
+         if (!sVanishedSet.IsEmpty())
          {
             String sVanished;
-            sVanished.Format(_T("* VANISHED (EARLIER) %s\r\n"), IMAPConnection::CompactUidSet(vanished).c_str());
+            sVanished.Format(_T("* VANISHED (EARLIER) %s\r\n"), sVanishedSet.c_str());
             sResponse += sVanished;
          }
 

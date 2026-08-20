@@ -1099,6 +1099,112 @@ namespace HM
       return result;
    }
 
+   namespace
+   {
+      // One element of a sequence set - "7" or "7:12" - appended to whatever is
+      // already there. Kept separate from CompactUidSet's own copy of this because
+      // that one works from a sorted vector and this one emits gaps as it walks.
+      void
+      AppendUidRange_(String &target, unsigned int rangeStart, unsigned int rangeEnd)
+      {
+         if (!target.IsEmpty())
+            target += _T(",");
+
+         String temp;
+
+         if (rangeStart == rangeEnd)
+            temp.Format(_T("%u"), rangeStart);
+         else
+            temp.Format(_T("%u:%u"), rangeStart, rangeEnd);
+
+         target += temp;
+      }
+   }
+
+   String
+   IMAPConnection::CompactMissingUidSet(std::shared_ptr<Messages> messages,
+                                        std::vector<std::pair<unsigned int, unsigned int>> ranges,
+                                        unsigned int highestUid)
+   {
+      // See the comment on the declaration for why a superset of the true answer is
+      // the correct answer here.
+      String result;
+
+      if (highestUid == 0)
+         return result;
+
+      std::set<unsigned int> present;
+
+      if (messages)
+      {
+         // GetCopy rather than walking the collection: another session can erase from
+         // the shared vector while it is being iterated.
+         for (std::shared_ptr<Message> pMessage : messages->GetCopy())
+         {
+            if (pMessage)
+               present.insert(pMessage->GetUID());
+         }
+      }
+
+      // A client may write its UID set in any order ("5,1:3"), and a sequence set
+      // read back in that order would be needlessly confusing. Sorting is enough -
+      // overlapping ranges can only produce a UID twice, and the gap walk below
+      // starts each range from where the previous one is, so it cannot.
+      std::sort(ranges.begin(), ranges.end());
+
+      unsigned int emittedUpTo = 0;
+
+      for (const std::pair<unsigned int, unsigned int> &range : ranges)
+      {
+         // UID 0 is not a UID. ParseUidSet_ produces it from a malformed set, and it
+         // would make the gap walk below start one below the first real UID.
+         unsigned int first = (range.first == 0) ? 1 : range.first;
+         unsigned int last = range.second;
+
+         // A UID above the highest this mailbox has ever issued never existed, so
+         // saying it vanished tells the client nothing. This is also what keeps
+         // "1:*" - which arrives here as 1:0xFFFFFFFF - from producing four billion
+         // UIDs.
+         if (last > highestUid)
+            last = highestUid;
+
+         // Nothing already covered by an earlier, overlapping range.
+         if (first <= emittedUpTo)
+            first = emittedUpTo + 1;
+
+         if (first == 0 || first > last)
+            continue;
+
+         unsigned int gapStart = first;
+
+         auto iter = present.lower_bound(first);
+
+         for (; iter != present.end() && *iter <= last; ++iter)
+         {
+            unsigned int uid = *iter;
+
+            if (uid > gapStart)
+               AppendUidRange_(result, gapStart, uid - 1);
+
+            if (uid == 0xFFFFFFFF)
+            {
+               // Would wrap to 0 below and restart the range at 1.
+               gapStart = 0;
+               break;
+            }
+
+            gapStart = uid + 1;
+         }
+
+         if (gapStart != 0 && gapStart <= last)
+            AppendUidRange_(result, gapStart, last);
+
+         emittedUpTo = last;
+      }
+
+      return result;
+   }
+
    String
    IMAPConnection::GetQResyncChangedFetch(__int64 sinceModSeq)
    {

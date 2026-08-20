@@ -582,6 +582,17 @@ namespace HM
       dkim_accept_sha1_ = ReadIniSettingInteger_("Settings", "DkimAcceptSha1", 0) == 1;
       quota_warning_percent_ = ReadIniSettingInteger_("Settings", "QuotaWarningPercent", 90);
       archive_retention_days_ = ReadIniSettingInteger_("Settings", "ArchiveRetentionDays", 0);
+      database_statement_timeout_ = ReadIniSettingInteger_("Settings", "DatabaseStatementTimeout", 30);
+      imap_expunge_retention_records_ = ReadIniSettingInteger_("Settings", "IMAPExpungeRetentionRecords", 5000);
+
+      // Both are "0 means no limit", so a negative value is folded into that rather
+      // than being passed on to a backend that would read it as an enormous one.
+      if (database_statement_timeout_ < 0)
+         database_statement_timeout_ = 0;
+
+      if (imap_expunge_retention_records_ < 0)
+         imap_expunge_retention_records_ = 0;
+
       metrics_per_domain_enabled_ = ReadIniSettingInteger_("Settings", "MetricsPerDomainEnabled", 0) == 1;
 
       filter_hook_url_ = ReadIniSettingString_("Settings", "FilterHookUrl", "");

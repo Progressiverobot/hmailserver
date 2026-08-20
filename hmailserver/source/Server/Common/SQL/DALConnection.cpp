@@ -168,6 +168,12 @@ namespace HM
       return false;
    }
 
+   void
+   DALConnection::ApplyDefaultTimeout()
+   {
+      SetTimeout(IniFileSettings::Instance()->GetDatabaseStatementTimeout());
+   }
+
    bool
    DALConnection::Reconnect(String &sErrorMessage)
    {

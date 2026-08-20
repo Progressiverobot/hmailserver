@@ -31,25 +31,35 @@ namespace HM
       virtual bool CommitTransaction(String &sErrorMessage);
       virtual bool RollbackTransaction(String &sErrorMessage);
       /*
-         Deliberately does nothing, which means PostgreSQL has no statement
-         timeout at all: a statement blocked on a lock holds its pooled
-         connection until the server or the network gives up, and since the pool
-         is fixed-size that is how the pool empties. MySQL is in the same
-         position; only the two ADO backends implement this.
+         libpq has no per-statement timeout API, so the mechanism is the server
+         side: statement_timeout, a GUC expressed in MILLISECONDS, which aborts
+         any statement running longer with SQLSTATE 57014. 0 disables it, which
+         is also PostgreSQL's own default.
 
-         It is not a one-line fix, which is why it is written down rather than
-         done. The only caller is SQLScriptRunner, which raises the limit to 30
-         minutes for a schema script and drops it to 30 seconds afterwards. The
-         natural implementation here - "SET statement_timeout" - is a *session*
-         setting on a pooled connection, so that 30 would then abort every
-         subsequent statement on this connection that ran longer, for the life of
-         the connection: a large delete during a domain removal, or a backup
-         sweep, would start failing on a server that had merely run an upgrade
-         script. Giving PostgreSQL and MySQL a real statement timeout means
-         deciding what the server-wide limit should be and applying it at
-         connect time, not borrowing SQLScriptRunner's.
+         It is a SESSION setting, and this connection is pooled, so it does not
+         belong to whichever caller set it last - which is the objection that
+         kept this empty. That is answered by giving the server one limit,
+         [Settings] DatabaseStatementTimeout, applying it at the end of Connect()
+         so every pooled connection carries it from the moment it exists, and
+         having SQLScriptRunner restore that same limit instead of the literal 30
+         it used to restore. Reconnect() calls Connect(), so it survives a dropped
+         connection too - which matters here more than on the ADO backends,
+         because a GUC lives in the server-side session and dies with it.
+
+         A failure to set it is logged and otherwise ignored: a connection that
+         works is worth more than a timeout that does not, and a role without
+         permission to SET statement_timeout is a configuration this server has
+         no business refusing to run on.
+
+         One caveat worth knowing before calling this from somewhere new: a plain
+         SET inside an open transaction is TRANSACTION-local on PostgreSQL and
+         reverts when that transaction ends. Neither of the two callers is inside
+         one - Connect() runs before anything, and SQLScriptRunner is handed a
+         connection from the pool and opens no transaction of its own - so the
+         value is a session value in practice. A future caller inside a
+         transaction would get a limit that quietly disappears at COMMIT.
       */
-      virtual void SetTimeout(int seconds) {}
+      virtual void SetTimeout(int seconds);
 
       virtual bool CheckServerVersion(String &errorMessage);
 

@@ -134,11 +134,30 @@ namespace HM
       // RFC 7162 (QRESYNC): replay flag/MODSEQ changes since the client's mod-sequence.
       if (qresyncRequested)
       {
-         std::vector<__int64> vanished = PersistentIMAPFolder::GetExpungedUIDsSince(pSelectedFolder->GetID(), qresyncModSeq);
-         if (!vanished.empty())
+         String sVanishedSet;
+
+         if (PersistentIMAPFolder::RemembersExpungesSince(pSelectedFolder->GetID(), qresyncModSeq))
+         {
+            sVanishedSet = IMAPConnection::CompactUidSet(
+               PersistentIMAPFolder::GetExpungedUIDsSince(pSelectedFolder->GetID(), qresyncModSeq));
+         }
+         else
+         {
+            // The expunge records covering this mod-sequence have been pruned. RFC
+            // 7162 section 3.2.6 then requires the complete list of UIDs in the
+            // requested set that the mailbox no longer holds, which for a client
+            // that supplied no UID set is 1:UIDNEXT-1 (section 3.2.5.1). Same rule
+            // and same reasoning as SELECT; see IMAPCommandSelect.
+            std::vector<std::pair<unsigned int, unsigned int>> wholeMailbox;
+            wholeMailbox.push_back(std::make_pair((unsigned int) 1, pSelectedFolder->GetCurrentUID()));
+
+            sVanishedSet = IMAPConnection::CompactMissingUidSet(messages, wholeMailbox, pSelectedFolder->GetCurrentUID());
+         }
+
+         if (!sVanishedSet.IsEmpty())
          {
             String sVanished;
-            sVanished.Format(_T("* VANISHED (EARLIER) %s\r\n"), IMAPConnection::CompactUidSet(vanished).c_str());
+            sVanished.Format(_T("* VANISHED (EARLIER) %s\r\n"), sVanishedSet.c_str());
             sResponse += sVanished;
          }
 

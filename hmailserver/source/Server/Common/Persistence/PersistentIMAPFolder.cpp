@@ -396,6 +396,40 @@ namespace HM
    }
 
    bool
+   PersistentIMAPFolder::RemembersExpungesSince(__int64 folderID, __int64 sinceModSeq)
+   {
+      if (folderID == 0)
+         return true;
+
+      SQLCommand command("SELECT COUNT(*) AS expungedcount, MIN(expungedmodseq) AS lowestmodseq "
+                         "FROM hm_imapexpunged WHERE expungedfolderid = @FOLDERID");
+      command.AddParameter("@FOLDERID", folderID);
+
+      std::shared_ptr<DALRecordset> pRS = Application::Instance()->GetDBManager()->OpenRecordset(command);
+
+      // A table that could not be read is not a table that has pruned anything.
+      // Answering "no" to a transient database failure would put every QRESYNC
+      // client on the complete-list path - a VANISHED response naming every gap in
+      // the mailbox, on every SELECT - for as long as the failure lasted.
+      if (!pRS || pRS->IsEOF())
+         return true;
+
+      // The count is read first because MIN over no rows is NULL, and how a NULL
+      // reads back through this DAL differs by backend. With no rows there is
+      // nothing to compare against anyway.
+      if (pRS->GetInt64Value("expungedcount") == 0)
+         return true;
+
+      __int64 lowestRemembered = pRS->GetInt64Value("lowestmodseq");
+
+      // RFC 7162 section 3.2.6: <minmodseq> is the smallest remembered expunged
+      // mod-sequence minus one, and a client at or above it can still be answered
+      // exactly - every record it needs has a higher mod-sequence than that, and
+      // every record with a higher mod-sequence is still here.
+      return sinceModSeq >= lowestRemembered - 1;
+   }
+
+   bool
    PersistentIMAPFolder::DeleteExpungedForFolder(__int64 folderID)
    {
       if (folderID == 0)
@@ -405,5 +439,265 @@ namespace HM
       command.AddParameter("@FOLDERID", folderID);
 
       return Application::Instance()->GetDBManager()->Execute(command);
+   }
+
+   std::vector<std::pair<__int64, __int64>>
+   PersistentIMAPFolder::GetExpungedRecordCounts()
+   {
+      std::vector<std::pair<__int64, __int64>> result;
+
+      SQLCommand command("SELECT expungedfolderid, COUNT(*) AS expungedcount FROM hm_imapexpunged "
+                         "GROUP BY expungedfolderid");
+
+      std::shared_ptr<DALRecordset> pRS = Application::Instance()->GetDBManager()->OpenRecordset(command);
+
+      if (!pRS)
+         return result;
+
+      while (!pRS->IsEOF())
+      {
+         __int64 folderID = pRS->GetInt64Value("expungedfolderid");
+         __int64 recordCount = pRS->GetInt64Value("expungedcount");
+
+         if (folderID > 0)
+            result.push_back(std::make_pair(folderID, recordCount));
+
+         pRS->MoveNext();
+      }
+
+      return result;
+   }
+
+   __int64
+   PersistentIMAPFolder::PruneExpungedForFolder(__int64 folderID, __int64 recordCount, int keepRecords, int batchRecords)
+   {
+      if (folderID <= 0 || keepRecords <= 0 || batchRecords <= 0)
+         return 0;
+
+      if (recordCount <= (__int64) keepRecords)
+         return 0;
+
+      SQLCommand boundsCommand("SELECT COUNT(*) AS expungedcount, MIN(expungedmodseq) AS lowestmodseq, "
+                               "MAX(expungedmodseq) AS highestmodseq FROM hm_imapexpunged "
+                               "WHERE expungedfolderid = @FOLDERID");
+      boundsCommand.AddParameter("@FOLDERID", folderID);
+
+      std::shared_ptr<DALRecordset> pRS = Application::Instance()->GetDBManager()->OpenRecordset(boundsCommand);
+
+      if (!pRS || pRS->IsEOF())
+         return 0;
+
+      // Re-read rather than trusted from the caller's GROUP BY: that snapshot was
+      // taken before the sweep started working through the other folders, and the
+      // mailbox has been live throughout.
+      __int64 total = pRS->GetInt64Value("expungedcount");
+
+      if (total <= (__int64) keepRecords)
+         return 0;
+
+      __int64 lowest = pRS->GetInt64Value("lowestmodseq");
+      __int64 highest = pRS->GetInt64Value("highestmodseq");
+
+      if (highest <= lowest)
+         return 0;
+
+      /*
+         Any cutoff at all is CORRECT here; only the size of the surviving queue
+         depends on getting it close. That is what makes an interpolated estimate
+         acceptable, and no portable "delete all but the newest N rows" exists across
+         these four backends anyway - window functions, DELETE ... LIMIT and OFFSET
+         are each missing from at least one of them.
+
+         Correct, because of what the reader does with what is left:
+         RemembersExpungesSince derives RFC 7162's <minmodseq> from the smallest
+         mod-sequence still in the table. Delete more and that boundary simply moves
+         up, and a client asking about anything older is told to expect the complete
+         list of missing UIDs rather than a short one. There is no cutoff that makes
+         a client believe a deleted message is still there.
+      */
+      __int64 toDelete = total - (__int64) keepRecords;
+      __int64 span = highest - lowest + 1;
+
+      // Done in floating point so a wide, sparse mod-sequence range cannot overflow
+      // the multiplication. The precision that costs is beside the point: this is an
+      // estimate whichever way it is computed.
+      __int64 cutoff = lowest + (__int64) ((double) span * (double) toDelete / (double) total);
+
+      /*
+         Never the newest record.
+
+         Keeping it is what lets RemembersExpungesSince tell "nothing was ever
+         expunged from this folder" (no rows) apart from "everything I knew about has
+         been pruned" (rows, but none as old as the client is asking about). It is
+         also RFC 7162 section 5.3's own instruction for a queue that has been
+         trimmed: "For all such 'expired' records, the server needs to store a single
+         mod-sequence, which is the highest mod-sequence for all 'expired' expunged
+         messages."
+      */
+      if (cutoff > highest)
+         cutoff = highest;
+
+      if (cutoff <= lowest)
+         return 0;
+
+      /*
+         The estimate assumed the mod-sequences were spread evenly between the oldest
+         and the newest. They are not - a folder's mod-sequence also advances on flag
+         changes, so a burst of expunges among quiet months is dense and the months
+         either side are empty - so the estimate can land too high and leave fewer
+         than keepRecords behind. That costs QRESYNC precision for no benefit, so it
+         is walked back down until enough survive.
+
+         Landing too LOW needs no correction: less is deleted than intended and the
+         next run carries on from there.
+      */
+      for (int attempt = 0; attempt < 4 && cutoff > lowest; attempt++)
+      {
+         SQLCommand survivorCommand("SELECT COUNT(*) AS expungedcount FROM hm_imapexpunged "
+                                    "WHERE expungedfolderid = @FOLDERID AND expungedmodseq >= @CUTOFF");
+         survivorCommand.AddParameter("@FOLDERID", folderID);
+         survivorCommand.AddParameter("@CUTOFF", cutoff);
+
+         std::shared_ptr<DALRecordset> pSurvivors = Application::Instance()->GetDBManager()->OpenRecordset(survivorCommand);
+
+         if (!pSurvivors || pSurvivors->IsEOF())
+            return 0;
+
+         if (pSurvivors->GetInt64Value("expungedcount") >= (__int64) keepRecords)
+            break;
+
+         cutoff -= ((cutoff - lowest) / 2 + 1);
+      }
+
+      if (cutoff <= lowest)
+         return 0;
+
+      /*
+         Deleted in slices rather than in one statement, and the reason is the other
+         half of this change: DatabaseStatementTimeout is now real on PostgreSQL and
+         MySQL, so a single DELETE over a table that has been growing since the
+         installation was built would be aborted at thirty seconds having achieved
+         nothing - every run, forever. Short statements also mean short locks on a
+         server that is still delivering mail.
+
+         The slice is a range of mod-sequence VALUES rather than a row count, because
+         no row-limited DELETE is portable across these four backends. It is scaled
+         by the density observed above so that a slice holds roughly batchRecords
+         rows; where the values turn out to be sparser it simply removes fewer, which
+         costs a round trip and nothing else. It can never hold MORE than it is units
+         wide, because mod-sequences are unique within a folder - GetNextModSeq
+         issues a fresh one per expunged message.
+      */
+      double density = (double) total / (double) span;
+      __int64 sliceWidth = (density > 0.0) ? (__int64) ((double) batchRecords / density) : (__int64) batchRecords;
+
+      if (sliceWidth < 1)
+         sliceWidth = 1;
+
+      // Cannot be wider than the whole range, which also keeps the addition below
+      // away from the end of the type.
+      if (sliceWidth > span)
+         sliceWidth = span;
+
+      // A ceiling on what one folder may do in one run, so that a single enormous
+      // mailbox cannot hold up the rest of the sweep. What is left is picked up on
+      // the next run.
+      const int max_batches = 64;
+
+      __int64 boundary = lowest;
+
+      for (int batch = 0; batch < max_batches && boundary < cutoff; batch++)
+      {
+         boundary += sliceWidth;
+
+         if (boundary > cutoff)
+            boundary = cutoff;
+
+         SQLCommand deleteCommand("DELETE FROM hm_imapexpunged WHERE expungedfolderid = @FOLDERID "
+                                  "AND expungedmodseq < @BOUNDARY");
+         deleteCommand.AddParameter("@FOLDERID", folderID);
+         deleteCommand.AddParameter("@BOUNDARY", boundary);
+
+         // A failed slice stops this folder rather than the sweep. The slices are
+         // cumulative ("everything below this boundary"), so a run that stops part
+         // way has removed a prefix and nothing is half-deleted.
+         if (!Application::Instance()->GetDBManager()->Execute(deleteCommand))
+            break;
+      }
+
+      // Counted afterwards rather than tracked, because none of the four backends
+      // returns a row count through this DAL. One aggregate over an indexed column
+      // is cheaper than counting before every slice.
+      SQLCommand remainingCommand("SELECT COUNT(*) AS expungedcount FROM hm_imapexpunged "
+                                  "WHERE expungedfolderid = @FOLDERID");
+      remainingCommand.AddParameter("@FOLDERID", folderID);
+
+      std::shared_ptr<DALRecordset> pRemaining = Application::Instance()->GetDBManager()->OpenRecordset(remainingCommand);
+
+      if (!pRemaining || pRemaining->IsEOF())
+         return 0;
+
+      __int64 remaining = pRemaining->GetInt64Value("expungedcount");
+
+      return total > remaining ? total - remaining : 0;
+   }
+
+   __int64
+   PersistentIMAPFolder::DeleteOrphanedExpunged(const std::vector<std::pair<__int64, __int64>> &recordCounts)
+   {
+      /*
+         Tombstones whose folder is gone.
+
+         They exist because DeleteExpungedForFolder can fail - HM6117 reports exactly
+         that, in as many words, and says the rows have been left behind - and
+         because until now nothing ever came back for them. Nothing can read one
+         either: GetExpungedUIDsSince is only ever called with the id of a folder a
+         session currently has selected.
+
+         Deliberately NOT written as "delete ... where not exists (select ...)",
+         which is how PersistentMessageMetaData::DeleteOrphanedItems does the
+         equivalent job. That statement only runs when message indexing is switched
+         on, so it has never been exercised against all four backends here, and this
+         one runs on every server start: a correlated subquery that one backend
+         rejects would put a database error in the log of every installation. Two
+         statements of a shape this file already uses cost more round trips and
+         cannot be wrong.
+      */
+      if (recordCounts.empty())
+         return 0;
+
+      std::set<__int64> existingFolders;
+
+      SQLCommand folderCommand("SELECT folderid FROM hm_imapfolders");
+
+      std::shared_ptr<DALRecordset> pRS = Application::Instance()->GetDBManager()->OpenRecordset(folderCommand);
+
+      if (!pRS)
+         return 0;
+
+      while (!pRS->IsEOF())
+      {
+         existingFolders.insert(pRS->GetInt64Value("folderid"));
+         pRS->MoveNext();
+      }
+
+      // A folder table that reads back empty on a server that has expunge records is
+      // very much more likely to be a read that went wrong than a server with no
+      // mailboxes at all - and acting on it would delete every record there is.
+      if (existingFolders.empty())
+         return 0;
+
+      __int64 removed = 0;
+
+      for (const std::pair<__int64, __int64> &folder : recordCounts)
+      {
+         if (existingFolders.find(folder.first) != existingFolders.end())
+            continue;
+
+         if (DeleteExpungedForFolder(folder.first))
+            removed += folder.second;
+      }
+
+      return removed;
    }
 }

@@ -20,6 +20,7 @@ namespace HM
    class IMAPFolder;
    class IMAPCommandArgument;
    class Message;
+   class Messages;
    class IMAPMailboxChangeNotifier;
    class IMailboxChangeClient;
    class ScramSha256;
@@ -155,6 +156,34 @@ namespace HM
       // RFC 7162 (QRESYNC): compress a list of UIDs into a sequence-set string
       // (e.g. "1:3,5,7:9") for use in "* VANISHED" responses. Sorts and de-dupes.
       static String CompactUidSet(std::vector<__int64> uids);
+
+      /*
+         RFC 7162 (QRESYNC), the sequence set for a VANISHED (EARLIER) response when
+         the expunge records that would have answered the client precisely are gone.
+
+         Section 3.2.6:
+
+            "Note: A server that receives a mod-sequence smaller than <minmodseq>,
+            where <minmodseq> is the value of the smallest expunged mod-sequence it
+            remembers minus one, MUST behave as if it was requested to report all
+            expunged messages from the provided UID set parameter."
+
+         "All expunged messages from the provided UID set" is computable without any
+         history: it is every UID in the requested ranges that the mailbox does not
+         currently hold. That is a SUPERSET of the precise answer - it names UIDs the
+         client may never have had, and UIDs it was told about on an earlier
+         connection - and that is exactly why it is the safe answer. A VANISHED
+         (EARLIER) UID a client does not know is a no-op for it; a UID left OUT is a
+         message the client goes on believing is there.
+
+         Ranges are clamped to 1:highestUid, because a UID above the mailbox's
+         highest issued UID has never existed and reporting it says nothing. They are
+         sorted and merged first, so the sequence set comes out ascending however the
+         client wrote its UID set.
+      */
+      static String CompactMissingUidSet(std::shared_ptr<Messages> messages,
+                                         std::vector<std::pair<unsigned int, unsigned int>> ranges,
+                                         unsigned int highestUid);
 
       // RFC 7162 (QRESYNC): build untagged FETCH lines (FLAGS/UID/MODSEQ) for every
       // message in the current folder whose MODSEQ is greater than sinceModSeq.

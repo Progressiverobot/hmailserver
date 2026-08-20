@@ -401,14 +401,18 @@ namespace HM
             std::shared_ptr<IMAPFolder> pCurFolder = pConnection->GetCurrentFolder();
             if (pCurFolder)
             {
-               std::vector<__int64> expunged = PersistentIMAPFolder::GetExpungedUIDsSince(pCurFolder->GetID(), fetchVanishedSince);
-               if (!expunged.empty())
+               // "*" stays unbounded here: an expunged UID can be higher than
+               // any UID still in the mailbox, so resolving it to the largest
+               // surviving UID would hide the very messages this reports.
+               std::vector<std::pair<unsigned int, unsigned int>> vanishedRanges =
+                  ParseUidSet_(sMailNo, (unsigned int) 0xFFFFFFFF);
+
+               String sVanishedSet;
+
+               if (PersistentIMAPFolder::RemembersExpungesSince(pCurFolder->GetID(), fetchVanishedSince))
                {
-                  // "*" stays unbounded here: an expunged UID can be higher than
-                  // any UID still in the mailbox, so resolving it to the largest
-                  // surviving UID would hide the very messages this reports.
-                  std::vector<std::pair<unsigned int, unsigned int>> vanishedRanges =
-                     ParseUidSet_(sMailNo, (unsigned int) 0xFFFFFFFF);
+                  std::vector<__int64> expunged = PersistentIMAPFolder::GetExpungedUIDsSince(pCurFolder->GetID(), fetchVanishedSince);
+
                   std::vector<__int64> reported;
                   for (__int64 uid : expunged)
                   {
@@ -422,12 +426,36 @@ namespace HM
                      }
                   }
 
-                  if (!reported.empty())
-                  {
-                     String sVanished;
-                     sVanished.Format(_T("* VANISHED (EARLIER) %s\r\n"), IMAPConnection::CompactUidSet(reported).c_str());
-                     pConnection->SendAsciiData(sVanished);
-                  }
+                  sVanishedSet = IMAPConnection::CompactUidSet(reported);
+               }
+               else
+               {
+                  /*
+                     The expunge records covering this mod-sequence have been pruned
+                     (see IMAPExpungeRetentionTask), and RFC 7162 section 3.2.6 is
+                     explicit about what has to happen then:
+
+                        "Note: A server that receives a mod-sequence smaller than
+                        <minmodseq>, where <minmodseq> is the value of the smallest
+                        expunged mod-sequence it remembers minus one, MUST behave as
+                        if it was requested to report all expunged messages from the
+                        provided UID set parameter."
+
+                     Here the client DID provide a UID set, so unlike SELECT this
+                     stays inside the ranges it asked about. "*" is resolved to the
+                     mailbox's highest issued UID rather than left unbounded, because
+                     a UID above that never existed and naming it tells the client
+                     nothing.
+                  */
+                  sVanishedSet = IMAPConnection::CompactMissingUidSet(pCurFolder->GetMessages(), vanishedRanges,
+                                                                     pCurFolder->GetCurrentUID());
+               }
+
+               if (!sVanishedSet.IsEmpty())
+               {
+                  String sVanished;
+                  sVanished.Format(_T("* VANISHED (EARLIER) %s\r\n"), sVanishedSet.c_str());
+                  pConnection->SendAsciiData(sVanished);
                }
             }
          }
