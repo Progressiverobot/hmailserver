@@ -61,6 +61,7 @@
 #include "../Persistence/PersistentDomain.h"
 #include "RemoveExpiredRecords.h"
 #include "LogRetentionTask.h"
+#include "ArchiveRetentionTask.h"
 #include "MessageStoreConsistencyTask.h"
 #include "WorkQueueHealthTask.h"
 #include "BackupScheduleTask.h"
@@ -638,6 +639,19 @@ namespace HM
       logRetentionTask->SetReoccurance(ScheduledTask::RunInfinitely);
       logRetentionTask->SetMinutesBetweenRun(6 * 60);
       scheduler_->ScheduleTask(logRetentionTask);
+
+      // Archive retention: prune ArchiveDir to ArchiveRetentionDays. Same shape as
+      // the log sweep above and no-ops the same way when the setting is 0, which is
+      // its default. Twelve hours rather than six because the archive is a directory
+      // tree rather than one folder, and nothing about it is urgent.
+      std::shared_ptr<ArchiveRetentionTask> archiveRetentionStartupTask = std::shared_ptr<ArchiveRetentionTask>(new ArchiveRetentionTask);
+      archiveRetentionStartupTask->SetReoccurance(ScheduledTask::RunOnce);
+      scheduler_->ScheduleTask(archiveRetentionStartupTask);
+
+      std::shared_ptr<ArchiveRetentionTask> archiveRetentionTask = std::shared_ptr<ArchiveRetentionTask>(new ArchiveRetentionTask);
+      archiveRetentionTask->SetReoccurance(ScheduledTask::RunInfinitely);
+      archiveRetentionTask->SetMinutesBetweenRun(12 * 60);
+      scheduler_->ScheduleTask(archiveRetentionTask);
 
       // Message-store consistency: cross-check the message database against the
       // files on disk and publish the number of missing files. The task no-ops

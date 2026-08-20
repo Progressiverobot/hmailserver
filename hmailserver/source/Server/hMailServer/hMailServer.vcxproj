@@ -224,6 +224,7 @@ EXIT 0
     <ClCompile Include="..\Common\Application\Property.cpp" />
     <ClCompile Include="..\Common\Application\PropertySet.cpp" />
     <ClCompile Include="..\Common\Application\Reinitializator.cpp" />
+    <ClCompile Include="..\Common\Application\ArchiveRetentionTask.cpp" />
     <ClCompile Include="..\Common\Application\LogRetentionTask.cpp" />
     <ClCompile Include="..\Common\Application\MessageStoreConsistencyTask.cpp" />
     <ClCompile Include="..\Common\Application\WorkQueueHealthTask.cpp" />
@@ -795,6 +796,7 @@ EXIT 0
     <ClInclude Include="..\Common\Application\Property.h" />
     <ClInclude Include="..\Common\Application\PropertySet.h" />
     <ClInclude Include="..\Common\Application\Reinitializator.h" />
+    <ClInclude Include="..\Common\Application\ArchiveRetentionTask.h" />
     <ClInclude Include="..\Common\Application\LogRetentionTask.h" />
     <ClInclude Include="..\Common\Application\MessageStoreConsistencyTask.h" />
     <ClInclude Include="..\Common\Application\WorkQueueHealthTask.h" />

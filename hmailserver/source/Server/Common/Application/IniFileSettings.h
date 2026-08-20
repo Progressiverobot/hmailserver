@@ -292,6 +292,12 @@ namespace HM
       // and by then the person it happens to is the last to know.
       int GetQuotaWarningPercent() const { return quota_warning_percent_; }
 
+      // How long a message stays in ArchiveDir. 0, the default, keeps everything -
+      // an archive is usually kept for a legal or contractual reason, and a server
+      // that started deleting from one on upgrade would be destroying the evidence
+      // it was told to keep.
+      int GetArchiveRetentionDays() const { return archive_retention_days_; }
+
       // Password policy, enforced where a password is CHOSEN (Account.Password over
       // COM) and never where one is verified or re-hashed. All off at 0/false, which
       // is what an existing installation gets until an administrator decides
@@ -723,6 +729,7 @@ namespace HM
       bool reject_full_mailbox_at_rcpt_;
       bool dkim_accept_sha1_;
       int quota_warning_percent_;
+      int archive_retention_days_;
       int password_policy_minimum_length_;
       bool password_policy_require_mixed_case_;
       bool password_policy_require_digit_;

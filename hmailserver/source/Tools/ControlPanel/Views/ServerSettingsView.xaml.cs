@@ -1060,6 +1060,21 @@ namespace hMailServer.ControlPanel.Views
                     "happens to is the last to know. Applies after a service restart.",
             IniStore = iniStore_
          });
+         smtp.Settings.Add(new IniNumber
+         {
+            Path = "ArchiveRetentionDays",
+            Label = "Delete archived messages after (days; 0 = keep for ever)",
+            Default = 0,
+            Blurb = "ArchiveDir is a raw copy of every message that passes through the server, and until now " +
+                    "nothing ever removed anything from it - so on a busy server it is a directory that only " +
+                    "grows, and the administrator who finds out is the one whose disk filled up. This prunes it. " +
+                    "0 keeps everything, and that is the default on purpose: an archive is usually kept for a " +
+                    "legal or contractual reason, and a server that started deleting from one on upgrade would " +
+                    "be destroying exactly what it was told to keep. The sweep only ever removes .eml files, so " +
+                    "anything else you keep in the archive is left alone, and it runs at startup and every " +
+                    "twelve hours after. Applies after a service restart.",
+            IniStore = iniStore_
+         });
          smtp.Settings.Add(new ComBool { Path = "AllowIncorrectLineEndings", Label = "Allow incorrect line endings" });
          smtp.Settings.Add(new ComBool { Path = "DisconnectInvalidClients", Label = "Disconnect clients sending too many invalid commands" });
          smtp.Settings.Add(new ComText { Path = "MaxNumberOfInvalidCommands", Label = "Invalid command limit", Numeric = true });
