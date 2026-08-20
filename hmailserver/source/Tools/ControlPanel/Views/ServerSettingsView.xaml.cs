@@ -1549,6 +1549,63 @@ namespace hMailServer.ControlPanel.Views
             IniStore = iniStore_
          });
          Tab("SpamAssassin").Cards.Add(sa);
+
+         var hook = Card("External filtering engine (rspamd and anything else that speaks HTTP)",
+            "Hands every accepted message to an engine over HTTP and uses the score it returns. The message is "
+          + "the request body and the envelope, connecting address and HELO travel as request headers, which is "
+          + "what rspamd's own check endpoint already expects - so pointing this at rspamd needs no adapter, and "
+          + "pointing it at something you wrote yourself needs only a program that answers JSON.");
+         hook.Settings.Add(new IniText
+         {
+            Path = "FilterHookUrl",
+            Label = "Engine URL (empty = no external engine)",
+            Blurb = "For example http://127.0.0.1:11333/checkv2. Plain HTTP only for now, so the engine should be "
+                  + "on this machine or on a network you trust - the whole message is sent to it. Applies after a "
+                  + "service restart.",
+            IniStore = iniStore_
+         });
+         hook.Settings.Add(new IniNumber
+         {
+            Path = "FilterHookTimeoutSeconds",
+            Label = "Timeout for the whole exchange (seconds)",
+            Default = 10,
+            Blurb = "This runs while the sending server waits for its answer to DATA, so the number is a promise "
+                  + "about the worst case rather than a hint. It bounds the connection as well as the reply: an "
+                  + "engine whose machine has gone away would otherwise cost the operating system's own TCP "
+                  + "timeout on every message.",
+            IniStore = iniStore_
+         });
+         hook.Settings.Add(new IniBool
+         {
+            Path = "FilterHookFailClosed",
+            Label = "Treat an unanswered check as spam",
+            Blurb = "Off by default, and this is the decision worth thinking about. Off, an engine that stops "
+                  + "answering lets spam through until somebody notices. On, it stops the mail instead - and a "
+                  + "message deferred while nobody is watching is a message that eventually bounces. Off is the "
+                  + "recoverable failure, which is why it is the default.",
+            IniStore = iniStore_
+         });
+         hook.Settings.Add(new IniNumber
+         {
+            Path = "FilterHookRejectScore",
+            Label = "Score applied when the engine says \"reject\"",
+            Default = 100,
+            Blurb = "The engine's verdict arrives as a score so that it lands alongside SPF, DKIM and DMARC and "
+                  + "your existing thresholds decide what happens - rather than a second, parallel notion of spam "
+                  + "that has to be reconciled with the first. This is what its strongest verdict is worth.",
+            IniStore = iniStore_
+         });
+         hook.Settings.Add(new IniNumber
+         {
+            Path = "FilterHookMaxMessageSizeKB",
+            Label = "Do not send messages larger than (KB; 0 = no limit)",
+            Default = 10240,
+            Blurb = "A message above this is passed without being sent to the engine. Posting a fifty-megabyte "
+                  + "attachment across the network to be told it is not spam costs more than the answer is worth. "
+                  + "0 removes the ceiling, which is reasonable for an engine on this machine.",
+            IniStore = iniStore_
+         });
+         Tab("SpamAssassin").Cards.Add(hook);
       }
 
       private void BuildAntiVirus()

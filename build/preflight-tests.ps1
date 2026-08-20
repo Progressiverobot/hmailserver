@@ -205,7 +205,7 @@ if (Test-Path $serverIni) {
                     'PasswordPolicyRequireNonAlphanumeric', 'PasswordPolicyRejectCommon',
                     'QuarantineEnabled', 'PasswordPolicyHistoryCount',
                     'PasswordPolicyMaximumAgeDays', 'DmarcTreeWalkEnabled',
-                    'AuthenticationResultsEnabled', 'DNSQueryTimeout', 'SpfVoidLookupLimit', 'RejectFullMailboxAtRcpt', 'DkimAcceptSha1', 'QuotaWarningPercent', 'ArchiveDir', 'ArchiveRetentionDays', 'MetricsPerDomainEnabled', 'PreferredHashAlgorithm'
+                    'AuthenticationResultsEnabled', 'DNSQueryTimeout', 'SpfVoidLookupLimit', 'RejectFullMailboxAtRcpt', 'DkimAcceptSha1', 'QuotaWarningPercent', 'ArchiveDir', 'ArchiveRetentionDays', 'MetricsPerDomainEnabled', 'PreferredHashAlgorithm', 'FilterHookUrl', 'FilterHookFailClosed', 'FilterHookTimeoutSeconds', 'FilterHookRejectScore'
 
     $iniLines = @(Get-Content -LiteralPath $serverIni)
     $pattern = '^\s*(' + ($leftoverKeys -join '|') + ')\s*='

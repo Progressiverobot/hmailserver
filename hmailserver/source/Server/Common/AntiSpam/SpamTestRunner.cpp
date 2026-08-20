@@ -15,6 +15,7 @@
 #include "SpamTestMXRecords.h"
 #include "SpamTestSPF.h"
 #include "SpamTestSURBL.h"
+#include "SpamTestFilterHook.h"
 #include "SpamTestSpamAssassin.h"
 #include "DKIM/SpamTestArc.h"
 #include "DKIM/SpamTestDKIM.h"
@@ -53,6 +54,12 @@ namespace HM
       spam_tests_.push_back(std::shared_ptr<SpamTestArc> (new SpamTestArc));
       spam_tests_.push_back(std::shared_ptr<SpamTestDMARC> (new SpamTestDMARC));
       spam_tests_.push_back(std::shared_ptr<SpamTestSpamAssassin> (new SpamTestSpamAssassin));
+
+      // Last, deliberately. The external engine is the most expensive test here - a
+      // whole message across a socket and a wait on somebody else's process - and
+      // running it after the cheap local checks means a message already condemned by
+      // them is not also paid for here.
+      spam_tests_.push_back(std::shared_ptr<SpamTestFilterHook> (new SpamTestFilterHook));
    }
 
    std::set<std::shared_ptr<SpamTestResult> >

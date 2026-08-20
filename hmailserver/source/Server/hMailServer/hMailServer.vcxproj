@@ -188,6 +188,8 @@ EXIT 0
     <ClCompile Include="..\Common\AntiSpam\SpamTestRunner.cpp" />
     <ClCompile Include="..\Common\AntiSpam\SpamTestSpamAssassin.cpp" />
     <ClCompile Include="..\Common\AntiSpam\SpamTestSPF.cpp" />
+    <ClCompile Include="..\Common\AntiSpam\FilterHookClient.cpp" />
+    <ClCompile Include="..\Common\AntiSpam\SpamTestFilterHook.cpp" />
     <ClCompile Include="..\Common\AntiSpam\SpamTestSURBL.cpp" />
     <ClCompile Include="..\Common\AntiSpam\SURBL.cpp" />
     <ClCompile Include="..\Common\AntiSpam\WhiteListCache.cpp" />
@@ -759,6 +761,8 @@ EXIT 0
     <ClInclude Include="..\Common\AntiSpam\SpamTestRunner.h" />
     <ClInclude Include="..\Common\AntiSpam\SpamTestSpamAssassin.h" />
     <ClInclude Include="..\Common\AntiSpam\SpamTestSPF.h" />
+    <ClInclude Include="..\Common\AntiSpam\FilterHookClient.h" />
+    <ClInclude Include="..\Common\AntiSpam\SpamTestFilterHook.h" />
     <ClInclude Include="..\Common\AntiSpam\SpamTestSURBL.h" />
     <ClInclude Include="..\Common\AntiSpam\SURBL.h" />
     <ClInclude Include="..\Common\AntiSpam\WhiteListCache.h" />

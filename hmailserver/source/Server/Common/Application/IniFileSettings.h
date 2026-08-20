@@ -306,6 +306,29 @@ namespace HM
       // labelled - so the cost is volume, not exposure.
       bool GetMetricsPerDomainEnabled() const { return metrics_per_domain_enabled_; }
 
+      // An external filtering engine in the path of every accepted message - rspamd,
+      // most likely. Empty disables it, which is the default: this sends the whole
+      // message somewhere, and that is not something to start doing on an upgrade.
+      String GetFilterHookUrl() const { return filter_hook_url_; }
+
+      // How long the engine gets, for the whole exchange. This runs while an SMTP
+      // client waits for its answer to DATA, so the number is a promise about the
+      // worst case rather than a hint.
+      int GetFilterHookTimeoutSeconds() const { return filter_hook_timeout_seconds_; }
+
+      // What happens when the engine does not answer. Open by default: a filter
+      // outage that lets spam through is recoverable, and one that stops the mail
+      // while nobody is watching ends in bounces.
+      bool GetFilterHookFailClosed() const { return filter_hook_fail_closed_; }
+
+      // What the engine's "reject" is worth, in the same units as every other spam
+      // test - so it still passes through the administrator's thresholds instead of
+      // being the one verdict that ignores them.
+      int GetFilterHookRejectScore() const { return filter_hook_reject_score_; }
+
+      // Messages above this are passed without being sent. 0 means no ceiling.
+      int GetFilterHookMaxMessageSizeKB() const { return filter_hook_max_message_size_kb_; }
+
       // Password policy, enforced where a password is CHOSEN (Account.Password over
       // COM) and never where one is verified or re-hashed. All off at 0/false, which
       // is what an existing installation gets until an administrator decides
@@ -739,6 +762,11 @@ namespace HM
       int quota_warning_percent_;
       int archive_retention_days_;
       bool metrics_per_domain_enabled_;
+      String filter_hook_url_;
+      int filter_hook_timeout_seconds_;
+      bool filter_hook_fail_closed_;
+      int filter_hook_reject_score_;
+      int filter_hook_max_message_size_kb_;
       int password_policy_minimum_length_;
       bool password_policy_require_mixed_case_;
       bool password_policy_require_digit_;

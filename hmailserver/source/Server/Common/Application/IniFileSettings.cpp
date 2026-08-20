@@ -537,6 +537,15 @@ namespace HM
       quota_warning_percent_ = ReadIniSettingInteger_("Settings", "QuotaWarningPercent", 90);
       archive_retention_days_ = ReadIniSettingInteger_("Settings", "ArchiveRetentionDays", 0);
       metrics_per_domain_enabled_ = ReadIniSettingInteger_("Settings", "MetricsPerDomainEnabled", 0) == 1;
+
+      filter_hook_url_ = ReadIniSettingString_("Settings", "FilterHookUrl", "");
+      filter_hook_timeout_seconds_ = ReadIniSettingInteger_("Settings", "FilterHookTimeoutSeconds", 10);
+      filter_hook_fail_closed_ = ReadIniSettingInteger_("Settings", "FilterHookFailClosed", 0) == 1;
+      filter_hook_reject_score_ = ReadIniSettingInteger_("Settings", "FilterHookRejectScore", 100);
+      filter_hook_max_message_size_kb_ = ReadIniSettingInteger_("Settings", "FilterHookMaxMessageSizeKB", 10240);
+
+      if (filter_hook_timeout_seconds_ < 1)
+         filter_hook_timeout_seconds_ = 1;
       password_policy_minimum_length_ = ReadIniSettingInteger_("Settings", "PasswordPolicyMinimumLength", 0);
       password_policy_require_mixed_case_ = ReadIniSettingInteger_("Settings", "PasswordPolicyRequireMixedCase", 0) == 1;
       password_policy_require_digit_ = ReadIniSettingInteger_("Settings", "PasswordPolicyRequireDigit", 0) == 1;
