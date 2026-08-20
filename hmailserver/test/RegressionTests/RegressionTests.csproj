@@ -301,6 +301,7 @@
     <Compile Include="Infrastructure\AcceptPathResilience.cs" />
     <Compile Include="Infrastructure\BackendPortability.cs" />
     <Compile Include="Infrastructure\DatabaseFailureHandling.cs" />
+    <Compile Include="Infrastructure\DiskSpaceGuard.cs" />
     <Compile Include="IMAP\CapabilityAuthAdvertisement.cs" />
     <Compile Include="IMAP\MasterUserImpersonation.cs" />
     <Compile Include="Infrastructure\SqlLayerErrorHandling.cs" />
@@ -595,6 +596,7 @@
     <Compile Include="SMTP\TlsRptInertReporting.cs" />
     <Compile Include="SMTP\TlsRptReporting.cs" />
     <Compile Include="AntiSpam\DmarcRptReporting.cs" />
+    <Compile Include="AntiSpam\DmarcRpt2Schema.cs" />
     <Compile Include="AntiSpam\DmarcTreeWalkResolution.cs" />
     <Compile Include="POP3\LoginDelay.cs" />
     <Compile Include="POP3\AuthRespCode.cs" />

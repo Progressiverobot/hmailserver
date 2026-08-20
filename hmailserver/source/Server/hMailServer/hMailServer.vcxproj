@@ -450,6 +450,7 @@ EXIT 0
     <ClCompile Include="..\Common\Util\SRS.cpp" />
     <ClCompile Include="..\Common\Util\BATV.cpp" />
     <ClCompile Include="..\Common\Util\RateLimiter.cpp" />
+    <ClCompile Include="..\Common\Util\DiskSpace.cpp" />
     <ClCompile Include="..\Common\Util\EmailAllUsers.cpp" />
     <ClCompile Include="..\Common\Util\Encoding\Base64.cpp" />
     <ClCompile Include="..\Common\Util\Encoding\ModifiedUTF7.cpp" />
@@ -1051,6 +1052,7 @@ EXIT 0
     <ClInclude Include="..\Common\Util\SRS.h" />
     <ClInclude Include="..\Common\Util\BATV.h" />
     <ClInclude Include="..\Common\Util\RateLimiter.h" />
+    <ClInclude Include="..\Common\Util\DiskSpace.h" />
     <ClInclude Include="..\Common\Util\Hashing\ScramSha256.h" />
     <ClInclude Include="..\Common\Util\HeapChecker.h" />
     <ClInclude Include="..\Common\Util\HTTPClient.h" />
