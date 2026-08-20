@@ -412,6 +412,7 @@
     <Compile Include="SMTP\XOriginalRcptHeaderTests.cs" />
     <Compile Include="SSL\SslTlsVersionTests.cs" />
     <Compile Include="SSL\SslServerTests.cs" />
+    <Compile Include="Infrastructure\MessageTraceTests.cs" />
     <Compile Include="Infrastructure\TCPIP.cs" />
     <Compile Include="Infrastructure\Timeouts.cs" />
     <Compile Include="Shared\TestSetup.cs" />

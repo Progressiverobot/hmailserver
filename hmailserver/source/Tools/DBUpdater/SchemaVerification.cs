@@ -203,7 +203,15 @@ namespace DBUpdater
          new SchemaProbe(6019, "hm_passwordhistory.phhash",
                          "update hm_passwordhistory set phhash = phhash where 1 = 0"),
          new SchemaProbe(6019, "hm_passwordhistory.phchanged",
-                         "update hm_passwordhistory set phchanged = phchanged where 1 = 0")
+                         "update hm_passwordhistory set phchanged = phchanged where 1 = 0"),
+
+         // Upgrade6019to6020* - the message trace.
+         new SchemaProbe(6020, "hm_messagetrace.mtqueueid",
+                         "update hm_messagetrace set mtqueueid = mtqueueid where 1 = 0"),
+         new SchemaProbe(6020, "hm_messagetrace.mtevent",
+                         "update hm_messagetrace set mtevent = mtevent where 1 = 0"),
+         new SchemaProbe(6020, "hm_messagetrace.mtoccurred",
+                         "update hm_messagetrace set mtoccurred = mtoccurred where 1 = 0")
       };
 
       /// <summary>

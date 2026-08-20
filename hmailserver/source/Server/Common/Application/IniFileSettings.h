@@ -252,6 +252,12 @@ namespace HM
       bool GetQuarantineEnabled() const { return quarantine_enabled_; }
       int GetQuarantineRetentionDays() const { return quarantine_retention_days_; }
 
+      // The queryable message trace. Off by default, and that is a PRIVACY default
+      // rather than a performance one: the table records who corresponds with whom,
+      // retained, so switching it on should be a decision.
+      bool GetMessageTraceEnabled() const { return message_trace_enabled_; }
+      int GetMessageTraceRetentionDays() const { return message_trace_retention_days_; }
+
       // Password policy, enforced where a password is CHOSEN (Account.Password over
       // COM) and never where one is verified or re-hashed. All off at 0/false, which
       // is what an existing installation gets until an administrator decides
@@ -676,6 +682,8 @@ namespace HM
       int pop3_login_delay_seconds_;
       bool quarantine_enabled_;
       int quarantine_retention_days_;
+      bool message_trace_enabled_;
+      int message_trace_retention_days_;
       int password_policy_minimum_length_;
       bool password_policy_require_mixed_case_;
       bool password_policy_require_digit_;

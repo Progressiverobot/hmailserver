@@ -3,6 +3,7 @@
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 
 #include "stdafx.h"
+#include "InterfaceMessageTrace.h"
 #include "COMError.h"
 #include "InterfaceGlobalObjects.h"
 #include "InterfaceDeliveryQueue.h"
@@ -30,6 +31,25 @@ void
 InterfaceGlobalObjects::SetAuthentication(std::shared_ptr<HM::COMAuthentication> pAuthentication)
 {
    authentication_ = pAuthentication;
+}
+
+STDMETHODIMP InterfaceGlobalObjects::get_MessageTrace(IInterfaceMessageTrace** pVal)
+{
+   try
+   {
+      CComObject<InterfaceMessageTrace>* pItem = new CComObject<InterfaceMessageTrace>();
+      pItem->SetAuthentication(authentication_);
+      pItem->AddRef();
+
+      // Returned empty. A trace is loaded by asking it a question, not by existing.
+      *pVal = pItem;
+
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
 }
 
 STDMETHODIMP InterfaceGlobalObjects::get_DeliveryQueue(IInterfaceDeliveryQueue **pVal)

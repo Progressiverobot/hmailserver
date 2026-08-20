@@ -160,6 +160,8 @@ IDR_INTERFACEAPPPASSWORD   REGISTRY                "..\\COM\\InterfaceAppPasswor
 IDR_INTERFACEAPPPASSWORDS  REGISTRY                "..\\COM\\InterfaceAppPasswords.rgs"
 IDR_INTERFACEQUARANTINEDMESSAGE REGISTRY           "..\\COM\\InterfaceQuarantinedMessage.rgs"
 IDR_INTERFACEQUARANTINE    REGISTRY                "..\\COM\\InterfaceQuarantine.rgs"
+IDR_INTERFACEMESSAGETRACEEVENT REGISTRY            "..\\COM\\InterfaceMessageTraceEvent.rgs"
+IDR_INTERFACEMESSAGETRACE  REGISTRY                "..\\COM\\InterfaceMessageTrace.rgs"
 IDR_INTERFACESCRIPTING  REGISTRY                "..\\COM\\InterfaceScripting.rgs"
 IDR_INTERFACEDOMAINALIASES REGISTRY                "..\\COM\\InterfaceDomainAliases.rgs"
 IDR_INTERFACEDOMAINALIAS REGISTRY                "..\\COM\\InterfaceDomainAlias.rgs"

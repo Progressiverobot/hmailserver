@@ -5,6 +5,7 @@
 #include "StdAfx.h"
 #include ".\awstats.h"
 #include "Time.h"
+#include "MessageTrace.h"
 #include "../BO/Message.h"
 #include "../BO/MessageRecipients.h"
 #include "../BO/MessageRecipient.h"
@@ -27,8 +28,14 @@ namespace HM
    }
 
    void
-   AWStats::LogDeliveryFailure(const String &senderIP, const String &sFromAddress, const String &sToAddress, int iErrorCode)
+   AWStats::LogDeliveryFailure(const String &senderIP, const String &sFromAddress, const String &sToAddress, int iErrorCode, __int64 queueID)
    {
+      // Recorded BEFORE the AWStats guard, because the two are separate features
+      // that happen to observe the same events: an administrator who wants a
+      // queryable trace should not have to switch on a web-statistics journal to
+      // get one, and vice versa.
+      MessageTrace::Record(queueID, MessageTrace::EventFailed, sFromAddress, sToAddress, senderIP, iErrorCode, _T(""));
+
       if (!enabled_)
          return;
 
@@ -43,6 +50,12 @@ namespace HM
    void
    AWStats::LogDeliverySuccess(const String &senderIP, const String &recipientIP, std::shared_ptr<Message> pMessage, const String &sRecipient)
    {
+      if (pMessage)
+      {
+         MessageTrace::Record(pMessage->GetID(), MessageTrace::EventDelivered, pMessage->GetFromAddress(),
+                              sRecipient, senderIP, 250, _T(""));
+      }
+
       if (!enabled_)
          return;
 

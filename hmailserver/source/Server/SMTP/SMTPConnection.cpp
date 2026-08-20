@@ -1039,7 +1039,7 @@ namespace HM
 
          if (dp != RecipientParser::DP_Possible && DatabaseUnavailableMarker::IsMarked())
          {
-            AWStats::LogDeliveryFailure(GetIPAddressString(), current_message_->GetFromAddress(), sRecipientAddress, 451);
+            AWStats::LogDeliveryFailure(GetIPAddressString(), current_message_->GetFromAddress(), sRecipientAddress, 451, current_message_->GetID());
 
             // The enhanced code belongs in its own field, not inside the text: passing
             // it as text made an ESMTP session receive "451 4.3.0 4.3.2 Unable...".
@@ -1050,7 +1050,7 @@ namespace HM
 
       if (dp != RecipientParser::DP_Possible)
       {
-         AWStats::LogDeliveryFailure(GetIPAddressString(), current_message_->GetFromAddress(), sRecipientAddress, 550);
+         AWStats::LogDeliveryFailure(GetIPAddressString(), current_message_->GetFromAddress(), sRecipientAddress, 550, current_message_->GetID());
 
          SendErrorResponse_(550, sErrMsg);
          return;
@@ -1074,7 +1074,7 @@ namespace HM
       {
          // User is not allowed to send this email.
          SendErrorResponse_(550, "Delivery is not allowed to this address.");
-         AWStats::LogDeliveryFailure(GetIPAddressString(), current_message_->GetFromAddress(), sRecipientAddress, 550);
+         AWStats::LogDeliveryFailure(GetIPAddressString(), current_message_->GetFromAddress(), sRecipientAddress, 550, current_message_->GetID());
          return;
       }
 
@@ -1093,7 +1093,7 @@ namespace HM
       {
          // Authentication is required, but the user hasn't authenticated.
          SendErrorResponse_(530, "SMTP authentication is required.");
-         AWStats::LogDeliveryFailure(GetIPAddressString(), current_message_->GetFromAddress(), sRecipientAddress, 530);
+         AWStats::LogDeliveryFailure(GetIPAddressString(), current_message_->GetFromAddress(), sRecipientAddress, 530, current_message_->GetID());
          return;
       }
 
@@ -1108,7 +1108,7 @@ namespace HM
 
             if (!DoSpamProtection_(SPPreTransmission, current_message_->GetFromAddress(), helo_host_, GetRemoteEndpointAddress()))
             {
-               AWStats::LogDeliveryFailure(GetIPAddressString(), current_message_->GetFromAddress(), sRecipientAddress, 550);
+               AWStats::LogDeliveryFailure(GetIPAddressString(), current_message_->GetFromAddress(), sRecipientAddress, 550, current_message_->GetID());
                return;
             }
          }

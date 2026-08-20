@@ -1,0 +1,24 @@
+HKCR
+{
+	hMailServer.MessageTraceEvent.1 = s 'MessageTraceEvent Class'
+	{
+		CLSID = s '{6C88E06B-0632-4F78-B080-85C1C527B84F}'
+	}
+	hMailServer.MessageTraceEvent = s 'MessageTraceEvent Class'
+	{
+		CLSID = s '{6C88E06B-0632-4F78-B080-85C1C527B84F}'
+		CurVer = s 'hMailServer.MessageTraceEvent.1'
+	}
+	NoRemove CLSID
+	{
+		ForceRemove {6C88E06B-0632-4F78-B080-85C1C527B84F} = s 'MessageTraceEvent Class'
+		{
+			ProgID = s 'hMailServer.MessageTraceEvent.1'
+			VersionIndependentProgID = s 'hMailServer.MessageTraceEvent'
+			ForceRemove 'Programmable'
+			LocalServer32 = s '%MODULE%'
+			val AppID = s '%APPID%'
+			'TypeLib' = s '{DB241B59-A1B1-4C59-98FC-8D101A2995F2}'
+		}
+	}
+}

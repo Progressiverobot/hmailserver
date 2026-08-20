@@ -42,6 +42,8 @@ interface IInterfaceFetchAccount;
 interface IInterfaceAppPasswords;
 interface IInterfaceQuarantinedMessage;
 interface IInterfaceQuarantine;
+interface IInterfaceMessageTraceEvent;
+interface IInterfaceMessageTrace;
 interface IInterfaceAppPassword;
 interface IInterfaceScripting;
 interface IInterfaceDomainAliases;
@@ -1813,6 +1815,40 @@ interface IInterfaceAppPassword : IDispatch{
 };
 [
 	object,
+	uuid(251C0B9A-CEB1-4455-9F89-1725F2B502B8),
+	dual,
+	nonextensible,
+	helpstring("One event in a message's delivery trace. The queue id correlates every event for one message INSTANCE; it does not follow a message across a fork, which creates a new queue entry."),
+	pointer_default(unique)
+]
+interface IInterfaceMessageTraceEvent : IDispatch{
+   [propget, id(1), helpstring("The database identifier.")] HRESULT ID([out, retval] LONG* pVal);
+   [propget, id(2), helpstring("The queue id this event belongs to. Every event sharing it is one message instance.")] HRESULT QueueID([out, retval] LONG* pVal);
+   [propget, id(3), helpstring("When it happened.")] HRESULT OccurredTime([out, retval] BSTR* pVal);
+   [propget, id(4), helpstring("What happened: accepted, delivered, failed or quarantined.")] HRESULT EventName([out, retval] BSTR* pVal);
+   [propget, id(5), helpstring("The envelope sender.")] HRESULT Sender([out, retval] BSTR* pVal);
+   [propget, id(6), helpstring("The recipient this event concerns.")] HRESULT Recipient([out, retval] BSTR* pVal);
+   [propget, id(7), helpstring("The IP address the message came from.")] HRESULT SourceIP([out, retval] BSTR* pVal);
+   [propget, id(8), helpstring("The SMTP status code, where one applies.")] HRESULT StatusCode([out, retval] LONG* pVal);
+   [propget, id(9), helpstring("Any extra detail recorded with the event.")] HRESULT Detail([out, retval] BSTR* pVal);
+};
+[
+	object,
+	uuid(748E5AC8-2A0E-42AA-A427-687C479EB180),
+	dual,
+	nonextensible,
+	helpstring("The queryable message trace: what happened to a message, without grepping logs. Empty and inert unless MessageTraceEnabled is set."),
+	pointer_default(unique)
+]
+interface IInterfaceMessageTrace : IDispatch{
+   [propget, id(1), helpstring("The total number of events recorded.")] HRESULT Count([out, retval] LONG* pVal);
+   [propget, id(0), defaultbind, helpstring("Item")] HRESULT Item([in] long Index, [out, retval] IInterfaceMessageTraceEvent** pVal);
+   [id(5), helpstring("Loads the most recent events for an address, matched against sender or recipient. An empty address loads the most recent events for anyone.")] HRESULT Search([in] BSTR Address);
+   [id(6), helpstring("Loads every event for one queue id, oldest first - the story of one message.")] HRESULT SearchByQueueID([in] long QueueID);
+   [id(7), helpstring("Deletes events older than MessageTraceRetentionDays and returns how many went.")] HRESULT DeleteExpired([out, retval] LONG* pVal);
+};
+[
+	object,
 	uuid(310F1911-69A5-4696-B08F-D364598105E5),
 	dual,
 	nonextensible,
@@ -2252,6 +2288,7 @@ interface IInterfaceBackup : IDispatch
 	pointer_default(unique)
 ]
 interface IInterfaceGlobalObjects : IDispatch{
+   [propget, id(3), helpstring("The queryable message trace. Beside DeliveryQueue because the two answer the same question at different moments: where is my mail now, and what happened to it.")] HRESULT MessageTrace([out, retval] IInterfaceMessageTrace** pVal);
    [propget, id(1), helpstring("Delivery queue")] HRESULT DeliveryQueue([out, retval] IInterfaceDeliveryQueue **pVal);
    [propget, id(2), helpstring("Returns a collection of GUI languages.")] HRESULT Languages([out, retval] IInterfaceLanguages **pVal);
    
@@ -3388,6 +3425,22 @@ library hMailServer
 	coclass Quarantine
 	{
 		[default] interface IInterfaceQuarantine;
+	};
+	[
+		uuid(6C88E06B-0632-4F78-B080-85C1C527B84F),
+		helpstring("MessageTraceEvent Class")
+	]
+	coclass MessageTraceEvent
+	{
+		[default] interface IInterfaceMessageTraceEvent;
+	};
+	[
+		uuid(8847931A-9AD6-4614-8ED1-6EC5C04878E6),
+		helpstring("MessageTrace Class")
+	]
+	coclass MessageTrace
+	{
+		[default] interface IInterfaceMessageTrace;
 	};
 	[
 		uuid(68A73A47-5B56-43A3-BC11-CFC436F3BA9E),

@@ -55,6 +55,7 @@ public:
    STDMETHOD(InterfaceSupportsErrorInfo)(REFIID riid);
    
    STDMETHOD(get_DeliveryQueue)(/*[out, retval]*/ IInterfaceDeliveryQueue** pVal);
+   STDMETHOD(get_MessageTrace)(/*[out, retval]*/ IInterfaceMessageTrace** pVal);
    STDMETHOD(get_Languages)(/*[out, retval]*/ IInterfaceLanguages **pVal);   
 
 private:

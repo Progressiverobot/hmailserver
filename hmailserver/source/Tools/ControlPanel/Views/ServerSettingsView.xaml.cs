@@ -1908,6 +1908,32 @@ namespace hMailServer.ControlPanel.Views
          });
          logging.Cards.Add(retention);
 
+         // Beside log retention rather than in a section of its own: the two answer the
+         // same operational question - how much history is kept, and for how long.
+         var trace = Card("Message trace",
+            "Records a queryable row for every delivery, refusal and quarantine, so \"what happened to the "
+          + "message Jane sent at 14:20\" can be answered by searching instead of grepping logs. The events "
+          + "are the same ones the AWStats journal has always seen; this gives them somewhere to be asked "
+          + "questions. Off by default, because it stores sender and recipient addresses - which makes it a "
+          + "record of who corresponds with whom. Applies after a service restart.");
+         trace.Settings.Add(new IniBool
+         {
+            Path = "MessageTraceEnabled",
+            Label = "Record a queryable message trace",
+            Blurb = "Independent of the AWStats log above - either can be on without the other.",
+            IniStore = iniStore_
+         });
+         trace.Settings.Add(new IniNumber
+         {
+            Path = "MessageTraceRetentionDays",
+            Label = "Delete trace events after (days; 0 = never)",
+            Default = 30,
+            Blurb = "For a record of who corresponds with whom, keeping it for ever should be a decision "
+                  + "rather than a default - which is why 0 is offered as an option instead of being one.",
+            IniStore = iniStore_
+         });
+         logging.Cards.Add(trace);
+
          // The classic Administrator's Logging pane showed the log directory and gave
          // you a button to open it. The Control Panel had neither, so the first
          // question anybody asks on this page - "where are these files?" - could only

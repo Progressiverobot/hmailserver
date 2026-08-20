@@ -348,6 +348,14 @@ namespace hMailServer.ControlPanel.Services
                   aliases: "Spool|Stuck mail|Pending mail|Outbound queue|Retry|Not delivered|Backlog",
                   seeAlso: "logs|delivery|status"),
 
+               // Next to the queue on purpose: the two answer the same question at
+               // different moments. The queue says where a message is now; the trace
+               // says what happened to one that has already gone.
+               Page("messagetrace", "Message trace",
+                  "What happened to a particular message - searchable by sender or recipient, instead of grepping logs.",
+                  aliases: "Message trace|Delivery history|Where did my email go|Did it arrive|Track a message|Was it delivered|Message log|Audit|What happened to|Trace",
+                  seeAlso: "queue|logs|quarantine"),
+
                Page("logs", "Live logs",
                   "Stream the server log as it is written - the fastest way to see what happened to one message.",
                   aliases: "Log viewer|Tail|Trace|Debug|SMTP conversation|Error log|Awstats",

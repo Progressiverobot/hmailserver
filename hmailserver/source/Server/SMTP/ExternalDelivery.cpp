@@ -758,7 +758,7 @@ namespace HM
                      original_message_->GetID(), recipient->GetAddress()));
             }
 
-            AWStats::LogDeliveryFailure(_sendersIP, original_message_->GetFromAddress(), recipient->GetAddress(),  550);
+            AWStats::LogDeliveryFailure(_sendersIP, original_message_->GetFromAddress(), recipient->GetAddress(),  550, original_message_->GetID());
             Events::FireOnDeliveryFailed(original_message_, _sendersIP, recipient->GetAddress(), recipient->GetErrorMessage());
          }
          else
@@ -865,7 +865,7 @@ namespace HM
             String sFailed = (*iterFailed).second;
 
             // Delivery has failed for the last time.
-            AWStats::LogDeliveryFailure(_sendersIP, original_message_->GetFromAddress(), sEmailAddress,  550);
+            AWStats::LogDeliveryFailure(_sendersIP, original_message_->GetFromAddress(), sEmailAddress,  550, original_message_->GetID());
             Events::FireOnDeliveryFailed(original_message_, _sendersIP, sEmailAddress, sFailed);
 
             // DSN (RFC 3461): suppress the bounce text for recipients that opted

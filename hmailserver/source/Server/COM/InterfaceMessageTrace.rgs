@@ -1,0 +1,24 @@
+HKCR
+{
+	hMailServer.MessageTrace.1 = s 'MessageTrace Class'
+	{
+		CLSID = s '{8847931A-9AD6-4614-8ED1-6EC5C04878E6}'
+	}
+	hMailServer.MessageTrace = s 'MessageTrace Class'
+	{
+		CLSID = s '{8847931A-9AD6-4614-8ED1-6EC5C04878E6}'
+		CurVer = s 'hMailServer.MessageTrace.1'
+	}
+	NoRemove CLSID
+	{
+		ForceRemove {8847931A-9AD6-4614-8ED1-6EC5C04878E6} = s 'MessageTrace Class'
+		{
+			ProgID = s 'hMailServer.MessageTrace.1'
+			VersionIndependentProgID = s 'hMailServer.MessageTrace'
+			ForceRemove 'Programmable'
+			LocalServer32 = s '%MODULE%'
+			val AppID = s '%APPID%'
+			'TypeLib' = s '{DB241B59-A1B1-4C59-98FC-8D101A2995F2}'
+		}
+	}
+}

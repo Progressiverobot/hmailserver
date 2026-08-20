@@ -88,6 +88,7 @@ namespace hMailServer.ControlPanel
          pageFactories_["dashboard"] = () => new DashboardView();
          pageFactories_["status"] = () => new StatusView();
          pageFactories_["queue"] = () => new QueueView();
+         pageFactories_["messagetrace"] = () => new MessageTraceView();
          pageFactories_["logs"] = () => new LogsView();
          pageFactories_["domains"] = () => new DomainsView();
          pageFactories_["rules"] = () => new RulesView();

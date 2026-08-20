@@ -493,6 +493,7 @@ EXIT 0
     <ClCompile Include="..\Common\Util\WebServicesServer.cpp" />
     <ClCompile Include="..\Common\AntiSpam\QuarantineStore.cpp" />
     <ClCompile Include="..\Common\Util\Totp.cpp" />
+    <ClCompile Include="..\Common\Util\MessageTrace.cpp" />
     <ClCompile Include="..\Common\Util\PasswordHistory.cpp" />
     <ClCompile Include="..\Common\Util\PasswordPolicy.cpp" />
     <ClCompile Include="..\Common\Util\Pop3LoginDelay.cpp" />
@@ -550,6 +551,8 @@ EXIT 0
     <ClCompile Include="..\Com\InterfaceEventLog.cpp" />
     <ClCompile Include="..\COM\InterfaceFetchAccount.cpp" />
     <ClCompile Include="..\COM\InterfaceAppPassword.cpp" />
+    <ClCompile Include="..\COM\InterfaceMessageTrace.cpp" />
+    <ClCompile Include="..\COM\InterfaceMessageTraceEvent.cpp" />
     <ClCompile Include="..\COM\InterfaceQuarantine.cpp" />
     <ClCompile Include="..\COM\InterfaceQuarantinedMessage.cpp" />
     <ClCompile Include="..\COM\InterfaceAppPasswords.cpp" />
@@ -1072,6 +1075,7 @@ EXIT 0
     <ClInclude Include="..\Common\Util\WebServicesServer.h" />
     <ClInclude Include="..\Common\AntiSpam\QuarantineStore.h" />
     <ClInclude Include="..\Common\Util\Totp.h" />
+    <ClInclude Include="..\Common\Util\MessageTrace.h" />
     <ClInclude Include="..\Common\Util\PasswordHistory.h" />
     <ClInclude Include="..\Common\Util\PasswordPolicy.h" />
     <ClInclude Include="..\Common\Util\Pop3LoginDelay.h" />
@@ -1135,6 +1139,8 @@ EXIT 0
     <ClInclude Include="..\Com\InterfaceEventLog.h" />
     <ClInclude Include="..\Com\InterfaceFetchAccount.h" />
     <ClInclude Include="..\Com\InterfaceAppPassword.h" />
+    <ClInclude Include="..\Com\InterfaceMessageTrace.h" />
+    <ClInclude Include="..\Com\InterfaceMessageTraceEvent.h" />
     <ClInclude Include="..\Com\InterfaceQuarantine.h" />
     <ClInclude Include="..\Com\InterfaceQuarantinedMessage.h" />
     <ClInclude Include="..\Com\InterfaceAppPasswords.h" />
@@ -1451,6 +1457,8 @@ EXIT 0
     <None Include="..\COM\InterfaceEventLog.rgs" />
     <None Include="..\COM\InterfaceFetchAccount.rgs" />
     <None Include="..\COM\InterfaceAppPassword.rgs" />
+    <None Include="..\COM\InterfaceMessageTrace.rgs" />
+    <None Include="..\COM\InterfaceMessageTraceEvent.rgs" />
     <None Include="..\COM\InterfaceQuarantine.rgs" />
     <None Include="..\COM\InterfaceQuarantinedMessage.rgs" />
     <None Include="..\COM\InterfaceAppPasswords.rgs" />
