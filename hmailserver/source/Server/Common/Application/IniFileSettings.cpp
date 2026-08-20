@@ -161,7 +161,29 @@ namespace HM
       String sValidLanguages = ReadIniSettingString_("GUILanguages", "ValidLanguages", "");
       valid_languages_ = StringParser::SplitString(sValidLanguages, ",");
 
-      preferred_hash_algorithm_ = ReadIniSettingInteger_("Settings", "PreferredHashAlgorithm", 4);
+      preferred_hash_algorithm_ = ReadIniSettingInteger_("Settings", "PreferredHashAlgorithm", 4);
+
+      // Crypt::EncryptionType: 0 None, 1 Blowfish, 2 MD5, 3 SHA256, 4 PBKDF2,
+      // 5 Argon2id. The first three are not password hashes - None and Blowfish are
+      // recoverable rather than hashed at all, and MD5 has not been a defensible
+      // choice for storing a password for well over a decade.
+      //
+      // Clamped here, at the single place the value is read, rather than at each of
+      // the five call sites that consume it: two of them hand it straight to Crypt
+      // as the scheme to store a NEW secret under, so a 0 or a 1 there would write
+      // account passwords and app passwords in a form anybody with the database can
+      // read back. Reported rather than silently corrected, because an administrator
+      // who set this deliberately is owed an explanation of why it did not take.
+      if (preferred_hash_algorithm_ < 3 || preferred_hash_algorithm_ > 5)
+      {
+         String message;
+         message.Format(_T("PreferredHashAlgorithm is set to %d, which is not a password-hashing scheme this server will store a new secret under (0 is no hashing, 1 is reversible, 2 is MD5). Using 4 (PBKDF2) instead. Set it to 3 (SHA256), 4 (PBKDF2) or 5 (Argon2id) to choose deliberately."),
+                        preferred_hash_algorithm_);
+
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5528, "IniFileSettings::LoadSettings", message);
+
+         preferred_hash_algorithm_ = 4;
+      }
 
       // Minimum password hash scheme an account may use to authenticate. Accounts
       // whose stored hash is weaker than this (Crypt::EncryptionType ordering) are

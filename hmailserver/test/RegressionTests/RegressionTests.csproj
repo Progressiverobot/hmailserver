@@ -604,6 +604,7 @@
     <Compile Include="Security\AccountLockoutTests.cs" />
     <Compile Include="AntiVirus\ScannerFailurePolicy.cs" />
     <Compile Include="Security\AccountSendingLimits.cs" />
+    <Compile Include="Security\PasswordHashFloor.cs" />
     <Compile Include="Security\PasswordHashUpgrade.cs" />
     <Compile Include="Sieve\SieveExtensionActions.cs" />
     <Compile Include="Sieve\SieveExtensionRequire.cs" />
