@@ -253,6 +253,193 @@ namespace HM
       return directory;
    }
 
+
+   time_t
+   AcmeClient::ParseRfc3339(const AnsiString &value)
+   {
+      // "2026-01-02T15:04:05Z", optionally with fractional seconds before the Z.
+      // Deliberately strict about the shape rather than tolerant: this decides when a
+      // certificate is renewed, and a timestamp half-understood is worse than one
+      // rejected, because rejecting it falls back to a calculation that works.
+      if (value.GetLength() < 20)
+         return 0;
+
+      tm parsed = {};
+
+      int year = 0, month = 0, day = 0, hour = 0, minute = 0, second = 0;
+
+      if (sscanf_s(value.c_str(), "%4d-%2d-%2dT%2d:%2d:%2d",
+                   &year, &month, &day, &hour, &minute, &second) != 6)
+         return 0;
+
+      if (year < 1970 || month < 1 || month > 12 || day < 1 || day > 31)
+         return 0;
+
+      parsed.tm_year = year - 1900;
+      parsed.tm_mon = month - 1;
+      parsed.tm_mday = day;
+      parsed.tm_hour = hour;
+      parsed.tm_min = minute;
+      parsed.tm_sec = second;
+
+      time_t converted = _mkgmtime(&parsed);
+
+      return converted == -1 ? 0 : converted;
+   }
+
+   AnsiString
+   AcmeClient::BuildAriId(const unsigned char *keyIdentifier, int keyIdentifierLength,
+                          const unsigned char *serialDer, int serialDerLength)
+   {
+      if (keyIdentifier == nullptr || keyIdentifierLength <= 0 ||
+          serialDer == nullptr || serialDerLength <= 0)
+         return "";
+
+      // RFC 9773 4.1: base64url of the AKI keyIdentifier, a dot, base64url of the
+      // serial's DER content octets. Unpadded, which Base64Url_ already handles.
+      return Base64Url_(keyIdentifier, keyIdentifierLength) + "." +
+             Base64Url_(serialDer, serialDerLength);
+   }
+
+   bool
+   AcmeClient::GetCertificateAriId(const String &certificateFile, AnsiString &ariId)
+   {
+      ariId = "";
+
+      if (!FileUtilities::Exists(certificateFile))
+         return false;
+
+      AnsiString narrowFileName = certificateFile;
+
+      BIO *bio = BIO_new_file(narrowFileName.c_str(), "r");
+      if (bio == nullptr)
+         return false;
+
+      X509 *certificate = PEM_read_bio_X509(bio, nullptr, nullptr, nullptr);
+      BIO_free(bio);
+
+      if (certificate == nullptr)
+         return false;
+
+      bool built = false;
+
+      const ASN1_OCTET_STRING *keyIdentifier = X509_get0_authority_key_id(certificate);
+      const ASN1_INTEGER *serial = X509_get0_serialNumber(certificate);
+
+      if (keyIdentifier != nullptr && serial != nullptr)
+      {
+         // The serial has to be its DER CONTENT octets, and that is not the same as
+         // the bytes OpenSSL keeps in the ASN1_INTEGER. DER encodes an INTEGER in
+         // two's complement, so a positive serial whose top bit is set carries a
+         // leading zero byte to keep it positive - RFC 9773's own example is serial
+         // 0x8765432101 encoding as 00 87 65 43 21 - while ASN1_STRING_get0_data
+         // hands back the magnitude without it. Getting that wrong costs nothing
+         // visible: the identifier is simply one the CA has never issued, it answers
+         // 404, and this server quietly falls back to deciding for itself. Which is
+         // to say it would have been wrong for about half of all certificates and
+         // nobody would have noticed. So the rule is applied explicitly below.
+         BIGNUM *serialNumber = ASN1_INTEGER_to_BN(serial, nullptr);
+
+         if (serialNumber != nullptr)
+         {
+            std::vector<unsigned char> serialBytes;
+
+            const int magnitudeLength = BN_num_bytes(serialNumber);
+
+            if (magnitudeLength == 0)
+            {
+               // Serial zero. Not legal in a public certificate, but DER encodes it
+               // as a single zero octet rather than as nothing, and an empty
+               // component would produce an identifier with a dot and no serial.
+               serialBytes.push_back(0x00);
+            }
+            else
+            {
+               serialBytes.resize(magnitudeLength);
+               BN_bn2bin(serialNumber, &serialBytes[0]);
+
+               // The rule this exists for: DER writes an INTEGER in two's
+               // complement, so a positive value whose top bit is set needs a
+               // leading zero octet or it would read as negative.
+               if ((serialBytes[0] & 0x80) != 0)
+                  serialBytes.insert(serialBytes.begin(), 0x00);
+            }
+
+            BN_free(serialNumber);
+
+            ariId = BuildAriId(ASN1_STRING_get0_data(keyIdentifier), ASN1_STRING_length(keyIdentifier),
+                               &serialBytes[0], (int) serialBytes.size());
+
+            built = !ariId.IsEmpty();
+         }
+      }
+
+      X509_free(certificate);
+
+      return built;
+   }
+
+   time_t
+   AcmeClient::GetRenewalTimeInWindow(const AnsiString &ariId, time_t windowStart, time_t windowEnd)
+   {
+      if (windowStart <= 0)
+         return 0;
+
+      if (windowEnd <= windowStart)
+         return windowStart;
+
+      // A stable point in the window, derived from the certificate's identifier.
+      // Any cheap spreading function does; this one is FNV-1a because it is four
+      // lines and has no dependencies.
+      unsigned __int64 hash = 14695981039346656037ULL;
+
+      for (int i = 0; i < ariId.GetLength(); i++)
+      {
+         hash ^= (unsigned char) ariId.GetAt(i);
+         hash *= 1099511628211ULL;
+      }
+
+      const time_t span = windowEnd - windowStart;
+
+      return windowStart + (time_t) (hash % (unsigned __int64) span);
+   }
+
+   bool
+   AcmeClient::FetchSuggestedRenewalTime_(time_t &renewAt)
+   {
+      renewAt = 0;
+
+      if (url_renewal_info_.IsEmpty())
+         return false;
+
+      AnsiString ariId;
+
+      if (!GetCertificateAriId(GetCertificateDirectory() + _T("\\fullchain.pem"), ariId))
+         return false;
+
+      AnsiString url = url_renewal_info_;
+
+      if (url.Right(1) != "/")
+         url += "/";
+
+      url += ariId;
+
+      HttpResponse response;
+
+      if (!Transact_(url, "GET", "", response) || response.status_code != 200)
+         return false;
+
+      time_t windowStart = ParseRfc3339(JsonStringValue_(response.body, "start"));
+      time_t windowEnd = ParseRfc3339(JsonStringValue_(response.body, "end"));
+
+      if (windowStart <= 0)
+         return false;
+
+      renewAt = GetRenewalTimeInWindow(ariId, windowStart, windowEnd);
+
+      return renewAt > 0;
+   }
+
    time_t
    AcmeClient::GetRenewalTime(time_t notBefore, time_t notAfter)
    {
@@ -287,17 +474,38 @@ namespace HM
    }
 
    bool
-   AcmeClient::RenewalNeeded()
+   AcmeClient::ShouldRenewNow()
    {
-      // No certificate, an unreadable one or one whose date will not parse all
-      // still mean "renew".
       time_t notBefore = 0;
       time_t notAfter = 0;
 
       if (!ReadCertificateDates(GetCertificateDirectory() + _T("\\fullchain.pem"), notBefore, notAfter))
          return true;
 
-      return time(nullptr) >= GetRenewalTime(notBefore, notAfter);
+      const time_t now = time(nullptr);
+
+      // The CA's opinion, if it has one and will tell us.
+      if (FetchDirectory_())
+      {
+         time_t suggested = 0;
+
+         if (FetchSuggestedRenewalTime_(suggested))
+         {
+            // Never later than a day before expiry, whatever the CA says. ARI is
+            // advisory and the certificate is not: RFC 9773 has the client respect
+            // the window but still renew in time, and a CA that returns a window
+            // past this certificate's own expiry - through a bug, a stale record or
+            // an identifier collision - must not be able to take TLS down here.
+            const time_t latest = notAfter - 86400;
+
+            if (suggested > latest)
+               suggested = latest;
+
+            return now >= suggested;
+         }
+      }
+
+      return now >= GetRenewalTime(notBefore, notAfter);
    }
 
    bool
@@ -700,6 +908,11 @@ namespace HM
       url_new_nonce_ = JsonStringValue_(response.body, "newNonce");
       url_new_account_ = JsonStringValue_(response.body, "newAccount");
       url_new_order_ = JsonStringValue_(response.body, "newOrder");
+
+      // RFC 9773. Optional, and its absence is not an error: a CA that does not
+      // implement ARI simply does not advertise it, and this server then decides for
+      // itself when to renew exactly as it did before.
+      url_renewal_info_ = JsonStringValue_(response.body, "renewalInfo");
 
       return !url_new_nonce_.IsEmpty() && !url_new_account_.IsEmpty() && !url_new_order_.IsEmpty();
    }
@@ -1540,12 +1753,12 @@ namespace HM
       if (!IniFileSettings::Instance()->GetAcmeEnabled())
          return;
 
-      if (!AcmeClient::RenewalNeeded())
+      AcmeClient client;
+
+      if (!client.ShouldRenewNow())
          return;
 
-      LOG_APPLICATION("ACME: Certificate is missing or expires soon. Requesting a new certificate.");
-
-      AcmeClient client;
+      LOG_APPLICATION("ACME: Certificate is missing or due for renewal. Requesting a new certificate.");
 
       if (client.RequestCertificate())
          return;

@@ -452,6 +452,86 @@ namespace HM
             throw 0;
       }
 
+      OutputDebugString(_T("hMailServer: Testing the ARI certificate identifier against RFC 9773's worked example\n"));
+      {
+         // RFC 9773 section 4.1 publishes a worked example, which is the only way to
+         // check this without a certificate from a real CA - and the only way to
+         // catch the mistake it is easy to make here. The serial's DER content
+         // octets carry a leading zero when the top bit is set, so 0x8765432101 is
+         // 00 87 65 43 21; the magnitude bytes OpenSSL stores do not have it. An
+         // identifier built from those is one no CA has ever issued, and the only
+         // symptom is a 404 and a silent fall back to deciding for ourselves.
+         const unsigned char keyIdentifier[] = {
+            0x69, 0x88, 0x5B, 0x6B, 0x87, 0x46, 0x40, 0x41, 0xE1, 0xB3,
+            0x7B, 0x84, 0x7B, 0xA0, 0xAE, 0x2C, 0xDE, 0x01, 0xC8, 0xD4
+         };
+
+         const unsigned char serialDer[] = { 0x00, 0x87, 0x65, 0x43, 0x21 };
+
+         AnsiString ariId = AcmeClient::BuildAriId(keyIdentifier, sizeof(keyIdentifier),
+                                                   serialDer, sizeof(serialDer));
+
+         if (ariId != "aYhba4dGQEHhs3uEe6CuLN4ByNQ.AIdlQyE")
+            throw 0;
+
+         // Missing either half is no identifier at all rather than half of one.
+         if (!AcmeClient::BuildAriId(nullptr, 0, serialDer, sizeof(serialDer)).IsEmpty())
+            throw 0;
+         if (!AcmeClient::BuildAriId(keyIdentifier, sizeof(keyIdentifier), nullptr, 0).IsEmpty())
+            throw 0;
+      }
+
+      OutputDebugString(_T("hMailServer: Testing ARI (RFC 9773) timestamp parsing and window selection\n"));
+      {
+         const time_t day = 86400;
+
+         // RFC 3339, the shape an ARI suggestedWindow carries.
+         if (AcmeClient::ParseRfc3339("1970-01-01T00:00:00Z") != 0)
+            throw 0;
+         if (AcmeClient::ParseRfc3339("2026-01-02T03:04:05Z") != 1767323045)
+            throw 0;
+
+         // Fractional seconds are legal in RFC 3339 and real CAs emit them.
+         if (AcmeClient::ParseRfc3339("2026-01-02T03:04:05.123Z") != 1767323045)
+            throw 0;
+
+         // Anything that cannot be read is 0, which the caller reads as "no opinion
+         // from the CA" and falls back to its own calculation. Rejecting is safe;
+         // half-understanding a timestamp that decides a renewal is not.
+         if (AcmeClient::ParseRfc3339("") != 0)
+            throw 0;
+         if (AcmeClient::ParseRfc3339("not a timestamp at all") != 0)
+            throw 0;
+         if (AcmeClient::ParseRfc3339("2026-13-45T99:99:99Z") != 0)
+            throw 0;
+
+         // The window point has to land INSIDE the window - that is the whole
+         // contract - and has to be the same answer every time for one certificate,
+         // because the renewal decision is re-taken hourly and a fresh roll each
+         // time would drift renewals towards the start of the window.
+         const time_t windowStart = 1800000000;
+         const time_t windowEnd = windowStart + 7 * day;
+
+         time_t first = AcmeClient::GetRenewalTimeInWindow("aki.serial", windowStart, windowEnd);
+
+         if (first < windowStart || first >= windowEnd)
+            throw 0;
+         if (AcmeClient::GetRenewalTimeInWindow("aki.serial", windowStart, windowEnd) != first)
+            throw 0;
+
+         // ...and a DIFFERENT certificate has to land somewhere else, or the whole
+         // point of the window - spreading a fleet's renewals - is lost and every
+         // server renews at the same instant.
+         if (AcmeClient::GetRenewalTimeInWindow("other.serial", windowStart, windowEnd) == first)
+            throw 0;
+
+         // A degenerate window is the start of it rather than an error.
+         if (AcmeClient::GetRenewalTimeInWindow("aki.serial", windowStart, windowStart) != windowStart)
+            throw 0;
+         if (AcmeClient::GetRenewalTimeInWindow("aki.serial", windowStart, windowStart - day) != windowStart)
+            throw 0;
+      }
+
       OutputDebugString(_T("hMailServer: Testing the TLS-RPT record parser and report builder\n"));
       {
          // The shape RFC 8460 section 3 gives, with two mailto targets and the
