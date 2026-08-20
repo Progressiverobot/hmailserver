@@ -418,9 +418,20 @@ namespace HM
          xml += "    </identifiers>\r\n";
          xml += "    <auth_results>\r\n";
 
-         for (const AnsiString &dkimDomain : row.dkim_passing_domains)
+         for (size_t i = 0; i < row.dkim_passing_domains.size(); i++)
          {
-            xml += "      <dkim><domain>" + XmlEscape_(dkimDomain) + "</domain><result>pass</result></dkim>\r\n";
+            xml += "      <dkim><domain>" + XmlEscape_(row.dkim_passing_domains[i]) + "</domain>";
+
+            // RFC 7489 Appendix C: selector is optional, so it is emitted only when
+            // the signature actually carried one. It is what turns "something of
+            // yours signed this" into "this key signed this", which is the
+            // difference between a report a domain owner can read and one they can
+            // act on - during a key rotation, or when working out which key a forger
+            // has got hold of.
+            if (i < row.dkim_passing_selectors.size() && !row.dkim_passing_selectors[i].IsEmpty())
+               xml += "<selector>" + XmlEscape_(row.dkim_passing_selectors[i]) + "</selector>";
+
+            xml += "<result>pass</result></dkim>\r\n";
          }
 
          // The raw SPF result, distinct from the ALIGNED verdict in
@@ -429,7 +440,7 @@ namespace HM
          // apart for exactly that case.
          if (!row.envelope_from_domain.IsEmpty())
          {
-            xml += "      <spf><domain>" + XmlEscape_(row.envelope_from_domain) + "</domain><result>";
+            xml += "      <spf><domain>" + XmlEscape_(row.envelope_from_domain) + "</domain><scope>mfrom</scope><result>";
             xml += row.spf_passed ? "pass" : "fail";
             xml += "</result></spf>\r\n";
          }
@@ -437,7 +448,7 @@ namespace HM
          {
             // The schema requires at least one auth_results element; a message
             // with no envelope sender (a bounce) evaluated SPF as none.
-            xml += "      <spf><domain></domain><result>none</result></spf>\r\n";
+            xml += "      <spf><domain></domain><scope>mfrom</scope><result>none</result></spf>\r\n";
          }
 
          xml += "    </auth_results>\r\n";

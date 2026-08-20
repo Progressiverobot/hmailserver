@@ -114,6 +114,7 @@ namespace RegressionTests.AntiSpam
          antiSpam.SpamMarkThreshold = 100;
          antiSpam.SpamDeleteThreshold = 1000;
          antiSpam.DMARCEnabled = true;
+         antiSpam.DKIMVerificationEnabled = true;
 
          // The zone this test needs, served locally: each policy domain publishes
          // p=none with a rua, and exactly one of the two external domains publishes the
@@ -132,7 +133,11 @@ namespace RegressionTests.AntiSpam
             .WithTxt("_dmarc." + InternalPolicyDomain, DmarcPolicy)
             .WithTxt("_dmarc." + ExternalUnverifiedPolicyDomain, DmarcPolicy)
             .WithTxt("_dmarc." + ExternalVerifiedPolicyDomain, DmarcPolicy)
-            .WithTxt(ExternalVerifiedPolicyDomain + "._report._dmarc.example.test", "v=DMARC1"))
+            .WithTxt(ExternalVerifiedPolicyDomain + "._report._dmarc.example.test", "v=DMARC1")
+
+            // The signing key for the seed below, so one row in the internal report
+            // is a DKIM pass with a selector to name rather than another fail.
+            .WithTxt("reportsel._domainkey." + InternalPolicyDomain, "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAit1HZshVeIm3Yu3dBqKzIAQDM+k5hPu+S9RzJeaFnPQw888jfvuBQkVTinZWn65X4TLhcEjsV7iDgWzVhcEKUUphhpR9i+JgOjncOSxs7zvv2xOpFuYweOqVrWV9brr8DEt3f+MdfYUiz62toL82Za447DOhNI/YAVEJqCmgbeSycN2emmZC6Z8dXV7fxKM3IeJ6G8hVLbvWhZe8fHkJ0+tJXeARBHhowFW1VXgkOGOHFtPjpmNrJRbbDKf8+IqyUk9uV51y3GEIunovr1Yc3vvExpXwWLZIdqKtvGVFBxyvTtuAmtw7Ebmz0evN41wH7vTWgui0VgsZqNIIUwz+fQIDAQAB"))
          {
             try
             {
@@ -151,9 +156,16 @@ namespace RegressionTests.AntiSpam
                SendSeed_(ExternalUnverifiedPolicyDomain);
                SendSeed_(ExternalVerifiedPolicyDomain);
 
+               // ...and one that is really signed, by a key this test publishes, so
+               // the report has a passing DKIM row. Everything else here produces
+               // failures, and a report where nothing ever passes cannot show
+               // whether the selector is being recorded or merely omitted.
+               SmtpClientSimulator.StaticSendRaw("bounce@unaligned-envelope.test", "seedrcpt@example.test",
+                                                 SignedSeed);
+
                // The seeds are in the mailbox, so their spam-time evaluations -
                // which run before delivery - are all recorded.
-               Pop3ClientSimulator.AssertMessageCount("seedrcpt@example.test", "test", 3);
+               Pop3ClientSimulator.AssertMessageCount("seedrcpt@example.test", "test", 4);
 
                int reportCount = (int) _application.Utilities.SendDmarcReports(true);
 
@@ -210,6 +222,20 @@ namespace RegressionTests.AntiSpam
                StringAssert.Contains("<header_from>" + InternalPolicyDomain + "</header_from>", internalReport,
                   "The identifiers block names the From domain. Got: " + internalReport);
 
+               // The selector, which is what turns "something of yours signed this"
+               // into "this key signed this" - the difference between a report a
+               // domain owner can read and one they can act on during a rotation or
+               // after a key is compromised.
+               StringAssert.Contains("<selector>reportsel</selector>", internalReport,
+                  "auth_results/dkim should name the selector that signed (RFC 7489 Appendix C). Got: " +
+                  internalReport);
+
+               // ...and the SPF identity's scope, which says WHICH identity was
+               // evaluated. Without it a reader cannot tell an envelope-sender check
+               // from a HELO one.
+               StringAssert.Contains("<scope>mfrom</scope>", internalReport,
+                  "auth_results/spf should say which identity SPF was evaluated on. Got: " + internalReport);
+
                // The pop is destructive by design: nothing new has been
                // recorded, so a second call has nothing to send.
                ClassicAssert.AreEqual(0, (int) _application.Utilities.SendDmarcReports(true),
@@ -231,6 +257,21 @@ namespace RegressionTests.AntiSpam
             }
          }
       }
+
+      /// <summary>
+      ///    A genuinely rsa-sha256-signed message from the internal policy domain,
+      ///    signed with the repository's example key, whose public half the zone
+      ///    above publishes at reportsel._domainkey. Pre-computed rather than signed
+      ///    at run time so the fixture is testing the REPORT rather than a signer.
+      /// </summary>
+      private const string SignedSeed =
+            "DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=sender-dom.example.test; s=reportsel; h=from:to:subject:date; bh=UiW1Vq02S/LU/SLyPMpS2+090dMUxUOeE/rTgKpvR2E=; b=E2azn0KKCQj/gs1l8KO8dyBJndQbtqTT2XnB1I83hnsvTM5Sns7nESoLIEyg4wBH8otamGx0zhxmK2l2hT/wQc4tpPkcr5mcuzAXqX3wky62Jk/CpQBvRIFHmch2t2Z9lftVeHqzXxjub3X9R11ocr+lTnionM8fA+QlCOsv3JfoHxb/36O8gzfIeX/zOQgD2p7dy61EW/1QU6APPtwSaWYcEceHAgDM+ZOzInX8wonrinub3pKgJrng2gQXTzm1SPHekwLZUgKABoYSfCJzFKow8hamNziBKQQoKKuWsySgNWOl2w179/8I0exJ0wEhgTjDJ/DFLBpKDu8m39eCAQ==\r\n" +
+            "From: <user@sender-dom.example.test>\r\n" +
+            "To: <seedrcpt@example.test>\r\n" +
+            "Subject: dkim selector seed\r\n" +
+            "Date: Thu, 20 Aug 2026 10:00:00 +0000\r\n" +
+            "\r\n" +
+            "Signed so the aggregate report has a selector to name.\r\n";
 
       private static void SendSeed_(string fromDomain)
       {

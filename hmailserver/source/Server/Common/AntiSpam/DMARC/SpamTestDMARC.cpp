@@ -112,8 +112,11 @@ namespace HM
          spfPassed = (spfResult == SPF::Pass);
       }
 
-      // Evaluate DKIM and collect the signing domains that verified.
+      // Evaluate DKIM and collect the signing domains that verified, and the
+      // selector each of them used - the second is for the aggregate report rather
+      // than for alignment, which only ever compares domains.
       std::vector<AnsiString> dkimPassingDomains;
+      std::vector<AnsiString> dkimPassingSelectors;
 
       std::shared_ptr<Message> pMessage = pMessageData->GetMessage();
       if (pMessage)
@@ -121,7 +124,7 @@ namespace HM
          const String fileName = PersistentMessage::GetFileName(pMessage);
 
          DKIM dkim;
-         dkim.Verify(fileName, dkimPassingDomains);
+         dkim.Verify(fileName, dkimPassingDomains, dkimPassingSelectors);
       }
 
       DMARC dmarc;
@@ -165,7 +168,7 @@ namespace HM
             sourceIp, disposition,
             evaluation.dkim_aligned, evaluation.spf_aligned,
             AnsiString(fromDomain),
-            AnsiString(envelopeFromDomain), spfPassed, dkimPassingDomains);
+            AnsiString(envelopeFromDomain), spfPassed, dkimPassingDomains, dkimPassingSelectors);
       }
 
       AntiSpamConfiguration &config = Configuration::Instance()->GetAntiSpamConfiguration();

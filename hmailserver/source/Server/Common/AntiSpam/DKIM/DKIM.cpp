@@ -556,6 +556,17 @@ namespace HM
    DKIM::Result
    DKIM::Verify(const String &fileName, std::vector<AnsiString> &passingDomains)
    {
+      // The callers that do not care which key signed - alignment only needs the
+      // domain - go through here and throw the selectors away.
+      std::vector<AnsiString> ignoredSelectors;
+
+      return Verify(fileName, passingDomains, ignoredSelectors);
+   }
+
+   DKIM::Result
+   DKIM::Verify(const String &fileName, std::vector<AnsiString> &passingDomains,
+                std::vector<AnsiString> &passingSelectors)
+   {
       if (FileUtilities::FileSize(fileName) > MaxFileSize)
          return Neutral;
       
@@ -578,13 +589,20 @@ namespace HM
       for (HeaderField signatureField : signatureFields)
       {
          AnsiString signingDomain;
-         Result signatureResult = VerifySignature_(fileName, messageHeader, signatureField, signingDomain);
+         AnsiString signingSelector;
+         Result signatureResult = VerifySignature_(fileName, messageHeader, signatureField, signingDomain, signingSelector);
 
          if (signatureResult == Pass && !signingDomain.IsEmpty())
          {
             // Every passing d= is collected, not just the first: DMARC needs all
             // of them, because alignment may hold for one and not another.
+            //
+            // The selector is pushed in lockstep so the two vectors stay
+            // index-aligned - a signature with no readable s= contributes an empty
+            // string rather than being skipped, because dropping it would silently
+            // shift every selector after it onto the wrong domain.
             passingDomains.push_back(signingDomain);
+            passingSelectors.push_back(signingSelector);
          }
 
          if (RankSignatureResult(signatureResult) > RankSignatureResult(result))
@@ -609,7 +627,7 @@ namespace HM
    }
 
    DKIM::Result 
-   DKIM::VerifySignature_(const String &fileName, const AnsiString &messageHeader, std::pair<AnsiString, AnsiString> signatureField, AnsiString &signingDomain)
+   DKIM::VerifySignature_(const String &fileName, const AnsiString &messageHeader, std::pair<AnsiString, AnsiString> signatureField, AnsiString &signingDomain, AnsiString &signingSelector)
    {
       AnsiString headerValue = signatureField.second;
 
@@ -622,6 +640,8 @@ namespace HM
 
       signingDomain = signatureParams.GetValue("d");
       signingDomain.MakeLower();
+
+      signingSelector = signatureParams.GetValue("s");
 
       if (!ValidateHeaderContents_(signatureParams))
       {

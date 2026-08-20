@@ -51,6 +51,15 @@ namespace HM
       // domains of every signature that passed verification.
       Result Verify(const String &messageFile, std::vector<AnsiString> &passingDomains);
 
+      // As above, and also reports the selector each passing signature used, in the
+      // same order. DMARC aggregate reports carry it - RFC 7489 Appendix C has a
+      // <selector> inside auth_results/dkim - and without it a domain owner reading
+      // their report can see that something of theirs signed the message but not
+      // WHICH key, which is the one thing they need in order to act on it during a
+      // rotation or after a key compromise.
+      Result Verify(const String &messageFile, std::vector<AnsiString> &passingDomains,
+                    std::vector<AnsiString> &passingSelectors);
+
       // Shared signing/verification primitives, also used by ARC (RFC 8617).
       static AnsiString SignHash_(AnsiString &privateKey, AnsiString &canonicalizedHeader, HashCreator::HashType keySize);
       static bool IsEd25519PrivateKey_(AnsiString &privateKey);
@@ -61,7 +70,7 @@ namespace HM
       bool ValidateHeaderContents_(const DKIMParameters &signatureParams);
       bool ValidateBodyHash_(const String &fileName, const DKIMParameters &signatureParams, std::shared_ptr<Canonicalization> canonicalization);
       bool ValidateDNSEntry_(const DKIMParameters &entryParams, const DKIMParameters &headerParams);
-      Result VerifySignature_(const String &fileName, const AnsiString &messageHeader, std::pair<AnsiString, AnsiString> signatureField, AnsiString &signingDomain);
+      Result VerifySignature_(const String &fileName, const AnsiString &messageHeader, std::pair<AnsiString, AnsiString> signatureField, AnsiString &signingDomain, AnsiString &signingSelector);
       Result RetrievePublicKey_(const DKIMParameters &signatureParams, AnsiString &publicKey, AnsiString &flags);
       AnsiString GetDKIMWithoutSignature_(AnsiString value);
 

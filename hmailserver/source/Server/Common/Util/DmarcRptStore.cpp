@@ -49,7 +49,8 @@ namespace HM
                          bool dkimAligned, bool spfAligned,
                          const AnsiString &headerFrom,
                          const AnsiString &envelopeFromDomain, bool spfPassed,
-                         const std::vector<AnsiString> &dkimPassingDomains)
+                         const std::vector<AnsiString> &dkimPassingDomains,
+                         const std::vector<AnsiString> &dkimPassingSelectors)
    {
       AnsiString domainKey = policyDomain;
       domainKey.MakeLower();
@@ -103,7 +104,8 @@ namespace HM
              row.header_from == from &&
              row.envelope_from_domain == envelopeDomain &&
              row.spf_passed == spfPassed &&
-             row.dkim_passing_domains == dkimPassingDomains)
+             row.dkim_passing_domains == dkimPassingDomains &&
+             row.dkim_passing_selectors == dkimPassingSelectors)
          {
             row.count++;
             return;
@@ -125,6 +127,7 @@ namespace HM
       row.envelope_from_domain = envelopeDomain;
       row.spf_passed = spfPassed;
       row.dkim_passing_domains = dkimPassingDomains;
+      row.dkim_passing_selectors = dkimPassingSelectors;
       row.count = 1;
 
       bucket.rows.push_back(row);

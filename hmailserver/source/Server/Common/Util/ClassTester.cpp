@@ -668,6 +668,16 @@ namespace HM
          row.envelope_from_domain = "bounce.example.org";
          row.spf_passed = true;
          row.dkim_passing_domains.push_back("other.example");
+         row.dkim_passing_selectors.push_back("sel2026");
+
+         // A second passing signature whose s= could not be read. The selector is
+         // optional in the schema, so this one must produce no <selector> element at
+         // all rather than an empty one - and it has to stay index-aligned with its
+         // domain, which is why an unreadable selector is pushed as empty rather
+         // than skipped.
+         row.dkim_passing_domains.push_back("nosel.example");
+         row.dkim_passing_selectors.push_back("");
+
          row.count = 3;
          bucket.rows.push_back(row);
 
@@ -717,10 +727,22 @@ namespace HM
             throw 0;
          if (xml.Find("<header_from>example.org</header_from>") < 0)
             throw 0;
-         if (xml.Find("<dkim><domain>other.example</domain><result>pass</result></dkim>") < 0)
+         // The selector names WHICH key signed, which is what a domain owner needs
+         // in order to act on the report during a rotation or after a compromise.
+         if (xml.Find("<dkim><domain>other.example</domain><selector>sel2026</selector><result>pass</result></dkim>") < 0)
             throw 0;
-         // The raw SPF result, distinct from the aligned fail above it.
-         if (xml.Find("<spf><domain>bounce.example.org</domain><result>pass</result></spf>") < 0)
+
+         // ...and a signature whose selector could not be read carries none, rather
+         // than an empty element that a parser would read as a key called "".
+         if (xml.Find("<dkim><domain>nosel.example</domain><result>pass</result></dkim>") < 0)
+            throw 0;
+         if (xml.Find("<selector></selector>") >= 0)
+            throw 0;
+
+         // The raw SPF result, distinct from the aligned fail above it, and the
+         // scope that says which identity it was evaluated on - without it a reader
+         // cannot tell an envelope-sender check from a HELO one.
+         if (xml.Find("<spf><domain>bounce.example.org</domain><scope>mfrom</scope><result>pass</result></spf>") < 0)
             throw 0;
       }
 

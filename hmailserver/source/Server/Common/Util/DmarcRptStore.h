@@ -29,6 +29,13 @@ namespace HM
          AnsiString envelope_from_domain;   // SPF identity; may be empty
          bool spf_passed = false;           // raw SPF result for auth_results
          std::vector<AnsiString> dkim_passing_domains;
+
+         // The selector each of those signatures used, index-aligned with the
+         // domains above. RFC 7489 Appendix C puts a <selector> inside
+         // auth_results/dkim, and without it a domain owner reading their report can
+         // see that something of theirs signed the message but not WHICH key - which
+         // is the one thing they need during a rotation or after a compromise.
+         std::vector<AnsiString> dkim_passing_selectors;
          int count = 0;
       };
 
@@ -58,7 +65,8 @@ namespace HM
                   bool dkimAligned, bool spfAligned,
                   const AnsiString &headerFrom,
                   const AnsiString &envelopeFromDomain, bool spfPassed,
-                  const std::vector<AnsiString> &dkimPassingDomains);
+                  const std::vector<AnsiString> &dkimPassingDomains,
+                  const std::vector<AnsiString> &dkimPassingSelectors);
 
       // Returns the day keys (yyyy-mm-dd, UTC) of all days before the
       // current one which still hold data.
