@@ -47,7 +47,8 @@ namespace HM
          String adkim;                 // as published; empty means the default (r)
          String aspf;
          String p;
-         String sp;                    // empty when the record carries none
+         String sp;
+         String np;                    // empty when the record carries none
          int pct = 100;
          bool spf_aligned = false;
          bool dkim_aligned = false;
@@ -85,5 +86,10 @@ namespace HM
       bool RetrievePolicy_(const String &domain, String &policyRecord, bool &dnsError);
       bool ParseTagValue_(const String &record, const String &tag, String &value);
       bool DomainsAligned_(const String &authenticatedDomain, const String &fromDomain, AlignmentMode mode);
+
+      // Whether RFC 9989 np= applies: the From domain is a subdomain of the policy
+      // domain AND does not exist in the DNS. Answers false on a resolver failure,
+      // so an outage cannot turn np=reject loose on subdomains that do exist.
+      bool SubdomainIsNonExistent_(const String &domain);
    };
 }

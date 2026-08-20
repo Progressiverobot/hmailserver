@@ -22,6 +22,10 @@ namespace HM
       bool GetIpAddresses(const String &sDomain, std::vector<String> &saFoundNames, bool followCnameRecords);
       bool GetTXTRecords(const String &sDomain, std::vector<String> &foundResult);
       bool GetPTRRecords(const String &sIP, std::vector<String> &vecFoundNames);
+
+      // Whether the name exists in the DNS at all. NXDOMAIN is the only answer
+      // that means no; a name with no records of the type asked for still exists.
+      bool DomainExists(const String &sDomain, bool &dnsError);
    private:
 
       bool GetEmailServersRecursive_(const String &sDomainName, std::vector<HostNameAndIpAddress> &saFoundNames, int recursionLevel);

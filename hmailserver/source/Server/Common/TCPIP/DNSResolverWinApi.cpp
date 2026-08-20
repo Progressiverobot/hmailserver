@@ -158,6 +158,25 @@ namespace HM
    bool
    DNSResolverWinApi::Query(const String &query, int resourceType, std::vector<DNSRecord> &foundRecords)
    {
+      int ignoredStatus = 0;
+
+      return Query(query, resourceType, foundRecords, ignoredStatus);
+   }
+
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // As above, but hands back the resolver status as well.
+   //
+   // Every other caller here only needs to know whether records came back, and for
+   // them NXDOMAIN and "the name exists but has no records of this type" are the
+   // same answer: nothing to use. They are NOT the same answer for DMARC's np= tag,
+   // which applies only to subdomains that do not exist AT ALL, so it needs to tell
+   // an absent name from an empty one - the difference between a policy that catches
+   // a forged subdomain and a policy that rejects mail from a real one.
+   //---------------------------------------------------------------------------()
+   bool
+   DNSResolverWinApi::Query(const String &query, int resourceType, std::vector<DNSRecord> &foundRecords, int &outStatus)
+   {
       DWORD fOptions;
       fOptions = DNS_QUERY_STANDARD;
 
@@ -169,7 +188,10 @@ namespace HM
       int dnsStatus = 0;
 
       if (RunQuery_(query, resourceType, fOptions, foundRecords, dnsStatus))
+      {
+         outStatus = dnsStatus;
          return true;
+      }
 
       // DNS_ERROR_BAD_PACKET (9502): the server sent a response the resolver could
       // not parse. Measured against a deliberately misbehaving server: a UDP answer
@@ -194,8 +216,14 @@ namespace HM
          // retry throws away the A records that already succeeded. A failed
          // RunQuery_ never adds records (every false path returns before the
          // record loop), so there is nothing of the failed attempt to remove.
-         return RunQuery_(query, resourceType, fOptions | DNS_QUERY_USE_TCP_ONLY, foundRecords, dnsStatus);
+         bool retried = RunQuery_(query, resourceType, fOptions | DNS_QUERY_USE_TCP_ONLY, foundRecords, dnsStatus);
+
+         outStatus = dnsStatus;
+
+         return retried;
       }
+
+      outStatus = dnsStatus;
 
       return false;
    }

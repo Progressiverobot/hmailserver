@@ -231,6 +231,63 @@ namespace HM
    }
 
    bool
+   DNSResolver::DomainExists(const String &sDomain, bool &dnsError)
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // Whether the name exists in the DNS at all - not whether it has an address.
+   //
+   // Only NXDOMAIN means "does not exist". A NOERROR answer with no records means
+   // the name IS there and simply holds nothing of the type asked for, which is an
+   // ordinary and common shape: a name carrying only TXT or only MX, or an empty
+   // non-terminal that exists purely because something below it does.
+   //
+   // The distinction is the whole value of this function. Its caller is DMARC's np=
+   // tag, which applies a stricter policy to subdomains that do not exist - the
+   // shape a phisher uses, because inventing a subdomain of a real company costs
+   // nothing. Treating "no A record" as "does not exist" would apply that stricter
+   // policy to real subdomains that simply have no address of their own, and the
+   // stricter policy is usually reject.
+   //
+   // dnsError reports a lookup that could not be completed. The caller must not read
+   // that as either answer: applying np on a resolver failure would reject mail from
+   // a domain that exists, and skipping it would let the failure be worth provoking.
+   //---------------------------------------------------------------------------()
+   {
+      dnsError = false;
+
+      if (sDomain.IsEmpty())
+         return false;
+
+      DNSResolverWinApi resolver;
+      std::vector<DNSRecord> foundRecords;
+      int dnsStatus = 0;
+
+      bool queried = resolver.Query(sDomain, DNS_TYPE_A, foundRecords, dnsStatus);
+
+      // Records came back, so the name is plainly there. Checked first and on its own,
+      // because the return value below cannot be read as "it worked": Query answers
+      // TRUE for NXDOMAIN as well. Every other caller wants that - to them a name that
+      // does not exist and a name with nothing useful on it are the same unusable
+      // answer, and neither is worth reporting as a failure - but it is the exact
+      // distinction this function was added to make, so the status has to be read even
+      // on the success path.
+      if (queried && !foundRecords.empty())
+         return true;
+
+      if (dnsStatus == DNS_ERROR_RCODE_NAME_ERROR)
+         return false;
+
+      // DNS_INFO_NO_RECORDS, or a clean answer carrying nothing: the name is there and
+      // simply has no A record.
+      if (dnsStatus == DNS_INFO_NO_RECORDS || (queried && dnsStatus == 0))
+         return true;
+
+      dnsError = true;
+
+      return false;
+   }
+
+   bool
    DNSResolver::GetEmailServers(const String &sDomainName, std::vector<HostNameAndIpAddress> &saFoundNames)
    {
       return GetEmailServersRecursive_(sDomainName, saFoundNames, 0);

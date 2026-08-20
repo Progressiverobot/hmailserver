@@ -335,6 +335,31 @@ namespace HM
       return GetOrganizationalDomain(authLower) == GetOrganizationalDomain(fromLower);
    }
 
+   bool
+   DMARC::SubdomainIsNonExistent_(const String &domain)
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // Whether np= applies to this From domain: does the name not exist in the DNS?
+   //
+   // Fails CLOSED against the resolver rather than against the sender. A lookup that
+   // cannot be completed answers "it exists", so np= is not applied and the message
+   // is judged by sp= or p= exactly as it would have been before np= was published.
+   // The alternative - treating a resolver failure as non-existence - would let a
+   // brief DNS outage apply a reject policy to every subdomain of every domain that
+   // publishes np=, including the real ones.
+   //---------------------------------------------------------------------------()
+   {
+      DNSResolver resolver;
+      bool dnsError = false;
+
+      bool exists = resolver.DomainExists(domain, dnsError);
+
+      if (dnsError)
+         return false;
+
+      return !exists;
+   }
+
    DMARC::Result
    DMARC::Verify(const String &fromHeaderDomain,
                  const String &envelopeFromDomain,
@@ -389,6 +414,14 @@ namespace HM
       String spTag;
       ParseTagValue_(policyRecord, _T("sp"), spTag);
 
+      // np= (RFC 9989 section 5.5.4): the policy for subdomains that do not exist.
+      // New in DMARCbis, and the most targeted of the three: p= covers the domain,
+      // sp= covers its subdomains, and np= covers the ones a phisher invented -
+      // because inventing a subdomain of a real company costs nothing and the
+      // company cannot publish a record for a name it has never heard of.
+      String npTag;
+      ParseTagValue_(policyRecord, _T("np"), npTag);
+
       int pct = 100;
       String tagValue;
       if (ParseTagValue_(policyRecord, _T("pct"), tagValue))
@@ -427,6 +460,7 @@ namespace HM
          evaluation->aspf = aspfTag;
          evaluation->p = pTag;
          evaluation->sp = spTag;
+         evaluation->np = npTag;
          evaluation->pct = pct;
          evaluation->spf_aligned = spfAligned;
          evaluation->dkim_aligned = dkimAligned;
@@ -435,9 +469,19 @@ namespace HM
       if (spfAligned || dkimAligned)
          return Pass;
 
-      // The message failed DMARC. Determine the requested policy: for
-      // subdomains the sp= tag takes precedence if present.
-      String policy = (isSubdomainPolicy && !spTag.IsEmpty()) ? spTag : pTag;
+      // The message failed DMARC. Determine the requested policy. For subdomains
+      // that is sp= if published, and np= ahead of it when the subdomain does not
+      // exist - the more specific statement wins, which is the same ordering the
+      // tree walk's psd= rules use.
+      String policy = pTag;
+
+      if (isSubdomainPolicy)
+      {
+         if (!npTag.IsEmpty() && SubdomainIsNonExistent_(fromDomain))
+            policy = npTag;
+         else if (!spTag.IsEmpty())
+            policy = spTag;
+      }
 
       if (policy.IsEmpty())
          return PermError;

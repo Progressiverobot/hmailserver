@@ -469,6 +469,7 @@
   <ItemGroup>
     <Compile Include="AntiSpam\AuthenticationResultsHeader.cs" />
     <Compile Include="AntiSpam\DmarcOrganizationalDomain.cs" />
+    <Compile Include="AntiSpam\DmarcNonExistentSubdomainPolicy.cs" />
     <Compile Include="AntiSpam\DKIM\ArcInboundFiltering.cs" />
     <Compile Include="AntiSpam\DKIM\DualSelectorRotation.cs" />
     <Compile Include="AntiSpam\DKIM\Signing.cs" />

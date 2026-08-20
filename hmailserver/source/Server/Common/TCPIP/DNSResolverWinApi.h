@@ -17,6 +17,7 @@ namespace HM
       virtual ~DNSResolverWinApi();
 
       bool Query(const String &query, int resourceType, std::vector<DNSRecord> &foundRecords);
+      bool Query(const String &query, int resourceType, std::vector<DNSRecord> &foundRecords, int &outStatus);
 
    private:
 

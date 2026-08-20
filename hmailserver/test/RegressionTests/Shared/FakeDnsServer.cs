@@ -48,6 +48,14 @@ namespace RegressionTests.Shared
       private readonly Dictionary<string, List<string>> answers_ =
          new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
 
+      // Names that must answer NXDOMAIN rather than the default NODATA. The two are
+      // easy to conflate and are not interchangeable: NODATA says the name is there
+      // and holds nothing of the type asked for, NXDOMAIN says the name is not there
+      // at all. DMARC's np= tag turns on exactly that difference, so a fixture for it
+      // cannot be written against a server that only knows how to say NODATA.
+      private readonly HashSet<string> nonExistent_ =
+         new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
       private readonly UdpClient udp_;
       private readonly TcpListener tcp_;
       private volatile bool stopping_;
@@ -110,6 +118,16 @@ namespace RegressionTests.Shared
       public FakeDnsServer WithMx(string name, int preference, string exchange)
       {
          return Add_(TypeMx, name, preference + " " + exchange);
+      }
+
+      /// <summary>
+      ///    Makes a name answer NXDOMAIN for every query type - the name does not
+      ///    exist. Any answer added for the same name wins, so a zone can hold both.
+      /// </summary>
+      public FakeDnsServer WithNxDomain(string name)
+      {
+         nonExistent_.Add(name.TrimEnd('.').ToLowerInvariant());
+         return this;
       }
 
       private FakeDnsServer Add_(int type, string name, string value)
@@ -234,11 +252,23 @@ namespace RegressionTests.Shared
          return i + 5;
       }
 
-      private static void WriteHeaderAndQuestion_(List<byte> m, byte[] query, int answerCount, int authorityCount = 0)
+      private static void WriteSoaRdata_(List<byte> m)
+      {
+         var soa = new List<byte>();
+         WriteName_(soa, "ns.example.test");
+         WriteName_(soa, "hostmaster.example.test");
+         for (int f = 0; f < 5; f++)
+         {
+            soa.Add(0); soa.Add(0); soa.Add(0); soa.Add(60);
+         }
+         WriteRdata_(m, soa);
+      }
+
+      private static void WriteHeaderAndQuestion_(List<byte> m, byte[] query, int answerCount, int authorityCount = 0, int rcode = 0)
       {
          int questionEnd = QuestionEnd_(query);
          m.Add(query[0]); m.Add(query[1]);            // ID
-         m.Add(0x81); m.Add(0x80);                    // QR|RD|RA, NOERROR
+         m.Add(0x81); m.Add((byte) (0x80 | rcode));   // QR|RD|RA, and the RCODE
          m.Add(0); m.Add(1);                          // QDCOUNT
          m.Add(0); m.Add((byte) answerCount);         // ANCOUNT
          m.Add(0); m.Add((byte) authorityCount);      // NSCOUNT
@@ -373,19 +403,25 @@ namespace RegressionTests.Shared
             return m.ToArray();
          }
 
+         // A name declared non-existent: RCODE 3, with the same SOA in AUTHORITY so
+         // the negative answer is cacheable (RFC 2308 again). Checked after the
+         // answer table so a name can be given records and still have OTHER names
+         // beneath it be absent.
+         if (nonExistent_.Contains(name.TrimEnd('.').ToLowerInvariant()))
+         {
+            var nxdomain = new List<byte>();
+            WriteHeaderAndQuestion_(nxdomain, query, 0, 1, 3);
+            WriteAnswerHeader_(nxdomain, 6);
+            WriteSoaRdata_(nxdomain);
+            return nxdomain.ToArray();
+         }
+
          // Everything else: NODATA - NOERROR, no answers, an SOA in the AUTHORITY
          // section per RFC 2308. See the class comment for why the SOA is required.
          var nodata = new List<byte>();
          WriteHeaderAndQuestion_(nodata, query, 0, 1);
          WriteAnswerHeader_(nodata, 6);
-         var soa = new List<byte>();
-         WriteName_(soa, "ns.example.test");
-         WriteName_(soa, "hostmaster.example.test");
-         for (int f = 0; f < 5; f++)
-         {
-            soa.Add(0); soa.Add(0); soa.Add(0); soa.Add(60);
-         }
-         WriteRdata_(nodata, soa);
+         WriteSoaRdata_(nodata);
          return nodata.ToArray();
       }
    }
