@@ -1,7 +1,12 @@
 name: Sign release artefacts
 
-# Signs every asset attached to a published release with Sigstore cosign, keyless,
-# and attaches the signature and certificate bundle alongside it.
+# Signs every asset attached to a release with Sigstore cosign, keyless, and
+# attaches the signature and certificate bundle alongside it.
+#
+# RUN THIS WHILE THE RELEASE IS STILL A DRAFT, and run it LAST. Immutable releases
+# are enabled here, so a published release refuses further uploads; and this signs
+# whatever is attached at the moment it runs, so it has to go after the SBOMs or it
+# signs the installer and nothing else. RELEASE.md has the order.
 #
 # Why: the roadmap records signing as the one genuinely missing supply-chain item.
 # SBOMs (SPDX + CycloneDX) already ship with every release, CodeQL and dependency
@@ -32,7 +37,11 @@ name: Sign release artefacts
 
 on:
   release:
-    types: [ published ]
+    # created, not published: it fires when a draft is saved, which is while the
+    # release can still be added to. Note this races the SBOM workflow, which fires
+    # on the same event - so the release procedure dispatches this one by hand,
+    # afterwards, and that is the run whose signatures count.
+    types: [ created ]
   workflow_dispatch:
     inputs:
       tag:

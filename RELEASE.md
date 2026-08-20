@@ -56,9 +56,29 @@ already cost a release cycle or nearly shipped a defect.
 11. **Installer**: ISCC on `hMailServer64.iss`. Never run the installer on
    the dev machine — validation is the CI smoke-test workflow
    (`installer-smoke.yml`), which installs it on a throwaway runner.
-12. **Commit** (as chrisholloway5, no co-author trailers), **tag**
-    `vX.Y.Z`, push branch then tag, `gh release create` with the installer.
-    The SBOM workflow attaches SPDX/CycloneDX automatically.
+12. **Commit** (as chrisholloway5, no co-author trailers), **tag** `vX.Y.Z`,
+    push branch then tag. Then publish **as a draft first** - this repository has
+    immutable releases enabled, so a published release refuses every further asset
+    upload and would be stuck with whatever it was created with:
+
+    ```
+    gh release create vX.Y.Z <installer> --draft --prerelease \
+       --title "..." --notes-file <notes>
+    gh workflow run "SBOM" -f release_tag=vX.Y.Z          # SPDX + CycloneDX
+    gh workflow run "Sign release artefacts" -f tag=vX.Y.Z  # LAST: signs what is attached
+    gh release view vX.Y.Z --json assets                   # expect installer + 2 SBOMs + bundle
+    gh release edit vX.Y.Z --draft=false                   # publish, now complete
+    ```
+
+    Order matters twice over: the SBOMs have to be on before signing, because
+    cosign signs whatever is attached when it runs; and everything has to be on
+    before publication, because nothing can be added afterwards. 6.2.22-pre4 was
+    published straight away and ended up with an installer and no SBOM at all.
+
+    Both workflows also fire on `release: created`, which happens when the draft is
+    saved, so the SBOMs usually attach without being asked. Dispatch them anyway -
+    the two race each other on that event, and the signing run that counts is the
+    one that goes last.
 13. **Close the loop**: answer every issue the release resolves (and close
     them), update the ones it does not resolve saying so plainly.
 

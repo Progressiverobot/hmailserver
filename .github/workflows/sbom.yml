@@ -1,8 +1,16 @@
 name: SBOM
 
 # Generates a Software Bill of Materials for the repository on every push to
-# master and attaches it to every published GitHub release, so each shipped
-# build has an auditable inventory of its components. Syft (anchore/sbom-action)
+# master and attaches it to every GitHub release, so each shipped build has an
+# auditable inventory of its components.
+#
+# ATTACHED WHILE THE RELEASE IS STILL A DRAFT, and that is not a style choice.
+# This repository has immutable releases enabled, so a published release refuses
+# every further asset upload with HTTP 422 - which is what happened to 6.2.22-pre4
+# and left it with an installer and no SBOM at all. A draft is still mutable, so
+# the assets go on before publication and the release is complete the moment it
+# becomes visible. The release procedure in RELEASE.md creates the draft, waits for
+# this and for the signing workflow, and publishes last. Syft (anchore/sbom-action)
 # inventories the .NET package references and the files in the tree; the SBOM is
 # emitted in both SPDX and CycloneDX JSON. Combined with Dependabot + the
 # dependency-review gate, this delivers the B8 "SBOM + dependency/CVE scanning"
@@ -12,8 +20,15 @@ on:
   push:
     branches: [ master ]
   release:
-    types: [ published ]
+    # created, not published: it fires when a draft is saved, which is while the
+    # release can still be added to.
+    types: [ created ]
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag to attach the SBOMs to (e.g. v6.2.22-pre5). Leave blank to build them as an artifact only.'
+        type: string
+        required: false
 
 permissions:
   contents: read
@@ -94,11 +109,20 @@ jobs:
           retention-days: 90
 
       - name: Attach the SBOMs to the release
-        if: ${{ github.event_name == 'release' }}
+        if: ${{ github.event_name == 'release' || inputs.release_tag != '' }}
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.release_tag || github.event.release.tag_name }}
         run: |
           set -euo pipefail
-          gh release upload "${{ github.event.release.tag_name }}" \
+
+          # A published release rejects this outright - immutable releases are on -
+          # so say which mistake was made rather than leaving a bare 422. The fix is
+          # always the same: attach assets while the release is a draft.
+          if [ "$(gh release view "$TAG" --json isDraft --jq .isDraft)" != "true" ]; then
+            echo "::warning::$TAG is already published, so its assets cannot be changed. Create the release as a draft, let this workflow and sign-release attach to it, and publish last - see RELEASE.md."
+          fi
+
+          gh release upload "$TAG" \
             hmailserver.spdx.json hmailserver.cyclonedx.json --clobber
