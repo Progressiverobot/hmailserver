@@ -285,6 +285,13 @@ namespace HM
       // alignment is built on.
       bool GetDkimAcceptSha1() const { return dkim_accept_sha1_; }
 
+      // Warn an account holder when a delivery takes their mailbox past this
+      // percentage of its quota. 0 disables it. On by default at 90, which is
+      // unusual for a setting added here - but the alternative is what this server
+      // did before, which is to say nothing at all until mail starts being refused,
+      // and by then the person it happens to is the last to know.
+      int GetQuotaWarningPercent() const { return quota_warning_percent_; }
+
       // Password policy, enforced where a password is CHOSEN (Account.Password over
       // COM) and never where one is verified or re-hashed. All off at 0/false, which
       // is what an existing installation gets until an administrator decides
@@ -715,6 +722,7 @@ namespace HM
       int spf_void_lookup_limit_;
       bool reject_full_mailbox_at_rcpt_;
       bool dkim_accept_sha1_;
+      int quota_warning_percent_;
       int password_policy_minimum_length_;
       bool password_policy_require_mixed_case_;
       bool password_policy_require_digit_;

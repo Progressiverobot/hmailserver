@@ -232,7 +232,15 @@ namespace DBUpdater
                          "update hm_domains set domainrelaypassword = domainrelaypassword where 1 = 0"),
 
          new SchemaProbe(6021, "hm_domains.domainrelayconnectionsecurity",
-                         "update hm_domains set domainrelayconnectionsecurity = domainrelayconnectionsecurity where 1 = 0")
+                         "update hm_domains set domainrelayconnectionsecurity = domainrelayconnectionsecurity where 1 = 0"),
+
+         // Upgrade6021to6022* - the quota warning notice. This step inserts ROWS
+         // rather than altering a table, so the probe asks whether the row is there:
+         // a step that half-ran leaves a server that starts fine and then reports
+         // "Server message 'QUOTA_WARNING' could not be found" to the one user whose
+         // mailbox filled up.
+         new SchemaProbe(6022, "hm_servermessages.QUOTA_WARNING",
+                         "update hm_servermessages set smtext = smtext where smname = 'QUOTA_WARNING' and 1 = 0")
       };
 
       /// <summary>

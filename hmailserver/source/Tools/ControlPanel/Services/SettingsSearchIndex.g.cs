@@ -281,6 +281,7 @@ namespace hMailServer.ControlPanel.Services
          new SettingEntry("SMTP server maximum timeout (s)", "SMTPDMaxTimeout", "protocols"),
          new SettingEntry("SMTP server minimum timeout (s)", "SMTPDMinTimeout", "protocols"),
          new SettingEntry("SORT", "IMAPSortEnabled", "protocols"),
+         new SettingEntry("Warn the mailbox owner at this percentage of their quota (0 = never)", "QuotaWarningPercent", "protocols"),
          new SettingEntry("Welcome banner (empty = default)", "WelcomeIMAP", "protocols"),
          new SettingEntry("Welcome banner (empty = default)", "WelcomePOP3", "protocols"),
          new SettingEntry("Welcome banner (empty = default)", "WelcomeSMTP", "protocols"),

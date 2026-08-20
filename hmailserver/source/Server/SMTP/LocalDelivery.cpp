@@ -5,6 +5,7 @@
 #include "StdAfx.h"
 
 #include "./LocalDelivery.h"
+#include "QuotaWarner.h"
 
 #include "../common/Application/ObjectCache.h"
 
@@ -727,6 +728,12 @@ namespace HM
 
          return false;
       }
+
+      // It fits - which is the moment to notice whether it only just fits. Placed
+      // here rather than after the message is stored so the size this compares
+      // against is still the size BEFORE this delivery, which is what makes the
+      // crossing recognisable at all.
+      QuotaWarner::NotifyIfThresholdCrossed(pCheckAccount, original_message_->GetSize());
 
       return true;
    }

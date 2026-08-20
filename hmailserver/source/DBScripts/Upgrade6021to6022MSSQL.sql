@@ -1,0 +1,4 @@
+insert into hm_servermessages (smname, smtext) values ('QUOTA_WARNING', 'Your mailbox is %MACRO_PERCENT%% full.' + NCHAR(13) + NCHAR(10) + '' + NCHAR(13) + NCHAR(10) + '   Mailbox: %MACRO_MAILBOX%' + NCHAR(13) + NCHAR(10) + '   Used: %MACRO_USED% MB of %MACRO_QUOTA% MB' + NCHAR(13) + NCHAR(10) + '' + NCHAR(13) + NCHAR(10) + 'When it is completely full, new messages sent to you will be refused and' + NCHAR(13) + NCHAR(10) + 'the sender will be told to try again later. Deleting mail you no longer' + NCHAR(13) + NCHAR(10) + 'need - and emptying the trash folder afterwards - will free the space.' + NCHAR(13) + NCHAR(10) + '' + NCHAR(13) + NCHAR(10) + 'hMailServer' + NCHAR(13) + NCHAR(10) + '')
+insert into hm_servermessages (smname, smtext) values ('QUOTA_WARNING_SUBJECT', 'Your mailbox is almost full')
+
+update hm_dbversion set value = 6022

@@ -1044,6 +1044,22 @@ namespace hMailServer.ControlPanel.Views
                     "service restart.",
             IniStore = iniStore_
          });
+         smtp.Settings.Add(new IniNumber
+         {
+            Path = "QuotaWarningPercent",
+            Label = "Warn the mailbox owner at this percentage of their quota (0 = never)",
+            Default = 90,
+            Blurb = "The delivery that takes a mailbox past this percentage produces one notice to the person " +
+                    "whose mailbox it is, from their own domain's postmaster. ONE, not one per message: the " +
+                    "server treats the threshold as something the mailbox CROSSES rather than a state it is in, " +
+                    "so a mailbox sitting at 95% is not warned about again on every delivery - which would fill " +
+                    "it faster than the mail does. Emptying the mailbox and filling it again warns again, which " +
+                    "is the behaviour anyone would expect and is free here rather than something that had to be " +
+                    "remembered and expired. On by default, because the alternative is what this server did " +
+                    "before: say nothing at all until mail starts being refused, by which point the person it " +
+                    "happens to is the last to know. Applies after a service restart.",
+            IniStore = iniStore_
+         });
          smtp.Settings.Add(new ComBool { Path = "AllowIncorrectLineEndings", Label = "Allow incorrect line endings" });
          smtp.Settings.Add(new ComBool { Path = "DisconnectInvalidClients", Label = "Disconnect clients sending too many invalid commands" });
          smtp.Settings.Add(new ComText { Path = "MaxNumberOfInvalidCommands", Label = "Invalid command limit", Numeric = true });

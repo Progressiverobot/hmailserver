@@ -361,6 +361,7 @@
     <Compile Include="SMTP\OutboundSize.cs" />
     <Compile Include="SMTP\OverQuotaRecipientRefusal.cs" />
     <Compile Include="SMTP\PerDomainRelay.cs" />
+    <Compile Include="SMTP\QuotaWarning.cs" />
     <Compile Include="ExternalAccounts\FetchXOAuth2.cs" />
     <Compile Include="Sieve\SieveRegexDelivery.cs" />
     <Compile Include="Sieve\SieveRejectDelivery.cs" />
