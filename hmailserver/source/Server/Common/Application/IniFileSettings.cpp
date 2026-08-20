@@ -7,6 +7,7 @@
 
 #include "IniSettingStore.h"
 #include "../Util/Crypt.h"
+#include "../Util/DiskSpace.h"
 #include "../Util/Utilities.h"
 
 #ifdef _DEBUG
@@ -365,6 +366,17 @@ namespace HM
       shutdown_drain_seconds_ = ReadIniSettingInteger_("Settings", "ShutdownDrainSeconds", 0);
       slow_query_log_ms_ = ReadIniSettingInteger_("Settings", "SlowQueryLogMilliseconds", 0);
       message_store_fsync_ = ReadIniSettingInteger_("Settings", "MessageStoreFsync", 0) == 1;
+
+      // Free-space policy on the message-store volume. Both clamped at 0 (= off)
+      // rather than trusted, because a negative megabyte count would otherwise
+      // become an enormous unsigned byte count in DiskSpace and refuse every
+      // message on a perfectly healthy server. See the getters for the defaults
+      // and the argument for them.
+      minimum_free_disk_space_mb_ = ReadIniSettingInteger_("Settings", "MinimumFreeDiskSpaceMB", 100);
+      if (minimum_free_disk_space_mb_ < 0) minimum_free_disk_space_mb_ = 0;
+      disk_space_warning_threshold_mb_ = ReadIniSettingInteger_("Settings", "DiskSpaceWarningThresholdMB", 1024);
+      if (disk_space_warning_threshold_mb_ < 0) disk_space_warning_threshold_mb_ = 0;
+
       simulate_spool_write_failure_ = ReadIniSettingInteger_("Settings", "SimulateSpoolWriteFailure", 0);
       simulate_database_failure_for_ = ReadIniSettingString_("Settings", "SimulateDatabaseFailureFor", "");
       simulate_database_failure_enabled_ = !simulate_database_failure_for_.IsEmpty();
@@ -589,6 +601,10 @@ namespace HM
       password_policy_maximum_age_days_ = ReadIniSettingInteger_("Settings", "PasswordPolicyMaximumAgeDays", 0);
       max_outbound_per_destination_per_minute_ = ReadIniSettingInteger_("Settings", "MaxOutboundPerDestinationPerMinute", 0);
       m_sDisableAUTHList = ReadIniSettingString_("Settings", "DisableAUTHList", "");
+
+      // DataFolder may just have changed, and the cached free-space reading is
+      // about whichever volume it named a moment ago.
+      DiskSpace::InvalidateCache();
    }
 
    bool 

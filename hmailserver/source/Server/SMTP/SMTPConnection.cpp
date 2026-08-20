@@ -64,6 +64,7 @@
 #include "../Common/Application/IniFileSettings.h"
 
 #include "../Common/Util/CrashSimulation.h"
+#include "../Common/Util/DiskSpace.h"
 #include "../Common/Util/RateLimiter.h"
 #include "../Common/SQL/DatabaseUnavailableMarker.h"
 
@@ -572,9 +573,29 @@ namespace HM
       if (!CheckStartTlsRequired_())
          return;
 
-      if (current_message_) 
+      if (current_message_)
       {
          SendResponse_(503, _T("5.5.1"), _T("Issue a reset if you want to start over"));
+         return;
+      }
+
+      // Free-space precondition, at the start of the transaction rather than at
+      // DATA. Refusing here means no recipient is ever validated, no spool file is
+      // opened and nothing is written for a message that is not going to be kept -
+      // and MAIL is the one command RFC 5321 4.1.1.2 lists 452 among the replies
+      // for, which DATA is not.
+      //
+      // 452 4.3.1 - "insufficient system storage" / "mail system full" - and not
+      // any 5xx. A permanent rejection here would destroy mail that a five-minute
+      // cleanup would have delivered; a sending server holds a 4xx for days. 452
+      // also leaves the session open, so a client with other mail for a different
+      // server is not disconnected.
+      //
+      // Inert unless MinimumFreeDiskSpaceMB says otherwise, and answered from a
+      // cached reading rather than a syscall per message - see DiskSpace.
+      if (!DiskSpace::DataDirectoryHasRoomForMail())
+      {
+         SendResponse_(452, _T("4.3.1"), _T("Insufficient system storage. Please try again later."));
          return;
       }
 

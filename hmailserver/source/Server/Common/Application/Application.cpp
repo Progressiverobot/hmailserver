@@ -64,6 +64,7 @@
 #include "ArchiveRetentionTask.h"
 #include "MessageStoreConsistencyTask.h"
 #include "WorkQueueHealthTask.h"
+#include "../Util/DiskSpace.h"
 #include "BackupScheduleTask.h"
 #include "../LDAP/DirectorySyncTask.h"
 
@@ -670,6 +671,30 @@ namespace HM
       // ever all busy at once with work queued behind them. Runs on the
       // scheduler's own thread, which belongs to a different queue than the one
       // it measures.
+      // Free space on the volume holding the message store. Registered
+      // unconditionally, because the half of that feature worth the most is the
+      // one that speaks BEFORE anything breaks: a line saying "1% free" at 03:00
+      // is worth more than a server that starts refusing mail at 09:00.
+      //
+      // Two registrations, like log retention and the consistency check: one at
+      // start-up, so an administrator who has just restarted a struggling server
+      // is told immediately, and one hourly thereafter. Hourly rather than by the
+      // minute because a disk fills over days and the task announces only a CHANGE
+      // of band - a server sitting in the warning band writes one line, not one an
+      // hour. The accept path notices the floor being crossed within seconds
+      // regardless; this task exists for the band nothing else looks at.
+      //
+      // Nothing here fires on a healthy default install: the warning threshold is
+      // 1024 MB and the floor 100 MB.
+      std::shared_ptr<DiskSpaceMonitorTask> diskSpaceStartupTask = std::shared_ptr<DiskSpaceMonitorTask>(new DiskSpaceMonitorTask);
+      diskSpaceStartupTask->SetReoccurance(ScheduledTask::RunOnce);
+      scheduler_->ScheduleTask(diskSpaceStartupTask);
+
+      std::shared_ptr<DiskSpaceMonitorTask> diskSpaceTask = std::shared_ptr<DiskSpaceMonitorTask>(new DiskSpaceMonitorTask);
+      diskSpaceTask->SetReoccurance(ScheduledTask::RunInfinitely);
+      diskSpaceTask->SetMinutesBetweenRun(60);
+      scheduler_->ScheduleTask(diskSpaceTask);
+
       std::shared_ptr<WorkQueueHealthTask> workQueueHealthTask = std::shared_ptr<WorkQueueHealthTask>(new WorkQueueHealthTask);
       workQueueHealthTask->SetReoccurance(ScheduledTask::RunInfinitely);
       workQueueHealthTask->SetMinutesBetweenRun(1);

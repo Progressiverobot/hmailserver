@@ -159,6 +159,34 @@ namespace HM
          errorMessage.Format(_T("Unable to create account-level message of %I64d for account %s."), original_message_->GetID(), String(account->GetAddress()).c_str());
 
          ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5209, "SMTPDeliverer::DeliverToLocalAccount_", errorMessage);
+
+         // And the sender is told, which is the part that was missing.
+         //
+         // This is the shape a full disk actually has on the delivery side:
+         // CreateAccountLevelMessage_ fails because FileUtilities::Copy could not
+         // write the account-level copy (or MoveFileToUserFolder could not move
+         // it), it returns empty, and the only trace was the HM5209 above.
+         // Meanwhile Perform() deletes this recipient's row and erases it from the
+         // vector unconditionally, and DeliverMessage then sees an empty
+         // saErrorMessages with nothing rescheduled and deletes the queued message
+         // - so the mail was gone, the sender had already been told 250, and the
+         // recipient never heard of it. That is silent loss, and one error-log line
+         // an administrator may never read is not a substitute for telling the
+         // sender.
+         //
+         // Handled exactly as the save failure further down is, and with the same
+         // stated regret: a bounce is not the ideal answer to what is usually a
+         // transient condition - holding the message for a later attempt would be -
+         // but local delivery has no reschedule path the way ExternalDelivery does,
+         // and telling the sender it failed is strictly better than the message
+         // evaporating. Subject to the same RFC 3461 NOTIFY opt-out the quota path
+         // honours.
+         if (!suppressFailureDsn)
+         {
+            saErrorMessages.push_back(Formatter::Format("{0}\r\n   Error Type: SMTP\r\n   Error Description: Delivery failed\r\n   Additional information: The message could not be written to the recipient's mailbox. This is usually a full disk or a locked file; the server administrator should check the hMailServer error log.\r\n\r\n",
+               account->GetAddress()));
+         }
+
          return;
       }
 

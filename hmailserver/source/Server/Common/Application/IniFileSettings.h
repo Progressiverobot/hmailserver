@@ -363,6 +363,40 @@ namespace HM
       int GetSlowQueryLogMilliseconds() const { return slow_query_log_ms_; }
       bool GetMessageStoreFsync() const { return message_store_fsync_; }
 
+      // Free-space policy on the volume holding the message store. Both in
+      // megabytes, both disabled by 0. See Common/Util/DiskSpace.h for what is
+      // and is not guaranteed by them.
+      //
+      // MinimumFreeDiskSpaceMB is the floor below which new mail is refused with
+      // a TEMPORARY failure (SMTP 452 4.3.1; IMAP APPEND NO [UNAVAILABLE]). The
+      // default is 100 MB, and the number is argued rather than picked:
+      //
+      //   * It has to be above the largest thing accepting one message can cost.
+      //     The shipped maximum message size is 20480 KB, and local delivery
+      //     copies the spool file once per local recipient, so a single accepted
+      //     message can cost several multiples of 20 MB. 100 MB is five of them.
+      //
+      //   * It has to be far below what any working installation sits at. 100 MB
+      //     is 0.4% of a 25 GB volume, which is about the smallest anybody runs a
+      //     mail server on. A server with less than 100 MB free has problems that
+      //     are not about mail.
+      //
+      //   * The two errors are not symmetrical. Refusing early costs delivery
+      //     latency and nothing else, because the refusal is temporary and a
+      //     sending server retries for days. Reaching zero costs a database that
+      //     will not open and a service that will not start. So the floor is
+      //     biased upwards.
+      //
+      // DiskSpaceWarningThresholdMB is where the administrator is TOLD, in the
+      // application log, well before any of that happens; 1024 MB by default,
+      // which is roughly fifty more maximum-size messages. Absolute rather than a
+      // percentage on purpose: what decides whether the next message fits is how
+      // many bytes are left, not what fraction of the volume they are. The
+      // percentage is written into the log line, where it is information rather
+      // than a trigger.
+      int GetMinimumFreeDiskSpaceMB() const { return minimum_free_disk_space_mb_; }
+      int GetDiskSpaceWarningThresholdMB() const { return disk_space_warning_threshold_mb_; }
+
       // Fault injection, for the regression suite only: makes writes of received message
       // data to the spool file report failure without writing anything.
       //
@@ -792,6 +826,8 @@ namespace HM
       int shutdown_drain_seconds_ = 0;
       int slow_query_log_ms_ = 0;
       bool message_store_fsync_ = false;
+      int minimum_free_disk_space_mb_ = 100;
+      int disk_space_warning_threshold_mb_ = 1024;
       int simulate_spool_write_failure_ = 0;
       String simulate_database_failure_for_;
       bool simulate_database_failure_enabled_ = false;

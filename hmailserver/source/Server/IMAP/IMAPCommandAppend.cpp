@@ -16,6 +16,7 @@
 #include "../Common/Tracking/ChangeNotification.h"
 #include "../Common/Tracking/NotificationServer.h"
 #include "../Common/Util/ByteBuffer.h"
+#include "../Common/Util/DiskSpace.h"
 #include "../Common/Util/File.h"
 #include "../Common/Util/Time.h"
 #include "../SMTP/SMTPConfiguration.h"
@@ -269,6 +270,26 @@ namespace HM
    // every later one in a MULTIAPPEND (parsed from a continuation line).
    //---------------------------------------------------------------------------
    {
+      // Free-space precondition, before anything about this particular message is
+      // considered: the disk is not a property of the mailbox, and a public folder
+      // has no quota to fall foul of but lives on the same volume as everything
+      // else.
+      //
+      // NO [UNAVAILABLE] (RFC 5530): "temporary failure because a subsystem is
+      // down" is the closest thing IMAP has to the SMTP 452, and the distinction
+      // matters just as much here. An APPEND is a client saving a draft or filing
+      // a Sent copy it may hold nowhere else, so the refusal has to read as "not
+      // now" - a client that treats this as permanent discards the message. The
+      // text says so in words as well, because the response code is advisory and
+      // most clients only show the text.
+      //
+      // Placed alongside the ceilings below rather than in ExecuteCommand so that
+      // it also covers the second and later messages of a MULTIAPPEND, whose
+      // literals are parsed from a continuation line and never pass through
+      // ExecuteCommand at all.
+      if (!DiskSpace::DataDirectoryHasRoomForMail())
+         return IMAPResult(IMAPResult::ResultNo, "[UNAVAILABLE] Insufficient system storage - the message was not stored. Please try again later.");
+
       // Absolute ceiling independent of the configured maximum, so an "unlimited"
       // (0) max message size cannot translate into an unbounded APPEND. TOOBIG
       // (RFC 4469, required alongside the RFC 7889 APPENDLIMIT advertisement)
