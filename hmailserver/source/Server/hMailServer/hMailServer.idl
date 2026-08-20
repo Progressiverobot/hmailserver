@@ -876,6 +876,19 @@ interface IInterfaceDomain : IDispatch
 	   [propput, id(42), helpstring("The private key file belonging to the secondary DKIM selector.")] HRESULT DKIMSecondaryPrivateKeyFile([in] BSTR newVal);
 	   [id(43), helpstring("Makes the secondary DKIM selector/key the primary one and clears the secondary. Fails if no usable secondary is staged. Call Save afterwards to persist the change.")] HRESULT DKIMPromoteSecondary();
 
+	   [propget, id(44), helpstring("Outbound relay for mail FROM this domain. Empty means the domain has no opinion and the global SMTP relayer applies, which is what an upgraded installation gets.")] HRESULT RelayHost([out, retval] BSTR *pVal);
+	   [propput, id(44), helpstring("Outbound relay for mail FROM this domain. Empty means the domain has no opinion and the global SMTP relayer applies, which is what an upgraded installation gets.")] HRESULT RelayHost([in] BSTR newVal);
+	   [propget, id(45), helpstring("Port of the domain's outbound relay. 0 means 25, the same rule the global relayer uses.")] HRESULT RelayPort([out, retval] long *pVal);
+	   [propput, id(45), helpstring("Port of the domain's outbound relay. 0 means 25, the same rule the global relayer uses.")] HRESULT RelayPort([in] long newVal);
+	   [propget, id(46), helpstring("Whether the domain's outbound relay needs a user name and password.")] HRESULT RelayRequiresAuthentication([out, retval] VARIANT_BOOL *pVal);
+	   [propput, id(46), helpstring("Whether the domain's outbound relay needs a user name and password.")] HRESULT RelayRequiresAuthentication([in] VARIANT_BOOL newVal);
+	   [propget, id(47), helpstring("User name for the domain's outbound relay.")] HRESULT RelayUsername([out, retval] BSTR *pVal);
+	   [propput, id(47), helpstring("User name for the domain's outbound relay.")] HRESULT RelayUsername([in] BSTR newVal);
+	   [propget, id(48), helpstring("Password for the domain's outbound relay. Write-only in effect: the getter returns what was set in this session, and the stored value is machine-protected.")] HRESULT RelayPassword([out, retval] BSTR *pVal);
+	   [propput, id(48), helpstring("Password for the domain's outbound relay. Write-only in effect: the getter returns what was set in this session, and the stored value is machine-protected.")] HRESULT RelayPassword([in] BSTR newVal);
+	   [propget, id(49), helpstring("Transport security used when connecting to the domain's outbound relay.")] HRESULT RelayConnectionSecurity([out, retval] eConnectionSecurity *pVal);
+	   [propput, id(49), helpstring("Transport security used when connecting to the domain's outbound relay.")] HRESULT RelayConnectionSecurity([in] eConnectionSecurity newVal);
+
 };
 [
 	object,

@@ -34,7 +34,10 @@ namespace HM
       max_no_of_aliases_(0),
       max_no_of_distribution_lists_(0),
       max_account_size_(0),
-      limitations_enabled_(0)
+      limitations_enabled_(0),
+      relay_port_(0),
+      relay_requires_auth_(false),
+      relay_connection_security_(CSNone)
    {
       
    }

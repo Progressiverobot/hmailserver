@@ -49,6 +49,14 @@ namespace hMailServer.ControlPanel.Views
       private readonly TextBox signaturePlain_ = NewMemo();
       private readonly TextBox signatureHtml_ = NewMemo();
 
+      // Outbound relay for this domain
+      private readonly TextBox relayHost_ = NewInput();
+      private readonly TextBox relayPort_ = NewInput();
+      private readonly CheckBox relayAuthOn_ = new() { Content = "The relay requires authentication", FontSize = 13 };
+      private readonly TextBox relayUser_ = NewInput();
+      private readonly PasswordBox relayPassword_ = new() { FontSize = 13, Margin = new Thickness(0, 0, 0, 10) };
+      private readonly ComboBox relaySecurity_ = new();
+
       // DKIM
       private readonly CheckBox dkimOn_ = new() { Content = "Enable DKIM signing", FontSize = 13 };
       private readonly CheckBox dkimAliases_ = new() { Content = "Sign aliases too", FontSize = 13 };
@@ -129,6 +137,7 @@ namespace hMailServer.ControlPanel.Views
          tabs.Items.Add(new TabItem { Header = "Names", Content = BuildNames() });
          tabs.Items.Add(new TabItem { Header = "Limits", Content = BuildLimits() });
          tabs.Items.Add(new TabItem { Header = "Signature", Content = BuildSignature() });
+         tabs.Items.Add(new TabItem { Header = "Relay", Content = BuildRelay() });
          tabs.Items.Add(new TabItem { Header = "DKIM", Content = BuildDkim() });
          Grid.SetRow(tabs, 1);
          root.Children.Add(tabs);
@@ -295,6 +304,39 @@ namespace hMailServer.ControlPanel.Views
          panel.Children.Add(signaturePlain_);
          panel.Children.Add(Label("HTML signature"));
          panel.Children.Add(signatureHtml_);
+         return Scroll(panel);
+      }
+
+      private ScrollViewer BuildRelay()
+      {
+         relaySecurity_.Items.Add(Combo("None", 0));
+         relaySecurity_.Items.Add(Combo("SSL/TLS", 1));
+         relaySecurity_.Items.Add(Combo("STARTTLS (optional)", 2));
+         relaySecurity_.Items.Add(Combo("STARTTLS (required)", 3));
+         StyleCombo(relaySecurity_);
+
+         var panel = TabPanel();
+         panel.Children.Add(Label(
+            "Where mail FROM this domain leaves through. This is a different question from a route, " +
+            "which decides where mail addressed TO a domain is sent - it is for a server hosting several " +
+            "independent domains where each has its own delivery provider."));
+         panel.Children.Add(Label(
+            "Leave the host empty and the domain has no opinion: the server-wide SMTP relayer applies, " +
+            "exactly as it did before this setting existed. A route still wins over both, because a route " +
+            "is a statement about the destination."));
+         panel.Children.Add(Separator());
+         panel.Children.Add(Label("Relay host (empty = use the server-wide relayer)"));
+         panel.Children.Add(Input(relayHost_));
+         panel.Children.Add(Label("Port (0 = 25)"));
+         panel.Children.Add(Input(relayPort_));
+         panel.Children.Add(Label("Connection security"));
+         panel.Children.Add(relaySecurity_);
+         panel.Children.Add(Separator());
+         panel.Children.Add(relayAuthOn_);
+         panel.Children.Add(Label("User name"));
+         panel.Children.Add(Input(relayUser_));
+         panel.Children.Add(Label("Password (leave blank to keep the stored one)"));
+         panel.Children.Add(relayPassword_);
          return Scroll(panel);
       }
 
@@ -925,6 +967,18 @@ namespace hMailServer.ControlPanel.Views
             signaturePlain_.Text = (string) d.SignaturePlainText ?? "";
             signatureHtml_.Text = (string) d.SignatureHTML ?? "";
 
+            relayHost_.Text = (string) d.RelayHost ?? "";
+            relayPort_.Text = ((long) d.RelayPort).ToString();
+            relayAuthOn_.IsChecked = (bool) d.RelayRequiresAuthentication;
+            relayUser_.Text = (string) d.RelayUsername ?? "";
+            SelectCombo(relaySecurity_, (int) d.RelayConnectionSecurity);
+
+            // The password box is deliberately left empty rather than filled with the
+            // stored secret: a dialog that shows a password back is a dialog that hands
+            // it to whoever is standing behind you, and it buys nothing - Save keeps the
+            // stored value when the box is blank.
+            relayPassword_.Password = "";
+
             dkimOn_.IsChecked = (bool) d.DKIMSignEnabled;
             dkimAliases_.IsChecked = (bool) d.DKIMSignAliasesEnabled;
             dkimSelector_.Text = (string) d.DKIMSelector ?? "";
@@ -966,7 +1020,8 @@ namespace hMailServer.ControlPanel.Views
           || !NumericField.TryValidate(maxAccountSize_.Text, "Maximum account size (MB)", 0, int.MaxValue, out int masV, out bool hasMas, out error)
           || !NumericField.TryValidate(maxAccounts_.Text, "Maximum number of accounts", 0, int.MaxValue, out int mnaV, out bool hasMna, out error)
           || !NumericField.TryValidate(maxAliases_.Text, "Maximum number of aliases", 0, int.MaxValue, out int mnalV, out bool hasMnal, out error)
-          || !NumericField.TryValidate(maxDists_.Text, "Maximum number of distribution lists", 0, int.MaxValue, out int mndV, out bool hasMnd, out error))
+          || !NumericField.TryValidate(maxDists_.Text, "Maximum number of distribution lists", 0, int.MaxValue, out int mndV, out bool hasMnd, out error)
+          || !NumericField.TryValidate(relayPort_.Text, "Relay port", 0, 65535, out int relayPortValue, out bool hasRelayPort, out error))
          {
             status_.Text = error;
             return;
@@ -1025,6 +1080,18 @@ namespace hMailServer.ControlPanel.Views
             d.AddSignaturesToLocalMail = signLocal_.IsChecked == true;
             d.SignaturePlainText = signaturePlain_.Text;
             d.SignatureHTML = signatureHtml_.Text;
+
+            d.RelayHost = relayHost_.Text.Trim();
+            d.RelayPort = relayPortValue;
+            d.RelayRequiresAuthentication = relayAuthOn_.IsChecked == true;
+            d.RelayUsername = relayUser_.Text.Trim();
+            int rs = ComboValue(relaySecurity_);
+            if (rs >= 0) d.RelayConnectionSecurity = rs;
+
+            // Only written when something was typed, so re-saving the dialog for an
+            // unrelated change does not silently blank the relay password.
+            if (relayPassword_.Password.Length > 0)
+               d.RelayPassword = relayPassword_.Password;
 
             d.DKIMSignEnabled = dkimOn_.IsChecked == true;
             d.DKIMSignAliasesEnabled = dkimAliases_.IsChecked == true;

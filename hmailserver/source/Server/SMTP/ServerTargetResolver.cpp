@@ -9,6 +9,8 @@
 #include "SMTPConfiguration.h"
 
 #include "../Common/BO/Message.h"
+#include "../Common/BO/Domain.h"
+#include "../Common/Cache/CacheContainer.h"
 #include "../Common/BO/Route.h"
 #include "../Common/BO/Routes.h"
 #include "../Common/BO/MessageRecipient.h"
@@ -49,7 +51,7 @@ namespace HM
          if (pRoute)
          {
             String domainName = pRoute->DomainName();
-            std::shared_ptr<ServerInfo> serverInfo = GetFixedSMTPHostForDomain_(domainName);
+            std::shared_ptr<ServerInfo> serverInfo = GetFixedSMTPHostForDomain_(domainName, GetSenderDomain_());
 
             if (serverInfo)
             {
@@ -99,7 +101,7 @@ namespace HM
 
          std::vector<std::shared_ptr<MessageRecipient> > vecRecipients = (*iter).second;
 
-         std::shared_ptr<ServerInfo> serverInfo = GetFixedSMTPHostForDomain_(domainName);
+         std::shared_ptr<ServerInfo> serverInfo = GetFixedSMTPHostForDomain_(domainName, GetSenderDomain_());
 
          if (!serverInfo)
          {
@@ -168,8 +170,49 @@ namespace HM
       return result;
    }
 
+   String
+   ServerTargetResolver::GetSenderDomain_() const
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // The domain of the envelope sender, lower-cased. Empty for a bounce, which has
+   // no envelope sender at all - and a bounce therefore never picks up a domain
+   // relay, which is correct: it belongs to the server, not to the domain whose
+   // message failed.
+   //---------------------------------------------------------------------------()
+   {
+      if (!message_)
+         return String();
+
+      String sender = StringParser::ExtractDomain(message_->GetFromAddress());
+      sender.MakeLower();
+
+      return sender;
+   }
+
+   std::shared_ptr<const Domain>
+   ServerTargetResolver::GetRelayingDomain_(const String &sSenderDomain)
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // The local domain the message is from, but only when it has a relay host
+   // configured. Returns nothing otherwise, so the caller falls through to the
+   // global relayer exactly as it always did - which is what keeps every existing
+   // installation's behaviour unchanged until an administrator fills a host in.
+   //---------------------------------------------------------------------------()
+   {
+      if (sSenderDomain.IsEmpty())
+         return std::shared_ptr<const Domain>();
+
+      std::shared_ptr<const Domain> domain = CacheContainer::Instance()->GetDomain(sSenderDomain);
+
+      if (!domain || domain->GetRelayHost().IsEmpty())
+         return std::shared_ptr<const Domain>();
+
+      return domain;
+   }
+
+
    std::shared_ptr<ServerInfo>
-   ServerTargetResolver::GetFixedSMTPHostForDomain_(const String &sDomain)
+   ServerTargetResolver::GetFixedSMTPHostForDomain_(const String &sDomain, const String &sSenderDomain)
    //---------------------------------------------------------------------------()
    // DESCRIPTION:
    // Check if there exists a fixed SMTP host for the domain given, and in that
@@ -199,6 +242,29 @@ namespace HM
             sUsername = pRoute->GetRelayerAuthUsername();
             sPassword = pRoute->GetRelayerAuthPassword();
          }
+      }
+      else if (std::shared_ptr<const Domain> pSenderDomain = GetRelayingDomain_(sSenderDomain))
+      {
+         // The sending domain has bought its own delivery provider. Between the
+         // route above and the global relayer below, because those two answer
+         // different questions and this one sits between them in specificity: a
+         // route is about where the mail is GOING and beats everything, the global
+         // relayer is the fallback for mail that nothing else has an opinion about,
+         // and this is the middle case - a server hosting several independent
+         // domains where each leaves through its own provider.
+         sSMTPHost = pSenderDomain->GetRelayHost();
+         lPort = pSenderDomain->GetRelayPort();
+
+         if (lPort == 0)
+            lPort = 25;
+
+         if (pSenderDomain->GetRelayRequiresAuth())
+         {
+            sUsername = pSenderDomain->GetRelayUsername();
+            sPassword = pSenderDomain->GetRelayPassword();
+         }
+
+         connection_security = pSenderDomain->GetRelayConnectionSecurity();
       }
       else
       {

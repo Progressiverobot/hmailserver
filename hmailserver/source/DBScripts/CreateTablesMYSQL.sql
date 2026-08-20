@@ -141,7 +141,13 @@ create table hm_domains
    domaindkimselector varchar(255) not null,
    domaindkimprivatekeyfile varchar(255) not null,
    domaindkimsecondaryselector varchar(255) not null,
-   domaindkimsecondaryprivatekeyfile varchar(255) not null
+   domaindkimsecondaryprivatekeyfile varchar(255) not null,
+   domainrelayhost varchar(255) not null,
+   domainrelayport int not null,
+   domainrelayrequiresauth int not null,
+   domainrelayusername varchar(255) not null,
+   domainrelaypassword varchar(255) not null,
+   domainrelayconnectionsecurity int not null
 )  DEFAULT CHARSET=utf8;
 
 CREATE INDEX idx_hm_domains ON hm_domains (domainname);
@@ -894,4 +900,4 @@ create table hm_messagetrace
 
 CREATE INDEX idx_hm_messagetrace ON hm_messagetrace (mtoccurred);
 
-insert into hm_dbversion values (6020);
+insert into hm_dbversion values (6021);

@@ -247,7 +247,13 @@ create table hm_domains (
    domaindkimselector nvarchar(255) not null,
    domaindkimprivatekeyfile nvarchar(255) not null,
    domaindkimsecondaryselector nvarchar(255) not null,
-   domaindkimsecondaryprivatekeyfile nvarchar(255) not null
+   domaindkimsecondaryprivatekeyfile nvarchar(255) not null,
+   domainrelayhost nvarchar(255) not null,
+   domainrelayport int not null,
+   domainrelayrequiresauth int not null,
+   domainrelayusername nvarchar(255) not null,
+   domainrelaypassword nvarchar(255) not null,
+   domainrelayconnectionsecurity int not null
 ) 
 
 ALTER TABLE hm_domains ADD CONSTRAINT hm_domains_pk PRIMARY KEY NONCLUSTERED (domainid) 
@@ -1085,4 +1091,4 @@ ALTER TABLE hm_messagetrace ADD CONSTRAINT hm_messagetrace_pk PRIMARY KEY NONCLU
 
 CREATE CLUSTERED INDEX idx_hm_messagetrace ON hm_messagetrace (mtoccurred)
 
-insert into hm_dbversion values (6020)
+insert into hm_dbversion values (6021)

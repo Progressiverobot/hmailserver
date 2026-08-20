@@ -148,6 +148,33 @@ namespace HM
       // prevent. The caller is responsible for persisting the domain afterwards.
       bool PromoteDKIMSecondary(String &errorMessage);
 
+      // An outbound relay chosen by the SENDING domain, which is a different
+      // question from the one routes answer. A route says "mail addressed to this
+      // domain goes to that host"; this says "mail FROM this domain leaves through
+      // that host", which is what a server hosting several independent domains
+      // needs when each of them has bought its own delivery provider. Empty host
+      // means the domain has no opinion and the global relayer applies, so an
+      // upgraded installation behaves exactly as before until somebody fills one in.
+      String GetRelayHost() const { return relay_host_; }
+      void SetRelayHost(const String &newValue) { relay_host_ = newValue; }
+
+      // 0 means "unset", and the resolver reads it as 25 - the same rule the global
+      // relayer already uses, so the two cannot disagree about what a blank port means.
+      long GetRelayPort() const { return relay_port_; }
+      void SetRelayPort(long newValue) { relay_port_ = newValue; }
+
+      bool GetRelayRequiresAuth() const { return relay_requires_auth_; }
+      void SetRelayRequiresAuth(bool newValue) { relay_requires_auth_ = newValue; }
+
+      String GetRelayUsername() const { return relay_username_; }
+      void SetRelayUsername(const String &newValue) { relay_username_ = newValue; }
+
+      String GetRelayPassword() const { return relay_password_; }
+      void SetRelayPassword(const String &newValue) { relay_password_ = newValue; }
+
+      ConnectionSecurity GetRelayConnectionSecurity() const { return relay_connection_security_; }
+      void SetRelayConnectionSecurity(ConnectionSecurity newValue) { relay_connection_security_ = newValue; }
+
       int GetDKIMHeaderCanonicalizationMethod() const;
       void SetDKIMHeaderCanonicalizationMethod(int newValue);
 
@@ -202,6 +229,13 @@ namespace HM
 
       String dkim_secondary_selector_;
       String dkim_secondary_private_key_file_;
+
+      String relay_host_;
+      long relay_port_;
+      bool relay_requires_auth_;
+      String relay_username_;
+      String relay_password_;
+      ConnectionSecurity relay_connection_security_;
 
       std::shared_ptr<Accounts> accounts_;
       std::shared_ptr<Aliases> aliases_;

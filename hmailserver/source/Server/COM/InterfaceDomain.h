@@ -158,6 +158,18 @@ END_COM_MAP()
    STDMETHOD(put_DKIMSecondarySelector)(/*[in]*/ BSTR newVal);
    STDMETHOD(get_DKIMSecondaryPrivateKeyFile)(/*[out, retval]*/ BSTR *pVal);
    STDMETHOD(put_DKIMSecondaryPrivateKeyFile)(/*[in]*/ BSTR newVal);
+   STDMETHOD(get_RelayHost)(/*[out, retval]*/ BSTR *pVal);
+   STDMETHOD(put_RelayHost)(/*[in]*/ BSTR newVal);
+   STDMETHOD(get_RelayPort)(/*[out, retval]*/ long *pVal);
+   STDMETHOD(put_RelayPort)(/*[in]*/ long newVal);
+   STDMETHOD(get_RelayRequiresAuthentication)(/*[out, retval]*/ VARIANT_BOOL *pVal);
+   STDMETHOD(put_RelayRequiresAuthentication)(/*[in]*/ VARIANT_BOOL newVal);
+   STDMETHOD(get_RelayUsername)(/*[out, retval]*/ BSTR *pVal);
+   STDMETHOD(put_RelayUsername)(/*[in]*/ BSTR newVal);
+   STDMETHOD(get_RelayPassword)(/*[out, retval]*/ BSTR *pVal);
+   STDMETHOD(put_RelayPassword)(/*[in]*/ BSTR newVal);
+   STDMETHOD(get_RelayConnectionSecurity)(/*[out, retval]*/ eConnectionSecurity *pVal);
+   STDMETHOD(put_RelayConnectionSecurity)(/*[in]*/ eConnectionSecurity newVal);
    STDMETHOD(DKIMPromoteSecondary)();
 
    // dkim end.

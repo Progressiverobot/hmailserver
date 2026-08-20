@@ -211,7 +211,28 @@ namespace DBUpdater
          new SchemaProbe(6020, "hm_messagetrace.mtevent",
                          "update hm_messagetrace set mtevent = mtevent where 1 = 0"),
          new SchemaProbe(6020, "hm_messagetrace.mtoccurred",
-                         "update hm_messagetrace set mtoccurred = mtoccurred where 1 = 0")
+                         "update hm_messagetrace set mtoccurred = mtoccurred where 1 = 0"),
+
+         // Upgrade6020to6021* - the per-domain outbound relay. One probe per column,
+         // because a partially-applied ALTER leaves a database that opens fine and
+         // then fails on the one domain somebody configured.
+         new SchemaProbe(6021, "hm_domains.domainrelayhost",
+                         "update hm_domains set domainrelayhost = domainrelayhost where 1 = 0"),
+
+         new SchemaProbe(6021, "hm_domains.domainrelayport",
+                         "update hm_domains set domainrelayport = domainrelayport where 1 = 0"),
+
+         new SchemaProbe(6021, "hm_domains.domainrelayrequiresauth",
+                         "update hm_domains set domainrelayrequiresauth = domainrelayrequiresauth where 1 = 0"),
+
+         new SchemaProbe(6021, "hm_domains.domainrelayusername",
+                         "update hm_domains set domainrelayusername = domainrelayusername where 1 = 0"),
+
+         new SchemaProbe(6021, "hm_domains.domainrelaypassword",
+                         "update hm_domains set domainrelaypassword = domainrelaypassword where 1 = 0"),
+
+         new SchemaProbe(6021, "hm_domains.domainrelayconnectionsecurity",
+                         "update hm_domains set domainrelayconnectionsecurity = domainrelayconnectionsecurity where 1 = 0")
       };
 
       /// <summary>

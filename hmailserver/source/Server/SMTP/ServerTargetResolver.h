@@ -10,6 +10,7 @@ namespace HM
    class RuleResult;
    class ServerInfo;
    class MessageRecipient;
+   class Domain;
 
    class ServerTargetResolver
    {
@@ -25,7 +26,10 @@ namespace HM
 
       std::map<std::shared_ptr<ServerInfo>, std::vector<std::shared_ptr<MessageRecipient> > > CreateDistinctMap(std::map<std::shared_ptr<ServerInfo>, std::vector<std::shared_ptr<MessageRecipient> > > serverInfos);
 
-      static std::shared_ptr<ServerInfo> GetFixedSMTPHostForDomain_(const String &sDomain);
+      static std::shared_ptr<ServerInfo> GetFixedSMTPHostForDomain_(const String &sDomain, const String &sSenderDomain);
+
+      String GetSenderDomain_() const;
+      static std::shared_ptr<const Domain> GetRelayingDomain_(const String &sSenderDomain);
 
       std::shared_ptr<Message> message_;
       const RuleResult &_globalRuleResult;

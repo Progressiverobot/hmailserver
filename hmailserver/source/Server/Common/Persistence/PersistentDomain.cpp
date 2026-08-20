@@ -11,6 +11,7 @@
 #include "PersistentDistributionList.h"
 #include "PersistentDistributionListRecipient.h"
 
+#include "../Util/Crypt.h"
 #include "../BO/Domain.h"
 #include "../BO/DomainAliases.h"
 #include "../BO/Accounts.h"
@@ -470,6 +471,18 @@ namespace HM
       pDomain->SetDKIMSecondarySelector(pRS->GetStringValue("domaindkimsecondaryselector"));
       pDomain->SetDKIMSecondaryPrivateKeyFile(pRS->GetStringValue("domaindkimsecondaryprivatekeyfile"));
 
+      pDomain->SetRelayHost(pRS->GetStringValue("domainrelayhost"));
+      pDomain->SetRelayPort(pRS->GetLongValue("domainrelayport"));
+      pDomain->SetRelayRequiresAuth(pRS->GetLongValue("domainrelayrequiresauth") == 1);
+      pDomain->SetRelayUsername(pRS->GetStringValue("domainrelayusername"));
+
+      // Protected with the same machine-bound scheme a route's relay password uses.
+      // It has to be recoverable rather than hashed, because the server presents it to
+      // another server - so it is protected against being read out of the database,
+      // which is the threat that actually applies to it.
+      pDomain->SetRelayPassword(Crypt::Instance()->UnprotectSecret(pRS->GetStringValue("domainrelaypassword")));
+      pDomain->SetRelayConnectionSecurity((ConnectionSecurity) pRS->GetLongValue("domainrelayconnectionsecurity"));
+
       return true;
    }
 
@@ -551,6 +564,13 @@ namespace HM
       oStatement.AddColumn("domaindkimprivatekeyfile", pDomain->GetDKIMPrivateKeyFile());
       oStatement.AddColumn("domaindkimsecondaryselector", pDomain->GetDKIMSecondarySelector());
       oStatement.AddColumn("domaindkimsecondaryprivatekeyfile", pDomain->GetDKIMSecondaryPrivateKeyFile());
+
+      oStatement.AddColumn("domainrelayhost", pDomain->GetRelayHost());
+      oStatement.AddColumn("domainrelayport", pDomain->GetRelayPort());
+      oStatement.AddColumn("domainrelayrequiresauth", pDomain->GetRelayRequiresAuth() ? 1 : 0);
+      oStatement.AddColumn("domainrelayusername", pDomain->GetRelayUsername());
+      oStatement.AddColumn("domainrelaypassword", Crypt::Instance()->ProtectSecret(pDomain->GetRelayPassword()));
+      oStatement.AddColumn("domainrelayconnectionsecurity", (int) pDomain->GetRelayConnectionSecurity());
 
       oStatement.SetTable("hm_domains");
       
