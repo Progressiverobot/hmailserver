@@ -75,10 +75,17 @@ already cost a release cycle or nearly shipped a defect.
     before publication, because nothing can be added afterwards. 6.2.22-pre4 was
     published straight away and ended up with an installer and no SBOM at all.
 
-    Both workflows also fire on `release: created`, which happens when the draft is
-    saved, so the SBOMs usually attach without being asked. Dispatch them anyway -
-    the two race each other on that event, and the signing run that counts is the
-    one that goes last.
+    **The two `gh workflow run` lines are required, not belt-and-braces.** Saving a
+    draft does not start a workflow: GitHub does not deliver `release` events for
+    draft releases, which was measured here rather than assumed - creating the pre5
+    draft produced no run at all. The `release: created` trigger on both workflows
+    therefore only covers a release published without a draft, which is the path
+    that can no longer attach anything. Dispatching them by hand is the path that
+    works.
+
+    And a tag is spent once: a tag that has backed an immutable release cannot back
+    another, even after that release is deleted. There is no re-cutting a broken
+    release under the same version - it needs the next number.
 13. **Close the loop**: answer every issue the release resolves (and close
     them), update the ones it does not resolve saying so plainly.
 

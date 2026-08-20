@@ -37,10 +37,11 @@ name: Sign release artefacts
 
 on:
   release:
-    # created, not published: it fires when a draft is saved, which is while the
-    # release can still be added to. Note this races the SBOM workflow, which fires
-    # on the same event - so the release procedure dispatches this one by hand,
-    # afterwards, and that is the run whose signatures count.
+    # Not published: a published release refuses uploads here. This does not fire
+    # for a draft either - GitHub delivers no release event for drafts - so the
+    # release procedure dispatches this by hand, after the SBOMs are attached,
+    # because cosign signs whatever is present when it runs. The trigger is kept
+    # only for a release published without a draft, where it will at least try.
     types: [ created ]
   workflow_dispatch:
     inputs:

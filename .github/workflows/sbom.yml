@@ -9,8 +9,13 @@ name: SBOM
 # every further asset upload with HTTP 422 - which is what happened to 6.2.22-pre4
 # and left it with an installer and no SBOM at all. A draft is still mutable, so
 # the assets go on before publication and the release is complete the moment it
-# becomes visible. The release procedure in RELEASE.md creates the draft, waits for
-# this and for the signing workflow, and publishes last. Syft (anchore/sbom-action)
+# becomes visible.
+#
+# Saving a draft does NOT start this workflow - GitHub delivers no release event for
+# draft releases - so the release procedure dispatches it by hand with release_tag.
+# The trigger below only catches a release published without a draft first, which is
+# the case that can no longer attach anything, and the warning in the upload step
+# says so. Syft (anchore/sbom-action)
 # inventories the .NET package references and the files in the tree; the SBOM is
 # emitted in both SPDX and CycloneDX JSON. Combined with Dependabot + the
 # dependency-review gate, this delivers the B8 "SBOM + dependency/CVE scanning"
