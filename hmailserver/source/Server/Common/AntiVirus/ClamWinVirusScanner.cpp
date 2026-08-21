@@ -55,9 +55,19 @@ namespace HM
       unsigned int exitCode = 0;
       ProcessLauncher launcher(sCommandLine, sPath);
       launcher.SetErrorLogTimeout(20000);
-      if (!launcher.Launch(exitCode))
+
+      ProcessLauncher::FailureReason failureReason = ProcessLauncher::FailureReason::None;
+      if (!launcher.Launch(exitCode, failureReason))
       {
-         return VirusScanningResult("ClamWinVirusScanner::Scan", "Unable to launch executable.");
+         // A timeout is the scanner being slow, not the path being wrong - see
+         // CustomVirusScanner for the full reasoning; both scanners had the
+         // same misleading message.
+         if (failureReason == ProcessLauncher::FailureReason::TimedOut)
+            return VirusScanningResult("ClamWinVirusScanner::Scan",
+               Formatter::Format("ClamWin did not finish within the maximum time (ExternalProcessTimeout) and was terminated. Command line: {0}.", sCommandLine));
+
+         return VirusScanningResult("ClamWinVirusScanner::Scan",
+            Formatter::Format("Unable to launch ClamWin. Check that the executable path is correct and runnable by the service account. Command line: {0}.", sCommandLine));
       }
 
       String sDebugMessage = Formatter::Format("ClamWin: {0}. Return code: {1}", sCommandLine, exitCode);

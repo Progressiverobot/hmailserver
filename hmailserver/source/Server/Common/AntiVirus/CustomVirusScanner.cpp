@@ -62,9 +62,20 @@ namespace HM
       unsigned int exitCode = 0;
       ProcessLauncher launcher(sCommandLine, sPath);
       launcher.SetErrorLogTimeout(20000);
-      if (!launcher.Launch(exitCode))
+
+      ProcessLauncher::FailureReason failureReason = ProcessLauncher::FailureReason::None;
+      if (!launcher.Launch(exitCode, failureReason))
       {
-         return VirusScanningResult("CustomVirusScanner::Scan", "Unable to launch executable.");
+         // The two failures read oppositely. A timeout means the scanner was
+         // reachable and simply too slow - which is exactly what AVFailAction
+         // exists to arbitrate - so reporting it as a launch failure would send
+         // an administrator to check a path that is perfectly correct.
+         if (failureReason == ProcessLauncher::FailureReason::TimedOut)
+            return VirusScanningResult("CustomVirusScanner::Scan",
+               Formatter::Format("The virus scanner did not finish within the maximum time (ExternalProcessTimeout) and was terminated. Command line: {0}.", sCommandLine));
+
+         return VirusScanningResult("CustomVirusScanner::Scan",
+            Formatter::Format("Unable to launch the virus scanner. Check that the executable path is correct and runnable by the service account. Command line: {0}.", sCommandLine));
       }
 
       String sDebugMessage = Formatter::Format("Scanner: {0}. Return code: {1}", sCommandLine, exitCode);

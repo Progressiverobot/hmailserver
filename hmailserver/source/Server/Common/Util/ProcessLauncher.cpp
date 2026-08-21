@@ -41,7 +41,15 @@ namespace HM
    bool
    ProcessLauncher::Launch(unsigned int &exitCode)
    {
+      FailureReason ignored = FailureReason::None;
+      return Launch(exitCode, ignored);
+   }
+
+   bool
+   ProcessLauncher::Launch(unsigned int &exitCode, FailureReason &failureReason)
+   {
       exitCode = 0;
+      failureReason = FailureReason::None;
 
       STARTUPINFO si;
       PROCESS_INFORMATION pi;
@@ -72,6 +80,7 @@ namespace HM
          String errorMessage = Formatter::Format("There was an error launching external process {0}. Process start failed. Windows error code: {1}", command_line_, (int) GetLastError());
          ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5401, "ProcessLauncher::Launch", errorMessage); 
          
+         failureReason = FailureReason::StartFailed;
          return false;
       }
 
@@ -166,6 +175,7 @@ namespace HM
             CloseHandle( pi.hProcess );
             CloseHandle( pi.hThread );
 
+            failureReason = FailureReason::TimedOut;
             return false;
          }
       case WAIT_FAILED:
