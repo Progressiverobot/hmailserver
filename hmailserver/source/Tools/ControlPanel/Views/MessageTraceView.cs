@@ -188,15 +188,14 @@ namespace hMailServer.ControlPanel.Views
 
       private void Build()
       {
-         var root = new StackPanel { Margin = new Thickness(16) };
+         // The shared page gutter and title style - these two pages were the
+         // newest and had drifted to their own 16px gutter and 22px title,
+         // which is exactly how a design system erodes: newest pages first.
+         var root = new StackPanel { Margin = new Thickness(26, 20, 26, 20) };
 
-         root.Children.Add(new TextBlock
-         {
-            Text = "Message trace",
-            FontSize = 22,
-            FontWeight = FontWeights.SemiBold,
-            Margin = new Thickness(0, 0, 0, 6)
-         });
+         var title = new TextBlock { Text = "Message trace" };
+         title.SetResourceReference(FrameworkElement.StyleProperty, "PageTitle");
+         root.Children.Add(title);
 
          var hint = new TextBlock
          {
