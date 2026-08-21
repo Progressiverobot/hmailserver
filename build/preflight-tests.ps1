@@ -205,10 +205,28 @@ if (Test-Path $serverIni) {
                     'PasswordPolicyRequireNonAlphanumeric', 'PasswordPolicyRejectCommon',
                     'QuarantineEnabled', 'PasswordPolicyHistoryCount',
                     'PasswordPolicyMaximumAgeDays', 'DmarcTreeWalkEnabled',
-                    'AuthenticationResultsEnabled', 'DNSQueryTimeout', 'SpfVoidLookupLimit', 'RejectFullMailboxAtRcpt', 'DkimAcceptSha1', 'QuotaWarningPercent', 'ArchiveDir', 'ArchiveRetentionDays', 'MetricsPerDomainEnabled', 'PreferredHashAlgorithm', 'FilterHookUrl', 'FilterHookFailClosed', 'FilterHookTimeoutSeconds', 'FilterHookRejectScore'
+                    'AuthenticationResultsEnabled', 'DNSQueryTimeout', 'SpfVoidLookupLimit', 'RejectFullMailboxAtRcpt', 'DkimAcceptSha1', 'QuotaWarningPercent', 'ArchiveDir', 'ArchiveRetentionDays', 'MetricsPerDomainEnabled', 'PreferredHashAlgorithm', 'FilterHookUrl', 'FilterHookFailClosed', 'FilterHookTimeoutSeconds', 'FilterHookRejectScore',
+                    #   SMTPProxyProtocol*     - the worst one on this list. With the feature on and a
+                    #                            trusted IP left behind, EVERY connection from that address
+                    #                            must begin with a PROXY header - so a normal test client is
+                    #                            dropped before the greeting and the whole suite fails at
+                    #                            connect, saying nothing about why
+                    #   SMTPXClient*           - milder: only changes what EHLO advertises to that address
+                    #   Otel*Endpoint          - every span, metric and log line then waits on a collector
+                    #                            that is not there, which is slow rather than wrong
+                    'SMTPProxyProtocolEnabled', 'SMTPProxyProtocolTrustedIPs',
+                    'SMTPXClientEnabled', 'SMTPXClientTrustedIPs',
+                    'OtelEndpoint', 'OtelMetricsEndpoint', 'OtelLogsEndpoint'
 
     $iniLines = @(Get-Content -LiteralPath $serverIni)
-    $pattern = '^\s*(' + ($leftoverKeys -join '|') + ')\s*='
+
+    # A key with an EMPTY value is not a leftover. Several fixtures put a setting
+    # back by writing "" rather than deleting the line, which is the correct,
+    # cleaned-up state for every key here - each of these is off, absent or
+    # default when empty. Matching the key name alone reported a clean bench as
+    # dirty, which is the one thing a pre-flight check must never do: a check
+    # that cries wolf is a check people learn to pass with -Clean without reading.
+    $pattern = '^\s*(' + ($leftoverKeys -join '|') + ')\s*=\s*\S'
     $leftovers = $iniLines | Where-Object { $_ -match $pattern }
 
     if ($leftovers -and $Clean) {

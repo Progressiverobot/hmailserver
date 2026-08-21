@@ -78,19 +78,29 @@ Common causes, in the order they actually occur:
 | `script/save` slow | an `OnAcceptMessage` event script, or the database |
 | Nothing between `354` and silence | you are on a version older than 6.2.17; upgrade, because that is the version that added these lines |
 
-> **`DNSServer` is currently broken, and setting it makes this worse rather than
-> better.** With `[Settings] DNSServer` configured, lookups through the custom
-> server fail — AAAA and CNAME queries return `ERROR_TIMEOUT` in the same
-> millisecond they were issued, and the A query returns a status the resolver
-> treats as "no records". This is a regression introduced in 6.2.17 and it is not
-> yet fixed (issue #25); the comment in `DNSResolverWinApi::Query` records what
-> has been ruled out. SpamAssassin is the visible symptom because it reports a
-> failed lookup, but DNSBL, SURBL, SPF, DKIM and MX lookups fail the same way in
-> silence — a server in that state has quietly stopped most of its spam filtering
-> and is still accepting mail. Leave `DNSServer` empty so the system resolvers are
-> used, and fix name resolution at the operating system instead. (For the record,
-> the setting also switches on `DNS_QUERY_BYPASS_CACHE`, so even when it worked
-> every lookup paid full price.)
+> **`DNSServer` was broken in 6.2.17 and 6.2.18. It was fixed in 6.2.19 (issue
+> #25).** On those two versions every lookup through a configured custom server
+> failed: AAAA and CNAME queries returned `ERROR_TIMEOUT` in the same millisecond
+> they were issued, and the A query returned a status the resolver treated as "no
+> records". SpamAssassin was the visible symptom because it reports a failed
+> lookup, but DNSBL, SURBL, SPF, DKIM and MX lookups failed the same way in
+> silence — a server in that state had quietly stopped most of its spam filtering
+> and was still accepting mail. **If you are on 6.2.17 or 6.2.18, upgrade, or
+> leave `DNSServer` empty so the system resolvers are used.**
+>
+> The cause is worth knowing, because the fix looks like a bug. Moving to the
+> asynchronous `DnsQueryEx` replaced a `PIP4_ARRAY`, which has no port field,
+> with a `DNS_ADDR`, which carries a full `SOCKADDR` — and a destination port of
+> **zero** is what that structure wants, because the DNS client supplies the port
+> itself. Filling in 53 looks like the obvious correction and breaks every
+> lookup: measured against a real server, port 53 returns status 87 and no
+> records for all three record types, while port 0 returns the A record and a
+> correct `DNS_INFO_NO_RECORDS` for a host with no AAAA. `DNSResolverWinApi.cpp`
+> says *do not "fix" this line* directly above it, for this reason.
+>
+> One caveat survives the fix: a custom server list is only honoured together
+> with `DNS_QUERY_BYPASS_CACHE`, so setting `DNSServer` still means every lookup
+> pays full price. Leave it empty unless you need a specific resolver.
 
 Since 6.2.17 acceptance is also bounded: if it exceeds `FinalizationTimeout`
 (240 seconds by default) the server answers `451` and the sender retries, rather

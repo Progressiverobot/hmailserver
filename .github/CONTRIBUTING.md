@@ -20,7 +20,7 @@ The compiler runs with `/WX` — code must build warning-free.
 
 ## Testing
 
-All changes must keep the regression suite green (898 tests). The suite
+All changes must keep the regression suite green. The suite
 runs against a live local server instance over SMTP/IMAP/POP3. The full
 environment recipe (SQL CE, ClamAV, SpamAssassin, INI settings) is not
 published — open an issue and we will walk you through it.
