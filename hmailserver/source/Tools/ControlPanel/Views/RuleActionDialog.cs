@@ -57,6 +57,9 @@ namespace hMailServer.ControlPanel.Views
          root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
          root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
+         // Upper-case deliberately, sentence-case sweep notwithstanding: "THEN"
+         // is the rule grammar's keyword, not prose - the pair to RuleCriteria-
+         // Dialog's "IF", both echoing RulesView's editor panes.
          var header = new TextBlock { Text = "THEN", FontSize = Typography.DialogTitle, FontWeight = FontWeights.SemiBold, Margin = new Thickness(2, 0, 0, 12) };
          header.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
          Grid.SetRow(header, 0);

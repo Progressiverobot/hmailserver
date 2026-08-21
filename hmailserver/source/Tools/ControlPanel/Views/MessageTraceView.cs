@@ -32,7 +32,7 @@ namespace hMailServer.ControlPanel.Views
       private readonly ListBox list_ = new()
       {
          FontSize = Typography.Body,
-         FontFamily = new System.Windows.Media.FontFamily("Consolas"),
+         FontFamily = new System.Windows.Media.FontFamily(Typography.MonoFontFamily),
          BorderThickness = new Thickness(0),
          Background = System.Windows.Media.Brushes.Transparent,
          MinHeight = 340

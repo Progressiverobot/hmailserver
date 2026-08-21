@@ -33,7 +33,7 @@ namespace hMailServer.ControlPanel.Views
       private readonly TextBox secret_ = new()
       {
          IsReadOnly = true,
-         FontFamily = new System.Windows.Media.FontFamily("Consolas"),
+         FontFamily = new System.Windows.Media.FontFamily(Typography.MonoFontFamily),
          BorderThickness = new Thickness(0),
          Background = System.Windows.Media.Brushes.Transparent,
          TextWrapping = TextWrapping.Wrap

@@ -11,7 +11,7 @@ namespace hMailServer.ControlPanel.Views
       private readonly Wpf.Ui.Controls.TextBox code_ = new()
       {
          FontSize = 28,
-         FontFamily = new System.Windows.Media.FontFamily("Cascadia Mono, Consolas"),
+         FontFamily = new System.Windows.Media.FontFamily(Typography.MonoFontFamily),
          MaxLength = 6,
          Width = 200,
          PlaceholderText = "000000",

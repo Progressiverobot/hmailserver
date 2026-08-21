@@ -193,7 +193,7 @@ namespace hMailServer.ControlPanel.Views
          newKeyLabel_.Margin = new Thickness(0, 0, 0, 6);
          content.Children.Add(newKeyLabel_);
 
-         newKeyToken_.FontFamily = new System.Windows.Media.FontFamily("Consolas, Courier New, monospace");
+         newKeyToken_.FontFamily = new System.Windows.Media.FontFamily(Typography.MonoFontFamily);
          newKeyToken_.FontSize = Typography.Body;
          newKeyToken_.TextWrapping = TextWrapping.Wrap;
          newKeyToken_.Margin = new Thickness(0, 0, 0, 12);
@@ -593,7 +593,7 @@ namespace hMailServer.ControlPanel.Views
    {
       public static ApiKeyRequest Ask(Window owner)
       {
-         var dlg = new Window
+         var dlg = new FluentDialogWindow
          {
             Owner = owner,
             Title = "Create a REST API key",

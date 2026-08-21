@@ -1,5 +1,6 @@
 using System;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
@@ -63,7 +64,7 @@ namespace hMailServer.ControlPanel.Views
          TextWrapping = TextWrapping.NoWrap,
          VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
          HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
-         FontFamily = new System.Windows.Media.FontFamily("Consolas"),
+         FontFamily = new System.Windows.Media.FontFamily(Typography.MonoFontFamily),
          FontSize = Typography.Label
       };
 
@@ -179,17 +180,17 @@ namespace hMailServer.ControlPanel.Views
 
          var panel = TabPanel();
          panel.Children.Add(active_);
-         panel.Children.Add(Label("Address (changing it renames the mailbox; it must stay in this domain)"));
+         panel.Children.Add(Label("Address (changing it renames the mailbox; it must stay in this domain)", addressBox_));
          panel.Children.Add(Input(addressBox_));
-         panel.Children.Add(Label("Administration level"));
+         panel.Children.Add(Label("Administration level", adminLevel_));
          panel.Children.Add(adminLevel_);
-         panel.Children.Add(Label("Quota (MB, 0 = unlimited)"));
+         panel.Children.Add(Label("Quota (MB, 0 = unlimited)", quota_));
          panel.Children.Add(Input(quota_));
-         panel.Children.Add(Label("First name"));
+         panel.Children.Add(Label("First name", firstName_));
          panel.Children.Add(Input(firstName_));
-         panel.Children.Add(Label("Last name"));
+         panel.Children.Add(Label("Last name", lastName_));
          panel.Children.Add(Input(lastName_));
-         panel.Children.Add(Label("New password (leave empty to keep current)"));
+         panel.Children.Add(Label("New password (leave empty to keep current)", password_));
          password_.FontSize = Typography.Body;
          password_.Padding = new Thickness(6);
          password_.Margin = new Thickness(0, 0, 0, 6);
@@ -207,7 +208,10 @@ namespace hMailServer.ControlPanel.Views
 
          generatedShow_.IsReadOnly = true;
          generatedShow_.FontSize = Typography.Body;
-         generatedShow_.FontFamily = new System.Windows.Media.FontFamily("Consolas");
+         generatedShow_.FontFamily = new System.Windows.Media.FontFamily(Typography.MonoFontFamily);
+         // No caption above it, so name it directly - otherwise the one-time
+         // password value is announced as an anonymous read-only "edit".
+         AutomationProperties.SetName(generatedShow_, "Generated password");
          generatedShow_.Visibility = Visibility.Collapsed;
          generatedShow_.Margin = new Thickness(0, 0, 0, 6);
          generatedShow_.MaxWidth = 320;
@@ -217,7 +221,7 @@ namespace hMailServer.ControlPanel.Views
 
          panel.Children.Add(pwStrength_);
          UpdatePasswordStrength();
-         panel.Children.Add(Label("Last logon"));
+         panel.Children.Add(Label("Last logon", lastLogon_));
          lastLogon_.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
          panel.Children.Add(lastLogon_);
          return Scroll(panel);
@@ -227,7 +231,7 @@ namespace hMailServer.ControlPanel.Views
       {
          var panel = TabPanel();
          panel.Children.Add(forwardOn_);
-         panel.Children.Add(Label("Forward to"));
+         panel.Children.Add(Label("Forward to", forwardTo_));
          panel.Children.Add(Input(forwardTo_));
          panel.Children.Add(forwardKeep_);
          panel.Children.Add(forwardAbortSpam_);
@@ -238,19 +242,19 @@ namespace hMailServer.ControlPanel.Views
       {
          var panel = TabPanel();
          panel.Children.Add(vacationOn_);
-         panel.Children.Add(Label("Reply subject"));
+         panel.Children.Add(Label("Reply subject", vacationSubject_));
          panel.Children.Add(Input(vacationSubject_));
-         panel.Children.Add(Label("Reply message"));
+         panel.Children.Add(Label("Reply message", vacationBody_));
          panel.Children.Add(vacationBody_);
          panel.Children.Add(Separator());
-         panel.Children.Add(Label("Start date"));
+         panel.Children.Add(Label("Start date", vacationBeginDate_));
          vacationBeginDate_.HorizontalAlignment = HorizontalAlignment.Left;
          vacationBeginDate_.MinWidth = 160;
          vacationBeginDate_.Margin = new Thickness(0, 0, 0, 8);
          panel.Children.Add(vacationBeginDate_);
 
          panel.Children.Add(vacationExpires_);
-         panel.Children.Add(Label("Expiry date"));
+         panel.Children.Add(Label("Expiry date", vacationExpiresDate_));
          vacationExpiresDate_.HorizontalAlignment = HorizontalAlignment.Left;
          vacationExpiresDate_.MinWidth = 160;
          vacationExpiresDate_.Margin = new Thickness(0, 0, 0, 8);
@@ -263,9 +267,9 @@ namespace hMailServer.ControlPanel.Views
       {
          var panel = TabPanel();
          panel.Children.Add(signatureOn_);
-         panel.Children.Add(Label("Plain-text signature"));
+         panel.Children.Add(Label("Plain-text signature", signaturePlain_));
          panel.Children.Add(signaturePlain_);
-         panel.Children.Add(Label("HTML signature"));
+         panel.Children.Add(Label("HTML signature", signatureHtml_));
          panel.Children.Add(signatureHtml_);
          return Scroll(panel);
       }
@@ -282,6 +286,9 @@ namespace hMailServer.ControlPanel.Views
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 0, 0, 8)
          });
+         // The explanation above is prose, not a caption, so the editor is
+         // named directly rather than through Label().
+         AutomationProperties.SetName(sieveScript_, "Sieve filter script");
          panel.Children.Add(sieveScript_);
          return Scroll(panel);
       }
@@ -321,11 +328,11 @@ namespace hMailServer.ControlPanel.Views
             "With this on, the password is not stored here at all - Windows is asked to check it. Leave it off "
             + "and the account uses the password on the Account tab."));
 
-         panel.Children.Add(Label("Windows domain (leave empty for a local Windows account)"));
+         panel.Children.Add(Label("Windows domain (leave empty for a local Windows account)", adDomain_));
          panel.Children.Add(Input(adDomain_));
          panel.Children.Add(directoryEffect_);
 
-         panel.Children.Add(Label("Windows user name"));
+         panel.Children.Add(Label("Windows user name", adUser_));
          panel.Children.Add(Input(adUser_));
 
          var browse = new Wpf.Ui.Controls.Button
@@ -381,8 +388,7 @@ namespace hMailServer.ControlPanel.Views
               + "That is the right setting when there is no Active Directory."
             : "This validates against the domain \"" + domain + "\". The server's own computer must be joined to it.";
 
-         directoryEffect_.SetResourceReference(Control.ForegroundProperty,
-            local ? "TextFillColorSecondaryBrush" : "TextFillColorSecondaryBrush");
+         directoryEffect_.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
       }
 
       private void BrowseActiveDirectory()
@@ -442,7 +448,7 @@ namespace hMailServer.ControlPanel.Views
       private FrameworkElement BuildFolders()
       {
          var panel = TabPanel();
-         panel.Children.Add(Label("IMAP folders in this mailbox"));
+         panel.Children.Add(Label("IMAP folders in this mailbox", folderList_));
          panel.Children.Add(folderList_);
 
          var actions = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 4) };
@@ -612,7 +618,7 @@ namespace hMailServer.ControlPanel.Views
 
       private string PromptText(string title, string prompt)
       {
-         var dlg = new Window
+         var dlg = new FluentDialogWindow
          {
             Owner = this,
             Title = title,
@@ -623,8 +629,8 @@ namespace hMailServer.ControlPanel.Views
          };
          dlg.SetResourceReference(BackgroundProperty, "ApplicationBackgroundBrush");
          var panel = new StackPanel { Margin = new Thickness(20) };
-         panel.Children.Add(Label(prompt));
          var box = new TextBox { FontSize = Typography.Body, Padding = new Thickness(6), Margin = new Thickness(0, 0, 0, 12) };
+         panel.Children.Add(Label(prompt, box));
          panel.Children.Add(box);
          var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
          string result = null;
@@ -730,12 +736,21 @@ namespace hMailServer.ControlPanel.Views
       {
          (PasswordStrength.Level level, string summary) = PasswordStrength.Evaluate(password_.Password);
          pwStrength_.Text = summary;
+
+         if (level == PasswordStrength.Level.Empty)
+         {
+            // The empty state recedes with the theme's own secondary text
+            // brush - a fixed Gray was near-invisible on one theme and
+            // over-loud on the other.
+            pwStrength_.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
+            return;
+         }
+
          pwStrength_.Foreground = level switch
          {
             PasswordStrength.Level.Strong => Services.ThemeTokens.Success,
             PasswordStrength.Level.Fair => Services.ThemeTokens.Warning,
-            PasswordStrength.Level.Weak => Services.ThemeTokens.Danger,
-            _ => System.Windows.Media.Brushes.Gray,
+            _ => Services.ThemeTokens.Danger,
          };
       }
 
@@ -899,10 +914,20 @@ namespace hMailServer.ControlPanel.Views
          return t;
       }
 
-      private static TextBlock Label(string text)
+      /// <summary>
+      /// A caption, and - when the editor it captions is passed in - that editor's
+      /// accessible name. A TextBlock above a control tells UI Automation nothing,
+      /// so every box on the account editor announced as a bare "edit". Same
+      /// helper as RuleActionDialog and RuleCriteriaDialog.
+      /// </summary>
+      private static TextBlock Label(string text, FrameworkElement editor = null)
       {
          var t = new TextBlock { Text = text, FontSize = Typography.Label, Margin = new Thickness(0, 8, 0, 4) };
          t.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
+
+         if (editor != null)
+            AutomationProperties.SetName(editor, AccessibleNames.Qualify(text, ""));
+
          return t;
       }
 

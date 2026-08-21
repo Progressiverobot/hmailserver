@@ -29,7 +29,9 @@ namespace hMailServer.ControlPanel.Views
          inner.Children.Add(new TextBlock
          {
             Text = "hMailServer Control Panel",
-            FontSize = 17,
+            // Card headings across the application are SectionHeading +
+            // SemiBold; 17 was off the 12/14/20/28 ramp entirely.
+            FontSize = Typography.SectionHeading,
             FontWeight = FontWeights.SemiBold,
             Margin = new Thickness(0, 0, 0, 4)
          });
@@ -58,7 +60,7 @@ namespace hMailServer.ControlPanel.Views
          });
 
          // Local helper: a clickable hyperlink that opens in the default browser.
-         TextBlock Link(string text, string url, double size = 12.5)
+         TextBlock Link(string text, string url, double size = Typography.Label)
          {
             var tb = new TextBlock { FontSize = size, TextWrapping = TextWrapping.Wrap };
             var hl = new Hyperlink(new Run(text)) { NavigateUri = new Uri(url) };
@@ -102,7 +104,7 @@ namespace hMailServer.ControlPanel.Views
          dev.Children.Add(new TextBlock
          {
             Text = "Christopher Holloway",
-            FontSize = 17,
+            FontSize = Typography.SectionHeading,
             FontWeight = FontWeights.SemiBold,
             Margin = new Thickness(0, 0, 0, 2)
          });

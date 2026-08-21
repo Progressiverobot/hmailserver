@@ -18,7 +18,7 @@ namespace hMailServer.ControlPanel.Views
    public class TotpSetupDialog : FluentDialogWindow
    {
       private static readonly System.Windows.Media.FontFamily Mono =
-         new("Cascadia Mono, Consolas");
+         new(Typography.MonoFontFamily);
 
       private readonly TextBlock status_ = new()
       {
@@ -42,7 +42,9 @@ namespace hMailServer.ControlPanel.Views
       {
          MaxLength = 6,
          Width = 200,
-         FontSize = 26,
+         // 28 is the ramp's Title rung, and what the login prompt
+         // (TotpPromptDialog) uses for the same six digits.
+         FontSize = 28,
          FontFamily = Mono,
          PlaceholderText = "000000",
          HorizontalAlignment = HorizontalAlignment.Left,
@@ -155,14 +157,14 @@ namespace hMailServer.ControlPanel.Views
       {
          if (TotpManager.IsConfigured())
          {
-            status_.Text = "Two-factor authentication is currently ENABLED. Enter a valid code to turn it off.";
+            status_.Text = "Two-factor authentication is currently enabled. Enter a valid code to turn it off.";
             enrolPanel_.Visibility = Visibility.Collapsed;
             action_.Content = "Disable two-factor authentication";
             pendingSecret_ = null;
          }
          else
          {
-            status_.Text = "Two-factor authentication is currently DISABLED. Add it to your authenticator app, then confirm with a code.";
+            status_.Text = "Two-factor authentication is currently disabled. Add it to your authenticator app, then confirm with a code.";
             pendingSecret_ = Totp.GenerateSecret();
             secret_.Text = FormatSecret(pendingSecret_);
             ShowQr(Totp.BuildOtpAuthUri("hMailServer Control Panel", pendingSecret_));

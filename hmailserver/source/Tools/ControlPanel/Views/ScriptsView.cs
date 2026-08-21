@@ -17,7 +17,7 @@ namespace hMailServer.ControlPanel.Views
    {
       private readonly TextBox editor_ = new()
       {
-         FontFamily = new System.Windows.Media.FontFamily("Consolas, Cascadia Mono, monospace"),
+         FontFamily = new System.Windows.Media.FontFamily(Typography.MonoFontFamily),
          FontSize = Typography.Body,
          AcceptsReturn = true,
          AcceptsTab = true,

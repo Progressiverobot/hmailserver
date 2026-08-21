@@ -23,7 +23,7 @@ namespace hMailServer.ControlPanel.Views
    /// message is a judgement call rather than an obvious one, and it is better to
    /// release it to the person it was addressed to than to guess here.
    /// </summary>
-   public class QuarantineView : UserControl
+   public class QuarantineView : UserControl, IPageLifecycle
    {
       private readonly ListBox list_ = new()
       {
@@ -40,10 +40,17 @@ namespace hMailServer.ControlPanel.Views
          TextWrapping = TextWrapping.Wrap
       };
 
-      public QuarantineView()
+      public QuarantineView() => Build();
+
+      // Loading on entry rather than in the constructor, because the page cache
+      // keeps this instance alive for the rest of the session: a constructor-only
+      // load meant leaving and returning showed the list as it stood the FIRST
+      // time the page was opened - on the one page whose list is the only copy
+      // of the messages it shows.
+      public void OnEnter() => Reload();
+
+      public void OnLeave()
       {
-         Build();
-         Reload();
       }
 
       private dynamic OpenQuarantine()
@@ -187,12 +194,16 @@ namespace hMailServer.ControlPanel.Views
          }
 
          // Confirmed, because this is the only copy. The sender was told the message
-         // was delivered and will not send it again.
+         // was delivered and will not send it again. YesNo like every other
+         // destructive confirmation in the application (revoke key, delete folder,
+         // empty mailbox), and No takes Enter: for an action with no undo and no
+         // other copy, the keyboard default declines.
          if (MessageBox.Show(
                "Delete this message permanently?\n\nThe sender was told it was accepted, so nothing will "
                + "retry and there is no other copy.",
-               "Delete quarantined message", MessageBoxButton.OKCancel, MessageBoxImage.Warning)
-             != MessageBoxResult.OK)
+               "Delete quarantined message", MessageBoxButton.YesNo, MessageBoxImage.Warning,
+               MessageBoxResult.No)
+             != MessageBoxResult.Yes)
          {
             return;
          }

@@ -50,17 +50,35 @@ namespace hMailServer.ControlPanel.Views
 
       public static MessageBoxResult Show(string messageBoxText, string caption, MessageBoxButton button, MessageBoxImage icon, MessageBoxResult defaultResult)
       {
-         var window = new Wpf.Ui.Controls.FluentWindow
+         // The Win32 box was callable from any thread; a WPF window is not -
+         // constructing one off the UI thread throws from the dispatcher. No
+         // current caller is off-thread, but a background worker reporting an
+         // error is the natural future caller, so marshal instead of trusting
+         // that audit to stay true. Invoke is synchronous, so the caller still
+         // blocks for the answer exactly as it always did.
+         var dispatcher = Application.Current?.Dispatcher;
+         if (dispatcher != null && !dispatcher.CheckAccess())
+            return dispatcher.Invoke(() => Show(messageBoxText, caption, button, icon, defaultResult));
+
+         // Win32 fell back to the first button when the named default was not in
+         // the set; honouring the name literally left NO default at all, so
+         // Enter did nothing. None restores the Win32 behaviour: the primary
+         // (always first here) takes Enter.
+         if (defaultResult != MessageBoxResult.None && !Offers_(button, defaultResult))
+            defaultResult = MessageBoxResult.None;
+
+         // SizeToContent.Height with a fixed width, not WidthAndHeight: auto-
+         // sizing both dimensions under FluentWindow's WindowChrome is the WPF
+         // combination known to clip the bottom of content on first show, and
+         // this is the most-shown window in the application. The 18 re-based
+         // dialogs all use exactly this fixed-width shape.
+         var window = new FluentDialogWindow
          {
             Title = string.IsNullOrWhiteSpace(caption) ? DefaultCaption : caption,
-            SizeToContent = SizeToContent.WidthAndHeight,
+            SizeToContent = SizeToContent.Height,
             ResizeMode = ResizeMode.NoResize,
-            ShowInTaskbar = false,
-            MaxWidth = 520,
-            MinWidth = 320,
-            FontFamily = new System.Windows.Media.FontFamily(Typography.UiFontFamily)
+            Width = 480
          };
-         window.SetResourceReference(Window.BackgroundProperty, "ApplicationBackgroundBrush");
 
          Window owner = ActiveWindow_();
          if (owner != null && !ReferenceEquals(owner, window))
@@ -90,7 +108,11 @@ namespace hMailServer.ControlPanel.Views
             Text = messageBoxText,
             FontSize = Typography.Body,
             TextWrapping = TextWrapping.Wrap,
-            MaxWidth = 420,
+            // The window is 480 wide; 24px margins each side and the 36px icon
+            // column leave 396. A horizontal StackPanel measures its children
+            // with infinite width, so this MaxWidth is what makes the text wrap
+            // at all rather than run off the right edge.
+            MaxWidth = 380,
             VerticalAlignment = VerticalAlignment.Center
          };
          text.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorPrimaryBrush");
@@ -127,8 +149,22 @@ namespace hMailServer.ControlPanel.Views
             {
                // A destructive confirmation gets the danger appearance, so the
                // button that deletes something never looks like the safe one.
-               buttonControl.Appearance = (icon == MessageBoxImage.Warning || icon == MessageBoxImage.Error) &&
-                                          (button == MessageBoxButton.YesNo || button == MessageBoxButton.YesNoCancel)
+               //
+               // The rule is Warning + a confirmation shape, and deliberately
+               // NOT Error. In this application a Warning icon on a two-answer
+               // box always means "the affirmative destroys or risks something"
+               // (every such call site is a delete, revoke, replace or
+               // proceed-against-advice), and that includes OKCancel - the
+               // directory-synchronisation apply, which rewrites accounts in
+               // bulk, asks with OKCancel. An Error icon means a failure
+               // already happened, and the affirmative there acknowledges or
+               // RECOVERS - the crash dialog's "Yes" restarts the application -
+               // so painting it Danger would mark the recovery button as the
+               // destructive one.
+               buttonControl.Appearance = icon == MessageBoxImage.Warning &&
+                                          (button == MessageBoxButton.OKCancel ||
+                                           button == MessageBoxButton.YesNo ||
+                                           button == MessageBoxButton.YesNoCancel)
                   ? Wpf.Ui.Controls.ControlAppearance.Danger
                   : Wpf.Ui.Controls.ControlAppearance.Primary;
             }
@@ -181,6 +217,26 @@ namespace hMailServer.ControlPanel.Views
             result = MessageBoxResult.Cancel;
 
          return result;
+      }
+
+      /// <summary>Whether this button set actually offers the given result.</summary>
+      private static bool Offers_(MessageBoxButton button, MessageBoxResult result)
+      {
+         switch (button)
+         {
+            case MessageBoxButton.OKCancel:
+               return result == MessageBoxResult.OK || result == MessageBoxResult.Cancel;
+
+            case MessageBoxButton.YesNo:
+               return result == MessageBoxResult.Yes || result == MessageBoxResult.No;
+
+            case MessageBoxButton.YesNoCancel:
+               return result == MessageBoxResult.Yes || result == MessageBoxResult.No ||
+                      result == MessageBoxResult.Cancel;
+
+            default:
+               return result == MessageBoxResult.OK;
+         }
       }
 
       private static Wpf.Ui.Controls.SymbolIcon IconFor_(MessageBoxImage image)

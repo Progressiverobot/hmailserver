@@ -291,7 +291,7 @@ namespace hMailServer.ControlPanel.Views
    {
       public static string Pick(Window owner, List<string> addresses)
       {
-         var dlg = new Window
+         var dlg = new FluentDialogWindow
          {
             Owner = owner,
             Title = "Add account to group",

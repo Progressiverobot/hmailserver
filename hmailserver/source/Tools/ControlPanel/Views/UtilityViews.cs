@@ -183,7 +183,7 @@ namespace hMailServer.ControlPanel.Views
       {
          IsReadOnly = true,
          AcceptsReturn = true,
-         FontFamily = new System.Windows.Media.FontFamily("Cascadia Mono, Consolas"),
+         FontFamily = new System.Windows.Media.FontFamily(Typography.MonoFontFamily),
          FontSize = Typography.Label,
          BorderThickness = new Thickness(0),
          Background = System.Windows.Media.Brushes.Transparent,
@@ -423,7 +423,7 @@ namespace hMailServer.ControlPanel.Views
       {
          IsReadOnly = true,
          AcceptsReturn = true,
-         FontFamily = new System.Windows.Media.FontFamily("Cascadia Mono, Consolas"),
+         FontFamily = new System.Windows.Media.FontFamily(Typography.MonoFontFamily),
          FontSize = Typography.Label,
          BorderThickness = new Thickness(0),
          Background = System.Windows.Media.Brushes.Transparent,

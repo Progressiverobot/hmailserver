@@ -12,7 +12,7 @@ namespace hMailServer.ControlPanel.Views
    {
       public static string Prompt(Window owner, string title, string prompt, string initial = "")
       {
-         var dlg = new Window
+         var dlg = new FluentDialogWindow
          {
             Owner = owner,
             Title = title,

@@ -37,6 +37,9 @@ namespace hMailServer.ControlPanel.Views
          root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
          root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
+         // Upper-case deliberately, sentence-case sweep notwithstanding: "IF" is
+         // the rule grammar's keyword, not prose. RulesView's editor panes carry
+         // the same IF/THEN pair, and this dialog edits one clause of it.
          var header = new TextBlock { Text = "IF", FontSize = Typography.DialogTitle, FontWeight = FontWeights.SemiBold, Margin = new Thickness(2, 0, 0, 12) };
          header.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
          Grid.SetRow(header, 0);

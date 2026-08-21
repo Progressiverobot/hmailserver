@@ -52,7 +52,7 @@ namespace hMailServer.ControlPanel.Views
             TextWrapping = TextWrapping.NoWrap,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
-            FontFamily = new System.Windows.Media.FontFamily("Cascadia Mono, Consolas"),
+            FontFamily = new System.Windows.Media.FontFamily(Typography.MonoFontFamily),
             FontSize = Typography.Label,
             Padding = new Thickness(8),
             Background = System.Windows.Media.Brushes.Transparent,
