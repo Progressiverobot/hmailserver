@@ -164,9 +164,42 @@ namespace hMailServer.ControlPanel
             NavTree.Items.Add(BuildNavItem(node));
       }
 
+      /// <summary>
+      /// A group header is a glyph and its title; a page header stays plain
+      /// text. The glyph is resolved from the map's string name so that
+      /// NavigationMap stays WPF-free, and a name that does not resolve
+      /// renders no icon rather than failing - a missing glyph is a cosmetic
+      /// bug, not a broken sidebar.
+      /// </summary>
+      private static object BuildNavHeader_(NavNode node)
+      {
+         if (string.IsNullOrEmpty(node.Icon) ||
+             !System.Enum.TryParse(node.Icon, out Wpf.Ui.Controls.SymbolRegular symbol))
+            return node.Title;
+
+         var header = new StackPanel { Orientation = Orientation.Horizontal };
+
+         var icon = new Wpf.Ui.Controls.SymbolIcon(symbol)
+         {
+            FontSize = 16,
+            Margin = new Thickness(0, 0, 10, 0),
+            VerticalAlignment = VerticalAlignment.Center
+         };
+         icon.SetResourceReference(ForegroundProperty, "TextFillColorSecondaryBrush");
+         header.Children.Add(icon);
+
+         header.Children.Add(new TextBlock
+         {
+            Text = node.Title,
+            VerticalAlignment = VerticalAlignment.Center
+         });
+
+         return header;
+      }
+
       private TreeViewItem BuildNavItem(NavNode node)
       {
-         var item = new TreeViewItem { Header = node.Title };
+         var item = new TreeViewItem { Header = BuildNavHeader_(node) };
 
          // The purpose statement as the tool tip and as the accessible help text.
          // A page whose title needs the manual has failed; this is the cheapest

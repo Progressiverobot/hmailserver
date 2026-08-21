@@ -81,7 +81,7 @@
                                     </StackPanel>
                                     <ui:Button Grid.Column="1" Content="Properties" FontSize="12" Padding="8,3" Margin="0,0,6,0"
                                                Tag="{Binding Name}" Click="EditDomain_Click" />
-                                    <ui:Button Grid.Column="2" Content="✕" FontSize="10" Padding="6,3"
+                                    <ui:Button Grid.Column="2" Icon="{ui:SymbolIcon Delete24}" Padding="6,3"
                                                ToolTip="Delete domain" AutomationProperties.Name="Delete domain"
                                                Foreground="{DynamicResource AppDangerBrush}"
                                                Tag="{Binding Name}" Click="DeleteDomain_Click" />
@@ -202,7 +202,7 @@
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Text="{Binding Display}" FontSize="12" VerticalAlignment="Center" />
-                                        <ui:Button Grid.Column="1" Content="✕" FontSize="10" Padding="6,2"
+                                        <ui:Button Grid.Column="1" Icon="{ui:SymbolIcon Delete24}" Padding="6,2"
                                                    ToolTip="Delete alias" AutomationProperties.Name="Delete alias"
                                                    Tag="{Binding Name}" Click="DeleteAlias_Click" />
                                     </Grid>
@@ -250,7 +250,7 @@
                                                    Tag="{Binding}" Click="EditDistList_Click" />
                                         <ui:Button Grid.Column="2" Content="Members" FontSize="10" Padding="6,2" Margin="0,0,4,0"
                                                    Tag="{Binding}" Click="EditRecipients_Click" />
-                                        <ui:Button Grid.Column="3" Content="✕" FontSize="10" Padding="6,2"
+                                        <ui:Button Grid.Column="3" Icon="{ui:SymbolIcon Delete24}" Padding="6,2"
                                                    ToolTip="Delete distribution list" AutomationProperties.Name="Delete distribution list"
                                                    Tag="{Binding}" Click="DeleteDistList_Click" />
                                     </Grid>

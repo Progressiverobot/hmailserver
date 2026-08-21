@@ -14,7 +14,7 @@ namespace hMailServer.ControlPanel.Services
    public sealed class NavNode
    {
       internal NavNode(string key, string title, string purpose, IReadOnlyList<string> aliases,
-         IReadOnlyList<string> seeAlso, IReadOnlyList<NavNode> children)
+         IReadOnlyList<string> seeAlso, IReadOnlyList<NavNode> children, string icon = null)
       {
          Key = key;
          Title = title;
@@ -22,6 +22,7 @@ namespace hMailServer.ControlPanel.Services
          Aliases = aliases;
          SeeAlso = seeAlso;
          Children = children;
+         Icon = icon;
       }
 
       /// <summary>The navigation key of the page, or null for a group heading.</summary>
@@ -63,6 +64,17 @@ namespace hMailServer.ControlPanel.Services
 
       /// <summary>True when this node is a navigable page rather than a heading.</summary>
       public bool IsPage => Key != null;
+
+      /// <summary>
+      /// The Segoe Fluent Icons glyph for this node, as the NAME of a
+      /// Wpf.Ui.Controls.SymbolRegular member ("Globe24"). A string rather than
+      /// the enum so this file stays WPF-free and testable; MainWindow resolves
+      /// it, and an unknown name simply renders no icon rather than failing.
+      /// Set on the top-level groups - a glyph on all fifty leaf pages would be
+      /// noise, and Windows 11's own settings surfaces put them on the
+      /// top level.
+      /// </summary>
+      public string Icon { get; }
    }
 
    /// <summary>
@@ -310,6 +322,9 @@ namespace hMailServer.ControlPanel.Services
       private static NavNode Group(string title, string purpose, string aliases, params NavNode[] children)
          => new NavNode(null, title, purpose, Split(aliases), Array.Empty<string>(), children);
 
+      private static NavNode Group(string icon, string title, string purpose, string aliases, params NavNode[] children)
+         => new NavNode(null, title, purpose, Split(aliases), Array.Empty<string>(), children, icon);
+
       private static IReadOnlyList<string> Split(string pipeSeparated)
          => string.IsNullOrEmpty(pipeSeparated)
             ? (IReadOnlyList<string>) Array.Empty<string>()
@@ -334,7 +349,7 @@ namespace hMailServer.ControlPanel.Services
                aliases: "Overview|Charts|Graphs|Statistics|Counters|Throughput",
                seeAlso: "status|queue"),
 
-            Group("Monitoring & troubleshooting",
+            Group("Pulse24", "Monitoring & troubleshooting",
                "Is mail flowing, and if it is not, where has it stopped?",
                "Status|Health|Troubleshooting|Problems|Something is wrong|Observability",
 
@@ -408,7 +423,7 @@ namespace hMailServer.ControlPanel.Services
                   aliases: "API key|Bearer token|Access token|Credential|Service account for the API|Revoke a key|hmapi|Automation credential|Read-only key",
                   seeAlso: "api|adminaccess")),
 
-            Group("Accounts & domains",
+            Group("Globe24", "Accounts & domains",
                "The people and the domains this server carries mail for.",
                "Users|Mailboxes|People|Addresses|Tenants",
 
@@ -427,7 +442,7 @@ namespace hMailServer.ControlPanel.Services
                   aliases: "Security groups|Roles|Membership|Permission groups",
                   seeAlso: "publicfolders|domains")),
 
-            Group("Mail flow & delivery",
+            Group("MailArrowForward24", "Mail flow & delivery",
                "How mail gets in, where it goes next, and what happens to it on the way.",
                "Delivery|Routing|Transport|SMTP|Relay|Mail flow",
 
@@ -461,7 +476,7 @@ namespace hMailServer.ControlPanel.Services
                   aliases: "Announcement|Mail all users|Broadcast|Notify everyone|Maintenance notice",
                   seeAlso: "domains")),
 
-            Group("Spam & virus filtering",
+            Group("ShieldCheckmark24", "Spam & virus filtering",
                "Everything that decides whether a message is wanted.",
                "Anti-spam|Antispam|Anti-virus|Antivirus|Filtering|Junk|Malware|Content filtering",
 
@@ -542,7 +557,7 @@ namespace hMailServer.ControlPanel.Services
                   aliases: "Attachment blocking|Block exe|File extensions|Strip attachments|Dangerous files|Zip",
                   seeAlso: "virusoverview|antivirus")),
 
-            Group("Connections & protocols",
+            Group("PlugConnected24", "Connections & protocols",
                "Which services listen, on what, and how clients reach them.",
                "Network|Ports|Listeners|Protocols|Bindings|Client access",
 
@@ -566,7 +581,7 @@ namespace hMailServer.ControlPanel.Services
                   aliases: "Name servers|Resolver|DNSSEC|Lookup failures|DNS cache|EDNS",
                   seeAlso: "security|antispam|mxquery")),
 
-            Group("TLS & certificates",
+            Group("LockClosed24", "TLS & certificates",
                "Is transport security correct, and will it still be correct next month?",
                "TLS|SSL|Certificates|Encryption|MTA-STS|DANE|Transport security",
 
@@ -616,7 +631,7 @@ namespace hMailServer.ControlPanel.Services
                   aliases: "DANE|TLSA|MTA-STS|TLS-RPT|TLS reporting|ARC|Downgrade|Opportunistic TLS|Enforce TLS",
                   seeAlso: "certs|dns|webservices")),
 
-            Group("Access & abuse protection",
+            Group("ShieldKeyhole24", "Access & abuse protection",
                "Who may connect, who may authenticate, and what happens when someone keeps trying.",
                "Security|Access control|Authentication|Abuse|Brute force|Who can connect",
 
@@ -672,7 +687,7 @@ namespace hMailServer.ControlPanel.Services
                   aliases: "IP range|Firewall|Block an IP|Allow an IP|Open relay|Relay permissions|Require authentication|Let a device send mail|Printer|Scanner|LAN|Localhost|My IP",
                   seeAlso: "authentication|autoban|relays|delivery")),
 
-            Group("Maintenance",
+            Group("Wrench24", "Maintenance",
                "Housekeeping, tuning, and the settings that still have no better home.",
                "Housekeeping|Backup|Tuning|Advanced|Scripting|INI",
 

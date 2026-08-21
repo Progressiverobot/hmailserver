@@ -88,10 +88,14 @@ namespace hMailServer.ControlPanel.Views
          {
             case ServerStateRunning_:
                PauseButton.Content = "Pause";
+               PauseButtonIcon.Symbol = Wpf.Ui.Controls.SymbolRegular.Pause24;
                PauseButton.IsEnabled = true;
                break;
             case ServerStateStopped_:
+               // The glyph swaps with the verb - a "Resume" button wearing a
+               // pause icon says two things at once, and one of them is wrong.
                PauseButton.Content = "Resume";
+               PauseButtonIcon.Symbol = Wpf.Ui.Controls.SymbolRegular.Play24;
                PauseButton.IsEnabled = true;
                break;
             default:

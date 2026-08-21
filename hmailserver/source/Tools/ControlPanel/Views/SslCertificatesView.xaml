@@ -102,11 +102,11 @@
                                 AutomationProperties.Name="Name for the new certificate" />
                     <ui:TextBox x:Name="NewCertFile" Grid.Column="1" PlaceholderText="Certificate file (PEM)" Margin="0,0,4,0"
                                 AutomationProperties.Name="Certificate file for the new certificate" />
-                    <ui:Button Grid.Column="2" Content="..." Click="BrowseCert_Click" Margin="0,0,8,0"
+                    <ui:Button Grid.Column="2" Content="…" Click="BrowseCert_Click" Margin="0,0,8,0"
                                AutomationProperties.Name="Browse for the certificate file" />
                     <ui:TextBox x:Name="NewKeyFile" Grid.Column="3" PlaceholderText="Private key file (PEM)" Margin="0,0,4,0"
                                 AutomationProperties.Name="Private key file for the new certificate" />
-                    <ui:Button Grid.Column="4" Content="..." Click="BrowseKey_Click" Margin="0,0,8,0"
+                    <ui:Button Grid.Column="4" Content="…" Click="BrowseKey_Click" Margin="0,0,8,0"
                                AutomationProperties.Name="Browse for the private key file" />
                     <ui:Button Grid.Column="5" Content="Add" Appearance="Primary" Click="Add_Click" Margin="0,0,8,0"
                                AutomationProperties.Name="Add the certificate" />

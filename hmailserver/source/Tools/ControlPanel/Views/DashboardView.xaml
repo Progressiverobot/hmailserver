@@ -66,7 +66,7 @@
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <TextBlock x:Name="KpiUptime" Text="—" Style="{StaticResource KpiValue}" FontSize="20" />
-                        <TextBlock Grid.Row="1" Text="UPTIME" Style="{StaticResource KpiLabel}" />
+                        <TextBlock Grid.Row="1" Text="Uptime" Style="{StaticResource KpiLabel}" />
                     </Grid>
                 </Border>
                 <Border Style="{StaticResource Card}" MinHeight="96" Margin="0,0,12,0">
@@ -76,7 +76,7 @@
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <TextBlock x:Name="KpiProcessed" Text="0" Style="{StaticResource KpiValue}" />
-                        <TextBlock Grid.Row="1" Text="MESSAGES PROCESSED" Style="{StaticResource KpiLabel}" />
+                        <TextBlock Grid.Row="1" Text="Messages processed" Style="{StaticResource KpiLabel}" />
                     </Grid>
                 </Border>
                 <Border Style="{StaticResource Card}" MinHeight="96" Margin="0,0,12,0">
@@ -118,7 +118,7 @@
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <TextBlock x:Name="KpiSpam" Text="0" Style="{StaticResource KpiValue}" />
-                        <TextBlock Grid.Row="1" Text="SPAM BLOCKED" Style="{StaticResource KpiLabel}" />
+                        <TextBlock Grid.Row="1" Text="Spam blocked" Style="{StaticResource KpiLabel}" />
                     </Grid>
                 </Border>
                 <Border Style="{StaticResource Card}" MinHeight="96">
@@ -128,7 +128,7 @@
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <TextBlock x:Name="KpiViruses" Text="0" Style="{StaticResource KpiValue}" />
-                        <TextBlock Grid.Row="1" Text="VIRUSES REMOVED" Style="{StaticResource KpiLabel}" />
+                        <TextBlock Grid.Row="1" Text="Viruses removed" Style="{StaticResource KpiLabel}" />
                     </Grid>
                 </Border>
             </UniformGrid>

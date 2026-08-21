@@ -35,7 +35,7 @@ namespace hMailServer.ControlPanel.Views
             "Add domains, accounts, aliases and distribution lists.", "domains"));
          tiles.Children.Add(Tile(Wpf.Ui.Controls.SymbolRegular.Server24, "Server settings",
             "Protocols, delivery, anti-spam, anti-virus and advanced options.", "protocols"));
-         tiles.Children.Add(Tile(Wpf.Ui.Controls.SymbolRegular.ArrowClockwise24, "Dashboard",
+         tiles.Children.Add(Tile(Wpf.Ui.Controls.SymbolRegular.DataUsage24, "Dashboard",
             "Live processed-mail, spam and virus counters with charts.", "dashboard"));
          tiles.Children.Add(Tile(Wpf.Ui.Controls.SymbolRegular.DocumentText24, "Live logs",
             "Stream the server log in real time.", "logs"));
