@@ -207,11 +207,41 @@ namespace HM
                   return DP_RecipientUnknown;
                }
 
+               String moderationKey = primaryAddress;
+               moderationKey.ToLower();
+
                // Need to check if this sender is authorized to send
                // to this distribution list.
                if (UserCanSendToList_(sSender, bSenderIsAuthed, pList, sErrMsg, iRecursionLevel) == DP_PermissionDenied)
-                  return DP_PermissionDenied;
+               {
+                  if (pList->GetModeratorAddress().IsEmpty())
+                     return DP_PermissionDenied;
 
+                  // The list's mode refuses this sender, but the list has a
+                  // moderator: the posting is accepted and, when this address is
+                  // expanded a moment later, forwarded to the moderator for
+                  // approval instead of being refused or distributed. The refusal
+                  // reason is deliberately discarded - the sender is told 250, not
+                  // why they were nearly refused - because a moderated list's whole
+                  // point is that the sender cannot tell approval from delivery.
+                  String msg;
+                  msg.Format(_T("RecipientParser - Posting from '%s' to distribution list '%s' requires approval (%s) and will be forwarded to the moderator."),
+                     sSender.c_str(), pList->GetAddress().c_str(), sErrMsg.c_str());
+                  LOG_APPLICATION(msg);
+
+                  sErrMsg.Empty();
+
+                  moderated_list_addresses_.insert(moderationKey);
+
+                  bDomainIsLocal = true;
+                  return DP_Possible;
+               }
+
+               // The sender may post directly. Erase any moderation mark a refused
+               // sender left for this list earlier on the same connection - the
+               // mark must describe THIS message's decision, and a stale one would
+               // send an authorized posting to the moderator instead of the list.
+               moderated_list_addresses_.erase(moderationKey);
 
                bDomainIsLocal = true;
                return DP_Possible;
@@ -383,6 +413,75 @@ namespace HM
             if (!pListADO->GetActive())
                return;
 
+            String moderationKey = primaryAddress;
+            moderationKey.ToLower();
+
+            if (moderated_list_addresses_.find(moderationKey) != moderated_list_addresses_.end())
+            {
+               // CheckDeliveryPossibility decided, a moment ago on this same
+               // parser, that this sender's posting to this list needs approval.
+               // The posting therefore expands to the MODERATOR and to nobody
+               // else - not refused, not distributed. The original address is
+               // passed through unchanged, exactly as member expansion does, so
+               // the forward still identifies as a posting to the list, which is
+               // what lets DistributionListSender stamp it.
+               const String moderatorAddress = pListADO->GetModeratorAddress();
+
+               if (moderatorAddress.IsEmpty())
+               {
+                  // The mark implies a moderator existed when the check ran, so
+                  // getting here means the list was edited in the instants
+                  // between. Refusing the recipient (recipientOK untouched) is
+                  // the safe answer: expanding to members instead would
+                  // distribute a message the check decided needed approval.
+                  ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6360, "RecipientParser::CreateMessageRecipientList_",
+                     Formatter::Format("Distribution list {0} needed a posting forwarded for approval, but no longer has a moderator address. The recipient was refused.",
+                        pListADO->GetAddress()));
+                  return;
+               }
+
+               if (moderatorAddress.CompareNoCase(pListADO->GetAddress().c_str()) == 0)
+               {
+                  // A list moderating itself would recurse straight back here, be
+                  // found marked again, and chase its own tail to the recursion
+                  // limit, reporting a failure at every level on the way back up.
+                  // Refused once, with the reason, instead.
+                  ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6363, "RecipientParser::CreateMessageRecipientList_",
+                     Formatter::Format("Distribution list {0} has its own address configured as its moderator address, so a posting needing approval has nowhere to go. The recipient was refused.",
+                        pListADO->GetAddress()));
+                  return;
+               }
+
+               std::vector<std::shared_ptr<MessageRecipient> > &addedRecipients = pRecipients->GetVector();
+               const size_t countBeforeModerator = addedRecipients.size();
+
+               bool moderatorOK = false;
+               CreateMessageRecipientList_(moderatorAddress, sOriginalAddress, lRecurse, pRecipients, moderatorOK);
+
+               if (!moderatorOK)
+               {
+                  // The moderator address does not resolve to anything mail can
+                  // reach. The RCPT is refused (recipientOK untouched), which the
+                  // sender sees as 550 - a posting silently lost between the list
+                  // and a broken moderator address would be worse, and would look
+                  // exactly like moderation working.
+                  ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6361, "RecipientParser::CreateMessageRecipientList_",
+                     Formatter::Format("Distribution list {0} needed a posting forwarded for approval, but its moderator address {1} does not resolve to any deliverable recipient. The recipient was refused.",
+                        pListADO->GetAddress(), moderatorAddress));
+                  return;
+               }
+
+               // Everything the recursion just appended is the moderation
+               // forward. Marked per recipient rather than per message so the
+               // marker travels with exactly the copies it describes.
+               for (size_t i = countBeforeModerator; i < addedRecipients.size(); i++)
+                  addedRecipients[i]->SetIsModerationForward(true);
+
+               recipientOK = true;
+
+               return;
+            }
+
             std::shared_ptr<const DistributionListRecipients> listRecipients = pListADO->GetMembers();
             const std::vector<std::shared_ptr<DistributionListRecipient> > vecRecipients = listRecipients->GetConstVector();
             std::vector<std::shared_ptr<DistributionListRecipient> >::const_iterator iterRecipient = vecRecipients.begin();
@@ -502,6 +601,39 @@ namespace HM
    {
       std::shared_ptr<DomainAliases> pDA = ObjectCache::Instance()->GetDomainAliases();
 
+      // The moderator of a list may always post to it - this is what approval IS.
+      // A moderated posting is forwarded to the moderator, and the moderator
+      // approves it by resending it to the list; this bypass is what lets that
+      // resend through the very mode checks that sent the original to moderation.
+      //
+      // The authentication requirement is unconditional and is the security
+      // boundary, deliberately NOT the list's own RequireAuth flag: MAIL FROM is
+      // free text, so an unauthenticated session claiming the moderator's address
+      // proves nothing and falls through to the ordinary mode checks below - where
+      // a mode that refuses it sends the forgery to the real moderator instead of
+      // the members. What authentication proves here is possession of valid
+      // credentials on this server, which is the same trust the existing
+      // RequireAuth machinery extends to an announcement list's owner address.
+      const String moderatorAddress = pList->GetModeratorAddress();
+
+      const bool isAuthenticatedModerator =
+         !moderatorAddress.IsEmpty() &&
+         bSenderIsAuthenticated &&
+         pDA->ApplyAliasesOnAddress(sSender).CompareNoCase(pDA->ApplyAliasesOnAddress(moderatorAddress)) == 0;
+
+      if (isAuthenticatedModerator)
+      {
+         Logger::Instance()->LogDebug("DistributionList::AuthenticatedModerator");
+
+         // Skip the RequireAuth and mode checks - all of them are what the
+         // moderator moderates - but fall through to the recursive check below:
+         // whether the moderator may reach every recipient of the list is a
+         // question about the RECIPIENTS, and being moderator answers nothing
+         // about it.
+      }
+      else
+      {
+
       if (pList->GetRequireAuth() && !bSenderIsAuthenticated)
       {
          sErrMsg = "SMTP authentication required.";
@@ -584,6 +716,8 @@ namespace HM
             return DP_PermissionDenied;
          }
       }
+
+      } // end of the non-moderator path; the recursive check below runs for both.
 
 
       // Check that the user is allowed to send to all recipient

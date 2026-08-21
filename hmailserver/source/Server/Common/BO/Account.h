@@ -125,6 +125,40 @@ namespace HM
       bool GetForwardAbortSpamFlagged() const { return forward_abort_spam_flagged_; }
       void SetForwardAbortSpamFlagged(bool bNewVal) { forward_abort_spam_flagged_ = bNewVal; }
 
+      // Per-account spam-filtering overrides. All three act at LOCAL DELIVERY, on
+      // this account's own copy of a message - never on the SMTP conversation,
+      // which is shared by every recipient and stays governed by the global
+      // thresholds. The honest consequence: an account cannot opt out of a
+      // conversation-time refusal or greylisting delay, and the overrides can only
+      // re-judge a message the global filter actually classified as spam, because
+      // that classification (the spam flag, and the recorded X-hMailServer-
+      // Reason-Score header) is all that survives from the conversation to
+      // delivery. A message below the global mark threshold reaches delivery
+      // carrying no score at all, so there is nothing for a stricter per-account
+      // threshold to measure it against.
+      //
+      // false = spam filtering is off for this account: a classified message is
+      // delivered to this account unmarked (flag cleared, spam headers and subject
+      // tag removed from its copy), and the per-account delete threshold below is
+      // ignored. Other recipients of the same message are unaffected.
+      bool GetAntiSpamEnabled() const { return anti_spam_enabled_; }
+      void SetAntiSpamEnabled(bool newVal) { anti_spam_enabled_ = newVal; }
+
+      // -1 = no override (the global behaviour stands). 0 = this account's copies
+      // are never marked as spam. > 0 = re-judge a classified copy against this
+      // value: it is unmarked when its recorded score is known and below the value.
+      int GetSpamMarkThreshold() const { return spam_mark_threshold_; }
+      void SetSpamMarkThreshold(int newVal) { spam_mark_threshold_ = newVal; }
+
+      // -1 or 0 = never delete at delivery (the global delete threshold acts
+      // during the SMTP conversation and needs no help here). > 0 = this account's
+      // copy of a classified message is not delivered when its score provably
+      // reached the value - the recorded score when present, otherwise the global
+      // mark threshold as a lower bound. Quarantined instead of dropped when the
+      // quarantine store is enabled.
+      int GetSpamDeleteThreshold() const { return spam_delete_threshold_; }
+      void SetSpamDeleteThreshold(int newVal) { spam_delete_threshold_ = newVal; }
+
       bool GetEnableSignature() const;
       void SetEnableSignature(bool bEnabled);
 
@@ -177,6 +211,9 @@ namespace HM
       bool forward_enabled_;
       bool forward_keep_original_;
       bool forward_abort_spam_flagged_;
+      bool anti_spam_enabled_;
+      int spam_mark_threshold_;
+      int spam_delete_threshold_;
       bool active_;
       bool is_ad_;
       bool vacation_message_is_on_;

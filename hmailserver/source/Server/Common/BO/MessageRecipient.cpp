@@ -18,6 +18,7 @@ namespace HM
       message_id_(0),
       requires_authentication_(false),
       is_local_name_(false),
+      moderation_forward_(false),
       dsn_notify_(0)
    {
 
@@ -35,6 +36,7 @@ namespace HM
       required_sender_ = pRecip->GetRequiredSender();
 
       is_local_name_ = pRecip->GetIsLocalName();
+      moderation_forward_ = pRecip->GetIsModerationForward();
 
       dsn_notify_ = pRecip->GetDSNNotify();
    }

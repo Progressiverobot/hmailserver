@@ -286,7 +286,23 @@ namespace DBUpdater
          new SchemaProbe(6024, "hm_blocked_senders.bsscore",
                          "update hm_blocked_senders set bsscore = bsscore where 1 = 0"),
          new SchemaProbe(6024, "hm_blocked_senders.bsdescription",
-                         "update hm_blocked_senders set bsdescription = bsdescription where 1 = 0")
+                         "update hm_blocked_senders set bsdescription = bsdescription where 1 = 0"),
+
+         // Upgrade6024to6025* - per-account spam overrides, list moderation, and
+         // the messageflags widening BINARYMIME's ninth flag bit needs. The
+         // widening cannot be probed by a column-exists trick (the column was
+         // always there); what CAN be probed is the five new columns, and a
+         // half-applied step fails on one of them.
+         new SchemaProbe(6025, "hm_accounts.accountantispamenabled",
+                         "update hm_accounts set accountantispamenabled = accountantispamenabled where 1 = 0"),
+         new SchemaProbe(6025, "hm_accounts.accountspammarkthreshold",
+                         "update hm_accounts set accountspammarkthreshold = accountspammarkthreshold where 1 = 0"),
+         new SchemaProbe(6025, "hm_accounts.accountspamdeletethreshold",
+                         "update hm_accounts set accountspamdeletethreshold = accountspamdeletethreshold where 1 = 0"),
+         new SchemaProbe(6025, "hm_distributionlists.distributionlistmoderatoraddress",
+                         "update hm_distributionlists set distributionlistmoderatoraddress = distributionlistmoderatoraddress where 1 = 0"),
+         new SchemaProbe(6025, "hm_distributionlists.distributionlistbounceaddress",
+                         "update hm_distributionlists set distributionlistbounceaddress = distributionlistbounceaddress where 1 = 0")
       };
 
       /// <summary>

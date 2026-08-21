@@ -37,7 +37,10 @@ namespace HM
       enable_signature_(false),
       vacation_expires_(false),
       vacation_abort_spam_flagged_(false),
-      forward_abort_spam_flagged_(false)
+      forward_abort_spam_flagged_(false),
+      anti_spam_enabled_(true),
+      spam_mark_threshold_(-1),
+      spam_delete_threshold_(-1)
    {
       Initialize();
    }
@@ -56,7 +59,10 @@ namespace HM
       enable_signature_(false),
       vacation_expires_(false),
       vacation_abort_spam_flagged_(false),
-      forward_abort_spam_flagged_(false)
+      forward_abort_spam_flagged_(false),
+      anti_spam_enabled_(true),
+      spam_mark_threshold_(-1),
+      spam_delete_threshold_(-1)
    {
       Initialize();
    }
@@ -99,6 +105,9 @@ namespace HM
       forward_enabled_ = oldAccount.forward_enabled_;
       forward_keep_original_ = oldAccount.forward_keep_original_;
       forward_abort_spam_flagged_ = oldAccount.forward_abort_spam_flagged_;
+      anti_spam_enabled_ = oldAccount.anti_spam_enabled_;
+      spam_mark_threshold_ = oldAccount.spam_mark_threshold_;
+      spam_delete_threshold_ = oldAccount.spam_delete_threshold_;
       active_ = oldAccount.active_;
       is_ad_ = oldAccount.is_ad_;
       vacation_message_is_on_ = oldAccount.vacation_message_is_on_;
@@ -313,6 +322,10 @@ namespace HM
       pNode->AppendAttr(_T("ForwardKeepOriginal"), forward_keep_original_ ? _T("1") : _T("0"));
       pNode->AppendAttr(_T("ForwardAbortSpamFlagged"), forward_abort_spam_flagged_ ? _T("1") : _T("0"));
 
+      pNode->AppendAttr(_T("AntiSpamEnabled"), anti_spam_enabled_ ? _T("1") : _T("0"));
+      pNode->AppendAttr(_T("SpamMarkThreshold"), StringParser::IntToString(spam_mark_threshold_));
+      pNode->AppendAttr(_T("SpamDeleteThreshold"), StringParser::IntToString(spam_delete_threshold_));
+
       pNode->AppendAttr(_T("EnableSignature"), enable_signature_ ? _T("1") : _T("0"));
       pNode->AppendAttr(_T("SignaturePlainText"), signature_plain_text_);
       pNode->AppendAttr(_T("SignatureHTML"), signature_html_);
@@ -383,6 +396,19 @@ namespace HM
       forward_address_ = pAccountNode->GetAttrValue(_T("ForwardAddress"));
       forward_keep_original_ = (pAccountNode->GetAttrValue(_T("ForwardKeepOriginal")) == _T("1"));
       forward_abort_spam_flagged_ = (pAccountNode->GetAttrValue(_T("ForwardAbortSpamFlagged")) == _T("1"));
+
+      // A backup taken before these settings existed carries no attributes for
+      // them, and the restore must land on "no override" rather than on whatever
+      // an empty string converts to - _ttoi("") is 0, which for the thresholds
+      // means "never mark/delete", a very different account than one that was
+      // never configured.
+      anti_spam_enabled_ = (pAccountNode->GetAttrValue(_T("AntiSpamEnabled")) != _T("0"));
+
+      String sSpamMarkThreshold = pAccountNode->GetAttrValue(_T("SpamMarkThreshold"));
+      spam_mark_threshold_ = sSpamMarkThreshold.IsEmpty() ? -1 : _ttoi(sSpamMarkThreshold);
+
+      String sSpamDeleteThreshold = pAccountNode->GetAttrValue(_T("SpamDeleteThreshold"));
+      spam_delete_threshold_ = sSpamDeleteThreshold.IsEmpty() ? -1 : _ttoi(sSpamDeleteThreshold);
 
       signature_plain_text_ = pAccountNode->GetAttrValue(_T("SignaturePlainText"));
       signature_html_ = pAccountNode->GetAttrValue(_T("SignatureHTML"));

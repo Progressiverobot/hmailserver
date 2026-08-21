@@ -28,6 +28,38 @@ namespace HM
       bool LocalDeliveryPreProcess_(std::shared_ptr<const Account> account, std::shared_ptr<Message> accountLevelMessage, const String &sOriginalAddress, std::vector<DeliveryFailure> &saErrorMessages, bool suppressFailureDsn);
       bool AddTraceHeaders_(std::shared_ptr<const Account> account, std::shared_ptr<Message> pMessage, const String &sOriginalAddress);
 
+      // Applies the account's own spam settings to its copy of the message, before
+      // anything else looks at that copy. Everything here re-judges a verdict the
+      // conversation already reached - it never re-runs a test - because the spam
+      // flag and the recorded X-hMailServer-Reason-Score header are all that
+      // survive from the conversation to delivery. A message the global filter did
+      // not classify carries neither, so for it this method does nothing, which is
+      // exactly the pre-feature behaviour.
+      //
+      // Returns false when this account's copy must not be delivered: its
+      // per-account delete threshold was provably reached (the recorded score when
+      // present, otherwise the global mark threshold as a lower bound - never a
+      // guess). The copy is first placed in the quarantine store when that is
+      // enabled; a quarantine failure delivers the marked copy instead, because
+      // discarding mail that was not actually stored would be silent loss.
+      //
+      // May instead unmark the copy in place (opt-out, or a mark-threshold
+      // override the recorded score falls short of): flag cleared, spam headers
+      // and subject tag rewritten out of this account's file.
+      bool ApplyAccountSpamOverrides_(std::shared_ptr<const Account> account, std::shared_ptr<Message> accountLevelMessage);
+
+      // The total score the conversation recorded on the message - the
+      // X-hMailServer-Reason-Score header, written when "add reason headers" is on
+      // and the message was classified. Returns -1 when absent or unparseable;
+      // never guesses.
+      static int ReadRecordedSpamScore_(std::shared_ptr<const Account> account, std::shared_ptr<Message> message);
+
+      // Removes the classification from this account's copy: the spam flag on the
+      // message object, the X-hMailServer-Spam / X-hMailServer-Reason-* headers,
+      // and the prepended subject tag, so the copy reads as if it was never
+      // classified. Only this copy - the file is already the account's own.
+      static void RemoveSpamClassification_(std::shared_ptr<const Account> account, std::shared_ptr<Message> message);
+
       // The account's own vacation message. Returns true when that feature is ON
       // for this account - whether or not a reply was actually produced (the
       // sender may be suppressed, the message spam-flagged, the sender the account
@@ -35,7 +67,12 @@ namespace HM
       // account that has spoken for itself, even by staying silent, is never
       // spoken over by the domain-wide reply, so exactly one auto-reply can ever
       // answer one delivered message.
-      bool SendAutoReplyMessage_(std::shared_ptr<const Account> pAccount, std::shared_ptr<Message> pMessage);
+      //
+      // messageIsSpamForThisAccount is the flag on the ACCOUNT'S copy, after the
+      // per-account overrides ran - an account that opted out of spam filtering
+      // has its auto-reply suppression judged against its own view of the message,
+      // not against the shared original's flag.
+      bool SendAutoReplyMessage_(std::shared_ptr<const Account> pAccount, std::shared_ptr<Message> pMessage, bool messageIsSpamForThisAccount);
 
       // The domain-wide out-of-office reply, for an account with no active
       // vacation message of its own. Chooses the domain's internal or external
@@ -46,7 +83,7 @@ namespace HM
       // has been evaluated, and only when neither the account's stored vacation
       // message nor a Sieve vacation action was active - the account's own voice,
       // in either form, wins over the domain's.
-      void SendDomainAutoReplyMessage_(std::shared_ptr<const Account> pAccount, std::shared_ptr<Message> pMessage);
+      void SendDomainAutoReplyMessage_(std::shared_ptr<const Account> pAccount, std::shared_ptr<Message> pMessage, bool messageIsSpamForThisAccount);
       bool RunAccountRules_(std::shared_ptr<const Account> pAccount, std::shared_ptr<Message> pMessage, RuleResult &accountRuleResult);
       bool CheckAccountQuotas_(std::shared_ptr<const Account> pAccount, std::vector<DeliveryFailure> &saErrorMessages, bool suppressFailureDsn);
 

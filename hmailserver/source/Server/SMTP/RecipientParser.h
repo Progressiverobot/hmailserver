@@ -38,13 +38,26 @@ namespace HM
       // this check is for.
       DeliveryPossibility CheckDeliveryPossibility(bool bSenderIsAuthed, String sSender, const String &sOriginalRecipient, String &sErrMsg, bool &bTreatSecurityAsLocal, int iRecursionLevel, bool checkRecipientQuota = false);
       void CreateMessageRecipientList(const String &sRecipientAddress, std::shared_ptr<MessageRecipients> pRecipients, bool &recipientOK);
-      
+
    private:
 
       void CreateMessageRecipientList_(const String &recipientAddress, const String &sOriginalAddress, long lRecurse, std::shared_ptr<MessageRecipients> pRecipients, bool &recipientOK);
       void AddRecipient_(std::shared_ptr<MessageRecipients> pRecipients, std::shared_ptr<MessageRecipient> pRecipient);
       bool IsMailboxFull_(std::shared_ptr<const Account> account, String &sErrMsg);
       DeliveryPossibility UserCanSendToList_(const String &sSender, bool bSenderIsAuthenticated, std::shared_ptr<const DistributionList> pList, String &sErrMsg, int iRecursionLevel);
+
+      // Distribution lists whose mode refused THIS transaction's sender but which
+      // have a moderator, keyed by the list's primary address, lowercased. Written
+      // by CheckDeliveryPossibility, read by CreateMessageRecipientList_, and the
+      // reason both are methods of one object: SMTPConnection calls them back to
+      // back on its one recipientParser_ member for every RCPT TO, so a mark made
+      // while deciding an address is still current when that same address is
+      // expanded a moment later. The check both marks and UNMARKS - a sender the
+      // list accepts erases any mark a previous message on this connection left -
+      // so a mark can never outlive the decision it recorded. Every other caller
+      // of CreateMessageRecipientList constructs a fresh parser, whose empty set
+      // means what it always meant: expand the list to its members.
+      std::set<String> moderated_list_addresses_;
 
   };
 }

@@ -118,6 +118,8 @@ namespace HM
       pDistList->SetRequireAuth(pRS->GetLongValue("distributionlistrequireauth") ? true : false);
       pDistList->SetRequireAddress(pRS->GetStringValue("distributionlistrequireaddress"));
       pDistList->SetListMode((HM::DistributionList::ListMode) pRS->GetLongValue("distributionlistmode"));
+      pDistList->SetModeratorAddress(pRS->GetStringValue("distributionlistmoderatoraddress"));
+      pDistList->SetBounceAddress(pRS->GetStringValue("distributionlistbounceaddress"));
 
       return true;
    }
@@ -144,6 +146,8 @@ namespace HM
       oStatement.AddColumn("distributionlistrequireauth", pDistList->GetRequireAuth() ? 1 : 0);
       oStatement.AddColumn("distributionlistrequireaddress", pDistList->GetRequireAddress());
       oStatement.AddColumn("distributionlistmode", pDistList->GetListMode());
+      oStatement.AddColumn("distributionlistmoderatoraddress", pDistList->GetModeratorAddress());
+      oStatement.AddColumn("distributionlistbounceaddress", pDistList->GetBounceAddress());
 
       if (pDistList->GetID() == 0)
       {

@@ -44,6 +44,17 @@ namespace HM
       bool GetIsLocalName() const {return is_local_name_; }
       void SetIsLocalName(bool isLocalName) {is_local_name_ = isLocalName; }
 
+      // True when this recipient is a distribution-list MODERATOR receiving a
+      // posting for approval rather than a member receiving a distribution.
+      // Set by RecipientParser when it redirects a moderated posting, and read by
+      // DistributionListSender while the message is still being accepted, to stamp
+      // the forward with its X-hMailServer-Moderation header instead of the List-*
+      // set. In-memory only, deliberately: the header is written before the
+      // message is queued, so nothing after that point needs the flag and it is
+      // not persisted to hm_messagerecipients.
+      bool GetIsModerationForward() const {return moderation_forward_; }
+      void SetIsModerationForward(bool newVal) {moderation_forward_ = newVal; }
+
       // DSN NOTIFY (RFC 3461) bitmask requested by the client for this recipient.
       // 0 = default behaviour, NEVER=1, SUCCESS=2, FAILURE=4, DELAY=8.
       enum DSNNotify
@@ -110,6 +121,7 @@ namespace HM
       __int64 message_id_;
 
       bool is_local_name_;
+      bool moderation_forward_;
 
       bool requires_authentication_;
       String required_sender_;

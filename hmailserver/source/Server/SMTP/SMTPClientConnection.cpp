@@ -394,18 +394,31 @@ namespace HM
       // declare this message's size and an oversized message can be refused
       // BEFORE its bytes are transferred rather than after.
       remote_size_limit_ = -1;
+      remote_supports_binarymime_ = false;
       std::vector<AnsiString> ehloLines = StringParser::SplitString(request, "\r\n");
       for (const AnsiString &line : ehloLines)
       {
+         // RFC 3030: an exact-keyword match ("250-BINARYMIME" / "250 BINARYMIME"),
+         // not a substring scan, so an unrelated capability containing the word
+         // cannot count as support. Informational only - see the member.
+         if (line.GetLength() >= 4)
+         {
+            AnsiString keyword = line.Mid(4);
+            keyword.Trim();
+            if (keyword.CompareNoCase("BINARYMIME") == 0)
+               remote_supports_binarymime_ = true;
+         }
+
          // A capability line is "250-SIZE 52428800" or "250 SIZE" - four digits,
-         // one separator, then the keyword.
-         if (line.GetLength() < 8 || line.Mid(4, 4).CompareNoCase("SIZE") != 0)
+         // one separator, then the keyword. Only the first SIZE line counts (no
+         // "break" here: this loop keeps scanning for the other capabilities
+         // above, so breaking on SIZE would hide any keyword listed after it).
+         if (remote_size_limit_ >= 0 || line.GetLength() < 8 || line.Mid(4, 4).CompareNoCase("SIZE") != 0)
             continue;
 
          AnsiString value = line.Mid(8);
          value.TrimLeft();
          remote_size_limit_ = value.IsEmpty() ? 0 : _atoi64(value.c_str());
-         break;
       }
 
       if (GetConnectionSecurity() == CSSTARTTLSRequired || 
@@ -486,6 +499,41 @@ namespace HM
    void
    SMTPClientConnection::ProtocolSendMailFrom_()
    {
+      // RFC 3030 section 4: a message received with BODY=BINARYMIME may hold bare
+      // CR, bare LF and NUL octets, and MUST NOT be sent to a server that has not
+      // advertised BINARYMIME. This client cannot send one to ANY server: it
+      // transmits message content via DATA only (line-oriented, dot-stuffed,
+      // CRLF.CRLF-terminated), which such content does not survive, and
+      // down-conversion (re-encoding the binary parts as base64) is not
+      // implemented. Every path to this point funnels through here - EHLO, the
+      // HELO fallback, and the AUTH flows - so this is the one choke point, and
+      // the refusal is permanent: 554 with 5.6.3 (conversion required but not
+      // supported, RFC 3463), which DSNs back to the sender.
+      //
+      // Directly-relayed recipients are normally refused at RCPT time by
+      // SMTPConnection, so what reaches this point is an indirect route outward:
+      // a local distribution list with an external member, a local alias
+      // resolving to an external address, a route whose recipients are treated
+      // as local, a forward, a rule or a mirror.
+      if (delivery_message_ && delivery_message_->GetBinaryMime())
+      {
+         String errorMessage = remote_supports_binarymime_
+            ? _T("This message was received as BINARYMIME (raw binary content, RFC 3030) and cannot be relayed: the receiving server does advertise BINARYMIME, but this server's delivery client transmits via DATA only and cannot send binary content. Conversion required but not supported.")
+            : _T("This message was received as BINARYMIME (raw binary content, RFC 3030) and cannot be relayed: the receiving server did not advertise BINARYMIME, and converting the content to a 7-bit-safe encoding is not supported. Conversion required but not supported.");
+
+         // Loud on purpose (HM6340): every occurrence is a permanently bounced
+         // message, and the administrator reading the error log should not have
+         // to reconstruct the cause from the DSN alone.
+         String logMessage;
+         logMessage.Format(_T("Message %I64d was received with BODY=BINARYMIME and had a recipient requiring onward relay (via a distribution list, forward, rule or mirror). It was not transmitted and a DSN (554 5.6.3) was generated. This server cannot relay binary messages; the sender must re-encode the content."),
+            delivery_message_->GetID());
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6340, "SMTPClientConnection::ProtocolSendMailFrom_", logMessage);
+
+         UpdateAllRecipientsWithError_(554, errorMessage, false, _T("5.6.3"), false);
+         SendQUIT_();
+         return;
+      }
+
       String sFrom = delivery_message_->GetFromAddress();
 
       // BATV (prvs): sign the envelope return-path of locally-originated outbound

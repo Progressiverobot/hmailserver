@@ -42,6 +42,8 @@ namespace HM
       pNode->AppendAttr(_T("RequiresAuth"), require_auth_ ? _T("1") : _T("0"));
       pNode->AppendAttr(_T("RequiresAuthAddress"), require_address_);
       pNode->AppendAttr(_T("ListMode"), sListMode);
+      pNode->AppendAttr(_T("ModeratorAddress"), moderator_address_);
+      pNode->AppendAttr(_T("BounceAddress"), bounce_address_);
 
       return GetMembers()->XMLStore(pNode, iOptions);
    }
@@ -54,6 +56,11 @@ namespace HM
       require_auth_ = pNode->GetAttrValue(_T("RequiresAuth")) == _T("1");
       require_address_ = pNode->GetAttrValue(_T("RequiresAuthAddress"));
       list_mode_ = (ListMode) _ttoi(pNode->GetAttrValue(_T("ListMode")));
+
+      // Absent in backups taken before these fields existed; GetAttrValue returns
+      // an empty string then, and empty is exactly the off state both fields need.
+      moderator_address_ = pNode->GetAttrValue(_T("ModeratorAddress"));
+      bounce_address_ = pNode->GetAttrValue(_T("BounceAddress"));
 
       return true;
    }

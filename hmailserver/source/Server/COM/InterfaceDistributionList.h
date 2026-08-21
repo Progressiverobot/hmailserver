@@ -83,6 +83,17 @@ public:
    STDMETHOD(get_Mode)(/*[out, retval]*/ eDistributionListMode *pVal);
    STDMETHOD(put_Mode)(/*[in]*/ eDistributionListMode newVal);
 
+   // Declared ahead of the IDL: IInterfaceDistributionList does not carry these
+   // yet, so until hMailServer.idl gains the ModeratorAddress/BounceAddress
+   // properties (dispids 11 and 12 are free) and the type library is regenerated,
+   // these are plain virtual functions no COM client can reach. The moment the
+   // IDL catches up they become the implementations, with no change here.
+   STDMETHOD(get_ModeratorAddress)(/*[out, retval]*/ BSTR *pVal);
+   STDMETHOD(put_ModeratorAddress)(/*[in]*/ BSTR newVal);
+
+   STDMETHOD(get_BounceAddress)(/*[out, retval]*/ BSTR *pVal);
+   STDMETHOD(put_BounceAddress)(/*[in]*/ BSTR newVal);
+
 private:
 
 #ifdef _DEBUG

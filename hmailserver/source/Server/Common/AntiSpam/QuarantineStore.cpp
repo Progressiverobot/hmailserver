@@ -61,12 +61,21 @@ namespace HM
    bool
    QuarantineStore::Quarantine(std::shared_ptr<Message> message, const String &reason, int score)
    {
+      if (!message)
+         return false;
+
+      return Quarantine(message, reason, score, PersistentMessage::GetFileName(message));
+   }
+
+   bool
+   QuarantineStore::Quarantine(std::shared_ptr<Message> message, const String &reason, int score, const String &sourceFileName)
+   {
       try
       {
          if (!message)
             return false;
 
-         String sourceFile = PersistentMessage::GetFileName(message);
+         String sourceFile = sourceFileName;
 
          if (sourceFile.IsEmpty() || !FileUtilities::Exists(sourceFile))
             return false;

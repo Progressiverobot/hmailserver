@@ -154,6 +154,13 @@ public:
    STDMETHOD(get_SieveScript)(/*[out, retval]*/ BSTR *pVal);
    STDMETHOD(put_SieveScript)(/*[in]*/ BSTR newVal);
 
+   STDMETHOD(get_AntiSpamEnabled)(/*[out, retval]*/ VARIANT_BOOL *pVal);
+   STDMETHOD(put_AntiSpamEnabled)(/*[in]*/ VARIANT_BOOL newVal);
+   STDMETHOD(get_SpamMarkThreshold)(/*[out, retval]*/ long *pVal);
+   STDMETHOD(put_SpamMarkThreshold)(/*[in]*/ long newVal);
+   STDMETHOD(get_SpamDeleteThreshold)(/*[out, retval]*/ long *pVal);
+   STDMETHOD(put_SpamDeleteThreshold)(/*[in]*/ long newVal);
+
 
 private:
 

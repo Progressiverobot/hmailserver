@@ -248,6 +248,10 @@ namespace HM
       pAccount->SetForwardKeepOriginal(pRS->GetLongValue("accountforwardkeeporiginal") ? true : false);
       pAccount->SetForwardAbortSpamFlagged(pRS->GetLongValue("accountforwardabortspamflagged") ? true : false);
 
+      pAccount->SetAntiSpamEnabled(pRS->GetLongValue("accountantispamenabled") ? true : false);
+      pAccount->SetSpamMarkThreshold(pRS->GetLongValue("accountspammarkthreshold"));
+      pAccount->SetSpamDeleteThreshold(pRS->GetLongValue("accountspamdeletethreshold"));
+
       pAccount->SetPasswordEncryption(pRS->GetLongValue("accountpwencryption"));
 
       pAccount->SetEnableSignature(pRS->GetLongValue("accountenablesignature") ? true : false);
@@ -437,6 +441,10 @@ namespace HM
       oStatement.AddColumn("accountforwardaddress", pAccount->GetForwardAddress());
       oStatement.AddColumn("accountforwardkeeporiginal", pAccount->GetForwardKeepOriginal());
       oStatement.AddColumn("accountforwardabortspamflagged", pAccount->GetForwardAbortSpamFlagged());
+
+      oStatement.AddColumn("accountantispamenabled", pAccount->GetAntiSpamEnabled());
+      oStatement.AddColumn("accountspammarkthreshold", pAccount->GetSpamMarkThreshold());
+      oStatement.AddColumn("accountspamdeletethreshold", pAccount->GetSpamDeleteThreshold());
 
       oStatement.AddColumn("accountenablesignature", pAccount->GetEnableSignature());
       oStatement.AddColumn("accountsignatureplaintext", pAccount->GetSignaturePlainText());

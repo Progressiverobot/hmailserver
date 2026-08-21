@@ -199,7 +199,10 @@ create table hm_accounts (
 	accountvacationabortspamflagged tinyint not null,
 	accountforwardabortspamflagged tinyint not null,
 	accounttotpsecret nvarchar(255) not null,
-	accountpasswordchanged datetime not null
+	accountpasswordchanged datetime not null,
+	accountantispamenabled tinyint not null,
+	accountspammarkthreshold int not null,
+	accountspamdeletethreshold int not null
 ) 
 
 ALTER TABLE hm_accounts ADD CONSTRAINT hm_accounts_pk PRIMARY KEY NONCLUSTERED (accountid) 
@@ -286,7 +289,7 @@ create table hm_messages (
 	messagesize bigint not null,
 	messagecurnooftries int not null,
 	messagenexttrytime datetime not null,
-	messageflags tinyint not null,
+	messageflags smallint not null,
 	messagecreatetime datetime not null,
 	messagesavedate datetime not null,
 	messageemailid nvarchar(48) not null,
@@ -355,7 +358,9 @@ create table hm_distributionlists
 	distributionlistenabled tinyint not null,	
    distributionlistrequireauth tinyint not null,
 	distributionlistrequireaddress nvarchar(255) not null,
-	distributionlistmode tinyint not null
+	distributionlistmode tinyint not null,
+	distributionlistmoderatoraddress nvarchar(255) not null,
+	distributionlistbounceaddress nvarchar(255) not null
 ) 
 
 ALTER TABLE hm_distributionlists ADD CONSTRAINT hm_distributionlists_pk PRIMARY KEY NONCLUSTERED (distributionlistid) 
@@ -1132,4 +1137,4 @@ create table hm_messageindexstate
 
 CREATE INDEX idx_hm_messageindexstate ON hm_messageindexstate (misaccountid)
 
-insert into hm_dbversion values (6024)
+insert into hm_dbversion values (6025)

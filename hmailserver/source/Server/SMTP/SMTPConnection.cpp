@@ -104,6 +104,7 @@ namespace HM
       authentication_failure_count_(0),
       esmtp_session_(false),
       smtputf8_requested_(false),
+      binarymime_requested_(false),
       bdat_active_(false),
       bdat_last_(false),
       bdat_discard_(false),
@@ -704,6 +705,7 @@ namespace HM
       // Detect the SMTPUTF8 parameter (RFC 6531) before validating the sender so an
       // internationalized (UTF-8) address is accepted.
       smtputf8_requested_ = false;
+      binarymime_requested_ = false;
       for (const String &peekParam : StringParser::SplitString(sParameters, " "))
       {
          if (peekParam.CompareNoCase(_T("SMTPUTF8")) == 0)
@@ -765,7 +767,21 @@ namespace HM
                   parameter.CompareNoCase(_T("BODY=8BITMIME")) == 0)
          {
             // 8BITMIME (RFC 6152): the transmission channel is 8-bit clean,
-            // so both body types are accepted as-is.
+            // so both body types are accepted as-is. Neither declaration is
+            // tracked beyond this transaction - deliberately, and BINARYMIME
+            // below must not copy that precedent: an 8-bit body survives the
+            // line-oriented DATA path unharmed, a binary one does not.
+         }
+         else if (parameter.CompareNoCase(_T("BODY=BINARYMIME")) == 0)
+         {
+            // BINARYMIME (RFC 3030): the message content is raw binary - bare CR,
+            // bare LF and NUL octets are all legal in it. It therefore MUST be
+            // transmitted with BDAT (byte-counted, byte-transparent) rather than
+            // DATA; ProtocolDATA_ answers 503 for this transaction. The flag also
+            // drives the two relay refusals (RCPT below, and the delivery client),
+            // because a binary message must never travel down a line-oriented
+            // DATA transmission.
+            binarymime_requested_ = true;
          }
          else if (parameter.CompareNoCase(_T("SMTPUTF8")) == 0)
          {
@@ -859,6 +875,13 @@ namespace HM
          current_message_ = std::shared_ptr<Message> (new Message);
       current_message_->SetFromAddress(sFromAddress);
       current_message_->SetState(Message::Delivering);
+
+      // RFC 3030: carry the BODY=BINARYMIME declaration on the message object so
+      // the delivery client can refuse to put this content down a line-oriented
+      // DATA transmission (see Message::SetBinaryMime for why this mark is
+      // in-memory only for now).
+      if (binarymime_requested_)
+         current_message_->SetBinaryMime(true);
       
       // 2.1.0 = originator (sender) address is valid (RFC 3463).
       SendResponse_(250, _T("2.1.0"), _T("OK")); 
@@ -1260,6 +1283,34 @@ namespace HM
          // Authentication is required, but the user hasn't authenticated.
          SendErrorResponse_(530, "SMTP authentication is required.");
          AWStats::LogDeliveryFailure(GetIPAddressString(), current_message_->GetFromAddress(), sRecipientAddress, 530, current_message_->GetID());
+         return;
+      }
+
+      // RFC 3030 section 4: a BINARYMIME message must not be sent to a server that
+      // has not advertised BINARYMIME, and this server's delivery client cannot
+      // send one to any server - it transmits via DATA only, which cannot carry
+      // bare CR, bare LF or NUL octets, and down-conversion (re-encoding binary
+      // parts to base64) is not implemented. So a recipient that would require
+      // onward relay is refused HERE, synchronously, with the RFC's own permanent
+      // code: 554 5.6.3, conversion required but not supported. Refusing at RCPT
+      // is strictly kinder than the alternative the RFC also allows
+      // (accept-then-bounce): the sending client learns before transferring a
+      // single content octet, and no DSN backscatter is generated. Local
+      // recipients in the same transaction are unaffected and deliver normally.
+      //
+      // Known gap, stated plainly: an address treated as local HERE (so accepted)
+      // can still route outward later - a distribution list with external members,
+      // a local alias resolving to an external address, a route whose recipients
+      // are treated as local, an account forward, a rule or mirror. Those are
+      // refused at delivery time by SMTPClientConnection with the same 554 5.6.3
+      // (as a DSN), for as long as the message's binary mark survives - see
+      // Message::SetBinaryMime for the persistence limitation.
+      if (binarymime_requested_ && !localDelivery)
+      {
+         AWStats::LogDeliveryFailure(GetIPAddressString(), current_message_->GetFromAddress(), sRecipientAddress, 554, current_message_->GetID());
+
+         SendResponse_(554, _T("5.6.3"),
+            _T("Conversion required but not supported. This server accepts BODY=BINARYMIME for local delivery only; it cannot relay a binary message onward. Re-encode the content (for example as base64) and send it without BODY=BINARYMIME."));
          return;
       }
 
@@ -2124,7 +2175,17 @@ namespace HM
       }
 
       // Check for bare LF's.
-      if (!Configuration::Instance()->GetSMTPConfiguration()->GetAllowIncorrectLineEndings())
+      //
+      // Except in a BINARYMIME transaction, where the check would be checking
+      // binary content for line discipline it never claimed to have: RFC 3030
+      // says BINARYMIME data is not line-oriented, and bare CR, bare LF and NUL
+      // are all legal in it. The header block is still required to be textual by
+      // the same RFC, but refusing a message because its binary BODY contains
+      // the byte 0x0A is refusing the exact content the extension exists to
+      // carry. This surfaced on the feature's own first test: the fixture's
+      // all-256-octet payload was refused 554 5.6.0 by this check.
+      if (!binarymime_requested_ &&
+          !Configuration::Instance()->GetSMTPConfiguration()->GetAllowIncorrectLineEndings())
       {
          if (!CheckLineEndings_())
          {
@@ -2348,8 +2409,9 @@ namespace HM
       // message.
       cur_no_of_rcptto_ = 0;
 
-      // Reset per-transaction ESMTP parameters (SMTPUTF8 / DSN).
+      // Reset per-transaction ESMTP parameters (SMTPUTF8 / BINARYMIME / DSN).
       smtputf8_requested_ = false;
+      binarymime_requested_ = false;
       dsn_envid_.Empty();
       dsn_ret_.Empty();
 
@@ -2395,6 +2457,14 @@ namespace HM
       // CHUNKING (RFC 3030): accept message data via one or more BDAT commands,
       // each carrying an explicit octet count, terminated by "BDAT <n> LAST".
       sData += "\r\n250-CHUNKING";
+
+      // BINARYMIME (RFC 3030, requires CHUNKING above): accept BODY=BINARYMIME -
+      // raw binary message content, delivered byte-for-byte via BDAT. Honest
+      // scope: local mailbox delivery only. A recipient that would require onward
+      // relay is refused synchronously at RCPT TO with 554 5.6.3, because the
+      // delivery client transmits via DATA only and down-conversion is not
+      // implemented - see ProtocolRCPT_ and SMTPClientConnection.
+      sData += "\r\n250-BINARYMIME";
 
       // SMTPUTF8 (RFC 6531): accept internationalized (UTF-8) envelope addresses.
       sData += "\r\n250-SMTPUTF8";
@@ -3025,6 +3095,18 @@ namespace HM
          // User tried to send a mail without specifying a correct mail from or rcpt to.
          SendResponse_(503, _T("5.5.1"), _T("Must have sender and recipient first."));
 
+         return;
+      }
+
+      // RFC 3030 section 3: a message declared BODY=BINARYMIME MUST be sent with
+      // BDAT - its content may hold bare CR, bare LF and NUL octets, none of which
+      // survive the line-oriented, dot-terminated DATA path (a NUL-free guarantee
+      // is not even the client's to make once it declared binary). The RFC
+      // prescribes 503 for a DATA in this situation. The transaction itself stays
+      // intact: the client may continue with BDAT.
+      if (binarymime_requested_)
+      {
+         SendResponse_(503, _T("5.5.1"), _T("Bad sequence of commands: DATA is not permitted with BODY=BINARYMIME; use BDAT (RFC 3030)."));
          return;
       }
 

@@ -29,6 +29,9 @@ namespace hMailServer.ControlPanel.Views
       private readonly TextBox addressBox_ = NewInput();
       private readonly ComboBox adminLevel_ = new();
       private readonly TextBox quota_ = NewInput();
+      private readonly CheckBox spamFilterOn_ = new() { Content = "Apply the server's spam filtering to this account", FontSize = Typography.Body };
+      private readonly TextBox spamMark_ = NewInput();
+      private readonly TextBox spamDelete_ = NewInput();
       private readonly TextBox firstName_ = NewInput();
       private readonly TextBox lastName_ = NewInput();
       private readonly Wpf.Ui.Controls.PasswordBox password_ = new();
@@ -133,6 +136,7 @@ namespace hMailServer.ControlPanel.Views
          tabs.Items.Add(new TabItem { Header = "General", Content = BuildGeneral() });
          tabs.Items.Add(new TabItem { Header = "Forwarding", Content = BuildForwarding() });
          tabs.Items.Add(new TabItem { Header = "Auto-reply", Content = BuildAutoReply() });
+         tabs.Items.Add(new TabItem { Header = "Spam", Content = BuildSpam() });
          tabs.Items.Add(new TabItem { Header = "Signature", Content = BuildSignature() });
          tabs.Items.Add(new TabItem { Header = "Sieve", Content = BuildSieve() });
          tabs.Items.Add(new TabItem { Header = "External", Content = BuildExternal() });
@@ -260,6 +264,36 @@ namespace hMailServer.ControlPanel.Views
          vacationExpiresDate_.Margin = new Thickness(0, 0, 0, 8);
          panel.Children.Add(vacationExpiresDate_);
          panel.Children.Add(vacationAbortSpam_);
+         return Scroll(panel);
+      }
+
+      private ScrollViewer BuildSpam()
+      {
+         var panel = TabPanel();
+         panel.Children.Add(Note(
+            "Per-account overrides of the server-wide spam handling, applied to THIS account's copy at " +
+            "delivery. They cannot reach back into the SMTP conversation: a message the global settings " +
+            "refuse, quarantine or greylist is stopped for every recipient before any per-account setting " +
+            "can run."));
+         panel.Children.Add(spamFilterOn_);
+         panel.Children.Add(Note(
+            "Unticked, a message the server classified as spam is still delivered here, unmarked - the " +
+            "spam headers and subject tag are removed from this account's copy. For the address that must " +
+            "never lose a mail."));
+         panel.Children.Add(Label("Mark threshold override (-1 = use the global setting, 0 = never mark)", spamMark_));
+         panel.Children.Add(Input(spamMark_));
+         panel.Children.Add(Label("Delete threshold override (-1 or 0 = off)", spamDelete_));
+         panel.Children.Add(Input(spamDelete_));
+         panel.Children.Add(Note(
+            "Both overrides read the score this server recorded in the message, so they need " +
+            "\"Add reason to header\" switched on (Anti-spam settings). With it off no score is " +
+            "recorded, nothing is provable, and neither override acts - the account keeps the " +
+            "server-wide behaviour. The value in the file is not trusted in that case because " +
+            "nothing stops a SENDER putting one there."));
+         panel.Children.Add(Note(
+            "The delete override never deletes on a guess: the copy is removed only when the " +
+            "recorded score actually reached the value, and it goes to the quarantine store " +
+            "instead when that is enabled."));
          return Scroll(panel);
       }
 
@@ -666,6 +700,9 @@ namespace hMailServer.ControlPanel.Views
             addressBox_.Text = (string) a.Address ?? address_;
             SelectCombo(adminLevel_, (int) a.AdminLevel);
             quota_.Text = ((int) a.MaxSize).ToString();
+            spamFilterOn_.IsChecked = (bool) a.AntiSpamEnabled;
+            spamMark_.Text = ((int) a.SpamMarkThreshold).ToString();
+            spamDelete_.Text = ((int) a.SpamDeleteThreshold).ToString();
             firstName_.Text = (string) a.PersonFirstName ?? "";
             lastName_.Text = (string) a.PersonLastName ?? "";
             try { lastLogon_.Text = Convert.ToString(a.LastLogonTime); } catch { lastLogon_.Text = "Never"; }
@@ -807,6 +844,9 @@ namespace hMailServer.ControlPanel.Views
             if (lvl >= 0) a.AdminLevel = lvl;
             if (hasQuota)
                a.MaxSize = quotaV;
+            a.AntiSpamEnabled = spamFilterOn_.IsChecked == true;
+            if (int.TryParse(spamMark_.Text.Trim(), out int spamMarkV)) a.SpamMarkThreshold = spamMarkV;
+            if (int.TryParse(spamDelete_.Text.Trim(), out int spamDeleteV)) a.SpamDeleteThreshold = spamDeleteV;
             a.PersonFirstName = firstName_.Text.Trim();
             a.PersonLastName = lastName_.Text.Trim();
             if (password_.Password.Length > 0)

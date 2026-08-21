@@ -40,6 +40,26 @@ namespace HM
       String GetRequireAddress() const {return require_address_;}
       void SetRequireAddress(const String & sNewVal) {require_address_ = sNewVal;}
 
+      // The list's moderator. Empty means moderation is off, which is the previous
+      // behaviour byte for byte: a sender the list's mode refuses gets a 550 at
+      // RCPT TO. When set, such a posting is accepted and forwarded to this address
+      // instead of being distributed, and the moderator approves it by resending it
+      // to the list from an AUTHENTICATED session - an authenticated sender whose
+      // address is the moderator's may always post. The authentication requirement
+      // is the security boundary: MAIL FROM is free text, so without it anyone who
+      // could spell the moderator's address could approve their own posting.
+      String GetModeratorAddress() const {return moderator_address_;}
+      void SetModeratorAddress(const String & sNewVal) {moderator_address_ = sNewVal;}
+
+      // The envelope sender (MAIL FROM / Return-Path) given to every copy this
+      // list sends: distributed copies to members, and moderation forwards to the
+      // moderator. Empty means the previous behaviour - copies keep the original
+      // poster's envelope sender, so a dead subscriber's bounces hammer whoever
+      // happened to post last. Set it to the list owner's mailbox and the bounces
+      // go to the one person who can act on them.
+      String GetBounceAddress() const {return bounce_address_;}
+      void SetBounceAddress(const String & sNewVal) {bounce_address_ = sNewVal;}
+
       ListMode GetListMode() const {return list_mode_; }
       void SetListMode(ListMode m) {list_mode_ = m; }
 
@@ -71,6 +91,9 @@ namespace HM
 
       bool require_auth_;
       String require_address_;
+
+      String moderator_address_;
+      String bounce_address_;
 
       ListMode list_mode_;
    };

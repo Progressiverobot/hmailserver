@@ -12,8 +12,12 @@
 #include "../common/BO/Account.h"
 #include "../common/BO/Domain.h"
 #include "../common/BO/Message.h"
+#include "../common/BO/MessageData.h"
 #include "../common/BO/MessageRecipient.h"
 #include "../common/BO/MessageRecipients.h"
+
+#include "../Common/AntiSpam/AntiSpamConfiguration.h"
+#include "../Common/AntiSpam/QuarantineStore.h"
 
 #include "../common/Cache/CacheContainer.h"
 #include "../common/Cache/AccountSizeCache.h"
@@ -301,10 +305,27 @@ namespace HM
    bool 
    LocalDelivery::LocalDeliveryPreProcess_(std::shared_ptr<const Account> account, std::shared_ptr<Message> accountLevelMessage, const String &sOriginalAddress, std::vector<DeliveryFailure> &saErrorMessages, bool suppressFailureDsn)
    {
+      // The account's own spam settings run first, before anything else looks at
+      // this copy, so that everything below - the auto-replies, the account rules,
+      // forwarding and the Sieve script, all of which consult the spam flag - sees
+      // the account's own view of the message rather than the shared verdict. A
+      // false return is this account's delete threshold acting: the copy is not
+      // delivered, and deliberately nothing is pushed onto saErrorMessages - the
+      // sender was answered 250 during the conversation, and a failure report now
+      // would be backscatter to a return path spam rarely uses honestly.
+      if (!ApplyAccountSpamOverrides_(account, accountLevelMessage))
+         return false;
+
+      // The flag on the ACCOUNT'S copy, after the overrides above. The two
+      // auto-reply decisions below take this rather than reading the shared
+      // original's flag: an account that opted out of spam filtering gets its
+      // auto-reply suppression judged against its own view of the message.
+      const bool messageIsSpamForThisAccount = accountLevelMessage->GetFlagSpam();
+
       // True when the account's own vacation-message feature is on, whether or not
       // it produced a reply for this particular message. Kept for the domain-wide
       // fallback decision after the Sieve script has run, further down.
-      bool accountVacationActive = SendAutoReplyMessage_(account, original_message_);
+      bool accountVacationActive = SendAutoReplyMessage_(account, original_message_, messageIsSpamForThisAccount);
 
       // We must run account level rules after the message file has been
       // moved to the destination folder, so that any changes it has only
@@ -357,7 +378,7 @@ namespace HM
       // delete-rule or a forward is an account somebody is actively managing,
       // and the domain fallback exists for the mailbox nobody speaks for.
       if (!accountVacationActive && !sieveVacationRequested)
-         SendDomainAutoReplyMessage_(account, original_message_);
+         SendDomainAutoReplyMessage_(account, original_message_, messageIsSpamForThisAccount);
 
       if (!sieveRejectReason.IsEmpty())
       {
@@ -914,7 +935,204 @@ namespace HM
    }    
 
    bool
-   LocalDelivery::SendAutoReplyMessage_(std::shared_ptr<const Account> pAccount, std::shared_ptr<Message> pMessage)
+   LocalDelivery::ApplyAccountSpamOverrides_(std::shared_ptr<const Account> account, std::shared_ptr<Message> accountLevelMessage)
+   {
+      // Only a message the conversation actually classified carries anything to
+      // re-judge. An unclassified message reaches delivery with no flag and no
+      // recorded score - there is nothing a per-account threshold could honestly
+      // measure it against - so for it this method does nothing, which is exactly
+      // the pre-feature behaviour. That also covers mail whose sender or IP was
+      // never tested at all (whitelisted, authenticated, an exempt IP range):
+      // "unflagged" never gets promoted to "proven clean".
+      if (!accountLevelMessage->GetFlagSpam())
+         return true;
+
+      // The opt-out. Checked before the thresholds on purpose: an account whose
+      // spam filtering is off has no thresholds, and its copy of a classified
+      // message is delivered as if the classification never happened.
+      if (!account->GetAntiSpamEnabled())
+      {
+         String sMessage = Formatter::Format("SMTPDeliverer - Message {0}: delivered to {1} unmarked - spam filtering is disabled for the account.",
+            original_message_->GetID(), account->GetAddress());
+         LOG_APPLICATION(sMessage);
+
+         RemoveSpamClassification_(account, accountLevelMessage);
+         return true;
+      }
+
+      const int deleteThreshold = account->GetSpamDeleteThreshold();
+      const int markThreshold = account->GetSpamMarkThreshold();
+
+      // -1 is "no override" for both; 0 additionally means "never delete" for the
+      // delete threshold, which needs no action here either.
+      if (deleteThreshold <= 0 && markThreshold < 0)
+         return true;
+
+      // What is provable about the score, and nothing beyond it. The recorded
+      // header is the exact sum of the failing tests - the same number the
+      // X-hMailServer-Reason headers show an administrator - and it is read only
+      // when this server wrote it (see ReadRecordedSpamScore_).
+      //
+      // When there is no such score, BOTH branches decline to act. An earlier
+      // version fell back to "the flag proves the score reached the global mark
+      // threshold", used as a lower bound - which reads as reasonable and is not:
+      // that threshold is read HERE, at delivery, and the message was judged
+      // against whatever it was at RECEPTION. An administrator raising it while
+      // mail sat queued could push the bound past an account's delete threshold
+      // and destroy a copy whose real score never reached it. The feature's
+      // promise is that it never deletes on a guess, and a bound derived from a
+      // mutable setting read at the wrong moment is a guess.
+      const int recordedScore = ReadRecordedSpamScore_(account, accountLevelMessage);
+
+      if (deleteThreshold > 0 && recordedScore >= deleteThreshold)
+      {
+         const String fileName = PersistentMessage::GetFileName(account, accountLevelMessage);
+
+         if (QuarantineStore::GetEnabled())
+         {
+            String reason = Formatter::Format("The score {0} reached the delete threshold {1} configured for {2}.",
+               recordedScore, deleteThreshold, account->GetAddress());
+
+            if (!QuarantineStore::Quarantine(accountLevelMessage, reason, recordedScore, fileName))
+            {
+               // The message exists and the store refused it, so the safe fallback
+               // is the marked copy in the mailbox - discarding mail that was not
+               // actually stored anywhere would be silent loss, the same trade the
+               // conversation-time quarantine refuses to make.
+               ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6350, "LocalDelivery::ApplyAccountSpamOverrides_",
+                  Formatter::Format("Message {0} could not be quarantined for {1}, whose spam delete threshold ({2}) its score ({3}) reached. The marked copy has been delivered instead.",
+                     original_message_->GetID(), account->GetAddress(), deleteThreshold, recordedScore));
+
+               return true;
+            }
+
+            String sMessage = Formatter::Format("SMTPDeliverer - Message {0}: quarantined instead of delivered to {1} - the score {2} reached the account's spam delete threshold {3}.",
+               original_message_->GetID(), account->GetAddress(), recordedScore, deleteThreshold);
+            LOG_APPLICATION(sMessage);
+
+            return false;
+         }
+
+         String sMessage = Formatter::Format("SMTPDeliverer - Message {0}: not delivered to {1} - the score {2} reached the account's spam delete threshold {3}.",
+            original_message_->GetID(), account->GetAddress(), recordedScore, deleteThreshold);
+         LOG_APPLICATION(sMessage);
+
+         return false;
+      }
+
+      // The mark override. 0 is "never mark this account's copies", which needs no
+      // score at all. A positive value re-judges the copy and can only do so when
+      // the exact recorded score exists: without one there is no proving the score
+      // fell short of anything, so the classification stands. A value at or below
+      // the global mark threshold changes nothing, honestly: a message below the
+      // global threshold was never classified and never reaches this line.
+      if (markThreshold == 0 ||
+          (markThreshold > 0 && recordedScore >= 0 && recordedScore < markThreshold))
+      {
+         String sMessage = Formatter::Format("SMTPDeliverer - Message {0}: delivered to {1} unmarked - the account's spam mark threshold is {2}, the recorded score {3}.",
+            original_message_->GetID(), account->GetAddress(), markThreshold, recordedScore);
+         LOG_APPLICATION(sMessage);
+
+         RemoveSpamClassification_(account, accountLevelMessage);
+      }
+
+      return true;
+   }
+
+   int
+   LocalDelivery::ReadRecordedSpamScore_(std::shared_ptr<const Account> account, std::shared_ptr<Message> message)
+   {
+      // The header is only evidence when this server wrote it, and it writes it
+      // only while "add reason to header" is on (SpamProtection::AddSpamScoreHeaders
+      // puts the whole block behind that setting). Inbound mail is NOT stripped of
+      // pre-existing X-hMailServer-* fields, so with the setting off this value is
+      // whatever the SENDER chose to put there.
+      //
+      // That mattered: a spammer could attach "X-hMailServer-Reason-Score: 1" to
+      // genuinely spammy mail and steer a recipient's own mark override into
+      // un-marking it - the attacker supplying the proof used to overrule the
+      // server's own classification. Refusing to read it here is what closes that,
+      // and it costs nothing in the default configuration, where the setting is on
+      // and the server's own value is what the file carries.
+      if (!Configuration::Instance()->GetAntiSpamConfiguration().GetAddHeaderReason())
+         return -1;
+
+      MessageData data;
+      if (!data.LoadFromMessage(account, message))
+         return -1;
+
+      String value = data.GetFieldValue("X-hMailServer-Reason-Score");
+      if (value.IsEmpty())
+         return -1;
+
+      int score = _ttoi(value);
+
+      // The header is only ever written as the positive total of failing tests, so
+      // zero or less here is an unparseable value, and an unparseable value is an
+      // unknown score, not a score of zero.
+      return score > 0 ? score : -1;
+   }
+
+   void
+   LocalDelivery::RemoveSpamClassification_(std::shared_ptr<const Account> account, std::shared_ptr<Message> message)
+   {
+      // The flag is cleared even if the file rewrite below fails: the flag is what
+      // the rules engine, forwarding, Sieve's spam test and the auto-replies
+      // consult, so it is the part that changes behaviour. A rewrite failure then
+      // degrades to a copy with stale headers but correct behaviour, rather than
+      // the reverse.
+      message->SetFlagSpam(false);
+
+      const String fileName = PersistentMessage::GetFileName(account, message);
+
+      MessageData data;
+      if (!data.LoadFromMessage(fileName, message))
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6351, "LocalDelivery::RemoveSpamClassification_",
+            Formatter::Format("Message {0} could not be loaded while removing its spam classification for {1}. The copy is delivered with its spam flag cleared but with the spam headers still present.",
+               message->GetID(), account->GetAddress()));
+         return;
+      }
+
+      data.DeleteField("X-hMailServer-Spam");
+      data.DeleteField("X-hMailServer-Reason-Score");
+
+      // The numbered reason headers are contiguous from 1, so the first gap is the
+      // end of them. The ceiling is paranoia against a crafted message carrying
+      // its own endless X-hMailServer-Reason-N ladder.
+      for (int i = 1; i <= 100; i++)
+      {
+         String fieldName = "X-hMailServer-Reason-" + StringParser::IntToString(i);
+         if (data.GetFieldValue(fieldName).IsEmpty())
+            break;
+
+         data.DeleteField(AnsiString(fieldName));
+      }
+
+      AntiSpamConfiguration &config = Configuration::Instance()->GetAntiSpamConfiguration();
+      String prependText = config.GetPrependSubjectText();
+      if (config.GetPrependSubject() && !prependText.IsEmpty())
+      {
+         String subject = data.GetFieldValue("Subject");
+         if (subject.Find(prependText + " ") == 0)
+            data.SetFieldValue("Subject", subject.Mid(prependText.GetLength() + 1));
+         else if (subject == prependText)
+            data.SetFieldValue("Subject", "");
+      }
+
+      // WriteReported has already put the failure itself in the error log; the
+      // consequence is mild by construction - the flag above is already cleared,
+      // so the copy behaves as unmarked and merely still carries the headers.
+      if (!data.WriteReported(fileName, "The per-account spam settings"))
+      {
+         String sMessage = Formatter::Format("Message {0} was delivered to {1} with its spam flag cleared but its spam headers still present - the rewrite of the message file failed.",
+            message->GetID(), account->GetAddress());
+         LOG_APPLICATION(sMessage);
+      }
+   }
+
+   bool
+   LocalDelivery::SendAutoReplyMessage_(std::shared_ptr<const Account> pAccount, std::shared_ptr<Message> pMessage, bool messageIsSpamForThisAccount)
    {
       // Do this before we move the message to the users
       // directory. If we do it afterwards, the user may have (at least theoretically)
@@ -934,7 +1152,9 @@ namespace HM
          return true;
 
       // Don't deliver vacation message when the message is classified as spam
-      if (pAccount->GetVacationAbortSpamFlagged() && pMessage->GetFlagSpam())
+      // for this account - the per-account spam settings have already run, so an
+      // account that opted out or unmarked its copy is judged by its own view.
+      if (pAccount->GetVacationAbortSpamFlagged() && messageIsSpamForThisAccount)
       {
          LOG_DEBUG("LocalDelivery::SendAutoReplyMessage_ aborted, message marked as spam");
          return true;
@@ -971,7 +1191,7 @@ namespace HM
    }
 
    void
-   LocalDelivery::SendDomainAutoReplyMessage_(std::shared_ptr<const Account> pAccount, std::shared_ptr<Message> pMessage)
+   LocalDelivery::SendDomainAutoReplyMessage_(std::shared_ptr<const Account> pAccount, std::shared_ptr<Message> pMessage, bool messageIsSpamForThisAccount)
    {
       std::shared_ptr<const Domain> pDomain = CacheContainer::Instance()->GetDomain(pAccount->GetDomainID());
       if (!pDomain || !pDomain->GetVacationMessageIsOn())
@@ -981,11 +1201,14 @@ namespace HM
       if (pAccount->GetAddress().CompareNoCase(pMessage->GetFromAddress()) == 0)
          return;
 
-      // No reply to a message the server has flagged as spam. The account-level
-      // path makes this a per-account choice; the domain has no per-sender
-      // preference to consult, and answering spam confirms to the sender that the
-      // address is live, so the safe answer is the only one offered.
-      if (pMessage->GetFlagSpam())
+      // No reply to a message classified as spam for this account. The
+      // account-level path makes the abort a per-account choice; the domain has no
+      // per-sender preference to consult, and answering spam confirms to the
+      // sender that the address is live, so the safe answer is the only one
+      // offered. Judged against the recipient's own view of the message - the
+      // per-account spam settings have already run - so an account that opted out
+      // of filtering is answered for like any other mail.
+      if (messageIsSpamForThisAccount)
       {
          LOG_DEBUG("LocalDelivery::SendDomainAutoReplyMessage_ aborted, message marked as spam");
          return;

@@ -306,6 +306,80 @@ STDMETHODIMP InterfaceDistributionList::get_Recipients(IInterfaceDistributionLis
    }
 }
 
+STDMETHODIMP InterfaceDistributionList::get_ModeratorAddress(BSTR *pVal)
+{
+   try
+   {
+      if (!object_)
+         return GetAccessDenied();
+
+      HM::String sAddress = object_->GetModeratorAddress();
+
+      *pVal = sAddress.AllocSysString();
+
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceDistributionList::put_ModeratorAddress(BSTR newVal)
+{
+   try
+   {
+      if (!object_)
+         return GetAccessDenied();
+
+      HM::String sAddress = newVal;
+      object_->SetModeratorAddress(sAddress);
+
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceDistributionList::get_BounceAddress(BSTR *pVal)
+{
+   try
+   {
+      if (!object_)
+         return GetAccessDenied();
+
+      HM::String sAddress = object_->GetBounceAddress();
+
+      *pVal = sAddress.AllocSysString();
+
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceDistributionList::put_BounceAddress(BSTR newVal)
+{
+   try
+   {
+      if (!object_)
+         return GetAccessDenied();
+
+      HM::String sAddress = newVal;
+      object_->SetBounceAddress(sAddress);
+
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
 STDMETHODIMP InterfaceDistributionList::get_Mode(eDistributionListMode *pVal)
 {
    try

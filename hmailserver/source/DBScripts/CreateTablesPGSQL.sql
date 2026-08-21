@@ -111,7 +111,10 @@ create table hm_accounts
 	accountvacationabortspamflagged smallint not null,
 	accountforwardabortspamflagged smallint not null,
 	accounttotpsecret varchar(255) not null default '',
-	accountpasswordchanged timestamp not null default '2000-01-01'
+	accountpasswordchanged timestamp not null default '2000-01-01',
+	accountantispamenabled smallint not null default 1,
+	accountspammarkthreshold int not null default -1,
+	accountspamdeletethreshold int not null default -1
 );
 
 
@@ -249,7 +252,9 @@ create table hm_distributionlists
 	distributionlistenabled smallint not null,
    distributionlistrequireauth smallint not null,
 	distributionlistrequireaddress varchar(255) not null,
-	distributionlistmode smallint not null
+	distributionlistmode smallint not null,
+	distributionlistmoderatoraddress varchar(255) not null default '',
+	distributionlistbounceaddress varchar(255) not null default ''
 );
 
 CREATE INDEX idx_hm_distributionlists ON hm_distributionlists (distributionlistdomainid);
@@ -954,4 +959,4 @@ create table hm_messageindexstate
 
 CREATE INDEX idx_hm_messageindexstate ON hm_messageindexstate (misaccountid);
 
-insert into hm_dbversion values (6024);
+insert into hm_dbversion values (6025);

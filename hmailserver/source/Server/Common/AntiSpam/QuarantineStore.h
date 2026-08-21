@@ -61,6 +61,14 @@ namespace HM
       // spam refusal into silent deletion, which is the one outcome nobody wants.
       static bool Quarantine(std::shared_ptr<Message> message, const String &reason, int score);
 
+      // The same, for a caller who already knows where the message file is. The
+      // three-argument form resolves the file the way the SMTP conversation needs
+      // it resolved - without an account, which lands on the queue or public
+      // folder - and that is wrong for an account-level delivery copy, whose file
+      // has already moved into the recipient's own folder. Local delivery's
+      // per-account delete threshold passes that path in here.
+      static bool Quarantine(std::shared_ptr<Message> message, const String &reason, int score, const String &sourceFile);
+
       static std::vector<QuarantinedMessage> List(int maxCount);
       static bool GetById(__int64 id, QuarantinedMessage &out_message);
 

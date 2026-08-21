@@ -99,7 +99,10 @@ create table hm_accounts
 	accountvacationabortspamflagged tinyint not null,
 	accountforwardabortspamflagged tinyint not null,
 	accounttotpsecret varchar(255) not null default '',
-	accountpasswordchanged datetime not null default '2000-01-01'
+	accountpasswordchanged datetime not null default '2000-01-01',
+	accountantispamenabled tinyint not null default 1,
+	accountspammarkthreshold int not null default -1,
+	accountspamdeletethreshold int not null default -1
 ) DEFAULT CHARSET=utf8;
 
 CREATE INDEX idx_hm_accounts ON hm_accounts (accountaddress);
@@ -176,7 +179,7 @@ create table hm_messages
 	messagesize bigint not null,
 	messagecurnooftries int not null,
 	messagenexttrytime datetime not null,
-	messageflags tinyint unsigned not null,
+	messageflags smallint unsigned not null,
 	messagecreatetime datetime not null,
 	messagesavedate datetime not null,
 	messageemailid varchar(48) not null,
@@ -235,7 +238,9 @@ create table hm_distributionlists
 	distributionlistenabled tinyint not null,
    distributionlistrequireauth tinyint not null,
 	distributionlistrequireaddress varchar(255) not null,
-	distributionlistmode tinyint not null
+	distributionlistmode tinyint not null,
+	distributionlistmoderatoraddress varchar(255) not null default '',
+	distributionlistbounceaddress varchar(255) not null default ''
 ) DEFAULT CHARSET=utf8;
 
 CREATE INDEX idx_hm_distributionlists ON hm_distributionlists (distributionlistdomainid);
@@ -938,4 +943,4 @@ create table hm_messageindexstate
 
 CREATE INDEX idx_hm_messageindexstate ON hm_messageindexstate (misaccountid);
 
-insert into hm_dbversion values (6024);
+insert into hm_dbversion values (6025);

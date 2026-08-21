@@ -142,6 +142,12 @@ namespace HM
       // 0 = advertised with no fixed limit, >0 = the advertised maximum.
       __int64 remote_size_limit_ = -1;
 
+      // RFC 3030: whether the remote's EHLO advertised BINARYMIME. Recorded only
+      // to make the refusal in ProtocolSendMailFrom_ honest about WHY a binary
+      // message cannot be sent - this client transmits via DATA only, so it
+      // cannot deliver a BINARYMIME message even to a remote that accepts them.
+      bool remote_supports_binarymime_ = false;
+
       String username_;
       String password_;
       String oauth_bearer_;

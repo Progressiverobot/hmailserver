@@ -1013,6 +1013,13 @@ interface IInterfaceAccount : IDispatch
     [id(44), helpstring("Enrols a second factor and returns the otpauth:// URI to show as a QR code. The secret is inside that URI and is not retrievable afterwards. Call Save to keep it.")] HRESULT EnrolTOTP([out, retval] BSTR* pVal);
     [id(45), helpstring("Removes this account's second factor. Call Save to keep the change.")] HRESULT DisableTOTP();
    [id(46), helpstring("Copies every message in the account to .eml files under the given directory, mirroring the folder structure. Returns the number exported; fails rather than reporting a partial export as success.")] HRESULT ExportMessages(BSTR Directory, [out, retval] long *ExportedCount);
+
+   [propget, id(47), helpstring("Whether the server's spam filtering applies to this account. When False, a message the server classified as spam is still delivered to this account, unmarked: the spam flag, the X-hMailServer spam headers and the subject tag are removed from this account's copy at delivery. Does not affect the SMTP conversation - a message the global settings refuse, quarantine or greylist is stopped for every recipient before any per-account setting can run.")] HRESULT AntiSpamEnabled([out, retval] VARIANT_BOOL *pVal);
+   [propput, id(47), helpstring("Whether the server's spam filtering applies to this account.")] HRESULT AntiSpamEnabled([in] VARIANT_BOOL newVal);
+   [propget, id(48), helpstring("Per-account override of the spam mark threshold, applied to this account's copy at delivery. -1 uses the global behaviour; 0 means this account's copies are never marked. A value above the global mark threshold unmarks a copy whose recorded score (the X-hMailServer-Reason-Score header, present when add-reason-to-header is on) is below it; without that header the classification stands. A value at or below the global threshold changes nothing: a message below the global threshold carries no score at delivery, so there is nothing to re-judge.")] HRESULT SpamMarkThreshold([out, retval] long *pVal);
+   [propput, id(48), helpstring("Per-account override of the spam mark threshold.")] HRESULT SpamMarkThreshold([in] long newVal);
+   [propget, id(49), helpstring("Per-account spam delete threshold, applied at delivery to this account's copy only. -1 or 0 disables it. The copy is removed (quarantined instead when the quarantine store is enabled) only when its score provably reached the value, which means the score header this server recorded - never a guess. Requires 'add reason to header' to be on; with it off no score is provable and this override does nothing. The global delete threshold continues to govern refusal during the SMTP conversation, for all recipients alike.")] HRESULT SpamDeleteThreshold([out, retval] long *pVal);
+   [propput, id(49), helpstring("Per-account spam delete threshold.")] HRESULT SpamDeleteThreshold([in] long newVal);
 };
 
 
@@ -1343,6 +1350,11 @@ interface IInterfaceDistributionList : IDispatch
    [propget, id(10), helpstring("Distribution list mode.")] HRESULT Mode([out, retval] eDistributionListMode *pVal);
    [propput, id(10), helpstring("Distribution list mode.")] HRESULT Mode([in] eDistributionListMode newVal);
 
+
+   [propget, id(11), helpstring("The moderator of the list. When set, a sender the list mode refuses is forwarded here for approval instead of being rejected; the moderator approves by resending the message to the list from an authenticated session. Empty disables moderation.")] HRESULT ModeratorAddress([out, retval] BSTR *pVal);
+   [propput, id(11), helpstring("The moderator of the list.")] HRESULT ModeratorAddress([in] BSTR newVal);
+   [propget, id(12), helpstring("The envelope sender given to every copy the list sends, so delivery failures go to the list owner instead of the original poster. Empty keeps the poster's envelope sender.")] HRESULT BounceAddress([out, retval] BSTR *pVal);
+   [propput, id(12), helpstring("The bounce address of the list.")] HRESULT BounceAddress([in] BSTR newVal);
 };
 
 [

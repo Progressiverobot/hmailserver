@@ -21,6 +21,8 @@ namespace hMailServer.ControlPanel.Views
       private readonly ComboBox mode_ = new();
       private readonly CheckBox requireAuth_ = new() { Content = "Require SMTP authentication to send to the list", FontSize = Typography.Body };
       private readonly TextBox requireSender_ = new();
+      private readonly TextBox moderator_ = new();
+      private readonly TextBox bounce_ = new();
 
       public DistributionListDialog(Window owner, string domainName, string address)
       {
@@ -82,6 +84,20 @@ namespace hMailServer.ControlPanel.Views
          panel.Children.Add(Label("Require sender address (empty = any)", requireSender_));
          panel.Children.Add(Input(requireSender_));
 
+         panel.Children.Add(Label("Moderator (empty = no moderation)", moderator_));
+         panel.Children.Add(Input(moderator_));
+         panel.Children.Add(Note(
+            "With a moderator set, a sender the rules above refuse is forwarded to the moderator " +
+            "instead of being rejected. The moderator approves by resending the message to the " +
+            "list from an authenticated session."));
+
+         panel.Children.Add(Label("Bounce address (empty = bounces go to the poster)", bounce_));
+         panel.Children.Add(Input(bounce_));
+         panel.Children.Add(Note(
+            "Used as the envelope sender of every copy the list sends, so delivery failures - a " +
+            "dead subscriber, a full mailbox - reach the list owner instead of whoever happened " +
+            "to post last."));
+
          var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
          // Enter saves, Escape cancels. Neither worked before.
          var save = new Wpf.Ui.Controls.Button { Content = "Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80, IsDefault = true };
@@ -117,6 +133,8 @@ namespace hMailServer.ControlPanel.Views
             SelectCombo(mode_, (int) l.Mode);
             requireAuth_.IsChecked = (bool) l.RequireSMTPAuth;
             requireSender_.Text = (string) l.RequireSenderAddress ?? "";
+            moderator_.Text = (string) l.ModeratorAddress ?? "";
+            bounce_.Text = (string) l.BounceAddress ?? "";
             ServerSession.Release(l);
          }
          catch (Exception ex)
@@ -142,6 +160,8 @@ namespace hMailServer.ControlPanel.Views
             l.Mode = ComboValue(mode_);
             l.RequireSMTPAuth = requireAuth_.IsChecked == true;
             l.RequireSenderAddress = requireSender_.Text.Trim();
+            l.ModeratorAddress = moderator_.Text.Trim();
+            l.BounceAddress = bounce_.Text.Trim();
             l.Save();
             ServerSession.Release(l);
             Close();
@@ -172,6 +192,19 @@ namespace hMailServer.ControlPanel.Views
             AutomationProperties.SetName(editor, AccessibleNames.Qualify(text, ""));
 
          return t;
+      }
+
+      /// <summary>A caption under an editor: what the setting actually does.</summary>
+      private static TextBlock Note(string text)
+      {
+         return new TextBlock
+         {
+            Text = text,
+            FontSize = Typography.Caption,
+            TextWrapping = TextWrapping.Wrap,
+            Opacity = 0.72,
+            Margin = new Thickness(0, 2, 0, 0)
+         };
       }
 
       private static TextBox Input(TextBox box)

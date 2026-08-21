@@ -51,9 +51,22 @@ namespace HM
          return;
       }
 
+      // Before anything that can return early: the bounce address is an envelope
+      // change, not a header change, so it must apply even when the header work
+      // below cannot run - a message that already carries a List-Id, a list
+      // address that yields no valid identifier, a message file an antivirus is
+      // holding open. Every copy this posting produces must bounce to the list
+      // owner regardless of which headers it could be given.
+      ApplyBounceAddress_(message, list);
+
+      // A posting RecipientParser redirected to the moderator is a forward for
+      // approval, not a distribution: it is stamped with the moderation header
+      // further down instead of the List-* set.
+      const bool moderationForward = MessageIsModerationForward_(message);
+
       const String listId = list->GetRfc2919ListId();
 
-      if (listId.IsEmpty())
+      if (listId.IsEmpty() && !moderationForward)
       {
          // A list address with no local part or no domain cannot produce a valid
          // RFC 2919 identifier. Nothing is wrong with the message and nothing is
@@ -111,6 +124,43 @@ namespace HM
 
       if (!mime)
          return;
+
+      if (moderationForward)
+      {
+         // The moderator's copy gets exactly one thing: a header naming the list
+         // that wants the approval. No List-* headers - this message is not being
+         // distributed, and stamping it as list mail would tell the moderator's
+         // mail client to file it with the list traffic it is supposed to stand
+         // out from. The moderator acts on it by resending the posting to the
+         // list from an authenticated session.
+         const String moderatedListAddress = list->GetAddress();
+
+         if (!IsUsAscii_(moderatedListAddress))
+         {
+            // Same constraint as the List-* values below: the value becomes raw
+            // bytes in the header block, and this path has no RFC 6532 handling.
+            // The forward still reaches the moderator - it is just unlabelled.
+            String msg;
+            msg.Format(_T("DistributionListSender - List address '%s' is not US-ASCII, so its moderation forward carries no X-hMailServer-Moderation header."), moderatedListAddress.c_str());
+            LOG_APPLICATION(msg);
+            return;
+         }
+
+         String moderationHeaderLines;
+
+         AppendFieldIfAbsent_(moderationHeaderLines, mime, "X-hMailServer-Moderation", moderatedListAddress);
+
+         if (moderationHeaderLines.IsEmpty())
+         {
+            // The message already carries the header - a posting that has been
+            // through moderation before, resent into moderation again. Nothing to
+            // write, so the file is not touched.
+            return;
+         }
+
+         PrependHeaderLines_(fileName, moderationHeaderLines, message, originalSize);
+         return;
+      }
 
       if (mime->FieldExists("List-Id"))
       {
@@ -324,6 +374,98 @@ namespace HM
       }
 
       return found;
+   }
+
+   void
+   DistributionListSender::ApplyBounceAddress_(std::shared_ptr<Message> message, std::shared_ptr<const DistributionList> list)
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // Replaces the message's envelope sender with the list's bounce address, when
+   // the list has one. From here on every copy this posting produces - the member
+   // copies, or the moderation forward - is sent with MAIL FROM of the bounce
+   // address (ExternalDelivery) and delivered with Return-Path of the bounce
+   // address (LocalDelivery::AddTraceHeaders_), both of which read
+   // Message::GetFromAddress. A member whose mailbox has died then bounces to the
+   // list owner, who can remove them, instead of to the original author, who can
+   // do nothing about it - and an external member's receiving server evaluates
+   // SPF against the list's own domain rather than the author's, which this
+   // server is actually entitled to pass.
+   //
+   // An empty bounce address is the off switch and the previous behaviour
+   // byte for byte: the envelope sender stays whatever MAIL FROM said.
+   //
+   // Runs while the message is still being accepted and before it is first saved,
+   // so the changed sender is what lands in hm_messages.messagefrom - nothing
+   // needs to remember to rewrite it later.
+   //---------------------------------------------------------------------------()
+   {
+      const String bounceAddress = list->GetBounceAddress();
+
+      if (bounceAddress.IsEmpty())
+         return;
+
+      if (bounceAddress.CompareNoCase(list->GetAddress().c_str()) == 0)
+      {
+         // A bounce address pointing at the list itself would hand every delivery
+         // failure back to the list for redistribution: a dead member's bounce
+         // becomes a posting, which produces more copies, which produce more
+         // bounces. Refusing the configuration here, loudly, is cheaper than the
+         // mail loop; the envelope sender is left as it arrived.
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6362, "DistributionListSender::ApplyBounceAddress_",
+            Formatter::Format("Distribution list {0} has its own address configured as its bounce address, which would mail-loop every delivery failure back into the list. The setting was ignored and the posting keeps its original envelope sender.",
+               list->GetAddress()));
+         return;
+      }
+
+      if (message->GetFromAddress().CompareNoCase(bounceAddress.c_str()) == 0)
+         return;
+
+      String msg;
+      msg.Format(_T("DistributionListSender - Envelope sender of the posting to '%s' changed from '%s' to the list's bounce address '%s'."),
+         list->GetAddress().c_str(), message->GetFromAddress().c_str(), bounceAddress.c_str());
+      LOG_DEBUG(msg);
+
+      message->SetFromAddress(bounceAddress);
+   }
+
+   bool
+   DistributionListSender::MessageIsModerationForward_(std::shared_ptr<Message> message)
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // Whether this message is a posting RecipientParser redirected to a list
+   // moderator for approval. The flag rides on the MessageRecipient objects the
+   // redirect created, which are the same in-memory objects this accept path is
+   // still holding - it never round-trips through the database, and does not need
+   // to: the header this answer gates is written before the message is queued.
+   //
+   // True only when EVERY recipient is a moderation forward. The header this
+   // gates is stamped on the one message file all recipients share, so it cannot
+   // be right for a mixture - and a mixture exists: a list the sender may post to
+   // whose members include a nested list that moderates them sends member copies
+   // and a moderation forward from the same file. That message is treated as the
+   // distribution it mostly is (List-* headers, no moderation header); the nested
+   // moderator's copy is the ordinary member copy of it, just addressed to them.
+   // The pure case - the posting went to moderation and nowhere else, which is
+   // what a moderated posting normally is - answers true.
+   //---------------------------------------------------------------------------()
+   {
+      std::shared_ptr<MessageRecipients> recipients = message->GetRecipients();
+
+      if (!recipients)
+         return false;
+
+      const std::vector<std::shared_ptr<MessageRecipient> > &recipientVector = recipients->GetVector();
+
+      if (recipientVector.empty())
+         return false;
+
+      for (const std::shared_ptr<MessageRecipient> &recipient : recipientVector)
+      {
+         if (!recipient->GetIsModerationForward())
+            return false;
+      }
+
+      return true;
    }
 
    String

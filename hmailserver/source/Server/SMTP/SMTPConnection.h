@@ -371,6 +371,15 @@ namespace HM
       // the SMTPUTF8 parameter to MAIL FROM, relaxing address validation to UTF-8.
       bool smtputf8_requested_;
 
+      // RFC 3030 (BINARYMIME): set for the current transaction when MAIL FROM
+      // carried BODY=BINARYMIME. Such a message may only be transmitted with BDAT
+      // (a DATA command is answered 503, RFC 3030 section 3), and it may not be
+      // relayed onward - this server's delivery client transmits via DATA only, so
+      // any recipient requiring onward relay is refused at RCPT time with the
+      // RFC's own permanent code, 554 5.6.3 (conversion required but not
+      // supported). Local mailbox delivery is byte-preserving and fully supported.
+      bool binarymime_requested_;
+
       // RFC 3461 (DSN) per-transaction parameters from MAIL FROM.
       String dsn_envid_;
       String dsn_ret_;
