@@ -39,6 +39,19 @@ namespace hMailServer.ControlPanel
       {
          InitializeComponent();
 
+         // The default text colour for the whole window, delivered by property
+         // inheritance rather than by an implicit TextBlock style. App.xaml
+         // carried such a style as a "global contrast guarantee" until it was
+         // found to be the cause of the one look complaint the forum ever
+         // recorded: an app-level implicit style also reaches the TextBlocks
+         // that ContentPresenter generates inside control templates, and a
+         // style setter outranks an inherited value - so it overwrote WPF-UI's
+         // on-accent button text with the ordinary body colour, which in the
+         // light theme is near-black on accent blue. Inheritance gives bare
+         // TextBlocks the same default while letting templates and Appearance
+         // setters override it, which is the entire difference.
+         SetResourceReference(ForegroundProperty, "TextFillColorPrimaryBrush");
+
          Services.Toast.Init(RootSnackbar);
          ApplySavedTheme();
          RestoreWindowBounds();
