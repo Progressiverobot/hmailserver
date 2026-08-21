@@ -1,4 +1,5 @@
 using System;
+using System.Windows.Automation;
 using System.Windows;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
@@ -168,9 +169,9 @@ namespace hMailServer.ControlPanel.Views
       {
          var panel = TabPanel();
          panel.Children.Add(active_);
-         panel.Children.Add(Label("Domain name (changing it renames the domain and moves every account, alias and list with it)"));
+         panel.Children.Add(Label("Domain name (changing it renames the domain and moves every account, alias and list with it)", name_));
          panel.Children.Add(Input(name_));
-         panel.Children.Add(Label("Postmaster address (mail to unknown recipients is redirected here)"));
+         panel.Children.Add(Label("Postmaster address (mail to unknown recipients is redirected here)", postmaster_));
          panel.Children.Add(Input(postmaster_));
          panel.Children.Add(Label("Active Directory domain (for AD-synchronised domains; optional)"));
          var adRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 12) };
@@ -267,11 +268,11 @@ namespace hMailServer.ControlPanel.Views
       private ScrollViewer BuildLimits()
       {
          var panel = TabPanel();
-         panel.Children.Add(Label("Maximum domain size (MB, 0 = unlimited)"));
+         panel.Children.Add(Label("Maximum domain size (MB, 0 = unlimited)", maxSize_));
          panel.Children.Add(Input(maxSize_));
-         panel.Children.Add(Label("Maximum message size (KB, 0 = unlimited)"));
+         panel.Children.Add(Label("Maximum message size (KB, 0 = unlimited)", maxMessageSize_));
          panel.Children.Add(Input(maxMessageSize_));
-         panel.Children.Add(Label("Maximum size for accounts created in this domain (MB, 0 = unlimited)"));
+         panel.Children.Add(Label("Maximum size for accounts created in this domain (MB, 0 = unlimited)", maxAccountSize_));
          panel.Children.Add(Input(maxAccountSize_));
          panel.Children.Add(Separator());
          panel.Children.Add(maxAccountsOn_);
@@ -282,7 +283,7 @@ namespace hMailServer.ControlPanel.Views
          panel.Children.Add(Input(maxDists_));
          panel.Children.Add(Separator());
          panel.Children.Add(plusAddressingOn_);
-         panel.Children.Add(Label("Plus addressing character"));
+         panel.Children.Add(Label("Plus addressing character", plusChar_));
          panel.Children.Add(Input(plusChar_));
          panel.Children.Add(greylisting_);
          return Scroll(panel);
@@ -297,13 +298,13 @@ namespace hMailServer.ControlPanel.Views
 
          var panel = TabPanel();
          panel.Children.Add(signatureOn_);
-         panel.Children.Add(Label("Signature method"));
+         panel.Children.Add(Label("Signature method", signatureMethod_));
          panel.Children.Add(signatureMethod_);
          panel.Children.Add(signReplies_);
          panel.Children.Add(signLocal_);
-         panel.Children.Add(Label("Plain-text signature"));
+         panel.Children.Add(Label("Plain-text signature", signaturePlain_));
          panel.Children.Add(signaturePlain_);
-         panel.Children.Add(Label("HTML signature"));
+         panel.Children.Add(Label("HTML signature", signatureHtml_));
          panel.Children.Add(signatureHtml_);
          return Scroll(panel);
       }
@@ -326,17 +327,17 @@ namespace hMailServer.ControlPanel.Views
             "exactly as it did before this setting existed. A route still wins over both, because a route " +
             "is a statement about the destination."));
          panel.Children.Add(Separator());
-         panel.Children.Add(Label("Relay host (empty = use the server-wide relayer)"));
+         panel.Children.Add(Label("Relay host (empty = use the server-wide relayer)", relayHost_));
          panel.Children.Add(Input(relayHost_));
-         panel.Children.Add(Label("Port (0 = 25)"));
+         panel.Children.Add(Label("Port (0 = 25)", relayPort_));
          panel.Children.Add(Input(relayPort_));
-         panel.Children.Add(Label("Connection security"));
+         panel.Children.Add(Label("Connection security", relaySecurity_));
          panel.Children.Add(relaySecurity_);
          panel.Children.Add(Separator());
          panel.Children.Add(relayAuthOn_);
-         panel.Children.Add(Label("User name"));
+         panel.Children.Add(Label("User name", relayUser_));
          panel.Children.Add(Input(relayUser_));
-         panel.Children.Add(Label("Password (leave blank to keep the stored one)"));
+         panel.Children.Add(Label("Password (leave blank to keep the stored one)", relayPassword_));
          panel.Children.Add(relayPassword_);
          return Scroll(panel);
       }
@@ -356,7 +357,7 @@ namespace hMailServer.ControlPanel.Views
          var panel = TabPanel();
          panel.Children.Add(dkimOn_);
          panel.Children.Add(dkimAliases_);
-         panel.Children.Add(Label("Selector"));
+         panel.Children.Add(Label("Selector", dkimSelector_));
          panel.Children.Add(Input(dkimSelector_));
          panel.Children.Add(Label("Private key file"));
          var dkimKeyRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
@@ -398,11 +399,11 @@ namespace hMailServer.ControlPanel.Views
          dkimDnsPanel_.Children.Add(dkimCopy);
          panel.Children.Add(dkimDnsPanel_);
 
-         panel.Children.Add(Label("Header canonicalization"));
+         panel.Children.Add(Label("Header canonicalization", dkimHeaderCanon_));
          panel.Children.Add(dkimHeaderCanon_);
-         panel.Children.Add(Label("Body canonicalization"));
+         panel.Children.Add(Label("Body canonicalization", dkimBodyCanon_));
          panel.Children.Add(dkimBodyCanon_);
-         panel.Children.Add(Label("Signing algorithm"));
+         panel.Children.Add(Label("Signing algorithm", dkimAlgorithm_));
          panel.Children.Add(dkimAlgorithm_);
 
          panel.Children.Add(Separator());
@@ -1155,10 +1156,20 @@ namespace hMailServer.ControlPanel.Views
          VerticalScrollBarVisibility = ScrollBarVisibility.Auto
       };
 
-      private static TextBlock Label(string text)
+      /// <summary>
+      /// A caption, and - when the editor it captions is passed in - that
+      /// editor's accessible name. A TextBlock above a control tells UI
+      /// Automation nothing, so without the second argument every field in
+      /// this dialog announces to a screen reader as an anonymous "edit".
+      /// </summary>
+      private static TextBlock Label(string text, FrameworkElement editor = null)
       {
          var t = new TextBlock { Text = text, FontSize = Typography.Label, Margin = new Thickness(0, 8, 0, 4) };
          t.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
+
+         if (editor != null)
+            AutomationProperties.SetName(editor, AccessibleNames.Qualify(text, ""));
+
          return t;
       }
 

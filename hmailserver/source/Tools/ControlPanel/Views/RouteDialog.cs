@@ -1,4 +1,5 @@
 using System;
+using System.Windows.Automation;
 using System.Windows;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
@@ -91,11 +92,11 @@ namespace hMailServer.ControlPanel.Views
       private ScrollViewer BuildGeneral()
       {
          var p = TabPanel();
-         p.Children.Add(Label("Target SMTP host"));
+         p.Children.Add(Label("Target SMTP host", host_));
          p.Children.Add(Input(host_));
-         p.Children.Add(Label("Target SMTP port"));
+         p.Children.Add(Label("Target SMTP port", port_));
          p.Children.Add(Input(port_));
-         p.Children.Add(Label("Description"));
+         p.Children.Add(Label("Description", description_));
          p.Children.Add(Input(description_));
          return Scroll(p);
       }
@@ -103,9 +104,9 @@ namespace hMailServer.ControlPanel.Views
       private ScrollViewer BuildDelivery()
       {
          var p = TabPanel();
-         p.Children.Add(Label("Number of delivery retries"));
+         p.Children.Add(Label("Number of delivery retries", tries_));
          p.Children.Add(Input(tries_));
-         p.Children.Add(Label("Minutes between retries"));
+         p.Children.Add(Label("Minutes between retries", minutes_));
          p.Children.Add(Input(minutes_));
          p.Children.Add(allAddresses_);
          return Scroll(p);
@@ -143,7 +144,7 @@ namespace hMailServer.ControlPanel.Views
          connSecurity_.Margin = new Thickness(0, 0, 0, 8);
 
          var p = TabPanel();
-         p.Children.Add(Label("Connection security"));
+         p.Children.Add(Label("Connection security", connSecurity_));
          p.Children.Add(connSecurity_);
          p.Children.Add(treatSenderLocal_);
          p.Children.Add(treatRecipientLocal_);
@@ -154,7 +155,7 @@ namespace hMailServer.ControlPanel.Views
       {
          var p = TabPanel();
          p.Children.Add(requiresAuth_);
-         p.Children.Add(Label("User name"));
+         p.Children.Add(Label("User name", authUser_));
          p.Children.Add(Input(authUser_));
          p.Children.Add(Label("Password (leave empty to keep current)"));
          authPassword_.FontSize = Typography.Body;
@@ -376,10 +377,20 @@ namespace hMailServer.ControlPanel.Views
       private static StackPanel TabPanel() => new() { Margin = new Thickness(4, 12, 4, 4) };
       private static ScrollViewer Scroll(StackPanel panel) => new() { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
 
-      private static TextBlock Label(string text)
+      /// <summary>
+      /// A caption, and - when the editor it captions is passed in - that
+      /// editor's accessible name. A TextBlock above a control tells UI
+      /// Automation nothing, so without the second argument every field in
+      /// this dialog announces to a screen reader as an anonymous "edit".
+      /// </summary>
+      private static TextBlock Label(string text, FrameworkElement editor = null)
       {
          var t = new TextBlock { Text = text, FontSize = Typography.Label, Margin = new Thickness(0, 8, 0, 4) };
          t.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
+
+         if (editor != null)
+            AutomationProperties.SetName(editor, AccessibleNames.Qualify(text, ""));
+
          return t;
       }
 
