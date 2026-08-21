@@ -69,8 +69,13 @@ namespace HM
       smtpdmax_size_drop_(0),
       backup_messages_dbonly_(false),
       add_xauth_user_ip_(false),
-      use_dns_cache_(true)
-      
+      use_dns_cache_(true),
+      // The Windows event log sink's two settings are read on the ERROR path,
+      // where an error reported before LoadSettings has run must still find the
+      // shipped defaults rather than an uninitialised read.
+      windows_event_log_enabled_(true),
+      windows_event_log_level_(2)
+
    {
 
    }
@@ -619,6 +624,17 @@ namespace HM
       quarantine_retention_days_ = ReadIniSettingInteger_("Settings", "QuarantineRetentionDays", 30);
       message_trace_enabled_ = ReadIniSettingInteger_("Settings", "MessageTraceEnabled", 0) == 1;
       message_trace_retention_days_ = ReadIniSettingInteger_("Settings", "MessageTraceRetentionDays", 30);
+      windows_event_log_enabled_ = ReadIniSettingInteger_("Settings", "WindowsEventLogEnabled", 1) == 1;
+      windows_event_log_level_ = ReadIniSettingInteger_("Settings", "WindowsEventLogLevel", 2);
+
+      // Severities run 1 (Critical) to 4 (Low); anything outside is folded to the
+      // nearest end rather than passed to the sink, whose own defensive clamp
+      // exists for the value that arrives between this load and the next.
+      if (windows_event_log_level_ < 1)
+         windows_event_log_level_ = 1;
+
+      if (windows_event_log_level_ > 4)
+         windows_event_log_level_ = 4;
       dmarc_tree_walk_enabled_ = ReadIniSettingInteger_("Settings", "DmarcTreeWalkEnabled", 1) == 1;
       spf_void_lookup_limit_ = ReadIniSettingInteger_("Settings", "SpfVoidLookupLimit", 2);
       reject_full_mailbox_at_rcpt_ = ReadIniSettingInteger_("Settings", "RejectFullMailboxAtRcpt", 1) == 1;

@@ -294,6 +294,18 @@ namespace HM
       bool GetMessageTraceEnabled() const { return message_trace_enabled_; }
       int GetMessageTraceRetentionDays() const { return message_trace_retention_days_; }
 
+      // The Windows event log sink (WindowsEventLog.h has the whole design, the
+      // event-id table and the defence of the default). ON by default: at the
+      // default level a healthy server writes nothing, while the administrator
+      // who never finds the setting is the one whose only monitoring is Event
+      // Viewer. Level is ErrorManager severity: 1 Critical only, 2 adds High,
+      // 3 adds Medium, 4 adds Low; LoadSettings clamps it to that range. Both
+      // are initialised in the constructor as well, unlike most neighbours,
+      // because they are read on the ERROR path, which must behave sensibly
+      // even for an error reported before LoadSettings has run.
+      bool GetWindowsEventLogEnabled() const { return windows_event_log_enabled_; }
+      int GetWindowsEventLogLevel() const { return windows_event_log_level_; }
+
       // RFC 9989 replaces the Public Suffix List with a DNS tree walk for finding a
       // domain's organizational domain. ON by default, because the RFC that made the
       // list authoritative has been obsoleted and a PSL answer is now wrong rather
@@ -881,6 +893,8 @@ namespace HM
       int quarantine_retention_days_;
       bool message_trace_enabled_;
       int message_trace_retention_days_;
+      bool windows_event_log_enabled_;
+      int windows_event_log_level_;
       bool dmarc_tree_walk_enabled_;
       int spf_void_lookup_limit_;
       bool reject_full_mailbox_at_rcpt_;

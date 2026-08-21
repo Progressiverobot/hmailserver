@@ -5,6 +5,7 @@
 #include "stdafx.h"
 #include "ErrorManager.h"
 
+#include "WindowsEventLog.h"
 
 #include <oledb.h>
 
@@ -351,7 +352,17 @@ namespace HM
       sErrorToLog.Format(_T("Severity: %d (%s), Code: HM%d, Source: %s, Description: %s"), 
                             iSeverity, sSeverityStr.c_str(), iErrorID, normalized_source.c_str(), normalized_description.c_str());
 
-      Logger::Instance()->LogError(sErrorToLog); 
+      Logger::Instance()->LogError(sErrorToLog);
+
+      // Mirror into the Windows event log, after the ERROR log write above: the
+      // file entry is the record, the event is the signal that points at it. One
+      // unconditional call, because everything that keeps this a signal rather
+      // than a firehose - the enabled switch, the severity gate, the per-id
+      // throttle - lives inside the sink, exactly as the recursion guards for the
+      // OnError script event below live here. The sink itself never reports and
+      // never logs an error, for the reason this comment sits between those two
+      // lines: it is called from inside both of them.
+      WindowsEventLog::Instance()->OnError(iSeverity, iErrorID, normalized_source, normalized_description);
 
       // Send an event if we've been able to load our settings. During database
       // creation, we don't have any PropertySet in the cache but we should still
