@@ -738,7 +738,15 @@ namespace HM
       if (responseIsRemoteReply)
       {
          pRecipient->SetRemoteSmtpReply(sResponse);
-         pRecipient->SetRemoteMta(remote_host_name_);
+
+         // A route or MX target configured as an IP literal has no hostname, and
+         // the address this connection actually went to is then the honest name
+         // for it - omitting Remote-MTA for a session that plainly happened would
+         // be withholding, not caution.
+         if (!remote_host_name_.IsEmpty())
+            pRecipient->SetRemoteMta(remote_host_name_);
+         else
+            pRecipient->SetRemoteMta(GetIPAddressString());
       }
    }
 

@@ -742,9 +742,16 @@ namespace RegressionTests.SMTP
 
             var bounceMessage = Pop3ClientSimulator.AssertGetFirstMessageText("test@example.test", "test");
 
-            Assert.IsFalse(bounceMessage.Contains("user1@dummy-example.com"));
-            Assert.IsFalse(bounceMessage.Contains("user2@dummy-example.com"));
-            Assert.IsTrue(bounceMessage.Contains("user3@dummy-example.com"));
+            // The bounce is now a multipart/report (RFC 3464), and its third part is
+            // the failed message's own headers - whose To: legitimately names every
+            // recipient, delivered or not. So absence is asserted where a recipient
+            // would be REPORTED AS FAILED - the per-recipient delivery-status group
+            // and the human-readable failure list - not over the whole message.
+            Assert.IsFalse(bounceMessage.Contains("Final-Recipient: rfc822; user1@dummy-example.com"));
+            Assert.IsFalse(bounceMessage.Contains("user1@dummy-example.com\r\n   Error Type"));
+            Assert.IsFalse(bounceMessage.Contains("Final-Recipient: rfc822; user2@dummy-example.com"));
+            Assert.IsFalse(bounceMessage.Contains("user2@dummy-example.com\r\n   Error Type"));
+            Assert.IsTrue(bounceMessage.Contains("Final-Recipient: rfc822; user3@dummy-example.com"));
             Assert.IsTrue(bounceMessage.Contains("499 user3@dummy-example.com"));
             Assert.IsTrue(bounceMessage.Contains("Tried 2 time(s)"));
          }
@@ -855,8 +862,15 @@ namespace RegressionTests.SMTP
             Assert.IsTrue(bounceMessage.Contains("400 user3@dummy-example.com"));
             Assert.IsTrue(bounceMessage.Contains("Tried 2 time(s)"));
 
-            Assert.IsFalse(bounceMessage.Contains("user2@dummy-example.com"));
-            Assert.IsFalse(bounceMessage.Contains("user1@dummy-example.com"));
+            // The bounce is now a multipart/report (RFC 3464), and its third part is
+            // the failed message's own headers - whose To: legitimately names every
+            // recipient, delivered or not. So absence is asserted where a recipient
+            // would be REPORTED AS FAILED - the per-recipient delivery-status group
+            // and the human-readable failure list - not over the whole message.
+            Assert.IsFalse(bounceMessage.Contains("Final-Recipient: rfc822; user2@dummy-example.com"));
+            Assert.IsFalse(bounceMessage.Contains("user2@dummy-example.com\r\n   Error Type"));
+            Assert.IsFalse(bounceMessage.Contains("Final-Recipient: rfc822; user1@dummy-example.com"));
+            Assert.IsFalse(bounceMessage.Contains("user1@dummy-example.com\r\n   Error Type"));
          }
       }
 
