@@ -348,6 +348,42 @@ namespace HM
       indexer_full_minutes_ =  ReadIniSettingInteger_("Settings", "IndexerFullMinutes",720);
       indexer_full_limit_ =  ReadIniSettingInteger_("Settings", "IndexerFullLimit",25000);
       indexer_quick_limit_ =  ReadIniSettingInteger_("Settings", "IndexerQuickLimit",1000);
+
+      // The full-text term index behind SEARCH BODY/TEXT. Off by default -
+      // enabling it costs a term table of a few kilobytes per message and a
+      // backfill pass over every delivered message, and that has to be an
+      // administrator's decision, never an upgrade's. The index only ever
+      // narrows the set of messages the existing substring scan reads, so the
+      // results are identical on and off; correctness never depends on these
+      // values, which is why they can be clamped rather than rejected.
+      indexer_full_text_enabled_ = ReadIniSettingInteger_("Settings", "IndexerFullText", 0) == 1;
+
+      // Batch: the id-range width of one backfill pass, so also the most
+      // messages one pass will read and tokenise before the cursor is saved
+      // and the thread pauses. Small enough not to monopolise the database,
+      // large enough that a million-message backfill finishes in hours, not
+      // weeks.
+      indexer_full_text_batch_size_ = ReadIniSettingInteger_("Settings", "IndexerFullTextBatchSize", 250);
+      if (indexer_full_text_batch_size_ < 1) indexer_full_text_batch_size_ = 1;
+      if (indexer_full_text_batch_size_ > 100000) indexer_full_text_batch_size_ = 100000;
+
+      // The shortest search-string run the index is allowed to answer for.
+      // Clamped at 3 from below because the index never STORES tokens shorter
+      // than three characters - the stored floor is a constant precisely so
+      // that changing this setting can never make the index promise answers
+      // the stored terms cannot give. Raising it only makes more searches
+      // fall back to the scan.
+      indexer_full_text_min_token_length_ = ReadIniSettingInteger_("Settings", "IndexerFullTextMinTokenLength", 3);
+      if (indexer_full_text_min_token_length_ < 3) indexer_full_text_min_token_length_ = 3;
+      if (indexer_full_text_min_token_length_ > 64) indexer_full_text_min_token_length_ = 64;
+
+      // Distinct terms per message before the indexer marks the message
+      // always-scanned instead. 2048 covers ordinary mail and most HTML;
+      // messages richer than that (inline base64 images, enormous newsletters)
+      // are scanned on every search, which is exactly what they cost today.
+      indexer_full_text_max_tokens_ = ReadIniSettingInteger_("Settings", "IndexerFullTextMaxTokensPerMessage", 2048);
+      if (indexer_full_text_max_tokens_ < 64) indexer_full_text_max_tokens_ = 64;
+      if (indexer_full_text_max_tokens_ > 1000000) indexer_full_text_max_tokens_ = 1000000;
       load_header_read_size_ =  ReadIniSettingInteger_("Settings", "LoadHeaderReadSize",4000);
       load_body_read_size_ =  ReadIniSettingInteger_("Settings", "LoadBodyReadSize",4000);
       blocked_iphold_seconds_ =  ReadIniSettingInteger_("Settings", "BlockedIPHoldSeconds",0);

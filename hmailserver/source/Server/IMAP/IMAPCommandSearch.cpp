@@ -16,12 +16,17 @@
 #include "../Common/BO/Account.h"
 #include "../Common/BO/IMAPFolder.h"
 #include "../Common/Persistence/PersistentMessage.h"
+#include "../Common/Persistence/PersistentMessageIndex.h"
 #include "../Common/BO/Message.h"
 #include "../Common/BO/Messages.h"
 #include "../Common/BO/MessageData.h"
 #include "../Common/Mime/Mime.h"
 #include "../Common/Util/Time.h"
 #include "../Common/Util/VariantDateTime.h"
+
+#include <algorithm>
+#include <iterator>
+
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
 #define new DEBUG_NEW
@@ -29,6 +34,202 @@
 
 namespace HM
 {
+   namespace
+   {
+      //---------------------------------------------------------------------------()
+      // Per-search cache of what the full-text term index can PROVE about the
+      // messages being searched. The index is strictly a filter: IMAP BODY/TEXT
+      // search is substring search ("ell" matches "hello"), which a term index
+      // cannot answer, so the only thing the index is ever allowed to say is
+      // "this message cannot contain that text - skip loading it". Every message
+      // it cannot vouch for is read and scanned by the existing code, unchanged,
+      // which is what keeps the result set identical with the index on and off.
+      //
+      // Installed for the duration of one ExecuteCommand through
+      // SearchIndexFilterScope and reached via a thread_local, because a SEARCH
+      // executes synchronously on one thread from start to finish and the
+      // matcher signatures (and the command object's header) stay untouched
+      // that way. Everything is loaded lazily, so a search with no BODY/TEXT
+      // key never queries the index at all.
+      //---------------------------------------------------------------------------()
+      class SearchIndexFilter
+      {
+      public:
+         SearchIndexFilter() :
+            initialized_(false),
+            usable_(false),
+            account_id_(0),
+            min_run_length_(0)
+         {
+         }
+
+         // True only when the index proves the message cannot contain the
+         // text. Every other answer - feature off, message not fully indexed,
+         // message the indexer gave up on, a text the index cannot answer
+         // for, a message from another account scope, any database trouble -
+         // is false, which sends the caller to the scan. A false negative
+         // here costs a file read; a false positive would corrupt search
+         // results, so every default points the same way.
+         bool CannotContain(const std::shared_ptr<Message> &message, const String &searchText)
+         {
+            if (!message)
+               return false;
+
+            EnsureInitialized_(message);
+
+            if (!usable_)
+               return false;
+
+            // The marker sets were loaded for one account scope (public
+            // folders index under account id 0, so they have a scope of
+            // their own). A message from any other scope is simply scanned.
+            if (message->GetAccountID() != account_id_)
+               return false;
+
+            const __int64 messageID = message->GetID();
+
+            // No complete-marker means the terms are not all committed - not
+            // yet indexed, indexing interrupted, or deliberately de-indexed
+            // after an edit - and the index has no standing to exclude it.
+            if (complete_set_.find(messageID) == complete_set_.end())
+               return false;
+
+            // The indexer gave up on this message (too many distinct terms,
+            // or its file was unreadable when indexed): always a candidate.
+            if (overflow_set_.find(messageID) != overflow_set_.end())
+               return false;
+
+            const CandidateEntry &entry = CandidatesFor_(searchText);
+            if (!entry.usable)
+               return false;
+
+            // Fully indexed, faithfully indexed, and no stored term of it
+            // contains every needle of the text: it cannot contain the text.
+            return entry.candidates.find(messageID) == entry.candidates.end();
+         }
+
+      private:
+
+         class CandidateEntry
+         {
+         public:
+            bool usable = false;
+            std::set<__int64> candidates;
+         };
+
+         void EnsureInitialized_(const std::shared_ptr<Message> &message)
+         {
+            if (initialized_)
+               return;
+
+            initialized_ = true;
+
+            if (!IniFileSettings::Instance()->GetIndexerFullTextEnabled())
+               return;
+
+            min_run_length_ = IniFileSettings::Instance()->GetIndexerFullTextMinTokenLength();
+            account_id_ = message->GetAccountID();
+
+            if (!PersistentMessageIndex::GetMessagesWithTerm(account_id_, PersistentMessageIndex::CompleteMarker(), complete_set_))
+               return;
+
+            if (!PersistentMessageIndex::GetMessagesWithTerm(account_id_, PersistentMessageIndex::OverflowMarker(), overflow_set_))
+               return;
+
+            usable_ = true;
+         }
+
+         const CandidateEntry& CandidatesFor_(const String &searchText)
+         {
+            auto existing = candidates_by_text_.find(searchText);
+            if (existing != candidates_by_text_.end())
+               return existing->second;
+
+            CandidateEntry &entry = candidates_by_text_[searchText];
+
+            std::vector<String> needles;
+            PersistentMessageIndex::CreateQueryNeedles(searchText, min_run_length_, needles);
+
+            // No usable needle (all runs too short, or non-ASCII): the index
+            // cannot answer for this text, so every message is scanned -
+            // entry.usable stays false.
+            if (needles.empty())
+               return entry;
+
+            // A message containing the text contains every needle, each
+            // inside some stored term, so the candidate set is the
+            // intersection of the per-needle matches. Failing needles fail
+            // open: any DB trouble leaves the entry unusable and the search
+            // scans everything.
+            bool first = true;
+            std::set<__int64> intersection;
+
+            for (const String &needle : needles)
+            {
+               std::set<__int64> matches;
+               if (!PersistentMessageIndex::GetMessagesWithTermContaining(account_id_, needle, matches))
+                  return entry;
+
+               if (first)
+               {
+                  intersection.swap(matches);
+                  first = false;
+               }
+               else
+               {
+                  std::set<__int64> merged;
+                  std::set_intersection(
+                     intersection.begin(), intersection.end(),
+                     matches.begin(), matches.end(),
+                     std::inserter(merged, merged.begin()));
+                  intersection.swap(merged);
+               }
+
+               if (intersection.empty())
+                  break;
+            }
+
+            entry.candidates.swap(intersection);
+            entry.usable = true;
+            return entry;
+         }
+
+         bool initialized_;
+         bool usable_;
+         __int64 account_id_;
+         int min_run_length_;
+         std::set<__int64> complete_set_;
+         std::set<__int64> overflow_set_;
+         std::map<String, CandidateEntry> candidates_by_text_;
+      };
+
+      // The filter for the SEARCH currently executing on this thread, when one
+      // is. Null outside ExecuteCommand, so the matchers degrade to plain
+      // scanning if ever reached another way.
+      thread_local SearchIndexFilter *current_search_index_filter = nullptr;
+
+      class SearchIndexFilterScope
+      {
+      public:
+         SearchIndexFilterScope() :
+            previous_(current_search_index_filter)
+         {
+            current_search_index_filter = &filter_;
+         }
+
+         ~SearchIndexFilterScope()
+         {
+            // Restore rather than null, so even a nested execution - none
+            // exists today - would unwind correctly.
+            current_search_index_filter = previous_;
+         }
+
+      private:
+         SearchIndexFilter *previous_;
+         SearchIndexFilter filter_;
+      };
+   }
+
    IMAPCommandSEARCH::IMAPCommandSEARCH(IMAPSearchCommandMode mode) :
       is_sort_(mode == IMAPSearchModeSort),
       is_thread_(mode == IMAPSearchModeThread),
@@ -63,6 +264,12 @@ namespace HM
       // created once per connection and reused for every SEARCH on it, so the
       // per-search state has to be cleared here rather than in the constructor.
       ResetSearchState_();
+
+      // The full-text index filter for this one search, consulted by the
+      // BODY/TEXT matchers. Scoped to the command so nothing can leak between
+      // searches; entirely lazy, so a search without a BODY/TEXT key never
+      // touches the index.
+      SearchIndexFilterScope searchIndexFilterScope;
 
       if (is_sort_ && !Configuration::Instance()->GetIMAPConfiguration()->GetUseIMAPSort())
          return IMAPResult(IMAPResult::ResultNo, "IMAP SORT is not enabled.");
@@ -913,6 +1120,17 @@ namespace HM
    {
       if (!message_data_)
       {
+         // The full-text index can prove some messages cannot contain the
+         // text; those are answered here without reading the file - which is
+         // also why they are never charged against the byte ceiling. Anything
+         // the index cannot vouch for falls through to the load and the exact
+         // substring scan below, unchanged, so the result set is identical
+         // with the index on and off. Skipped when the message is already
+         // loaded: the scan is then the cheaper answer.
+         if (current_search_index_filter &&
+             current_search_index_filter->CannotContain(pMessage, pCriteria->GetText()))
+            return !pCriteria->GetPositive();
+
          // Charged before the load, not after: the whole file is read and MIME
          // parsed whether or not it turns out to match, and the recorded message
          // size is what that costs. Charged here rather than in the caller because
@@ -1163,6 +1381,15 @@ namespace HM
    {
       if (!message_data_)
       {
+         // The index covers TEXT as well: it stores terms of the raw header
+         // alongside the bodies, so "no stored term contains the needles"
+         // rules out a header match too. As in MatchesBODYCriteria_, this
+         // only ever skips messages that provably cannot match; everything
+         // else is loaded and scanned exactly as before.
+         if (current_search_index_filter &&
+             current_search_index_filter->CannotContain(pMessage, pCriteria->GetText()))
+            return !pCriteria->GetPositive();
+
          // See MatchesBODYCriteria_ - TEXT reads the same whole message.
          const int message_size = pMessage->GetSize();
          if (message_size > 0)

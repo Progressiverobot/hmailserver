@@ -223,6 +223,28 @@ namespace HM
       int GetIndexerFullMinutes () {return indexer_full_minutes_; }
       int GetIndexerFullLimit () {return indexer_full_limit_; }
       int GetIndexerQuickLimit () {return indexer_quick_limit_; }
+
+      // The full-text term index behind IMAP SEARCH BODY/TEXT
+      // (hm_messageindexterms). Off by default, and that default is
+      // load-bearing: enabling it grows a term table of roughly a few
+      // kilobytes per message and starts a backfill over the whole store, so
+      // an upgrade must never switch it on by itself. It is a pure filter -
+      // search results are identical either way, only the cost changes - so
+      // off is always safe. Requires the message indexer to be enabled
+      // (Settings.MessageIndexing over COM) for anything to be indexed.
+      bool GetIndexerFullTextEnabled () {return indexer_full_text_enabled_; }
+      // Backfill batch: the width of the message-id range one pass covers, so
+      // also the most messages one pass can read. See the read site for the
+      // clamps.
+      int GetIndexerFullTextBatchSize () {return indexer_full_text_batch_size_; }
+      // The shortest search-string run the index may answer for; shorter runs
+      // fall back to the scan. Query-side only: the index itself always stores
+      // tokens of three characters and up, so LOWERING this back down later
+      // stays sound without a re-index.
+      int GetIndexerFullTextMinTokenLength () {return indexer_full_text_min_token_length_; }
+      // Distinct terms stored per message before the indexer gives up on it
+      // and marks it always-scanned.
+      int GetIndexerFullTextMaxTokensPerMessage () {return indexer_full_text_max_tokens_; }
       int GetLoadHeaderReadSize () {return load_header_read_size_; }
       int GetLoadBodyReadSize () {return load_body_read_size_; }
       int GetBlockedIPHoldSeconds () {return blocked_iphold_seconds_; }
@@ -810,6 +832,10 @@ namespace HM
       int indexer_full_minutes_;
       int indexer_full_limit_;
       int indexer_quick_limit_;
+      bool indexer_full_text_enabled_;
+      int indexer_full_text_batch_size_;
+      int indexer_full_text_min_token_length_;
+      int indexer_full_text_max_tokens_;
       int load_header_read_size_;
       int load_body_read_size_;
       int blocked_iphold_seconds_;
