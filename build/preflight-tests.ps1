@@ -221,6 +221,61 @@ if (Test-Path $serverIni) {
         ("hMailServer.ini still has '{0}', left by an aborted fixture. Re-run with -Clean, then restart the service." -f ($leftovers -join '; '))
 }
 
+# 13. No orphan domain directories in the data folder.
+#
+#     Several persistence fixtures RENAME the test domain - example.test becomes
+#     example.com, new1.example.com and others - and the rename moves the whole
+#     directory. Kill a run mid-rename and the renamed directory survives with no
+#     domain row pointing at it, and then every later run of that fixture fails
+#     with "Can't rename ... since ... already exists" - a message about a
+#     directory the fixture never mentions, in a test that was passing yesterday.
+#
+#     Cost this an entire gate on 21 August 2026, twice: two killed runs had left
+#     two different orphans, so removing the first only revealed the second.
+#
+#     Anything in the data folder that is not a live domain, and not one of the
+#     server's own subdirectories, is an orphan. The live domains are read from
+#     the running server rather than assumed, so a real multi-domain bench is not
+#     flagged.
+$dataFolder = 'C:\HMTest\Data'
+if (Test-Path $dataFolder) {
+    $reserved = @('Quarantine', 'Sieve', 'Temp', 'Events')
+
+    $liveDomains = @()
+    try {
+        $probe = New-Object -ComObject hMailServer.Application
+        if ($probe.Authenticate('Administrator', 'testar')) {
+            for ($i = 0; $i -lt $probe.Domains.Count; $i++) {
+                $liveDomains += $probe.Domains.Item($i).Name
+            }
+        }
+    } catch {
+        # If the server cannot be asked, say nothing rather than deleting a
+        # directory on a guess - a wrong answer here removes mail.
+        $liveDomains = $null
+    }
+
+    if ($null -ne $liveDomains) {
+        $orphanDirs = @()
+        foreach ($dir in Get-ChildItem -LiteralPath $dataFolder -Directory -ErrorAction SilentlyContinue) {
+            if ($reserved -contains $dir.Name) { continue }
+            if ($liveDomains -contains $dir.Name) { continue }
+            $orphanDirs += $dir.Name
+        }
+
+        if ($orphanDirs -and $Clean) {
+            foreach ($name in $orphanDirs) {
+                Remove-Item -LiteralPath (Join-Path $dataFolder $name) -Recurse -Force -ErrorAction SilentlyContinue
+            }
+            Write-Host ('  CLEAN Removed orphan domain director(ies) left by an aborted run: {0}' -f ($orphanDirs -join ', ')) -ForegroundColor Yellow
+            $orphanDirs = @()
+        }
+
+        Report ($orphanDirs.Count -eq 0) 'No orphan domain directories' `
+            ("{0} in C:\HMTest\Data has no domain in the database - left by an aborted rename. Re-run with -Clean." -f ($orphanDirs -join ', '))
+    }
+}
+
 Write-Host ''
 if ($failures -eq 0) {
     Write-Host 'Pre-flight passed - safe to run the suite.' -ForegroundColor Green
