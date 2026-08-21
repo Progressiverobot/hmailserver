@@ -997,6 +997,7 @@ interface IInterfaceAccount : IDispatch
     [propget, id(43), helpstring("True when this account has a second factor enrolled. While it is, the account password no longer authenticates a mail client and an app password is the only credential that does.")] HRESULT TOTPEnabled([out, retval] VARIANT_BOOL* pVal);
     [id(44), helpstring("Enrols a second factor and returns the otpauth:// URI to show as a QR code. The secret is inside that URI and is not retrievable afterwards. Call Save to keep it.")] HRESULT EnrolTOTP([out, retval] BSTR* pVal);
     [id(45), helpstring("Removes this account's second factor. Call Save to keep the change.")] HRESULT DisableTOTP();
+   [id(46), helpstring("Copies every message in the account to .eml files under the given directory, mirroring the folder structure. Returns the number exported; fails rather than reporting a partial export as success.")] HRESULT ExportMessages(BSTR Directory, [out, retval] long *ExportedCount);
 };
 
 
@@ -1173,6 +1174,7 @@ interface IInterfaceUtilities : IDispatch{
    // reporter only mails days that are over, so an administrator who has just
    // configured DmarcRptFromAddress has nothing to look at until tomorrow.
    [id(24), helpstring("Sends the DMARC aggregate reports (RFC 7489) collected so far to the domains that request them, rather than waiting for the hourly schedule. Set IncludeCurrentDay to also report today's still-accumulating statistics. Returns the number of reports submitted. Raises an error when DmarcRptFromAddress is not configured; requires server administrator rights.")] HRESULT SendDmarcReports([in] VARIANT_BOOL IncludeCurrentDay, [out, retval] long *ReportCount);
+   [id(25), helpstring("Erases the stored traces of an email address that account deletion leaves behind: quarantine entries, message-trace rows, greylisting triplets, distribution-list memberships, aliases, and (optionally) the per-user archive tree. Deliberately separate from deleting the account. Returns how many things were removed.")] HRESULT EraseAddressTraces([in] BSTR Address, [in] VARIANT_BOOL IncludeArchive, [out, retval] long *RemovedCount);
 };
 
 [

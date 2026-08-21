@@ -18,6 +18,12 @@
 #include "../Common/Util/Totp.h"
 #include "../Common/Util/PasswordValidator.h"
 #include "../Common/Util/Crypt.h"
+#include "../Common/Util/FileUtilities.h"
+#include "../Common/BO/IMAPFolder.h"
+#include "../Common/BO/IMAPFolders.h"
+#include "../Common/BO/Messages.h"
+#include "../Common/BO/Message.h"
+#include "../common/Persistence/PersistentMessage.h"
 #include "../Common/Util/Time.h"
 #include "../Common/Cache/AccountSizeCache.h"
 #include "../Common/Sieve/SieveStorage.h"
@@ -322,6 +328,140 @@ STDMETHODIMP InterfaceAccount::DisableTOTP()
       // client the account holder had set up, as a side effect of an unrelated
       // administrative action.
       object_->SetTotpSecret("");
+
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+namespace
+{
+   // A folder name is IMAP data, not a path: it can contain every character
+   // Windows refuses in a directory name. Each is replaced rather than dropped,
+   // so two folders differing only in a forbidden character stay distinct.
+   HM::String SanitizeFolderNameForExport(const HM::String &name)
+   {
+      HM::String result = name;
+
+      const TCHAR *forbidden = _T("\\/:*?\"<>|");
+      for (const TCHAR *c = forbidden; *c != 0; ++c)
+         result.Replace(*c, _T('_'));
+
+      result.Trim();
+      if (result.IsEmpty())
+         result = _T("_");
+
+      return result;
+   }
+
+   // Walks the folder tree depth-first, copying every message file into a
+   // directory mirroring the folder structure. Stops on the FIRST failure and
+   // says which file, because a partial export that reports success is exactly
+   // the wrong artefact to hand to a person exercising a data-access right.
+   bool ExportFolderTreeForAccount(std::shared_ptr<HM::Account> account,
+                                   std::shared_ptr<HM::IMAPFolders> folders,
+                                   const HM::String &directory,
+                                   int &exported,
+                                   HM::String &error)
+   {
+      if (!folders)
+         return true;
+
+      // No Refresh() here, and the absence is load-bearing: IMAPFolders::Refresh
+      // loads the account's ENTIRE tree into whichever collection it is called
+      // on - it is the top-level collection's loader, and it populates the
+      // sub-folder collections itself as it builds the hierarchy. Calling it on
+      // a sub-folder collection turns that collection into a second copy of the
+      // whole tree, and this walk into infinite descent. The one Refresh this
+      // export needs is done by the caller, on the root, before the walk.
+
+      for (unsigned int i = 0; i < (unsigned int) folders->GetCount(); i++)
+      {
+         std::shared_ptr<HM::IMAPFolder> folder = folders->GetItem(i);
+         if (!folder)
+            continue;
+
+         const HM::String folderDirectory = directory + _T("\\") + SanitizeFolderNameForExport(folder->GetFolderName());
+
+         std::shared_ptr<HM::Messages> messages = folder->GetMessages();
+         if (messages)
+         {
+            messages->Refresh(false);
+
+            for (unsigned int j = 0; j < (unsigned int) messages->GetCount(); j++)
+            {
+               std::shared_ptr<HM::Message> message = messages->GetItem(j);
+               if (!message)
+                  continue;
+
+               const HM::String source = HM::PersistentMessage::GetFileName(account, message);
+
+               HM::String target;
+               target.Format(_T("%s\\%u.eml"), folderDirectory.c_str(), message->GetUID());
+
+               // The copy creates the folder directory on first use, so an
+               // empty folder produces no empty directory - the export mirrors
+               // the mail, not the folder skeleton.
+               if (!HM::FileUtilities::Copy(source, target, true))
+               {
+                  error.Format(_T("The message file %s could not be copied to %s. The export is incomplete and should be re-run."),
+                     source.c_str(), target.c_str());
+                  return false;
+               }
+
+               exported++;
+            }
+         }
+
+         if (!ExportFolderTreeForAccount(account, folder->GetSubFolders(), folderDirectory, exported, error))
+            return false;
+      }
+
+      return true;
+   }
+}
+
+STDMETHODIMP InterfaceAccount::ExportMessages(BSTR Directory, long *ExportedCount)
+{
+   try
+   {
+      if (!ExportedCount)
+         return COMError::GenerateGenericMessage();
+
+      *ExportedCount = 0;
+
+      if (!object_)
+         return GetAccessDenied();
+
+      // Server admin, not domain admin: this writes to the server's own file
+      // system, and where a file may be written is a machine-level trust.
+      if (!authentication_->GetIsServerAdmin())
+         return authentication_->GetAccessDenied();
+
+      HM::String directory = Directory;
+      directory.Trim();
+
+      if (directory.IsEmpty())
+         return COMError::GenerateError("A target directory must be given.");
+
+      int exported = 0;
+      HM::String error;
+
+      std::shared_ptr<HM::IMAPFolders> rootFolders = object_->GetFolders();
+      if (rootFolders)
+         rootFolders->Refresh();
+
+      if (!ExportFolderTreeForAccount(object_, rootFolders, directory, exported, error))
+         return COMError::GenerateError(error);
+
+      *ExportedCount = exported;
+
+      HM::String logMessage;
+      logMessage.Format(_T("Exported %d message(s) for an account on an operator's request."), exported);
+      LOG_APPLICATION(logMessage);
 
       return S_OK;
    }

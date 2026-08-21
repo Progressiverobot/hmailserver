@@ -4,6 +4,7 @@
 
 #include "stdafx.h"
 #include "InterfaceUtilities.h"
+#include "../Common/Util/AddressTraceEraser.h"
 #include "../Common/TCPIP/DNSResolver.h"
 #include "../Common/TCPIP/HostNameAndIpAddress.h"
 #include "../Common/util/ServiceManager.h"
@@ -167,6 +168,44 @@ STDMETHODIMP InterfaceUtilities::SendDmarcReports(VARIANT_BOOL IncludeCurrentDay
 
       *ReportCount = HM::DmarcRptReporterTask::SendReportsNow(IncludeCurrentDay != VARIANT_FALSE);
 
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceUtilities::EraseAddressTraces(BSTR Address, VARIANT_BOOL IncludeArchive, long *RemovedCount)
+{
+   try
+   {
+      if (!RemovedCount)
+         return COMError::GenerateGenericMessage();
+
+      *RemovedCount = 0;
+
+      // Destroys records across half a dozen stores, so it is the server
+      // administrator's call - a domain administrator's authority ends at
+      // their domain, and greylisting triplets and quarantine rows do not
+      // belong to one.
+      if (!authentication_->GetIsServerAdmin())
+         return authentication_->GetAccessDenied();
+
+      HM::String address = Address;
+      address.Trim();
+
+      if (address.IsEmpty() || address.Find(_T("@")) <= 0)
+         return COMError::GenerateError("A full email address must be given.");
+
+      int removed = 0;
+      if (!HM::AddressTraceEraser::Erase(address, IncludeArchive != VARIANT_FALSE, removed))
+      {
+         *RemovedCount = removed;
+         return COMError::GenerateError("Some traces could not be removed - the hMailServer error log names the stores to retry. What could be removed has been.");
+      }
+
+      *RemovedCount = removed;
       return S_OK;
    }
    catch (...)
