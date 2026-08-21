@@ -228,7 +228,7 @@ namespace HM
       if (!pAccount)
          return false;
 
-      std::shared_ptr<Message> pNewMessage = PersistentMessage::CopyToIMAPFolder(pAccount, pMessage, pFolder);
+      std::shared_ptr<Message> pNewMessage = PersistentMessage::CopyToIMAPFolder(pMessage, pFolder);
       if (!pNewMessage)
          return false;
 
@@ -240,7 +240,15 @@ namespace HM
       // Message.Copy - was told the copy had succeeded. Remove the orphan and fail.
       if (!PersistentMessage::SaveObject(pNewMessage))
       {
-         const String orphanedFile = PersistentMessage::GetFileName(pAccount, pNewMessage);
+         // Derived from the COPY's own account, not from the source's. They are
+         // the same here by construction - the destination folder was looked up in
+         // the message's own tree - but that is precisely the assumption whose
+         // silent breakage stranded delegated copies outside every read path, so
+         // it is written as a derivation rather than trusted.
+         std::shared_ptr<const Account> copyOwner =
+            CacheContainer::Instance()->GetAccount(pNewMessage->GetAccountID());
+
+         const String orphanedFile = PersistentMessage::GetFileName(copyOwner, pNewMessage);
 
          String errorMessage;
          errorMessage.Format(_T("The copy of message %I64d could not be saved in the database. Copied file: %s"),

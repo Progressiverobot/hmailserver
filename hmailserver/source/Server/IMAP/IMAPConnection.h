@@ -110,6 +110,11 @@ namespace HM
       // nothing, and is served the "file does not exist on the server"
       // placeholder instead of the mail.
       std::shared_ptr<const Account> GetAccountOwningCurrentFolder();
+
+      // The account whose directory holds a given folder's messages. Use this for
+      // any DESTINATION folder (APPEND/COPY/MOVE); the one above only answers for
+      // the selected folder.
+      std::shared_ptr<const Account> GetAccountOwningFolder(std::shared_ptr<IMAPFolder> folder);
       
       void RefreshIMAPFolders();
       void NotifyFolderChange(eIMAPCommandType active_command);

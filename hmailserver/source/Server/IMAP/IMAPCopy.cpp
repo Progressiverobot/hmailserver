@@ -55,11 +55,19 @@ namespace HM
       if (!pFolder)
          return IMAPResult(IMAPResult::ResultBad, "The folder could not be found.");
 
-      std::shared_ptr<const Account> pAccount = pConnection->GetAccount();
+      // The quota that matters is the DESTINATION folder owner's, because that
+      // is the mailbox the copy will occupy - for an ordinary folder that is the
+      // caller, and for a delegated one it is the owner. Charging the caller let
+      // a delegate fill somebody else's mailbox past its limit while being
+      // refused at their own.
+      std::shared_ptr<const Account> pDestinationOwner = pConnection->GetAccountOwningFolder(pFolder);
 
       if (!pFolder->IsPublicFolder())
       {
-         if (!pAccount->SpaceAvailable(pOldMessage->GetSize()))
+         if (!pDestinationOwner)
+            return IMAPResult(IMAPResult::ResultNo, "The destination folder could not be resolved.");
+
+         if (!pDestinationOwner->SpaceAvailable(pOldMessage->GetSize()))
             return IMAPResult(IMAPResult::ResultNo, "[OVERQUOTA] Your quota has been exceeded.");
       }
 
@@ -67,7 +75,7 @@ namespace HM
       if (!pConnection->CheckPermission(pFolder, ACLPermission::PermissionInsert))
          return IMAPResult(IMAPResult::ResultBad, "ACL: Insert permission denied (Required for COPY command).");
 
-      std::shared_ptr<Message> pNewMessage = PersistentMessage::CopyToIMAPFolder(pAccount, pOldMessage, pFolder);
+      std::shared_ptr<Message> pNewMessage = PersistentMessage::CopyToIMAPFolder(pOldMessage, pFolder);
 
       if (!pNewMessage)
          return IMAPResult(IMAPResult::ResultBad, "Failed to copy message");

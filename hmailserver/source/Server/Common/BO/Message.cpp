@@ -81,6 +81,10 @@ namespace HM
 
       // Message flags.
       flags_ = 0;
+
+      // RFC 3030: not binary until a MAIL FROM says so. Also the value every
+      // message re-read from the database gets, since the mark does not persist
+      // yet - see the declaration.
    }
 
    std::shared_ptr<MessageRecipients>

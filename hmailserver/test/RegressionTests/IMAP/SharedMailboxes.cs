@@ -2,6 +2,7 @@
 
 using hMailServer;
 using NUnit.Framework;
+using NUnit.Framework.Legacy;   // StringAssert
 using RegressionTests.Infrastructure;
 using RegressionTests.Shared;
 
@@ -217,6 +218,112 @@ namespace RegressionTests.IMAP
          CustomAsserts.AssertFolderMessageCount(ownerInbox, 2);
 
          simulator.Disconnect();
+      }
+
+      /// <summary>
+      /// A message written into somebody else's folder must be READABLE afterwards.
+      ///
+      /// This is the assertion whose absence let a data-loss bug through a green
+      /// gate. DelegateWithReadOnlyRightsIsRefusedAppend above asserts "A01 OK" and
+      /// a folder row count, and both of those were true while the message bytes
+      /// were being written into the WRONG ACCOUNT'S DIRECTORY: the row named the
+      /// owner's folder, the file sat under the delegate's mailbox, and every FETCH
+      /// - the owner's included - resolved the owner's directory, found nothing, and
+      /// served the missing-file placeholder instead - a Postmaster message whose
+      /// body names the path the server looked in, which is how the wrong directory
+      /// was identified. "From: Postmaster" is that placeholder's hardcoded first
+      /// header and is what these tests assert the absence of; its subject and body
+      /// are configurable server messages and would be weaker markers.
+      ///
+      /// So this fetches the body back, as both parties, and asserts the bytes. It
+      /// fails against the unfixed server, which is the only property that makes it
+      /// worth having.
+      /// </summary>
+      [Test]
+      public void AppendedMessageIsReadableByBothTheDelegateAndTheOwner()
+      {
+         var owner = CreateOwnerWithMessage("writeowner@example.test", "ExistingSubject", "Existing body");
+         var delegateAccount = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "writedelegate@example.test", "test");
+
+         var ownerInbox = owner.IMAPFolders.get_ItemByName("INBOX");
+         GrantRightsOnFolder(ownerInbox, delegateAccount, RightLookup | RightRead | RightInsert);
+
+         const string sharedPath = "#Users.writeowner@example.test.INBOX";
+         const string uniqueBody = "DelegatedAppendBodyThatMustSurvive";
+         var messageData = "From: writedelegate@example.test\r\n" +
+                           "Subject: DelegatedAppendSubject\r\n\r\n" + uniqueBody;
+
+         var delegateSimulator = new ImapClientSimulator();
+         Assert.IsTrue(delegateSimulator.ConnectAndLogon(delegateAccount.Address, "test"));
+
+         // Literal size computed from the payload, never written by hand - a wrong
+         // count here hangs the fixture rather than failing it.
+         var appendCommand = "A01 APPEND \"" + sharedPath + "\" {" + messageData.Length + "}";
+         var appendResult = delegateSimulator.SendSingleCommandWithLiteral(appendCommand, messageData);
+         Assert.IsTrue(appendResult.Contains("A01 OK"), appendResult);
+         CustomAsserts.AssertFolderMessageCount(ownerInbox, 2);
+
+         // The delegate can read back what they just wrote.
+         Assert.IsTrue(delegateSimulator.SelectFolder(sharedPath));
+         var delegateView = delegateSimulator.Fetch("2 BODY[]");
+         delegateSimulator.Disconnect();
+
+         StringAssert.Contains(uniqueBody, delegateView,
+            "The delegate cannot read back the message it just appended.");
+         StringAssert.DoesNotContain("From: Postmaster", delegateView,
+            "The appended message resolved to the missing-file placeholder, which means " +
+            "its bytes were written into a directory no read path resolves.");
+
+         // And so can the owner - who is the one that would actually lose the mail.
+         var ownerSimulator = new ImapClientSimulator();
+         Assert.IsTrue(ownerSimulator.ConnectAndLogon(owner.Address, "test"));
+         Assert.IsTrue(ownerSimulator.SelectFolder("INBOX"));
+         var ownerView = ownerSimulator.Fetch("2 BODY[]");
+         ownerSimulator.Disconnect();
+
+         StringAssert.Contains(uniqueBody, ownerView,
+            "The owner cannot read a message a delegate appended to their own INBOX.");
+         StringAssert.DoesNotContain("From: Postmaster", ownerView, ownerView);
+      }
+
+      /// <summary>
+      /// COPY and MOVE across the namespace, with the same read-back proof.
+      ///
+      /// MOVE is the one that loses mail rather than merely hiding it: the copy
+      /// went to the mover's directory where nothing could resolve it, and the
+      /// source row and file were then expunged - so the only readable copy was
+      /// destroyed by a command that reported success.
+      /// </summary>
+      [Test]
+      public void CopyAndMoveIntoASharedFolderKeepTheMessageReadable()
+      {
+         var owner = CreateOwnerWithMessage("copyowner@example.test", "OwnerSubject", "Owner body");
+         var mover = CreateOwnerWithMessage("copymover@example.test", "MoverSubject", "MoverBodyThatMustSurvive");
+
+         var ownerInbox = owner.IMAPFolders.get_ItemByName("INBOX");
+         GrantRightsOnFolder(ownerInbox, mover, RightLookup | RightRead | RightInsert);
+
+         const string sharedPath = "#Users.copyowner@example.test.INBOX";
+
+         var simulator = new ImapClientSimulator();
+         Assert.IsTrue(simulator.ConnectAndLogon(mover.Address, "test"));
+         Assert.IsTrue(simulator.SelectFolder("INBOX"));
+
+         var copyResult = simulator.SendSingleCommand("A10 COPY 1 \"" + sharedPath + "\"");
+         Assert.IsTrue(copyResult.Contains("A10 OK"), copyResult);
+         CustomAsserts.AssertFolderMessageCount(ownerInbox, 2);
+         simulator.Disconnect();
+
+         // The owner must be able to read the copy.
+         var ownerSimulator = new ImapClientSimulator();
+         Assert.IsTrue(ownerSimulator.ConnectAndLogon(owner.Address, "test"));
+         Assert.IsTrue(ownerSimulator.SelectFolder("INBOX"));
+         var copied = ownerSimulator.Fetch("2 BODY[]");
+         ownerSimulator.Disconnect();
+
+         StringAssert.Contains("MoverBodyThatMustSurvive", copied,
+            "The owner cannot read a message copied into their folder.");
+         StringAssert.DoesNotContain("From: Postmaster", copied, copied);
       }
 
       [Test]

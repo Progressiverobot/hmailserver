@@ -27,7 +27,7 @@ namespace HM
       };
 
       static std::shared_ptr<Message> CopyToQueue(std::shared_ptr<const Account> sourceAccount, std::shared_ptr<Message> sourceMessage);
-      static std::shared_ptr<Message> CopyToIMAPFolder(std::shared_ptr<const Account> sourceAccount, std::shared_ptr<Message> sourceMessage, std::shared_ptr<IMAPFolder> destinationFolder);
+      static std::shared_ptr<Message> CopyToIMAPFolder(std::shared_ptr<Message> sourceMessage, std::shared_ptr<IMAPFolder> destinationFolder);
       static std::shared_ptr<Message> CopyFromQueueToInbox(std::shared_ptr<Message> sourceMessage, std::shared_ptr<const Account> destinationAccount);
 
       static bool DeleteObject(std::shared_ptr<Message> pMessage);

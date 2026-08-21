@@ -966,13 +966,26 @@ namespace HM
    std::shared_ptr<const Account>
    IMAPConnection::GetAccountOwningCurrentFolder()
    {
-      // A personal folder and the logged-in account agree, which is every case
-      // that existed before delegated mailboxes. A delegated folder does not:
-      // its messages live under the OWNER's directory, and resolving them
-      // against the reader's would look in a directory that has never held
-      // them.
-      std::shared_ptr<IMAPFolder> folder = GetCurrentFolder();
+      return GetAccountOwningFolder(GetCurrentFolder());
+   }
 
+   std::shared_ptr<const Account>
+   IMAPConnection::GetAccountOwningFolder(std::shared_ptr<IMAPFolder> folder)
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // The account whose directory holds the messages of this folder.
+   //
+   // A personal folder and the logged-in account agree, which is every case that
+   // existed before delegated mailboxes. A delegated folder does not: its
+   // messages live under the OWNER's directory, and resolving them against the
+   // caller's would look in a directory that has never held them.
+   //
+   // Taking the folder as an argument rather than always reading the selected
+   // one matters for the WRITE paths: APPEND, COPY and MOVE all name a
+   // DESTINATION folder that is not the selected one, and answering for the
+   // wrong folder there is what stranded copies outside every read path.
+   //---------------------------------------------------------------------------()
+   {
       if (!folder)
          return account_;
 
@@ -986,9 +999,9 @@ namespace HM
 
       std::shared_ptr<const Account> owner = CacheContainer::Instance()->GetAccount(ownerAccountID);
 
-      // Falling back to the reader would build a path under the wrong mailbox,
+      // Falling back to the caller would build a path under the wrong mailbox,
       // so an owner that cannot be loaded answers with nothing and lets the
-      // caller report a missing file rather than inventing a wrong one.
+      // caller refuse rather than invent a wrong path.
       return owner;
    }
 

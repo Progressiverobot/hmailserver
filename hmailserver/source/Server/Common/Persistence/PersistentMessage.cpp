@@ -457,23 +457,78 @@ namespace HM
    }
 
    std::shared_ptr<Message>
-   PersistentMessage::CopyToIMAPFolder(std::shared_ptr<const Account> sourceAccount, std::shared_ptr<Message> sourceMessage, std::shared_ptr<IMAPFolder> destinationFolder)
+   PersistentMessage::CopyToIMAPFolder(std::shared_ptr<Message> sourceMessage, std::shared_ptr<IMAPFolder> destinationFolder)
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // Copies a message's bytes into another IMAP folder, which may belong to a
+   // DIFFERENT account than the one the message is in.
+   //
+   // Both accounts are derived here, from the objects themselves, rather than
+   // passed in - and that is the whole point of this function's shape.
+   //
+   // It used to take a single `sourceAccount` and use it for both the source
+   // path and the destination path, under a comment that read "Copy within the
+   // same account". That was true for as long as it was true: before the
+   // "#Users" namespace, a folder was only ever reachable by the account that
+   // owned it, so one account really did serve both ends.
+   //
+   // Opening delegated mailboxes turned that assumption into silent mail loss.
+   // A delegate copying into somebody else's folder wrote the bytes under the
+   // CALLER's directory while the row named the OWNER's folder, so no read path
+   // could ever resolve the file - FETCH answered with the "file does not exist"
+   // placeholder - and MOVE compounded it by expunging the source afterwards,
+   // destroying the only copy anyone could still read. The read paths had
+   // already been corrected for this (IMAPConnection::GetAccountOwningCurrentFolder);
+   // the write paths had not.
+   //
+   // Deriving both ends from the source message and the destination folder makes
+   // the mismatch unrepresentable, which matters more than fixing the three call
+   // sites: a caller that CAN pass the wrong account eventually does.
+   //---------------------------------------------------------------------------()
    {
       std::shared_ptr<Message> messageCopy = CreateCopy_(sourceMessage, (int) destinationFolder->GetAccountID());
       messageCopy->SetState(Message::Delivered);
       messageCopy->SetFolderID(destinationFolder->GetID());
 
-      // Copy the message file.
-      const String sourceFile = GetFileName(sourceAccount, sourceMessage);
-      
-      String destinationFile = "";
-      
+      // The source bytes live under the account that owns the SOURCE message. An
+      // account id of zero is a public-folder message, where the address is not
+      // part of the path and an empty one is correct.
+      String sourceAddress;
+
+      if (sourceMessage->GetAccountID() > 0)
+      {
+         std::shared_ptr<const Account> sourceAccount =
+            CacheContainer::Instance()->GetAccount(sourceMessage->GetAccountID());
+
+         // Refusing beats guessing. Falling back to any other account would name
+         // a directory that has never held this message, and the copy would
+         // "succeed" against a file that is not there.
+         if (!sourceAccount)
+            return std::shared_ptr<Message>();
+
+         sourceAddress = sourceAccount->GetAddress();
+      }
+
+      const String sourceFile = GetFileName(sourceAddress, sourceMessage);
+
+      String destinationFile;
+
       if (destinationFolder->IsPublicFolder())
+      {
          destinationFile = GetFileName(messageCopy, PublicFolder);
+      }
       else
       {
-         // Copy within the same account.
-         destinationFile = GetFileName(sourceAccount, messageCopy, AccountFolder);
+         // The copy belongs under the account that owns the DESTINATION folder,
+         // which is the owner for a delegated folder and the caller for an
+         // ordinary one.
+         std::shared_ptr<const Account> destinationAccount =
+            CacheContainer::Instance()->GetAccount(destinationFolder->GetAccountID());
+
+         if (!destinationAccount)
+            return std::shared_ptr<Message>();
+
+         destinationFile = GetFileName(destinationAccount->GetAddress(), messageCopy, AccountFolder);
       }
 
       if (!FileUtilities::Copy(sourceFile, destinationFile, true))
@@ -533,6 +588,9 @@ namespace HM
       // the exact opposite of the save date, which a copy gets fresh.
       pTo->SetEmailId(sourceMessage->GetEmailId());
 
+      // RFC 3030's binary mark rides along in here: it is bit 256 of the flags
+      // now, so a copy of a binary message is still binary without a second
+      // statement that could be forgotten.
       pTo->SetFlags(sourceMessage->GetFlags());
 
       return pTo;

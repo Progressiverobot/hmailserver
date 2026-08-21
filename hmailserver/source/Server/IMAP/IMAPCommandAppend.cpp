@@ -340,10 +340,22 @@ namespace HM
       current_message_->SetFolderID(destination_folder_->GetID());
 
       // Construct a file name which we'll write the message to.
-      // Should we connect this message to an account? Yes, if this is not a public folder.
+      //
+      // The owner of the DESTINATION folder, not the caller. The row above is
+      // already stamped with destination_folder_->GetAccountID(), so using the
+      // caller here wrote the bytes into one account's directory while the row
+      // named another's - and every later FETCH, by the owner or by the appending
+      // delegate, resolved the owner's directory, found nothing, and served the
+      // "file does not exist" placeholder. The APPEND itself answered OK.
       std::shared_ptr<const Account> pMessageOwner;
       if (!destination_folder_->IsPublicFolder())
-         pMessageOwner = pConnection->GetAccount();
+      {
+         pMessageOwner = pConnection->GetAccountOwningFolder(destination_folder_);
+
+         // No owner means no path we are willing to guess at.
+         if (!pMessageOwner)
+            return IMAPResult(IMAPResult::ResultNo, "The destination folder could not be resolved.");
+      }
 
       message_file_name_ = PersistentMessage::GetFileName(pMessageOwner, current_message_);
 
