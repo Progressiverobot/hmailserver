@@ -48,6 +48,14 @@ namespace DBSetupQuick
             if (CommandLineParser.IsSilent())
                arguments += " /silent";
 
+            // Forward the administrator password as well. The create path has always
+            // done this; the upgrade path did not, and that asymmetry is what made an
+            // unattended upgrade hang. DBUpdater authenticates before it can upgrade,
+            // had no password to authenticate with, and fell through to a modal dialog
+            // nobody was there to answer.
+            if (CommandLineParser.ContainsArgument("password"))
+               arguments += " password:" + CommandLineParser.GetArgument("password");
+
             upgradeProcess.Arguments = arguments;
 
             // Launch upgrader and wait for it to complete.

@@ -149,13 +149,11 @@ namespace hMailServer.ControlPanel.Services
 
          if (halves.Length > 1)
          {
-            foreach (string trimmed in halves[1].Split(',').Select(key => key.Trim()))
+            foreach (string trimmed in halves[1].Split(',').Select(key => key.Trim())
+               .Where(key => key.Length != 0)
+               .Distinct(StringComparer.OrdinalIgnoreCase)
+               .Take(MaxRecent))
             {
-               if (trimmed.Length == 0 || usage.recent_.Count >= MaxRecent)
-                  continue;
-               if (usage.recent_.Any(r => string.Equals(r, trimmed, StringComparison.OrdinalIgnoreCase)))
-                  continue;
-
                usage.recent_.Add(trimmed);
             }
          }

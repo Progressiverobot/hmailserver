@@ -933,12 +933,13 @@ begin
          // Add the password as well, so that the administrator doesn't have to type it in
          // again if he has just entered it, or supplied it with /adminpassword.
          //
-         // This only helps the create path. On an *upgrade* the tools ask for the existing
-         // password themselves: DBSetupQuick forwards only /silent to DBUpdater, and
-         // DBUpdater's Authenticator falls through to a modal password dialog - which in a
-         // silent install has nobody to answer it and hangs the installation. Fixing that
-         // needs a change in source\Tools (forward the password on the upgrade path, and
-         // fail instead of prompting under /silent); nothing the installer can do alone.
+         // This is load-bearing on the UPGRADE path, not just the create path. DBUpdater
+         // must authenticate before it can move the schema, and until 6.2.23 DBSetupQuick
+         // forwarded only /silent to it - so on a silent upgrade DBUpdater had no password,
+         // fell through to a modal dialog nobody was there to answer, and hung the install
+         // indefinitely. DBSetupQuick now forwards this value on both paths, and the shared
+         // Authenticator fails instead of prompting under /silent, so the worst case is a
+         // reported exit code rather than a wait with no end.
          if (Length(g_szAdminPassword) > 0) then
             szParameters := szParameters + ' password:' + g_szAdminPassword;
 

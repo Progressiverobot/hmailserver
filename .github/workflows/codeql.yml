@@ -68,11 +68,15 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      # security-and-quality is the suite the Code Quality page reads. The
-      # default suite is security only, which is why that page has been empty
-      # since the workflow was added. The five rules that fire in bulk here on
-      # deliberate design rather than on defects are filtered in the config
-      # file, each with its measured count and the reasoning for excluding it.
+      # security-and-quality adds the quality-tagged queries to the security
+      # suite; their findings surface as code-scanning alerts alongside the
+      # security ones. (Not, as this comment once claimed, on the Code quality
+      # page - that page was fed by a separate GitHub-managed buildless scan,
+      # which ignored this repository's config entirely and was switched off
+      # deliberately: it re-reported, without type information, the exact
+      # rules excluded below with measured reasoning.) The six rules that fire
+      # in bulk here on deliberate design rather than on defects are filtered
+      # in the config file, each with its measured count and the reasoning.
       - name: Initialize CodeQL
         uses: github/codeql-action/init@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
         with:
@@ -81,12 +85,59 @@ jobs:
           config-file: ./.github/codeql/codeql-config.yml
           queries: security-and-quality
 
+      # Both solutions, deliberately: for a traced build, CodeQL analyses only
+      # what the compiler compiles, so a project left out of this step is a
+      # project that has never been scanned. That was DBUpdater, DBSetup,
+      # DBSetupQuick, DataDirectorySynchronizer, ImportTool and Shared until
+      # the managed quality scan's findings revealed the gap - the only scanner
+      # covering those tools was the one being switched off for ignoring the
+      # config. The test projects are not built here and stay unscanned:
+      # fixtures, not shipped code.
       - name: Build Control Panel
         run: dotnet build hmailserver/source/Tools/ControlPanel/ControlPanel.csproj -c Release
+
+      - name: Build the setup and migration tools
+        run: dotnet build "hmailserver/source/Tools/hMailServer Tools.sln" -c Release
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
         with:
+          category: "/language:csharp"
+          upload: never
+          output: sarif-results
+
+      # paths-ignore in codeql-config.yml cannot drop these results: for a
+      # compiled language analysed with build-mode: manual, CodeQL extracts
+      # whatever the compiler compiles - including the WPF XAML compiler's
+      # *.g.cs under obj/ - and a config file's path filters only restrict
+      # extraction for interpreted languages or for build-mode: none. So the
+      # build output is dropped from the SARIF here, between analyse and upload.
+      - name: Drop build-output results from the SARIF
+        shell: python
+        run: |
+          import json
+
+          def in_build_output(result):
+              locations = result.get("locations") or []
+              if not locations:
+                  return False
+              uri = locations[0].get("physicalLocation", {}).get("artifactLocation", {}).get("uri", "")
+              return any(part in ("obj", "bin") for part in uri.split("/"))
+
+          path = "sarif-results/csharp.sarif"
+          with open(path, encoding="utf-8") as f:
+              sarif = json.load(f)
+          for run in sarif["runs"]:
+              before = len(run["results"])
+              run["results"] = [r for r in run["results"] if not in_build_output(r)]
+              print(f"Dropped {before - len(run['results'])} build-output result(s); {len(run['results'])} remain.")
+          with open(path, "w", encoding="utf-8") as f:
+              json.dump(sarif, f)
+
+      - name: Upload results
+        uses: github/codeql-action/upload-sarif@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
+        with:
+          sarif_file: sarif-results/csharp.sarif
           category: "/language:csharp"
 
   cpp:
@@ -139,10 +190,9 @@ jobs:
       # security-extended rather than security-and-quality, deliberately, and
       # this is the one place the two languages are configured differently:
       #
-      #   * The Code Quality page is driven by quality-tagged queries, and
-      #     CodeQL ships none of those for C++ (measured in d1c35ec: 108 for C#,
-      #     zero for C++). So security-and-quality would buy this language no
-      #     Code Quality coverage at all.
+      #   * CodeQL ships no quality-tagged queries for C++ at all (measured
+      #     in d1c35ec: 108 for C#, zero for C++), so security-and-quality
+      #     would add nothing but the generic maintainability set.
       #   * What it would buy is roughly a hundred maintainability and
       #     reliability queries let loose on 6.1 MB of twenty-year-old ATL/COM
       #     C++, on a codebase that has never been scanned once. d1c35ec was

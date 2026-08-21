@@ -36,6 +36,14 @@ already cost a release cycle or nearly shipped a defect.
    the CREATE path a fresh install takes. 6.2.22-pre4 shipped an installer whose
    database could not be created at all, and the only symptom was a service that
    started and did not listen.
+
+   Run `build\check-schema-versions.ps1` beside it (pwsh 7, not Windows
+   PowerShell 5.1, where it dies in `Measure-Object -Property To`). It walks the
+   registered upgrade chain and proves it is contiguous and forward-only, and that
+   every step is present for every backend. That matters most on exactly the kind
+   of release this checklist keeps being used for - one that moves the schema
+   several steps past the last stable - and it was missing from this step until
+   6.2.23.
 
 7. **Version stamp**: `Version.h` (version, numeric, build),
    `section_setup_64.iss`, all seven `.csproj` `<Version>` values. Verify
@@ -45,6 +53,15 @@ already cost a release cycle or nearly shipped a defect.
    `dotnet publish` to its `publish\` folder (build-tools does not cover it),
    `build-tests.ps1`. Confirm the stamped `FileVersion` on
    `hMailServer.exe` and `publish\hMailCP.dll`.
+
+   If `hMailServer.idl` changed in this range, regenerate the checked-in COM
+   wrapper after the server build and before the tools build - the command is in
+   `source\Tools\Interop\README.md`. A stale wrapper still compiles, which is why
+   this is easy to skip: the tools use a small stable subset of the API, so nothing
+   fails, and the members added this release are simply invisible to them.
+   Regenerate AFTER any interface-ordering fix, never before, or the old vtable
+   layout is baked into the shipped wrapper permanently.
+
 9. **Full regression suite on the stamped binary** — every test, nothing
    skipped. If *anything* changes after this run, the run is void: rebuild
    and re-run. Never abort a run; if one must be stopped, expect step 4 to

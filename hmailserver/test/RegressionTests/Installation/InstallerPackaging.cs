@@ -574,5 +574,97 @@ namespace RegressionTests.Installation
                serverVersion + ".");
          }
       }
-   }
+
+      [Test]
+      [Description("The seven shipped .csproj <Version> values track Version.h. A prerelease label is allowed on them and not on Version.h, so this asserts starts-with rather than equality.")]
+      public void TestToolVersionsTrackTheServerVersion()
+      {
+         Match version = Regex.Match(ReadRepositoryFile(@"hmailserver\source\Server\Common\Application\Version.h"),
+                                     @"#define\s+HMAILSERVER_VERSION\s+""([0-9.]+)""");
+         Assert.IsTrue(version.Success, "Could not read HMAILSERVER_VERSION from Version.h.");
+         string serverVersion = version.Groups[1].Value;
+
+         // Every shipped tool, and only the shipped tools: ControlPanel.Core and
+         // ControlPanel.Tests carry no <Version> because neither is installed.
+         string[] projects =
+         {
+            @"ControlPanel\ControlPanel.csproj",
+            @"DBSetup\DBSetup.csproj",
+            @"DBSetupQuick\DBSetupQuick.csproj",
+            @"DBUpdater\DBUpdater.csproj",
+            @"DataDirectorySynchronizer\DataDirectorySynchronizer.csproj",
+            @"ImportTool\ImportTool.csproj",
+            @"Shared\Shared.csproj",
+         };
+
+         foreach (string project in projects)
+         {
+            string text = File.ReadAllText(Path.Combine(SourceRoot, @"Tools", project));
+            Match element = Regex.Match(text, @"<Version>(.+?)</Version>");
+
+            Assert.IsTrue(element.Success, project + " has no <Version> element.");
+
+            // Starts-with, not equals. The label lives on the tools (where the .NET
+            // SDK strips it back off for AssemblyVersion/FileVersion and keeps it in
+            // InformationalVersion) and must NOT live in Version.h, where the regex
+            // above - a digits-and-dots class - would stop matching and take this
+            // whole fixture down with it.
+            StringAssert.StartsWith(serverVersion, element.Groups[1].Value,
+               project + " is stamped " + element.Groups[1].Value + " but Version.h says " + serverVersion + ".");
+         }
+      }
+
+      [Test]
+      [Description("No MSVC #import output is tracked. The generated .tlh includes its .tli by ABSOLUTE path, so committing one ships a developer machine layout and breaks the build everywhere else.")]
+      public void TestNoImportGeneratedHeadersAreTracked()
+      {
+         // Walk the source tree rather than asking git: this fixture has no git
+         // dependency anywhere else, and an untracked-but-present file is exactly
+         // the normal state here - these are build output, produced on every build.
+         // What matters is that none of them is COMMITTED, and the ignore rule is
+         // what guarantees that, so the ignore rule is what this asserts.
+         string ignore = ReadRepositoryFile(".gitignore");
+
+         Assert.IsTrue(Regex.IsMatch(ignore, @"^\s*\*\.tlh\s*$", RegexOptions.Multiline),
+            ".gitignore does not ignore *.tlh. MSVC #import writes these on every build and the " +
+            "generated text embeds the absolute path of the machine that produced it.");
+
+         Assert.IsTrue(Regex.IsMatch(ignore, @"^\s*\*\.tli\s*$", RegexOptions.Multiline),
+            ".gitignore does not ignore *.tli.");
+
+         // No content sweep over the files themselves, deliberately. Untracked .tlh
+         // files are the NORMAL state of a built tree, and every one of them contains
+         // an absolute path, because that is simply what MSVC generates - so a sweep
+         // would fail on any machine that has ever built the server. The defect was
+         // never that the files exist; it was that three of them were committed, and
+         // the ignore rules above are the mechanism that prevents that recurring.
+      }
+
+      [Test]
+      [Description("An unattended upgrade must never reach a modal password dialog: DBSetupQuick has to forward the password to DBUpdater, and the shared Authenticator has to fail rather than prompt under /silent.")]
+      public void TestSilentUpgradeCannotReachAPasswordDialog()
+      {
+         // The two halves are separate files and either one alone leaves the hang in
+         // place, so both are asserted here rather than in two fixtures that could
+         // pass independently while the product still waits forever.
+         string quick = File.ReadAllText(Path.Combine(SourceRoot, @"Tools\DBSetupQuick\Program.cs"));
+         Match upgrade = Regex.Match(quick, @"private static int UpgradeDatabase\(\)(.*?)\n      \}",
+                                     RegexOptions.Singleline);
+
+         Assert.IsTrue(upgrade.Success, "Could not find UpgradeDatabase in DBSetupQuick.");
+         StringAssert.Contains("password:", upgrade.Groups[1].Value,
+            "DBSetupQuick.UpgradeDatabase does not forward the administrator password to DBUpdater. " +
+            "DBUpdater authenticates before it can move the schema, so without it an unattended " +
+            "upgrade falls through to a modal dialog nobody is there to answer.");
+
+         string authenticator = File.ReadAllText(Path.Combine(SourceRoot, @"Tools\Shared\Miscellaneous\Authenticator.cs"));
+         int silent = authenticator.IndexOf("IsSilent()", StringComparison.Ordinal);
+         int dialog = authenticator.IndexOf("formEnterPassword", StringComparison.Ordinal);
+
+         Assert.Greater(silent, -1, "Authenticator does not consult CommandLineParser.IsSilent().");
+         Assert.Greater(dialog, -1, "Authenticator no longer references formEnterPassword - update this test.");
+         Assert.Less(silent, dialog,
+            "Authenticator reaches formEnterPassword before it checks IsSilent(). Under /silent that " +
+            "dialog is not a prompt, it is a hang - and it hangs the installer waiting on the process.");
+      }   }
 }

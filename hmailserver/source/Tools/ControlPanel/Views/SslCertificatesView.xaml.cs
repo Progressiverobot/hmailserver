@@ -266,12 +266,7 @@ namespace hMailServer.ControlPanel.Views
 
       private static CertificateFinding WorstOf(params CertificateFinding[] findings)
       {
-         CertificateFinding worst = null;
-         foreach (CertificateFinding finding in findings.Where(f => f != null))
-         {
-            if (worst == null || finding.Level > worst.Level)
-               worst = finding;
-         }
+         CertificateFinding worst = findings.Where(f => f != null).MaxBy(f => f.Level);
          return worst ?? new CertificateFinding(StatusLevel.Information, "Not checked", "This entry was not checked.");
       }
 
@@ -596,7 +591,15 @@ namespace hMailServer.ControlPanel.Views
             }
          }
 
-         dynamic certs = ServerSession.Current.Application.Settings.SSLCertificates;
+         // Current cannot be null here today (this page only exists after
+         // sign-in and nothing ever clears the session), but this handler has
+         // awaited since the click and is async void - if a sign-out path ever
+         // arrives, failing soft here beats the crash dialog.
+         ServerSession session = ServerSession.Current;
+         if (session == null)
+            return;
+
+         dynamic certs = session.Application.Settings.SSLCertificates;
          try
          {
             dynamic cert = certs.Add();
