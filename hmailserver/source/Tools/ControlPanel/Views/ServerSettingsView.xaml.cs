@@ -965,11 +965,33 @@ namespace hMailServer.ControlPanel.Views
 
       // ---- definitions -------------------------------------------------------
 
+      /// <summary>
+      /// The tab with this header, creating it the first time it is asked for.
+      ///
+      /// GET-or-create, which it was not. Every call used to append a new tab, so
+      /// two cards written as Tab("General").Cards.Add(...) - plainly meaning "put
+      /// this on the General tab" - produced TWO tabs both called General, each
+      /// holding one card. The anti-spam page shipped with General, General, Sender
+      /// auth, Host checks, Greylisting, SpamAssassin, SpamAssassin, and the only way
+      /// to find the quarantine settings was to notice that the second identically
+      /// named tab was not the same as the first.
+      ///
+      /// tabs_ is rebuilt per section, so a header reused by a different section is
+      /// unaffected - the match is only ever within the page being built. Ordinal
+      /// comparison: these headers are literals in this file, and a culture-sensitive
+      /// match would be a slower way to get the same answer.
+      /// </summary>
       private TabDef Tab(string header)
       {
-         var t = new TabDef { Header = header };
-         tabs_.Add(t);
-         return t;
+         foreach (TabDef existing in tabs_)
+         {
+            if (string.Equals(existing.Header, header, StringComparison.Ordinal))
+               return existing;
+         }
+
+         var created = new TabDef { Header = header };
+         tabs_.Add(created);
+         return created;
       }
 
       private static CardDef Card(string title, string blurb = null)

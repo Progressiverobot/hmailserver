@@ -286,6 +286,42 @@ namespace hMailServer.ControlPanel.Tests.Services
          Assert.Contains("ComInert", rowType);
       }
 
+      /// <summary>
+      /// A settings page must not build two tabs with the same name.
+      ///
+      /// ServerSettingsView writes its pages as Tab("General").Cards.Add(card),
+      /// which reads as "put this card on the General tab". The helper used to
+      /// APPEND a tab on every call, so two cards written that way produced two tabs
+      /// both called General with one card each. The anti-spam page shipped showing
+      /// General, General, Sender auth, Host checks, Greylisting, SpamAssassin,
+      /// SpamAssassin - and the only route to the quarantine settings was noticing
+      /// that the second identically named tab was not the first.
+      ///
+      /// Source-scanned rather than exercised, for the same reason the withdrawn
+      /// claims above are: the page is WPF and this project is deliberately not, so
+      /// reading the source is the only way a test can see this at all. It asserts
+      /// the helper looks for an existing tab before making one, which is the
+      /// property that makes duplicates impossible rather than merely absent today.
+      /// </summary>
+      [Fact]
+      public void TabHelper_ReturnsAnExistingTabRatherThanAppendingADuplicate()
+      {
+         string source = ReadView("ServerSettingsView.xaml.cs");
+         Assert.False(source == null, "ServerSettingsView.xaml.cs could not be found from the test binaries.");
+
+         int helper = source.IndexOf("private TabDef Tab(string header)", StringComparison.Ordinal);
+         Assert.True(helper >= 0, "The Tab(string) helper has been renamed or removed.");
+
+         int close = source.IndexOf("      }", helper, StringComparison.Ordinal);
+         Assert.True(close > helper);
+
+         string body = source.Substring(helper, close - helper);
+
+         Assert.True(body.Contains("foreach") || body.Contains("FirstOrDefault") || body.Contains("Find("),
+            "Tab(string) no longer looks for an existing tab before creating one, so two cards " +
+            "asking for the same tab will produce two tabs with the same name again.");
+      }
+
       /// <summary>Walks up from the test binaries to a settings page source.</summary>
       private static string ReadView(string fileName)
       {
