@@ -10,8 +10,16 @@
 // This deliberately follows the same self-contained pattern as MetricsServer /
 // RestApiServer (raw sockets + a std::thread) rather than vendoring the
 // opentelemetry-cpp SDK (which would drag protobuf/gRPC into the v145/ATL build).
+//
+// The traces signal has two siblings, OtelMetricsExporter and OtelLogExporter,
+// each gated by its own endpoint setting and built on the same transport
+// (OtelExportChannel) and the same batching shape as this class. W3C trace
+// context - accepting a caller's traceparent and emitting this server's own -
+// lives in OtelTraceContext.
 
 #pragma once
+
+#include "OtelExportChannel.h"
 
 #include <thread>
 #include <deque>
@@ -21,6 +29,8 @@
 
 namespace HM
 {
+   struct OtelTraceContext;
+
    // OTLP span kind (subset we emit).
    enum OtelSpanKind
    {
@@ -71,13 +81,21 @@ namespace HM
       // A fresh 128-bit trace id (32 lowercase hex) identifying one session/trace.
       static AnsiString NewTraceId();
 
+      // A fresh 64-bit span id (16 lowercase hex). Public because the W3C
+      // trace-context code mints the id a prepended traceparent will carry.
+      static AnsiString NewSpanId();
+
       // Current wall-clock time as Unix nanoseconds (for stamping span events).
       static unsigned __int64 UnixNanoNow();
 
       // Starts a span as a child of the current thread-local active span. Pass a
-      // trace_id to begin a new root span (e.g. the first command of a session).
-      // Pushes the span onto the thread-local stack; pair with EndSpan.
-      OtelSpanHandle StartSpan(const AnsiString &name, int kind, const AnsiString &trace_id);
+      // trace_id to begin a new root span (e.g. the first command of a session);
+      // pass parent_span_id as well when that root continues a REMOTE trace - a
+      // validated inbound traceparent - so the new span attaches to the caller's
+      // span instead of floating. Pushes the span onto the thread-local stack;
+      // pair with EndSpan.
+      OtelSpanHandle StartSpan(const AnsiString &name, int kind, const AnsiString &trace_id,
+                               const AnsiString &parent_span_id = AnsiString());
 
       // Ends a span started with StartSpan: pops the thread-local stack and queues
       // the completed span for export, along with any attributes and span events.
@@ -89,6 +107,19 @@ namespace HM
       // the work was already measured.
       void RecordCompletedSpan(const AnsiString &name, int kind, unsigned __int64 duration_micros,
                                const std::vector<OtelAttribute> &attributes);
+
+      // Records a completed span whose ids the caller minted. Used at SMTP
+      // reception, where the span id has to be the one the prepended traceparent
+      // names - the whole point is that the exported span and the propagated
+      // header agree - and where the parent is a remote span this process never
+      // saw start. Bypasses the thread-local stack entirely.
+      void RecordLinkedSpan(const AnsiString &name, int kind, const AnsiString &trace_id,
+                            const AnsiString &span_id, const AnsiString &parent_span_id,
+                            const std::vector<OtelAttribute> &attributes);
+
+      // The current thread-local active span's ids, for correlating other
+      // signals (log records) with the trace. False when no span is active.
+      bool GetCurrentThreadContext(AnsiString &trace_id, AnsiString &span_id) const;
 
    private:
       struct CompletedSpan
@@ -107,17 +138,12 @@ namespace HM
 
       void Run_();
       void ExportBatch_(const std::vector<CompletedSpan> &spans);
-      bool PostOtlp_(const AnsiString &json);
       void Enqueue_(const CompletedSpan &span);
 
-      static AnsiString NewSpanId();
       static unsigned __int64 NowUnixNano_();
-      static AnsiString JsonEscape_(const AnsiString &value);
 
       bool enabled_;
-      AnsiString endpoint_host_;
-      int endpoint_port_;
-      AnsiString endpoint_path_;
+      OtelExportChannel channel_;
       AnsiString service_name_;
       bool last_post_failed_;
 
@@ -134,6 +160,13 @@ namespace HM
    {
    public:
       OtelSpanScope(const AnsiString &name, int kind, const AnsiString &trace_id);
+
+      // Starts the span from a validated inbound W3C context: a root span that
+      // continues the remote trace when the context is valid, a fresh local root
+      // when it is not (which is also what a rejected traceparent produces - the
+      // request is served either way). A no-op when tracing is disabled.
+      OtelSpanScope(const AnsiString &name, int kind, const OtelTraceContext &context);
+
       ~OtelSpanScope();
 
       void SetOk(bool ok) { ok_ = ok; }
@@ -141,6 +174,11 @@ namespace HM
 
       // Records a milestone event on the span (no-op when tracing is disabled).
       void AddEvent(const AnsiString &name);
+
+      // The W3C traceparent value naming this span, for propagation on an
+      // outbound call made under it. Empty when tracing is disabled, so a caller
+      // can gate the header on emptiness alone.
+      AnsiString GetTraceparentValue() const;
 
    private:
       OtelSpanScope(const OtelSpanScope &);

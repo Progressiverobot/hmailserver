@@ -9,6 +9,7 @@
 #include "SocketConstants.h"
 #include "IOOperationQueue.h"
 #include "DaneVerifier.h"
+#include "IPAddress.h"
 
 
 #include <boost/atomic.hpp>
@@ -86,6 +87,24 @@ namespace HM
       
       IPAddress GetRemoteEndpointAddress();
       unsigned long GetLocalEndpointPort();
+
+      // The address of the ACTUAL TCP peer (the socket's remote endpoint),
+      // never affected by a PROXY protocol or XCLIENT rewrite. Trust decisions
+      // - is this peer allowed to assert a client address at all - MUST be made
+      // against this, so that a chained proxy can never bootstrap trust from an
+      // address it supplied itself. GetRemoteEndpointAddress() returns the
+      // EFFECTIVE client address (the rewritten one when a rewrite applied),
+      // which is what every security check wants.
+      IPAddress GetTrueRemoteEndpointAddress();
+
+      // PROXY protocol (HAProxy): called by TCPServer before Start() when the
+      // real peer of an inbound connection is on the configured trusted-proxy
+      // list. Start() then consumes the PROXY protocol v1/v2 header first -
+      // before the TLS handshake on an SSL port and before any protocol
+      // greeting - and installs the header's source address as the session's
+      // effective client address. The session type is needed to re-check the
+      // rewritten address against the IP-range settings for the right protocol.
+      void SetProxyProtocolExpected(SessionType sessionType);
 
       void UpdateAutoLogoutTimer();
 
@@ -181,6 +200,16 @@ namespace HM
 
       AnsiString GetSslTlsCipher();
 
+      // Replaces the session's effective remote address (and source port, for
+      // logging) with one asserted by a TRUSTED upstream - the PROXY protocol
+      // header reader below, or the SMTP XCLIENT handler. After this call every
+      // consumer of GetRemoteEndpointAddress()/GetIPAddressString() - DNSBL,
+      // SPF, greylisting, auto-ban, IP-range lookups, Received headers - sees
+      // the asserted client address; the socket peer stays reachable through
+      // GetTrueRemoteEndpointAddress(). Callers are responsible for having made
+      // the trust decision against the TRUE peer address first.
+      void SetRemoteAddressOverride(const IPAddress &address, unsigned int port);
+
    private:
 
       void ThrowIfNotConnected_();
@@ -225,6 +254,18 @@ namespace HM
       // with no channel back to the connection, and because only here is the
       // final verdict (SSL_get_verify_result) known.
       void LogInboundClientCertificate_();
+
+      // PROXY protocol header consumption (see SetProxyProtocolExpected).
+      // Reads straight from the raw socket - never through receive_buffer_,
+      // because on an SSL port the bytes after the header belong to the TLS
+      // handshake, which reads from the socket directly - and only ever in
+      // amounts the parser guarantees are part of the header, so nothing beyond
+      // the header can be consumed.
+      void StartProxyProtocolRead_(size_t bytesNeeded);
+      void AsyncProxyHeaderReadCompleted(const boost::system::error_code& error, size_t bytes_transferred);
+      // The part of Start() that runs once the header has been consumed (or
+      // immediately, when no header is expected).
+      void ContinueStart_();
 
       void AsyncConnectCompleted(const boost::system::error_code& err);
       void AsyncHandshakeCompleted(const boost::system::error_code& error);
@@ -285,6 +326,18 @@ namespace HM
       // Set only for an inbound session whose client certificate verified
       // against the port's CA bundle; see GetVerifiedClientCertificateSubject.
       AnsiString verified_client_certificate_subject_;
+
+      // PROXY protocol state (inbound sessions from a trusted proxy only).
+      bool proxy_protocol_expected_ = false;
+      SessionType proxy_session_type_ = STUnknown;
+      std::vector<unsigned char> proxy_header_buffer_;
+      std::vector<unsigned char> proxy_read_chunk_;
+
+      // The effective client address when a trusted upstream rewrote it
+      // (PROXY protocol / XCLIENT). See SetRemoteAddressOverride.
+      bool has_remote_address_override_ = false;
+      IPAddress remote_address_override_;
+      unsigned int remote_port_override_ = 0;
 
       boost::atomic<ConnectionState> connection_state_;
       boost::mutex autologout_timer_;

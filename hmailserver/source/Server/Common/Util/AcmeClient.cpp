@@ -6,6 +6,7 @@
 
 #include "AcmeClient.h"
 #include "FileUtilities.h"
+#include "OtelTracer.h"
 #include "WebServicesServer.h"
 #include "Encoding/Base64.h"
 
@@ -511,6 +512,11 @@ namespace HM
    bool
    AcmeClient::Transact_(const AnsiString &url, const AnsiString &method, const AnsiString &payload, HttpResponse &response)
    {
+      // OpenTelemetry: a client span for the outbound request, whose traceparent
+      // is emitted with the request headers below. No-op unless OtelEndpoint is
+      // configured.
+      OtelSpanScope otelSpan("http.request", OtelSpanKindClient, AnsiString());
+
       try
       {
          AnsiString host;
@@ -519,6 +525,8 @@ namespace HM
 
          if (!ParseHttpsUrl(url, host, port, path))
             return false;
+
+         otelSpan.AddAttribute("http.host", host);
 
          boost::asio::io_context ioContext;
 
@@ -564,6 +572,16 @@ namespace HM
          request.append(" HTTP/1.0\r\nHost: ");
          request.append(host);
          request.append("\r\nUser-Agent: hMailServer-ACME\r\n");
+
+         // W3C trace context: propagate this request's span. Empty (and no
+         // header at all) when tracing is disabled.
+         AnsiString otelTraceparent = otelSpan.GetTraceparentValue();
+         if (!otelTraceparent.IsEmpty())
+         {
+            request.append("traceparent: ");
+            request.append(otelTraceparent);
+            request.append("\r\n");
+         }
 
          if (method == "POST")
          {

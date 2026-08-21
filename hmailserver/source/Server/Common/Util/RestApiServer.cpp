@@ -6,6 +6,8 @@
 
 #include "RestApiServer.h"
 #include "ServerStatus.h"
+#include "OtelTracer.h"
+#include "OtelTraceContext.h"
 #include "Crypt.h"
 #include "AccountLogon.h"
 #include "AcmeClient.h"
@@ -1423,6 +1425,17 @@ namespace HM
       int queryPosition = path.Find("?");
       if (queryPosition >= 0)
          path = path.Mid(0, queryPosition);
+
+      // OpenTelemetry: span this request, continuing the caller's trace when a
+      // valid traceparent header arrived and starting a fresh local one when it
+      // was absent or rejected - a rejected value never refuses the request.
+      // Named after the sanitized method (low-cardinality even for junk input)
+      // with the path as an attribute.
+      // The RAII scope covers every return below. No-op unless OtelEndpoint is
+      // configured.
+      OtelSpanScope otelSpan(OtelTraceContext::SanitizeSpanName(method), OtelSpanKindServer,
+                             OtelTraceContext::FromHttpRequest(request));
+      otelSpan.AddAttribute("http.target", path);
 
       // The web admin SPA shell is served without authentication (it is a
       // static login page). This is the only unauthenticated route in the

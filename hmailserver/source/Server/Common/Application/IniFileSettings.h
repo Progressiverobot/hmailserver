@@ -267,6 +267,20 @@ namespace HM
       // (the default) advertises nothing and enforces nothing.
       int GetPop3LoginDelaySeconds() const { return pop3_login_delay_seconds_; }
 
+      // Reverse-proxy client-address forwarding for the SMTP listener: the
+      // HAProxy PROXY protocol (v1/v2, consumed before TLS and the banner) and
+      // the Postfix XCLIENT ESMTP verb. Both are OFF by default and their
+      // trusted lists default to EMPTY, and that default is load-bearing: a
+      // peer that may rewrite its own source address has defeated DNSBL, SPF,
+      // greylisting, auto-ban and every IP-range setting at once, so nothing
+      // is trusted until the administrator names it. The lists are
+      // comma-separated IP addresses and/or CIDR ranges, always matched
+      // against the REAL TCP peer address.
+      bool GetSMTPProxyProtocolEnabled() const { return smtp_proxy_protocol_enabled_; }
+      String GetSMTPProxyProtocolTrustedIPs() const { return smtp_proxy_protocol_trusted_ips_; }
+      bool GetSMTPXClientEnabled() const { return smtp_xclient_enabled_; }
+      String GetSMTPXClientTrustedIPs() const { return smtp_xclient_trusted_ips_; }
+
       // Spam quarantine. Off by default, and that default is load-bearing: turning
       // it on changes a REFUSAL into an ACCEPTANCE, so a server that has been
       // rejecting spam at the door starts storing it instead. Retention 0 means
@@ -543,6 +557,16 @@ namespace HM
       // http://127.0.0.1:4318/v1/traces). Empty disables tracing.
       String GetOtelEndpoint() const { return otel_endpoint_; }
       String GetOtelServiceName() const { return otel_service_name_; }
+
+      // The other two OTLP signals, each gated exactly as the traces signal is:
+      // by its own endpoint URL, empty (and therefore off) by default. The
+      // metrics signal pushes the same ServerStatus counters /metrics scrapes;
+      // the logs signal forwards what the configured log mask already produces.
+      String GetOtelMetricsEndpoint() const { return otel_metrics_endpoint_; }
+      String GetOtelLogsEndpoint() const { return otel_logs_endpoint_; }
+
+      // Seconds between metric pushes. Clamped by the exporter to 5..3600.
+      int GetOtelMetricsInterval() const { return otel_metrics_interval_; }
       int GetManageSieveServerPort() const { return manage_sieve_server_port_; }
       String GetManageSieveServerBindAddress() const { return manage_sieve_server_bind_address_; }
       bool GetArcSealingEnabled() const { return arc_sealing_enabled_; }
@@ -849,6 +873,10 @@ namespace HM
       String batv_secret_;
       int max_submissions_per_ip_per_minute_;
       int pop3_login_delay_seconds_;
+      bool smtp_proxy_protocol_enabled_;
+      String smtp_proxy_protocol_trusted_ips_;
+      bool smtp_xclient_enabled_;
+      String smtp_xclient_trusted_ips_;
       bool quarantine_enabled_;
       int quarantine_retention_days_;
       bool message_trace_enabled_;
@@ -907,6 +935,9 @@ namespace HM
       int scheduled_backup_max_age_days_ = 0;
       String otel_endpoint_;
       String otel_service_name_;
+      String otel_metrics_endpoint_;
+      String otel_logs_endpoint_;
+      int otel_metrics_interval_ = 60;
       int manage_sieve_server_port_ = 0;
       String manage_sieve_server_bind_address_;
       bool arc_sealing_enabled_ = false;

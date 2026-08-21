@@ -25,6 +25,7 @@
 #include "../common/Util/MessageAttachmentStripper.h"
 #include "../common/Util/MessageUtilities.h"
 #include "../common/Util/OtelTracer.h"
+#include "../common/Util/OtelTraceContext.h"
 
 #include "../common/Scripting/Events.h"
 
@@ -293,13 +294,16 @@ namespace HM
       String preprocessingFailureReason;
       RuleResult globalRuleResult;
 
-      // OpenTelemetry: one root span per delivery attempt, with milestone events at
+      // OpenTelemetry: one span per delivery attempt, with milestone events at
       // each stage and the terminal outcome. Parents any DB-query spans run during
-      // delivery. No-op unless OtelEndpoint is configured; the trace-id generation
-      // and attribute formatting are skipped entirely when tracing is disabled.
+      // delivery. The span joins the trace named by the message's own traceparent
+      // header - the one reception prepended, or a fresh trace when the stored
+      // message carries none - so every attempt for a message, and every
+      // downstream hop, share one trace. No-op unless OtelEndpoint is configured;
+      // FromMessageFile reads nothing when tracing is disabled.
       const bool otelEnabled = OtelTracer::Instance()->IsEnabled();
       OtelSpanScope otelDelivery("delivery", OtelSpanKindInternal,
-                                 otelEnabled ? OtelTracer::NewTraceId() : AnsiString());
+                                 OtelTraceContext::FromMessageFile(messageFileName));
       if (otelEnabled)
       {
          AnsiString otelMessageId;

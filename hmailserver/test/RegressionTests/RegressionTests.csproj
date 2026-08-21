@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="12.0">
   <Import Project="..\packages\NUnit3TestAdapter.6.2.0\build\net462\NUnit3TestAdapter.props" Condition="Exists('..\packages\NUnit3TestAdapter.6.2.0\build\net462\NUnit3TestAdapter.props')" />
   <Import Project="..\packages\Microsoft.Testing.Extensions.Telemetry.2.3.3\build\netstandard2.0\Microsoft.Testing.Extensions.Telemetry.props" Condition="Exists('..\packages\Microsoft.Testing.Extensions.Telemetry.2.3.3\build\netstandard2.0\Microsoft.Testing.Extensions.Telemetry.props')" />
@@ -303,6 +303,7 @@
     <Compile Include="Infrastructure\DatabaseFailureHandling.cs" />
     <Compile Include="Infrastructure\DiskSpaceGuard.cs" />
     <Compile Include="Infrastructure\ListenerIpv6.cs" />
+    <Compile Include="Infrastructure\TraceContext.cs" />
     <Compile Include="Infrastructure\PrivacyTools.cs" />
     <Compile Include="IMAP\CapabilityAuthAdvertisement.cs" />
     <Compile Include="IMAP\MasterUserImpersonation.cs" />
@@ -399,6 +400,7 @@
     <Compile Include="IMAP\Basics.cs" />
     <Compile Include="IMAP\TombstoneRetention.cs" />
     <Compile Include="IMAP\SharedMailboxes.cs" />
+    <Compile Include="SMTP\ProxyProtocol.cs" />
     <Compile Include="IMAP\FullTextSearch.cs" />
     <Compile Include="Shared\ImapClientSimulator.cs" />
     <Compile Include="Infrastructure\IPRanges.cs" />

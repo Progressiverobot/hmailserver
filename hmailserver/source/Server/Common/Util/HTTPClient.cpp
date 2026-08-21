@@ -5,6 +5,8 @@
 #include "stdafx.h"
 #include "HTTPClient.h"
 
+#include "OtelTracer.h"
+
 using boost::asio::ip::tcp;
 
 #ifdef _DEBUG
@@ -27,6 +29,13 @@ namespace HM
    bool
    HTTPClient::ExecuteScript(const String &sServer, const String &sPage, AnsiString &output) const
    {
+      // OpenTelemetry: a client span for the outbound request, whose traceparent
+      // is emitted below so the far side can join this trace. Parents to the
+      // active span on this thread when one exists. No-op unless OtelEndpoint is
+      // configured.
+      OtelSpanScope otelSpan("http.request", OtelSpanKindClient, AnsiString());
+      otelSpan.AddAttribute("http.host", AnsiString(sServer));
+
       try
       {
          boost::asio::io_context io_context;
@@ -59,6 +68,13 @@ namespace HM
          request_stream << "GET " << AnsiString(sPage) << " HTTP/1.0\r\n";
          request_stream << "Host: " << AnsiString(sServer) << "\r\n";
          request_stream << "Accept: */*\r\n";
+
+         // W3C trace context: propagate this request's span. Empty (and no
+         // header at all) when tracing is disabled.
+         AnsiString traceparent = otelSpan.GetTraceparentValue();
+         if (!traceparent.IsEmpty())
+            request_stream << "traceparent: " << traceparent << "\r\n";
+
          request_stream << "Connection: close\r\n\r\n";
 
          // Send the request.

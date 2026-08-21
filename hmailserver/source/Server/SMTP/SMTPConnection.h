@@ -42,7 +42,8 @@ namespace HM
       SMTP_COMMAND_NOOP = 1012,
       SMTP_COMMAND_ETRN = 1013,
       SMTP_COMMAND_STARTTLS = 1014,
-      SMTP_COMMAND_BDAT = 1015   // RFC 3030 CHUNKING
+      SMTP_COMMAND_BDAT = 1015,  // RFC 3030 CHUNKING
+      SMTP_COMMAND_XCLIENT = 1016 // Postfix XCLIENT (trusted upstream forwards the real client's identity)
    };
 
    class SMTPConnection : public TCPConnection
@@ -71,6 +72,9 @@ namespace HM
       bool CheckStartTlsRequired_();
       void EnqueueWrite_(const String &sData);
       void SendBanner_();
+      // The "220 ..." greeting line, shared by the connection banner and the
+      // XCLIENT success response (which per Postfix is a fresh greeting).
+      String GetBannerText_();
 
       bool ParseAddressWithExtensions_(String mailFrom, String &address, String &parameters);
       void HandleSMTPFinalizationTaskCompleted_();
@@ -164,6 +168,19 @@ namespace HM
       // should have their client retry, not have the mail bounced back) and logs
       // the refusal.
       void RefuseForAccountSendingQuota_(AccountQuotaResult quotaResult);
+
+      // Postfix XCLIENT (advertised in EHLO as "XCLIENT ADDR NAME PORT PROTO
+      // HELO LOGIN"): a trusted upstream MTA/proxy forwards the identity of the
+      // client it is relaying for, and the session then behaves - for DNSBL,
+      // SPF, greylisting, auto-ban, IP ranges and the Received header - as if
+      // that client had connected directly. Whether the peer may use (or even
+      // see) the verb is decided by XClientPermitted_ against the REAL TCP peer
+      // address, never against an address any header supplied.
+      void ProtocolXCLIENT_(const String &sRequest);
+      bool XClientPermitted_();
+      // Re-runs the PTR prefetch after an XCLIENT ADDR rewrite, so the
+      // Received header resolves the asserted client rather than the upstream.
+      void RestartPtrPrefetch_();
 
       void ProtocolMAIL_(const String &Request);
       void ProtocolQUIT_();
@@ -368,6 +385,17 @@ namespace HM
       boost::mutex ptr_result_mutex_;
       bool ptr_lookup_completed_;   // PrefetchPtrRecord_ has stored a result
       String ptr_record_host_;      // PTR host for the Received header ("Unknown" when unresolvable)
+      // The client IP the stored PTR result belongs to. XCLIENT can change the
+      // effective client address mid-session while a prefetch for the OLD
+      // address is still in flight; a result whose address no longer matches
+      // the session's effective address is stale and must not be used.
+      AnsiString ptr_record_for_ip_;
+
+      // True when the session's authenticated state was asserted by a trusted
+      // upstream via XCLIENT LOGIN rather than by credentials presented on
+      // this connection. There is no password to re-validate at MAIL FROM in
+      // that case, so ReAuthenticateUser must not try.
+      bool authenticated_by_xclient_;
 
       // SECURITY: the per-account outbound sending ceiling in force for the current
       // transaction. Established at MAIL FROM: quota_account_ is the authenticated

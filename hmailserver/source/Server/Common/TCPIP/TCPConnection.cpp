@@ -23,6 +23,9 @@
 #include "IOOperation.h"
 #include "CertificateVerifier.h"
 #include "CipherInfo.h"
+#include "ProxyProtocol.h"
+
+#include "../BO/SecurityRange.h"
 
 #include <openssl/x509.h>
 #include <openssl/evp.h>
@@ -233,12 +236,186 @@ namespace HM
       // is owned by a shared_ptr.
       ArmSessionCeiling_();
 
+      if (proxy_protocol_expected_ && !is_client_)
+      {
+         // The PROXY protocol header is the very first thing on the wire,
+         // ahead of the TLS handshake on an SSL port and ahead of any
+         // greeting, so it must be consumed before OnConnected() can send a
+         // banner and before EnqueueHandshake(). ContinueStart_ picks the
+         // normal startup back up once the header has been read and applied.
+         StartProxyProtocolRead_(1);
+         return;
+      }
+
+      ContinueStart_();
+   }
+
+   void
+   TCPConnection::ContinueStart_()
+   {
       OnConnected();
 
       if (connection_security_ == CSSSL)
       {
          EnqueueHandshake();
       }
+   }
+
+   void
+   TCPConnection::StartProxyProtocolRead_(size_t bytesNeeded)
+   {
+      UpdateAutoLogoutTimer();
+
+      proxy_read_chunk_.resize(bytesNeeded);
+
+      // Straight off the raw socket, never through receive_buffer_: on an SSL
+      // port the bytes that follow the header belong to the TLS handshake,
+      // which reads from the socket directly, so buffering past the header
+      // would eat the ClientHello. The parser only ever asks for byte counts
+      // that are guaranteed to be part of the header (one byte at a time for
+      // the v1 text line, exact block sizes for v2), so transfer_exactly can
+      // never consume beyond it.
+      boost::asio::async_read(socket_, boost::asio::buffer(proxy_read_chunk_),
+         boost::asio::transfer_exactly(bytesNeeded),
+         std::bind(&TCPConnection::AsyncProxyHeaderReadCompleted, shared_from_this(),
+            std::placeholders::_1, std::placeholders::_2));
+   }
+
+   void
+   TCPConnection::AsyncProxyHeaderReadCompleted(const boost::system::error_code& error, size_t bytes_transferred)
+   {
+      UpdateAutoLogoutTimer();
+
+      if (error)
+      {
+         if (connection_state_ != StateConnected)
+            return;
+
+         String message;
+         message.Format(_T("TCP - The connection from %s was closed before a complete PROXY protocol header was received. Session: %d"),
+            String(GetTrueRemoteEndpointAddress().ToString()).c_str(), session_id_);
+         LOG_TCPIP(message);
+
+         EnqueueDisconnect();
+         return;
+      }
+
+      proxy_header_buffer_.insert(proxy_header_buffer_.end(),
+         proxy_read_chunk_.begin(), proxy_read_chunk_.begin() + static_cast<std::ptrdiff_t>(bytes_transferred));
+
+      size_t bytesNeeded = 0;
+      ProxyProtocolParser::Result result;
+
+      switch (ProxyProtocolParser::Parse(proxy_header_buffer_.data(), proxy_header_buffer_.size(), bytesNeeded, result))
+      {
+      case ProxyProtocolParser::StatusNeedMore:
+         StartProxyProtocolRead_(bytesNeeded);
+         return;
+
+      case ProxyProtocolParser::StatusInvalid:
+         {
+            // Only a peer the administrator listed as a trusted proxy ever
+            // reaches this code, so a malformed header is a proxy
+            // misconfiguration the administrator needs to know about rather
+            // than attacker noise. The specification forbids answering an
+            // invalid header; the connection is simply closed.
+            ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6280, "TCPConnection::AsyncProxyHeaderReadCompleted",
+               Formatter::Format(_T("Invalid PROXY protocol header received from the trusted proxy {0}: {1}. The connection has been closed. Session: {2}"),
+                  String(GetTrueRemoteEndpointAddress().ToString()), result.error_message, session_id_));
+
+            EnqueueDisconnect();
+            return;
+         }
+
+      case ProxyProtocolParser::StatusComplete:
+         break;
+      }
+
+      proxy_header_buffer_.clear();
+      proxy_header_buffer_.shrink_to_fit();
+      proxy_read_chunk_.clear();
+      proxy_read_chunk_.shrink_to_fit();
+
+      if (result.has_source_address)
+      {
+         String message;
+         message.Format(_T("TCP - PROXY protocol: the connection from %s is on behalf of %s:%u. Session: %d"),
+            String(GetTrueRemoteEndpointAddress().ToString()).c_str(),
+            String(result.source_address.ToString()).c_str(), result.source_port, session_id_);
+         LOG_TCPIP(message);
+
+         SetRemoteAddressOverride(result.source_address, result.source_port);
+
+         // The security range read at accept time matched the PROXY, not the
+         // client it forwards for. Re-evaluate against the client address so
+         // the IP-range settings - including auto-ban ranges - govern the
+         // real client, exactly as if it had connected directly.
+         std::shared_ptr<SecurityRange> securityRange = PersistentSecurityRange::ReadMatchingIP(result.source_address);
+
+         bool allow = securityRange != nullptr;
+         if (allow)
+         {
+            switch (proxy_session_type_)
+            {
+            case STSMTP:
+               allow = securityRange->GetAllowSMTP();
+               break;
+            case STPOP3:
+               allow = securityRange->GetAllowPOP3();
+               break;
+            case STIMAP:
+               allow = securityRange->GetAllowIMAP();
+               break;
+            default:
+               break;
+            }
+         }
+
+         if (!allow)
+         {
+            // The feature doing its job - a client that would have been
+            // refused at accept had it connected directly is refused here -
+            // so an application-log line, not an error report an attacker
+            // could fill the error log with.
+            String refusedMessage;
+            refusedMessage.Format(_T("TCP - PROXY protocol: the client %s presented by %s is blocked by the IP range configuration. The connection has been closed. Session: %d"),
+               String(result.source_address.ToString()).c_str(),
+               String(GetTrueRemoteEndpointAddress().ToString()).c_str(), session_id_);
+            LOG_APPLICATION(refusedMessage);
+
+            EnqueueDisconnect();
+            return;
+         }
+
+         SetSecurityRange(securityRange);
+      }
+      else
+      {
+         // A v1 UNKNOWN header, a v2 LOCAL command or a v2 AF_UNSPEC family:
+         // the header vouched for no client address, so per the specification
+         // the session keeps the real (proxy's own) endpoint address.
+         String message;
+         message.Format(_T("TCP - PROXY protocol: the header from %s carries no client address (LOCAL/UNKNOWN); the session keeps the proxy's own address. Session: %d"),
+            String(GetTrueRemoteEndpointAddress().ToString()).c_str(), session_id_);
+         LOG_TCPIP(message);
+      }
+
+      ContinueStart_();
+   }
+
+   void
+   TCPConnection::SetProxyProtocolExpected(SessionType sessionType)
+   {
+      proxy_protocol_expected_ = true;
+      proxy_session_type_ = sessionType;
+   }
+
+   void
+   TCPConnection::SetRemoteAddressOverride(const IPAddress &address, unsigned int port)
+   {
+      has_remote_address_override_ = true;
+      remote_address_override_ = address;
+      remote_port_override_ = port;
    }
 
    void
@@ -1026,8 +1203,23 @@ namespace HM
       ProcessOperationQueue_(0);
    }
 
-   IPAddress 
+   IPAddress
    TCPConnection::GetRemoteEndpointAddress()
+   {
+      // The EFFECTIVE client address: when a trusted upstream asserted the
+      // real client's address (PROXY protocol before the session started, or
+      // SMTP XCLIENT during it), every consumer of this function - DNSBL, SPF,
+      // greylisting, auto-ban, IP-range lookups, Received headers, logging -
+      // must see that address, or the checks evaluate the proxy instead of the
+      // client. Trust decisions must use GetTrueRemoteEndpointAddress().
+      if (has_remote_address_override_)
+         return remote_address_override_;
+
+      return GetTrueRemoteEndpointAddress();
+   }
+
+   IPAddress
+   TCPConnection::GetTrueRemoteEndpointAddress()
    {
       // The non-throwing overload. remote_endpoint() with no argument raises
       // boost::system::system_error once the peer has reset the connection, and several
@@ -1061,11 +1253,17 @@ namespace HM
       receive_binary_ = binary;
    }
 
-   String 
+   String
    TCPConnection::SafeGetIPAddress()
    {
       try
       {
+         // The effective client address, like GetRemoteEndpointAddress: log
+         // lines must name the client a trusted upstream asserted, not the
+         // upstream itself (the one-time rewrite is logged with both).
+         if (has_remote_address_override_)
+            return String(remote_address_override_.ToString());
+
          IPAddress address = socket_.remote_endpoint().address();
 
          return address.ToString();
@@ -1093,9 +1291,10 @@ namespace HM
    {
       if (!security_range_)
       {
-         IPAddress address(socket_.remote_endpoint().address());
-
-         security_range_ = PersistentSecurityRange::ReadMatchingIP(address);
+         // The effective client address: after a PROXY protocol or XCLIENT
+         // rewrite the range must be the one covering the real client, not
+         // the proxy (the rewrite paths also refresh an already-set range).
+         security_range_ = PersistentSecurityRange::ReadMatchingIP(GetRemoteEndpointAddress());
       }
 
       return security_range_;

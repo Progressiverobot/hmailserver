@@ -81,7 +81,7 @@ Operations and observability
 ----------------------------
 
 * **Prometheus** `/metrics` (database pool, TLS handshakes, delivery queue, authentication outcomes, delivery outcomes, command and query latency) with Kubernetes-style `/livez`, `/readyz` and `/healthz` probes.
-* **OpenTelemetry** trace export (OTLP `/v1/traces`; traces only - there is no metrics or logs exporter, and `/metrics` is a separate Prometheus endpoint), and message-to-session correlation IDs.
+* **OpenTelemetry** export over OTLP/HTTP for all three signals - traces (`/v1/traces`), metrics (`/v1/metrics`) and logs (`/v1/logs`) - each with its own endpoint setting and each off until it is set. The exported metrics are the same counters the Prometheus `/metrics` endpoint serves, under the same names, rather than a second tally. Inbound W3C `traceparent` is honoured on HTTP and on SMTP (where it travels as a message header), and emitted onward, so a message keeps one trace across hops. Plus message-to-session correlation IDs.
 * Optional **JSON-structured logs**, log retention, per-service log files, and a slow-query log with every SQL string literal redacted.
 * Per-stage timing of message acceptance, so a slow scanner, DNS lookup or event script is identified by name in the log rather than appearing as an unexplained pause. Acceptance is also bounded: if it runs past its deadline the sender gets a temporary `451` and retries, instead of waiting for a reply that never comes. Every wait that can hold a pooled thread - scanners, DNS, event scripts, external processes, outbound sessions - has a ceiling, and the work queue reports which task is holding each thread when they are all busy. See [diagnosing slow or stalled mail](hmailserver/docs/DiagnosingStalledMail.md).
 * Backup and restore, a read-only **message-store consistency check** with a recovery report, configurable message-store fsync, graceful-shutdown drain, and a documented active/passive HA runbook.
@@ -370,6 +370,31 @@ Administration and monitoring:
    MetricsServerAuthPassword=
    MetricsServerCertificateFile= ; PEM; both must be set to serve the metrics port over HTTPS
    MetricsServerPrivateKeyFile=  ; without them the port stays plain HTTP and says so in the application log
+   OtelEndpoint=                 ; OTLP/HTTP collector for TRACES (empty = off). Default path /v1/traces, default
+                                 ; port 4318. One endpoint per signal; this one carries spans and nothing else
+   OtelServiceName=hmailserver   ; service.name on every exported span, metric and log record
+   OtelMetricsEndpoint=          ; OTLP/HTTP collector for METRICS (empty = off). Default path /v1/metrics. Pushes
+                                 ; the same counters /metrics serves, under the same names - not a second tally.
+                                 ; Queue depth, database probes and certificate expiry are NOT exported: they are
+                                 ; computed by the metrics listener from database and file reads
+   OtelLogsEndpoint=             ; OTLP/HTTP collector for LOGS (empty = off). Default path /v1/logs. The same lines,
+                                 ; categories and mask the log files get, with trace and span ids attached where a
+                                 ; span was active on the logging thread
+   OtelMetricsInterval=60        ; seconds between metric pushes; clamped to 5-3600
+   SMTPProxyProtocolEnabled=0    ; accept the HAProxy PROXY protocol (v1 and v2) on the SMTP listener. Off by default.
+                                 ; A front-end proxy otherwise makes every connection appear to come from IT, which
+                                 ; silently misdirects DNSBL, SPF, greylisting, auto-ban and the IP range rules
+   SMTPProxyProtocolTrustedIPs=  ; comma-separated addresses or CIDR ranges allowed to send a PROXY header. EMPTY
+                                 ; MEANS NOBODY, which is the safe default - a peer that can rewrite its own source
+                                 ; address has defeated every IP-based control here. Matched against the real TCP
+                                 ; peer, never an address a header supplied, so chained proxies cannot bootstrap
+                                 ; trust. An entry that does not parse matches nothing and is logged once per run.
+                                 ; NOTE: once an address is listed the header becomes REQUIRED from it - configure
+                                 ; the proxy to send it (HAProxy: send-proxy or send-proxy-v2) or it will be dropped
+   SMTPXClientEnabled=0          ; accept the Postfix XCLIENT command. Off by default
+   SMTPXClientTrustedIPs=        ; comma-separated addresses or CIDR ranges allowed to use XCLIENT. Empty means
+                                 ; nobody. XCLIENT is not advertised in EHLO to an upstream that is not listed, so
+                                 ; asking reveals nothing about the deployment
    ScheduledBackupTime=          ; 24-hour local "HH:MM" for a daily backup (empty = none); wins over the interval
    ScheduledBackupIntervalMinutes=0   ; minutes between backups (0 = none). What is backed up and where comes
                                  ; from the existing backup settings; these only decide when

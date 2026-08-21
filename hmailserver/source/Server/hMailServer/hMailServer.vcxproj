@@ -428,6 +428,11 @@ EXIT 0
     <ClCompile Include="..\Common\TCPIP\SslContextInitializer.cpp" />
     <ClCompile Include="..\Common\TCPIP\SynchronousConnection.cpp" />
     <ClCompile Include="..\Common\TCPIP\TCPConnection.cpp" />
+    <ClCompile Include="..\Common\TCPIP\ProxyProtocol.cpp" />
+    <ClCompile Include="..\Common\Util\OtelExportChannel.cpp" />
+    <ClCompile Include="..\Common\Util\OtelLogExporter.cpp" />
+    <ClCompile Include="..\Common\Util\OtelMetricsExporter.cpp" />
+    <ClCompile Include="..\Common\Util\OtelTraceContext.cpp" />
     <ClCompile Include="..\Common\TCPIP\TCPConnectionFactory.cpp" />
     <ClCompile Include="..\Common\TCPIP\TCPServer.cpp" />
     <ClCompile Include="..\Common\Threading\Task.cpp" />
@@ -1019,6 +1024,11 @@ EXIT 0
     <ClInclude Include="..\Common\TCPIP\SslContextInitializer.h" />
     <ClInclude Include="..\Common\TCPIP\SynchronousConnection.h" />
     <ClInclude Include="..\Common\TCPIP\TCPConnection.h" />
+    <ClInclude Include="..\Common\TCPIP\ProxyProtocol.h" />
+    <ClInclude Include="..\Common\Util\OtelExportChannel.h" />
+    <ClInclude Include="..\Common\Util\OtelLogExporter.h" />
+    <ClInclude Include="..\Common\Util\OtelMetricsExporter.h" />
+    <ClInclude Include="..\Common\Util\OtelTraceContext.h" />
     <ClInclude Include="..\Common\TCPIP\TCPConnectionFactory.h" />
     <ClInclude Include="..\Common\TCPIP\TCPServer.h" />
     <ClInclude Include="..\Common\Threading\AsynchronousTask.h" />

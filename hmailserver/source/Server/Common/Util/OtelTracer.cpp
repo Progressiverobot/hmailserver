@@ -6,9 +6,10 @@
 
 #include "OtelTracer.h"
 
+#include "OtelTraceContext.h"
+
 #include "../Application/IniFileSettings.h"
 
-#include <ws2tcpip.h>
 #include <random>
 #include <chrono>
 
@@ -41,7 +42,6 @@ namespace HM
 
    OtelTracer::OtelTracer() :
       enabled_(false),
-      endpoint_port_(4318),
       service_name_("hmailserver"),
       last_post_failed_(false),
       running_(false)
@@ -67,51 +67,12 @@ namespace HM
          return;
       }
 
-      // Parse "http://host[:port][/path]". Only plain HTTP is supported (the
-      // standard OTLP/HTTP collector port is 4318); TLS export is future work.
-      AnsiString lower = endpoint;
-      lower.MakeLower();
-      if (lower.Find("http://") != 0)
+      AnsiString configureError;
+      if (!channel_.Configure(endpoint, "/v1/traces", configureError))
       {
-         LOG_APPLICATION("OtelTracer: OtelEndpoint must be an http:// URL; tracing disabled.");
-         enabled_ = false;
-         return;
-      }
-
-      AnsiString remainder = endpoint.Mid(7); // strip "http://"
-      int slashPos = remainder.Find("/");
-      AnsiString hostPort;
-      if (slashPos < 0)
-      {
-         hostPort = remainder;
-         endpoint_path_ = "/v1/traces";
-      }
-      else
-      {
-         hostPort = remainder.Mid(0, slashPos);
-         endpoint_path_ = remainder.Mid(slashPos);
-      }
-
-      if (endpoint_path_.IsEmpty() || endpoint_path_ == "/")
-         endpoint_path_ = "/v1/traces";
-
-      int colonPos = hostPort.Find(":");
-      if (colonPos < 0)
-      {
-         endpoint_host_ = hostPort;
-         endpoint_port_ = 4318;
-      }
-      else
-      {
-         endpoint_host_ = hostPort.Mid(0, colonPos);
-         endpoint_port_ = atoi(hostPort.Mid(colonPos + 1).c_str());
-         if (endpoint_port_ <= 0 || endpoint_port_ > 65535)
-            endpoint_port_ = 4318;
-      }
-
-      if (endpoint_host_.IsEmpty())
-      {
-         LOG_APPLICATION("OtelTracer: OtelEndpoint has no host; tracing disabled.");
+         String message;
+         message.Format(_T("OtelTracer: OtelEndpoint %s; tracing disabled."), String(configureError).c_str());
+         LOG_APPLICATION(message);
          enabled_ = false;
          return;
       }
@@ -127,7 +88,7 @@ namespace HM
 
       String message;
       message.Format(_T("OtelTracer: exporting spans to http://%s:%d%s."),
-         String(endpoint_host_).c_str(), endpoint_port_, String(endpoint_path_).c_str());
+         String(channel_.GetHost()).c_str(), channel_.GetPort(), String(channel_.GetPath()).c_str());
       LOG_APPLICATION(message);
    }
 
@@ -188,7 +149,8 @@ namespace HM
    }
 
    OtelSpanHandle
-   OtelTracer::StartSpan(const AnsiString &name, int kind, const AnsiString &trace_id)
+   OtelTracer::StartSpan(const AnsiString &name, int kind, const AnsiString &trace_id,
+                         const AnsiString &parent_span_id)
    {
       OtelSpanHandle h;
       if (!enabled_)
@@ -203,9 +165,10 @@ namespace HM
       std::vector<OtelSpanHandle> &stack = ActiveSpans_();
       if (!trace_id.IsEmpty())
       {
-         // A new root span for the session trace.
+         // A new root span for the session trace - parented to a remote span
+         // when the caller carried a validated inbound trace context.
          h.trace_id = trace_id;
-         h.parent_span_id = "";
+         h.parent_span_id = parent_span_id;
       }
       else if (!stack.empty())
       {
@@ -288,6 +251,43 @@ namespace HM
    }
 
    void
+   OtelTracer::RecordLinkedSpan(const AnsiString &name, int kind, const AnsiString &trace_id,
+                                const AnsiString &span_id, const AnsiString &parent_span_id,
+                                const std::vector<OtelAttribute> &attributes)
+   {
+      if (!enabled_)
+         return;
+
+      CompletedSpan cs;
+      cs.trace_id = trace_id;
+      cs.span_id = span_id;
+      cs.parent_span_id = parent_span_id;
+      cs.name = name;
+      cs.kind = kind;
+      cs.end_unix_nano = NowUnixNano_();
+      cs.start_unix_nano = cs.end_unix_nano;
+      cs.attributes = attributes;
+      cs.ok = true;
+
+      Enqueue_(cs);
+   }
+
+   bool
+   OtelTracer::GetCurrentThreadContext(AnsiString &trace_id, AnsiString &span_id) const
+   {
+      if (!enabled_)
+         return false;
+
+      std::vector<OtelSpanHandle> &stack = ActiveSpans_();
+      if (stack.empty())
+         return false;
+
+      trace_id = stack.back().trace_id;
+      span_id = stack.back().span_id;
+      return true;
+   }
+
+   void
    OtelTracer::Enqueue_(const CompletedSpan &span)
    {
       {
@@ -327,45 +327,12 @@ namespace HM
       }
    }
 
-   AnsiString
-   OtelTracer::JsonEscape_(const AnsiString &value)
-   {
-      AnsiString out;
-      int len = value.GetLength();
-      for (int i = 0; i < len; i++)
-      {
-         char c = value.GetAt(i);
-         switch (c)
-         {
-         case '\"': out += "\\\""; break;
-         case '\\': out += "\\\\"; break;
-         case '\b': out += "\\b"; break;
-         case '\f': out += "\\f"; break;
-         case '\n': out += "\\n"; break;
-         case '\r': out += "\\r"; break;
-         case '\t': out += "\\t"; break;
-         default:
-            if (static_cast<unsigned char>(c) < 0x20)
-            {
-               AnsiString esc;
-               esc.Format("\\u%04x", static_cast<unsigned int>(static_cast<unsigned char>(c)));
-               out += esc;
-            }
-            else
-            {
-               out += c;
-            }
-         }
-      }
-      return out;
-   }
-
    void
    OtelTracer::ExportBatch_(const std::vector<CompletedSpan> &spans)
    {
       AnsiString json;
       json += "{\"resourceSpans\":[{\"resource\":{\"attributes\":[{\"key\":\"service.name\",\"value\":{\"stringValue\":\"";
-      json += JsonEscape_(service_name_);
+      json += OtelExportChannel::JsonEscape(service_name_);
       json += "\"}}]},\"scopeSpans\":[{\"scope\":{\"name\":\"hmailserver\"},\"spans\":[";
 
       for (size_t i = 0; i < spans.size(); i++)
@@ -388,7 +355,7 @@ namespace HM
          }
 
          json += "\"name\":\"";
-         json += JsonEscape_(s.name);
+         json += OtelExportChannel::JsonEscape(s.name);
          json += "\",";
 
          AnsiString fields;
@@ -402,9 +369,9 @@ namespace HM
             if (a > 0)
                json += ",";
             json += "{\"key\":\"";
-            json += JsonEscape_(s.attributes[a].key);
+            json += OtelExportChannel::JsonEscape(s.attributes[a].key);
             json += "\",\"value\":{\"stringValue\":\"";
-            json += JsonEscape_(s.attributes[a].value);
+            json += OtelExportChannel::JsonEscape(s.attributes[a].value);
             json += "\"}}";
          }
          json += "],";
@@ -417,7 +384,7 @@ namespace HM
             AnsiString ev;
             ev.Format("{\"timeUnixNano\":\"%I64u\",\"name\":\"", s.events[e].time_unix_nano);
             json += ev;
-            json += JsonEscape_(s.events[e].name);
+            json += OtelExportChannel::JsonEscape(s.events[e].name);
             json += "\"}";
          }
          json += "],";
@@ -431,7 +398,7 @@ namespace HM
 
       json += "]}]}]}";
 
-      if (PostOtlp_(json))
+      if (channel_.PostJson(json))
       {
          last_post_failed_ = false;
       }
@@ -440,81 +407,6 @@ namespace HM
          LOG_APPLICATION("OtelTracer: failed to export spans to the OTLP endpoint (further failures suppressed until the next success).");
          last_post_failed_ = true;
       }
-   }
-
-   bool
-   OtelTracer::PostOtlp_(const AnsiString &json)
-   {
-      SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-      if (sock == INVALID_SOCKET)
-         return false;
-
-      bool ok = false;
-
-      do
-      {
-         sockaddr_in addr = {};
-         addr.sin_family = AF_INET;
-         addr.sin_port = htons(static_cast<unsigned short>(endpoint_port_));
-
-         if (inet_pton(AF_INET, endpoint_host_.c_str(), &addr.sin_addr) != 1)
-         {
-            // Not a literal IPv4 address - resolve the host name.
-            addrinfo hints = {};
-            hints.ai_family = AF_INET;
-            hints.ai_socktype = SOCK_STREAM;
-
-            addrinfo *result = nullptr;
-            if (getaddrinfo(endpoint_host_.c_str(), nullptr, &hints, &result) != 0 || result == nullptr)
-               break;
-
-            addr.sin_addr = reinterpret_cast<sockaddr_in*>(result->ai_addr)->sin_addr;
-            freeaddrinfo(result);
-         }
-
-         DWORD timeout = 3000;
-         setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout));
-         setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout));
-
-         if (connect(sock, reinterpret_cast<const sockaddr*>(&addr), sizeof(addr)) == SOCKET_ERROR)
-            break;
-
-         AnsiString request;
-         request.Format("POST %s HTTP/1.1\r\nHost: %s:%d\r\nContent-Type: application/json\r\nContent-Length: %d\r\nConnection: close\r\n\r\n",
-            endpoint_path_.c_str(), endpoint_host_.c_str(), endpoint_port_, json.GetLength());
-         request += json;
-
-         int total = request.GetLength();
-         int sent = 0;
-         const char *buffer = request.c_str();
-         bool sendOk = true;
-         while (sent < total)
-         {
-            int n = send(sock, buffer + sent, total - sent, 0);
-            if (n == SOCKET_ERROR || n <= 0)
-            {
-               sendOk = false;
-               break;
-            }
-            sent += n;
-         }
-
-         if (!sendOk)
-            break;
-
-         // Confirm a 2xx status line; the body is irrelevant to us.
-         char response[256];
-         int received = recv(sock, response, sizeof(response) - 1, 0);
-         if (received > 0)
-         {
-            response[received] = 0;
-            if (strstr(response, " 200") || strstr(response, " 202") || strstr(response, " 204"))
-               ok = true;
-         }
-      } while (false);
-
-      closesocket(sock);
-      return ok;
    }
 
    //
@@ -530,6 +422,35 @@ namespace HM
          handle_ = OtelTracer::Instance()->StartSpan(name, kind, trace_id);
          active_ = handle_.active;
       }
+   }
+
+   OtelSpanScope::OtelSpanScope(const AnsiString &name, int kind, const OtelTraceContext &context) :
+      active_(false),
+      ok_(true)
+   {
+      if (OtelTracer::Instance()->IsEnabled())
+      {
+         // A valid context continues the caller's trace under the caller's span;
+         // an invalid one - absent, malformed, all-zero ids - starts a fresh
+         // local trace, exactly as if no context had arrived at all.
+         if (context.valid)
+            handle_ = OtelTracer::Instance()->StartSpan(name, kind, context.trace_id, context.parent_span_id);
+         else
+            handle_ = OtelTracer::Instance()->StartSpan(name, kind, OtelTracer::NewTraceId());
+
+         active_ = handle_.active;
+      }
+   }
+
+   AnsiString
+   OtelSpanScope::GetTraceparentValue() const
+   {
+      if (!active_)
+         return "";
+
+      // The sampled flag is this server's own recording decision - an active
+      // span here IS recorded - never an echo of anything inbound.
+      return OtelTraceContext::FormatTraceparent(handle_.trace_id, handle_.span_id, true);
    }
 
    OtelSpanScope::~OtelSpanScope()

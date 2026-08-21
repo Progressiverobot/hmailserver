@@ -9,6 +9,8 @@
 #include "WebServicesServer.h"
 #include "AcmeClient.h"
 #include "FileUtilities.h"
+#include "OtelTracer.h"
+#include "OtelTraceContext.h"
 
 #include "../BO/Domains.h"
 #include "../BO/Domain.h"
@@ -861,6 +863,17 @@ namespace HM
       }
 
       AnsiString host = GetRequestHost_(request);
+
+      // OpenTelemetry: span this request, continuing the caller's trace when a
+      // valid traceparent header arrived and starting a fresh local one when it
+      // was absent or rejected - a rejected value never refuses the request.
+      // Named after the sanitized method (low-cardinality even for junk input)
+      // with the path as an attribute.
+      // The RAII scope covers every return below. No-op unless OtelEndpoint is
+      // configured.
+      OtelSpanScope otelSpan(OtelTraceContext::SanitizeSpanName(method), OtelSpanKindServer,
+                             OtelTraceContext::FromHttpRequest(request));
+      otelSpan.AddAttribute("http.target", path);
 
       try
       {

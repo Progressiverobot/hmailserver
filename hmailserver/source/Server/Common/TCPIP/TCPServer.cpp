@@ -23,6 +23,7 @@
 #include "../Util/Encoding/Base64.h"
 
 #include "SslContextInitializer.h"
+#include "ProxyProtocol.h"
 
 #include <openssl/ssl.h>
 
@@ -431,6 +432,22 @@ namespace HM
          }
 
          connection->SetSecurityRange(securityRange);
+
+         // PROXY protocol (HAProxy) for the SMTP listener: when enabled and
+         // the peer - the address this TCP connection ACTUALLY comes from,
+         // never one any header supplied - is on the administrator's trusted
+         // proxy list, the connection must begin with a PROXY protocol v1/v2
+         // header, which Start() consumes before the TLS handshake and before
+         // any greeting and uses to install the real client's address. Off by
+         // default, and the trusted list defaults to empty: a peer that may
+         // rewrite its own source address has defeated every IP-based control
+         // on this server, so nothing is trusted until it is named here.
+         if (sessionType_ == STSMTP &&
+             IniFileSettings::Instance()->GetSMTPProxyProtocolEnabled() &&
+             TrustedProxyList::Matches(IniFileSettings::Instance()->GetSMTPProxyProtocolTrustedIPs(), remoteAddress))
+         {
+            connection->SetProxyProtocolExpected(sessionType_);
+         }
 
          // Now TCPConnection is responsible for decreasing the session count when the connection ends:
          // its destructor releases a slot for every connection past StatePendingConnect, which Start()

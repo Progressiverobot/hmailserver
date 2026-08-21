@@ -6,6 +6,7 @@
 
 #include "../Util/Time.h"
 #include "../Util/File.h"
+#include "../Util/OtelLogExporter.h"
 
 #include "NcsaLogFormatter.h"
 #include "SqlLogDevice.h"
@@ -152,6 +153,13 @@ namespace HM
    void
    Logger::Write_(const Entry &entry, const String &line, LogType lt)
    {
+      // Forward to the OTLP log exporter (a no-op unless OtelLogsEndpoint is
+      // configured). Before device routing, so an entry the SQL device accepts
+      // is exported all the same; from the pre-rendered entry, so the exporter
+      // never depends on which file format the devices use.
+      OtelLogExporter::Instance()->OnLogEntry(entry.category, entry.thread, entry.session,
+                                              entry.remote_host, entry.message);
+
       if (log_device_ == DeviceSQL)
       {
          if (SqlLogDevice::Instance()->Enqueue(entry.category, (int) lt, entry.thread, entry.session,
@@ -291,6 +299,13 @@ namespace HM
       // the main log, not by a second row for the same event.
       if (GetLoggingEnabled())
          Write_(entry, sData, Normal);
+      else
+         // The error log is written even when logging is off, and the OTLP logs
+         // signal mirrors that: an error must reach a configured collector
+         // whatever the log mask says. When logging IS enabled the Write_ call
+         // above already forwarded this entry, so this is not a second copy.
+         OtelLogExporter::Instance()->OnLogEntry(entry.category, entry.thread, entry.session,
+                                                 entry.remote_host, entry.message);
    }
 
 

@@ -50,6 +50,8 @@
 #include "../common/Threading/WorkQueue.h"
 
 #include "../Common/TCPIP/DNSResolver.h"
+#include "../Common/TCPIP/ProxyProtocol.h"
+#include "../common/persistence/PersistentSecurityRange.h"
 
 #include "../Common/AntiSpam/AntiSpamConfiguration.h"
 #include "../Common/AntiSpam/SpamProtection.h"
@@ -108,6 +110,7 @@ namespace HM
       bdat_chunk_size_(0),
       bdat_chunk_remaining_(0),
       ptr_lookup_completed_(false),
+      authenticated_by_xclient_(false),
       start_tls_used_(false)
    {
       smtpconf_ = Configuration::Instance()->GetSMTPConfiguration();
@@ -181,20 +184,40 @@ namespace HM
       // Postfix in the reported case - timed out and abandoned the message.
       String ptr_host = "Unknown";
 
+      // Captured once: the effective client address can change mid-session
+      // (XCLIENT), and the result below is stamped with the address it was
+      // resolved for so a stale lookup can never be attributed to a new one.
+      AnsiString lookup_address = GetIPAddressString();
+
       std::vector<String> results;
       DNSResolver dns_resolver;
-      if (dns_resolver.GetPTRRecords(GetIPAddressString(), results) && results.size() > 0)
+      if (dns_resolver.GetPTRRecords(lookup_address, results) && results.size() > 0)
       {
          ptr_host = results[0];
       }
       else
       {
-         LOG_DEBUG("Could not retrieve PTR record for IP (false)! " + GetIPAddressString());
+         LOG_DEBUG("Could not retrieve PTR record for IP (false)! " + lookup_address);
       }
 
       boost::lock_guard<boost::mutex> guard(ptr_result_mutex_);
       ptr_record_host_ = ptr_host;
+      ptr_record_for_ip_ = lookup_address;
       ptr_lookup_completed_ = true;
+   }
+
+   void
+   SMTPConnection::RestartPtrPrefetch_()
+   {
+      // Same worker-thread rules as the prefetch in OnConnected: the blocking
+      // DnsQuery must never run on the network I/O thread.
+      std::shared_ptr<AsynchronousTask<TCPConnection> > ptrTask =
+         std::shared_ptr<AsynchronousTask<TCPConnection> >(new AsynchronousTask<TCPConnection>
+            (std::bind(&SMTPConnection::PrefetchPtrRecord_, this), shared_from_this()));
+
+      std::shared_ptr<WorkQueue> lookupQueue = Application::Instance()->GetNameLookupWorkQueue();
+      if (lookupQueue)
+         lookupQueue->AddTask(ptrTask);
    }
 
    String
@@ -205,6 +228,13 @@ namespace HM
       // If the lookup is still in flight, fall back to "Unknown" rather than wait:
       // the Received header is being generated on the I/O thread.
       if (!ptr_lookup_completed_)
+         return "Unknown";
+
+      // A result for an address that is no longer the session's effective
+      // client address (XCLIENT rewrote it while a lookup for the old address
+      // was in flight) is stale; the header must not name the upstream's host
+      // as the client's.
+      if (ptr_record_for_ip_ != GetIPAddressString())
          return "Unknown";
 
       return ptr_record_host_;
@@ -237,12 +267,11 @@ namespace HM
       }
    }
 
-   void 
-   SMTPConnection::SendBanner_()
+   String
+   SMTPConnection::GetBannerText_()
    {
-
       String sWelcome = Configuration::Instance()->GetSMTPConfiguration()->GetWelcomeMessage();
-      
+
       String sESMTP = " ESMTP";
 
       String sData = "220 ";
@@ -254,10 +283,15 @@ namespace HM
       else
          sData += sWelcome;
 
-      EnqueueWrite_(sData);
+      return sData;
+   }
+
+   void
+   SMTPConnection::SendBanner_()
+   {
+      EnqueueWrite_(GetBannerText_());
 
       EnqueueRead();
-
    }
 
    AnsiString 
@@ -299,6 +333,8 @@ namespace HM
          return SMTP_COMMAND_ETRN;
       else if (sFirstWord == _T("STARTTLS"))
          return SMTP_COMMAND_STARTTLS;
+      else if (sFirstWord == _T("XCLIENT"))
+         return SMTP_COMMAND_XCLIENT;
 
       return SMTP_COMMAND_UNKNOWN;
    }
@@ -429,12 +465,34 @@ namespace HM
 
       sFirstWord.MakeUpper();
 
+      // A PROXY protocol header arriving as an SMTP command means a peer that
+      // was NOT authorised to assert a client address is trying to anyway - a
+      // trusted proxy's header is consumed before the banner and never reaches
+      // the command parser. Per the PROXY protocol specification an invalid
+      // header must not be answered; the connection is dropped, because
+      // "ignore and continue" would leave the real client's commands being
+      // read as though the proxy had sent them. Only active while the feature
+      // is enabled - switched off, the verb stays the unknown command it
+      // always was, and nothing changes.
+      if (sFirstWord == _T("PROXY") &&
+          IniFileSettings::Instance()->GetSMTPProxyProtocolEnabled())
+      {
+         String message;
+         message.Format(_T("SMTP - A PROXY protocol header was received from the untrusted peer %s. The connection has been closed. Session: %d"),
+            String(GetTrueRemoteEndpointAddress().ToString()).c_str(), GetSessionID());
+         LOG_APPLICATION(message);
+
+         pending_disconnect_ = true;
+         EnqueueDisconnect();
+         return;
+      }
+
       eSMTPCommandTypes eCommandType = GetCommandType_(sFirstWord);
 
       // The following commands are available regardless of of state.
       switch (eCommandType)
       {
-         case SMTP_COMMAND_HELP: ProtocolHELP_(); return; 
+         case SMTP_COMMAND_HELP: ProtocolHELP_(); return;
          case SMTP_COMMAND_EHLO: ProtocolEHLO_(sRequest); return;
          case SMTP_COMMAND_HELO: ProtocolHELO_(sRequest); return;
          case SMTP_COMMAND_QUIT: ProtocolQUIT_(); return;
@@ -446,8 +504,17 @@ namespace HM
       {
          case INITIAL:
             {
+               // XCLIENT is permitted before EHLO (Postfix allows it at any
+               // point outside a mail transaction), and after a successful
+               // XCLIENT the state returns here so the upstream re-EHLOs.
+               if (eCommandType == SMTP_COMMAND_XCLIENT)
+               {
+                  ProtocolXCLIENT_(sRequest);
+                  break;
+               }
+
                requestedAuthenticationType_ = AUTH_NONE;
-               SendErrorResponse_(503, "Bad sequence of commands"); 
+               SendErrorResponse_(503, "Bad sequence of commands");
                break;
             }
          case HEADER:
@@ -472,8 +539,9 @@ namespace HM
                      break;
                   case SMTP_COMMAND_DATA: ProtocolDATA_(); break;
                   case SMTP_COMMAND_BDAT: ProtocolBDAT_(sRequest); break;
+                  case SMTP_COMMAND_XCLIENT: ProtocolXCLIENT_(sRequest); break;
                   default:
-                     SendErrorResponse_(503, "Bad sequence of commands"); 
+                     SendErrorResponse_(503, "Bad sequence of commands");
                }
                break;
             }
@@ -804,7 +872,16 @@ namespace HM
          // Nothing to re-authenticate
          return true;
       }
-         
+
+      if (authenticated_by_xclient_)
+      {
+         // The authenticated state was asserted by a trusted upstream via
+         // XCLIENT LOGIN: the client authenticated with the upstream, and no
+         // password ever crossed this connection, so there is nothing to
+         // re-validate here.
+         return true;
+      }
+
       std::shared_ptr<const Account> pAccount = PasswordValidator::ValidatePassword(username_, password_);
       
       if (pAccount)
@@ -2329,6 +2406,14 @@ namespace HM
       // and honour NOTIFY=NEVER when generating delivery-failure notifications.
       sData += "\r\n250-DSN";
 
+      // XCLIENT (Postfix): advertised ONLY to a configured trusted upstream,
+      // decided against the REAL TCP peer address. Advertising it to anyone
+      // else both invites the attempt and leaks the deployment shape, so an
+      // untrusted peer never learns the verb exists (and gets 550 if it tries
+      // anyway).
+      if (XClientPermitted_())
+         sData += "\r\n250-XCLIENT ADDR NAME PORT PROTO HELO LOGIN";
+
       if (!IsSSLConnection())
       {
          if (GetConnectionSecurity() == CSSTARTTLSOptional ||
@@ -2594,6 +2679,282 @@ namespace HM
       if (current_state_ == INITIAL)
          current_state_ = HEADER;
 
+   }
+
+   bool
+   SMTPConnection::XClientPermitted_()
+   {
+      if (!IniFileSettings::Instance()->GetSMTPXClientEnabled())
+         return false;
+
+      // Decided against the REAL TCP peer - the socket's remote endpoint -
+      // never against the effective (possibly rewritten) client address. A
+      // PROXY protocol rewrite earlier in the session must not let the
+      // FORWARDED client inherit the upstream's XCLIENT authority, and an
+      // XCLIENT rewrite must not chain into further trust: whatever addresses
+      // have been asserted, the entity on the other end of this socket is the
+      // one being authorised.
+      return TrustedProxyList::Matches(
+         IniFileSettings::Instance()->GetSMTPXClientTrustedIPs(),
+         GetTrueRemoteEndpointAddress());
+   }
+
+   void
+   SMTPConnection::ProtocolXCLIENT_(const String &sRequest)
+   {
+      // Postfix XCLIENT: a trusted upstream forwards the identity of the
+      // client it relays for; on success the server answers with a fresh 220
+      // greeting and the upstream re-issues EHLO, after which the session
+      // behaves as if the asserted client had connected directly.
+
+      // Authorisation first, before any syntax checking, so an untrusted peer
+      // learns nothing but the refusal. The verb is not advertised to
+      // untrusted peers either (see SendEHLOKeywords_), so reaching this is a
+      // probe or a misconfigured upstream. Postfix's wording.
+      if (!XClientPermitted_())
+      {
+         SendResponse_(550, _T("5.7.0"), _T("Error: insufficient authorization."));
+         return;
+      }
+
+      // On a STARTTLS-required port the upstream must negotiate TLS before
+      // asserting identities, the same rule every other verb follows.
+      if (!CheckStartTlsRequired_())
+         return;
+
+      if (current_message_)
+      {
+         SendResponse_(503, _T("5.5.1"), _T("XCLIENT is not permitted inside a mail transaction."));
+         return;
+      }
+
+      String sAttributes = sRequest.Mid(7).Trim();
+
+      if (sAttributes.IsEmpty())
+      {
+         SendResponse_(501, _T("5.5.4"), _T("Bad command parameter syntax."));
+         return;
+      }
+
+      // Validate every attribute before applying any: a command that is
+      // half-good must not leave the session half-rewritten.
+      bool haveAddr = false;
+      IPAddress newAddress;
+      bool havePort = false;
+      unsigned int newPort = 0;
+      bool haveName = false;
+      String newName;
+      bool haveHelo = false;
+      String newHelo;
+      bool haveProto = false;
+      bool newEsmtp = false;
+      bool haveLogin = false;
+      String newLogin;
+
+      std::vector<String> attributes = StringParser::SplitString(sAttributes, " ");
+
+      for (String attribute : attributes)
+      {
+         attribute = attribute.Trim();
+         if (attribute.IsEmpty())
+            continue;
+
+         int equalsIndex = attribute.Find(_T("="));
+         if (equalsIndex <= 0 || equalsIndex == attribute.GetLength() - 1)
+         {
+            SendResponse_(501, _T("5.5.4"), _T("Bad command parameter syntax."));
+            return;
+         }
+
+         String name = attribute.Left(equalsIndex);
+         name.MakeUpper();
+         String value = attribute.Mid(equalsIndex + 1);
+
+         // The two defined "don't know" values (the brackets are literal).
+         // [UNAVAILABLE] = the upstream does not have this datum;
+         // [TEMPUNAVAIL] = it could not obtain it right now. Neither carries
+         // an address or name to apply.
+         bool unavailable = value.CompareNoCase(_T("[UNAVAILABLE]")) == 0 ||
+                            value.CompareNoCase(_T("[TEMPUNAVAIL]")) == 0;
+
+         if (name == _T("ADDR"))
+         {
+            if (unavailable)
+               continue; // "don't know" must not rewrite the address.
+
+            String addressValue = value;
+
+            // Postfix sends IPv6 addresses with an "IPV6:" prefix.
+            if (addressValue.Left(5).CompareNoCase(_T("IPV6:")) == 0)
+               addressValue = addressValue.Mid(5);
+
+            if (!newAddress.TryParse(addressValue, false))
+            {
+               SendResponse_(501, _T("5.5.4"), _T("Bad ADDR syntax."));
+               return;
+            }
+
+            haveAddr = true;
+         }
+         else if (name == _T("PORT"))
+         {
+            if (unavailable)
+               continue;
+
+            bool valid = !value.IsEmpty() && value.GetLength() <= 5;
+            unsigned int parsedPort = 0;
+
+            if (valid)
+            {
+               for (int i = 0; i < value.GetLength(); i++)
+               {
+                  wchar_t c = value.GetAt(i);
+                  if (c < '0' || c > '9')
+                  {
+                     valid = false;
+                     break;
+                  }
+                  parsedPort = parsedPort * 10 + (c - '0');
+               }
+            }
+
+            if (!valid || parsedPort > 65535)
+            {
+               SendResponse_(501, _T("5.5.4"), _T("Bad PORT syntax."));
+               return;
+            }
+
+            havePort = true;
+            newPort = parsedPort;
+         }
+         else if (name == _T("NAME"))
+         {
+            haveName = true;
+            newName = unavailable ? String(_T("Unknown")) : value;
+         }
+         else if (name == _T("HELO"))
+         {
+            haveHelo = true;
+            newHelo = unavailable ? String(_T("")) : value;
+         }
+         else if (name == _T("PROTO"))
+         {
+            if (value.CompareNoCase(_T("SMTP")) == 0)
+               newEsmtp = false;
+            else if (value.CompareNoCase(_T("ESMTP")) == 0)
+               newEsmtp = true;
+            else
+            {
+               SendResponse_(501, _T("5.5.4"), _T("Bad PROTO syntax."));
+               return;
+            }
+
+            haveProto = true;
+         }
+         else if (name == _T("LOGIN"))
+         {
+            haveLogin = true;
+            newLogin = unavailable ? String(_T("")) : value;
+         }
+         else
+         {
+            // Only the attributes advertised in EHLO are within the contract.
+            SendResponse_(501, _T("5.5.4"), _T("Bad command parameter syntax."));
+            return;
+         }
+      }
+
+      if (haveAddr)
+      {
+         // The rewritten client must still be allowed to connect at all: the
+         // IP-range check that ran at accept time saw the upstream's address,
+         // not this one. A client that would have been refused at the door -
+         // including by an auto-ban range - is refused here.
+         std::shared_ptr<SecurityRange> securityRange = PersistentSecurityRange::ReadMatchingIP(newAddress);
+
+         if (!securityRange || !securityRange->GetAllowSMTP())
+         {
+            String message;
+            message.Format(_T("SMTP - XCLIENT from %s: the asserted client address %s is blocked by the IP range configuration. The connection has been closed. Session: %d"),
+               String(GetTrueRemoteEndpointAddress().ToString()).c_str(),
+               String(newAddress.ToString()).c_str(), GetSessionID());
+            LOG_APPLICATION(message);
+
+            SendResponse_(550, _T("5.7.1"), _T("Client host rejected by IP range policy."));
+            pending_disconnect_ = true;
+            EnqueueDisconnect();
+            return;
+         }
+
+         String message;
+         message.Format(_T("SMTP - XCLIENT from %s: the session's client address is now %s. Session: %d"),
+            String(GetTrueRemoteEndpointAddress().ToString()).c_str(),
+            String(newAddress.ToString()).c_str(), GetSessionID());
+         LOG_TCPIP(message);
+
+         // Applied before any of the checks that consume the client address
+         // can run again: DNSBL/SPF/greylisting run at MAIL FROM / RCPT TO,
+         // auto-ban registration at AUTH, the Received header at DATA - all
+         // later than this point, and all read GetRemoteEndpointAddress().
+         SetRemoteAddressOverride(newAddress, havePort ? newPort : 0);
+         SetSecurityRange(securityRange);
+
+         // Whatever PTR was prefetched belongs to the upstream's address.
+         {
+            boost::lock_guard<boost::mutex> guard(ptr_result_mutex_);
+            ptr_lookup_completed_ = false;
+            ptr_record_host_.Empty();
+            ptr_record_for_ip_.Empty();
+         }
+
+         if (!haveName)
+            RestartPtrPrefetch_();
+      }
+
+      if (haveName)
+      {
+         boost::lock_guard<boost::mutex> guard(ptr_result_mutex_);
+         ptr_record_host_ = newName;
+         ptr_record_for_ip_ = GetIPAddressString();
+         ptr_lookup_completed_ = true;
+      }
+
+      if (haveHelo)
+         helo_host_ = newHelo;
+
+      if (haveProto)
+         esmtp_session_ = newEsmtp;
+
+      if (haveLogin)
+      {
+         if (newLogin.IsEmpty())
+         {
+            // LOGIN=[UNAVAILABLE]: the upstream says the client is not
+            // authenticated.
+            isAuthenticated_ = false;
+            authenticated_by_xclient_ = false;
+            username_ = "";
+         }
+         else
+         {
+            // The trusted upstream vouches that the client authenticated with
+            // it under this name. No password crossed this connection;
+            // ReAuthenticateUser knows not to demand one.
+            username_ = newLogin;
+            password_ = "";
+            isAuthenticated_ = true;
+            authenticated_by_xclient_ = true;
+         }
+      }
+
+      // XCLIENT begins a new SMTP session: transaction state is forgotten,
+      // the state machine returns to the just-connected position, and the
+      // reply is a fresh 220 greeting, after which the upstream re-issues
+      // EHLO. (ParseData arms the next command read after this returns.)
+      ResetCurrentMessage_();
+      current_state_ = INITIAL;
+
+      EnqueueWrite_(GetBannerText_());
    }
 
    void
@@ -3636,6 +3997,7 @@ namespace HM
    {
       requestedAuthenticationType_ = AUTH_NONE;
       isAuthenticated_ = false;
+      authenticated_by_xclient_ = false;
 
       scram_session_.reset();
 

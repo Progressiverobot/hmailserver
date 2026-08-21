@@ -31,6 +31,8 @@
 #include "../Util/Utilities.h"
 #include "../Util/MetricsServer.h"
 #include "../Util/OtelTracer.h"
+#include "../Util/OtelMetricsExporter.h"
+#include "../Util/OtelLogExporter.h"
 #include "../Mime/MimeCode.h"
 
 #include "Property.h"
@@ -497,8 +499,11 @@ namespace HM
          metrics_server_->Start(IniFileSettings::Instance()->GetMetricsServerBindAddress(), metricsPort);
       }
 
-      // Start the OpenTelemetry trace exporter if an OTLP endpoint is configured.
+      // Start the OpenTelemetry exporters - one per OTLP signal, each a no-op
+      // unless its own endpoint is configured.
       OtelTracer::Instance()->Start();
+      OtelMetricsExporter::Instance()->Start();
+      OtelLogExporter::Instance()->Start();
 
       // Start the REST administration API if enabled in hMailServer.ini.
       int restApiPort = IniFileSettings::Instance()->GetRestApiPort();
@@ -853,8 +858,12 @@ namespace HM
          metrics_server_.reset();
       }
 
-      // Stop the OpenTelemetry trace exporter (flushes any queued spans).
+      // Stop the OpenTelemetry exporters (each flushes what it has queued). The
+      // log exporter goes last of the three so the others' shutdown log lines
+      // still reach a collector.
       OtelTracer::Instance()->Stop();
+      OtelMetricsExporter::Instance()->Stop();
+      OtelLogExporter::Instance()->Stop();
 
       if (rest_api_server_)
       {

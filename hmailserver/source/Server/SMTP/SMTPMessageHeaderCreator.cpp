@@ -14,6 +14,7 @@
 
 #include "../Common/Util/Utilities.h"
 #include "../Common/Util/Time.h"
+#include "../Common/Util/OtelTraceContext.h"
 #include "../Common/Mime/Mime.h"
 
 #ifdef _DEBUG
@@ -129,6 +130,12 @@ namespace HM
          if (!original_headers_->FieldExists("X-AuthUserIP"))
             new_header_lines += "X-AuthUserIP: " + overriden_authenticated_ip_address + "\r\n";
       }
+
+      // W3C trace context: continue or start this message's trace and prepend
+      // this hop's traceparent, the way the Received header above is prepended.
+      // Returns nothing (and the message is byte-for-byte untouched) unless
+      // OtelEndpoint is configured. See Common/Util/OtelTraceContext.h.
+      new_header_lines += String(OtelTraceContext::CreateReceptionHeaders(original_headers_, session_id_));
 
       AnsiString new_header_lines_ansi = new_header_lines;
       return new_header_lines_ansi;

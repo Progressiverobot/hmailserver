@@ -441,6 +441,9 @@ namespace HM
       scheduled_backup_max_age_days_ = ReadIniSettingInteger_("Settings", "ScheduledBackupMaxAgeDays", 0);
       otel_endpoint_ = ReadIniSettingString_("Settings", "OtelEndpoint", "");
       otel_service_name_ = ReadIniSettingString_("Settings", "OtelServiceName", "hmailserver");
+      otel_metrics_endpoint_ = ReadIniSettingString_("Settings", "OtelMetricsEndpoint", "");
+      otel_logs_endpoint_ = ReadIniSettingString_("Settings", "OtelLogsEndpoint", "");
+      otel_metrics_interval_ = ReadIniSettingInteger_("Settings", "OtelMetricsInterval", 60);
       manage_sieve_server_port_ = ReadIniSettingInteger_("Settings", "ManageSieveServerPort", 0);
       manage_sieve_server_bind_address_ = ReadIniSettingString_("Settings", "ManageSieveServerBindAddress", "127.0.0.1");
       arc_sealing_enabled_ = ReadIniSettingInteger_("Settings", "ArcSealingEnabled", 0) == 1;
@@ -608,6 +611,10 @@ namespace HM
       batv_secret_ = ReadIniSettingString_("Settings", "BATVSecret", "");
       max_submissions_per_ip_per_minute_ = ReadIniSettingInteger_("Settings", "MaxSubmissionsPerIPPerMinute", 0);
       pop3_login_delay_seconds_ = ReadIniSettingInteger_("Settings", "Pop3LoginDelaySeconds", 0);
+      smtp_proxy_protocol_enabled_ = ReadIniSettingInteger_("Settings", "SMTPProxyProtocolEnabled", 0) == 1;
+      smtp_proxy_protocol_trusted_ips_ = ReadIniSettingString_("Settings", "SMTPProxyProtocolTrustedIPs", "");
+      smtp_xclient_enabled_ = ReadIniSettingInteger_("Settings", "SMTPXClientEnabled", 0) == 1;
+      smtp_xclient_trusted_ips_ = ReadIniSettingString_("Settings", "SMTPXClientTrustedIPs", "");
       quarantine_enabled_ = ReadIniSettingInteger_("Settings", "QuarantineEnabled", 0) == 1;
       quarantine_retention_days_ = ReadIniSettingInteger_("Settings", "QuarantineRetentionDays", 30);
       message_trace_enabled_ = ReadIniSettingInteger_("Settings", "MessageTraceEnabled", 0) == 1;
