@@ -240,7 +240,27 @@ namespace DBUpdater
          // "Server message 'QUOTA_WARNING' could not be found" to the one user whose
          // mailbox filled up.
          new SchemaProbe(6022, "hm_servermessages.QUOTA_WARNING",
-                         "update hm_servermessages set smtext = smtext where smname = 'QUOTA_WARNING' and 1 = 0")
+                         "update hm_servermessages set smtext = smtext where smname = 'QUOTA_WARNING' and 1 = 0"),
+
+         // Upgrade6022to6023* - the full-text index. One probe per column across
+         // both tables: a half-applied step here leaves a server that starts, indexes
+         // happily into a table missing the column the search then reads, and answers
+         // SEARCH with silence rather than an error - which is the worst shape a
+         // failure can take, because nobody reports mail they cannot find.
+         new SchemaProbe(6023, "hm_messageindexterms.mitmessageid",
+                         "update hm_messageindexterms set mitmessageid = mitmessageid where 1 = 0"),
+
+         new SchemaProbe(6023, "hm_messageindexterms.mitaccountid",
+                         "update hm_messageindexterms set mitaccountid = mitaccountid where 1 = 0"),
+
+         new SchemaProbe(6023, "hm_messageindexterms.mitterm",
+                         "update hm_messageindexterms set mitterm = mitterm where 1 = 0"),
+
+         new SchemaProbe(6023, "hm_messageindexstate.misaccountid",
+                         "update hm_messageindexstate set misaccountid = misaccountid where 1 = 0"),
+
+         new SchemaProbe(6023, "hm_messageindexstate.mishighwatermark",
+                         "update hm_messageindexstate set mishighwatermark = mishighwatermark where 1 = 0")
       };
 
       /// <summary>

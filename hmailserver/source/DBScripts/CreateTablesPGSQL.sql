@@ -920,4 +920,23 @@ insert into hm_servermessages (smname, smtext) values ('QUOTA_WARNING', E'Your m
 
 insert into hm_servermessages (smname, smtext) values ('QUOTA_WARNING_SUBJECT', 'Your mailbox is almost full');
 
-insert into hm_dbversion values (6022);
+create table hm_messageindexterms
+(
+	mitmessageid bigint not null,
+	mitaccountid int not null,
+	mitterm varchar(64) not null
+);
+
+CREATE INDEX idx_hm_messageindexterms_lookup ON hm_messageindexterms (mitaccountid, mitterm);
+
+CREATE INDEX idx_hm_messageindexterms_message ON hm_messageindexterms (mitmessageid);
+
+create table hm_messageindexstate
+(
+	misaccountid int not null,
+	mishighwatermark bigint not null
+);
+
+CREATE INDEX idx_hm_messageindexstate ON hm_messageindexstate (misaccountid);
+
+insert into hm_dbversion values (6023);
