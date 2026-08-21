@@ -1,0 +1,49 @@
+name: Coding style
+
+# Automatically enforces the project's selected coding style, which is
+# declared in .editorconfig (C++/C#: spaces, width 3).
+#
+# Two checks:
+#   1. editorconfig-checker validates every text file against .editorconfig
+#      (indentation style, trailing whitespace, final newline).
+#   2. dotnet format verifies the C# code against the same .editorconfig
+#      via Roslyn, without changing anything (--verify-no-changes).
+#
+# Style exceptions live in .ecrc / .editorconfig, in the repository, where
+# they are visible and reviewable — not in anyone's local settings.
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  editorconfig:
+    name: editorconfig-checker
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check files against .editorconfig
+        uses: editorconfig-checker/action-editorconfig-checker@v2
+
+  csharp-format:
+    name: dotnet format (verify only)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Verify Control Panel formatting
+        run: dotnet format whitespace hmailserver/source/Tools/ControlPanel/ControlPanel.csproj --verify-no-changes
