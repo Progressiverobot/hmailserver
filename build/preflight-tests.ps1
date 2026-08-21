@@ -294,6 +294,27 @@ if (Test-Path $dataFolder) {
     }
 }
 
+# Housekeeping, not a check: the NUnit console runner drops a
+# nunit-agent_<pid>.log in the repository root for every test-agent process it
+# starts, and leaves it behind empty when nothing went wrong. They are gitignored
+# (*.log) so they never reach a commit, but they accumulate at roughly fifty a
+# day and bury the actual contents of the root in an editor's file list - 565 of
+# them had built up by 21 August 2026.
+#
+# Swept only under -Clean, and only when EMPTY: a non-empty one is a runner
+# failure somebody may still want to read, and this is the wrong place to decide
+# it is finished with. Deliberately reports nothing when there is nothing to do,
+# because a pre-flight that talks about tidiness trains people to skim it.
+if ($Clean) {
+    $strayAgentLogs = @(Get-ChildItem -LiteralPath $repoRoot -Filter 'nunit-agent_*.log' -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Length -eq 0 })
+
+    if ($strayAgentLogs.Count -gt 0) {
+        $strayAgentLogs | Remove-Item -Force -ErrorAction SilentlyContinue
+        Write-Host ('  CLEAN Removed {0} empty nunit-agent log(s) from the repository root.' -f $strayAgentLogs.Count) -ForegroundColor Yellow
+    }
+}
+
 Write-Host ''
 if ($failures -eq 0) {
     Write-Host 'Pre-flight passed - safe to run the suite.' -ForegroundColor Green
