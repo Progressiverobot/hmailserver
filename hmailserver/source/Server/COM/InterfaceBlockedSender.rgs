@@ -1,0 +1,24 @@
+HKCR
+{
+	hMailServer.BlockedSender.1 = s 'BlockedSender Class'
+	{
+		CLSID = s '{B2C34A51-D343-4CA4-9FA4-9E1DDC8E11BD}'
+	}
+	hMailServer.BlockedSender = s 'BlockedSender Class'
+	{
+		CLSID = s '{B2C34A51-D343-4CA4-9FA4-9E1DDC8E11BD}'
+		CurVer = s 'hMailServer.BlockedSender.1'
+	}
+	NoRemove CLSID
+	{
+		ForceRemove {B2C34A51-D343-4CA4-9FA4-9E1DDC8E11BD} = s 'BlockedSender Class'
+		{
+			ProgID = s 'hMailServer.BlockedSender.1'
+			VersionIndependentProgID = s 'hMailServer.BlockedSender'
+			ForceRemove 'Programmable'
+			LocalServer32 = s '%MODULE%'
+			val AppID = s '%APPID%'
+			'TypeLib' = s '{DB241B59-A1B1-4C59-98FC-8D101A2995F2}'
+		}
+	}
+}

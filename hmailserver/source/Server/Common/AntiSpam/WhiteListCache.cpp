@@ -82,21 +82,22 @@ namespace HM
    {
 
       WhiteListAddresses addresses;
-      addresses.Refresh();
-
-      std::vector<std::shared_ptr<WhiteListAddress> > vec = addresses.GetConstVector();
-
-      auto iter = vec.begin();
-      auto iterEnd = vec.end();
-
-      std::vector<std::shared_ptr<WhiteListAddress>> items;
-      for (; iter != iterEnd; iter++)
+      if (!addresses.Refresh())
       {
-         std::shared_ptr<WhiteListAddress> whiteAddress = (*iter);
-
-         items.push_back(whiteAddress);
+         // The database could not be read. Keep the previous contents and
+         // leave needRefresh_ set so the next message retries; replacing
+         // them with an empty list would silently stop whitelisting.
+         return;
       }
 
-      whitelistItems_ = items;
+      whitelistItems_ = addresses.GetConstVector();
+
+      // Cleared only here, and only after a successful load. This line was
+      // missing, so the flag stayed true forever and every message paid a
+      // full hm_whitelist read - the cache existed but never cached. It is
+      // also why the missing invalidation in PersistentWhiteListAddress::
+      // DeleteObject went unnoticed: a cache that reloads every time cannot
+      // be stale.
+      needRefresh_ = false;
    }
 }

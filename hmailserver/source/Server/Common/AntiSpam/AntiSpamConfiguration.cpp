@@ -9,6 +9,7 @@
 #include "../BO/DNSBlackLists.h"
 #include "../BO/GreyListingWhiteAddresses.h"
 #include "../BO/WhiteListAddresses.h"
+#include "../BO/BlockedSenders.h"
 #include "../Persistence/PersistentGreyList.h"
 
 #ifdef _DEBUG
@@ -208,6 +209,10 @@ namespace HM
       if (!GetWhiteListAddresses()->XMLStore(pBackupNode, iOptions))
          return false;
 
+      // BLOCKED SENDERS
+      if (!GetBlockedSenders()->XMLStore(pBackupNode, iOptions))
+         return false;
+
       // DNS BLACK LISTS
       if (!dnsBlackLists_->XMLStore(pBackupNode, iOptions))
          return false;
@@ -229,6 +234,10 @@ namespace HM
 
       // WHITELIST
       if (!GetWhiteListAddresses()->XMLLoad(pBackupNode, iRestoreOptions))
+         return false;
+
+      // BLOCKED SENDERS
+      if (!GetBlockedSenders()->XMLLoad(pBackupNode, iRestoreOptions))
          return false;
 
       // DNS BLACK LISTS
@@ -513,6 +522,14 @@ namespace HM
       std::shared_ptr<WhiteListAddresses> whiteListAddresses = std::shared_ptr<WhiteListAddresses>(new WhiteListAddresses);
       whiteListAddresses->Refresh();
       return whiteListAddresses;
+   }
+
+   std::shared_ptr<BlockedSenders>
+   AntiSpamConfiguration::GetBlockedSenders()
+   {
+      std::shared_ptr<BlockedSenders> blockedSenders = std::shared_ptr<BlockedSenders>(new BlockedSenders);
+      blockedSenders->Refresh();
+      return blockedSenders;
    }
 
    std::shared_ptr<GreyListingWhiteAddresses>

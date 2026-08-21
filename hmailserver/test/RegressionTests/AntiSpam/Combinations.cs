@@ -153,13 +153,37 @@ namespace RegressionTests.AntiSpam
 
          _settings.Logging.EnableLiveLogging(false);
 
-         var iFirst = liveLog.IndexOf("Spam test:");
-         var iLast = liveLog.LastIndexOf("Spam test:");
-         Assert.AreNotEqual(-1, iFirst);
+         // The property under test is that the pipeline STOPS as soon as the score
+         // crosses the delete threshold: with the threshold at 2 and every enabled
+         // test worth 5, the first test that matches must also be the last that
+         // runs.
+         //
+         // This used to assert that only one "Spam test:" line was logged at all,
+         // which was a proxy rather than the property. SpamTestRunner logs a line
+         // for EVERY test it runs, matched or not, so the proxy quietly assumed the
+         // first test in the pipeline would be one that matches. The sender
+         // blacklist is registered ahead of the others (it is the cheapest test, and
+         // matching there avoids a DNS lookup), scores zero on an empty list, and
+         // broke the proxy while leaving the property untouched - same final score,
+         // same refusal, one more debug line.
+         //
+         // So count the tests that actually SCORED. Exactly one may, because the
+         // one that does ends the pipeline.
+         var scored = System.Text.RegularExpressions.Regex.Matches(
+            liveLog, @"Spam test: [^,]+, Score: (-?\d+)");
 
-         // there should only be one spam test, since any spam match
-         // should result in a spam score over the delete threshold.
-         Assert.AreEqual(iFirst, iLast);
+         Assert.AreNotEqual(0, scored.Count, "no spam test ran at all");
+
+         var withScore = new System.Collections.Generic.List<string>();
+         foreach (System.Text.RegularExpressions.Match m in scored)
+         {
+            if (int.Parse(m.Groups[1].Value) != 0)
+               withScore.Add(m.Value);
+         }
+
+         Assert.AreEqual(1, withScore.Count,
+            "exactly one test should have scored before the pipeline stopped, but these did: " +
+            string.Join(" | ", withScore));
       }
    }
 }

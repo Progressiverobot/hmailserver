@@ -22,15 +22,17 @@ namespace HM
    }
 
 
-   void 
+   bool
    WhiteListAddresses::Refresh()
    //---------------------------------------------------------------------------()
    // DESCRIPTION:
-   // Reads all SURBL servers from the database.
+   // Reads all white list addresses from the database. The bool result lets
+   // WhiteListCache tell "the list is empty" from "the database could not
+   // be read", which must not be cached the same way.
    //---------------------------------------------------------------------------()
    {
       String sSQL = "select * from hm_whitelist order by whiteloweripaddress1 asc, whiteloweripaddress2 asc";
-      DBLoad_(sSQL);
+      return DBLoad_(sSQL);
    }
 
 

@@ -92,6 +92,7 @@ public:
 
    STDMETHOD(get_GreyListingWhiteAddresses)(/*[out, retval]*/ IInterfaceGreyListingWhiteAddresses **pVal);
    STDMETHOD(get_WhiteListAddresses)(/*[out, retval]*/ IInterfaceWhiteListAddresses **pVal);
+   STDMETHOD(get_BlockedSenders)(/*[out, retval]*/ IInterfaceBlockedSenders **pVal);
 
    STDMETHOD(get_UseSPF)(/*[out, retval]*/ VARIANT_BOOL *pVal);
    STDMETHOD(put_UseSPF)(/*[in]*/ VARIANT_BOOL newVal);	

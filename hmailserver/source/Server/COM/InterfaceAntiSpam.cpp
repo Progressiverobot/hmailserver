@@ -13,10 +13,12 @@
 #include "../Common/AntiSpam/DKIM/DKIM.h"
 
 #include "..\Common\BO\WhiteListAddresses.h"
+#include "..\Common\BO\BlockedSenders.h"
 
 #include "InterfaceAntiSpam.h"
 #include "InterfaceGreyListingWhiteAddresses.h"
 #include "InterfaceWhiteListAddresses.h"
+#include "InterfaceBlockedSenders.h"
 #include "InterfaceSURBLServers.h"
 #include "InterfaceDNSBlackLists.h"
 
@@ -580,9 +582,31 @@ STDMETHODIMP InterfaceAntiSpam::get_WhiteListAddresses(IInterfaceWhiteListAddres
       pGLWhiteList->SetAuthentication(authentication_);
       pGLWhiteList->Attach(HM::Configuration::Instance()->GetAntiSpamConfiguration().GetWhiteListAddresses());
       pGLWhiteList->AddRef();
-   
+
       *pVal = pGLWhiteList;
-   
+
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceAntiSpam::get_BlockedSenders(IInterfaceBlockedSenders **pVal)
+{
+   try
+   {
+      if (!config_)
+         return GetAccessDenied();
+
+      CComObject<InterfaceBlockedSenders>* pBlockedSenders = new CComObject<InterfaceBlockedSenders>();
+      pBlockedSenders->SetAuthentication(authentication_);
+      pBlockedSenders->Attach(HM::Configuration::Instance()->GetAntiSpamConfiguration().GetBlockedSenders());
+      pBlockedSenders->AddRef();
+
+      *pVal = pBlockedSenders;
+
       return S_OK;
    }
    catch (...)

@@ -159,6 +159,22 @@ END_COM_MAP()
    STDMETHOD(get_DKIMSecondaryPrivateKeyFile)(/*[out, retval]*/ BSTR *pVal);
    STDMETHOD(put_DKIMSecondaryPrivateKeyFile)(/*[in]*/ BSTR newVal);
    STDMETHOD(get_RelayHost)(/*[out, retval]*/ BSTR *pVal);
+
+   // The domain-wide out-of-office reply. Sent only to accounts with no vacation
+   // message of their own, except that VacationExternalOverride also replaces an
+   // account's own text for senders outside this server. See BO/Domain.h.
+   STDMETHOD(get_VacationMessageIsOn)(/*[out, retval]*/ VARIANT_BOOL *pVal);
+   STDMETHOD(put_VacationMessageIsOn)(/*[in]*/ VARIANT_BOOL newVal);
+   STDMETHOD(get_VacationSubject)(/*[out, retval]*/ BSTR *pVal);
+   STDMETHOD(put_VacationSubject)(/*[in]*/ BSTR newVal);
+   STDMETHOD(get_VacationMessage)(/*[out, retval]*/ BSTR *pVal);
+   STDMETHOD(put_VacationMessage)(/*[in]*/ BSTR newVal);
+   STDMETHOD(get_VacationInternalSubject)(/*[out, retval]*/ BSTR *pVal);
+   STDMETHOD(put_VacationInternalSubject)(/*[in]*/ BSTR newVal);
+   STDMETHOD(get_VacationInternalMessage)(/*[out, retval]*/ BSTR *pVal);
+   STDMETHOD(put_VacationInternalMessage)(/*[in]*/ BSTR newVal);
+   STDMETHOD(get_VacationExternalOverride)(/*[out, retval]*/ VARIANT_BOOL *pVal);
+   STDMETHOD(put_VacationExternalOverride)(/*[in]*/ VARIANT_BOOL newVal);
    STDMETHOD(put_RelayHost)(/*[in]*/ BSTR newVal);
    STDMETHOD(get_RelayPort)(/*[out, retval]*/ long *pVal);
    STDMETHOD(put_RelayPort)(/*[in]*/ long newVal);

@@ -10,6 +10,7 @@
 #include "SpamTestResult.h"
 
 #include "SpamTestDNSBlackLists.h"
+#include "SpamTestSenderBlacklist.h"
 #include "SpamTestHeloHost.h"
 #include "SpamTestPTR.h"
 #include "SpamTestMXRecords.h"
@@ -38,9 +39,16 @@ namespace HM
 
    }
 
-   void 
+   void
    SpamTestRunner::LoadSpamTests()
    {
+      // First, deliberately. This is the cheapest test in the pipeline - one
+      // walk of an in-memory list, no network - and an administrator's
+      // explicit "never accept mail from this sender" is the verdict most
+      // worth reaching before any DNS lookup is paid for. With the default
+      // entry score the early-out below stops the pipeline right here.
+      spam_tests_.push_back(std::shared_ptr<SpamTestSenderBlacklist> (new SpamTestSenderBlacklist));
+
       spam_tests_.push_back(std::shared_ptr<SpamTestDNSBlackLists> (new SpamTestDNSBlackLists));
       spam_tests_.push_back(std::shared_ptr<SpamTestHeloHost> (new SpamTestHeloHost));
       spam_tests_.push_back(std::shared_ptr<SpamTestPTR> (new SpamTestPTR));

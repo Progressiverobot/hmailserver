@@ -574,6 +574,27 @@ namespace RegressionTests.Shared
 
          antiSpam.WhiteListAddresses.Clear();
 
+         // The deny-list counterpart. A blocked sender surviving one fixture into
+         // the next refuses mail in a test that never mentions blocking, which is
+         // the same shape of failure the white list clear above prevents.
+         try
+         {
+            antiSpam.BlockedSenders.Clear();
+         }
+         catch (COMException ex) when (ex.ErrorCode == unchecked((int) 0x80040155))
+         {
+            // REGDB_E_IIDNOTREG. On a development bench the BlockedSenders
+            // interfaces are unreachable between an IDL change and the next
+            // elevated "hMailServer.exe /Register" - the marshaller needs the new
+            // IIDs under HKLM, which an unelevated build cannot write.
+            //
+            // Swallowed, and ONLY this HRESULT, because in that state the list is
+            // provably empty: no test can have added a blocked sender through an
+            // interface no test can reach. Failing every fixture's setup over a
+            // list nobody could have populated helps no one, and SenderBlacklist's
+            // own tests still fail loudly and specifically until it is registered.
+         }
+
          for (var i = 0; i < antiSpam.DNSBlackLists.Count; i++)
          {
             var list = antiSpam.DNSBlackLists[i];

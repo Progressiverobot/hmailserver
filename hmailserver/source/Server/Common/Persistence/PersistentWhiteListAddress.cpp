@@ -31,7 +31,16 @@ namespace HM
       SQLCommand command("delete from hm_whitelist where whiteid = @WHITEID");
       command.AddParameter("@WHITEID", pObject->GetID());
 
-      return Application::Instance()->GetDBManager()->Execute(command);
+      bool bRetVal = Application::Instance()->GetDBManager()->Execute(command);
+
+      // A deleted entry must leave the cache too. This was missing, masked
+      // by the cache reloading on every message (WhiteListCache::Refresh
+      // never cleared its flag); now that the cache actually caches, a
+      // delete without this line would keep whitelisting the removed
+      // sender until the service restarted.
+      WhiteListCache::SetNeedRefresh();
+
+      return bRetVal;
    }
 
    bool 

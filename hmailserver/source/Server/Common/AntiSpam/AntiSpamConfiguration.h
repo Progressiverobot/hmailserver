@@ -9,6 +9,7 @@ namespace HM
    class SURBLServers;
    class GreyListingWhiteAddresses;
    class WhiteListAddresses;
+   class BlockedSenders;
    class DNSBlackLists;
 
    class AntiSpamConfiguration
@@ -129,6 +130,7 @@ namespace HM
 
       std::shared_ptr<GreyListingWhiteAddresses> GetGreyListingWhiteAddresses();
       std::shared_ptr<WhiteListAddresses> GetWhiteListAddresses();
+      std::shared_ptr<BlockedSenders> GetBlockedSenders();
       std::shared_ptr<DNSBlackLists> GetDNSBlackLists() {return dnsBlackLists_;}
       std::shared_ptr<SURBLServers> GetSURBLServers() {return surblServers_;}
 

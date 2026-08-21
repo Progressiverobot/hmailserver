@@ -17,8 +17,9 @@ namespace HM
       WhiteListAddresses();
       ~WhiteListAddresses(void);
 
-      // Refreshes this collection from the database.
-      void Refresh();
+      // Refreshes this collection from the database. Returns false if the
+      // database could not be read; the collection is left untouched then.
+      bool Refresh();
 
    protected:
    
