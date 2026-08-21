@@ -2,10 +2,7 @@
 ===========
 
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/14187/badge)](https://www.bestpractices.dev/projects/14187)
-<<<<<<< HEAD
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/Progressiverobot/hmailserver/badge)](https://scorecard.dev/viewer/?uri=github.com/Progressiverobot/hmailserver)
-=======
->>>>>>> origin/master
 
 hMailServer is a free, open source email server for Microsoft Windows, implementing SMTP, IMAP and POP3.
 
