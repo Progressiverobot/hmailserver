@@ -253,7 +253,13 @@ create table hm_domains (
    domainrelayrequiresauth int not null,
    domainrelayusername nvarchar(255) not null,
    domainrelaypassword nvarchar(255) not null,
-   domainrelayconnectionsecurity int not null
+   domainrelayconnectionsecurity int not null,
+	domainvacationmessageon int not null,
+	domainvacationsubject nvarchar(200) not null,
+	domainvacationmessage nvarchar(1000) not null,
+	domainvacationinternalsubject nvarchar(200) not null,
+	domainvacationinternalmessage nvarchar(1000) not null,
+	domainvacationexternaloverride int not null
 ) 
 
 ALTER TABLE hm_domains ADD CONSTRAINT hm_domains_pk PRIMARY KEY NONCLUSTERED (domainid) 
@@ -663,6 +669,18 @@ create table hm_whitelist
 	whiteemailaddress nvarchar(255) not null,
 	whitedescription nvarchar(255) not null
 ) 
+
+create table hm_blocked_senders
+(
+	bsid bigint identity(1,1) not null,
+	bsaddress nvarchar(255) not null,
+	bsscore int not null,
+	bsdescription nvarchar(255) not null
+)
+
+ALTER TABLE hm_blocked_senders ADD CONSTRAINT hm_bsid_pk PRIMARY KEY NONCLUSTERED (bsid)
+
+CREATE UNIQUE INDEX u_bsaddress ON hm_blocked_senders (bsaddress)
 
 ALTER TABLE hm_whitelist ADD CONSTRAINT hm_whitelist_pk PRIMARY KEY NONCLUSTERED (whiteid) 
 
@@ -1114,4 +1132,4 @@ create table hm_messageindexstate
 
 CREATE INDEX idx_hm_messageindexstate ON hm_messageindexstate (misaccountid)
 
-insert into hm_dbversion values (6023)
+insert into hm_dbversion values (6024)

@@ -77,6 +77,8 @@ interface IInterfaceTCPIPPort;
 interface IInterfaceTCPIPPorts;
 interface IInterfaceWhiteListAddress;
 interface IInterfaceWhiteListAddresses;
+interface IInterfaceBlockedSender;
+interface IInterfaceBlockedSenders;
 interface IInterfaceMessageHeader;
 interface IInterfaceMessageHeaders;
 interface IInterfaceSSLCertificate;
@@ -888,6 +890,19 @@ interface IInterfaceDomain : IDispatch
 	   [propput, id(48), helpstring("Password for the domain's outbound relay. Write-only in effect: the getter returns what was set in this session, and the stored value is machine-protected.")] HRESULT RelayPassword([in] BSTR newVal);
 	   [propget, id(49), helpstring("Transport security used when connecting to the domain's outbound relay.")] HRESULT RelayConnectionSecurity([out, retval] eConnectionSecurity *pVal);
 	   [propput, id(49), helpstring("Transport security used when connecting to the domain's outbound relay.")] HRESULT RelayConnectionSecurity([in] eConnectionSecurity newVal);
+
+	   [propget, id(50), helpstring("Domain-wide out-of-office reply, sent only to accounts that have no vacation message of their own.")] HRESULT VacationMessageIsOn([out, retval] VARIANT_BOOL *pVal);
+	   [propput, id(50), helpstring("Domain-wide out-of-office reply, sent only to accounts that have no vacation message of their own.")] HRESULT VacationMessageIsOn([in] VARIANT_BOOL newVal);
+	   [propget, id(51), helpstring("Subject of the domain-wide reply. Also the subject external senders see when VacationExternalOverride is on.")] HRESULT VacationSubject([out, retval] BSTR *pVal);
+	   [propput, id(51), helpstring("Subject of the domain-wide reply. Also the subject external senders see when VacationExternalOverride is on.")] HRESULT VacationSubject([in] BSTR newVal);
+	   [propget, id(52), helpstring("Text of the domain-wide reply, and the text external senders see when VacationExternalOverride is on.")] HRESULT VacationMessage([out, retval] BSTR *pVal);
+	   [propput, id(52), helpstring("Text of the domain-wide reply, and the text external senders see when VacationExternalOverride is on.")] HRESULT VacationMessage([in] BSTR newVal);
+	   [propget, id(53), helpstring("Subject sent to senders whose address belongs to this server. Empty means use VacationSubject.")] HRESULT VacationInternalSubject([out, retval] BSTR *pVal);
+	   [propput, id(53), helpstring("Subject sent to senders whose address belongs to this server. Empty means use VacationSubject.")] HRESULT VacationInternalSubject([in] BSTR newVal);
+	   [propget, id(54), helpstring("Text sent to senders whose address belongs to this server. Empty means use VacationMessage. Note this identifies the address, not the person: an envelope sender is forgeable, so treat it as a courtesy and never as access control.")] HRESULT VacationInternalMessage([out, retval] BSTR *pVal);
+	   [propput, id(54), helpstring("Text sent to senders whose address belongs to this server. Empty means use VacationMessage. Note this identifies the address, not the person: an envelope sender is forgeable, so treat it as a courtesy and never as access control.")] HRESULT VacationInternalMessage([in] BSTR newVal);
+	   [propget, id(55), helpstring("When on, senders outside this server receive the domain's text even if the account has a vacation message of its own; local senders still get the account's.")] HRESULT VacationExternalOverride([out, retval] VARIANT_BOOL *pVal);
+	   [propput, id(55), helpstring("When on, senders outside this server receive the domain's text even if the account has a vacation message of its own; local senders still get the account's.")] HRESULT VacationExternalOverride([in] VARIANT_BOOL newVal);
 
 };
 [
@@ -2468,6 +2483,7 @@ interface IInterfaceAntiSpam : IDispatch
    [propput, id(11), helpstring("Text to prepend to message subject.")] HRESULT PrependSubjectText([in] BSTR newVal);
    [propget, id(12), helpstring("White list for greylisting.")] HRESULT GreyListingWhiteAddresses([out, retval] IInterfaceGreyListingWhiteAddresses** pVal);
    [propget, id(13), helpstring("Global white list.")] HRESULT WhiteListAddresses([out, retval] IInterfaceWhiteListAddresses **pVal);
+   [propget, id(44), helpstring("Global list of blocked sender addresses and domains.")] HRESULT BlockedSenders([out, retval] IInterfaceBlockedSenders **pVal);
    [propget, id(14), helpstring("Check host specified in HELO command (SpamScore).")] HRESULT CheckHostInHeloScore([out, retval] long *pVal);
    [propput, id(14), helpstring("Check host specified in HELO command (SpamScore).")] HRESULT CheckHostInHeloScore([in] long newVal);
    [propget, id(15), helpstring("Spam mark threshold")] HRESULT SpamMarkThreshold([out, retval] long *pVal);
@@ -2739,6 +2755,51 @@ interface IInterfaceWhiteListAddress : IDispatch
    [id(6), helpstring("Saves changes of the object in the database.")] HRESULT Save();
    [id(7), helpstring("Deletes the object from the database.")] HRESULT Delete();
    
+};
+
+// The blocked-sender list: the deny-list counterpart to the white list above.
+// A match contributes its own score through the ordinary spam pipeline rather
+// than refusing by a separate path, so the existing thresholds, quarantine
+// fallback and headers all apply unchanged.
+[
+	object,
+	uuid(778D2305-46DD-40B6-A34F-4C4065FD2E9E),
+	dual,
+	nonextensible,
+	helpstring("The BlockedSenders object is a collection of blocked sender addresses and domains."),
+	pointer_default(unique)
+]
+interface IInterfaceBlockedSenders : IDispatch
+{
+   [propget, id(0), defaultbind, helpstring("Returns an object by its given index.")] HRESULT Item([in] long Index, [out, retval] IInterfaceBlockedSender **pVal);
+   [propget, id(1), helpstring("The number of objects in the collection.")] HRESULT Count([out, retval] long *pVal);
+   [id(2), helpstring("Deletes an object in the database by its given database identifier.")] HRESULT DeleteByDBID([in] long DBID);
+   [id(3), helpstring("Adds a new object to the collection.")] HRESULT Add([out, retval] IInterfaceBlockedSender **pVal);
+   [propget, id(4), helpstring("Returns an object by the address it blocks.")] HRESULT ItemByName([in] BSTR sName, [out, retval] IInterfaceBlockedSender **pVal);
+   [propget, id(5), helpstring("Returns a object by its database identifier")] HRESULT ItemByDBID([in] long DBID, [out, retval] IInterfaceBlockedSender* *pVal);
+   [id(6), helpstring("Refreshes the collection.")] HRESULT Refresh();
+   [id(7), helpstring("Clears the collection.")] HRESULT Clear();
+};
+
+[
+	object,
+	uuid(F192BDA6-7B52-4969-8476-DF66F9A32AC7),
+	dual,
+	nonextensible,
+	helpstring("The BlockedSender object represents one blocked sender address or domain."),
+	pointer_default(unique)
+]
+interface IInterfaceBlockedSender : IDispatch
+{
+   [propget, id(1), helpstring("The unique database identifier for the object.")] HRESULT ID([out, retval] long *pVal);
+   [propget, id(2), helpstring("The blocked address (user@example.com) or domain (example.com, which also covers its subdomains). Matched against the SMTP envelope sender, which the sender controls - so this stops a sender who keeps using one address, and nothing that rotates.")] HRESULT Address([out, retval] BSTR *pVal);
+   [propput, id(2), helpstring("The blocked address (user@example.com) or domain (example.com, which also covers its subdomains). Matched against the SMTP envelope sender, which the sender controls - so this stops a sender who keeps using one address, and nothing that rotates.")] HRESULT Address([in] BSTR newVal);
+   [propget, id(3), helpstring("Spam score a match contributes. The default of 100 crosses the delete threshold, which refuses the message.")] HRESULT Score([out, retval] long *pVal);
+   [propput, id(3), helpstring("Spam score a match contributes. The default of 100 crosses the delete threshold, which refuses the message.")] HRESULT Score([in] long newVal);
+   [propget, id(4), helpstring("Description of the record.")] HRESULT Description([out, retval] BSTR *pVal);
+   [propput, id(4), helpstring("Description of the record.")] HRESULT Description([in] BSTR newVal);
+   [id(5), helpstring("Saves changes of the object in the database.")] HRESULT Save();
+   [id(6), helpstring("Deletes the object from the database.")] HRESULT Delete();
 };
 
 [
@@ -3723,6 +3784,24 @@ library hMailServer
 	coclass WhiteListAddresses
 	{
 		[default] interface IInterfaceWhiteListAddresses;
+	};
+
+	[
+		uuid(451538C0-8D9C-49F1-9ED3-F6E639F05832),
+		helpstring("BlockedSenders Class")
+	]
+	coclass BlockedSenders
+	{
+		[default] interface IInterfaceBlockedSenders;
+	};
+
+	[
+		uuid(B2C34A51-D343-4CA4-9FA4-9E1DDC8E11BD),
+		helpstring("BlockedSender Class")
+	]
+	coclass BlockedSender
+	{
+		[default] interface IInterfaceBlockedSender;
 	};
 	
 	[

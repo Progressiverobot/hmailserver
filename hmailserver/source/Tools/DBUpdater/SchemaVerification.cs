@@ -260,7 +260,33 @@ namespace DBUpdater
                          "update hm_messageindexstate set misaccountid = misaccountid where 1 = 0"),
 
          new SchemaProbe(6023, "hm_messageindexstate.mishighwatermark",
-                         "update hm_messageindexstate set mishighwatermark = mishighwatermark where 1 = 0")
+                         "update hm_messageindexstate set mishighwatermark = mishighwatermark where 1 = 0"),
+
+         // Upgrade6023to6024* - the domain-wide out-of-office reply and the blocked
+         // sender list. Two features in one step because they landed together, and
+         // both fail quietly if half-applied: a missing vacation column means the
+         // domain reads back as "no auto-reply" and simply never answers, and a
+         // missing blocked-senders table means every listed sender is silently
+         // delivered again. Neither raises anything an administrator would see, so
+         // each column is probed rather than trusting the step's own success.
+         new SchemaProbe(6024, "hm_domains.domainvacationmessageon",
+                         "update hm_domains set domainvacationmessageon = domainvacationmessageon where 1 = 0"),
+         new SchemaProbe(6024, "hm_domains.domainvacationsubject",
+                         "update hm_domains set domainvacationsubject = domainvacationsubject where 1 = 0"),
+         new SchemaProbe(6024, "hm_domains.domainvacationmessage",
+                         "update hm_domains set domainvacationmessage = domainvacationmessage where 1 = 0"),
+         new SchemaProbe(6024, "hm_domains.domainvacationinternalsubject",
+                         "update hm_domains set domainvacationinternalsubject = domainvacationinternalsubject where 1 = 0"),
+         new SchemaProbe(6024, "hm_domains.domainvacationinternalmessage",
+                         "update hm_domains set domainvacationinternalmessage = domainvacationinternalmessage where 1 = 0"),
+         new SchemaProbe(6024, "hm_domains.domainvacationexternaloverride",
+                         "update hm_domains set domainvacationexternaloverride = domainvacationexternaloverride where 1 = 0"),
+         new SchemaProbe(6024, "hm_blocked_senders.bsaddress",
+                         "update hm_blocked_senders set bsaddress = bsaddress where 1 = 0"),
+         new SchemaProbe(6024, "hm_blocked_senders.bsscore",
+                         "update hm_blocked_senders set bsscore = bsscore where 1 = 0"),
+         new SchemaProbe(6024, "hm_blocked_senders.bsdescription",
+                         "update hm_blocked_senders set bsdescription = bsdescription where 1 = 0")
       };
 
       /// <summary>

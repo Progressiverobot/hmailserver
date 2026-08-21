@@ -147,7 +147,13 @@ create table hm_domains
    domainrelayrequiresauth int not null,
    domainrelayusername varchar(255) not null,
    domainrelaypassword varchar(255) not null,
-   domainrelayconnectionsecurity int not null
+   domainrelayconnectionsecurity int not null,
+	domainvacationmessageon int not null default 0,
+	domainvacationsubject varchar(200) not null default '',
+	domainvacationmessage text,
+	domainvacationinternalsubject varchar(200) not null default '',
+	domainvacationinternalmessage text,
+	domainvacationexternaloverride int not null default 0
 )  DEFAULT CHARSET=utf8;
 
 CREATE INDEX idx_hm_domains ON hm_domains (domainname);
@@ -495,6 +501,15 @@ create table hm_whitelist
    whiteupperipaddress2 bigint null,
 	whiteemailaddress varchar(255) not null,
 	whitedescription varchar(255) not null
+) DEFAULT CHARSET=utf8;
+
+create table hm_blocked_senders
+(
+	bsid bigint auto_increment not null, primary key(bsid), unique(bsid),
+	bsaddress varchar(255) not null,
+	bsscore int not null,
+	bsdescription varchar(255) not null,
+	unique u_bsaddress (bsaddress)
 ) DEFAULT CHARSET=utf8;
 
 create table hm_sslcertificates
@@ -923,4 +938,4 @@ create table hm_messageindexstate
 
 CREATE INDEX idx_hm_messageindexstate ON hm_messageindexstate (misaccountid);
 
-insert into hm_dbversion values (6023);
+insert into hm_dbversion values (6024);
