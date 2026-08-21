@@ -25,11 +25,31 @@ namespace hMailServer.ControlPanel.Views
    /// </summary>
    public class QuarantineView : UserControl, IPageLifecycle
    {
-      private readonly ListBox list_ = new()
+      /// <summary>
+      /// Five fields per held message, so it is a table and is drawn as one.
+      ///
+      /// It used to be a ListBox of strings built as
+      /// "{0}   {1}  ->  {2}   [score {3}]   {4}" - date, sender, recipients, score
+      /// and subject run together on one line with runs of spaces standing in for
+      /// columns. Nothing lined up, because the font is proportional and the fields
+      /// vary in length; the subject, which is what anyone scans for, sat at the
+      /// far right after everything else had taken what it wanted; and the score,
+      /// which is the one field worth sorting by, could not be sorted by.
+      /// </summary>
+      private readonly DataGrid list_ = new()
       {
-         FontSize = Typography.Body,
+         AutoGenerateColumns = false,
+         IsReadOnly = true,
+         CanUserAddRows = false,
+         CanUserDeleteRows = false,
+         CanUserResizeRows = false,
+         SelectionMode = DataGridSelectionMode.Single,
+         SelectionUnit = DataGridSelectionUnit.FullRow,
+         HeadersVisibility = DataGridHeadersVisibility.Column,
+         GridLinesVisibility = DataGridGridLinesVisibility.None,
          BorderThickness = new Thickness(0),
          Background = System.Windows.Media.Brushes.Transparent,
+         RowBackground = System.Windows.Media.Brushes.Transparent,
          MinHeight = 320
       };
 
@@ -67,7 +87,7 @@ namespace hMailServer.ControlPanel.Views
 
       private void Reload()
       {
-         list_.Items.Clear();
+         var rows = new System.Collections.Generic.List<HeldRow>();
 
          try
          {
@@ -96,16 +116,16 @@ namespace hMailServer.ControlPanel.Views
 
                   try
                   {
-                     list_.Items.Add(new ListBoxItem
+                     rows.Add(new HeldRow
                      {
-                        Content = string.Format("{0}   {1}  ->  {2}   [score {3}]   {4}",
-                           (string) item.CreatedTime,
-                           (string) item.Sender,
-                           (string) item.Recipients,
-                           (int) item.Score,
-                           string.IsNullOrEmpty((string) item.Subject) ? "(no subject)" : (string) item.Subject),
-                        Tag = (int) item.ID,
-                        ToolTip = "Held because: " + (string) item.Reason
+                        CreatedTime = (string) item.CreatedTime,
+                        Sender = (string) item.Sender,
+                        Recipients = (string) item.Recipients,
+                        Score = (int) item.Score,
+                        Subject = string.IsNullOrEmpty((string) item.Subject)
+                           ? "(no subject)" : (string) item.Subject,
+                        Reason = (string) item.Reason,
+                        Id = (int) item.ID
                      });
 
                      listed++;
@@ -115,6 +135,8 @@ namespace hMailServer.ControlPanel.Views
                      ServerSession.Release(item);
                   }
                }
+
+               list_.ItemsSource = rows;
 
                if (total == 0)
                {
@@ -144,10 +166,97 @@ namespace hMailServer.ControlPanel.Views
          }
       }
 
+      /// <summary>One held message. Values are copied out so the COM object can be
+      /// released immediately - the collection is a page of a table, and holding a
+      /// live reference per visible row keeps that many server objects alive for as
+      /// long as somebody leaves the page open.</summary>
+      private sealed class HeldRow
+      {
+         public string CreatedTime { get; init; }
+         public string Sender { get; init; }
+         public string Recipients { get; init; }
+         public int Score { get; init; }
+         public string Subject { get; init; }
+         public string Reason { get; init; }
+         public int Id { get; init; }
+
+         public string HeldBecause => "Held because: " + Reason;
+      }
+
+      /// <summary>
+      /// Held, from whom, to whom, how badly it scored, and what it says it is.
+      ///
+      /// Subject and the two address columns share the width, because those are the
+      /// three that vary and the subject is what anyone actually scans. Score sizes
+      /// to its content and is right-aligned: it is the field worth sorting by, and
+      /// a column of numbers that do not line up is harder to compare than one that
+      /// does.
+      /// </summary>
+      private void BuildColumns()
+      {
+         list_.Columns.Add(new DataGridTextColumn
+         {
+            Header = "Held",
+            Binding = new System.Windows.Data.Binding(nameof(HeldRow.CreatedTime)),
+            Width = DataGridLength.SizeToCells
+         });
+
+         list_.Columns.Add(new DataGridTextColumn
+         {
+            Header = "Sender",
+            Binding = new System.Windows.Data.Binding(nameof(HeldRow.Sender)),
+            Width = new DataGridLength(1, DataGridLengthUnitType.Star)
+         });
+
+         list_.Columns.Add(new DataGridTextColumn
+         {
+            Header = "Recipients",
+            Binding = new System.Windows.Data.Binding(nameof(HeldRow.Recipients)),
+            Width = new DataGridLength(1, DataGridLengthUnitType.Star)
+         });
+
+         var score = new DataGridTextColumn
+         {
+            Header = "Score",
+            Binding = new System.Windows.Data.Binding(nameof(HeldRow.Score)),
+            Width = DataGridLength.SizeToCells
+         };
+
+         // ElementStyle, not CellStyle. App.xaml gives DataGridCell its own template
+         // whose ContentPresenter does not pick up the cell's HorizontalAlignment, so
+         // aligning the cell would move the cell and leave the number where it was.
+         // Styling the generated TextBlock is the part that actually shows.
+         var rightAligned = new Style(typeof(TextBlock));
+         rightAligned.Setters.Add(new Setter(TextBlock.TextAlignmentProperty, TextAlignment.Right));
+         score.ElementStyle = rightAligned;
+
+         list_.Columns.Add(score);
+
+         list_.Columns.Add(new DataGridTextColumn
+         {
+            Header = "Subject",
+            Binding = new System.Windows.Data.Binding(nameof(HeldRow.Subject)),
+            Width = new DataGridLength(2, DataGridLengthUnitType.Star)
+         });
+
+         // Why this message was held, which is the question the page exists to
+         // answer and has no column of its own because the reasons are sentences.
+         // BasedOn the application's implicit style, because assigning RowStyle
+         // replaces the implicit one rather than adding to it.
+         var rowStyle = new Style(typeof(DataGridRow));
+
+         if (Application.Current?.TryFindResource(typeof(DataGridRow)) is Style appRowStyle)
+            rowStyle.BasedOn = appRowStyle;
+
+         rowStyle.Setters.Add(new Setter(ToolTipProperty,
+            new System.Windows.Data.Binding(nameof(HeldRow.HeldBecause))));
+         list_.RowStyle = rowStyle;
+      }
+
       private int SelectedId()
       {
-         if (list_.SelectedItem is ListBoxItem item && item.Tag is int id)
-            return id;
+         if (list_.SelectedItem is HeldRow row)
+            return row.Id;
 
          return 0;
       }
@@ -287,6 +396,8 @@ namespace hMailServer.ControlPanel.Views
 
          var card = new Border { Padding = new Thickness(8) };
          card.SetResourceReference(StyleProperty, "Card");
+         BuildColumns();
+
          card.Child = list_;
          root.Children.Add(card);
 

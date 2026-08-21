@@ -27,11 +27,31 @@ namespace hMailServer.ControlPanel.Views
       private readonly string domainName_;
       private readonly string address_;
 
-      private readonly ListBox list_ = new()
+      /// <summary>
+      /// Four facts per credential, so it is a table.
+      ///
+      /// It used to be a ListBox of "{0}{1}   issued {2}   {3}" - the name, a
+      /// parenthesised "(revoked)" only when it applied, the issue date, and either
+      /// "never used" or "last used ...". Because the revoked marker was present or
+      /// absent rather than a column, the dates after it started in a different
+      /// place on every row, and whether a credential was live had to be read out of
+      /// the middle of a sentence rather than seen down a column. That is the one
+      /// thing anybody comes to this tab to check.
+      /// </summary>
+      private readonly DataGrid list_ = new()
       {
-         FontSize = Typography.Body,
+         AutoGenerateColumns = false,
+         IsReadOnly = true,
+         CanUserAddRows = false,
+         CanUserDeleteRows = false,
+         CanUserResizeRows = false,
+         SelectionMode = DataGridSelectionMode.Single,
+         SelectionUnit = DataGridSelectionUnit.FullRow,
+         HeadersVisibility = DataGridHeadersVisibility.Column,
+         GridLinesVisibility = DataGridGridLinesVisibility.None,
          BorderThickness = new Thickness(0),
          Background = System.Windows.Media.Brushes.Transparent,
+         RowBackground = System.Windows.Media.Brushes.Transparent,
          MinHeight = 160
       };
 
@@ -62,7 +82,8 @@ namespace hMailServer.ControlPanel.Views
       /// <summary>Loads the list. Called when the account editor opens the tab.</summary>
       public void Reload()
       {
-         list_.Items.Clear();
+         var rows = new System.Collections.Generic.List<CredentialRow>();
+         list_.ItemsSource = rows;
 
          if (string.IsNullOrEmpty(address_))
          {
@@ -89,14 +110,13 @@ namespace hMailServer.ControlPanel.Views
                   {
                      string lastUsed = (string) item.LastUsedTime;
 
-                     list_.Items.Add(new ListBoxItem
+                     rows.Add(new CredentialRow
                      {
-                        Content = string.Format("{0}{1}   issued {2}   {3}",
-                           (string) item.Name,
-                           ((bool) item.Active) ? "" : "   (revoked)",
-                           (string) item.CreatedTime,
-                           string.IsNullOrEmpty(lastUsed) ? "never used" : "last used " + lastUsed),
-                        Tag = (int) item.ID
+                        Name = (string) item.Name,
+                        Active = (bool) item.Active,
+                        CreatedTime = (string) item.CreatedTime,
+                        LastUsed = lastUsed,
+                        Id = (int) item.ID
                      });
                   }
                   finally
@@ -104,6 +124,10 @@ namespace hMailServer.ControlPanel.Views
                      ServerSession.Release(item);
                   }
                }
+
+               // ItemsSource was set to the list before it was filled, so the grid
+               // has to be told the contents changed - a plain List raises nothing.
+               list_.Items.Refresh();
 
                status_.Text = count == 0
                   ? "No app passwords. Create one per mail client, so that losing a device revokes only that device."
@@ -134,6 +158,63 @@ namespace hMailServer.ControlPanel.Views
          ServerSession.Release(domains);
 
          return passwords;
+      }
+
+      /// <summary>One app password as the tab shows it.</summary>
+      private sealed class CredentialRow
+      {
+         public string Name { get; init; }
+         public bool Active { get; init; }
+         public string CreatedTime { get; init; }
+         public string LastUsed { get; init; }
+         public int Id { get; init; }
+
+         /// <summary>
+         /// A word, not a blank. "Active" earns its column: an empty cell reads as
+         /// missing data, and this is the field somebody is checking when they come
+         /// here after losing a phone.
+         /// </summary>
+         public string State => Active ? "Active" : "Revoked";
+
+         public string LastUsedText => string.IsNullOrEmpty(LastUsed) ? "Never" : LastUsed;
+      }
+
+      /// <summary>
+      /// Name, whether it still works, when it was issued, when it was last used.
+      ///
+      /// State gets its own column rather than a parenthesis inside the name,
+      /// because whether a credential is live is the question this tab answers and
+      /// it should be readable down a column instead of found mid-sentence.
+      /// </summary>
+      private void BuildColumns()
+      {
+         list_.Columns.Add(new DataGridTextColumn
+         {
+            Header = "Name",
+            Binding = new System.Windows.Data.Binding(nameof(CredentialRow.Name)),
+            Width = new DataGridLength(2, DataGridLengthUnitType.Star)
+         });
+
+         list_.Columns.Add(new DataGridTextColumn
+         {
+            Header = "State",
+            Binding = new System.Windows.Data.Binding(nameof(CredentialRow.State)),
+            Width = DataGridLength.SizeToCells
+         });
+
+         list_.Columns.Add(new DataGridTextColumn
+         {
+            Header = "Issued",
+            Binding = new System.Windows.Data.Binding(nameof(CredentialRow.CreatedTime)),
+            Width = DataGridLength.SizeToCells
+         });
+
+         list_.Columns.Add(new DataGridTextColumn
+         {
+            Header = "Last used",
+            Binding = new System.Windows.Data.Binding(nameof(CredentialRow.LastUsedText)),
+            Width = DataGridLength.SizeToCells
+         });
       }
 
       private void Build()
@@ -167,6 +248,8 @@ namespace hMailServer.ControlPanel.Views
 
          var card = new Border { Padding = new Thickness(8) };
          card.SetResourceReference(StyleProperty, "Card");
+         BuildColumns();
+
          card.Child = list_;
          root.Children.Add(card);
 
@@ -253,7 +336,7 @@ namespace hMailServer.ControlPanel.Views
 
       private int SelectedId()
       {
-         return list_.SelectedItem is ListBoxItem item && item.Tag is int id ? id : 0;
+         return list_.SelectedItem is CredentialRow row ? row.Id : 0;
       }
 
       private void ToggleActive()
