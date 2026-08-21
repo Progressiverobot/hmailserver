@@ -169,7 +169,16 @@
                 </TreeView>
 
                 <!-- Footer -->
-                <StackPanel Grid.Row="3" Margin="18,0,18,14">
+                <!-- A hairline between the scrolling navigation and this fixed
+                     footer. Without it the tree simply stops wherever the scroll
+                     position leaves it and the connection badge begins on the next
+                     line, so a half-scrolled item reads as bleeding into the status
+                     area rather than as a list that continues above. Windows puts a
+                     separator here for the same reason, and it costs one pixel. -->
+                <Border Grid.Row="3" BorderThickness="0,1,0,0" Margin="0,0,0,0"
+                        BorderBrush="{DynamicResource ControlElevationBorderBrush}"
+                        VerticalAlignment="Top" />
+                <StackPanel Grid.Row="3" Margin="18,10,18,14">
                     <!-- The connection indicator. The dot was a literal #3FB950,
                          which is the dark theme's success green painted regardless
                          of theme: on a High Contrast desktop it is an off-palette

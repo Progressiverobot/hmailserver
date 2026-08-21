@@ -299,6 +299,53 @@ namespace hMailServer.ControlPanel.Services
       }
 
       /// <summary>Axis, grid, tooltip and surface colours for one theme.</summary>
+      /// <summary>
+      /// Composites a translucent overlay colour onto an opaque backdrop and returns
+      /// the opaque colour that looks identical.
+      ///
+      /// This exists because a Fluent control fill is an OVERLAY, not a tinted
+      /// colour. In the dark theme `ControlFillColorDefaultBrush` is #0FFFFFFF -
+      /// white, at six percent - and every bit of its dark appearance comes from the
+      /// alpha channel. Code that needs an opaque colour and reaches for the RGB
+      /// alone gets pure white, in a dark application. That shipped, on the chart
+      /// cards, and was the most visible thing wrong with this interface.
+      ///
+      /// Straight source-over compositing: result = overlay*a + backdrop*(1-a). The
+      /// backdrop's own alpha is ignored, because a backdrop is by definition what is
+      /// already on screen. An opaque overlay is returned unchanged.
+      ///
+      /// It lives here, with the palette, rather than beside the one caller: it is
+      /// pure arithmetic over colours, which makes it the kind of thing that can be
+      /// tested without a dispatcher - and the reason it was wrong for so long is
+      /// that the previous version could not be.
+      /// </summary>
+      public static uint Flatten(uint overlayArgb, uint backdropArgb)
+      {
+         uint alpha = (overlayArgb >> 24) & 0xFF;
+
+         if (alpha == 0xFF)
+            return overlayArgb;
+
+         if (alpha == 0)
+            return 0xFF000000u | (backdropArgb & 0x00FFFFFFu);
+
+         return 0xFF000000u
+              | (Mix((overlayArgb >> 16) & 0xFF, (backdropArgb >> 16) & 0xFF, alpha) << 16)
+              | (Mix((overlayArgb >> 8) & 0xFF, (backdropArgb >> 8) & 0xFF, alpha) << 8)
+              |  Mix(overlayArgb & 0xFF, backdropArgb & 0xFF, alpha);
+      }
+
+      /// <summary>
+      /// One channel of a source-over composite, rounded to nearest rather than
+      /// truncated - eight channels each losing up to a whole level is a visible
+      /// shift on the flat greys these cards are made of.
+      /// </summary>
+      private static uint Mix(uint overlay, uint backdrop, uint alpha)
+      {
+         uint value = (overlay * alpha + backdrop * (255 - alpha) + 127) / 255;
+         return value > 255 ? 255 : value;
+      }
+
       public static ChartChrome ResolveChrome(ChartTheme theme, ChartSystemColors system)
       {
          if (theme == ChartTheme.HighContrast)

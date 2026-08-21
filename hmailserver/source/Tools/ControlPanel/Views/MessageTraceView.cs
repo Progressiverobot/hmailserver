@@ -298,14 +298,20 @@ namespace hMailServer.ControlPanel.Views
          {
             Header = "Time",
             Binding = new System.Windows.Data.Binding(nameof(TraceRow.OccurredTime)),
-            Width = DataGridLength.SizeToCells
+            // Auto, not SizeToCells. SizeToCells measures the CELLS only, so on an
+            // empty grid the column collapses to zero and its header disappears
+            // with it - which is how Quarantine shipped a table showing Sender,
+            // Recipients and Subject while Held and Score were simply absent until
+            // the first row arrived. Auto is max(header, cells), so the column is
+            // never narrower than the word naming it.
+            Width = DataGridLength.Auto
          });
 
          list_.Columns.Add(new DataGridTextColumn
          {
             Header = "Event",
             Binding = new System.Windows.Data.Binding(nameof(TraceRow.EventName)),
-            Width = DataGridLength.SizeToCells
+            Width = DataGridLength.Auto
          });
 
          list_.Columns.Add(new DataGridTextColumn
@@ -326,7 +332,7 @@ namespace hMailServer.ControlPanel.Views
          {
             Header = "Status",
             Binding = new System.Windows.Data.Binding(nameof(TraceRow.StatusCode)),
-            Width = DataGridLength.SizeToCells
+            Width = DataGridLength.Auto
          });
 
          // The tip that used to live on each ListBoxItem. It says whether a row can

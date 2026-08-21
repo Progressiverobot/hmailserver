@@ -402,5 +402,87 @@ namespace hMailServer.ControlPanel.Tests.Services
          Assert.Equal(Enum.GetValues<ShapeMark>().Length,
             Enum.GetValues<ShapeMark>().Select(ChartPalette.DescribeMarker).Distinct().Count());
       }
+      // ---- Flatten: the bug that shipped ------------------------------------
+
+      /// <summary>
+      /// The chart cards rendered PURE WHITE in the dark theme, and this is the
+      /// arithmetic that stops it happening again.
+      ///
+      /// A Fluent control fill is an overlay, not a tinted colour. Dark theme's
+      /// ControlFillColorDefaultBrush is #0FFFFFFF - white at six percent - so its
+      /// entire dark appearance lives in the alpha channel. The old code needed an
+      /// opaque colour and took the RGB, which is white. Two large cards on the
+      /// busiest page in the application went from near-black to white, keeping
+      /// axis labels painted for a dark surface.
+      ///
+      /// The numbers below are measured from the real window, not invented: the page
+      /// backdrop is 32,32,32 and a healthy card - one whose alpha nothing touched -
+      /// is 45,45,45. Compositing has to reproduce that exactly, or the fixed card
+      /// still will not match the ones beside it.
+      /// </summary>
+      [Fact]
+      public void Flatten_TurnsTheDarkThemeCardFillIntoTheColourItLooksLike()
+      {
+         const uint controlFillDark = 0x0FFFFFFF;   // white at 6%
+         const uint pageBackdrop = 0xFF202020;      // 32,32,32
+
+         uint result = ChartPalette.Flatten(controlFillDark, pageBackdrop);
+
+         Assert.Equal(0xFFu, (result >> 24) & 0xFF);
+
+         // 45,45,45 - the same colour as every other card on that page.
+         Assert.Equal(45u, (result >> 16) & 0xFF);
+         Assert.Equal(45u, (result >> 8) & 0xFF);
+         Assert.Equal(45u, result & 0xFF);
+      }
+
+      /// <summary>
+      /// The negative control. This is the exact assertion the shipped code failed:
+      /// whatever else Flatten does, a nearly-transparent white must never come out
+      /// anywhere near white when the backdrop is dark.
+      /// </summary>
+      [Fact]
+      public void Flatten_NeverInvertsATranslucentOverlayOnADarkBackdrop()
+      {
+         uint result = ChartPalette.Flatten(0x0FFFFFFF, 0xFF202020);
+
+         uint red = (result >> 16) & 0xFF;
+
+         Assert.True(red < 96,
+            "a six-percent white over a dark backdrop must stay dark, but came out at " + red);
+      }
+
+      [Fact]
+      public void Flatten_LeavesAnOpaqueOverlayAlone()
+      {
+         const uint opaque = 0xFF123456;
+
+         Assert.Equal(opaque, ChartPalette.Flatten(opaque, 0xFF202020));
+      }
+
+      [Fact]
+      public void Flatten_OnAFullyTransparentOverlayIsTheBackdrop()
+      {
+         uint result = ChartPalette.Flatten(0x00FFFFFF, 0xFF202020);
+
+         Assert.Equal(0xFF202020u, result);
+      }
+
+      /// <summary>
+      /// The light theme has the same shape with the sign reversed - a translucent
+      /// BLACK overlay on a near-white page - and dropping the alpha there would
+      /// have produced pure black. Nobody hit it because the app was being run in
+      /// dark mode, which is exactly why it is pinned here.
+      /// </summary>
+      [Fact]
+      public void Flatten_HandlesTheLightThemeShapeToo()
+      {
+         uint result = ChartPalette.Flatten(0x0F000000, 0xFFFAFAFA);
+
+         uint red = (result >> 16) & 0xFF;
+
+         Assert.True(red > 200,
+            "a six-percent black over a near-white backdrop must stay light, but came out at " + red);
+      }
    }
 }

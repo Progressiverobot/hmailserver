@@ -496,23 +496,37 @@ namespace hMailServer.ControlPanel.Views
       }
 
       /// <summary>
-      ///    Removes the transparency from the card's background without choosing its
-      ///    colour.
+      ///    Removes the transparency from the card's background while keeping the
+      ///    colour it appeared to have.
       ///
-      ///    A chart series lands on whatever is behind it, and the window is Mica - so a
-      ///    card whose background carries any alpha puts the plot over a non-deterministic
-      ///    composited surface, and no contrast ratio computed against the card's nominal
-      ///    colour actually holds. That is the whole of the "chart cards are translucent
-      ///    over Mica" defect: not that the colour is wrong, but that there is no
-      ///    guaranteed colour at all.
+      ///    WHY IT HAS TO BE OPAQUE. A chart series lands on whatever is behind it, and
+      ///    the window is Mica - so a card whose background carries any alpha puts the
+      ///    plot over a non-deterministic composited surface, and no contrast ratio
+      ///    computed against the card's nominal colour actually holds. That is the whole
+      ///    of the "chart cards are translucent over Mica" defect: not that the colour
+      ///    is wrong, but that there is no guaranteed colour at all.
       ///
-      ///    Deliberately keeps the theme's own colour and only forces the alpha channel.
-      ///    Picking an opaque token here instead would mean this file having an opinion
-      ///    about the card palette for Light and Dark, which is the designer's decision
-      ///    and would drift the moment the theme changed. Re-applied on every theme
-      ///    change, because it pins a local value over the style - and ApplyTheme_ now
-      ///    runs on the light/dark toggle AND on Windows switching High Contrast, so the
-      ///    pin can never outlive the colour it was derived from.
+      ///    WHY IT COMPOSITES RATHER THAN JUST DROPPING THE ALPHA, which is what this
+      ///    did until 21 August 2026 and is the single most visible thing that has ever
+      ///    been wrong with this application. A Fluent control fill is not a colour with
+      ///    some transparency added for effect - it is an OVERLAY, and in the dark theme
+      ///    `ControlFillColorDefaultBrush` is #0FFFFFFF: white, at six percent. Its
+      ///    entire dark appearance comes from the alpha. Discarding that channel and
+      ///    keeping the RGB turned every chart card from near-black to PURE WHITE, in a
+      ///    dark application, with the axis labels still painted for a dark surface. The
+      ///    KPI tiles two inches above use the same Card style and render 45,45,45
+      ///    precisely because nothing stripped their alpha.
+      ///
+      ///    So the alpha is resolved instead of thrown away: the fill is composited over
+      ///    the page backdrop it was designed to sit on, giving an opaque colour that
+      ///    LOOKS the same and can be reasoned about. 32,32,32 under a six-percent white
+      ///    comes out at 45,45,45 - the same colour as every other card on the page,
+      ///    which is the point.
+      ///
+      ///    It still declines to pick a colour of its own. The backdrop comes from the
+      ///    theme's own ApplicationBackgroundBrush, so Light and Dark remain the
+      ///    designer's decision and this file only does the arithmetic. Re-applied on
+      ///    every theme change, because it pins a local value over the style.
       ///
       ///    Anything that is not a plain SolidColorBrush is left alone: a gradient or an
       ///    image behind a chart is a deliberate choice by whoever put it there, and
@@ -523,8 +537,53 @@ namespace hMailServer.ControlPanel.Views
          if (surface_.Background is not SolidColorBrush brush || brush.Color.A == 255)
             return;
 
-         Color c = brush.Color;
-         surface_.Background = new SolidColorBrush(Color.FromRgb(c.R, c.G, c.B));
+         uint flattened = ChartPalette.Flatten(Argb_(brush.Color), Argb_(PageBackdrop_()));
+         surface_.Background = ShapeMarkVisuals.ToBrush(flattened);
+      }
+
+      /// <summary>
+      /// The opaque colour the card's translucent fill was designed to sit on.
+      ///
+      /// ApplicationBackgroundBrush is what MainWindow paints the content area with
+      /// and what every dialog in this application sets itself to, so it is the
+      /// surface a card actually overlays. If it is missing or is itself
+      /// translucent, the visual tree is asked instead - the nearest ancestor that
+      /// paints something opaque is by definition what shows through. Only if both
+      /// fail does this fall back to a flat guess from the current theme, which is
+      /// still better than inverting the card.
+      /// </summary>
+      /// <summary>A WPF colour as the packed ARGB the palette code speaks in.</summary>
+      private static uint Argb_(Color color)
+      {
+         return ((uint) color.A << 24) | ((uint) color.R << 16) | ((uint) color.G << 8) | color.B;
+      }
+
+      private Color PageBackdrop_()
+      {
+         if (TryFindResource("ApplicationBackgroundBrush") is SolidColorBrush themeBackdrop &&
+             themeBackdrop.Color.A == 255)
+         {
+            return themeBackdrop.Color;
+         }
+
+         for (DependencyObject node = VisualTreeHelper.GetParent(surface_); node != null;
+              node = VisualTreeHelper.GetParent(node))
+         {
+            Brush background = node switch
+            {
+               Panel panel => panel.Background,
+               Border border => border.Background,
+               Control control => control.Background,
+               _ => null
+            };
+
+            if (background is SolidColorBrush solid && solid.Color.A == 255)
+               return solid.Color;
+         }
+
+         return ThemeTokens.CurrentChartTheme == ChartTheme.Light
+            ? Color.FromRgb(0xFA, 0xFA, 0xFA)
+            : Color.FromRgb(0x20, 0x20, 0x20);
       }
 
       /// <summary>

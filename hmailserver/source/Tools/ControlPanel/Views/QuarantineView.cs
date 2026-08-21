@@ -198,7 +198,13 @@ namespace hMailServer.ControlPanel.Views
          {
             Header = "Held",
             Binding = new System.Windows.Data.Binding(nameof(HeldRow.CreatedTime)),
-            Width = DataGridLength.SizeToCells
+            // Auto, not SizeToCells. SizeToCells measures the CELLS only, so on an
+            // empty grid the column collapses to zero and its header disappears
+            // with it - which is how Quarantine shipped a table showing Sender,
+            // Recipients and Subject while Held and Score were simply absent until
+            // the first row arrived. Auto is max(header, cells), so the column is
+            // never narrower than the word naming it.
+            Width = DataGridLength.Auto
          });
 
          list_.Columns.Add(new DataGridTextColumn
@@ -219,7 +225,7 @@ namespace hMailServer.ControlPanel.Views
          {
             Header = "Score",
             Binding = new System.Windows.Data.Binding(nameof(HeldRow.Score)),
-            Width = DataGridLength.SizeToCells
+            Width = DataGridLength.Auto
          };
 
          // ElementStyle, not CellStyle. App.xaml gives DataGridCell its own template
