@@ -29,12 +29,34 @@ namespace hMailServer.ControlPanel.Views
          VerticalContentAlignment = VerticalAlignment.Center
       };
 
-      private readonly ListBox list_ = new()
+      /// <summary>
+      /// A real grid, because the rows are a table and were being drawn as one.
+      ///
+      /// This was a ListBox of monospaced strings padded to fixed widths - the
+      /// addresses to 34 characters each. Every address longer than its column
+      /// pushed the rest of that row out of line, and mail addresses longer than 34
+      /// characters are not an edge case. It also had no headers, so the reader had
+      /// to work out what the columns were; nothing could be sorted; a single field
+      /// could not be copied without the padding around it; and a screen reader read
+      /// each row as one run-on line with the alignment spaces in it.
+      ///
+      /// The column styling is the application's, from the implicit DataGrid styles
+      /// in App.xaml, so this page did not need any appearance code of its own.
+      /// </summary>
+      private readonly DataGrid list_ = new()
       {
-         FontSize = Typography.Body,
-         FontFamily = new System.Windows.Media.FontFamily(Typography.MonoFontFamily),
+         AutoGenerateColumns = false,
+         IsReadOnly = true,
+         CanUserAddRows = false,
+         CanUserDeleteRows = false,
+         CanUserResizeRows = false,
+         SelectionMode = DataGridSelectionMode.Single,
+         SelectionUnit = DataGridSelectionUnit.FullRow,
+         HeadersVisibility = DataGridHeadersVisibility.Column,
+         GridLinesVisibility = DataGridGridLinesVisibility.None,
          BorderThickness = new Thickness(0),
          Background = System.Windows.Media.Brushes.Transparent,
+         RowBackground = System.Windows.Media.Brushes.Transparent,
          MinHeight = 340
       };
 
@@ -65,7 +87,7 @@ namespace hMailServer.ControlPanel.Views
 
       private void Fill(dynamic trace, string emptyMessage)
       {
-         list_.Items.Clear();
+         var rows = new System.Collections.Generic.List<TraceRow>();
 
          int count = (int) trace.Count;
 
@@ -75,23 +97,14 @@ namespace hMailServer.ControlPanel.Views
 
             try
             {
-               int queueId = (int) item.QueueID;
-
-               list_.Items.Add(new ListBoxItem
+               rows.Add(new TraceRow
                {
-                  Content = string.Format("{0}  {1,-11} {2,-34} -> {3,-34} {4}",
-                     (string) item.OccurredTime,
-                     (string) item.EventName,
-                     (string) item.Sender,
-                     (string) item.Recipient,
-                     (int) item.StatusCode),
-                  // 0 means the event happened before a queue entry existed - a refusal
-                  // at RCPT - so there is nothing to follow and the row is not clickable
-                  // into a story.
-                  Tag = queueId,
-                  ToolTip = queueId == 0
-                     ? "Refused before the message was queued, so there is no message to follow."
-                     : "Queue id " + queueId + " - select and choose \"Follow this message\"."
+                  OccurredTime = (string) item.OccurredTime,
+                  EventName = (string) item.EventName,
+                  Sender = (string) item.Sender,
+                  Recipient = (string) item.Recipient,
+                  StatusCode = (int) item.StatusCode,
+                  QueueId = (int) item.QueueID
                });
             }
             finally
@@ -100,8 +113,37 @@ namespace hMailServer.ControlPanel.Views
             }
          }
 
+         list_.ItemsSource = rows;
+
          status_.Text = count == 0 ? emptyMessage
             : count == 1 ? "1 event." : count + " events, newest first.";
+      }
+
+      /// <summary>
+      /// One row of the grid.
+      ///
+      /// The COM objects behind these are released as soon as they are read - the
+      /// trace collection is a snapshot and holding a few hundred live references
+      /// across a user's browsing is how a page keeps a server object alive for an
+      /// afternoon - so the values are copied out rather than bound through.
+      /// </summary>
+      private sealed class TraceRow
+      {
+         public string OccurredTime { get; init; }
+         public string EventName { get; init; }
+         public string Sender { get; init; }
+         public string Recipient { get; init; }
+         public int StatusCode { get; init; }
+
+         /// <summary>
+         /// 0 means the event happened before a queue entry existed - a refusal at
+         /// RCPT - so there is nothing to follow and no story to open.
+         /// </summary>
+         public int QueueId { get; init; }
+
+         public string FollowHint => QueueId == 0
+            ? "Refused before the message was queued, so there is no message to follow."
+            : "Queue id " + QueueId + " - select and choose \"Follow this message\".";
       }
 
       private void Search()
@@ -128,11 +170,13 @@ namespace hMailServer.ControlPanel.Views
 
       private void FollowSelected()
       {
-         if (list_.SelectedItem is not ListBoxItem selected || selected.Tag is not int queueId)
+         if (list_.SelectedItem is not TraceRow selected)
          {
             status_.Text = "Select an event first.";
             return;
          }
+
+         int queueId = selected.QueueId;
 
          if (queueId == 0)
          {
@@ -221,6 +265,8 @@ namespace hMailServer.ControlPanel.Views
          toolbar.Children.Add(MakeButton("Remove expired", Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => SweepExpired()));
          root.Children.Add(toolbar);
 
+         BuildColumns();
+
          var card = new Border { Padding = new Thickness(8) };
          card.SetResourceReference(StyleProperty, "Card");
          card.Child = list_;
@@ -233,6 +279,71 @@ namespace hMailServer.ControlPanel.Views
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             Content = root
          };
+      }
+
+      /// <summary>
+      /// The columns, in the order the question is asked: when, what happened, who
+      /// to whom, and what the server said.
+      ///
+      /// The two address columns are the ones that used to be padded to a fixed 34
+      /// characters and are now star-sized, so a long address takes the room it
+      /// needs and the reader can drag the divider if it needs more. Time, event and
+      /// status size to their contents, because none of them varies much and giving
+      /// them a share of the width takes it from the addresses, which is where the
+      /// variation actually is.
+      /// </summary>
+      private void BuildColumns()
+      {
+         list_.Columns.Add(new DataGridTextColumn
+         {
+            Header = "Time",
+            Binding = new System.Windows.Data.Binding(nameof(TraceRow.OccurredTime)),
+            Width = DataGridLength.SizeToCells
+         });
+
+         list_.Columns.Add(new DataGridTextColumn
+         {
+            Header = "Event",
+            Binding = new System.Windows.Data.Binding(nameof(TraceRow.EventName)),
+            Width = DataGridLength.SizeToCells
+         });
+
+         list_.Columns.Add(new DataGridTextColumn
+         {
+            Header = "Sender",
+            Binding = new System.Windows.Data.Binding(nameof(TraceRow.Sender)),
+            Width = new DataGridLength(1, DataGridLengthUnitType.Star)
+         });
+
+         list_.Columns.Add(new DataGridTextColumn
+         {
+            Header = "Recipient",
+            Binding = new System.Windows.Data.Binding(nameof(TraceRow.Recipient)),
+            Width = new DataGridLength(1, DataGridLengthUnitType.Star)
+         });
+
+         list_.Columns.Add(new DataGridTextColumn
+         {
+            Header = "Status",
+            Binding = new System.Windows.Data.Binding(nameof(TraceRow.StatusCode)),
+            Width = DataGridLength.SizeToCells
+         });
+
+         // The tip that used to live on each ListBoxItem. It says whether a row can
+         // be followed at all, which is not otherwise visible - a refusal at RCPT
+         // looks exactly like any other event until you try to follow it.
+         // BasedOn the application's implicit DataGridRow style, not instead of it.
+         // Assigning RowStyle REPLACES the implicit style rather than adding to it,
+         // so building this from scratch would have quietly cost this grid alone the
+         // hover and selection fills every other grid in the app has.
+         var rowStyle = new Style(typeof(DataGridRow));
+
+         if (Application.Current?.TryFindResource(typeof(DataGridRow)) is Style appRowStyle)
+            rowStyle.BasedOn = appRowStyle;
+
+         rowStyle.Setters.Add(new Setter(ToolTipProperty,
+            new System.Windows.Data.Binding(nameof(TraceRow.FollowHint))));
+         list_.RowStyle = rowStyle;
       }
 
       private static Button MakeButton(string text, Wpf.Ui.Controls.ControlAppearance appearance, RoutedEventHandler onClick)
