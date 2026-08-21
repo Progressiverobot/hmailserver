@@ -187,11 +187,14 @@ namespace hMailServer.ControlPanel.Services
             hashUsable = false;
          }
 
-         foreach (string line in lines.Select(rawLine => rawLine.Trim()))
+         // Blank and comment lines are filtered rather than skipped inside the
+         // body, so the loop reads as "for every meaningful line".
+         foreach (string line in lines
+            .Select(rawLine => rawLine.Trim())
+            .Where(trimmed => trimmed.Length > 0 &&
+                              !trimmed.StartsWith(";") &&
+                              !trimmed.StartsWith("#")))
          {
-            if (line.Length == 0 || line.StartsWith(";") || line.StartsWith("#"))
-               continue;
-
             if (line.StartsWith("["))
             {
                Commit();

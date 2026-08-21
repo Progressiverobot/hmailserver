@@ -983,11 +983,11 @@ namespace hMailServer.ControlPanel.Views
       /// </summary>
       private TabDef Tab(string header)
       {
-         foreach (TabDef existing in tabs_)
-         {
-            if (string.Equals(existing.Header, header, StringComparison.Ordinal))
-               return existing;
-         }
+         TabDef existing = tabs_.FirstOrDefault(
+            tab => string.Equals(tab.Header, header, StringComparison.Ordinal));
+
+         if (existing != null)
+            return existing;
 
          var created = new TabDef { Header = header };
          tabs_.Add(created);

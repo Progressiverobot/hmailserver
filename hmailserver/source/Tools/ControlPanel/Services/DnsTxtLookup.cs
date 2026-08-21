@@ -288,12 +288,14 @@ namespace hMailServer.ControlPanel.Services
 
       private static string ExtractTag(string txtValue, string tag)
       {
-         foreach (string flat in txtValue.Split(';').Select(StripWhitespace))
-         {
-            if (flat.Length > tag.Length && flat[tag.Length] == '=' &&
-                string.Equals(flat.Substring(0, tag.Length), tag, StringComparison.OrdinalIgnoreCase))
-               return flat.Substring(tag.Length + 1);
-         }
+         string match = txtValue.Split(';')
+            .Select(StripWhitespace)
+            .FirstOrDefault(flat => flat.Length > tag.Length && flat[tag.Length] == '=' &&
+                                    string.Equals(flat.Substring(0, tag.Length), tag,
+                                       StringComparison.OrdinalIgnoreCase));
+
+         if (match != null)
+            return match.Substring(tag.Length + 1);
 
          return null;
       }

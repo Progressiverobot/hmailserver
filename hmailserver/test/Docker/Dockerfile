@@ -1,5 +1,15 @@
 # escape=\
-FROM mcr.microsoft.com/windows/servercore:ltsc2022
+# Pinned by digest, not by tag. A tag is a moving target: "ltsc2022" is
+# whatever Microsoft last pushed, so an image that built and passed yesterday
+# can be a different base today - which is both a reproducibility problem and
+# the supply-chain one Scorecard's pinned-dependencies check is about.
+#
+# The cost is the honest other half: a pinned digest does NOT pick up base-image
+# security updates on its own. Refresh it deliberately with
+#   docker pull mcr.microsoft.com/windows/servercore:ltsc2022
+#   docker inspect --format='{{index .RepoDigests 0}}' mcr.microsoft.com/windows/servercore:ltsc2022
+# and update the digest below, rather than dropping back to the bare tag.
+FROM mcr.microsoft.com/windows/servercore:ltsc2022@sha256:0df5b1c3394198525f426e379b61d8f09ce60cb449b1cb4cab163e965672cd67
 
 SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop';"]
 
