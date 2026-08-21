@@ -15,7 +15,7 @@ namespace hMailServer.ControlPanel.Views
    /// with a verification code. Writing the secret requires the Control Panel to
    /// run elevated (the secret lives under HKLM).
    /// </summary>
-   public class TotpSetupDialog : Window
+   public class TotpSetupDialog : FluentDialogWindow
    {
       private static readonly System.Windows.Media.FontFamily Mono =
          new("Cascadia Mono, Consolas");

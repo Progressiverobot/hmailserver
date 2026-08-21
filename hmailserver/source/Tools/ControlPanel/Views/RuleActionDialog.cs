@@ -8,7 +8,7 @@ using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
 namespace hMailServer.ControlPanel.Views
 {
    /// <summary>Add/edit a single rule action, with the contextual fields for each action type.</summary>
-   public class RuleActionDialog : Window
+   public class RuleActionDialog : FluentDialogWindow
    {
       private readonly int ruleId_;
       private readonly int actionId_; // 0 = new

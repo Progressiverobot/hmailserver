@@ -11,7 +11,7 @@ namespace hMailServer.ControlPanel.Views
    /// Property editor for one distribution list (the membership list is edited
    /// separately via <see cref="RecipientsDialog"/>).
    /// </summary>
-   public class DistributionListDialog : Window
+   public class DistributionListDialog : FluentDialogWindow
    {
       private readonly string domainName_;
       private readonly string address_;

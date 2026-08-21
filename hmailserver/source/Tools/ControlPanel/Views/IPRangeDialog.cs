@@ -13,7 +13,7 @@ namespace hMailServer.ControlPanel.Views
    /// authentication, anti-spam/anti-virus and expiry) that the inline panel does
    /// not expose.
    /// </summary>
-   public class IPRangeDialog : Window
+   public class IPRangeDialog : FluentDialogWindow
    {
       private readonly int rangeId_;
 

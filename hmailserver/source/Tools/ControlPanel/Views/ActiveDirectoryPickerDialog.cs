@@ -15,7 +15,7 @@ namespace hMailServer.ControlPanel.Views
    /// users and returns the selected account(s). Used to fill the AD fields on an account
    /// and to bulk-import members into groups / distribution lists.
    /// </summary>
-   public class ActiveDirectoryPickerDialog : Window
+   public class ActiveDirectoryPickerDialog : FluentDialogWindow
    {
       private readonly bool multiSelect_;
       private readonly ComboBox domainBox_ = new() { FontSize = Typography.Body, MinWidth = 240, Padding = new Thickness(6) };

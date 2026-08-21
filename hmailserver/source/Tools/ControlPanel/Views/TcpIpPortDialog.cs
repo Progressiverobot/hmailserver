@@ -13,7 +13,7 @@ namespace hMailServer.ControlPanel.Views
    /// certificate (mutual TLS) policy, which nothing else in the interface
    /// could set at all.
    /// </summary>
-   public class TcpIpPortDialog : Window
+   public class TcpIpPortDialog : FluentDialogWindow
    {
       private readonly int portId_;
 

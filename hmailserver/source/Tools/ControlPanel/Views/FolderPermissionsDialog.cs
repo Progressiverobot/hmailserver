@@ -58,7 +58,7 @@ namespace hMailServer.ControlPanel.Views
    /// ACL permission editor for one public IMAP folder. Lists the access-control
    /// entries (user / group / anyone) and lets each be added, edited or removed.
    /// </summary>
-   public class FolderPermissionsDialog : Window
+   public class FolderPermissionsDialog : FluentDialogWindow
    {
       // eACLPermission bit flags.
       private static readonly (string Label, int Bit)[] Flags =
@@ -325,7 +325,7 @@ namespace hMailServer.ControlPanel.Views
    }
 
    /// <summary>Add/edit dialog for a single ACL entry.</summary>
-   internal class PermissionEditDialog : Window
+   internal class PermissionEditDialog : FluentDialogWindow
    {
       private readonly ComboBox typeCombo_ = new() { FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 10) };
       private readonly TextBox subject_ = new() { FontSize = Typography.Body, Padding = new Thickness(6), Margin = new Thickness(0, 0, 0, 10) };

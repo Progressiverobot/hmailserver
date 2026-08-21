@@ -7,7 +7,7 @@ using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
 namespace hMailServer.ControlPanel.Views
 {
    /// <summary>Tabbed editor for one route's full set of options.</summary>
-   public class RouteDialog : Window
+   public class RouteDialog : FluentDialogWindow
    {
       private readonly string domainName_;
       private int routeId_;

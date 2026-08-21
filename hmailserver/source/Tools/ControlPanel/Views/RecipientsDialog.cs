@@ -12,7 +12,7 @@ namespace hMailServer.ControlPanel.Views
    /// <summary>
    /// Modal editor for the recipients of a distribution list.
    /// </summary>
-   public class RecipientsDialog : Window
+   public class RecipientsDialog : FluentDialogWindow
    {
       private readonly string domainName_;
       private readonly string listAddress_;

@@ -10,7 +10,7 @@ namespace hMailServer.ControlPanel.Views
    /// Modal, tabbed editor for one domain: general, limits, signature and DKIM.
    /// Aliases and distribution lists are managed from the Domains page itself.
    /// </summary>
-   public class DomainDialog : Window
+   public class DomainDialog : FluentDialogWindow
    {
       private readonly string domainName_;
 

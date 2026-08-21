@@ -25,7 +25,7 @@ namespace hMailServer.ControlPanel.Views
    /// silently vanishes from a permissions list is the sort of thing an
    /// administrator only discovers when someone cannot read a folder.
    /// </summary>
-   public class GroupMembersDialog : Window
+   public class GroupMembersDialog : FluentDialogWindow
    {
       private readonly int groupId_;
       private readonly string groupName_;

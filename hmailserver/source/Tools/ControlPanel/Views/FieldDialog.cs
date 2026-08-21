@@ -25,7 +25,7 @@ namespace hMailServer.ControlPanel.Views
    /// was a TextBlock placed above the control with nothing connecting the two, so
    /// every box in every one of those dialogs was announced as an unnamed "edit".
    /// </summary>
-   internal sealed class FieldDialog : Window
+   internal sealed class FieldDialog : FluentDialogWindow
    {
       public Dictionary<string, object> Result { get; } = new();
 

@@ -10,7 +10,7 @@ namespace hMailServer.ControlPanel.Views
    /// Modal, tabbed editor for one account: general, forwarding, auto-reply,
    /// signature and Active Directory.
    /// </summary>
-   public class AccountDialog : Window
+   public class AccountDialog : FluentDialogWindow
    {
       private readonly string domainName_;
       private readonly string address_;

@@ -10,7 +10,7 @@ namespace hMailServer.ControlPanel.Views
    /// Read-only viewer for a queued message's raw source (headers + body), read
    /// straight from the .eml file on disk like hMailServer Administrator does.
    /// </summary>
-   public class MessageViewerDialog : Window
+   public class MessageViewerDialog : FluentDialogWindow
    {
       public MessageViewerDialog(Window owner, string filePath)
       {

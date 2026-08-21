@@ -6,7 +6,7 @@ using System.Windows.Input;
 namespace hMailServer.ControlPanel.Views
 {
    /// <summary>Prompts for a 6-digit two-factor verification code at login.</summary>
-   public class TotpPromptDialog : Window
+   public class TotpPromptDialog : FluentDialogWindow
    {
       private readonly Wpf.Ui.Controls.TextBox code_ = new()
       {

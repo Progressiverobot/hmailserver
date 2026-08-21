@@ -8,7 +8,7 @@ using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
 namespace hMailServer.ControlPanel.Views
 {
    /// <summary>Add/edit a single rule criterion (predefined field or custom header, match type, value).</summary>
-   public class RuleCriteriaDialog : Window
+   public class RuleCriteriaDialog : FluentDialogWindow
    {
       private readonly int ruleId_;
       private readonly int criteriaId_; // 0 = new

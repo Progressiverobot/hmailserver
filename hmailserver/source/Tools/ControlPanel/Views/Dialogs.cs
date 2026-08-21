@@ -45,6 +45,11 @@ namespace hMailServer.ControlPanel.Views
 
       public static MessageBoxResult Show(string messageBoxText, string caption, MessageBoxButton button, MessageBoxImage icon)
       {
+         return Show(messageBoxText, caption, button, icon, MessageBoxResult.None);
+      }
+
+      public static MessageBoxResult Show(string messageBoxText, string caption, MessageBoxButton button, MessageBoxImage icon, MessageBoxResult defaultResult)
+      {
          var window = new Wpf.Ui.Controls.FluentWindow
          {
             Title = string.IsNullOrWhiteSpace(caption) ? DefaultCaption : caption,
@@ -104,12 +109,17 @@ namespace hMailServer.ControlPanel.Views
 
          void AddButton(string label, MessageBoxResult value, bool primary, bool isCancel)
          {
+            // The Win32 box let a caller name the DEFAULT button - used here for
+            // confirmations whose safe answer is Cancel, so Enter declines. The
+            // named button takes Enter; visual prominence stays with the primary.
+            bool isDefault = defaultResult == MessageBoxResult.None ? primary : value == defaultResult;
+
             var buttonControl = new Wpf.Ui.Controls.Button
             {
                Content = label,
                MinWidth = 88,
                Margin = new Thickness(0, 0, isCancel ? 0 : 8, 0),
-               IsDefault = primary,
+               IsDefault = isDefault,
                IsCancel = isCancel
             };
 
