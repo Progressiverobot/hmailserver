@@ -127,3 +127,8 @@ jobs:
           file: coverage.cobertura.xml
           language: C#
           label: code-coverage-agent
+          # The upload needs "Code quality" enabled in repository settings
+          # (currently 403 without it). The coverage report is also kept as
+          # a build artifact, so a failed upload is a warning, not a failed
+          # pipeline.
+          fail-on-error: false
