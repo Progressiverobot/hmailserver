@@ -366,7 +366,7 @@ namespace hMailServer.ControlPanel.Views
             "and at most one reply answers any message."));
          panel.Children.Add(Label(
             "The usual auto-reply protections apply and cannot be switched off here: no reply to bounces, " +
-            "mailing lists or other auto-replies, one reply per sender per period, and the reply itself is " +
+            "mailing lists or other auto-replies, one reply per sender, and the reply itself is " +
             "marked Auto-Submitted so two servers cannot loop."));
          panel.Children.Add(Separator());
          panel.Children.Add(oooOn_);

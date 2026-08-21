@@ -31,10 +31,11 @@ namespace HM
 
       bool bRetVal = Application::Instance()->GetDBManager()->Execute(command);
 
-      // Invalidated on delete as well as on save. The whitelist's persister
-      // only invalidates on save, which was masked by its cache reloading on
-      // every message; a cache that actually caches must hear about deletes,
-      // or a removed entry keeps blocking mail until the service restarts.
+      // Invalidated on delete as well as on save. The whitelist's persister used
+      // to invalidate only on save, which went unnoticed because its cache was
+      // reloading on every message anyway - both halves of that were fixed in the
+      // same change that added this file. A cache that actually caches must hear
+      // about deletes, or a removed entry keeps blocking mail until a restart.
       BlockedSenderCache::SetNeedRefresh();
 
       return bRetVal;

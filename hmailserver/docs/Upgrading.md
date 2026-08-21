@@ -21,14 +21,22 @@ upgrade cannot do is undo itself. See [Rolling back](#rolling-back).
 Where you can upgrade from
 --------------------------
 
-The upgrade chain is continuous: **73 registered steps**, from schema version `0`
-through to the current **6022**, applied in sequence. A database at any
-intermediate version is brought forward one step at a time, so there is no "you
-must first upgrade to 5.x" hop to plan around.
+The upgrade chain is continuous, from schema version `0` through to whatever
+version this build requires, applied one step at a time. A database at any
+intermediate version is brought forward step by step, so there is no "you must
+first upgrade to 5.x" hop to plan around.
+
+**The step count and the target version are deliberately not written here.**
+They have gone stale on this page four times now, and a version number is
+exactly the sort of fact a reader trusts without checking. Read them from the
+tree instead: `REQUIRED_DB_VERSION` in
+`hmailserver/source/Server/Common/Application/Constants.h` is the version this
+build demands, and `build\check-schema-versions.ps1` prints both numbers and
+proves the chain reaches one in exactly the other.
 
 That includes databases created by the *original* upstream project. This fork did
-not branch the schema; it extended it. Version 6022 is a superset, reached by the
-same mechanism upstream used.
+not branch the schema; it extended it. The current version is a superset,
+reached by the same mechanism upstream used.
 
 **How far back the chain reaches depends on your backend, and this is the one
 qualification worth knowing before you start.** The steps are registered once, for
@@ -192,12 +200,13 @@ need it as well as the Control Panel does.
 Verified against the code
 -------------------------
 
-Re-checked 21 August 2026. The two numbers on this page had gone stale for a
-third time - 57 steps to 6008, when the tree said 73 to 6022 - which is the
-argument for deriving them rather than transcribing them, since a version
-number is exactly the sort of fact a reader trusts without checking. Against:
-`formMain.LoadScripts` in `DBUpdater` (the 73 registered steps and the version
-at each end), `Constants.h`'s `REQUIRED_DB_VERSION` (6022),
+Re-checked 21 August 2026, and this time the argument was acted on rather than
+restated. The two numbers had gone stale a FOURTH time - the page said 73 steps
+to 6022 while the tree had moved on - after a previous revision had already
+written down that deriving them beats transcribing them, and then transcribed
+them anyway. They are gone from the prose now; the sources below are the answer.
+Against: `formMain.LoadScripts` in `DBUpdater` (the registered steps and the
+version at each end), `Constants.h`'s `REQUIRED_DB_VERSION`,
 `hmailserver/source/DBScripts` (which dialects ship which steps, and the
 `hm_adsynchronization` asymmetry), `DatabaseConnectionManager::GetCurrentDatabaseVersion`
 (`select … from hm_dbversion`), `Application::OnDatabaseConnected` (the two refusal
