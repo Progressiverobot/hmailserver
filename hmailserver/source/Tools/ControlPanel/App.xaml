@@ -3,6 +3,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:svc="clr-namespace:hMailServer.ControlPanel.Services"
     StartupUri="MainWindow.xaml">
     <Application.Resources>
         <ResourceDictionary>
@@ -206,6 +207,44 @@
                 </Setter>
             </Style>
 
+            <!-- The chevrons that scroll an overflowing tab strip. Sized and
+                 spaced to sit inside the strip's own height so adding them does
+                 not make every tabbed dialog taller, and kept visually quieter
+                 than the tabs themselves - they are a way to reach the content,
+                 not part of it. Disabled rather than hidden at each end of the
+                 range, so the strip does not reflow as you scroll it. -->
+            <Style x:Key="TabStripChevron" TargetType="RepeatButton">
+                <Setter Property="Width" Value="24" />
+                <Setter Property="Height" Value="34" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="Focusable" Value="False" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="Delay" Value="400" />
+                <Setter Property="Interval" Value="120" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="RepeatButton">
+                            <Border x:Name="Bd" Background="Transparent" CornerRadius="5"
+                                    SnapsToDevicePixels="True">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Bd" Property="Background"
+                                            Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter Property="Opacity" Value="0.3" />
+                                    <Setter Property="Cursor" Value="Arrow" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
             <Style TargetType="TabControl">
                 <Setter Property="Background" Value="Transparent" />
                 <Setter Property="BorderThickness" Value="0" />
@@ -218,13 +257,50 @@
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="*" />
                                 </Grid.RowDefinitions>
+                                <!-- The strip scrolls rather than wrapping, so when the
+                                     tabs overflow they have to stay reachable. Without
+                                     the chevrons, AccountDialog's eleven tabs ran past
+                                     the edge of the dialog and could only be got at with
+                                     the arrow keys. They appear only when there is
+                                     somewhere to go - see TabStripScrolling. -->
                                 <Border Grid.Row="0" BorderThickness="0,0,0,1"
                                         BorderBrush="{DynamicResource ControlElevationBorderBrush}">
-                                    <ScrollViewer HorizontalScrollBarVisibility="Hidden"
-                                                  VerticalScrollBarVisibility="Disabled" Focusable="False">
-                                        <StackPanel x:Name="HeaderPanel" IsItemsHost="True"
-                                                    Orientation="Horizontal" KeyboardNavigation.TabIndex="1" />
-                                    </ScrollViewer>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <RepeatButton x:Name="ScrollLeft" Grid.Column="0"
+                                                      Style="{StaticResource TabStripChevron}"
+                                                      Visibility="Collapsed"
+                                                      AutomationProperties.Name="Scroll tabs left">
+                                            <Path Data="M 8 2 L 4 6 L 8 10"
+                                                  Stroke="{DynamicResource TextFillColorSecondaryBrush}"
+                                                  StrokeThickness="1.4" StrokeEndLineCap="Round"
+                                                  StrokeStartLineCap="Round" />
+                                        </RepeatButton>
+
+                                        <ScrollViewer x:Name="HeaderScroll" Grid.Column="1"
+                                                      HorizontalScrollBarVisibility="Hidden"
+                                                      VerticalScrollBarVisibility="Disabled" Focusable="False"
+                                                      svc:TabStripScrolling.LeftButton="{Binding ElementName=ScrollLeft}"
+                                                      svc:TabStripScrolling.RightButton="{Binding ElementName=ScrollRight}">
+                                            <StackPanel x:Name="HeaderPanel" IsItemsHost="True"
+                                                        Orientation="Horizontal" KeyboardNavigation.TabIndex="1" />
+                                        </ScrollViewer>
+
+                                        <RepeatButton x:Name="ScrollRight" Grid.Column="2"
+                                                      Style="{StaticResource TabStripChevron}"
+                                                      Visibility="Collapsed"
+                                                      AutomationProperties.Name="Scroll tabs right">
+                                            <Path Data="M 4 2 L 8 6 L 4 10"
+                                                  Stroke="{DynamicResource TextFillColorSecondaryBrush}"
+                                                  StrokeThickness="1.4" StrokeEndLineCap="Round"
+                                                  StrokeStartLineCap="Round" />
+                                        </RepeatButton>
+                                    </Grid>
                                 </Border>
                                 <Border Grid.Row="1" Background="Transparent"
                                         Padding="{TemplateBinding Padding}" KeyboardNavigation.TabIndex="2">

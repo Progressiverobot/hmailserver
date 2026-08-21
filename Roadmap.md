@@ -41,7 +41,7 @@ than a wording problem.
 
 ### Contents and totals
 
-806 items. The counts are the point of this table — they say where the fork is
+807 items. The counts are the point of this table — they say where the fork is
 strong and where it is thin far more honestly than any prose summary.
 
 | Section | ✅ | 🔄 | ⬜ | ⏸️ |
@@ -53,7 +53,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Structural prerequisites](#structural-prerequisites) | 7 | – | 2 | – |
 | **Control Panel findability and accessibility** | | | | |
 | [What is concretely wrong](#what-is-concretely-wrong) | 7 | – | 1 | – |
-| [What to do about it](#what-to-do-about-it) | 6 | 1 | – | – |
+| [What to do about it](#what-to-do-about-it) | 7 | 1 | – | – |
 | [Accessibility, which is not optional](#accessibility-which-is-not-optional) | 6 | 1 | 2 | – |
 | **The capability matrix** | | | | |
 | [SMTP and ESMTP](#smtp-and-esmtp) | 27 | – | 2 | – |
@@ -75,7 +75,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 8 | – | – | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 5 | 1 | 2 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 6 | 2 | 1 | – |
-| **Total** | **710** | **14** | **67** | **15** |
+| **Total** | **711** | **14** | **67** | **15** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage, the administration surface and the core protocol layer are the
@@ -184,7 +184,7 @@ author-domain signing. The correction is recorded rather than quietly dropped,
 because the claim went out in a release.
 
 And what the fork is behind on has now been *measured* rather than guessed. The
-capability matrix below is the result: 682 items in fourteen sections — 806
+capability matrix below is the result: 682 items in fourteen sections — 807
 across the whole page — built by auditing the source and
 then having every "shipped" claim adversarially re-checked against the code. That
 second pass changed 69 rows and caught 15 overclaims — the failure shape, almost
@@ -1235,6 +1235,7 @@ Named specifically, because "improve the UX" is not actionable:
 | ✅ | **Keep Ctrl+K, and make it better** | It stays — it is genuinely the fastest route for an experienced administrator. Improvements worth having once the IA is fixed: match on the purpose statements above, show the navigation path of each result so the palette teaches the structure rather than bypassing it, and surface recently-visited pages. |
 | ✅ | **Settle the MVVM question** | `CONTROL-PANEL-PLAN.md` pre-decided `CommunityToolkit.Mvvm` and a `ViewModels/` folder. Neither exists; every view is imperative code-behind. That is not automatically wrong, but the plan and the code disagree, and a large reorganisation is the moment to decide rather than discover. |
 | ✅ | **The sign-in screen froze the whole window** — fixed 21 Aug 2026 | Connecting is three blocking COM calls — a ProgID lookup against the remote registry, a DCOM activation and an `Authenticate` — and all three ran **on the UI thread**, behind a single 50ms yield whose only job was to let the disabled button repaint. Against a host that answers, imperceptible. Against one that does not, RPC takes its own time to decide, and for the whole of it the window does not redraw, does not move, and collects a `(Not Responding)` in its title bar — at the first screen a new user ever sees. **The obvious fix is wrong**: an out-of-process COM proxy belongs to the apartment that created it, so moving the activation to a temporary STA thread orphans the session the moment that thread exits, and every later call is talking to a dead apartment. The correct version of that fix is a long-lived STA thread owning the session with every call marshalled onto it — a real change to how the application talks to the server, and not something to smuggle in beside a progress ring. So this attacks **the wait** instead of the thread: `HostReachability` asks off-thread, with a timeout we choose rather than one RPC chooses, whether the host resolves and answers on the endpoint mapper, and every address a name resolves to gets a turn because a host reachable on IPv4 and not IPv6 is otherwise reported as down. An unreachable host now fails in about two seconds with a sentence naming the firewall case, which is invisible from the client and unguessable. It narrows the window rather than closing it — a host that accepts TCP and then stalls inside DCOM still blocks — and the row says so. The host-name rules moved to `LocalHostNames` so the probe and `ServerSession.Open` cannot form separate opinions about what "local" means; a disagreement there would either refuse a connection that would have worked or skip the probe entirely. The screen also gained **the application's first `ProgressRing`**: the button is replaced rather than greyed out, because a greyed-out button is how every other screen says "you cannot do that". |
+| ✅ | **Eleven tabs, and four of them unreachable with a mouse** — fixed 21 Aug 2026 | The Control Panel replaces the stock WPF tab strip — which wraps headers onto several rows — with a single row inside a `ScrollViewer` whose scrollbar is set to `Hidden`. That reads far better right up until the tabs stop fitting. `AccountDialog` has **eleven**. Measured on the real template, its headers extend **1321px inside a 372px viewport**: 949 pixels of tabs sat past the edge, still focusable with the arrow keys and completely unreachable with a pointer, with nothing on screen to suggest anything had been cut off. `TabStripScrolling` adds the three things that were missing, and all three are needed: the **wheel** scrolls the strip horizontally (a vertical gesture is what people try first, and a ScrollViewer with no vertical range silently ignores it — so the most natural gesture was also the most convincing evidence that there was nothing more to see); **chevrons** appear at the ends, but only while there is somewhere to go, each disabling at its own end of the range, because permanent buttons would put furniture on every dialog whose tabs fit and always-enabled ones would claim more content than exists; and **keyboard selection scrolls into view**, because arrow keys already moved selection off screen, leaving the dialog showing a page whose tab was invisible — a worse state than merely not reaching it. Attached in the `TabControl` template rather than per dialog, so `DomainDialog` (6 tabs), `RouteDialog` and `IPRangeDialog` (5 each) get it too; fixing it per dialog is how AccountDialog would have been repaired and the other three would not. |
 
 ### Accessibility, which is not optional
 
