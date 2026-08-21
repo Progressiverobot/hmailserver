@@ -10,6 +10,8 @@
 
 #include "IMAPConfiguration.h"
 
+#include "../Common/Application/ACLManager.h"
+
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
 #define new DEBUG_NEW
@@ -34,7 +36,17 @@ namespace HM
       hierarchyDelimiter.Replace(_T("\\"), _T("\\\\"));
 
       String sPersonalNamespace = "((\"\" \"" + hierarchyDelimiter + "\"))";
+
+      // RFC 2342, the Other Users namespace: where other accounts' folders appear
+      // when their owners have granted this user rights on them (shared/delegated
+      // mailboxes). The prefix is advertised without a trailing delimiter, the
+      // same convention this response has always used for the public namespace.
+      // With ACL enforcement off the namespace does not exist and NIL is
+      // advertised - see ACLManager::GetOtherUsersNamespaceEnabled.
       String sOtherUsersNamespace = "NIL";
+      if (ACLManager::GetOtherUsersNamespaceEnabled())
+         sOtherUsersNamespace = "((\"" + ACLManager::GetOtherUsersFolderName() + "\" \"" + hierarchyDelimiter + "\"))";
+
       String sSharedNamespaces = "((\"" + sPublicFolderName + "\" \"" + hierarchyDelimiter + "\"))";
       String sResponse;
       

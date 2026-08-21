@@ -257,6 +257,14 @@ namespace HM
       void Disconnect_();
       bool IsReceivingLiteralDataForLoginCommand_() const;
 
+      // Resolves "#Users <delim> owner-address <delim> folder..." into a folder in
+      // the owner's tree, or null. Null is returned - indistinguishable from "no
+      // such folder" - when the namespace is disabled, the owner does not exist,
+      // the folder does not exist, or the caller lacks the lookup right on it, so
+      // no command that resolves a path can be used to probe which accounts and
+      // folders exist. The rights decision itself is ACLManager's.
+      std::shared_ptr<IMAPFolder> GetDelegatedFolderByPath_(const std::vector<String> &vecFolderPath);
+
       bool AskForLiteralData_(const String &sInput);
 
       void EndIdleMode_();

@@ -12,6 +12,7 @@
 #include "../BO/Groups.h"
 #include "../BO/Account.h"
 #include "../../IMAP/IMAPConfiguration.h"
+#include "../../IMAP/IMAPFolderContainer.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -67,6 +68,86 @@ namespace HM
       return Configuration::Instance()->GetIMAPConfiguration()->GetUseIMAPACL();
    }
 
+   String
+   ACLManager::GetOtherUsersFolderName()
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // The single definition of the "Other Users" namespace prefix. See the header.
+   //---------------------------------------------------------------------------()
+   {
+      return "#Users";
+   }
+
+   bool
+   ACLManager::GetOtherUsersNamespaceEnabled()
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // No ACL enforcement means no "#Users" namespace - see the header for why
+   // "disabled" must not mean "open".
+   //---------------------------------------------------------------------------()
+   {
+      return GetAclEnforcementEnabled();
+   }
+
+   std::vector<__int64>
+   ACLManager::GetAccountsWithFolderShares()
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // Candidate owners for the "#Users" namespace: accounts with at least one ACL
+   // entry on one of their own folders. Not an access decision - see the header.
+   //---------------------------------------------------------------------------()
+   {
+      std::vector<__int64> result;
+
+      SQLCommand command(
+         "SELECT DISTINCT f.folderaccountid AS ownerid "
+         "FROM hm_acl a "
+         "INNER JOIN hm_imapfolders f ON f.folderid = a.aclsharefolderid "
+         "WHERE f.folderaccountid <> 0 "
+         "ORDER BY f.folderaccountid");
+
+      std::shared_ptr<DALRecordset> pRS = Application::Instance()->GetDBManager()->OpenRecordset(command);
+      if (!pRS)
+      {
+         // The recordset itself failed - a database problem, not an empty result.
+         // Report it: the symptom otherwise is shared mailboxes silently missing
+         // from LIST, which looks exactly like a permissions mistake.
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6252, "ACLManager::GetAccountsWithFolderShares",
+            "The list of accounts with shared folders could not be read from the database.");
+         return result;
+      }
+
+      while (!pRS->IsEOF())
+      {
+         result.push_back(pRS->GetInt64Value("ownerid"));
+         pRS->MoveNext();
+      }
+
+      return result;
+   }
+
+   std::shared_ptr<ACLPermissions>
+   ACLManager::GetFolderPermissions_(std::shared_ptr<IMAPFolder> pFolder)
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // The ACL entries stored for exactly this folder. IMAPFolder::GetPermissions()
+   // deliberately skips the database read for account-level folders ("account
+   // level folders never have permissions set") - which stopped being true the
+   // day one user's folder could be shared with another. The read lives here,
+   // in the one class that decides access, rather than in IMAPFolder, so the
+   // business object keeps its cheap no-op for the overwhelmingly common
+   // unshared case everywhere else it is called.
+   //---------------------------------------------------------------------------()
+   {
+      if (pFolder->IsPublicFolder())
+         return pFolder->GetPermissions();
+
+      std::shared_ptr<ACLPermissions> pPermissions = std::shared_ptr<ACLPermissions>(new ACLPermissions(pFolder->GetID()));
+      pPermissions->Refresh();
+
+      return pPermissions;
+   }
+
    std::shared_ptr<ACLPermission>
    ACLManager::GetPermissionForFolder(__int64 iAccountID, std::shared_ptr<IMAPFolder> pFolder)
    //---------------------------------------------------------------------------()
@@ -81,17 +162,21 @@ namespace HM
          // Folder is owned by requester. Full access.
          std::shared_ptr<ACLPermission> pFullPermissions = std::shared_ptr<ACLPermission>(new ACLPermission);
          pFullPermissions->GrantAll();
-         return pFullPermissions;         
+         return pFullPermissions;
       }
 
+      // The requester does not own the folder: it is either a public folder or
+      // another account's (shared) folder. Since not all folders have their own
+      // permissions, the walk below locates the nearest ancestor that has any
+      // and inherits from it - and the ancestors of a shared folder live in the
+      // OWNER's tree, not the public tree, so the parent lookups must be made
+      // against the tree the folder actually belongs to.
+      std::shared_ptr<IMAPFolders> pOwnerTree;
+      if (pFolder->GetAccountID() == 0)
+         pOwnerTree = Configuration::Instance()->GetIMAPConfiguration()->GetPublicFolders();
+      else
+         pOwnerTree = IMAPFolderContainer::Instance()->GetFoldersForAccount(pFolder->GetAccountID());
 
-      std::shared_ptr<IMAPFolders> pPublicFolders = Configuration::Instance()->GetIMAPConfiguration()->GetPublicFolders();
-
-      // The user is trying to access a public folder. Determine the permissions for this one.
-      // We have a list containing Folder A and Folder B1. Since not all folders may have permissions
-      // we need to locate a parent folder in the structure which has a permission and then
-      // inherit that one.
-      
       std::shared_ptr<IMAPFolder> pCheckFolder = pFolder;
 
       int maxRecursions = 250;
@@ -101,7 +186,7 @@ namespace HM
 
          // Check if permissions is set for this folder. If it is, we need to check
          // if we have permissions to it.
-         std::shared_ptr<ACLPermissions> pPermissions = pCheckFolder->GetPermissions();
+         std::shared_ptr<ACLPermissions> pPermissions = GetFolderPermissions_(pCheckFolder);
 
          if (pPermissions && pPermissions->GetCount() > 0)
          {
@@ -114,7 +199,10 @@ namespace HM
          // Locate parent folder.
          __int64 iParentFolderID = pCheckFolder->GetParentFolderID();
 
-         pCheckFolder = pPublicFolders->GetItemByDBIDRecursive(iParentFolderID);
+         if (!pOwnerTree)
+            break;
+
+         pCheckFolder = pOwnerTree->GetItemByDBIDRecursive(iParentFolderID);
       }
 
       std::shared_ptr<ACLPermission> pNoPermission;

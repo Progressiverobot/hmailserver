@@ -7,13 +7,16 @@
 #include "IMAPCommandStatus.h"
 #include "IMAPConnection.h"
 #include "IMAPSimpleCommandParser.h"
+#include "../Common/Application/ACLManager.h"
 #include "../Common/BO/Account.h"
 #include "../Common/BO/ACLPermission.h"
 #include "../Common/BO/IMAPFolder.h"
 #include "../Common/BO/IMAPFolders.h"
+#include "../Common/Cache/CacheContainer.h"
 
 #include "FolderListCreator.h"
 #include "IMAPConfiguration.h"
+#include "IMAPFolderContainer.h"
 
 #include <algorithm>
 
@@ -145,7 +148,22 @@ namespace HM
          return IMAPResult(IMAPResult::ResultNo, "LIST failed - No folders.");
 
       String hierarchyDelimiter = Configuration::Instance()->GetIMAPConfiguration()->GetHierarchyDelimiter();
-      String sPublicFolderName = Configuration::Instance()->GetIMAPConfiguration()->GetIMAPPublicFolderName(); 
+      String sPublicFolderName = Configuration::Instance()->GetIMAPConfiguration()->GetIMAPPublicFolderName();
+
+      // Shared mailboxes, the "#Users" namespace: the accounts that have shared
+      // at least one of their folders with somebody. Resolved once, before the
+      // pattern loop; whether THIS caller may see any given folder is decided
+      // per folder by ACLManager inside the listing walk, exactly as it is for
+      // public folders - an owner who shared nothing with this caller produces
+      // no output and therefore no trace in the response.
+      std::vector<__int64> vecShareOwnerIds;
+      if (ACLManager::GetOtherUsersNamespaceEnabled())
+      {
+         ACLManager aclManager;
+         vecShareOwnerIds = aclManager.GetAccountsWithFolderShares();
+      }
+
+      String sOtherUsersName = ACLManager::GetOtherUsersFolderName();
 
       std::vector<String> seenLines;
       String sResult;
@@ -171,6 +189,61 @@ namespace HM
             sPatternResult = FolderListCreator::GetIMAPFolderList(pConnection->GetAccount()->GetID(), pFolders, folderSpecifier, "") +
                              FolderListCreator::GetIMAPFolderList(pConnection->GetAccount()->GetID(), pPublicFolders, folderSpecifier, sPublicFolderName);
          }
+
+         // One listing per sharing owner, prefixed "#Users.owner@domain". The
+         // walk skips every folder the caller lacks the lookup right on, so a
+         // caller with no rights sees neither the folders nor the owner node.
+         bool bAnyDelegatedVisible = false;
+         for (__int64 iOwnerAccountID : vecShareOwnerIds)
+         {
+            if (iOwnerAccountID == pConnection->GetAccount()->GetID())
+               continue;   // the caller's own folders are the personal namespace.
+
+            std::shared_ptr<const Account> pOwnerAccount = CacheContainer::Instance()->GetAccount(iOwnerAccountID);
+            if (!pOwnerAccount)
+               continue;
+
+            std::shared_ptr<IMAPFolders> pOwnerFolders = IMAPFolderContainer::Instance()->GetFoldersForAccount(iOwnerAccountID);
+            if (!pOwnerFolders)
+               continue;
+
+            String sOwnerPrefix = sOtherUsersName + hierarchyDelimiter + pOwnerAccount->GetAddress();
+
+            bool bOwnerVisible = false;
+            if (bExtended)
+               sPatternResult += FolderListCreator::GetIMAPFolderListExtended(pConnection->GetAccount()->GetID(), pOwnerFolders, folderSpecifier, sOwnerPrefix, bOnlySubscribed, bAnnotateSubscribed, bOnlySpecialUse, &bOwnerVisible);
+            else
+               sPatternResult += FolderListCreator::GetIMAPFolderList(pConnection->GetAccount()->GetID(), pOwnerFolders, folderSpecifier, sOwnerPrefix, &bOwnerVisible);
+
+            if (bOwnerVisible)
+            {
+               bAnyDelegatedVisible = true;
+
+               // The owner's address usually contains the hierarchy delimiter
+               // (with the default "." every dotted domain does), so a client
+               // walking the hierarchy level by level with "%" passes through
+               // intermediate levels - "#Users.info@example" - that are not
+               // real nodes. Report each as \Noselect, the way the namespace
+               // root itself is, so "%" discovery reaches the real folders.
+               // The full owner node ("#Users.info@example.test") is emitted by
+               // the listing walk above as its prefix root.
+               std::vector<String> vecAddressParts = StringParser::SplitString(pOwnerAccount->GetAddress(), hierarchyDelimiter);
+
+               String sIntermediate = sOtherUsersName;
+               for (size_t iPart = 0; iPart + 1 < vecAddressParts.size(); iPart++)
+               {
+                  sIntermediate += hierarchyDelimiter + vecAddressParts[iPart];
+                  sPatternResult += FolderListCreator::CreateNamespaceRootLine(sIntermediate, folderSpecifier);
+               }
+            }
+         }
+
+         // The namespace root itself, "#Users" - \Noselect, like "#Public" - is
+         // reported exactly when at least one shared folder is visible to the
+         // caller, whether or not the current pattern happened to match any of
+         // them ("%" matches the root and none of the folders beneath it).
+         if (bAnyDelegatedVisible)
+            sPatternResult += FolderListCreator::CreateNamespaceRootLine(sOtherUsersName, folderSpecifier);
 
          // De-duplicate lines so a mailbox matching multiple patterns is listed once.
          std::vector<String> lines = StringParser::SplitString(sPatternResult, "\r\n");

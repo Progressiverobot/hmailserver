@@ -32,12 +32,12 @@ namespace HM
    }
 
    String
-   FolderListCreator::GetIMAPFolderList(__int64 iAccountID, std::shared_ptr<IMAPFolders> pStartFolders, const String &sWildcard, const String &sPrefix)
+   FolderListCreator::GetIMAPFolderList(__int64 iAccountID, std::shared_ptr<IMAPFolders> pStartFolders, const String &sWildcard, const String &sPrefix, bool *pAnyFolderVisible)
    {
       ListRequest_ request;
       request.emit_as_list_ = true;
 
-      return Create_(iAccountID, pStartFolders, sWildcard, sPrefix, request);
+      return Create_(iAccountID, pStartFolders, sWildcard, sPrefix, request, pAnyFolderVisible);
    }
 
    String
@@ -47,11 +47,11 @@ namespace HM
       request.emit_as_list_ = false;
       request.only_subscribed_ = true;
 
-      return Create_(iAccountID, pStartFolders, sWildcard, sPrefix, request);
+      return Create_(iAccountID, pStartFolders, sWildcard, sPrefix, request, nullptr);
    }
 
    String
-   FolderListCreator::GetIMAPFolderListExtended(__int64 iAccountID, std::shared_ptr<IMAPFolders> pStartFolders, const String &sWildcard, const String &sPrefix, bool bOnlySubscribed, bool bAnnotateSubscribed, bool bOnlySpecialUse)
+   FolderListCreator::GetIMAPFolderListExtended(__int64 iAccountID, std::shared_ptr<IMAPFolders> pStartFolders, const String &sWildcard, const String &sPrefix, bool bOnlySubscribed, bool bAnnotateSubscribed, bool bOnlySpecialUse, bool *pAnyFolderVisible)
    {
       ListRequest_ request;
       request.emit_as_list_ = true;
@@ -59,12 +59,38 @@ namespace HM
       request.annotate_subscribed_ = bAnnotateSubscribed;
       request.only_special_use_ = bOnlySpecialUse;
 
-      return Create_(iAccountID, pStartFolders, sWildcard, sPrefix, request);
+      return Create_(iAccountID, pStartFolders, sWildcard, sPrefix, request, pAnyFolderVisible);
    }
 
    String
-   FolderListCreator::Create_(__int64 iAccountID, std::shared_ptr<IMAPFolders> pStartFolders, const String &sWildcard, const String &sPrefix, ListRequest_ &request)
+   FolderListCreator::CreateNamespaceRootLine(const String &sRootPath, const String &sWildcard)
    {
+      String hierarchyDelimiter = Configuration::Instance()->GetIMAPConfiguration()->GetHierarchyDelimiter();
+
+      if (!FolderWildcardMatch_(sRootPath, sWildcard, hierarchyDelimiter))
+         return _T("");
+
+      // The same dummy-folder emission the listing walk uses for a namespace
+      // root it reached through a prefix ("#Public", "#Users.owner@domain").
+      ListRequest_ request;
+      request.emit_as_list_ = true;
+
+      std::shared_ptr<IMAPFolder> pFolderDummy;
+      String sPath = sRootPath;
+
+      String sLine = CreateFolderLine_(pFolderDummy, true, sPath, sWildcard, false, hierarchyDelimiter, request);
+      if (sLine.IsEmpty())
+         return _T("");
+
+      return sLine + _T("\r\n");
+   }
+
+   String
+   FolderListCreator::Create_(__int64 iAccountID, std::shared_ptr<IMAPFolders> pStartFolders, const String &sWildcard, const String &sPrefix, ListRequest_ &request, bool *pAnyFolderVisible)
+   {
+      if (pAnyFolderVisible)
+         *pAnyFolderVisible = false;
+
       // RFC 6154: work out which folder owns which special-use attribute once, before
       // the walk, rather than deciding per folder inside it.
       //
@@ -76,14 +102,18 @@ namespace HM
       // measured in microseconds for a realistic mailbox.
       //
       // The public folder collection is identified by account id zero and gets no
-      // designations at all, deliberately: see ListRequest_::special_use_.
-      if (pStartFolders && pStartFolders->GetAccountID() != 0)
+      // designations at all, deliberately: see ListRequest_::special_use_. A tree
+      // being listed on behalf of an account that does not own it - a shared
+      // mailbox under "#Users" - gets none either, for the same reason: the
+      // owner's \Trash advertised to a delegate is an invitation for the
+      // delegate's client to expunge the owner's mail.
+      if (pStartFolders && pStartFolders->GetAccountID() != 0 && pStartFolders->GetAccountID() == iAccountID)
          IMAPSpecialUse::Resolve(pStartFolders, request.special_use_);
 
       std::vector<String> vecCurrentFolder;
       std::vector<String> vecMatchingFolders;
 
-      CreateIMAPFolderList_(iAccountID, pStartFolders, sWildcard, sPrefix, vecCurrentFolder, vecMatchingFolders, request);
+      CreateIMAPFolderList_(iAccountID, pStartFolders, sWildcard, sPrefix, vecCurrentFolder, vecMatchingFolders, request, pAnyFolderVisible);
 
       String sRet = StringParser::JoinVector(vecMatchingFolders, "\r\n");
 
@@ -94,14 +124,14 @@ namespace HM
    }
 
    void
-   FolderListCreator::CreateIMAPFolderList_(__int64 iAccountID, std::shared_ptr<IMAPFolders> pStartFolders, const String &sWildcard, const String &sPrefix, std::vector<String> &vecCurrentFolder, std::vector<String> &vecMatchingFolders, const ListRequest_ &request)
+   FolderListCreator::CreateIMAPFolderList_(__int64 iAccountID, std::shared_ptr<IMAPFolders> pStartFolders, const String &sWildcard, const String &sPrefix, std::vector<String> &vecCurrentFolder, std::vector<String> &vecMatchingFolders, const ListRequest_ &request, bool *pAnyFolderVisible)
    {
-      if (vecCurrentFolder.size() > IMAPFolder::MaxFolderDepth)    
+      if (vecCurrentFolder.size() > IMAPFolder::MaxFolderDepth)
          return;
-         
+
       String hierarchyDelimiter = Configuration::Instance()->GetIMAPConfiguration()->GetHierarchyDelimiter();
 
-      bool publicFolderAccessible = false;
+      bool anyFolderVisible = false;
 
 	  ACLManager aclManager;
       for(std::shared_ptr<IMAPFolder> currentFolder : pStartFolders->GetVector())
@@ -112,9 +142,9 @@ namespace HM
          {
             continue;
          }
-         
-         // at least one public folder is accessible by the user.
-         publicFolderAccessible = true;
+
+         // at least one folder at this level is visible to the user.
+         anyFolderVisible = true;
 
          vecCurrentFolder.push_back(currentFolder->GetFolderName());
 
@@ -136,21 +166,31 @@ namespace HM
          }
 
          if (hasSubFolders)
-            CreateIMAPFolderList_(iAccountID, subFolders, sWildcard, sPrefix, vecCurrentFolder, vecMatchingFolders, request);
+            CreateIMAPFolderList_(iAccountID, subFolders, sWildcard, sPrefix, vecCurrentFolder, vecMatchingFolders, request, nullptr);
 
          vecCurrentFolder.erase(vecCurrentFolder.end() - 1);
       }
 
-      if (vecCurrentFolder.size() == 0 && publicFolderAccessible && !sPrefix.IsEmpty())
-      {
-         // the user has permission to see at least one public folder.
-         String publicFolderName = Configuration::Instance()->GetIMAPConfiguration()->GetIMAPPublicFolderName();
+      // Only the outermost frame reports visibility and emits the root: nested
+      // frames enter with a non-empty vecCurrentFolder, and the flag means
+      // "a TOP-level folder of this tree is visible" - the same condition the
+      // root line has always been emitted on.
+      if (vecCurrentFolder.size() == 0 && pAnyFolderVisible)
+         *pAnyFolderVisible = anyFolderVisible;
 
-         // we're listing public folders and are on the top level.
-         if (FolderWildcardMatch_(publicFolderName, sWildcard, hierarchyDelimiter))
+      if (vecCurrentFolder.size() == 0 && anyFolderVisible && !sPrefix.IsEmpty())
+      {
+         // The user can see at least one folder under this namespace root and
+         // we're on the top level, so report the root itself as \Noselect. The
+         // root is the prefix this listing was invoked with: "#Public" for the
+         // public tree (callers pass the configured public folder name as the
+         // prefix), "#Users.owner@domain" for a shared mailbox tree.
+         String rootName = sPrefix;
+
+         if (FolderWildcardMatch_(rootName, sWildcard, hierarchyDelimiter))
          {
             std::shared_ptr<IMAPFolder> pFolderDummy;
-            String sFolderLine = CreateFolderLine_(pFolderDummy, true, publicFolderName, sWildcard, false, hierarchyDelimiter, request);
+            String sFolderLine = CreateFolderLine_(pFolderDummy, true, rootName, sWildcard, false, hierarchyDelimiter, request);
 
             if (!sFolderLine.IsEmpty())
                vecMatchingFolders.push_back(sFolderLine);

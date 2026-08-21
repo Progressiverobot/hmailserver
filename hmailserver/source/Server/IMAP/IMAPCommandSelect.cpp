@@ -9,6 +9,9 @@
 #include "IMAPConfiguration.h"
 #include "MessagesContainer.h"
 
+#include "../Common/Application/ACLManager.h"
+#include "../Common/BO/ACLPermission.h"
+#include "../Common/BO/Account.h"
 #include "../Common/BO/IMAPFolders.h"
 #include "../Common/BO/IMAPFolder.h"
 #include "../Common/Persistence/PersistentIMAPFolder.h"
@@ -79,7 +82,18 @@ namespace HM
          
       std::shared_ptr<IMAPFolder> pSelectedFolder = pConnection->GetFolderByFullPath(sFolderName);
       if (!pSelectedFolder)
+      {
+         // Note that this is also the answer for a shared ("#Users") path the
+         // caller lacks the lookup right on: resolution refuses those before
+         // this command ever sees a folder, so "no rights" and "no such folder"
+         // are indistinguishable here by construction.
          return IMAPResult(IMAPResult::ResultBad, "Folder could not be found.");
+      }
+
+      // A folder that belongs to another account - reached through the "#Users"
+      // namespace, and only reachable there with the lookup right.
+      bool bIsDelegatedFolder = pSelectedFolder->GetAccountID() != 0 &&
+                                pSelectedFolder->GetAccountID() != pConnection->GetAccount()->GetID();
 
       bool readAccess = false;
       bool writeAccess = false;
@@ -87,7 +101,15 @@ namespace HM
 
       // Check if the user has access to read this folder.
       if (!readAccess)
+      {
+         // RFC 4314: for a mailbox the user may look up but not read, SELECT
+         // fails with NO. The folder's existence is not a secret at this point -
+         // the lookup right already made it visible in LIST.
+         if (bIsDelegatedFolder)
+            return IMAPResult(IMAPResult::ResultNo, "ACL: Read permission denied (Required for SELECT command).");
+
          return IMAPResult(IMAPResult::ResultBad, "ACL: Read permission denied (Required for SELECT command).");
+      }
 
       pConnection->SetCurrentFolder(pSelectedFolder, false);
 
@@ -143,7 +165,36 @@ namespace HM
          sResponse += sRespTemp;
       }
 
-      sResponse += _T("* OK [PERMANENTFLAGS (\\Deleted \\Seen \\Draft \\Answered \\Flagged)] limited\r\n");
+      // RFC 3501/4314: PERMANENTFLAGS advertises what this user may change. On a
+      // shared folder that is the caller's rights, flag by flag: \Deleted needs
+      // t, \Seen needs s, the rest need w. The enforcement itself lives in the
+      // STORE/FETCH/APPEND handlers (via ACLManager); this response is what lets
+      // a well-behaved client grey the controls out instead of discovering the
+      // refusal one NO at a time. Note that \Seen here is SHARED state - see the
+      // design record in ACLManager.h.
+      if (bIsDelegatedFolder && ACLManager::GetAclEnforcementEnabled())
+      {
+         ACLManager aclManager;
+         std::shared_ptr<ACLPermission> pDelegateRights = aclManager.GetPermissionForFolder(pConnection->GetAccount()->GetID(), pSelectedFolder);
+
+         String sPermanentFlags;
+         if (pDelegateRights)
+         {
+            if (pDelegateRights->GetAllow(ACLPermission::PermissionWriteDeleted))
+               sPermanentFlags += _T("\\Deleted");
+            if (pDelegateRights->GetAllow(ACLPermission::PermissionWriteSeen))
+               sPermanentFlags += sPermanentFlags.IsEmpty() ? _T("\\Seen") : _T(" \\Seen");
+            if (pDelegateRights->GetAllow(ACLPermission::PermissionWriteOthers))
+               sPermanentFlags += sPermanentFlags.IsEmpty() ? _T("\\Draft \\Answered \\Flagged") : _T(" \\Draft \\Answered \\Flagged");
+         }
+
+         sRespTemp.Format(_T("* OK [PERMANENTFLAGS (%s)] limited\r\n"), sPermanentFlags.c_str());
+         sResponse += sRespTemp;
+      }
+      else
+      {
+         sResponse += _T("* OK [PERMANENTFLAGS (\\Deleted \\Seen \\Draft \\Answered \\Flagged)] limited\r\n");
+      }
 
       // RFC 7162 (QRESYNC): replay flag/MODSEQ changes since the client's mod-sequence.
       if (qresyncRequested)

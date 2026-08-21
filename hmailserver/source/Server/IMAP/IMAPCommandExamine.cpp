@@ -10,6 +10,7 @@
 #include "MessagesContainer.h"
 
 #include "../Common/BO/ACLPermission.h"
+#include "../Common/BO/Account.h"
 #include "../Common/BO/IMAPFolders.h"
 #include "../Common/BO/IMAPFolder.h"
 #include "../Common/Persistence/PersistentIMAPFolder.h"
@@ -77,10 +78,26 @@ namespace HM
       std::shared_ptr<IMAPFolder> pSelectedFolder = pConnection->GetFolderByFullPath(sFolderName);
       
       if (!pSelectedFolder)
+      {
+         // Also the answer for a shared ("#Users") path the caller lacks the
+         // lookup right on: resolution refuses those before this command sees a
+         // folder, so "no rights" and "no such folder" are indistinguishable.
          return IMAPResult(IMAPResult::ResultBad, "Folder could not be found.");
+      }
 
       if (!pConnection->CheckPermission(pSelectedFolder, ACLPermission::PermissionRead))
+      {
+         // RFC 4314: a mailbox the user may look up but not read fails with NO.
+         // Delegated folders only resolve at all with the lookup right, so their
+         // existence is not a secret on this branch.
+         bool bIsDelegatedFolder = pSelectedFolder->GetAccountID() != 0 &&
+                                   pSelectedFolder->GetAccountID() != pConnection->GetAccount()->GetID();
+
+         if (bIsDelegatedFolder)
+            return IMAPResult(IMAPResult::ResultNo, "ACL: Read permission denied (Required for EXAMINE command).");
+
          return IMAPResult(IMAPResult::ResultBad, "ACL: Read permission denied (Required for EXAMINE command).");
+      }
 
       pConnection->SetCurrentFolder(pSelectedFolder, true);
       

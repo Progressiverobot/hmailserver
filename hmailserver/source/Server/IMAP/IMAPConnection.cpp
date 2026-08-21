@@ -19,6 +19,7 @@
 #include "../Common/BO/IMAPFolder.h"
 #include "../Common/BO/ACLPermission.h"
 #include "../Common/BO/Message.h"
+#include "../Common/Cache/CacheContainer.h"
 
 // IMAP Utilities
 #include "IMAPFolderUtilities.h"
@@ -971,7 +972,7 @@ namespace HM
       return GetFolderByFullPath(vecFolderPath);
    }
 
-   std::shared_ptr<IMAPFolder> 
+   std::shared_ptr<IMAPFolder>
    IMAPConnection::GetFolderByFullPath(std::vector<String> &vecFolderPath)
    {
       std::shared_ptr<IMAPFolder> pFolder;
@@ -1000,9 +1001,95 @@ namespace HM
             if (pFolder)
                return pFolder;
          }
+
+         if (!bIsPublicFolder)
+         {
+            // Shared mailboxes: "#Users.owner@domain.folder". Tried only after
+            // the user's own folders, so an account that happens to own a folder
+            // literally named "#Users" - possible, since CREATE does not reserve
+            // the name - keeps reaching its own data; the namespace is shadowed
+            // for that account rather than the account's folder made unreachable.
+            pFolder = GetDelegatedFolderByPath_(vecFolderPath);
+            if (pFolder)
+               return pFolder;
+         }
       }
 
       return pFolder;
+   }
+
+   std::shared_ptr<IMAPFolder>
+   IMAPConnection::GetDelegatedFolderByPath_(const std::vector<String> &vecFolderPath)
+   {
+      std::shared_ptr<IMAPFolder> pEmpty;
+
+      // With ACL enforcement off there is no decision-maker for cross-account
+      // access, so the namespace does not exist. See ACLManager.
+      if (!ACLManager::GetOtherUsersNamespaceEnabled())
+         return pEmpty;
+
+      // "#Users", the owner's address, and at least one folder below it. The
+      // namespace root and the per-owner node are \Noselect: they resolve to
+      // nothing, exactly like "#Public" itself.
+      if (vecFolderPath.size() < 3)
+         return pEmpty;
+
+      if (ACLManager::GetOtherUsersFolderName().CompareNoCase(vecFolderPath[0]) != 0)
+         return pEmpty;
+
+      if (!account_)
+         return pEmpty;
+
+      String hierarchyDelimiter = Configuration::Instance()->GetIMAPConfiguration()->GetHierarchyDelimiter();
+
+      // The owner's address usually contains the hierarchy delimiter itself -
+      // with the default "." every dotted domain does - so the path cannot be
+      // split into (address, folder path) at a fixed position. Every split is
+      // tried, shortest address first, and the first one that names an existing
+      // account, an existing folder in that account's tree AND passes the
+      // lookup gate below is the answer. A split naming a real folder the
+      // caller may not look up is skipped exactly like one naming nothing, so
+      // the gate's no-probing property survives the ambiguity.
+      for (size_t addressParts = 1; addressParts + 1 < vecFolderPath.size(); addressParts++)
+      {
+         String sOwnerAddress = vecFolderPath[1];
+         for (size_t i = 2; i <= addressParts; i++)
+            sOwnerAddress += hierarchyDelimiter + vecFolderPath[i];
+
+         // Every account address contains an @; skipping splits without one
+         // saves pointless account lookups.
+         if (sOwnerAddress.Find(_T("@")) < 0)
+            continue;
+
+         std::shared_ptr<const Account> pOwner = CacheContainer::Instance()->GetAccount(sOwnerAddress);
+         if (!pOwner)
+            continue;
+
+         std::shared_ptr<IMAPFolders> pOwnerFolders = IMAPFolderContainer::Instance()->GetFoldersForAccount(pOwner->GetID());
+         if (!pOwnerFolders)
+            continue;
+
+         std::vector<String> vecOwnerPath(vecFolderPath.begin() + 1 + addressParts, vecFolderPath.end());
+
+         std::shared_ptr<IMAPFolder> pFolder = pOwnerFolders->GetFolderByFullPath(vecOwnerPath);
+         if (!pFolder)
+            continue;
+
+         // The lookup gate, applied AT RESOLUTION: without the l right this
+         // folder must not be observable at all, and every command in the
+         // server resolves paths through here - so refusing here makes "no
+         // rights" and "no such folder" the same answer everywhere, instead of
+         // relying on each command to remember to hide its refusal. One
+         // decision, asked of ACLManager.
+         ACLManager aclManager;
+         std::shared_ptr<ACLPermission> pPermission = aclManager.GetPermissionForFolder(account_->GetID(), pFolder);
+         if (!pPermission || !pPermission->GetAllow(ACLPermission::PermissionLookup))
+            continue;
+
+         return pFolder;
+      }
+
+      return pEmpty;
    }
 
    void
