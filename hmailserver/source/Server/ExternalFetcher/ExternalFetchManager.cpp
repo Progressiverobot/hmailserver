@@ -6,6 +6,7 @@
 #include ".\ExternalFetchManager.h"
 
 #include "../Common/BO/FetchAccounts.h"
+#include "../Common/Util/DiskSpace.h"
 #include "../Common/BO/FetchAccount.h"
 #include "../Common/Persistence/PersistentFetchAccount.h"
 
@@ -73,6 +74,35 @@ namespace HM
 
       while (1)
       {
+         // Free-space precondition, same floor as SMTP's (MinimumFreeDiskSpaceMB,
+         // 0 = off). Skipping a fetch is the one refusal that is completely free:
+         // the mail stays on the remote server, which serves it again next cycle
+         // - where refusing an inbound SMTP message at least costs the sender a
+         // retry. It would also be the worst place to run out mid-write: a POP3
+         // fetch that saves short and then DELEs has destroyed the only copy, and
+         // although the fetcher already refuses to DELE after a failed save, not
+         // starting the download is strictly safer than trusting that path under
+         // disk pressure. The whole sweep is skipped rather than each account,
+         // so SetNextTryTime is not advanced and every pending account fetches
+         // immediately once space returns.
+         if (!DiskSpace::DataDirectoryHasRoomForMail())
+         {
+            if (!fetch_paused_for_disk_space_)
+            {
+               LOG_APPLICATION("External account fetching is paused: free disk space on the data directory's volume is below MinimumFreeDiskSpaceMB.");
+               fetch_paused_for_disk_space_ = true;
+            }
+
+            check_now_.WaitFor(boost::chrono::minutes(1));
+            continue;
+         }
+
+         if (fetch_paused_for_disk_space_)
+         {
+            LOG_APPLICATION("External account fetching has resumed: free disk space is back above the floor.");
+            fetch_paused_for_disk_space_ = false;
+         }
+
          fetch_accounts_->RefreshPendingList();
 
          std::vector<std::shared_ptr<FetchAccount> > &vecAccounts = fetch_accounts_->GetVector();

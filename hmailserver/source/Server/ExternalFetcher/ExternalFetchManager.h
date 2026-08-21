@@ -32,5 +32,10 @@ namespace HM
       const String queue_name_;
 
       Event check_now_;
+
+      // Whether fetching is currently paused for lack of disk space, so the
+      // pause and the resumption are each logged once rather than once a minute
+      // for as long as the condition lasts.
+      bool fetch_paused_for_disk_space_ = false;
    };
 }

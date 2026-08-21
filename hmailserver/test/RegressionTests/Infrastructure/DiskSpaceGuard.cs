@@ -240,5 +240,85 @@ namespace RegressionTests.Infrastructure
             RestoreDefaultsAndRestart();
          }
       }
+
+      [Test]
+      [Description("Below the floor, external account fetching pauses rather than downloading onto a full disk - the one refusal that is free, because the mail stays on the remote server")]
+      public void ExternalFetchingPausesBelowTheFloor()
+      {
+         const string address = "diskfetch@example.test";
+         const string password = "diskfetch-password";
+
+         var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, address, password);
+
+         // Read from COM BEFORE the restart: the proxies die with the service.
+         string accountAddress = account.Address;
+
+         var messages = new System.Collections.Generic.List<RegressionTests.ExternalAccounts.ScriptedPop3Server.RemoteMessage>
+         {
+            new RegressionTests.ExternalAccounts.ScriptedPop3Server.RemoteMessage("UID-DISKFULL-1",
+               "From: sender@dummy-example.com\r\n" +
+               "To: " + address + "\r\n" +
+               "Subject: should stay remote\r\n" +
+               "\r\n" +
+               "A message that must not be fetched while the disk is full.\r\n")
+         };
+
+         using (var remoteServer = new RegressionTests.ExternalAccounts.ScriptedPop3Server(11390, messages))
+         {
+            remoteServer.StartListen();
+
+            try
+            {
+               ServerIniFile.SetSetting(FloorSetting, LargerThanAnyVolume);
+               RestartServerAndReacquireCom();
+
+               var restartedAccount = SingletonProvider<TestSetup>.Instance.GetApp()
+                  .Domains.get_ItemByName("example.test").Accounts.get_ItemByAddress(accountAddress);
+
+               var fetchAccount = restartedAccount.FetchAccounts.Add();
+               fetchAccount.Enabled = true;
+               fetchAccount.MinutesBetweenFetch = 60;
+               fetchAccount.Name = "DiskFullPause";
+               fetchAccount.Username = "remote@dummy-example.com";
+               fetchAccount.Password = "remote";
+               fetchAccount.UseSSL = false;
+               fetchAccount.ServerAddress = "localhost";
+               fetchAccount.Port = 11390;
+               fetchAccount.ProcessMIMERecipients = false;
+               fetchAccount.DaysToKeepMessages = -1;
+               fetchAccount.UseAntiSpam = false;
+               fetchAccount.UseAntiVirus = false;
+               fetchAccount.Save();
+
+               fetchAccount.DownloadNow();
+
+               // The pause is announced once in the application log - that line, plus
+               // the message never arriving, is the whole contract.
+               RetryHelper.TryAction(TimeSpan.FromSeconds(15), () =>
+               {
+                  var log = LogHandler.ReadCurrentDefaultLog();
+
+                  if (!log.Contains("External account fetching is paused"))
+                     throw new Exception("The pause was not announced in the application log. Log:\r\n" + log);
+               });
+
+               // Deterministic failure signal for a broken precondition: had the fetch
+               // run, this message would be in the mailbox.
+               Pop3ClientSimulator.AssertMessageCount(accountAddress, password, 0);
+
+               Assert.AreEqual(0, remoteServer.RetrievedMessages.Count,
+                  "The remote server should never have been asked for a message while the disk is below the floor.");
+
+               // Crossing below the floor reports HM6230 once, by design. Consume
+               // it - AssertReportedError asserts AND deletes - or the next
+               // fixture's clean-log precondition fails on this test's leavings.
+               CustomAsserts.AssertReportedError("HM6230");
+            }
+            finally
+            {
+               RestoreDefaultsAndRestart();
+            }
+         }
+      }
    }
 }
