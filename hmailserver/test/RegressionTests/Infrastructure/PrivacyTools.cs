@@ -25,6 +25,20 @@ namespace RegressionTests.Infrastructure
    [TestFixture]
    public class PrivacyTools : TestFixtureBase
    {
+      /// <summary>
+      ///    APPEND with the literal size derived from the payload rather than
+      ///    typed. A wrong count does not fail the test, it HANGS it: the
+      ///    server waits for octets that will never arrive while the client
+      ///    waits for a response, and the whole fixture wedges. Two of these
+      ///    were miscounted by hand while this file was being written, so the
+      ///    arithmetic now lives in one place that cannot be wrong.
+      /// </summary>
+      private static void AppendTo(ImapClientSimulator imap, string tag, string folder, string message)
+      {
+         imap.SendSingleCommandWithLiteral(
+            tag + " APPEND \"" + folder + "\" {" + message.Length + "}", message);
+      }
+
       [Test]
       [Description("Export mirrors the folder tree as .eml files and reports how many - a partial export raises an error instead of a smaller number")]
       public void ExportMirrorsTheFolderTreeAsEmlFiles()
@@ -41,8 +55,7 @@ namespace RegressionTests.Infrastructure
          var imap = new ImapClientSimulator();
          Assert.IsTrue(imap.ConnectAndLogon(account.Address, "test"));
          Assert.IsTrue(imap.CreateFolder("Projects"));
-         imap.SendSingleCommandWithLiteral("A10 APPEND Projects {59}",
-            "Subject: Filed\r\n\r\nA body filed under Projects for export.\r\n");
+         AppendTo(imap, "A10", "Projects", "Subject: Filed\r\n\r\nA body filed under Projects for export.\r\n");
          imap.Disconnect();
 
          string exportDirectory = Path.Combine(Path.GetTempPath(), "hm-export-" + Guid.NewGuid().ToString("N"));
@@ -72,6 +85,69 @@ namespace RegressionTests.Infrastructure
 
             StringAssert.Contains("A body filed under Projects for export.", File.ReadAllText(filed),
                "The exported file must be the message itself, byte content included.");
+         }
+         finally
+         {
+            if (Directory.Exists(exportDirectory))
+               Directory.Delete(exportDirectory, true);
+         }
+      }
+
+
+      [Test]
+      [Description("Two folders that sanitise to the same directory name each export their own messages - the second must not overwrite the first, and the count must match the files")]
+      public void ExportDoesNotLoseMessagesToAFolderNameCollision()
+      {
+         var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "collision@example.test", "test");
+
+         var imap = new ImapClientSimulator();
+         Assert.IsTrue(imap.ConnectAndLogon(account.Address, "test"));
+
+         // Two sibling folders whose names differ only in a character Windows
+         // forbids in a path - both sanitise to "Team_A". IsValidFolderName
+         // imposes no character restrictions, so a mailbox owner can genuinely
+         // create these; the export must not let one clobber the other. ":" and
+         // "|" are not the hierarchy delimiter ("."), so each is a single
+         // folder rather than a path.
+         Assert.IsTrue(imap.CreateFolder("Team:A"));
+         Assert.IsTrue(imap.CreateFolder("Team|A"));
+
+         // A message in each, and their per-folder UIDs will both be 1 - which
+         // is exactly what made the naive export overwrite one with the other.
+         //
+         // The literal octet count is computed, never typed. A hand-counted
+         // {n} that is too large makes the server wait for octets the client
+         // has already stopped sending, and the fixture hangs rather than
+         // failing - which costs far more than the arithmetic saves.
+         AppendTo(imap, "A10", "Team:A", "Subject: FromColon\r\n\r\nColon folder body.\r\n");
+         AppendTo(imap, "A11", "Team|A", "Subject: FromPipe\r\n\r\nPipe folder body.\r\n");
+         imap.Disconnect();
+
+         string exportDirectory = Path.Combine(Path.GetTempPath(), "hm-collide-" + Guid.NewGuid().ToString("N"));
+
+         try
+         {
+            int exported = account.ExportMessages(exportDirectory);
+
+            var files = Directory.GetFiles(exportDirectory, "*.eml", SearchOption.AllDirectories);
+
+            // The count the API returns must equal the files actually written -
+            // a count of 2 with one file is the silent-loss bug this guards.
+            ClassicAssert.AreEqual(exported, files.Length,
+               "ExportMessages counted more messages than it wrote - a folder-name collision dropped one. Files: " +
+               string.Join(", ", files));
+
+            // And both bodies must survive, in two distinct directories.
+            bool colon = false, pipe = false;
+            foreach (string file in files)
+            {
+               string text = File.ReadAllText(file);
+               if (text.Contains("Colon folder body.")) colon = true;
+               if (text.Contains("Pipe folder body.")) pipe = true;
+            }
+
+            Assert.IsTrue(colon && pipe,
+               "Both colliding folders' messages must survive the export; one was lost to the other's directory.");
          }
          finally
          {

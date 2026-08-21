@@ -186,6 +186,24 @@ namespace HM
       return removed;
    }
 
+   // True when a string cannot safely be one segment of a filesystem path:
+   // empty, all dots (. / .. / ...), or containing a separator. Static file
+   // scope - it is only needed here.
+   static bool IsUnsafePathSegment_(const String &segment)
+   {
+      if (segment.IsEmpty())
+         return true;
+
+      if (segment.Find(_T("\\")) >= 0 || segment.Find(_T("/")) >= 0)
+         return true;
+
+      for (int i = 0; i < segment.GetLength(); i++)
+         if (segment[i] != _T('.'))
+            return false;
+
+      return true;   // reached only when every character was a dot
+   }
+
    int
    AddressTraceEraser::EraseArchive_(const String &address, bool &failed)
    {
@@ -207,6 +225,20 @@ namespace HM
       String domainPart = parts[1];
       localPart.ToLower();
       domainPart.ToLower();
+
+      // Neither half may be all-dots or carry a separator: the archive path is
+      // built by concatenation, so a local part of ".." would make DeleteDirectory
+      // climb to the domain folder and remove every user's archive, and a "\\"
+      // would point it anywhere. An address that shaped is not one this server
+      // would have written an archive for, so refusing to erase is correct - the
+      // caller's COM validation guarantees a single "@" but not this.
+      if (IsUnsafePathSegment_(localPart) || IsUnsafePathSegment_(domainPart))
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6251, "AddressTraceEraser::EraseArchive_",
+            Formatter::Format(_T("The archive was not swept for {0}: its address does not form a safe directory name."), address));
+         failed = true;
+         return 0;
+      }
 
       const String userArchive = archiveDir + _T("\\") + domainPart + _T("\\") + localPart;
 

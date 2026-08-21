@@ -18,6 +18,7 @@
 #include "../Common/Util/Totp.h"
 #include "../Common/Util/PasswordValidator.h"
 #include "../Common/Util/Crypt.h"
+#include <set>
 #include "../Common/Util/FileUtilities.h"
 #include "../Common/BO/IMAPFolder.h"
 #include "../Common/BO/IMAPFolders.h"
@@ -340,8 +341,10 @@ STDMETHODIMP InterfaceAccount::DisableTOTP()
 namespace
 {
    // A folder name is IMAP data, not a path: it can contain every character
-   // Windows refuses in a directory name. Each is replaced rather than dropped,
-   // so two folders differing only in a forbidden character stay distinct.
+   // Windows refuses in a directory name, and all of them map to '_'. That
+   // makes the mapping lossy - "A:B" and "A|B" both become "A_B" - so the
+   // CALLER must disambiguate a collision between siblings; this function's
+   // only jobs are to produce a legal name and to refuse a traversal.
    HM::String SanitizeFolderNameForExport(const HM::String &name)
    {
       HM::String result = name;
@@ -351,7 +354,25 @@ namespace
          result.Replace(*c, _T('_'));
 
       result.Trim();
-      if (result.IsEmpty())
+
+      // A folder named "." or ".." would climb out of the export directory:
+      // the separators above are neutralised, but the dots are not, so
+      // directory + "\\" + ".." resolves to the parent. IsValidFolderName
+      // accepts such a name, so it can genuinely arrive here. A legitimate
+      // folder may contain dots ("2024.Archive"), so only a segment that is
+      // ENTIRELY dots is replaced - that is the whole traversal set and
+      // nothing a real folder is called.
+      bool allDots = !result.IsEmpty();
+      for (int i = 0; i < result.GetLength(); i++)
+      {
+         if (result[i] != _T('.'))
+         {
+            allDots = false;
+            break;
+         }
+      }
+
+      if (result.IsEmpty() || allDots)
          result = _T("_");
 
       return result;
@@ -378,13 +399,45 @@ namespace
       // whole tree, and this walk into infinite descent. The one Refresh this
       // export needs is done by the caller, on the root, before the walk.
 
+      // Sibling folders can sanitise to the same directory name ("A:B" and
+      // "A|B" both become "A_B"), and their per-folder UIDs repeat, so without
+      // this two folders would write into one directory and the second would
+      // overwrite the first - a data-access export that silently drops mail
+      // while the count says otherwise. Names taken at THIS level are tracked
+      // (case-insensitively, because the file system is), and a collision gets
+      // a " (2)", " (3)" suffix, the way a file manager resolves the same clash.
+      std::set<HM::String> usedNames;
+
       for (unsigned int i = 0; i < (unsigned int) folders->GetCount(); i++)
       {
          std::shared_ptr<HM::IMAPFolder> folder = folders->GetItem(i);
          if (!folder)
             continue;
 
-         const HM::String folderDirectory = directory + _T("\\") + SanitizeFolderNameForExport(folder->GetFolderName());
+         HM::String folderName = SanitizeFolderNameForExport(folder->GetFolderName());
+         HM::String lowered = folderName;
+         lowered.ToLower();
+
+         if (usedNames.find(lowered) != usedNames.end())
+         {
+            for (int suffix = 2; ; suffix++)
+            {
+               HM::String candidate;
+               candidate.Format(_T("%s (%d)"), folderName.c_str(), suffix);
+               HM::String candidateLower = candidate;
+               candidateLower.ToLower();
+               if (usedNames.find(candidateLower) == usedNames.end())
+               {
+                  folderName = candidate;
+                  lowered = candidateLower;
+                  break;
+               }
+            }
+         }
+
+         usedNames.insert(lowered);
+
+         const HM::String folderDirectory = directory + _T("\\") + folderName;
 
          std::shared_ptr<HM::Messages> messages = folder->GetMessages();
          if (messages)
