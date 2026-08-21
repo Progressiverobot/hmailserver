@@ -19,6 +19,8 @@
 
 #include "../Common/Application/TimeoutCalculator.h"
 
+#include "DeliveryFailure.h"
+
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
 #define new DEBUG_NEW
@@ -38,6 +40,7 @@ namespace HM
       cur_recipient_(-1),
       session_ended_(false),
       remote_supports_smtputf8_(false),
+      remote_host_name_(expected_remote_hostname),
       transmission_buffer_(true)
    {
       
@@ -133,7 +136,10 @@ namespace HM
 
       if (multi_line_response_buffer_.GetLength() > 10000)
       {
-         UpdateAllRecipientsWithError_(500, "Unexpected response from server (too long).", false);
+         // RFC 3463 X.5.2 "Syntax error": what came back could not be interpreted
+         // as an SMTP reply at all. Our judgement, not the remote's, so no
+         // Diagnostic-Code.
+         UpdateAllRecipientsWithError_(500, "Unexpected response from server (too long).", false, _T("5.5.2"), false);
          return;
       }
 
@@ -205,7 +211,13 @@ namespace HM
             if (current_state_ == XOAUTH2SENT)
                OutboundOAuth2TokenClient::Instance()->Invalidate();
 
-            UpdateAllRecipientsWithError_(iCode, Request, false);
+            // A real reply from the remote server, so its own enhanced code is
+            // preferred over anything derived here. Not the RCPT TO stage - this
+            // branch covers HELO/AUTH/MAIL FROM/DATA - so the reply code alone
+            // says nothing address-specific and the fallback stays undefined for
+            // the class.
+            UpdateAllRecipientsWithError_(iCode, Request, false,
+               DeliveryFailure::EnhancedStatusFromSmtpReply(iCode, Request, false), true);
             SendQUIT_();
             return true;
          }
@@ -302,7 +314,11 @@ namespace HM
          }
          else
          {
-            UpdateRecipientWithError_(code, request, recipients_[cur_recipient_], false);
+            // The one place in the session where the three-digit code is about
+            // THIS address (RFC 5321 4.2.3), so the reply-code mapping is
+            // allowed to be recipient-specific here and nowhere else.
+            UpdateRecipientWithError_(code, request, recipients_[cur_recipient_], false,
+               DeliveryFailure::EnhancedStatusFromSmtpReply(code, request, true), true);
          }
       }
 
@@ -354,7 +370,9 @@ namespace HM
          if (ehlo_required)
          {
             // hMailServer is configured to require EHLO, but the remote server does not support it.
-            UpdateAllRecipientsWithError_(500, "Server does not support EHLO command.", false);
+            // RFC 3463 X.5.1 "Invalid command": the command this server must use
+            // is one the remote does not support.
+            UpdateAllRecipientsWithError_(500, "Server does not support EHLO command.", false, _T("5.5.1"), false);
             SendQUIT_();
          }
          else
@@ -406,7 +424,13 @@ namespace HM
                // Remote server does not support STARTTLS
                if (GetConnectionSecurity() == CSSTARTTLSRequired)
                {
-                  UpdateAllRecipientsWithError_(500, "Server does not support STARTTLS.", false);
+                  // RFC 3463 X.7.0 "Other or undefined security status". The
+                  // message is refused for a security reason of this server's
+                  // choosing; RFC 3463 registers no code for "encryption was
+                  // required and not offered", and the undefined security code is
+                  // the honest cover rather than a more specific one that means
+                  // something else.
+                  UpdateAllRecipientsWithError_(500, "Server does not support STARTTLS.", false, _T("5.7.0"), false);
                   SendQUIT_();
                   return;
                }
@@ -504,7 +528,9 @@ namespace HM
             errorMessage.Format(_T("The message is %I64d bytes and the receiving server accepts at most %I64d (its EHLO SIZE limit). It was not transferred."),
                messageSize, remote_size_limit_);
 
-            UpdateAllRecipientsWithError_(552, errorMessage, false);
+            // RFC 3463 X.3.4 "Message too big for system" - and this one is known
+            // exactly, because the remote published the limit in its own EHLO.
+            UpdateAllRecipientsWithError_(552, errorMessage, false, _T("5.3.4"), false);
             SendQUIT_();
             return;
          }
@@ -592,7 +618,9 @@ namespace HM
          return; // The session has already ended, so any error which takes place now is not interesting.
       }
 
-      UpdateAllRecipientsWithError_(0, "There was a timeout while talking to the remote server.", false);
+      // RFC 3463 X.4.2 "Bad connection", whose text names time-out explicitly:
+      // the connection was established but the transaction could not complete.
+      UpdateAllRecipientsWithError_(0, "There was a timeout while talking to the remote server.", false, _T("4.4.2"), false);
    }
 
 
@@ -602,7 +630,9 @@ namespace HM
       if (session_ended_)
          return; // The session has ended, so any error which takes place now is not interesting.
 
-      UpdateAllRecipientsWithError_(0, "Excessive amount of data sent to server.", false);
+      // RFC 3463 X.5.0 "Other or undefined protocol status": the remote is not
+      // behaving like an SMTP server, but nothing here says it will not later.
+      UpdateAllRecipientsWithError_(0, "Excessive amount of data sent to server.", false, _T("4.5.0"), false);
    }
    
    void
@@ -611,7 +641,8 @@ namespace HM
       if (session_ended_)
          return; // The session has ended, so any error which takes place now is not interesting.
 
-      UpdateAllRecipientsWithError_(0, "Remote server closed connection.", false);
+      // RFC 3463 X.4.2 "Bad connection": established, then unable to complete.
+      UpdateAllRecipientsWithError_(0, "Remote server closed connection.", false, _T("4.4.2"), false);
    }
 
    bool 
@@ -634,19 +665,19 @@ namespace HM
    }
 
    void 
-   SMTPClientConnection::UpdateAllRecipientsWithError_(int iErrorCode, const AnsiString &sResponse, bool bPreConnectError)
+   SMTPClientConnection::UpdateAllRecipientsWithError_(int iErrorCode, const AnsiString &sResponse, bool bPreConnectError, const String &enhancedStatusCode, bool responseIsRemoteReply)
    {
       auto iterRecipient = recipients_.begin();
       while (iterRecipient != recipients_.end())
       {
-         UpdateRecipientWithError_(iErrorCode, sResponse, (*iterRecipient), bPreConnectError);
+         UpdateRecipientWithError_(iErrorCode, sResponse, (*iterRecipient), bPreConnectError, enhancedStatusCode, responseIsRemoteReply);
          iterRecipient++;
       }
-      
+
    }
 
-   void 
-   SMTPClientConnection::UpdateRecipientWithError_(int iErrorCode, const AnsiString &sResponse, std::shared_ptr<MessageRecipient> pRecipient, bool bPreConnectError)
+   void
+   SMTPClientConnection::UpdateRecipientWithError_(int iErrorCode, const AnsiString &sResponse, std::shared_ptr<MessageRecipient> pRecipient, bool bPreConnectError, const String &enhancedStatusCode, bool responseIsRemoteReply)
    {
       if (pRecipient->GetDeliveryResult() == MessageRecipient::ResultFatalError)
       {
@@ -696,8 +727,20 @@ namespace HM
             String(GetIPAddressString()).c_str(), String(last_sent_data_).c_str(), String(sResponse).c_str());
 
       }
-      pRecipient->SetErrorMessage(sData);
-   } 
+
+      pRecipient->SetDeliveryError(sData, enhancedStatusCode);
+
+      // RFC 3464 2.3.6/2.3.7. Diagnostic-Code is defined as the diagnostic given
+      // by the OTHER MTA, so it is only ever filled from what the remote really
+      // replied - never from the sentences above, which are this server's own
+      // account of the session. Same for the host: naming a Remote-MTA for a
+      // connection that was never established would be an invented field.
+      if (responseIsRemoteReply)
+      {
+         pRecipient->SetRemoteSmtpReply(sResponse);
+         pRecipient->SetRemoteMta(remote_host_name_);
+      }
+   }
 
    void 
    SMTPClientConnection::SetAuthInfo(const String &sUsername, const String &sPassword)
@@ -860,7 +903,12 @@ namespace HM
             continue;
 
          recipient->SetDeliveryResult(permanent ? MessageRecipient::ResultFatalError : MessageRecipient::ResultNonFatalError);
-         recipient->SetErrorMessage(sBounceMessage);
+
+         // RFC 3463 X.3.0 "Other or undefined mail system status" - the mail
+         // system at fault being this one. The class follows the same judgement
+         // the delivery result does: a file that has gone is hopeless (5), a file
+         // that could not be read right now is not (4).
+         recipient->SetDeliveryError(sBounceMessage, permanent ? _T("5.3.0") : _T("4.3.0"));
       }
 
       // The remote server has answered 354 and is reading message data, so a QUIT
@@ -924,7 +972,9 @@ namespace HM
    void 
    SMTPClientConnection::OnCouldNotConnect(const AnsiString &sErrorDescription)
    {
-      UpdateAllRecipientsWithError_(0, sErrorDescription, true);
+      // RFC 3463 X.4.1 "No answer from host": the connection attempt itself did
+      // not succeed, so there is no remote MTA to name and nothing it said.
+      UpdateAllRecipientsWithError_(0, sErrorDescription, true, _T("4.4.1"), false);
 
       LOG_DEBUG("SMTPDeliverer - Message " + StringParser::IntToString(delivery_message_->GetID()) + " - Connection failed: " + String(sErrorDescription) );
    }

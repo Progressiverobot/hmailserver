@@ -50,6 +50,10 @@
 #include "MirrorMessage.h"
 
 #include "../Common/Util/AWstats.h"
+#include "../common/Util/Charset.h"
+#include "../common/Mime/Mime.h"
+
+#include "DeliveryFailure.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -87,6 +91,154 @@ namespace HM
          ErrorManager::Instance()->ReportError(ErrorManager::High, 6104, "SMTPDeliverer::DeliverMessage",
             Formatter::Format("Message {0} could not be removed from the delivery queue. {1}",
                messageId, consequence));
+      }
+
+      //---------------------------------------------------------------------
+      // RFC 3464 delivery status notification.
+      //
+      // Everything below turns the failure records into the machine-readable
+      // half of the bounce. The human-readable half is untouched - it is a
+      // translatable server message and it stays exactly as it was, first in
+      // the report, which is where a person's mail client will show it.
+      //---------------------------------------------------------------------
+
+      bool ContainsNonAscii_(const String &value)
+      {
+         for (int i = 0; i < value.GetLength(); i++)
+         {
+            if (value.GetAt(i) > 127)
+               return true;
+         }
+
+         return false;
+      }
+
+      bool ContainsNonAscii_(const AnsiString &value)
+      {
+         for (int i = 0; i < value.GetLength(); i++)
+         {
+            if ((unsigned char) value.GetAt(i) > 127)
+               return true;
+         }
+
+         return false;
+      }
+
+      // A field value that must survive as ONE header field in the DSN.
+      //
+      // Two things are being prevented. A raw CR or LF inside the value would end
+      // the field early and everything after it would be read as a new field
+      // name - that is how a remote server's reply text becomes header injection
+      // in a report addressed to a third party. And a value long enough to push
+      // the line past the RFC 5322 998-octet limit makes the whole report
+      // malformed; a remote reply is capped at 512 octets by RFC 5321 4.5.3.1.5,
+      // but nothing forces a remote server to obey that and this server should
+      // not emit an invalid message when one does not.
+      //
+      // Both are answered by RFC 5322 2.2.3 folding: a CRLF followed by
+      // whitespace, which unfolds back to exactly what came in.
+      String FoldForDsnField_(const String &value)
+      {
+         // Deliberately short of 78. The field name and its prefix sit in front
+         // of the first line, and folding a few characters early costs nothing.
+         const int maxLineLength = 70;
+
+         String folded;
+         int lineLength = 0;
+
+         for (int i = 0; i < value.GetLength(); i++)
+         {
+            wchar_t c = value.GetAt(i);
+
+            if (c == '\r' || c == '\n')
+            {
+               // A CRLF pair, or a lone CR or LF: either way one fold.
+               if (c == '\r' && i + 1 < value.GetLength() && value.GetAt(i + 1) == '\n')
+                  i++;
+
+               folded += _T("\r\n ");
+               lineLength = 1;
+               continue;
+            }
+
+            // Other C0 controls have no meaning in a field body and some of them
+            // (a bare NUL in particular) confuse everything downstream.
+            if (c < 32 && c != '\t')
+               continue;
+
+            // Fold at a space rather than inside a word, so that unfolding gives
+            // the original text back character for character.
+            if (c == ' ' && lineLength >= maxLineLength)
+            {
+               folded += _T("\r\n ");
+               lineLength = 1;
+               continue;
+            }
+
+            folded += c;
+            lineLength++;
+         }
+
+         folded.TrimRight(_T("\r\n "));
+
+         return folded;
+      }
+
+      // The per-message and per-recipient fields of RFC 3464 section 2.
+      String BuildDeliveryStatusContent_(const std::vector<DeliveryFailure> &failures)
+      {
+         String content;
+
+         // RFC 3464 2.2.2. The only per-message field this server can fill
+         // honestly: Arrival-Date is stored as a database timestamp rather than
+         // an RFC 5322 date and there is no converter for it, and an
+         // Original-Envelope-Id needs the ENVID this server accepts but does not
+         // retain. Both are optional, and an omitted field asserts nothing.
+         content += _T("Reporting-MTA: dns; ") + Utilities::ComputerName() + _T("\r\n");
+
+         for (const DeliveryFailure &failure : failures)
+         {
+            content += _T("\r\n");
+
+            // RFC 3464 2.3.1 requires Final-Recipient; RFC 6533 3.2 gives the
+            // "utf-8" address type for an internationalized address, which is
+            // the only correct label for one that will not fit in "rfc822".
+            //
+            // Original-Recipient is deliberately absent: it must come from the
+            // RFC 3461 ORCPT parameter, and SMTPConnection validates ORCPT
+            // without retaining it. Reconstructing it from the address this
+            // server resolved to would report an alias expansion as the
+            // sender's own spelling, which is exactly the mistake the field
+            // exists to prevent.
+            content += ContainsNonAscii_(failure.GetRecipient()) ? _T("Final-Recipient: utf-8; ") : _T("Final-Recipient: rfc822; ");
+            content += failure.GetRecipient() + _T("\r\n");
+
+            // RFC 3464 2.3.3. Always "failed" here, and never "delayed": every
+            // record reaching this function belongs to a message this server has
+            // stopped trying to deliver. A delay report would need its own
+            // trigger, and this server does not send one - see the RFC 3461
+            // NOTIFY=DELAY note in the release notes.
+            content += _T("Action: failed\r\n");
+            content += _T("Status: ") + failure.GetEnhancedStatusCode() + _T("\r\n");
+
+            if (!failure.GetRemoteMta().IsEmpty())
+               content += _T("Remote-MTA: dns; ") + failure.GetRemoteMta() + _T("\r\n");
+
+            // RFC 3464 2.3.6: the diagnostic given by the remote MTA, in its own
+            // words. Present only when there was one.
+            if (!failure.GetRemoteSmtpReply().IsEmpty())
+            {
+               String diagnostic = FoldForDsnField_(failure.GetRemoteSmtpReply());
+
+               if (!diagnostic.IsEmpty())
+                  content += _T("Diagnostic-Code: smtp; ") + diagnostic + _T("\r\n");
+            }
+
+            if (!failure.GetLastAttemptDate().IsEmpty())
+               content += _T("Last-Attempt-Date: ") + failure.GetLastAttemptDate() + _T("\r\n");
+         }
+
+         return content;
       }
    }
 
@@ -186,7 +338,7 @@ namespace HM
 
       otelDelivery.AddEvent("delivery.preprocessed");
 
-      std::vector<String> saErrorMessages;
+      std::vector<DeliveryFailure> saErrorMessages;
 
       // Perform deliver to local recipients.
       LocalDelivery localDeliverer(sSendersIP, pMessage, globalRuleResult);
@@ -324,14 +476,34 @@ namespace HM
 
 
    void
-   SMTPDeliverer::SubmitErrorLog_(std::shared_ptr<Message> pOrigMessage, std::vector<String> &saErrorMessages)
+   SMTPDeliverer::SubmitErrorLog_(std::shared_ptr<Message> pOrigMessage, std::vector<DeliveryFailure> &saErrorMessages)
    //---------------------------------------------------------------------------()
    // DESCRIPTION:
    // Some of the messages was not sent to the recipient. We have to
    // send a mail back to the sender to tell him this.
+   //
+   // The report is a multipart/report; report-type=delivery-status (RFC 3462)
+   // with the three parts RFC 3464 describes: the human-readable explanation
+   // this server has always sent, unchanged and still first; the per-recipient
+   // machine-readable record; and the failed message's own headers.
+   //
+   // There is no setting to turn this off, and there should not be. A
+   // multipart/report whose first part is the same plain text as before reads
+   // identically in every mail client - a client that knows nothing about RFC
+   // 3464 shows the first part, which is what it used to show - and RFC 3464 has
+   // been the interoperable form of a bounce since 2003. What was there before
+   // was the thing with the compatibility problem: nothing could parse it.
    //---------------------------------------------------------------------------()
    {
-      LOG_DEBUG("SD::SubmitErrorLog_");      
+      LOG_DEBUG("SD::SubmitErrorLog_");
+
+      // Every caller has at least one failed recipient, and this is the
+      // invariant rather than a case to handle: RFC 3464 2.3 requires at least
+      // one per-recipient group, and a report naming nobody tells the sender
+      // nothing while still looking like a delivery-status notification.
+      if (saErrorMessages.empty())
+         return;
+
       if (MailerDaemonAddressDeterminer::IsMailerDaemonAddress(pOrigMessage->GetFromAddress()))
       {
          LOG_DEBUG("SD::~SubmitErrorLog_");      
@@ -377,7 +549,7 @@ namespace HM
 
       String sCollectedErrors;
       for (unsigned int i=0;i<saErrorMessages.size();i++)
-         sCollectedErrors += saErrorMessages[i];
+         sCollectedErrors += saErrorMessages[i].GetText();
 
       sErrMsg.Replace(_T("%MACRO_RECIPIENTS%"), sCollectedErrors);
 
@@ -398,9 +570,98 @@ namespace HM
       pNewMsgData->SetFrom(sMailerDaemonAddress);
       pNewMsgData->SetTo(pOrigMessage->GetFromAddress());
       pNewMsgData->SetSubject(sMessageUndeliverable + ": " + pMsgData->GetSubject());
-      pNewMsgData->SetBody(sErrMsg);
       pNewMsgData->SetAutoGenerated();
       pNewMsgData->SetRuleLoopCount(iRuleLoopCount + 1);
+
+      // The body. SetBody is deliberately NOT used: it rebuilds the message
+      // around a single text/plain part, which is what made every bounce this
+      // server has ever sent unparseable. The three parts are assembled directly
+      // on the MIME tree instead, which MessageData::Write then serialises.
+      {
+         std::shared_ptr<MimeBody> reportMessage = pNewMsgData->GetMimeMessage();
+
+         // Content-Type is written as one raw value rather than through
+         // SetParameter, which quotes what it adds: report-type is a token in
+         // every other MTA's bounce and there is no reason for this one to be
+         // the odd one out. SetBoundary is left to generate the delimiter, since
+         // it is the same generator every other multipart in this server uses,
+         // and it appends to the value rather than replacing it because the
+         // value already begins with "multipart".
+         reportMessage->SetContentType("multipart/report; report-type=delivery-status", "");
+         reportMessage->SetBoundary(nullptr);
+
+         // The preamble, for a reader that shows the raw message. Same sentence
+         // MessageData::CreatePart writes when it builds a multipart, so a
+         // multipart this server produces looks the same however it was made.
+         reportMessage->SetRawText("This is a multi-part message.\r\n\r\n");
+
+         std::shared_ptr<MimeBody> emptyPosition;
+
+         // Part 1, the human-readable notification (RFC 3464 2.1: "the first
+         // component ... a human-readable description"). Byte-for-byte what the
+         // whole body used to be - the same server message, the same macro
+         // substitutions, the same UTF-8 quoted-printable encoding SetBody
+         // produced - and first, so a mail client that has never heard of
+         // multipart/report shows exactly what it showed before.
+         String humanReadableBody = sErrMsg;
+         if (humanReadableBody.Right(2) != _T("\r\n"))
+            humanReadableBody += _T("\r\n");
+
+         std::shared_ptr<MimeBody> humanReadablePart = reportMessage->CreatePart("text/plain", emptyPosition);
+         humanReadablePart->SetContentType("text/plain", "");
+         humanReadablePart->SetUnicodeText(humanReadableBody);
+
+         // Part 2, the delivery status (RFC 3464 2.1). RFC 6533 3.1 gives
+         // message/global-delivery-status for a report that must carry a UTF-8
+         // address; message/delivery-status is a 7-bit-only type, so labelling
+         // one that way and then writing UTF-8 into it would be a lie the
+         // receiving parser acts on.
+         String deliveryStatus = BuildDeliveryStatusContent_(saErrorMessages);
+
+         std::shared_ptr<MimeBody> deliveryStatusPart = reportMessage->CreatePart("message/delivery-status", emptyPosition);
+
+         // ToMultiByte in both branches, including the pure-ASCII one: the UTF-8
+         // encoding of ASCII is the same bytes, and going through the same
+         // converter means the wide-to-narrow step can never be done against the
+         // machine's ANSI code page by accident.
+         const AnsiString encodedDeliveryStatus = Charset::ToMultiByte(deliveryStatus, "utf-8");
+
+         if (ContainsNonAscii_(deliveryStatus))
+         {
+            deliveryStatusPart->SetContentType("message/global-delivery-status", "");
+            deliveryStatusPart->SetTransferEncoding("8bit");
+         }
+         else
+         {
+            deliveryStatusPart->SetContentType("message/delivery-status", "");
+            deliveryStatusPart->SetTransferEncoding("7bit");
+         }
+
+         deliveryStatusPart->SetRawText(encodedDeliveryStatus);
+
+         // Part 3, the original message's headers (RFC 3462 3, which names
+         // text/rfc822-headers for the headers-only form).
+         //
+         // MimeHeader::Store rather than MessageData::GetHeader: GetHeader
+         // rebuilds each field from its parsed name and value, which unfolds
+         // them, and a DKIM-Signature or a long Received chain unfolded onto one
+         // line is both a lossy copy and a line over the RFC 5322 limit. Store
+         // writes back the original bytes of every field that was not modified,
+         // which is what "the original headers" means. The explicit
+         // qualification is needed because MimeBody declares its own two-argument
+         // Store, which hides the base class's.
+         AnsiString originalHeaders = pMsgData->GetMimeMessage()->MimeHeader::Store();
+
+         std::shared_ptr<MimeBody> originalHeadersPart = reportMessage->CreatePart("text/rfc822-headers", emptyPosition);
+         originalHeadersPart->SetContentType("text/rfc822-headers", "");
+
+         // The bytes are copied verbatim, so the transfer encoding has to
+         // describe what they are rather than what would be convenient. No
+         // charset is declared with the 8-bit case: the original header block's
+         // charset is not knowable here, and guessing one would misdecode it.
+         originalHeadersPart->SetTransferEncoding(ContainsNonAscii_(originalHeaders) ? "8bit" : "7bit");
+         originalHeadersPart->SetRawText(originalHeaders);
+      }
 
       // Write message data. A first write of a message built from nothing, so a failure
       // means there is no bounce to deliver - queueing it anyway leaves a row whose file
@@ -737,9 +998,28 @@ namespace HM
                pMessage->GetID(), pMessage->GetRecipients()->GetCommaSeperatedRecipientList()));
       }
 
-      std::vector<String> errorMessages;
-      errorMessages.push_back(Formatter::Format("{0}\r\n   Error Type: SMTP\r\n   Error Description: Delivery failed\r\n   Additional information: The message could not be checked for viruses - the scanner did not respond on any delivery attempt - and this server is configured not to deliver unscanned mail. The server administrator should check the hMailServer error log.\r\n\r\n",
-         pMessage->GetRecipients()->GetCommaSeperatedRecipientList()));
+      // One record per recipient, where this used to be one record naming all of
+      // them in a comma-separated list. RFC 3464 2.3.1 wants Final-Recipient to
+      // be one address, and a list in that field is not a recipient - it is a
+      // string no parser can use. The wording of the sentence a person reads is
+      // unchanged; for the single-recipient case, which is nearly all of them,
+      // so is every byte of it.
+      //
+      // RFC 3463 X.7.0, "other or undefined security status": the message is
+      // being refused for a security reason of this installation's choosing
+      // (AVFailAction 1), and RFC 3463 registers nothing more specific for
+      // "could not be scanned". Class 4 rather than 5 because the condition is a
+      // scanner that is not answering, which is temporary by nature even though
+      // it outlasted the hold window - the recipient's address was never in
+      // question and a report claiming otherwise would be false.
+      std::vector<DeliveryFailure> errorMessages;
+
+      for (std::shared_ptr<MessageRecipient> recipient : pMessage->GetRecipients()->GetVector())
+      {
+         errorMessages.push_back(DeliveryFailure(recipient->GetAddress(), _T("4.7.0"),
+            Formatter::Format("{0}\r\n   Error Type: SMTP\r\n   Error Description: Delivery failed\r\n   Additional information: The message could not be checked for viruses - the scanner did not respond on any delivery attempt - and this server is configured not to deliver unscanned mail. The server administrator should check the hMailServer error log.\r\n\r\n",
+               recipient->GetAddress())));
+      }
 
       SubmitErrorLog_(pMessage, errorMessages);
 

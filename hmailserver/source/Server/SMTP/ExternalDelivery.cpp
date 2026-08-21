@@ -41,7 +41,35 @@
 #endif
 
 namespace HM
-{ 
+{
+   namespace
+   {
+      // Records a recipient whose delivery failed non-fatally, keyed by address.
+      //
+      // A plain mapFailed[address] = text is what this replaced, and it cannot
+      // work any more: DeliveryFailure has no default constructor, precisely so
+      // that no code path can produce a half-filled one. Find-then-insert or
+      // assign is the same operation the subscript used to perform.
+      void RememberNonFatalFailure_(std::map<String, DeliveryFailure> &pendingFailures,
+                                    std::shared_ptr<MessageRecipient> recipient,
+                                    const String &humanReadableText,
+                                    const String &enhancedStatusCode)
+      {
+         DeliveryFailure failure(recipient->GetAddress(), enhancedStatusCode, humanReadableText);
+
+         // Empty unless a remote server really answered - see MessageRecipient.
+         failure.SetRemoteSmtpReply(recipient->GetRemoteSmtpReply());
+         failure.SetRemoteMta(recipient->GetRemoteMta());
+
+         auto existing = pendingFailures.find(recipient->GetAddress());
+
+         if (existing == pendingFailures.end())
+            pendingFailures.insert(std::make_pair(recipient->GetAddress(), failure));
+         else
+            existing->second = failure;
+      }
+   }
+
    ExternalDelivery::ExternalDelivery(const String &sSendersIP, std::shared_ptr<Message> message, const RuleResult &globalRuleResult) :
       _sendersIP(sSendersIP),
       original_message_(message),
@@ -62,9 +90,9 @@ namespace HM
    /// Performs deliver to any external recipients. 
    /// Returns true if the message has been rescheduled for later delivery.
    bool
-   ExternalDelivery::Perform(std::vector<String> &saErrorMessages)
+   ExternalDelivery::Perform(std::vector<DeliveryFailure> &saErrorMessages)
    {
-      std::map<String,String> mapFailedDueToNonFatalError;
+      std::map<String,DeliveryFailure> mapFailedDueToNonFatalError;
 
       // DSN (RFC 3461): addresses whose recipients opted out of failure
       // notifications (NOTIFY=NEVER, or a NOTIFY list without FAILURE).
@@ -158,7 +186,11 @@ namespace HM
          {
             LOG_APPLICATION("SMTPDeliverer - Message " + StringParser::IntToString(original_message_->GetID()) + ": Delivery to " + recipientDomain + " deferred due to the per-destination rate limit.");
             String errorMessage = _T("   Error Type: SMTP\r\n   Error Description: Delivery temporarily deferred by the sending server's per-destination rate limit.\r\n\r\n");
-            HandleExternalDeliveryFailure_(vecRecipients, false, errorMessage);
+            // RFC 3463 X.4.5 "Mail system congestion". The congestion is this
+            // server's own deliberate shaping rather than an overload, but the
+            // meaning a sender needs - too much mail for this route right now,
+            // try later - is exactly what X.4.5 carries.
+            HandleExternalDeliveryFailure_(vecRecipients, false, errorMessage, _T("4.4.5"));
             return;
          }
       }
@@ -193,7 +225,11 @@ namespace HM
                LOG_APPLICATION("SMTPDeliverer - Message " + StringParser::IntToString(original_message_->GetID()) + ": Delivery to " + recipientDomain + " deferred. No MX host matches the domain's MTA-STS policy.");
 
                String errorMessage = _T("   Error Type: SMTP\r\n   Error Description: Delivery blocked by the recipient domain's MTA-STS policy. None of the MX hosts match the published policy.\r\n\r\n");
-               HandleExternalDeliveryFailure_(vecRecipients, false, errorMessage);
+               // RFC 3463 X.7.0 "Other or undefined security status". RFC 8461
+               // registers no enhanced code of its own, and the undefined
+               // security code says the true thing - refused on security grounds
+               // - without borrowing a code that means something else.
+               HandleExternalDeliveryFailure_(vecRecipients, false, errorMessage, _T("4.7.0"));
                return;
             }
 
@@ -373,7 +409,8 @@ namespace HM
          LOG_APPLICATION("SMTPDeliverer - Message " + StringParser::IntToString(original_message_->GetID()) + ": Delivery to " + recipientDomain + " deferred. TLSA records of all MX hosts failed DNSSEC validation.");
 
          String errorMessage = _T("   Error Type: SMTP\r\n   Error Description: Delivery blocked: the DANE TLSA records of all MX hosts failed DNSSEC validation.\r\n\r\n");
-         HandleExternalDeliveryFailure_(vecRecipients, false, errorMessage);
+         // As above: refused on security grounds, RFC 3463 X.7.0.
+         HandleExternalDeliveryFailure_(vecRecipients, false, errorMessage, _T("4.7.0"));
       }
    }
 
@@ -492,9 +529,10 @@ namespace HM
    }
 
    void 
-   ExternalDelivery::HandleExternalDeliveryFailure_(std::vector<std::shared_ptr<MessageRecipient> > &vecRecipients,    
-                                                      bool bIsFatal,    
-                                                      String &sErrorString)
+   ExternalDelivery::HandleExternalDeliveryFailure_(std::vector<std::shared_ptr<MessageRecipient> > &vecRecipients,
+                                                      bool bIsFatal,
+                                                      String &sErrorString,
+                                                      const String &enhancedStatusCode)
    {
 
 
@@ -515,7 +553,7 @@ namespace HM
             else
                pRecipient->SetDeliveryResult(MessageRecipient::ResultNonFatalError);
 
-            pRecipient->SetErrorMessage(sErrorString);
+            pRecipient->SetDeliveryError(sErrorString, enhancedStatusCode);
          }
 
          iterRecipient++;
@@ -533,18 +571,41 @@ namespace HM
 
       String bounceMessageText;
 
+      // The enhanced status code alongside it. Every one of these is class 4,
+      // and deliberately so even where the condition looks permanent: the loop
+      // below forces a NON-FATAL delivery result whatever DNS said, so the
+      // message is retried, and a 5.x.x code paired with a retry would tell the
+      // sender's software that the address is dead while this server is still
+      // trying it. The class the report carries has to be the class this server
+      // is actually acting on.
+      String enhancedStatusCode;
+
       // Generate a string which will be included in the bounce message.
 
       if (bDNSQueryOK)
       {
          if (isSpecificRelayServer)
+         {
             bounceMessageText = _T("   Error Type: SMTP\r\n   Error Description: The host specified as SMTP relay server could not be found. Please contact your server administrator.\r\n\r\n");
+            // RFC 3463 X.3.5 "System incorrectly configured" - the relay host is
+            // this installation's own setting, and it does not resolve.
+            enhancedStatusCode = _T("4.3.5");
+         }
          else
+         {
             bounceMessageText = _T("   Error Type: SMTP\r\n   Error Description: No mail servers appear to exists for the recipient's address.\r\n   Additional information: Please check that you have not misspelled the recipient's email address.\r\n\r\n");
+            // RFC 3463 X.1.2 "Bad destination system address" - DNS answered, and
+            // the answer was that the recipient's domain publishes nowhere to
+            // deliver mail.
+            enhancedStatusCode = _T("4.1.2");
+         }
       }
       else
       {
          bounceMessageText = _T("   Error Type: SMTP\r\n   Error Description: Unable to find the recipient's email server. The DNS query has failed.\r\n\r\n");
+         // RFC 3463 X.4.4 "Unable to route" - its text names precisely this: the
+         // routing information was unavailable from the directory server.
+         enhancedStatusCode = _T("4.4.4");
       }
 
       // Update the recipients with the bounce message text and delivery result.
@@ -554,8 +615,8 @@ namespace HM
          // Messages bouncing immediately due to no mail servers due to DNS issue
          recipient->SetDeliveryResult(MessageRecipient::ResultNonFatalError);
          // recipient->SetDeliveryResult(bDNSQueryOK ? MessageRecipient::ResultFatalError : MessageRecipient::ResultNonFatalError);
-         recipient->SetErrorMessage(bounceMessageText);
-      }  
+         recipient->SetDeliveryError(bounceMessageText, enhancedStatusCode);
+      }
    }
 
    void
@@ -681,10 +742,10 @@ namespace HM
    }
 
    void 
-   ExternalDelivery::CollectDeliveryResult_(const String &serverHostName, 
-                                             std::vector<std::shared_ptr<MessageRecipient> > &vecRecipients, 
-                                             std::vector<String> &saErrorMessages,
-                                             std::map<String,String> &mapFailedDueToNonFatalError,
+   ExternalDelivery::CollectDeliveryResult_(const String &serverHostName,
+                                             std::vector<std::shared_ptr<MessageRecipient> > &vecRecipients,
+                                             std::vector<DeliveryFailure> &saErrorMessages,
+                                             std::map<String,DeliveryFailure> &mapFailedDueToNonFatalError,
                                              std::set<String> &suppressFailureDsnAddresses)
    //---------------------------------------------------------------------------()
    // DESCRIPTION:
@@ -726,7 +787,13 @@ namespace HM
          }
          else if (recipient->GetDeliveryResult() == MessageRecipient::ResultNonFatalError)
          {
-            mapFailedDueToNonFatalError[recipient->GetAddress()] = recipient->GetErrorMessage();
+            RememberNonFatalFailure_(mapFailedDueToNonFatalError, recipient, recipient->GetErrorMessage(),
+               // Every path that sets a non-fatal result also sets a status now.
+               // The fallback exists so that a path added later without one still
+               // produces a well-formed report - RFC 3463 X.0.0, "other undefined
+               // status", which is what "we do not know" looks like in this
+               // vocabulary and is not a claim about the recipient.
+               recipient->GetEnhancedStatusCode().IsEmpty() ? String(_T("4.0.0")) : recipient->GetEnhancedStatusCode());
          }
          else if (recipient->GetDeliveryResult() == MessageRecipient::ResultFatalError)
          {
@@ -746,7 +813,18 @@ namespace HM
                sSingleErrorMsg = sSingleErrorMsg + recipient->GetErrorMessage();
                sSingleErrorMsg = sSingleErrorMsg + "\r\n";
 
-               saErrorMessages.push_back(sSingleErrorMsg);
+               // The status the remote server's reply produced. Only
+               // SMTPClientConnection can reach a fatal result, and it always
+               // records one, but the fallback is the honest undefined permanent
+               // code rather than a guess at which of the 5.x.x conditions it was.
+               DeliveryFailure failure(sRecipient,
+                  recipient->GetEnhancedStatusCode().IsEmpty() ? String(_T("5.0.0")) : recipient->GetEnhancedStatusCode(),
+                  sSingleErrorMsg);
+
+               failure.SetRemoteSmtpReply(recipient->GetRemoteSmtpReply());
+               failure.SetRemoteMta(recipient->GetRemoteMta());
+
+               saErrorMessages.push_back(failure);
             }
 
             // Delete this recipient from the database. As above: a row that survives
@@ -763,10 +841,12 @@ namespace HM
          }
          else
          {
-            mapFailedDueToNonFatalError[recipient->GetAddress()] = "Remote server closed connection.";
+            // RFC 3463 X.4.2 "Bad connection". Reached when the recipient came
+            // back undefined - nothing in the session ever gave a verdict for it.
+            RememberNonFatalFailure_(mapFailedDueToNonFatalError, recipient, _T("Remote server closed connection."), _T("4.4.2"));
          }
 
-      }  
+      }
 
       LOG_DEBUG("Summarized delivery results");
    }
@@ -774,7 +854,7 @@ namespace HM
    /// Checks if we should reschedule the message for later delivery. If so, we do.
    /// Returns true if the message is rescheduled.
    bool
-   ExternalDelivery::RescheduleDelivery_(std::map<String,String> &mapFailedDueToNonFatalError, std::vector<String> &saErrorMessages, std::set<String> &suppressFailureDsnAddresses)
+   ExternalDelivery::RescheduleDelivery_(std::map<String,DeliveryFailure> &mapFailedDueToNonFatalError, std::vector<DeliveryFailure> &saErrorMessages, std::set<String> &suppressFailureDsnAddresses)
    {
 
       LOG_DEBUG("SD::RescheduleDelivery_");
@@ -856,13 +936,27 @@ namespace HM
          LOG_APPLICATION("SMTPDeliverer - Message " + StringParser::IntToString(original_message_->GetID()) + ": Message could not be delivered. Returning error log to sender.");
 
          // Delivery failed the last time.
-         String sErrorMessage;
+         //
+         // One report per recipient, where this used to build a single block of
+         // prose covering all of them. RFC 3464 needs a per-recipient record -
+         // "which address failed, and with what status" is the whole question -
+         // and there is no way back to that from a concatenated string.
+         //
+         // The wording is unchanged, including the trailing "Tried N time(s)".
+         // For the single-recipient case, which is the overwhelming majority,
+         // the text a person reads is byte-for-byte what it was. For several
+         // recipients each now carries its own copy of that line instead of the
+         // recipients sharing one at the end, which is what makes each block
+         // self-contained enough to stand as its own recipient record.
+         String sMsg;
+         sMsg.Format(_T("Tried %d time(s)"), iMaxNoOfRetries+ 1);
 
          auto iterFailed = mapFailedDueToNonFatalError.begin();
          while (iterFailed != mapFailedDueToNonFatalError.end())
          {
             String sEmailAddress = (*iterFailed).first;
-            String sFailed = (*iterFailed).second;
+            const DeliveryFailure &pendingFailure = (*iterFailed).second;
+            String sFailed = pendingFailure.GetText();
 
             // Delivery has failed for the last time.
             AWStats::LogDeliveryFailure(_sendersIP, original_message_->GetFromAddress(), sEmailAddress,  550, original_message_->GetID());
@@ -876,24 +970,30 @@ namespace HM
                continue;
             }
 
-            if (!sErrorMessage.IsEmpty())
-               sErrorMessage += "\r\n";
+            String sErrorMessage = sEmailAddress + "\r\n" + sFailed;
+            sErrorMessage += "\r\n";
+            sErrorMessage += sMsg;
+            sErrorMessage += "\r\n\r\n";
 
-            sErrorMessage += sEmailAddress + "\r\n" + sFailed;
+            // The status carried forward is the one the LAST attempt produced,
+            // not a generic "gave up" code, because it is the more specific true
+            // statement: 4.4.1 says nobody answered, 4.4.2 says the conversation
+            // broke, 4.7.0 says a security policy blocked it. All of them are
+            // class 4, which is the class RFC 3463 defines for exactly this - a
+            // temporary condition that persisted until the attempts were
+            // abandoned - and which keeps a list manager from unsubscribing an
+            // address that was never shown to be bad.
+            DeliveryFailure expired(sEmailAddress, pendingFailure.GetEnhancedStatusCode(), sErrorMessage);
+            expired.SetRemoteSmtpReply(pendingFailure.GetRemoteSmtpReply());
+            expired.SetRemoteMta(pendingFailure.GetRemoteMta());
+
+            saErrorMessages.push_back(expired);
 
             iterFailed++;
          }
 
-         String sMsg;
-         sMsg.Format(_T("Tried %d time(s)"), iMaxNoOfRetries+ 1);
-
-         sErrorMessage += "\r\n";
-         sErrorMessage += sMsg;
-         sErrorMessage += "\r\n\r\n";
-         saErrorMessages.push_back(sErrorMessage);
-
          LOG_DEBUG("Message not rescheduled for later delivery.")
-         
+
         return false;
       }
    }
@@ -903,7 +1003,7 @@ namespace HM
    /// every try.
    // Type changed to bool for use in ETRN's
    bool 
-   ExternalDelivery::GetRetryOptions_(std::map<String,String> &mapFailedDueToNonFatalError, long &lNoOfRetries, long &lMinutesBetween)
+   ExternalDelivery::GetRetryOptions_(std::map<String,DeliveryFailure> &mapFailedDueToNonFatalError, long &lNoOfRetries, long &lMinutesBetween)
    {
       std::shared_ptr<SMTPConfiguration> pSMTPConfig = Configuration::Instance()->GetSMTPConfiguration();
       std::shared_ptr<Routes> pRoutes = Configuration::Instance()->GetSMTPConfiguration()->GetRoutes();

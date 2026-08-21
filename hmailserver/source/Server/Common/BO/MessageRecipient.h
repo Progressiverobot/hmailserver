@@ -65,7 +65,42 @@ namespace HM
       void SetDeliveryResult(DeliveryResult newVal) {result_ = newVal; }
 
       String GetErrorMessage() const {return error_message_;}
-      void SetErrorMessage(const String &sNewVal) {error_message_ = sNewVal; }
+
+      // The RFC 3463 enhanced status code that goes with error_message_.
+      //
+      // Empty only for a recipient that has not failed. There is deliberately no
+      // separate setter for the prose: the delivery-status notification is built
+      // from BOTH, and a failure site that could record one without the other is
+      // how every recipient ends up reported as "5.0.0". Setting them together is
+      // the whole point of this function existing.
+      String GetEnhancedStatusCode() const {return enhanced_status_code_;}
+      void SetDeliveryError(const String &errorMessage, const String &enhancedStatusCode)
+      {
+         error_message_ = errorMessage;
+         enhanced_status_code_ = enhancedStatusCode;
+
+         // A new failure discards the previous one's remote attribution.
+         //
+         // Without this the fields are sticky, and one recipient can be tried
+         // against several MX hosts in one pass: a 4xx from the first host
+         // followed by a connection timeout on the second would leave the first
+         // host's name and reply attached to a failure it had nothing to do with,
+         // and the report would quote one server's words as another's. The caller
+         // sets them again immediately when this failure really does have them.
+         remote_smtp_reply_.Empty();
+         remote_mta_.Empty();
+      }
+
+      // What a remote server actually replied, verbatim and including its
+      // three-digit code, and the host that replied it. Both stay empty unless
+      // this server really did have an SMTP conversation - our own reasons for
+      // abandoning a delivery must not be reported as the remote's words, and
+      // RFC 3464 2.3 would rather have the field omitted than invented.
+      String GetRemoteSmtpReply() const {return remote_smtp_reply_;}
+      void SetRemoteSmtpReply(const String &sNewVal) {remote_smtp_reply_ = sNewVal; }
+
+      String GetRemoteMta() const {return remote_mta_;}
+      void SetRemoteMta(const String &sNewVal) {remote_mta_ = sNewVal; }
       // -- END REMOTE DELIVERY
 
    protected:
@@ -85,6 +120,9 @@ namespace HM
       // -- BEGIN REMOTE DELIVERY
       DeliveryResult result_;
       String error_message_;
+      String enhanced_status_code_;
+      String remote_smtp_reply_;
+      String remote_mta_;
       // -- END REMOTE DELIVERY
    };
 }

@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "DeliveryFailure.h"
+
 namespace HM
 {
    class Message;
@@ -41,7 +43,11 @@ namespace HM
       static void ForgetUnscannableHold_(__int64 messageID);
       static bool RunGlobalRules_(std::shared_ptr<Message> pMessage, RuleResult &ruleResult);
 
-      static void SubmitErrorLog_(std::shared_ptr<Message> pOrigMessage, std::vector<String> &saErrorMessages);
+      // Builds and queues the non-delivery report. One DeliveryFailure per failed
+      // recipient: the report is a multipart/report (RFC 3464) whose second part
+      // is a per-recipient machine-readable record, and there is no way to
+      // produce that from concatenated prose.
+      static void SubmitErrorLog_(std::shared_ptr<Message> pOrigMessage, std::vector<DeliveryFailure> &saErrorMessages);
 
       static bool HandleInfectedMessage_(std::shared_ptr<Message> pMessage, const String &virusName);
       

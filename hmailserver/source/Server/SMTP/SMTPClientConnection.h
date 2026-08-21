@@ -79,8 +79,21 @@ namespace HM
       void ProtocolSendUsername_();
       void ProtocolSendPassword_();
 
-      void UpdateAllRecipientsWithError_(int iErrorCode, const AnsiString &sResponse, bool bPreConnectError);
-      void UpdateRecipientWithError_(int iErrorCode, const AnsiString &sResponse,std::shared_ptr<MessageRecipient> pRecipient, bool bPreConnectError);
+      // enhancedStatusCode is the RFC 3463 status this failure is reported as in
+      // the delivery-status notification, and it has no default on purpose: the
+      // three-digit reply code is not enough to derive one outside the RCPT TO
+      // stage, and a default would silently label every locally-decided failure
+      // (no STARTTLS, over the remote's SIZE limit, a timeout) with whatever the
+      // default happened to be. DeliveryFailure::EnhancedStatusFromSmtpReply
+      // supplies it where the remote server really did answer.
+      //
+      // responseIsRemoteReply says whether sResponse is the remote server's own
+      // words. Only then is it recorded as Diagnostic-Code and only then is a
+      // Remote-MTA named - the rest of these messages are this server's own
+      // description of why it gave up, and attributing them to the remote host
+      // would be a fabricated field in someone else's bounce.
+      void UpdateAllRecipientsWithError_(int iErrorCode, const AnsiString &sResponse, bool bPreConnectError, const String &enhancedStatusCode, bool responseIsRemoteReply);
+      void UpdateRecipientWithError_(int iErrorCode, const AnsiString &sResponse,std::shared_ptr<MessageRecipient> pRecipient, bool bPreConnectError, const String &enhancedStatusCode, bool responseIsRemoteReply);
 
       std::shared_ptr<MessageRecipient> GetNextRecipient_();
       void UpdateSuccessfulRecipients_();
@@ -138,7 +151,13 @@ namespace HM
       bool session_ended_;
 
       AnsiString last_sent_data_;
-      
+
+      // The host name this connection was opened for. TCPConnection keeps the
+      // same value privately for SNI and certificate verification, so it is kept
+      // again here rather than widening that class's interface. It is what
+      // Remote-MTA names in a delivery-status notification.
+      AnsiString remote_host_name_;
+
       File current_file_;   
       TransparentTransmissionBuffer transmission_buffer_;
 

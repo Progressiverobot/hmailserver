@@ -70,7 +70,7 @@ namespace HM
    /// Returns true if the message has been re-used by us. If it has, the deliverer outside
    /// should not delete the message from the database when we're done.
    bool
-   LocalDelivery::Perform(std::vector<String> &saErrorMessages)
+   LocalDelivery::Perform(std::vector<DeliveryFailure> &saErrorMessages)
    {
       LOG_DEBUG("Performing local delivery");
 
@@ -137,7 +137,7 @@ namespace HM
    /// Delivers a single message to a specific account.
    /// Returns true if the delivery was made, false otherwise.
    void
-   LocalDelivery::DeliverToLocalAccount_(std::shared_ptr<const Account> account, size_t iNoOfRecipients, std::vector<String> &saErrorMessages, const String &sOriginalAddress, bool &messageReused, bool suppressFailureDsn)
+   LocalDelivery::DeliverToLocalAccount_(std::shared_ptr<const Account> account, size_t iNoOfRecipients, std::vector<DeliveryFailure> &saErrorMessages, const String &sOriginalAddress, bool &messageReused, bool suppressFailureDsn)
    {
       // First check that we're actually able to deliver a message to this account. If the account
       // has reached it's quota, we should cancel delivery immediately. If we create the account-level
@@ -253,8 +253,22 @@ namespace HM
 
          if (!suppressFailureDsn)
          {
-            saErrorMessages.push_back(Formatter::Format("{0}\r\n   Error Type: SMTP\r\n   Error Description: Delivery failed\r\n   Additional information: The message could not be saved to the recipient's mailbox. The server administrator should check the hMailServer error log.\r\n\r\n",
-               account->GetAddress()));
+            // RFC 3463 X.3.0, "other or undefined mail system status" - the mail
+            // system in question being this one, since what failed is this
+            // server's own database write.
+            //
+            // Class 4 and not 5, even though this server does abandon the message
+            // here. Class 5 asserts that no later attempt could succeed, and that
+            // is a statement about the RECIPIENT which is simply untrue: their
+            // mailbox is fine, this server's database was not. A list manager
+            // acting on a 5.x.x would unsubscribe an address that never had
+            // anything wrong with it. RFC 3463 1 defines class 4 as a persistent
+            // transient failure - a temporary condition that lasted long enough
+            // for the attempt to be given up on - which is exactly this, and RFC
+            // 3464 2.3.2 puts no constraint on the Action that accompanies it.
+            saErrorMessages.push_back(DeliveryFailure(account->GetAddress(), _T("4.3.0"),
+               Formatter::Format("{0}\r\n   Error Type: SMTP\r\n   Error Description: Delivery failed\r\n   Additional information: The message could not be saved to the recipient's mailbox. The server administrator should check the hMailServer error log.\r\n\r\n",
+                  account->GetAddress())));
          }
 
          return;
@@ -279,7 +293,7 @@ namespace HM
    Returns true if message should be delivered, false if it should be aborted.
    */
    bool 
-   LocalDelivery::LocalDeliveryPreProcess_(std::shared_ptr<const Account> account, std::shared_ptr<Message> accountLevelMessage, const String &sOriginalAddress, std::vector<String> &saErrorMessages, bool suppressFailureDsn)
+   LocalDelivery::LocalDeliveryPreProcess_(std::shared_ptr<const Account> account, std::shared_ptr<Message> accountLevelMessage, const String &sOriginalAddress, std::vector<DeliveryFailure> &saErrorMessages, bool suppressFailureDsn)
    {
       SendAutoReplyMessage_(account, original_message_);
 
@@ -327,7 +341,14 @@ namespace HM
             String sRejectText;
             sRejectText.Format(_T("%s\r\n   Error Type: SMTP\r\n   Error Description: Message rejected\r\n   Additional information: The recipient's mail filter rejected the message: %s\r\n\r\n"),
                String(account->GetAddress()).c_str(), sieveRejectReason.c_str());
-            saErrorMessages.push_back(sRejectText);
+
+            // RFC 3463 X.7.1, "delivery not authorized, message refused". RFC
+            // 5429 2.1.2 gives the reply a Sieve reject produces over SMTP as
+            // "550 5.7.1", and this is the same refusal arriving one step later,
+            // so it is reported with the same code the protocol form uses.
+            // Permanent, and honestly so: the recipient's own filter said no, and
+            // it will say no again to the same message.
+            saErrorMessages.push_back(DeliveryFailure(account->GetAddress(), _T("5.7.1"), sRejectText));
          }
 
          String sMessage = Formatter::Format("SMTPDeliverer - Message {0}: rejected by the Sieve script for {1}.",
@@ -725,7 +746,7 @@ namespace HM
    }
 
    bool
-   LocalDelivery::CheckAccountQuotas_(std::shared_ptr<const Account> pCheckAccount, std::vector<String> &saErrorMessages, bool suppressFailureDsn)
+   LocalDelivery::CheckAccountQuotas_(std::shared_ptr<const Account> pCheckAccount, std::vector<DeliveryFailure> &saErrorMessages, bool suppressFailureDsn)
    //---------------------------------------------------------------------------()
    // DESCRIPTION:
    // Checks that the recipient account has enough space available. If not, 
@@ -740,8 +761,22 @@ namespace HM
             pCheckAccount->GetAddress());
 
          // DSN (RFC 3461): only bounce when the sender did not opt out via NOTIFY.
+         //
+         // RFC 3463 X.2.2, "mailbox full" - which is a different thing from
+         // X.1.1 "bad destination mailbox address", and the difference is the
+         // entire reason a machine-readable report is worth having: the address
+         // is perfectly good and must not be struck off a list.
+         //
+         // Class 5 rather than the class 4 that RFC 3463's own note on X.2.2
+         // suggests, because that note describes a server which queues the
+         // message and retries until the mailbox has room. This one does not: it
+         // has refused the message and will not try again, and the sender is
+         // being told so in the same breath. A 4.2.2 here would promise a retry
+         // that is not coming. 5.2.2 is also what every mail system in service
+         // emits for a hard quota refusal, and what list software already reads
+         // as "full mailbox, not a dead address".
          if (!suppressFailureDsn)
-            saErrorMessages.push_back(sMsg);  
+            saErrorMessages.push_back(DeliveryFailure(pCheckAccount->GetAddress(), _T("5.2.2"), sMsg));
 
          __int64 currentSize = AccountSizeCache::Instance()->GetSize(pCheckAccount->GetID()) + original_message_->GetSize();
 
