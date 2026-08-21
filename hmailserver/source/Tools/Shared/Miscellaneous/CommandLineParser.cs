@@ -45,6 +45,13 @@ namespace hMailServer.Shared
 
       public static bool ContainsArgument(string argument)
       {
+         // Parse on demand rather than throw. Every caller in the tree does call
+         // Parse() first, but the alternative to this guard is a NullReferenceException
+         // inside the code that decides whether it is safe to show a dialog, and a
+         // crash there would be a worse failure than the hang it replaced.
+         if (_argumentMap == null)
+            Parse();
+
          return _argumentMap.ContainsKey(argument);
       }
 
