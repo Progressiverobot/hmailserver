@@ -64,7 +64,7 @@
                                         </StackPanel.Style>
                                         <ui:SymbolIcon Symbol="Globe24" Foreground="{StaticResource BrandBrush}" />
                                         <TextBlock Text="{Binding Name}" Margin="10,0,0,0" FontSize="14" VerticalAlignment="Center" />
-                                        <TextBlock Text="inactive" FontSize="11" FontStyle="Italic" Margin="8,0,0,0"
+                                        <TextBlock Text="inactive" FontSize="12" FontStyle="Italic" Margin="8,0,0,0"
                                                    VerticalAlignment="Center"
                                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}">
                                             <TextBlock.Style>
@@ -79,7 +79,7 @@
                                             </TextBlock.Style>
                                         </TextBlock>
                                     </StackPanel>
-                                    <ui:Button Grid.Column="1" Content="Properties" FontSize="11" Padding="8,3" Margin="0,0,6,0"
+                                    <ui:Button Grid.Column="1" Content="Properties" FontSize="12" Padding="8,3" Margin="0,0,6,0"
                                                Tag="{Binding Name}" Click="EditDomain_Click" />
                                     <ui:Button Grid.Column="2" Content="✕" FontSize="10" Padding="6,3"
                                                ToolTip="Delete domain" AutomationProperties.Name="Delete domain"
@@ -136,8 +136,8 @@
                                             </Style>
                                         </StackPanel.Style>
                                         <ui:SymbolIcon Symbol="Person24" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                                        <TextBlock Text="{Binding Address}" Margin="10,0,0,0" FontSize="13.5" VerticalAlignment="Center" />
-                                        <TextBlock Text="inactive" FontSize="11" FontStyle="Italic" Margin="8,0,0,0"
+                                        <TextBlock Text="{Binding Address}" Margin="10,0,0,0" FontSize="14" VerticalAlignment="Center" />
+                                        <TextBlock Text="inactive" FontSize="12" FontStyle="Italic" Margin="8,0,0,0"
                                                    VerticalAlignment="Center"
                                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}">
                                             <TextBlock.Style>
@@ -152,9 +152,9 @@
                                             </TextBlock.Style>
                                         </TextBlock>
                                     </StackPanel>
-                                    <ui:Button Grid.Column="1" Content="Edit" FontSize="11" Padding="8,3" Margin="0,0,6,0"
+                                    <ui:Button Grid.Column="1" Content="Edit" FontSize="12" Padding="8,3" Margin="0,0,6,0"
                                                Tag="{Binding Address}" Click="EditAccount_Click" />
-                                    <ui:Button Grid.Column="2" Content="Delete" Appearance="Secondary" FontSize="11"
+                                    <ui:Button Grid.Column="2" Content="Delete" Appearance="Secondary" FontSize="12"
                                                Foreground="{DynamicResource AppDangerBrush}"
                                                Padding="8,3" Tag="{Binding Address}" Click="DeleteAccount_Click" />
                                 </Grid>
@@ -192,7 +192,7 @@
                             <RowDefinition Height="*" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
-                        <TextBlock Text="Aliases" FontWeight="SemiBold" FontSize="13.5" Margin="6,2,0,6" />
+                        <TextBlock Text="Aliases" FontWeight="SemiBold" FontSize="14" Margin="6,2,0,6" />
                         <ListView x:Name="AliasList" Grid.Row="1" BorderThickness="0" Background="Transparent">
                             <ListView.ItemTemplate>
                                 <DataTemplate>
@@ -201,7 +201,7 @@
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Text="{Binding Display}" FontSize="12.5" VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding Display}" FontSize="12" VerticalAlignment="Center" />
                                         <ui:Button Grid.Column="1" Content="✕" FontSize="10" Padding="6,2"
                                                    ToolTip="Delete alias" AutomationProperties.Name="Delete alias"
                                                    Tag="{Binding Name}" Click="DeleteAlias_Click" />
@@ -234,7 +234,7 @@
                             <RowDefinition Height="*" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
-                        <TextBlock Text="Distribution lists" FontWeight="SemiBold" FontSize="13.5" Margin="6,2,0,6" />
+                        <TextBlock Text="Distribution lists" FontWeight="SemiBold" FontSize="14" Margin="6,2,0,6" />
                         <ListView x:Name="DistList" Grid.Row="1" BorderThickness="0" Background="Transparent">
                             <ListView.ItemTemplate>
                                 <DataTemplate>
@@ -245,7 +245,7 @@
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Text="{Binding}" FontSize="12.5" VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding}" FontSize="12" VerticalAlignment="Center" />
                                         <ui:Button Grid.Column="1" Content="Properties" FontSize="10" Padding="6,2" Margin="0,0,4,0"
                                                    Tag="{Binding}" Click="EditDistList_Click" />
                                         <ui:Button Grid.Column="2" Content="Members" FontSize="10" Padding="6,2" Margin="0,0,4,0"

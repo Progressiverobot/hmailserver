@@ -38,7 +38,7 @@ namespace hMailServer.ControlPanel.Views
          listBox_.SetResourceReference(Control.BorderBrushProperty, "ControlElevationBorderBrush");
          listBox_.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
          listBox_.Background = System.Windows.Media.Brushes.Transparent;
-         listBox_.FontSize = 13;
+         listBox_.FontSize = Typography.Body;
          AutomationProperties.SetName(listBox_, "Recipients of " + listAddress);
          grid.Children.Add(listBox_);
 
@@ -48,7 +48,7 @@ namespace hMailServer.ControlPanel.Views
          bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
          bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-         addBox_.FontSize = 13;
+         addBox_.FontSize = Typography.Body;
          addBox_.Padding = new Thickness(6);
          addBox_.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
          addBox_.Background = System.Windows.Media.Brushes.Transparent;

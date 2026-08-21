@@ -194,7 +194,7 @@ namespace hMailServer.ControlPanel.Views
             var caption = new TextBlock
             {
                Text = row.Title.ToUpperInvariant(),
-               FontSize = 10.5,
+               FontSize = Typography.Caption,
                FontWeight = FontWeights.SemiBold,
                Margin = new Thickness(2, 8, 2, 2)
             };
@@ -226,7 +226,7 @@ namespace hMailServer.ControlPanel.Views
             var detail = new TextBlock
             {
                Text = secondary,
-               FontSize = 11.5,
+               FontSize = Typography.Caption,
                TextTrimming = TextTrimming.CharacterEllipsis,
                Margin = new Thickness(0, 1, 0, 0)
             };

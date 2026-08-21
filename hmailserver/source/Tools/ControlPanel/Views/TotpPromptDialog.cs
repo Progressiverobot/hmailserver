@@ -1,4 +1,5 @@
 using System.Windows;
+using hMailServer.ControlPanel.Services;
 using System.Windows.Controls;
 using System.Windows.Input;
 
@@ -34,7 +35,7 @@ namespace hMailServer.ControlPanel.Views
          var info = new TextBlock
          {
             Text = "Enter the 6-digit code from your authenticator app:",
-            FontSize = 13,
+            FontSize = Typography.Body,
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 0, 0, 14)
          };

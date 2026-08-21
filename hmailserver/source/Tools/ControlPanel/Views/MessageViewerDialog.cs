@@ -1,4 +1,5 @@
 using System;
+using hMailServer.ControlPanel.Services;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -26,7 +27,7 @@ namespace hMailServer.ControlPanel.Views
          root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
          root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-         var header = new TextBlock { Text = "Message source", FontSize = 20, FontWeight = FontWeights.SemiBold, Margin = new Thickness(2, 0, 0, 10) };
+         var header = new TextBlock { Text = "Message source", FontSize = Typography.DialogTitle, FontWeight = FontWeights.SemiBold, Margin = new Thickness(2, 0, 0, 10) };
          header.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
          Grid.SetRow(header, 0);
          root.Children.Add(header);
@@ -35,7 +36,7 @@ namespace hMailServer.ControlPanel.Views
          {
             Text = filePath ?? "",
             IsReadOnly = true,
-            FontSize = 12,
+            FontSize = Typography.Caption,
             Padding = new Thickness(6),
             Margin = new Thickness(0, 0, 0, 10),
             Background = System.Windows.Media.Brushes.Transparent
@@ -52,7 +53,7 @@ namespace hMailServer.ControlPanel.Views
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
             FontFamily = new System.Windows.Media.FontFamily("Cascadia Mono, Consolas"),
-            FontSize = 12.5,
+            FontSize = Typography.Label,
             Padding = new Thickness(8),
             Background = System.Windows.Media.Brushes.Transparent,
             Text = ReadMessage(filePath)

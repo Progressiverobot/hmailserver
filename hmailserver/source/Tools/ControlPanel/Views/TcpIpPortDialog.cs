@@ -37,7 +37,7 @@ namespace hMailServer.ControlPanel.Views
          SetResourceReference(BackgroundProperty, "ApplicationBackgroundBrush");
 
          var panel = new StackPanel { Margin = new Thickness(22) };
-         var header = new TextBlock { Text = "Port binding", FontSize = 18, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 14) };
+         var header = new TextBlock { Text = "Port binding", FontSize = Typography.DialogTitle, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 14) };
          header.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
          panel.Children.Add(header);
 
@@ -113,7 +113,7 @@ namespace hMailServer.ControlPanel.Views
          // relaying a COM error after Save. The state is carried by the text
          // itself (present or absent), never by colour, and the live setting
          // makes a screen reader announce it when it appears.
-         clientCertWarning_.FontSize = 12;
+         clientCertWarning_.FontSize = Typography.Caption;
          clientCertWarning_.TextWrapping = TextWrapping.Wrap;
          clientCertWarning_.Margin = new Thickness(0, 6, 0, 0);
          clientCertWarning_.Visibility = Visibility.Collapsed;
@@ -310,7 +310,7 @@ namespace hMailServer.ControlPanel.Views
       /// </summary>
       private static TextBlock Label(string text, FrameworkElement editor = null)
       {
-         var t = new TextBlock { Text = text, FontSize = 12.5, Margin = new Thickness(0, 8, 0, 4) };
+         var t = new TextBlock { Text = text, FontSize = Typography.Label, Margin = new Thickness(0, 8, 0, 4) };
          t.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
 
          if (editor != null)
@@ -328,14 +328,14 @@ namespace hMailServer.ControlPanel.Views
       /// </summary>
       private static TextBlock Note(string text)
       {
-         var t = new TextBlock { Text = text, FontSize = 11.5, TextWrapping = TextWrapping.Wrap, Opacity = 0.75, Margin = new Thickness(0, 2, 0, 4) };
+         var t = new TextBlock { Text = text, FontSize = Typography.Caption, TextWrapping = TextWrapping.Wrap, Opacity = 0.75, Margin = new Thickness(0, 2, 0, 4) };
          t.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
          return t;
       }
 
       private static TextBox Input(TextBox box)
       {
-         box.FontSize = 13;
+         box.FontSize = Typography.Body;
          box.Padding = new Thickness(6);
          box.Margin = new Thickness(0, 0, 0, 4);
          box.Background = System.Windows.Media.Brushes.Transparent;
@@ -344,7 +344,7 @@ namespace hMailServer.ControlPanel.Views
       }
 
       private static ComboBoxItem Combo(string text, int value) => new() { Content = text, Tag = value };
-      private static void StyleCombo(ComboBox combo) { combo.FontSize = 13; combo.Margin = new Thickness(0, 0, 0, 4); }
+      private static void StyleCombo(ComboBox combo) { combo.FontSize = Typography.Body; combo.Margin = new Thickness(0, 0, 0, 4); }
 
       private static void SelectCombo(ComboBox combo, int value)
       {

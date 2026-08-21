@@ -144,7 +144,7 @@ namespace hMailServer.ControlPanel.Views
             {
                Content = Label,
                IsChecked = store.ReadBool(Key, Default),
-               FontSize = 13.5
+               FontSize = Typography.Body
             };
             SetAid(box_, Key);
 
@@ -189,14 +189,14 @@ namespace hMailServer.ControlPanel.Views
             panel.Children.Add(new TextBlock
             {
                Text = Label,
-               FontSize = 13,
+               FontSize = Typography.Body,
                Margin = new Thickness(0, 0, 0, 4)
             });
             box_ = new Wpf.Ui.Controls.TextBox
             {
                Text = store.Read(Key, Default),
                PlaceholderText = Placeholder,
-               FontSize = 13,
+               FontSize = Typography.Body,
                MaxWidth = 520,
                MinWidth = 320,
                HorizontalAlignment = HorizontalAlignment.Left
@@ -237,7 +237,7 @@ namespace hMailServer.ControlPanel.Views
             panel.Children.Add(new TextBlock
             {
                Text = Label,
-               FontSize = 13,
+               FontSize = Typography.Body,
                Margin = new Thickness(0, 0, 0, 4)
             });
 
@@ -249,7 +249,7 @@ namespace hMailServer.ControlPanel.Views
             {
                Text = store.Read(Key, Default),
                PlaceholderText = Placeholder,
-               FontSize = 13,
+               FontSize = Typography.Body,
                HorizontalAlignment = HorizontalAlignment.Stretch
             };
             Describe(box_, Key);
@@ -311,11 +311,11 @@ namespace hMailServer.ControlPanel.Views
             panel.Children.Add(new TextBlock
             {
                Text = Label,
-               FontSize = 13,
+               FontSize = Typography.Body,
                Margin = new Thickness(0, 0, 0, 4)
             });
 
-            combo_ = new ComboBox { FontSize = 13, MinWidth = 320, HorizontalAlignment = HorizontalAlignment.Left };
+            combo_ = new ComboBox { FontSize = Typography.Body, MinWidth = 320, HorizontalAlignment = HorizontalAlignment.Left };
             if (!int.TryParse(store.Read(Key, Default.ToString()), out int current))
                current = Default;
             foreach ((int value, string label) in Options)
@@ -394,7 +394,7 @@ namespace hMailServer.ControlPanel.Views
          public override FrameworkElement CreateEditor(IniFeatureStore store)
          {
             var panel = new StackPanel();
-            panel.Children.Add(new TextBlock { Text = Label, FontSize = 13, Margin = new Thickness(0, 0, 0, 4) });
+            panel.Children.Add(new TextBlock { Text = Label, FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 4) });
 
             hasStored_ = !string.IsNullOrEmpty(store.Read(Key, "").Trim());
             string placeholder = hasStored_
@@ -404,7 +404,7 @@ namespace hMailServer.ControlPanel.Views
             box_ = new Wpf.Ui.Controls.PasswordBox
             {
                PlaceholderText = placeholder,
-               FontSize = 13,
+               FontSize = Typography.Body,
                HorizontalAlignment = HorizontalAlignment.Stretch
             };
             Describe(box_, Key);
@@ -581,14 +581,14 @@ namespace hMailServer.ControlPanel.Views
             panel.Children.Add(new TextBlock
             {
                Text = Label,
-               FontSize = 13,
+               FontSize = Typography.Body,
                Margin = new Thickness(0, 0, 0, 4)
             });
             box_ = new Wpf.Ui.Controls.TextBox
             {
                Text = IniDirect.ReadValue(store.IniPath, Section, Key, Default),
                PlaceholderText = Placeholder,
-               FontSize = 13,
+               FontSize = Typography.Body,
                MaxWidth = 520,
                MinWidth = 320,
                HorizontalAlignment = HorizontalAlignment.Left
@@ -634,7 +634,7 @@ namespace hMailServer.ControlPanel.Views
             panel.Children.Add(new TextBlock
             {
                Text = Label,
-               FontSize = 13,
+               FontSize = Typography.Body,
                Margin = new Thickness(0, 0, 0, 4)
             });
 
@@ -644,7 +644,7 @@ namespace hMailServer.ControlPanel.Views
             {
                Text = loaded_,
                PlaceholderText = Placeholder,
-               FontSize = 13,
+               FontSize = Typography.Body,
                MaxWidth = 520,
                MinWidth = 320,
                MinHeight = 88,
@@ -713,7 +713,7 @@ namespace hMailServer.ControlPanel.Views
             var text = new TextBlock
             {
                Text = Label + "  →  " + destination,
-               FontSize = 13,
+               FontSize = Typography.Body,
                TextWrapping = TextWrapping.Wrap,
                VerticalAlignment = VerticalAlignment.Center,
                MaxWidth = 420

@@ -193,7 +193,7 @@ namespace hMailServer.ControlPanel.Views
          content.Children.Add(newKeyLabel_);
 
          newKeyToken_.FontFamily = new System.Windows.Media.FontFamily("Consolas, Courier New, monospace");
-         newKeyToken_.FontSize = 13;
+         newKeyToken_.FontSize = Typography.Body;
          newKeyToken_.TextWrapping = TextWrapping.Wrap;
          newKeyToken_.Margin = new Thickness(0, 0, 0, 12);
          System.Windows.Automation.AutomationProperties.SetAutomationId(newKeyToken_, "apikeys-new-token");
@@ -745,7 +745,7 @@ namespace hMailServer.ControlPanel.Views
          return new TextBlock
          {
             Text = text,
-            FontSize = 12.5,
+            FontSize = Typography.Label,
             Margin = new Thickness(0, 0, 0, 6)
          };
       }
@@ -769,7 +769,7 @@ namespace hMailServer.ControlPanel.Views
          var created = new Wpf.Ui.Controls.TextBox
          {
             PlaceholderText = placeholder,
-            FontSize = 13,
+            FontSize = Typography.Body,
             Margin = new Thickness(0, 0, 0, 12)
          };
          System.Windows.Automation.AutomationProperties.SetName(created, caption);

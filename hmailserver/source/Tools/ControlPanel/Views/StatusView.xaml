@@ -39,7 +39,7 @@
                     <!-- Server -->
                     <Border Style="{StaticResource Card}" Margin="0,0,6,0">
                         <StackPanel>
-                            <TextBlock Text="Server" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,12" />
+                            <TextBlock Text="Server" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,12" />
                             <Grid x:Name="ServerGrid">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
@@ -66,7 +66,7 @@
                     <!-- Database -->
                     <Border Grid.Column="1" Style="{StaticResource Card}" Margin="6,0,0,0">
                         <StackPanel>
-                            <TextBlock Text="Database" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,12" />
+                            <TextBlock Text="Database" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,12" />
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
@@ -94,7 +94,7 @@
                 <!-- Statistics -->
                 <Border Style="{StaticResource Card}" Margin="0,12,0,0">
                     <StackPanel>
-                        <TextBlock Text="Statistics" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,12" />
+                        <TextBlock Text="Statistics" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,12" />
                         <UniformGrid Columns="3">
                             <StackPanel Margin="0,0,0,8">
                                 <TextBlock Text="Processed messages" Style="{StaticResource StatusLabel}" />
@@ -133,7 +133,7 @@
                 <!-- Warnings -->
                 <Border Style="{StaticResource Card}" Margin="0,12,0,0">
                     <StackPanel>
-                        <TextBlock Text="Warnings" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,12" />
+                        <TextBlock Text="Warnings" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,12" />
                         <StackPanel x:Name="WarningsPanel" />
                     </StackPanel>
                 </Border>

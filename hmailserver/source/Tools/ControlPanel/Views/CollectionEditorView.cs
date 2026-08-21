@@ -110,7 +110,7 @@ namespace hMailServer.ControlPanel.Views
                var hint = new TextBlock
                {
                   Text = spec_.Subtitle,
-                  FontSize = 12,
+                  FontSize = Typography.Caption,
                   TextWrapping = TextWrapping.Wrap,
                   Margin = new Thickness(0, 0, 0, 10)
                };
@@ -140,7 +140,7 @@ namespace hMailServer.ControlPanel.Views
             Background = (Brush) FindResource("BrandBrush")
          };
          countBadge_.Foreground = Brushes.White;
-         countBadge_.FontSize = 12.5;
+         countBadge_.FontSize = Typography.Label;
          countBadge_.FontWeight = FontWeights.SemiBold;
          badge.Child = countBadge_;
          toolbar.Children.Add(badge);
@@ -204,7 +204,7 @@ namespace hMailServer.ControlPanel.Views
          root.Children.Add(card);
 
          status_.Margin = new Thickness(0, 12, 0, 0);
-         status_.FontSize = 12;
+         status_.FontSize = Typography.Caption;
          status_.SetResourceReference(ForegroundProperty, "TextFillColorSecondaryBrush");
          Grid.SetRow(status_, 3);
          root.Children.Add(status_);

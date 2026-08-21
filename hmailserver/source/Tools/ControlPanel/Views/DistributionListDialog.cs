@@ -15,10 +15,10 @@ namespace hMailServer.ControlPanel.Views
       private readonly string domainName_;
       private readonly string address_;
 
-      private readonly CheckBox active_ = new() { Content = "List is active", FontSize = 13 };
+      private readonly CheckBox active_ = new() { Content = "List is active", FontSize = Typography.Body };
       private readonly TextBox addressBox_ = new();
       private readonly ComboBox mode_ = new();
-      private readonly CheckBox requireAuth_ = new() { Content = "Require SMTP authentication to send to the list", FontSize = 13 };
+      private readonly CheckBox requireAuth_ = new() { Content = "Require SMTP authentication to send to the list", FontSize = Typography.Body };
       private readonly TextBox requireSender_ = new();
 
       public DistributionListDialog(Window owner, string domainName, string address)
@@ -34,7 +34,7 @@ namespace hMailServer.ControlPanel.Views
          SetResourceReference(BackgroundProperty, "ApplicationBackgroundBrush");
 
          var panel = new StackPanel { Margin = new Thickness(22) };
-         var header = new TextBlock { Text = address, FontSize = 18, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 14) };
+         var header = new TextBlock { Text = address, FontSize = Typography.DialogTitle, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 14) };
          header.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
          panel.Children.Add(header);
 
@@ -62,7 +62,7 @@ namespace hMailServer.ControlPanel.Views
          mode_.Items.Add(Combo("Membership — only list members can send", 1));
          mode_.Items.Add(Combo("Announcements only", 2));
          mode_.Items.Add(Combo("Anyone in the domain can send", 3));
-         mode_.FontSize = 13;
+         mode_.FontSize = Typography.Body;
          mode_.Margin = new Thickness(0, 0, 0, 8);
          panel.Children.Add(Label("Who may send to this list", mode_));
          panel.Children.Add(mode_);
@@ -164,7 +164,7 @@ namespace hMailServer.ControlPanel.Views
       /// </summary>
       private static TextBlock Label(string text, FrameworkElement editor = null)
       {
-         var t = new TextBlock { Text = text, FontSize = 12.5, Margin = new Thickness(0, 8, 0, 4) };
+         var t = new TextBlock { Text = text, FontSize = Typography.Label, Margin = new Thickness(0, 8, 0, 4) };
          t.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
 
          if (editor != null)
@@ -175,7 +175,7 @@ namespace hMailServer.ControlPanel.Views
 
       private static TextBox Input(TextBox box)
       {
-         box.FontSize = 13;
+         box.FontSize = Typography.Body;
          box.Padding = new Thickness(6);
          box.Margin = new Thickness(0, 0, 0, 8);
          box.Background = System.Windows.Media.Brushes.Transparent;

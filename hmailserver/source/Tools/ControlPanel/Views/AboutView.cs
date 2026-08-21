@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using hMailServer.ControlPanel.Services;
+using Typography = hMailServer.ControlPanel.Services.Typography;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -36,12 +37,12 @@ namespace hMailServer.ControlPanel.Views
          {
             Text = "Version " + (System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "?")
                  + "  -  .NET " + Environment.Version,
-            FontSize = 12.5,
+            FontSize = Typography.Label,
             Opacity = 0.65,
             Margin = new Thickness(0, 0, 0, 12)
          });
 
-         serverVersion_.FontSize = 12.5;
+         serverVersion_.FontSize = Typography.Label;
          serverVersion_.Opacity = 0.65;
          serverVersion_.Margin = new Thickness(0, 0, 0, 14);
          inner.Children.Add(serverVersion_);
@@ -51,7 +52,7 @@ namespace hMailServer.ControlPanel.Views
             Text = "A modern administration app for hMailServer: live dashboard, domains "
                  + "and accounts, delivery queue, log streaming, full server settings and "
                  + "the 6.x transport-security features (DANE, MTA-STS, ARC, TLS-RPT, ACME).",
-            FontSize = 12.5,
+            FontSize = Typography.Label,
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 0, 0, 14)
          });
@@ -77,7 +78,7 @@ namespace hMailServer.ControlPanel.Views
          {
             Text = "hMailServer is free and open source software, licensed under the GNU AGPLv3. "
                  + "This Control Panel is built with WPF-UI (Fluent design) and LiveCharts2 on .NET 10.",
-            FontSize = 11.5,
+            FontSize = Typography.Caption,
             Opacity = 0.5,
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 14, 0, 0)
@@ -94,7 +95,7 @@ namespace hMailServer.ControlPanel.Views
          dev.Children.Add(new TextBlock
          {
             Text = "Developed & maintained by",
-            FontSize = 12,
+            FontSize = Typography.Caption,
             Opacity = 0.6,
             Margin = new Thickness(0, 0, 0, 6)
          });
@@ -108,7 +109,7 @@ namespace hMailServer.ControlPanel.Views
          dev.Children.Add(new TextBlock
          {
             Text = "Progressive Robot Ltd",
-            FontSize = 13.5,
+            FontSize = Typography.Body,
             FontWeight = FontWeights.SemiBold,
             Opacity = 0.85,
             Margin = new Thickness(0, 0, 0, 10)
@@ -119,7 +120,7 @@ namespace hMailServer.ControlPanel.Views
             Text = "Progressive Robot Ltd is a software engineering company that builds and "
                  + "modernizes production software \u2014 taking mature, real-world systems and "
                  + "bringing them up to current standards of security, reliability and tooling.",
-            FontSize = 12.5,
+            FontSize = Typography.Label,
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 0, 0, 10)
          });
@@ -134,12 +135,12 @@ namespace hMailServer.ControlPanel.Views
                  + "Sieve / ManageSieve filtering, health and OpenTelemetry observability, broad "
                  + "MySQL / MariaDB / MS SQL / PostgreSQL support, and this modern Fluent-design "
                  + "Control Panel in place of the legacy administrator.",
-            FontSize = 12.5,
+            FontSize = Typography.Label,
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 0, 0, 12)
          });
 
-         var web = new TextBlock { FontSize = 13, Margin = new Thickness(0, 0, 0, 2) };
+         var web = new TextBlock { FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 2) };
          web.Inlines.Add(new Run("Web  ") { FontWeight = FontWeights.SemiBold });
          var webLink = new Hyperlink(new Run("www.progressiverobot.com"))
          {
@@ -158,7 +159,7 @@ namespace hMailServer.ControlPanel.Views
             Text = "Copyright \u00A9 2026 Christopher Holloway / Progressive Robot Ltd. "
                  + "hMailServer is a trademark of its respective owners; this is an independent, "
                  + "community-maintained fork.",
-            FontSize = 11,
+            FontSize = Typography.Caption,
             Opacity = 0.5,
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 12, 0, 0)

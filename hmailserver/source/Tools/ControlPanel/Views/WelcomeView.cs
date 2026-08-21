@@ -24,7 +24,7 @@ namespace hMailServer.ControlPanel.Views
          panel.Children.Add(new TextBlock
          {
             Text = "Jump straight to a task below, or press Ctrl+K to search every page.",
-            FontSize = 13,
+            FontSize = Typography.Body,
             Opacity = 0.8,
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 0, 0, 18)
@@ -77,7 +77,7 @@ namespace hMailServer.ControlPanel.Views
          stack.Children.Add(new TextBlock
          {
             Text = subtitle,
-            FontSize = 12,
+            FontSize = Typography.Caption,
             Opacity = 0.72,
             TextWrapping = TextWrapping.Wrap
          });

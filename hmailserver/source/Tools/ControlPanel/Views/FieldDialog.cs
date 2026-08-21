@@ -99,7 +99,7 @@ namespace hMailServer.ControlPanel.Views
                {
                   Content = f.Label,
                   IsChecked = current is bool b && b,
-                  FontSize = 13,
+                  FontSize = Typography.Body,
                   Margin = new Thickness(0, 6, 0, 10)
                };
                // A checkbox is named by its Content, so it only needs an override
@@ -116,7 +116,7 @@ namespace hMailServer.ControlPanel.Views
             case CollectionEditorView.FieldKind.Combo:
             {
                host.Children.Add(Label(f.Label));
-               var combo = new ComboBox { FontSize = 13, Margin = new Thickness(0, 0, 0, 10) };
+               var combo = new ComboBox { FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 10) };
                int sel = current is int ci ? ci : Convert.ToInt32(current ?? 0);
                foreach ((int Value, string Label) opt in f.Options)
                {
@@ -142,7 +142,7 @@ namespace hMailServer.ControlPanel.Views
                var box = new TextBox
                {
                   Text = Convert.ToString(current) ?? "",
-                  FontSize = 13,
+                  FontSize = Typography.Body,
                   AcceptsReturn = true,
                   TextWrapping = TextWrapping.Wrap,
                   MinLines = 4,
@@ -160,7 +160,7 @@ namespace hMailServer.ControlPanel.Views
                var box = new Wpf.Ui.Controls.PasswordBox
                {
                   Password = Convert.ToString(current) ?? "",
-                  FontSize = 13,
+                  FontSize = Typography.Body,
                   Margin = new Thickness(0, 0, 0, 10)
                };
                Describe(box, prop, accessibleName);
@@ -179,7 +179,7 @@ namespace hMailServer.ControlPanel.Views
                   MaxDecimalPlaces = 0,
                   SmallChange = 1,
                   LargeChange = 10,
-                  FontSize = 13,
+                  FontSize = Typography.Body,
                   Margin = new Thickness(0, 0, 0, 10)
                };
                Describe(box, prop, accessibleName);
@@ -190,7 +190,7 @@ namespace hMailServer.ControlPanel.Views
             default:
             {
                host.Children.Add(Label(f.Label));
-               var box = new TextBox { Text = Convert.ToString(current) ?? "", FontSize = 13, Margin = new Thickness(0, 0, 0, 10) };
+               var box = new TextBox { Text = Convert.ToString(current) ?? "", FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 10) };
                Describe(box, prop, accessibleName);
                host.Children.Add(box);
                committers_.Add(() => { Result[prop] = box.Text; return true; });
@@ -219,7 +219,7 @@ namespace hMailServer.ControlPanel.Views
       private static TextBlock Label(string text) => new()
       {
          Text = text,
-         FontSize = 12.5,
+         FontSize = Typography.Label,
          Margin = new Thickness(0, 6, 0, 4)
       };
    }

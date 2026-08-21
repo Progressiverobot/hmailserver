@@ -67,7 +67,7 @@ namespace hMailServer.ControlPanel.Services
          new SettingEntry("Prepend text to subject", "AntiSpam.PrependSubject", "antispam"),
          new SettingEntry("PTR check score", "AntiSpam.CheckPTRScore", "antispam"),
          new SettingEntry("Record expiration interval, minutes (restart required)", "GreylistingRecordExpirationInterval", "antispam"),
-         new SettingEntry("Score applied when the engine says \", "FilterHookRejectScore", "antispam"),
+         new SettingEntry("Score applied when the engine says \"reject\"", "FilterHookRejectScore", "antispam"),
          new SettingEntry("Score when not merging", "AntiSpam.SpamAssassinScore", "antispam"),
          new SettingEntry("Spam delete threshold (score)", "AntiSpam.SpamDeleteThreshold", "antispam"),
          new SettingEntry("Spam mark threshold (score)", "AntiSpam.SpamMarkThreshold", "antispam"),

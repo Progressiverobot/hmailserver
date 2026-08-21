@@ -14,7 +14,7 @@ namespace hMailServer.ControlPanel.Views
       private readonly string domainName_;
 
       // General
-      private readonly CheckBox active_ = new() { Content = "Domain enabled", FontSize = 13 };
+      private readonly CheckBox active_ = new() { Content = "Domain enabled", FontSize = Typography.Body };
       private readonly TextBox name_ = NewInput();
       private readonly TextBox postmaster_ = NewInput();
       private readonly TextBox adDomain_ = NewInput();
@@ -31,35 +31,35 @@ namespace hMailServer.ControlPanel.Views
       private readonly TextBox maxSize_ = NewInput();
       private readonly TextBox maxMessageSize_ = NewInput();
       private readonly TextBox maxAccountSize_ = NewInput();
-      private readonly CheckBox maxAccountsOn_ = new() { Content = "Limit number of accounts", FontSize = 13 };
+      private readonly CheckBox maxAccountsOn_ = new() { Content = "Limit number of accounts", FontSize = Typography.Body };
       private readonly TextBox maxAccounts_ = NewInput();
-      private readonly CheckBox maxAliasesOn_ = new() { Content = "Limit number of aliases", FontSize = 13 };
+      private readonly CheckBox maxAliasesOn_ = new() { Content = "Limit number of aliases", FontSize = Typography.Body };
       private readonly TextBox maxAliases_ = NewInput();
-      private readonly CheckBox maxDistsOn_ = new() { Content = "Limit number of distribution lists", FontSize = 13 };
+      private readonly CheckBox maxDistsOn_ = new() { Content = "Limit number of distribution lists", FontSize = Typography.Body };
       private readonly TextBox maxDists_ = NewInput();
-      private readonly CheckBox plusAddressingOn_ = new() { Content = "Enable plus addressing", FontSize = 13 };
+      private readonly CheckBox plusAddressingOn_ = new() { Content = "Enable plus addressing", FontSize = Typography.Body };
       private readonly TextBox plusChar_ = NewInput();
-      private readonly CheckBox greylisting_ = new() { Content = "Enable greylisting for this domain", FontSize = 13 };
+      private readonly CheckBox greylisting_ = new() { Content = "Enable greylisting for this domain", FontSize = Typography.Body };
 
       // Signature
-      private readonly CheckBox signatureOn_ = new() { Content = "Add signature to outgoing messages", FontSize = 13 };
+      private readonly CheckBox signatureOn_ = new() { Content = "Add signature to outgoing messages", FontSize = Typography.Body };
       private readonly ComboBox signatureMethod_ = new();
-      private readonly CheckBox signReplies_ = new() { Content = "Add signature to replies", FontSize = 13 };
-      private readonly CheckBox signLocal_ = new() { Content = "Add signature to local e-mail", FontSize = 13 };
+      private readonly CheckBox signReplies_ = new() { Content = "Add signature to replies", FontSize = Typography.Body };
+      private readonly CheckBox signLocal_ = new() { Content = "Add signature to local e-mail", FontSize = Typography.Body };
       private readonly TextBox signaturePlain_ = NewMemo();
       private readonly TextBox signatureHtml_ = NewMemo();
 
       // Outbound relay for this domain
       private readonly TextBox relayHost_ = NewInput();
       private readonly TextBox relayPort_ = NewInput();
-      private readonly CheckBox relayAuthOn_ = new() { Content = "The relay requires authentication", FontSize = 13 };
+      private readonly CheckBox relayAuthOn_ = new() { Content = "The relay requires authentication", FontSize = Typography.Body };
       private readonly TextBox relayUser_ = NewInput();
-      private readonly PasswordBox relayPassword_ = new() { FontSize = 13, Margin = new Thickness(0, 0, 0, 10) };
+      private readonly PasswordBox relayPassword_ = new() { FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 10) };
       private readonly ComboBox relaySecurity_ = new();
 
       // DKIM
-      private readonly CheckBox dkimOn_ = new() { Content = "Enable DKIM signing", FontSize = 13 };
-      private readonly CheckBox dkimAliases_ = new() { Content = "Sign aliases too", FontSize = 13 };
+      private readonly CheckBox dkimOn_ = new() { Content = "Enable DKIM signing", FontSize = Typography.Body };
+      private readonly CheckBox dkimAliases_ = new() { Content = "Sign aliases too", FontSize = Typography.Body };
       private readonly TextBox dkimSelector_ = NewInput();
       private readonly TextBox dkimKeyFile_ = NewInput();
       private readonly ComboBox dkimHeaderCanon_ = new();
@@ -70,7 +70,7 @@ namespace hMailServer.ControlPanel.Views
          IsReadOnly = true,
          AcceptsReturn = true,
          TextWrapping = TextWrapping.Wrap,
-         FontSize = 12,
+         FontSize = Typography.Caption,
          MinHeight = 70,
          Padding = new Thickness(6),
          Margin = new Thickness(0, 0, 0, 4),
@@ -124,7 +124,7 @@ namespace hMailServer.ControlPanel.Views
          var header = new TextBlock
          {
             Text = domainName,
-            FontSize = 20,
+            FontSize = Typography.DialogTitle,
             FontWeight = FontWeights.SemiBold,
             Margin = new Thickness(2, 0, 0, 12)
          };
@@ -496,7 +496,7 @@ namespace hMailServer.ControlPanel.Views
          rotStatus_ = new TextBlock
          {
             TextWrapping = TextWrapping.Wrap,
-            FontSize = 12.5,
+            FontSize = Typography.Label,
             Margin = new Thickness(0, 6, 0, 8)
          };
          rotStagedPanel_.Children.Add(rotStatus_);
@@ -1139,7 +1139,7 @@ namespace hMailServer.ControlPanel.Views
          IsReadOnly = true,
          AcceptsReturn = true,
          TextWrapping = TextWrapping.Wrap,
-         FontSize = 12,
+         FontSize = Typography.Caption,
          MinHeight = minHeight,
          Padding = new Thickness(6),
          Margin = new Thickness(0, 0, 0, 4),
@@ -1156,14 +1156,14 @@ namespace hMailServer.ControlPanel.Views
 
       private static TextBlock Label(string text)
       {
-         var t = new TextBlock { Text = text, FontSize = 12.5, Margin = new Thickness(0, 8, 0, 4) };
+         var t = new TextBlock { Text = text, FontSize = Typography.Label, Margin = new Thickness(0, 8, 0, 4) };
          t.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
          return t;
       }
 
       private static TextBox Input(TextBox box)
       {
-         box.FontSize = 13;
+         box.FontSize = Typography.Body;
          box.Padding = new Thickness(6);
          box.Margin = new Thickness(0, 0, 0, 8);
          box.Background = System.Windows.Media.Brushes.Transparent;
@@ -1171,19 +1171,20 @@ namespace hMailServer.ControlPanel.Views
          return box;
       }
 
-      private static Border Separator() => new()
+      private static Border Separator()
       {
-         Height = 1,
-         Margin = new Thickness(0, 12, 0, 12),
-         Background = System.Windows.Media.Brushes.Gray,
-         Opacity = 0.3
-      };
+         // The theme's own hairline, not a fixed Gray: at 0.3 opacity the old
+         // one was near-invisible on the light theme, and theme-blind on all.
+         var divider = new Border { Height = 1, Margin = new Thickness(0, 12, 0, 12) };
+         divider.SetResourceReference(Border.BackgroundProperty, "ControlElevationBorderBrush");
+         return divider;
+      }
 
       private static ComboBoxItem Combo(string text, int value) => new() { Content = text, Tag = value };
 
       private static void StyleCombo(ComboBox combo)
       {
-         combo.FontSize = 13;
+         combo.FontSize = Typography.Body;
          combo.Margin = new Thickness(0, 0, 0, 8);
       }
 

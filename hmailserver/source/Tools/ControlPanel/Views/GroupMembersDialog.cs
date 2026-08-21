@@ -29,7 +29,7 @@ namespace hMailServer.ControlPanel.Views
       private readonly int groupId_;
       private readonly string groupName_;
 
-      private readonly ListBox list_ = new() { FontSize = 13, Height = 260, Margin = new Thickness(0, 0, 0, 12) };
+      private readonly ListBox list_ = new() { FontSize = Typography.Body, Height = 260, Margin = new Thickness(0, 0, 0, 12) };
 
       /// <summary>Member row database ids, parallel to <see cref="list_"/>.</summary>
       private readonly List<int> memberIds_ = new();
@@ -54,7 +54,7 @@ namespace hMailServer.ControlPanel.Views
          var header = new TextBlock
          {
             Text = groupName_,
-            FontSize = 18,
+            FontSize = Typography.DialogTitle,
             FontWeight = FontWeights.SemiBold,
             Margin = new Thickness(0, 0, 0, 4)
          };
@@ -66,7 +66,7 @@ namespace hMailServer.ControlPanel.Views
             Text = "A group exists so that several accounts can be given the same rights at once - "
                    + "grant the group access to a public folder under Public folders, and every account "
                    + "listed here gets that access. An empty group grants nothing to anyone.",
-            FontSize = 12.5,
+            FontSize = Typography.Label,
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 0, 0, 12)
          };
@@ -306,13 +306,13 @@ namespace hMailServer.ControlPanel.Views
          var label = new TextBlock
          {
             Text = "Account to add",
-            FontSize = 12.5,
+            FontSize = Typography.Label,
             Margin = new Thickness(0, 0, 0, 6)
          };
          label.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
          panel.Children.Add(label);
 
-         var combo = new ComboBox { FontSize = 13, Margin = new Thickness(0, 0, 0, 12), IsEditable = false };
+         var combo = new ComboBox { FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 12), IsEditable = false };
          foreach (string address in addresses)
             combo.Items.Add(address);
          combo.SelectedIndex = 0;

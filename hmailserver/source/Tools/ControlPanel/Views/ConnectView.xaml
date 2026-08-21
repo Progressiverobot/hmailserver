@@ -10,14 +10,14 @@
             <StackPanel>
                 <Border Width="52" Height="52" CornerRadius="14" Background="{StaticResource BrandGradient}"
                         HorizontalAlignment="Left" Margin="0,0,0,16">
-                    <TextBlock Text="hM" FontWeight="Bold" FontSize="20" Foreground="White"
+                    <TextBlock Text="hM" FontWeight="SemiBold" FontSize="20" Foreground="White"
                                HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Border>
 
-                <TextBlock Text="Connect to server" FontSize="22" FontWeight="SemiBold"
+                <TextBlock Text="Connect to server" FontSize="20" FontWeight="SemiBold"
                            Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
                 <TextBlock Text="Sign in with the hMailServer administrator credential."
-                           FontSize="12.5" Margin="0,4,0,22"
+                           FontSize="12" Margin="0,4,0,22"
                            Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
 
                 <ui:TextBox x:Name="HostBox" PlaceholderText="Server (localhost)" Margin="0,0,0,10" Text="localhost">

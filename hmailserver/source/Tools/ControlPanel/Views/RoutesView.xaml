@@ -38,14 +38,14 @@
             </DataGrid>
             <TextBlock x:Name="EmptyStatus" Visibility="Collapsed"
                        HorizontalAlignment="Center" VerticalAlignment="Center"
-                       FontSize="13" Opacity="0.7" TextWrapping="Wrap" TextAlignment="Center"
+                       FontSize="14" Opacity="0.7" TextWrapping="Wrap" TextAlignment="Center"
                        Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
             </Grid>
         </Border>
 
         <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,12,0,0">
             <StackPanel>
-                <TextBlock Text="Add route" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,12" />
+                <TextBlock Text="Add route" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,12" />
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="2*" />

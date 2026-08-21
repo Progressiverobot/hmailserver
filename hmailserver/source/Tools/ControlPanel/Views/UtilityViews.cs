@@ -41,7 +41,7 @@ namespace hMailServer.ControlPanel.Views
          var addCard = new Border { Margin = new Thickness(0, 12, 0, 0) };
          addCard.SetResourceReference(StyleProperty, "Card");
          var addPanel = new StackPanel();
-         addPanel.Children.Add(new TextBlock { Text = "Add relay", FontSize = 15, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 12) });
+         addPanel.Children.Add(new TextBlock { Text = "Add relay", FontSize = Typography.SectionHeading, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 12) });
 
          var row = new Grid();
          for (int i = 0; i < 3; i++)
@@ -183,7 +183,7 @@ namespace hMailServer.ControlPanel.Views
          IsReadOnly = true,
          AcceptsReturn = true,
          FontFamily = new System.Windows.Media.FontFamily("Cascadia Mono, Consolas"),
-         FontSize = 12.5,
+         FontSize = Typography.Label,
          BorderThickness = new Thickness(0),
          Background = System.Windows.Media.Brushes.Transparent,
          VerticalScrollBarVisibility = ScrollBarVisibility.Auto
@@ -318,10 +318,10 @@ namespace hMailServer.ControlPanel.Views
          Height = 140,
          TextWrapping = TextWrapping.Wrap,
          VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-         FontSize = 13,
+         FontSize = Typography.Body,
          Padding = new Thickness(6)
       };
-      private readonly TextBlock status_ = new() { FontSize = 12, Margin = new Thickness(0, 10, 0, 0), Opacity = 0.7 };
+      private readonly TextBlock status_ = new() { FontSize = Typography.Caption, Margin = new Thickness(0, 10, 0, 0), Opacity = 0.7 };
 
       public SendoutView()
       {
@@ -366,7 +366,7 @@ namespace hMailServer.ControlPanel.Views
          Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
       }
 
-      private static TextBlock Label(string text) => new() { Text = text, FontSize = 12.5, Margin = new Thickness(0, 6, 0, 4) };
+      private static TextBlock Label(string text) => new() { Text = text, FontSize = Typography.Label, Margin = new Thickness(0, 6, 0, 4) };
 
       private static FrameworkElement Spaced(FrameworkElement element)
       {
@@ -423,7 +423,7 @@ namespace hMailServer.ControlPanel.Views
          IsReadOnly = true,
          AcceptsReturn = true,
          FontFamily = new System.Windows.Media.FontFamily("Cascadia Mono, Consolas"),
-         FontSize = 12.5,
+         FontSize = Typography.Label,
          BorderThickness = new Thickness(0),
          Background = System.Windows.Media.Brushes.Transparent,
          VerticalScrollBarVisibility = ScrollBarVisibility.Auto
@@ -435,7 +435,7 @@ namespace hMailServer.ControlPanel.Views
       // Control Panel shows the result by reading that report.
       private readonly TextBlock consistencyStatus_ = new()
       {
-         FontSize = 12.5,
+         FontSize = Typography.Label,
          TextWrapping = TextWrapping.Wrap,
          Margin = new Thickness(0, 0, 0, 10)
       };
@@ -527,7 +527,7 @@ namespace hMailServer.ControlPanel.Views
          titleRow.Children.Add(new TextBlock
          {
             Text = "Message-store consistency",
-            FontSize = 15,
+            FontSize = Typography.SectionHeading,
             FontWeight = FontWeights.SemiBold,
             VerticalAlignment = VerticalAlignment.Center
          });

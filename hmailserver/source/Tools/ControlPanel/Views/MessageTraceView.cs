@@ -31,7 +31,7 @@ namespace hMailServer.ControlPanel.Views
 
       private readonly ListBox list_ = new()
       {
-         FontSize = 13,
+         FontSize = Typography.Body,
          FontFamily = new System.Windows.Media.FontFamily("Consolas"),
          BorderThickness = new Thickness(0),
          Background = System.Windows.Media.Brushes.Transparent,
@@ -40,7 +40,7 @@ namespace hMailServer.ControlPanel.Views
 
       private readonly TextBlock status_ = new()
       {
-         FontSize = 12,
+         FontSize = Typography.Caption,
          Margin = new Thickness(0, 10, 0, 0),
          TextWrapping = TextWrapping.Wrap
       };

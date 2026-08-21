@@ -143,6 +143,16 @@ function ConvertTo-CSharpLiteral($text) {
    return $text.Replace('\', '\\').Replace('"', '\"')
 }
 
+# The reverse, for labels lifted OUT of C# source. A label may legitimately
+# contain an escaped quote - says \"reject\" - and a capture that keeps the
+# escapes would be double-escaped on emit, showing literal backslashes in the
+# palette. This bit for real on FilterHookRejectScore's label: the naive
+# [^"]* capture stopped at the escaped quote, emitted a string ending in a
+# lone backslash, and the generated file did not compile.
+function ConvertFrom-CSharpLiteral($text) {
+   return $text.Replace('\"', '"').Replace('\\', '\')
+}
+
 $entries = New-Object System.Collections.ArrayList
 
 # --- INI-backed pages (FeatureSettingsView): "case Section.X:" blocks ---
@@ -154,8 +164,8 @@ for ($i = 1; $i -lt $featureParts.Count; $i += 2) {
    $page = $featurePages[$section]
    if (-not $page) { continue }
 
-   foreach ($m in [regex]::Matches($body, 'Key = "([^"]+)"[^}]*?Label = "([^"]*)"')) {
-      Add-Entry $entries $m.Groups[2].Value $m.Groups[1].Value $page
+   foreach ($m in [regex]::Matches($body, 'Key = "([^"]+)"[^}]*?Label = "((?:[^"\\]|\\.)*)"')) {
+      Add-Entry $entries (ConvertFrom-CSharpLiteral $m.Groups[2].Value) $m.Groups[1].Value $page
    }
 }
 
@@ -167,11 +177,11 @@ foreach ($m in [regex]::Matches($serverText, '(?s)private void Build(\w+)\(\)\s*
    $page = $serverPages[$section]
    if (-not $page) { continue }
 
-   foreach ($s in [regex]::Matches($body, 'Path = "([^"]+)",\s*Label = "([^"]*)"')) {
-      Add-Entry $entries $s.Groups[2].Value $s.Groups[1].Value $page
+   foreach ($s in [regex]::Matches($body, 'Path = "([^"]+)",\s*Label = "((?:[^"\\]|\\.)*)"')) {
+      Add-Entry $entries (ConvertFrom-CSharpLiteral $s.Groups[2].Value) $s.Groups[1].Value $page
    }
-   foreach ($s in [regex]::Matches($body, 'Label = "([^"]*)",\s*Path = "([^"]+)"')) {
-      Add-Entry $entries $s.Groups[1].Value $s.Groups[2].Value $page
+   foreach ($s in [regex]::Matches($body, 'Label = "((?:[^"\\]|\\.)*)",\s*Path = "([^"]+)"')) {
+      Add-Entry $entries (ConvertFrom-CSharpLiteral $s.Groups[1].Value) $s.Groups[2].Value $page
    }
 }
 
@@ -192,7 +202,7 @@ foreach ($view in ($handWrittenPages.Keys | Sort-Object)) {
    # by name, so there is nothing useful to index.
    foreach ($control in ($keys.Keys | Sort-Object)) {
       if (-not $labels.ContainsKey($control)) { continue }
-      Add-Entry $entries (ConvertTo-CSharpLiteral $labels[$control]) $keys[$control] $page
+      Add-Entry $entries $labels[$control] $keys[$control] $page
    }
 }
 
@@ -216,7 +226,9 @@ $sb = New-Object System.Text.StringBuilder
 foreach ($e in $sorted) {
    # The captured text comes straight out of a C# string literal, so it is
    # already escaped; re-escaping it here would double the backslashes.
-   [void]$sb.AppendLine("         new SettingEntry(`"$($e.Label)`", `"$($e.Key)`", `"$($e.Page)`"),")
+   # One escape, at the one place text becomes a C# literal - wherever the
+   # label came from, it is plain text by the time it reaches here.
+   [void]$sb.AppendLine("         new SettingEntry(`"$(ConvertTo-CSharpLiteral $e.Label)`", `"$($e.Key)`", `"$($e.Page)`"),")
 }
 
 [void]$sb.AppendLine('      };')

@@ -28,14 +28,14 @@ namespace hMailServer.ControlPanel.Views
 
       private readonly ListBox list_ = new()
       {
-         FontSize = 13,
+         FontSize = Typography.Body,
          BorderThickness = new Thickness(0),
          Background = System.Windows.Media.Brushes.Transparent,
          MinHeight = 160
       };
 
       private readonly TextBox newName_ = new() { Width = 220, VerticalContentAlignment = VerticalAlignment.Center };
-      private readonly TextBlock status_ = new() { FontSize = 12, Margin = new Thickness(0, 10, 0, 0), TextWrapping = TextWrapping.Wrap };
+      private readonly TextBlock status_ = new() { FontSize = Typography.Caption, Margin = new Thickness(0, 10, 0, 0), TextWrapping = TextWrapping.Wrap };
 
       private readonly Border issuedCard_;
       private readonly TextBox issuedValue_ = new()

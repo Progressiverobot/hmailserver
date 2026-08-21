@@ -12,8 +12,8 @@
 
             <Border Style="{StaticResource Card}" Margin="0,0,12,12">
                 <StackPanel>
-                    <TextBlock Text="Backup" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,14" />
-                    <TextBlock Text="Destination folder (on the server)" FontSize="13" Margin="0,0,0,4" />
+                    <TextBlock Text="Backup" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,14" />
+                    <TextBlock Text="Destination folder (on the server)" FontSize="14" Margin="0,0,0,4" />
                     <Grid Width="520" HorizontalAlignment="Left" Margin="0,0,0,12">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -23,15 +23,15 @@
                         <ui:Button x:Name="BrowseDestination" Grid.Column="1" Content="…" MinWidth="40" Margin="8,0,0,0"
                                    VerticalAlignment="Bottom" ToolTip="Browse for a folder" Click="BrowseDestination_Click" />
                     </Grid>
-                    <CheckBox x:Name="CheckDomains" Content="Back up domains (accounts, aliases, lists)" FontSize="13.5" Margin="0,0,0,12" />
-                    <CheckBox x:Name="CheckMessages" Content="Back up messages" FontSize="13.5" Margin="0,0,0,8" />
+                    <CheckBox x:Name="CheckDomains" Content="Back up domains (accounts, aliases, lists)" FontSize="14" Margin="0,0,0,12" />
+                    <CheckBox x:Name="CheckMessages" Content="Back up messages" FontSize="14" Margin="0,0,0,8" />
                     <CheckBox x:Name="CheckMessagesDbOnly" Content="Message metadata only — do not copy the message files"
-                              FontSize="13.5" Margin="22,0,0,4" />
+                              FontSize="14" Margin="22,0,0,4" />
                     <TextBlock x:Name="MessagesDbOnlyNote" MaxWidth="520" HorizontalAlignment="Left"
                                Text="hMailServer.ini setting BackupMessagesDBOnly. The backup then records which messages exist but not their contents, and a restore expects the files to still be in the data folder. Applies to backup and restore, after a service restart."
                                FontSize="12" Opacity="0.65" TextWrapping="Wrap" Margin="22,0,0,12" />
-                    <CheckBox x:Name="CheckSettings" Content="Back up settings" FontSize="13.5" Margin="0,0,0,12" />
-                    <CheckBox x:Name="CheckCompress" Content="Compress destination files (zip)" FontSize="13.5" Margin="0,0,0,14" />
+                    <CheckBox x:Name="CheckSettings" Content="Back up settings" FontSize="14" Margin="0,0,0,12" />
+                    <CheckBox x:Name="CheckCompress" Content="Compress destination files (zip)" FontSize="14" Margin="0,0,0,14" />
                     <StackPanel Orientation="Horizontal">
                         <ui:Button Content="Save settings" Click="SaveSettings_Click" Margin="0,0,8,0" />
                         <ui:Button Content="Start backup now" Appearance="Primary" Click="StartBackup_Click" />
@@ -41,7 +41,7 @@
 
             <Border Style="{StaticResource Card}" Margin="0,0,12,12">
                 <StackPanel>
-                    <TextBlock Text="Scheduled backups" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,10" />
+                    <TextBlock Text="Scheduled backups" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,10" />
 
                     <!-- State first: whether a schedule exists and how old the newest archive is.
                          Colour, shape AND word (StatusSemantics), so no channel is load-bearing alone. -->
@@ -51,7 +51,7 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <Path x:Name="ScheduleMark" Width="11" Height="11" Stretch="Fill" Margin="0,4,8,0" VerticalAlignment="Top" />
-                        <TextBlock x:Name="ScheduleStatusText" Grid.Column="1" FontSize="13" TextWrapping="Wrap" />
+                        <TextBlock x:Name="ScheduleStatusText" Grid.Column="1" FontSize="14" TextWrapping="Wrap" />
                     </Grid>
                     <Grid MaxWidth="520" HorizontalAlignment="Left" Margin="0,0,0,14">
                         <Grid.ColumnDefinitions>
@@ -59,28 +59,28 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <Path x:Name="LastBackupMark" Width="11" Height="11" Stretch="Fill" Margin="0,4,8,0" VerticalAlignment="Top" />
-                        <TextBlock x:Name="LastBackupStatusText" Grid.Column="1" FontSize="13" TextWrapping="Wrap" />
+                        <TextBlock x:Name="LastBackupStatusText" Grid.Column="1" FontSize="14" TextWrapping="Wrap" />
                     </Grid>
 
-                    <TextBlock Text="Daily backup time (24-hour HH:MM, empty = off)" FontSize="13" Margin="0,0,0,4" />
+                    <TextBlock Text="Daily backup time (24-hour HH:MM, empty = off)" FontSize="14" Margin="0,0,0,4" />
                     <ui:TextBox x:Name="ScheduleTimeBox" Width="200" HorizontalAlignment="Left"
                                 AutomationProperties.Name="Daily backup time (24-hour HH:MM, empty = off)" />
                     <TextBlock MaxWidth="520" HorizontalAlignment="Left"
                                Text="At most one backup per calendar day, taken at the first check at or after this time (the server's local time). If an interval is also set below, the daily time wins."
                                FontSize="12" Opacity="0.65" TextWrapping="Wrap" Margin="0,4,0,12" />
 
-                    <TextBlock Text="Backup interval in minutes (0 = off)" FontSize="13" Margin="0,0,0,4" />
+                    <TextBlock Text="Backup interval in minutes (0 = off)" FontSize="14" Margin="0,0,0,4" />
                     <ui:TextBox x:Name="IntervalBox" Width="200" HorizontalAlignment="Left"
                                 AutomationProperties.Name="Backup interval in minutes (0 = off)" />
                     <TextBlock MaxWidth="520" HorizontalAlignment="Left"
                                Text="Used when no daily time is set. The interval is measured against the newest archive in the destination, so it survives service restarts; if the destination holds no backup at all, the first one is taken about a minute after the service starts."
                                FontSize="12" Opacity="0.65" TextWrapping="Wrap" Margin="0,4,0,12" />
 
-                    <TextBlock Text="Retention" FontSize="13.5" FontWeight="SemiBold" Margin="0,2,0,8" />
-                    <TextBlock Text="Archives to keep (0 = keep all)" FontSize="13" Margin="0,0,0,4" />
+                    <TextBlock Text="Retention" FontSize="14" FontWeight="SemiBold" Margin="0,2,0,8" />
+                    <TextBlock Text="Archives to keep (0 = keep all)" FontSize="14" Margin="0,0,0,4" />
                     <ui:TextBox x:Name="KeepCountBox" Width="200" HorizontalAlignment="Left"
                                 AutomationProperties.Name="Archives to keep (0 = keep all)" />
-                    <TextBlock Text="Delete archives older than this many days (0 = keep all)" FontSize="13" Margin="0,8,0,4" />
+                    <TextBlock Text="Delete archives older than this many days (0 = keep all)" FontSize="14" Margin="0,8,0,4" />
                     <ui:TextBox x:Name="MaxAgeBox" Width="200" HorizontalAlignment="Left"
                                 AutomationProperties.Name="Delete archives older than this many days (0 = keep all)" />
                     <TextBlock MaxWidth="520" HorizontalAlignment="Left"
@@ -103,10 +103,10 @@
 
             <Border Style="{StaticResource Card}" Margin="0,0,12,0">
                 <StackPanel>
-                    <TextBlock Text="Restore" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,4" />
+                    <TextBlock Text="Restore" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,4" />
                     <TextBlock Text="Select the backup XML file created by a previous backup (in the destination folder). The contents replace the current data for the selected categories."
                                FontSize="12" Opacity="0.65" TextWrapping="Wrap" Margin="0,0,0,14" />
-                    <TextBlock Text="Backup file (HMBackup*.xml on the server)" FontSize="13" Margin="0,0,0,4" />
+                    <TextBlock Text="Backup file (HMBackup*.xml on the server)" FontSize="14" Margin="0,0,0,4" />
                     <Grid Width="520" HorizontalAlignment="Left" Margin="0,0,0,12">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -116,9 +116,9 @@
                         <ui:Button x:Name="BrowseBackupFile" Grid.Column="1" Content="…" MinWidth="40" Margin="8,0,0,0"
                                    VerticalAlignment="Bottom" ToolTip="Browse for a file" Click="BrowseBackupFile_Click" />
                     </Grid>
-                    <CheckBox x:Name="RestoreDomains" Content="Restore domains" FontSize="13.5" Margin="0,0,0,12" />
-                    <CheckBox x:Name="RestoreMessages" Content="Restore messages" FontSize="13.5" Margin="0,0,0,12" />
-                    <CheckBox x:Name="RestoreSettings" Content="Restore settings" FontSize="13.5" Margin="0,0,0,14" />
+                    <CheckBox x:Name="RestoreDomains" Content="Restore domains" FontSize="14" Margin="0,0,0,12" />
+                    <CheckBox x:Name="RestoreMessages" Content="Restore messages" FontSize="14" Margin="0,0,0,12" />
+                    <CheckBox x:Name="RestoreSettings" Content="Restore settings" FontSize="14" Margin="0,0,0,14" />
                     <ui:Button Content="Start restore" Appearance="Danger" Click="StartRestore_Click" HorizontalAlignment="Left" />
                 </StackPanel>
             </Border>

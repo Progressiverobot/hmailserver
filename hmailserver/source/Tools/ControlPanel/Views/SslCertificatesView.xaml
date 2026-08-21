@@ -58,7 +58,7 @@
             </DataGrid>
             <TextBlock x:Name="EmptyStatus" Visibility="Collapsed"
                        HorizontalAlignment="Center" VerticalAlignment="Center"
-                       FontSize="13" Opacity="0.7" TextWrapping="Wrap" TextAlignment="Center"
+                       FontSize="14" Opacity="0.7" TextWrapping="Wrap" TextAlignment="Center"
                        Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
             </Grid>
         </Border>
@@ -68,10 +68,10 @@
              read back - the private key passphrase. -->
         <Border Grid.Row="2" x:Name="DetailsCard" Style="{StaticResource Card}" Margin="0,12,0,0" Visibility="Collapsed">
             <StackPanel>
-                <TextBlock x:Name="DetailsTitle" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,8" />
+                <TextBlock x:Name="DetailsTitle" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,8" />
                 <StackPanel x:Name="DetailsLines" />
 
-                <TextBlock Text="Private key passphrase" FontSize="13.5" FontWeight="SemiBold" Margin="0,12,0,4" />
+                <TextBlock Text="Private key passphrase" FontSize="14" FontWeight="SemiBold" Margin="0,12,0,4" />
                 <TextBlock FontSize="12" Opacity="0.75" TextWrapping="Wrap" Margin="0,0,0,8"
                            Text="Only needed when the key file is encrypted: with an encrypted key and no passphrase, the key does not load (server error 6170) and every TLS port using this certificate does not start - inbound mail on those ports stops. The passphrase is a secret: it is stored protected on the server and never displayed here again, and saving a new one replaces whatever was stored before." />
                 <StackPanel Orientation="Horizontal">
@@ -87,7 +87,7 @@
 
         <Border Grid.Row="3" Style="{StaticResource Card}" Margin="0,12,0,0">
             <StackPanel>
-                <TextBlock Text="Add certificate" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,12" />
+                <TextBlock Text="Add certificate" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,12" />
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />

@@ -18,13 +18,13 @@ namespace hMailServer.ControlPanel.Views
    public class ActiveDirectoryPickerDialog : Window
    {
       private readonly bool multiSelect_;
-      private readonly ComboBox domainBox_ = new() { FontSize = 13, MinWidth = 240, Padding = new Thickness(6) };
-      private readonly TextBox searchBox_ = new() { FontSize = 13, Padding = new Thickness(6) };
-      private readonly ListView list_ = new() { FontSize = 13 };
+      private readonly ComboBox domainBox_ = new() { FontSize = Typography.Body, MinWidth = 240, Padding = new Thickness(6) };
+      private readonly TextBox searchBox_ = new() { FontSize = Typography.Body, Padding = new Thickness(6) };
+      private readonly ListView list_ = new() { FontSize = Typography.Body };
 
       private readonly TextBlock status_ = new()
       {
-         FontSize = 12.5,
+         FontSize = Typography.Label,
          TextWrapping = TextWrapping.Wrap,
          Margin = new Thickness(2, 8, 2, 0)
       };
@@ -64,7 +64,7 @@ namespace hMailServer.ControlPanel.Views
          var header = new TextBlock
          {
             Text = multiSelect ? "Select Active Directory accounts" : "Select an Active Directory account",
-            FontSize = 18,
+            FontSize = Typography.DialogTitle,
             FontWeight = FontWeights.SemiBold,
             Margin = new Thickness(2, 0, 0, 12)
          };
@@ -123,7 +123,7 @@ namespace hMailServer.ControlPanel.Views
             Text = "Domain",
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(0, 0, 8, 0),
-            FontSize = 13
+            FontSize = Typography.Body
          };
          domainLabel.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
          Grid.SetColumn(domainLabel, 0);

@@ -61,8 +61,8 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                        <TextBlock Text="IF" FontWeight="Bold" FontSize="15" VerticalAlignment="Center" Margin="0,0,12,0" />
-                        <ComboBox x:Name="MatchMode" FontSize="12.5" Width="180"
+                        <TextBlock Text="IF" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center" Margin="0,0,12,0" />
+                        <ComboBox x:Name="MatchMode" FontSize="12" Width="180"
                                   SelectionChanged="MatchMode_SelectionChanged" />
                     </StackPanel>
                     <DataGrid Grid.Row="1" x:Name="CriteriaGrid" AutoGenerateColumns="False" IsReadOnly="True"
@@ -89,7 +89,7 @@
                         <RowDefinition Height="*" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
-                    <TextBlock Text="THEN" FontWeight="Bold" FontSize="15" Margin="0,0,0,8" />
+                    <TextBlock Text="THEN" FontWeight="SemiBold" FontSize="14" Margin="0,0,0,8" />
                     <DataGrid Grid.Row="1" x:Name="ActionsGrid" AutoGenerateColumns="False" IsReadOnly="True"
                               HeadersVisibility="None" GridLinesVisibility="None"
                               Background="Transparent" BorderThickness="0" RowHeight="30"

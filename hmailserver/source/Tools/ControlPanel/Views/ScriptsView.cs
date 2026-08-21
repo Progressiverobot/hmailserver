@@ -17,7 +17,7 @@ namespace hMailServer.ControlPanel.Views
       private readonly TextBox editor_ = new()
       {
          FontFamily = new System.Windows.Media.FontFamily("Consolas, Cascadia Mono, monospace"),
-         FontSize = 13,
+         FontSize = Typography.Body,
          AcceptsReturn = true,
          AcceptsTab = true,
          TextWrapping = TextWrapping.NoWrap,
@@ -25,8 +25,8 @@ namespace hMailServer.ControlPanel.Views
          VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
          Background = System.Windows.Media.Brushes.Transparent
       };
-      private readonly TextBlock pathText_ = new() { FontSize = 12, Margin = new Thickness(0, 0, 0, 8) };
-      private readonly TextBlock status_ = new() { FontSize = 12, Margin = new Thickness(0, 12, 0, 0), TextWrapping = TextWrapping.Wrap };
+      private readonly TextBlock pathText_ = new() { FontSize = Typography.Caption, Margin = new Thickness(0, 0, 0, 8) };
+      private readonly TextBlock status_ = new() { FontSize = Typography.Caption, Margin = new Thickness(0, 12, 0, 0), TextWrapping = TextWrapping.Wrap };
 
       private string scriptPath_;
 

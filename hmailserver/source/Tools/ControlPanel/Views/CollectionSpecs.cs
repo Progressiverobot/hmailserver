@@ -312,7 +312,7 @@ namespace hMailServer.ControlPanel.Views
          membersHint_ = new TextBlock
          {
             Text = HintNoSelection,
-            FontSize = 12,
+            FontSize = Typography.Caption,
             TextWrapping = TextWrapping.Wrap,
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(10, 0, 0, 0)

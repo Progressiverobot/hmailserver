@@ -23,10 +23,10 @@ namespace hMailServer.ControlPanel.Views
          dlg.SetResourceReference(Control.BackgroundProperty, "ApplicationBackgroundBrush");
 
          var panel = new StackPanel { Margin = new Thickness(20) };
-         var label = new TextBlock { Text = prompt, FontSize = 12.5, Margin = new Thickness(0, 0, 0, 6) };
+         var label = new TextBlock { Text = prompt, FontSize = Typography.Label, Margin = new Thickness(0, 0, 0, 6) };
          label.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
          panel.Children.Add(label);
-         var box = new TextBox { Text = initial, FontSize = 13, Padding = new Thickness(6), Margin = new Thickness(0, 0, 0, 12) };
+         var box = new TextBox { Text = initial, FontSize = Typography.Body, Padding = new Thickness(6), Margin = new Thickness(0, 0, 0, 12) };
          // The prompt is a TextBlock above the box, which UI Automation does not
          // connect to it: this is the dialog that asks for a public folder name, and
          // a screen reader announced it as an unnamed "edit".
@@ -81,7 +81,7 @@ namespace hMailServer.ControlPanel.Views
       };
 
       private readonly string folderName_;
-      private readonly ListBox list_ = new() { FontSize = 13, Height = 260, Margin = new Thickness(0, 0, 0, 12) };
+      private readonly ListBox list_ = new() { FontSize = Typography.Body, Height = 260, Margin = new Thickness(0, 0, 0, 12) };
       private readonly List<int> ids_ = new();
 
       public FolderPermissionsDialog(Window owner, string folderName)
@@ -96,7 +96,7 @@ namespace hMailServer.ControlPanel.Views
          SetResourceReference(Control.BackgroundProperty, "ApplicationBackgroundBrush");
 
          var panel = new StackPanel { Margin = new Thickness(20) };
-         var header = new TextBlock { Text = folderName, FontSize = 18, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 12) };
+         var header = new TextBlock { Text = folderName, FontSize = Typography.DialogTitle, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 12) };
          header.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
          panel.Children.Add(header);
          panel.Children.Add(list_);
@@ -326,8 +326,8 @@ namespace hMailServer.ControlPanel.Views
    /// <summary>Add/edit dialog for a single ACL entry.</summary>
    internal class PermissionEditDialog : Window
    {
-      private readonly ComboBox typeCombo_ = new() { FontSize = 13, Margin = new Thickness(0, 0, 0, 10) };
-      private readonly TextBox subject_ = new() { FontSize = 13, Padding = new Thickness(6), Margin = new Thickness(0, 0, 0, 10) };
+      private readonly ComboBox typeCombo_ = new() { FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 10) };
+      private readonly TextBox subject_ = new() { FontSize = Typography.Body, Padding = new Thickness(6), Margin = new Thickness(0, 0, 0, 10) };
       private readonly TextBlock subjectLabel_;
       private readonly List<(CheckBox Box, int Bit)> flagBoxes_ = new();
 
@@ -360,7 +360,7 @@ namespace hMailServer.ControlPanel.Views
          panel.Children.Add(Label("Permissions"));
          foreach ((string label, int bit) in flags)
          {
-            var cb = new CheckBox { Content = label, FontSize = 12.5, Margin = new Thickness(0, 2, 0, 2) };
+            var cb = new CheckBox { Content = label, FontSize = Typography.Label, Margin = new Thickness(0, 2, 0, 2) };
             flagBoxes_.Add((cb, bit));
             panel.Children.Add(cb);
          }
@@ -425,7 +425,7 @@ namespace hMailServer.ControlPanel.Views
       /// </summary>
       private static TextBlock Label(string text, FrameworkElement editor = null)
       {
-         var t = new TextBlock { Text = text, FontSize = 12.5, Margin = new Thickness(0, 6, 0, 4) };
+         var t = new TextBlock { Text = text, FontSize = Typography.Label, Margin = new Thickness(0, 6, 0, 4) };
          t.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
 
          if (editor != null)

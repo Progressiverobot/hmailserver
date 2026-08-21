@@ -272,7 +272,7 @@ namespace hMailServer.ControlPanel.Views
             var ok = new TextBlock
             {
                Text = "No configuration warnings.",
-               FontSize = 13,
+               FontSize = Typography.Body,
                Margin = new Thickness(0, 2, 0, 2)
             };
             ok.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
@@ -333,7 +333,7 @@ namespace hMailServer.ControlPanel.Views
          var word = new TextBlock
          {
             Text = severity,
-            FontSize = 11,
+            FontSize = Typography.Caption,
             FontWeight = FontWeights.SemiBold,
             VerticalAlignment = VerticalAlignment.Center
          };
@@ -351,7 +351,7 @@ namespace hMailServer.ControlPanel.Views
          Grid.SetColumn(badge, 0);
          row.Children.Add(badge);
 
-         var msg = new TextBlock { Text = text, FontSize = 13, TextWrapping = TextWrapping.Wrap };
+         var msg = new TextBlock { Text = text, FontSize = Typography.Body, TextWrapping = TextWrapping.Wrap };
          msg.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
 
          // The severity said again, in the message's own accessible name, so that a

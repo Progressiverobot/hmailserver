@@ -149,7 +149,7 @@ namespace hMailServer.ControlPanel.Views
 
          public override FrameworkElement CreateEditor(object value)
          {
-            box_ = new CheckBox { Content = Label, IsChecked = value is bool b && b, FontSize = 13.5 };
+            box_ = new CheckBox { Content = Label, IsChecked = value is bool b && b, FontSize = Typography.Body };
             SetAid(box_, Path);
 
             // A checkbox is named by its Content, so it needs an override only
@@ -209,7 +209,7 @@ namespace hMailServer.ControlPanel.Views
          public override FrameworkElement CreateEditor(object value)
          {
             var panel = new StackPanel();
-            panel.Children.Add(new TextBlock { Text = Label, FontSize = 13, Margin = new Thickness(0, 0, 0, 4) });
+            panel.Children.Add(new TextBlock { Text = Label, FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 4) });
             object shown = value;
             if (Numeric && Divisor > 1 && value != null)
             {
@@ -228,7 +228,7 @@ namespace hMailServer.ControlPanel.Views
                   MaxDecimalPlaces = 0,
                   SmallChange = 1,
                   LargeChange = 10,
-                  FontSize = 13,
+                  FontSize = Typography.Body,
                   MaxWidth = 180,
                   MinWidth = 120,
                   HorizontalAlignment = HorizontalAlignment.Left
@@ -242,7 +242,7 @@ namespace hMailServer.ControlPanel.Views
             box_ = new TextBox
             {
                Text = Convert.ToString(shown) ?? "",
-               FontSize = 13,
+               FontSize = Typography.Body,
                MaxWidth = 520,
                HorizontalAlignment = HorizontalAlignment.Left,
                MinWidth = 320
@@ -339,7 +339,7 @@ namespace hMailServer.ControlPanel.Views
 
             var panel = new StackPanel();
 
-            box_ = new CheckBox { Content = Label, IsChecked = current, FontSize = 13.5 };
+            box_ = new CheckBox { Content = Label, IsChecked = current, FontSize = Typography.Body };
             SetAid(box_, Path);
             if (!string.IsNullOrEmpty(AccessibleName) &&
                 !string.Equals(AccessibleName, Label, StringComparison.Ordinal))
@@ -399,7 +399,7 @@ namespace hMailServer.ControlPanel.Views
             }
 
             var panel = new StackPanel();
-            panel.Children.Add(new TextBlock { Text = Label, FontSize = 13, Margin = new Thickness(0, 0, 0, 4) });
+            panel.Children.Add(new TextBlock { Text = Label, FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 4) });
 
             number_ = new Wpf.Ui.Controls.NumberBox
             {
@@ -408,7 +408,7 @@ namespace hMailServer.ControlPanel.Views
                MaxDecimalPlaces = 0,
                SmallChange = 1,
                LargeChange = 10,
-               FontSize = 13,
+               FontSize = Typography.Body,
                MaxWidth = 180,
                MinWidth = 120,
                HorizontalAlignment = HorizontalAlignment.Left
@@ -464,7 +464,7 @@ namespace hMailServer.ControlPanel.Views
             }
 
             var panel = new StackPanel();
-            panel.Children.Add(new TextBlock { Text = Label, FontSize = 13, Margin = new Thickness(0, 0, 0, 4) });
+            panel.Children.Add(new TextBlock { Text = Label, FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 4) });
 
             number_ = new Wpf.Ui.Controls.NumberBox
             {
@@ -473,7 +473,7 @@ namespace hMailServer.ControlPanel.Views
                MaxDecimalPlaces = 0,
                SmallChange = 1,
                LargeChange = 10,
-               FontSize = 13,
+               FontSize = Typography.Body,
                MaxWidth = 180,
                MinWidth = 120,
                HorizontalAlignment = HorizontalAlignment.Left
@@ -529,13 +529,13 @@ namespace hMailServer.ControlPanel.Views
                current = IniStore.Read(Path, Default);
 
             var panel = new StackPanel();
-            panel.Children.Add(new TextBlock { Text = Label, FontSize = 13, Margin = new Thickness(0, 0, 0, 4) });
+            panel.Children.Add(new TextBlock { Text = Label, FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 4) });
 
             box_ = new TextBox
             {
                Text = current,
                PlaceholderText = Placeholder,
-               FontSize = 13,
+               FontSize = Typography.Body,
                HorizontalAlignment = HorizontalAlignment.Stretch
             };
             Describe(box_, Path);
@@ -608,8 +608,8 @@ namespace hMailServer.ControlPanel.Views
          public override FrameworkElement CreateEditor(object value)
          {
             var panel = new StackPanel();
-            panel.Children.Add(new TextBlock { Text = Label, FontSize = 13, Margin = new Thickness(0, 0, 0, 4) });
-            combo_ = new ComboBox { MinWidth = 320, HorizontalAlignment = HorizontalAlignment.Left, FontSize = 13 };
+            panel.Children.Add(new TextBlock { Text = Label, FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 4) });
+            combo_ = new ComboBox { MinWidth = 320, HorizontalAlignment = HorizontalAlignment.Left, FontSize = Typography.Body };
             int sel;
             try { sel = Convert.ToInt32(value); } catch (Exception) { sel = 0; }
             foreach ((int v, string l) in Options)
@@ -640,10 +640,10 @@ namespace hMailServer.ControlPanel.Views
          public override FrameworkElement CreateEditor(object value)
          {
             var panel = new StackPanel();
-            panel.Children.Add(new TextBlock { Text = Label, FontSize = 13, Margin = new Thickness(0, 0, 0, 4) });
+            panel.Children.Add(new TextBlock { Text = Label, FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 4) });
             box_ = new Wpf.Ui.Controls.PasswordBox
             {
-               FontSize = 13,
+               FontSize = Typography.Body,
                MinWidth = 320,
                MaxWidth = 520,
                Padding = new Thickness(6),
@@ -686,7 +686,7 @@ namespace hMailServer.ControlPanel.Views
             var panel = new StackPanel();
 
             if (!string.IsNullOrEmpty(Label))
-               panel.Children.Add(new TextBlock { Text = Label, FontSize = 13, Margin = new Thickness(0, 0, 0, 4) });
+               panel.Children.Add(new TextBlock { Text = Label, FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 4) });
 
             string text;
             try
@@ -701,7 +701,7 @@ namespace hMailServer.ControlPanel.Views
             var line = new TextBlock
             {
                Text = text,
-               FontSize = 13,
+               FontSize = Typography.Body,
                TextWrapping = TextWrapping.Wrap,
                MaxWidth = 620,
                HorizontalAlignment = HorizontalAlignment.Left
@@ -758,7 +758,7 @@ namespace hMailServer.ControlPanel.Views
             };
             result_ = new System.Windows.Controls.TextBlock
             {
-               FontSize = 12,
+               FontSize = Typography.Caption,
                Margin = new Thickness(0, 8, 0, 0),
                TextWrapping = TextWrapping.Wrap
             };
@@ -829,9 +829,9 @@ namespace hMailServer.ControlPanel.Views
          public override FrameworkElement CreateEditor(object value)
          {
             var panel = new StackPanel();
-            panel.Children.Add(new TextBlock { Text = Label, FontSize = 13, Margin = new Thickness(0, 0, 0, 4) });
+            panel.Children.Add(new TextBlock { Text = Label, FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 4) });
 
-            var combo = new ComboBox { MinWidth = 320, HorizontalAlignment = HorizontalAlignment.Left, FontSize = 13 };
+            var combo = new ComboBox { MinWidth = 320, HorizontalAlignment = HorizontalAlignment.Left, FontSize = Typography.Body };
             combo.Items.Add(new ComboBoxItem { Content = "Choose a preset\u2026", Tag = -1 });
             for (int i = 0; i < Presets.Length; i++)
                combo.Items.Add(new ComboBoxItem { Content = Presets[i].Name, Tag = i });
@@ -883,12 +883,12 @@ namespace hMailServer.ControlPanel.Views
          public override FrameworkElement CreateEditor(object value)
          {
             var panel = new StackPanel();
-            panel.Children.Add(new TextBlock { Text = Label, FontSize = 13, Margin = new Thickness(0, 0, 0, 4) });
+            panel.Children.Add(new TextBlock { Text = Label, FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 4) });
 
             var box = new TextBox
             {
                Text = Convert.ToString(value) ?? "",
-               FontSize = 13,
+               FontSize = Typography.Body,
                MaxWidth = 180,
                MinWidth = 120,
                HorizontalAlignment = HorizontalAlignment.Left,

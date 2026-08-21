@@ -80,7 +80,7 @@ namespace hMailServer.ControlPanel.Views
    /// </summary>
    public class DnsRecordsView : UserControl, IPageLifecycle
    {
-      private readonly ComboBox domainCombo_ = new() { FontSize = 13, MinWidth = 280, Margin = new Thickness(8, 0, 0, 0) };
+      private readonly ComboBox domainCombo_ = new() { FontSize = Typography.Body, MinWidth = 280, Margin = new Thickness(8, 0, 0, 0) };
       private readonly StackPanel body_ = new();
       private readonly TextBlock status_ = new();
 
@@ -199,7 +199,7 @@ namespace hMailServer.ControlPanel.Views
             {
                Content = domain.Name + (domain.Active ? "" : " (inactive)"),
                Tag = domain.Name,
-               FontSize = 13
+               FontSize = Typography.Body
             };
             domainCombo_.Items.Add(item);
          }
@@ -512,7 +512,7 @@ namespace hMailServer.ControlPanel.Views
             var selectorBox = new TextBox
             {
                Text = "dkim",
-               FontSize = 13,
+               FontSize = Typography.Body,
                MinWidth = 180,
                Padding = new Thickness(6),
                VerticalAlignment = VerticalAlignment.Center
@@ -1210,7 +1210,7 @@ namespace hMailServer.ControlPanel.Views
          var addressBox = new TextBox
          {
             Text = havePostmaster ? domain.Postmaster : "",
-            FontSize = 13,
+            FontSize = Typography.Body,
             MinWidth = 280,
             Padding = new Thickness(6),
             VerticalAlignment = VerticalAlignment.Center
@@ -1757,7 +1757,7 @@ namespace hMailServer.ControlPanel.Views
 
       private static TextBlock Label(string text)
       {
-         var label = new TextBlock { Text = text, FontSize = 12.5, Margin = new Thickness(0, 6, 0, 4) };
+         var label = new TextBlock { Text = text, FontSize = Typography.Label, Margin = new Thickness(0, 6, 0, 4) };
          label.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
          return label;
       }
@@ -1770,7 +1770,7 @@ namespace hMailServer.ControlPanel.Views
          IsReadOnly = true,
          AcceptsReturn = true,
          TextWrapping = TextWrapping.Wrap,
-         FontSize = 12,
+         FontSize = Typography.Caption,
          MinHeight = minHeight,
          Padding = new Thickness(6),
          Margin = new Thickness(0, 0, 0, 4),

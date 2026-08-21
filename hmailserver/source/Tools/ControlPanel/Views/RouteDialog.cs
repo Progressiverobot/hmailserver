@@ -16,16 +16,16 @@ namespace hMailServer.ControlPanel.Views
       private readonly Wpf.Ui.Controls.TextBox description_ = new();
       private readonly Wpf.Ui.Controls.TextBox tries_ = new();
       private readonly Wpf.Ui.Controls.TextBox minutes_ = new();
-      private readonly CheckBox allAddresses_ = new() { Content = "Deliver to all addresses (not only known accounts)", FontSize = 13 };
+      private readonly CheckBox allAddresses_ = new() { Content = "Deliver to all addresses (not only known accounts)", FontSize = Typography.Body };
 
-      private readonly ListBox addressList_ = new() { Height = 200, FontSize = 13 };
+      private readonly ListBox addressList_ = new() { Height = 200, FontSize = Typography.Body };
       private readonly Wpf.Ui.Controls.TextBox newAddress_ = new();
 
       private readonly ComboBox connSecurity_ = new();
-      private readonly CheckBox treatSenderLocal_ = new() { Content = "Treat sender domain as local", FontSize = 13 };
-      private readonly CheckBox treatRecipientLocal_ = new() { Content = "Treat recipient domain as local", FontSize = 13 };
+      private readonly CheckBox treatSenderLocal_ = new() { Content = "Treat sender domain as local", FontSize = Typography.Body };
+      private readonly CheckBox treatRecipientLocal_ = new() { Content = "Treat recipient domain as local", FontSize = Typography.Body };
 
-      private readonly CheckBox requiresAuth_ = new() { Content = "Target server requires authentication", FontSize = 13 };
+      private readonly CheckBox requiresAuth_ = new() { Content = "Target server requires authentication", FontSize = Typography.Body };
       private readonly Wpf.Ui.Controls.TextBox authUser_ = new();
       private readonly Wpf.Ui.Controls.PasswordBox authPassword_ = new();
 
@@ -52,7 +52,7 @@ namespace hMailServer.ControlPanel.Views
          root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
          root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-         var header = new TextBlock { Text = domainName, FontSize = 20, FontWeight = FontWeights.SemiBold, Margin = new Thickness(2, 0, 0, 12) };
+         var header = new TextBlock { Text = domainName, FontSize = Typography.DialogTitle, FontWeight = FontWeights.SemiBold, Margin = new Thickness(2, 0, 0, 12) };
          header.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
          Grid.SetRow(header, 0);
          root.Children.Add(header);
@@ -138,7 +138,7 @@ namespace hMailServer.ControlPanel.Views
          connSecurity_.Items.Add(Combo("SSL/TLS", 1));
          connSecurity_.Items.Add(Combo("STARTTLS (optional)", 2));
          connSecurity_.Items.Add(Combo("STARTTLS (required)", 3));
-         connSecurity_.FontSize = 13;
+         connSecurity_.FontSize = Typography.Body;
          connSecurity_.Margin = new Thickness(0, 0, 0, 8);
 
          var p = TabPanel();
@@ -156,7 +156,7 @@ namespace hMailServer.ControlPanel.Views
          p.Children.Add(Label("User name"));
          p.Children.Add(Input(authUser_));
          p.Children.Add(Label("Password (leave empty to keep current)"));
-         authPassword_.FontSize = 13;
+         authPassword_.FontSize = Typography.Body;
          authPassword_.Padding = new Thickness(6);
          authPassword_.Margin = new Thickness(0, 0, 0, 8);
          p.Children.Add(authPassword_);
@@ -377,14 +377,14 @@ namespace hMailServer.ControlPanel.Views
 
       private static TextBlock Label(string text)
       {
-         var t = new TextBlock { Text = text, FontSize = 12.5, Margin = new Thickness(0, 8, 0, 4) };
+         var t = new TextBlock { Text = text, FontSize = Typography.Label, Margin = new Thickness(0, 8, 0, 4) };
          t.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
          return t;
       }
 
       private static TextBox Input(TextBox box)
       {
-         box.FontSize = 13;
+         box.FontSize = Typography.Body;
          box.Padding = new Thickness(6);
          box.Margin = new Thickness(0, 0, 0, 8);
          box.Background = System.Windows.Media.Brushes.Transparent;

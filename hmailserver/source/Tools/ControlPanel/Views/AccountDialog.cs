@@ -23,7 +23,7 @@ namespace hMailServer.ControlPanel.Views
       };
 
       // General
-      private readonly CheckBox active_ = new() { Content = "Account enabled", FontSize = 13 };
+      private readonly CheckBox active_ = new() { Content = "Account enabled", FontSize = Typography.Body };
       private readonly TextBox addressBox_ = NewInput();
       private readonly ComboBox adminLevel_ = new();
       private readonly TextBox quota_ = NewInput();
@@ -31,26 +31,26 @@ namespace hMailServer.ControlPanel.Views
       private readonly TextBox lastName_ = NewInput();
       private readonly Wpf.Ui.Controls.PasswordBox password_ = new();
       private readonly Wpf.Ui.Controls.TextBox generatedShow_ = new();
-      private readonly TextBlock pwStrength_ = new() { FontSize = 11.5, Margin = new Thickness(0, 0, 0, 12), TextWrapping = TextWrapping.Wrap };
-      private readonly TextBlock lastLogon_ = new() { FontSize = 12.5, Margin = new Thickness(0, 0, 0, 8) };
+      private readonly TextBlock pwStrength_ = new() { FontSize = Typography.Caption, Margin = new Thickness(0, 0, 0, 12), TextWrapping = TextWrapping.Wrap };
+      private readonly TextBlock lastLogon_ = new() { FontSize = Typography.Label, Margin = new Thickness(0, 0, 0, 8) };
 
       // Forwarding
-      private readonly CheckBox forwardOn_ = new() { Content = "Forward incoming mail", FontSize = 13 };
+      private readonly CheckBox forwardOn_ = new() { Content = "Forward incoming mail", FontSize = Typography.Body };
       private readonly TextBox forwardTo_ = NewInput();
-      private readonly CheckBox forwardKeep_ = new() { Content = "Keep original message", FontSize = 13 };
-      private readonly CheckBox forwardAbortSpam_ = new() { Content = "Do not forward messages flagged as spam", FontSize = 13 };
+      private readonly CheckBox forwardKeep_ = new() { Content = "Keep original message", FontSize = Typography.Body };
+      private readonly CheckBox forwardAbortSpam_ = new() { Content = "Do not forward messages flagged as spam", FontSize = Typography.Body };
 
       // Auto-reply
-      private readonly CheckBox vacationOn_ = new() { Content = "Send automatic reply (vacation message)", FontSize = 13 };
+      private readonly CheckBox vacationOn_ = new() { Content = "Send automatic reply (vacation message)", FontSize = Typography.Body };
       private readonly TextBox vacationSubject_ = NewInput();
       private readonly TextBox vacationBody_ = NewMemo();
-      private readonly CheckBox vacationExpires_ = new() { Content = "Stop sending replies after a date", FontSize = 13 };
+      private readonly CheckBox vacationExpires_ = new() { Content = "Stop sending replies after a date", FontSize = Typography.Body };
       private readonly DatePicker vacationExpiresDate_ = new();
       private readonly DatePicker vacationBeginDate_ = new();
-      private readonly CheckBox vacationAbortSpam_ = new() { Content = "Do not reply to messages flagged as spam", FontSize = 13 };
+      private readonly CheckBox vacationAbortSpam_ = new() { Content = "Do not reply to messages flagged as spam", FontSize = Typography.Body };
 
       // Signature
-      private readonly CheckBox signatureOn_ = new() { Content = "Add signature to outgoing messages", FontSize = 13 };
+      private readonly CheckBox signatureOn_ = new() { Content = "Add signature to outgoing messages", FontSize = Typography.Body };
       private readonly TextBox signaturePlain_ = NewMemo();
       private readonly TextBox signatureHtml_ = NewMemo();
 
@@ -63,7 +63,7 @@ namespace hMailServer.ControlPanel.Views
          VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
          HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
          FontFamily = new System.Windows.Media.FontFamily("Consolas"),
-         FontSize = 12.5
+         FontSize = Typography.Label
       };
 
       // Active Directory
@@ -71,14 +71,14 @@ namespace hMailServer.ControlPanel.Views
       // throughout, and an empty domain quietly means "a local Windows account on this
       // computer" - which is the only form of this feature available to anyone with no
       // domain at all, and was undiscoverable from the interface.
-      private readonly CheckBox isAd_ = new() { Content = "Check this password against Windows (Active Directory, or a local Windows account)", FontSize = 13 };
+      private readonly CheckBox isAd_ = new() { Content = "Check this password against Windows (Active Directory, or a local Windows account)", FontSize = Typography.Body };
 
       // What the values below actually do, restated as a sentence. Updated as the
       // domain box is typed in, because the difference between the two behaviours is
       // an empty box rather than anything the reader can see.
       private readonly TextBlock directoryEffect_ = new()
       {
-         FontSize = 12,
+         FontSize = Typography.Caption,
          TextWrapping = TextWrapping.Wrap,
          Margin = new Thickness(0, 0, 0, 8)
       };
@@ -90,8 +90,8 @@ namespace hMailServer.ControlPanel.Views
       private AppPasswordsPanel appPasswords_;
       private AccountTwoFactorPanel twoFactor_;
       private RulesView accountRules_;
-      private readonly ListBox folderList_ = new() { Height = 220, FontSize = 13, Margin = new Thickness(0, 0, 0, 10) };
-      private readonly TextBlock folderStatus_ = new() { FontSize = 12, Margin = new Thickness(0, 4, 0, 0) };
+      private readonly ListBox folderList_ = new() { Height = 220, FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 10) };
+      private readonly TextBlock folderStatus_ = new() { FontSize = Typography.Caption, Margin = new Thickness(0, 4, 0, 0) };
 
       // What Load() read from the server, so Save can write the Sieve file only on
       // a real edit. Null until Load runs.
@@ -119,7 +119,7 @@ namespace hMailServer.ControlPanel.Views
          var header = new TextBlock
          {
             Text = address,
-            FontSize = 20,
+            FontSize = Typography.DialogTitle,
             FontWeight = FontWeights.SemiBold,
             Margin = new Thickness(2, 0, 0, 12)
          };
@@ -189,7 +189,7 @@ namespace hMailServer.ControlPanel.Views
          panel.Children.Add(Label("Last name"));
          panel.Children.Add(Input(lastName_));
          panel.Children.Add(Label("New password (leave empty to keep current)"));
-         password_.FontSize = 13;
+         password_.FontSize = Typography.Body;
          password_.Padding = new Thickness(6);
          password_.Margin = new Thickness(0, 0, 0, 6);
          password_.PasswordChanged += (s, e) =>
@@ -205,7 +205,7 @@ namespace hMailServer.ControlPanel.Views
          panel.Children.Add(genBtn);
 
          generatedShow_.IsReadOnly = true;
-         generatedShow_.FontSize = 13;
+         generatedShow_.FontSize = Typography.Body;
          generatedShow_.FontFamily = new System.Windows.Media.FontFamily("Consolas");
          generatedShow_.Visibility = Visibility.Collapsed;
          generatedShow_.Margin = new Thickness(0, 0, 0, 6);
@@ -277,7 +277,7 @@ namespace hMailServer.ControlPanel.Views
             Text = "Active Sieve (RFC 5228) filter script for this account. It runs during local " +
                    "delivery and supports keep, fileinto, discard and redirect. Leave empty to disable. " +
                    "Multiple named scripts can be managed over ManageSieve.",
-            FontSize = 12,
+            FontSize = Typography.Caption,
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 0, 0, 8)
          });
@@ -623,7 +623,7 @@ namespace hMailServer.ControlPanel.Views
          dlg.SetResourceReference(BackgroundProperty, "ApplicationBackgroundBrush");
          var panel = new StackPanel { Margin = new Thickness(20) };
          panel.Children.Add(Label(prompt));
-         var box = new TextBox { FontSize = 13, Padding = new Thickness(6), Margin = new Thickness(0, 0, 0, 12) };
+         var box = new TextBox { FontSize = Typography.Body, Padding = new Thickness(6), Margin = new Thickness(0, 0, 0, 12) };
          panel.Children.Add(box);
          var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
          string result = null;
@@ -889,7 +889,7 @@ namespace hMailServer.ControlPanel.Views
          var t = new TextBlock
          {
             Text = text,
-            FontSize = 12,
+            FontSize = Typography.Caption,
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 4, 0, 8),
             Opacity = 0.75
@@ -900,14 +900,14 @@ namespace hMailServer.ControlPanel.Views
 
       private static TextBlock Label(string text)
       {
-         var t = new TextBlock { Text = text, FontSize = 12.5, Margin = new Thickness(0, 8, 0, 4) };
+         var t = new TextBlock { Text = text, FontSize = Typography.Label, Margin = new Thickness(0, 8, 0, 4) };
          t.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
          return t;
       }
 
       private static TextBox Input(TextBox box)
       {
-         box.FontSize = 13;
+         box.FontSize = Typography.Body;
          box.Padding = new Thickness(6);
          box.Margin = new Thickness(0, 0, 0, 8);
          box.Background = System.Windows.Media.Brushes.Transparent;
@@ -915,19 +915,20 @@ namespace hMailServer.ControlPanel.Views
          return box;
       }
 
-      private static Border Separator() => new()
+      private static Border Separator()
       {
-         Height = 1,
-         Margin = new Thickness(0, 12, 0, 12),
-         Background = System.Windows.Media.Brushes.Gray,
-         Opacity = 0.3
-      };
+         // The theme's own hairline, not a fixed Gray: at 0.3 opacity the old
+         // one was near-invisible on the light theme, and theme-blind on all.
+         var divider = new Border { Height = 1, Margin = new Thickness(0, 12, 0, 12) };
+         divider.SetResourceReference(Border.BackgroundProperty, "ControlElevationBorderBrush");
+         return divider;
+      }
 
       private static ComboBoxItem Combo(string text, int value) => new() { Content = text, Tag = value };
 
       private static void StyleCombo(ComboBox combo)
       {
-         combo.FontSize = 13;
+         combo.FontSize = Typography.Body;
          combo.Margin = new Thickness(0, 0, 0, 8);
       }
 

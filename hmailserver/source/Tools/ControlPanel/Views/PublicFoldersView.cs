@@ -15,11 +15,11 @@ namespace hMailServer.ControlPanel.Views
    {
       private readonly ListBox list_ = new()
       {
-         FontSize = 13,
+         FontSize = Typography.Body,
          BorderThickness = new Thickness(0),
          Background = System.Windows.Media.Brushes.Transparent
       };
-      private readonly TextBlock status_ = new() { FontSize = 12, Margin = new Thickness(0, 12, 0, 0) };
+      private readonly TextBlock status_ = new() { FontSize = Typography.Caption, Margin = new Thickness(0, 12, 0, 0) };
 
       public PublicFoldersView() => Build();
 

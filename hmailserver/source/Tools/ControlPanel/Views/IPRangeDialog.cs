@@ -23,27 +23,27 @@ namespace hMailServer.ControlPanel.Views
       private readonly TextBox priority_ = new();
 
       // Connections
-      private readonly CheckBox smtp_ = new() { Content = "Allow SMTP connections", FontSize = 13 };
-      private readonly CheckBox imap_ = new() { Content = "Allow IMAP connections", FontSize = 13 };
-      private readonly CheckBox pop3_ = new() { Content = "Allow POP3 connections", FontSize = 13 };
+      private readonly CheckBox smtp_ = new() { Content = "Allow SMTP connections", FontSize = Typography.Body };
+      private readonly CheckBox imap_ = new() { Content = "Allow IMAP connections", FontSize = Typography.Body };
+      private readonly CheckBox pop3_ = new() { Content = "Allow POP3 connections", FontSize = Typography.Body };
 
       // Relaying
-      private readonly CheckBox ll_ = new() { Content = "Local to local", FontSize = 13 };
-      private readonly CheckBox lr_ = new() { Content = "Local to external (relay out)", FontSize = 13 };
-      private readonly CheckBox rl_ = new() { Content = "External to local", FontSize = 13 };
-      private readonly CheckBox rr_ = new() { Content = "External to external (open relay!)", FontSize = 13 };
+      private readonly CheckBox ll_ = new() { Content = "Local to local", FontSize = Typography.Body };
+      private readonly CheckBox lr_ = new() { Content = "Local to external (relay out)", FontSize = Typography.Body };
+      private readonly CheckBox rl_ = new() { Content = "External to local", FontSize = Typography.Body };
+      private readonly CheckBox rr_ = new() { Content = "External to external (open relay!)", FontSize = Typography.Body };
 
       // SMTP authentication required
-      private readonly CheckBox authLL_ = new() { Content = "Require auth: local to local", FontSize = 13 };
-      private readonly CheckBox authLE_ = new() { Content = "Require auth: local to external", FontSize = 13 };
-      private readonly CheckBox authEL_ = new() { Content = "Require auth: external to local", FontSize = 13 };
-      private readonly CheckBox authEE_ = new() { Content = "Require auth: external to external", FontSize = 13 };
-      private readonly CheckBox tlsAuth_ = new() { Content = "Require SSL/TLS when authenticating", FontSize = 13 };
+      private readonly CheckBox authLL_ = new() { Content = "Require auth: local to local", FontSize = Typography.Body };
+      private readonly CheckBox authLE_ = new() { Content = "Require auth: local to external", FontSize = Typography.Body };
+      private readonly CheckBox authEL_ = new() { Content = "Require auth: external to local", FontSize = Typography.Body };
+      private readonly CheckBox authEE_ = new() { Content = "Require auth: external to external", FontSize = Typography.Body };
+      private readonly CheckBox tlsAuth_ = new() { Content = "Require SSL/TLS when authenticating", FontSize = Typography.Body };
 
       // Protection + expiry
-      private readonly CheckBox spam_ = new() { Content = "Enable anti-spam for this range", FontSize = 13 };
-      private readonly CheckBox virus_ = new() { Content = "Enable anti-virus for this range", FontSize = 13 };
-      private readonly CheckBox expires_ = new() { Content = "This range expires", FontSize = 13 };
+      private readonly CheckBox spam_ = new() { Content = "Enable anti-spam for this range", FontSize = Typography.Body };
+      private readonly CheckBox virus_ = new() { Content = "Enable anti-virus for this range", FontSize = Typography.Body };
+      private readonly CheckBox expires_ = new() { Content = "This range expires", FontSize = Typography.Body };
       private readonly TextBox expiresTime_ = new();
 
       public IPRangeDialog(Window owner, int rangeId)
@@ -61,7 +61,7 @@ namespace hMailServer.ControlPanel.Views
          root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
          root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-         var header = new TextBlock { Text = "IP range", FontSize = 20, FontWeight = FontWeights.SemiBold, Margin = new Thickness(2, 0, 0, 12) };
+         var header = new TextBlock { Text = "IP range", FontSize = Typography.DialogTitle, FontWeight = FontWeights.SemiBold, Margin = new Thickness(2, 0, 0, 12) };
          header.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
          Grid.SetRow(header, 0);
          root.Children.Add(header);
@@ -273,7 +273,7 @@ namespace hMailServer.ControlPanel.Views
       /// </summary>
       private static TextBlock Label(string text, FrameworkElement editor = null)
       {
-         var t = new TextBlock { Text = text, FontSize = 12.5, Margin = new Thickness(0, 8, 0, 4) };
+         var t = new TextBlock { Text = text, FontSize = Typography.Label, Margin = new Thickness(0, 8, 0, 4) };
          t.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
 
          if (editor != null)
@@ -284,7 +284,7 @@ namespace hMailServer.ControlPanel.Views
 
       private static TextBox Input(TextBox box)
       {
-         box.FontSize = 13;
+         box.FontSize = Typography.Body;
          box.Padding = new Thickness(6);
          box.Margin = new Thickness(0, 0, 0, 8);
          box.Background = System.Windows.Media.Brushes.Transparent;
@@ -292,12 +292,13 @@ namespace hMailServer.ControlPanel.Views
          return box;
       }
 
-      private static Border Separator() => new()
+      private static Border Separator()
       {
-         Height = 1,
-         Margin = new Thickness(0, 12, 0, 12),
-         Background = System.Windows.Media.Brushes.Gray,
-         Opacity = 0.3
-      };
+         // The theme's own hairline, not a fixed Gray: at 0.3 opacity the old
+         // one was near-invisible on the light theme, and theme-blind on all.
+         var divider = new Border { Height = 1, Margin = new Thickness(0, 12, 0, 12) };
+         divider.SetResourceReference(Border.BackgroundProperty, "ControlElevationBorderBrush");
+         return divider;
+      }
    }
 }

@@ -51,7 +51,7 @@ namespace hMailServer.ControlPanel.Views
       // One shared typeface: SKTypeface is unmanaged and the palette is rebuilt on
       // every theme change, so allocating one per rebuild would leak steadily for
       // as long as the user keeps toggling the theme.
-      private static readonly SKTypeface AxisTypeface = SKTypeface.FromFamilyName("Segoe UI");
+      private static readonly SKTypeface AxisTypeface = SKTypeface.FromFamilyName("Segoe UI Variable Text, Segoe UI");
 
       private readonly ChartDefinition definition_;
       private readonly int historyLength_;

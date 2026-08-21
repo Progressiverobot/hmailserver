@@ -42,23 +42,23 @@
             </DataGrid>
             <TextBlock x:Name="EmptyStatus" Visibility="Collapsed"
                        HorizontalAlignment="Center" VerticalAlignment="Center"
-                       FontSize="13" Opacity="0.7" TextWrapping="Wrap" TextAlignment="Center"
+                       FontSize="14" Opacity="0.7" TextWrapping="Wrap" TextAlignment="Center"
                        Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
             </Grid>
         </Border>
 
         <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,12,0,0">
             <StackPanel>
-                <TextBlock x:Name="PermHeader" Text="Permissions (select a range)" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,12" />
+                <TextBlock x:Name="PermHeader" Text="Permissions (select a range)" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,12" />
                 <UniformGrid Columns="4" Margin="0,0,0,12">
-                    <CheckBox x:Name="PermSmtp" Content="Allow SMTP" FontSize="13" Margin="0,0,12,8" />
-                    <CheckBox x:Name="PermImap" Content="Allow IMAP" FontSize="13" Margin="0,0,12,8" />
-                    <CheckBox x:Name="PermPop3" Content="Allow POP3" FontSize="13" Margin="0,0,12,8" />
-                    <CheckBox x:Name="PermTlsAuth" Content="Require TLS for auth" FontSize="13" Margin="0,0,12,8" />
-                    <CheckBox x:Name="PermLL" Content="Deliver local → local" FontSize="13" Margin="0,0,12,0" />
-                    <CheckBox x:Name="PermLR" Content="Deliver local → remote" FontSize="13" Margin="0,0,12,0" />
-                    <CheckBox x:Name="PermRL" Content="Deliver remote → local" FontSize="13" Margin="0,0,12,0" />
-                    <CheckBox x:Name="PermRR" Content="Deliver remote → remote (relay)" FontSize="13" Margin="0,0,12,0" />
+                    <CheckBox x:Name="PermSmtp" Content="Allow SMTP" FontSize="14" Margin="0,0,12,8" />
+                    <CheckBox x:Name="PermImap" Content="Allow IMAP" FontSize="14" Margin="0,0,12,8" />
+                    <CheckBox x:Name="PermPop3" Content="Allow POP3" FontSize="14" Margin="0,0,12,8" />
+                    <CheckBox x:Name="PermTlsAuth" Content="Require TLS for auth" FontSize="14" Margin="0,0,12,8" />
+                    <CheckBox x:Name="PermLL" Content="Deliver local → local" FontSize="14" Margin="0,0,12,0" />
+                    <CheckBox x:Name="PermLR" Content="Deliver local → remote" FontSize="14" Margin="0,0,12,0" />
+                    <CheckBox x:Name="PermRL" Content="Deliver remote → local" FontSize="14" Margin="0,0,12,0" />
+                    <CheckBox x:Name="PermRR" Content="Deliver remote → remote (relay)" FontSize="14" Margin="0,0,12,0" />
                 </UniformGrid>
                 <StackPanel Orientation="Horizontal">
                     <ui:Button x:Name="SavePermsButton" Content="Save permissions" Appearance="Primary" Click="SavePerms_Click" IsEnabled="False" Margin="0,0,8,0" />
@@ -73,7 +73,7 @@
 
         <Border Grid.Row="3" Style="{StaticResource Card}" Margin="0,12,0,0">
             <StackPanel>
-                <TextBlock Text="Add range" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,12" />
+                <TextBlock Text="Add range" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,12" />
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="2*" />

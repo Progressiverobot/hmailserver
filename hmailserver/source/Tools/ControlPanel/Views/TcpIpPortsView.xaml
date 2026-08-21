@@ -67,19 +67,19 @@
             </DataGrid>
             <TextBlock x:Name="EmptyStatus" Visibility="Collapsed"
                        HorizontalAlignment="Center" VerticalAlignment="Center"
-                       FontSize="13" Opacity="0.7" TextWrapping="Wrap" TextAlignment="Center"
+                       FontSize="14" Opacity="0.7" TextWrapping="Wrap" TextAlignment="Center"
                        Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
             </Grid>
         </Border>
 
         <TextBlock x:Name="ListenerSummary" Grid.Row="2"
-                   Margin="2,10,2,0" FontSize="12.5" TextWrapping="Wrap"
+                   Margin="2,10,2,0" FontSize="12" TextWrapping="Wrap"
                    Visibility="Collapsed"
                    Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
 
         <Border Grid.Row="3" Style="{StaticResource Card}" Margin="0,12,0,0">
             <StackPanel>
-                <TextBlock Text="Add port" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,12" />
+                <TextBlock Text="Add port" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,12" />
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />

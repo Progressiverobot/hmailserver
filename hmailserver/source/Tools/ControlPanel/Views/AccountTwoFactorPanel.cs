@@ -27,7 +27,7 @@ namespace hMailServer.ControlPanel.Views
       private readonly string domainName_;
       private readonly string address_;
 
-      private readonly TextBlock status_ = new() { TextWrapping = TextWrapping.Wrap, FontSize = 13 };
+      private readonly TextBlock status_ = new() { TextWrapping = TextWrapping.Wrap, FontSize = Typography.Body };
       private readonly Border enrolCard_;
       private readonly Image qr_ = new() { Width = 190, Height = 190, HorizontalAlignment = HorizontalAlignment.Left };
       private readonly TextBox secret_ = new()

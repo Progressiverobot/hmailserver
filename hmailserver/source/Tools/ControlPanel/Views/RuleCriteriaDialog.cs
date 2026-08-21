@@ -13,10 +13,10 @@ namespace hMailServer.ControlPanel.Views
       private readonly int criteriaId_; // 0 = new
       private readonly Func<dynamic> rulesProvider_;
 
-      private readonly ComboBox field_ = new() { FontSize = 13, Margin = new Thickness(0, 0, 0, 8) };
+      private readonly ComboBox field_ = new() { FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 8) };
       private readonly TextBox header_ = new();
       private readonly StackPanel headerPanel_ = new();
-      private readonly ComboBox match_ = new() { FontSize = 13, Margin = new Thickness(0, 0, 0, 8) };
+      private readonly ComboBox match_ = new() { FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 8) };
       private readonly TextBox value_ = new();
 
       public RuleCriteriaDialog(Window owner, int ruleId, int criteriaId, Func<dynamic> rulesProvider = null)
@@ -36,7 +36,7 @@ namespace hMailServer.ControlPanel.Views
          root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
          root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-         var header = new TextBlock { Text = "IF", FontSize = 20, FontWeight = FontWeights.SemiBold, Margin = new Thickness(2, 0, 0, 12) };
+         var header = new TextBlock { Text = "IF", FontSize = Typography.DialogTitle, FontWeight = FontWeights.SemiBold, Margin = new Thickness(2, 0, 0, 12) };
          header.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
          Grid.SetRow(header, 0);
          root.Children.Add(header);
@@ -203,7 +203,7 @@ namespace hMailServer.ControlPanel.Views
       /// </summary>
       private static TextBlock Label(string text, FrameworkElement editor = null)
       {
-         var t = new TextBlock { Text = text, FontSize = 12.5, Margin = new Thickness(0, 8, 0, 4) };
+         var t = new TextBlock { Text = text, FontSize = Typography.Label, Margin = new Thickness(0, 8, 0, 4) };
          t.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
 
          if (editor != null)
@@ -214,7 +214,7 @@ namespace hMailServer.ControlPanel.Views
 
       private static TextBox Input(TextBox box)
       {
-         box.FontSize = 13;
+         box.FontSize = Typography.Body;
          box.Padding = new Thickness(6);
          box.Margin = new Thickness(0, 0, 0, 8);
          box.Background = System.Windows.Media.Brushes.Transparent;
