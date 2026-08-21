@@ -814,7 +814,7 @@ namespace HM
 
          AnsiString rfc9990Xml = DmarcRptReporterTask::BuildReportXml(
             "2026-08-16", bucket, "rpt-1", _T("postmaster@sender.test"), "A & B <Ltd>",
-            DmarcRptReporterTask::SchemaRfc9990, "hMailServer 6.2.22");
+            DmarcRptReporterTask::SchemaRfc9990, "hMailServer test-generator");
 
          // The namespace is what identifies the document as the 2.0 schema, and it
          // is declared as the default xmlns on the root so that every element
@@ -847,7 +847,7 @@ namespace HM
             throw 0;
 
          // report_metadata/generator: who to complain to about a malformed report.
-         if (rfc9990Xml.Find("<generator>hMailServer 6.2.22</generator>") < 0)
+         if (rfc9990Xml.Find("<generator>hMailServer test-generator</generator>") < 0)
             throw 0;
 
          // ActionDispositionType's extra member. The passing row becomes "pass",
@@ -886,7 +886,7 @@ namespace HM
          // of use, because the safe fallback is the form every receiver parses.
          AnsiString outOfRangeXml = DmarcRptReporterTask::BuildReportXml(
             "2026-08-16", bucket, "rpt-1", _T("postmaster@sender.test"), "A & B <Ltd>",
-            7, "hMailServer 6.2.22");
+            7, "hMailServer test-generator");
 
          if (!(outOfRangeXml == xml))
             throw 0;
@@ -899,7 +899,7 @@ namespace HM
 
          AnsiString unknownDiscoveryXml = DmarcRptReporterTask::BuildReportXml(
             "2026-08-16", unknownDiscovery, "rpt-1", _T("postmaster@sender.test"), "A & B <Ltd>",
-            DmarcRptReporterTask::SchemaRfc9990, "hMailServer 6.2.22");
+            DmarcRptReporterTask::SchemaRfc9990, "hMailServer test-generator");
 
          if (unknownDiscoveryXml.Find("<discovery_method>") >= 0)
             throw 0;
@@ -915,7 +915,7 @@ namespace HM
 
          AnsiString noTestingXml = DmarcRptReporterTask::BuildReportXml(
             "2026-08-16", noTesting, "rpt-1", _T("postmaster@sender.test"), "A & B <Ltd>",
-            DmarcRptReporterTask::SchemaRfc9990, "hMailServer 6.2.22");
+            DmarcRptReporterTask::SchemaRfc9990, "hMailServer test-generator");
 
          if (noTestingXml.Find("<testing>n</testing>") < 0)
             throw 0;
