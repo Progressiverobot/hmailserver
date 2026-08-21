@@ -10,6 +10,7 @@
 #include "IMAPSimpleCommandParser.h"
 #include "IMAPConfiguration.h"
 
+#include "../Common/Application/ACLManager.h"
 #include "../Common/Cache/CacheContainer.h"
 #include "../Common/BO/Account.h"
 #include "../Common/BO/IMAPFolder.h"
@@ -72,7 +73,16 @@ namespace HM
          return IMAPResult(IMAPResult::ResultNo, "DeleteACL failed. Identifier not found");
       }
 
-      if (!pFolder->GetPermissions()->DeletePermissionsForAccount(pAccount->GetID()))
+      // Read through ACLManager, not IMAPFolder::GetPermissions() - the latter
+      // returns an empty, unloaded collection for account folders, so this
+      // delete iterated nothing, removed nothing, and still answered OK.
+      // Deleting the identifier's stored rows is also all this command can do:
+      // the folder OWNER's rights are implicit rather than stored, so no
+      // DELETEACL - including one naming the owner - can lock the owner out.
+      ACLManager aclManager;
+      std::shared_ptr<ACLPermissions> pPermissions = aclManager.GetPermissionsSetOnFolder(pFolder);
+
+      if (!pPermissions || !pPermissions->DeletePermissionsForAccount(pAccount->GetID()))
          return IMAPResult(IMAPResult::ResultNo, "DeleteACL failed");
 
       String sResponse = pArgument->Tag() + _T(" OK DeleteACL complete\r\n");

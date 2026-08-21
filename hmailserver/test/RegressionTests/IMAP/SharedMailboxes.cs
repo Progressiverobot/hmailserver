@@ -36,6 +36,9 @@ namespace RegressionTests.IMAP
       private const int RightRead = 2;          // r
       private const int RightWriteSeen = 4;     // s
       private const int RightInsert = 16;       // i
+      private const int RightCreate = 64;       // k
+      private const int RightDeleteMailbox = 128; // x
+      private const int RightAdminister = 1024; // a
 
       /// <summary>
       ///    Grants rights on one of an account's own folders to another account by
@@ -325,6 +328,390 @@ namespace RegressionTests.IMAP
          Assert.IsTrue(enforcedSimulator.ConnectAndLogon(delegateAccount.Address, "test"));
          Assert.IsTrue(enforcedSimulator.SelectFolder("#Users.aclowner@example.test.INBOX"));
          enforcedSimulator.Disconnect();
+      }
+
+      /// <summary>
+      ///    The negative control for the RENAME fix. A delegate holding the "x"
+      ///    (delete mailbox) right could - before RENAME became ownership-aware -
+      ///    rename a folder out of the owner's tree and into their own, because
+      ///    the guard only distinguished public from non-public and had no way to
+      ///    say "non-public but somebody else's". If the fix were inert, both
+      ///    renames below would succeed and every assertion after them would
+      ///    fail.
+      /// </summary>
+      [Test]
+      public void DelegateWithDeleteRightCannotRenameOwnersFolderIntoTheirOwnTree()
+      {
+         var owner = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "renameowner@example.test", "test");
+         var delegateAccount = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "renamethief@example.test", "test");
+
+         var ownerSimulator = new ImapClientSimulator();
+         Assert.IsTrue(ownerSimulator.ConnectAndLogon(owner.Address, "test"));
+         Assert.IsTrue(ownerSimulator.CreateFolder("Cases"));
+         ownerSimulator.Disconnect();
+
+         var casesFolder = CustomAsserts.AssertFolderExists(owner.IMAPFolders, "Cases");
+         GrantRightsOnFolder(casesFolder, delegateAccount, RightLookup | RightDeleteMailbox);
+
+         var sharedPath = "#Users.renameowner@example.test.Cases";
+
+         var simulator = new ImapClientSimulator();
+         Assert.IsTrue(simulator.ConnectAndLogon(delegateAccount.Address, "test"));
+
+         // Into the delegate's own root, and into the delegate's own INBOX:
+         // both are renames between owners, and the "x" right does not permit
+         // either - a rename never moves message files between mailbox
+         // directories, so an owner-crossing rename would strand them.
+         string renameResult;
+         Assert.IsFalse(simulator.RenameFolder(sharedPath, "StolenCases", out renameResult), renameResult);
+         Assert.IsTrue(renameResult.Contains("different account"), renameResult);
+         Assert.IsFalse(simulator.RenameFolder(sharedPath, "INBOX.StolenCases", out renameResult), renameResult);
+
+         // Renaming it under ANOTHER account's namespace path is refused the
+         // same way, decided from the path shape alone - the response must not
+         // depend on whether that account exists, or it is an account oracle.
+         string intoGhost;
+         string intoOther;
+         Assert.IsFalse(simulator.RenameFolder(sharedPath, "#Users.ghost@example.test.Cases", out intoGhost), intoGhost);
+         Assert.IsFalse(simulator.RenameFolder(sharedPath, "#Users.renamethief@example.test.Cases", out intoOther), intoOther);
+         Assert.AreEqual(intoGhost.Replace("ghost@example.test", "").Replace("renamethief@example.test", ""),
+                         intoOther.Replace("ghost@example.test", "").Replace("renamethief@example.test", ""));
+
+         var delegateList = simulator.List();
+         Assert.IsFalse(delegateList.Contains("StolenCases"), delegateList);
+         simulator.Disconnect();
+
+         // The folder never moved: still the owner's, still selectable.
+         var ownerCheck = new ImapClientSimulator();
+         Assert.IsTrue(ownerCheck.ConnectAndLogon(owner.Address, "test"));
+         Assert.IsTrue(ownerCheck.List().Contains("\"Cases\""));
+         Assert.IsTrue(ownerCheck.SelectFolder("Cases"));
+         ownerCheck.Disconnect();
+      }
+
+      /// <summary>
+      ///    RENAME inside the owner's tree is the legitimate use, and RFC 4314
+      ///    prices it as a delete-plus-create: "x" on the folder being renamed,
+      ///    "k" on its new parent. The rights flip mid-test proves the "k" check
+      ///    is live, the same pattern the APPEND test uses for "i".
+      /// </summary>
+      [Test]
+      public void DelegateRenameWithinTheOwnersTreeDemandsDeleteAndCreateRights()
+      {
+         var owner = CreateOwnerWithMessage("renamehost@example.test", "RenameSubject", "Rename body");
+         var delegateAccount = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "renamehand@example.test", "test");
+
+         var ownerSimulator = new ImapClientSimulator();
+         Assert.IsTrue(ownerSimulator.ConnectAndLogon(owner.Address, "test"));
+         Assert.IsTrue(ownerSimulator.CreateFolder("INBOX.Drafts"));
+         ownerSimulator.Disconnect();
+
+         var ownerInbox = owner.IMAPFolders.get_ItemByName("INBOX");
+         GrantRightsOnFolder(ownerInbox, delegateAccount, RightLookup | RightDeleteMailbox);
+
+         var oldPath = "#Users.renamehost@example.test.INBOX.Drafts";
+         var newPath = "#Users.renamehost@example.test.INBOX.Done";
+
+         var simulator = new ImapClientSimulator();
+         Assert.IsTrue(simulator.ConnectAndLogon(delegateAccount.Address, "test"));
+
+         // "x" alone is not enough: the new parent (INBOX) carries no "k" for
+         // this delegate yet.
+         string refusedResult;
+         Assert.IsFalse(simulator.RenameFolder(oldPath, newPath, out refusedResult), refusedResult);
+         Assert.IsTrue(refusedResult.Contains("CreateMailbox permission denied"), refusedResult);
+
+         UpdateRightsOnFolder(ownerInbox, delegateAccount, RightLookup | RightDeleteMailbox | RightCreate);
+
+         string allowedResult;
+         Assert.IsTrue(simulator.RenameFolder(oldPath, newPath, out allowedResult), allowedResult);
+         simulator.Disconnect();
+
+         // The owner sees the rename, in the owner's own names.
+         var ownerCheck = new ImapClientSimulator();
+         Assert.IsTrue(ownerCheck.ConnectAndLogon(owner.Address, "test"));
+         var ownerList = ownerCheck.List();
+         Assert.IsTrue(ownerList.Contains("\"INBOX.Done\""), ownerList);
+         Assert.IsFalse(ownerList.Contains("\"INBOX.Drafts\""), ownerList);
+         ownerCheck.Disconnect();
+      }
+
+      /// <summary>
+      ///    An inbox is renameable and deletable by nobody, however it is
+      ///    spelled. The historical guards compared the path text against the
+      ///    single word "INBOX", which "#Users.owner@domain.INBOX" is not - and
+      ///    behind that miss, DELETE would have emptied the owner's inbox of
+      ///    every message and subfolder even though the inbox ROW survives.
+      /// </summary>
+      [Test]
+      public void DelegateCannotRenameOrDeleteTheOwnersInbox()
+      {
+         var owner = CreateOwnerWithMessage("inboxowner@example.test", "InboxSubject", "Inbox body");
+         var delegateAccount = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "inboxdelegate@example.test", "test");
+
+         var ownerInbox = owner.IMAPFolders.get_ItemByName("INBOX");
+         GrantRightsOnFolder(ownerInbox, delegateAccount, RightLookup | RightRead | RightDeleteMailbox | RightCreate);
+
+         var sharedInbox = "#Users.inboxowner@example.test.INBOX";
+
+         var simulator = new ImapClientSimulator();
+         Assert.IsTrue(simulator.ConnectAndLogon(delegateAccount.Address, "test"));
+
+         string renameResult;
+         Assert.IsFalse(simulator.RenameFolder(sharedInbox, "#Users.inboxowner@example.test.OldMail", out renameResult), renameResult);
+         Assert.IsTrue(renameResult.Contains("Cannot rename INBOX"), renameResult);
+
+         var deleteResult = simulator.SendSingleCommand("A22 DELETE " + sharedInbox);
+         Assert.IsTrue(deleteResult.Contains("You cannot delete the inbox"), deleteResult);
+
+         simulator.Disconnect();
+
+         // Nothing was emptied: the owner's message is where it was.
+         CustomAsserts.AssertFolderMessageCount(ownerInbox, 1);
+      }
+
+      /// <summary>
+      ///    DELETE of a delegated subfolder. Before the fix this crashed: the
+      ///    parent folder was looked up in the CALLER's tree, where a delegated
+      ///    folder's parent does not exist, and the null was dereferenced. The
+      ///    first phase also pins that "x" is demanded before anything happens.
+      /// </summary>
+      [Test]
+      public void DeleteOfADelegatedSubfolderDemandsTheDeleteRightAndWorks()
+      {
+         var owner = CreateOwnerWithMessage("deleteowner@example.test", "DeleteSubject", "Delete body");
+         var delegateAccount = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "deletedelegate@example.test", "test");
+
+         var ownerSimulator = new ImapClientSimulator();
+         Assert.IsTrue(ownerSimulator.ConnectAndLogon(owner.Address, "test"));
+         Assert.IsTrue(ownerSimulator.CreateFolder("INBOX.Old"));
+         ownerSimulator.Disconnect();
+
+         var ownerInbox = owner.IMAPFolders.get_ItemByName("INBOX");
+         GrantRightsOnFolder(ownerInbox, delegateAccount, RightLookup | RightRead);
+
+         var sharedSubfolder = "#Users.deleteowner@example.test.INBOX.Old";
+
+         var simulator = new ImapClientSimulator();
+         Assert.IsTrue(simulator.ConnectAndLogon(delegateAccount.Address, "test"));
+
+         // Without "x": refused, folder stays.
+         Assert.IsFalse(simulator.DeleteFolder(sharedSubfolder));
+         Assert.IsTrue(simulator.List().Contains(sharedSubfolder), "the refused DELETE must leave the folder in place");
+
+         // With "x" (inherited from the INBOX grant): deleted - and the session
+         // survives, which is the crash regression this test exists for.
+         UpdateRightsOnFolder(ownerInbox, delegateAccount, RightLookup | RightRead | RightDeleteMailbox);
+         Assert.IsTrue(simulator.DeleteFolder(sharedSubfolder));
+
+         var afterDeleteList = simulator.List();
+         Assert.IsFalse(afterDeleteList.Contains(sharedSubfolder), afterDeleteList);
+         Assert.IsTrue(simulator.SelectFolder("#Users.deleteowner@example.test.INBOX"),
+            "the session must still be usable after deleting a delegated subfolder");
+         simulator.Disconnect();
+
+         // The owner agrees the folder is gone - and only that folder.
+         var ownerCheck = new ImapClientSimulator();
+         Assert.IsTrue(ownerCheck.ConnectAndLogon(owner.Address, "test"));
+         var ownerList = ownerCheck.List();
+         Assert.IsFalse(ownerList.Contains("\"INBOX.Old\""), ownerList);
+         CustomAsserts.AssertFolderMessageCount(ownerInbox, 1);
+         ownerCheck.Disconnect();
+      }
+
+      /// <summary>
+      ///    The grant surface: SETACL now works on account folders, gated on the
+      ///    RFC 4314 "a" (administer) right. The owner holds "a" implicitly; a
+      ///    delegate holds it only when granted. The rights flip is the negative
+      ///    control - if SETACL still refused account folders outright, the
+      ///    second half would fail.
+      /// </summary>
+      [Test]
+      public void SetAclOnADelegatedFolderDemandsTheAdministerRight()
+      {
+         var owner = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "granthost@example.test", "test");
+         var delegateAccount = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "grantadmin@example.test", "test");
+         var thirdAccount = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "grantthird@example.test", "test");
+
+         var ownerSimulator = new ImapClientSimulator();
+         Assert.IsTrue(ownerSimulator.ConnectAndLogon(owner.Address, "test"));
+         Assert.IsTrue(ownerSimulator.CreateFolder("Team"));
+         ownerSimulator.Disconnect();
+
+         var teamFolder = CustomAsserts.AssertFolderExists(owner.IMAPFolders, "Team");
+         GrantRightsOnFolder(teamFolder, delegateAccount, RightLookup | RightRead);
+
+         var sharedPath = "#Users.granthost@example.test.Team";
+
+         var simulator = new ImapClientSimulator();
+         Assert.IsTrue(simulator.ConnectAndLogon(delegateAccount.Address, "test"));
+
+         // "lr" can read, but cannot administer: no granting others, no reading
+         // the ACL, no LISTRIGHTS.
+         Assert.IsFalse(simulator.SetACL(sharedPath, thirdAccount.Address, "lr"));
+         Assert.IsTrue(simulator.GetACL(sharedPath).Contains("Permission denied"), "GETACL without the a right must be refused");
+         Assert.IsTrue(simulator.ListRights(sharedPath, delegateAccount.Address).Contains("Permission denied"), "LISTRIGHTS without the a right must be refused");
+
+         var thirdBefore = new ImapClientSimulator();
+         Assert.IsTrue(thirdBefore.ConnectAndLogon(thirdAccount.Address, "test"));
+         Assert.IsFalse(thirdBefore.SelectFolder(sharedPath));
+         thirdBefore.Disconnect();
+
+         // With "a", the same SETACL succeeds and the new grant is live.
+         UpdateRightsOnFolder(teamFolder, delegateAccount, RightLookup | RightRead | RightAdminister);
+
+         Assert.IsTrue(simulator.SetACL(sharedPath, thirdAccount.Address, "lr"));
+         var aclList = simulator.GetACL(sharedPath);
+         Assert.IsTrue(aclList.Contains(thirdAccount.Address), aclList);
+         simulator.Disconnect();
+
+         var thirdAfter = new ImapClientSimulator();
+         Assert.IsTrue(thirdAfter.ConnectAndLogon(thirdAccount.Address, "test"));
+         Assert.IsTrue(thirdAfter.SelectFolder(sharedPath));
+         thirdAfter.Disconnect();
+      }
+
+      /// <summary>
+      ///    An owner shares their own folder over plain IMAP - no direct SQL -
+      ///    and a repeated SETACL for the same grantee UPDATES the stored grant
+      ///    rather than inserting a second row beside it. The single-entry
+      ///    assertion pins that: before the fix, SETACL read the ACL through a
+      ///    path that returns an empty list for account folders, so every SETACL
+      ///    "updated" nothing and inserted a duplicate.
+      /// </summary>
+      [Test]
+      public void OwnerGrantsOverImapAndRepeatedSetAclUpdatesInPlace()
+      {
+         var owner = CreateOwnerWithMessage("selfgrant@example.test", "SelfSubject", "Self body");
+         var delegateAccount = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "selfdelegate@example.test", "test");
+
+         var ownerSimulator = new ImapClientSimulator();
+         Assert.IsTrue(ownerSimulator.ConnectAndLogon(owner.Address, "test"));
+
+         // The owner needs no stored grant to administer their own folder.
+         Assert.IsTrue(ownerSimulator.SetACL("INBOX", delegateAccount.Address, "lr"));
+
+         // Second SETACL for the same grantee: the rights change, the entry
+         // count does not.
+         Assert.IsTrue(ownerSimulator.SetACL("INBOX", delegateAccount.Address, "lrs"));
+
+         var aclList = ownerSimulator.GetACL("INBOX");
+         var firstEntry = aclList.IndexOf(delegateAccount.Address);
+         var lastEntry = aclList.LastIndexOf(delegateAccount.Address);
+         Assert.IsTrue(firstEntry >= 0, aclList);
+         Assert.AreEqual(firstEntry, lastEntry, "one grantee must produce exactly one ACL entry: " + aclList);
+         Assert.IsTrue(aclList.Contains(delegateAccount.Address + " lrs"), aclList);
+         ownerSimulator.Disconnect();
+
+         // And the grant made over IMAP behaves exactly like one inserted by
+         // SQL: the delegate reads the shared mailbox.
+         var simulator = new ImapClientSimulator();
+         Assert.IsTrue(simulator.ConnectAndLogon(delegateAccount.Address, "test"));
+         Assert.IsTrue(simulator.SelectFolder("#Users.selfgrant@example.test.INBOX"));
+         var myRights = simulator.GetMyRights("#Users.selfgrant@example.test.INBOX");
+         Assert.IsTrue(myRights.Contains("lrs"), myRights);
+         simulator.Disconnect();
+      }
+
+      /// <summary>
+      ///    No SETACL/DELETEACL sequence can lock an owner out of their own
+      ///    folder. The owner's rights are implicit - answered before a single
+      ///    ACL row is read - so they are not stored state that a grant edit
+      ///    could remove: SETACL naming the owner is refused, DELETEACL naming
+      ///    the owner deletes nothing, and removing the last "a" grant merely
+      ///    returns the folder to owner-only administration.
+      /// </summary>
+      [Test]
+      public void OwnerCannotBeLockedOutOfTheirOwnFolder()
+      {
+         var owner = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "lockowner@example.test", "test");
+         var delegateAccount = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "lockadmin@example.test", "test");
+
+         var ownerSimulator = new ImapClientSimulator();
+         Assert.IsTrue(ownerSimulator.ConnectAndLogon(owner.Address, "test"));
+         Assert.IsTrue(ownerSimulator.CreateFolder("Records"));
+         Assert.IsTrue(ownerSimulator.SetACL("Records", delegateAccount.Address, "lra"));
+         ownerSimulator.Disconnect();
+
+         var sharedPath = "#Users.lockowner@example.test.Records";
+
+         var simulator = new ImapClientSimulator();
+         Assert.IsTrue(simulator.ConnectAndLogon(delegateAccount.Address, "test"));
+
+         // The administering delegate tries to demote the owner - both ways.
+         var setAclResult = simulator.SendSingleCommand("A41 SETACL " + sharedPath + " " + owner.Address + " lr");
+         Assert.IsTrue(setAclResult.Contains("implicit and cannot be changed"), setAclResult);
+
+         // DELETEACL naming the owner answers OK - there is, correctly, no
+         // stored row for the owner to delete - and must change nothing.
+         Assert.IsTrue(simulator.DeleteACL(sharedPath, owner.Address));
+
+         // Last, the delegate removes their own grant: the folder returns to
+         // owner-only, and the delegate's own access dies with it.
+         Assert.IsTrue(simulator.DeleteACL(sharedPath, delegateAccount.Address));
+         Assert.IsFalse(simulator.SelectFolder(sharedPath));
+         simulator.Disconnect();
+
+         // The owner never lost a thing: still selects, still administers.
+         var ownerCheck = new ImapClientSimulator();
+         Assert.IsTrue(ownerCheck.ConnectAndLogon(owner.Address, "test"));
+         Assert.IsTrue(ownerCheck.SelectFolder("Records"));
+         Assert.IsTrue(ownerCheck.SetACL("Records", delegateAccount.Address, "lr"),
+            "the owner must still hold the administer right after every grant was removed");
+         ownerCheck.Disconnect();
+      }
+
+      /// <summary>
+      ///    The no-probing property, extended to the commands this change
+      ///    touches: for a caller without the lookup right, a real folder, a
+      ///    missing folder and a missing account must answer byte-for-byte
+      ///    identically - for RENAME, DELETE, SETACL, GETACL, DELETEACL,
+      ///    LISTRIGHTS and MYRIGHTS, exactly as SELECT/STATUS already pin it.
+      /// </summary>
+      [Test]
+      public void RenameDeleteAndAclCommandsAreBlindWithoutTheLookupRight()
+      {
+         var owner = CreateOwnerWithMessage("blindowner@example.test", "BlindSubject", "Blind body");
+         var trustedDelegate = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "blindtrusted@example.test", "test");
+         var outsider = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "blindoutsider@example.test", "test");
+
+         // Shared - with somebody else. The outsider must still see nothing.
+         GrantRightsOnFolder(owner.IMAPFolders.get_ItemByName("INBOX"), trustedDelegate, RightLookup | RightRead);
+
+         var realFolder = "#Users.blindowner@example.test.INBOX";
+         var missingFolder = "#Users.blindowner@example.test.NoSuchFolder";
+         var missingAccount = "#Users.ghost@example.test.INBOX";
+
+         var simulator = new ImapClientSimulator();
+         Assert.IsTrue(simulator.ConnectAndLogon(outsider.Address, "test"));
+
+         foreach (var probe in new[]
+         {
+            "A51 RENAME {0} SomewhereElse",
+            "A52 DELETE {0}",
+            "A53 SETACL {0} " + outsider.Address + " lr",
+            "A54 GETACL {0}",
+            "A55 DELETEACL {0} " + outsider.Address,
+            "A56 LISTRIGHTS {0} " + outsider.Address,
+            "A57 MYRIGHTS {0}"
+         })
+         {
+            var realResponse = simulator.SendSingleCommand(string.Format(probe, realFolder));
+            var missingFolderResponse = simulator.SendSingleCommand(string.Format(probe, missingFolder));
+            var missingAccountResponse = simulator.SendSingleCommand(string.Format(probe, missingAccount));
+
+            Assert.AreEqual(missingFolderResponse, realResponse, probe);
+            Assert.AreEqual(missingAccountResponse, realResponse, probe);
+         }
+
+         simulator.Disconnect();
+
+         // The probes changed nothing: the real folder is still there for the
+         // one account genuinely granted rights on it.
+         var trustedSimulator = new ImapClientSimulator();
+         Assert.IsTrue(trustedSimulator.ConnectAndLogon(trustedDelegate.Address, "test"));
+         Assert.IsTrue(trustedSimulator.SelectFolder(realFolder));
+         trustedSimulator.Disconnect();
       }
    }
 }

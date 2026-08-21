@@ -86,14 +86,19 @@ namespace HM
       */
       std::shared_ptr<ACLPermission> GetPermissionForFolder(__int64 iAccountID, std::shared_ptr<IMAPFolder> pFolder);
 
+      // The ACL entries stored for exactly this folder (not inherited ones).
+      // Exists because IMAPFolder::GetPermissions() skips the database read for
+      // account-level folders - see the comment at the definition. Public
+      // because everything that READS or EDITS a folder's stored ACL (GETACL,
+      // SETACL, DELETEACL) has to see the account-folder rows too; going
+      // through IMAPFolder::GetPermissions() instead means editing an empty
+      // list that is thrown away, which on an account folder reports success
+      // while changing nothing.
+      std::shared_ptr<ACLPermissions> GetPermissionsSetOnFolder(std::shared_ptr<IMAPFolder> pFolder);
+
       bool SetACL(std::shared_ptr<IMAPFolder> pFolder, const String& sIdentifier, const String &sPermissions);
 
 	private:
-
-      // The ACL entries stored for exactly this folder (not inherited ones).
-      // Exists because IMAPFolder::GetPermissions() skips the database read for
-      // account-level folders - see the comment at the definition.
-      std::shared_ptr<ACLPermissions> GetFolderPermissions_(std::shared_ptr<IMAPFolder> pFolder);
 
       std::shared_ptr<ACLPermission> GetPermissionForAccount_(std::shared_ptr<ACLPermissions> pPermissions, __int64 iAccountID);
    };

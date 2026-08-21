@@ -5,6 +5,7 @@
 #include "stdafx.h"
 #include "IMAPCommandDelete.h"
 #include "IMAPConnection.h"
+#include "IMAPFolderContainer.h"
 #include "IMAPSimpleCommandParser.h"
 #include "../Common/BO/IMAPFolders.h"
 #include "../Common/BO/IMAPFolder.h"
@@ -44,6 +45,19 @@ namespace HM
       if (!pFolder)
          return IMAPResult(IMAPResult::ResultNo, "Folder could not be found.");
 
+      // Decided on the RESOLVED folder as well as the path text above. The text
+      // compare answers "DELETE INBOX", but the inbox no longer has only one
+      // name: "#Users.owner@domain.INBOX" names an inbox too - a delegating
+      // owner's, or the caller's own - and DeleteObject would empty it of every
+      // message and subfolder even where its "keep the inbox row" backstop
+      // holds. An inbox is deletable by nobody, however it is spelled.
+      if (pFolder->GetAccountID() != 0 &&
+          pFolder->GetParentFolderID() == -1 &&
+          pFolder->GetFolderName().CompareNoCase(_T("Inbox")) == 0)
+      {
+         return IMAPResult(IMAPResult::ResultNo, "You cannot delete the inbox.");
+      }
+
       // Check if the user has access to rename this folder
       if (!pConnection->CheckPermission(pFolder, ACLPermission::PermissionDeleteMailbox))
          return IMAPResult(IMAPResult::ResultNo, "ACL: DeleteMailbox permission denied (required for DELETE).");
@@ -70,21 +84,39 @@ namespace HM
    {
       __int64 parentFolderID = pFolder->GetParentFolderID();
 
-      std::shared_ptr<IMAPFolders> parentFolderCollection;
+      // The parent lives in the tree that OWNS the folder. For the caller's own
+      // folders that is the same object GetAccountFolders() holds (the container
+      // caches one tree per account), but a delegated folder's parent is in the
+      // owner's tree and is not in the caller's tree at all - looking it up
+      // there answered nothing, and the parent was dereferenced unchecked.
+      std::shared_ptr<IMAPFolders> owningTree;
 
       if (pFolder->IsPublicFolder())
+         owningTree = pConnection->GetPublicFolders();
+      else
+         owningTree = IMAPFolderContainer::Instance()->GetFoldersForAccount(pFolder->GetAccountID());
+
+      if (!owningTree)
+         return;
+
+      std::shared_ptr<IMAPFolders> parentFolderCollection;
+
+      if (parentFolderID >= 0)
       {
-         if (parentFolderID >= 0)
-            parentFolderCollection = pConnection->GetPublicFolders()->GetItemByDBIDRecursive(parentFolderID)->GetSubFolders();
-         else
-            parentFolderCollection = pConnection->GetPublicFolders();
+         std::shared_ptr<IMAPFolder> pParentFolder = owningTree->GetItemByDBIDRecursive(parentFolderID);
+
+         // No parent node in the in-memory tree. The database row is already
+         // gone, which is the part that matters; the stale in-memory entry
+         // disappears at the next refresh. Proceeding without the null check is
+         // how a DELETE of a delegated subfolder took the whole session down.
+         if (!pParentFolder)
+            return;
+
+         parentFolderCollection = pParentFolder->GetSubFolders();
       }
       else
       {
-         if (parentFolderID >= 0)
-            parentFolderCollection = pConnection->GetAccountFolders()->GetItemByDBIDRecursive(parentFolderID)->GetSubFolders();
-         else
-            parentFolderCollection = pConnection->GetAccountFolders();
+         parentFolderCollection = owningTree;
       }
 
       if (parentFolderCollection)

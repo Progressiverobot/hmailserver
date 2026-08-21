@@ -78,7 +78,16 @@ namespace HM
       auto messages = MessagesContainer::Instance()->GetMessages(pFolder->GetAccountID(), pFolder->GetID());
       messages->DeleteMessages(filter);
             
-      if (!pFolder->GetPermissions()->DeleteAll())
+      // The folder's stored ACL rows, loaded explicitly. IMAPFolder::
+      // GetPermissions() returns an UNLOADED collection for account folders
+      // (its comment says account folders never have permissions set, which
+      // stopped being true when one user's folder became shareable with
+      // another), so this DeleteAll iterated an empty vector and every deleted
+      // shared folder left its hm_acl grants behind as orphan rows.
+      std::shared_ptr<ACLPermissions> pFolderAcl = std::shared_ptr<ACLPermissions>(new ACLPermissions(pFolder->GetID()));
+      pFolderAcl->Refresh();
+
+      if (!pFolderAcl->DeleteAll())
          return false;
 
       bool isInbox = pFolder->GetParentFolderID() == -1 && pFolder->GetFolderName().CompareNoCase(_T("Inbox")) == 0;

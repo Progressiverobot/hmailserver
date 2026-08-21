@@ -6,6 +6,7 @@
 
 #include "IMAPACLHelper.h"
 
+#include "../Common/Application/ACLManager.h"
 #include "../Common/BO/Account.h"
 #include "../Common/BO/ACLPermission.h"
 #include "../Common/BO/ACLPermissions.h"
@@ -33,8 +34,13 @@ namespace HM
    String
    IMAPACLHelper::CreateACLList(std::shared_ptr<IMAPFolder> pFolder, const String &sEscapedFolderName)
    {
-      // Retrieve a list of all rights for this folder.
-      std::shared_ptr<ACLPermissions> pPermissions = pFolder->GetPermissions();
+      // Retrieve a list of all rights for this folder - through ACLManager,
+      // because IMAPFolder::GetPermissions() returns an empty, unloaded
+      // collection for account folders, and a GETACL that lists nothing for a
+      // folder with stored grants is worse than an error: it reads as "nobody
+      // has been granted anything".
+      ACLManager aclManager;
+      std::shared_ptr<ACLPermissions> pPermissions = aclManager.GetPermissionsSetOnFolder(pFolder);
 
       String sACLList = "* ACL \"" + sEscapedFolderName + "\"";
       for (int i = 0; i < pPermissions->GetCount(); i++)

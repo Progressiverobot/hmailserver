@@ -9,10 +9,14 @@
 #include "IMAPConfiguration.h"
 #include "IMAPFolderUtilities.h"
 
+#include "IMAPFolderContainer.h"
+
+#include "../Common/Application/ACLManager.h"
 #include "../Common/BO/Account.h"
 #include "../Common/BO/ACLPermission.h"
 #include "../Common/BO/IMAPFolders.h"
 #include "../Common/BO/IMAPFolder.h"
+#include "../Common/Cache/CacheContainer.h"
 #include "../Common/Persistence/PersistentIMAPFolder.h"
 #include "../Common/Util/FolderManipulationLock.h"
 #ifdef _DEBUG
@@ -45,11 +49,38 @@ namespace HM
       if (!pFolderToRename)
          return IMAPResult(IMAPResult::ResultBad, "Folder could not be found.");
 
+      // Decided on the RESOLVED folder, not the path text. The historical check in
+      // ConfirmPossibleToRename compares the path against the single word "INBOX",
+      // which the inbox no longer has to be named by: "#Users.owner@domain.INBOX"
+      // names an inbox too - the caller's own, or a delegating owner's - and
+      // renaming an inbox out from under its account loses the folder every
+      // message is delivered into.
+      if (pFolderToRename->GetAccountID() != 0 &&
+          pFolderToRename->GetParentFolderID() == -1 &&
+          pFolderToRename->GetFolderName().CompareNoCase(_T("INBOX")) == 0)
+      {
+         return IMAPResult(IMAPResult::ResultNo, "Cannot rename INBOX.");
+      }
+
       String hierarchyDelimiter = Configuration::Instance()->GetIMAPConfiguration()->GetHierarchyDelimiter();
 
       std::vector<String> vecOldPath = StringParser::SplitString(sOldFolderName, hierarchyDelimiter);
       std::vector<String> vecNewPath = StringParser::SplitString(sNewFolderName, hierarchyDelimiter);
-      
+
+      // Anything touching the "#Users" namespace takes the ownership-aware flow:
+      // a source folder owned by another account, or either path shaped like the
+      // namespace. The classic flow below draws only the public/non-public
+      // distinction, and its in-memory manipulation is hard-wired to the
+      // CALLER's folder tree - correct for every rename that existed before
+      // delegated folders, and wrong for every rename involving one.
+      const __int64 callerAccountID = pConnection->GetAccount()->GetID();
+      const bool sourceIsDelegated =
+         pFolderToRename->GetAccountID() != 0 &&
+         pFolderToRename->GetAccountID() != callerAccountID;
+
+      if (sourceIsDelegated || IsOtherUsersPath_(vecOldPath) || IsOtherUsersPath_(vecNewPath))
+         return ExecuteOtherUsersRename_(pConnection, pArgument, pFolderToRename, vecNewPath);
+
       bool bSourceIsPublic = IMAPFolderUtilities::IsPublicFolder(vecOldPath);
       bool bDestinationIsPublic = IMAPFolderUtilities::IsPublicFolder(vecNewPath);
 
@@ -232,5 +263,218 @@ namespace HM
        }
 
        return IMAPResult();
+   }
+
+   bool
+   IMAPCommandRENAME::IsOtherUsersPath_(const std::vector<String> &vecPath)
+   {
+      return ACLManager::GetOtherUsersNamespaceEnabled() &&
+             vecPath.size() > 0 &&
+             ACLManager::GetOtherUsersFolderName().CompareNoCase(vecPath[0]) == 0;
+   }
+
+   IMAPResult
+   IMAPCommandRENAME::ExecuteOtherUsersRename_(std::shared_ptr<HM::IMAPConnection> pConnection, std::shared_ptr<IMAPCommandArgument> pArgument, std::shared_ptr<IMAPFolder> pFolderToRename, const std::vector<String> &vecNewPath)
+   {
+      // Everything here is decided against the account that OWNS the source
+      // folder. The caller's rights on that account's folders come from
+      // ACLManager, exactly as they do for SELECT and DELETE; nothing in this
+      // flow makes a second, parallel access decision.
+
+      const __int64 callerAccountID = pConnection->GetAccount()->GetID();
+      const __int64 ownerAccountID = pFolderToRename->GetAccountID();
+
+      // A public folder cannot be renamed into the "#Users" namespace: the
+      // destination is some account's mailbox and the source belongs to no
+      // account. Same refusal the classic flow gives the public/local mix.
+      if (ownerAccountID == 0)
+         return IMAPResult(IMAPResult::ResultNo, "RENAME: Cannot rename a public folder to local or vice versa.");
+
+      std::shared_ptr<const Account> pOwner = CacheContainer::Instance()->GetAccount(ownerAccountID);
+      if (!pOwner)
+         return IMAPResult(IMAPResult::ResultNo, "The folder could not be renamed.");
+
+      String hierarchyDelimiter = Configuration::Instance()->GetIMAPConfiguration()->GetHierarchyDelimiter();
+
+      // Which account does the destination path name? Decided from the path
+      // SHAPE plus facts the caller already holds (the source folder's owner),
+      // never by probing the account database - so the refusals below cannot be
+      // used to learn whether some other account exists.
+      //
+      //   - public-shaped                          -> no account (refused above/below)
+      //   - "#Users" + the source owner's address  -> the same owner's tree
+      //   - "#Users" + anything else               -> a different owner (refused)
+      //   - anything else                          -> the caller's own tree
+      std::vector<String> vecOwnerRelativeNewPath;
+
+      if (IMAPFolderUtilities::IsPublicFolder(vecNewPath))
+         return IMAPResult(IMAPResult::ResultNo, "RENAME: Cannot rename a public folder to local or vice versa.");
+
+      if (IsOtherUsersPath_(vecNewPath))
+      {
+         std::vector<String> vecExpectedPrefix = StringParser::SplitString(pOwner->GetAddress(), hierarchyDelimiter);
+         vecExpectedPrefix.insert(vecExpectedPrefix.begin(), ACLManager::GetOtherUsersFolderName());
+
+         bool prefixMatches = vecNewPath.size() > vecExpectedPrefix.size();
+         if (prefixMatches)
+         {
+            for (size_t i = 0; i < vecExpectedPrefix.size(); i++)
+            {
+               if (vecExpectedPrefix[i].CompareNoCase(vecNewPath[i]) != 0)
+               {
+                  prefixMatches = false;
+                  break;
+               }
+            }
+         }
+
+         if (!prefixMatches)
+            return IMAPResult(IMAPResult::ResultNo, "RENAME: A folder cannot be renamed into a different account's mailbox.");
+
+         vecOwnerRelativeNewPath.assign(vecNewPath.begin() + vecExpectedPrefix.size(), vecNewPath.end());
+      }
+      else
+      {
+         // A plain destination path names the caller's own tree. That is a
+         // rename between owners unless the source folder is the caller's own
+         // (which it can be: the caller's folders resolve under
+         // "#Users.<own address>" too).
+         if (ownerAccountID != callerAccountID)
+            return IMAPResult(IMAPResult::ResultNo, "RENAME: A folder cannot be renamed into a different account's mailbox.");
+
+         vecOwnerRelativeNewPath = vecNewPath;
+      }
+
+      if (vecOwnerRelativeNewPath.size() == 1 &&
+          vecOwnerRelativeNewPath[0].CompareNoCase(_T("INBOX")) == 0)
+      {
+         return IMAPResult(IMAPResult::ResultNo, "Cannot rename INBOX.");
+      }
+
+      if (!IMAPFolder::IsValidFolderName(vecOwnerRelativeNewPath, false))
+         return IMAPResult(IMAPResult::ResultNo, "The new folder name is invalid.");
+
+      std::shared_ptr<IMAPFolders> pOwnerTree = IMAPFolderContainer::Instance()->GetFoldersForAccount(ownerAccountID);
+      if (!pOwnerTree)
+         return IMAPResult(IMAPResult::ResultNo, "The folder could not be renamed.");
+
+      // RFC 4314: RENAME demands the "x" right on the mailbox being renamed and
+      // the "k" right on its new parent - it is a delete at the old name and a
+      // create at the new one. The "x" half:
+      if (!pConnection->CheckPermission(pFolderToRename, ACLPermission::PermissionDeleteMailbox))
+         return IMAPResult(IMAPResult::ResultNo, "ACL DeleteMailbox permission denied (required for RENAME).");
+
+      // The "k" half. The destination parent must already exist in the owner's
+      // tree - unlike the classic flow this one never creates missing parent
+      // folders, because each of those creations would itself need a rights
+      // decision against a folder that does not exist yet. A parent the caller
+      // holds no lookup right on answers exactly like a parent that is not
+      // there, so this refusal is not an oracle for the owner's folder names.
+      std::shared_ptr<IMAPFolder> pNewParentFolder;
+
+      if (vecOwnerRelativeNewPath.size() > 1)
+      {
+         std::vector<String> vecNewParentPath(vecOwnerRelativeNewPath.begin(), vecOwnerRelativeNewPath.end() - 1);
+
+         pNewParentFolder = pOwnerTree->GetFolderByFullPath(vecNewParentPath);
+
+         if (!pNewParentFolder || !pConnection->CheckPermission(pNewParentFolder, ACLPermission::PermissionLookup))
+            return IMAPResult(IMAPResult::ResultNo, "RENAME: The destination folder does not exist.");
+
+         if (!pConnection->CheckPermission(pNewParentFolder, ACLPermission::PermissionCreate))
+            return IMAPResult(IMAPResult::ResultNo, "ACL CreateMailbox permission denied (required for RENAME).");
+      }
+      else
+      {
+         // A root-level destination has no parent folder to carry the "k"
+         // right, so only the owner may put a folder there. There is no
+         // folder-that-grants-create at the root of somebody else's account.
+         if (callerAccountID != ownerAccountID)
+            return IMAPResult(IMAPResult::ResultNo, "ACL CreateMailbox permission denied (required for RENAME).");
+      }
+
+      // Existence is checked in the OWNER's tree. The connection's resolver
+      // hides folders the caller lacks the lookup right on, and a collision
+      // with a hidden folder must still be refused - AddItem below would
+      // otherwise put two folders with one name under one parent. The caller
+      // holds "k" on the parent here, and a name collision is exactly what the
+      // "k" right already reveals through CREATE.
+      if (pOwnerTree->GetFolderByFullPath(vecOwnerRelativeNewPath))
+         return IMAPResult(IMAPResult::ResultNo, "Target folder already exist.");
+
+      // The owner-relative path of the source folder, walked up by parent id in
+      // the owner's tree. Derived from the resolved folder rather than from the
+      // path the client sent, which may name the same folder several ways.
+      std::vector<String> vecOwnerRelativeOldPath;
+      {
+         std::shared_ptr<IMAPFolder> pWalk = pFolderToRename;
+         int recursionGuard = 0;
+
+         while (pWalk && recursionGuard++ <= IMAPFolder::MaxFolderDepth)
+         {
+            vecOwnerRelativeOldPath.insert(vecOwnerRelativeOldPath.begin(), pWalk->GetFolderName());
+
+            __int64 walkParentID = pWalk->GetParentFolderID();
+            pWalk = walkParentID >= 0 ? pOwnerTree->GetItemByDBIDRecursive(walkParentID) : nullptr;
+         }
+      }
+
+      // Same two structural rules the classic flow enforces.
+      String sOwnerRelativeOldName = StringParser::JoinVector(vecOwnerRelativeOldPath, hierarchyDelimiter);
+      String sOwnerRelativeNewName = StringParser::JoinVector(vecOwnerRelativeNewPath, hierarchyDelimiter);
+
+      if (sOwnerRelativeNewName.FindNoCase(sOwnerRelativeOldName + hierarchyDelimiter) == 0)
+         return IMAPResult(IMAPResult::ResultNo, "A folder cannot be moved into one of its subfolders.");
+
+      int iRecursion = 0;
+      int iOldFolderDepth = pFolderToRename->GetFolderDepth(iRecursion);
+      int iNewMaxFolderDepth = (int) (iOldFolderDepth + (vecOwnerRelativeNewPath.size() - 1));
+
+      if (iNewMaxFolderDepth > IMAPFolder::MaxFolderDepth)
+         return IMAPResult(IMAPResult::ResultNo, "To many sub-folders in structure.");
+
+      // The tree being manipulated is the owner's, so the lock is the owner's
+      // too - the same lock the owner's own sessions take.
+      FolderManipulationLock oFolderLock((int) ownerAccountID, -1);
+      oFolderLock.Lock();
+
+      std::shared_ptr<IMAPFolder> pOldParentFolder;
+      __int64 oldParentFolderID = pFolderToRename->GetParentFolderID();
+      if (oldParentFolderID >= 0)
+         pOldParentFolder = pOwnerTree->GetItemByDBIDRecursive(oldParentFolderID);
+
+      if (pOldParentFolder)
+         pOldParentFolder->GetSubFolders()->RemoveFolder(pFolderToRename);
+      else
+         pOwnerTree->RemoveFolder(pFolderToRename);
+
+      pFolderToRename->SetFolderName(vecOwnerRelativeNewPath[vecOwnerRelativeNewPath.size() - 1]);
+
+      if (pNewParentFolder)
+      {
+         pFolderToRename->SetParentFolderID(pNewParentFolder->GetID());
+         pNewParentFolder->GetSubFolders()->AddItem(pFolderToRename);
+      }
+      else
+      {
+         pFolderToRename->SetParentFolderID(-1);
+         pOwnerTree->AddItem(pFolderToRename);
+      }
+
+      // Same contract as the classic flow: a refused save is answered NO, the
+      // in-memory re-parenting is not unwound (see the comment there), and the
+      // next refresh reads the tree back from the database.
+      if (!PersistentIMAPFolder::SaveObject(pFolderToRename))
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 6300, "IMAPCommandRENAME::ExecuteOtherUsersRename_",
+            "A rename of a delegated folder could not be saved and has been refused. The owner's folder tree held in memory may show the new name until it is reloaded.");
+
+         return IMAPResult(IMAPResult::ResultNo, "The folder could not be renamed.");
+      }
+
+      String sResponse = pArgument->Tag() + " OK Rename completed\r\n";
+      pConnection->SendAsciiData(sResponse);
+
+      return IMAPResult();
    }
 }

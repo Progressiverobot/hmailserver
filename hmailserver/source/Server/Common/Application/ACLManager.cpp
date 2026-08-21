@@ -127,7 +127,7 @@ namespace HM
    }
 
    std::shared_ptr<ACLPermissions>
-   ACLManager::GetFolderPermissions_(std::shared_ptr<IMAPFolder> pFolder)
+   ACLManager::GetPermissionsSetOnFolder(std::shared_ptr<IMAPFolder> pFolder)
    //---------------------------------------------------------------------------()
    // DESCRIPTION:
    // The ACL entries stored for exactly this folder. IMAPFolder::GetPermissions()
@@ -186,7 +186,7 @@ namespace HM
 
          // Check if permissions is set for this folder. If it is, we need to check
          // if we have permissions to it.
-         std::shared_ptr<ACLPermissions> pPermissions = GetFolderPermissions_(pCheckFolder);
+         std::shared_ptr<ACLPermissions> pPermissions = GetPermissionsSetOnFolder(pCheckFolder);
 
          if (pPermissions && pPermissions->GetCount() > 0)
          {
@@ -328,13 +328,20 @@ namespace HM
 
       if (pAccount && pAccount->GetID() == pFolder->GetAccountID())
       {
-         // Should we ever come here? A user should not be able to modify
-         // his own right on his own folder.
-         assert(0);       
+         // The owner of a folder holds every right on it implicitly
+         // (GetPermissionForFolder answers GrantAll before it reads a single
+         // row), so a stored row for the owner could only ever disagree with
+         // the truth. Refused, quietly: this stopped being an assert the day
+         // account folders could be named in a SETACL at all, because a branch
+         // any authenticated client can drive is not a programming error.
          return false;
       }
 
-      std::shared_ptr<ACLPermissions> pFolderPermissions = pFolder->GetPermissions();
+      // Read through the manager, not IMAPFolder::GetPermissions() - that
+      // returns an EMPTY, unloaded collection for account folders, so an
+      // existing grant would never be found here and every SETACL would insert
+      // a fresh hm_acl row next to the one it should have updated.
+      std::shared_ptr<ACLPermissions> pFolderPermissions = GetPermissionsSetOnFolder(pFolder);
       
       std::shared_ptr<ACLPermission> pPermission;
       

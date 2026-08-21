@@ -42,7 +42,13 @@ namespace HM
 
       if (pParser->Word(1)->Clammerized())
       {
-         sOriginalFolderName = pArgument->Literal(0);
+         // Read the literal into the FOLDER NAME. The two assignments here used
+         // to be sOriginalFolderName = Literal(0) followed by
+         // sOriginalFolderName = sFolderName - the second overwrote the first
+         // with the still-empty sFolderName, so every GETACL that sent its
+         // folder name as a literal looked up the folder "" and was told the
+         // folder could not be found.
+         sFolderName = pArgument->Literal(0);
          sOriginalFolderName = sFolderName;
       }
       else

@@ -1153,6 +1153,12 @@ namespace RegressionTests.IMAP
       [Test]
       public void TestSetACLOnAccountFolder()
       {
+         // This test used to pin the opposite: SETACL on an account folder was
+         // refused outright, which kept delegations unreachable while RENAME
+         // and DELETE were not yet safe against them. Both are now
+         // ownership-aware, so the grant surface is open: the owner of a folder
+         // holds the administer right implicitly and may share it over IMAP.
+         // The full delegation surface is pinned by IMAP/SharedMailboxes.
          var application = SingletonProvider<TestSetup>.Instance.GetApp();
 
          var account1 = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "account1@example.test", "test");
@@ -1162,8 +1168,16 @@ namespace RegressionTests.IMAP
          imapClientSimulator.Connect();
          imapClientSimulator.LogonWithLiteral(account1.Address, "test");
          Assert.IsTrue(imapClientSimulator.CreateFolder("SharedFolder"));
-         Assert.IsFalse(imapClientSimulator.SetACL("SharedFolder", account2.Address, "lrswipkxtea"));
+         Assert.IsTrue(imapClientSimulator.SetACL("SharedFolder", account2.Address, "lr"));
          imapClientSimulator.Disconnect();
+
+         // The grant is live: the grantee reaches the folder through the
+         // "#Users" namespace with exactly the rights just given.
+         var granteeSimulator = new ImapClientSimulator();
+         granteeSimulator.Connect();
+         granteeSimulator.LogonWithLiteral(account2.Address, "test");
+         Assert.IsTrue(granteeSimulator.SelectFolder("#Users." + account1.Address + ".SharedFolder"));
+         granteeSimulator.Disconnect();
       }
 
       [Test]

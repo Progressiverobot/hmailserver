@@ -9,6 +9,7 @@
 #include "IMAPSimpleCommandParser.h"
 #include "IMAPConfiguration.h"
 
+#include "../Common/BO/ACLPermission.h"
 #include "../Common/BO/IMAPFolder.h"
 
 #ifdef _DEBUG
@@ -52,6 +53,14 @@ namespace HM
       std::shared_ptr<IMAPFolder> pFolder = pConnection->GetFolderByFullPath(sFolderName);
       if (!pFolder)
          return IMAPResult(IMAPResult::ResultBad, "Folder could not be found.");
+
+      // RFC 4314 section 3.7 requires the "a" (administer) right for
+      // LISTRIGHTS, the same as GETACL - and this was the one command in the
+      // ACL family with no rights check at all. The folder's owner holds "a"
+      // implicitly, so this costs an owner nothing; a caller without it could
+      // previously use LISTRIGHTS to confirm any folder's existence.
+      if (!pConnection->CheckPermission(pFolder, ACLPermission::PermissionAdminister))
+         return IMAPResult(IMAPResult::ResultNo, "Permission denied.");
 
       // Always produce the same output.
       String sIdentifier = pParser->Word(2)->Value();
