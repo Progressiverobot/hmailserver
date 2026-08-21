@@ -361,6 +361,7 @@ EXIT 0
     <ClCompile Include="..\Common\Persistence\PersistentLogonFailure.cpp" />
     <ClCompile Include="..\Common\Persistence\PersistentMessage.cpp" />
     <ClCompile Include="..\Common\Persistence\PersistentMessageMetaData.cpp" />
+    <ClCompile Include="..\Common\Persistence\PersistentMessageIndex.cpp" />
     <ClCompile Include="..\Common\Persistence\PersistentMessageRecipient.cpp" />
     <ClCompile Include="..\Common\Persistence\PersistentRoute.cpp" />
     <ClCompile Include="..\Common\Persistence\PersistentRouteAddress.cpp" />
@@ -946,6 +947,7 @@ EXIT 0
     <ClInclude Include="..\Common\Persistence\PersistentLogonFailure.h" />
     <ClInclude Include="..\Common\Persistence\PersistentMessage.h" />
     <ClInclude Include="..\Common\Persistence\PersistentMessageMetaData.h" />
+    <ClInclude Include="..\Common\Persistence\PersistentMessageIndex.h" />
     <ClInclude Include="..\Common\Persistence\PersistentMessageRecipient.h" />
     <ClInclude Include="..\Common\Persistence\PersistentRoute.h" />
     <ClInclude Include="..\Common\Persistence\PersistentRouteAddress.h" />

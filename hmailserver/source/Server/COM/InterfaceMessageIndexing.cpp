@@ -8,6 +8,7 @@
 
 #include "../Common/Persistence/PersistentMessage.h"
 #include "../Common/Persistence/PersistentMessageMetaData.h"
+#include "../Common/Persistence/PersistentMessageIndex.h"
 
 #include "../Common/Application/MessageIndexer.h"
 
@@ -110,6 +111,12 @@ STDMETHODIMP InterfaceMessageIndexing::Clear()
       HM::PersistentMessageMetaData md;
       
       md.Clear();
+
+      // The full-text terms and the backfill cursor go with it. An
+      // administrator who asks to clear the index means all of it: leaving the
+      // cursor behind would clear the terms and then never rebuild them,
+      // because the backfill believes it has already passed every message.
+      HM::PersistentMessageIndex::Clear();
    
       return S_OK;
    }

@@ -12,6 +12,7 @@
 #include "PersistentDistributionList.h"
 #include "PersistentServerMessage.h"
 #include "PersistentMessageMetaData.h"
+#include "PersistentMessageIndex.h"
 #include "../Util/MailerDaemonAddressDeterminer.h"
 #include "../../SMTP/SMTPConfiguration.h"
 #include "../../IMAP/IMAPConfiguration.h"
@@ -103,6 +104,12 @@ namespace HM
             PersistentMessageMetaData md;
             md.DeleteForMessage(pMessage);
          }
+
+         // And its full-text terms. The indexer's orphan sweep would collect
+         // these eventually, so this is promptness rather than correctness: a
+         // search only ever iterates a folder's live messages, so a dead
+         // message's terms cannot produce a wrong answer, only dead rows.
+         PersistentMessageIndex::DeleteForMessage(iMessageID);
 
          // Reset the message ID.
          pMessage->SetID(0);
@@ -569,6 +576,19 @@ namespace HM
 
       if (!AddObject(pMessage))
          return false;
+
+      // A DELIVERED message being saved again is a message whose file may just
+      // have been rewritten - the COM API lets a script set Body and Save, and
+      // the rules engine edits headers. Its full-text terms now describe
+      // content that is no longer there, and stale terms do not merely waste
+      // space: the index is consulted to prove a message CANNOT contain a
+      // string, so a term set describing the old body can exclude a message
+      // that now genuinely matches. That is a wrong search result, which is
+      // worse than a slow one. Dropping the terms here returns the message to
+      // "not indexed", where every search reads it exactly as it did before the
+      // index existed, until the indexer re-reads it.
+      if (!bNewMessage && pMessage->GetState() == Message::Delivered)
+         PersistentMessageIndex::DeleteForMessage(pMessage->GetID());
 
       // Should we fetch the message id now?
       if (bNewMessage && pMessage->GetRecipients()->GetCount())
