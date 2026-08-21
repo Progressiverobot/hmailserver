@@ -610,7 +610,7 @@ namespace hMailServer.ControlPanel.Views
             "The key is shown once, when it is created, and never again. It is live immediately - the server "
             + "re-reads its key store on every request."));
 
-         var label = Field_(panel, "Label", "What this key is for, e.g. \"Grafana probe\"", out TextBox labelBox);
+         Field_(panel, "Label", "What this key is for, e.g. \"Grafana probe\"", out TextBox labelBox);
          System.Windows.Automation.AutomationProperties.SetAutomationId(labelBox, "apikeys-dialog-label");
 
          // Read-only first and selected by default, matching the server: a create

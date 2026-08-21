@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
@@ -135,7 +136,7 @@ namespace hMailServer.ControlPanel.Views
             // The certificate files live beside the server. Read remotely, the file
             // checks are meaningless - and quietly reporting "missing" for a file
             // that is simply on another machine would be the worst possible answer.
-            string host = Read(() => (string) ServerSession.Current.Host) ?? "";
+            string host = Read(() => ServerSession.Current.Host) ?? "";
             config.CertificateFilesReadable = string.IsNullOrEmpty(host) || CertificateInspector.SessionIsLocal(host);
 
             // Certificates first: the listener pass resolves each port's certificate
@@ -222,13 +223,10 @@ namespace hMailServer.ControlPanel.Views
 
       private static string FirstProblem(CertificateHealth health)
       {
-         foreach (CertificateFinding finding in new[] { health.CertificateFile, health.PrivateKeyFile, health.Pair })
-         {
-            if (finding != null && finding.Level == StatusLevel.Critical)
-               return finding.Detail;
-         }
+         CertificateFinding critical = new[] { health.CertificateFile, health.PrivateKeyFile, health.Pair }
+            .FirstOrDefault(finding => finding != null && finding.Level == StatusLevel.Critical);
 
-         return null;
+         return critical?.Detail;
       }
 
       private void ReadListeners(TlsPostureConfig config, dynamic settings)
@@ -313,25 +311,15 @@ namespace hMailServer.ControlPanel.Views
          if (certificateId <= 0)
             return "";
 
-         foreach (TlsCertificate certificate in config.Certificates)
-         {
-            if (certificate.Id == certificateId)
-               return certificate.Name;
-         }
-
-         return "";
+         TlsCertificate match = config.Certificates.FirstOrDefault(c => c.Id == certificateId);
+         return match == null ? "" : match.Name;
       }
 
       private static void MarkInUse(TlsPostureConfig config, int certificateId)
       {
-         foreach (TlsCertificate certificate in config.Certificates)
-         {
-            if (certificate.Id == certificateId)
-            {
-               certificate.InUse = true;
-               return;
-            }
-         }
+         TlsCertificate match = config.Certificates.FirstOrDefault(c => c.Id == certificateId);
+         if (match != null)
+            match.InUse = true;
       }
 
       private void ReadSecurityRanges(TlsPostureConfig config, dynamic settings)

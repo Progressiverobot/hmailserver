@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -138,14 +139,9 @@ namespace hMailServer.ControlPanel.Views
 
          if (reselectId != 0)
          {
-            foreach (CertRow row in rows)
-            {
-               if (row.Id == reselectId)
-               {
-                  CertGrid.SelectedItem = row;
-                  break;
-               }
-            }
+            CertRow reselect = rows.FirstOrDefault(row => row.Id == reselectId);
+            if (reselect != null)
+               CertGrid.SelectedItem = reselect;
          }
 
          UpdateDetailsPane();
@@ -271,10 +267,8 @@ namespace hMailServer.ControlPanel.Views
       private static CertificateFinding WorstOf(params CertificateFinding[] findings)
       {
          CertificateFinding worst = null;
-         foreach (CertificateFinding finding in findings)
+         foreach (CertificateFinding finding in findings.Where(f => f != null))
          {
-            if (finding == null)
-               continue;
             if (worst == null || finding.Level > worst.Level)
                worst = finding;
          }

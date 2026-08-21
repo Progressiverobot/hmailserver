@@ -1620,9 +1620,8 @@ namespace hMailServer.ControlPanel.Views
       /// the comparison in DnsTxtLookup.</summary>
       private static string ParseTag(string record, string tag)
       {
-         foreach (string part in (record ?? "").Split(';'))
+         foreach (string trimmed in (record ?? "").Split(';').Select(part => part.Trim()))
          {
-            string trimmed = part.Trim();
             int equals = trimmed.IndexOf('=');
             if (equals > 0 && trimmed.Substring(0, equals).Trim().Equals(tag, StringComparison.OrdinalIgnoreCase))
                return trimmed.Substring(equals + 1).Trim();

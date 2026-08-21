@@ -692,6 +692,7 @@ namespace hMailServer.ControlPanel.Views
       {
          private readonly string page_;
 
+         /// <summary>Creates a signpost row pointing at the page that owns a setting.</summary>
          /// <param name="page">Nav key of the page that owns the setting.</param>
          /// <param name="caption">What is over there, in the administrator's words.</param>
          public ElsewhereSetting(string page, string caption)
@@ -804,14 +805,9 @@ namespace hMailServer.ControlPanel.Views
          if (cards_ == null)
             return null;
 
-         foreach (CardDef card in cards_)
-         foreach (Setting setting in card.Settings)
-         {
-            if (string.Equals(setting.Key, key, StringComparison.OrdinalIgnoreCase))
-               return setting;
-         }
-
-         return null;
+         return cards_
+            .SelectMany(card => card.Settings)
+            .FirstOrDefault(setting => string.Equals(setting.Key, key, StringComparison.OrdinalIgnoreCase));
       }
 
       private string LiveText_(string key, string fallbackDefault)
@@ -2703,10 +2699,12 @@ namespace hMailServer.ControlPanel.Views
          var editors = new List<LabelledEditor>();
 
          foreach (CardDef card in cards_)
-         foreach (Setting setting in card.Settings)
          {
-            settings.Add(setting);
-            editors.Add(new LabelledEditor(setting.Label, card.Title, setting.Key));
+            foreach (Setting setting in card.Settings)
+            {
+               settings.Add(setting);
+               editors.Add(new LabelledEditor(setting.Label, card.Title, setting.Key));
+            }
          }
 
          IReadOnlyList<string> names = AccessibleNames.Resolve(editors);
@@ -2772,8 +2770,8 @@ namespace hMailServer.ControlPanel.Views
          // Wire every editor to the warnings AFTER all the editors exist, because
          // a warning may read a setting on a later card than its own.
          foreach (CardDef card in cards_)
-         foreach (Setting setting in card.Settings)
-            setting.OnEditorChanged(RefreshWarnings_);
+            foreach (Setting setting in card.Settings)
+               setting.OnEditorChanged(RefreshWarnings_);
 
          RefreshWarnings_();
 

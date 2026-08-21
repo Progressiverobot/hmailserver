@@ -458,10 +458,10 @@ namespace hMailServer.ControlPanel.Views
          public override FrameworkElement CreateEditor(object value)
          {
             int current = Default;
-            if (IniStore != null && IniStore.IsAvailable)
+            if (IniStore != null && IniStore.IsAvailable &&
+                !int.TryParse(IniStore.ReadFrom(Section, Path, Default.ToString()), out current))
             {
-               if (!int.TryParse(IniStore.ReadFrom(Section, Path, Default.ToString()), out current))
-                  current = Default;
+               current = Default;
             }
 
             var panel = new StackPanel();
@@ -2581,11 +2581,15 @@ namespace hMailServer.ControlPanel.Views
          var editors = new List<LabelledEditor>();
 
          foreach (TabDef tab in tabs_)
-         foreach (CardDef card in tab.Cards)
-         foreach (ComSetting setting in card.Settings)
          {
-            settings.Add(setting);
-            editors.Add(new LabelledEditor(setting.Label, card.Title, setting.Path));
+            foreach (CardDef card in tab.Cards)
+            {
+               foreach (ComSetting setting in card.Settings)
+               {
+                  settings.Add(setting);
+                  editors.Add(new LabelledEditor(setting.Label, card.Title, setting.Path));
+               }
+            }
          }
 
          IReadOnlyList<string> names = AccessibleNames.Resolve(editors);
@@ -3183,9 +3187,7 @@ namespace hMailServer.ControlPanel.Views
 
          bool iniWritten = false;
 
-         foreach (TabDef tab in tabs_)
-         foreach (CardDef card in tab.Cards)
-         foreach (ComSetting setting in card.Settings)
+         foreach (ComSetting setting in tabs_.SelectMany(tab => tab.Cards).SelectMany(card => card.Settings))
          {
             try
             {

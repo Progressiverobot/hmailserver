@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
@@ -890,17 +891,11 @@ namespace hMailServer.ControlPanel.Views
       {
          // The rows that cost something first. Four hundred lines of equal weight is a
          // log; the six that matter have to be at the top or they are not read at all.
-         foreach (DirectorySyncRow row in report.Rows)
-         {
-            if (row.NeedsAttention)
-               rows_.Children.Add(Row_(row, true));
-         }
+         foreach (DirectorySyncRow row in report.Rows.Where(r => r.NeedsAttention))
+            rows_.Children.Add(Row_(row, true));
 
-         foreach (DirectorySyncRow row in report.Rows)
-         {
-            if (!row.NeedsAttention)
-               rows_.Children.Add(Row_(row, false));
-         }
+         foreach (DirectorySyncRow row in report.Rows.Where(r => !r.NeedsAttention))
+            rows_.Children.Add(Row_(row, false));
 
          if (report.SkipBreakdown.Count == 0)
             return;

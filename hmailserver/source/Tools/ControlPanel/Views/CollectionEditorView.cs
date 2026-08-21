@@ -74,6 +74,7 @@ namespace hMailServer.ControlPanel.Views
       {
       }
 
+      /// <summary>Creates the editor for one collection, optionally without page chrome.</summary>
       /// <param name="embedded">
       /// When true the page chrome (large title/subtitle and outer page margins)
       /// is dropped so the editor can be hosted inside a dialog tab. Only a
@@ -421,11 +422,8 @@ namespace hMailServer.ControlPanel.Views
                try
                {
                   int number = System.Convert.ToInt32(value, CultureInfo.InvariantCulture);
-                  foreach ((int Value, string Label) option in options_)
-                  {
-                     if (option.Value == number)
-                        return option.Label;
-                  }
+                  foreach ((int Value, string Label) option in options_.Where(o => o.Value == number))
+                     return option.Label;
                }
                catch (FormatException)
                {

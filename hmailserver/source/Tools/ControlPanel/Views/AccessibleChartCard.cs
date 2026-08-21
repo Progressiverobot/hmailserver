@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Linq;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -840,16 +841,7 @@ namespace hMailServer.ControlPanel.Views
 
       private bool HasActivity_()
       {
-         foreach (List<double?> series in samples_)
-         {
-            foreach (double? value in series)
-            {
-               if (value.GetValueOrDefault() > 0)
-                  return true;
-            }
-         }
-
-         return false;
+         return samples_.Any(series => series.Any(value => value.GetValueOrDefault() > 0));
       }
 
       private static SKColor Skia_(uint argb)

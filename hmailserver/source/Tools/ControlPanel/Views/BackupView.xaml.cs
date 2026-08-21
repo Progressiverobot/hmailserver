@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
@@ -346,9 +347,9 @@ namespace hMailServer.ControlPanel.Views
 
             try
             {
-               foreach (string file in System.IO.Directory.EnumerateFiles(destination))
+               foreach (string name in System.IO.Directory.EnumerateFiles(destination)
+                  .Select(System.IO.Path.GetFileName))
                {
-                  string name = System.IO.Path.GetFileName(file);
                   if (TryParseArchiveName(name, out DateTime created) &&
                       (newestName == null || created > newestTime))
                   {
@@ -469,12 +470,10 @@ namespace hMailServer.ControlPanel.Views
          if (hourPart.Length > 2 || minutePart.Length != 2)
             return false;
 
-         foreach (char c in hourPart)
-            if (!char.IsAsciiDigit(c))
-               return false;
-         foreach (char c in minutePart)
-            if (!char.IsAsciiDigit(c))
-               return false;
+         if (!hourPart.All(char.IsAsciiDigit))
+            return false;
+         if (!minutePart.All(char.IsAsciiDigit))
+            return false;
 
          int parsedHour = int.Parse(hourPart, CultureInfo.InvariantCulture);
          int parsedMinute = int.Parse(minutePart, CultureInfo.InvariantCulture);
@@ -512,9 +511,8 @@ namespace hMailServer.ControlPanel.Views
             return false;
 
          int[] dateDigitOffsets = { 9, 10, 11, 12, 14, 15, 17, 18 };
-         foreach (int offset in dateDigitOffsets)
-            if (!char.IsAsciiDigit(fileName[offset]))
-               return false;
+         if (!dateDigitOffsets.All(offset => char.IsAsciiDigit(fileName[offset])))
+            return false;
 
          for (int offset = 20; offset <= 25; offset++)
             if (!char.IsAsciiDigit(fileName[offset]))
