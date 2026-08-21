@@ -483,6 +483,15 @@ namespace HM
       pDomain->SetRelayPassword(Crypt::Instance()->UnprotectSecret(pRS->GetStringValue("domainrelaypassword")));
       pDomain->SetRelayConnectionSecurity((ConnectionSecurity) pRS->GetLongValue("domainrelayconnectionsecurity"));
 
+      // All six columns default to off/empty, so a domain that predates them reads
+      // back as one that has never configured a domain-wide out-of-office reply.
+      pDomain->SetVacationMessageIsOn(pRS->GetLongValue("domainvacationmessageon") == 1);
+      pDomain->SetVacationSubject(pRS->GetStringValue("domainvacationsubject"));
+      pDomain->SetVacationMessage(pRS->GetStringValue("domainvacationmessage"));
+      pDomain->SetVacationInternalSubject(pRS->GetStringValue("domainvacationinternalsubject"));
+      pDomain->SetVacationInternalMessage(pRS->GetStringValue("domainvacationinternalmessage"));
+      pDomain->SetVacationExternalOverride(pRS->GetLongValue("domainvacationexternaloverride") == 1);
+
       return true;
    }
 
@@ -571,6 +580,13 @@ namespace HM
       oStatement.AddColumn("domainrelayusername", pDomain->GetRelayUsername());
       oStatement.AddColumn("domainrelaypassword", Crypt::Instance()->ProtectSecret(pDomain->GetRelayPassword()));
       oStatement.AddColumn("domainrelayconnectionsecurity", (int) pDomain->GetRelayConnectionSecurity());
+
+      oStatement.AddColumn("domainvacationmessageon", pDomain->GetVacationMessageIsOn() ? 1 : 0);
+      oStatement.AddColumn("domainvacationsubject", pDomain->GetVacationSubject());
+      oStatement.AddColumn("domainvacationmessage", pDomain->GetVacationMessage());
+      oStatement.AddColumn("domainvacationinternalsubject", pDomain->GetVacationInternalSubject());
+      oStatement.AddColumn("domainvacationinternalmessage", pDomain->GetVacationInternalMessage());
+      oStatement.AddColumn("domainvacationexternaloverride", pDomain->GetVacationExternalOverride() ? 1 : 0);
 
       oStatement.SetTable("hm_domains");
       

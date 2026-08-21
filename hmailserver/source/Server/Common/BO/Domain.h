@@ -175,6 +175,56 @@ namespace HM
       ConnectionSecurity GetRelayConnectionSecurity() const { return relay_connection_security_; }
       void SetRelayConnectionSecurity(ConnectionSecurity newValue) { relay_connection_security_ = newValue; }
 
+      // The domain-wide out-of-office reply. It answers mail to accounts that have
+      // no active vacation message of their own (a closed office, a decommissioned
+      // department), and it can say different things to different senders:
+      //
+      //   * GetVacationSubject/GetVacationMessage is the EXTERNAL text - what a
+      //     sender from outside the server's own domains receives. It is also the
+      //     fallback for internal senders when no internal text is configured, so
+      //     the safe, generic wording belongs here.
+      //   * GetVacationInternalSubject/GetVacationInternalMessage is the optional
+      //     INTERNAL text - what a sender who resolves to an account or alias
+      //     hosted on this server receives. Empty means "internal senders get the
+      //     external text too".
+      //
+      // "Internal" is decided by SMTPVacationMessageCreator::IsInternalSender, and
+      // its guarantee is deliberately weak: the envelope sender NAMES a local
+      // mailbox, not that the message came from that mailbox's owner. The envelope
+      // is forgeable wherever the installation's IP ranges accept a local MAIL FROM
+      // without authentication, so the internal text must never carry anything that
+      // cannot be shown to a stranger.
+      //
+      // Precedence against an account's own vacation message: the account wins, the
+      // domain answers only for accounts with nothing of their own, and exactly one
+      // reply is ever produced per delivered message. Two replies would double the
+      // loop pressure and can contradict each other ("back on Monday" beside "this
+      // office has closed").
+      bool GetVacationMessageIsOn() const { return vacation_message_on_; }
+      void SetVacationMessageIsOn(bool bNewVal);
+
+      String GetVacationSubject() const { return vacation_subject_; }
+      void SetVacationSubject(const String &sNewVal) { vacation_subject_ = sNewVal; }
+
+      String GetVacationMessage() const { return vacation_message_; }
+      void SetVacationMessage(const String &sNewVal) { vacation_message_ = sNewVal; }
+
+      String GetVacationInternalSubject() const { return vacation_internal_subject_; }
+      void SetVacationInternalSubject(const String &sNewVal) { vacation_internal_subject_ = sNewVal; }
+
+      String GetVacationInternalMessage() const { return vacation_internal_message_; }
+      void SetVacationInternalMessage(const String &sNewVal) { vacation_internal_message_ = sNewVal; }
+
+      // The organisation-wide privacy policy for accounts that DO have their own
+      // vacation message: when this is on and the domain's external text is
+      // configured, an external sender receives the domain's external text in place
+      // of the account's personal one, while internal senders still receive what
+      // the account wrote. Off (the default) preserves the pre-existing behaviour -
+      // the account's single message goes to everyone - so an upgraded installation
+      // changes nothing until an administrator decides otherwise.
+      bool GetVacationExternalOverride() const { return vacation_external_override_; }
+      void SetVacationExternalOverride(bool bNewVal) { vacation_external_override_ = bNewVal; }
+
       int GetDKIMHeaderCanonicalizationMethod() const;
       void SetDKIMHeaderCanonicalizationMethod(int newValue);
 
@@ -236,6 +286,13 @@ namespace HM
       String relay_username_;
       String relay_password_;
       ConnectionSecurity relay_connection_security_;
+
+      bool vacation_message_on_;
+      String vacation_subject_;
+      String vacation_message_;
+      String vacation_internal_subject_;
+      String vacation_internal_message_;
+      bool vacation_external_override_;
 
       std::shared_ptr<Accounts> accounts_;
       std::shared_ptr<Aliases> aliases_;

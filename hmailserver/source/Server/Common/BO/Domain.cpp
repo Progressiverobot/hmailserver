@@ -12,6 +12,8 @@
 #include "DistributionLists.h"
 #include "DomainAliases.h"
 
+#include "../../SMTP/SMTPVacationMessageCreator.h"
+
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
 #define new DEBUG_NEW
@@ -37,9 +39,11 @@ namespace HM
       limitations_enabled_(0),
       relay_port_(0),
       relay_requires_auth_(false),
-      relay_connection_security_(CSNone)
+      relay_connection_security_(CSNone),
+      vacation_message_on_(false),
+      vacation_external_override_(false)
    {
-      
+
    }
 
    Domain::~Domain()
@@ -138,6 +142,13 @@ namespace HM
       pNode->AppendAttr(_T("DKIMSecondarySelector"), dkim_secondary_selector_);
       pNode->AppendAttr(_T("DKIMSecondaryPrivateKeyFile"), dkim_secondary_private_key_file_);
 
+      pNode->AppendAttr(_T("VacationMessageOn"), vacation_message_on_ ? _T("1") : _T("0"));
+      pNode->AppendAttr(_T("VacationSubject"), vacation_subject_);
+      pNode->AppendAttr(_T("VacationMessage"), vacation_message_);
+      pNode->AppendAttr(_T("VacationInternalSubject"), vacation_internal_subject_);
+      pNode->AppendAttr(_T("VacationInternalMessage"), vacation_internal_message_);
+      pNode->AppendAttr(_T("VacationExternalOverride"), vacation_external_override_ ? _T("1") : _T("0"));
+
       if (!GetDomainAliases()->XMLStore(pNode, iBackupOptions))
          return false;
 
@@ -192,6 +203,18 @@ namespace HM
       // old backup restores to today's behaviour.
       dkim_secondary_selector_ = pNode->GetAttrValue(_T("DKIMSecondarySelector"));
       dkim_secondary_private_key_file_ = pNode->GetAttrValue(_T("DKIMSecondaryPrivateKeyFile"));
+
+      // A backup taken before these attributes existed restores as "off with empty
+      // texts", which is the state of a domain that has never configured the
+      // domain-wide out-of-office reply. Assigned to the members rather than through
+      // SetVacationMessageIsOn: this is a restore, not an administrator's toggle,
+      // and must not touch the running server's already-answered memory.
+      vacation_message_on_ = pNode->GetAttrValue(_T("VacationMessageOn")) == _T("1");
+      vacation_subject_ = pNode->GetAttrValue(_T("VacationSubject"));
+      vacation_message_ = pNode->GetAttrValue(_T("VacationMessage"));
+      vacation_internal_subject_ = pNode->GetAttrValue(_T("VacationInternalSubject"));
+      vacation_internal_message_ = pNode->GetAttrValue(_T("VacationInternalMessage"));
+      vacation_external_override_ = pNode->GetAttrValue(_T("VacationExternalOverride")) == _T("1");
 
       return true;
    }
@@ -586,7 +609,29 @@ namespace HM
          anti_spam_options_ &= ~ASDKIMSHA1;
    }
 
-   size_t 
+   void
+   Domain::SetVacationMessageIsOn(bool bNewVal)
+   {
+      if (!bNewVal && vacation_message_on_ && !name_.IsEmpty())
+      {
+         // The administrator has just turned the domain-wide out-of-office reply
+         // off. Forget who has already been answered on this domain's behalf, the
+         // same way Account::SetVacationMessageIsOn forgets for one account: without
+         // this, switching the reply off and on again (a re-opened office closing
+         // for the next holiday) stays silent towards everyone it answered the
+         // first time, for as long as the service runs.
+         //
+         // This over-clears on purpose. The map does not record WHICH feature
+         // answered a sender, so entries made by an account's own vacation message
+         // for accounts in this domain are dropped too; the cost is one repeated
+         // courtesy reply, the alternative is a reply that never comes.
+         SMTPVacationMessageCreator::Instance()->DomainVacationMessageTurnedOff(name_);
+      }
+
+      vacation_message_on_ = bNewVal;
+   }
+
+   size_t
    Domain::GetEstimatedCachingSize()
    {
       return 1024;

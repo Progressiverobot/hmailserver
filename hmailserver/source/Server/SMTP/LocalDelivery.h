@@ -27,7 +27,26 @@ namespace HM
       // through because a Sieve reject sends its non-delivery report from here.
       bool LocalDeliveryPreProcess_(std::shared_ptr<const Account> account, std::shared_ptr<Message> accountLevelMessage, const String &sOriginalAddress, std::vector<DeliveryFailure> &saErrorMessages, bool suppressFailureDsn);
       bool AddTraceHeaders_(std::shared_ptr<const Account> account, std::shared_ptr<Message> pMessage, const String &sOriginalAddress);
-      void SendAutoReplyMessage_(std::shared_ptr<const Account> pAccount, std::shared_ptr<Message> pMessage);
+
+      // The account's own vacation message. Returns true when that feature is ON
+      // for this account - whether or not a reply was actually produced (the
+      // sender may be suppressed, the message spam-flagged, the sender the account
+      // itself). The return value is what keeps the precedence rule honest: an
+      // account that has spoken for itself, even by staying silent, is never
+      // spoken over by the domain-wide reply, so exactly one auto-reply can ever
+      // answer one delivered message.
+      bool SendAutoReplyMessage_(std::shared_ptr<const Account> pAccount, std::shared_ptr<Message> pMessage);
+
+      // The domain-wide out-of-office reply, for an account with no active
+      // vacation message of its own. Chooses the domain's internal or external
+      // text by what the envelope sender resolves to (see
+      // SMTPVacationMessageCreator::IsInternalSender) and sends through the same
+      // creator the account-level reply uses, so the RFC 3834 loop guards and the
+      // once-per-sender memory exist exactly once. Called after the Sieve script
+      // has been evaluated, and only when neither the account's stored vacation
+      // message nor a Sieve vacation action was active - the account's own voice,
+      // in either form, wins over the domain's.
+      void SendDomainAutoReplyMessage_(std::shared_ptr<const Account> pAccount, std::shared_ptr<Message> pMessage);
       bool RunAccountRules_(std::shared_ptr<const Account> pAccount, std::shared_ptr<Message> pMessage, RuleResult &accountRuleResult);
       bool CheckAccountQuotas_(std::shared_ptr<const Account> pAccount, std::vector<DeliveryFailure> &saErrorMessages, bool suppressFailureDsn);
 
@@ -52,10 +71,15 @@ namespace HM
       // reject/ereject (RFC 5429): the caller then drops the local copy AND sends
       // a non-delivery report carrying the reason, through the same machinery as
       // a quota bounce.
+      // sieveVacationRequested is true when the script asked for a vacation reply
+      // to this message - whether or not the responder's own suppression window
+      // then let it out. It exists for the domain-wide out-of-office reply's
+      // precedence decision, which is about who SPEAKS for the account, not about
+      // whether this particular reply escaped the rate limit.
       void EvaluateSieveScript_(std::shared_ptr<const Account> account, std::shared_ptr<Message> message,
                                 const String &sOriginalAddress, String &sieveFolder, bool &sieveDrop,
                                 bool &sieveFlagsGiven, std::vector<String> &sieveFlags,
-                                String &sieveRejectReason);
+                                String &sieveRejectReason, bool &sieveVacationRequested);
 
       // Writes the flags a script decided onto the message that is about to be saved.
       //

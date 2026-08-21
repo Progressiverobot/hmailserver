@@ -10,6 +10,7 @@
 #include "../common/Application/ObjectCache.h"
 
 #include "../common/BO/Account.h"
+#include "../common/BO/Domain.h"
 #include "../common/BO/Message.h"
 #include "../common/BO/MessageRecipient.h"
 #include "../common/BO/MessageRecipients.h"
@@ -300,7 +301,10 @@ namespace HM
    bool 
    LocalDelivery::LocalDeliveryPreProcess_(std::shared_ptr<const Account> account, std::shared_ptr<Message> accountLevelMessage, const String &sOriginalAddress, std::vector<DeliveryFailure> &saErrorMessages, bool suppressFailureDsn)
    {
-      SendAutoReplyMessage_(account, original_message_);
+      // True when the account's own vacation-message feature is on, whether or not
+      // it produced a reply for this particular message. Kept for the domain-wide
+      // fallback decision after the Sieve script has run, further down.
+      bool accountVacationActive = SendAutoReplyMessage_(account, original_message_);
 
       // We must run account level rules after the message file has been
       // moved to the destination folder, so that any changes it has only
@@ -331,8 +335,29 @@ namespace HM
       bool sieveFlagsGiven = false;
       std::vector<String> sieveFlags;
       String sieveRejectReason;
+      bool sieveVacationRequested = false;
       EvaluateSieveScript_(account, accountLevelMessage, sOriginalAddress, sieveFolder, sieveDrop,
-                           sieveFlagsGiven, sieveFlags, sieveRejectReason);
+                           sieveFlagsGiven, sieveFlags, sieveRejectReason, sieveVacationRequested);
+
+      // The domain-wide out-of-office reply, and the precedence rule in one line:
+      // it answers only when the account has no voice of its own - neither the
+      // stored vacation message nor a Sieve vacation action for this message. One
+      // delivered message therefore produces at most ONE auto-reply, ever. Sending
+      // both would double the pressure on every loop guard, and the two texts can
+      // contradict each other ("back on Monday" beside "this office has closed"),
+      // which is worse than either alone.
+      //
+      // Placed here, after the Sieve evaluation, because the Sieve half of the
+      // account's voice is not known any earlier. Two consequences of the
+      // placement, both accepted deliberately: a Sieve reject or discard still
+      // gets the domain reply (this line runs before those are acted on, matching
+      // the account-level reply, which also fires before the message's fate is
+      // decided); and a message a rule deleted or a forward diverted never
+      // reaches this line at all - which is right, because an account with a
+      // delete-rule or a forward is an account somebody is actively managing,
+      // and the domain fallback exists for the mailbox nobody speaks for.
+      if (!accountVacationActive && !sieveVacationRequested)
+         SendDomainAutoReplyMessage_(account, original_message_);
 
       if (!sieveRejectReason.IsEmpty())
       {
@@ -504,13 +529,14 @@ namespace HM
    LocalDelivery::EvaluateSieveScript_(std::shared_ptr<const Account> account, std::shared_ptr<Message> message,
                                        const String &sOriginalAddress, String &sieveFolder, bool &sieveDrop,
                                        bool &sieveFlagsGiven, std::vector<String> &sieveFlags,
-                                       String &sieveRejectReason)
+                                       String &sieveRejectReason, bool &sieveVacationRequested)
    {
       sieveFolder = _T("");
       sieveDrop = false;
       sieveFlagsGiven = false;
       sieveFlags.clear();
       sieveRejectReason.Empty();
+      sieveVacationRequested = false;
 
       String script = SieveStorage::GetActiveScript(account->GetAddress());
       if (script.IsEmpty())
@@ -600,6 +626,13 @@ namespace HM
       // survived every loop-prevention check the evaluator could apply. The responder
       // applies the suppression window and the remaining guards, and never touches the
       // delivery of the message itself, so nothing below depends on it.
+      //
+      // "Requested" and not "sent": the domain-wide fallback that reads this flag
+      // must stay silent whenever the script spoke for the account, including when
+      // the responder's suppression window then held THIS reply back - the sender
+      // already got the script's answer once, and the domain repeating a different
+      // one would be the two-replies problem arriving sideways.
+      sieveVacationRequested = sieveResult.vacation.send;
       SieveVacationResponder::Instance()->Respond(account, sieveResult.vacation);
 
       if (!sieveResult.fileInto.IsEmpty())
@@ -880,7 +913,7 @@ namespace HM
       return writer.Write(fileName, pMessage, fieldsToWrite);
    }    
 
-   void 
+   bool
    LocalDelivery::SendAutoReplyMessage_(std::shared_ptr<const Account> pAccount, std::shared_ptr<Message> pMessage)
    {
       // Do this before we move the message to the users
@@ -890,27 +923,103 @@ namespace HM
 
       // Should we send a vacation message back?
       if (!PersistentAccount::GetIsVacationMessageOn(pAccount))
-         return;
+         return false;
+
+      // From here on the account's vacation message is ON, so the answer is true
+      // whatever happens below: the guards that follow suppress THIS reply, they do
+      // not hand the account's voice to the domain-wide fallback.
 
       // Don't deliver vacation message to ourselves.
       if (pAccount->GetAddress().CompareNoCase(pMessage->GetFromAddress()) == 0)
-         return;
+         return true;
 
       // Don't deliver vacation message when the message is classified as spam
       if (pAccount->GetVacationAbortSpamFlagged() && pMessage->GetFlagSpam())
       {
          LOG_DEBUG("LocalDelivery::SendAutoReplyMessage_ aborted, message marked as spam");
-         return;
+         return true;
+      }
+
+      String sSubject = pAccount->GetVacationSubject();
+      String sMessage = pAccount->GetVacationMessage();
+
+      // The domain's privacy policy for external senders: when the account's domain
+      // says so, a sender from outside this installation receives the domain's
+      // generic external text in place of the account's personal one - "your
+      // message has been received" instead of "I am at the conference, ask Priya".
+      // Internal senders still get what the account wrote. Off by default, so an
+      // installation that has not opted in behaves exactly as before.
+      std::shared_ptr<const Domain> pDomain = CacheContainer::Instance()->GetDomain(pAccount->GetDomainID());
+      if (pDomain &&
+          pDomain->GetVacationExternalOverride() &&
+          !pDomain->GetVacationMessage().IsEmpty() &&
+          !SMTPVacationMessageCreator::IsInternalSender(pMessage->GetFromAddress()))
+      {
+         sSubject = pDomain->GetVacationSubject();
+         sMessage = pDomain->GetVacationMessage();
       }
 
       // Save a new message with the vacation message in it.
-      SMTPVacationMessageCreator::Instance()->CreateVacationMessage(pAccount, 
-         pMessage->GetFromAddress(), 
-         pAccount->GetVacationSubject(), 
-         pAccount->GetVacationMessage(),
+      SMTPVacationMessageCreator::Instance()->CreateVacationMessage(pAccount,
+         pMessage->GetFromAddress(),
+         sSubject,
+         sMessage,
          pMessage
          );
-   }      
+
+      return true;
+   }
+
+   void
+   LocalDelivery::SendDomainAutoReplyMessage_(std::shared_ptr<const Account> pAccount, std::shared_ptr<Message> pMessage)
+   {
+      std::shared_ptr<const Domain> pDomain = CacheContainer::Instance()->GetDomain(pAccount->GetDomainID());
+      if (!pDomain || !pDomain->GetVacationMessageIsOn())
+         return;
+
+      // Never answer ourselves, the same guard the account-level reply applies.
+      if (pAccount->GetAddress().CompareNoCase(pMessage->GetFromAddress()) == 0)
+         return;
+
+      // No reply to a message the server has flagged as spam. The account-level
+      // path makes this a per-account choice; the domain has no per-sender
+      // preference to consult, and answering spam confirms to the sender that the
+      // address is live, so the safe answer is the only one offered.
+      if (pMessage->GetFlagSpam())
+      {
+         LOG_DEBUG("LocalDelivery::SendDomainAutoReplyMessage_ aborted, message marked as spam");
+         return;
+      }
+
+      // The internal text is richer and optional; the external text is generic and
+      // is the fallback for everyone when no internal text is configured. A sender
+      // class whose text works out empty gets nothing - an empty-bodied "reply"
+      // helps nobody - which also means an administrator can configure an
+      // internal-only notice by leaving the external text blank.
+      String sSubject = pDomain->GetVacationSubject();
+      String sMessage = pDomain->GetVacationMessage();
+
+      if (SMTPVacationMessageCreator::IsInternalSender(pMessage->GetFromAddress()) &&
+          !pDomain->GetVacationInternalMessage().IsEmpty())
+      {
+         sSubject = pDomain->GetVacationInternalSubject();
+         sMessage = pDomain->GetVacationInternalMessage();
+      }
+
+      if (sMessage.IsEmpty())
+         return;
+
+      // The same creator the account-level reply uses, on purpose: the RFC 3834
+      // suppression rules, the null return path, the Auto-Submitted stamp and the
+      // once-per-sender memory live there exactly once, and a second copy of any
+      // of them is how one of the two quietly stops being correct.
+      SMTPVacationMessageCreator::Instance()->CreateVacationMessage(pAccount,
+         pMessage->GetFromAddress(),
+         sSubject,
+         sMessage,
+         pMessage
+         );
+   }
 
    bool 
    LocalDelivery::RunAccountRules_(std::shared_ptr<const Account> pAccount, std::shared_ptr<Message> pMessage, RuleResult &accountRuleResult)
