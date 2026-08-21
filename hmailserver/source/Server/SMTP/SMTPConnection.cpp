@@ -1922,8 +1922,20 @@ namespace HM
 
       SetMessageSignature_(pMsgData);
 
-      if (pMsgData)
-         pMsgData->WriteReported(PersistentMessage::GetFileName(current_message_), "The message signature");
+      if (pMsgData && !pMsgData->WriteReported(PersistentMessage::GetFileName(current_message_), "The message signature"))
+      {
+         // WriteReported has already put the failure itself in the error log; what
+         // belongs here is the consequence, because it is what an administrator
+         // will actually be diagnosing: the file on disk is left as it arrived, so
+         // the message is delivered without its spam-score headers and signature,
+         // and a rule matching those headers will not fire for it. Refusing the
+         // message instead would turn a failed header edit into refused mail,
+         // which is the worse trade - the spam FLAG set above still travels on
+         // the message object either way.
+         String sWriteFailed;
+         sWriteFailed.Format(_T("Message %I64d was delivered without its spam-score headers or signature - the rewrite of the message file failed."), current_message_->GetID());
+         LOG_APPLICATION(sWriteFailed);
+      }
 
       // RFC 2369 / RFC 2919 List-* headers for postings to local distribution lists.
       //

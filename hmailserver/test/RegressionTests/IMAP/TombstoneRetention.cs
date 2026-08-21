@@ -241,5 +241,44 @@ namespace RegressionTests.IMAP
             "A client resynchronising from the current HIGHESTMODSEQ has missed nothing, and must not be sent " +
             "a VANISHED response merely because older records were pruned. " + uptodate);
       }
+
+      [Test]
+      [Description("RFC 7162 3.2.6: VANISHED (EARLIER) is sent before any FETCH response - the order is a MUST, because the client renumbers by it")]
+      public void VanishedEarlierComesBeforeTheFetchResponses()
+      {
+         const string address = "tombstoneorder@example.test";
+
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, address, "test");
+
+         var simulator = new ImapClientSimulator();
+         simulator.Connect();
+         simulator.LogonWithLiteral(address, "test");
+
+         long clientModSeq = BuildMailboxWithExpunges(simulator);
+
+         // Change the survivor AFTER the client's sync point, so the UID FETCH below
+         // has a FETCH response to send as well as a VANISHED one - a response with
+         // only one of the two proves nothing about their order.
+         simulator.SendSingleCommand("F01 UID STORE 5 +FLAGS (\\Answered)");
+
+         string result = simulator.SendSingleCommand(
+            "F02 UID FETCH 1:* (FLAGS) (CHANGEDSINCE " + clientModSeq + " VANISHED)");
+
+         simulator.Disconnect();
+
+         int vanishedAt = result.IndexOf("* VANISHED (EARLIER)");
+         int fetchAt = result.IndexOf("FETCH (");
+
+         Assert.IsTrue(vanishedAt >= 0, "The expunges after the client's mod-sequence must be reported. " + result);
+         Assert.IsTrue(fetchAt >= 0, "The flagged survivor must produce a FETCH response. " + result);
+
+         // RFC 7162 3.2.6: "Any VANISHED (EARLIER) responses MUST be returned before
+         // any FETCH responses, otherwise the client might get confused about how
+         // message numbers map to UIDs." The client shrinks its model by the vanished
+         // set first; a FETCH that arrives before it is renumbering a mailbox the
+         // client still believes is larger.
+         Assert.IsTrue(vanishedAt < fetchAt,
+            "VANISHED (EARLIER) must precede the FETCH responses (RFC 7162 3.2.6 MUST). " + result);
+      }
    }
 }
