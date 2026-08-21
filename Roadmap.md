@@ -41,11 +41,12 @@ than a wording problem.
 
 ### Contents and totals
 
-814 items. The counts are the point of this table — they say where the fork is
+830 items. The counts are the point of this table — they say where the fork is
 strong and where it is thin far more honestly than any prose summary.
 
 | Section | ✅ | 🔄 | ⬜ | ⏸️ |
 |---|--:|--:|--:|--:|
+| [Urgent — the OpenSSF gold badge](#urgent--the-openssf-gold-badge) | – | – | 13 | 3 |
 | [Dated items — the forcing functions](#dated-items--the-forcing-functions) | 2 | – | 4 | 1 |
 | [Defects found by the audit](#defects-found-by-the-audit) | 30 | – | – | – |
 | **The next generation** | | | | |
@@ -110,6 +111,64 @@ moves — as they had, by 48 items in one section, before the 6.2.22-pre2 review
 caught them, and again days later when app passwords shipped while this paragraph
 still said none of that chain existed. Re-read them against the table whenever
 the totals change.
+
+Urgent — the OpenSSF gold badge
+-------------------------------
+
+Added 21 August 2026, the day the **passing** badge was earned (52% → 100% in
+one sitting) and silver reached 96%. Gold is the stated target, so this section
+sits at the top until it is either achieved or honestly declared unreachable.
+The live numbers are at <https://www.bestpractices.dev/en/projects/14187>:
+passing 100%, silver 96%, gold 48%, baseline 1/2/3 at 92/95/43%.
+
+Two rules carried over from how the badge was filled in, and they bind here
+too: **nothing is claimed that the repository does not show**, and a criterion
+that is honestly Unmet is recorded as Unmet with the reason — the programme
+accepts that for non-MUST criteria, and a false answer on a public
+self-certification would cost more than the badge is worth. Every answer
+already submitted was evidence-checked against the tree and then adversarially
+re-verified; nine were corrected before submission.
+
+### The ceiling, stated first
+
+Gold has 23 criteria. Three are MUST, allow no N/A, and require **a second
+human**: `bus_factor` ≥ 2, `contributors_unassociated` (two significant
+contributors not from the same organisation), and `two_person_review` (half of
+all changes reviewed by someone other than the author). A single-maintainer
+project cannot reach 100% gold by any amount of work on the code. Everything
+else below is real and worth doing — it takes gold from 48% to roughly 80% —
+but the last three rows wait for a person, and that is recorded as ⏸️ rather
+than dressed up.
+
+### What stands between here and gold
+
+| | Criterion | What is needed, precisely |
+|:-:|---|---|
+| ⬜ | **`license_per_file` + `copyright_per_file`** — mechanical, one PR | Not one source file carries an SPDX line. Add `SPDX-License-Identifier: AGPL-3.0-or-later` as the first comment of every source file, and a copyright line where one is missing: **20 `.cpp`, 27 `.h`, 227 `.cs`, 29 `.ps1`, 3 `.py`** lack copyright; all 1,806 lack SPDX (`libraries/` excluded — vendored, and inventoried in `third-party-binaries.json`). Traps: **76 `.cs`, 7 `.cpp` and 2 `.ps1` start with a UTF-8 BOM** — insert after it, never before; every file is CRLF, keep it; MSVC is happy with a comment before `#include <stdafx.h>`; PowerShell comment-based help may be preceded by plain `#` comments, so the SPDX line goes first. Script it, build, run the suite, one commit. Wording the badge accepts: `// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors` then `// SPDX-License-Identifier: AGPL-3.0-or-later`. |
+| ⬜ | **`small_tasks`** — an afternoon | Create a `good first issue` label and file real, bounded issues under it, then add a *Small tasks* paragraph to `CONTRIBUTING.md` pointing at the label. Candidates that are each genuinely small and each closes a gap recorded elsewhere on this page: run `dotnet format` over the C# tree and restore the format-verify job removed from `style.yml` on 21 Aug because the tree was not clean; turn on Control Flow Guard (`/guard:cf`) and prove the suite still passes (named as residual risk in `ASSURANCE-CASE.md`); sign release tags with gitsign or cosign (`version_tags_signed`); add a DCO sign-off check (`dco`); write the regression-environment recipe that `CONTRIBUTING.md` admits is unpublished; add fuzz dictionaries for iCalendar and vCard under `fuzz/dict/`; SCRAM-SHA-1 alongside SHA-256 for older clients. |
+| ⬜ | **`hardened_site`** — web host, not repo | <https://www.progressiverobot.com/hmailserver-services/> sends HSTS (`preload`), `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN` and `Referrer-Policy` — and **no `Content-Security-Policy`**. That one header is the whole gap; GitHub (repository and download site) already passes. Add a CSP at the host and re-check at <https://securityheaders.com/>. |
+| ⬜ | **`dynamic_analysis`** — a RELEASE.md step | The full regression suite runs on the stamped binary before every release (RELEASE.md step 9), but the badge counts a test suite as dynamic analysis only at ≥ 80% *branch* coverage, which is unmeasured here. Fuzzing counts unconditionally, and the harnesses exist: `fuzz/run-fuzz.ps1 -Target mime_message_fuzzer`. Make a timed fuzz run a **required step for every minor release** in RELEASE.md, do it for the next one, and only then mark Met. |
+| ⬜ | **`dynamic_analysis_enable_assertions`** (SHOULD) | Release builds compile `assert` to `((void)0)` — roughly 190 sites do nothing in the shipped binary, which is why this was recorded Unmet rather than claimed. Recorded-with-reason already counts for a SHOULD; the real fix is a Release-with-assertions configuration used by the fuzz build and the pre-release suite run. |
+| ⬜ | **`test_statement_coverage80`** (silver MUST) | Native C++ coverage has never been measured; only the Control Panel reports cobertura. OpenCppCoverage is FLOSS, so N/A would not be honest. Run it over `build/run-tests.ps1` on the self-hosted runner, publish the number whatever it is, then decide. This and the next row are the last two silver criteria; closing both makes `achieve_silver` true automatically. |
+| ⬜ | **`build_repeatable` / `build_reproducible`** (silver + gold) | Not established and not claimed. MSVC side: `/Brepro`, `/d1trimfile`, `/pdbaltpath` (or keep the PDB out of the hashed artefact), pinned toolset (already v145, SDK pinned in `global.json`); Inno Setup side: `TouchDate` / `TouchTime` so the installer's timestamps are fixed; then build twice on two machines and diff. Document the container or VM hash a rebuild must use. The largest engineering item on this list. |
+| ⬜ | **`test_statement_coverage90` + `test_branch_coverage80`** (gold) | Follow from measuring. Likely far off for the native server; honest until the number exists. |
+| ⬜ | **`achieve_silver`** | Computed by the badge site; true the moment the two silver rows above close. |
+| ⏸️ | **`bus_factor`** | One person knows the codebase. `GOVERNANCE.md` now says which half of continuity is arranged (access, legal rights) and which is not (knowledge). Waits for a second maintainer — see *Becoming a maintainer* there. |
+| ⏸️ | **`contributors_unassociated`** | Two significant contributors from different organisations. The repository has one human committer and Dependabot. |
+| ⏸️ | **`two_person_review`** | Half of proposed changes reviewed by someone other than the author. Structurally impossible alone; becomes possible the day the row above does. |
+
+### Housekeeping that fell out of the badge work
+
+Not gold criteria, but found while getting there, and each is a toggle or a
+small change rather than a project.
+
+| | Item | Detail |
+|:-:|---|---|
+| ⬜ | **Interop manifest drift** | Regenerating `Interop.hMailServer.dll` after a COM API change without updating its SHA-256 in `hmailserver/docs/third-party-binaries.json` failed the binary-provenance check **twice on 21 Aug alone**. The regeneration step in `hmailserver/source/Tools/Interop/README.md` should rewrite its own manifest entry so the hash and the binary can never disagree. |
+| ⬜ | **Repository setting: Code quality** | The CI coverage upload returns 403 until *Code quality* is enabled in repository settings; `ci.yml` treats the failure as a warning meanwhile. Enable it, then remove `fail-on-error: false`. |
+| ⬜ | **Repository setting: automatic dependency submission** | GitHub's own NuGet submission job is red on every push because it restores Windows-targeting projects on a Linux runner. It duplicates what `sbom.yml` already submits. Turn it off under *Dependency graph*, or accept a permanent red X. |
+| ⬜ | **Organisation setting: require 2FA** | The maintainer account uses a passkey; the org-wide requirement is still off (the API refused it — it would eject any member without 2FA, and the org has a second, read-only member). Enable it in *Authentication security* once that member is confirmed enrolled. |
+
 
 Dated items — the forcing functions
 -----------------------------------
