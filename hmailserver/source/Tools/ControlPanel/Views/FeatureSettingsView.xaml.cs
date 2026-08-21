@@ -1935,6 +1935,28 @@ namespace hMailServer.ControlPanel.Views
                         Placeholder = "http://localhost:4318",
                         Blurb = SettingClaims.NoteFor("OtelEndpoint")
                      },
+                     new TextSetting
+                     {
+                        Key = "OtelMetricsEndpoint",
+                        Label = "OpenTelemetry OTLP endpoint for metrics (empty = disabled)",
+                        Placeholder = "http://localhost:4318",
+                        Blurb = SettingClaims.NoteFor("OtelMetricsEndpoint")
+                     },
+                     new TextSetting
+                     {
+                        Key = "OtelLogsEndpoint",
+                        Label = "OpenTelemetry OTLP endpoint for logs (empty = disabled)",
+                        Placeholder = "http://localhost:4318",
+                        Blurb = SettingClaims.NoteFor("OtelLogsEndpoint")
+                     },
+                     new TextSetting
+                     {
+                        Key = "OtelMetricsInterval",
+                        Default = "60",
+                        Label = "Seconds between metric pushes",
+                        Placeholder = "60",
+                        Blurb = "Clamped to 5-3600 by the exporter. Only used when the metrics endpoint above is set."
+                     },
                      new TextSetting { Key = "OtelServiceName", Default = "hmailserver", Label = "OpenTelemetry service name" },
                      new TextSetting { Key = "SlowQueryLogMilliseconds", Default = "0", Label = "Log database queries slower than N ms (0 = off)", Placeholder = "250" }
                   },
@@ -2149,6 +2171,50 @@ namespace hMailServer.ControlPanel.Views
                // Scanner timeouts moved to the scanner they configure: SpamAssassin
                // on the Anti-spam page and ClamAV on the Anti-virus page. The
                // resolver settings moved to Network > DNS resolver.
+               cards_.Add(new CardDef
+               {
+                  // Both of these let a peer tell this server where a connection
+                  // "really" came from, which is why the wording leads with the
+                  // trust list rather than the on/off switch. Verified in
+                  // TCPServer::HandleAccept and SMTPConnection::XClientPermitted_:
+                  // every trust decision is made against the real TCP peer, never
+                  // against an address a header supplied, so chained proxies cannot
+                  // bootstrap trust.
+                  Title = "Front-end proxies (PROXY protocol and XCLIENT)",
+                  Blurb = "Put a load balancer, a TLS terminator or a Postfix relay in front of the SMTP listener and " +
+                          "every connection appears to come from IT - which silently breaks DNSBL checks, SPF, " +
+                          "greylisting, auto-ban and the IP range rules all at once, while everything still reports " +
+                          "success. These let a named upstream pass on the real client address. Both are off by " +
+                          "default and trust nobody until an address is listed, because a peer that can rewrite its " +
+                          "own source address has defeated every IP-based control on this server. " +
+                          "The upstream has to be configured to send it or nothing here changes: HAProxy needs " +
+                          "send-proxy or send-proxy-v2 on its server line, and a Postfix relay needs XCLIENT " +
+                          "enabled towards this host. hMailServer cannot check that from here - and note that " +
+                          "once an address is listed as a PROXY protocol proxy the header becomes REQUIRED from " +
+                          "it, so a proxy that does not send one will have its connections dropped.",
+                  Settings =
+                  {
+                     new BoolSetting { Key = "SMTPProxyProtocolEnabled", Default = false, Label = "Accept the PROXY protocol (v1 and v2) on the SMTP listener" },
+                     new TextSetting
+                     {
+                        Key = "SMTPProxyProtocolTrustedIPs",
+                        Label = "Proxies allowed to send a PROXY header (comma-separated addresses or CIDR ranges)",
+                        Placeholder = "10.0.0.5, 192.168.10.0/24",
+                        Blurb = "Empty means nobody, which is the safe default. Matched against the real TCP peer. " +
+                                "An entry that does not parse matches nothing rather than everything, and is " +
+                                "reported in the error log once per run."
+                     },
+                     new BoolSetting { Key = "SMTPXClientEnabled", Default = false, Label = "Accept the XCLIENT command (Postfix)" },
+                     new TextSetting
+                     {
+                        Key = "SMTPXClientTrustedIPs",
+                        Label = "Upstreams allowed to use XCLIENT (comma-separated addresses or CIDR ranges)",
+                        Placeholder = "10.0.0.6",
+                        Blurb = "Empty means nobody. XCLIENT is not even advertised in EHLO to an upstream that is " +
+                                "not listed here, so an attacker learns nothing about the deployment by asking."
+                     }
+                  }
+               });
                cards_.Add(new CardDef
                {
                   Title = "Received headers",

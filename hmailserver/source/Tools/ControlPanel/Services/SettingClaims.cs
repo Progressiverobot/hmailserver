@@ -218,8 +218,18 @@ namespace hMailServer.ControlPanel.Services
          new SettingClaim("Cache.DistributionListCacheMaxSizeKb", ClaimKind.Honoured, CacheMaxSizeIsSessionOnly),
 
          new SettingClaim("OtelEndpoint", ClaimKind.Honoured,
-            "Traces only. The exporter posts to /v1/traces; there is no metrics or logs exporter, so a collector "
-            + "configured here receives spans and nothing else. Prometheus metrics are the port above.")
+            "Traces only. A collector configured here receives spans and nothing else - metrics and logs have "
+            + "their own endpoints below, each off until it is set. Prometheus metrics are the port above, and "
+            + "are the same counters the metrics endpoint pushes rather than a second tally."),
+         new SettingClaim("OtelMetricsEndpoint", ClaimKind.Honoured,
+            "Pushes the same counters the Prometheus endpoint serves, under the same names, on the interval "
+            + "below. Not everything on /metrics is exported: queue depth, database probes and certificate "
+            + "expiry are computed by the metrics listener from database and file reads, and a push exporter "
+            + "does not own those."),
+         new SettingClaim("OtelLogsEndpoint", ClaimKind.Honoured,
+            "The same lines, categories and mask the log files get, with the trace and span id attached "
+            + "whenever a span is active on the thread that logged. The exporter never exports its own "
+            + "failure lines, or a dead collector would feed itself.")
       };
 
       /// <summary>Every setting whose interface wording is pinned by a test.</summary>

@@ -148,17 +148,33 @@ namespace hMailServer.ControlPanel.Tests.Services
       }
 
       /// <summary>
-      /// Only the traces signal exists: OtelTracer hard-codes the /v1/traces path
-      /// and there is no metric or log record builder. The Monitoring card
-      /// advertised "OpenTelemetry traces/metrics export".
+      /// This setting is still the TRACES endpoint and must keep saying so.
+      ///
+      /// It used to read "there is no metrics or logs exporter", which was true when
+      /// it was written and stopped being true on 21 August 2026 when both signals
+      /// shipped. That is the failure mode this whole class exists to catch, arriving
+      /// from the other direction for once: not a claim that overstates what the
+      /// server does, but one that understates it, which sends an administrator to
+      /// Prometheus for metrics they could have had over OTLP. The assertion now pins
+      /// the part that has to stay true - one endpoint per signal - rather than the
+      /// absence of a feature, because an absence is exactly what a roadmap turns
+      /// into a presence.
       /// </summary>
       [Fact]
-      public void OtelClaim_SaysTracesOnly()
+      public void OtelClaim_SaysWhichSignalItCarries()
       {
          string note = SettingClaims.NoteFor("OtelEndpoint");
 
          Assert.Contains("traces", note, StringComparison.OrdinalIgnoreCase);
-         Assert.Contains("no metrics", note, StringComparison.OrdinalIgnoreCase);
+
+         // The reader has to be able to find the other two from here.
+         Assert.Contains("metrics and logs have", note, StringComparison.OrdinalIgnoreCase);
+
+         // And they must actually exist, or the sentence above is the overclaim.
+         Assert.False(string.IsNullOrWhiteSpace(SettingClaims.NoteFor("OtelMetricsEndpoint")),
+            "OtelEndpoint points the reader at a metrics endpoint that has no claim of its own.");
+         Assert.False(string.IsNullOrWhiteSpace(SettingClaims.NoteFor("OtelLogsEndpoint")),
+            "OtelEndpoint points the reader at a logs endpoint that has no claim of its own.");
       }
 
       /// <summary>
