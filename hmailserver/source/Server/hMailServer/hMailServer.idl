@@ -992,8 +992,6 @@ interface IInterfaceAccount : IDispatch
   
    [propget, id(34), helpstring("The vacation message expires this date")] HRESULT VacationMessageExpiresDate([out, retval] BSTR *pVal);
    [propput, id(34), helpstring("The vacation message expires this date")] HRESULT VacationMessageExpiresDate([in] BSTR pVal);
-   [propget, id(41), helpstring("The vacation message does not activate before this date, so an absence can be scheduled in advance")] HRESULT VacationMessageBeginDate([out, retval] BSTR *pVal);
-   [propput, id(41), helpstring("The vacation message does not activate before this date, so an absence can be scheduled in advance")] HRESULT VacationMessageBeginDate([in] BSTR pVal);
    
 	[propget, id(35), helpstring("First name of the account holder.")] HRESULT PersonFirstName([out, retval] BSTR *pVal);
 	[propput, id(35), helpstring("First name of the account holder.")] HRESULT PersonFirstName([in] BSTR newVal);
@@ -1020,6 +1018,16 @@ interface IInterfaceAccount : IDispatch
    [propput, id(48), helpstring("Per-account override of the spam mark threshold.")] HRESULT SpamMarkThreshold([in] long newVal);
    [propget, id(49), helpstring("Per-account spam delete threshold, applied at delivery to this account's copy only. -1 or 0 disables it. The copy is removed (quarantined instead when the quarantine store is enabled) only when its score provably reached the value, which means the score header this server recorded - never a guess. Requires 'add reason to header' to be on; with it off no score is provable and this override does nothing. The global delete threshold continues to govern refusal during the SMTP conversation, for all recipients alike.")] HRESULT SpamDeleteThreshold([out, retval] long *pVal);
    [propput, id(49), helpstring("Per-account spam delete threshold.")] HRESULT SpamDeleteThreshold([in] long newVal);
+
+   // Appended - and anything added later must be appended here too, below this
+   // note. A dual interface's vtable follows DECLARATION order, not id(), so a
+   // member inserted higher up silently shifts every slot beneath it while the
+   // IID stays the same. An early-bound client built against the older type
+   // library then calls the wrong method rather than failing to bind. The id()
+   // values are what keep late binding stable; position is what keeps early
+   // binding stable, and only one of the two is visible in a diff.
+   [propget, id(41), helpstring("The vacation message does not activate before this date, so an absence can be scheduled in advance")] HRESULT VacationMessageBeginDate([out, retval] BSTR *pVal);
+   [propput, id(41), helpstring("The vacation message does not activate before this date, so an absence can be scheduled in advance")] HRESULT VacationMessageBeginDate([in] BSTR pVal);
 };
 
 
@@ -1661,11 +1669,19 @@ interface IInterfaceApplication : IDispatch{
    [propget, id(15), helpstring("Gets the backup manager.")] HRESULT BackupManager([out, retval] IInterfaceBackupManager **pVal);
    [propget, id(16), helpstring("Gets the global objects object.")] HRESULT GlobalObjects([out, retval] IInterfaceGlobalObjects **pVal);
    [id(17), helpstring("Authenticate the client.")] HRESULT Authenticate([in] BSTR Username, [in] BSTR Password, [out, retval] IInterfaceAccount** pAccount);
-   [id(21), helpstring("Authenticate the client, presenting a TOTP code. An account with a second factor enrolled cannot be authenticated by password alone - a mail client has nowhere to type a code, which is what app passwords exist for, and this is the one path that can.")] HRESULT AuthenticateWithCode([in] BSTR Username, [in] BSTR Password, [in] BSTR Code, [out, retval] IInterfaceAccount** pAccount);
    [propget, id(18), helpstring("Quick links to access objects")] HRESULT Links([out, retval] IInterfaceLinks **pVal);
    [propget, id(19), helpstring("Gets a diagnostics object.")] HRESULT Diagnostics([out, retval] IInterfaceDiagnostics **pVal);
 
    [propget, id(20), helpstring("Gets the current hMailServer architecture (x86/x64)")] HRESULT VersionArchitecture([out, retval] BSTR *pVal);
+
+   // Appended - and anything added later must be appended here too, below this
+   // note. A dual interface's vtable follows DECLARATION order, not id(), so a
+   // member inserted higher up silently shifts every slot beneath it while the
+   // IID stays the same. An early-bound client built against the older type
+   // library then calls the wrong method rather than failing to bind. The id()
+   // values are what keep late binding stable; position is what keeps early
+   // binding stable, and only one of the two is visible in a diff.
+   [id(21), helpstring("Authenticate the client, presenting a TOTP code. An account with a second factor enrolled cannot be authenticated by password alone - a mail client has nowhere to type a code, which is what app passwords exist for, and this is the one path that can.")] HRESULT AuthenticateWithCode([in] BSTR Username, [in] BSTR Password, [in] BSTR Code, [out, retval] IInterfaceAccount** pAccount);
 };
 
 [
@@ -2330,10 +2346,17 @@ interface IInterfaceBackup : IDispatch
 	pointer_default(unique)
 ]
 interface IInterfaceGlobalObjects : IDispatch{
-   [propget, id(3), helpstring("The queryable message trace. Beside DeliveryQueue because the two answer the same question at different moments: where is my mail now, and what happened to it.")] HRESULT MessageTrace([out, retval] IInterfaceMessageTrace** pVal);
    [propget, id(1), helpstring("Delivery queue")] HRESULT DeliveryQueue([out, retval] IInterfaceDeliveryQueue **pVal);
    [propget, id(2), helpstring("Returns a collection of GUI languages.")] HRESULT Languages([out, retval] IInterfaceLanguages **pVal);
-   
+
+   // Appended - and anything added later must be appended here too, below this
+   // note. A dual interface's vtable follows DECLARATION order, not id(), so a
+   // member inserted higher up silently shifts every slot beneath it while the
+   // IID stays the same. An early-bound client built against the older type
+   // library then calls the wrong method rather than failing to bind. The id()
+   // values are what keep late binding stable; position is what keeps early
+   // binding stable, and only one of the two is visible in a diff.
+   [propget, id(3), helpstring("The queryable message trace. It answers the question DeliveryQueue answers, but at a different moment: where is my mail now, against what became of it.")] HRESULT MessageTrace([out, retval] IInterfaceMessageTrace** pVal);
 };
 [
 	object,
@@ -2471,7 +2494,6 @@ interface IInterfaceSURBLServer : IDispatch
 ]
 interface IInterfaceAntiSpam : IDispatch
 {
-   [propget, id(43), helpstring("The spam quarantine: messages held for review instead of refused. Empty and inert unless QuarantineEnabled is set in hMailServer.ini.")] HRESULT Quarantine([out, retval] IInterfaceQuarantine** pVal);
    [propget, id(1), helpstring("Use grey listing.")] HRESULT GreyListingEnabled([out, retval] VARIANT_BOOL *pVal);
    [propput, id(1), helpstring("Use grey listing..")] HRESULT GreyListingEnabled([in] VARIANT_BOOL newVal);
    [propget, id(2), helpstring("GreyListing - Delay before accepting messages (minutes).")] HRESULT GreyListingInitialDelay([out, retval] long *pVal);
@@ -2495,7 +2517,6 @@ interface IInterfaceAntiSpam : IDispatch
    [propput, id(11), helpstring("Text to prepend to message subject.")] HRESULT PrependSubjectText([in] BSTR newVal);
    [propget, id(12), helpstring("White list for greylisting.")] HRESULT GreyListingWhiteAddresses([out, retval] IInterfaceGreyListingWhiteAddresses** pVal);
    [propget, id(13), helpstring("Global white list.")] HRESULT WhiteListAddresses([out, retval] IInterfaceWhiteListAddresses **pVal);
-   [propget, id(44), helpstring("Global list of blocked sender addresses and domains.")] HRESULT BlockedSenders([out, retval] IInterfaceBlockedSenders **pVal);
    [propget, id(14), helpstring("Check host specified in HELO command (SpamScore).")] HRESULT CheckHostInHeloScore([out, retval] long *pVal);
    [propput, id(14), helpstring("Check host specified in HELO command (SpamScore).")] HRESULT CheckHostInHeloScore([in] long newVal);
    [propget, id(15), helpstring("Spam mark threshold")] HRESULT SpamMarkThreshold([out, retval] long *pVal);
@@ -2560,6 +2581,16 @@ interface IInterfaceAntiSpam : IDispatch
    [propput, id(41), helpstring("Use a validated ARC chain from a trusted sealer to offset a DMARC failure caused by forwarding (RFC 8617). Does nothing while ArcTrustedSealers is empty.")] HRESULT ArcFilteringEnabled([in] VARIANT_BOOL newVal);
    [propget, id(42), helpstring("Domains whose ARC seals are honoured, separated by comma, semicolon or whitespace. Anyone can seal a chain with their own key, so a chain is only meaningful from a sealer you already trust.")] HRESULT ArcTrustedSealers([out, retval] BSTR  *pVal);
    [propput, id(42), helpstring("Domains whose ARC seals are honoured, separated by comma, semicolon or whitespace. Anyone can seal a chain with their own key, so a chain is only meaningful from a sealer you already trust.")] HRESULT ArcTrustedSealers([in] BSTR newVal);
+
+   // Appended - and anything added later must be appended here too, below this
+   // note. A dual interface's vtable follows DECLARATION order, not id(), so a
+   // member inserted higher up silently shifts every slot beneath it while the
+   // IID stays the same. An early-bound client built against the older type
+   // library then calls the wrong method rather than failing to bind. The id()
+   // values are what keep late binding stable; position is what keeps early
+   // binding stable, and only one of the two is visible in a diff.
+   [propget, id(43), helpstring("The spam quarantine: messages held for review instead of refused. Empty and inert unless QuarantineEnabled is set in hMailServer.ini.")] HRESULT Quarantine([out, retval] IInterfaceQuarantine** pVal);
+   [propget, id(44), helpstring("Global list of blocked sender addresses and domains.")] HRESULT BlockedSenders([out, retval] IInterfaceBlockedSenders **pVal);
 };
 
 

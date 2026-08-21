@@ -79,3 +79,12 @@ CLAUDE.md
 /hmailserver/source/Tools/ControlPanel.Core/obj/
 
 .fake
+
+# MSVC #import output. These are regenerated from the type library on every
+# build, and the generated text embeds the ABSOLUTE path of the machine that
+# produced it - the .tlh #includes its .tli by full path. Committing them put
+# one developer's home directory into an AGPL source drop, and broke the build
+# anywhere the path did not exist, because MSVC reuses a .tlh it does not judge
+# stale and a fresh clone gives the .tlh and the .tlb near-identical mtimes.
+*.tlh
+*.tli
