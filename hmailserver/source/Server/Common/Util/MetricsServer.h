@@ -203,11 +203,14 @@ namespace HM
       MetricsServer();
       ~MetricsServer();
 
-      // Starts the listener. Returns false only if the bind address is not an IPv4
-      // literal or the socket could not be bound or listened on; the reason is
-      // written to the application log. Deliberately narrow: see rule 1 above -
-      // access control never refuses to start, because the probes have to answer
-      // in every configuration.
+      // Starts the listener. Returns false only if the bind address is not an
+      // IPv4 or IPv6 literal or the socket could not be bound or listened on;
+      // the reason is written to the application log. Deliberately narrow: see
+      // rule 1 above - access control never refuses to start, because the
+      // probes have to answer in every configuration. A bind to :: is made
+      // dual-stack (IPV6_V6ONLY cleared), because this listener has exactly one
+      // bind-address setting and :: is therefore the only way to serve both
+      // families.
       bool Start(const String &bind_address, int port);
       void Stop();
 
@@ -322,8 +325,12 @@ namespace HM
       // True for an address only this machine can reach: the whole of 127.0.0.0/8,
       // not merely 127.0.0.1, because an operator who binds 127.0.0.2 has still
       // bound a loopback address and demanding a credential there would be a false
-      // positive - the sort that teaches people the check is noise. Anything that
-      // does not parse as an IPv4 literal reports false, so the gate fails closed;
+      // positive - the sort that teaches people the check is noise. The IPv6
+      // loopback ::1 counts as well, and for the same reason it must: it carries
+      // exactly the guarantee 127.0.0.1 does, and refusing to see it would demand
+      // a credential of a bind no remote client can reach - or worse, teach an
+      // operator that the loopback rules are IPv4 folklore. Anything that does not
+      // parse as an IPv4 or IPv6 literal reports false, so the gate fails closed;
       // Start() rejects such an address before this runs, but a future change to
       // that order must not silently open a hole.
       static bool IsLoopbackAddress_(const String &bind_address);

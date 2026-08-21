@@ -21,6 +21,8 @@
 
 #include <ws2tcpip.h>
 
+#include <cstring>
+
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #include <openssl/sha.h>
@@ -79,6 +81,12 @@ namespace HM
       // The plain-HTTP port a running instance listens on (0 = none).
       // Read by AcmeClient through IsListeningOnPort.
       volatile long http_listen_port = 0;
+
+      // The HTTPS port a running instance listens on (0 = none). Read by
+      // RestApiServer's /api/v1/srv handler through GetHttpsListenPort, which
+      // is why it records the port actually being served rather than the
+      // configured one - the HTTPS listener stays down without a certificate.
+      volatile long https_listen_port = 0;
 
       // Cache of MX lookups used for MTA-STS policy generation.
       boost::recursive_mutex mx_cache_mutex;
@@ -255,6 +263,81 @@ namespace HM
          request = data.c_str();
          return true;
       }
+
+      // Parses a bind address that is an IPv4 or IPv6 literal into a sockaddr
+      // ready for bind(), choosing the family by the presence of a colon - the
+      // same test IPAddress::TryParse uses, and one no IPv4 literal can pass.
+      // False when the address is neither. A scoped link-local literal
+      // ("fe80::1%3") is not accepted, because inet_pton does not parse scope
+      // ids; it fails here and is reported as an invalid bind address.
+      bool ParseBindAddress(const AnsiString &narrowBindAddress, int port,
+                            sockaddr_storage &address, int &addressLength)
+      {
+         if (narrowBindAddress.Find(":") >= 0)
+         {
+            sockaddr_in6 address6 = {};
+            address6.sin6_family = AF_INET6;
+            address6.sin6_port = htons(static_cast<unsigned short>(port));
+
+            if (inet_pton(AF_INET6, narrowBindAddress.c_str(), &address6.sin6_addr) != 1)
+               return false;
+
+            memcpy(&address, &address6, sizeof(address6));
+            addressLength = static_cast<int>(sizeof(address6));
+            return true;
+         }
+
+         sockaddr_in address4 = {};
+         address4.sin_family = AF_INET;
+         address4.sin_port = htons(static_cast<unsigned short>(port));
+
+         if (inet_pton(AF_INET, narrowBindAddress.c_str(), &address4.sin_addr) != 1)
+            return false;
+
+         memcpy(&address, &address4, sizeof(address4));
+         addressLength = static_cast<int>(sizeof(address4));
+         return true;
+      }
+
+      // Windows creates AF_INET6 sockets with IPV6_V6ONLY on, so a listener
+      // bound to :: would accept IPv6 clients only - and MTA-STS fetchers,
+      // autoconfig clients and ACME validators still overwhelmingly arrive
+      // over IPv4. This listener has exactly one bind-address setting (unlike
+      // the mail protocols, which take one port row per address), so :: is the
+      // only way to serve both families and is therefore made dual-stack. A
+      // specific IPv6 address is left alone: it can only ever accept IPv6.
+      // Returns false only when the option was needed and could not be set, so
+      // the caller can say IPv4 will not be served rather than leave it to be
+      // discovered.
+      bool TryEnableDualStack(SOCKET listenSocket, const sockaddr_storage &address)
+      {
+         if (address.ss_family != AF_INET6)
+            return true;
+
+         const sockaddr_in6 *address6 = reinterpret_cast<const sockaddr_in6*>(&address);
+
+         if (!IN6_IS_ADDR_UNSPECIFIED(&address6->sin6_addr))
+            return true;
+
+         DWORD v6Only = 0;
+
+         return setsockopt(listenSocket, IPPROTO_IPV6, IPV6_V6ONLY,
+            reinterpret_cast<const char*>(&v6Only), sizeof(v6Only)) != SOCKET_ERROR;
+      }
+
+      // "host:port" for log lines, with an IPv6 literal in brackets -
+      // "[::1]:8080" - because "::1:8080" reads as a different IPv6 address.
+      String FormatEndpoint(const String &bind_address, int port)
+      {
+         String result;
+
+         if (bind_address.Find(_T(":")) >= 0)
+            result.Format(_T("[%s]:%d"), bind_address.c_str(), port);
+         else
+            result.Format(_T("%s:%d"), bind_address.c_str(), port);
+
+         return result;
+      }
    }
 
    WebServicesServer::WebServicesServer() :
@@ -275,6 +358,12 @@ namespace HM
    WebServicesServer::IsListeningOnPort(int port)
    {
       return port > 0 && http_listen_port == port;
+   }
+
+   int
+   WebServicesServer::GetHttpsListenPort()
+   {
+      return https_listen_port;
    }
 
    void
@@ -443,28 +532,30 @@ namespace HM
    {
       AnsiString narrowBindAddress = bind_address == _T("localhost") ? AnsiString("127.0.0.1") : AnsiString(bind_address);
 
-      sockaddr_in address = {};
-      address.sin_family = AF_INET;
-      address.sin_port = htons(static_cast<unsigned short>(port));
+      sockaddr_storage address = {};
+      int addressLength = 0;
 
-      if (inet_pton(AF_INET, narrowBindAddress.c_str(), &address.sin_addr) != 1)
+      if (!ParseBindAddress(narrowBindAddress, port, address, addressLength))
       {
          LOG_APPLICATION("WebServices: Invalid bind address: " + bind_address);
          return false;
       }
 
-      listen_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+      listen_socket = socket(address.ss_family, SOCK_STREAM, IPPROTO_TCP);
       if (listen_socket == INVALID_SOCKET)
          return false;
 
       BOOL reuseAddress = TRUE;
       setsockopt(listen_socket, SOL_SOCKET, SO_REUSEADDR, (const char*) &reuseAddress, sizeof(reuseAddress));
 
-      if (bind(listen_socket, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) == SOCKET_ERROR ||
+      if (!TryEnableDualStack(listen_socket, address))
+         LOG_APPLICATION("WebServices: IPV6_V6ONLY could not be cleared for the :: bind, so this listener will accept IPv6 connections only. Bind 0.0.0.0 instead if IPv4 is what is needed.");
+
+      if (bind(listen_socket, reinterpret_cast<const sockaddr*>(&address), addressLength) == SOCKET_ERROR ||
           listen(listen_socket, 5) == SOCKET_ERROR)
       {
          String message;
-         message.Format(_T("WebServices: Failed to bind to %s:%d. Is the port in use?"), bind_address.c_str(), port);
+         message.Format(_T("WebServices: Failed to bind to %s. Is the port in use?"), FormatEndpoint(bind_address, port).c_str());
          LOG_APPLICATION(message);
 
          closesocket(listen_socket);
@@ -613,7 +704,10 @@ namespace HM
       }
 
       if (https_socket_ != INVALID_SOCKET)
+      {
+         https_listen_port = https_port;
          https_worker_ = std::thread(&WebServicesServer::Run_, this, https_socket_, true);
+      }
 
       String message;
       message.Format(_T("WebServices: Listening on %s (http port %d, https port %d)."),
@@ -633,6 +727,7 @@ namespace HM
 
       running_ = false;
       http_listen_port = 0;
+      https_listen_port = 0;
 
       if (http_socket_ != INVALID_SOCKET)
       {

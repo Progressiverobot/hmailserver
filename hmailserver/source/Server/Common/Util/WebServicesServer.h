@@ -57,6 +57,14 @@ namespace HM
       // listener is needed.
       static bool IsListeningOnPort(int port);
 
+      // The HTTPS port a running instance actually serves, 0 when there is
+      // none. Written when the HTTPS worker starts and cleared by Stop(). It
+      // exists so the REST API's /api/v1/srv endpoint can advertise an
+      // _autodiscover._tcp record only when something real answers it: the
+      // configured WebServicesHttpsPort is not enough, because the HTTPS
+      // listener silently stays down when no certificate is available yet.
+      static int GetHttpsListenPort();
+
       // Reports, as LOG_APPLICATION lines, every feature that is switched on
       // but cannot be reached with the web-services configuration as it
       // stands. Two cases: no listener configured at all, and a listener that

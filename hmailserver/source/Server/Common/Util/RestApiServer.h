@@ -14,7 +14,8 @@
 //   - API key management (/api/v1/apikeys) deliberately requires the
 //     administrator password: a key must not be able to mint or revoke keys,
 //     otherwise a narrowly scoped key trivially escalates to an unscoped one.
-//   - TLS is mandatory unless the listener is bound to 127.0.0.1.
+//   - TLS is mandatory unless the listener is bound to loopback (127.0.0.1
+//     or ::1).
 //   - An empty administrator password disables the API entirely.
 //
 // What "scoped" means, and what it did not mean before August 2026: a key
@@ -115,6 +116,7 @@ namespace HM
          RouteQueueRetry,
          RouteQueueDelete,
          RouteTlsa,
+         RouteSrv,
          RouteQuarantineList,
          RouteQuarantineRelease,
          RouteQuarantineDelete,
@@ -252,6 +254,14 @@ namespace HM
       static AnsiString HandleQueueRetry_(__int64 messageId);
       static AnsiString HandleQueueDelete_(__int64 messageId);
       static AnsiString HandleTlsa_();
+
+      // Ready-to-publish client-discovery SRV records (RFC 6186 / RFC 8314,
+      // plus the Outlook _autodiscover convention), derived from the ports
+      // that are actually configured and enabled. allowedDomains filters the
+      // per-domain records exactly as HandleListDomains_ filters the domain
+      // listing, and for the same reason.
+      static AnsiString HandleSrv_(const std::vector<String> &allowedDomains);
+
       AnsiString HandleListQuarantine_();
       AnsiString HandleQuarantineRelease_(__int64 id);
       AnsiString HandleQuarantineDelete_(__int64 id);

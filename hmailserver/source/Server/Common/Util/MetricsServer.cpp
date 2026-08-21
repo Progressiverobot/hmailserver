@@ -191,6 +191,82 @@ namespace HM
 
          return static_cast<__int64>(converted);
       }
+
+      // Parses a bind address that is an IPv4 or IPv6 literal into a sockaddr
+      // ready for bind(), choosing the family by the presence of a colon - the
+      // same test IPAddress::TryParse uses, and one no IPv4 literal can pass.
+      // False when the address is neither. A scoped link-local literal
+      // ("fe80::1%3") is not accepted, because inet_pton does not parse scope
+      // ids; it fails here and is reported as an invalid bind address.
+      bool ParseBindAddress(const AnsiString &narrowBindAddress, int port,
+                            sockaddr_storage &address, int &addressLength)
+      {
+         if (narrowBindAddress.Find(":") >= 0)
+         {
+            sockaddr_in6 address6 = {};
+            address6.sin6_family = AF_INET6;
+            address6.sin6_port = htons(static_cast<unsigned short>(port));
+
+            if (inet_pton(AF_INET6, narrowBindAddress.c_str(), &address6.sin6_addr) != 1)
+               return false;
+
+            memcpy(&address, &address6, sizeof(address6));
+            addressLength = static_cast<int>(sizeof(address6));
+            return true;
+         }
+
+         sockaddr_in address4 = {};
+         address4.sin_family = AF_INET;
+         address4.sin_port = htons(static_cast<unsigned short>(port));
+
+         if (inet_pton(AF_INET, narrowBindAddress.c_str(), &address4.sin_addr) != 1)
+            return false;
+
+         memcpy(&address, &address4, sizeof(address4));
+         addressLength = static_cast<int>(sizeof(address4));
+         return true;
+      }
+
+      // Windows creates AF_INET6 sockets with IPV6_V6ONLY on, so a listener
+      // bound to :: would accept IPv6 clients only - and an operator who binds
+      // "any" and then finds their IPv4 Prometheus refused would have nothing
+      // to go on. This listener has exactly one bind-address setting (unlike
+      // the mail protocols, which take one port row per address), so :: is the
+      // only way to serve both families and is therefore made dual-stack. A
+      // specific IPv6 address is left alone: it can only ever accept IPv6.
+      // Returns false only when the option was needed and could not be set, so
+      // the caller can say IPv4 will not be served rather than leave it to be
+      // discovered. Note that :: is not loopback, so rule 2's credential gate
+      // applies to it exactly as to 0.0.0.0.
+      bool TryEnableDualStack(SOCKET listenSocket, const sockaddr_storage &address)
+      {
+         if (address.ss_family != AF_INET6)
+            return true;
+
+         const sockaddr_in6 *address6 = reinterpret_cast<const sockaddr_in6*>(&address);
+
+         if (!IN6_IS_ADDR_UNSPECIFIED(&address6->sin6_addr))
+            return true;
+
+         DWORD v6Only = 0;
+
+         return setsockopt(listenSocket, IPPROTO_IPV6, IPV6_V6ONLY,
+            reinterpret_cast<const char*>(&v6Only), sizeof(v6Only)) != SOCKET_ERROR;
+      }
+
+      // "host:port" for log lines, with an IPv6 literal in brackets -
+      // "[::1]:8080" - because "::1:8080" reads as a different IPv6 address.
+      String FormatEndpoint(const String &bind_address, int port)
+      {
+         String result;
+
+         if (bind_address.Find(_T(":")) >= 0)
+            result.Format(_T("[%s]:%d"), bind_address.c_str(), port);
+         else
+            result.Format(_T("%s:%d"), bind_address.c_str(), port);
+
+         return result;
+      }
    }
 
    MetricsServer::MetricsServer() :
@@ -234,11 +310,10 @@ namespace HM
       // the operator looking for the wrong problem.
       AnsiString narrowBindAddress = bind_address;
 
-      sockaddr_in address = {};
-      address.sin_family = AF_INET;
-      address.sin_port = htons(static_cast<unsigned short>(port));
+      sockaddr_storage address = {};
+      int addressLength = 0;
 
-      if (inet_pton(AF_INET, narrowBindAddress.c_str(), &address.sin_addr) != 1)
+      if (!ParseBindAddress(narrowBindAddress, port, address, addressLength))
       {
          LOG_APPLICATION("MetricsServer: Invalid bind address: " + bind_address);
          return false;
@@ -318,7 +393,7 @@ namespace HM
       if (!loopbackOnly && !credentialConfigured)
       {
          String message;
-         message.Format(_T("MetricsServer: /metrics will answer 503 - the listener is bound to %s, which is not a loopback address, and no credential is configured. /metrics publishes delivery-queue depth, session counts, authentication-failure counts and the build and schema versions, so it must not be readable from the network unauthenticated. Set MetricsServerAuthToken, or set both MetricsServerAuthUsername and MetricsServerAuthPassword, or bind to 127.0.0.1. /livez, /readyz and /healthz are unaffected and keep answering without authentication."),
+         message.Format(_T("MetricsServer: /metrics will answer 503 - the listener is bound to %s, which is not a loopback address, and no credential is configured. /metrics publishes delivery-queue depth, session counts, authentication-failure counts and the build and schema versions, so it must not be readable from the network unauthenticated. Set MetricsServerAuthToken, or set both MetricsServerAuthUsername and MetricsServerAuthPassword, or bind to 127.0.0.1 or ::1. /livez, /readyz and /healthz are unaffected and keep answering without authentication."),
             bind_address.c_str());
          LOG_APPLICATION(message);
       }
@@ -330,12 +405,12 @@ namespace HM
          // making a defensible call, and taking their monitoring away instead would
          // only teach them to pin the old version.
          String message;
-         message.Format(_T("MetricsServer: the listener is bound to %s with a credential but without TLS, so that credential will cross the network in clear text on every scrape and can be replayed by anyone on the path. Set MetricsServerCertificateFile and MetricsServerPrivateKeyFile to encrypt it, or bind to 127.0.0.1."),
+         message.Format(_T("MetricsServer: the listener is bound to %s with a credential but without TLS, so that credential will cross the network in clear text on every scrape and can be replayed by anyone on the path. Set MetricsServerCertificateFile and MetricsServerPrivateKeyFile to encrypt it, or bind to 127.0.0.1 or ::1."),
             bind_address.c_str());
          LOG_APPLICATION(message);
       }
 
-      listen_socket_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+      listen_socket_ = socket(address.ss_family, SOCK_STREAM, IPPROTO_TCP);
       if (listen_socket_ == INVALID_SOCKET)
       {
          ScrubSecret_(basicPassword);
@@ -347,6 +422,9 @@ namespace HM
       BOOL reuseAddress = TRUE;
       setsockopt(listen_socket_, SOL_SOCKET, SO_REUSEADDR, (const char*) &reuseAddress, sizeof(reuseAddress));
 
+      if (!TryEnableDualStack(listen_socket_, address))
+         LOG_APPLICATION("MetricsServer: IPV6_V6ONLY could not be cleared for the :: bind, so this listener will accept IPv6 connections only. Bind 0.0.0.0 instead if IPv4 is what is needed.");
+
       // SOMAXCONN and not 5. The backlog is how many connections the kernel holds
       // while this single-threaded loop is busy with one, and a connection that
       // overflows it is REFUSED - which on a health-check port means a load balancer
@@ -354,11 +432,11 @@ namespace HM
       // liveness, readiness and startup checks at once with a scrape alongside them,
       // and a VIP with several members adds one probe per member; five is not a lot
       // of headroom for that, and the backlog costs nothing until it is used.
-      if (bind(listen_socket_, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) == SOCKET_ERROR ||
+      if (bind(listen_socket_, reinterpret_cast<const sockaddr*>(&address), addressLength) == SOCKET_ERROR ||
           listen(listen_socket_, SOMAXCONN) == SOCKET_ERROR)
       {
          String message;
-         message.Format(_T("MetricsServer: Failed to bind to %s:%d."), bind_address.c_str(), port);
+         message.Format(_T("MetricsServer: Failed to bind to %s."), FormatEndpoint(bind_address, port).c_str());
          LOG_APPLICATION(message);
 
          closesocket(listen_socket_);
@@ -446,8 +524,8 @@ namespace HM
          loopbackOnly ? _T("/metrics is open, loopback bind only") : _T("/metrics is open");
 
       String message;
-      message.Format(_T("MetricsServer: Listening on %s:%d over %s. %s. /livez, /readyz and /healthz are always served without authentication."),
-         bind_address.c_str(), port, transport, metricsAccess);
+      message.Format(_T("MetricsServer: Listening on %s over %s. %s. /livez, /readyz and /healthz are always served without authentication."),
+         FormatEndpoint(bind_address, port).c_str(), transport, metricsAccess);
       LOG_APPLICATION(message);
 
       return true;
@@ -553,6 +631,26 @@ namespace HM
    MetricsServer::IsLoopbackAddress_(const String &bind_address)
    {
       AnsiString narrowBindAddress = bind_address;
+
+      // A colon can only mean an IPv6 literal - the same family test the bind
+      // path uses, so this function cannot classify an address the listener
+      // parsed as the other family.
+      if (narrowBindAddress.Find(":") >= 0)
+      {
+         in6_addr parsed6 = {};
+
+         if (inet_pton(AF_INET6, narrowBindAddress.c_str(), &parsed6) != 1)
+         {
+            // Not a literal; fails closed, as below.
+            return false;
+         }
+
+         // ::1 and nothing wider: IPv6 has no loopback /8, and every other v6
+         // address - including an IPv4-mapped ::ffff:127.0.0.1, which this
+         // listener's bind path cannot produce a listener for anyway - stays
+         // "not loopback" so the credential gate errs toward demanding one.
+         return IN6_IS_ADDR_LOOPBACK(&parsed6) != 0;
+      }
 
       in_addr parsed = {};
 
@@ -1338,7 +1436,7 @@ namespace HM
       case MetricsNeedsCredential:
          body = "metrics unavailable: this listener is bound to a non-loopback address and no credential is configured, "
                 "so the exposition would be readable by anyone who can reach this port. Set MetricsServerAuthToken, or "
-                "set both MetricsServerAuthUsername and MetricsServerAuthPassword, or bind to 127.0.0.1. The health "
+                "set both MetricsServerAuthUsername and MetricsServerAuthPassword, or bind to 127.0.0.1 or ::1. The health "
                 "probes /livez, /readyz and /healthz are unaffected.\n";
          break;
 

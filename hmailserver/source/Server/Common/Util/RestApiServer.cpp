@@ -9,6 +9,7 @@
 #include "Crypt.h"
 #include "AccountLogon.h"
 #include "AcmeClient.h"
+#include "WebServicesServer.h"
 #include "../AntiSpam/QuarantineStore.h"
 #include "../BO/Aliases.h"
 #include "../BO/Alias.h"
@@ -23,6 +24,8 @@
 #include "../BO/Account.h"
 #include "../BO/SSLCertificates.h"
 #include "../BO/SSLCertificate.h"
+#include "../BO/TCPIPPort.h"
+#include "../BO/TCPIPPorts.h"
 #include "../BO/Message.h"
 #include "../Persistence/PersistentAccount.h"
 #include "../Persistence/PersistentMessage.h"
@@ -34,6 +37,7 @@
 #include <ws2tcpip.h>
 
 #include <algorithm>
+#include <cstring>
 #include <mutex>
 
 #include <openssl/ssl.h>
@@ -545,6 +549,115 @@ namespace HM
          request.assign(data.c_str(), data.size());
          return RequestReadOk;
       }
+
+      // Parses a bind address that is an IPv4 or IPv6 literal into a sockaddr
+      // ready for bind(), choosing the family by the presence of a colon - the
+      // same test IPAddress::TryParse uses, and one no IPv4 literal can pass.
+      // False when the address is neither. A scoped link-local literal
+      // ("fe80::1%3") is not accepted, because inet_pton does not parse scope
+      // ids; it fails here and is reported as an invalid bind address.
+      bool ParseBindAddress(const AnsiString &narrowBindAddress, int port,
+                            sockaddr_storage &address, int &addressLength)
+      {
+         if (narrowBindAddress.Find(":") >= 0)
+         {
+            sockaddr_in6 address6 = {};
+            address6.sin6_family = AF_INET6;
+            address6.sin6_port = htons(static_cast<unsigned short>(port));
+
+            if (inet_pton(AF_INET6, narrowBindAddress.c_str(), &address6.sin6_addr) != 1)
+               return false;
+
+            memcpy(&address, &address6, sizeof(address6));
+            addressLength = static_cast<int>(sizeof(address6));
+            return true;
+         }
+
+         sockaddr_in address4 = {};
+         address4.sin_family = AF_INET;
+         address4.sin_port = htons(static_cast<unsigned short>(port));
+
+         if (inet_pton(AF_INET, narrowBindAddress.c_str(), &address4.sin_addr) != 1)
+            return false;
+
+         memcpy(&address, &address4, sizeof(address4));
+         addressLength = static_cast<int>(sizeof(address4));
+         return true;
+      }
+
+      // Windows creates AF_INET6 sockets with IPV6_V6ONLY on, so a listener
+      // bound to :: would accept IPv6 clients only - and an operator who binds
+      // "any" and then finds IPv4 clients refused would have nothing to go on.
+      // This listener has exactly one bind-address setting (unlike the mail
+      // protocols, which take one port row per address), so :: is the only way
+      // to serve both families and is therefore made dual-stack. A specific
+      // IPv6 address is left alone: it can only ever accept IPv6, and the
+      // option would be dead weight. Returns false only when the option was
+      // needed and could not be set, so the caller can say IPv4 will not be
+      // served rather than leave it to be discovered.
+      bool TryEnableDualStack(SOCKET listenSocket, const sockaddr_storage &address)
+      {
+         if (address.ss_family != AF_INET6)
+            return true;
+
+         const sockaddr_in6 *address6 = reinterpret_cast<const sockaddr_in6*>(&address);
+
+         if (!IN6_IS_ADDR_UNSPECIFIED(&address6->sin6_addr))
+            return true;
+
+         DWORD v6Only = 0;
+
+         return setsockopt(listenSocket, IPPROTO_IPV6, IPV6_V6ONLY,
+            reinterpret_cast<const char*>(&v6Only), sizeof(v6Only)) != SOCKET_ERROR;
+      }
+
+      // Renders an accepted peer's address as text. On the dual-stack listener
+      // an IPv4 client arrives as an IPv4-mapped IPv6 address (::ffff:a.b.c.d),
+      // which is unmapped to its IPv4 form here - not cosmetics: every consumer
+      // of the result matches on address family. The auto-ban exclusion
+      // compares against "127.0.0.1", an AllowedFrom restriction written as an
+      // IPv4 address, range or CIDR refuses any IPv6 peer outright, and the
+      // security ranges the auto-ban creates are IPv4 ranges. A v4 client
+      // dressed as v6 would silently match none of them - including the
+      // loopback exclusion, so the server could auto-ban its own loopback.
+      bool FormatPeerAddress(const sockaddr_storage &peer, char *buffer, size_t bufferSize)
+      {
+         if (peer.ss_family == AF_INET)
+         {
+            const sockaddr_in *peer4 = reinterpret_cast<const sockaddr_in*>(&peer);
+            return inet_ntop(AF_INET, &peer4->sin_addr, buffer, bufferSize) != nullptr;
+         }
+
+         if (peer.ss_family == AF_INET6)
+         {
+            const sockaddr_in6 *peer6 = reinterpret_cast<const sockaddr_in6*>(&peer);
+
+            if (IN6_IS_ADDR_V4MAPPED(&peer6->sin6_addr))
+            {
+               in_addr mapped = {};
+               memcpy(&mapped, peer6->sin6_addr.s6_addr + 12, sizeof(mapped));
+               return inet_ntop(AF_INET, &mapped, buffer, bufferSize) != nullptr;
+            }
+
+            return inet_ntop(AF_INET6, &peer6->sin6_addr, buffer, bufferSize) != nullptr;
+         }
+
+         return false;
+      }
+
+      // "host:port" for log lines, with an IPv6 literal in brackets -
+      // "[::1]:8080" - because "::1:8080" reads as a different IPv6 address.
+      String FormatEndpoint(const String &bind_address, int port)
+      {
+         String result;
+
+         if (bind_address.Find(_T(":")) >= 0)
+            result.Format(_T("[%s]:%d"), bind_address.c_str(), port);
+         else
+            result.Format(_T("%s:%d"), bind_address.c_str(), port);
+
+         return result;
+      }
    }
 
    RestApiServer::RestApiServer() :
@@ -576,11 +689,16 @@ namespace HM
       certificate_file_ = certificate_file;
       private_key_file_ = private_key_file;
 
-      bool isLoopback = bind_address == _T("127.0.0.1") || bind_address == _T("localhost");
+      // ::1 carries exactly the guarantee 127.0.0.1 does - only a process on
+      // this machine can connect - so it satisfies the TLS exemption on the
+      // same grounds. Exact literals only, as before: this is a security gate,
+      // and widening it (127/8, mapped forms) is a separate decision.
+      bool isLoopback = bind_address == _T("127.0.0.1") || bind_address == _T("localhost") ||
+                        bind_address == _T("::1");
 
       if (!use_tls_ && !isLoopback)
       {
-         LOG_APPLICATION("RestApi: Refusing to start - TLS certificate is required unless bound to 127.0.0.1. Set RestApiCertificateFile and RestApiPrivateKeyFile.");
+         LOG_APPLICATION("RestApi: Refusing to start - TLS certificate is required unless bound to 127.0.0.1 or ::1. Set RestApiCertificateFile and RestApiPrivateKeyFile.");
          return false;
       }
 
@@ -651,28 +769,30 @@ namespace HM
 
       AnsiString narrowBindAddress = bind_address == _T("localhost") ? AnsiString("127.0.0.1") : AnsiString(bind_address);
 
-      sockaddr_in address = {};
-      address.sin_family = AF_INET;
-      address.sin_port = htons(static_cast<unsigned short>(port));
+      sockaddr_storage address = {};
+      int addressLength = 0;
 
-      if (inet_pton(AF_INET, narrowBindAddress.c_str(), &address.sin_addr) != 1)
+      if (!ParseBindAddress(narrowBindAddress, port, address, addressLength))
       {
          LOG_APPLICATION("RestApi: Invalid bind address: " + bind_address);
          return false;
       }
 
-      listen_socket_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+      listen_socket_ = socket(address.ss_family, SOCK_STREAM, IPPROTO_TCP);
       if (listen_socket_ == INVALID_SOCKET)
          return false;
 
       BOOL reuseAddress = TRUE;
       setsockopt(listen_socket_, SOL_SOCKET, SO_REUSEADDR, (const char*) &reuseAddress, sizeof(reuseAddress));
 
-      if (bind(listen_socket_, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) == SOCKET_ERROR ||
+      if (!TryEnableDualStack(listen_socket_, address))
+         LOG_APPLICATION("RestApi: IPV6_V6ONLY could not be cleared for the :: bind, so this listener will accept IPv6 connections only. Bind 0.0.0.0 instead if IPv4 is what is needed.");
+
+      if (bind(listen_socket_, reinterpret_cast<const sockaddr*>(&address), addressLength) == SOCKET_ERROR ||
           listen(listen_socket_, 5) == SOCKET_ERROR)
       {
          String message;
-         message.Format(_T("RestApi: Failed to bind to %s:%d."), bind_address.c_str(), port);
+         message.Format(_T("RestApi: Failed to bind to %s."), FormatEndpoint(bind_address, port).c_str());
          LOG_APPLICATION(message);
 
          closesocket(listen_socket_);
@@ -684,7 +804,7 @@ namespace HM
       worker_ = std::thread(&RestApiServer::Run_, this);
 
       String message;
-      message.Format(_T("RestApi: Listening on %s:%d (%s)."), bind_address.c_str(), port, use_tls_ ? _T("https") : _T("http, loopback only"));
+      message.Format(_T("RestApi: Listening on %s (%s)."), FormatEndpoint(bind_address, port).c_str(), use_tls_ ? _T("https") : _T("http, loopback only"));
       LOG_APPLICATION(message);
 
       return true;
@@ -729,8 +849,10 @@ namespace HM
          // The peer address is captured here rather than discarded: an
          // authentication failure has to be attributable to an IP for the
          // auto-ban machinery, and an API key may be restricted to a source
-         // address or range.
-         sockaddr_in peer = {};
+         // address or range. sockaddr_storage, because the listener may be an
+         // AF_INET or an AF_INET6 socket and this has to hold either family's
+         // address.
+         sockaddr_storage peer = {};
          int peerLength = sizeof(peer);
 
          SOCKET clientSocket = accept(listen_socket_, reinterpret_cast<sockaddr*>(&peer), &peerLength);
@@ -752,8 +874,8 @@ namespace HM
          {
             IPAddress peerAddress;
 
-            char peerText[INET_ADDRSTRLEN] = {};
-            if (inet_ntop(AF_INET, &peer.sin_addr, peerText, sizeof(peerText)) != nullptr)
+            char peerText[INET6_ADDRSTRLEN] = {};
+            if (FormatPeerAddress(peer, peerText, sizeof(peerText)))
             {
                // A parse failure leaves peerAddress as the default 0.0.0.0,
                // which is refused by every non-empty source restriction and is
@@ -1405,6 +1527,9 @@ namespace HM
          case RouteTlsa:
             return HandleTlsa_();
 
+         case RouteSrv:
+            return HandleSrv_(caller.domains);
+
          case RouteQuarantineList:
             return HandleListQuarantine_();
 
@@ -1571,6 +1696,12 @@ namespace HM
       if (method == "GET" && path == "/api/v1/tlsa")
       {
          route.kind = RouteTlsa;
+         return;
+      }
+
+      if (method == "GET" && path == "/api/v1/srv")
+      {
+         route.kind = RouteSrv;
          return;
       }
 
@@ -1764,10 +1895,12 @@ namespace HM
          break;
 
       default:
-         // Server-wide and read-only: /status, /tlsa, and the domain listing,
-         // which its handler filters to the key's domains rather than refusing
-         // (a listing that answered 403 would be useless to exactly the
-         // credential the restriction exists for).
+         // Server-wide and read-only: /status, /tlsa, /srv and the domain
+         // listing. The latter two filter their per-domain output to the key's
+         // domains in their handlers rather than being refused here (a listing
+         // that answered 403 would be useless to exactly the credential the
+         // restriction exists for, and /srv names every local domain in its
+         // records - which a key issued for one customer must not be handed).
          return AuthorizationAllowed;
       }
 
@@ -2974,6 +3107,7 @@ namespace HM
          "\"/api/v1/quarantine/{id}\":{\"delete\":{\"summary\":\"Delete a quarantined message\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"Unknown id\"}}}},"
          "\"/api/v1/domains/{domain}/aliases\":{\"get\":{\"summary\":\"List aliases in a domain\",\"responses\":{\"200\":{\"description\":\"Array of aliases\"},\"404\":{\"description\":\"Unknown domain\"}}}},"
          "\"/api/v1/tlsa\":{\"get\":{\"summary\":\"Recommended DANE TLSA records for the configured certificates\",\"responses\":{\"200\":{\"description\":\"Array of TLSA records\"}}}},"
+         "\"/api/v1/srv\":{\"get\":{\"summary\":\"Recommended client-discovery SRV records (RFC 6186/8314 and Outlook autodiscover) for the enabled listeners\",\"description\":\"One record set per active domain; a domain-restricted key sees only its own domains. Only services that are enabled and not loopback-bound are advertised.\",\"responses\":{\"200\":{\"description\":\"Array of SRV records\"}}}},"
          "\"/api/v1/api-keys\":{"
          "\"get\":{\"summary\":\"List API keys\",\"description\":\"Administrator password only.\",\"responses\":{\"200\":{\"description\":\"Array of keys, never the clear-text tokens\"}}},"
          "\"post\":{\"summary\":\"Create an API key\",\"description\":\"Administrator password only. The token is returned once, at creation.\",\"responses\":{\"201\":{\"description\":\"Created\"}}}},"
@@ -3041,6 +3175,248 @@ namespace HM
       AnsiString body;
       body.Format("{\"host\":\"%hs\",\"count\":%d,\"records\":[%hs]}",
          JsonEscape_(hostName).c_str(), count, items.c_str());
+
+      return BuildResponse_(200, body);
+   }
+
+   AnsiString
+   RestApiServer::HandleSrv_(const std::vector<String> &allowedDomains)
+   {
+      // Ready-to-publish client-discovery SRV records: RFC 6186 for
+      // _imap/_imaps/_pop3/_pop3s/_submission, RFC 8314 section 5.1 for
+      // _submissions, and the Outlook _autodiscover._tcp convention. Built
+      // from the ports that are actually configured and enabled - the same
+      // one-source-of-truth idea as /api/v1/tlsa, which hashes the real
+      // certificates rather than restating them, and the same port ranking as
+      // the autoconfig XML, so DNS discovery and autoconfig cannot disagree.
+      //
+      // A record is only emitted for a service that is genuinely served,
+      // because a published SRV pointing at a dead port sends every client of
+      // that domain to a socket that will never answer - worse than publishing
+      // nothing, which at least leaves clients to their fallback probing. So:
+      // a protocol whose service is switched off contributes nothing (its port
+      // rows survive in the configuration, but no listener starts for them),
+      // and a port bound to a loopback address contributes nothing (the only
+      // clients that resolve SRV records are on other machines). What this
+      // reads is the configuration, exactly as the autoconfig handlers do; a
+      // port added since the last restart is advertised even though its
+      // listener starts at the next one, which is the established semantics of
+      // every client-discovery answer this server gives.
+      AnsiString target = AnsiString(IniFileSettings::Instance()->GetAutoconfigClientHost());
+      target.Trim();
+
+      if (target.IsEmpty())
+         target = AnsiString(Configuration::Instance()->GetHostName());
+
+      target.Trim();
+      target.MakeLower();
+
+      // The placeholder convention of /api/v1/tlsa: with no host name
+      // configured there is nothing honest to point a record at, so the
+      // records carry a placeholder the administrator has to replace.
+      if (target.IsEmpty())
+         target = "<your-mail-hostname>";
+
+      bool smtpEnabled = Configuration::Instance()->GetUseSMTP();
+      bool imapEnabled = Configuration::Instance()->GetUseIMAP();
+      bool pop3Enabled = Configuration::Instance()->GetUsePOP3();
+
+      // Per protocol, the best implicit-TLS port and the best
+      // STARTTLS-or-plain port. Ranked the way GetClientAccessSettings_ ranks
+      // the autoconfig answer: required STARTTLS over optional over plain, and
+      // the standard port over an unusual one.
+      int imapsPort = 0, imapsRank = -1;
+      int imapPort = 0, imapRank = -1;
+      int pop3sPort = 0, pop3sRank = -1;
+      int pop3Port = 0, pop3Rank = -1;
+      int submissionsPort = 0, submissionsRank = -1;
+      int submissionPort = 0, submissionRank = -1;
+
+      auto consider = [](int &bestPort, int &bestRank, int candidatePort, int candidateRank)
+      {
+         if (candidateRank > bestRank)
+         {
+            bestRank = candidateRank;
+            bestPort = candidatePort;
+         }
+      };
+
+      // A copy of the vector, exactly as GetClientAccessSettings_ takes one,
+      // rather than a Refresh() of the shared collection from this thread.
+      std::vector<std::shared_ptr<TCPIPPort>> ports = Configuration::Instance()->GetTCPIPPorts()->GetVector();
+
+      for (std::shared_ptr<TCPIPPort> port : ports)
+      {
+         if (!port)
+            continue;
+
+         // Bound to loopback: real, but unreachable from any machine that
+         // would be resolving the record.
+         if (port->GetAddress().GetAddress().is_loopback())
+            continue;
+
+         int portNumber = port->GetPortNumber();
+         ConnectionSecurity security = port->GetConnectionSecurity();
+         bool implicitTls = security == CSSSL;
+
+         int starttlsRank = security == CSSTARTTLSRequired ? 30 :
+                            security == CSSTARTTLSOptional ? 20 : 10;
+
+         switch (port->GetProtocol())
+         {
+         case STIMAP:
+            if (!imapEnabled)
+               break;
+
+            if (implicitTls)
+               consider(imapsPort, imapsRank, portNumber, portNumber == 993 ? 2 : 1);
+            else
+               consider(imapPort, imapRank, portNumber, starttlsRank + (portNumber == 143 ? 5 : 0));
+            break;
+
+         case STPOP3:
+            if (!pop3Enabled)
+               break;
+
+            if (implicitTls)
+               consider(pop3sPort, pop3sRank, portNumber, portNumber == 995 ? 2 : 1);
+            else
+               consider(pop3Port, pop3Rank, portNumber, starttlsRank + (portNumber == 110 ? 5 : 0));
+            break;
+
+         case STSMTP:
+            if (!smtpEnabled)
+               break;
+
+            // Port 25 is the server-to-server MX port, whatever its security
+            // setting says. Advertising it for client submission would invite
+            // every discovered client onto the port the MX record owns, which
+            // is exactly the confusion RFC 6186 discovery exists to end.
+            if (portNumber == 25)
+               break;
+
+            if (implicitTls)
+               consider(submissionsPort, submissionsRank, portNumber, portNumber == 465 ? 2 : 1);
+            else
+               consider(submissionPort, submissionRank, portNumber, starttlsRank + (portNumber == 587 ? 5 : 0));
+            break;
+
+         default:
+            break;
+         }
+      }
+
+      struct ServiceRecord
+      {
+         AnsiString service;
+         int priority;
+         int weight;
+         int port;
+      };
+
+      // Priority 0, weight 1 - the published RFC 6186 example form. With one
+      // record per service name the two values carry no load anyway.
+      std::vector<ServiceRecord> services;
+
+      if (imapsPort > 0)
+         services.push_back({ "_imaps._tcp", 0, 1, imapsPort });
+      if (imapPort > 0)
+         services.push_back({ "_imap._tcp", 0, 1, imapPort });
+      if (pop3sPort > 0)
+         services.push_back({ "_pop3s._tcp", 0, 1, pop3sPort });
+      if (pop3Port > 0)
+         services.push_back({ "_pop3._tcp", 0, 1, pop3Port });
+      if (submissionsPort > 0)
+         services.push_back({ "_submissions._tcp", 0, 1, submissionsPort });
+      if (submissionPort > 0)
+         services.push_back({ "_submission._tcp", 0, 1, submissionPort });
+
+      // _autodiscover._tcp points Outlook at the web-services HTTPS listener.
+      // The condition is the listener that is RUNNING, not the one configured:
+      // WebServicesServer silently keeps HTTPS down when no certificate is
+      // available yet (ACME may not have issued one), and an SRV record
+      // pointing into that gap would break every Outlook profile setup until
+      // it closed. Priority 0 weight 0, the form Microsoft's own documentation
+      // publishes. Loopback binds are excluded for the same reason as the mail
+      // ports above.
+      int autodiscoverPort = WebServicesServer::GetHttpsListenPort();
+
+      if (autodiscoverPort > 0 && IniFileSettings::Instance()->GetAutoconfigEnabled())
+      {
+         String webBindAddress = IniFileSettings::Instance()->GetWebServicesBindAddress();
+
+         IPAddress parsedBind;
+         bool loopbackBound = webBindAddress == _T("localhost") ||
+            (parsedBind.TryParse(AnsiString(webBindAddress), false) && parsedBind.GetAddress().is_loopback());
+
+         if (!loopbackBound)
+            services.push_back({ "_autodiscover._tcp", 0, 0, autodiscoverPort });
+      }
+
+      AnsiString serviceJson;
+      int serviceCount = 0;
+
+      for (const ServiceRecord &service : services)
+      {
+         AnsiString entry;
+         entry.Format("{\"service\":\"%hs\",\"priority\":%d,\"weight\":%d,\"port\":%d}",
+            service.service.c_str(), service.priority, service.weight, service.port);
+
+         if (serviceCount > 0)
+            serviceJson += ",";
+
+         serviceJson += entry;
+         serviceCount++;
+      }
+
+      // One record set per active local domain: SRV owner names live under the
+      // mail domain, not under the server's host name, so this is the shape an
+      // administrator actually pastes into a zone file.
+      Domains domains;
+      domains.Refresh();
+
+      AnsiString recordJson;
+      int recordCount = 0;
+
+      for (int i = 0; i < domains.GetCount(); i++)
+      {
+         std::shared_ptr<Domain> domain = domains.GetItem(i);
+         if (!domain)
+            continue;
+
+         // An inactive domain accepts no mail; nothing should be inviting
+         // clients to configure accounts in it.
+         if (!domain->GetIsActive())
+            continue;
+
+         // The same filtering as the domain listing, for the same reason: a
+         // key issued for one customer's domain must not be handed the names
+         // of all the others as a side effect of asking for DNS records.
+         if (!IsDomainAllowed_(allowedDomains, domain->GetName()))
+            continue;
+
+         AnsiString domainName = JsonEscape_(AnsiString(domain->GetName()));
+
+         for (const ServiceRecord &service : services)
+         {
+            AnsiString entry;
+            entry.Format("{\"domain\":\"%hs\",\"service\":\"%hs\",\"record\":\"%hs.%hs. IN SRV %d %d %d %hs.\"}",
+               domainName.c_str(), service.service.c_str(),
+               service.service.c_str(), domainName.c_str(),
+               service.priority, service.weight, service.port,
+               JsonEscape_(target).c_str());
+
+            if (recordCount > 0)
+               recordJson += ",";
+
+            recordJson += entry;
+            recordCount++;
+         }
+      }
+
+      AnsiString body;
+      body.Format("{\"target\":\"%hs\",\"count\":%d,\"services\":[%hs],\"records\":[%hs]}",
+         JsonEscape_(target).c_str(), recordCount, serviceJson.c_str(), recordJson.c_str());
 
       return BuildResponse_(200, body);
    }
