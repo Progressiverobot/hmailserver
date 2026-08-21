@@ -1,0 +1,31 @@
+name: Coding style
+
+# Automatically enforces the project's selected coding style, which is
+# declared in .editorconfig (C++/C#: spaces, width 3).
+#
+# editorconfig-checker validates every text file against .editorconfig
+# (indentation style, trailing whitespace, final newline).
+#
+# Style exceptions live in .ecrc / .editorconfig, in the repository, where
+# they are visible and reviewable — not in anyone's local settings.
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  editorconfig:
+    name: editorconfig-checker
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check files against .editorconfig
+        uses: editorconfig-checker/action-editorconfig-checker@v2
