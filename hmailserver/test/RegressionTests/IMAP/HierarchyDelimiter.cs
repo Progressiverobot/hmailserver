@@ -118,7 +118,7 @@ namespace RegressionTests.IMAP
          var simulator = new ImapClientSimulator();
          simulator.ConnectAndLogon(account.Address, "test");
          var result = simulator.Send("A01 NAMESPACE");
-         var correctNamespaceSetting = "* NAMESPACE ((\"\" \"\\\\\")) NIL ((\"" + publicFolderName +
+         var correctNamespaceSetting = "* NAMESPACE ((\"\" \"\\\\\")) ((\"#Users\" \"\\\\\")) ((\"" + publicFolderName +
                                        "\" \"\\\\\"))";
          Assert.IsTrue(result.Contains(correctNamespaceSetting), result);
          simulator.Disconnect();
@@ -129,7 +129,7 @@ namespace RegressionTests.IMAP
          simulator.ConnectAndLogon(account.Address, "test");
 
          result = simulator.Send("A01 NAMESPACE");
-         correctNamespaceSetting = "* NAMESPACE ((\"\" \".\")) NIL ((\"" + publicFolderName + "\" \".\"))";
+         correctNamespaceSetting = "* NAMESPACE ((\"\" \".\")) ((\"#Users\" \".\")) ((\"" + publicFolderName + "\" \".\"))";
          Assert.IsTrue(result.Contains(correctNamespaceSetting), result);
          simulator.Disconnect();
 
@@ -139,7 +139,7 @@ namespace RegressionTests.IMAP
          simulator.ConnectAndLogon(account.Address, "test");
 
          result = simulator.Send("A01 NAMESPACE");
-         correctNamespaceSetting = "* NAMESPACE ((\"\" \"/\")) NIL ((\"" + publicFolderName + "\" \"/\"))";
+         correctNamespaceSetting = "* NAMESPACE ((\"\" \"/\")) ((\"#Users\" \"/\")) ((\"" + publicFolderName + "\" \"/\"))";
          Assert.IsTrue(result.Contains(correctNamespaceSetting), result);
          simulator.Disconnect();
       }

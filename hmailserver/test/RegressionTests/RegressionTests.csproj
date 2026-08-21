@@ -302,6 +302,7 @@
     <Compile Include="Infrastructure\BackendPortability.cs" />
     <Compile Include="Infrastructure\DatabaseFailureHandling.cs" />
     <Compile Include="Infrastructure\DiskSpaceGuard.cs" />
+    <Compile Include="Infrastructure\ListenerIpv6.cs" />
     <Compile Include="Infrastructure\PrivacyTools.cs" />
     <Compile Include="IMAP\CapabilityAuthAdvertisement.cs" />
     <Compile Include="IMAP\MasterUserImpersonation.cs" />
@@ -397,6 +398,7 @@
     <Compile Include="Infrastructure\DomainServices.cs" />
     <Compile Include="IMAP\Basics.cs" />
     <Compile Include="IMAP\TombstoneRetention.cs" />
+    <Compile Include="IMAP\SharedMailboxes.cs" />
     <Compile Include="Shared\ImapClientSimulator.cs" />
     <Compile Include="Infrastructure\IPRanges.cs" />
     <Compile Include="Infrastructure\MainOperations.cs" />
@@ -584,6 +586,7 @@
     <Compile Include="SSL\StartTls\SmtpServerTests.cs" />
     <Compile Include="API\RestApiQueue.cs" />
     <Compile Include="API\RestApiQuarantineAndAliases.cs" />
+    <Compile Include="API\RestApiSrvRecords.cs" />
     <Compile Include="API\ScriptReload.cs" />
     <Compile Include="AntiSpam\DKIM\ArcSealing.cs" />
     <Compile Include="POP3\ProtocolConformance.cs" />

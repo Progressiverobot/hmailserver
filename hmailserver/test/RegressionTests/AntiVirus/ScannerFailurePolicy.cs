@@ -101,7 +101,10 @@ namespace RegressionTests.AntiVirus
 
          // And the scanner failure is not silent, which is the half that was
          // already true and must stay true.
-         CustomAsserts.AssertReportedError("Unable to launch executable");
+         // The wording changed when the launcher learned to tell a failed start
+         // from a timeout kill: this path is a genuinely missing executable, so
+         // it must report the path problem and not the timeout one.
+         CustomAsserts.AssertReportedError("Unable to launch the virus scanner");
       }
 
       [Test]

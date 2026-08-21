@@ -2076,7 +2076,9 @@ namespace RegressionTests.IMAP
          simulator.Logon("delete@example.test", "test");
          var result = simulator.Send("A01 NAMESPACE");
 
-         var correctNamespaceSetting = "* NAMESPACE ((\"\" \".\")) NIL ((\"" + imapFolderName + "\" \".\"))";
+         // The other-users slot is no longer NIL: shared mailboxes advertise
+         // "#Users" whenever ACL enforcement is on, which is the default.
+         var correctNamespaceSetting = "* NAMESPACE ((\"\" \".\")) ((\"#Users\" \".\")) ((\"" + imapFolderName + "\" \".\"))";
 
          if (!result.Contains(correctNamespaceSetting)) Assert.Fail("Namespace failed");
       }
