@@ -434,7 +434,7 @@ namespace hMailServer.ControlPanel.Services
             // has gone. What changed is that "it answered" is the liveness signal,
             // not "it answered Running". Readiness after a service RESTART is a
             // different question and is still asked separately by IsServerReady.
-            int ignored = (int) app_.ServerState;
+            _ = (int) app_.ServerState;
             return true;
          }
          catch (Exception ex)

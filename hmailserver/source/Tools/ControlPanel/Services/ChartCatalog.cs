@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace hMailServer.ControlPanel.Services
 {
@@ -111,14 +112,6 @@ namespace hMailServer.ControlPanel.Services
 
       /// <summary>The definition with this id, or null when there is no such chart.</summary>
       public static ChartDefinition ById(string id)
-      {
-         foreach (ChartDefinition definition in All)
-         {
-            if (string.Equals(definition.Id, id, StringComparison.Ordinal))
-               return definition;
-         }
-
-         return null;
-      }
+         => All.FirstOrDefault(definition => string.Equals(definition.Id, id, StringComparison.Ordinal));
    }
 }

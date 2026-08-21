@@ -45,17 +45,16 @@ namespace hMailServer.ControlPanel.Services
          if (t.IsPrimitive || item is DateTime)
             return item.ToString().IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0;
 
+         // Booleans are skipped, because their text is "True"/"False" and nobody
+         // searches for that - while plenty of real queries are substrings of it.
+         // With the domain and account lists now carrying an Active flag, typing
+         // "al" to find alice also matched every INACTIVE row (a substring of
+         // "False"), and "tr"/"ru"/"rue" matched every active one.
          foreach (PropertyInfo p in t.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                                     .Where(p => p.GetIndexParameters().Length == 0))
+                                     .Where(p => p.GetIndexParameters().Length == 0
+                                                 && p.PropertyType != typeof(bool)
+                                                 && p.PropertyType != typeof(bool?)))
          {
-            // Booleans are skipped, because their text is "True"/"False" and nobody
-            // searches for that - while plenty of real queries are substrings of it.
-            // With the domain and account lists now carrying an Active flag, typing
-            // "al" to find alice also matched every INACTIVE row (a substring of
-            // "False"), and "tr"/"ru"/"rue" matched every active one.
-            if (p.PropertyType == typeof(bool) || p.PropertyType == typeof(bool?))
-               continue;
-
             object value;
             try
             {

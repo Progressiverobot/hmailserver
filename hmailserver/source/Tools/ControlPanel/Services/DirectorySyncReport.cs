@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace hMailServer.ControlPanel.Services
 {
@@ -140,39 +141,14 @@ namespace hMailServer.ControlPanel.Services
 
       public IList<DirectorySyncRow> Rows { get; }
 
-      public int Count(DirectorySyncRowKind kind)
-      {
-         int total = 0;
-
-         foreach (DirectorySyncRow row in Rows)
-         {
-            if (row.Kind == kind)
-               total++;
-         }
-
-         return total;
-      }
+      public int Count(DirectorySyncRowKind kind) => Rows.Count(row => row.Kind == kind);
 
       /// <summary>
       /// How many rows an administrator ought to read before applying. Zero is the
       /// answer that means "this is safe to press", and it is worth being able to say
       /// that in one number.
       /// </summary>
-      public int AttentionCount
-      {
-         get
-         {
-            int total = 0;
-
-            foreach (DirectorySyncRow row in Rows)
-            {
-               if (row.NeedsAttention)
-                  total++;
-            }
-
-            return total;
-         }
-      }
+      public int AttentionCount => Rows.Count(row => row.NeedsAttention);
 
       /// <summary>
       /// Parses what Settings.PreviewDirectorySync or ApplyDirectorySync returned.

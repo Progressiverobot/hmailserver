@@ -111,7 +111,7 @@ namespace hMailServer.ControlPanel.Services
             counts.Append(visit.Key).Append('=').Append(visit.Value.ToString(CultureInfo.InvariantCulture));
          }
 
-         return counts.ToString() + "|" + string.Join(",", recent_);
+         return counts.Append('|').Append(string.Join(",", recent_)).ToString();
       }
 
       /// <summary>
@@ -149,9 +149,8 @@ namespace hMailServer.ControlPanel.Services
 
          if (halves.Length > 1)
          {
-            foreach (string key in halves[1].Split(','))
+            foreach (string trimmed in halves[1].Split(',').Select(key => key.Trim()))
             {
-               string trimmed = key.Trim();
                if (trimmed.Length == 0 || usage.recent_.Count >= MaxRecent)
                   continue;
                if (usage.recent_.Any(r => string.Equals(r, trimmed, StringComparison.OrdinalIgnoreCase)))

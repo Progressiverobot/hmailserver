@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace hMailServer.ControlPanel.Services
 {
@@ -66,12 +67,8 @@ namespace hMailServer.ControlPanel.Services
          if (string.IsNullOrEmpty(text))
             return report;
 
-         foreach (string raw in text.Split('\n'))
+         foreach (string line in text.Split('\n').Select(raw => raw.TrimEnd('\r')).Where(l => l.Length != 0))
          {
-            string line = raw.TrimEnd('\r');
-            if (line.Length == 0)
-               continue;
-
             if (line[0] == '#')
             {
                if (line.StartsWith(GeneratedPrefix, StringComparison.OrdinalIgnoreCase))
@@ -80,10 +77,11 @@ namespace hMailServer.ControlPanel.Services
                   if (value.Length > 0)
                      report.Generated = value;
                }
-               else if (line.StartsWith(MissingPrefix, StringComparison.OrdinalIgnoreCase))
+               else if (line.StartsWith(MissingPrefix, StringComparison.OrdinalIgnoreCase)
+                        && int.TryParse(line.Substring(MissingPrefix.Length).Trim(), out int count)
+                        && count >= 0)
                {
-                  if (int.TryParse(line.Substring(MissingPrefix.Length).Trim(), out int count) && count >= 0)
-                     report.ReportedMissingCount = count;
+                  report.ReportedMissingCount = count;
                }
 
                continue;

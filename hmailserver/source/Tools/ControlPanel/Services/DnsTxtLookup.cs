@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -171,16 +172,9 @@ namespace hMailServer.ControlPanel.Services
                return result;
          }
 
-         foreach (string record in lookup.Records)
-         {
-            if (Matches(record, expectedValue))
-            {
-               result.Status = MatchStatus.FoundAndMatches;
-               return result;
-            }
-         }
-
-         result.Status = MatchStatus.FoundButDifferent;
+         result.Status = lookup.Records.Any(record => Matches(record, expectedValue))
+            ? MatchStatus.FoundAndMatches
+            : MatchStatus.FoundButDifferent;
          return result;
       }
 
@@ -294,9 +288,8 @@ namespace hMailServer.ControlPanel.Services
 
       private static string ExtractTag(string txtValue, string tag)
       {
-         foreach (string part in txtValue.Split(';'))
+         foreach (string flat in txtValue.Split(';').Select(StripWhitespace))
          {
-            string flat = StripWhitespace(part);
             if (flat.Length > tag.Length && flat[tag.Length] == '=' &&
                 string.Equals(flat.Substring(0, tag.Length), tag, StringComparison.OrdinalIgnoreCase))
                return flat.Substring(tag.Length + 1);
@@ -306,12 +299,6 @@ namespace hMailServer.ControlPanel.Services
       }
 
       private static string StripWhitespace(string value)
-      {
-         var flat = new StringBuilder(value.Length);
-         foreach (char c in value)
-            if (!char.IsWhiteSpace(c))
-               flat.Append(c);
-         return flat.ToString();
-      }
+         => string.Concat(value.Where(c => !char.IsWhiteSpace(c)));
    }
 }

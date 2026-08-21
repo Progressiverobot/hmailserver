@@ -107,29 +107,20 @@ namespace hMailServer.ControlPanel.Services
       {
          var health = new CertificateHealth();
 
-         X509Certificate2 certificate = InspectCertificate_(certificateFile, filesReadableHere, health);
-
-         // try/finally, because the two calls between the load and the Dispose can
-         // throw and the certificate holds an unmanaged key handle. Without it, an
-         // exception out of InspectPrivateKey_ or InspectPair_ leaks that handle -
-         // and this method is called once per certificate every time the page is
-         // opened, so a file that reliably throws leaks on every visit until the
-         // Control Panel is restarted.
+         // A using declaration, because the two calls between the load and the end
+         // of the method can throw and the certificate holds an unmanaged key
+         // handle. Without it, an exception out of InspectPrivateKey_ or
+         // InspectPair_ leaks that handle - and this method is called once per
+         // certificate every time the page is opened, so a file that reliably
+         // throws leaks on every visit until the Control Panel is restarted.
          //
-         // It also makes the "never throws" contract in the summary above true rather
-         // than aspirational: the finally runs on the exception path as well, and the
-         // exception itself is still the caller's to see, because this method's
-         // promise is about FINDINGS, not about swallowing faults it does not
-         // understand.
-         try
-         {
-            string keyPem = InspectPrivateKey_(privateKeyFile, filesReadableHere, health);
-            InspectPair_(certificate, keyPem, filesReadableHere, health);
-         }
-         finally
-         {
-            certificate?.Dispose();
-         }
+         // The dispose runs on the exception path as well, and the exception itself
+         // is still the caller's to see, because this method's promise is about
+         // FINDINGS, not about swallowing faults it does not understand.
+         using X509Certificate2 certificate = InspectCertificate_(certificateFile, filesReadableHere, health);
+
+         string keyPem = InspectPrivateKey_(privateKeyFile, filesReadableHere, health);
+         InspectPair_(certificate, keyPem, filesReadableHere, health);
 
          return health;
       }

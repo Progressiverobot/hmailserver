@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace hMailServer.ControlPanel.Services
 {
@@ -94,12 +95,8 @@ namespace hMailServer.ControlPanel.Services
          // confuse a listener are the Protocols page's connection limit and welcome
          // banner, which sit on three different cards in three different tabs.
          var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-         foreach (LabelledEditor editor in editors)
+         foreach (string label in editors.Select(e => Clean(e?.Label)).Where(l => l.Length != 0))
          {
-            string label = Clean(editor?.Label);
-            if (label.Length == 0)
-               continue;
-
             counts.TryGetValue(label, out int count);
             counts[label] = count + 1;
          }
@@ -116,7 +113,7 @@ namespace hMailServer.ControlPanel.Services
                continue;
             }
 
-            names[i] = counts[label] > 1 ? Qualify(label, editor.Group) : label;
+            names[i] = counts[label] > 1 ? Qualify(label, editor?.Group) : label;
          }
 
          return names;

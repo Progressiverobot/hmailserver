@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace hMailServer.ControlPanel.Services
@@ -305,19 +306,13 @@ namespace hMailServer.ControlPanel.Services
       /// </summary>
       public static List<string> Tokenize(string normalized)
       {
-         var tokens = new List<string>();
          if (string.IsNullOrEmpty(normalized))
-            return tokens;
+            return new List<string>();
 
-         foreach (string word in normalized.Split(' '))
-         {
-            if (word.Length == 0 || StopWords.Contains(word))
-               continue;
-
-            tokens.Add(Canonical(word));
-         }
-
-         return tokens;
+         return normalized.Split(' ')
+            .Where(word => word.Length != 0 && !StopWords.Contains(word))
+            .Select(Canonical)
+            .ToList();
       }
 
       /// <summary>The word every synonym of <paramref name="word"/> folds onto.</summary>
@@ -458,19 +453,12 @@ namespace hMailServer.ControlPanel.Services
             // rather than merely whether all of them did.
             foreach (string queryToken in tokens_)
             {
-               bool hit = false;
+               bool hit = candidateTokens.Any(
+                  candidateToken => SearchTerms.TokenMatches(queryToken, candidateToken));
 
-               foreach (string candidateToken in candidateTokens)
-               {
-                  if (SearchTerms.TokenMatches(queryToken, candidateToken))
-                  {
-                     matched++;
-                     hit = true;
-                     break;
-                  }
-               }
-
-               if (!hit)
+               if (hit)
+                  matched++;
+               else
                   soleUnmatchedToken = soleUnmatchedToken == null ? queryToken : null;
             }
 
@@ -542,18 +530,12 @@ namespace hMailServer.ControlPanel.Services
       /// <summary>Best (lowest) score over several candidate strings.</summary>
       public int BestScore(IEnumerable<string> candidates)
       {
-         int best = SearchTerms.NoMatch;
          if (candidates == null)
-            return best;
+            return SearchTerms.NoMatch;
 
-         foreach (string candidate in candidates)
-         {
-            int score = Score(candidate);
-            if (score < best)
-               best = score;
-         }
-
-         return best;
+         // NoMatch is the floor: an empty candidate list scores NoMatch, and no
+         // real score is ever above it.
+         return candidates.Select(Score).Prepend(SearchTerms.NoMatch).Min();
       }
    }
 }

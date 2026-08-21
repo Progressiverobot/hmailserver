@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace hMailServer.ControlPanel.Services
 {
@@ -313,15 +314,12 @@ namespace hMailServer.ControlPanel.Services
 
          // ---- cannot work ------------------------------------------------------
 
-         foreach (VirusScannerEntry scanner in scanners)
+         foreach (VirusScannerEntry scanner in scanners.Where(s => s.Enabled && !s.Usable))
          {
-            if (scanner.Enabled && !scanner.Usable)
-            {
-               notes.Add(new VirusPipelineNote(StatusLevel.Critical,
-                  scanner.Name + " is switched on but cannot run. " + scanner.Problem
-                  + " Every scan it is asked for fails, and a failed scan is not a failed message: the error is "
-                  + "logged and the message is delivered as though it had been examined and found clean."));
-            }
+            notes.Add(new VirusPipelineNote(StatusLevel.Critical,
+               scanner.Name + " is switched on but cannot run. " + scanner.Problem
+               + " Every scan it is asked for fails, and a failed scan is not a failed message: the error is "
+               + "logged and the message is delivered as though it had been examined and found clean."));
          }
 
          if (usable == 0 && !config.AttachmentBlockingEnabled)
@@ -433,17 +431,7 @@ namespace hMailServer.ControlPanel.Services
 
       /// <summary>How many scanners are both switched on and able to run.</summary>
       public static int CountUsable(VirusPipelineConfig config)
-      {
-         int usable = 0;
-
-         foreach (VirusScannerEntry scanner in Scanners(config))
-         {
-            if (scanner.Usable)
-               usable++;
-         }
-
-         return usable;
-      }
+         => Scanners(config).Count(scanner => scanner.Usable);
 
       private static bool IsBlank(string value) => string.IsNullOrWhiteSpace(value);
 

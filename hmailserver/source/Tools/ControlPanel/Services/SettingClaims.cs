@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace hMailServer.ControlPanel.Services
 {
@@ -230,13 +231,8 @@ namespace hMailServer.ControlPanel.Services
          if (string.IsNullOrEmpty(key))
             return null;
 
-         foreach (SettingClaim claim in entries_)
-         {
-            if (string.Equals(claim.Key, key, StringComparison.OrdinalIgnoreCase))
-               return claim;
-         }
-
-         return null;
+         return entries_.FirstOrDefault(
+            claim => string.Equals(claim.Key, key, StringComparison.OrdinalIgnoreCase));
       }
 
       /// <summary>The note for a setting, or an empty string when it has none.</summary>

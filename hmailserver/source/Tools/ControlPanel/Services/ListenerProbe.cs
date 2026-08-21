@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
@@ -108,11 +109,8 @@ namespace hMailServer.ControlPanel.Services
             return false;
          }
 
-         foreach (IPEndPoint listener in listeners)
+         foreach (IPEndPoint listener in listeners.Where(l => l != null && l.Port == port))
          {
-            if (listener == null || listener.Port != port)
-               continue;
-
             // A wildcard row is served by a wildcard listener, and Windows reports a
             // successful wildcard bind literally as 0.0.0.0 or [::] - so matching
             // any address on the port would be looser than the question asked.

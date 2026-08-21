@@ -187,10 +187,8 @@ namespace hMailServer.ControlPanel.Services
             hashUsable = false;
          }
 
-         foreach (string rawLine in lines)
+         foreach (string line in lines.Select(rawLine => rawLine.Trim()))
          {
-            string line = rawLine.Trim();
-
             if (line.Length == 0 || line.StartsWith(";") || line.StartsWith("#"))
                continue;
 
@@ -428,11 +426,8 @@ namespace hMailServer.ControlPanel.Services
          if (value.Length > MaxLabelLength)
             return "The label has to be " + MaxLabelLength + " characters or fewer.";
 
-         foreach (char c in value)
-         {
-            if (c < 0x20 || c == 0x7F)
-               return "The label must not contain control characters.";
-         }
+         if (value.Any(c => c < 0x20 || c == 0x7F))
+            return "The label must not contain control characters.";
 
          return null;
       }
@@ -452,12 +447,10 @@ namespace hMailServer.ControlPanel.Services
 
          var names = new List<string>();
 
-         foreach (string part in value.Split(','))
+         foreach (string name in value.Split(',')
+                                      .Select(part => part.Trim().ToLowerInvariant())
+                                      .Where(n => n.Length != 0))
          {
-            string name = part.Trim().ToLowerInvariant();
-            if (name.Length == 0)
-               continue;
-
             if (!IsValidDomainName(name))
             {
                error = "'" + name + "' is not a domain name. Give a comma-separated list of domains, or leave the "
@@ -526,12 +519,10 @@ namespace hMailServer.ControlPanel.Services
             if (label.StartsWith("-") || label.EndsWith("-"))
                return false;
 
-            foreach (char c in label)
-            {
-               bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-';
-               if (!ok)
-                  return false;
-            }
+            // ASCII letters, digits and the hyphen only. IsAsciiLetterOrDigit, not
+            // IsLetterOrDigit: the latter would accept every Unicode letter.
+            if (!label.All(c => char.IsAsciiLetterOrDigit(c) || c == '-'))
+               return false;
          }
 
          // No dot required: a single label is a domain name the server accepts.
@@ -597,14 +588,7 @@ namespace hMailServer.ControlPanel.Services
          if (value == null || value.Length != expectedLength)
             return false;
 
-         foreach (char c in value)
-         {
-            bool ok = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
-            if (!ok)
-               return false;
-         }
-
-         return true;
+         return value.All(char.IsAsciiHexDigitLower);
       }
 
       /// <summary>

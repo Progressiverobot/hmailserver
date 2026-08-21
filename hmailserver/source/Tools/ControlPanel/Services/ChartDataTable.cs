@@ -216,9 +216,11 @@ namespace hMailServer.ControlPanel.Services
 
       private static int SampleCount_(IReadOnlyList<ChartSeriesSamples> series)
       {
+         if (series == null)
+            return 0;
+
          int count = 0;
-         int seriesCount = series?.Count ?? 0;
-         for (int s = 0; s < seriesCount; s++)
+         for (int s = 0; s < series.Count; s++)
             count = Math.Max(count, series[s].Values.Count);
          return count;
       }
@@ -226,10 +228,12 @@ namespace hMailServer.ControlPanel.Services
       private static ChartTableRow Row_(ChartDefinition definition, IReadOnlyList<ChartSeriesSamples> series,
                                         IReadOnlyList<DateTime> times, int sampleCount, int index)
       {
-         int seriesCount = series?.Count ?? 0;
-         var cells = new string[seriesCount];
+         // No series list means no value cells - normalised here so the indexing
+         // below is provably never a null dereference.
+         series ??= Array.Empty<ChartSeriesSamples>();
+         var cells = new string[series.Count];
 
-         for (int s = 0; s < seriesCount; s++)
+         for (int s = 0; s < series.Count; s++)
          {
             IReadOnlyList<double?> values = series[s].Values;
             int offset = sampleCount - values.Count;
@@ -260,8 +264,8 @@ namespace hMailServer.ControlPanel.Services
          var summaries = new List<ChartSeriesSummary>();
          bool hasData = false;
 
-         int seriesCount = series?.Count ?? 0;
-         for (int s = 0; s < seriesCount; s++)
+         series ??= Array.Empty<ChartSeriesSamples>();
+         for (int s = 0; s < series.Count; s++)
          {
             IReadOnlyList<double?> values = series[s].Values;
             double? latest = null;
