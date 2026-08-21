@@ -127,13 +127,17 @@ common continuity failure for a small project.
 Continuity
 ----------
 
-**Current status: the bus factor is 1.** One person can accept changes,
-publish a release, and respond to a security report. If that person were
-unavailable, the project would stall until repository access were recovered
-through GitHub's own account-recovery or organisation-ownership processes.
+**Current status: the knowledge bus factor is 1; access continuity is
+arranged.** One person does the work today — but the credentials and legal
+rights needed to continue the project do not die with them. The maintainer
+keeps the critical credentials in a managed arrangement that a trusted person
+can reach if the maintainer is confirmed unavailable, together with the legal
+authority to use them, so the project could create and close issues, accept
+changes and publish a release within days rather than being locked out.
 
-This is an open, known gap rather than a solved problem, and it is recorded
-here rather than papered over. The mitigations that *are* in place:
+What remains true is that no second person currently *knows* the codebase the
+way the maintainer does — that is the bus-factor gap recorded honestly above
+and in the badge entry. The mitigations in place for it:
 
 - Every build, test and release step is scripted and committed, so the work is
   reproducible by someone else without tacit knowledge.
