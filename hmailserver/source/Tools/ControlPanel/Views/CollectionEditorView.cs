@@ -12,10 +12,10 @@ using Button = Wpf.Ui.Controls.Button;
 using TextBox = Wpf.Ui.Controls.TextBox;
 using TextBlock = System.Windows.Controls.TextBlock;
 using DataGrid = System.Windows.Controls.DataGrid;
-using MessageBox = System.Windows.MessageBox;
 using MessageBoxButton = System.Windows.MessageBoxButton;
 using MessageBoxResult = System.Windows.MessageBoxResult;
 using System.Linq;
+using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
 
 namespace hMailServer.ControlPanel.Views
 {

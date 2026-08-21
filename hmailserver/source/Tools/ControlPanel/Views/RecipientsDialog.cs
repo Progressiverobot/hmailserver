@@ -5,6 +5,7 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
 using hMailServer.ControlPanel.Services;
+using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
 
 namespace hMailServer.ControlPanel.Views
 {

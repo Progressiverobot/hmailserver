@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
 using TextBox = Wpf.Ui.Controls.TextBox;
 using System.Linq;
+using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
 
 namespace hMailServer.ControlPanel.Views
 {

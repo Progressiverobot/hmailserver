@@ -18,6 +18,7 @@ using System.Windows.Shapes;
 using Typography = hMailServer.ControlPanel.Services.Typography;
 using hMailServer.ControlPanel.Services;
 using System.Linq;
+using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
 
 namespace hMailServer.ControlPanel.Views
 {

@@ -8,6 +8,7 @@ using Microsoft.Win32;
 using Wpf.Ui.Appearance;
 using hMailServer.ControlPanel.Services;
 using hMailServer.ControlPanel.Views;
+using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
 
 namespace hMailServer.ControlPanel
 {

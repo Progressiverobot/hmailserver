@@ -9,6 +9,7 @@ using System.Windows.Media;
 using hMailServer.ControlPanel.Services;
 
 using Typography = hMailServer.ControlPanel.Services.Typography;
+using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
 
 namespace hMailServer.ControlPanel.Views
 {

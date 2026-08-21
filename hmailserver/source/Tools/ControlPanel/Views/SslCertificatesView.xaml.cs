@@ -17,6 +17,7 @@ using Typography = hMailServer.ControlPanel.Services.Typography;
 // The status marks are System.Windows.Shapes.Path; the implicit usings bring in
 // System.IO.Path. The alias picks the drawing one.
 using Path = System.Windows.Shapes.Path;
+using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
 
 namespace hMailServer.ControlPanel.Views
 {
