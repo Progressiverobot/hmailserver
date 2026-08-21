@@ -56,7 +56,7 @@
                  The accessible name of each value is set in code to "label, value"
                  on every refresh. AutomationProperties.LabeledBy looks like the
                  right tool and is not: on a TextBlock it *replaces* the announced
-                 name, so a screen reader would read "IN QUEUE" and never say the
+                 name, so a screen reader would read "In queue" and never say the
                  number. -->
             <UniformGrid Columns="5" Margin="0,0,0,12">
                 <Border Style="{StaticResource Card}" MinHeight="96" Margin="0,0,12,0">
@@ -108,7 +108,7 @@
                                            VerticalAlignment="Center" />
                             </StackPanel>
                         </StackPanel>
-                        <TextBlock Grid.Row="1" Text="IN QUEUE" Style="{StaticResource KpiLabel}" />
+                        <TextBlock Grid.Row="1" Text="In queue" Style="{StaticResource KpiLabel}" />
                     </Grid>
                 </Border>
                 <Border Style="{StaticResource Card}" MinHeight="96" Margin="0,0,12,0">

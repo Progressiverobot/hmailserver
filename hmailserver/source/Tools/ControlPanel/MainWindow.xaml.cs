@@ -56,6 +56,12 @@ namespace hMailServer.ControlPanel
          ServerSession.Reconnected += OnSessionReconnected;
          Closing += (s, e) => ServerSession.Reconnected -= OnSessionReconnected;
 
+         // Covers every way the theme can change after ApplySavedTheme's own
+         // explicit call: the toggle button, and the OS switching while the
+         // application is still following the system theme.
+         ApplicationThemeManager.Changed += OnThemeChanged;
+         Closing += (s, e) => ApplicationThemeManager.Changed -= OnThemeChanged;
+
          // Ctrl+K command palette.
          PreviewKeyDown += (s, e) =>
          {
@@ -173,19 +179,35 @@ namespace hMailServer.ControlPanel
       /// </summary>
       private static object BuildNavHeader_(NavNode node)
       {
-         if (string.IsNullOrEmpty(node.Icon) ||
-             !System.Enum.TryParse(node.Icon, out Wpf.Ui.Controls.SymbolRegular symbol))
+         if (string.IsNullOrEmpty(node.Icon))
             return node.Title;
+
+         if (!System.Enum.TryParse(node.Icon, out Wpf.Ui.Controls.SymbolRegular symbol))
+         {
+            // Right for the user, wrong to be quiet about: Enum.TryParse failing
+            // silently is how a mistyped name once shipped one group bare among
+            // seven with glyphs, and no test can catch it because the tests are
+            // deliberately WPF-free and never see this enum. Loud in DEBUG,
+            // still just a missing icon in Release.
+            System.Diagnostics.Debug.Fail(
+               "Navigation icon \"" + node.Icon + "\" on \"" + node.Title +
+               "\" is not a member of Wpf.Ui.Controls.SymbolRegular.");
+            return node.Title;
+         }
 
          var header = new StackPanel { Orientation = Orientation.Horizontal };
 
+         // No explicit Foreground: SymbolIcon's Foreground inherits from the
+         // TreeViewItem exactly as the TextBlock's does, so the glyph dims at
+         // rest and brightens on hover and selection together with its label.
+         // It was pinned to the secondary brush here once, which left it the
+         // only part of the row that never responded to state.
          var icon = new Wpf.Ui.Controls.SymbolIcon(symbol)
          {
             FontSize = 16,
             Margin = new Thickness(0, 0, 10, 0),
             VerticalAlignment = VerticalAlignment.Center
          };
-         icon.SetResourceReference(ForegroundProperty, "TextFillColorSecondaryBrush");
          header.Children.Add(icon);
 
          header.Children.Add(new TextBlock
@@ -223,6 +245,15 @@ namespace hMailServer.ControlPanel
          // Groups keep the automation id they had, derived from the title, so
          // that anything driving this interface by id keeps working for the
          // groups that kept their names.
+         //
+         // The Tag contract for the whole tree: a page's Tag is its key (a
+         // string), a group's Tag is its NavNode. AllLeaves, AllGroups and
+         // NavTree_SelectedItemChanged all discriminate on "Tag is string", so
+         // a group's Tag must never be one. The group's node is here so that
+         // RevealGroup can find the group without inspecting its Header -
+         // matching on "Header as string" broke the moment headers became
+         // icon-plus-text panels.
+         item.Tag = node;
          item.IsExpanded = true;
          item.FontWeight = FontWeights.SemiBold;
          System.Windows.Automation.AutomationProperties.SetAutomationId(item, "navgroup-" + NavigationMap.Slug(node.Title));
@@ -457,7 +488,8 @@ namespace hMailServer.ControlPanel
       ///    Deliberately does NOT call group.Focus(). A TreeView's selection follows
       ///    keyboard focus, so focusing the group heading selected it and deselected the
       ///    page the user is actually looking at: the content stayed put - because
-      ///    NavTree_SelectedItemChanged early-returns for a heading, which has no Tag -
+      ///    NavTree_SelectedItemChanged early-returns for a heading, whose Tag is its
+      ///    NavNode rather than a page-key string -
       ///    while the sidebar highlight and the brand pill jumped to the heading. The
       ///    sidebar then disagreed with the content, which is precisely the "where am I"
       ///    problem this navigation work exists to remove.
@@ -468,8 +500,11 @@ namespace hMailServer.ControlPanel
       /// </summary>
       private void RevealGroup(string title)
       {
+         // By the NavNode in the Tag, never by the Header: a group's header is
+         // an icon-plus-text StackPanel whenever its icon name resolves, so
+         // "Header as string" matched only the groups whose icon was broken.
          foreach (TreeViewItem group in AllGroups(NavTree.Items)
-            .Where(g => string.Equals(g.Header as string, title, StringComparison.Ordinal)))
+            .Where(g => g.Tag is NavNode node && string.Equals(node.Title, title, StringComparison.Ordinal)))
          {
             for (var parent = group.Parent as TreeViewItem; parent != null; parent = parent.Parent as TreeViewItem)
                parent.IsExpanded = true;
@@ -822,7 +857,32 @@ namespace hMailServer.ControlPanel
 
          // Make sure the semantic tokens match whatever theme we just applied.
          Services.ThemeTokens.Refresh();
+
+         UpdateThemeToggle_();
       }
+
+      /// <summary>
+      /// Points the theme toggle at the state a click will produce: a sun while
+      /// the application is dark, a moon while it is light. It used to show
+      /// DarkTheme24 in both states - an icon disagreeing with its verb, the
+      /// same defect the Pause button had. The tool tip and accessible name
+      /// follow, so "what will this do" reads the same by eye and by ear.
+      /// </summary>
+      private void UpdateThemeToggle_()
+      {
+         bool dark = ApplicationThemeManager.GetAppTheme() == ApplicationTheme.Dark;
+
+         ThemeButton.Icon = new Wpf.Ui.Controls.SymbolIcon(
+            dark ? Wpf.Ui.Controls.SymbolRegular.WeatherSunny24
+                 : Wpf.Ui.Controls.SymbolRegular.WeatherMoon24);
+
+         string action = dark ? "Switch to the light theme" : "Switch to the dark theme";
+         ThemeButton.ToolTip = action;
+         System.Windows.Automation.AutomationProperties.SetName(ThemeButton, action);
+      }
+
+      private void OnThemeChanged(ApplicationTheme theme, System.Windows.Media.Color accent)
+         => UpdateThemeToggle_();
 
       private void Theme_Click(object sender, RoutedEventArgs e)
       {
@@ -840,6 +900,11 @@ namespace hMailServer.ControlPanel
 
          // Recompute semantic tokens for the newly applied theme.
          Services.ThemeTokens.Refresh();
+
+         // OnThemeChanged has already run via the Changed event; calling again
+         // costs nothing and keeps the button honest even if a future WPF-UI
+         // stops raising Changed from Apply.
+         UpdateThemeToggle_();
 
          try
          {

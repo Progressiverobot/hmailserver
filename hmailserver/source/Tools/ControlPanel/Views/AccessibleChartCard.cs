@@ -51,7 +51,16 @@ namespace hMailServer.ControlPanel.Views
       // One shared typeface: SKTypeface is unmanaged and the palette is rebuilt on
       // every theme change, so allocating one per rebuild would leak steadily for
       // as long as the user keeps toggling the theme.
-      private static readonly SKTypeface AxisTypeface = SKTypeface.FromFamilyName("Segoe UI Variable Text, Segoe UI");
+      //
+      // Skia takes ONE family name, not a WPF-style fallback list - handing it
+      // "Segoe UI Variable Text, Segoe UI" matches no installed family, and
+      // FromFamilyName then silently answers with Skia's default face. So the
+      // fallback is spelled out: ask the font manager for the Windows 11 face,
+      // which returns null rather than a substitute when it is absent, and only
+      // then take classic Segoe UI, which every supported Windows has.
+      private static readonly SKTypeface AxisTypeface =
+         SKFontManager.Default.MatchFamily("Segoe UI Variable Text")
+         ?? SKTypeface.FromFamilyName("Segoe UI");
 
       private readonly ChartDefinition definition_;
       private readonly int historyLength_;
@@ -413,7 +422,7 @@ namespace hMailServer.ControlPanel.Views
             IsVisible = true,
             Name = WindowDescription_(),
             NamePaint = axisPaint,
-            NameTextSize = 11,
+            NameTextSize = Typography.Caption,
             LabelsPaint = null,
             SeparatorsPaint = gridPaint,
             TicksPaint = null
@@ -426,7 +435,7 @@ namespace hMailServer.ControlPanel.Views
             {
                LabelsPaint = axisPaint,
                SeparatorsPaint = gridPaint,
-               TextSize = 12,
+               TextSize = Typography.Caption,
                MinLimit = 0
             }
          };

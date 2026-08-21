@@ -69,7 +69,9 @@ namespace hMailServer.ControlPanel.Services
       /// The Segoe Fluent Icons glyph for this node, as the NAME of a
       /// Wpf.Ui.Controls.SymbolRegular member ("Globe24"). A string rather than
       /// the enum so this file stays WPF-free and testable; MainWindow resolves
-      /// it, and an unknown name simply renders no icon rather than failing.
+      /// it, and an unknown name renders no icon rather than failing - loudly
+      /// in DEBUG builds, because Enum.TryParse failing silently is how a
+      /// mistyped name once shipped one group bare among seven with glyphs.
       /// Set on the top-level groups - a glyph on all fifty leaf pages would be
       /// noise, and Windows 11's own settings surfaces put them on the
       /// top level.
@@ -442,7 +444,7 @@ namespace hMailServer.ControlPanel.Services
                   aliases: "Security groups|Roles|Membership|Permission groups",
                   seeAlso: "publicfolders|domains")),
 
-            Group("MailArrowForward24", "Mail flow & delivery",
+            Group("MailArrowForward20", "Mail flow & delivery",
                "How mail gets in, where it goes next, and what happens to it on the way.",
                "Delivery|Routing|Transport|SMTP|Relay|Mail flow",
 

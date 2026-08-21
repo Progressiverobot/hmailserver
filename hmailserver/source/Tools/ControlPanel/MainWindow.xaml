@@ -88,7 +88,10 @@
                         <Style TargetType="TreeViewItem">
                             <Setter Property="Padding" Value="6,6" />
                             <Setter Property="Margin" Value="0,1" />
-                            <Setter Property="FontSize" Value="13" />
+                            <!-- Fluent Body (Typography.Body). The rows sat at 13
+                                 through the ramp re-basing, a half-step off both
+                                 rungs and the actual size of most of the sidebar. -->
+                            <Setter Property="FontSize" Value="14" />
                             <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
                             <Setter Property="Background" Value="Transparent" />
                             <Setter Property="HorizontalContentAlignment" Value="Left" />
@@ -171,10 +174,18 @@
                     <Grid Margin="0,6,0,0">
                         <TextBlock x:Name="VersionText" FontSize="12" Margin="15,4,0,0" VerticalAlignment="Center"
                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                        <!-- The icon, tool tip and accessible name are owned by
+                             UpdateThemeToggle_ in code-behind, which points all
+                             three at the state a click will produce (sun while
+                             dark, moon while light) and re-points them when the
+                             OS flips the theme. The XAML icon is only a
+                             placeholder for the instant before ApplySavedTheme
+                             runs; a fixed DarkTheme24 here once sat on the
+                             button in both states, disagreeing with its verb
+                             half the time. -->
                         <ui:Button x:Name="ThemeButton" Padding="7,3"
-                                   Icon="{ui:SymbolIcon DarkTheme24}"
-                                   HorizontalAlignment="Right" ToolTip="Toggle light/dark theme"
-                                   AutomationProperties.Name="Toggle light or dark theme"
+                                   Icon="{ui:SymbolIcon WeatherMoon24}"
+                                   HorizontalAlignment="Right"
                                    Click="Theme_Click" />
                     </Grid>
                 </StackPanel>
