@@ -114,7 +114,12 @@ namespace HM
          RouteQueueList,
          RouteQueueRetry,
          RouteQueueDelete,
-         RouteTlsa
+         RouteTlsa,
+         RouteQuarantineList,
+         RouteQuarantineRelease,
+         RouteQuarantineDelete,
+         RouteAliasList,
+         RouteOpenApi
       };
 
       struct Route
@@ -247,6 +252,11 @@ namespace HM
       static AnsiString HandleQueueRetry_(__int64 messageId);
       static AnsiString HandleQueueDelete_(__int64 messageId);
       static AnsiString HandleTlsa_();
+      AnsiString HandleListQuarantine_();
+      AnsiString HandleQuarantineRelease_(__int64 id);
+      AnsiString HandleQuarantineDelete_(__int64 id);
+      AnsiString HandleListAliases_(const String &domainName);
+      AnsiString HandleOpenApi_();
 
       // True if the id names a message that is really in the delivery queue.
       static bool QueueMessageExists_(__int64 messageId);

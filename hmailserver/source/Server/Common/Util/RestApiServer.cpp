@@ -9,6 +9,9 @@
 #include "Crypt.h"
 #include "AccountLogon.h"
 #include "AcmeClient.h"
+#include "../AntiSpam/QuarantineStore.h"
+#include "../BO/Aliases.h"
+#include "../BO/Alias.h"
 #include "FileUtilities.h"
 #include "Time.h"
 #include "Encoding/Base64.h"
@@ -1402,6 +1405,21 @@ namespace HM
          case RouteTlsa:
             return HandleTlsa_();
 
+         case RouteQuarantineList:
+            return HandleListQuarantine_();
+
+         case RouteQuarantineRelease:
+            return HandleQuarantineRelease_(route.message_id);
+
+         case RouteQuarantineDelete:
+            return HandleQuarantineDelete_(route.message_id);
+
+         case RouteAliasList:
+            return HandleListAliases_(String(route.identifier));
+
+         case RouteOpenApi:
+            return HandleOpenApi_();
+
          default:
             break;
          }
@@ -1551,7 +1569,65 @@ namespace HM
       }
 
       if (method == "GET" && path == "/api/v1/tlsa")
+      {
          route.kind = RouteTlsa;
+         return;
+      }
+
+      // /api/v1/quarantine, /api/v1/quarantine/<id>/release, /api/v1/quarantine/<id>
+      if (method == "GET" && path == "/api/v1/quarantine")
+      {
+         route.kind = RouteQuarantineList;
+         return;
+      }
+
+      const AnsiString quarantinePrefix = "/api/v1/quarantine/";
+
+      if (path.StartsWith(quarantinePrefix))
+      {
+         AnsiString remainder = path.Mid(quarantinePrefix.GetLength());
+
+         if (method == "POST" && remainder.EndsWith("/release"))
+         {
+            AnsiString idPart = remainder.Mid(0, remainder.GetLength() - AnsiString("/release").GetLength());
+
+            __int64 quarantineId = 0;
+            if (ParseQueueId(idPart, quarantineId))
+            {
+               route.kind = RouteQuarantineRelease;
+               route.message_id = quarantineId;
+               return;
+            }
+         }
+
+         if (method == "DELETE" && remainder.Find("/") < 0)
+         {
+            __int64 quarantineId = 0;
+            if (ParseQueueId(remainder, quarantineId))
+            {
+               route.kind = RouteQuarantineDelete;
+               route.message_id = quarantineId;
+               return;
+            }
+         }
+      }
+
+      // /api/v1/domains/<name>/aliases - same shape as the accounts listing.
+      if (method == "GET" && path.StartsWith(domainsPrefix) && path.EndsWith("/aliases"))
+      {
+         AnsiString domainName = path.Mid(domainsPrefix.GetLength(),
+            path.GetLength() - domainsPrefix.GetLength() - AnsiString("/aliases").GetLength());
+
+         if (!domainName.IsEmpty() && domainName.Find("/") < 0)
+         {
+            route.kind = RouteAliasList;
+            route.identifier = domainName;
+            return;
+         }
+      }
+
+      if (method == "GET" && path == "/api/v1/openapi.json")
+         route.kind = RouteOpenApi;
    }
 
    bool
@@ -1587,6 +1663,8 @@ namespace HM
       case RouteAccountDelete:
       case RouteQueueRetry:
       case RouteQueueDelete:
+      case RouteQuarantineRelease:
+      case RouteQuarantineDelete:
          return true;
 
       default:
@@ -1657,12 +1735,22 @@ namespace HM
          return AuthorizationForbidden;
       }
 
+      // The quarantine has the queue's shape exactly: one entry names a sender
+      // and recipients in any number of domains, and releasing one delivers
+      // mail. The same reasoning gives the same answer.
+      if (route.kind == RouteQuarantineList || route.kind == RouteQuarantineRelease || route.kind == RouteQuarantineDelete)
+      {
+         refusalReason = "this api key is restricted to named domains, and the quarantine is server-wide";
+         return AuthorizationForbidden;
+      }
+
       String targetDomain;
 
       switch (route.kind)
       {
       case RouteAccountList:
       case RouteAccountCreate:
+      case RouteAliasList:
          targetDomain = String(route.identifier);
          break;
 
@@ -2744,6 +2832,161 @@ namespace HM
       LOG_APPLICATION("RestApi: Queue message " + StringParser::IntToString(messageId) + " removed from the delivery queue.");
 
       return BuildResponse_(200, "{\"deleted\":true}");
+   }
+
+   AnsiString
+   RestApiServer::HandleListQuarantine_()
+   {
+      // The same store call the administration surface uses, bounded the same
+      // way, so what the API reports and what a reviewer sees cannot disagree.
+      const std::vector<QuarantinedMessage> messages = QuarantineStore::List(1000);
+
+      AnsiString body = "[";
+      int count = 0;
+
+      for (const QuarantinedMessage &message : messages)
+      {
+         if (count > 0)
+            body += ",";
+
+         AnsiString entry;
+         entry.Format("{\"id\":%I64d,\"sender\":\"%hs\",\"recipients\":\"%hs\",\"subject\":\"%hs\",\"reason\":\"%hs\",\"score\":%d,\"size\":%d,\"created\":\"%hs\"}",
+            message.id,
+            JsonEscape_(AnsiString(message.sender)).c_str(),
+            JsonEscape_(AnsiString(message.recipients)).c_str(),
+            JsonEscape_(AnsiString(message.subject)).c_str(),
+            JsonEscape_(AnsiString(message.reason)).c_str(),
+            message.score,
+            message.size,
+            JsonEscape_(AnsiString(message.created)).c_str());
+
+         body += entry;
+         count++;
+      }
+
+      body += "]";
+
+      return BuildResponse_(200, body);
+   }
+
+   AnsiString
+   RestApiServer::HandleQuarantineRelease_(__int64 id)
+   {
+      // Existence checked first, so an unknown id is a 404 rather than a 500
+      // with somebody else's wording - the queue routes learned this the
+      // expensive way.
+      QuarantinedMessage message;
+      if (!QuarantineStore::GetById(id, message))
+         return BuildResponse_(404, "{\"error\":\"quarantined message not found\"}");
+
+      String error;
+      if (!QuarantineStore::Release(id, error))
+      {
+         AnsiString body;
+         body.Format("{\"error\":\"%hs\"}", JsonEscape_(AnsiString(error)).c_str());
+         return BuildResponse_(500, body);
+      }
+
+      return BuildResponse_(200, "{\"released\":true}");
+   }
+
+   AnsiString
+   RestApiServer::HandleQuarantineDelete_(__int64 id)
+   {
+      QuarantinedMessage message;
+      if (!QuarantineStore::GetById(id, message))
+         return BuildResponse_(404, "{\"error\":\"quarantined message not found\"}");
+
+      if (!QuarantineStore::Delete(id))
+         return BuildResponse_(500, "{\"error\":\"the quarantined message could not be deleted\"}");
+
+      return BuildResponse_(200, "{\"deleted\":true}");
+   }
+
+   AnsiString
+   RestApiServer::HandleListAliases_(const String &domainName)
+   {
+      Domains domains;
+      domains.Refresh();
+
+      std::shared_ptr<Domain> domain = domains.GetItemByName(domainName);
+      if (!domain)
+         return BuildResponse_(404, "{\"error\":\"domain not found\"}");
+
+      std::shared_ptr<Aliases> aliases = domain->GetAliases();
+      if (!aliases)
+         return BuildResponse_(200, "[]");
+
+      aliases->Refresh();
+
+      AnsiString body = "[";
+      int count = 0;
+
+      for (int i = 0; i < aliases->GetCount(); i++)
+      {
+         std::shared_ptr<Alias> alias = aliases->GetItem(i);
+         if (!alias)
+            continue;
+
+         if (count > 0)
+            body += ",";
+
+         AnsiString entry;
+         entry.Format("{\"name\":\"%hs\",\"value\":\"%hs\",\"active\":%hs}",
+            JsonEscape_(AnsiString(alias->GetName())).c_str(),
+            JsonEscape_(AnsiString(alias->GetValue())).c_str(),
+            alias->GetIsActive() ? "true" : "false");
+
+         body += entry;
+         count++;
+      }
+
+      body += "]";
+
+      return BuildResponse_(200, body);
+   }
+
+   AnsiString
+   RestApiServer::HandleOpenApi_()
+   {
+      // The description lives here, beside the router it describes, so a route
+      // change and its documentation change land in the same diff - a separate
+      // file would drift the way every hand-maintained count in this project
+      // has. Kept to OpenAPI 3.0 syntax and deliberately terse: the reference
+      // for behaviour is the server, and this is the map, not the territory.
+      static const char *openApiJson =
+         "{"
+         "\"openapi\":\"3.0.3\","
+         "\"info\":{\"title\":\"hMailServer REST API\",\"version\":\"1\","
+         "\"description\":\"Administration API. Authenticate with the administrator password (HTTP Basic, user 'Administrator') or an API key (Bearer). API keys can be read-only or restricted to named domains; key management itself requires the administrator password.\"},"
+         "\"paths\":{"
+         "\"/api/v1/status\":{\"get\":{\"summary\":\"Server status\",\"responses\":{\"200\":{\"description\":\"Status, state and uptime\"}}}},"
+         "\"/api/v1/domains\":{\"get\":{\"summary\":\"List domains\",\"description\":\"A domain-restricted key sees only its own domains.\",\"responses\":{\"200\":{\"description\":\"Array of domains\"}}}},"
+         "\"/api/v1/domains/{domain}/accounts\":{"
+         "\"get\":{\"summary\":\"List accounts in a domain\",\"responses\":{\"200\":{\"description\":\"Array of accounts\"},\"404\":{\"description\":\"Unknown domain\"}}},"
+         "\"post\":{\"summary\":\"Create an account\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"address\",\"password\"],\"properties\":{\"address\":{\"type\":\"string\"},\"password\":{\"type\":\"string\"},\"active\":{\"type\":\"boolean\"},\"maxSizeMB\":{\"type\":\"integer\"}}}}}},\"responses\":{\"201\":{\"description\":\"Created\"},\"400\":{\"description\":\"Malformed request\"},\"404\":{\"description\":\"Unknown domain\"}}}},"
+         "\"/api/v1/accounts/{address}\":{\"delete\":{\"summary\":\"Delete an account\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"Unknown account\"}}}},"
+         "\"/api/v1/queue\":{\"get\":{\"summary\":\"List the delivery queue\",\"description\":\"Server-wide; refused for domain-restricted keys.\",\"responses\":{\"200\":{\"description\":\"Array of queued messages\"}}}},"
+         "\"/api/v1/queue/{id}/retry\":{\"post\":{\"summary\":\"Retry a queued message now\",\"responses\":{\"200\":{\"description\":\"Rescheduled\"},\"404\":{\"description\":\"Unknown id\"}}}},"
+         "\"/api/v1/queue/{id}\":{\"delete\":{\"summary\":\"Remove a message from the queue\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"Unknown id\"}}}},"
+         "\"/api/v1/quarantine\":{\"get\":{\"summary\":\"List quarantined messages\",\"description\":\"Server-wide; refused for domain-restricted keys. Bounded to the newest 1000.\",\"responses\":{\"200\":{\"description\":\"Array of quarantined messages\"}}}},"
+         "\"/api/v1/quarantine/{id}/release\":{\"post\":{\"summary\":\"Release a quarantined message to its original recipients\",\"description\":\"Delivery is direct rather than back through the filters: a release is an administrator overruling them.\",\"responses\":{\"200\":{\"description\":\"Released\"},\"404\":{\"description\":\"Unknown id\"}}}},"
+         "\"/api/v1/quarantine/{id}\":{\"delete\":{\"summary\":\"Delete a quarantined message\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"Unknown id\"}}}},"
+         "\"/api/v1/domains/{domain}/aliases\":{\"get\":{\"summary\":\"List aliases in a domain\",\"responses\":{\"200\":{\"description\":\"Array of aliases\"},\"404\":{\"description\":\"Unknown domain\"}}}},"
+         "\"/api/v1/tlsa\":{\"get\":{\"summary\":\"Recommended DANE TLSA records for the configured certificates\",\"responses\":{\"200\":{\"description\":\"Array of TLSA records\"}}}},"
+         "\"/api/v1/api-keys\":{"
+         "\"get\":{\"summary\":\"List API keys\",\"description\":\"Administrator password only.\",\"responses\":{\"200\":{\"description\":\"Array of keys, never the clear-text tokens\"}}},"
+         "\"post\":{\"summary\":\"Create an API key\",\"description\":\"Administrator password only. The token is returned once, at creation.\",\"responses\":{\"201\":{\"description\":\"Created\"}}}},"
+         "\"/api/v1/api-keys/{id}\":{\"delete\":{\"summary\":\"Revoke an API key\",\"description\":\"Administrator password only.\",\"responses\":{\"200\":{\"description\":\"Revoked\"}}}},"
+         "\"/api/v1/openapi.json\":{\"get\":{\"summary\":\"This document\",\"responses\":{\"200\":{\"description\":\"The OpenAPI description\"}}}}"
+         "},"
+         "\"components\":{\"securitySchemes\":{"
+         "\"basic\":{\"type\":\"http\",\"scheme\":\"basic\"},"
+         "\"bearer\":{\"type\":\"http\",\"scheme\":\"bearer\"}}},"
+         "\"security\":[{\"basic\":[]},{\"bearer\":[]}]"
+         "}";
+
+      return BuildResponse_(200, AnsiString(openApiJson));
    }
 
    AnsiString

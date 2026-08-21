@@ -583,6 +583,7 @@
     <Compile Include="SSL\StartTls\Pop3ServerTests.cs" />
     <Compile Include="SSL\StartTls\SmtpServerTests.cs" />
     <Compile Include="API\RestApiQueue.cs" />
+    <Compile Include="API\RestApiQuarantineAndAliases.cs" />
     <Compile Include="API\ScriptReload.cs" />
     <Compile Include="AntiSpam\DKIM\ArcSealing.cs" />
     <Compile Include="POP3\ProtocolConformance.cs" />
