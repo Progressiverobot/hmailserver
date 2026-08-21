@@ -173,11 +173,8 @@ namespace hMailServer.ControlPanel.Services
          bool inSkipBreakdown = false;
          var breakdown = new List<string>();
 
-         foreach (string line in lines)
+         foreach (string line in lines.Where(line => line.Length != 0))
          {
-            if (line.Length == 0)
-               continue;
-
             if (!haveSummary)
             {
                summary = line.Trim();

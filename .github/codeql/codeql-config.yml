@@ -5,10 +5,13 @@ name: "hMailServer CodeQL config"
 # Shared by both analyses in .github/workflows/codeql.yml - the C# Control Panel
 # and the C++ server. Query SUITE selection is not here: it differs per language
 # and is set on each Initialize CodeQL step, with the reasoning at that point.
-# In short, C# runs security-and-quality (the suite the Code Quality page reads)
-# and C++ runs security-extended (CodeQL ships no quality-tagged queries for C++,
-# so the quality half would add noise and no Code Quality coverage). Everything
-# below - the paths and the rule filters - applies to both.
+# In short, C# runs security-and-quality (quality findings surface as ordinary
+# code-scanning alerts) and C++ runs security-extended (CodeQL ships no
+# quality-tagged queries for C++, so the quality half would add noise for no
+# coverage). Everything below - the paths and the rule filters - applies to
+# both. The separate "Code quality" page was fed by a GitHub-managed buildless
+# scan that ignored this file entirely - no filters, no type information - and
+# was deliberately switched off in favour of this configured analysis.
 #
 # The test harnesses are fixtures rather than shipped code; grading the
 # project's reliability on its own test scaffolding buries the signal from the
@@ -28,10 +31,12 @@ paths-ignore:
   # sources from obj/ - the WPF XAML compiler's *.g.cs partial classes. Those
   # files are regenerated on every build, so a finding in one is unactionable
   # and merely duplicates the scan of the hand-written half of the same partial
-  # class. Note this must be HERE and not in the workflow's own paths-ignore:
-  # for compiled languages this file's filters are applied to the analysis
-  # results, whereas a workflow-level paths-ignore only decides whether the
-  # workflow runs at all.
+  # class. These two entries are intent, not mechanism: a config file's path
+  # filters only restrict extraction for interpreted languages or for
+  # build-mode: none, and the C# job builds with build-mode: manual, so CodeQL
+  # analyses whatever csc compiles no matter what is listed here. The results
+  # are actually dropped in codeql.yml, which filters obj/ and bin/ out of the
+  # SARIF between the analyse and upload steps.
   - "**/obj/**"
   - "**/bin/**"
 
@@ -79,3 +84,18 @@ query-filters:
   # and returns early - and is still flagged.
   - exclude:
       id: cs/path-combine
+
+  # 385 hits in the current scan, spread across 36 files - first triaged in
+  # August, with more appearing every time a view touches another COM property,
+  # which is what moved this from per-alert dismissals to a filter. Every one is a cast applied to a COM property read
+  # through a `dynamic`, and CodeQL's message states the reasoning it is using:
+  # "There is no need to upcast from dynamic to Int32 - the conversion can be
+  # done implicitly." That is true of the conversion in isolation and wrong
+  # about the code, because an implicit conversion from dynamic makes the
+  # ENCLOSING expression dynamic too. A call written with the cast binds its
+  # overload at compile time; drop the cast and the whole call is dispatched at
+  # runtime, so a wrong overload becomes a runtime exception in a GUI instead of
+  # a build error. The casts are also the only place the expected type of a
+  # late-bound COM property is written down anywhere.
+  - exclude:
+      id: cs/useless-upcast

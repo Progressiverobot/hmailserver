@@ -290,11 +290,9 @@ namespace hMailServer.ControlPanel.Services
          // anti-spam page is worse than showing the one that matched best.
          var best = new Dictionary<string, PaletteRow>(StringComparer.OrdinalIgnoreCase);
 
-         foreach (IntentEntry intent in IntentIndex.Entries)
+         foreach (IntentEntry intent in IntentIndex.Entries
+            .Where(intent => NavigationMap.Find(intent.Page) != null))
          {
-            if (NavigationMap.Find(intent.Page) == null)
-               continue;
-
             int score = query.Score(intent.Phrase);
             if (score == SearchTerms.NoMatch)
                continue;
@@ -332,11 +330,9 @@ namespace hMailServer.ControlPanel.Services
 
          // Where the page used to be. Someone following instructions written
          // against an older release types the old path, and it has to work.
-         foreach (KeyValuePair<string, string> legacy in NavigationMap.LegacyPaths)
+         foreach (KeyValuePair<string, string> legacy in NavigationMap.LegacyPaths
+            .Where(legacy => NavigationMap.Find(legacy.Value) != null))
          {
-            if (NavigationMap.Find(legacy.Value) == null)
-               continue;
-
             int score = Add(query.Score(legacy.Key), LegacyPathBase);
             if (score != SearchTerms.NoMatch)
                Keep(scores, legacy.Value, score);
@@ -363,22 +359,17 @@ namespace hMailServer.ControlPanel.Services
       private static List<PaletteRow> MatchSettings(SearchQuery query)
       {
          var rows = new List<PaletteRow>();
-         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-         foreach (SettingMatch match in SettingsSearchIndex.Search(query))
-         {
+         foreach (SettingMatch match in SettingsSearchIndex.Search(query)
             // A setting on a page the navigation cannot reach would be a dead
             // result. SettingsSearchIndexTests already fails when that happens;
             // this keeps the palette honest in the meantime.
-            if (NavigationMap.Find(match.Page) == null)
-               continue;
-
+            .Where(match => NavigationMap.Find(match.Page) != null)
             // The same label legitimately appears on more than one page ("Host",
             // "Port"), so the page is part of the identity; only an exact repeat of
             // both is a duplicate row.
-            if (!seen.Add(match.Label + " | " + match.Page))
-               continue;
-
+            .DistinctBy(match => match.Label + " | " + match.Page, StringComparer.OrdinalIgnoreCase))
+         {
             rows.Add(new PaletteRow(PaletteRowKind.Setting, SettingSection, match.Label,
                match.Location, "Setting  -  " + match.Key,
                match.Page, Add(match.Rank, SettingBase)));
