@@ -1280,6 +1280,7 @@ EXIT 0
     <ClInclude Include="..\Pop3\POP3Sessions.h" />
     <ClInclude Include="..\Smtp\BLCheck.h" />
     <ClInclude Include="..\Smtp\DeliveryQueue.h" />
+    <ClInclude Include="..\SMTP\DeliveryFailure.h" />
     <ClInclude Include="..\Smtp\DeliveryTask.h" />
     <ClInclude Include="..\SMTP\ExternalDelivery.h" />
     <ClInclude Include="..\SMTP\ExternalDeliveryServerResult.h" />

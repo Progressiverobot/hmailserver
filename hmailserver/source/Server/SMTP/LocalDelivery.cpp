@@ -183,8 +183,13 @@ namespace HM
          // honours.
          if (!suppressFailureDsn)
          {
-            saErrorMessages.push_back(Formatter::Format("{0}\r\n   Error Type: SMTP\r\n   Error Description: Delivery failed\r\n   Additional information: The message could not be written to the recipient's mailbox. This is usually a full disk or a locked file; the server administrator should check the hMailServer error log.\r\n\r\n",
-               account->GetAddress()));
+            // RFC 3463 4.3.1, "mail system full": what failed is this server's own
+            // disk, not the recipient's mailbox. Class 4 for the same reason the
+            // save-failure below is - a permanent code would tell a list manager
+            // to strike an address that never had anything wrong with it.
+            saErrorMessages.push_back(DeliveryFailure(account->GetAddress(), _T("4.3.1"),
+               Formatter::Format("{0}\r\n   Error Type: SMTP\r\n   Error Description: Delivery failed\r\n   Additional information: The message could not be written to the recipient's mailbox. This is usually a full disk or a locked file; the server administrator should check the hMailServer error log.\r\n\r\n",
+                  account->GetAddress())));
          }
 
          return;

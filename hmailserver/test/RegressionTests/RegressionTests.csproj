@@ -411,6 +411,7 @@
     <Compile Include="SMTP\Basics.cs" />
     <Compile Include="SMTP\ESmtpTests.cs" />
     <Compile Include="SMTP\Deliverability.cs" />
+    <Compile Include="SMTP\DeliveryStatusNotification.cs" />
     <Compile Include="SMTP\Srs.cs" />
     <Compile Include="SMTP\Batv.cs" />
     <Compile Include="SMTP\Bdat.cs" />
