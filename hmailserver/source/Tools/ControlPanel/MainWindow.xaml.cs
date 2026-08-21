@@ -208,7 +208,15 @@ namespace hMailServer.ControlPanel
             return node.Title;
          }
 
-         var header = new StackPanel { Orientation = Orientation.Horizontal };
+         // A Grid, not a horizontal StackPanel. A StackPanel measures its children
+         // with infinite width along the stacking direction, so the label below
+         // always reported its full desired width and was CLIPPED by the sidebar
+         // rather than trimmed - "Monitoring & troubleshooting" ended mid-word with
+         // no ellipsis to say so. A star column hands the label the width that is
+         // actually left, which is what TextTrimming needs in order to do anything.
+         var header = new Grid();
+         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+         header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
          // No explicit Foreground: SymbolIcon's Foreground inherits from the
          // TreeViewItem exactly as the TextBlock's does, so the glyph dims at
@@ -223,11 +231,15 @@ namespace hMailServer.ControlPanel
          };
          header.Children.Add(icon);
 
-         header.Children.Add(new TextBlock
+         var label = new TextBlock
          {
             Text = node.Title,
-            VerticalAlignment = VerticalAlignment.Center
-         });
+            VerticalAlignment = VerticalAlignment.Center,
+            TextTrimming = TextTrimming.CharacterEllipsis
+         };
+
+         Grid.SetColumn(label, 1);
+         header.Children.Add(label);
 
          return header;
       }
@@ -241,8 +253,16 @@ namespace hMailServer.ControlPanel
          // possible fix, and it reaches a screen reader as well as a mouse.
          if (!string.IsNullOrEmpty(node.Purpose))
          {
-            item.ToolTip = node.Purpose;
+            // The title leads, then the purpose. The title is in the tip because the
+            // label can be ellipsized when the pane is narrow, and a tool tip that
+            // explains a name the reader cannot finish reading is answering the
+            // wrong question.
+            item.ToolTip = node.Title + " - " + node.Purpose;
             System.Windows.Automation.AutomationProperties.SetHelpText(item, node.Purpose);
+         }
+         else
+         {
+            item.ToolTip = node.Title;
          }
 
          System.Windows.Automation.AutomationProperties.SetName(item, node.Title);

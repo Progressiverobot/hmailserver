@@ -26,7 +26,16 @@
 
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="0.24*" MinWidth="200" MaxWidth="260" />
+                <!-- Sized by the longest group name, not by taste.
+                     "Monitoring & troubleshooting" did not fit and was cut mid-word.
+                     It ellipsizes now rather than clipping, and the full name is
+                     always in the tool tip - but an ellipsis on a permanent
+                     navigation label is a smaller defect, not the absence of one,
+                     so the pane also gets the width to hold it. The star fraction is
+                     what binds at ordinary window sizes; MaxWidth only stops the
+                     pane running away on a very wide monitor, and MinWidth is what
+                     protects the content area on a narrow one. -->
+                <ColumnDefinition Width="0.28*" MinWidth="200" MaxWidth="320" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
@@ -56,8 +65,13 @@
                      by knowing that Ctrl+K exists, which is not a discoverable
                      interface; this is a normal tab stop that opens the same
                      palette and names the shortcut while it does so. -->
+                <!-- HorizontalContentAlignment must be Stretch, not Left. Left makes
+                     the button shrink-wrap its content, which leaves the Grid below no
+                     width to distribute - so its star column collapses and the "Ctrl+K"
+                     hint sits flush against the word "Search" instead of at the far end
+                     of the button. On screen it read as one word: "SearchCtrl+K". -->
                 <ui:Button x:Name="SearchButton" Grid.Row="1" Margin="14,0,14,10"
-                           HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                           HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
                            Padding="10,7" Click="Search_Click"
                            AutomationProperties.AutomationId="nav-search"
                            AutomationProperties.Name="Search pages, settings and tasks. Keyboard shortcut Control K."
