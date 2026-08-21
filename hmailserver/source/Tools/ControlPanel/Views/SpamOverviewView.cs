@@ -123,6 +123,7 @@ namespace hMailServer.ControlPanel.Views
             config.MarkThreshold = Read(() => (int) antiSpam.SpamMarkThreshold);
             config.DeleteThreshold = Read(() => (int) antiSpam.SpamDeleteThreshold);
             config.MaxScanKilobytes = Read(() => (int) antiSpam.MaximumMessageSize);
+            config.BlockedSenderCount = Read(() => (int) antiSpam.BlockedSenders.Count);
 
             config.AddSpamHeader = Read(() => (bool) antiSpam.AddHeaderSpam);
             config.AddReasonHeader = Read(() => (bool) antiSpam.AddHeaderReason);

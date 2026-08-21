@@ -105,7 +105,13 @@ namespace RegressionTests.AntiSpam
             sock.Connect(25);
             Assert.IsTrue(sock.Receive().StartsWith("220"));
 
-            sock.Send("HELO test.com\r\n");
+            // EHLO, not HELO, and the assertion below depends on it: RFC 2034
+            // enhanced status codes are an ESMTP capability, and the server
+            // correctly withholds "5.7.1" from a session that opened with HELO.
+            // This test first shipped with HELO and failed on exactly that -
+            // the refusal was right, and the test was asserting a decoration
+            // the client had declined to negotiate.
+            sock.Send("EHLO test.com\r\n");
             Assert.IsTrue(sock.Receive().StartsWith("250"));
 
             sock.Send("MAIL FROM:<spammer@blacklisted.example>\r\n");

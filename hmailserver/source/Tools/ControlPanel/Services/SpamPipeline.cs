@@ -128,6 +128,11 @@ namespace hMailServer.ControlPanel.Services
       /// <summary>AntiSpam.MaximumMessageSize, in KB. 0 = no limit of our own.</summary>
       public int MaxScanKilobytes { get; set; }
 
+      /// <summary>How many blocked-sender entries exist. The blacklist has no
+      /// on/off switch - an empty list IS the off state - so the count is the
+      /// enablement.</summary>
+      public int BlockedSenderCount { get; set; }
+
       // What "marked" actually does to the message.
       public bool AddSpamHeader { get; set; }
       public bool AddReasonHeader { get; set; }
@@ -219,11 +224,11 @@ namespace hMailServer.ControlPanel.Services
       /// </summary>
       public static IReadOnlyList<string> LinkedPages { get; } = new[]
       {
-         "antispam", "dnsbl", "quarantine", "surbl", "spamwhitelist", "greylistwhitelist"
+         "antispam", "blockedsenders", "dnsbl", "quarantine", "surbl", "spamwhitelist", "greylistwhitelist"
       };
 
       /// <summary>
-      /// The nine scoring checks, in the order SpamTestRunner runs them.
+      /// The ten scoring checks, in the order SpamTestRunner runs them.
       ///
       /// Greylisting is deliberately not one of them: it defers a message instead
       /// of scoring it, and folding a deferral into a score table would be the same
@@ -237,53 +242,66 @@ namespace hMailServer.ControlPanel.Services
 
          var checks = new List<SpamCheck>
          {
-            // 1-5: SpamTest::PreTransmission, run at RCPT TO.
-            new SpamCheck("dnsbl", 1, "DNS blacklists (DNSBL)", SpamCheckPhase.BeforeTheBody,
+            // 1-6: SpamTest::PreTransmission. Run at MAIL FROM by default
+            // (DNSBLChecksAfterMailFrom=1), at the first RCPT when that is 0.
+            //
+            // The blacklist is registered first in SpamTestRunner::LoadSpamTests
+            // on purpose: it is the cheapest test, and with the default score a
+            // match ends the run before any DNS lookup happens.
+            new SpamCheck("blockedsenders", 1, "Blocked senders", SpamCheckPhase.BeforeTheBody,
+               config.BlockedSenderCount > 0, null,
+               config.BlockedSenderCount > 0 ? "per entry" : "-",
+               config.BlockedSenderCount > 0
+                  ? string.Format("Matches the envelope sender against {0} blocked address(es) and domain(s); the score comes from the entry that matched.", config.BlockedSenderCount)
+                  : "No blocked senders are defined, so nothing is matched. The list has no on/off switch - an empty list is the off state.",
+               "blockedsenders"),
+
+            new SpamCheck("dnsbl", 2, "DNS blacklists (DNSBL)", SpamCheckPhase.BeforeTheBody,
                config.ActiveDnsBlackLists > 0, null,
                config.ActiveDnsBlackLists > 0 ? "per list entry" : "-",
                DescribeList("Looks up the connecting address on each active blacklist; the score comes from the entry that matched",
                   config.ActiveDnsBlackLists, config.TotalDnsBlackLists),
                "dnsbl"),
 
-            new SpamCheck("helo", 2, "HELO host check", SpamCheckPhase.BeforeTheBody,
+            new SpamCheck("helo", 3, "HELO host check", SpamCheckPhase.BeforeTheBody,
                config.CheckHeloHost, config.HeloHostScore, Score(config.HeloHostScore),
                "Fails when the name the client gave in HELO/EHLO does not resolve to the address it is connecting from.",
                "antispam"),
 
-            new SpamCheck("ptr", 3, "PTR record check", SpamCheckPhase.BeforeTheBody,
+            new SpamCheck("ptr", 4, "PTR record check", SpamCheckPhase.BeforeTheBody,
                config.CheckPtr, config.PtrScore, Score(config.PtrScore),
                "Fails when the connecting address has no reverse DNS record.",
                "antispam"),
 
-            new SpamCheck("mx", 4, "Sender MX check", SpamCheckPhase.BeforeTheBody,
+            new SpamCheck("mx", 5, "Sender MX check", SpamCheckPhase.BeforeTheBody,
                config.CheckSenderMx, config.SenderMxScore, Score(config.SenderMxScore),
                "Fails when the envelope sender's domain publishes no MX record.",
                "antispam"),
 
-            new SpamCheck("spf", 5, "SPF", SpamCheckPhase.BeforeTheBody,
+            new SpamCheck("spf", 6, "SPF", SpamCheckPhase.BeforeTheBody,
                config.CheckSpf, config.SpfScore, Score(config.SpfScore),
                "Checks the sender's SPF policy against the connecting address. A pass can also bypass greylisting.",
                "antispam"),
 
             // 6-9: SpamTest::PostTransmission, run once the body has arrived.
-            new SpamCheck("surbl", 6, "SURBL servers", SpamCheckPhase.AfterTheBody,
+            new SpamCheck("surbl", 7, "SURBL servers", SpamCheckPhase.AfterTheBody,
                config.ActiveSurblServers > 0, null,
                config.ActiveSurblServers > 0 ? "per list entry" : "-",
                DescribeList("Looks up the domains of links found in the body on each active SURBL server",
                   config.ActiveSurblServers, config.TotalSurblServers),
                "surbl"),
 
-            new SpamCheck("dkim", 7, "DKIM verification", SpamCheckPhase.AfterTheBody,
+            new SpamCheck("dkim", 8, "DKIM verification", SpamCheckPhase.AfterTheBody,
                config.VerifyDkim, config.DkimFailureScore, Score(config.DkimFailureScore),
                "Scores only a permanent failure - a signature that is present and wrong. An unsigned message scores nothing.",
                "antispam"),
 
-            new SpamCheck("dmarc", 8, "DMARC", SpamCheckPhase.AfterTheBody,
+            new SpamCheck("dmarc", 9, "DMARC", SpamCheckPhase.AfterTheBody,
                config.EvaluateDmarc, config.DmarcFailureScore, Score(config.DmarcFailureScore),
                "Evaluates the From: domain's DMARC policy, using its own SPF and DKIM results.",
                "antispam"),
 
-            new SpamCheck("spamassassin", 9, "SpamAssassin", SpamCheckPhase.AfterTheBody,
+            new SpamCheck("spamassassin", 10, "SpamAssassin", SpamCheckPhase.AfterTheBody,
                config.SpamAssassinEnabled,
                config.SpamAssassinMergesScore ? (int?) null : config.SpamAssassinScore,
                config.SpamAssassinMergesScore ? "SpamAssassin's own score" : Score(config.SpamAssassinScore),

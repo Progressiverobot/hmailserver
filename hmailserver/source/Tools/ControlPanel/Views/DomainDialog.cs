@@ -52,6 +52,20 @@ namespace hMailServer.ControlPanel.Views
       private readonly TextBox signatureHtml_ = NewMemo();
 
       // Outbound relay for this domain
+      // Domain-wide out-of-office. The server sends this only for accounts that
+      // have no vacation message of their own; the override below additionally
+      // replaces an account's personal text for senders outside this server.
+      private readonly CheckBox oooOn_ = new() { Content = "Send a domain-wide out-of-office reply", FontSize = Typography.Body };
+      private readonly TextBox oooSubject_ = NewInput();
+      private readonly TextBox oooMessage_ = NewMemo();
+      private readonly TextBox oooInternalSubject_ = NewInput();
+      private readonly TextBox oooInternalMessage_ = NewMemo();
+      private readonly CheckBox oooExternalOverride_ = new()
+      {
+         Content = "Outside senders always get the domain's text, even when the account has its own",
+         FontSize = Typography.Body
+      };
+
       private readonly TextBox relayHost_ = NewInput();
       private readonly TextBox relayPort_ = NewInput();
       private readonly CheckBox relayAuthOn_ = new() { Content = "The relay requires authentication", FontSize = Typography.Body };
@@ -140,6 +154,7 @@ namespace hMailServer.ControlPanel.Views
          tabs.Items.Add(new TabItem { Header = "Limits", Content = BuildLimits() });
          tabs.Items.Add(new TabItem { Header = "Signature", Content = BuildSignature() });
          tabs.Items.Add(new TabItem { Header = "Relay", Content = BuildRelay() });
+         tabs.Items.Add(new TabItem { Header = "Out of office", Content = BuildOutOfOffice() });
          tabs.Items.Add(new TabItem { Header = "DKIM", Content = BuildDkim() });
          Grid.SetRow(tabs, 1);
          root.Children.Add(tabs);
@@ -339,6 +354,41 @@ namespace hMailServer.ControlPanel.Views
          panel.Children.Add(Input(relayUser_));
          panel.Children.Add(Label("Password (leave blank to keep the stored one)", relayPassword_));
          panel.Children.Add(relayPassword_);
+         return Scroll(panel);
+      }
+
+      private ScrollViewer BuildOutOfOffice()
+      {
+         var panel = TabPanel();
+         panel.Children.Add(Label(
+            "A reply for the whole domain - a closed office, a decommissioned department. It answers only " +
+            "for accounts that have NO vacation message of their own: an account's own message always wins, " +
+            "and at most one reply answers any message."));
+         panel.Children.Add(Label(
+            "The usual auto-reply protections apply and cannot be switched off here: no reply to bounces, " +
+            "mailing lists or other auto-replies, one reply per sender per period, and the reply itself is " +
+            "marked Auto-Submitted so two servers cannot loop."));
+         panel.Children.Add(Separator());
+         panel.Children.Add(oooOn_);
+         panel.Children.Add(Label("Subject", oooSubject_));
+         panel.Children.Add(Input(oooSubject_));
+         panel.Children.Add(Label("Message", oooMessage_));
+         panel.Children.Add(oooMessage_);
+         panel.Children.Add(Separator());
+         panel.Children.Add(Label(
+            "Optional different text for local senders - colleagues can be told more than strangers. " +
+            "Empty means everyone gets the text above. Note this identifies the sender's ADDRESS, which is " +
+            "forgeable: treat it as a courtesy, never as a place for anything confidential."));
+         panel.Children.Add(Label("Subject for local senders (empty = same as above)", oooInternalSubject_));
+         panel.Children.Add(Input(oooInternalSubject_));
+         panel.Children.Add(Label("Message for local senders (empty = same as above)", oooInternalMessage_));
+         panel.Children.Add(oooInternalMessage_);
+         panel.Children.Add(Separator());
+         panel.Children.Add(oooExternalOverride_);
+         panel.Children.Add(Label(
+            "With this on, an account's own vacation message still answers colleagues, but outside senders " +
+            "get the domain's generic text instead - so personal detail in a vacation message stays inside " +
+            "the organisation."));
          return Scroll(panel);
       }
 
@@ -981,6 +1031,13 @@ namespace hMailServer.ControlPanel.Views
             // stored value when the box is blank.
             relayPassword_.Password = "";
 
+            oooOn_.IsChecked = (bool) d.VacationMessageIsOn;
+            oooSubject_.Text = (string) d.VacationSubject ?? "";
+            oooMessage_.Text = (string) d.VacationMessage ?? "";
+            oooInternalSubject_.Text = (string) d.VacationInternalSubject ?? "";
+            oooInternalMessage_.Text = (string) d.VacationInternalMessage ?? "";
+            oooExternalOverride_.IsChecked = (bool) d.VacationExternalOverride;
+
             dkimOn_.IsChecked = (bool) d.DKIMSignEnabled;
             dkimAliases_.IsChecked = (bool) d.DKIMSignAliasesEnabled;
             dkimSelector_.Text = (string) d.DKIMSelector ?? "";
@@ -1094,6 +1151,13 @@ namespace hMailServer.ControlPanel.Views
             // unrelated change does not silently blank the relay password.
             if (relayPassword_.Password.Length > 0)
                d.RelayPassword = relayPassword_.Password;
+
+            d.VacationMessageIsOn = oooOn_.IsChecked == true;
+            d.VacationSubject = oooSubject_.Text.Trim();
+            d.VacationMessage = oooMessage_.Text;
+            d.VacationInternalSubject = oooInternalSubject_.Text.Trim();
+            d.VacationInternalMessage = oooInternalMessage_.Text;
+            d.VacationExternalOverride = oooExternalOverride_.IsChecked == true;
 
             d.DKIMSignEnabled = dkimOn_.IsChecked == true;
             d.DKIMSignAliasesEnabled = dkimAliases_.IsChecked == true;

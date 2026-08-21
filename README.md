@@ -381,6 +381,14 @@ Administration and monitoring:
                                  ; categories and mask the log files get, with trace and span ids attached where a
                                  ; span was active on the logging thread
    OtelMetricsInterval=60        ; seconds between metric pushes; clamped to 5-3600
+   WindowsEventLogEnabled=1      ; write operational events (database down, listener failed to bind, crash,
+                                 ; failed backup, disk floor) to the Windows Application log with stable event
+                                 ; ids - the table lives in Server/Common/Application/WindowsEventLog.h. On by
+                                 ; default because a HEALTHY server writes zero events, while the administrator
+                                 ; who never finds this setting is the one whose only monitoring is Event Viewer.
+                                 ; Throttled to 5 events per id per 10 minutes; the overflow stays in the ERROR log
+   WindowsEventLogLevel=2        ; minimum severity that becomes an event: 1=Critical, 2=+High (default),
+                                 ; 3=+Medium, 4=everything ErrorManager reports. Protocol chatter never goes here
    SMTPProxyProtocolEnabled=0    ; accept the HAProxy PROXY protocol (v1 and v2) on the SMTP listener. Off by default.
                                  ; A front-end proxy otherwise makes every connection appear to come from IT, which
                                  ; silently misdirects DNSBL, SPF, greylisting, auto-ban and the IP range rules

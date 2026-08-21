@@ -1851,19 +1851,17 @@ namespace hMailServer.ControlPanel.Views
                cards_.Add(new CardDef
                {
                   Title = "Monitoring",
-                  // This blurb used to advertise an OpenTelemetry metrics export
-                  // alongside the trace export. Only the trace signal exists:
-                  // OtelTracer hard-codes the /v1/traces path and there is no metric
-                  // or log record builder, so a collector configured here receives
-                  // spans and nothing else. An administrator who read that blurb and
-                  // pointed their collector at the server expecting OTLP metrics got
-                  // none, and no error to explain why - the metrics that do exist are
-                  // the Prometheus endpoint above, which is a different mechanism.
-                  //
-                  // The withdrawn wording is pinned by SettingClaimsTests, which
-                  // scans this file for it; do not reintroduce it, in a comment or
-                  // otherwise, without a metrics exporter behind it.
-                  Blurb = "Prometheus metrics (/metrics), OpenTelemetry trace export, a slow-query log, and "
+                  // This blurb has been wrong in BOTH directions. It once advertised
+                  // an OpenTelemetry metrics export that did not exist - an
+                  // administrator pointed a collector here, got nothing, and no error
+                  // explained why. Then the metrics and logs exporters shipped on
+                  // 21 Aug 2026 and the corrected wording immediately understated the
+                  // truth instead. SettingClaimsTests scans this file: the withdrawn
+                  // overclaim's wording must not come back verbatim, and the claim on
+                  // each Otel*Endpoint setting is pinned separately. Keep this blurb
+                  // in step with what Application::StartServers actually starts.
+                  Blurb = "Prometheus metrics (/metrics), OpenTelemetry export of traces, metrics and logs "
+                          + "(one endpoint per signal, each off until set), a slow-query log, and "
                           + "JSON-structured log output for log aggregators (on the Logging page).",
                   Settings =
                   {
@@ -2087,6 +2085,37 @@ namespace hMailServer.ControlPanel.Views
                                      "Set the certificate and key files, or bind to 127.0.0.1. The server still starts - " +
                                      "it logs this same warning."
                            };
+                        }
+                     }
+                  }
+               });
+               cards_.Add(new CardDef
+               {
+                  // Verified in WindowsEventLog.cpp: the sink hooks ErrorManager, not
+                  // the Logger, so it fires independently of the log mask - which is
+                  // the whole case for shipping it on. A healthy server writes zero
+                  // events, and a per-id throttle (5 per 10 minutes) answers floods.
+                  Title = "Windows Event Log",
+                  Blurb = "Writes the conditions an operator alerts on - database unavailable, a listener that " +
+                          "would not start, a crash, a failed backup, the disk floor - to the Windows Application " +
+                          "log, where Event Viewer, monitoring agents and SIEM collectors can see them. Stable " +
+                          "event ids (the table lives in WindowsEventLog.h); a healthy server writes nothing at " +
+                          "all. Protocol traffic and routine logging never go here - a mail server that logs " +
+                          "every session to the Application log gets itself uninstalled.",
+                  Settings =
+                  {
+                     new BoolSetting { Key = "WindowsEventLogEnabled", Default = true, Label = "Write operational events to the Windows Application log" },
+                     new ChoiceSetting
+                     {
+                        Key = "WindowsEventLogLevel",
+                        Default = 2,
+                        Label = "Minimum severity that becomes an event",
+                        Options = new[]
+                        {
+                           (1, "Critical only"),
+                           (2, "Critical and High (default - a healthy server writes nothing)"),
+                           (3, "Critical, High and Medium"),
+                           (4, "Everything ErrorManager reports")
                         }
                      }
                   }

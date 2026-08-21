@@ -78,6 +78,24 @@ namespace hMailServer.ControlPanel.Views
          }
       });
 
+      public static CollectionEditorView BlockedSenders() => new(new CollectionSpec
+      {
+         Title = "Blocked senders",
+         Subtitle = "Envelope senders refused outright, or scored. An entry with an @ is one exact address; " +
+                    "without one it is a whole domain including its subdomains. The default score of 100 " +
+                    "crosses the delete threshold and refuses the message during the SMTP conversation. " +
+                    "This matches the address the sender CLAIMS, so it stops a correspondent who keeps using " +
+                    "one address - it is not an anti-spoofing tool, and stops nothing that rotates addresses.",
+         ItemNoun = "blocked sender",
+         GetCollection = () => AntiSpam.BlockedSenders,
+         Fields =
+         {
+            new FieldSpec { Prop = "Address", Label = "Address or domain", GridWidth = 260 },
+            new FieldSpec { Prop = "Score", Label = "Score", GridWidth = 80, Default = "100" },
+            new FieldSpec { Prop = "Description", Label = "Description" }
+         }
+      });
+
       public static CollectionEditorView GreyListWhiteList() => new(new CollectionSpec
       {
          Title = "Greylisting white list",

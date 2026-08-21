@@ -88,10 +88,10 @@ namespace hMailServer.ControlPanel.Tests.Services
          IReadOnlyList<SpamCheck> checks = SpamPipeline.Checks(Defaults());
 
          Assert.Equal(
-            new[] { "dnsbl", "helo", "ptr", "mx", "spf", "surbl", "dkim", "dmarc", "spamassassin" },
+            new[] { "blockedsenders", "dnsbl", "helo", "ptr", "mx", "spf", "surbl", "dkim", "dmarc", "spamassassin" },
             checks.Select(c => c.Key));
 
-         Assert.Equal(Enumerable.Range(1, 9), checks.Select(c => c.Order));
+         Assert.Equal(Enumerable.Range(1, 10), checks.Select(c => c.Order));
       }
 
       /// <summary>

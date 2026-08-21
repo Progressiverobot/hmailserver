@@ -532,6 +532,11 @@ namespace hMailServer.ControlPanel.Services
                   aliases: "Anti-spam white list|Allow list|Safe senders|False positive|Let a sender through|Exempt from spam filter",
                   seeAlso: "spamoverview|antispam|greylistwhitelist"),
 
+               Page("blockedsenders", "Blocked senders",
+                  "Envelope senders refused outright or scored - one address, or a whole domain with its subdomains.",
+                  aliases: "Blacklist|Block list|Deny list|Block a sender|Banned senders|Refuse mail from",
+                  seeAlso: "spamwhitelist|antispam|spamoverview"),
+
                Page("greylistwhitelist", "Greylisting white list",
                   "IP addresses exempt from the greylisting delay, for senders that will not retry.",
                   aliases: "Greylist exemption|Greylisting delay|Slow mail|First message delayed|Retry delay",
