@@ -1,6 +1,8 @@
 ﻿hMailServer
 ===========
 
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/14187/badge)](https://www.bestpractices.dev/projects/14187)
+
 hMailServer is a free, open source email server for Microsoft Windows, implementing SMTP, IMAP and POP3.
 
 This repository is a maintained fork of the original project, which is no longer developed upstream. It has been brought up to date with a current toolchain, current cryptography, and the transport-security and authentication standards expected of a mail server in 2026 — while remaining a drop-in upgrade for existing hMailServer installations. It is maintained by Christopher Holloway / [Progressive Robot Ltd](https://www.progressiverobot.com).
@@ -146,7 +148,7 @@ The installer is Inno Setup, so it takes the standard switches, plus one of its 
 Example:
 
 ```bat
-hMailServer-6.2.20-x64.exe /VERYSILENT /SUPPRESSMSGBOXES /LOG="C:\Temp\hmail-install.log" ^
+hMailServer-x.y.z-x64.exe /VERYSILENT /SUPPRESSMSGBOXES /LOG="C:\Temp\hmail-install.log" ^
    /COMPONENTS="server,controlpanel" /useinternaldbms=true
 ```
 

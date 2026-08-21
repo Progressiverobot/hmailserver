@@ -45,10 +45,10 @@ exist:
 
 | Backend | Steps that ship | Reaches back to |
 |---|---|---|
-| MySQL / MariaDB | all 57 | schema `0` (hMailServer 1.0) |
-| Microsoft SQL Server | all 57 | schema `0` (hMailServer 1.0) |
-| PostgreSQL | the last 30 | schema `5001` |
-| SQL Server Compact (internal) | the last 30 | schema `5001` |
+| MySQL / MariaDB | every step | schema `0` (hMailServer 1.0) |
+| Microsoft SQL Server | every step | schema `0` (hMailServer 1.0) |
+| PostgreSQL | every step from `5001` onwards | schema `5001` |
+| SQL Server Compact (internal) | every step from `5001` onwards | schema `5001` |
 
 In practice that is not a gap, because neither PostgreSQL nor the internal SQL CE
 database was a supported backend before hMailServer 5, so no database older than
