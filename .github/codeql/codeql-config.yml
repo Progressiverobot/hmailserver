@@ -23,6 +23,17 @@ paths-ignore:
   # IContainer components field could be readonly.
   - "**/*.Designer.cs"
   - "**/*.designer.cs"
+  # Build output. obj/ and bin/ are not committed (.gitignore lines 19-20), but
+  # the C# analysis traces the compiler, and the compiler consumes generated
+  # sources from obj/ - the WPF XAML compiler's *.g.cs partial classes. Those
+  # files are regenerated on every build, so a finding in one is unactionable
+  # and merely duplicates the scan of the hand-written half of the same partial
+  # class. Note this must be HERE and not in the workflow's own paths-ignore:
+  # for compiled languages this file's filters are applied to the analysis
+  # results, whereas a workflow-level paths-ignore only decides whether the
+  # workflow runs at all.
+  - "**/obj/**"
+  - "**/bin/**"
 
 # Three rules fire in bulk on deliberate design rather than on defects. They are
 # excluded here with the reasoning recorded, rather than silenced by scattering
