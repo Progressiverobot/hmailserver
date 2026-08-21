@@ -30,8 +30,21 @@
                     <ui:PasswordBox.Icon><ui:SymbolIcon Symbol="Key24" /></ui:PasswordBox.Icon>
                 </ui:PasswordBox>
 
-                <ui:Button x:Name="ConnectButton" Content="Connect" Appearance="Primary"
-                           HorizontalAlignment="Stretch" Height="38" Click="Connect_Click" />
+                <!-- The button and the busy indicator occupy the same cell, so the
+                     card does not change height when a connection starts. A layout
+                     that jumps as soon as you click it reads as instability, which
+                     is the opposite of what a progress indicator is for. -->
+                <Grid Height="38">
+                    <ui:Button x:Name="ConnectButton" Content="Connect" Appearance="Primary"
+                               HorizontalAlignment="Stretch" Height="38" Click="Connect_Click" />
+                    <StackPanel x:Name="BusyPanel" Orientation="Horizontal" Visibility="Collapsed"
+                                HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <ui:ProgressRing IsIndeterminate="True" Width="20" Height="20" />
+                        <TextBlock x:Name="BusyText" Text="Connecting…" FontSize="13" Margin="10,0,0,0"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </Grid>
 
                 <TextBlock x:Name="ErrorText" Foreground="{DynamicResource AppDangerBrush}" FontSize="12" Margin="0,12,0,0"
                            TextWrapping="Wrap" Visibility="Collapsed" />

@@ -65,6 +65,19 @@
          feature that does not need a directory, a server or a dispatcher, so it lives
          here on its own and is tested here on its own. -->
     <Compile Include="..\ControlPanel\Services\DirectorySyncReport.cs" />
+
+    <!-- The sign-in screen's reachability pre-check, and the host-name rules it
+         shares with ServerSession. Connecting used to run three blocking COM
+         calls on the UI thread, so an unreachable host froze the first window
+         anybody sees for as long as RPC took to give up. The probe answers that
+         question off-thread with a timeout we choose; what is worth testing is
+         that it honours the timeout and that it still short-circuits a local
+         host, because making loopback sign-in slower would be a poor trade.
+         LocalHostNames is compiled in alongside it for the same reason it exists
+         at all: it is the only thing HostReachability needs from ServerSession,
+         and it carries no COM, no service control and no WPF. -->
+    <Compile Include="..\ControlPanel\Services\LocalHostNames.cs" />
+    <Compile Include="..\ControlPanel\Services\HostReachability.cs" />
   </ItemGroup>
 
   <ItemGroup>

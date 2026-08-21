@@ -339,46 +339,16 @@ namespace hMailServer.ControlPanel.Services
       /// the same check answers a question nobody asked, and the honest result is
       /// "cannot tell from here" rather than a confident report about the wrong
       /// machine.
+      ///
+      /// The rules themselves live in <see cref="LocalHostNames"/>, so that
+      /// HostReachability can apply exactly the same ones before it decides
+      /// whether to probe the network. Two opinions here would either refuse a
+      /// connection that would have worked, or skip the probe and reinstate the
+      /// frozen window the probe exists to prevent.
       /// </summary>
       public static bool IsLocalHost(string host)
       {
-         string value = (host ?? "").Trim();
-
-         if (value.Length == 0 ||
-             string.Equals(value, "localhost", StringComparison.OrdinalIgnoreCase) ||
-             value == "127.0.0.1" ||
-             value == "::1" ||
-             value == "[::1]")
-         {
-            return true;
-         }
-
-         // This machine's own name is this machine. /connect takes a host name, and
-         // typing the server's name while sitting at the server is an ordinary thing
-         // to do - it is what an administrator with one saved shortcut does. Treating
-         // it as remote made every local check say "connected to another host, so
-         // this cannot be read from here" while looking straight at the files it was
-         // declining to read.
-         try
-         {
-            if (string.Equals(value, Environment.MachineName, StringComparison.OrdinalIgnoreCase))
-               return true;
-
-            // The fully-qualified form of the same name, without a DNS lookup: a
-            // resolve here would block the UI thread, and the leading label is
-            // enough to recognise "mail.example.com" as this machine.
-            int dot = value.IndexOf('.');
-            if (dot > 0 && string.Equals(value.Substring(0, dot), Environment.MachineName, StringComparison.OrdinalIgnoreCase))
-               return true;
-         }
-         catch (InvalidOperationException)
-         {
-            // MachineName can throw if the name is not set; fall through to false,
-            // which is the safe direction - a check that declines to run is better
-            // than one that describes the wrong machine.
-         }
-
-         return false;
+         return LocalHostNames.IsLocal(host);
       }
 
       /// <summary>True when the current session is against this machine, including
