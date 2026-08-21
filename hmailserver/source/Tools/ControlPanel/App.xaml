@@ -20,12 +20,16 @@
                 <GradientStop Color="{StaticResource Brand2Color}" Offset="1" />
             </LinearGradientBrush>
 
-            <!-- Global contrast guarantee: every TextBlock defaults to the
-                 theme's primary text brush so text can never render
-                 dark-on-dark or light-on-light. -->
-            <Style TargetType="TextBlock">
-                <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
-            </Style>
+            <!-- There is deliberately NO implicit TextBlock style here. An
+                 app-level implicit style reaches into every control template's
+                 generated TextBlocks and its Foreground setter outranks the
+                 inherited value, so it silently overrode WPF-UI's on-accent
+                 button text (near-black on accent blue in the light theme),
+                 the TabItem dim/hover states below, and the sidebar
+                 TreeViewItem foreground swap. The default text colour comes
+                 from property inheritance instead: WPF-UI's FluentWindow style
+                 sets Foreground to the theme's WindowForeground, and
+                 FluentDialogWindow re-states it explicitly. -->
 
             <!-- Chevron expander used by the sidebar TreeViewItem template. -->
             <Style x:Key="NavExpanderToggle" TargetType="ToggleButton">

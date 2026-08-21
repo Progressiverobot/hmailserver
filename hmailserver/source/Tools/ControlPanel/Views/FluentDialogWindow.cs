@@ -22,6 +22,18 @@ namespace hMailServer.ControlPanel.Views
       {
          FontFamily = new System.Windows.Media.FontFamily(Services.Typography.UiFontFamily);
          SetResourceReference(BackgroundProperty, "ApplicationBackgroundBrush");
+         // The default text colour for everything in the dialog, delivered by
+         // property inheritance rather than by an implicit TextBlock style.
+         // App.xaml used to carry such a style as a "global contrast
+         // guarantee", but an app-level implicit style also reaches the
+         // TextBlocks that ContentPresenter generates inside control
+         // templates, and a style setter outranks an inherited value - so it
+         // overwrote WPF-UI's on-accent button text (near-black on accent
+         // blue in the light theme), tab dim states and the sidebar's
+         // hover/selected foreground swap. Inheritance gives bare TextBlocks
+         // the same default while letting templates and Appearance setters
+         // override it, which is the whole point.
+         SetResourceReference(ForegroundProperty, "TextFillColorPrimaryBrush");
          ShowInTaskbar = false;
       }
    }

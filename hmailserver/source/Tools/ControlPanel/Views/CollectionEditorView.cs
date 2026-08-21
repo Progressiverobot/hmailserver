@@ -136,10 +136,17 @@ namespace hMailServer.ControlPanel.Views
             CornerRadius = new CornerRadius(11),
             Padding = new Thickness(12, 4, 12, 4),
             HorizontalAlignment = HorizontalAlignment.Left,
-            VerticalAlignment = VerticalAlignment.Center,
-            Background = (Brush) FindResource("BrandBrush")
+            VerticalAlignment = VerticalAlignment.Center
          };
-         countBadge_.Foreground = Brushes.White;
+         // The accent-button pair, exactly as Appearance=Primary buttons use it,
+         // so the badge always carries whatever contrast the theme's own accent
+         // buttons do. The previous hardcoded White on BrandBrush failed in the
+         // dark theme: ThemeTokens retints BrandBrush to #4C8DFF there, and
+         // white on #4C8DFF is 3.2:1 - below the 4.5:1 required for this 12px
+         // SemiBold text. The pair is defined in every WPF-UI theme dictionary,
+         // High Contrast included, and both references re-resolve on theme flips.
+         badge.SetResourceReference(Border.BackgroundProperty, "AccentButtonBackground");
+         countBadge_.SetResourceReference(TextBlock.ForegroundProperty, "AccentButtonForeground");
          countBadge_.FontSize = Typography.Label;
          countBadge_.FontWeight = FontWeights.SemiBold;
          badge.Child = countBadge_;
