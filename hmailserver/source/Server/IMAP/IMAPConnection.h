@@ -100,6 +100,16 @@ namespace HM
       void SendAsciiData(const AnsiString & sData);
       
       std::shared_ptr<const Account> GetAccount() { return account_; }
+
+      // The account whose DIRECTORY holds the messages of the folder currently
+      // selected. That is the logged-in account for a personal folder, and the
+      // OWNER for a delegated one - a message file lives under the mailbox it
+      // belongs to, not under whoever is reading it. Anything that turns a
+      // Message into a path must ask this rather than GetAccount(), or a
+      // delegate reading a shared folder looks in their own directory, finds
+      // nothing, and is served the "file does not exist on the server"
+      // placeholder instead of the mail.
+      std::shared_ptr<const Account> GetAccountOwningCurrentFolder();
       
       void RefreshIMAPFolders();
       void NotifyFolderChange(eIMAPCommandType active_command);

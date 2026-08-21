@@ -606,7 +606,7 @@ namespace HM
          const int sequence = messagePair.first;
          const std::shared_ptr<Message> pMessage = messagePair.second;
 
-         const String fileName = PersistentMessage::GetFileName(pConnection->GetAccount(), pMessage);
+         const String fileName = PersistentMessage::GetFileName(pConnection->GetAccountOwningCurrentFolder(), pMessage);
 
          AnsiString sHeader = PersistentMessage::LoadHeader(fileName);
          MimeHeader oHeader;

@@ -330,7 +330,7 @@ namespace HM
          
          if (dbMetaIter == databaseMetaData.end())
          {
-            String fileName = PersistentMessage::GetFileName(pConnection->GetAccount(), p1);
+            String fileName = PersistentMessage::GetFileName(pConnection->GetAccountOwningCurrentFolder(), p1);
 
             AnsiString sHeader = PersistentMessage::LoadHeader(fileName);
 

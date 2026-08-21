@@ -46,7 +46,7 @@ namespace HM
       if (!pArgument || !pMessage)
          return IMAPResult(IMAPResult::ResultBad, "Invalid parameters");
 
-      const String messageFileName = PersistentMessage::GetFileName(pConnection->GetAccount(), pMessage);
+      const String messageFileName = PersistentMessage::GetFileName(pConnection->GetAccountOwningCurrentFolder(), pMessage);
 
       append_space_ = false;
 
@@ -96,7 +96,10 @@ namespace HM
       if (willReadMessageFile)
       {
          // Ensure that the data file exists.
-         PersistentMessage::EnsureFileExistance(pConnection->GetAccount(), pMessage);
+         // The folder's owner, not the reader - same reason as the path built
+         // above. Asking under the reader's directory would find nothing and
+         // rewrite the delegate a placeholder over the owner's mail.
+         PersistentMessage::EnsureFileExistance(pConnection->GetAccountOwningCurrentFolder(), pMessage);
       }
 
       MimeHeader oMimeHeader;
@@ -306,7 +309,7 @@ namespace HM
             int iOctetStart = oPart.octet_start_;
             int iOctetCount = oPart.octet_count_;
            
-            const String messageFileName = PersistentMessage::GetFileName(pConnection->GetAccount(), pMessage);
+            const String messageFileName = PersistentMessage::GetFileName(pConnection->GetAccountOwningCurrentFolder(), pMessage);
             std::shared_ptr<ByteBuffer> pBuffer = GetByteBufferByBodyPart_(messageFileName, pMimeBody, oPart);
             
             String sPartIdentifier;
@@ -1450,7 +1453,7 @@ namespace HM
    //---------------------------------------------------------------------------
    {
       MessageData messageData;
-      if (!messageData.LoadFromMessage(pConnection->GetAccount(), pMessage))
+      if (!messageData.LoadFromMessage(pConnection->GetAccountOwningCurrentFolder(), pMessage))
          return "";
 
       String text = messageData.GetBody();

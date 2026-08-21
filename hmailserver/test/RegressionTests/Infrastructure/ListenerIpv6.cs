@@ -176,7 +176,12 @@ namespace RegressionTests.Infrastructure
             }
 
             Assert.AreEqual(200, probe.status, "Body: " + probe.body);
-            StringAssert.Contains("\"status\"", probe.body);
+            // The status document has no "status" key - it reports version,
+            // state and counters. Assert on what it genuinely contains, so a
+            // pass means the REST listener answered over IPv6 rather than
+            // meaning the assertion was vague enough to survive anything.
+            StringAssert.Contains("\"version\"", probe.body);
+            StringAssert.Contains("\"state\"", probe.body);
          }
          finally
          {

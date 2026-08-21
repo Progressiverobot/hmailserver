@@ -963,6 +963,35 @@ namespace HM
       public_imap_folders_ = IMAPFolderContainer::Instance()->GetPublicFolders();
    }
 
+   std::shared_ptr<const Account>
+   IMAPConnection::GetAccountOwningCurrentFolder()
+   {
+      // A personal folder and the logged-in account agree, which is every case
+      // that existed before delegated mailboxes. A delegated folder does not:
+      // its messages live under the OWNER's directory, and resolving them
+      // against the reader's would look in a directory that has never held
+      // them.
+      std::shared_ptr<IMAPFolder> folder = GetCurrentFolder();
+
+      if (!folder)
+         return account_;
+
+      const __int64 ownerAccountID = folder->GetAccountID();
+
+      if (ownerAccountID <= 0)
+         return account_;   // a public folder - the caller already handles those
+
+      if (account_ && ownerAccountID == account_->GetID())
+         return account_;
+
+      std::shared_ptr<const Account> owner = CacheContainer::Instance()->GetAccount(ownerAccountID);
+
+      // Falling back to the reader would build a path under the wrong mailbox,
+      // so an owner that cannot be loaded answers with nothing and lets the
+      // caller report a missing file rather than inventing a wrong one.
+      return owner;
+   }
+
    std::shared_ptr<IMAPFolder> 
    IMAPConnection::GetFolderByFullPath(const String &sFolderName)
    {

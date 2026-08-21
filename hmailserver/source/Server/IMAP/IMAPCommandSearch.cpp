@@ -420,7 +420,7 @@ namespace HM
             if (BoundExceeded_())
                return AbortSearch_(pConnection, index);
 
-            const String fileName = PersistentMessage::GetFileName(pConnection->GetAccount(), pMessage);
+            const String fileName = PersistentMessage::GetFileName(pConnection->GetAccountOwningCurrentFolder(), pMessage);
 
             index++;
             if (pMessage && DoesMessageMatch_(pConnection, pParser->GetCriteria(), fileName, pMessage, index))
