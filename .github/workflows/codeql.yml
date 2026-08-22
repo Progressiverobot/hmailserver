@@ -78,7 +78,7 @@ jobs:
       # in bulk here on deliberate design rather than on defects are filtered
       # in the config file, each with its measured count and the reasoning.
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
+        uses: github/codeql-action/init@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
         with:
           languages: csharp
           build-mode: manual
@@ -100,7 +100,7 @@ jobs:
         run: dotnet build "hmailserver/source/Tools/hMailServer Tools.sln" -c Release
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
+        uses: github/codeql-action/analyze@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
         with:
           category: "/language:csharp"
           upload: never
@@ -135,7 +135,7 @@ jobs:
               json.dump(sarif, f)
 
       - name: Upload results
-        uses: github/codeql-action/upload-sarif@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
+        uses: github/codeql-action/upload-sarif@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
         with:
           sarif_file: sarif-results/csharp.sarif
           category: "/language:csharp"
@@ -205,7 +205,7 @@ jobs:
       # is triaged, moving this to security-and-quality is a one-word change -
       # but do it from a measured count, not on principle.
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
+        uses: github/codeql-action/init@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
         with:
           languages: c-cpp
           build-mode: manual
@@ -223,7 +223,7 @@ jobs:
         run: ./build/build.ps1 -Configuration $env:BUILD_CONFIGURATION -Clean
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
+        uses: github/codeql-action/analyze@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
         with:
           category: "/language:c-cpp"
 
