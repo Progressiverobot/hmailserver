@@ -22,8 +22,19 @@ The compiler runs with `/WX` — code must build warning-free.
 
 All changes must keep the regression suite green. The suite
 runs against a live local server instance over SMTP/IMAP/POP3. The full
-environment recipe (SQL CE, ClamAV, SpamAssassin, INI settings) is not
-published — open an issue and we will walk you through it.
+environment recipe (SQL CE, ClamAV, SpamAssassin, INI settings) is not yet
+published; `build/preflight-tests.ps1` is its machine-readable outline, and
+writing the human version is itself one of the small tasks below — until then,
+open an issue and we will walk you through it.
+
+## Small tasks
+
+If you want to contribute and do not know where to start, the issues labelled
+[`good first issue`](https://github.com/Progressiverobot/hmailserver/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
+are real, bounded pieces of work, each of which closes a gap recorded in
+`Roadmap.md` — none is make-work. Each says what it is for, where to look, how
+to check it, and what "done" means. Comment on one to claim it; if it turns out
+to be larger than it looked, say so on the issue rather than growing the change.
 
 ## Pull Requests
 
