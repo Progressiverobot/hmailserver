@@ -41,41 +41,49 @@ namespace ImportTool.MboxImport
 
             long consumed = 0;
             byte[] line;
-            while ((line = ReadLine(stream)) != null)
-            {
-               consumed += line.Length;
 
-               if (previousLineBlank && StartsWithFromMarker(line))
+            // The finally disposes whichever buffer is live when the loop exits,
+            // however it exits - including a callback throwing mid-message.
+            try
+            {
+               while ((line = ReadLine(stream)) != null)
                {
-                  // Envelope line: flush the previous message and skip the line.
-                  if (messageStarted)
+                  consumed += line.Length;
+
+                  if (previousLineBlank && StartsWithFromMarker(line))
                   {
-                     onMessage(TrimTrailingBlankLine(current));
-                     current.Dispose();
-                     current = new MemoryStream();
+                     // Envelope line: flush the previous message and skip the line.
+                     if (messageStarted)
+                     {
+                        onMessage(TrimTrailingBlankLine(current));
+                        current.Dispose();
+                        current = new MemoryStream();
+                     }
+
+                     messageStarted = true;
+                     previousLineBlank = false;
+
+                     if (onProgress != null)
+                        onProgress(consumed);
+
+                     continue;
                   }
 
-                  messageStarted = true;
-                  previousLineBlank = false;
+                  previousLineBlank = IsBlank(line);
 
-                  if (onProgress != null)
-                     onProgress(consumed);
+                  if (!messageStarted)
+                     continue;   // preamble before the first envelope line
 
-                  continue;
+                  WriteBodyLine(current, line);
                }
 
-               previousLineBlank = IsBlank(line);
-
-               if (!messageStarted)
-                  continue;   // preamble before the first envelope line
-
-               WriteBodyLine(current, line);
+               if (messageStarted)
+                  onMessage(TrimTrailingBlankLine(current));
             }
-
-            if (messageStarted)
-               onMessage(TrimTrailingBlankLine(current));
-
-            current.Dispose();
+            finally
+            {
+               current.Dispose();
+            }
 
             if (onProgress != null)
                onProgress(consumed);
