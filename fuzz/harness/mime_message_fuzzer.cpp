@@ -21,6 +21,7 @@
 //   - Anything above the parser: IMAP BODYSTRUCTURE generation, rule matching,
 //     the DKIM canonicalisers. Those are separate targets when someone wants
 //     them.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "stdafx.h"
 

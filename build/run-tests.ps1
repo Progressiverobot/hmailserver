@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # Runs the NUnit regression suite against the live service.
 #
 # -StopOnError passes nunit3-console's /stoponerror, which abandons the run at the

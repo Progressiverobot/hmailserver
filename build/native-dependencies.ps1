@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # Emits the server's NATIVE dependencies as JSON, for merging into the SBOM.
 #
 # Why this has to exist. The SBOM workflow runs Syft over the repository, and Syft can

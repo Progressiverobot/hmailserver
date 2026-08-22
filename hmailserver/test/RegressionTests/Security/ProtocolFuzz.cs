@@ -13,6 +13,7 @@
 //
 // The inputs use a fixed RNG seed so any failure is reproducible. A per-test
 // [Timeout] is a hard backstop in case a malformed input ever wedged the server.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System;
 using System.Text;

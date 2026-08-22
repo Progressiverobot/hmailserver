@@ -1,6 +1,7 @@
 // Copyright (c) 2026 hMailServer
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // DANE-EE (RFC 7672) certificate verification for outbound SMTP connections.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

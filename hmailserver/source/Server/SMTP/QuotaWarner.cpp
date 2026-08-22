@@ -11,6 +11,7 @@
 #include "../Common/BO/MessageData.h"
 #include "../Common/BO/MessageRecipients.h"
 #include "../Common/Application/Configuration.h"
+// SPDX-License-Identifier: AGPL-3.0-or-later
 #include "../Common/Persistence/PersistentServerMessage.h"
 #include "../Common/BO/ServerMessages.h"
 #include "../Common/Application/IniFileSettings.h"

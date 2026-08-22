@@ -30,6 +30,7 @@
 // threw is a far worse outcome than skipping one rate limit, and an exception
 // reaching TCPConnection reports HM5136, drops the session and rethrows so the
 // worker writes a minidump.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

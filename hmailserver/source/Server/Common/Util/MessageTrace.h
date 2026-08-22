@@ -26,6 +26,7 @@
 // this table stores sender and recipient addresses, so it is a record of who
 // corresponds with whom, retained. An administrator should switch that on
 // deliberately and choose how long it is kept.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

@@ -1,6 +1,7 @@
 // Copyright (c) 2010 Martin Knafve / hMailServer.com.  
 // https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #define PROPERTY_MAXPOP3CONNECTIONS             _T("maxpop3connections")
 #define PROPERTY_MAXSMTPCONNECTIONS             _T("maxsmtpconnections")

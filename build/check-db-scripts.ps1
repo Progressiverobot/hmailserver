@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # Builds a throwaway SQL CE database from the create script, and applies every
 # upgrade script to a second one, using exactly the splitting and preprocessing
 # rules SQLScriptParser uses. Reports the first statement that fails.

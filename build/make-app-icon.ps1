@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # Generates the hMailServer Control Panel application icon (.ico with
 # PNG-compressed 256/64/32/16 px images of the gradient brand tile).
 Add-Type -AssemblyName System.Drawing

@@ -43,6 +43,7 @@
 //
 // Setting DnssecValidationEnabled=0 reverts to opportunistic
 // (unvalidated) TLSA usage.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

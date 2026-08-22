@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 // Copyright (c) 2005 Martin Knafve / hMailServer.com.  
 // https://www.progressiverobot.com

@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 """Minimal SMTP sink that records the exact bytes a client transmits.
 
 Advertises PIPELINING/8BITMIME/SIZE like hMailServer does, accepts one

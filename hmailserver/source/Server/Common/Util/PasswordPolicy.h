@@ -25,6 +25,7 @@
 // clock - so the rules can be pinned by tests without a configured server, in
 // the same shape OAuth2TokenValidator::ValidateWithConfig uses for the same
 // reason.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

@@ -55,6 +55,7 @@
 // is ever stored; the clear-text token exists once, in the 201 response that
 // created it. See the comment above LoadKeys_ in the .cpp for the file format
 // and for why SHA-256 (and not Argon2id) is the right primitive here.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

@@ -6,6 +6,7 @@
 // Disabled by default. Enable with AcmeEnabled=1 in hMailServer.ini and
 // configure AcmeContactEmail and AcmeDomains. Issued certificates are
 // written as fullchain.pem / privkey.pem in AcmeCertificateDirectory.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

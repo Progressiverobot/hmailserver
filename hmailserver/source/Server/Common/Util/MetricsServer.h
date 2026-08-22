@@ -2,6 +2,7 @@
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // Minimal HTTP endpoint exposing server statistics in the Prometheus
 // text exposition format. Enabled with MetricsServerPort in hMailServer.ini.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

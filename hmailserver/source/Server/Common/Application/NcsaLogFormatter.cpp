@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // https://www.progressiverobot.com
 // See NcsaLogFormatter.h for the field order and the reasoning behind it.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "stdafx.h"
 

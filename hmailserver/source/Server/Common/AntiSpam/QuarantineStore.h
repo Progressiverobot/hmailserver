@@ -30,6 +30,7 @@
 //
 // Off by default. An installation that has been refusing spam for years must
 // not silently start accepting and storing it because of an upgrade.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

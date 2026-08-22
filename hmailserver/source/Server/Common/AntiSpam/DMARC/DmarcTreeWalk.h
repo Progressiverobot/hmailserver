@@ -37,6 +37,7 @@
 // against it. Uncached, a single message could cost two dozen lookups. So the
 // answers are cached, and the cache is the reason this is usable at all rather
 // than an optimisation added later.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

@@ -3,6 +3,7 @@
 // Implementation of the shared traversal. See fuzz_mime_common.h for the
 // reasoning behind the buffer contract, the volatile sink and the traversal
 // limits.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "stdafx.h"
 

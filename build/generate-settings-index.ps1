@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # Regenerates the Control Panel's settings search index.
 #
 # The Ctrl+K palette searches page names AND individual settings, so an

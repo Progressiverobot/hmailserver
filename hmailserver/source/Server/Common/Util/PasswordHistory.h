@@ -29,6 +29,7 @@
 // does not live here - it lives in the directory, which has its own expiry
 // policy and its own change mechanism - so this server aging it out would refuse
 // a credential it does not own and cannot help anybody renew.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # Builds the libFuzzer targets for the MIME parser with clang-cl.
 #
 # WHY THIS IS A SEPARATE BUILD AND NOT A PROJECT IN hMailServer.sln

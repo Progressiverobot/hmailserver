@@ -9,6 +9,7 @@
 // listeners each built their own context and each drifted from the shared
 // configuration, and a third copy of THIS code would repeat that mistake with
 // the endpoint grammar instead of the cipher list.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

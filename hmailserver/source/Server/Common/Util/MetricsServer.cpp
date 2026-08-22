@@ -2,6 +2,7 @@
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // Minimal HTTP endpoint exposing server statistics in the Prometheus
 // text exposition format. See MetricsServer.h.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "StdAfx.h"
 

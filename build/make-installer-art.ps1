@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # Generates modern InnoSetup wizard bitmaps for the hMailServer installer.
 # setup.bmp        164 x 314  (left banner)
 # setup-small.bmp   55 x 55   (top-right corner image)

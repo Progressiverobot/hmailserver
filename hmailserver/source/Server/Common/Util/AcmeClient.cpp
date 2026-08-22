@@ -1,6 +1,7 @@
 ﻿// Copyright (c) 2026 hMailServer
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // ACME v2 (RFC 8555) client. See AcmeClient.h.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "StdAfx.h"
 
