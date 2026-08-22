@@ -66,6 +66,17 @@ already cost a release cycle or nearly shipped a defect.
    fix, never before, or the old vtable layout is baked into the shipped wrapper
    permanently.
 
+   Then prove the build is still reproducible: build Release a second time
+   from clean (`build\build.ps1 -Configuration Release -Clean`) and compare
+   the SHA-256 of `hMailServer.exe` with the first. They must be identical -
+   /Brepro, /d1trimfile, /pdbaltpath and OPENSSL_NO_FILENAMES in the project
+   make the executable a pure function of the source and the toolchain, and
+   a mismatch means something has started embedding a timestamp or a path
+   again. Put the hash in the release notes' verification section so anyone
+   with the same toolchain (v145, Windows SDK 10.0.26100) and library layout
+   can check the published binary came from the published source. Both
+   builds restart the service, so do this before step 9, never after.
+
 9. **Full regression suite on the stamped binary** — every test, nothing
    skipped. If *anything* changes after this run, the run is void: rebuild
    and re-run. Never abort a run; if one must be stopped, expect step 4 to
