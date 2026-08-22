@@ -86,15 +86,29 @@ def process(path, ext, apply):
     raw = open(path, 'rb').read()
     bom = raw.startswith(BOM)
     body = raw[len(BOM):] if bom else raw
-    nl = b'\r\n' if b'\r\n' in body else b'\n'
+    # Lines are split on LF with any CR kept attached to its line, so a file
+    # with MIXED endings (one test file had a single CRLF among 268 LF lines)
+    # is still seen line by line. The first version split on whichever
+    # terminator it found first, which turned that file into one 268-line
+    # chunk and put the header after it. New lines take the ending the file's
+    # own first line uses.
+    nl = b'\r\n' if body.split(b'\n', 1)[0].endswith(b'\r') else b'\n'
 
     if b'SPDX-License-Identifier' in body[:HEAD_BYTES]:
         return None
 
     # A notice, not the word: "Copyright (c) 2010 ...", "Copyright 2026 ...",
     # "(c) 2026 ...". Prose that merely mentions copyright does not count.
-    has_copyright = re.search(rb'[Cc]opyright\s*(\(c\)|\xc2\xa9|\d{4})|\(c\)\s*\d{4}', body[:HEAD_BYTES]) is not None
+    NOTICE = re.compile(rb'[Cc]opyright\s*(\(c\)|\xc2\xa9|\d{4})|\(c\)\s*\d{4}')
+    has_copyright = NOTICE.search(body[:HEAD_BYTES]) is not None
     lines = body.split(nl)
+
+    # An SPDX line that exists but sits beyond the window is one the first
+    # version of this script put at the END of the leading comment block - and
+    # twenty-five files open with a block of prose long enough to push it past
+    # the window the check reads. Pull it out; it is re-placed below, directly
+    # after the copyright line, where REUSE expects it and the check can see it.
+    lines = [l for l in lines if b'SPDX-License-Identifier' not in l]
 
     if ext in BLOCK_COMMENT:
         open_, close = BLOCK_COMMENT[ext]
@@ -115,16 +129,21 @@ def process(path, ext, apply):
             insert_at = 1
 
         if has_copyright:
-            # Append the SPDX line to the end of the leading comment block,
-            # leaving the existing notice byte-for-byte intact.
+            # Place the SPDX line directly after the LAST copyright line of the
+            # leading comment block - not after the whole block, which in this
+            # tree can be thirty lines of design notes - leaving the existing
+            # notice byte-for-byte intact.
             block = leading_comment_block(lines[insert_at:], marker.encode())
             if block == 0:
                 # A notice that is not a leading line comment (a block comment,
                 # or a notice further down). Put a single SPDX line on top.
-                new_lines = lines[:insert_at] + [(marker + ' ' + SPDX).encode()] + lines[insert_at:]
+                at = insert_at
             else:
                 at = insert_at + block
-                new_lines = lines[:at] + [(marker + ' ' + SPDX).encode()] + lines[at:]
+                for k in range(insert_at, insert_at + block):
+                    if NOTICE.search(lines[k]):
+                        at = k + 1
+            new_lines = lines[:at] + [(marker + ' ' + SPDX).encode()] + lines[at:]
             action = 'spdx'
         else:
             header = [

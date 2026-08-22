@@ -1,5 +1,6 @@
 // Copyright (c) 2026 hMailServer
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // REST administration API over HTTPS.
 //
 // Disabled by default. Enabled with RestApiPort in hMailServer.ini.
@@ -55,7 +56,6 @@
 // is ever stored; the clear-text token exists once, in the 201 response that
 // created it. See the comment above LoadKeys_ in the .cpp for the file format
 // and for why SHA-256 (and not Argon2id) is the right primitive here.
-// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

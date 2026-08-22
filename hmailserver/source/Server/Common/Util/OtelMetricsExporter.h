@@ -1,4 +1,5 @@
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // https://www.progressiverobot.com
 //
 // The OTLP metrics signal: a periodic push of the SAME counters the Prometheus
@@ -21,7 +22,6 @@
 // Follows the OtelTracer pattern: a Singleton with Start/Stop driven from
 // Application::StartServers, a worker std::thread, and the shared
 // OtelExportChannel transport.
-// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

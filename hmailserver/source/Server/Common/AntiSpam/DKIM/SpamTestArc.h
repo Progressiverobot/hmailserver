@@ -1,5 +1,6 @@
 // Copyright (c) 2026 hMailServer
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // ARC results used for inbound filtering (RFC 8617).
 //
@@ -39,7 +40,6 @@
 // failure score alone typically reaches it - so an offset registered after
 // DMARC would be skipped in exactly the case it exists for. Running first,
 // the offset lands before the penalty and the pair cancels.
-// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 
