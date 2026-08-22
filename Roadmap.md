@@ -47,7 +47,7 @@ strong and where it is thin far more honestly than any prose summary.
 | Section | ✅ | 🔄 | ⬜ | ⏸️ |
 |---|--:|--:|--:|--:|
 | **Urgent — the OpenSSF gold badge** | | | | |
-| [What stands between here and gold](#what-stands-between-here-and-gold) | 2 | – | 7 | 3 |
+| [What stands between here and gold](#what-stands-between-here-and-gold) | 3 | – | 6 | 3 |
 | [Housekeeping that fell out of the badge work](#housekeeping-that-fell-out-of-the-badge-work) | 1 | – | 2 | 1 |
 | [Dated items — the forcing functions](#dated-items--the-forcing-functions) | 2 | – | 4 | 1 |
 | [Defects found by the audit](#defects-found-by-the-audit) | 30 | – | – | – |
@@ -78,7 +78,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 8 | – | – | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 5 | 1 | 2 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 6 | 2 | 1 | – |
-| **Total** | **734** | **13** | **66** | **19** |
+| **Total** | **735** | **13** | **65** | **19** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage, the administration surface and the core protocol layer are the
@@ -152,7 +152,7 @@ than dressed up.
 | ⬜ | **`dynamic_analysis`** — a RELEASE.md step | The full regression suite runs on the stamped binary before every release (RELEASE.md step 9), but the badge counts a test suite as dynamic analysis only at ≥ 80% *branch* coverage, which is unmeasured here. Fuzzing counts unconditionally, and the harnesses exist: `fuzz/run-fuzz.ps1 -Target mime_message_fuzzer`. Make a timed fuzz run a **required step for every minor release** in RELEASE.md, do it for the next one, and only then mark Met. |
 | ⬜ | **`dynamic_analysis_enable_assertions`** (SHOULD) | Release builds compile `assert` to `((void)0)` — roughly 190 sites do nothing in the shipped binary, which is why this was recorded Unmet rather than claimed. Recorded-with-reason already counts for a SHOULD; the real fix is a Release-with-assertions configuration used by the fuzz build and the pre-release suite run. |
 | ⬜ | **`test_statement_coverage80`** (silver MUST) | Native C++ coverage has never been measured; only the Control Panel reports cobertura. OpenCppCoverage is FLOSS, so N/A would not be honest. Run it over `build/run-tests.ps1` on the self-hosted runner, publish the number whatever it is, then decide. This and the next row are the last two silver criteria; closing both makes `achieve_silver` true automatically. |
-| ⬜ | **`build_repeatable` / `build_reproducible`** (silver + gold) | Not established and not claimed. MSVC side: `/Brepro`, `/d1trimfile`, `/pdbaltpath` (or keep the PDB out of the hashed artefact), pinned toolset (already v145, SDK pinned in `global.json`); Inno Setup side: `TouchDate` / `TouchTime` so the installer's timestamps are fixed; then build twice on two machines and diff. Document the container or VM hash a rebuild must use. The largest engineering item on this list. |
+| ✅ | **`build_repeatable` / `build_reproducible`** (silver + gold) — repeatable proven 22 August 2026; reproducible as far as one toolchain can establish | Two clean Release builds of the same tree produce byte-identical `hMailServer.exe` (SHA-256 `ABC698DA…`, 10,074,624 bytes, twice). Three options: `/Brepro` on compiler and linker, which replaces the timestamps MSVC stamps into objects and the PE header with content hashes; `/d1trimfile:$(SolutionDir)`, which strips the checkout directory from the debug records; `/pdbaltpath:%_PDB%`, which writes only the PDB's file name into the executable. The first proven build still carried two absolute checkout paths, and finding out why was the useful part: `DKIM.cpp` and `OAuth2TokenValidator.cpp` are the only translation units that call `OPENSSL_free`/`OPENSSL_malloc`, which expand to `CRYPTO_free(p, OPENSSL_FILE, OPENSSL_LINE)` — and `OPENSSL_FILE` is `__FILE__` unless `OPENSSL_NO_FILENAMES` is defined. So `/d1trimfile` reaches debug records, not `__FILE__` string literals. The define is now set for every configuration and the rebuilt binary carries no absolute path at all (`3C419205…`). **What is and is not claimed:** *repeatable* (same machine, same tree, same bytes) is proven. *Reproducible* in the badge's sense needs an independent party to rebuild from the release source with the same toolchain (v145, Windows SDK 10.0.26100) and the same library layout under `%hMailServerLibs%`, and nobody has yet; the `.vcxproj` comment and `RELEASE.md` say how. Until someone does, the badge answer is "repeatable: Met; reproducible: Unmet, with the reason" — a false answer on a public self-certification would cost more than the badge is worth. |
 | ⬜ | **`test_statement_coverage90` + `test_branch_coverage80`** (gold) | Follow from measuring. Likely far off for the native server; honest until the number exists. |
 | ⬜ | **`achieve_silver`** | Computed by the badge site; true the moment the two silver rows above close. |
 | ⏸️ | **`bus_factor`** | One person knows the codebase. `GOVERNANCE.md` now says which half of continuity is arranged (access, legal rights) and which is not (knowledge). Waits for a second maintainer — see *Becoming a maintainer* there. |

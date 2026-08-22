@@ -61,7 +61,7 @@ EXIT 0
 </Command>
     </PreBuildEvent>
     <Midl>
-      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>OPENSSL_NO_FILENAMES;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MkTypLibCompatible>false</MkTypLibCompatible>
       <GenerateStublessProxies>true</GenerateStublessProxies>
       <TypeLibraryName>$(IntDir)hMailServer.tlb</TypeLibraryName>
@@ -74,7 +74,7 @@ EXIT 0
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>$(hMailServerLibs)\boost_1_91_0;..\..\..\..\Libraries\mssqlce3.5;$(hMailServerLibs)\openssl-4.0.1\out64\include;$(hMailServerLibs)\postgresql-18.3\src\interfaces\libpq;$(BOOST_INCLUDE_PATH);$(OPENSSL_INCLUDE_PATH);$(ProjectDir);$(hMailServerLibs)\postgresql-18.3\src\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;_WINDOWS;_DEBUG;UNICODE;_UNICODE;BOOST_DATE_TIME_NO_LIB;_SCL_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>OPENSSL_NO_FILENAMES;WIN32;_WINDOWS;_DEBUG;UNICODE;_UNICODE;BOOST_DATE_TIME_NO_LIB;_SCL_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>false</MinimalRebuild>
       <ExceptionHandling>Async</ExceptionHandling>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
@@ -87,7 +87,7 @@ EXIT 0
       <AdditionalOptions>/Zm200 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <ResourceCompile>
-      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>OPENSSL_NO_FILENAMES;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <Culture>0x0409</Culture>
       <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
@@ -109,14 +109,31 @@ EXIT 0
       <Command>call "$(ProjectDir)post-build.bat" "$(hMailServerLibs)" "$(OutDir)" "$(TargetPath)" "$(IntDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+      <!-- Reproducible Release builds. /Brepro on both compiler and linker
+         replaces the timestamps MSVC otherwise stamps into objects and the
+         PE header with hashes of the content; /d1trimfile strips the
+         checkout directory out of __FILE__ and the debug records, so two
+         clones in different places produce the same bytes; /pdbaltpath
+         writes only the PDB file name into the executable rather than the
+         absolute path it was linked from. Together they make
+         hMailServer.exe a pure function of the source and the toolchain,
+         which is what lets anyone check that a released binary came from
+         the released source. Verified by building twice from clean and
+         comparing SHA-256 of the executable. OPENSSL_NO_FILENAMES, defined for
+         every configuration below, is the last piece: OpenSSL's OPENSSL_free
+         and OPENSSL_malloc expand to CRYPTO_free(p, OPENSSL_FILE, OPENSSL_LINE),
+         and OPENSSL_FILE is __FILE__ unless that macro is set - which is how the
+         two translation units that call them were the only ones carrying an
+         absolute checkout path into the shipped binary. /d1trimfile reaches
+         the debug records, not a __FILE__ string literal. -->
+<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <PreBuildEvent>
       <Command>NET STOP hMailServer
 EXIT 0
 </Command>
     </PreBuildEvent>
     <Midl>
-      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>OPENSSL_NO_FILENAMES;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MkTypLibCompatible>false</MkTypLibCompatible>
       <GenerateStublessProxies>true</GenerateStublessProxies>
       <TypeLibraryName>$(IntDir)hMailServer.tlb</TypeLibraryName>
@@ -128,7 +145,7 @@ EXIT 0
     </Midl>
     <ClCompile>
       <AdditionalIncludeDirectories>$(hMailServerLibs)\boost_1_91_0;..\..\..\..\Libraries\mssqlce3.5;$(hMailServerLibs)\openssl-4.0.1\out64\include;$(hMailServerLibs)\postgresql-18.3\src\interfaces\libpq;$(BOOST_INCLUDE_PATH);$(OPENSSL_INCLUDE_PATH);$(ProjectDir);$(hMailServerLibs)\postgresql-18.3\src\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;_WINDOWS;UNICODE;_UNICODE;NDEBUG;BOOST_DATE_TIME_NO_LIB;_SCL_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>OPENSSL_NO_FILENAMES;WIN32;_WINDOWS;UNICODE;_UNICODE;NDEBUG;BOOST_DATE_TIME_NO_LIB;_SCL_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ExceptionHandling>Async</ExceptionHandling>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <PrecompiledHeader>Use</PrecompiledHeader>
@@ -136,15 +153,15 @@ EXIT 0
       <TreatWarningAsError>true</TreatWarningAsError>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <AdditionalOptions>/Zm200 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/Zm200 /Brepro /d1trimfile:$(SolutionDir) %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <ResourceCompile>
-      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>OPENSSL_NO_FILENAMES;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <Culture>0x0409</Culture>
       <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Link>
-      <AdditionalOptions>/ignore:4099 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/ignore:4099 /Brepro /pdbaltpath:%_PDB% %(AdditionalOptions)</AdditionalOptions>
       <AdditionalDependencies>libcrypto.lib;libssl.lib;Adsiid.lib;activeds.lib;IPHlpAPI.lib;Dnsapi.lib;Ws2_32.lib;libpq.lib;crypt32.lib;Secur32.lib;Netapi32.lib;wldap32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)hMailServer.exe</OutputFile>
       <AdditionalLibraryDirectories>$(hMailServerLibs)\boost_1_91_0\stage\lib;$(hMailServerLibs)\openssl-4.0.1\out64\lib;$(hMailServerLibs)\postgresql-18.3\builddir\src\interfaces\libpq;$(BOOST_LIBS_PATH);$(OPENSSL_LIBS_PATH);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
