@@ -1,7 +1,9 @@
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.IO;
 
 namespace ImportTool.MboxImport
@@ -49,6 +51,7 @@ namespace ImportTool.MboxImport
                   if (messageStarted)
                   {
                      onMessage(TrimTrailingBlankLine(current));
+                     current.Dispose();
                      current = new MemoryStream();
                   }
 
@@ -72,6 +75,8 @@ namespace ImportTool.MboxImport
             if (messageStarted)
                onMessage(TrimTrailingBlankLine(current));
 
+            current.Dispose();
+
             if (onProgress != null)
                onProgress(consumed);
          }
@@ -82,16 +87,18 @@ namespace ImportTool.MboxImport
       /// </summary>
       private static byte[] ReadLine(Stream stream)
       {
-         var buffer = new MemoryStream();
-         int value;
-         while ((value = stream.ReadByte()) != -1)
+         using (var buffer = new MemoryStream())
          {
-            buffer.WriteByte((byte)value);
-            if (value == '\n')
-               break;
-         }
+            int value;
+            while ((value = stream.ReadByte()) != -1)
+            {
+               buffer.WriteByte((byte)value);
+               if (value == '\n')
+                  break;
+            }
 
-         return buffer.Length == 0 ? null : buffer.ToArray();
+            return buffer.Length == 0 ? null : buffer.ToArray();
+         }
       }
 
       private static bool StartsWithFromMarker(byte[] line)
@@ -110,13 +117,7 @@ namespace ImportTool.MboxImport
 
       private static bool IsBlank(byte[] line)
       {
-         foreach (var b in line)
-         {
-            if (b != '\r' && b != '\n')
-               return false;
-         }
-
-         return true;
+         return line.All(b => b == '\r' || b == '\n');
       }
 
       /// <summary>

@@ -1,6 +1,7 @@
 // Copyright (c) 2010 Martin Knafve / hMailServer.com.  
 // https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System;
 using System.Collections.Generic;
@@ -25,8 +26,6 @@ namespace DBSetup
       public formMain()
       {
          InitializeComponent();
-
-         this.Cursor = Cursors.Default;
 
          wizard.AddPage(new ucWelcome());
          wizard.AddPage(new ucAction());
