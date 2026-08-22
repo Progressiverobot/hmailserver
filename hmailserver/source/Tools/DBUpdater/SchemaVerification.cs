@@ -1,6 +1,8 @@
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System.Collections.Generic;
+using System.Linq;
 
 namespace DBUpdater
 {
@@ -312,15 +314,7 @@ namespace DBUpdater
       /// </summary>
       public static IList<SchemaProbe> GetProbesFor(int version)
       {
-         List<SchemaProbe> result = new List<SchemaProbe>();
-
-         foreach (SchemaProbe probe in Probes)
-         {
-            if (probe.Version == version)
-               result.Add(probe);
-         }
-
-         return result;
+         return Probes.Where(probe => probe.Version == version).ToList();
       }
    }
 }

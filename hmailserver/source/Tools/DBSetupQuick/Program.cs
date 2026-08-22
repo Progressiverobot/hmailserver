@@ -1,6 +1,7 @@
 // Copyright (c) 2010 Martin Knafve / hMailServer.com.  
 // https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System;
 using System.Collections.Generic;
@@ -25,10 +26,7 @@ namespace DBSetupQuick
 
          // Propagate the outcome to the installer: a failed database create/upgrade
          // must fail the install rather than silently produce a broken server.
-         if (_application.Database.DatabaseExists)
-            return UpgradeDatabase();
-         else
-            return CreateDatabase();
+         return _application.Database.DatabaseExists ? UpgradeDatabase() : CreateDatabase();
       }
 
       private static int UpgradeDatabase()

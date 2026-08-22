@@ -109,10 +109,15 @@ jobs:
       # paths-ignore in codeql-config.yml cannot drop these results: for a
       # compiled language analysed with build-mode: manual, CodeQL extracts
       # whatever the compiler compiles - including the WPF XAML compiler's
-      # *.g.cs under obj/ - and a config file's path filters only restrict
-      # extraction for interpreted languages or for build-mode: none. So the
-      # build output is dropped from the SARIF here, between analyse and upload.
-      - name: Drop build-output results from the SARIF
+      # *.g.cs under obj/ and the WinForms designer's *.Designer.cs - and a
+      # config file's path filters only restrict extraction for interpreted
+      # languages or for build-mode: none. So both are dropped from the SARIF
+      # here, between analyse and upload, for the reasons the config records:
+      # build output is regenerated on every build, and designer files are
+      # rewritten by Visual Studio on every designer save, so a fix in either
+      # lasts until the next one. The first scan of the setup tools showed
+      # nine designer-file results, every one a cast the designer itself wrote.
+      - name: Drop build-output and designer-generated results from the SARIF
         shell: python
         run: |
           import json
@@ -122,6 +127,8 @@ jobs:
               if not locations:
                   return False
               uri = locations[0].get("physicalLocation", {}).get("artifactLocation", {}).get("uri", "")
+              if uri.lower().endswith(".designer.cs"):
+                  return True
               return any(part in ("obj", "bin") for part in uri.split("/"))
 
           path = "sarif-results/csharp.sarif"
@@ -130,7 +137,7 @@ jobs:
           for run in sarif["runs"]:
               before = len(run["results"])
               run["results"] = [r for r in run["results"] if not in_build_output(r)]
-              print(f"Dropped {before - len(run['results'])} build-output result(s); {len(run['results'])} remain.")
+              print(f"Dropped {before - len(run['results'])} build-output or designer-generated result(s); {len(run['results'])} remain.")
           with open(path, "w", encoding="utf-8") as f:
               json.dump(sarif, f)
 
