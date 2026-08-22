@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -1161,6 +1164,24 @@ namespace hMailServer.ControlPanel.Views
             IniStore = iniStore_
          });
          Tab("IMAP").Cards.Add(imapSearch);
+         // Its own card rather than a row in "IMAP": the setting is about how much
+         // history the server keeps, and the cost of getting it wrong is a full
+         // resync for every client, which reads as "IMAP is slow" rather than as
+         // anything to do with this value.
+         var history = Card("Change history for synchronising clients",
+            "QRESYNC and CONDSTORE clients ask what vanished while they were away instead of re-listing the folder. "
+            + "The server answers from a table of expunge records, pruned to the newest N twelve-hourly and once at "
+            + "service start. A client whose last sync is older than the retained history gets a full resync - never "
+            + "a wrong answer. Applies after a service restart.");
+         history.Settings.Add(new IniNumber
+         {
+            Path = "IMAPExpungeRetentionRecords",
+            Label = "Expunge records to keep (0 = keep everything, which also skips the prune at start-up)",
+            Default = 5000,
+            MinimumValue = 0,
+            IniStore = iniStore_
+         });
+         Tab("IMAP").Cards.Add(history);
 
          var pop3 = Card("POP3");
          pop3.Settings.Add(new ComText { Path = "MaxPOP3Connections", Label = "Max simultaneous connections (0 = unlimited)", Numeric = true });
@@ -1454,6 +1475,18 @@ namespace hMailServer.ControlPanel.Views
                     "lookup the walk cannot complete because DNS was unavailable - a resolver outage must not " +
                     "quietly turn relaxed alignment into strict. Costs up to eight DNS queries per domain, cached " +
                     "for five minutes. Applies after a service restart.",
+            IniStore = iniStore_
+         });
+         auth.Settings.Add(new IniNumber
+         {
+            Path = "DmarcRptSchemaVersion",
+            Label = "Aggregate-report schema this server sends: 1 = RFC 7489 Appendix C, 2 = RFC 9990",
+            Default = 1,
+            MinimumValue = 1,
+            Blurb = "Which spelling of the DMARC aggregate report goes out to the domains this server reports on. "
+                    + "1 is what every report consumer deployed today parses; 2 is DMARCbis, for the day the consumers "
+                    + "have caught up. Any other value is reported as an error and treated as 1, because a typo must not "
+                    + "decide what goes on the wire. Applies after a service restart.",
             IniStore = iniStore_
          });
          auth.Settings.Add(new ComBool
@@ -2264,6 +2297,48 @@ namespace hMailServer.ControlPanel.Views
          index.Settings.Add(new IniNumber { Path = "IndexerFullMinutes", Label = "Full re-index interval (minutes)", Default = 720, IniStore = iniStore_ });
          index.Settings.Add(new IniNumber { Path = "IndexerFullLimit", Label = "Messages per full-index pass", Default = 25000, IniStore = iniStore_ });
          index.Settings.Add(new IniNumber { Path = "IndexerQuickLimit", Label = "Messages per quick-index pass", Default = 1000, IniStore = iniStore_ });
+         // The full-text term index is a second, optional layer behind the switch
+         // above: it needs message indexing on to run at all, and the server
+         // refuses nothing when it is off - SEARCH BODY/TEXT simply reads every
+         // message instead of the narrowed set. These four keys had no editor and
+         // no README entry, so the feature was invisible to anyone who did not
+         // read IniFileSettings.cpp.
+         index.Settings.Add(new IniBool
+         {
+            Path = "IndexerFullText",
+            Label = "Full-text term index for IMAP SEARCH BODY and TEXT",
+            Default = false,
+            Blurb = "Off by default because it costs a term table of a few kilobytes per message and a backfill pass "
+                    + "over every message already delivered - an administrator's decision, never an upgrade's. Results "
+                    + "are identical on and off: the index only narrows which messages the substring scan has to read. "
+                    + "Requires message indexing (above) to be enabled; on its own this indexes nothing. Applies after a "
+                    + "service restart.",
+            IniStore = iniStore_
+         });
+         index.Settings.Add(new IniNumber
+         {
+            Path = "IndexerFullTextBatchSize",
+            Label = "Messages one backfill pass reads before pausing (1-100000)",
+            Default = 250,
+            MinimumValue = 1,
+            IniStore = iniStore_
+         });
+         index.Settings.Add(new IniNumber
+         {
+            Path = "IndexerFullTextMinTokenLength",
+            Label = "Shortest search string the index answers for (3-64; shorter strings fall back to the scan)",
+            Default = 3,
+            MinimumValue = 3,
+            IniStore = iniStore_
+         });
+         index.Settings.Add(new IniNumber
+         {
+            Path = "IndexerFullTextMaxTokensPerMessage",
+            Label = "Distinct terms per message before it is always scanned instead (64-1000000)",
+            Default = 2048,
+            MinimumValue = 64,
+            IniStore = iniStore_
+         });
 
          // The two actions on MessageIndexing existed over COM and nowhere else, so
          // "search finds nothing" or "search finds messages that were deleted" had
@@ -2373,6 +2448,19 @@ namespace hMailServer.ControlPanel.Views
             MinimumValue = 1,
             IniStore = iniStore_
          });
+         database.Settings.Add(new IniNumber
+         {
+            Path = "DatabaseStatementTimeout",
+            Label = "Seconds a single SQL statement may run (0 = no limit)",
+            Default = 30,
+            MinimumValue = 0,
+            Blurb = "What stops one statement blocked on a lock from holding a worker thread for ever. Honoured at "
+                    + "connect time by MySQL/MariaDB and PostgreSQL; MS SQL and SQL CE start at ADO's own 30 seconds "
+                    + "and pick this value up on any connection that has run an upgrade or maintenance script. Those "
+                    + "scripts run under a 30-minute per-statement ceiling of their own regardless of this value. "
+                    + "Applies after a service restart.",
+            IniStore = iniStore_
+         });
 
          Tab("Database").Cards.Add(database);
       }
@@ -2435,6 +2523,35 @@ namespace hMailServer.ControlPanel.Views
             IniStore = iniStore_
          });
          copies.Cards.Add(archive);
+
+         // The two disk-space keys govern the message-store volume, which is also
+         // what archiving fills, so they sit here rather than under Database.
+         var disk = Card("Disk space",
+            "What the server does as the message-store volume fills. Both values are absolute megabytes rather than "
+            + "percentages, because what decides whether the next message fits is how many bytes are left, not what "
+            + "fraction of the volume they are. Applies after a service restart.");
+         disk.Settings.Add(new IniNumber
+         {
+            Path = "DiskSpaceWarningThresholdMB",
+            Label = "Warn in the application log and Windows event log below this much free space (MB; 0 = never)",
+            Default = 1024,
+            MinimumValue = 0,
+            Blurb = "Where the administrator is told, well before anything is refused. 1024 MB is roughly fifty more "
+                    + "maximum-size messages.",
+            IniStore = iniStore_
+         });
+         disk.Settings.Add(new IniNumber
+         {
+            Path = "MinimumFreeDiskSpaceMB",
+            Label = "Refuse mail with a temporary error below this much free space (MB; 0 = never)",
+            Default = 100,
+            MinimumValue = 0,
+            Blurb = "Biased upwards on purpose: refusing early costs delivery latency and nothing else, because the "
+                    + "refusal is temporary and a sending server retries for days, while a volume that reaches zero "
+                    + "costs a database that will not open and a service that will not start.",
+            IniStore = iniStore_
+         });
+         copies.Cards.Add(disk);
 
          var script = Card("Scripting", "Runs event scripts (OnAcceptMessage, OnDeliveryStart...) from the Events folder. The script engine reloads when you save.");
          script.Settings.Add(new ComBool { Path = "Scripting.Enabled", Label = "Enable server-side event scripts" });
