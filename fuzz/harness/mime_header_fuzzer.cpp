@@ -1,4 +1,5 @@
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // libFuzzer target: the header parser on its own, in all three shapes
 // production calls it.
@@ -20,7 +21,6 @@
 // The seed corpus for this target is the header block of each real test message
 // (make-corpus.ps1 copies the bytes up to and including the first blank line -
 // verbatim, no rewriting), so the seeds are already valid folded headers.
-// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "stdafx.h"
 

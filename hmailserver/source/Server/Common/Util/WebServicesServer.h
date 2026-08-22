@@ -1,5 +1,6 @@
 // Copyright (c) 2026 hMailServer
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Public web services for mail domains:
 //
 //   - MTA-STS policy hosting (RFC 8461): serves
@@ -35,7 +36,6 @@
 // a static settings-and-logging function on purpose: Application::StartServers
 // calls it unconditionally, before and independently of any instance of this
 // class existing.
-// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

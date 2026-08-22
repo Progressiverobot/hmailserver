@@ -1,4 +1,5 @@
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // https://www.progressiverobot.com
 
 using System;
@@ -266,7 +267,6 @@ namespace RegressionTests.AntiSpam
       /// </summary>
       private const string SignedSeed =
             "DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=sender-dom.example.test; s=reportsel; h=from:to:subject:date; bh=UiW1Vq02S/LU/SLyPMpS2+090dMUxUOeE/rTgKpvR2E=; b=E2azn0KKCQj/gs1l8KO8dyBJndQbtqTT2XnB1I83hnsvTM5Sns7nESoLIEyg4wBH8otamGx0zhxmK2l2hT/wQc4tpPkcr5mcuzAXqX3wky62Jk/CpQBvRIFHmch2t2Z9lftVeHqzXxjub3X9R11ocr+lTnionM8fA+QlCOsv3JfoHxb/36O8gzfIeX/zOQgD2p7dy61EW/1QU6APPtwSaWYcEceHAgDM+ZOzInX8wonrinub3pKgJrng2gQXTzm1SPHekwLZUgKABoYSfCJzFKow8hamNziBKQQoKKuWsySgNWOl2w179/8I0exJ0wEhgTjDJ/DFLBpKDu8m39eCAQ==\r\n" +
-// SPDX-License-Identifier: AGPL-3.0-or-later
             "From: <user@sender-dom.example.test>\r\n" +
             "To: <seedrcpt@example.test>\r\n" +
             "Subject: dkim selector seed\r\n" +

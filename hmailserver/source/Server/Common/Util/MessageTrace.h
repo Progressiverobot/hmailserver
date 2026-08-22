@@ -1,4 +1,5 @@
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // A queryable per-message delivery trace.
 //
 // The question this exists for is "what happened to the message Jane sent at
@@ -26,7 +27,6 @@
 // this table stores sender and recipient addresses, so it is a record of who
 // corresponds with whom, retained. An administrator should switch that on
 // deliberately and choose how long it is kept.
-// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

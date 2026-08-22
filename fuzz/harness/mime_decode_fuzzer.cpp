@@ -1,4 +1,5 @@
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // libFuzzer target: the codecs, driven directly.
 //
@@ -26,7 +27,6 @@
 // decode with, the rest is the payload. The selector is part of the artifact
 // file, so a crash reproduces by replaying the file with no extra ceremony -
 // which is the only property of an input layout that really matters.
-// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "stdafx.h"
 

@@ -88,3 +88,7 @@ CLAUDE.md
 # stale and a fresh clone gives the .tlh and the .tlb near-identical mtimes.
 *.tlh
 *.tli
+
+# Python bytecode. The three .py files under build/ are imported by their own
+# dry-run tooling now and then, and the interpreter leaves this behind.
+__pycache__/

@@ -1,5 +1,6 @@
 // Copyright (c) 2026 hMailServer
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Outbound TLS policy support:
 //   - MTA-STS (RFC 8461): SMTP MTA Strict Transport Security
 //   - DANE TLSA lookups (RFC 6698 / RFC 7672) for outbound SMTP
@@ -43,7 +44,6 @@
 //
 // Setting DnssecValidationEnabled=0 reverts to opportunistic
 // (unvalidated) TLSA usage.
-// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

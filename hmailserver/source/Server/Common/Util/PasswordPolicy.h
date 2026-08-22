@@ -1,4 +1,5 @@
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Server-enforced password policy.
 //
 // Until now this server had opinions about passwords and enforced none of them:
@@ -25,7 +26,6 @@
 // clock - so the rules can be pinned by tests without a configured server, in
 // the same shape OAuth2TokenValidator::ValidateWithConfig uses for the same
 // reason.
-// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 
