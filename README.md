@@ -417,6 +417,43 @@ Administration and monitoring:
    MessageStoreFsync=0           ; force each received message to physical disk before it is acknowledged (1 = on)
    MessageStoreConsistencyCheck=0; periodically cross-check message rows against files on disk (1 = on, read-only)
                                  ; writes hMailServer_messagestore_consistency.report listing any affected messages
+   MinimumFreeDiskSpaceMB=100    ; free-space floor on the message-store volume, in megabytes. Below it the
+                                 ; server REFUSES mail with a temporary error rather than accept a message it
+                                 ; may not be able to write - a sending server retries for days, while a volume
+                                 ; that reaches zero costs a database that will not open and a service that
+                                 ; will not start, so the floor is biased upwards. 0 = off
+   DiskSpaceWarningThresholdMB=1024 ; where the administrator is TOLD, in the application log and the Windows
+                                 ; Application log, well before the floor is reached. Absolute rather than a
+                                 ; percentage: what decides whether the next message fits is how many bytes
+                                 ; are left, not what fraction of the volume they are. 0 = off
+   DatabaseStatementTimeout=30   ; seconds a single SQL statement may run before the backend abandons it
+                                 ; (0 = no limit). Honoured at connect time by MySQL/MariaDB and PostgreSQL;
+                                 ; MS SQL and SQL CE start at ADO's own 30 s and pick this value up on any
+                                 ; connection that has run an upgrade or maintenance script. Scripts
+                                 ; themselves run under a 30-minute per-statement ceiling regardless
+   IMAPExpungeRetentionRecords=5000 ; how many expunge records to keep for QRESYNC/CONDSTORE clients, which
+                                 ; use them to learn what vanished while they were away. Pruned to the newest
+                                 ; N twelve-hourly and once at service start; a client whose last sync is
+                                 ; older than the retained history gets a full resync, never a wrong one.
+                                 ; 0 = keep everything, which also defers the prune at the first start after
+                                 ; an upgrade on a long-lived installation
+   DmarcRptSchemaVersion=1       ; which spelling of the DMARC aggregate report this server SENDS: 1 = RFC 7489
+                                 ; Appendix C (what every report consumer deployed today parses), 2 = RFC 9990.
+                                 ; Anything else is reported as an error and treated as 1 - a typo must not
+                                 ; decide what goes on the wire
+   IndexerFullText=0             ; build a term index behind IMAP SEARCH BODY/TEXT. Off by default: it costs a
+                                 ; term table of a few kilobytes per message and a backfill pass over every
+                                 ; message already delivered, which is an administrator's decision and never an
+                                 ; upgrade's. Results are identical on and off - the index only narrows what the
+                                 ; substring scan reads. ALSO requires message indexing to be enabled in the
+                                 ; Control Panel ("Enable message indexing"); on its own this key indexes nothing
+   IndexerFullTextBatchSize=250  ; messages one backfill pass reads and tokenises before the cursor is saved
+                                 ; and the thread pauses; clamped to 1-100000
+   IndexerFullTextMinTokenLength=3 ; shortest search string the index will answer for; the stored floor is 3,
+                                 ; so lower values are clamped up and higher ones only send more searches to
+                                 ; the scan; clamped to 3-64
+   IndexerFullTextMaxTokensPerMessage=2048 ; distinct terms per message before it is marked always-scanned
+                                 ; instead of indexed; clamped to 64-1000000
    IMAPSearchTimeout=60          ; seconds one IMAP SEARCH may run before returning the matches found so far (0 = no limit)
    IMAPSearchMaxMegabytes=2048   ; message content one IMAP SEARCH may read and parse (0 = no limit)
                                  ; SEARCH BODY/TEXT reads every message in the mailbox, so these bound what a single
