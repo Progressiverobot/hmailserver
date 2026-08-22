@@ -55,12 +55,16 @@ already cost a release cycle or nearly shipped a defect.
    `hMailServer.exe` and `publish\hMailCP.dll`.
 
    If `hMailServer.idl` changed in this range, regenerate the checked-in COM
-   wrapper after the server build and before the tools build - the command is in
-   `source\Tools\Interop\README.md`. A stale wrapper still compiles, which is why
-   this is easy to skip: the tools use a small stable subset of the API, so nothing
-   fails, and the members added this release are simply invisible to them.
-   Regenerate AFTER any interface-ordering fix, never before, or the old vtable
-   layout is baked into the shipped wrapper permanently.
+   wrapper after the server build and before the tools build:
+   `buildegenerate-interop.ps1`. It runs TlbImp AND rewrites the wrapper's
+   SHA-256 and size in `hmailserver\docs	hird-party-binaries.json` - the
+   binary-provenance workflow fails when those disagree, and regenerating by
+   hand without the manifest did exactly that twice in one day. A stale wrapper
+   still compiles, which is why this is easy to skip: the tools use a small
+   stable subset of the API, so nothing fails, and the members added this
+   release are simply invisible to them. Regenerate AFTER any interface-ordering
+   fix, never before, or the old vtable layout is baked into the shipped wrapper
+   permanently.
 
 9. **Full regression suite on the stamped binary** — every test, nothing
    skipped. If *anything* changes after this run, the run is void: rebuild
@@ -73,8 +77,23 @@ already cost a release cycle or nearly shipped a defect.
 11. **Installer**: ISCC on `hMailServer64.iss`. Never run the installer on
    the dev machine — validation is the CI smoke-test workflow
    (`installer-smoke.yml`), which installs it on a throwaway runner.
-12. **Commit** (as chrisholloway5, no co-author trailers), **tag** `vX.Y.Z`,
-    push branch then tag. Then publish **as a draft first** - this repository has
+12. **Commit** (as chrisholloway5, no co-author trailers - history has been
+    rewritten once to remove them, and will be again). `master` is protected:
+    changes arrive by pull request, force-pushes and deletions are refused, and
+    the maintainer's bypass exists for emergencies, not for the release flow.
+    So push the working branch, open the PR and merge it with a rebase so the
+    history stays linear and the commits keep their own messages:
+
+    ```
+    git push origin server-fixes-wave
+    gh pr create --base master --head server-fixes-wave --fill
+    gh pr merge --rebase            # self-merge is allowed; no reviewer is required
+    git pull --ff-only origin master
+    ```
+
+    Then **tag** `vX.Y.Z` on master and push the tag (tags matching `v*` are
+    protected too: no deletion, no rewrite - a tag is spent once). Then publish
+    **as a draft first** - this repository has
     immutable releases enabled, so a published release refuses every further asset
     upload and would be stuck with whatever it was created with:
 

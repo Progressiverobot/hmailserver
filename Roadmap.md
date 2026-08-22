@@ -48,7 +48,7 @@ strong and where it is thin far more honestly than any prose summary.
 |---|--:|--:|--:|--:|
 | **Urgent — the OpenSSF gold badge** | | | | |
 | [What stands between here and gold](#what-stands-between-here-and-gold) | – | – | 9 | 3 |
-| [Housekeeping that fell out of the badge work](#housekeeping-that-fell-out-of-the-badge-work) | – | – | 4 | – |
+| [Housekeeping that fell out of the badge work](#housekeeping-that-fell-out-of-the-badge-work) | 1 | – | 2 | 1 |
 | [Dated items — the forcing functions](#dated-items--the-forcing-functions) | 2 | – | 4 | 1 |
 | [Defects found by the audit](#defects-found-by-the-audit) | 30 | – | – | – |
 | **The next generation** | | | | |
@@ -78,7 +78,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 8 | – | – | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 5 | 1 | 2 | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 6 | 2 | 1 | – |
-| **Total** | **729** | **13** | **70** | **18** |
+| **Total** | **730** | **13** | **68** | **19** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage, the administration surface and the core protocol layer are the
@@ -166,8 +166,8 @@ small change rather than a project.
 
 | | Item | Detail |
 |:-:|---|---|
-| ⬜ | **Interop manifest drift** | Regenerating `Interop.hMailServer.dll` after a COM API change without updating its SHA-256 in `hmailserver/docs/third-party-binaries.json` failed the binary-provenance check **twice on 21 Aug alone**. The regeneration step in `hmailserver/source/Tools/Interop/README.md` should rewrite its own manifest entry so the hash and the binary can never disagree. |
-| ⬜ | **Repository setting: Code quality** | The CI coverage upload returns 403 until *Code quality* is enabled in repository settings; `ci.yml` treats the failure as a warning meanwhile. **Do not simply enable it**: the same setting drives GitHub's managed buildless quality scan, which was switched off deliberately on 21 August after it produced 1,482 findings that ignored the repository's analysis configuration (see the commit *The Code quality page was a second scanner disagreeing with the first*). First establish whether the feature can be enabled for coverage upload alone — `PATCH /repos/{o}/{r}/code-quality/setup` with no languages — and only then remove `fail-on-error: false`. If it cannot, the build artifact is the coverage record and the warning stays. |
+| ✅ | **Interop manifest drift** | **Closed 22 August 2026.** Regenerating `Interop.hMailServer.dll` after a COM API change without updating its SHA-256 in `hmailserver/docs/third-party-binaries.json` failed the binary-provenance check twice on 21 August alone, after two different people had each done the first half correctly. Two steps that must always happen together are now one step: `build/regenerate-interop.ps1` runs TlbImp and rewrites the manifest entry's hash and size in place, refuses to run from a type library older than the IDL's last commit or its uncommitted edits (an mtime alone is not evidence - git bumps it on every checkout, which is how the first version of that guard refused a current library), and prefers the intermediate `.tlb` MIDL just wrote over a stale staged copy. `RELEASE.md` step 8 and `Interop/README.md` point at it. Verified by running it against a fresh Release build: manifest and disk agreed afterwards. |
+| ⏸️ | **Repository setting: Code quality** | **Tested 22 August 2026 and settled.** The CI coverage upload needs the *Code quality* repository setting, and with the setting configured and *no languages* the upload does succeed (`PATCH /repos/{o}/{r}/code-quality/setup`, `{"state":"configured","languages":[]}`; CI run 32552896421). But the setting being on at all re-exposes the 1,482 stale findings of the managed buildless scan that was switched off on 21 August for ignoring the repository's analysis configuration — and with no languages configured nothing ever re-scans them closed. There is no API to dismiss findings. So the setting stays off, the cobertura build artifact is the coverage record, and `fail-on-error: false` stays with the reasoning written beside it. Revisit only if GitHub adds per-rule filtering or a dismissal API to the feature. |
 | ⬜ | **Repository setting: automatic dependency submission** | GitHub's own NuGet submission job is red on every push because it restores Windows-targeting projects on a Linux runner. It duplicates what `sbom.yml` already submits. Turn it off under *Dependency graph*, or accept a permanent red X. |
 | ⬜ | **Organisation setting: require 2FA** | The maintainer account uses a passkey; the org-wide requirement is still off (the API refused it — it would eject any member without 2FA, and the org has a second, read-only member). Enable it in *Authentication security* once that member is confirmed enrolled. |
 
