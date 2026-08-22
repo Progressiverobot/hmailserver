@@ -8,6 +8,7 @@
 // a decision that, if got wrong, turns the fuzzer from a bug finder into a
 // generator of false positives - and a fuzzer that cries wolf gets switched off
 // within a week, which is the normal way this kind of work dies.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

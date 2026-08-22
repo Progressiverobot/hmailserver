@@ -26,6 +26,7 @@
 // decode with, the rest is the payload. The selector is part of the artifact
 // file, so a crash reproduces by replaying the file with no extra ceremony -
 // which is the only property of an input layout that really matters.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "stdafx.h"
 

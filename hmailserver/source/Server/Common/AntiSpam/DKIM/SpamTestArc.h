@@ -39,6 +39,7 @@
 // failure score alone typically reaches it - so an offset registered after
 // DMARC would be skipped in exactly the case it exists for. Running first,
 // the offset lands before the penalty and the pair cancels.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

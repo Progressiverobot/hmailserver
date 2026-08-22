@@ -22,6 +22,7 @@
 // github.io) separate registrants exactly the way ccTLD registries do, and
 // treating them as one organization would let any tenant DMARC-align as any
 // other.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

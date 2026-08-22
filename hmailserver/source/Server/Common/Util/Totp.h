@@ -25,6 +25,7 @@
 // time both arrive as parameters. That is what lets the whole of it be pinned by
 // tests against RFC 6238's published vectors, which is the only way to be sure a
 // TOTP implementation is right - "it works with my phone" tests the phone.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

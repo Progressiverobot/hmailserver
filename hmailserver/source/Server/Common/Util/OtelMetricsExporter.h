@@ -21,6 +21,7 @@
 // Follows the OtelTracer pattern: a Singleton with Start/Stop driven from
 // Application::StartServers, a worker std::thread, and the shared
 // OtelExportChannel transport.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

@@ -2,6 +2,7 @@
 // https://www.progressiverobot.com
 // OTLP metrics export from the shared ServerStatus counters. See
 // OtelMetricsExporter.h.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "StdAfx.h"
 

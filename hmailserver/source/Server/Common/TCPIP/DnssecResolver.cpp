@@ -7,6 +7,7 @@
 //     Insecure: DANE is simply not applied, mail still flows.
 //   - Received data that fails cryptographic validation is Bogus: the
 //     host is not used (RFC 7672 section 2.1.3).
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "StdAfx.h"
 

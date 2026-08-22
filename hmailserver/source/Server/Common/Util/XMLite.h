@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /*
 	License notice from http://www.codeproject.com/KB/recipes/xmlite.aspx
 	LicenseSometimes I get email about license of XMLite. You can use/modify/redistribute 

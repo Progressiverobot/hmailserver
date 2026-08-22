@@ -16,6 +16,7 @@
 // (OtelExportChannel) and the same batching shape as this class. W3C trace
 // context - accepting a caller's traceparent and emitting this server's own -
 // lives in OtelTraceContext.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

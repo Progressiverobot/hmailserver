@@ -21,6 +21,7 @@
 // full message - a privacy leak to whoever operates the ruf mailbox - and a
 // reporter that sends what Google and Microsoft will not is a liability,
 // not a feature.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

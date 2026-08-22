@@ -2,6 +2,7 @@
 // https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // Created 2005-07-21
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

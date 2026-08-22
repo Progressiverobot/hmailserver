@@ -31,6 +31,7 @@
 // bottom-up) where deletion is not. Delivery then reads the first traceparent
 // back out of the stored message file, so every delivery attempt - and every
 // downstream hop - joins the same trace.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

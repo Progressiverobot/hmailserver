@@ -23,6 +23,7 @@
 # than emitting a partial header, because a truncated table IS the vulnerability
 # this data exists to close: every suffix that fails to make it into the header is
 # a suffix whose registrants can forge each other under relaxed alignment.
+# SPDX-License-Identifier: AGPL-3.0-or-later
 
 [CmdletBinding()]
 param(

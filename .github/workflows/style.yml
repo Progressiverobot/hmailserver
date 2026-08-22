@@ -25,7 +25,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Check files against .editorconfig
-        uses: editorconfig-checker/action-editorconfig-checker@v2
+        uses: editorconfig-checker/action-editorconfig-checker@840e866d93b8e032123c23bac69dece044d4d84c # v2.2.0
+
+  license-headers:
+    name: SPDX identifier on every source file
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The same script that added the headers, in its report-only mode. A
+      # file added without one fails here with its name, and the fix is the
+      # script's other mode. Generated MIDL output and vendored code under
+      # libraries/ are excluded inside the script, with the reasons.
+      - name: Every source file carries a copyright line and an SPDX identifier
+        run: python3 build/add-license-headers.py --check

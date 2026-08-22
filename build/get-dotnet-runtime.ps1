@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # Downloads the .NET Desktop Runtime installer that the hMailServer installer
 # bundles for the Control Panel component. The file is not kept in the repository
 # (55+ MB, and .gitignore excludes the whole DotNet folder); run this once before

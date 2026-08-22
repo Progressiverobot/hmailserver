@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 """Injects test messages into the local Postfix (port 2525) with precisely
 controlled line endings, the way a misbehaving internet sender would.
 

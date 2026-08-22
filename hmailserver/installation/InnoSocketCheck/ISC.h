@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 // The following ifdef block is the standard way of creating macros which make exporting 
 // from a DLL simpler. All files within this DLL are compiled with the ISC_EXPORTS

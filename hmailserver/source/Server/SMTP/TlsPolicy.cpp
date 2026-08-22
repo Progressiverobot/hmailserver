@@ -1,6 +1,7 @@
 // Copyright (c) 2026 hMailServer
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // Outbound TLS policy support (MTA-STS, DANE TLSA). See TlsPolicy.h.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "stdafx.h"
 

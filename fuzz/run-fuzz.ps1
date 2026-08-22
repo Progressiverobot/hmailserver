@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # Runs one of the MIME fuzz targets, or replays a corpus, or reproduces a crash.
 #
 # The flags below are not decoration - each one is the difference between a run

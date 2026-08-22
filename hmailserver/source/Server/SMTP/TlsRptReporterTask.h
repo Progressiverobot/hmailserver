@@ -8,6 +8,7 @@
 // constructor says so in the application log - once per service start, because
 // the task is constructed once - since the alternative is an administrator
 // waiting indefinitely for reports that were never going to be sent.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

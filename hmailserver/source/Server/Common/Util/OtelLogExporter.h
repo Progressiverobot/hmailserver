@@ -17,6 +17,7 @@
 // Follows the OtelTracer pattern: a Singleton with Start/Stop driven from
 // Application::StartServers, a bounded drop-oldest queue, a worker std::thread
 // batching to the shared OtelExportChannel transport.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # Builds and publishes the .NET tools the installer ships: the database setup
 # tools into their per-project publish folders (merged into {app}\Bin by the
 # installer) plus DataDirectorySynchronizer and ImportTool. Run before

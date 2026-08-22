@@ -2,6 +2,7 @@
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // In-memory store of outbound TLS session results, aggregated per UTC day
 // and recipient domain. Used to generate SMTP TLS reports (RFC 8460).
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

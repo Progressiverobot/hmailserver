@@ -53,6 +53,7 @@
 // would also skip the per-IP auto-ban accounting that follows this class on the
 // failed-logon path. Keep it that way when editing; these members allocate.
 // (RateLimiter carries the same barrier for the same reason.)
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

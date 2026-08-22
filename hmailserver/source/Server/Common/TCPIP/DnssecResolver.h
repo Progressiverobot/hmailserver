@@ -12,6 +12,7 @@
 // Supported algorithms: RSA/SHA-256 (8), RSA/SHA-512 (10),
 // ECDSA P-256/SHA-256 (13), ECDSA P-384/SHA-384 (14), Ed25519 (15).
 // Supported DS digests: SHA-256 (2), SHA-384 (4).
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

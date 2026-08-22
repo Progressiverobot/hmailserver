@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 <#
    Applies the pending schema upgrade scripts to the regression bench's
    database, through the running hMailServer service's COM API.

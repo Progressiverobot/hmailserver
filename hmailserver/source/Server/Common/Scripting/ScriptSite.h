@@ -29,6 +29,7 @@
 //    would be appreciated, but is not required.
 //
 /////////////////////////////////////////////////////////////////////////////
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

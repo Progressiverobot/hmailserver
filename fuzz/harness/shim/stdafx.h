@@ -42,6 +42,7 @@
 // program* than the one that ships, because half the string handling would
 // change width. build-fuzz.ps1 passes them on the command line; they are
 // asserted here so a hand-run clang-cl cannot silently get it wrong.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

@@ -10,6 +10,7 @@
 // The same chain, read inbound, is what lets THIS server recover the
 // authentication results a forwarder observed before it broke SPF/DKIM for
 // us - see SpamTestArc. Both directions share the chain validation here.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

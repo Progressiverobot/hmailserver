@@ -4,6 +4,7 @@
 // the trust model and the reasons behind each refusal below.
 //
 // Everything parsed in this file arrives in an unauthenticated message.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "StdAfx.h"
 

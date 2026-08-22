@@ -6,6 +6,7 @@
 // Carries the authentication verdicts for one inbound message from the spam tests
 // that produced them to the point where the trace headers are written. Nothing
 // here touches the disk - see AuthenticationResultsWriter.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

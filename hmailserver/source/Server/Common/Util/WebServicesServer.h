@@ -35,6 +35,7 @@
 // a static settings-and-logging function on purpose: Application::StartServers
 // calls it unconditionally, before and independently of any instance of this
 // class existing.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

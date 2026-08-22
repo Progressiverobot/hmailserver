@@ -1,4 +1,7 @@
-﻿# Verifies this machine is in the known-good state for running the hMailServer
+﻿# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# Verifies this machine is in the known-good state for running the hMailServer
 # regression suite, and names the exact fault when it is not. Every check here
 # corresponds to a failure mode that has actually burned a run:
 #   - the service pointing at a stray installer's copy instead of the repo build

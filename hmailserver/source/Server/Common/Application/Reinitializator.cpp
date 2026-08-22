@@ -4,6 +4,7 @@
 // This class is a bit whacky. The single purpose of it is to
 // reintialize the entire server. Sometimes, for example when
 // doing a restore, this needs to be done asynchroniously.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "StdAfx.h"
 #include ".\reinitializator.h"

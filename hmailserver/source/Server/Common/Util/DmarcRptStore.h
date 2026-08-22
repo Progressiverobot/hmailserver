@@ -7,6 +7,7 @@
 // The sibling of TlsRptStore, and deliberately shaped like it: a day is a
 // map of buckets, a completed day is one before today, and popping a day is
 // destructive - the reporter owns whatever it pops.
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 
