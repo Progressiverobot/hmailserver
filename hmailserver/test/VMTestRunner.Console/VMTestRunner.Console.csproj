@@ -42,7 +42,7 @@
       <Private>True</Private>
     </Reference>
     <Reference Include="NLog, Version=6.0.0.0, Culture=neutral, PublicKeyToken=5120e14c03d0593c">
-      <HintPath>..\packages\NLog.6.1.4\lib\net46\NLog.dll</HintPath>
+      <HintPath>..\packages\NLog.6.2.0\lib\net46\NLog.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="System" />
