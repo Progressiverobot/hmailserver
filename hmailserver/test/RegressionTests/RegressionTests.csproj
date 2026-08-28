@@ -62,8 +62,8 @@
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Azure.Core, Version=1.61.0.0, Culture=neutral, PublicKeyToken=92742159e12e44c8">
-      <HintPath>..\packages\Azure.Core.1.61.0\lib\net472\Azure.Core.dll</HintPath>
+    <Reference Include="Azure.Core, Version=1.62.0.0, Culture=neutral, PublicKeyToken=92742159e12e44c8">
+      <HintPath>..\packages\Azure.Core.1.62.0\lib\net472\Azure.Core.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Azure.Monitor.OpenTelemetry.Exporter, Version=1.8.3.0, Culture=neutral, PublicKeyToken=92742159e12e44c8">
@@ -138,12 +138,12 @@
       <HintPath>..\packages\Microsoft.Extensions.Primitives.10.0.11\lib\net462\Microsoft.Extensions.Primitives.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="Microsoft.Identity.Client, Version=4.87.0.0, Culture=neutral, PublicKeyToken=0a613f4dd989e8ae">
-      <HintPath>..\packages\Microsoft.Identity.Client.4.87.0\lib\net472\Microsoft.Identity.Client.dll</HintPath>
+    <Reference Include="Microsoft.Identity.Client, Version=4.88.0.0, Culture=neutral, PublicKeyToken=0a613f4dd989e8ae">
+      <HintPath>..\packages\Microsoft.Identity.Client.4.88.0\lib\net472\Microsoft.Identity.Client.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="Microsoft.Identity.Client.Extensions.Msal, Version=4.87.0.0, Culture=neutral, PublicKeyToken=0a613f4dd989e8ae">
-      <HintPath>..\packages\Microsoft.Identity.Client.Extensions.Msal.4.87.0\lib\netstandard2.0\Microsoft.Identity.Client.Extensions.Msal.dll</HintPath>
+    <Reference Include="Microsoft.Identity.Client.Extensions.Msal, Version=4.88.0.0, Culture=neutral, PublicKeyToken=0a613f4dd989e8ae">
+      <HintPath>..\packages\Microsoft.Identity.Client.Extensions.Msal.4.88.0\lib\netstandard2.0\Microsoft.Identity.Client.Extensions.Msal.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Microsoft.IdentityModel.Abstractions, Version=8.22.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35">
@@ -192,19 +192,19 @@
       <Private>True</Private>
     </Reference>
     <Reference Include="OpenTelemetry, Version=1.0.0.0, Culture=neutral, PublicKeyToken=7bd6737fe5b67e3c">
-      <HintPath>..\packages\OpenTelemetry.1.17.0\lib\net462\OpenTelemetry.dll</HintPath>
+      <HintPath>..\packages\OpenTelemetry.1.18.0\lib\net462\OpenTelemetry.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="OpenTelemetry.Api, Version=1.0.0.0, Culture=neutral, PublicKeyToken=7bd6737fe5b67e3c">
-      <HintPath>..\packages\OpenTelemetry.Api.1.17.0\lib\net462\OpenTelemetry.Api.dll</HintPath>
+      <HintPath>..\packages\OpenTelemetry.Api.1.18.0\lib\net462\OpenTelemetry.Api.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="OpenTelemetry.Api.ProviderBuilderExtensions, Version=1.0.0.0, Culture=neutral, PublicKeyToken=7bd6737fe5b67e3c">
-      <HintPath>..\packages\OpenTelemetry.Api.ProviderBuilderExtensions.1.17.0\lib\net462\OpenTelemetry.Api.ProviderBuilderExtensions.dll</HintPath>
+      <HintPath>..\packages\OpenTelemetry.Api.ProviderBuilderExtensions.1.18.0\lib\net462\OpenTelemetry.Api.ProviderBuilderExtensions.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="OpenTelemetry.Extensions.Hosting, Version=1.0.0.0, Culture=neutral, PublicKeyToken=7bd6737fe5b67e3c">
-      <HintPath>..\packages\OpenTelemetry.Extensions.Hosting.1.17.0\lib\net462\OpenTelemetry.Extensions.Hosting.dll</HintPath>
+      <HintPath>..\packages\OpenTelemetry.Extensions.Hosting.1.18.0\lib\net462\OpenTelemetry.Extensions.Hosting.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="OpenTelemetry.PersistentStorage.Abstractions, Version=1.1.1.1228, Culture=neutral, PublicKeyToken=7bd6737fe5b67e3c">
