@@ -7,6 +7,7 @@ using System.Linq;
 using hMailServer;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
+using RegressionTests.Infrastructure;
 using RegressionTests.Shared;
 
 namespace RegressionTests.IMAP
@@ -727,6 +728,129 @@ namespace RegressionTests.IMAP
          Assert.IsTrue(createResult.StartsWith("A01 NO"), createResult);
          StringAssert.Contains("[USEATTR]", createResult);
          Assert.IsFalse(response.Contains("\\Trash"), response);
+      }
+
+      // ---- Default special-use folders at account creation (upstream #550) ----
+      //
+      // TestSetup turns the setting off before every test, so each of these turns it
+      // on for itself and does not need to turn it off again.
+
+      private static readonly string[] DefaultFolderNames = {"Drafts", "Sent", "Trash", "Junk"};
+
+      [Test]
+      [Description("With the setting on, a new account gets Drafts, Sent, Trash and Junk, each designated for RFC 6154")]
+      public void DefaultSpecialUseFoldersAreCreatedWhenEnabled()
+      {
+         _settings.CreateDefaultSpecialUseFoldersEnabled = true;
+
+         var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "su30@example.test", "test");
+
+         // Seen through COM: exactly one row per folder, plus the inbox.
+         foreach (var name in DefaultFolderNames)
+            Assert.AreEqual(1, CountTopLevelFoldersNamed(account.Address, name), name);
+         Assert.AreEqual(5, account.IMAPFolders.Count);
+
+         // Seen through the protocol: each folder is listed once, with its attribute on
+         // its own line. Fails against the build before this one because the folders do
+         // not exist.
+         var simulator = LogonAs(account.Address);
+         var response = simulator.SendSingleCommand("A01 LIST \"\" \"*\"");
+         simulator.Disconnect();
+
+         StringAssert.Contains("\\Drafts", RequireListLine(response, "Drafts"));
+         StringAssert.Contains("\\Sent", RequireListLine(response, "Sent"));
+         StringAssert.Contains("\\Trash", RequireListLine(response, "Trash"));
+         StringAssert.Contains("\\Junk", RequireListLine(response, "Junk"));
+         Assert.AreEqual(1, CountOccurrences(response, "\\Sent"), response);
+      }
+
+      [Test]
+      [Description("The negative control: with the setting off, which is the default, a new account has an inbox and nothing else")]
+      public void DefaultSpecialUseFoldersAreNotCreatedWhenDisabled()
+      {
+         Assert.IsFalse(_settings.CreateDefaultSpecialUseFoldersEnabled);
+
+         var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "su31@example.test", "test");
+
+         Assert.AreEqual(1, account.IMAPFolders.Count);
+         Assert.AreEqual("INBOX", account.IMAPFolders[0].Name);
+      }
+
+      [Test]
+      [Description("Emptying an account (Account.DeleteMessages) empties the designated folders and keeps them, the way it keeps the inbox")]
+      public void EmptyingAnAccountKeepsItsDesignatedFolders()
+      {
+         _settings.CreateDefaultSpecialUseFoldersEnabled = true;
+
+         var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "su32@example.test", "test");
+
+         // Something to empty, in the inbox and in a designated folder: a plain folder
+         // beside them is the control that the emptying still deletes what it used to.
+         SmtpClientSimulator.StaticSend("sender@example.test", account.Address, "Test", "Test");
+         Pop3ClientSimulator.AssertMessageCount(account.Address, "test", 1);
+
+         var simulator = LogonAs(account.Address);
+         Assert.IsTrue(simulator.SendSingleCommand("A00 SELECT INBOX").Contains("A00 OK"));
+         Assert.IsTrue(simulator.SendSingleCommand("A01 COPY 1 \"Sent\"").Contains("A01 OK"));
+         Assert.IsTrue(simulator.SendSingleCommand("A02 CREATE \"Projects\"").Contains("A02 OK"));
+         simulator.Disconnect();
+
+         account.DeleteMessages();
+
+         // The rows, read back after the cache is gone so that they mean something.
+         DropFolderCache();
+         foreach (var name in DefaultFolderNames)
+            Assert.AreEqual(1, CountTopLevelFoldersNamed(account.Address, name), name);
+         Assert.AreEqual(0, CountTopLevelFoldersNamed(account.Address, "Projects"));
+         Assert.AreEqual(1, CountTopLevelFoldersNamed(account.Address, "INBOX"));
+
+         // And they are empty, but still designated.
+         simulator = LogonAs(account.Address);
+         StringAssert.Contains("* 0 EXISTS", simulator.SendSingleCommand("A03 SELECT \"Sent\""));
+         StringAssert.Contains("* 0 EXISTS", simulator.SendSingleCommand("A04 SELECT INBOX"));
+         var response = simulator.SendSingleCommand("A05 LIST \"\" \"*\"");
+         simulator.Disconnect();
+
+         StringAssert.Contains("\\Sent", RequireListLine(response, "Sent"));
+         Assert.IsNull(ListLineFor(response, "Projects"), response);
+      }
+
+      [Test]
+      [Description("A designated folder can still be deleted by the client: keeping them is what emptying an account does, not what DELETE does")]
+      public void ImapDeleteStillRemovesADesignatedFolder()
+      {
+         _settings.CreateDefaultSpecialUseFoldersEnabled = true;
+
+         var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "su33@example.test", "test");
+
+         var simulator = LogonAs(account.Address);
+         var deleteResult = simulator.SendSingleCommand("A01 DELETE \"Trash\"");
+         var response = simulator.SendSingleCommand("A02 LIST \"\" \"*\"");
+         simulator.Disconnect();
+
+         Assert.IsTrue(deleteResult.StartsWith("A01 OK"), deleteResult);
+         Assert.IsNull(ListLineFor(response, "Trash"), response);
+
+         DropFolderCache();
+         Assert.AreEqual(0, CountTopLevelFoldersNamed(account.Address, "Trash"));
+      }
+
+      [Test]
+      [Description("Deleting the account takes the designated folders with it: nothing is kept, nothing is reported as left behind")]
+      public void DeletingAnAccountRemovesItsDesignatedFolders()
+      {
+         _settings.CreateDefaultSpecialUseFoldersEnabled = true;
+
+         var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "su34@example.test", "test");
+         Assert.AreEqual(5, account.IMAPFolders.Count);
+
+         LogHandler.DeleteErrorLog();
+         account.Delete();
+
+         // PersistentAccount::DeleteObject reports, once, anything the cascade could not
+         // remove - so a kept folder row would show up here as an orphan report.
+         CustomAsserts.AssertNoReportedError();
+         Assert.AreEqual(0, _domain.Accounts.Count);
       }
    }
 }

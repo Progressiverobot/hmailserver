@@ -275,6 +275,7 @@ namespace hMailServer.ControlPanel.Services
          new SettingEntry("Allow plain-text authentication (AUTH PLAIN/LOGIN)", "AllowSMTPAuthPlain", "protocols"),
          new SettingEntry("Allow SASL initial client response", "IMAPSASLInitialResponseEnabled", "protocols"),
          new SettingEntry("Allow SASL PLAIN authentication", "IMAPSASLPlainEnabled", "protocols"),
+         new SettingEntry("Create Drafts, Sent, Trash and Junk for new accounts", "CreateDefaultSpecialUseFoldersEnabled", "protocols"),
          new SettingEntry("Delete archived messages after (days; 0 = keep for ever)", "ArchiveRetentionDays", "protocols"),
          new SettingEntry("Disconnect clients sending too many invalid commands", "DisconnectInvalidClients", "protocols"),
          new SettingEntry("Expose per-domain message counters on /metrics", "MetricsPerDomainEnabled", "protocols"),

@@ -247,6 +247,11 @@ namespace RegressionTests.Shared
          if (!_settings.IMAPACLEnabled)
             _settings.IMAPACLEnabled = true;
 
+         // Off is the product default, and most of the suite counts an account's
+         // folders on the assumption that a new account has an inbox and nothing else.
+         if (_settings.CreateDefaultSpecialUseFoldersEnabled)
+            _settings.CreateDefaultSpecialUseFoldersEnabled = false;
+
          if (_settings.MaxMessageSize != 20480)
             _settings.MaxMessageSize = 20480;
 

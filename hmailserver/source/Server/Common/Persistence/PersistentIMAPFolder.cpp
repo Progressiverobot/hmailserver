@@ -1,4 +1,4 @@
-// Copyright (c) 2010 Martin Knafve / hMailServer.com.  
+// Copyright (c) 2010 Martin Knafve / hMailServer.com.
 // https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -38,12 +38,31 @@ namespace HM
    bool
    PersistentIMAPFolder::DeleteByAccount(__int64 iAccountID)
    {
+      return DeleteByAccount(iAccountID, false);
+   }
+
+   bool
+   PersistentIMAPFolder::DeleteByAccount(__int64 iAccountID, bool forceDelete)
+   {
       if (iAccountID <= 0)
          return false;
 
       IMAPFolders accountFolders (iAccountID, -1);
       accountFolders.Refresh();
-      return accountFolders.DeleteAll();
+
+      // Walked explicitly rather than through Collection::DeleteAll, which knows
+      // nothing of forceDelete and would keep the inbox even when the account itself
+      // is going. This local tree is discarded afterwards, so what the walk leaves in
+      // it does not matter; the callers uncache the account's folders.
+      std::vector<std::shared_ptr<IMAPFolder> > &folders = accountFolders.GetVector();
+      for (std::shared_ptr<IMAPFolder> folder : folders)
+      {
+         bool kept = false;
+         if (!DeleteObject_(folder, forceDelete, !forceDelete, kept))
+            return false;
+      }
+
+      return true;
    }
 
    bool
@@ -61,12 +80,32 @@ namespace HM
    bool
    PersistentIMAPFolder::DeleteObject(std::shared_ptr<IMAPFolder> pFolder, bool forceDelete)
    {
+      bool kept = false;
+      return DeleteObject_(pFolder, forceDelete, false, kept);
+   }
+
+   bool
+   PersistentIMAPFolder::DeleteObject_(std::shared_ptr<IMAPFolder> pFolder, bool forceDelete, bool keepSpecialUse, bool &kept)
+   {
+      kept = false;
+
       if (pFolder->GetID() <= 0)
          return false;
-      
-      // Delete sub folders first...
-      if (!pFolder->GetSubFolders()->DeleteAll())
-         return false;
+
+      // Delete sub folders first. Walked here rather than through the collection's
+      // DeleteAll so that forceDelete and keepSpecialUse reach nested folders, and so
+      // that a kept subfolder can keep its parent: a designated folder two levels
+      // down whose parent row was deleted would be an orphan nothing could reach.
+      bool subfolderKept = false;
+      std::vector<std::shared_ptr<IMAPFolder> > &subFolders = pFolder->GetSubFolders()->GetVector();
+      for (std::shared_ptr<IMAPFolder> subFolder : subFolders)
+      {
+         bool thisSubfolderKept = false;
+         if (!DeleteObject_(subFolder, forceDelete, keepSpecialUse, thisSubfolderKept))
+            return false;
+
+         subfolderKept = subfolderKept || thisSubfolderKept;
+      }
 
       // We must delete all email in this folder.
       pFolder->GetMessages()->Refresh(false);
@@ -78,7 +117,7 @@ namespace HM
 
       auto messages = MessagesContainer::Instance()->GetMessages(pFolder->GetAccountID(), pFolder->GetID());
       messages->DeleteMessages(filter);
-            
+
       // The folder's stored ACL rows, loaded explicitly. IMAPFolder::
       // GetPermissions() returns an UNLOADED collection for account folders
       // (its comment says account folders never have permissions set, which
@@ -92,7 +131,10 @@ namespace HM
          return false;
 
       bool isInbox = pFolder->GetParentFolderID() == -1 && pFolder->GetFolderName().CompareNoCase(_T("Inbox")) == 0;
-      bool deleteActualFolder = forceDelete || !isInbox;
+      bool isDesignated = keepSpecialUse && pFolder->GetSpecialUseFlags() != 0;
+      bool deleteActualFolder = forceDelete || !(isInbox || isDesignated || subfolderKept);
+
+      kept = !deleteActualFolder;
 
       if (deleteActualFolder)
       {
@@ -134,11 +176,11 @@ namespace HM
       bool bNewObject = true;
       if (pFolder->GetID())
          bNewObject = false;
-      
+
       SQLStatement oStatement;
-      
+
       oStatement.SetTable("hm_imapfolders");
-      
+
       if (bNewObject)
       {
          oStatement.SetStatementType(SQLStatement::STInsert);
@@ -187,7 +229,7 @@ namespace HM
       oStatement.AddColumn("foldername", pFolder->GetFolderName());
       oStatement.AddColumn("folderissubscribed", pFolder->GetIsSubscribed() ? 1 : 0);
 
-      
+
       __int64 iDBID = 0;
       bool bRetVal = Application::Instance()->GetDBManager()->Execute(oStatement, bNewObject ? &iDBID : 0);
       if (bRetVal && bNewObject)
@@ -199,7 +241,7 @@ namespace HM
       return bRetVal;
    }
 
-   __int64 
+   __int64
    PersistentIMAPFolder::GetUserInboxFolder(__int64 accountID)
    {
       SQLCommand command("SELECT folderid FROM hm_imapfolders WHERE folderaccountid = @FOLDERACCOUNTID and folderparentid = -1 and foldername = 'INBOX'");
@@ -220,7 +262,7 @@ namespace HM
    }
 
 
-   bool 
+   bool
    PersistentIMAPFolder::GetExistsFolderContainingCharacter(String theChar)
    {
       theChar = SQLStatement::Escape(theChar);
@@ -236,7 +278,7 @@ namespace HM
       return count > 0;
    }
 
-   unsigned int 
+   unsigned int
    PersistentIMAPFolder::GetCurrentUID_(__int64 folderID)
    {
       if (folderID == 0)
@@ -269,7 +311,7 @@ namespace HM
       return lastUID;
    }
 
-   bool 
+   bool
    PersistentIMAPFolder::IncreaseCurrentUID_(__int64 folderID)
    {
       SQLCommand command("UPDATE hm_imapfolders SET foldercurrentuid = foldercurrentuid + 1 WHERE folderid = @FOLDERID");
@@ -278,7 +320,7 @@ namespace HM
       return Application::Instance()->GetDBManager()->Execute(command);
    }
 
-   unsigned int 
+   unsigned int
    PersistentIMAPFolder::GetUniqueMessageID(__int64 accountID, __int64 folderID)
    {
       if (folderID == 0)
@@ -309,7 +351,7 @@ namespace HM
       return newUID;
    }
 
-   bool 
+   bool
    PersistentIMAPFolder::IncreaseCurrentModSeq_(__int64 folderID)
    {
       SQLCommand command("UPDATE hm_imapfolders SET foldercurrentmodseq = foldercurrentmodseq + 1 WHERE folderid = @FOLDERID");

@@ -27,6 +27,8 @@
 #include "../BO/Rules.h"
 #include "../BO/IMAPFolder.h"
 #include "../BO/IMAPFolders.h"
+#include "../Application/Configuration.h"
+#include "../../IMAP/IMAPSpecialUse.h"
 
 #include "NameChanger.h"
 
@@ -88,13 +90,13 @@ namespace HM
       if (!DeleteMessages(pAccount))
          orphans.push_back(_T("its messages"));
 
-      // Force delete the inbox as well. DeleteMessages above does not delete it.
-      std::shared_ptr<IMAPFolder> inbox = pAccount->GetFolders()->GetFolderByName("Inbox");
-      if (inbox)
-      {
-         if (!PersistentIMAPFolder::DeleteObject(inbox, true))
-            orphans.push_back(_T("its inbox"));
-      }
+      // DeleteMessages above empties the folders it keeps - the inbox, and any folder
+      // carrying a special-use designation - rather than deleting them, because those
+      // are expected to outlive an emptied account. This account is going, so they go
+      // with it. Read back from the database rather than from the account object,
+      // whose folder tree DeleteMessages has just uncached.
+      if (!PersistentIMAPFolder::DeleteByAccount(iID, true))
+         orphans.push_back(_T("its inbox or special-use folders"));
 
       if (!pAccount->GetRules()->DeleteAll())
          orphans.push_back(_T("its rules"));
@@ -520,6 +522,10 @@ namespace HM
 
                bRetVal = false;
             }
+            else if (Configuration::Instance()->GetCreateDefaultSpecialUseFolders())
+            {
+               CreateDefaultSpecialUseFolders_(*pAccount);
+            }
          }
       }
 
@@ -568,6 +574,47 @@ namespace HM
 
       return iSize;
       
+   }
+
+   void
+   PersistentAccount::CreateDefaultSpecialUseFolders_(const Account &account)
+   {
+      // The English names are the ones every major client creates for itself, and
+      // the ones IMAPSpecialUse's name table already maps - so an account that had
+      // these created by an older client looks the same as one that got them here.
+      // The designation is stored explicitly all the same: the name guess is a
+      // fallback for folders that were never designated, and a client that renames
+      // "Sent" to "Enviados" must keep its \Sent.
+      struct DefaultFolder
+      {
+         const TCHAR *name;
+         int designation;
+      };
+
+      const DefaultFolder defaultFolders[] =
+      {
+         { _T("Drafts"), IMAPSpecialUse::DesignationDrafts },
+         { _T("Sent"), IMAPSpecialUse::DesignationSent },
+         { _T("Trash"), IMAPSpecialUse::DesignationTrash },
+         { _T("Junk"), IMAPSpecialUse::DesignationJunk },
+      };
+
+      for (const DefaultFolder &defaultFolder : defaultFolders)
+      {
+         std::shared_ptr<IMAPFolder> folder = std::shared_ptr<IMAPFolder>(new IMAPFolder(account.GetID(), -1));
+         folder->SetFolderName(defaultFolder.name);
+         folder->SetIsSubscribed(true);
+
+         // Two writes, on purpose: SaveObject inserts the row and hands back its id,
+         // and StoreSpecialUseFlags is the only path that persists a designation (see
+         // IMAPFolder.h for why the whole-row save must not carry it).
+         if (!PersistentIMAPFolder::SaveObject(folder) || !folder->StoreSpecialUseFlags(defaultFolder.designation))
+         {
+            ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5560, "PersistentAccount::CreateDefaultSpecialUseFolders_",
+               Formatter::Format("The default folder {0} could not be created for account {1}. The account exists and has an inbox; the folder can be created by the client or by hand.",
+                  String(defaultFolder.name), account.GetAddress()));
+         }
+      }
    }
 
    bool

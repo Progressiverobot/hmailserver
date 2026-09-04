@@ -166,6 +166,9 @@ namespace HM
       bool GetIPv6Preferred();
       void SetIPv6Preferred(bool enabled);
 
+      bool GetCreateDefaultSpecialUseFolders();
+      void SetCreateDefaultSpecialUseFolders(bool enabled);
+
       int GetCrashSimulationMode() const;
       void SetCrashSimulationMode(int mode);
 
