@@ -340,6 +340,57 @@ namespace RegressionTests.SMTP
       }
 
       [Test]
+      [Category("SMTP")]
+      [Description("A missing Message-ID is supplied for an authenticated sender: this server is the message's submission server (RFC 6409).")]
+      public void TestMessageIDAddedForAuthenticatedSender()
+      {
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "test@example.test", "test");
+
+         var client = new SmtpClientSimulator();
+         client.Send(false, "test@example.test", "test", "test@example.test", "test@example.test", "Test subject", "Test body", out var errorMessage);
+         Assert.IsEmpty(errorMessage);
+
+         var test = Pop3ClientSimulator.AssertGetFirstMessageText("test@example.test", "test");
+
+         Assert.IsTrue(test.Contains("Message-ID: <"), test);
+      }
+
+      [Test]
+      [Category("SMTP")]
+      [Description("Upstream #536: a missing Message-ID is also supplied for an unauthenticated sender that a range allows to send as one of our domains - the server itself under the default ranges - since this server is the submission server for it too.")]
+      public void TestMessageIDAddedForLocalSenderNotRequiredToAuthenticate()
+      {
+         // The "My computer" range lets the local computer send as one of our domains
+         // without authenticating. Web sites, scripts and the COM API rely on this.
+         var range = SingletonProvider<TestSetup>.Instance.GetApp().Settings.SecurityRanges.get_ItemByName("My computer");
+         Assert.IsFalse(range.RequireSMTPAuthLocalToLocal);
+
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "test@example.test", "test");
+
+         SmtpClientSimulator.StaticSend("test@example.test", "test@example.test", "Test subject", "Test body");
+
+         var test = Pop3ClientSimulator.AssertGetFirstMessageText("test@example.test", "test");
+
+         Assert.IsTrue(test.Contains("Message-ID: <"), test);
+      }
+
+      [Test]
+      [Category("SMTP")]
+      [Description("Upstream #536: a missing Message-ID is NOT supplied for a relayed message, since that hides from spam filters and rules downstream that the original had none.")]
+      public void TestMessageIDNotAddedForRelayedMessage()
+      {
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "test@example.test", "test");
+
+         // The sender is not one of our domains and does not authenticate, so this
+         // server is relaying rather than submitting.
+         SmtpClientSimulator.StaticSend("someone@example.com", "test@example.test", "Test subject", "Test body");
+
+         var test = Pop3ClientSimulator.AssertGetFirstMessageText("test@example.test", "test");
+
+         Assert.IsFalse(test.Contains("Message-ID"), test);
+      }
+
+      [Test]
       public void TestEHLOKeywords()
       {
          var application = SingletonProvider<TestSetup>.Instance.GetApp();

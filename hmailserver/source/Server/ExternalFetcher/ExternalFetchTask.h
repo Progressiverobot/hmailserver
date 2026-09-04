@@ -6,6 +6,7 @@
 #pragma once
 
 #include "..\Common\Threading\Task.h"
+#include ".\FetchAccountLock.h"
 
 namespace HM
 {
@@ -22,5 +23,10 @@ namespace HM
    private:
 
       std::shared_ptr<FetchAccount> fetch_account_;
+
+      // Declared last, so that the account stays locked until everything else the
+      // task owns has been destroyed. See FetchAccountLock.h for why the task, and
+      // not the manager, holds the lock.
+      FetchAccountLock lock_;
    };
 }

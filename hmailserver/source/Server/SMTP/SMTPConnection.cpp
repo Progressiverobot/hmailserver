@@ -94,6 +94,7 @@ namespace HM
       rejected_by_delayed_grey_listing_(false),
       current_state_(INITIAL),
       trace_headers_written_(true),
+      message_submission_(false),
       requestedAuthenticationType_(AUTH_NONE),
       max_message_size_kb_(0),
       cur_no_of_rcptto_(0),
@@ -1295,6 +1296,14 @@ namespace HM
          return;
       }
 
+      // This server is the submission server (RFC 6409) for the message if the client
+      // has authenticated, or if it sends as one of our own domains from a range that
+      // does not require authentication to do so - by default, only the server itself.
+      // For everyone else it is a relay, and a relay adds trace fields only. Decided
+      // here because this is where that determination is already made. Upstream #552.
+      if (isAuthenticated_ || (localSender && !authenticationRequired))
+         message_submission_ = true;
+
       // RFC 3030 section 4: a BINARYMIME message must not be sent to a server that
       // has not advertised BINARYMIME, and this server's delivery client cannot
       // send one to any server - it transmits via DATA only, which cannot carry
@@ -1537,7 +1546,7 @@ namespace HM
       {
          std::shared_ptr<MimeHeader> original_headers = Utilities::GetMimeHeader(transmission_buffer_->GetBuffer()->GetBuffer(), transmission_buffer_->GetBuffer()->GetSize());
 
-         SMTPMessageHeaderCreator header_creator(username_, GetIPAddressString(), isAuthenticated_, helo_host_, original_headers, current_message_, GetSessionID());
+         SMTPMessageHeaderCreator header_creator(username_, GetIPAddressString(), isAuthenticated_, message_submission_, helo_host_, original_headers, current_message_, GetSessionID());
 
          header_creator.SetPtrHost(GetPtrRecordHost_());
 
@@ -2407,6 +2416,8 @@ namespace HM
       }
 
       rejected_by_delayed_grey_listing_ = false;
+
+      message_submission_ = false;
 
       sender_domain_.reset();
       sender_account_.reset();

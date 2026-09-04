@@ -119,18 +119,47 @@ public:
    {
       if(pase==NULL)
          return E_POINTER;
-      EXCEPINFO ei;
-      HR(pase->GetExceptionInfo(&ei));
-      if(ei.pfnDeferredFillIn!=NULL) {
-         HR((*ei.pfnDeferredFillIn)(&ei));
-      }
-      DWORD dwContext;
-      ULONG ulLine;
-      LONG lPos;
-      HR(pase->GetSourcePosition(&dwContext,&ulLine,&lPos));
+
+      // The engine allocates the three BSTRs in the EXCEPINFO for the caller, who
+      // owns them from GetExceptionInfo on. They used to be dropped on every return
+      // path, so every script error leaked its source, description and help-file
+      // strings. Upstream f047b8c1b.
+      EXCEPINFO ei = {};
+      HRESULT hr = pase->GetExceptionInfo(&ei);
+      if (FAILED(hr))
+         return hr;
+
+      DWORD dwContext = 0;
+      ULONG ulLine = 0;
+      LONG lPos = 0;
       CComBSTR src;
-      pase->GetSourceLineText(&src);
-      return HandleScriptError(&ei,ulLine,lPos,src);
+
+      if (ei.pfnDeferredFillIn != NULL)
+         hr = (*ei.pfnDeferredFillIn)(&ei);
+
+      if (SUCCEEDED(hr))
+         hr = pase->GetSourcePosition(&dwContext,&ulLine,&lPos);
+
+      if (SUCCEEDED(hr))
+      {
+         pase->GetSourceLineText(&src);
+         hr = HandleScriptError(&ei,ulLine,lPos,src);
+      }
+
+      FreeExceptionInfoStrings(ei);
+      return hr;
+   }
+
+   // Frees the strings an EXCEPINFO carries. SysFreeString accepts NULL, so this is
+   // safe on a zero-initialised structure the engine never filled in.
+   static void FreeExceptionInfoStrings(EXCEPINFO &ei)
+   {
+      ::SysFreeString(ei.bstrSource);
+      ::SysFreeString(ei.bstrDescription);
+      ::SysFreeString(ei.bstrHelpFile);
+      ei.bstrSource = NULL;
+      ei.bstrDescription = NULL;
+      ei.bstrHelpFile = NULL;
    }
 
    // This method is called when (before) the script engine starts executing the script/event handler
@@ -360,10 +389,16 @@ public:
 
       USES_CONVERSION;
       const DWORD dwFlags = SCRIPTTEXT_ISVISIBLE;
-      EXCEPINFO einfo;
-      return spParse->ParseScriptText(T2COLE(pszScript),pszContext!=NULL ? T2COLE(pszContext) : OLESTR(""),NULL,NULL,0,0,dwFlags,NULL,&einfo);
 
-      
+      // A parse failure fills the EXCEPINFO with strings the caller owns. They were
+      // never freed, so every failed Reload or Check-syntax leaked them. Upstream
+      // f047b8c1b.
+      EXCEPINFO einfo = {};
+      HRESULT hr = spParse->ParseScriptText(T2COLE(pszScript),pszContext!=NULL ? T2COLE(pszContext) : OLESTR(""),NULL,NULL,0,0,dwFlags,NULL,&einfo);
+
+      IActiveScriptSiteImpl::FreeExceptionInfoStrings(einfo);
+
+      return hr;
    }
 
    STDMETHOD(SetObjectContainer)(std::shared_ptr<HM::ScriptObjectContainer> pObject)
