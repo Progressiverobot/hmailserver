@@ -97,7 +97,7 @@ namespace DBSetup.Pages
             AddToLog("");
             AddToLog("Task completed.");
 
-            
+
          }
          catch (Exception ex)
          {
@@ -115,7 +115,7 @@ namespace DBSetup.Pages
             if (service.Length == 0)
                return;
 
-            int paranthesisStart = service.LastIndexOf("(")+1;
+            int paranthesisStart = service.LastIndexOf("(") + 1;
             int paranthesisEnd = service.IndexOf(")", paranthesisStart);
             int len = paranthesisEnd - paranthesisStart;
 

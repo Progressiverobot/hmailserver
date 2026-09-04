@@ -92,7 +92,7 @@ namespace hMailServer.ControlPanel.Views
       {
          var rows = new System.Collections.Generic.List<TraceRow>();
 
-         int count = (int) trace.Count;
+         int count = (int)trace.Count;
 
          for (int i = 0; i < count; i++)
          {
@@ -102,12 +102,12 @@ namespace hMailServer.ControlPanel.Views
             {
                rows.Add(new TraceRow
                {
-                  OccurredTime = (string) item.OccurredTime,
-                  EventName = (string) item.EventName,
-                  Sender = (string) item.Sender,
-                  Recipient = (string) item.Recipient,
-                  StatusCode = (int) item.StatusCode,
-                  QueueId = (int) item.QueueID
+                  OccurredTime = (string)item.OccurredTime,
+                  EventName = (string)item.EventName,
+                  Sender = (string)item.Sender,
+                  Recipient = (string)item.Recipient,
+                  StatusCode = (int)item.StatusCode,
+                  QueueId = (int)item.QueueID
                });
             }
             finally
@@ -215,7 +215,7 @@ namespace hMailServer.ControlPanel.Views
             dynamic trace = OpenTrace();
             try
             {
-               int removed = (int) trace.DeleteExpired();
+               int removed = (int)trace.DeleteExpired();
 
                status_.Text = removed == 0
                   ? "Nothing was old enough to remove. The window is MessageTraceRetentionDays, and 0 "

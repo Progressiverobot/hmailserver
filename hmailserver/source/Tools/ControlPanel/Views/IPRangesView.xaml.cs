@@ -41,20 +41,20 @@ namespace hMailServer.ControlPanel.Views
          dynamic ranges = ServerSession.Current.Application.Settings.SecurityRanges;
          try
          {
-            int count = (int) ranges.Count;
+            int count = (int)ranges.Count;
             for (int i = 0; i < count; i++)
             {
                dynamic range = ranges.Item[i];
                rows.Add(new RangeRow
                {
-                  Id = (int) range.ID,
-                  Name = (string) range.Name,
-                  LowerIP = (string) range.LowerIP,
-                  UpperIP = (string) range.UpperIP,
-                  Priority = (int) range.Priority,
-                  Smtp = (bool) range.AllowSMTPConnections ? "Yes" : "No",
-                  Imap = (bool) range.AllowIMAPConnections ? "Yes" : "No",
-                  Pop3 = (bool) range.AllowPOP3Connections ? "Yes" : "No"
+                  Id = (int)range.ID,
+                  Name = (string)range.Name,
+                  LowerIP = (string)range.LowerIP,
+                  UpperIP = (string)range.UpperIP,
+                  Priority = (int)range.Priority,
+                  Smtp = (bool)range.AllowSMTPConnections ? "Yes" : "No",
+                  Imap = (bool)range.AllowIMAPConnections ? "Yes" : "No",
+                  Pop3 = (bool)range.AllowPOP3Connections ? "Yes" : "No"
                });
                ServerSession.Release(range);
             }
@@ -89,14 +89,14 @@ namespace hMailServer.ControlPanel.Views
                return;
 
             PermHeader.Text = "Permissions - " + row.Name;
-            PermSmtp.IsChecked = (bool) range.AllowSMTPConnections;
-            PermImap.IsChecked = (bool) range.AllowIMAPConnections;
-            PermPop3.IsChecked = (bool) range.AllowPOP3Connections;
-            PermTlsAuth.IsChecked = (bool) range.RequireSSLTLSForAuth;
-            PermLL.IsChecked = (bool) range.AllowDeliveryFromLocalToLocal;
-            PermLR.IsChecked = (bool) range.AllowDeliveryFromLocalToRemote;
-            PermRL.IsChecked = (bool) range.AllowDeliveryFromRemoteToLocal;
-            PermRR.IsChecked = (bool) range.AllowDeliveryFromRemoteToRemote;
+            PermSmtp.IsChecked = (bool)range.AllowSMTPConnections;
+            PermImap.IsChecked = (bool)range.AllowIMAPConnections;
+            PermPop3.IsChecked = (bool)range.AllowPOP3Connections;
+            PermTlsAuth.IsChecked = (bool)range.RequireSSLTLSForAuth;
+            PermLL.IsChecked = (bool)range.AllowDeliveryFromLocalToLocal;
+            PermLR.IsChecked = (bool)range.AllowDeliveryFromLocalToRemote;
+            PermRL.IsChecked = (bool)range.AllowDeliveryFromRemoteToLocal;
+            PermRR.IsChecked = (bool)range.AllowDeliveryFromRemoteToRemote;
             SavePermsButton.IsEnabled = true;
             ServerSession.Release(range);
          }
@@ -112,11 +112,11 @@ namespace hMailServer.ControlPanel.Views
 
       private static dynamic FindRange(dynamic ranges, RangeRow row)
       {
-         int count = (int) ranges.Count;
+         int count = (int)ranges.Count;
          for (int i = 0; i < count; i++)
          {
             dynamic range = ranges.Item[i];
-            if ((string) range.Name == row.Name && (string) range.LowerIP == row.LowerIP)
+            if ((string)range.Name == row.Name && (string)range.LowerIP == row.LowerIP)
                return range;
             ServerSession.Release(range);
          }
@@ -261,11 +261,11 @@ namespace hMailServer.ControlPanel.Views
          dynamic ranges = ServerSession.Current.Application.Settings.SecurityRanges;
          try
          {
-            int count = (int) ranges.Count;
+            int count = (int)ranges.Count;
             for (int i = 0; i < count; i++)
             {
                dynamic range = ranges.Item[i];
-               if ((string) range.Name == row.Name && (string) range.LowerIP == row.LowerIP)
+               if ((string)range.Name == row.Name && (string)range.LowerIP == row.LowerIP)
                {
                   range.Delete();
                   ServerSession.Release(range);

@@ -155,7 +155,7 @@ namespace hMailServer.ControlPanel.Views
          dynamic certs = ServerSession.Current.Application.Settings.SSLCertificates;
          try
          {
-            int count = (int) certs.Count;
+            int count = (int)certs.Count;
             for (int i = 0; i < count; i++)
             {
                dynamic cert = certs.Item[i];
@@ -163,10 +163,10 @@ namespace hMailServer.ControlPanel.Views
                {
                   var row = new CertRow
                   {
-                     Id = (int) cert.ID,
-                     Name = (string) cert.Name,
-                     CertificateFile = (string) cert.CertificateFile,
-                     PrivateKeyFile = (string) cert.PrivateKeyFile
+                     Id = (int)cert.ID,
+                     Name = (string)cert.Name,
+                     CertificateFile = (string)cert.CertificateFile,
+                     PrivateKeyFile = (string)cert.PrivateKeyFile
                   };
 
                   // Only the EMPTINESS of the stored passphrase is tested; the
@@ -176,7 +176,7 @@ namespace hMailServer.ControlPanel.Views
                   // to "unknown" rather than to a guess.
                   try
                   {
-                     string password = (string) cert.PrivateKeyPassword;
+                     string password = (string)cert.PrivateKeyPassword;
                      row.Passphrase = string.IsNullOrEmpty(password) ? StoredPassphrase.NotSet : StoredPassphrase.Set;
                   }
                   catch (Exception)
@@ -188,13 +188,13 @@ namespace hMailServer.ControlPanel.Views
                }
                finally
                {
-                  ServerSession.Release((object) cert);
+                  ServerSession.Release((object)cert);
                }
             }
          }
          finally
          {
-            ServerSession.Release((object) certs);
+            ServerSession.Release((object)certs);
          }
       }
 
@@ -444,13 +444,13 @@ namespace hMailServer.ControlPanel.Views
          try
          {
             certs = ServerSession.Current.Application.Settings.SSLCertificates;
-            int count = (int) certs.Count;
+            int count = (int)certs.Count;
             for (int i = 0; i < count; i++)
             {
                dynamic cert = certs.Item[i];
                try
                {
-                  if ((int) cert.ID == row.Id)
+                  if ((int)cert.ID == row.Id)
                   {
                      cert.PrivateKeyPassword = passphrase;
                      cert.Save();
@@ -459,7 +459,7 @@ namespace hMailServer.ControlPanel.Views
                }
                finally
                {
-                  ServerSession.Release((object) cert);
+                  ServerSession.Release((object)cert);
                }
             }
 
@@ -473,7 +473,7 @@ namespace hMailServer.ControlPanel.Views
          }
          finally
          {
-            ServerSession.Release((object) certs);
+            ServerSession.Release((object)certs);
          }
       }
 
@@ -516,7 +516,7 @@ namespace hMailServer.ControlPanel.Views
          {
             try
             {
-               return File.Exists(file) ? CertificateInspector.LooksLikeEncryptedPem(file) : (bool?) null;
+               return File.Exists(file) ? CertificateInspector.LooksLikeEncryptedPem(file) : (bool?)null;
             }
             catch (Exception)
             {
@@ -576,7 +576,7 @@ namespace hMailServer.ControlPanel.Views
             {
                try
                {
-                  return File.Exists(keyFile) ? CertificateInspector.LooksLikeEncryptedPem(keyFile) : (bool?) null;
+                  return File.Exists(keyFile) ? CertificateInspector.LooksLikeEncryptedPem(keyFile) : (bool?)null;
                }
                catch (Exception)
                {
@@ -612,7 +612,7 @@ namespace hMailServer.ControlPanel.Views
             if (passphrase.Length > 0)
                cert.PrivateKeyPassword = passphrase;
             cert.Save();
-            ServerSession.Release((object) cert);
+            ServerSession.Release((object)cert);
          }
          catch (Exception ex)
          {
@@ -621,7 +621,7 @@ namespace hMailServer.ControlPanel.Views
          }
          finally
          {
-            ServerSession.Release((object) certs);
+            ServerSession.Release((object)certs);
          }
 
          NewCertName.Text = NewCertFile.Text = NewKeyFile.Text = "";
@@ -642,17 +642,17 @@ namespace hMailServer.ControlPanel.Views
          dynamic certs = ServerSession.Current.Application.Settings.SSLCertificates;
          try
          {
-            int count = (int) certs.Count;
+            int count = (int)certs.Count;
             for (int i = 0; i < count; i++)
             {
                dynamic cert = certs.Item[i];
-               if ((int) cert.ID == row.Id)
+               if ((int)cert.ID == row.Id)
                {
                   cert.Delete();
-                  ServerSession.Release((object) cert);
+                  ServerSession.Release((object)cert);
                   break;
                }
-               ServerSession.Release((object) cert);
+               ServerSession.Release((object)cert);
             }
          }
          catch (Exception ex)
@@ -661,7 +661,7 @@ namespace hMailServer.ControlPanel.Views
          }
          finally
          {
-            ServerSession.Release((object) certs);
+            ServerSession.Release((object)certs);
          }
 
          Reload();

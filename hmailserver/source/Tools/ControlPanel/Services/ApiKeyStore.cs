@@ -49,7 +49,7 @@ namespace hMailServer.ControlPanel.Services
          DateTime.TryParseExact(Expires ?? "", ApiKeyStore.TimestampFormat,
             CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime value)
             ? value
-            : (DateTime?) null;
+            : (DateTime?)null;
 
       /// <summary>
       /// True when the server would refuse this key today. An unreadable or

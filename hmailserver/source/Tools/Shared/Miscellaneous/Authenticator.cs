@@ -37,7 +37,7 @@ namespace hMailServer.Shared
             return true;
 
          // Try to authenticate using password on command line...
-         string [] args = Environment.GetCommandLineArgs();
+         string[] args = Environment.GetCommandLineArgs();
          if (args.Any(password => AuthenticateUser(application, password)))
             return true;
 

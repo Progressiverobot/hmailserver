@@ -239,7 +239,7 @@ namespace hMailServer.ControlPanel.Services
          try
          {
             domains = ServerSession.Current.Application.Domains;
-            int count = (int) domains.Count;
+            int count = (int)domains.Count;
             for (int i = 0; i < count; i++)
             {
                dynamic domain = domains.Item[i];
@@ -247,18 +247,18 @@ namespace hMailServer.ControlPanel.Services
                {
                   result.Add(new DomainDkim
                   {
-                     Name = ((string) domain.Name ?? "").Trim(),
-                     Active = (bool) domain.Active,
-                     SignEnabled = (bool) domain.DKIMSignEnabled,
-                     Selector = ((string) domain.DKIMSelector ?? "").Trim(),
-                     KeyFile = ((string) domain.DKIMPrivateKeyFile ?? "").Trim(),
-                     SecondarySelector = ((string) domain.DKIMSecondarySelector ?? "").Trim(),
-                     SecondaryKeyFile = ((string) domain.DKIMSecondaryPrivateKeyFile ?? "").Trim()
+                     Name = ((string)domain.Name ?? "").Trim(),
+                     Active = (bool)domain.Active,
+                     SignEnabled = (bool)domain.DKIMSignEnabled,
+                     Selector = ((string)domain.DKIMSelector ?? "").Trim(),
+                     KeyFile = ((string)domain.DKIMPrivateKeyFile ?? "").Trim(),
+                     SecondarySelector = ((string)domain.DKIMSecondarySelector ?? "").Trim(),
+                     SecondaryKeyFile = ((string)domain.DKIMSecondaryPrivateKeyFile ?? "").Trim()
                   });
                }
                finally
                {
-                  ServerSession.Release((object) domain);
+                  ServerSession.Release((object)domain);
                }
             }
          }
@@ -269,7 +269,7 @@ namespace hMailServer.ControlPanel.Services
          }
          finally
          {
-            ServerSession.Release((object) domains);
+            ServerSession.Release((object)domains);
          }
          return result;
       }
@@ -750,12 +750,12 @@ namespace hMailServer.ControlPanel.Services
             {
                settings = ServerSession.Current.Application.Settings;
                antiSpam = settings.AntiSpam;
-               return (bool) antiSpam.ArcFilteringEnabled;
+               return (bool)antiSpam.ArcFilteringEnabled;
             }
             finally
             {
-               ServerSession.Release((object) antiSpam);
-               ServerSession.Release((object) settings);
+               ServerSession.Release((object)antiSpam);
+               ServerSession.Release((object)settings);
             }
          });
 
@@ -767,12 +767,12 @@ namespace hMailServer.ControlPanel.Services
             {
                settings = ServerSession.Current.Application.Settings;
                antiSpam = settings.AntiSpam;
-               return (string) antiSpam.ArcTrustedSealers ?? "";
+               return (string)antiSpam.ArcTrustedSealers ?? "";
             }
             finally
             {
-               ServerSession.Release((object) antiSpam);
-               ServerSession.Release((object) settings);
+               ServerSession.Release((object)antiSpam);
+               ServerSession.Release((object)settings);
             }
          });
 
@@ -820,12 +820,12 @@ namespace hMailServer.ControlPanel.Services
             {
                settings = ServerSession.Current.Application.Settings;
                antiSpam = settings.AntiSpam;
-               return (int) antiSpam.DMARCFailureScore;
+               return (int)antiSpam.DMARCFailureScore;
             }
             finally
             {
-               ServerSession.Release((object) antiSpam);
-               ServerSession.Release((object) settings);
+               ServerSession.Release((object)antiSpam);
+               ServerSession.Release((object)settings);
             }
          });
 
@@ -1078,7 +1078,7 @@ namespace hMailServer.ControlPanel.Services
          {
             settings = ServerSession.Current.Application.Settings;
             certs = settings.SSLCertificates;
-            int count = (int) certs.Count;
+            int count = (int)certs.Count;
 
             if (count == 0)
                item.Add(SetupItemState.NotNeeded, "No SSL certificates are configured, so there are no key files to check.");
@@ -1088,8 +1088,8 @@ namespace hMailServer.ControlPanel.Services
                dynamic cert = certs.Item[i];
                try
                {
-                  string name = ((string) cert.Name ?? "").Trim();
-                  string keyFile = ((string) cert.PrivateKeyFile ?? "").Trim();
+                  string name = ((string)cert.Name ?? "").Trim();
+                  string keyFile = ((string)cert.PrivateKeyFile ?? "").Trim();
                   string label = name.Length > 0 ? name : "certificate " + (i + 1);
 
                   if (keyFile.Length == 0)
@@ -1138,7 +1138,7 @@ namespace hMailServer.ControlPanel.Services
                   bool passwordSet = false;
                   try
                   {
-                     string password = (string) cert.PrivateKeyPassword;
+                     string password = (string)cert.PrivateKeyPassword;
                      passwordSet = !string.IsNullOrEmpty(password);
                   }
                   catch (Exception)
@@ -1158,7 +1158,7 @@ namespace hMailServer.ControlPanel.Services
                }
                finally
                {
-                  ServerSession.Release((object) cert);
+                  ServerSession.Release((object)cert);
                }
             }
          }
@@ -1170,8 +1170,8 @@ namespace hMailServer.ControlPanel.Services
          }
          finally
          {
-            ServerSession.Release((object) certs);
-            ServerSession.Release((object) settings);
+            ServerSession.Release((object)certs);
+            ServerSession.Release((object)settings);
          }
 
          item.AggregateFromFindings();
@@ -1264,7 +1264,7 @@ namespace hMailServer.ControlPanel.Services
          {
             settings = ServerSession.Current.Application.Settings;
             ports = settings.TCPIPPorts;
-            int count = (int) ports.Count;
+            int count = (int)ports.Count;
             int withPolicy = 0;
 
             for (int i = 0; i < count; i++)
@@ -1272,16 +1272,16 @@ namespace hMailServer.ControlPanel.Services
                dynamic port = ports.Item[i];
                try
                {
-                  int policy = (int) port.ClientCertificatePolicy;
+                  int policy = (int)port.ClientCertificatePolicy;
                   if (policy == 0)
                      continue;
 
                   withPolicy++;
 
-                  string label = ProtocolName((int) port.Protocol) + " " + (string) port.Address + ":" + (int) port.PortNumber
+                  string label = ProtocolName((int)port.Protocol) + " " + (string)port.Address + ":" + (int)port.PortNumber
                                  + " (" + (policy == 2 ? "require" : "request") + ")";
-                  int security = (int) port.ConnectionSecurity;
-                  string caFile = ((string) port.ClientCertificateCAFile ?? "").Trim();
+                  int security = (int)port.ConnectionSecurity;
+                  string caFile = ((string)port.ClientCertificateCAFile ?? "").Trim();
 
                   if (security == 0)
                   {
@@ -1344,7 +1344,7 @@ namespace hMailServer.ControlPanel.Services
                }
                finally
                {
-                  ServerSession.Release((object) port);
+                  ServerSession.Release((object)port);
                }
             }
 
@@ -1359,8 +1359,8 @@ namespace hMailServer.ControlPanel.Services
          }
          finally
          {
-            ServerSession.Release((object) ports);
-            ServerSession.Release((object) settings);
+            ServerSession.Release((object)ports);
+            ServerSession.Release((object)settings);
          }
 
          item.AggregateFromFindings();

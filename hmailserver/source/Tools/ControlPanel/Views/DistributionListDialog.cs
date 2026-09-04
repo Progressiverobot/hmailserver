@@ -131,13 +131,13 @@ namespace hMailServer.ControlPanel.Views
          try
          {
             dynamic l = OpenList(domains);
-            active_.IsChecked = (bool) l.Active;
-            addressBox_.Text = (string) l.Address ?? "";
-            SelectCombo(mode_, (int) l.Mode);
-            requireAuth_.IsChecked = (bool) l.RequireSMTPAuth;
-            requireSender_.Text = (string) l.RequireSenderAddress ?? "";
-            moderator_.Text = (string) l.ModeratorAddress ?? "";
-            bounce_.Text = (string) l.BounceAddress ?? "";
+            active_.IsChecked = (bool)l.Active;
+            addressBox_.Text = (string)l.Address ?? "";
+            SelectCombo(mode_, (int)l.Mode);
+            requireAuth_.IsChecked = (bool)l.RequireSMTPAuth;
+            requireSender_.Text = (string)l.RequireSenderAddress ?? "";
+            moderator_.Text = (string)l.ModeratorAddress ?? "";
+            bounce_.Text = (string)l.BounceAddress ?? "";
             ServerSession.Release(l);
          }
          catch (Exception ex)
@@ -225,9 +225,9 @@ namespace hMailServer.ControlPanel.Views
       private static void SelectCombo(ComboBox combo, int value)
       {
          foreach (ComboBoxItem item in combo.Items)
-            if ((int) item.Tag == value) { combo.SelectedItem = item; return; }
+            if ((int)item.Tag == value) { combo.SelectedItem = item; return; }
       }
 
-      private static int ComboValue(ComboBox combo) => combo.SelectedItem is ComboBoxItem item ? (int) item.Tag : 0;
+      private static int ComboValue(ComboBox combo) => combo.SelectedItem is ComboBoxItem item ? (int)item.Tag : 0;
    }
 }

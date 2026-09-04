@@ -18,7 +18,7 @@ namespace hMailServer.Shared
          _argumentMap = new Dictionary<string, string>();
 
          bool firstArgument = true;
-         
+
          string[] arguments = Environment.GetCommandLineArgs();
 
          foreach (string argument in arguments)

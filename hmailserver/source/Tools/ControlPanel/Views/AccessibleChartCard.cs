@@ -185,12 +185,12 @@ namespace hMailServer.ControlPanel.Views
          TimeSpan span = times_[times_.Count - 1] - times_[0];
 
          if (span.TotalSeconds < 90)
-            return "last " + Math.Max(1, (int) Math.Round(span.TotalSeconds)) + " seconds";
+            return "last " + Math.Max(1, (int)Math.Round(span.TotalSeconds)) + " seconds";
 
          if (span.TotalMinutes < 90)
-            return "last " + Math.Max(1, (int) Math.Round(span.TotalMinutes)) + " minutes";
+            return "last " + Math.Max(1, (int)Math.Round(span.TotalMinutes)) + " minutes";
 
-         return "last " + Math.Max(1, (int) Math.Round(span.TotalHours)) + " hours";
+         return "last " + Math.Max(1, (int)Math.Round(span.TotalHours)) + " hours";
       }
 
       /// <summary>Switches between the chart and the table view.</summary>
@@ -558,7 +558,7 @@ namespace hMailServer.ControlPanel.Views
       /// <summary>A WPF colour as the packed ARGB the palette code speaks in.</summary>
       private static uint Argb_(Color color)
       {
-         return ((uint) color.A << 24) | ((uint) color.R << 16) | ((uint) color.G << 8) | color.B;
+         return ((uint)color.A << 24) | ((uint)color.R << 16) | ((uint)color.G << 8) | color.B;
       }
 
       private Color PageBackdrop_()
@@ -908,7 +908,7 @@ namespace hMailServer.ControlPanel.Views
 
       private static SKColor Skia_(uint argb)
       {
-         return new SKColor((byte) (argb >> 16), (byte) (argb >> 8), (byte) argb, (byte) (argb >> 24));
+         return new SKColor((byte)(argb >> 16), (byte)(argb >> 8), (byte)argb, (byte)(argb >> 24));
       }
 
       /// <summary>

@@ -324,7 +324,7 @@ namespace hMailServer.ControlPanel.Views
       {
          foreach (ComboBoxItem item in combo.Items)
          {
-            if ((int) item.Tag == value)
+            if ((int)item.Tag == value)
             {
                combo.SelectedItem = item;
                return;
@@ -336,7 +336,7 @@ namespace hMailServer.ControlPanel.Views
       }
 
       private static int SelectedTag_(ComboBox combo, int fallback)
-         => combo.SelectedItem is ComboBoxItem item ? (int) item.Tag : fallback;
+         => combo.SelectedItem is ComboBoxItem item ? (int)item.Tag : fallback;
 
       // ---- the cards ------------------------------------------------------------
 
@@ -1351,8 +1351,8 @@ namespace hMailServer.ControlPanel.Views
                bool useLdaps = config.Security == 2;
 
                session_ = useLdaps
-                  ? ldap_sslinitW(config.Server, (uint) config.EffectivePort(), 1)
-                  : ldap_initW(config.Server, (uint) config.EffectivePort());
+                  ? ldap_sslinitW(config.Server, (uint)config.EffectivePort(), 1)
+                  : ldap_initW(config.Server, (uint)config.EffectivePort());
 
                if (session_ == IntPtr.Zero)
                   return Record_(LdapGetLastError());
@@ -1367,7 +1367,7 @@ namespace hMailServer.ControlPanel.Views
                ldap_set_option(session_, LDAP_OPT_REFERRALS, IntPtr.Zero);
 
                if (useLdaps)
-                  ldap_set_option(session_, LDAP_OPT_SSL, (IntPtr) 1);
+                  ldap_set_option(session_, LDAP_OPT_SSL, (IntPtr)1);
 
                int timeLimit = timeoutSeconds_;
                ldap_set_option(session_, LDAP_OPT_TIMELIMIT, ref timeLimit);
@@ -1490,11 +1490,11 @@ namespace hMailServer.ControlPanel.Views
                   var identity = new SEC_WINNT_AUTH_IDENTITY_W
                   {
                      User = userBuffer,
-                     UserLength = (uint) username.Length,
+                     UserLength = (uint)username.Length,
                      Domain = domainBuffer,
-                     DomainLength = (uint) (domain?.Length ?? 0),
+                     DomainLength = (uint)(domain?.Length ?? 0),
                      Password = passwordBuffer,
-                     PasswordLength = (uint) password.Length,
+                     PasswordLength = (uint)password.Length,
                      Flags = SEC_WINNT_AUTH_IDENTITY_UNICODE
                   };
 
@@ -1549,7 +1549,7 @@ namespace hMailServer.ControlPanel.Views
                if (searchResult == IntPtr.Zero)
                   return Record_(LDAP_SUCCESS);
 
-               matchCount = (int) ldap_count_entries(session_, searchResult);
+               matchCount = (int)ldap_count_entries(session_, searchResult);
 
                if (searchStatus == LDAP_SIZELIMIT_EXCEEDED && matchCount < 2)
                   matchCount = 2;

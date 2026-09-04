@@ -38,17 +38,17 @@ namespace hMailServer.ControlPanel.Views
          dynamic routes = ServerSession.Current.Application.Settings.Routes;
          try
          {
-            int count = (int) routes.Count;
+            int count = (int)routes.Count;
             for (int i = 0; i < count; i++)
             {
                dynamic route = routes.Item[i];
                rows.Add(new RouteRow
                {
-                  DomainName = (string) route.DomainName,
-                  TargetHost = (string) route.TargetSMTPHost,
-                  TargetPort = (int) route.TargetSMTPPort,
-                  Retries = (int) route.NumberOfTries,
-                  Auth = (bool) route.RelayerRequiresAuth ? "Yes" : "No"
+                  DomainName = (string)route.DomainName,
+                  TargetHost = (string)route.TargetSMTPHost,
+                  TargetPort = (int)route.TargetSMTPPort,
+                  Retries = (int)route.NumberOfTries,
+                  Auth = (bool)route.RelayerRequiresAuth ? "Yes" : "No"
                });
                ServerSession.Release(route);
             }
@@ -130,11 +130,11 @@ namespace hMailServer.ControlPanel.Views
          dynamic routes = ServerSession.Current.Application.Settings.Routes;
          try
          {
-            int count = (int) routes.Count;
+            int count = (int)routes.Count;
             for (int i = 0; i < count; i++)
             {
                dynamic route = routes.Item[i];
-               if ((string) route.DomainName == row.DomainName)
+               if ((string)route.DomainName == row.DomainName)
                {
                   route.Delete();
                   ServerSession.Release(route);

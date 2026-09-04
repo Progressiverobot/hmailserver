@@ -68,16 +68,16 @@ namespace hMailServer.ControlPanel.Views
          dynamic rules = OpenRules();
          try
          {
-            int count = (int) rules.Count;
+            int count = (int)rules.Count;
             for (int i = 0; i < count; i++)
             {
                dynamic rule = rules.Item[i];
                rows.Add(new RuleRow
                {
-                  Id = (int) rule.ID,
+                  Id = (int)rule.ID,
                   Position = i + 1,
-                  Name = (string) rule.Name,
-                  Enabled = (bool) rule.Active ? "Yes" : "No"
+                  Name = (string)rule.Name,
+                  Enabled = (bool)rule.Active ? "Yes" : "No"
                });
                ServerSession.Release(rule);
             }
@@ -143,31 +143,31 @@ namespace hMailServer.ControlPanel.Views
             if (rule == null)
                return;
 
-            useAnd = (bool) rule.UseAND;
+            useAnd = (bool)rule.UseAND;
 
             dynamic criterias = rule.Criterias;
-            int cc = (int) criterias.Count;
+            int cc = (int)criterias.Count;
             for (int i = 0; i < cc; i++)
             {
                dynamic c = criterias.Item[i];
-               string field = (bool) c.UsePredefined
-                  ? Pick(FieldNames, (int) c.PredefinedField)
-                  : "header '" + (string) c.HeaderField + "'";
+               string field = (bool)c.UsePredefined
+                  ? Pick(FieldNames, (int)c.PredefinedField)
+                  : "header '" + (string)c.HeaderField + "'";
                criteria.Add(new DetailRow
                {
-                  Id = (int) c.ID,
-                  Description = field + " " + Pick(MatchNames, (int) c.MatchType) + " '" + (string) c.MatchValue + "'"
+                  Id = (int)c.ID,
+                  Description = field + " " + Pick(MatchNames, (int)c.MatchType) + " '" + (string)c.MatchValue + "'"
                });
                ServerSession.Release(c);
             }
             ServerSession.Release(criterias);
 
             dynamic acts = rule.Actions;
-            int ac = (int) acts.Count;
+            int ac = (int)acts.Count;
             for (int i = 0; i < ac; i++)
             {
                dynamic a = acts.Item[i];
-               actions.Add(new DetailRow { Id = (int) a.ID, Description = DescribeAction(a) });
+               actions.Add(new DetailRow { Id = (int)a.ID, Description = DescribeAction(a) });
                ServerSession.Release(a);
             }
             ServerSession.Release(acts);
@@ -193,19 +193,19 @@ namespace hMailServer.ControlPanel.Views
 
       private static string DescribeAction(dynamic a)
       {
-         int type = (int) a.Type;
+         int type = (int)a.Type;
          string text = Pick(ActionNames, type);
          try
          {
             switch (type)
             {
-               case 2: text += " -> " + (string) a.To; break;
-               case 3: text += " (subject '" + (string) a.Subject + "')"; break;
-               case 4: text += " '" + (string) a.IMAPFolder + "'"; break;
-               case 5: text += " " + (string) a.ScriptFunction; break;
-               case 7: text += " " + (string) a.HeaderName + "=" + (string) a.Value; break;
-               case 8: text += " (route #" + (int) a.RouteID + ")"; break;
-               case 10: text += " " + (string) a.Value; break;
+               case 2: text += " -> " + (string)a.To; break;
+               case 3: text += " (subject '" + (string)a.Subject + "')"; break;
+               case 4: text += " '" + (string)a.IMAPFolder + "'"; break;
+               case 5: text += " " + (string)a.ScriptFunction; break;
+               case 7: text += " " + (string)a.HeaderName + "=" + (string)a.Value; break;
+               case 8: text += " (route #" + (int)a.RouteID + ")"; break;
+               case 10: text += " " + (string)a.Value; break;
             }
          }
          catch (Exception)
@@ -251,7 +251,7 @@ namespace hMailServer.ControlPanel.Views
 
       private void Toggle_Click(object sender, RoutedEventArgs e) => WithSelectedRule(rule =>
       {
-         rule.Active = !(bool) rule.Active;
+         rule.Active = !(bool)rule.Active;
          rule.Save();
       });
 

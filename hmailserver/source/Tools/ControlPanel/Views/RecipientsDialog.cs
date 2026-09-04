@@ -128,11 +128,11 @@ namespace hMailServer.ControlPanel.Views
       {
          dynamic domain = domains.ItemByName[domainName_];
          dynamic lists = domain.DistributionLists;
-         int count = (int) lists.Count;
+         int count = (int)lists.Count;
          for (int i = 0; i < count; i++)
          {
             dynamic list = lists.Item[i];
-            if ((string) list.Address == listAddress_)
+            if ((string)list.Address == listAddress_)
             {
                ServerSession.Release(lists);
                ServerSession.Release(domain);
@@ -155,11 +155,11 @@ namespace hMailServer.ControlPanel.Views
             if (list != null)
             {
                dynamic recipients = list.Recipients;
-               int count = (int) recipients.Count;
+               int count = (int)recipients.Count;
                for (int i = 0; i < count; i++)
                {
                   dynamic recipient = recipients.Item[i];
-                  rows.Add((string) recipient.RecipientAddress);
+                  rows.Add((string)recipient.RecipientAddress);
                   ServerSession.Release(recipient);
                }
                ServerSession.Release(recipients);
@@ -284,11 +284,11 @@ namespace hMailServer.ControlPanel.Views
             if (list != null)
             {
                dynamic recipients = list.Recipients;
-               int count = (int) recipients.Count;
+               int count = (int)recipients.Count;
                for (int i = 0; i < count; i++)
                {
                   dynamic recipient = recipients.Item[i];
-                  if ((string) recipient.RecipientAddress == address)
+                  if ((string)recipient.RecipientAddress == address)
                   {
                      recipient.Delete();
                      ServerSession.Release(recipient);

@@ -94,29 +94,29 @@ namespace DBSetupQuick
 
       private static int InitializeInternalDatabase()
       {
-          try
-          {
-              hMailServer.Database database = _application.Database;
+         try
+         {
+            hMailServer.Database database = _application.Database;
 
-              database.CreateInternalDatabase();
+            database.CreateInternalDatabase();
 
-              // Database has been upgraded. Reinitialize the connections.
-              _application.Reinitialize();
+            // Database has been upgraded. Reinitialize the connections.
+            _application.Reinitialize();
 
-              // Re-initialize to connect to the newly created database.
-              _application.Reinitialize();
+            // Re-initialize to connect to the newly created database.
+            _application.Reinitialize();
 
-              return 0;
-          }
-          catch (Exception ex)
-          {
-              Console.Error.WriteLine("Failed to create the hMailServer database: " + ex.Message);
+            return 0;
+         }
+         catch (Exception ex)
+         {
+            Console.Error.WriteLine("Failed to create the hMailServer database: " + ex.Message);
 
-              if (!CommandLineParser.IsSilent())
-                  MessageBox.Show(ex.Message, "hMailServer", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            if (!CommandLineParser.IsSilent())
+               MessageBox.Show(ex.Message, "hMailServer", MessageBoxButtons.OK, MessageBoxIcon.Error);
 
-              return 1;
-          }
+            return 1;
+         }
       }
 
    }

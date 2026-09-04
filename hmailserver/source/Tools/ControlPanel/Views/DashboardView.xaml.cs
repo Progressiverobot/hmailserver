@@ -418,9 +418,9 @@ namespace hMailServer.ControlPanel.Views
          {
             TimeSpan up = DateTime.Now - started;
             if (up.TotalSeconds < 0) return startTime;
-            if (up.TotalDays >= 1) return $"{(int) up.TotalDays}d {up.Hours}h";
+            if (up.TotalDays >= 1) return $"{(int)up.TotalDays}d {up.Hours}h";
             if (up.TotalHours >= 1) return $"{up.Hours}h {up.Minutes}m";
-            return $"{Math.Max(0, (int) up.TotalMinutes)}m";
+            return $"{Math.Max(0, (int)up.TotalMinutes)}m";
          }
          return string.IsNullOrEmpty(startTime) ? "-" : startTime;
       }

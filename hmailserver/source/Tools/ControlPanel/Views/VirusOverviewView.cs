@@ -128,29 +128,29 @@ namespace hMailServer.ControlPanel.Views
             settings = ServerSession.Current.Application.Settings;
             antiVirus = settings.AntiVirus;
 
-            config.ClamAvEnabled = Read(() => (bool) antiVirus.ClamAVEnabled);
-            config.ClamAvHost = Read(() => (string) antiVirus.ClamAVHost) ?? "";
-            config.ClamAvPort = Read(() => (int) antiVirus.ClamAVPort);
+            config.ClamAvEnabled = Read(() => (bool)antiVirus.ClamAVEnabled);
+            config.ClamAvHost = Read(() => (string)antiVirus.ClamAVHost) ?? "";
+            config.ClamAvPort = Read(() => (int)antiVirus.ClamAVPort);
 
-            config.ClamWinEnabled = Read(() => (bool) antiVirus.ClamWinEnabled);
-            config.ClamWinExecutable = Read(() => (string) antiVirus.ClamWinExecutable) ?? "";
-            config.ClamWinDatabaseFolder = Read(() => (string) antiVirus.ClamWinDBFolder) ?? "";
+            config.ClamWinEnabled = Read(() => (bool)antiVirus.ClamWinEnabled);
+            config.ClamWinExecutable = Read(() => (string)antiVirus.ClamWinExecutable) ?? "";
+            config.ClamWinDatabaseFolder = Read(() => (string)antiVirus.ClamWinDBFolder) ?? "";
 
-            config.CustomScannerEnabled = Read(() => (bool) antiVirus.CustomScannerEnabled);
-            config.CustomScannerExecutable = Read(() => (string) antiVirus.CustomScannerExecutable) ?? "";
-            config.CustomScannerVirusReturnValue = Read(() => (int) antiVirus.CustomScannerReturnValue);
+            config.CustomScannerEnabled = Read(() => (bool)antiVirus.CustomScannerEnabled);
+            config.CustomScannerExecutable = Read(() => (string)antiVirus.CustomScannerExecutable) ?? "";
+            config.CustomScannerVirusReturnValue = Read(() => (int)antiVirus.CustomScannerReturnValue);
 
-            config.MaxScanKilobytes = Read(() => (int) antiVirus.MaximumMessageSize);
+            config.MaxScanKilobytes = Read(() => (int)antiVirus.MaximumMessageSize);
 
             // eAntivirusAction: 0 = delete the message, 1 = strip the attachments.
-            config.Action = Read(() => (int) antiVirus.Action) == 1
+            config.Action = Read(() => (int)antiVirus.Action) == 1
                ? VirusAction.StripAttachments
                : VirusAction.DeleteMessage;
 
-            config.NotifySender = Read(() => (bool) antiVirus.NotifySender);
-            config.NotifyRecipient = Read(() => (bool) antiVirus.NotifyReceiver);
+            config.NotifySender = Read(() => (bool)antiVirus.NotifySender);
+            config.NotifyRecipient = Read(() => (bool)antiVirus.NotifyReceiver);
 
-            config.AttachmentBlockingEnabled = Read(() => (bool) antiVirus.EnableAttachmentBlocking);
+            config.AttachmentBlockingEnabled = Read(() => (bool)antiVirus.EnableAttachmentBlocking);
             config.BlockedAttachmentPatterns = CountCollection(() => antiVirus.BlockedAttachments);
 
             CountFetchAccounts(config);
@@ -162,8 +162,8 @@ namespace hMailServer.ControlPanel.Views
          }
          finally
          {
-            ServerSession.Release((object) antiVirus);
-            ServerSession.Release((object) settings);
+            ServerSession.Release((object)antiVirus);
+            ServerSession.Release((object)settings);
          }
 
          return config;
@@ -189,7 +189,7 @@ namespace hMailServer.ControlPanel.Views
          try
          {
             collection = open();
-            return (int) collection.Count;
+            return (int)collection.Count;
          }
          catch (Exception ex)
          {
@@ -199,7 +199,7 @@ namespace hMailServer.ControlPanel.Views
          }
          finally
          {
-            ServerSession.Release((object) collection);
+            ServerSession.Release((object)collection);
          }
       }
 
@@ -230,7 +230,7 @@ namespace hMailServer.ControlPanel.Views
          try
          {
             domains = ServerSession.Current.Application.Domains;
-            int domainCount = (int) domains.Count;
+            int domainCount = (int)domains.Count;
 
             for (int d = 0; d < domainCount; d++)
             {
@@ -241,7 +241,7 @@ namespace hMailServer.ControlPanel.Views
                {
                   domain = domains.Item[d];
                   accounts = domain.Accounts;
-                  int accountCount = (int) accounts.Count;
+                  int accountCount = (int)accounts.Count;
 
                   for (int a = 0; a < accountCount; a++)
                   {
@@ -260,7 +260,7 @@ namespace hMailServer.ControlPanel.Views
                      {
                         account = accounts.Item[a];
                         fetchAccounts = account.FetchAccounts;
-                        int fetchCount = (int) fetchAccounts.Count;
+                        int fetchCount = (int)fetchAccounts.Count;
 
                         for (int f = 0; f < fetchCount; f++)
                         {
@@ -271,26 +271,26 @@ namespace hMailServer.ControlPanel.Views
                               fetchAccount = fetchAccounts.Item[f];
                               config.FetchAccountsTotal++;
 
-                              if (!(bool) fetchAccount.UseAntiVirus)
+                              if (!(bool)fetchAccount.UseAntiVirus)
                                  config.FetchAccountsWithScanningOff++;
                            }
                            finally
                            {
-                              ServerSession.Release((object) fetchAccount);
+                              ServerSession.Release((object)fetchAccount);
                            }
                         }
                      }
                      finally
                      {
-                        ServerSession.Release((object) fetchAccounts);
-                        ServerSession.Release((object) account);
+                        ServerSession.Release((object)fetchAccounts);
+                        ServerSession.Release((object)account);
                      }
                   }
                }
                finally
                {
-                  ServerSession.Release((object) accounts);
-                  ServerSession.Release((object) domain);
+                  ServerSession.Release((object)accounts);
+                  ServerSession.Release((object)domain);
                }
             }
          }
@@ -303,7 +303,7 @@ namespace hMailServer.ControlPanel.Views
          }
          finally
          {
-            ServerSession.Release((object) domains);
+            ServerSession.Release((object)domains);
          }
       }
 

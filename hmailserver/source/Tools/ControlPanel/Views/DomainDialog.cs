@@ -272,7 +272,7 @@ namespace hMailServer.ControlPanel.Views
             item.Click += (s2, e2) => adDomain_.Text = dom;
             menu.Items.Add(item);
          }
-         menu.PlacementTarget = (UIElement) sender;
+         menu.PlacementTarget = (UIElement)sender;
          menu.IsOpen = true;
       }
 
@@ -807,8 +807,8 @@ namespace hMailServer.ControlPanel.Views
             d.DKIMPromoteSecondary();
             d.Save();
 
-            string newSelector = (string) d.DKIMSelector ?? "";
-            string newKeyFile = (string) d.DKIMPrivateKeyFile ?? "";
+            string newSelector = (string)d.DKIMSelector ?? "";
+            string newKeyFile = (string)d.DKIMPrivateKeyFile ?? "";
             ServerSession.Release(d);
 
             // Mirror the promoted values into the primary fields: they now hold
@@ -997,36 +997,36 @@ namespace hMailServer.ControlPanel.Views
          try
          {
             dynamic d = domains.ItemByName[domainName_];
-            active_.IsChecked = (bool) d.Active;
-            name_.Text = (string) d.Name ?? domainName_;
-            postmaster_.Text = (string) d.Postmaster ?? "";
-            adDomain_.Text = (string) d.ADDomainName ?? "";
+            active_.IsChecked = (bool)d.Active;
+            name_.Text = (string)d.Name ?? domainName_;
+            postmaster_.Text = (string)d.Postmaster ?? "";
+            adDomain_.Text = (string)d.ADDomainName ?? "";
 
-            maxSize_.Text = ((int) d.MaxSize).ToString();
-            maxMessageSize_.Text = ((int) d.MaxMessageSize).ToString();
-            maxAccountSize_.Text = ((int) d.MaxAccountSize).ToString();
-            maxAccountsOn_.IsChecked = (bool) d.MaxNumberOfAccountsEnabled;
-            maxAccounts_.Text = ((int) d.MaxNumberOfAccounts).ToString();
-            maxAliasesOn_.IsChecked = (bool) d.MaxNumberOfAliasesEnabled;
-            maxAliases_.Text = ((int) d.MaxNumberOfAliases).ToString();
-            maxDistsOn_.IsChecked = (bool) d.MaxNumberOfDistributionListsEnabled;
-            maxDists_.Text = ((int) d.MaxNumberOfDistributionLists).ToString();
-            plusAddressingOn_.IsChecked = (bool) d.PlusAddressingEnabled;
-            plusChar_.Text = (string) d.PlusAddressingCharacter ?? "";
-            greylisting_.IsChecked = (bool) d.AntiSpamEnableGreylisting;
+            maxSize_.Text = ((int)d.MaxSize).ToString();
+            maxMessageSize_.Text = ((int)d.MaxMessageSize).ToString();
+            maxAccountSize_.Text = ((int)d.MaxAccountSize).ToString();
+            maxAccountsOn_.IsChecked = (bool)d.MaxNumberOfAccountsEnabled;
+            maxAccounts_.Text = ((int)d.MaxNumberOfAccounts).ToString();
+            maxAliasesOn_.IsChecked = (bool)d.MaxNumberOfAliasesEnabled;
+            maxAliases_.Text = ((int)d.MaxNumberOfAliases).ToString();
+            maxDistsOn_.IsChecked = (bool)d.MaxNumberOfDistributionListsEnabled;
+            maxDists_.Text = ((int)d.MaxNumberOfDistributionLists).ToString();
+            plusAddressingOn_.IsChecked = (bool)d.PlusAddressingEnabled;
+            plusChar_.Text = (string)d.PlusAddressingCharacter ?? "";
+            greylisting_.IsChecked = (bool)d.AntiSpamEnableGreylisting;
 
-            signatureOn_.IsChecked = (bool) d.SignatureEnabled;
-            SelectCombo(signatureMethod_, (int) d.SignatureMethod);
-            signReplies_.IsChecked = (bool) d.AddSignaturesToReplies;
-            signLocal_.IsChecked = (bool) d.AddSignaturesToLocalMail;
-            signaturePlain_.Text = (string) d.SignaturePlainText ?? "";
-            signatureHtml_.Text = (string) d.SignatureHTML ?? "";
+            signatureOn_.IsChecked = (bool)d.SignatureEnabled;
+            SelectCombo(signatureMethod_, (int)d.SignatureMethod);
+            signReplies_.IsChecked = (bool)d.AddSignaturesToReplies;
+            signLocal_.IsChecked = (bool)d.AddSignaturesToLocalMail;
+            signaturePlain_.Text = (string)d.SignaturePlainText ?? "";
+            signatureHtml_.Text = (string)d.SignatureHTML ?? "";
 
-            relayHost_.Text = (string) d.RelayHost ?? "";
-            relayPort_.Text = ((long) d.RelayPort).ToString();
-            relayAuthOn_.IsChecked = (bool) d.RelayRequiresAuthentication;
-            relayUser_.Text = (string) d.RelayUsername ?? "";
-            SelectCombo(relaySecurity_, (int) d.RelayConnectionSecurity);
+            relayHost_.Text = (string)d.RelayHost ?? "";
+            relayPort_.Text = ((long)d.RelayPort).ToString();
+            relayAuthOn_.IsChecked = (bool)d.RelayRequiresAuthentication;
+            relayUser_.Text = (string)d.RelayUsername ?? "";
+            SelectCombo(relaySecurity_, (int)d.RelayConnectionSecurity);
 
             // The password box is deliberately left empty rather than filled with the
             // stored secret: a dialog that shows a password back is a dialog that hands
@@ -1034,20 +1034,20 @@ namespace hMailServer.ControlPanel.Views
             // stored value when the box is blank.
             relayPassword_.Password = "";
 
-            oooOn_.IsChecked = (bool) d.VacationMessageIsOn;
-            oooSubject_.Text = (string) d.VacationSubject ?? "";
-            oooMessage_.Text = (string) d.VacationMessage ?? "";
-            oooInternalSubject_.Text = (string) d.VacationInternalSubject ?? "";
-            oooInternalMessage_.Text = (string) d.VacationInternalMessage ?? "";
-            oooExternalOverride_.IsChecked = (bool) d.VacationExternalOverride;
+            oooOn_.IsChecked = (bool)d.VacationMessageIsOn;
+            oooSubject_.Text = (string)d.VacationSubject ?? "";
+            oooMessage_.Text = (string)d.VacationMessage ?? "";
+            oooInternalSubject_.Text = (string)d.VacationInternalSubject ?? "";
+            oooInternalMessage_.Text = (string)d.VacationInternalMessage ?? "";
+            oooExternalOverride_.IsChecked = (bool)d.VacationExternalOverride;
 
-            dkimOn_.IsChecked = (bool) d.DKIMSignEnabled;
-            dkimAliases_.IsChecked = (bool) d.DKIMSignAliasesEnabled;
-            dkimSelector_.Text = (string) d.DKIMSelector ?? "";
-            dkimKeyFile_.Text = (string) d.DKIMPrivateKeyFile ?? "";
-            SelectCombo(dkimHeaderCanon_, (int) d.DKIMHeaderCanonicalizationMethod);
-            SelectCombo(dkimBodyCanon_, (int) d.DKIMBodyCanonicalizationMethod);
-            SelectCombo(dkimAlgorithm_, (int) d.DKIMSigningAlgorithm);
+            dkimOn_.IsChecked = (bool)d.DKIMSignEnabled;
+            dkimAliases_.IsChecked = (bool)d.DKIMSignAliasesEnabled;
+            dkimSelector_.Text = (string)d.DKIMSelector ?? "";
+            dkimKeyFile_.Text = (string)d.DKIMPrivateKeyFile ?? "";
+            SelectCombo(dkimHeaderCanon_, (int)d.DKIMHeaderCanonicalizationMethod);
+            SelectCombo(dkimBodyCanon_, (int)d.DKIMBodyCanonicalizationMethod);
+            SelectCombo(dkimAlgorithm_, (int)d.DKIMSigningAlgorithm);
 
             // The staged rotation pair, if an earlier session left one behind.
             // Read defensively: against an older server that predates the
@@ -1056,8 +1056,8 @@ namespace hMailServer.ControlPanel.Views
             string stagedSelector = "", stagedKeyFile = "";
             try
             {
-               stagedSelector = ((string) d.DKIMSecondarySelector ?? "").Trim();
-               stagedKeyFile = ((string) d.DKIMSecondaryPrivateKeyFile ?? "").Trim();
+               stagedSelector = ((string)d.DKIMSecondarySelector ?? "").Trim();
+               stagedKeyFile = ((string)d.DKIMSecondaryPrivateKeyFile ?? "").Trim();
             }
             catch (Exception) { }
             RestoreStagedRotation(stagedSelector, stagedKeyFile);
@@ -1270,7 +1270,7 @@ namespace hMailServer.ControlPanel.Views
       private static void SelectCombo(ComboBox combo, int value)
       {
          foreach (ComboBoxItem item in combo.Items)
-            if ((int) item.Tag == value)
+            if ((int)item.Tag == value)
             {
                combo.SelectedItem = item;
                return;
@@ -1278,6 +1278,6 @@ namespace hMailServer.ControlPanel.Views
       }
 
       private static int ComboValue(ComboBox combo) =>
-         combo.SelectedItem is ComboBoxItem item ? (int) item.Tag : 0;
+         combo.SelectedItem is ComboBoxItem item ? (int)item.Tag : 0;
    }
 }

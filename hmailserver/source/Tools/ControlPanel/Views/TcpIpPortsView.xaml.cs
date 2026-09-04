@@ -69,15 +69,15 @@ namespace hMailServer.ControlPanel.Views
          dynamic ports = ServerSession.Current.Application.Settings.TCPIPPorts;
          try
          {
-            int count = (int) ports.Count;
+            int count = (int)ports.Count;
             for (int i = 0; i < count; i++)
             {
                dynamic port = ports.Item[i];
-               int security = (int) port.ConnectionSecurity;
-               int certId = (int) port.SSLCertificateID;
-               string protocol = ProtocolName((int) port.Protocol);
-               string address = (string) port.Address;
-               int portNumber = (int) port.PortNumber;
+               int security = (int)port.ConnectionSecurity;
+               int certId = (int)port.SSLCertificateID;
+               string protocol = ProtocolName((int)port.Protocol);
+               string address = (string)port.Address;
+               int portNumber = (int)port.PortNumber;
 
                protocolEnabled.TryGetValue(protocol, out bool? enabled);
 
@@ -86,7 +86,7 @@ namespace hMailServer.ControlPanel.Views
 
                rows.Add(new PortRow
                {
-                  Id = (int) port.ID,
+                  Id = (int)port.ID,
                   Protocol = protocol,
                   Address = address,
                   Port = portNumber,
@@ -192,16 +192,16 @@ namespace hMailServer.ControlPanel.Views
          dynamic settings = ServerSession.Current.Application.Settings;
          try
          {
-            map["SMTP"] = (bool) settings.ServiceSMTP;
-            map["POP3"] = (bool) settings.ServicePOP3;
-            map["IMAP"] = (bool) settings.ServiceIMAP;
+            map["SMTP"] = (bool)settings.ServiceSMTP;
+            map["POP3"] = (bool)settings.ServicePOP3;
+            map["IMAP"] = (bool)settings.ServiceIMAP;
          }
          catch (Exception)
          {
          }
          finally
          {
-            ServerSession.Release((object) settings);
+            ServerSession.Release((object)settings);
          }
 
          return map;
@@ -216,11 +216,11 @@ namespace hMailServer.ControlPanel.Views
          dynamic certs = ServerSession.Current.Application.Settings.SSLCertificates;
          try
          {
-            int count = (int) certs.Count;
+            int count = (int)certs.Count;
             for (int i = 0; i < count; i++)
             {
                dynamic c = certs.Item[i];
-               map[(int) c.ID] = (string) c.Name;
+               map[(int)c.ID] = (string)c.Name;
                ServerSession.Release(c);
             }
          }
@@ -332,13 +332,13 @@ namespace hMailServer.ControlPanel.Views
          dynamic ports = ServerSession.Current.Application.Settings.TCPIPPorts;
          try
          {
-            int count = (int) ports.Count;
+            int count = (int)ports.Count;
             for (int i = 0; i < count; i++)
             {
                dynamic port = ports.Item[i];
-               if (ProtocolName((int) port.Protocol) == row.Protocol &&
-                   (int) port.PortNumber == row.Port &&
-                   (string) port.Address == row.Address)
+               if (ProtocolName((int)port.Protocol) == row.Protocol &&
+                   (int)port.PortNumber == row.Port &&
+                   (string)port.Address == row.Address)
                {
                   port.Delete();
                   ServerSession.Release(port);

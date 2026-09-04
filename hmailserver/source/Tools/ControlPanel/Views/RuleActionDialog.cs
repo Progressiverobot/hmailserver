@@ -172,11 +172,11 @@ namespace hMailServer.ControlPanel.Views
          dynamic routes = ServerSession.Current.Application.Settings.Routes;
          try
          {
-            int count = (int) routes.Count;
+            int count = (int)routes.Count;
             for (int i = 0; i < count; i++)
             {
                dynamic r = routes.Item[i];
-               route_.Items.Add(new ComboBoxItem { Content = (string) r.DomainName, Tag = (int) r.ID });
+               route_.Items.Add(new ComboBoxItem { Content = (string)r.DomainName, Tag = (int)r.ID });
                ServerSession.Release(r);
             }
          }
@@ -208,20 +208,20 @@ namespace hMailServer.ControlPanel.Views
             try
             {
                dynamic a = actions.ItemByDBID[actionId_];
-               int type = (int) a.Type;
+               int type = (int)a.Type;
                SelectCombo(type_, type);
-               to_.Text = (string) a.To ?? "";
-               abortSpam_.IsChecked = (bool) a.AbortSpamFlagged;
-               fromName_.Text = (string) a.FromName ?? "";
-               fromAddress_.Text = (string) a.FromAddress ?? "";
-               subject_.Text = (string) a.Subject ?? "";
-               body_.Text = (string) a.Body ?? "";
-               imapFolder_.Text = (string) a.IMAPFolder ?? "";
-               scriptFunction_.Text = (string) a.ScriptFunction ?? "";
-               headerName_.Text = (string) a.HeaderName ?? "";
-               value_.Text = (string) a.Value ?? "";
-               bindAddress_.Text = (string) a.Value ?? "";
-               SelectCombo(route_, (int) a.RouteID);
+               to_.Text = (string)a.To ?? "";
+               abortSpam_.IsChecked = (bool)a.AbortSpamFlagged;
+               fromName_.Text = (string)a.FromName ?? "";
+               fromAddress_.Text = (string)a.FromAddress ?? "";
+               subject_.Text = (string)a.Subject ?? "";
+               body_.Text = (string)a.Body ?? "";
+               imapFolder_.Text = (string)a.IMAPFolder ?? "";
+               scriptFunction_.Text = (string)a.ScriptFunction ?? "";
+               headerName_.Text = (string)a.HeaderName ?? "";
+               value_.Text = (string)a.Value ?? "";
+               bindAddress_.Text = (string)a.Value ?? "";
+               SelectCombo(route_, (int)a.RouteID);
                ServerSession.Release(a);
             }
             finally
@@ -344,9 +344,9 @@ namespace hMailServer.ControlPanel.Views
       private static void SelectCombo(ComboBox combo, int value)
       {
          foreach (ComboBoxItem item in combo.Items)
-            if ((int) item.Tag == value) { combo.SelectedItem = item; return; }
+            if ((int)item.Tag == value) { combo.SelectedItem = item; return; }
       }
 
-      private static int ComboValue(ComboBox combo) => combo.SelectedItem is ComboBoxItem item ? (int) item.Tag : 0;
+      private static int ComboValue(ComboBox combo) => combo.SelectedItem is ComboBoxItem item ? (int)item.Tag : 0;
    }
 }

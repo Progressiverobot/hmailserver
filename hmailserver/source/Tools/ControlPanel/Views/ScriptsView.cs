@@ -215,8 +215,8 @@ End Sub
          dynamic scripting = ServerSession.Current.Application.Settings.Scripting;
          try
          {
-            string file = (string) scripting.CurrentScriptFile;
-            string dir = (string) scripting.Directory;
+            string file = (string)scripting.CurrentScriptFile;
+            string dir = (string)scripting.Directory;
             if (!string.IsNullOrWhiteSpace(file) && Path.IsPathRooted(file))
                return file;
             if (!string.IsNullOrWhiteSpace(dir) && !string.IsNullOrWhiteSpace(file))
@@ -259,7 +259,7 @@ End Sub
          {
             scripting.Reload();
             string result = "";
-            try { result = (string) scripting.CheckSyntax(); } catch (Exception) { }
+            try { result = (string)scripting.CheckSyntax(); } catch (Exception) { }
             status_.Text = string.IsNullOrWhiteSpace(result)
                ? "Saved and reloaded at " + DateTime.Now.ToLongTimeString() + ". No syntax errors."
                : "Saved. Compiler reported: " + result;
@@ -279,7 +279,7 @@ End Sub
          dynamic scripting = ServerSession.Current.Application.Settings.Scripting;
          try
          {
-            string result = (string) scripting.CheckSyntax();
+            string result = (string)scripting.CheckSyntax();
             status_.Text = string.IsNullOrWhiteSpace(result)
                ? "No syntax errors reported."
                : "Compiler reported: " + result;

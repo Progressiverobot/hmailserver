@@ -181,7 +181,7 @@ namespace hMailServer.ControlPanel.Views
          try
          {
             serverVersion_.Text = "Connected server: hMailServer " +
-               (string) ServerSession.Current.Application.Version +
+               (string)ServerSession.Current.Application.Version +
                " @ " + ServerSession.Current.Host;
          }
          catch (Exception)

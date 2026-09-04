@@ -43,3 +43,30 @@ jobs:
       # libraries/ are excluded inside the script, with the reasons.
       - name: Every source file carries a copyright line and an SPDX identifier
         run: python3 build/add-license-headers.py --check
+
+  dotnet-format:
+    name: dotnet format leaves the C# tree unchanged
+    # Written on 21 August 2026 and taken out of the same commit, because the
+    # tree was not clean and a red check on every push would have trained
+    # everyone to ignore it. The tree was brought to clean on 4 September
+    # 2026 (issue #44) as a formatting-only commit; this keeps it there. The
+    # two targets are the ones the issue measured: the setup and migration
+    # tools' solution and the Control Panel project. Formatting only -
+    # whitespace and using-directive order under .editorconfig - which is
+    # why the check needs no build of its own beyond the restore dotnet
+    # format performs itself.
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: The setup and migration tools
+        run: dotnet format "hmailserver/source/Tools/hMailServer Tools.sln" --verify-no-changes
+
+      - name: The Control Panel
+        run: dotnet format hmailserver/source/Tools/ControlPanel/ControlPanel.csproj --verify-no-changes

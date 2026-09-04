@@ -99,7 +99,7 @@ namespace hMailServer.ControlPanel.Views
             {
                quarantine.Refresh();
 
-               int total = (int) quarantine.Count;
+               int total = (int)quarantine.Count;
                int listed = 0;
 
                for (int i = 0; ; i++)
@@ -121,14 +121,14 @@ namespace hMailServer.ControlPanel.Views
                   {
                      rows.Add(new HeldRow
                      {
-                        CreatedTime = (string) item.CreatedTime,
-                        Sender = (string) item.Sender,
-                        Recipients = (string) item.Recipients,
-                        Score = (int) item.Score,
-                        Subject = string.IsNullOrEmpty((string) item.Subject)
-                           ? "(no subject)" : (string) item.Subject,
-                        Reason = (string) item.Reason,
-                        Id = (int) item.ID
+                        CreatedTime = (string)item.CreatedTime,
+                        Sender = (string)item.Sender,
+                        Recipients = (string)item.Recipients,
+                        Score = (int)item.Score,
+                        Subject = string.IsNullOrEmpty((string)item.Subject)
+                           ? "(no subject)" : (string)item.Subject,
+                        Reason = (string)item.Reason,
+                        Id = (int)item.ID
                      });
 
                      listed++;
@@ -354,7 +354,7 @@ namespace hMailServer.ControlPanel.Views
             dynamic quarantine = OpenQuarantine();
             try
             {
-               int removed = (int) quarantine.DeleteExpired();
+               int removed = (int)quarantine.DeleteExpired();
 
                status_.Text = removed == 0
                   ? "Nothing was old enough to remove. The window is QuarantineRetentionDays in hMailServer.ini, "

@@ -633,7 +633,7 @@ namespace hMailServer.ControlPanel
 
          try
          {
-            VersionText.Text = "hMailServer " + (string) ServerSession.Current.Application.Version;
+            VersionText.Text = "hMailServer " + (string)ServerSession.Current.Application.Version;
          }
          catch (Exception)
          {
@@ -840,10 +840,10 @@ namespace hMailServer.ControlPanel
             // Persist the normal (restored) bounds so un-maximizing next time works.
             Rect bounds = maximized ? RestoreBounds : new Rect(Left, Top, Width, Height);
 
-            key.SetValue("WindowWidth", (int) bounds.Width);
-            key.SetValue("WindowHeight", (int) bounds.Height);
-            key.SetValue("WindowLeft", (int) bounds.Left);
-            key.SetValue("WindowTop", (int) bounds.Top);
+            key.SetValue("WindowWidth", (int)bounds.Width);
+            key.SetValue("WindowHeight", (int)bounds.Height);
+            key.SetValue("WindowLeft", (int)bounds.Left);
+            key.SetValue("WindowTop", (int)bounds.Top);
             key.SetValue("WindowMaximized", maximized ? "1" : "0");
          }
          catch (Exception)

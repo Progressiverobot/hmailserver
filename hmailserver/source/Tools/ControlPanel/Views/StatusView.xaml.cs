@@ -53,7 +53,7 @@ namespace hMailServer.ControlPanel.Views
 
          try
          {
-            int state = (int) app.ServerState;
+            int state = (int)app.ServerState;
 
             if (state == ServerStateRunning_)
             {
@@ -107,7 +107,7 @@ namespace hMailServer.ControlPanel.Views
                break;
          }
 
-         AutomationProperties.SetName(PauseButton, (string) PauseButton.Content + " the mail server engine");
+         AutomationProperties.SetName(PauseButton, (string)PauseButton.Content + " the mail server engine");
       }
 
       private static string DatabaseTypeName(int type) => type switch
@@ -138,13 +138,13 @@ namespace hMailServer.ControlPanel.Views
          try
          {
             SetValue_(VersionValue, "Version",
-               (string) app.Version + " (" + (string) app.VersionArchitecture + ")");
+               (string)app.Version + " (" + (string)app.VersionArchitecture + ")");
          }
          catch (Exception) { SetValue_(VersionValue, "Version", "-"); }
 
          try
          {
-            int state = (int) app.ServerState;
+            int state = (int)app.ServerState;
             SetValue_(StateValue, "State", ServerStateName(state));
             UpdatePauseButton_(state);
          }
@@ -157,12 +157,12 @@ namespace hMailServer.ControlPanel.Views
          try
          {
             dynamic db = app.Database;
-            SetValue_(DbTypeValue, "Database type", DatabaseTypeName((int) db.DatabaseType));
-            string host = (string) db.ServerName;
+            SetValue_(DbTypeValue, "Database type", DatabaseTypeName((int)db.DatabaseType));
+            string host = (string)db.ServerName;
             SetValue_(DbHostValue, "Database host", string.IsNullOrEmpty(host) ? "-" : host);
-            string name = (string) db.DatabaseName;
+            string name = (string)db.DatabaseName;
             SetValue_(DbNameValue, "Database name", string.IsNullOrEmpty(name) ? "-" : name);
-            SetValue_(DbVersionValue, "Database schema version", ((int) db.CurrentVersion).ToString());
+            SetValue_(DbVersionValue, "Database schema version", ((int)db.CurrentVersion).ToString());
             ServerSession.Release(db);
          }
          catch (Exception)
@@ -231,27 +231,27 @@ namespace hMailServer.ControlPanel.Views
             dynamic settings = app.Settings;
             try
             {
-               if (((string) settings.HostName).Length == 0)
+               if (((string)settings.HostName).Length == 0)
                   count += AddWarning("High", "No public host name is configured in the SMTP settings.");
 
-               if ((bool) settings.DenyMailFromNull)
+               if ((bool)settings.DenyMailFromNull)
                   count += AddWarning("High", "Mail from an empty sender address is denied. Many servers send bounces from <>, which will be rejected.");
 
                dynamic ranges = settings.SecurityRanges;
                int autoban = 0;
-               int rangeCount = (int) ranges.Count;
+               int rangeCount = (int)ranges.Count;
                for (int i = 0; i < rangeCount; i++)
                {
                   dynamic range = ranges.Item[i];
                   try
                   {
-                     if ((bool) range.AllowDeliveryFromRemoteToRemote && !(bool) range.RequireSMTPAuthExternalToExternal)
-                        count += AddWarning("Critical", "IP range '" + (string) range.Name + "' allows external-to-external delivery without authentication (open relay risk).");
+                     if ((bool)range.AllowDeliveryFromRemoteToRemote && !(bool)range.RequireSMTPAuthExternalToExternal)
+                        count += AddWarning("Critical", "IP range '" + (string)range.Name + "' allows external-to-external delivery without authentication (open relay risk).");
 
-                     if ((string) range.LowerIP == "127.0.0.1" && (string) range.UpperIP == "127.0.0.1" && (bool) range.Expires)
+                     if ((string)range.LowerIP == "127.0.0.1" && (string)range.UpperIP == "127.0.0.1" && (bool)range.Expires)
                         count += AddWarning("High", "Localhost is currently banned in the IP ranges.");
 
-                     if ((bool) range.Expires)
+                     if ((bool)range.Expires)
                         autoban++;
                   }
                   finally
@@ -382,9 +382,9 @@ namespace hMailServer.ControlPanel.Views
          {
             TimeSpan up = DateTime.Now - started;
             if (up.TotalSeconds < 0) return startTime;
-            if (up.TotalDays >= 1) return (int) up.TotalDays + "d " + up.Hours + "h " + up.Minutes + "m";
+            if (up.TotalDays >= 1) return (int)up.TotalDays + "d " + up.Hours + "h " + up.Minutes + "m";
             if (up.TotalHours >= 1) return up.Hours + "h " + up.Minutes + "m";
-            return Math.Max(0, (int) up.TotalMinutes) + "m";
+            return Math.Max(0, (int)up.TotalMinutes) + "m";
          }
          return string.IsNullOrEmpty(startTime) ? "-" : startTime;
       }

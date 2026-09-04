@@ -111,7 +111,7 @@ namespace hMailServer.ControlPanel.Views
          try
          {
             serverLine_.Text = "Connected to hMailServer " +
-               (string) ServerSession.Current.Application.Version + " on " + ServerSession.Current.Host + ".";
+               (string)ServerSession.Current.Application.Version + " on " + ServerSession.Current.Host + ".";
          }
          catch (Exception)
          {

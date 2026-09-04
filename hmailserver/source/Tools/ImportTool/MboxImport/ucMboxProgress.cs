@@ -95,7 +95,7 @@ namespace ImportTool.MboxImport
                   consumed =>
                   {
                      if (fileSize > 0)
-                        progressCurrentFile.Value = (int) Math.Min(100, consumed * 100 / fileSize);
+                        progressCurrentFile.Value = (int)Math.Min(100, consumed * 100 / fileSize);
 
                      Application.DoEvents();
                   });

@@ -290,7 +290,7 @@ namespace hMailServer.ControlPanel.Services
 
             hasData |= counted > 0;
             summaries.Add(new ChartSeriesSummary(series[s].Name, latest, peak,
-               counted > 0 ? total / counted : (double?) null, counted));
+               counted > 0 ? total / counted : (double?)null, counted));
          }
 
          return new ChartSummary(summaries, hasData, SummaryText_(definition, summaries, hasData));

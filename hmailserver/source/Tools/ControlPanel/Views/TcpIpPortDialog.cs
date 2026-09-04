@@ -152,11 +152,11 @@ namespace hMailServer.ControlPanel.Views
          dynamic certs = ServerSession.Current.Application.Settings.SSLCertificates;
          try
          {
-            int count = (int) certs.Count;
+            int count = (int)certs.Count;
             for (int i = 0; i < count; i++)
             {
                dynamic c = certs.Item[i];
-               certificate_.Items.Add(Combo((string) c.Name, (int) c.ID));
+               certificate_.Items.Add(Combo((string)c.Name, (int)c.ID));
                ServerSession.Release(c);
             }
          }
@@ -167,11 +167,11 @@ namespace hMailServer.ControlPanel.Views
 
       private dynamic FindPort(dynamic ports)
       {
-         int count = (int) ports.Count;
+         int count = (int)ports.Count;
          for (int i = 0; i < count; i++)
          {
             dynamic p = ports.Item[i];
-            if ((int) p.ID == portId_)
+            if ((int)p.ID == portId_)
                return p;
             ServerSession.Release(p);
          }
@@ -185,13 +185,13 @@ namespace hMailServer.ControlPanel.Views
          {
             dynamic p = FindPort(ports);
             if (p == null) { Close(); return; }
-            SelectCombo(protocol_, (int) p.Protocol);
-            address_.Text = (string) p.Address ?? "";
-            port_.Text = ((int) p.PortNumber).ToString();
-            SelectCombo(security_, (int) p.ConnectionSecurity);
-            LoadCertificates((int) p.SSLCertificateID);
-            SelectCombo(clientCertPolicy_, (int) p.ClientCertificatePolicy);
-            clientCertCaFile_.Text = (string) p.ClientCertificateCAFile ?? "";
+            SelectCombo(protocol_, (int)p.Protocol);
+            address_.Text = (string)p.Address ?? "";
+            port_.Text = ((int)p.PortNumber).ToString();
+            SelectCombo(security_, (int)p.ConnectionSecurity);
+            LoadCertificates((int)p.SSLCertificateID);
+            SelectCombo(clientCertPolicy_, (int)p.ClientCertificatePolicy);
+            clientCertCaFile_.Text = (string)p.ClientCertificateCAFile ?? "";
             UpdateClientCertificateValidation();
             ServerSession.Release(p);
          }
@@ -353,10 +353,10 @@ namespace hMailServer.ControlPanel.Views
       private static void SelectCombo(ComboBox combo, int value)
       {
          foreach (ComboBoxItem item in combo.Items)
-            if ((int) item.Tag == value) { combo.SelectedItem = item; return; }
+            if ((int)item.Tag == value) { combo.SelectedItem = item; return; }
          if (combo.Items.Count > 0) combo.SelectedIndex = 0;
       }
 
-      private static int ComboValue(ComboBox combo) => combo.SelectedItem is ComboBoxItem item ? (int) item.Tag : 0;
+      private static int ComboValue(ComboBox combo) => combo.SelectedItem is ComboBoxItem item ? (int)item.Tag : 0;
    }
 }

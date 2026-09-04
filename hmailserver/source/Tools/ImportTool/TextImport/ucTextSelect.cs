@@ -62,7 +62,7 @@ namespace ImportTool.TextImport
          }
 
          SelectedFile = textFile.Text;
-         SelectedDomain = (string) comboDomains.SelectedItem;
+         SelectedDomain = (string)comboDomains.SelectedItem;
 
          return true;
       }

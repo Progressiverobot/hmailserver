@@ -13,95 +13,95 @@ using System.Threading;
 
 namespace hMailServer.Shared
 {
-    public partial class formErrorMessage : Form
-    {
-        private Exception _exception;
-        private readonly UnhandledExceptionEventArgs _args;
-        private readonly ThreadExceptionEventArgs _threadArgs;
+   public partial class formErrorMessage : Form
+   {
+      private Exception _exception;
+      private readonly UnhandledExceptionEventArgs _args;
+      private readonly ThreadExceptionEventArgs _threadArgs;
 
-        private readonly string _title;
-        private readonly string _errorMessage;
+      private readonly string _title;
+      private readonly string _errorMessage;
 
-        public formErrorMessage(UnhandledExceptionEventArgs args)
-        {
-            _args = args;
+      public formErrorMessage(UnhandledExceptionEventArgs args)
+      {
+         _args = args;
 
-            InitializeComponent();
-        }
+         InitializeComponent();
+      }
 
-        public formErrorMessage(ThreadExceptionEventArgs args)
-        {
-            _threadArgs = args;
+      public formErrorMessage(ThreadExceptionEventArgs args)
+      {
+         _threadArgs = args;
 
-            InitializeComponent();
-        }
+         InitializeComponent();
+      }
 
-        public formErrorMessage(Exception exception, string title, string errorMessage)
-        {
-            _exception = exception;
-            _title = title;
-            _errorMessage = errorMessage;
+      public formErrorMessage(Exception exception, string title, string errorMessage)
+      {
+         _exception = exception;
+         _title = title;
+         _errorMessage = errorMessage;
 
-            InitializeComponent();
-        }
+         InitializeComponent();
+      }
 
-        private void buttonClose_Click(object sender, EventArgs e)
-        {
-            if (_args != null)
-            {
-                // Global exception. Exit application.
-                System.Windows.Forms.Application.Exit();
-            }
-            else
-            {
-                this.Close();
-            }
-        }
+      private void buttonClose_Click(object sender, EventArgs e)
+      {
+         if (_args != null)
+         {
+            // Global exception. Exit application.
+            System.Windows.Forms.Application.Exit();
+         }
+         else
+         {
+            this.Close();
+         }
+      }
 
-        private void formErrorMessage_Shown(object sender, EventArgs e)
-        {
+      private void formErrorMessage_Shown(object sender, EventArgs e)
+      {
 
-            if (_exception == null)
-                _exception = _args == null
-                    ? _threadArgs.Exception
-                    : (Exception)_args.ExceptionObject;
+         if (_exception == null)
+            _exception = _args == null
+                ? _threadArgs.Exception
+                : (Exception)_args.ExceptionObject;
 
-            textErrorMessage.Text = string.IsNullOrEmpty(_errorMessage)
-                ? _exception.Message
-                : _errorMessage;
+         textErrorMessage.Text = string.IsNullOrEmpty(_errorMessage)
+             ? _exception.Message
+             : _errorMessage;
 
-            if (!string.IsNullOrEmpty(_title))
-                this.Text = _title;
+         if (!string.IsNullOrEmpty(_title))
+            this.Text = _title;
 
-            var details = new StringBuilder();
-            details.Append(_exception.Message).Append(Environment.NewLine).Append(Environment.NewLine);
+         var details = new StringBuilder();
+         details.Append(_exception.Message).Append(Environment.NewLine).Append(Environment.NewLine);
 
-            AppendException(details, _exception, string.Empty);
+         AppendException(details, _exception, string.Empty);
 
-            Exception ie = _exception;
-            for (int depth = 1; ie.InnerException != null; depth++)
-            {
-                ie = ie.InnerException;
-                string indent = new string('	', depth);
-                details.Append(indent).Append("****** Inner Exception ******").Append(Environment.NewLine);
-                AppendException(details, ie, indent);
-            }
+         Exception ie = _exception;
+         for (int depth = 1; ie.InnerException != null; depth++)
+         {
+            ie = ie.InnerException;
+            string indent = new string('	', depth);
+            details.Append(indent).Append("****** Inner Exception ******").Append(Environment.NewLine);
+            AppendException(details, ie, indent);
+         }
 
-            textErrorDetails.Text = details.ToString();
-        }
+         textErrorDetails.Text = details.ToString();
+      }
 
-        // Built with a StringBuilder rather than repeated string concatenation, and
-        // shared between the outer exception and each inner one - the inner-exception
-        // copy of this block had "+ Environment.NewLine" inside the format string, so
-        // the StackTrace and TargetSite lines printed that text instead of a newline.
-        private static void AppendException(StringBuilder details, Exception exception, string indent)
-        {
-            details.Append(indent).Append("ExceptionType: ").Append(exception.GetType().Name).Append(Environment.NewLine);
-            details.Append(indent).Append("HelpLine: ").Append(exception.HelpLink).Append(Environment.NewLine);
-            details.Append(indent).Append("Message: ").Append(exception.Message).Append(Environment.NewLine);
-            details.Append(indent).Append("Source: ").Append(exception.Source).Append(Environment.NewLine);
-            details.Append(indent).Append("StackTrace: ").Append(exception.StackTrace).Append(Environment.NewLine);
-            details.Append(indent).Append("TargetSite: ").Append(exception.TargetSite).Append(Environment.NewLine);
-        }
-    }
+      // Built with a StringBuilder rather than repeated string concatenation, and
+      // shared between the outer exception and each inner one - the inner-exception
+      // copy of this block had "+ Environment.NewLine" inside the format string, so
+      // the StackTrace and TargetSite lines printed that text instead of a newline.
+      private static void AppendException(StringBuilder details, Exception exception, string indent)
+      {
+         details.Append(indent).Append("ExceptionType: ").Append(exception.GetType().Name).Append(Environment.NewLine);
+         details.Append(indent).Append("HelpLine: ").Append(exception.HelpLink).Append(Environment.NewLine);
+         details.Append(indent).Append("Message: ").Append(exception.Message).Append(Environment.NewLine);
+         details.Append(indent).Append("Source: ").Append(exception.Source).Append(Environment.NewLine);
+         details.Append(indent).Append("StackTrace: ").Append(exception.StackTrace).Append(Environment.NewLine);
+         details.Append(indent).Append("TargetSite: ").Append(exception.TargetSite).Append(Environment.NewLine);
+      }
+   }
 }

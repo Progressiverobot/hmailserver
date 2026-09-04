@@ -67,7 +67,7 @@ namespace hMailServer.ControlPanel.Services
 
       private static long GetCurrentCounter()
       {
-         long unixTime = (long) (DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds;
+         long unixTime = (long)(DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds;
          return unixTime / PeriodSeconds;
       }
 
@@ -88,7 +88,7 @@ namespace hMailServer.ControlPanel.Services
             ((hash[dynamicOffset + 2] & 0xFF) << 8) |
             (hash[dynamicOffset + 3] & 0xFF);
 
-         int otp = binaryCode % (int) Math.Pow(10, Digits);
+         int otp = binaryCode % (int)Math.Pow(10, Digits);
          return otp.ToString(new string('0', Digits));
       }
 
@@ -146,7 +146,7 @@ namespace hMailServer.ControlPanel.Services
             bitCount += 5;
             if (bitCount >= 8)
             {
-               result.Add((byte) ((bitBuffer >> (bitCount - 8)) & 0xFF));
+               result.Add((byte)((bitBuffer >> (bitCount - 8)) & 0xFF));
                bitCount -= 8;
             }
          }

@@ -9,29 +9,29 @@ using hMailServer.Shared;
 
 namespace DataDirectorySynchronizer.Pages
 {
-    public partial class ucSynchMode : UserControl, IWizardPage
-    {
-        public ucSynchMode()
-        {
-            InitializeComponent();
-        }
+   public partial class ucSynchMode : UserControl, IWizardPage
+   {
+      public ucSynchMode()
+      {
+         InitializeComponent();
+      }
 
 
-        public void OnShowPage(Dictionary<string, string> _state)
-        {
+      public void OnShowPage(Dictionary<string, string> _state)
+      {
 
-        }
+      }
 
-        public bool OnLeavePage(bool next)
-        {
-           Globals.Mode = radioImport.Checked ? Globals.ModeType.Import : Globals.ModeType.Delete;
+      public bool OnLeavePage(bool next)
+      {
+         Globals.Mode = radioImport.Checked ? Globals.ModeType.Import : Globals.ModeType.Delete;
 
-           return true;
-        }
+         return true;
+      }
 
-        public string Title
-        {
-           get { return "Select mode"; }
-        }
-    }
+      public string Title
+      {
+         get { return "Select mode"; }
+      }
+   }
 }

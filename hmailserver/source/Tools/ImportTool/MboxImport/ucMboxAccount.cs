@@ -46,7 +46,7 @@ namespace ImportTool.MboxImport
          }
 
          var address = listAccounts.SelectedItems[0].Text;
-         var domain = Globals.GetApp().Domains.get_ItemByName((string) comboDomains.SelectedItem);
+         var domain = Globals.GetApp().Domains.get_ItemByName((string)comboDomains.SelectedItem);
          var account = domain.Accounts.get_ItemByAddress(address);
 
          SelectedAccount = address;
@@ -59,7 +59,7 @@ namespace ImportTool.MboxImport
       {
          listAccounts.Items.Clear();
 
-         var domain = Globals.GetApp().Domains.get_ItemByName((string) comboDomains.SelectedItem);
+         var domain = Globals.GetApp().Domains.get_ItemByName((string)comboDomains.SelectedItem);
          var accounts = domain.Accounts;
          for (int i = 0; i < accounts.Count; i++)
             listAccounts.Items.Add(accounts[i].Address);

@@ -9,13 +9,13 @@ using System.Text;
 
 namespace hMailServer.Shared
 {
-    public interface IPropertyEditor
-    {
-        bool Dirty
-        {
-            get;
-        }
+   public interface IPropertyEditor
+   {
+      bool Dirty
+      {
+         get;
+      }
 
-        void SetClean();
-    }
+      void SetClean();
+   }
 }

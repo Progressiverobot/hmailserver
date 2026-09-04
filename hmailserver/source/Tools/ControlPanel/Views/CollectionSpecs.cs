@@ -311,8 +311,8 @@ namespace hMailServer.ControlPanel.Views
          root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
          var head = new StackPanel();
-         head.Children.Add(new TextBlock { Text = spec.Title, Style = (Style) FindResource("PageTitle") });
-         head.Children.Add(new TextBlock { Text = subtitle, Style = (Style) FindResource("PageSubtitle") });
+         head.Children.Add(new TextBlock { Text = spec.Title, Style = (Style)FindResource("PageTitle") });
+         head.Children.Add(new TextBlock { Text = subtitle, Style = (Style)FindResource("PageSubtitle") });
          root.Children.Add(head);
 
          Grid.SetRow(editor_, 1);
