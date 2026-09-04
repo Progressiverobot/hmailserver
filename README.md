@@ -32,7 +32,7 @@ Mail protocols
 --------------
 
 * **SMTP** with PIPELINING, ENHANCEDSTATUSCODES, 8BITMIME, SIZE, CHUNKING/BDAT (RFC 3030), DSN delivery status notifications (RFC 3461/3464) and SMTPUTF8/EAI for internationalised addresses.
-* **IMAP4rev1**, plus **IMAP4rev2** (RFC 9051) advertised with its behavioural deltas implemented — a few of the extensions rev2 folds in (LIST-STATUS, non-synchronising literals, BINARY) are still missing — with IDLE, MOVE (RFC 6851), UIDPLUS (RFC 4315), CONDSTORE/QRESYNC (RFC 7162), SEARCHRES (RFC 5182), ESEARCH (RFC 4731), SORT and THREAD (RFC 5256, both ORDEREDSUBJECT and REFERENCES), ACL, NAMESPACE, ID (RFC 2971), SPECIAL-USE (RFC 6154, including explicit designation via `CREATE ... (USE (\Sent))`) and QUOTA.
+* **IMAP4rev1**, plus **IMAP4rev2** (RFC 9051) advertised with its behavioural deltas implemented, including the extensions rev2 folds in (LIST-STATUS, non-synchronising literals, BINARY) — with IDLE, MOVE (RFC 6851), UIDPLUS (RFC 4315), CONDSTORE/QRESYNC (RFC 7162), SEARCHRES (RFC 5182), ESEARCH (RFC 4731), SORT and THREAD (RFC 5256, both ORDEREDSUBJECT and REFERENCES), ACL, NAMESPACE, ID (RFC 2971), SPECIAL-USE (RFC 6154, including explicit designation via `CREATE ... (USE (\Sent))`) and QUOTA.
 * **POP3**, including retrieval from external POP3 accounts on a schedule.
 * **Public folders**, shared across accounts with per-user ACLs.
 
@@ -101,7 +101,7 @@ Technology
 | MySQL/MariaDB client | MariaDB Connector/C, shipped as `libmysql.dll` with auth plugins — works with MySQL 8 `caching_sha2_password` and MariaDB `ed25519`/`gssapi` out of the box |
 | Administration GUI and tools | C# / .NET 10 (WPF, Fluent design) |
 | Extensibility | COM/IDispatch API, plus a REST administration API |
-| Schema | Database version 6010, upgradeable from every earlier hMailServer release |
+| Schema | Database version 6025, upgradeable from every earlier hMailServer release |
 
 **Quality gates.** Every release ships SPDX and CycloneDX SBOMs (Syft). The repository runs CodeQL analysis, Dependabot CVE alerts with grouped update pull requests, a dependency-review gate on pull requests, an installer smoke test that installs the built installer on a clean machine and verifies the service comes up, and a monthly comparison against the original upstream repository so nothing landing there is missed.
 
@@ -360,7 +360,7 @@ Web services (MTA-STS hosting, client autoconfiguration):
 Administration and monitoring:
 
    <pre>
-   RestApiPort=0                 ; REST admin API (HTTP Basic auth, administrator password)
+   RestApiPort=0                 ; REST admin API (Bearer API keys, or HTTP Basic with the administrator password)
    RestApiBindAddress=127.0.0.1  ; TLS is required unless bound to 127.0.0.1
    RestApiCertificateFile=       ; PEM; falls back to the ACME certificate
    RestApiPrivateKeyFile=
