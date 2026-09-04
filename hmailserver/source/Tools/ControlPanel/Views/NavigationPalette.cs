@@ -68,7 +68,7 @@ namespace hMailServer.ControlPanel.Views
          // The application face. The palette is a plain chromeless Window, not
          // a FluentDialogWindow, so it never inherited the face the rest of
          // the app gets from its window base classes.
-         FontFamily = new FontFamily(Typography.UiFontFamily);
+         FontFamily = new System.Windows.Media.FontFamily(Typography.UiFontFamily);
          WindowStyle = WindowStyle.None;
          AllowsTransparency = true;
          Background = Brushes.Transparent;

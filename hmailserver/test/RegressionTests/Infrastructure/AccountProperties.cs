@@ -29,7 +29,7 @@ namespace RegressionTests.Infrastructure
          ImapClientSimulator.AssertMessageCount("test@example.test", "test", "Inbox", 30);
 
          var size = account.Size;
-         if (size == 0)
+         if (!(size > 0))
             throw new Exception("Account is empty");
       }
 

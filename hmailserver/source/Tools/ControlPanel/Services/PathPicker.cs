@@ -31,7 +31,9 @@ namespace hMailServer.ControlPanel.Services
       /// </summary>
       public static string PickFile(string current, string filter)
       {
-         var dialog = new OpenFileDialog
+         // Fully qualified: the WPF dialog, which is not disposable, not the
+         // WinForms one of the same name.
+         var dialog = new Microsoft.Win32.OpenFileDialog
          {
             Filter = string.IsNullOrEmpty(filter) ? "All files (*.*)|*.*" : filter
          };

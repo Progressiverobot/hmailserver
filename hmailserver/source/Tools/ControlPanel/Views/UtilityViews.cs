@@ -795,8 +795,9 @@ namespace hMailServer.ControlPanel.Views
 
          Services.MessageStoreConsistencyReport report = Services.MessageStoreConsistencyReport.Parse(text);
          string when = string.IsNullOrEmpty(report.Generated) ? "" : " Last scan: " + report.Generated + ".";
-         string truncated = report.IsTruncated
-            ? " The report header says " + report.ReportedMissingCount.Value + " but lists " + report.Entries.Count +
+         int? reportedMissing = report.ReportedMissingCount;
+         string truncated = report.IsTruncated && reportedMissing.HasValue
+            ? " The report header says " + reportedMissing.Value + " but lists " + report.Entries.Count +
               " - it was probably read while the server was rewriting it, so refresh."
             : "";
 

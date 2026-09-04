@@ -134,10 +134,10 @@ namespace hMailServer.ControlPanel.Services
 
          try
          {
-            Application current = Application.Current;
+            System.Windows.Threading.Dispatcher dispatcher = Application.Current?.Dispatcher;
 
-            if (current?.Dispatcher != null && !current.Dispatcher.CheckAccess())
-               current.Dispatcher.BeginInvoke(new Action(Refresh));
+            if (dispatcher != null && !dispatcher.CheckAccess())
+               dispatcher.BeginInvoke(new Action(Refresh));
             else
                Refresh();
          }

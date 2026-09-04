@@ -4,8 +4,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System;
-using System.Net;
 using System.IO;
+using System.Net;
+using System.Net.Http;
 using System.Text;
 
 namespace TranslationExtractor
@@ -39,13 +40,9 @@ namespace TranslationExtractor
       {
          var url = string.Format(TranslationScript, language);
 
-         var request = (HttpWebRequest) WebRequest.Create(url);
-
-         using (var response = request.GetResponse())
-         using (var responseStream = response.GetResponseStream())
-         using (var streamReader = new StreamReader(responseStream))
+         using (var client = new HttpClient())
          {
-            var content = streamReader.ReadToEnd();
+            var content = client.GetStringAsync(url).GetAwaiter().GetResult();
 
             var targetFile = Path.Combine(targetDir, string.Format("{0}.ini", language));
 
