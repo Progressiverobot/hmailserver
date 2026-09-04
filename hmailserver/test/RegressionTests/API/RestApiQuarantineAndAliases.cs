@@ -158,8 +158,8 @@ namespace RegressionTests.API
             "/api/v1/quarantine/{id}",
             "/api/v1/domains/{domain}/aliases",
             "/api/v1/tlsa",
-            "/api/v1/api-keys",
-            "/api/v1/api-keys/{id}",
+            "/api/v1/apikeys",
+            "/api/v1/apikeys/{id}",
             "/api/v1/openapi.json"
          };
 

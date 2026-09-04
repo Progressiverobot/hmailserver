@@ -6,8 +6,8 @@
 // It exists because POP3 has no idle notification, so a client that wants to
 // look responsive polls - and the ones that poll every ten seconds are not
 // rare. Each poll is a TCP connection, a TLS handshake and a password
-// verification, and the password verification is Argon2id by default, which is
-// deliberately expensive. A handful of over-eager clients can therefore cost
+// verification, and the password verification is a deliberately expensive hash
+// (PBKDF2 by default, Argon2id where PreferredHashAlgorithm selects it). A handful of over-eager clients can therefore cost
 // more than the mail does. LOGIN-DELAY is the standard way to say so: the
 // server declares the interval in CAPA, and refuses a login that arrives early
 // with -ERR [LOGIN-DELAY], which a conforming client backs off from rather
