@@ -19,6 +19,7 @@ import time
 
 HOST, PORT = "127.0.0.2", 2525
 RCPT = "test@pipelining.example.test"
+VALID_CASES = ("crlf", "barelf", "midlf", "params")
 
 def build(case):
     headers = (b"From: bench@example.org\r\n"
@@ -38,7 +39,32 @@ def build(case):
 def run(case):
     msg = build(case)
     s = socket.create_connection((HOST, PORT), timeout=30)
-    r = s.recv(4096)
+    def recv_smtp_reply():
+        data = b""
+        code = None
+        while True:
+            chunk = s.recv(4096)
+            if not chunk:
+                break
+            data += chunk
+
+            lines = data.split(b"\r\n")
+            complete_lines = lines[:-1]
+            if not complete_lines:
+                continue
+
+            for line in complete_lines:
+                if len(line) >= 4 and line[:3].isdigit():
+                    if code is None:
+                        code = line[:3]
+                    if line[:3] == code and line[3:4] == b" ":
+                        return data
+
+            if code is None and data.endswith(b"\r\n"):
+                return data
+        return data
+
+    r = recv_smtp_reply()
     transcript = [("<", r)]
 
     def send(b):
@@ -46,7 +72,7 @@ def run(case):
         s.sendall(b)
 
     def recv():
-        r = s.recv(4096)
+        r = recv_smtp_reply()
         transcript.append(("<", r))
         return r
 
@@ -87,6 +113,16 @@ def run(case):
     return ok
 
 if __name__ == "__main__":
-    cases = sys.argv[1:] or ["crlf", "barelf", "midlf", "params"]
+    cases = sys.argv[1:] or list(VALID_CASES)
+    invalid = [c for c in cases if c not in VALID_CASES]
+    if invalid:
+        print(
+            "ERROR: unsupported case name(s): "
+            + ", ".join(invalid)
+            + ". Supported cases: "
+            + ", ".join(VALID_CASES),
+            file=sys.stderr,
+        )
+        sys.exit(2)
     results = {c: run(c) for c in cases}
     print("SUMMARY:", results)

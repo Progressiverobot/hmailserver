@@ -175,14 +175,19 @@ pre{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padd
 <script>
 "use strict";
 const $=s=>document.querySelector(s);
-let auth=sessionStorage.getItem("hmsAuth")||null;
+let auth=null;
 let view="dash", pollTimer=null;
 
 /* ---------- API ---------- */
 async function api(path,opts={}){
-  const res=await fetch(path,{...opts,headers:{...(opts.headers||{}),"Authorization":"Basic "+auth}});
+  const res=await fetch(path,{...opts,credentials:"same-origin",headers:{...(opts.headers||{})}});
   if(res.status===401) throw new Error("auth");
-  if(!res.ok){let t=await res.text();throw new Error(t||res.status)}
+  if(!res.ok){
+    let t="";
+    try{t=await res.text();}catch(_){}
+    console.error("API request failed", {path,status:res.status,body:t});
+    throw new Error("Request failed. Please try again.");
+  }
   const text=await res.text();
   return text?JSON.parse(text):{};
 }
@@ -204,11 +209,10 @@ $("#loginForm").onsubmit=async e=>{
   auth=candidate;
   try{
     const s=await api("/api/v1/status");
-    sessionStorage.setItem("hmsAuth",candidate);
     enter(s);
   }catch(_){auth=null;$("#loginErr").textContent="Authentication failed. Check the password.";}
 };
-$("#logoutBtn").onclick=()=>{sessionStorage.removeItem("hmsAuth");location.reload()};
+$("#logoutBtn").onclick=()=>{location.reload()};
 
 function enter(status){
   $("#gate").style.display="none";$("#app").style.display="flex";
@@ -234,13 +238,32 @@ async function render(silent){
     else if(view==="tlsa")await renderTlsa();
     $("#connState").textContent="Connected";
   }catch(err){
-    if(err.message==="auth"){sessionStorage.removeItem("hmsAuth");location.reload();return;}
+    if(err.message==="auth"){location.reload();return;}
     $("#connState").textContent="Connection problem";
     if(!silent)$("#content").innerHTML='<div class="empty">Could not reach the server: '+err.message+'</div>';
   }
 }
 
 /* ---------- Views ---------- */
+function escHtml(v){
+  return String(v)
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;")
+    .replace(/'/g,"&#39;");
+}
+
+function escJsSingle(v){
+  return String(v)
+    .replace(/\\/g,"\\\\")
+    .replace(/'/g,"\\'")
+    .replace(/\r/g,"\\r")
+    .replace(/\n/g,"\\n")
+    .replace(/\u2028/g,"\\u2028")
+    .replace(/\u2029/g,"\\u2029");
+}
+
 function animateNum(el,target){
   const start=parseInt(el.dataset.v||"0",10),diff=target-start;if(!diff){el.textContent=target.toLocaleString();return}
   const t0=performance.now();
@@ -281,9 +304,9 @@ async function renderDomains(){
   const d=await api("/api/v1/domains");
   const list=Array.isArray(d)?d:(d.domains||[]);
   const rows=list.map(x=>`
-    <tr><td><b>${x.name}</b></td>
+    <tr><td><b>${escHtml(x.name)}</b></td>
         <td>${x.active?'<span class="badge good">Active</span>':'<span class="badge warn">Disabled</span>'}</td>
-        <td style="text-align:right"><button class="btn ghost sm" onclick="showAccounts('${x.name}')">Accounts ›</button></td></tr>`).join("");
+        <td style="text-align:right"><button class="btn ghost sm" onclick="showAccounts('${escJsSingle(x.name)}')">Accounts ›</button></td></tr>`).join("");
   $("#content").innerHTML=`<div class="card view">
     <table><thead><tr><th>Domain</th><th>Status</th><th></th></tr></thead>
     <tbody>${rows||'<tr><td colspan="3" class="empty">No domains configured.</td></tr>'}</tbody></table></div>`;
@@ -293,21 +316,21 @@ window.showAccounts=async function(domain){
   const a=await api("/api/v1/domains/"+encodeURIComponent(domain)+"/accounts");
   const list=Array.isArray(a)?a:(a.accounts||[]);
   const rows=list.map(x=>`
-    <tr><td><b>${x.address}</b></td>
+    <tr><td><b>${escHtml(x.address)}</b></td>
         <td>${x.active?'<span class="badge good">Active</span>':'<span class="badge warn">Disabled</span>'}</td>
-        <td style="text-align:right"><button class="btn danger sm" onclick="delAccount('${x.address}','${domain}')">Delete</button></td></tr>`).join("");
+        <td style="text-align:right"><button class="btn danger sm" onclick="delAccount('${escJsSingle(x.address)}','${escJsSingle(domain)}')">Delete</button></td></tr>`).join("");
   $("#content").innerHTML=`
   <div class="view">
     <button class="btn ghost sm" onclick="render()">‹ All domains</button>
-    <div class="sect"><h2>${domain} — accounts</h2>
+    <div class="sect"><h2>${escHtml(domain)} — accounts</h2>
       <div class="card"><table><thead><tr><th>Address</th><th>Status</th><th></th></tr></thead>
       <tbody>${rows||'<tr><td colspan="3" class="empty">No accounts.</td></tr>'}</tbody></table></div>
     </div>
     <div class="sect"><h2>New account</h2>
       <div class="card" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
-        <input id="newAddr" placeholder="user@${domain}" style="flex:1;min-width:220px">
+        <input id="newAddr" placeholder="user@${escHtml(domain)}" style="flex:1;min-width:220px">
         <input id="newPass" type="password" placeholder="Password" style="flex:1;min-width:160px">
-        <button class="btn" onclick="addAccount('${domain}')">Create account</button>
+        <button class="btn" onclick="addAccount('${escJsSingle(domain)}')">Create account</button>
       </div>
     </div>
   </div>`;
@@ -333,7 +356,7 @@ window.delAccount=async function(address,domain){
 async function renderQueue(){
   const q=await api("/api/v1/queue");
   const rows=(q.messages||[]).map(x=>`
-    <tr><td>${x.id}</td><td>${x.from||"—"}</td><td>${x.recipients||"—"}</td><td>${x.next_try||"—"}</td>
+    <tr><td>${escHtml(x.id)}</td><td>${escHtml(x.from||"—")}</td><td>${escHtml(x.recipients||"—")}</td><td>${escHtml(x.next_try||"—")}</td>
         <td style="text-align:right;white-space:nowrap">
           <button class="btn ghost sm" onclick="retryMsg(${x.id})">Retry now</button>
           <button class="btn danger sm" onclick="delMsg(${x.id})">Delete</button></td></tr>`).join("");
@@ -351,13 +374,12 @@ async function renderTlsa(){
   $("#content").innerHTML=`<div class="view">
     <div class="card"><p style="color:var(--muted);font-size:13px;margin-bottom:14px">
       Publish-ready DANE TLSA records for your certificates. Add these to DNS (with DNSSEC) to enable DANE validation by sending servers.</p>
-      <pre id="tlsaPre">${recs||"No TLSA records available — assign an SSL certificate first."}</pre>
+      <pre id="tlsaPre">${escHtml(recs||"No TLSA records available — assign an SSL certificate first.")}</pre>
       <div style="margin-top:12px"><button class="btn ghost sm" onclick="navigator.clipboard.writeText($('#tlsaPre').textContent).then(()=>toast('Copied to clipboard'))">Copy all</button></div>
     </div></div>`;
 }
 
 /* ---------- Boot ---------- */
-if(auth){api("/api/v1/status").then(enter).catch(()=>{sessionStorage.removeItem("hmsAuth")});}
 </script>
 </body>
 </html>

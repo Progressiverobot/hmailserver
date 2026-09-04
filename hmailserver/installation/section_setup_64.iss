@@ -4,4 +4,4 @@ AppVerName=hMailServer 6.2.24-x64
 ArchitecturesInstallIn64BitMode=x64
 ArchitecturesAllowed=x64
 AppVersion=6.2.24
-VersionInfoVersion=6.2.24.0
+VersionInfoVersion=6.2.24.34

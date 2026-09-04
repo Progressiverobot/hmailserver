@@ -189,17 +189,39 @@ namespace hMailServer.ControlPanel.Views
       {
          var addresses = new List<string>();
 
-         dynamic domains = ServerSession.Current.Application.Domains;
-         int domainCount = (int)domains.Count;
-
-         for (int d = 0; d < domainCount; d++)
+         dynamic domains = null;
+         try
          {
-            dynamic domain = domains[d];
-            dynamic accounts = domain.Accounts;
-            int accountCount = (int)accounts.Count;
+            domains = ServerSession.Current.Application.Domains;
+            int domainCount = (int)domains.Count;
 
-            for (int a = 0; a < accountCount; a++)
-               addresses.Add((string)accounts[a].Address);
+            for (int d = 0; d < domainCount; d++)
+            {
+               dynamic domain = null;
+               dynamic accounts = null;
+
+               try
+               {
+                  domain = domains[d];
+                  accounts = domain.Accounts;
+                  int accountCount = (int)accounts.Count;
+
+                  for (int a = 0; a < accountCount; a++)
+                     addresses.Add((string)accounts[a].Address);
+               }
+               finally
+               {
+                  if (accounts != null)
+                     ServerSession.Release(accounts);
+                  if (domain != null)
+                     ServerSession.Release(domain);
+               }
+            }
+         }
+         finally
+         {
+            if (domains != null)
+               ServerSession.Release(domains);
          }
 
          addresses.Sort(StringComparer.OrdinalIgnoreCase);
