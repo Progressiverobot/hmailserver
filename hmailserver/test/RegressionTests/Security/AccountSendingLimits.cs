@@ -62,9 +62,9 @@ namespace RegressionTests.Security
       private static string UniqueAddress(string prefix)
       {
          return prefix
-                + DateTime.Now.Ticks.ToString()
+                + DateTime.Now.Ticks
                 + "x"
-                + Interlocked.Increment(ref _addressCounter).ToString()
+                + Interlocked.Increment(ref _addressCounter)
                 + "@example.test";
       }
 

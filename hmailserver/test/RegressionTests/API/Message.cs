@@ -109,7 +109,7 @@ namespace RegressionTests.API
 
          var a = Assembly.GetExecutingAssembly();
 
-         var mail = new MailMessage();
+         using var mail = new MailMessage();
          mail.From = new MailAddress("test@test.se");
          mail.To.Add("test@example.test");
          mail.Subject = "Automatiskt servertest";
@@ -117,7 +117,7 @@ namespace RegressionTests.API
          mail.BodyEncoding = Encoding.GetEncoding(1252);
          mail.SubjectEncoding = Encoding.GetEncoding(1252);
          mail.Attachments.Add(new Attachment(a.Location));
-         var oClient = new SmtpClient("localhost", 25);
+         using var oClient = new SmtpClient("localhost", 25);
          oClient.Send(mail);
 
          // Check that the message exists
@@ -152,7 +152,7 @@ namespace RegressionTests.API
 
          var a = Assembly.GetExecutingAssembly();
 
-         var mail = new MailMessage();
+         using var mail = new MailMessage();
          mail.From = new MailAddress("test@test.se");
          mail.To.Add("test@example.test");
          mail.Subject = "Automatiskt servertest";
@@ -160,7 +160,7 @@ namespace RegressionTests.API
          mail.BodyEncoding = Encoding.GetEncoding(1252);
          mail.SubjectEncoding = Encoding.GetEncoding(1252);
          mail.Attachments.Add(new Attachment(a.Location));
-         var oClient = new SmtpClient("localhost", 25);
+         using var oClient = new SmtpClient("localhost", 25);
          oClient.Send(mail);
 
          // Check that the message exists

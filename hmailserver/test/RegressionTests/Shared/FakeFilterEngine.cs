@@ -94,7 +94,7 @@ namespace RegressionTests.Shared
                   // Read the headers, then exactly as many body bytes as
                   // Content-Length promises. Reading to end-of-stream would deadlock:
                   // the client keeps the connection open waiting for this answer.
-                  var received = new MemoryStream();
+                  using var received = new MemoryStream();
                   var buffer = new byte[8192];
                   int headerEnd = -1;
                   int contentLength = 0;

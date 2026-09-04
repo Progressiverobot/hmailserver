@@ -83,7 +83,8 @@ def leading_comment_block(lines, marker):
 
 
 def process(path, ext, apply):
-    raw = open(path, 'rb').read()
+    with open(path, 'rb') as f:
+        raw = f.read()
     bom = raw.startswith(BOM)
     body = raw[len(BOM):] if bom else raw
     # Lines are split on LF with any CR kept attached to its line, so a file
@@ -162,7 +163,8 @@ def process(path, ext, apply):
     if bom:
         out = BOM + out
     if apply:
-        open(path, 'wb').write(out)
+        with open(path, 'wb') as f:
+            f.write(out)
     return action
 
 

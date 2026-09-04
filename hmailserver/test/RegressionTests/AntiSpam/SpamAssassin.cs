@@ -331,7 +331,7 @@ namespace RegressionTests.AntiSpam
       {
          try
          {
-            var serviceController = new ServiceController("SpamAssassinJAM");
+            using var serviceController = new ServiceController("SpamAssassinJAM");
             if (serviceController.Status != ServiceControllerStatus.Stopped)
             {
                serviceController.Stop();

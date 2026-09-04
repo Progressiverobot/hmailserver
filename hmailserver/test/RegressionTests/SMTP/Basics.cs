@@ -566,11 +566,6 @@ namespace RegressionTests.SMTP
             var route = TestSetup.AddRoutePointingAtLocalhostMultipleHosts(2, smtpServerPort);
 
             // Send message to this route.
-            var smtp = new SmtpClientSimulator();
-            var recipients = new List<string>();
-
-            recipients.Add("user1@dummy-example.com");
-
             SmtpClientSimulator.StaticSend("test@example.test", "user1@dummy-example.com", "Test", "Test");
 
             // Wait for the client to disconnect.

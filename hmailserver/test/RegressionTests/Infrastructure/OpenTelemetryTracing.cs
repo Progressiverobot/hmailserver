@@ -120,7 +120,7 @@ namespace RegressionTests.Infrastructure
 
          private static string ReadRequestBody(NetworkStream stream)
          {
-            var raw = new MemoryStream();
+            using var raw = new MemoryStream();
             byte[] buffer = new byte[4096];
             int headerEnd = -1;
 
@@ -148,7 +148,7 @@ namespace RegressionTests.Infrastructure
 
             int bodyStart = headerEnd + 4;
             int bodyHave = all.Length - bodyStart;
-            var bodyStream = new MemoryStream();
+            using var bodyStream = new MemoryStream();
             if (bodyHave > 0)
                bodyStream.Write(all, bodyStart, bodyHave);
 

@@ -768,10 +768,10 @@ namespace RegressionTests.Shared
                // Check that some data has actually been read.
                if (!string.IsNullOrEmpty(contents)) return contents;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                if (i == 100)
-                  throw ex;
+                  throw;
             }
 
             Thread.Sleep(100);

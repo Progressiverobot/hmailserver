@@ -111,7 +111,7 @@ namespace RegressionTests.SMTP
          {
             using (var attachment = new Attachment(tempFile))
             {
-               var mail = new MailMessage();
+               using var mail = new MailMessage();
                mail.From = new MailAddress("test@example.test");
                mail.To.Add("test@example.test");
                mail.Subject = "Test";
@@ -120,7 +120,7 @@ namespace RegressionTests.SMTP
                mail.SubjectEncoding = Encoding.GetEncoding(1252);
                mail.Attachments.Add(attachment);
 
-               var smtpClient = new SmtpClient("localhost", 25);
+               using var smtpClient = new SmtpClient("localhost", 25);
                smtpClient.Send(mail);
             }
 
@@ -150,7 +150,7 @@ namespace RegressionTests.SMTP
             using (var attachment1 = new Attachment(tempFile1))
             using (var attachment2 = new Attachment(tempFile2))
             {
-               var mail = new MailMessage();
+               using var mail = new MailMessage();
                mail.From = new MailAddress("test@example.test");
                mail.To.Add("test@example.test");
                mail.Subject = "Test";
@@ -160,7 +160,7 @@ namespace RegressionTests.SMTP
                mail.Attachments.Add(attachment1);
                mail.Attachments.Add(attachment2);
 
-               var smtpClient = new SmtpClient("localhost", 25);
+               using var smtpClient = new SmtpClient("localhost", 25);
                smtpClient.Send(mail);
             }
 
@@ -336,7 +336,7 @@ namespace RegressionTests.SMTP
          {
             using (var attachment = new Attachment(tempFile))
             {
-               var mail = new MailMessage();
+               using var mail = new MailMessage();
                mail.From = new MailAddress("test@example.test");
                mail.To.Add("test@example.test");
                mail.Subject = "Test";
@@ -345,7 +345,7 @@ namespace RegressionTests.SMTP
                mail.SubjectEncoding = Encoding.GetEncoding(1252);
                mail.Attachments.Add(attachment);
 
-               var smtpClient = new SmtpClient("localhost", 25);
+               using var smtpClient = new SmtpClient("localhost", 25);
                smtpClient.Send(mail);
             }
 

@@ -105,6 +105,7 @@ namespace RegressionTests.ExternalAccounts
 
          while (ProcessCommand(Receive()))
          {
+            // ProcessCommand does the work and says whether the session goes on.
          }
       }
 

@@ -301,10 +301,10 @@ namespace RegressionTests.API
 
                break;
             }
-            catch (Exception e)
+            catch (Exception)
             {
                if (i == 40)
-                  throw e;
+                  throw;
             }
 
             Thread.Sleep(25);

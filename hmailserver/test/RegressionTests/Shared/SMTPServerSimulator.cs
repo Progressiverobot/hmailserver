@@ -105,9 +105,6 @@ namespace RegressionTests.Shared
 
          Send("220 ESMTP Test Server\r\n");
 
-         if (SimulatedError == SimulatedErrorType.DisconnectAfterSessionStart)
-            return;
-
          while (true)
          {
             var text = ReadUntil("\r\n");
@@ -214,10 +211,10 @@ namespace RegressionTests.Shared
 
             var address = command.Substring(StartPos, length);
 
-            if (!_currentRecipientResult.ContainsKey(address))
+            if (!_currentRecipientResult.TryGetValue(address, out var recipientResult))
                throw new Exception("Unexpected address");
 
-            var result = _currentRecipientResult[address].ToString();
+            var result = recipientResult.ToString();
 
             Send(result + " " + address + "\r\n");
 
