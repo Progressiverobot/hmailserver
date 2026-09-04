@@ -165,8 +165,15 @@ namespace RegressionTests.IMAP
          imapSim.Disconnect();
       }
 
+      /// <summary>
+      ///    The wrapper is recognised by its shape - the keyword, the "(", the
+      ///    literal8 - not by the word UTF8 alone. A mailbox that happens to be
+      ///    called UTF8 takes a plain literal exactly as any other mailbox does,
+      ///    and "APPEND UTF8 (~{n}" with no mailbox at all is a malformed command
+      ///    rather than a message filed somewhere by guesswork.
+      /// </summary>
       [Test]
-      [Description("A mailbox whose name ends in UTF8 is not mistaken for the wrapper keyword.")]
+      [Description("A mailbox named UTF8 is not mistaken for the wrapper keyword, and a wrapper with no mailbox is refused.")]
       public void AMailboxNamedUtf8IsNotMistakenForTheWrapper()
       {
          const string message = "Subject: folder name\r\n\r\nThe folder is called UTF8.\r\n";
@@ -174,12 +181,11 @@ namespace RegressionTests.IMAP
          var imapSim = LogonAndEnableUtf8(_account);
          imapSim.SendSingleCommand("A00 CREATE UTF8");
 
-         imapSim.SendRaw("A01 APPEND UTF8 (~{" + message.Length + "}\r\n");
+         // The plain literal8 form against the mailbox named UTF8.
+         imapSim.SendRaw("A01 APPEND UTF8 ~{" + message.Length + "}\r\n");
          string continuation = imapSim.ReceiveUntilAny("+ ", "A01 ");
          StringAssert.Contains("+ Ready", continuation, "No continuation. Got: " + continuation);
 
-         // The word before "(~{n}" is the mailbox, so this is the plain literal8
-         // form: no ")" follows the octets.
          imapSim.SendRaw(message + "\r\n");
          string response = imapSim.ReceiveUntil("A01 ");
          StringAssert.Contains("A01 OK", response,
@@ -188,6 +194,12 @@ namespace RegressionTests.IMAP
          imapSim.SendRaw("A02 STATUS UTF8 (MESSAGES)\r\n");
          string status = imapSim.ReceiveUntil("A02 ");
          StringAssert.Contains("MESSAGES 1", status, "The message must be in the UTF8 mailbox. Got: " + status);
+
+         // The wrapper with the mailbox missing: nothing may be stored.
+         imapSim.SendRaw("A03 APPEND UTF8 (~{" + message.Length + "}\r\n");
+         response = imapSim.ReceiveUntilAny("+ ", "A03 ");
+         StringAssert.Contains("A03 BAD", response,
+            "A UTF8 wrapper with no mailbox before it is a malformed APPEND. Got: " + response);
 
          imapSim.Disconnect();
       }
