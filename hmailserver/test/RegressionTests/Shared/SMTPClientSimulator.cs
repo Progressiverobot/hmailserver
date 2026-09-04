@@ -208,6 +208,13 @@ namespace RegressionTests.Shared
             SendAndReceive("STARTTLS\r\n");
 
             _tcpConnection.HandshakeAsClient();
+
+            // RFC 3207 section 4.2: the handshake resets the session to the
+            // just-greeted state and the client has to say EHLO again before
+            // anything that needs a greeting - which AUTH does. Every real
+            // client does this; the simulator used to skip it and relied on the
+            // server not noticing, which it no longer fails to.
+            SendAndReceive("EHLO example.com\r\n");
          }
 
          if (!string.IsNullOrEmpty(username))

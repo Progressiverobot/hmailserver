@@ -128,6 +128,11 @@ namespace RegressionTests.SSL.StartTls
          smtpClientSimulator.SendAndReceive("STARTTLS\r\n");
          smtpClientSimulator.HandshakeAsClient();
 
+         // The greeting is discarded by the handshake (RFC 3207 section 4.2), so
+         // AUTH - an extension the server has not yet advertised on the encrypted
+         // session - needs the EHLO first, exactly as every real client sends it.
+         smtpClientSimulator.SendAndReceive("EHLO example.com\r\n");
+
          var loginResult = smtpClientSimulator.SendAndReceive("AUTH LOGIN\r\n");
          Assert.IsTrue(loginResult.StartsWith("334"));
       }
