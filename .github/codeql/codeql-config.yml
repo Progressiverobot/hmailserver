@@ -5,15 +5,16 @@ name: "hMailServer CodeQL config"
 # Shared by both analyses in .github/workflows/codeql.yml - the C# Control Panel
 # and the C++ server. Query SUITE selection is not here: it differs per language
 # and is set on each Initialize CodeQL step, with the reasoning at that point.
-# In short, C# runs two analysis kinds from one build - security-extended for
-# code scanning and the quality suite for the Code Quality page - and C++ runs
-# security-extended (CodeQL ships no quality-tagged queries for C++, so the
-# quality half would add noise for no coverage). Everything below - the paths
-# and the rule filters - applies to all of it, the quality analysis included.
-# The Code Quality page's C# findings therefore come from THIS analysis; the
-# GitHub-managed buildless scan of C# that ignored this file (no filters, no
-# type information, 1,400 findings of which 1,300 were the rules excluded
-# below) is off, its default setup scoped to Python only.
+# In short, C# runs security-and-quality (quality findings surface as ordinary
+# code-scanning alerts) and C++ runs security-extended (CodeQL ships no
+# quality-tagged queries for C++, so the quality half would add noise for no
+# coverage). Everything below - the paths and the rule filters - applies to
+# both. The separate "Code quality" page is fed only by GitHub's own
+# default-setup scan, which ignores this file entirely - no filters, no type
+# information - and a custom workflow cannot feed that page (measured 4
+# September 2026: the action refuses the code-quality analysis kind outside
+# GitHub's own setup). That scan is therefore scoped to Python; C# quality is
+# analysed here, with the reasoning below applied.
 #
 # The test harnesses are fixtures rather than shipped code; grading the
 # project's reliability on its own test scaffolding buries the signal from the
