@@ -71,8 +71,10 @@ def run(case):
     send(b"QUIT\r\n")
     try:
         recv()
-    except Exception:
-        pass
+    except Exception as quit_error:
+        # The server may close the socket without answering QUIT; that is not
+        # part of what this case measures, so it is noted rather than fatal.
+        print(f"CASE {case}: no reply to QUIT ({quit_error})")
     s.close()
 
     ok = b"250" in final

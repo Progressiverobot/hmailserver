@@ -234,7 +234,7 @@ async function render(silent){
     else if(view==="tlsa")await renderTlsa();
     $("#connState").textContent="Connected";
   }catch(err){
-    if(err.message==="auth"){sessionStorage.removeItem("hmsAuth");location.reload();return}
+    if(err.message==="auth"){sessionStorage.removeItem("hmsAuth");location.reload();return;}
     $("#connState").textContent="Connection problem";
     if(!silent)$("#content").innerHTML='<div class="empty">Could not reach the server: '+err.message+'</div>';
   }
