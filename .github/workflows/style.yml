@@ -27,8 +27,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # The checker's version is pinned as well as the action's. The action
+      # defaults to "latest" and downloads the release asset named
+      # ec-linux-amd64*; editorconfig-checker 4.0.0 (3 September 2026) renamed
+      # its assets to editorconfig-checker-linux-amd64*, so from that day
+      # every run - master included - failed in the download step with "The
+      # binary 'ec-linux-amd64*' not found" before checking a single file.
+      # 3.11.3 is the last release that still ships the old name. Bump this
+      # together with the action, once an action release understands 4.x.
       - name: Check files against .editorconfig
         uses: editorconfig-checker/action-editorconfig-checker@840e866d93b8e032123c23bac69dece044d4d84c # v2.2.0
+        with:
+          version: v3.11.3
 
   license-headers:
     name: SPDX identifier on every source file

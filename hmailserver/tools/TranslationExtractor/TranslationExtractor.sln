@@ -1,6 +1,6 @@
 ﻿
-Microsoft Visual Studio Solution File, Format Version 10.00
-# Visual Studio 2008
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TranslationExtractor", "TranslationExtractor.csproj", "{5BC541A7-3DAA-41DC-9C6C-2DAF41244F62}"
 EndProject
 Global
