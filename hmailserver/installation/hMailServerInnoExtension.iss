@@ -1209,7 +1209,13 @@ begin
   	// Create the hMailServer database
  	  if (IsComponentSelected('server')) then
 	  begin
-	    RunPostInstallTasks();
+	    // The result used to be discarded here, so a failed database create or
+	    // upgrade showed a (suppressible) message box and setup still finished
+	    // with exit code 0 - a scripted deployment could not tell. Raising turns
+	    // it into a failed install with a non-zero exit code; the specific
+	    // message has already been shown by RunPostInstallTasks itself.
+	    if (RunPostInstallTasks() = false) then
+	      RaiseException('The hMailServer database could not be created or upgraded. See the message above; run DBSetupQuick.exe from the hMailServer Bin folder to retry.');
 	  end
 	 else
 	 begin

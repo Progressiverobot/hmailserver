@@ -54,6 +54,11 @@ namespace HM
    private:
       void TestComputerName_();
       void TestReceivedHeaderParse_();
+      void TestHeloDependentReceivedHeaderParse_();
+      void TestMalformedReceivedHeaderParse_();
+
+      void AssertHostName_(const String &receivedHeader, const String &expectedHostName);
+      void AssertIPAddress_(const String &receivedHeader, const String &expectedIPAddress);
    };
 
 }

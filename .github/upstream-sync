@@ -48,5 +48,95 @@
 # the full-scan line-ending check, DKIM-sign-aliases and the spam-flag
 # reply/forward suppression. All present, as the 2026-08-12 triage recorded.
 #
+# Triaged 2026-09-04: 71 commits since the previous baseline. Upstream is active
+# again (Martin Knafve, RvdH, from mid-August 2026). Content-first, three
+# read-only passes partitioned by area, every "already present" verdict tied to
+# a named function in our tree. The previous month's scheduled run had computed
+# this list and then lost it on a token permission error creating the tracking
+# issue; upstream-watch.yml now creates the issue through the REST endpoint.
+#
+#   PORTED in 6.2.23 Alpha 2 (each with a test where the suite can reach it):
+#   - b558cc7b8 (#546/#168) Received-header IP parsing: the first bracketed
+#     value after "from" is the HELO literal the CLIENT chose; the observed
+#     address is the last one before "by". A header whose host name was not a
+#     valid domain name was skipped entirely, letting parsing fall through into
+#     headers the sender wrote, or leaving no originating address at all - so
+#     DNSBL/SPF/HELO tests ran against a sender-chosen IP or not at all.
+#     Utilities::GetIPAddressFromReceivedHeader rewritten; the two assert(0)
+#     on sender-reachable input removed; RetrieveReceivedIPList_ keeps a header
+#     without a host name. Upstream's in-tree tests taken with it.
+#   - 2f399fdb9 (#605) + b57256ee2 (#604): ResetCurrentMessage_ no longer
+#     promotes INITIAL to HEADER, and OnHandshakeCompleted returns to INITIAL,
+#     so neither RSET-before-EHLO nor STARTTLS-without-re-EHLO can open a
+#     transaction with helo_host_ empty (which skipped SpamTestHeloHost and the
+#     OnHELO/OnEHLO events). #604's local save/restore is superseded by #605's
+#     guard and is not taken separately. Two regression tests in
+#     SSL/StartTls/SmtpServerTests.cs.
+#   - d5e087066 (#609) PTR trailing dot only: a fully qualified PTR owner name
+#     no longer fails the equality filter in DNSResolverWinApi::RunQuery_. The
+#     rest of #609 (malloc/free, |=, custom-server fallback) is NOT APPLICABLE:
+#     our DnsQueryEx rewrite has none of that code and already ORs the flag.
+#   - db478a671 (#583) engine_ null guard in ScriptSite::ProcedureExists.
+#   - 3d0cf55fe (#580), the null-folder guards only: IMAPNotificationClient
+#     dereferenced GetCurrentFolder() on the notifying thread while the owning
+#     session could be closing it. The rest of #580 is a roadmap row.
+#   - 9e33a6f3e (#534), the COM half only: InterfaceIMAPFolder::Delete now
+#     reports a refused deletion instead of S_OK. The orphaned-row defect itself
+#     is NOT APPLICABLE - our PersistentIMAPFolder::DeleteObject keeps only the
+#     inbox, never a special-use folder.
+#   - a643b33c7 (#579), one line of it: the installer raises when the database
+#     step fails, so setup exits non-zero instead of 0 with a suppressible box.
+#     The password forwarding and the silent-mode behaviour were already here,
+#     and deeper (the upgrade path forwards it too; Authenticator fails rather
+#     than prompts under /silent).
+#
+#   ALREADY PRESENT, as supersets (nothing to port):
+#   - 4fe93f9f2 (#565) file left open after DATA: TransparentTransmissionBuffer
+#     ::Flush closes on transmission_ended_ in both modes, fsyncs when asked
+#     and checks the result; the empty-buffer early return is already gone.
+#   - a41b9d175 (#553) kept-open log flush: our #33 fix of 2026-08-16, with a
+#     checked File::Flush and a separate FlushToDisk.
+#   - 2f37c6c50 (#556) atomic Move: two-argument Move with the return value
+#     checked at both call sites. Residuals (backoff, GetLastError in
+#     LoadHeader) are cosmetic.
+#   - 174a67db7 (#595) OnClientLogon from AUTHENTICATE: fired from four paths
+#     here (PLAIN, OAUTHBEARER/XOAUTH2, SCRAM success and failure).
+#   - 7e250b408 (#594) POP3 -ERR with [SYS/TEMP].
+#   - e4485b55a (#603) duplicate-UID guard in MessageCleanup_ (the RAII lock
+#     half is a roadmap row).
+#   - 2a1e18ce2 (#537) accountid subquery, independently derived.
+#   - e5352cb9a (#597) DMARC: ours adds ARC, aggregate reporting and a
+#     compiled-in public suffix list.
+#   - 239f7364b (#550) SPECIAL-USE: complete, plus backup of the designation
+#     (auto-create at account creation is a roadmap row).
+#   - 620cf52d9/4f5e35c25 (#559/#582) MariaDB Connector/C: vendored with its
+#     auth plugins (the TLS climb-down is a roadmap row).
+#   - 059dc3691 wait for the service to stop: ours polls to STOPPED on a budget
+#     derived from ShutdownDrainSeconds and blocks the install on failure.
+#   - f05a14493 (#601) GetPartialFilename: fixed here case-insensitively (the
+#     tool-side public-folder walk is a roadmap row).
+#   - 13aeee3bf (#573) endless read loop: SUPERSEDED - TCPConnection
+#     disconnects after any end-of-stream (the counterpart of the eof hunk
+#     from #528 that this file already records as deliberately not taken).
+#   - Cache setter locking from #580, Collection::GetCount and
+#     GetRecentMessageIDs from #566, DeleteItemByDBID result from #534.
+#
+#   NOT APPLICABLE:
+#   - e09490a0a/29fef7c2e OpenSSL 3.5.x, b5bd0b500 PostgreSQL 15.19: behind us
+#     (4.0.1, 18.3). 1b7c248c4 Boost 1.92: newer than our 1.91 by one routine
+#     release; a maintenance bump, not a fix. Side finding: libraries/
+#     asio-overrides is referenced by nothing in hMailServer.vcxproj.
+#   - c4df877e2 MimeCode comment typo: we keep nDelimeter, recorded above.
+#   - 0f307c57f codespell pass, d8528aaf1 bundled translations: our text and
+#     string catalogues have diverged; run codespell on our own tree instead,
+#     and do not import 40 catalogues that lack every fork-specific string.
+#     The dead Language::Download / InterfaceLanguage::Download pair is a COM
+#     method and stays, since removing an IDL method shifts the vtable.
+#   - 7ce4538e8 (#541) MySQL subquery tidy-up: no defect either way.
+#   - 99c037b04 (#592) hosted-runner builds, fd1abf26f (#554) tunable hash
+#     cost, 806304507 (#566) / 3d0cf55fe (#580) remainder, fce66080a (#602),
+#     0f7c26762 (#552), f047b8c1b, a843b0ec4 (#558): roadmap rows under
+#     "Planned work", each with the size and the reason it did not ride along.
+#
 # Update this SHA (and only this SHA) when a batch has been triaged.
-a998b528f9ba0949c1fc0a704f9929e8762509ea
+d5e087066fa8ba5382787739ba61a9abc8975d99

@@ -155,7 +155,14 @@ namespace HM
          {
          case ChangeNotification::NotificationMessageAdded:
             {
-               std::shared_ptr<Messages> pMessages = connection->GetCurrentFolder()->GetMessages();
+               // The folder can be closed by the connection's own thread while a
+               // notification for it is still being delivered on another; a null
+               // folder here is that race, not an error (upstream #580).
+               std::shared_ptr<IMAPFolder> currentFolder = connection->GetCurrentFolder();
+               if (!currentFolder)
+                  break;
+
+               std::shared_ptr<Messages> pMessages = currentFolder->GetMessages();
                pMessages->Refresh(false);
                lastExists = pMessages->GetCount();
                lastRecent = (int)connection->GetRecentMessages().size();
@@ -165,11 +172,15 @@ namespace HM
             {
                if (send_expunge)
                {
+                  std::shared_ptr<IMAPFolder> currentFolder = connection->GetCurrentFolder();
+                  if (!currentFolder)
+                     break;
+
                   // Send EXPUNGE
                   SendEXPUNGE_(changeNotification->GetAffectedMessages());
 
                   // Send EXISTS
-                  std::shared_ptr<Messages> pMessages = connection->GetCurrentFolder()->GetMessages();
+                  std::shared_ptr<Messages> pMessages = currentFolder->GetMessages();
                   lastExists = pMessages->GetCount();
                   lastRecent = (int)connection->GetRecentMessages().size();
 
@@ -226,11 +237,18 @@ namespace HM
       if (!connection)
          return;
 
+      // Delivered on the notifying session's thread, while this connection may
+      // be closing its folder on its own. A folder that is gone by the time the
+      // notification arrives has nothing to be told about it (upstream #580).
+      std::shared_ptr<IMAPFolder> currentFolder = connection->GetCurrentFolder();
+      if (!currentFolder)
+         return;
+
       switch (pChangeNotification->GetType())
       {
       case ChangeNotification::NotificationMessageAdded:
          {
-               std::shared_ptr<Messages> pMessages = connection->GetCurrentFolder()->GetMessages();
+            std::shared_ptr<Messages> pMessages = currentFolder->GetMessages();
             SendEXISTS_(pMessages->GetCount());
             SendRECENT_((int)connection->GetRecentMessages().size());
             break;
@@ -241,7 +259,7 @@ namespace HM
             SendEXPUNGE_(pChangeNotification->GetAffectedMessages());
 
             // Send EXISTS
-               std::shared_ptr<Messages> pMessages = connection->GetCurrentFolder()->GetMessages();
+            std::shared_ptr<Messages> pMessages = currentFolder->GetMessages();
             SendEXISTS_(pMessages->GetCount());
             SendRECENT_((int)connection->GetRecentMessages().size());
 
@@ -286,12 +304,16 @@ namespace HM
       if (!connection)
          return;
 
+      std::shared_ptr<IMAPFolder> currentFolder = connection->GetCurrentFolder();
+      if (!currentFolder)
+         return;
+
       for(__int64 messageID : vecMessages)
       {
          String sResponse;
 
          int foundIndex = 0;
-         std::shared_ptr<Message> pMessage = connection->GetCurrentFolder()->GetMessages()->GetItemByDBID(messageID, foundIndex);
+         std::shared_ptr<Message> pMessage = currentFolder->GetMessages()->GetItemByDBID(messageID, foundIndex);
 
          if (!pMessage)
             return;
