@@ -67,6 +67,8 @@ namespace HM
       bool WriteData_(const std::shared_ptr<IMAPConnection> pConnection, const BYTE *pBuf, size_t WriteLen);
       void KillCurrentMessage_();
 
+      static bool StripUtf8LiteralWrapper_(String &command);
+
       int GetMaxMessageSize_(std::shared_ptr<const Domain> pDomain);
 
       String current_tag_;
@@ -98,6 +100,10 @@ namespace HM
       bool replace_mode_ = false;
       bool replace_uid_mode_ = false;
       std::shared_ptr<Message> replace_target_;
+
+      // RFC 6855 section 4: the message was sent as UTF8 (~{n}) and the ")"
+      // that closes the wrapper follows its octets on the wire.
+      bool utf8_wrapped_literal_ = false;
 
       std::vector<PendingMessage> pending_messages_;
 
