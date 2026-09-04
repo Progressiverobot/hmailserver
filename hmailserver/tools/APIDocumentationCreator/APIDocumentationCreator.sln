@@ -1,6 +1,6 @@
 ﻿
-Microsoft Visual Studio Solution File, Format Version 10.00
-# Visual Studio 2008
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "APIDocumentationCreator", "APIDocumentationCreator\APIDocumentationCreator.csproj", "{0B85A56B-894F-4F25-BCB8-7884E9D03837}"
 EndProject
 Global
