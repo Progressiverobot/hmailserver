@@ -196,7 +196,7 @@ async function api(path,opts={}){
   return text?JSON.parse(text):{};
 }
 function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");
-  clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),2600)}
+  clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),2600);}
 
 /* Server-provided values (domain names, addresses, queue entries, TLSA records) are
    rendered into HTML, so every one of them goes through this first. */
@@ -234,7 +234,7 @@ function enter(status){
   $("#gate").style.display="none";$("#app").style.display="flex";
   $("#ver").textContent=status.version||"?";
   render();
-  pollTimer=setInterval(()=>{if(view==="dash")render(true)},3000);
+  pollTimer=setInterval(()=>{if(view==="dash")render(true);},3000);
 }
 
 /* ---------- Navigation ---------- */
@@ -351,7 +351,7 @@ async function showAccounts(domain){
 
 async function addAccount(domain){
   const address=$("#newAddr").value.trim(),password=$("#newPass").value;
-  if(!address||!password){toast("Address and password are required");return}
+  if(!address||!password){toast("Address and password are required");return;}
   try{
     await api("/api/v1/domains/"+encodeURIComponent(domain)+"/accounts",
       {method:"POST",body:JSON.stringify({address:address,password:password})});
@@ -377,9 +377,9 @@ async function renderQueue(){
     <table><thead><tr><th>ID</th><th>From</th><th>To</th><th>Next try</th><th></th></tr></thead>
     <tbody>${rows||'<tr><td colspan="5" class="empty">The delivery queue is empty. ✦</td></tr>'}</tbody></table></div>`;
 }
-async function retryMsg(id){try{await api("/api/v1/queue/"+encodeURIComponent(id)+"/retry",{method:"POST"});toast("Delivery retriggered");renderQueue()}catch(e){toast("Failed: "+e.message)}}
+async function retryMsg(id){try{await api("/api/v1/queue/"+encodeURIComponent(id)+"/retry",{method:"POST"});toast("Delivery retriggered");renderQueue();}catch(e){toast("Failed: "+e.message);}}
 async function delMsg(id){if(!confirm("Remove message "+id+" from the queue?"))return;
-  try{await api("/api/v1/queue/"+encodeURIComponent(id),{method:"DELETE"});toast("Message removed");renderQueue()}catch(e){toast("Failed: "+e.message)}}
+  try{await api("/api/v1/queue/"+encodeURIComponent(id),{method:"DELETE"});toast("Message removed");renderQueue();}catch(e){toast("Failed: "+e.message);}}
 
 async function renderTlsa(){
   const t=await api("/api/v1/tlsa");
