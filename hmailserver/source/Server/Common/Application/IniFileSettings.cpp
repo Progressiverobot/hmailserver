@@ -29,6 +29,7 @@ namespace HM
       add_xoriginal_rcpt_to_header_(false),
       no_of_dbconnection_attempts_(6),
       no_of_dbconnection_attempts_Delay(5),
+      database_allow_unencrypted_connection_(false),
       max_no_of_external_fetch_threads_(15),
       greylisting_enabled_during_record_expiration_(true),
       greylisting_expiration_interval_(240),
@@ -144,6 +145,7 @@ namespace HM
       no_of_dbconnections_ = ReadIniSettingInteger_("Database", "NumberOfConnections", 5);            
       no_of_dbconnection_attempts_ = ReadIniSettingInteger_("Database", "ConnectionAttempts", 6);  
       no_of_dbconnection_attempts_Delay = ReadIniSettingInteger_("Database", "ConnectionAttemptsDelay", 5);  
+      database_allow_unencrypted_connection_ = ReadIniSettingInteger_("Database", "AllowUnencryptedConnection", 0) == 1;
       
       if (sqldbtype_ == HM::DatabaseSettings::TypeMSSQLCompactEdition)
       {

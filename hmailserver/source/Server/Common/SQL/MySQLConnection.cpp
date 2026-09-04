@@ -1,4 +1,4 @@
-// Copyright (c) 2010 Martin Knafve / hMailServer.com.  
+// Copyright (c) 2010 Martin Knafve / hMailServer.com.
 // https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -8,6 +8,7 @@
 #include "MySQLConnection.h"
 #include "MySQLRecordset.h"
 #include "DatabaseSettings.h"
+#include "../Application/IniFileSettings.h"
 #include "Macros/MySQLMacroExpander.h"
 #include "..\Util\Unicode.h"
 
@@ -41,7 +42,7 @@ namespace HM
       {
 
       }
-         
+
    }
 
    DALConnection::ConnectionResult
@@ -67,8 +68,8 @@ namespace HM
 
          if (lDBPort == 0)
             lDBPort = 3306;
-         
-         
+
+
 
          dbconn_ = MySQLInterface::Instance()->p_mysql_init(NULL);
 
@@ -86,22 +87,39 @@ namespace HM
             MySQLInterface::Instance()->p_mysql_options(dbconn_, HM_MYSQL_PLUGIN_DIR, sPluginDir.c_str());
          }
 
+         // The bundled client is MariaDB Connector/C 3.4, which negotiates TLS and
+         // refuses to continue against a server that has none: "SSL is required, but
+         // the server does not support it". That is the right default and it is not
+         // changed here - a database connection that quietly downgraded to plaintext
+         // would be the worst kind of configuration drift. A server that genuinely has
+         // no TLS is a choice written in the ini instead: [Database]
+         // AllowUnencryptedConnection=1 asks the client to prefer TLS and fall back,
+         // which is what the old libmysql did without asking. Certificate
+         // verification is left at the client's default either way; upstream #559
+         // switches both off unconditionally.
+         if (IniFileSettings::Instance()->GetDatabaseAllowUnencryptedConnection() &&
+             MySQLInterface::Instance()->p_mysql_options != 0)
+         {
+            char enforceTls = 0;
+            MySQLInterface::Instance()->p_mysql_options(dbconn_, HM_MYSQL_OPT_SSL_ENFORCE, &enforceTls);
+         }
+
          //MYSQL *pResult = mysql_real_connect(
          hm_MYSQL *pResult = MySQLInterface::Instance()->p_mysql_real_connect(
-                     dbconn_, 
-                     Unicode::ToANSI(sServer), 
-                     Unicode::ToANSI(sUsername), 
-                     Unicode::ToANSI(sPassword), 
+                     dbconn_,
+                     Unicode::ToANSI(sServer),
+                     Unicode::ToANSI(sUsername),
+                     Unicode::ToANSI(sPassword),
                      Unicode::ToANSI(sDatabase), lDBPort, 0, 0);
 
          if (pResult == 0)
          {
             // From MySQL manual:
-            // 
+            //
             // Return Values:
             //
-            // A MYSQL* connection handle if the connection was successful, NULL if the connection was 
-            // unsuccessful. For a successful connection, the return value is the same as the value 
+            // A MYSQL* connection handle if the connection was successful, NULL if the connection was
+            // unsuccessful. For a successful connection, the return value is the same as the value
             // of the first parameter.
 
             const char *pError = MySQLInterface::Instance()->p_mysql_error(dbconn_);
@@ -117,6 +135,16 @@ namespace HM
             // actionable guidance instead of dead-ending the setup wizard.
             String sLowerError = pError;
             sLowerError.MakeLower();
+
+            // The client's own wording, which says what happened but not what to do.
+            if (sLowerError.Find(_T("ssl is required")) >= 0)
+            {
+               sErrorMessage += _T("\r\n\r\n"
+                  "The database server did not offer TLS, and the bundled MariaDB Connector/C requires it by "
+                  "default. Enable TLS on the database server - or, if it genuinely has none, set "
+                  "AllowUnencryptedConnection=1 under [Database] in hMailServer.ini to let the client fall "
+                  "back to an unencrypted connection.");
+            }
             if (sLowerError.Find(_T("plugin")) >= 0 &&
                 (sLowerError.Find(_T("cannot be loaded")) >= 0 || sLowerError.Find(_T("gssapi")) >= 0))
             {
@@ -166,11 +194,11 @@ namespace HM
          ErrorManager::Instance()->ReportError(ErrorManager::Critical, 5008, "MySQLConnection::Connect", "An unhandled error occurred when connecting to the database.");
          return TemporaryFailure;
       }
-          
+
       return Connected;
    }
 
-   bool 
+   bool
    MySQLConnection::CheckServerVersion(String &errorMessage)
    {
       // check server version.
@@ -197,21 +225,21 @@ namespace HM
    }
 
    DALConnection::ExecutionResult
-   MySQLConnection::TryExecute(const SQLCommand &command, String &sErrorMessage, __int64 *iInsertID, int iIgnoreErrors) 
+   MySQLConnection::TryExecute(const SQLCommand &command, String &sErrorMessage, __int64 *iInsertID, int iIgnoreErrors)
    {
       String SQL = command.GetQueryString();
       try
       {
          // mysql_query-doc:
          // Zero if the query was successful. Non-zero if an error occurred.
-         // 
+         //
          AnsiString sQuery;
          if (!Unicode::WideToMultiByte(SQL, sQuery))
          {
             ErrorManager::Instance()->ReportError(ErrorManager::Critical, 5105, "MySQLConnection::TryExecute", "Could not convert string into multi-byte.");
             return DALConnection::DALUnknown;
          }
-   
+
          if (MySQLInterface::Instance()->p_mysql_query(dbconn_, sQuery))
          {
             // Classified first, because whether the marker may discard this
@@ -279,7 +307,7 @@ namespace HM
    {
       try
       {
-         if (pSQL==NULL) 
+         if (pSQL==NULL)
             return DALSuccess;
 
          int iErrNo = MySQLInterface::Instance()->p_mysql_errno(pSQL);
@@ -312,25 +340,25 @@ namespace HM
    {
       try
       {
-         if (pSQL==NULL) 
+         if (pSQL==NULL)
             return DALConnection::DALSuccess;
 
          const char *pError = MySQLInterface::Instance()->p_mysql_error(pSQL);
          if (!pError[0] != '\0')
             return DALConnection::DALSuccess;
 
-         
+
          DALConnection::ExecutionResult result = DALConnection::DALUnknown;
 
          int errorCode = MySQLInterface::Instance()->p_mysql_errno(pSQL);
          switch (errorCode)
          {
-         case 2006: // MySQL server has gone away 
-         case 2013: // Lost connection to MySQL server during query 
+         case 2006: // MySQL server has gone away
+         case 2013: // Lost connection to MySQL server during query
             result = DALConnection::DALConnectionProblem;
             break;
          }
-         
+
 
          AnsiString sMySqlErrorAnsi = pError;
          String sMySQLErrorUnicode = sMySqlErrorAnsi;
@@ -349,11 +377,11 @@ namespace HM
       }
    }
 
-   void 
+   void
    MySQLConnection::OnConnected()
    //---------------------------------------------------------------------------()
    // DESCRIPTION:
-   // This would need refactoring some day. This is the place 
+   // This would need refactoring some day. This is the place
    // where the internal MySQL database structure is managed.
    // The update of the data tables is taken care of by the
    // installation program, but the mysql.* tables are updated
@@ -363,7 +391,7 @@ namespace HM
       // Check if the user is using the internal database. We don't rely
       // entirely on the [Database]->Internal setting in hMailServer.ini so
       // we check a few other properties as well.
-      if (IniFileSettings::Instance()->GetDatabasePort() != 3307 || 
+      if (IniFileSettings::Instance()->GetDatabasePort() != 3307 ||
           IniFileSettings::Instance()->GetUsername().CompareNoCase(_T("root")) != 0 &&
           IniFileSettings::Instance()->GetUsername().CompareNoCase(_T("hmailserver")) != 0 &&
           IniFileSettings::Instance()->GetIsInternalDatabase())
@@ -374,7 +402,7 @@ namespace HM
 
       // Remove dummy user created after installation.
       UpdatePassword_();
-         
+
       // Run the scripts file
       String sScriptsFile = IniFileSettings::Instance()->GetDBScriptDirectory() + "\\Internal MySQL\\HMS4.3-MySQL4.1.18.sql";
       RunScriptFile_(sScriptsFile);
@@ -382,7 +410,7 @@ namespace HM
       RunCommand_("FLUSH PRIVILEGES");
    }
 
-   void 
+   void
    MySQLConnection::UpdatePassword_()
    //---------------------------------------------------------------------------()
    // DESCRIPTION:
@@ -394,8 +422,8 @@ namespace HM
       RunCommand_("DELETE FROM mysql.user WHERE User = ''");
    }
 
-   void 
-   MySQLConnection::RunScriptFile_(const String &sFile) 
+   void
+   MySQLConnection::RunScriptFile_(const String &sFile)
    //---------------------------------------------------------------------------()
    // DESCRIPTION:
    // Runs a SQL script which contains commands separated with semicolons. This
@@ -423,19 +451,19 @@ namespace HM
 #endif
    }
 
-   void 
-   MySQLConnection::RunCommand_(const String &sCommand) 
+   void
+   MySQLConnection::RunCommand_(const String &sCommand)
    //---------------------------------------------------------------------------()
    // DESCRIPTION:
    // Runs a single SQL command without any error handling.
    //---------------------------------------------------------------------------()
    {
       String sError;
-      
+
       TryExecute(SQLCommand(sCommand), sError, 0);
    }
 
-   bool 
+   bool
    MySQLConnection::BeginTransaction(String &sErrorMessage)
    {
       if (supports_transactions_)
@@ -446,19 +474,19 @@ namespace HM
       return true;
    }
 
-   bool 
+   bool
    MySQLConnection::CommitTransaction(String &sErrorMessage)
    {
       if (supports_transactions_)
       {
          return TryExecute(SQLCommand("COMMIT"), sErrorMessage, 0)  == DALSuccess;
       }
-      
+
 
       return true;
    }
 
-   bool 
+   bool
    MySQLConnection::RollbackTransaction(String &sErrorMessage)
    {
       if (supports_transactions_)
@@ -474,7 +502,7 @@ namespace HM
       }
    }
 
-   void 
+   void
    MySQLConnection::LoadSupportsTransactions_(const String &database)
    {
       supports_transactions_ = false;
@@ -508,7 +536,7 @@ namespace HM
       }
    }
 
-   void 
+   void
    MySQLConnection::SetConnectionCharacterSet_()
    {
       std::set<String> utf_character_sets;
@@ -690,7 +718,7 @@ namespace HM
       sInput.Replace(_T("\\"), _T("\\\\"));
    }
 
-   std::shared_ptr<IMacroExpander> 
+   std::shared_ptr<IMacroExpander>
    MySQLConnection::CreateMacroExpander()
    {
       std::shared_ptr<MySQLMacroExpander> expander = std::shared_ptr<MySQLMacroExpander>(new MySQLMacroExpander());

@@ -22,11 +22,18 @@ namespace DataDirectorySynchronizer
       public static ModeType Mode { get; set; }
       public static List<string> SelectedDomains { get; set; }
 
+      // The public folders live beside the domain directories, not under any of
+      // them, so they are walked separately and can be left out separately. On by
+      // default: a message file under #Public that the database no longer knows was
+      // never checked before, in either mode.
+      public static bool SynchronizePublicFolders { get; set; }
+
       private static hMailServer.Application _application;
 
       static Globals()
       {
          SelectedDomains = new List<string>();
+         SynchronizePublicFolders = true;
       }
 
       public static void SetApp(hMailServer.Application application)

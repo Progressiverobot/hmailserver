@@ -66,6 +66,11 @@ namespace DataDirectorySynchronizer.Pages
             // Process all domains
             IterateDomainFolders(dirInfo);
 
+            // The public folders are not under any domain directory, so they are
+            // walked on their own. Upstream #601.
+            if (Globals.SynchronizePublicFolders)
+               IteratePublicFolder(dirInfo, application.Settings.PublicFolderDiskName);
+
             timer.Enabled = false;
 
             application.Reinitialize();
@@ -111,6 +116,31 @@ namespace DataDirectorySynchronizer.Pages
             }
 
             AddProcessedFile(fullName, imported);
+         }
+      }
+
+      private void IteratePublicFolder(DirectoryInfo dirRoot, string publicFolderDiskName)
+      {
+         DirectoryInfo publicFolder = new DirectoryInfo(Path.Combine(dirRoot.FullName, publicFolderDiskName));
+
+         if (!publicFolder.Exists)
+            return;
+
+         try
+         {
+            // Messages in public folders are owned by no account, which is why none is
+            // given. In import mode the server refuses a file it cannot place - which
+            // public folder a file belongs to is not part of its path - and the file is
+            // listed as skipped; in delete mode a file the database no longer knows is
+            // removed, as it is under any account.
+            ProcessFilesInFolder(publicFolder, 0);
+
+            foreach (DirectoryInfo publicSubFolder in publicFolder.GetDirectories())
+               ProcessFilesInFolder(publicSubFolder, 0);
+         }
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
+         {
+            AddProcessedFile(publicFolder.FullName, false);
          }
       }
 

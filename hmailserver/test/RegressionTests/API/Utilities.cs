@@ -94,6 +94,97 @@ namespace RegressionTests.API
       }
 
       [Test]
+      [Description(
+         "Import a message stored in a sub directory of the public folder. This must fail as well, since " +
+         "the public IMAP folder isn't part of the path on disk - and the file must be left where it was, " +
+         "not relocated or filed into the account whose id was supplied."
+      )]
+      public void TestImportOfMessageInPublicFolderSubdirectory()
+      {
+         var messageText =
+            "From: test@example.test\r\n" +
+            "\r\n" +
+            "Test\r\n";
+
+         var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "test@example.test", "test");
+
+         var guid = Guid.NewGuid().ToString();
+         var publicFolder = Paths.Combine(_application.Settings.Directories.DataDirectory,
+            _application.Settings.PublicFolderDiskName);
+         var guidPath = Paths.Combine(publicFolder, guid.Substring(1, 2));
+
+         Directory.CreateDirectory(guidPath);
+
+         var fileName = Paths.Combine(guidPath, guid + ".eml");
+
+         File.WriteAllText(fileName, messageText);
+
+         try
+         {
+            // Against the build before this one the first call answered true: the file
+            // was moved into a named subdirectory and imported into the account's inbox.
+            Assert.IsFalse(_application.Utilities.ImportMessageFromFile(fileName, account.ID));
+            Assert.IsFalse(_application.Utilities.ImportMessageFromFile(fileName, 0));
+
+            Assert.IsTrue(File.Exists(fileName), "The file should have been left alone.");
+
+            Pop3ClientSimulator.AssertMessageCount(account.Address, "test", 0);
+         }
+         finally
+         {
+            Directory.Delete(guidPath, true);
+         }
+      }
+
+      [Test]
+      [Description(
+         "A message stored in a public folder must be found by its file name, so that the data directory " +
+         "synchronizer doesn't consider it an orphan and delete it. Guards the partial-filename fix the " +
+         "synchronizer's public-folder walk depends on."
+      )]
+      public void TestRetrieveMessageIdForMessageInPublicFolder()
+      {
+         var publicFolders = _settings.PublicFolders;
+         var folder = publicFolders.Add("Share1");
+         folder.Save();
+
+         var message = folder.Messages.Add();
+         message.Subject = "Test";
+         message.Save();
+
+         var fileName = message.Filename;
+
+         Assert.IsTrue(fileName.Contains(_settings.PublicFolderDiskName), fileName);
+         Assert.AreEqual(message.ID, _application.Utilities.RetrieveMessageID(fileName));
+      }
+
+      [Test]
+      [Description(
+         "Importing a message which is already stored in a public folder should be a no-op. It should " +
+         "neither be duplicated nor moved to another file."
+      )]
+      public void TestImportOfExistingMessageInPublicFolder()
+      {
+         var publicFolders = _settings.PublicFolders;
+         var folder = publicFolders.Add("Share1");
+         folder.Save();
+
+         var message = folder.Messages.Add();
+         message.Subject = "Test";
+         message.Save();
+
+         var fileName = message.Filename;
+
+         Assert.IsTrue(_application.Utilities.ImportMessageFromFile(fileName, 0));
+
+         _application.Reinitialize();
+
+         Assert.AreEqual(1, _settings.PublicFolders[0].Messages.Count);
+         Assert.AreEqual(fileName, _settings.PublicFolders[0].Messages[0].Filename);
+         Assert.IsTrue(File.Exists(fileName));
+      }
+
+      [Test]
       [Description("Import a mail located properly in a sub directory.")]
       public void TestImportOfMessageInSubdirectory()
       {

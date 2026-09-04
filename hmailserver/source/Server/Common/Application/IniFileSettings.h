@@ -141,6 +141,14 @@ namespace HM
       int GetNumberOfDatabaseConnections() const;
       int GetNumberOfDatabaseConnectionAttempts() const;
       int GetDBConnectionAttemptsDelay() const;
+
+      // [Database] AllowUnencryptedConnection=1. The bundled MariaDB Connector/C
+      // requires TLS from a MySQL/MariaDB server and refuses one that has none; this
+      // asks it to prefer TLS and fall back to plaintext instead. Off by default, so
+      // that an encrypted database connection stays the default and a plaintext-only
+      // server is a choice written in the ini rather than a silent downgrade. See
+      // MySQLConnection::Connect for the client option it sets.
+      bool GetDatabaseAllowUnencryptedConnection() const { return database_allow_unencrypted_connection_; }
       
       bool GetAddXAuthUserHeader() {return add_xauth_user_header_; }
       String GetDaemonAddressDomain() const { return daemonaddress_domain_; }
@@ -796,6 +804,7 @@ namespace HM
       int no_of_dbconnections_;
       int no_of_dbconnection_attempts_;
       int no_of_dbconnection_attempts_Delay;
+      bool database_allow_unencrypted_connection_;
       bool add_xauth_user_header_;
       String daemonaddress_domain_;
       bool add_xoriginal_rcpt_to_header_;	  
