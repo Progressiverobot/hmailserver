@@ -93,11 +93,15 @@ jobs:
       # covering those tools was the one being switched off for ignoring the
       # config. The test projects are not built here and stay unscanned:
       # fixtures, not shipped code.
+      # RestoreLockedMode: the implicit restore inside these builds is held to
+      # the committed packages.lock.json files, the same way ci.yml's explicit
+      # restores are, so the code that is analysed is built against the graph
+      # that was reviewed.
       - name: Build Control Panel
-        run: dotnet build hmailserver/source/Tools/ControlPanel/ControlPanel.csproj -c Release
+        run: dotnet build hmailserver/source/Tools/ControlPanel/ControlPanel.csproj -c Release -p:RestoreLockedMode=true
 
       - name: Build the setup and migration tools
-        run: dotnet build "hmailserver/source/Tools/hMailServer Tools.sln" -c Release
+        run: dotnet build "hmailserver/source/Tools/hMailServer Tools.sln" -c Release -p:RestoreLockedMode=true
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4.37.8

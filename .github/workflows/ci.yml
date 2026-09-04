@@ -55,8 +55,14 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      # --locked-mode: restore exactly the graph recorded in packages.lock.json
+      # and fail if it would resolve anything else. The lock files are committed
+      # beside each project (RestorePackagesWithLockFile in
+      # source/Tools/Directory.Build.props); a package bump without its lock
+      # file update fails here rather than building against a different graph
+      # than the one reviewed.
       - name: Restore
-        run: dotnet restore hmailserver/source/Tools/ControlPanel/ControlPanel.csproj
+        run: dotnet restore hmailserver/source/Tools/ControlPanel/ControlPanel.csproj --locked-mode
 
       - name: Build (Release, warnings as errors)
         run: dotnet build hmailserver/source/Tools/ControlPanel/ControlPanel.csproj -c Release --no-restore -warnaserror
@@ -66,7 +72,7 @@ jobs:
 
       - name: Restore tests
         shell: bash
-        run: dotnet restore hmailserver/source/Tools/ControlPanel.Tests/ControlPanel.Tests.csproj
+        run: dotnet restore hmailserver/source/Tools/ControlPanel.Tests/ControlPanel.Tests.csproj --locked-mode
 
       - name: Test with coverage
         shell: bash
@@ -103,8 +109,11 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      - name: Restore (locked to packages.lock.json)
+        run: dotnet restore "hmailserver/source/Tools/hMailServer Tools.sln" --locked-mode
+
       - name: Build tools solution (Release)
-        run: dotnet build "hmailserver/source/Tools/hMailServer Tools.sln" -c Release -warnaserror
+        run: dotnet build "hmailserver/source/Tools/hMailServer Tools.sln" -c Release --no-restore -warnaserror
 
       - name: Publish smoke check
         shell: pwsh

@@ -15,5 +15,19 @@
   -->
   <PropertyGroup>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
+
+    <!--
+      NuGet lock files (packages.lock.json beside each project). A restore
+      records the exact package graph - every transitive version and its
+      content hash - and CI restores with "dotnet restore ... -locked-mode",
+      which fails rather than silently resolving something different from
+      what was committed. That is the OpenSSF Scorecard Pinned-Dependencies
+      finding for NuGet, and it is real: without a lock file, a floating
+      transitive dependency or a re-published package version changes what
+      ships without a commit saying so. On a developer machine a plain
+      restore updates the lock file when a package reference changes; commit
+      it with the change. Dependabot updates lock files with its bumps.
+    -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
 </Project>
