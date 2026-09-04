@@ -1,0 +1,11 @@
+# Keys that may sign this repository's release tags (git's SSH signature
+# format; see `git help gpg.ssh.allowedSignersFile`). Read by the tag check in
+# .github/workflows/sign-release.yml and usable locally:
+#
+#   git -c gpg.ssh.allowedSignersFile=.github/allowed_signers verify-tag vX.Y.Z
+#
+# One principal per line: the identity the signature must carry, then the key.
+# A key that is rotated is removed here and the tags it signed stay verifiable
+# only by anyone who kept the old line - which is the intended property of an
+# allow list, not a defect in it.
+christopher.j.holloway@outlook.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIB9HiI7F4JgXDg9DyvL3KSQUlKfygNjVkT2rKf6pOUL

@@ -76,6 +76,40 @@ jobs:
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
+      # The tag has to be a signed, annotated tag object before anything that
+      # hangs off it is signed. Every release tag before 6.2.23 Alpha 2 was a
+      # lightweight ref - `git cat-file -t` said "commit" - so there was no tag
+      # object and nothing to verify: anyone with push rights to a v* ref could
+      # have pointed it elsewhere and the cosign bundles would have signed
+      # whatever was attached just the same. Signing is SSH-based (git's own
+      # ssh-keygen -Y machinery, no GPG key management) against the allow list
+      # in .github/allowed_signers, which is the one file this job checks out
+      # the repository for.
+      - name: Checkout the allow list of signing keys
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: .github/allowed_signers
+          sparse-checkout-cone-mode: false
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Refuse an unsigned or lightweight tag
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          git fetch --force origin "refs/tags/${TAG}:refs/tags/${TAG}"
+          kind=$(git cat-file -t "refs/tags/${TAG}")
+          if [ "${kind}" != "tag" ]; then
+            echo "::error::${TAG} is a lightweight tag (a bare ${kind} ref). Release tags must be annotated and signed: git tag -s ${TAG} -m '...'. See RELEASE.md step 12."
+            exit 1
+          fi
+          if ! git -c gpg.ssh.allowedSignersFile=.github/allowed_signers verify-tag "${TAG}"; then
+            echo "::error::${TAG} is not signed by a key in .github/allowed_signers. Nothing has been signed."
+            exit 1
+          fi
+          echo "${TAG} is an annotated tag with a valid signature from an allowed key."
+
       - name: Install cosign
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v3.10.1
 
