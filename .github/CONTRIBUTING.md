@@ -20,12 +20,13 @@ The compiler runs with `/WX` — code must build warning-free.
 
 ## Testing
 
-All changes must keep the regression suite green. The suite
-runs against a live local server instance over SMTP/IMAP/POP3. The full
-environment recipe (SQL CE, ClamAV, SpamAssassin, INI settings) is not yet
-published; `build/preflight-tests.ps1` is its machine-readable outline, and
-writing the human version is itself one of the small tasks below — until then,
-open an issue and we will walk you through it.
+All changes must keep the regression suite green. The suite runs against a
+live local server instance over SMTP/IMAP/POP3. Setting a machine up for it -
+the service, SQL Server Compact and the bench database, ClamAV, SpamAssassin,
+the standard ports and the traps that have broken runs before - is written up
+in [hmailserver/docs/RegressionEnvironment.md](../hmailserver/docs/RegressionEnvironment.md);
+`build/preflight-tests.ps1` is the machine-readable version of the same recipe
+and tells you exactly which step is missing.
 
 ## Small tasks
 
@@ -35,6 +36,16 @@ are real, bounded pieces of work, each of which closes a gap recorded in
 `Roadmap.md` — none is make-work. Each says what it is for, where to look, how
 to check it, and what "done" means. Comment on one to claim it; if it turns out
 to be larger than it looked, say so on the issue rather than growing the change.
+
+## Sign-off
+
+Commit with `git commit -s`. That adds a `Signed-off-by: Your Name <you@example.com>`
+trailer, which is your statement that you wrote the change (or have the right
+to submit it) and that it may be distributed under this project's licence -
+the [Developer Certificate of Origin](https://developercertificate.org/), the
+whole text of which is eleven lines. There is no CLA. A pull request whose
+commits lack the trailer fails the `DCO` check, which names the commit; the
+fix is `git commit --amend -s` and a push.
 
 ## Pull Requests
 
