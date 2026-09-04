@@ -131,7 +131,9 @@ function Get-CodeKeys($codeText) {
          $keys[$m.Groups[1].Value] = $m.Groups[3].Value
       }
    }
-   foreach ($m in [regex]::Matches($codeText, '(\w+)\.(\w+)\s*=\s*(\w+)\.(?:IsChecked\s*==\s*true|Text\b)')) {
+   # A check box reads back as `x.IsChecked is true` (or the older `== true`);
+   # both are the same setting.
+   foreach ($m in [regex]::Matches($codeText, '(\w+)\.(\w+)\s*=\s*(\w+)\.(?:IsChecked\s*(?:==|is)\s*true|Text\b)')) {
       if ($dynamicLocals.ContainsKey($m.Groups[1].Value) -and -not $keys.ContainsKey($m.Groups[3].Value)) {
          $keys[$m.Groups[3].Value] = $m.Groups[2].Value
       }
