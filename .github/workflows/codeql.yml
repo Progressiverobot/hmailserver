@@ -83,7 +83,7 @@ jobs:
       # defects are filtered in the config file, each with its count and the
       # reasoning.
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4.37.8
+        uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
         with:
           languages: csharp
           build-mode: manual
@@ -109,7 +109,7 @@ jobs:
         run: dotnet build "hmailserver/source/Tools/hMailServer Tools.sln" -c Release -p:RestoreLockedMode=true
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4.37.8
+        uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
         with:
           category: "/language:csharp"
           upload: never
@@ -154,7 +154,7 @@ jobs:
                   json.dump(sarif, f)
 
       - name: Upload results
-        uses: github/codeql-action/upload-sarif@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4.37.8
+        uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
         with:
           sarif_file: sarif-results
           category: "/language:csharp"
@@ -224,7 +224,7 @@ jobs:
       # is triaged, moving this to security-and-quality is a one-word change -
       # but do it from a measured count, not on principle.
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4.37.8
+        uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
         with:
           languages: c-cpp
           build-mode: manual
@@ -242,7 +242,7 @@ jobs:
         run: ./build/build.ps1 -Configuration $env:BUILD_CONFIGURATION -Clean
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4.37.8
+        uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
         with:
           category: "/language:c-cpp"
 
