@@ -47,10 +47,16 @@ namespace ConfigureInstallation
          var numericVersion = string.Format("{0},{1},{2},{3}", versionMajor, versionMinor, versionPatch, build);
 
          Console.WriteLine("Writing c++ version info to {0}", cppVersionFile);
-         var versionContent = string.Format(@"#pragma once
-                                              #define HMAILSERVER_VERSION ""{0}""
-                                              #define HMAILSERVER_VERSION_NUMERIC {1}
-                                              #define HMAILSERVER_BUILD {2}" + Environment.NewLine + Environment.NewLine, version, numericVersion, build);
+         // The same shape the file has in the repository: the licence header the
+         // SPDX check requires, then the three defines at column one.
+         var versionContent = string.Format(
+            "// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors\n" +
+            "// SPDX-License-Identifier: AGPL-3.0-or-later\n" +
+            "\n" +
+            "#pragma once\n" +
+            "#define HMAILSERVER_VERSION \"{0}\"\n" +
+            "#define HMAILSERVER_VERSION_NUMERIC {1}\n" +
+            "#define HMAILSERVER_BUILD {2}\n", version, numericVersion, build);
          File.WriteAllText(cppVersionFile, versionContent);
 
          // Write C++ version header file.
@@ -89,10 +95,11 @@ namespace ConfigureInstallation
             Ini.Write(installationFile, "Setup", "OutputBaseFilename", string.Format("hMailServer-{0}-B{1}-x86", version, build));
          }
 
-         string versionWithBuild = string.Format("{0}.{1}", version, build);
-
-         Ini.Write(installationFile, "Setup", "AppVersion", versionWithBuild);
-         Ini.Write(installationFile, "Setup", "VersionInfoVersion", versionWithBuild);
+         // The build number travels in Version.h and the release tag; the installer's
+         // version fields carry the version alone, so a build-only re-cut never has
+         // to touch this file (RELEASE.md, step 7).
+         Ini.Write(installationFile, "Setup", "AppVersion", version);
+         Ini.Write(installationFile, "Setup", "VersionInfoVersion", version + ".0");
 
          return true;
       }
