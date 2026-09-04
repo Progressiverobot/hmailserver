@@ -1,0 +1,40 @@
+{
+   "_comment": [
+      "editorconfig-checker configuration, read by the style.yml job and by a local run of",
+      "editorconfig-checker from the repository root.",
+      "",
+      "IndentSize is disabled on purpose: .editorconfig declares width 3 for C++ and C#,",
+      "and the checker reads that as 'every indented line must be a multiple of three',",
+      "which condemns the continuation-line alignment that dotnet format itself produces",
+      "(2,110 lines, most of them in the formatted C# tree). Indent STYLE (spaces, never",
+      "tabs) is still checked, as are the final newline and trailing whitespace where",
+      ".editorconfig asks for them.",
+      "",
+      "The excluded paths are the trees that still carry tabs from the original",
+      "hMailServer sources: 284 of the C++ server's files, two SQL CE headers under",
+      "libraries/, one installer helper and two files of an old test project. They are",
+      "excluded, not ignored: the roadmap carries the conversion, and the exclusion",
+      "comes off with it. Everything else in the repository is checked."
+   ],
+   "Verbose": false,
+   "Debug": false,
+   "IgnoreDefaults": false,
+   "SpacesAfterTabs": false,
+   "NoColor": true,
+   "Exclude": [
+      "^hmailserver/source/Server/",
+      "^libraries/mssqlce3\\.5/",
+      "^hmailserver/installation/InnoSocketCheck/",
+      "^hmailserver/test/TestInvalidConnections/"
+   ],
+   "AllowedContentTypes": [],
+   "PassedFiles": [],
+   "Disable": {
+      "EndOfLine": false,
+      "Indentation": false,
+      "IndentSize": true,
+      "InsertFinalNewline": false,
+      "TrimTrailingWhitespace": false,
+      "MaxLineLength": false
+   }
+}
