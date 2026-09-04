@@ -181,7 +181,7 @@ namespace RegressionTests.SMTP
       /// </summary>
       private static byte[] BuildBinaryMessage()
       {
-         var stream = new MemoryStream();
+         using var stream = new MemoryStream();
 
          byte[] headers = Ascii(
             "Subject: BINARYMIME fidelity\r\n" +

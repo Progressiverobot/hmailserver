@@ -256,7 +256,7 @@ namespace RegressionTests.POP3
 
             var fileHash = GetFileHash(testFile);
 
-            var mail = new MailMessage();
+            using var mail = new MailMessage();
             mail.From = new MailAddress("test@example.test");
             mail.To.Add("test@example.test");
             mail.Subject = "Test";
@@ -665,7 +665,7 @@ namespace RegressionTests.POP3
          for (var i = 0; i < 5; i++)
             try
             {
-               var client = new SmtpClient("localhost", 25);
+               using var client = new SmtpClient("localhost", 25);
                client.Send(mailMessage);
 
                return;
@@ -681,7 +681,7 @@ namespace RegressionTests.POP3
       public static string GetFileHash(string fileName)
       {
          var bytes = File.ReadAllBytes(fileName);
-         SHA1 sha = new SHA1CryptoServiceProvider();
+         using SHA1 sha = SHA1.Create();
          var hash = new StringBuilder();
 
          var hashedData = sha.ComputeHash(bytes);

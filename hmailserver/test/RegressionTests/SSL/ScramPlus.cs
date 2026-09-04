@@ -166,7 +166,7 @@ namespace RegressionTests.SSL
       {
          Assert.IsNotNull(cert, "No server certificate was negotiated.");
 
-         var cert2 = new X509Certificate2(cert);
+         using var cert2 = new X509Certificate2(cert);
          HashAlgorithm hash;
          switch (cert2.SignatureAlgorithm.Value)
          {

@@ -33,57 +33,50 @@ namespace ImportTool.MboxImport
       /// </summary>
       public static void Parse(string path, Action<byte[]> onMessage, Action<long> onProgress)
       {
+         // One buffer for the whole file, emptied between messages rather than
+         // replaced: a single using scope then owns it for every exit path,
+         // including a callback throwing mid-message.
          using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+         using (var current = new MemoryStream())
          {
-            var current = new MemoryStream();
             var messageStarted = false;
             var previousLineBlank = true;   // start of file counts as a boundary
 
             long consumed = 0;
             byte[] line;
 
-            // The finally disposes whichever buffer is live when the loop exits,
-            // however it exits - including a callback throwing mid-message.
-            try
+            while ((line = ReadLine(stream)) != null)
             {
-               while ((line = ReadLine(stream)) != null)
+               consumed += line.Length;
+
+               if (previousLineBlank && StartsWithFromMarker(line))
                {
-                  consumed += line.Length;
-
-                  if (previousLineBlank && StartsWithFromMarker(line))
+                  // Envelope line: flush the previous message and skip the line.
+                  if (messageStarted)
                   {
-                     // Envelope line: flush the previous message and skip the line.
-                     if (messageStarted)
-                     {
-                        onMessage(TrimTrailingBlankLine(current));
-                        current.Dispose();
-                        current = new MemoryStream();
-                     }
-
-                     messageStarted = true;
-                     previousLineBlank = false;
-
-                     if (onProgress != null)
-                        onProgress(consumed);
-
-                     continue;
+                     onMessage(TrimTrailingBlankLine(current));
+                     current.SetLength(0);
                   }
 
-                  previousLineBlank = IsBlank(line);
+                  messageStarted = true;
+                  previousLineBlank = false;
 
-                  if (!messageStarted)
-                     continue;   // preamble before the first envelope line
+                  if (onProgress != null)
+                     onProgress(consumed);
 
-                  WriteBodyLine(current, line);
+                  continue;
                }
 
-               if (messageStarted)
-                  onMessage(TrimTrailingBlankLine(current));
+               previousLineBlank = IsBlank(line);
+
+               if (!messageStarted)
+                  continue;   // preamble before the first envelope line
+
+               WriteBodyLine(current, line);
             }
-            finally
-            {
-               current.Dispose();
-            }
+
+            if (messageStarted)
+               onMessage(TrimTrailingBlankLine(current));
 
             if (onProgress != null)
                onProgress(consumed);

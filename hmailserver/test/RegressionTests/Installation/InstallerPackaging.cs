@@ -136,8 +136,8 @@ namespace RegressionTests.Installation
 
             if (term.Length >= 2 && term.StartsWith("\"") && term.EndsWith("\""))
                value += term.Substring(1, term.Length - 2);
-            else if (known.ContainsKey(term))
-               value += known[term];
+            else if (known.TryGetValue(term, out string knownValue))
+               value += knownValue;
             else
                return null;
          }
@@ -148,8 +148,8 @@ namespace RegressionTests.Installation
       private static string ResolveIspp(string text, Dictionary<string, string> defines)
       {
          return Regex.Replace(text, @"\{#(\w+)\}",
-                              match => defines.ContainsKey(match.Groups[1].Value)
-                                          ? defines[match.Groups[1].Value]
+                              match => defines.TryGetValue(match.Groups[1].Value, out string defined)
+                                          ? defined
                                           : match.Value);
       }
 

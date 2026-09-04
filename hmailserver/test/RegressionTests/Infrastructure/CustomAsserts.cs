@@ -84,7 +84,7 @@ namespace RegressionTests.Infrastructure
             // Check if we can launch it...
             try
             {
-               var serviceController = new ServiceController("SpamAssassinJAM");
+               using var serviceController = new ServiceController("SpamAssassinJAM");
                if (serviceController.Status != ServiceControllerStatus.Running)
                   serviceController.Start();
             }
@@ -130,10 +130,10 @@ namespace RegressionTests.Infrastructure
                File.Delete(file);
                return;
             }
-            catch (Exception e)
+            catch (Exception)
             {
                if (i == 400)
-                  throw e;
+                  throw;
             }
 
             Thread.Sleep(25);

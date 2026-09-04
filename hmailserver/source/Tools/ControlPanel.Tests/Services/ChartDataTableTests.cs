@@ -231,7 +231,7 @@ namespace hMailServer.ControlPanel.Tests.Services
          IReadOnlyList<ChartSeriesSamples> series = Samples_(definition, 5);
          var times = new List<DateTime>();
          for (int i = 0; i < 5; i++)
-            times.Add(new DateTime(2026, 8, 12, 9, 0, 0).AddSeconds(2 * i));
+            times.Add(new DateTime(2026, 8, 12, 9, 0, 0).AddSeconds(2.0 * i));
 
          ChartDataTable table = ChartDataTable.Build(definition, series, times);
          ChartTableRow newest = ChartDataTable.BuildNewestRow(definition, series, times);
