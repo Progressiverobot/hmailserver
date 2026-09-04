@@ -44,7 +44,7 @@ already cost a release cycle or nearly shipped a defect.
    of release this checklist keeps being used for - one that moves the schema
    several steps past the last stable - and it was missing from this step until
    6.2.23.
-
+
 7. **Version stamp**: `Version.h` (version, numeric, build),
    `section_setup_64.iss`, all seven `.csproj` `<Version>` values. Verify
    nothing else still carries the old version: `git grep <old-version>`.
@@ -102,9 +102,25 @@ already cost a release cycle or nearly shipped a defect.
     git pull --ff-only origin master
     ```
 
-    Then **tag** `vX.Y.Z` on master and push the tag (tags matching `v*` are
-    protected too: no deletion, no rewrite - a tag is spent once). Then publish
-    **as a draft first** - this repository has
+    Then **tag** `vX.Y.Z` on master as an **annotated, signed** tag and push it
+    (tags matching `v*` are protected too: no deletion, no rewrite - a tag is
+    spent once):
+
+    ```
+    git tag -s vX.Y.Z -m "hMailServer X.Y.Z"
+    git -c gpg.ssh.allowedSignersFile=.github/allowed_signers verify-tag vX.Y.Z
+    git push origin vX.Y.Z
+    ```
+
+    Signing is SSH-based (`git config gpg.format ssh` and `user.signingkey`
+    pointing at the public key, set once in the repository's config), and the
+    key must be listed in `.github/allowed_signers` - the signing workflow
+    below refuses to sign anything for a tag that is lightweight or that does
+    not verify against that file, so an unsigned tag stops the release before
+    it has any assets. Every tag up to `v6.2.23-alpha1` was lightweight; there
+    was nothing to verify and nothing stopped a `v*` ref being moved.
+
+    Then publish **as a draft first** - this repository has
     immutable releases enabled, so a published release refuses every further asset
     upload and would be stuck with whatever it was created with:
 

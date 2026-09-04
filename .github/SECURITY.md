@@ -80,3 +80,28 @@ Every release ships an SBOM (SPDX and CycloneDX) covering both the .NET and
 the native dependencies. Third-party binaries committed to this repository are
 inventoried, checksummed and verified on every build — see
 [hmailserver/docs/ThirdPartyBinaries.md](../hmailserver/docs/ThirdPartyBinaries.md).
+
+Two things on a release can be verified independently of GitHub:
+
+- **The release tag** (from `v6.2.23-alpha2` on) is an annotated tag signed
+  with the maintainer's SSH key. The allow list is in the repository, so a
+  clone can check it without trusting anything else:
+
+  ```
+  git -c gpg.ssh.allowedSignersFile=.github/allowed_signers verify-tag v6.2.23-alpha2
+  ```
+
+- **Every asset** carries a Sigstore bundle (`<asset>.cosign.bundle`), keyless,
+  bound to this repository's workflow identity and recorded in the public
+  Rekor log. With [cosign](https://github.com/sigstore/cosign) installed:
+
+  ```
+  cosign verify-blob \
+    --bundle hMailServer-x.y.z-x64.exe.cosign.bundle \
+    --certificate-identity-regexp '^https://github\.com/Progressiverobot/hmailserver/' \
+    --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+    hMailServer-x.y.z-x64.exe
+  ```
+
+Neither replaces Authenticode: Windows SmartScreen and the UAC prompt do not
+read either signature, and the installer is not Authenticode-signed today.

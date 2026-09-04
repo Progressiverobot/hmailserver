@@ -1,0 +1,76 @@
+name: DCO
+
+# Developer Certificate of Origin (https://developercertificate.org/) on pull
+# requests. The project is AGPL-3.0-or-later and CONTRIBUTING.md says
+# contributions are licensed the same way; a Signed-off-by trailer is how a
+# contributor records that they agree, and `git commit -s` is the whole
+# ceremony. There is no CLA.
+#
+# Scope, deliberately narrow:
+#   * Pull requests only. The maintainer's direct history is not retrofitted -
+#     no commit before this workflow carries a sign-off, and rewriting history
+#     to add one would assert something nobody said at the time.
+#   * Bots are exempt (Dependabot cannot sign off, and its commits are
+#     dependency bumps with no authorship to certify).
+#   * The repository owner is exempt too. Their commits are the project's own,
+#     and the release flow lands them through pull requests they open and merge
+#     themselves - a red check there would mean either signing off on every
+#     release commit as a formality or bypassing the check, and a check that
+#     is routinely bypassed teaches everyone to ignore it. The DCO is about
+#     recording OUTSIDE contributors' agreement, and that is where it applies.
+#
+# No third-party action: the check is thirty lines of shell over `git log`,
+# which is easier to audit than a pinned SHA and has nothing to update.
+
+on:
+  pull_request:
+    branches: [ master ]
+
+permissions:
+  contents: read
+
+jobs:
+  dco:
+    name: Signed-off-by on every commit
+    runs-on: ubuntu-latest
+    if: >-
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
+      github.event.pull_request.user.login != github.repository_owner
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Check every commit in the pull request
+        shell: bash
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          missing=0
+          while IFS= read -r sha; do
+            [ -z "${sha}" ] && continue
+            author_email=$(git log -1 --format='%ae' "${sha}")
+            subject=$(git log -1 --format='%s' "${sha}")
+            # The trailer must name the commit's author: a sign-off by someone
+            # else certifies nothing about the person who wrote the change.
+            if git log -1 --format='%(trailers:key=Signed-off-by,valueonly)' "${sha}" \
+                 | grep -qiF "<${author_email}>"; then
+              echo "ok       ${sha:0:12} ${subject}"
+            else
+              echo "::error::Commit ${sha:0:12} (\"${subject}\") has no Signed-off-by trailer for ${author_email}."
+              missing=$((missing + 1))
+            fi
+          done < <(git rev-list --reverse "${BASE}..${HEAD}")
+
+          if [ "${missing}" -gt 0 ]; then
+            echo ""
+            echo "${missing} commit(s) lack a Developer Certificate of Origin sign-off."
+            echo "Add one with 'git commit -s' (or 'git commit --amend -s' for an existing"
+            echo "commit, then 'git rebase --exec \"git commit --amend --no-edit -s\"' for a"
+            echo "series). What you are certifying is at https://developercertificate.org/."
+            exit 1
+          fi
+          echo "Every commit carries a sign-off."
