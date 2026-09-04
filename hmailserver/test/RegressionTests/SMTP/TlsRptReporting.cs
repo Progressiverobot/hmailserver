@@ -100,7 +100,8 @@ namespace RegressionTests.SMTP
                   }
                }
 
-               ClassicAssert.IsNotNull(port25, "No SMTP port 25 exists in the test environment.");
+               if (port25 == null)
+                  throw new InvalidOperationException("No SMTP port 25 exists in the test environment.");
 
                originalPort25Security = port25.ConnectionSecurity;
                originalPort25Certificate = port25.SSLCertificateID;

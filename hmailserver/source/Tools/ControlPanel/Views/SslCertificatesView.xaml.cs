@@ -484,7 +484,7 @@ namespace hMailServer.ControlPanel.Views
 
       private static string BrowsePem()
       {
-         var dialog = new OpenFileDialog
+         var dialog = new Microsoft.Win32.OpenFileDialog
          {
             Filter = "PEM files (*.pem;*.crt;*.key)|*.pem;*.crt;*.key|All files (*.*)|*.*"
          };

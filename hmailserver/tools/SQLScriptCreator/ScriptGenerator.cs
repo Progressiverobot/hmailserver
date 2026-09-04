@@ -102,7 +102,7 @@ namespace SQLScriptCreator.Statements
                   }
                }
                else
-                  throw new Exception("Unknown statement type:" + statement.ToString());
+                  throw new Exception("Unknown statement type:" + statement.GetType().Name);
                               
 
                if (scripts.ContainsKey(generator.Name))
@@ -116,7 +116,7 @@ namespace SQLScriptCreator.Statements
 
             if (found == false)
             {
-               throw new Exception("SQL not generated for statement: " + statement.ToString());
+               throw new Exception("SQL not generated for statement: " + statement.GetType().Name);
             }
             
          }

@@ -14,12 +14,10 @@ namespace DatabaseUnicodeConversion
     class Parser
     {
         private List<string> outCommands;
-        private List<string> outCommandsMySQL;
 
         public void Run(string sInputFile, string sOutputFile)
         {
             outCommands = new List<string>();
-            outCommandsMySQL = new List<string>();
 
             TextReader reader = File.OpenText(sInputFile);
             string sFileContents = reader.ReadToEnd();
@@ -97,8 +95,6 @@ namespace DatabaseUnicodeConversion
 
                     // MSSQL:
                     outCommands.Add("hm_drop_table_objects '" + tableName + "'");
-
-                    outCommandsMySQL.Add("ALTER TABLE " + tableName + " CONVERT TO CHARACTER SET utf8");
 
                     continue;
                 }

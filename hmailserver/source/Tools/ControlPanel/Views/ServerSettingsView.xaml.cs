@@ -3272,7 +3272,7 @@ namespace hMailServer.ControlPanel.Views
       /// </summary>
       private static void WireLogFormatDependency(ComCombo format, IniBool json)
       {
-         if (format?.Combo == null || json?.Box == null)
+         if (format == null || json == null || format.Combo == null || json.Box == null)
             return;
 
          void Update()
@@ -3295,7 +3295,9 @@ namespace hMailServer.ControlPanel.Views
 
       private static void WireChaChaDependency(ComBool preferServer, ComBool chacha, ComBool tls12, ComBool tls13)
       {
-         if (preferServer?.Box == null || chacha?.Box == null || tls12?.Box == null || tls13?.Box == null)
+         if (preferServer == null || chacha == null || tls12 == null || tls13 == null)
+            return;
+         if (preferServer.Box == null || chacha.Box == null || tls12.Box == null || tls13.Box == null)
             return;
 
          void Update()

@@ -304,10 +304,14 @@ namespace RegressionTests.Infrastructure
                Assert.IsFalse(double.IsNaN(value),
                   "hmailserver_state{state=\"" + state + "\"} is missing. A StateSet emits every state, not only the active one, " +
                   "so a PromQL alert can compare against a state that is currently 0. Body: " + body);
-               Assert.IsTrue(value == 0 || value == 1,
+               // A StateSet member is exactly 0 or 1; compared with a tolerance because the
+               // value has been through a text exposition and a double parse.
+               bool isZero = Math.Abs(value) < 1e-9;
+               bool isOne = Math.Abs(value - 1) < 1e-9;
+               Assert.IsTrue(isZero || isOne,
                   "hmailserver_state series must be boolean, got " + value + " for " + state + ". Body: " + body);
 
-               if (value == 1)
+               if (isOne)
                   statesSetToOne++;
             }
 

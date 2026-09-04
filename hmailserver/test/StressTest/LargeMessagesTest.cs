@@ -52,7 +52,7 @@ namespace StressTest
                mail.SubjectEncoding = Encoding.GetEncoding(1252);
                mail.Attachments.Add(new Attachment(largeFile));
 
-               var oClient = new SmtpClient("localhost", 25);
+               using (var oClient = new SmtpClient("localhost", 25))
                {
                   oClient.Send(mail);
                }

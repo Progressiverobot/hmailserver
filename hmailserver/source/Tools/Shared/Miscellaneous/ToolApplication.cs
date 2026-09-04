@@ -8,6 +8,10 @@ namespace hMailServer.Shared
 {
    public static class ToolApplication
    {
+      // The default font lives as long as the process; Application.SetDefaultFont
+      // keeps a reference and every form draws with it.
+      private static readonly Font DefaultFont = new Font("Microsoft Sans Serif", 8.25f);
+
       /// <summary>
       /// Standard WinForms bootstrap for the setup tools. The forms were designed
       /// against the .NET Framework defaults (Microsoft Sans Serif 8.25pt,
@@ -18,7 +22,7 @@ namespace hMailServer.Shared
       {
          System.Windows.Forms.Application.EnableVisualStyles();
          System.Windows.Forms.Application.SetCompatibleTextRenderingDefault(false);
-         System.Windows.Forms.Application.SetDefaultFont(new Font("Microsoft Sans Serif", 8.25f));
+         System.Windows.Forms.Application.SetDefaultFont(DefaultFont);
          System.Windows.Forms.Application.SetHighDpiMode(HighDpiMode.SystemAware);
       }
    }

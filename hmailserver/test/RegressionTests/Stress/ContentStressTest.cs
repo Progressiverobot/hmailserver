@@ -262,8 +262,8 @@ namespace RegressionTests.Stress
       private void AssertIsConnectionTerminatedException(IOException exception)
       {
          var inner = exception.InnerException as SocketException;
-         Assert.IsNotNull(inner);
-
+         if (inner == null)
+            throw new AssertionException("The inner exception is not a SocketException: " + exception.InnerException);
 
          Assert.AreEqual(10054, inner.ErrorCode);
       }

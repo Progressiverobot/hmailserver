@@ -232,7 +232,7 @@ namespace StressTest
 
          string executableName = Shared.GetExecutableName();
 
-         var mail = new MailMessage {From = new MailAddress("test@example.test")};
+         using var mail = new MailMessage {From = new MailAddress("test@example.test")};
          mail.To.Add("test@example.test");
          mail.Subject = "Automatic test";
          mail.Body = "Automatic test";
@@ -242,7 +242,7 @@ namespace StressTest
 
          for (int i = 1; i <= numberOfMessages; i++)
          {
-            var oClient = new SmtpClient("127.0.0.1", 25);
+            using var oClient = new SmtpClient("127.0.0.1", 25);
             oClient.Send(mail);
 
             if (i%10 == 0)
@@ -446,7 +446,7 @@ namespace StressTest
 
          const int numberOfMessages = 100;
 
-         var mail = new MailMessage();
+         using var mail = new MailMessage();
          mail.From = new MailAddress("test@example.test");
          mail.To.Add("test@example.test");
          mail.Subject = "Automatic server test";
@@ -457,7 +457,7 @@ namespace StressTest
          for (int i = 1; i <= numberOfMessages; i++)
          {
 
-            var oClient = new SmtpClient("localhost", 25);
+            using var oClient = new SmtpClient("localhost", 25);
             oClient.Send(mail);
 
             if (i % 5 == 0)

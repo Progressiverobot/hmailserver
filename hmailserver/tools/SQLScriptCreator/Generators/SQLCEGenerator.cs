@@ -60,8 +60,6 @@ namespace SQLScriptCreator.Generators
 
       public List<string> GenerateAddColumnStatement(AddColumn addColumnStatement)
       {
-
-         List<string> result = new List<string>();
          StringBuilder sb = new StringBuilder();
          sb.AppendFormat("ALTER TABLE {0} ADD {1} {2} {3}", addColumnStatement.Table, addColumnStatement.Name, addColumnStatement.DataType, addColumnStatement.Nullable ? "NULL" : "NOT NULL");
 

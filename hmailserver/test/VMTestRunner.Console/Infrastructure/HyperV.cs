@@ -15,6 +15,7 @@ namespace VMTestRunner.Console
    {
       private string _vmName;
       private PSCredential _credential;
+      private SecureString _securePassword;
       private readonly int _testIndex;
 
       private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
@@ -130,12 +131,15 @@ namespace VMTestRunner.Console
 
       public void SetCredentials(string username, string password)
       {
-         var securePassword = new SecureString();
+         // Owned for the lifetime of the credential, which is held for the life
+         // of this object; a previous password is released when replaced.
+         _securePassword?.Dispose();
+         _securePassword = new SecureString();
 
          foreach (char c in password)
-            securePassword.AppendChar(c);
+            _securePassword.AppendChar(c);
 
-         _credential = new PSCredential(username, securePassword);
+         _credential = new PSCredential(username, _securePassword);
       }
 
       public void CopyFileToGuest(string hostPath, string guestPath)

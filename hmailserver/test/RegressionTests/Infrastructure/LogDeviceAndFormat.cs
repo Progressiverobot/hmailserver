@@ -110,7 +110,7 @@ namespace RegressionTests.Infrastructure
                @"^(?<host>\S+) - (?<user>session-\d+) " + ClfDate + @" ""SMTPD SENT: 220 [^""\r\n]*"" 220 -\r?$",
                RegexOptions.Multiline);
 
-            Match match = null;
+            Match match = Match.Empty;
             var log = string.Empty;
 
             for (var attempt = 0; attempt < 20; attempt++)
@@ -356,7 +356,7 @@ namespace RegressionTests.Infrastructure
             var summaryPattern = new Regex(
                @"SQL log device: stopped\. (?<written>\d+) entries written to table hm_log, (?<tofile>\d+) written to file instead\.");
 
-            Match summary = null;
+            Match summary = Match.Empty;
 
             for (var attempt = 0; attempt < 40; attempt++)
             {

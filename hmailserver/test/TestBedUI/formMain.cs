@@ -24,14 +24,16 @@ namespace TestBedUI
         {
             try
             {
-                var message = new MailMessage();
-                message.From = new MailAddress(textFrom.Text);
-                message.To.Add(textTo.Text);
-                message.Subject = textSubject.Text;
+                using (var message = new MailMessage())
+                using (var client = new SmtpClient())
+                {
+                    message.From = new MailAddress(textFrom.Text);
+                    message.To.Add(textTo.Text);
+                    message.Subject = textSubject.Text;
 
-                SmtpClient client = new SmtpClient();
-                client.Host = "localhost";
-                client.Send(message);
+                    client.Host = "localhost";
+                    client.Send(message);
+                }
             }
             catch(Exception ex)
             {
@@ -43,14 +45,16 @@ namespace TestBedUI
         {
             try
             {
-                var message = new MailMessage();
-                message.From = new MailAddress(textFrom.Text);
-                message.To.Add(textTo.Text);
-                message.Subject = textSubject.Text;
-                message.Body = @"X5O!P%@AP[4\PZX54(P^)7CC)7}" + @"$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*";
-                SmtpClient client = new SmtpClient();
-                client.Host = "localhost";
-                client.Send(message);
+                using (var message = new MailMessage())
+                using (var client = new SmtpClient())
+                {
+                    message.From = new MailAddress(textFrom.Text);
+                    message.To.Add(textTo.Text);
+                    message.Subject = textSubject.Text;
+                    message.Body = @"X5O!P%@AP[4\PZX54(P^)7CC)7}" + @"$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*";
+                    client.Host = "localhost";
+                    client.Send(message);
+                }
             }
             catch (Exception ex)
             {
