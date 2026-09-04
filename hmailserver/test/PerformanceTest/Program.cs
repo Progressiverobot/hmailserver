@@ -38,15 +38,12 @@ namespace PerformanceTest
 
             pop3sim.QUIT();
 
-            System.Threading.Thread.Sleep(1000 * 60 * 60);
-
+            // The measurement is the RETR and DELE work, so the clock stops here. The
+            // original tool slept for an hour at this point before stopping it, which
+            // made the printed time the sleep rather than the work.
             stopwatch.Stop();
 
             Console.WriteLine("Passed time: " + stopwatch.Elapsed.TotalSeconds);
-
-
-            
-
         }
     }
 }
