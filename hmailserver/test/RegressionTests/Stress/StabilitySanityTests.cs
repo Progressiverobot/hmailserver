@@ -62,8 +62,9 @@ namespace RegressionTests.Stress
             watch.Start();
             account.Save();
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
+            // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
          }
 
          watch.Stop();

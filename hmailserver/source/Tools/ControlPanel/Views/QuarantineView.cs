@@ -110,7 +110,7 @@ namespace hMailServer.ControlPanel.Views
                   {
                      item = quarantine[i];
                   }
-                  catch
+                  catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
                   {
                      // The collection loads a page rather than the whole table, and
                      // indexing past it is how that page ends.
@@ -163,7 +163,7 @@ namespace hMailServer.ControlPanel.Views
                ServerSession.Release(quarantine);
             }
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             status_.Text = ServerSession.DescribeComError(ex);
          }
@@ -295,7 +295,7 @@ namespace hMailServer.ControlPanel.Views
 
             Reload();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             status_.Text = ServerSession.DescribeComError(ex);
          }
@@ -341,7 +341,7 @@ namespace hMailServer.ControlPanel.Views
 
             Reload();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             status_.Text = ServerSession.DescribeComError(ex);
          }
@@ -368,7 +368,7 @@ namespace hMailServer.ControlPanel.Views
 
             Reload();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             status_.Text = ServerSession.DescribeComError(ex);
          }

@@ -3,6 +3,7 @@
 
 using System;
 using System.Threading;
+using RegressionTests.Shared;
 
 namespace RegressionTests.Infrastructure
 {
@@ -21,7 +22,7 @@ namespace RegressionTests.Infrastructure
                action();
                return;
             }
-            catch
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
             {
                // Will retry.
             }

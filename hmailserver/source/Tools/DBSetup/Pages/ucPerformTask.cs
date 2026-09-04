@@ -99,7 +99,7 @@ namespace DBSetup.Pages
 
 
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             AddToLog(ex.Message);
             return false;
@@ -123,7 +123,7 @@ namespace DBSetup.Pages
 
             Globals.GetApp().Utilities.MakeDependent(serviceName);
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             MessageBox.Show("The set-up failed to set the service dependency.", "hMailServer");
          }

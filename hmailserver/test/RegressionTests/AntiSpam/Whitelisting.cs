@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
+using System.Linq;
 using hMailServer;
 using NUnit.Framework;
 using RegressionTests.Infrastructure;
@@ -40,14 +41,12 @@ namespace RegressionTests.AntiSpam
       [OneTimeTearDown]
       public void RestoreTheSystemResolver()
       {
-         try
+         // The fake resolver stays up until the server is back on the system one, so
+         // the restart never runs against a dead resolver.
+         using (dns_)
          {
             ServerIniFile.SetSetting("DNSServer", null);
             RestartServerAndReacquireCom();
-         }
-         finally
-         {
-            dns_?.Dispose();
          }
       }
 
@@ -567,16 +566,13 @@ namespace RegressionTests.AntiSpam
          ;
          var ipEntry = Dns.GetHostEntry(strHostName);
 
-         foreach (var address in ipEntry.AddressList)
-            if (address.AddressFamily == family)
-            {
-               var addr = address.ToString();
-
-               if (addr.Contains("%"))
-                  result.Add(addr.Substring(0, addr.IndexOf("%", StringComparison.InvariantCulture)));
-               else
-                  result.Add(addr);
-            }
+         foreach (var addr in ipEntry.AddressList.Where(address => address.AddressFamily == family).Select(address => address.ToString()))
+         {
+            if (addr.Contains("%"))
+               result.Add(addr.Substring(0, addr.IndexOf("%", StringComparison.InvariantCulture)));
+            else
+               result.Add(addr);
+         }
 
          return result.ToArray();
       }

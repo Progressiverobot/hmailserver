@@ -63,7 +63,7 @@ namespace SQLScriptCreator.Generators
             statement.Clustered ? "CLUSTERED" : "NONCLUSTERED",
             statement.Name,
             statement.Table,
-            columnList.ToString());
+            columnList);
 
          return new List<string>() { sb.ToString() };
       }
@@ -82,7 +82,7 @@ namespace SQLScriptCreator.Generators
       public List<string> GenerateRawSQLStatement(RawSQL statement)
       {
          if (statement.Engines.Count > 0 &&
-             statement.Engines.Contains("MSSQL") == false)
+             !statement.Engines.Contains("MSSQL"))
               return new List<string>(){};
 
          return new List<string>() { statement.Statement };

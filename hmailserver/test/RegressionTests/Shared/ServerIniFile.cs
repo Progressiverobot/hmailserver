@@ -5,6 +5,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using NUnit.Framework;
 
 namespace RegressionTests.Shared
@@ -41,7 +42,7 @@ namespace RegressionTests.Shared
 
          while (directory != null)
          {
-            var candidate = System.IO.Path.Combine(directory.FullName,
+            var candidate = Paths.Combine(directory.FullName,
                @"source\Server\hMailServer\x64\Release\hMailServer.ini");
 
             if (File.Exists(candidate))
@@ -80,13 +81,10 @@ namespace RegressionTests.Shared
       /// </summary>
       public static string GetSetting(string key)
       {
-         foreach (var line in File.ReadAllLines(Path()))
-         {
-            if (line.StartsWith(key + "=", StringComparison.OrdinalIgnoreCase))
-               return line.Substring(key.Length + 1);
-         }
-
-         return null;
+         return File.ReadAllLines(Path())
+            .Where(line => line.StartsWith(key + "=", StringComparison.OrdinalIgnoreCase))
+            .Select(line => line.Substring(key.Length + 1))
+            .FirstOrDefault();
       }
    }
 }

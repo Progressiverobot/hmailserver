@@ -24,7 +24,7 @@ namespace RegressionTests.IMAP
 
          var attachmentName = "本本本.zip";
 
-         var filename = Path.Combine(Path.GetTempPath(), attachmentName);
+         var filename = Paths.Combine(Path.GetTempPath(), attachmentName);
          File.WriteAllText(filename, "tjena moss");
 
          var message = new Message();
@@ -82,7 +82,7 @@ namespace RegressionTests.IMAP
 
          var attachmentName = "本本本.zip";
 
-         var filename = Path.Combine(Path.GetTempPath(), attachmentName);
+         var filename = Paths.Combine(Path.GetTempPath(), attachmentName);
          File.WriteAllText(filename, "tjena moss");
 
          var message = new Message();

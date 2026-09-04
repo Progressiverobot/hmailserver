@@ -9,6 +9,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
+using System.Linq;
 using hMailServer;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
@@ -81,14 +82,9 @@ namespace RegressionTests.API
 
       private string FindKeyStore()
       {
-         foreach (string directory in IniFileSetting.CandidateDirectories())
-         {
-            string candidate = Path.Combine(directory, KeyStoreFileName);
-            if (File.Exists(candidate))
-               return candidate;
-         }
-
-         return null;
+         return IniFileSetting.CandidateDirectories()
+            .Select(directory => Paths.Combine(directory, KeyStoreFileName))
+            .FirstOrDefault(File.Exists);
       }
 
       private void DeleteKeyStore()

@@ -4,9 +4,9 @@
 
 using System;
 using System.IO;
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
+using System.Linq;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
 using RegressionTests.Infrastructure;
@@ -45,8 +45,6 @@ namespace RegressionTests.Security
    [TestFixture]
    public class AccountSendingLimits : TestFixtureBase
    {
-      [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-      private static extern bool WritePrivateProfileString(string section, string key, string value, string filePath);
 
       private const string SettingsSection = "SendingLimits";
 
@@ -78,18 +76,15 @@ namespace RegressionTests.Security
          string programDirectory = _application.Settings.Directories.ProgramDirectory;
          string[] candidates =
          {
-            Path.Combine(programDirectory, "hMailServer.ini"),
-            Path.Combine(programDirectory, "Bin", "hMailServer.ini"),
+            Paths.Combine(programDirectory, "hMailServer.ini"),
+            Paths.Combine(programDirectory, "Bin", "hMailServer.ini"),
          };
 
          bool wroteAny = false;
-         foreach (string iniPath in candidates)
+         foreach (string iniPath in candidates.Where(File.Exists))
          {
-            if (!File.Exists(iniPath))
-               continue;
-
             Assert.IsTrue(
-               WritePrivateProfileString(SettingsSection, key, value, iniPath),
+               IniFile.WritePrivateProfileString(SettingsSection, key, value, iniPath),
                "Failed to write " + key + " to " + iniPath + ".");
             wroteAny = true;
          }
@@ -296,7 +291,7 @@ namespace RegressionTests.Security
          string address = UniqueAddress("refusalwrite");
          SingletonProvider<TestSetup>.Instance.AddAccount(_domain, address, "test");
 
-         string stateFile = Path.Combine(
+         string stateFile = Paths.Combine(
             _application.Settings.Directories.DataDirectory,
             "hmailserver_sendinglimits.dat");
 
@@ -440,7 +435,7 @@ namespace RegressionTests.Security
       // command. Poll rather than assume.
       private string WaitForStateFileContaining(string address)
       {
-         string stateFile = Path.Combine(
+         string stateFile = Paths.Combine(
             _application.Settings.Directories.DataDirectory,
             "hmailserver_sendinglimits.dat");
 

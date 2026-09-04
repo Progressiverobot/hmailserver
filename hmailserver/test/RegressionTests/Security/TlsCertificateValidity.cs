@@ -98,12 +98,12 @@ namespace RegressionTests.Security
       // reason.
       private string ExpiredCertificateFile
       {
-         get { return Path.Combine(_application.Settings.Directories.ProgramDirectory, "hm_expired_test.crt"); }
+         get { return Paths.Combine(_application.Settings.Directories.ProgramDirectory, "hm_expired_test.crt"); }
       }
 
       private string ExpiredPrivateKeyFile
       {
-         get { return Path.Combine(_application.Settings.Directories.ProgramDirectory, "hm_expired_test.key"); }
+         get { return Paths.Combine(_application.Settings.Directories.ProgramDirectory, "hm_expired_test.key"); }
       }
 
       [Test]

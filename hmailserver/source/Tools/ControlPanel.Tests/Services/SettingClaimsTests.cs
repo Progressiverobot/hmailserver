@@ -332,7 +332,7 @@ namespace hMailServer.ControlPanel.Tests.Services
 
          while (directory != null)
          {
-            string candidate = Path.Combine(directory.FullName, "ControlPanel", "Views", fileName);
+            string candidate = Path.Join(directory.FullName, "ControlPanel", "Views", fileName);
             if (File.Exists(candidate))
                return File.ReadAllText(candidate);
 

@@ -111,7 +111,7 @@ namespace hMailServer.ControlPanel.Views
          {
             ReadRowsFromCom(rows);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             rows.Clear();
             error = ServerSession.DescribeComError(ex);
@@ -179,7 +179,7 @@ namespace hMailServer.ControlPanel.Views
                      string password = (string)cert.PrivateKeyPassword;
                      row.Passphrase = string.IsNullOrEmpty(password) ? StoredPassphrase.NotSet : StoredPassphrase.Set;
                   }
-                  catch (Exception)
+                  catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
                   {
                      row.Passphrase = StoredPassphrase.Unknown;
                   }
@@ -466,7 +466,7 @@ namespace hMailServer.ControlPanel.Views
             error = "the certificate no longer exists - reload the page.";
             return false;
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             error = ServerSession.DescribeComError(ex);
             return false;
@@ -518,7 +518,7 @@ namespace hMailServer.ControlPanel.Views
             {
                return File.Exists(file) ? CertificateInspector.LooksLikeEncryptedPem(file) : (bool?)null;
             }
-            catch (Exception)
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
             {
                return null;
             }
@@ -578,7 +578,7 @@ namespace hMailServer.ControlPanel.Views
                {
                   return File.Exists(keyFile) ? CertificateInspector.LooksLikeEncryptedPem(keyFile) : (bool?)null;
                }
-               catch (Exception)
+               catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
                {
                   return null;
                }
@@ -614,7 +614,7 @@ namespace hMailServer.ControlPanel.Views
             cert.Save();
             ServerSession.Release((object)cert);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not add the certificate: " + ex.Message, "Control Panel");
             return;
@@ -655,7 +655,7 @@ namespace hMailServer.ControlPanel.Views
                ServerSession.Release((object)cert);
             }
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not delete the certificate: " + ex.Message, "Control Panel");
          }

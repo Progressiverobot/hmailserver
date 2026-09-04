@@ -4,6 +4,7 @@
 
 using System.Reflection;
 using System.Text;
+using System.Threading;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
 using RegressionTests.Infrastructure;
@@ -36,6 +37,12 @@ namespace RegressionTests.Sieve
 
       private static int accountSequence_;
 
+      // Unique per account created by this fixture, however the tests are ordered or parallelised.
+      private static int NextAccountSequence()
+      {
+         return Interlocked.Increment(ref accountSequence_);
+      }
+
       // The SURBL listing that makes the message spam, served locally.
       //
       // Grounding the verdict in the real pipeline is what this fixture is for - see
@@ -63,14 +70,12 @@ namespace RegressionTests.Sieve
       [OneTimeTearDown]
       public void RestoreTheSystemResolver()
       {
-         try
+         // The fake resolver stays up until the server is back on the system one, so
+         // the restart never runs against a dead resolver.
+         using (dns_)
          {
             ServerIniFile.SetSetting("DNSServer", null);
             RestartServerAndReacquireCom();
-         }
-         finally
-         {
-            dns_?.Dispose();
          }
       }
 
@@ -86,9 +91,9 @@ namespace RegressionTests.Sieve
       /// </summary>
       private bool FilesIntoJunk(string script, bool makeItSpam)
       {
-         accountSequence_++;
+         int sequence = NextAccountSequence();
          Account recipient = SingletonProvider<TestSetup>.Instance.AddAccount(
-            _domain, "sieve-spamtest-" + accountSequence_ + "@example.test", Password);
+            _domain, "sieve-spamtest-" + sequence + "@example.test", Password);
 
          recipient.IMAPFolders.Add(TargetFolder);
          SetScript(recipient, script);
@@ -205,9 +210,9 @@ namespace RegressionTests.Sieve
       [Description("A sender-written verdict header does not file the message - the spoofing control.")]
       public void ASenderWrittenVerdictHeaderDoesNotCount()
       {
-         accountSequence_++;
+         int sequence = NextAccountSequence();
          Account recipient = SingletonProvider<TestSetup>.Instance.AddAccount(
-            _domain, "sieve-spamtest-" + accountSequence_ + "@example.test", Password);
+            _domain, "sieve-spamtest-" + sequence + "@example.test", Password);
 
          recipient.IMAPFolders.Add(TargetFolder);
          SetScript(recipient, FileIntoJunkIf("spamtest :value \"ge\" :comparator \"i;ascii-numeric\" \"1\""));

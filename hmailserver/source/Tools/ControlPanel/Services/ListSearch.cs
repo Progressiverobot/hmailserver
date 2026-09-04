@@ -63,7 +63,7 @@ namespace hMailServer.ControlPanel.Services
             {
                value = p.GetValue(item);
             }
-            catch
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
             {
                continue;
             }

@@ -196,8 +196,9 @@ namespace hMailServer.ControlPanel.Views
             map["POP3"] = (bool)settings.ServicePOP3;
             map["IMAP"] = (bool)settings.ServiceIMAP;
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
+            // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
          }
          finally
          {
@@ -224,8 +225,9 @@ namespace hMailServer.ControlPanel.Views
                ServerSession.Release(c);
             }
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
+            // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
          }
          finally
          {
@@ -272,7 +274,7 @@ namespace hMailServer.ControlPanel.Views
             port.Save();
             ServerSession.Release(port);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not add the port: " + ex.Message, "Control Panel");
             return;
@@ -308,7 +310,7 @@ namespace hMailServer.ControlPanel.Views
          {
             ports.SetDefault();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show(ex.Message, "Control Panel", MessageBoxButton.OK, MessageBoxImage.Error);
          }
@@ -347,7 +349,7 @@ namespace hMailServer.ControlPanel.Views
                ServerSession.Release(port);
             }
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not delete the port: " + ex.Message, "Control Panel");
          }

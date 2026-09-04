@@ -128,7 +128,7 @@ namespace RegressionTests.SMTP
                   break;
             }
          }
-         catch (Exception exception)
+         catch (Exception exception) when (!ExceptionPolicy.IsFatal(exception))
          {
             Assert.Fail("The server never replied (" + exception.GetType().Name + "). Received so far: \"" +
                         reply.ToString().Replace("\r", "\\r").Replace("\n", "\\n") + "\". " +

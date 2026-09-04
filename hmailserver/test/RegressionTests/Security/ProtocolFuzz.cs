@@ -68,7 +68,7 @@ namespace RegressionTests.Security
          }
       }
 
-      private static void Quiet(Action a) { try { a(); } catch { } }
+      private static void Quiet(Action a) { try { a(); } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ } }
 
       // Reads any pending response without ever blocking on a silent server.
       private static void Drain(TcpConnection tc, int maxMs = 250)
@@ -78,7 +78,7 @@ namespace RegressionTests.Security
          {
             bool has;
             try { has = tc.Peek(); }
-            catch { return; }
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { return; }
 
             if (has)
             {
@@ -118,11 +118,11 @@ namespace RegressionTests.Security
                for (int j = 0; j < commands; j++)
                {
                   string line = verbs[rng.Next(verbs.Length)] + " " + Junk(rng, 300) + Terminator(rng);
-                  try { tc.Send(line); } catch { break; }
+                  try { tc.Send(line); } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { break; }
                   Drain(tc);
                }
             }
-            catch (Exception) { /* connection-level errors are expected; the liveness check is the real assertion */ }
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* connection-level errors are expected; the liveness check is the real assertion */ }
             finally { if (tc != null) Quiet(() => tc.Disconnect()); }
          }
 
@@ -167,11 +167,11 @@ namespace RegressionTests.Security
                   }
 
                   string line = "A" + rng.Next(0, 99) + " " + verbs[rng.Next(verbs.Length)] + " " + arg + Terminator(rng);
-                  try { tc.Send(line); } catch { break; }
+                  try { tc.Send(line); } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { break; }
                   Drain(tc);
                }
             }
-            catch (Exception) { }
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }
             finally { if (tc != null) Quiet(() => tc.Disconnect()); }
          }
 
@@ -204,7 +204,7 @@ namespace RegressionTests.Security
                Drain(tc, 1500);
                tc.Send("QUIT\r\n");
             }
-            catch (Exception) { }
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }
             finally { if (tc != null) Quiet(() => tc.Disconnect()); }
          }
 

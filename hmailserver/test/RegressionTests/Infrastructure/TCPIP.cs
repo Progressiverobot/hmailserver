@@ -48,14 +48,12 @@ namespace RegressionTests.Infrastructure
       [OneTimeTearDown]
       public void RestoreTheSystemResolver()
       {
-         try
+         // The fake resolver stays up until the server is back on the system one, so
+         // the restart never runs against a dead resolver.
+         using (dns_)
          {
             ServerIniFile.SetSetting("DNSServer", null);
             RestartServerAndReacquireCom();
-         }
-         finally
-         {
-            dns_?.Dispose();
          }
       }
 

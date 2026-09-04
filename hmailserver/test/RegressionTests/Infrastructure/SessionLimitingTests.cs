@@ -12,7 +12,7 @@ namespace RegressionTests.Infrastructure
    [TestFixture]
    public class SessionLimitingTests : TestFixtureBase
    {
-      private TimeSpan _readTimeout = TimeSpan.FromSeconds(5);
+      private readonly TimeSpan _readTimeout = TimeSpan.FromSeconds(5);
 
       [Test]
       public void TestLimitImapSessionCount()

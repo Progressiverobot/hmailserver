@@ -25,12 +25,12 @@ namespace RegressionTests.API
 
          var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "test@example.test", "test");
 
-         var domainPath = Path.Combine(_application.Settings.Directories.DataDirectory, "example.test");
-         var accountPath = Path.Combine(domainPath, "test");
+         var domainPath = Paths.Combine(_application.Settings.Directories.DataDirectory, "example.test");
+         var accountPath = Paths.Combine(domainPath, "test");
 
          Directory.CreateDirectory(accountPath);
 
-         var fileName = Path.Combine(accountPath, "something.eml");
+         var fileName = Paths.Combine(accountPath, "something.eml");
 
          File.WriteAllText(fileName, messageText);
 
@@ -51,15 +51,15 @@ namespace RegressionTests.API
 
          var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "test@example.test", "test");
 
-         var domainPath = Path.Combine(_application.Settings.Directories.DataDirectory, "example.test");
-         var accountPath = Path.Combine(domainPath, "test");
+         var domainPath = Paths.Combine(_application.Settings.Directories.DataDirectory, "example.test");
+         var accountPath = Paths.Combine(domainPath, "test");
          Directory.CreateDirectory(accountPath);
 
          var guid = Guid.NewGuid().ToString();
-         var guidPath = Path.Combine(accountPath, guid.Substring(1, 2));
+         var guidPath = Paths.Combine(accountPath, guid.Substring(1, 2));
          Directory.CreateDirectory(guidPath);
 
-         var fileName = Path.Combine(guidPath, "§§§§.eml");
+         var fileName = Paths.Combine(guidPath, "§§§§.eml");
 
          File.WriteAllText(fileName, messageText);
 
@@ -81,12 +81,12 @@ namespace RegressionTests.API
             "Test\r\n";
 
          var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "test@example.test", "test");
-         var publicFolder = Path.Combine(_application.Settings.Directories.DataDirectory, "#Public");
+         var publicFolder = Paths.Combine(_application.Settings.Directories.DataDirectory, "#Public");
 
          if (!Directory.Exists(publicFolder))
             Directory.CreateDirectory(publicFolder);
 
-         var fileName = Path.Combine(publicFolder, "§§§§.eml");
+         var fileName = Paths.Combine(publicFolder, "§§§§.eml");
 
          File.WriteAllText(fileName, messageText);
 
@@ -104,15 +104,15 @@ namespace RegressionTests.API
 
          var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "test@example.test", "test");
 
-         var domainPath = Path.Combine(_application.Settings.Directories.DataDirectory, "example.test");
-         var accountPath = Path.Combine(domainPath, "test");
+         var domainPath = Paths.Combine(_application.Settings.Directories.DataDirectory, "example.test");
+         var accountPath = Paths.Combine(domainPath, "test");
          Directory.CreateDirectory(accountPath);
 
          var guid = Guid.NewGuid().ToString();
-         var guidPath = Path.Combine(accountPath, guid.Substring(1, 2));
+         var guidPath = Paths.Combine(accountPath, guid.Substring(1, 2));
          Directory.CreateDirectory(guidPath);
 
-         var fileName = Path.Combine(guidPath, guid + ".eml");
+         var fileName = Paths.Combine(guidPath, guid + ".eml");
 
          File.WriteAllText(fileName, messageText);
 
@@ -133,12 +133,12 @@ namespace RegressionTests.API
 
          var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "test@example.test", "test");
 
-         var domainPath = Path.Combine(_application.Settings.Directories.DataDirectory, "example.test");
-         var accountPath = Path.Combine(domainPath, "test");
+         var domainPath = Paths.Combine(_application.Settings.Directories.DataDirectory, "example.test");
+         var accountPath = Paths.Combine(domainPath, "test");
 
          Directory.CreateDirectory(accountPath);
 
-         var fileName = Path.Combine(accountPath, "something.eml");
+         var fileName = Paths.Combine(accountPath, "something.eml");
 
          File.WriteAllText(fileName, messageText);
 
@@ -159,12 +159,12 @@ namespace RegressionTests.API
 
          var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "test@example.test", "test");
 
-         var domainPath = Path.Combine(_application.Settings.Directories.DataDirectory, "example.test");
-         var accountPath = Path.Combine(domainPath, "test");
+         var domainPath = Paths.Combine(_application.Settings.Directories.DataDirectory, "example.test");
+         var accountPath = Paths.Combine(domainPath, "test");
 
          Directory.CreateDirectory(accountPath);
 
-         var fileName = Path.Combine(accountPath, "something.eml");
+         var fileName = Paths.Combine(accountPath, "something.eml");
 
          File.WriteAllText(fileName, messageText);
 
@@ -187,11 +187,11 @@ namespace RegressionTests.API
 
          account.IMAPFolders.Add("Woho");
 
-         var domainPath = Path.Combine(_application.Settings.Directories.DataDirectory, "example.test");
-         var accountPath = Path.Combine(domainPath, "test");
+         var domainPath = Paths.Combine(_application.Settings.Directories.DataDirectory, "example.test");
+         var accountPath = Paths.Combine(domainPath, "test");
 
          Directory.CreateDirectory(accountPath);
-         var fileName = Path.Combine(accountPath, "something.eml");
+         var fileName = Paths.Combine(accountPath, "something.eml");
 
          File.WriteAllText(fileName, messageText);
 
@@ -220,8 +220,8 @@ namespace RegressionTests.API
          message.Save();
 
          // Move the message file to another folder.
-         var publicFolderPath = Path.Combine(_application.Settings.Directories.DataDirectory, "#Public");
-         var fileName = Path.Combine(publicFolderPath, "randomMail.eml");
+         var publicFolderPath = Paths.Combine(_application.Settings.Directories.DataDirectory, "#Public");
+         var fileName = Paths.Combine(publicFolderPath, "randomMail.eml");
          File.Move(message.Filename, fileName);
 
          // Update the database with the 'invalid' path.
@@ -255,9 +255,9 @@ namespace RegressionTests.API
          Assert.IsTrue(_application.Utilities.ImportMessageFromFile(message.Filename, account.ID));
 
          // Move the message file to another folder.
-         var domainPath = Path.Combine(_application.Settings.Directories.DataDirectory, _domain.Name);
-         var accountPath = Path.Combine(domainPath, "test");
-         var fileName = Path.Combine(accountPath, "randomMail.eml");
+         var domainPath = Paths.Combine(_application.Settings.Directories.DataDirectory, _domain.Name);
+         var accountPath = Paths.Combine(domainPath, "test");
+         var fileName = Paths.Combine(accountPath, "randomMail.eml");
          File.Move(message.Filename, fileName);
 
          // Update the database with the 'invalid' path.

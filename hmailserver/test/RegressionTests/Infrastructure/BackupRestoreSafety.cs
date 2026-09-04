@@ -8,6 +8,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Threading;
+using System.Linq;
 using NUnit.Framework;
 using RegressionTests.Shared;
 
@@ -76,7 +77,7 @@ namespace RegressionTests.Infrastructure
       [SetUp]
       public void SetUpBackupRestoreSafety()
       {
-         _backupDirectory = Path.Combine(Path.GetTempPath(), "hMailBackupSafety-" + TestSetup.UniqueString());
+         _backupDirectory = Paths.Combine(Path.GetTempPath(), "hMailBackupSafety-" + TestSetup.UniqueString());
          Directory.CreateDirectory(_backupDirectory);
 
          var backup = _application.Settings.Backup;
@@ -196,7 +197,7 @@ namespace RegressionTests.Infrastructure
       private string CreateTruncatedArchive()
       {
          string source = SingleArchive();
-         string truncated = Path.Combine(_backupDirectory, "truncated.7z");
+         string truncated = Paths.Combine(_backupDirectory, "truncated.7z");
 
          byte[] head = new byte[512];
          int read;
@@ -221,18 +222,15 @@ namespace RegressionTests.Infrastructure
          // build that is not registered runs from the directory it was built into.
          string[] candidates =
          {
-            Path.Combine(programDirectory, "7za.exe"),
-            Path.Combine(programDirectory, "Bin", "7za.exe"),
+            Paths.Combine(programDirectory, "7za.exe"),
+            Paths.Combine(programDirectory, "Bin", "7za.exe"),
          };
 
-         foreach (string candidate in candidates)
-         {
-            if (File.Exists(candidate))
-               return candidate;
-         }
+         string found = candidates.FirstOrDefault(File.Exists);
+         if (found == null)
+            Assert.Fail("Could not find 7za.exe next to the server. Looked in " + string.Join(" and ", candidates) + ".");
 
-         Assert.Fail("Could not find 7za.exe next to the server. Looked in " + string.Join(" and ", candidates) + ".");
-         return null;
+         return found;
       }
 
       // Builds an archive that claims to have been written by a much later
@@ -240,7 +238,7 @@ namespace RegressionTests.Infrastructure
       // else in the archive is looked at, which is the property being tested.
       private string CreateArchiveClaimingVersion(string version)
       {
-         string stagingDirectory = Path.Combine(_backupDirectory, "forged");
+         string stagingDirectory = Paths.Combine(_backupDirectory, "forged");
          Directory.CreateDirectory(stagingDirectory);
 
          // Mode 11 is domains + settings + compression, which is what a real archive
@@ -249,9 +247,9 @@ namespace RegressionTests.Infrastructure
          // ReadCompleteTextFile expects to detect.
          string xml = "<Backup><BackupInformation Mode=\"11\" Version=\"" + version + "\"/></Backup>";
 
-         File.WriteAllText(Path.Combine(stagingDirectory, "hMailServerBackup.xml"), xml, Encoding.Unicode);
+         File.WriteAllText(Paths.Combine(stagingDirectory, "hMailServerBackup.xml"), xml, Encoding.Unicode);
 
-         string archive = Path.Combine(_backupDirectory, "forged.7z");
+         string archive = Paths.Combine(_backupDirectory, "forged.7z");
 
          // Run with the staging directory as the working directory and pass a bare
          // file name, so the entry is stored as "hMailServerBackup.xml" and not under
@@ -507,7 +505,7 @@ namespace RegressionTests.Infrastructure
 
          RunBackupAndWaitForSuccess();
 
-         string stagedStore = Path.Combine(_backupDirectory, "DataBackup");
+         string stagedStore = Paths.Combine(_backupDirectory, "DataBackup");
          Assert.IsTrue(Directory.Exists(stagedStore),
             "An uncompressed backup should leave the message store in " + stagedStore + ".");
 

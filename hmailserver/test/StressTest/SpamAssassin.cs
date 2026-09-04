@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2010 Martin Knafve / hMailServer.com.  
+﻿// Copyright (c) 2010 Martin Knafve / hMailServer.com.
 // https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -93,20 +93,16 @@ namespace StressTest
       public void TestVaryingMessageSizes()
       {
          const int messageSizeIncrease = 100;
+         string message = new string('A', messageSizeIncrease - 2) + Environment.NewLine;
+
          for (int i = 0; i < 100000; i += messageSizeIncrease)
          {
-            var messageBuilder = new StringBuilder();
-            messageBuilder.Append('A', messageSizeIncrease-2);
-            messageBuilder.AppendLine();
-
-            var message = messageBuilder.ToString();
-
             SmtpClientSimulator.StaticSendRaw("test@example.test", "test@example.test", message);
 
             var defaultLog = LogHandler.ReadCurrentDefaultLog();
-            
+
             StringAssert.DoesNotContain("There was a communication error with SpamAssassin.", defaultLog);
-            
+
             LogHandler.DeleteCurrentDefaultLog();
 
             Pop3ClientSimulator.AssertGetFirstMessageText("test@example.test", "test");

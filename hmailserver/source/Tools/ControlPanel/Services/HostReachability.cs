@@ -109,7 +109,7 @@ namespace hMailServer.ControlPanel.Services
          {
             return Result.Fail(NotFound(host, timedOut: true));
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             return Result.Fail(NotFound(host, timedOut: false));
          }
@@ -161,7 +161,7 @@ namespace hMailServer.ControlPanel.Services
             await socket.ConnectAsync(new IPEndPoint(address, EndpointMapperPort), attempt.Token).ConfigureAwait(false);
             return true;
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             // Refused, filtered, timed out or unroutable. The distinction does not
             // change the advice, and reporting it would be guessing at a cause.

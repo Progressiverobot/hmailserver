@@ -184,7 +184,7 @@ namespace hMailServer.ControlPanel.Views
                (string)ServerSession.Current.Application.Version +
                " @ " + ServerSession.Current.Host;
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             serverVersion_.Text = "";
          }

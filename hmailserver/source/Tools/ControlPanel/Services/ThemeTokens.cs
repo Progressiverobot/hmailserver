@@ -93,7 +93,7 @@ namespace hMailServer.ControlPanel.Services
          {
             ApplicationThemeManager.Changed += (_, __) => Refresh();
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             // If the theme manager doesn't raise changes we still refresh
             // explicitly from the theme toggle (see MainWindow).
@@ -117,7 +117,7 @@ namespace hMailServer.ControlPanel.Services
          {
             SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged_;
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             // A missing SystemEvents pump is not a reason to fail startup; the theme
             // toggle still refreshes explicitly.
@@ -141,7 +141,7 @@ namespace hMailServer.ControlPanel.Services
             else
                Refresh();
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             // Never let a system notification take the application down.
          }
@@ -264,7 +264,7 @@ namespace hMailServer.ControlPanel.Services
             {
                ((EventHandler)handler)(null, EventArgs.Empty);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
             {
                App.LogException(ex);
             }
@@ -289,7 +289,7 @@ namespace hMailServer.ControlPanel.Services
                ToArgb(SystemColors.HotTrackColor),
                ToArgb(SystemColors.GrayTextColor));
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             return ChartSystemColors.Fallback;
          }
@@ -306,7 +306,7 @@ namespace hMailServer.ControlPanel.Services
          {
             return ApplicationThemeManager.GetAppTheme() == ApplicationTheme.Light;
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             return false;
          }

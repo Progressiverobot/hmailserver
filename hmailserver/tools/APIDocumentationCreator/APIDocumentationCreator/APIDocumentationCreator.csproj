@@ -47,6 +47,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Paths.cs" />
     <Compile Include="APIInterface.cs" />
     <Compile Include="APIMethod.cs" />
     <Compile Include="APIParameter.cs" />

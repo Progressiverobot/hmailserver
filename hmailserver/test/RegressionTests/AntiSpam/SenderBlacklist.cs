@@ -6,6 +6,7 @@ using NUnit.Framework;
 using NUnit.Framework.Legacy;   // StringAssert and the other classic asserts
 using RegressionTests.Infrastructure;
 using RegressionTests.Shared;
+using System;
 
 namespace RegressionTests.AntiSpam
 {
@@ -61,7 +62,7 @@ namespace RegressionTests.AntiSpam
          {
             _settings.AntiSpam.BlockedSenders.Clear();
          }
-         catch
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             // If the server died the base TearDown will report it; failing
             // here would only replace that report with a less useful one.

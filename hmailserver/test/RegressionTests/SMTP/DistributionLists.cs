@@ -85,7 +85,7 @@ namespace RegressionTests.SMTP
          {
             SingletonProvider<TestSetup>.Instance.AddDistributionList(_domain, "list1@example.test", recipients);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             Assert.IsTrue(ex.Message.Contains("The recipient address is empty"), ex.Message);
             return;

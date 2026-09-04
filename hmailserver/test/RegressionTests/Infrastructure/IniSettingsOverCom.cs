@@ -49,7 +49,7 @@ namespace RegressionTests.Infrastructure
          {
             _application.Settings.DeleteIniSetting(ProbeKey);
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             // A cleanup failure must not replace the real failure being reported.
          }

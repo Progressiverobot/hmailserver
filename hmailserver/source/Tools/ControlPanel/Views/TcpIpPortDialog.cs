@@ -160,7 +160,7 @@ namespace hMailServer.ControlPanel.Views
                ServerSession.Release(c);
             }
          }
-         catch (Exception) { }
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }
          finally { ServerSession.Release(certs); }
          SelectCombo(certificate_, selectedId);
       }
@@ -195,7 +195,7 @@ namespace hMailServer.ControlPanel.Views
             UpdateClientCertificateValidation();
             ServerSession.Release(p);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not load the port: " + ex.Message, "Control Panel");
             Close();
@@ -241,7 +241,7 @@ namespace hMailServer.ControlPanel.Views
             ServerSession.Release(p);
             Close();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not save the port: " + ex.Message, "Control Panel");
          }

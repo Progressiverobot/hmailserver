@@ -9,6 +9,7 @@ using NUnit.Framework;
 using RegressionTests.Infrastructure;
 using RegressionTests.Shared;
 using RegressionTests.SSL;
+using System;
 
 namespace RegressionTests.Security
 {
@@ -146,7 +147,7 @@ namespace RegressionTests.Security
                smtpClient.Send(false, account.Address, "test", account.Address, account.Address, "Test", "test",
                   out errorMessage);
             }
-            catch (System.Exception)
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
             {
                // AuthenticationException, Win32Exception or IOException depending on
                // the Windows build - the same set SslTlsVersionTests catches.

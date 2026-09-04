@@ -7,9 +7,9 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Net.Sockets;
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
+using System.Linq;
 using NUnit.Framework;
 using RegressionTests.Shared;
 
@@ -72,26 +72,20 @@ namespace RegressionTests.Infrastructure
       private const int ReadinessPort = 9560;
       private const int LeakPort = 9561;
 
-      [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-      private static extern bool WritePrivateProfileString(string section, string key, string value, string filePath);
-
       private void WriteSetting(string key, string value)
       {
          string programDirectory = _application.Settings.Directories.ProgramDirectory;
          string[] candidates =
          {
-            Path.Combine(programDirectory, "hMailServer.ini"),
-            Path.Combine(programDirectory, "Bin", "hMailServer.ini"),
+            Paths.Combine(programDirectory, "hMailServer.ini"),
+            Paths.Combine(programDirectory, "Bin", "hMailServer.ini"),
          };
 
          bool wroteAny = false;
-         foreach (string iniPath in candidates)
+         foreach (string iniPath in candidates.Where(File.Exists))
          {
-            if (!File.Exists(iniPath))
-               continue;
-
             Assert.IsTrue(
-               WritePrivateProfileString("Settings", key, value, iniPath),
+               IniFile.WritePrivateProfileString("Settings", key, value, iniPath),
                "Failed to write " + key + " to " + iniPath + ".");
             wroteAny = true;
          }
@@ -217,25 +211,14 @@ namespace RegressionTests.Infrastructure
       // Value of one exact series identity in an exposition body, or NaN when absent.
       private static double ParseSeries(string body, string identity)
       {
-         foreach (string raw in body.Split('\n'))
-         {
-            string line = raw.Trim();
-            if (line.Length == 0 || line.StartsWith("#", StringComparison.Ordinal))
-               continue;
-
-            int space = line.LastIndexOf(' ');
-            if (space <= 0 || space == line.Length - 1)
-               continue;
-
-            if (line.Substring(0, space) != identity)
-               continue;
-
-            double parsed;
-            if (double.TryParse(line.Substring(space + 1), NumberStyles.Float, CultureInfo.InvariantCulture, out parsed))
-               return parsed;
-         }
-
-         return double.NaN;
+         // A sample line is "<identity> <value>"; comments and blank lines are skipped.
+         return body.Split('\n')
+            .Select(raw => raw.Trim())
+            .Where(line => line.Length > 0 && !line.StartsWith("#", StringComparison.Ordinal))
+            .Select(line => (Line: line, Space: line.LastIndexOf(' ')))
+            .Where(sample => sample.Space > 0 && sample.Space < sample.Line.Length - 1 && sample.Line.Substring(0, sample.Space) == identity)
+            .Select(sample => double.TryParse(sample.Line.Substring(sample.Space + 1), NumberStyles.Float, CultureInfo.InvariantCulture, out double parsed) ? parsed : (double?)null)
+            .FirstOrDefault(value => value.HasValue) ?? double.NaN;
       }
 
       // The "# HELP <family> ..." text for a family, or null when absent.
@@ -243,14 +226,11 @@ namespace RegressionTests.Infrastructure
       {
          string prefix = "# HELP " + family + " ";
 
-         foreach (string raw in body.Split('\n'))
-         {
-            string line = raw.Trim();
-            if (line.StartsWith(prefix, StringComparison.Ordinal))
-               return line.Substring(prefix.Length);
-         }
-
-         return null;
+         return body.Split('\n')
+            .Select(raw => raw.Trim())
+            .Where(line => line.StartsWith(prefix, StringComparison.Ordinal))
+            .Select(line => line.Substring(prefix.Length))
+            .FirstOrDefault();
       }
 
       [Test]
@@ -341,12 +321,7 @@ namespace RegressionTests.Infrastructure
                timestamps.Add(timestamp);
             }
 
-            double maxAge = 0;
-            foreach (double age in ages)
-            {
-               if (age > maxAge)
-                  maxAge = age;
-            }
+            double maxAge = ages.Aggregate(0.0, Math.Max);
 
             Assert.GreaterOrEqual(maxAge, 1.0,
                "hmailserver_database_probe_age_seconds was zero on every one of " + ages.Count + " scrapes, which means " +

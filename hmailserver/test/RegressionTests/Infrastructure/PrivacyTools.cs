@@ -5,6 +5,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
 using RegressionTests.Shared;
@@ -59,7 +60,7 @@ namespace RegressionTests.Infrastructure
          AppendTo(imap, "A10", "Projects", "Subject: Filed\r\n\r\nA body filed under Projects for export.\r\n");
          imap.Disconnect();
 
-         string exportDirectory = Path.Combine(Path.GetTempPath(), "hm-export-" + Guid.NewGuid().ToString("N"));
+         string exportDirectory = Paths.Combine(Path.GetTempPath(), "hm-export-" + Guid.NewGuid().ToString("N"));
 
          try
          {
@@ -74,12 +75,8 @@ namespace RegressionTests.Infrastructure
 
             // The structure is the point: the filed message sits under a
             // directory named for its folder, not in one flat heap.
-            string filed = null;
-            foreach (string file in files)
-            {
-               if (Directory.GetParent(file).Name.Equals("Projects", StringComparison.OrdinalIgnoreCase))
-                  filed = file;
-            }
+            string filed = files.LastOrDefault(file =>
+               Directory.GetParent(file).Name.Equals("Projects", StringComparison.OrdinalIgnoreCase));
 
             Assert.IsNotNull(filed, "The appended message should be under a 'Projects' directory. Files: " +
                string.Join(", ", files));
@@ -124,7 +121,7 @@ namespace RegressionTests.Infrastructure
          AppendTo(imap, "A11", "Team|A", "Subject: FromPipe\r\n\r\nPipe folder body.\r\n");
          imap.Disconnect();
 
-         string exportDirectory = Path.Combine(Path.GetTempPath(), "hm-collide-" + Guid.NewGuid().ToString("N"));
+         string exportDirectory = Paths.Combine(Path.GetTempPath(), "hm-collide-" + Guid.NewGuid().ToString("N"));
 
          try
          {
@@ -140,9 +137,8 @@ namespace RegressionTests.Infrastructure
 
             // And both bodies must survive, in two distinct directories.
             bool colon = false, pipe = false;
-            foreach (string file in files)
+            foreach (string text in files.Select(File.ReadAllText))
             {
-               string text = File.ReadAllText(file);
                if (text.Contains("Colon folder body.")) colon = true;
                if (text.Contains("Pipe folder body.")) pipe = true;
             }

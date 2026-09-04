@@ -7,9 +7,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
+using System.Linq;
 using NUnit.Framework;
 using RegressionTests.Shared;
 
@@ -30,26 +30,20 @@ namespace RegressionTests.Infrastructure
       // with NUnit running tests in parallel this collector would fail to bind.
       private const int CollectorPort = 9096;
 
-      [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-      private static extern bool WritePrivateProfileString(string section, string key, string value, string filePath);
-
       private void WriteSetting(string key, string value)
       {
          string programDirectory = _application.Settings.Directories.ProgramDirectory;
          string[] candidates =
          {
-            Path.Combine(programDirectory, "hMailServer.ini"),
-            Path.Combine(programDirectory, "Bin", "hMailServer.ini"),
+            Paths.Combine(programDirectory, "hMailServer.ini"),
+            Paths.Combine(programDirectory, "Bin", "hMailServer.ini"),
          };
 
          bool wroteAny = false;
-         foreach (string iniPath in candidates)
+         foreach (string iniPath in candidates.Where(File.Exists))
          {
-            if (!File.Exists(iniPath))
-               continue;
-
             Assert.IsTrue(
-               WritePrivateProfileString("Settings", key, value, iniPath),
+               IniFile.WritePrivateProfileString("Settings", key, value, iniPath),
                "Failed to write " + key + " to " + iniPath + ".");
             wroteAny = true;
          }
@@ -90,7 +84,7 @@ namespace RegressionTests.Infrastructure
                {
                   client = _listener.AcceptTcpClient();
                }
-               catch
+               catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
                {
                   return; // listener stopped
                }
@@ -111,7 +105,7 @@ namespace RegressionTests.Infrastructure
                      stream.Write(response, 0, response.Length);
                   }
                }
-               catch
+               catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
                {
                   // Ignore a malformed/aborted connection and keep serving.
                }
@@ -140,11 +134,9 @@ namespace RegressionTests.Infrastructure
 
             string header = Encoding.ASCII.GetString(all, 0, headerEnd);
             int contentLength = 0;
-            foreach (string line in header.Split(new[] { "\r\n" }, StringSplitOptions.None))
-            {
-               if (line.StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase))
-                  int.TryParse(line.Substring("Content-Length:".Length).Trim(), out contentLength);
-            }
+            foreach (string line in header.Split(new[] { "\r\n" }, StringSplitOptions.None)
+               .Where(line => line.StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase)))
+               int.TryParse(line.Substring("Content-Length:".Length).Trim(), out contentLength);
 
             int bodyStart = headerEnd + 4;
             int bodyHave = all.Length - bodyStart;
@@ -186,9 +178,9 @@ namespace RegressionTests.Infrastructure
          {
             _running = false;
             try { _listener.Stop(); }
-            catch { }
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }
             try { _thread.Join(2000); }
-            catch { }
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }
          }
       }
 

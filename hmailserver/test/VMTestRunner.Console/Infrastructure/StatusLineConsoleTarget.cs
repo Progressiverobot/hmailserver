@@ -11,10 +11,21 @@ namespace VMTestRunner.Console
    [Target("StatusLineConsole")]
    public sealed class StatusLineConsoleTarget : TargetWithLayout
    {
-      private static string _lastStatus;
-      private static DateTime _statusStarted;
-      private static readonly object _lock = new object();
-      private static readonly Timer _timer = new Timer(_ => Tick(), null, Timeout.Infinite, Timeout.Infinite);
+      private readonly object _lock = new object();
+      private readonly Timer _timer;
+      private string _lastStatus;
+      private DateTime _statusStarted;
+
+      public StatusLineConsoleTarget()
+      {
+         _timer = new Timer(_ => Tick(), null, Timeout.Infinite, Timeout.Infinite);
+      }
+
+      protected override void CloseTarget()
+      {
+         _timer.Dispose();
+         base.CloseTarget();
+      }
 
       protected override void Write(LogEventInfo logEvent)
       {
@@ -40,7 +51,7 @@ namespace VMTestRunner.Console
          }
       }
 
-      private static void Tick()
+      private void Tick()
       {
          lock (_lock)
          {
@@ -49,7 +60,7 @@ namespace VMTestRunner.Console
          }
       }
 
-      private static void DrawStatus()
+      private void DrawStatus()
       {
          var elapsed = DateTime.UtcNow - _statusStarted;
          var timestamp = $"{(int)elapsed.TotalHours:D2}:{elapsed.Minutes:D2}:{elapsed.Seconds:D2}";
@@ -69,7 +80,7 @@ namespace VMTestRunner.Console
             var display = text.Length > width ? text.Substring(0, width) : text;
             System.Console.Write("\r" + display.PadRight(width) + "\r");
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             // Console may be redirected; silently ignore.
          }

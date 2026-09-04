@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2010 Martin Knafve / hMailServer.com.  
+﻿// Copyright (c) 2010 Martin Knafve / hMailServer.com.
 // https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -22,142 +22,104 @@ namespace APIDocumentationCreator
             {
                 conn.Open();
 
+                // One page per interface; the builders are reused across them.
+                var outputCode = new StringBuilder();
+                var outputLine = new StringBuilder();
+
                 foreach (APIInterface apiInterface in parser.Interfaces)
                 {
                     // do some pre-sorting...
                     IEnumerable<APIMethod> methods = apiInterface.Methods.OrderBy(method => method.Name);
                     IEnumerable<APIProperty> properties = apiInterface.Properties.OrderBy(prop => prop.Name);
 
-                    string fileName = Path.Combine(destinationFolder, "com_object_" + apiInterface.Name + ".html");
+                    string fileName = Paths.Combine(destinationFolder, "com_object_" + apiInterface.Name + ".html");
                     fileName = fileName.ToLower();
 
-                    string outputCode = "";
-
-                    outputCode = "<h3>Description</h3>";
-                    outputCode += apiInterface.HelpString  + "<br/>";
+                    outputCode.Length = 0;
+                    outputCode.Append("<h3>Description</h3>");
+                    outputCode.Append(apiInterface.HelpString).Append("<br/>");
 
                     if (methods.Count() > 0)
                     {
-                        outputCode += "<h3>Methods</h3>";
+                        outputCode.Append("<h3>Methods</h3>");
 
                         foreach (APIMethod method in methods)
                         {
-                            string outputLine = string.Format("<div class=\"api_method_name\">{0}(", method.Name);
+                            string parameters = string.Join(", ", method.Parameters
+                                .Where(parameter => parameter.Input)
+                                .Select(parameter => string.Format("{0} {1}", CreateLinkToType(parser, FriendlynizeType(parameter.Type)), parameter.Name))
+                                .ToArray());
 
-                            string parameters = "";
-                            foreach (APIParameter parameter in method.Parameters)
-                            {
-                                if (!parameter.Input)
-                                    continue;
-
-                                string parameterItem = string.Format("{0} {1}", CreateLinkToType(parser, FriendlynizeType(parameter.Type)), parameter.Name);
-
-                                if (parameters.Length > 0)
-                                    parameters += ", ";
-
-                                parameters += parameterItem;
-                            }
-
-                            outputLine += parameters;
-                            outputLine += ")";
-
-                            outputLine += "</div>";
-                            outputCode += outputLine;
+                            outputCode.Append(string.Format("<div class=\"api_method_name\">{0}({1})</div>", method.Name, parameters));
 
                             if (method.HelpString.Length > 0)
-                            {
-                                outputLine = string.Format("<br/><div class=\"api_description\">{0}</div>", method.HelpString);
+                                outputCode.Append(string.Format("<br/><div class=\"api_description\">{0}</div>", method.HelpString));
 
-                                outputCode += outputLine;
-                            }
-
-                            outputCode += "<br/>";
+                            outputCode.Append("<br/>");
                         }
                     }
 
                     if (properties.Count() > 0)
                     {
-                        outputCode += "<h3>Properties</h3>";
+                        outputCode.Append("<h3>Properties</h3>");
 
                         List<string> printedProperties = new List<string>();
 
                         foreach (APIProperty property in properties)
                         {
-                            string outputLine = string.Format("<div class=\"api_method_name\">");
+                            outputLine.Length = 0;
+                            outputLine.Append("<div class=\"api_method_name\">");
 
                             if (printedProperties.Contains(property.Name))
                                 continue;
 
                             printedProperties.Add(property.Name);
 
-                            foreach (APIParameter parameter in property.Parameters)
-                            {
-                                if (parameter.Input && property.Parameters.Count > 1)
-                                    continue;
+                            // An indexed property lists its input parameters after the name instead.
+                            foreach (APIParameter parameter in property.Parameters.Where(parameter => !parameter.Input || property.Parameters.Count == 1))
+                                outputLine.Append(CreateLinkToType(parser, FriendlynizeType(parameter.Type))).Append(" ");
 
-                                outputLine += CreateLinkToType(parser, FriendlynizeType(parameter.Type)) + " ";
-                            }
+                            outputLine.Append(property.Name);
 
-                            outputLine += string.Format("{0}", property.Name);
-
-                            string parameters = "";
                             if (property.Parameters.Count > 1)
                             {
-                                
-
-                                for (int i = 0; i < property.Parameters.Count; i++ )
-                                {
-                                    APIParameter parameter = property.Parameters[i];
-                                    if (!parameter.Input)
-                                        continue;
-
-                                    string parameterItem = string.Format("{0} {1}", CreateLinkToType(parser, FriendlynizeType(parameter.Type)), parameter.Name);
-
-                                    if (parameters.Length > 0)
-                                        parameters += ", ";
-
-                                    parameters += parameterItem;
-                                }
+                                string parameters = string.Join(", ", property.Parameters
+                                    .Where(parameter => parameter.Input)
+                                    .Select(parameter => string.Format("{0} {1}", CreateLinkToType(parser, FriendlynizeType(parameter.Type)), parameter.Name))
+                                    .ToArray());
 
                                 if (parameters.Length > 0)
-                                {
-                                    outputLine += "(";
-                                    outputLine += parameters;
-                                    outputLine += ")";
-
-                                }
+                                    outputLine.Append("(").Append(parameters).Append(")");
                             }
 
-                            outputLine += "</div>";
-                            outputCode += outputLine;
+                            outputLine.Append("</div>");
+                            outputCode.Append(outputLine);
 
                             if (property.HelpString.Length > 0)
                             {
-                                outputLine = string.Format("<br/><div class=\"api_description\">{0}<br/>", property.HelpString);
+                                outputCode.Append(string.Format("<br/><div class=\"api_description\">{0}<br/>", property.HelpString));
 
                                 if (!property.HasSet)
                                 {
                                     // check if there's a set-property with same name.
-                                    IEnumerable<APIProperty> setProperties = properties.Where(prop => prop.Name == property.Name && prop.HasSet == true);
+                                    IEnumerable<APIProperty> setProperties = properties.Where(prop => prop.Name == property.Name && prop.HasSet);
                                     if (setProperties.Count() == 0)
-                                        outputLine += " <i>(read-only)</i>";
+                                        outputCode.Append(" <i>(read-only)</i>");
                                 }
 
-                                outputLine += "</div>";
-                                outputCode += outputLine;
+                                outputCode.Append("</div>");
                             }
 
-                            outputCode += "<br/>";
+                            outputCode.Append("<br/>");
                         }
                     }
 
-                    
-                    File.WriteAllText(fileName, outputCode);
+                    File.WriteAllText(fileName, outputCode.ToString());
 
-                    UploadDocument(conn, apiInterface, outputCode);
-                }   
+                    UploadDocument(conn, apiInterface, outputCode.ToString());
+                }
 
-                                
+
                 // remove old documents.
                 string sql = "select documentid, documentname from hm_documents where documentname like 'com\\_object\\_%'";
                 MySqlCommand selectCommand = new MySqlCommand(sql, conn);
@@ -186,7 +148,7 @@ namespace APIDocumentationCreator
                     MySqlCommand deleteCommand = new MySqlCommand(sql, conn);
                     deleteCommand.ExecuteNonQuery();
                 }
-            
+
             }
         }
 
@@ -214,19 +176,11 @@ namespace APIDocumentationCreator
                 reader.Close();
             }
 
-            string sql = null;
-
-            if (exists)
-            {
-                sql = string.Format("update hm_documents set documenttext = '{0}' where documentname = '{1}'", documentText, documentName);
-
-            }
-            else
-            {
-                sql = string.Format(@"insert into hm_documents (documentname, documenttitle, documenttext, documentlatestchange, documentreads, documentparentid, documentindex, documentisbook, documentfirstpage) VALUES
+            string sql = exists
+                ? string.Format("update hm_documents set documenttext = '{0}' where documentname = '{1}'", documentText, documentName)
+                : string.Format(@"insert into hm_documents (documentname, documenttitle, documenttext, documentlatestchange, documentreads, documentparentid, documentindex, documentisbook, documentfirstpage) VALUES
                                             ('{0}', '{1}', '{2}', '{3}', '{4}', {5}, {6}, {7}, {8})",
                                              documentName, documentTitle, documentText, documentLatestChange, documentReads, documentParentID, documentIndex, documentIsBook, documentFirstPage);
-            }
 
             MySqlCommand updateCommand = new MySqlCommand(sql, conn);
             updateCommand.ExecuteNonQuery();

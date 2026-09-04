@@ -3,8 +3,6 @@
 
 using System;
 using System.IO;
-using System.Runtime.InteropServices;
-using System.Text;
 using Microsoft.Win32;
 
 namespace hMailServer.ControlPanel.Services
@@ -60,13 +58,6 @@ namespace hMailServer.ControlPanel.Services
          IniPath = Locate();
       }
 
-      [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-      private static extern int GetPrivateProfileString(string section, string key, string defaultValue,
-         StringBuilder result, int size, string filePath);
-
-      [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-      private static extern bool WritePrivateProfileString(string section, string key, string value, string filePath);
-
       private static string Locate()
       {
          // Installed server: registry InstallLocation.
@@ -80,15 +71,15 @@ namespace hMailServer.ControlPanel.Services
                if (string.IsNullOrEmpty(install))
                   continue;
 
-               string path = Path.Combine(install, "Bin", "hMailServer.INI");
+               string path = Path.Join(install, "Bin", "hMailServer.INI");
                if (File.Exists(path))
                   return path;
 
-               path = Path.Combine(install, "hMailServer.INI");
+               path = Path.Join(install, "hMailServer.INI");
                if (File.Exists(path))
                   return path;
             }
-            catch
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
             {
                // Try the next view.
             }
@@ -115,13 +106,14 @@ namespace hMailServer.ControlPanel.Services
                if (dir == null)
                   continue;
 
-               string path = Path.Combine(dir, "hMailServer.ini");
+               string path = Path.Join(dir, "hMailServer.ini");
                if (File.Exists(path))
                   return path;
             }
          }
-         catch
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
+            // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
          }
 
          return null;
@@ -138,11 +130,7 @@ namespace hMailServer.ControlPanel.Services
       public string Read(string key, string defaultValue = "")
       {
          if (IsAvailable)
-         {
-            var buffer = new StringBuilder(2048);
-            GetPrivateProfileString(Section, key, defaultValue, buffer, buffer.Capacity, IniPath);
-            return buffer.ToString();
-         }
+            return ProfileApi.ReadString(Section, key, defaultValue, IniPath, 2048);
 
          Func<string, string> read = ComReadSetting;
 
@@ -158,7 +146,7 @@ namespace hMailServer.ControlPanel.Services
             // exactly as GetPrivateProfileString would have decided above.
             return string.IsNullOrEmpty(value) ? defaultValue : value;
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             // An older server without these members, or a session that has gone
             // away. The default is the same answer this returned before the COM
@@ -183,7 +171,7 @@ namespace hMailServer.ControlPanel.Services
       {
          if (IsAvailable)
          {
-            WritePrivateProfileString(Section, key, value, IniPath);
+            ProfileApi.WriteString(Section, key, value, IniPath);
             return;
          }
 
@@ -212,9 +200,7 @@ namespace hMailServer.ControlPanel.Services
       {
          if (!IsAvailable)
             return defaultValue;
-         var buffer = new StringBuilder(2048);
-         GetPrivateProfileString(section, key, defaultValue, buffer, buffer.Capacity, IniPath);
-         return buffer.ToString();
+         return ProfileApi.ReadString(section, key, defaultValue, IniPath, 2048);
       }
 
       /// <summary>Writes a value to a named section. See <see cref="ReadFrom"/>.</summary>
@@ -222,7 +208,7 @@ namespace hMailServer.ControlPanel.Services
       {
          if (!IsAvailable)
             throw new InvalidOperationException("hMailServer.INI was not found on this machine.");
-         WritePrivateProfileString(section, key, value, IniPath);
+         ProfileApi.WriteString(section, key, value, IniPath);
       }
 
       /// <summary>Reads the configured log folder from the [Directories] section.</summary>

@@ -5,9 +5,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Threading;
+using System.Linq;
 using NUnit.Framework;
 using RegressionTests.Shared;
 
@@ -48,8 +48,6 @@ namespace RegressionTests.Infrastructure
    [TestFixture]
    public class ScheduledBackup : TestFixtureBase
    {
-      [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-      private static extern bool WritePrivateProfileString(string section, string key, string value, string filePath);
 
       // Exactly the shape BackupExecuter::StartBackup generates and
       // BackupRetention::ParseArchiveName recognises: "HMBackup YYYY-MM-DD HHMMSS.7z".
@@ -70,7 +68,7 @@ namespace RegressionTests.Infrastructure
       [SetUp]
       public void SetUpScheduledBackup()
       {
-         _backupDirectory = Path.Combine(Path.GetTempPath(), "hMailScheduledBackup-" + TestSetup.UniqueString());
+         _backupDirectory = Paths.Combine(Path.GetTempPath(), "hMailScheduledBackup-" + TestSetup.UniqueString());
          Directory.CreateDirectory(_backupDirectory);
 
          var backup = _application.Settings.Backup;
@@ -136,18 +134,15 @@ namespace RegressionTests.Infrastructure
          string programDirectory = _application.Settings.Directories.ProgramDirectory;
          string[] candidates =
          {
-            Path.Combine(programDirectory, "hMailServer.ini"),
-            Path.Combine(programDirectory, "Bin", "hMailServer.ini"),
+            Paths.Combine(programDirectory, "hMailServer.ini"),
+            Paths.Combine(programDirectory, "Bin", "hMailServer.ini"),
          };
 
          bool wroteAny = false;
-         foreach (string iniPath in candidates)
+         foreach (string iniPath in candidates.Where(File.Exists))
          {
-            if (!File.Exists(iniPath))
-               continue;
-
             Assert.IsTrue(
-               WritePrivateProfileString("Settings", key, value, iniPath),
+               IniFile.WritePrivateProfileString("Settings", key, value, iniPath),
                "Failed to write " + key + " to " + iniPath + ".");
             wroteAny = true;
          }
@@ -161,7 +156,7 @@ namespace RegressionTests.Infrastructure
          // them, so the contents are irrelevant - but the name has to be exactly the
          // one the server generates, or (correctly) nothing will touch it.
          string name = "HMBackup " + timestamp.ToString("yyyy-MM-dd HHmmss") + ".7z";
-         string path = Path.Combine(_backupDirectory, name);
+         string path = Paths.Combine(_backupDirectory, name);
 
          File.WriteAllText(path, "placeholder for a backup archive");
 
@@ -170,15 +165,10 @@ namespace RegressionTests.Infrastructure
 
       private List<string> ArchiveNames()
       {
-         var names = new List<string>();
-
-         foreach (string file in Directory.GetFiles(_backupDirectory))
-         {
-            string name = Path.GetFileName(file);
-
-            if (ArchiveNamePattern.IsMatch(name))
-               names.Add(name);
-         }
+         var names = Directory.GetFiles(_backupDirectory)
+            .Select(Path.GetFileName)
+            .Where(name => ArchiveNamePattern.IsMatch(name))
+            .ToList();
 
          names.Sort(StringComparer.OrdinalIgnoreCase);
 
@@ -270,14 +260,7 @@ namespace RegressionTests.Infrastructure
 
          for (int attempt = 0; attempt < 180 && newArchive == null; attempt++)
          {
-            foreach (string name in ArchiveNames())
-            {
-               if (!preExisting.Contains(name))
-               {
-                  newArchive = name;
-                  break;
-               }
-            }
+            newArchive = ArchiveNames().FirstOrDefault(name => !preExisting.Contains(name));
 
             if (newArchive == null)
                Thread.Sleep(1000);
@@ -336,12 +319,7 @@ namespace RegressionTests.Infrastructure
          Assert.IsFalse(remaining.Contains(threeDaysOld), "The 3-day-old archive should have been deleted.");
          Assert.IsTrue(remaining.Contains(twoDaysOld), "The 2-day-old archive is inside the keep count and should have survived.");
 
-         bool newArchivePresent = false;
-         foreach (string name in remaining)
-         {
-            if (!preExisting.Contains(name))
-               newArchivePresent = true;
-         }
+         bool newArchivePresent = remaining.Any(name => !preExisting.Contains(name));
 
          Assert.IsTrue(newArchivePresent,
             "Retention must never delete the archive the backup just produced, but " + Describe(remaining) +
@@ -445,7 +423,7 @@ namespace RegressionTests.Infrastructure
          // perfectly good, which is the point: the failure has to happen *after* an
          // implementation that pruned to make room would have pruned, and it has to
          // leave the directory readable so the assertions below mean something.
-         string blockingDirectory = Path.Combine(_backupDirectory, "hMailServerBackup.xml");
+         string blockingDirectory = Paths.Combine(_backupDirectory, "hMailServerBackup.xml");
          Directory.CreateDirectory(blockingDirectory);
 
          try

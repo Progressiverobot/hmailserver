@@ -72,12 +72,12 @@ namespace RegressionTests.Security
       // for the same reason.
       private string AcmeDirectory
       {
-         get { return Path.Combine(_application.Settings.Directories.ProgramDirectory, "hm_acme_test"); }
+         get { return Paths.Combine(_application.Settings.Directories.ProgramDirectory, "hm_acme_test"); }
       }
 
       private string AcmeCertificateFile
       {
-         get { return Path.Combine(AcmeDirectory, "fullchain.pem"); }
+         get { return Paths.Combine(AcmeDirectory, "fullchain.pem"); }
       }
 
       [TearDown]
@@ -114,6 +114,7 @@ namespace RegressionTests.Security
             }
             catch (IOException)
             {
+               // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
             }
          }
       }

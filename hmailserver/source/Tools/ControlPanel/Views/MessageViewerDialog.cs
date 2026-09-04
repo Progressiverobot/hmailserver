@@ -76,7 +76,7 @@ namespace hMailServer.ControlPanel.Views
          var copy = new Wpf.Ui.Controls.Button { Content = "Copy", Margin = new Thickness(0, 0, 8, 0) };
          copy.Click += (s, e) =>
          {
-            try { Clipboard.SetText(content.Text); } catch (Exception) { }
+            try { Clipboard.SetText(content.Text); } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }
          };
          var close = new Wpf.Ui.Controls.Button { Content = "Close", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, IsCancel = true };
          close.Click += (s, e) => Close();
@@ -109,7 +109,7 @@ namespace hMailServer.ControlPanel.Views
          {
             return "Access to the message file was denied:\r\n   " + filePath + "\r\n\r\nThe Control Panel can only read message files when it runs on the same machine as the server, with sufficient permissions.";
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             return "Could not read the message file:\r\n   " + filePath + "\r\n\r\n" + ex.Message;
          }

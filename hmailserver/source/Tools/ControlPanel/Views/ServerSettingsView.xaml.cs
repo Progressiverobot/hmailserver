@@ -183,7 +183,7 @@ namespace hMailServer.ControlPanel.Views
             return panel;
          }
 
-         public override object ReadEditor() => box_.IsChecked == true;
+         public override object ReadEditor() => box_.IsChecked is true;
       }
 
       private class ComText : ComSetting
@@ -217,14 +217,14 @@ namespace hMailServer.ControlPanel.Views
             object shown = value;
             if (Numeric && Divisor > 1 && value != null)
             {
-               try { shown = Convert.ToInt64(value) / Divisor; } catch (Exception) { shown = value; }
+               try { shown = Convert.ToInt64(value) / Divisor; } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { shown = value; }
             }
 
             // Numeric settings get an up/down NumberBox; everything else a text box.
             if (Numeric)
             {
                double current = 0;
-               try { current = Convert.ToDouble(shown); } catch (Exception) { current = 0; }
+               try { current = Convert.ToDouble(shown); } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { current = 0; }
                number_ = new Wpf.Ui.Controls.NumberBox
                {
                   Value = current,
@@ -356,14 +356,14 @@ namespace hMailServer.ControlPanel.Views
             return panel;
          }
 
-         public override object ReadEditor() => box_?.IsChecked == true;
+         public override object ReadEditor() => box_?.IsChecked is true;
 
          public void SaveToIni()
          {
             if (IniStore == null || !IniStore.IsAvailable || box_ == null)
                return;
 
-            IniStore.WriteBool(Path, box_.IsChecked == true);
+            IniStore.WriteBool(Path, box_.IsChecked is true);
          }
       }
 
@@ -615,7 +615,7 @@ namespace hMailServer.ControlPanel.Views
             panel.Children.Add(new TextBlock { Text = Label, FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 4) });
             combo_ = new ComboBox { MinWidth = 320, HorizontalAlignment = HorizontalAlignment.Left, FontSize = Typography.Body };
             int sel;
-            try { sel = Convert.ToInt32(value); } catch (Exception) { sel = 0; }
+            try { sel = Convert.ToInt32(value); } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { sel = 0; }
             foreach ((int v, string l) in Options)
             {
                var item = new ComboBoxItem { Content = l, Tag = v };
@@ -697,7 +697,7 @@ namespace hMailServer.ControlPanel.Views
             {
                text = Read();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
             {
                text = "This could not be read from the server: " + ServerSession.DescribeComError(ex);
             }
@@ -793,7 +793,7 @@ namespace hMailServer.ControlPanel.Views
                      ? Services.ThemeTokens.Success
                      : Services.ThemeTokens.Danger;
                }
-               catch (Exception ex)
+               catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
                {
                   result_.Text = "Test failed: " + ex.Message;
                   result_.Foreground = Services.ThemeTokens.Danger;
@@ -2204,7 +2204,7 @@ namespace hMailServer.ControlPanel.Views
 
             return (true, "Opened " + path);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             return (false, "Could not open the folder: " + ex.Message);
          }
@@ -2787,7 +2787,7 @@ namespace hMailServer.ControlPanel.Views
                         object owner = ResolveOwner(setting.Path, out string property);
                         value = GetProperty(owner, property);
                      }
-                     catch (Exception ex)
+                     catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
                      {
                         failedReads_++;
                         diag_ ??= ServerSession.DescribeComError(ex);
@@ -2956,7 +2956,7 @@ namespace hMailServer.ControlPanel.Views
          {
             return ((long)(int)indexing.TotalMessageCount, (long)(int)indexing.TotalIndexedCount);
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             return null;
          }
@@ -3004,7 +3004,7 @@ namespace hMailServer.ControlPanel.Views
          {
             return (bool)indexing.Enabled;
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             // Unknown rather than off: refusing to act on a read that failed would
             // be worse than letting the attempt report its own error.
@@ -3246,7 +3246,7 @@ namespace hMailServer.ControlPanel.Views
       {
          string[] candidates =
          {
-            System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), @"ClamWin\db"),
+            System.IO.Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), @"ClamWin\db"),
             @"C:\ProgramData\ClamWin\db",
          };
 
@@ -3302,8 +3302,8 @@ namespace hMailServer.ControlPanel.Views
 
          void Update()
          {
-            bool eligible = preferServer.Box.IsChecked == true
-               && (tls12.Box.IsChecked == true || tls13.Box.IsChecked == true);
+            bool eligible = preferServer.Box.IsChecked is true
+               && (tls12.Box.IsChecked is true || tls13.Box.IsChecked is true);
             chacha.Box.IsEnabled = eligible;
             chacha.Box.ToolTip = eligible
                ? null
@@ -3356,7 +3356,7 @@ namespace hMailServer.ControlPanel.Views
                setting.Write(owner, property);
                saved++;
             }
-            catch (Exception)
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
             {
                failed++;
             }
@@ -3386,8 +3386,9 @@ namespace hMailServer.ControlPanel.Views
                scripting.Reload();
                ServerSession.Release(scripting);
             }
-            catch (Exception)
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
             {
+               // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
             }
          }
       }

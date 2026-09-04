@@ -75,7 +75,7 @@ namespace RegressionTests.Infrastructure
             if (File.Exists(file))
                File.Delete(file);
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             // Restoring scripting is best effort; the error-log clearing below is
             // the part that must happen, because a leftover ERROR log fails every
@@ -241,7 +241,7 @@ namespace RegressionTests.Infrastructure
          {
             // A destination that does not exist. The backup fails on its
             // accessibility check and reports HM5014, severity Critical.
-            backup.Destination = Path.Combine(Path.GetTempPath(), "hm-eventlog-no-such-dir-" + Guid.NewGuid().ToString("N"));
+            backup.Destination = Paths.Combine(Path.GetTempPath(), "hm-eventlog-no-such-dir-" + Guid.NewGuid().ToString("N"));
 
             _application.BackupManager.StartBackup();
 

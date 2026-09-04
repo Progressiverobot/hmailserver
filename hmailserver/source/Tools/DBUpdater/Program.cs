@@ -83,7 +83,7 @@ namespace DBUpdater
             // the old schema; report that as a failure so callers do not carry on.
             return main.UpgradeSucceeded ? ExitSuccess : ExitUpgradeFailed;
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             Console.Error.WriteLine("hMailServer database upgrade failed: " + ex.Message);
 

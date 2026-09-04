@@ -330,7 +330,7 @@ namespace RegressionTests.Security
          var directory = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
          while (directory != null)
          {
-            var candidate = Path.Combine(directory.FullName,
+            var candidate = Paths.Combine(directory.FullName,
                @"source\Server\hMailServer\x64\Release\hMailServer.ini");
             if (File.Exists(candidate))
                return candidate;

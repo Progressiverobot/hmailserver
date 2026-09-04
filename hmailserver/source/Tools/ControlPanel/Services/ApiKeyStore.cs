@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -122,9 +121,6 @@ namespace hMailServer.ControlPanel.Services
       public const string ScopeFull = "full";
       public const string ScopeReadOnly = "readonly";
 
-      [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-      private static extern bool WritePrivateProfileString(string section, string key, string value, string filePath);
-
       /// <summary>
       /// Full path of the key store, or null when hMailServer.INI cannot be found
       /// - which is every case where this machine is not the server.
@@ -138,7 +134,7 @@ namespace hMailServer.ControlPanel.Services
                return null;
 
             string directory = Path.GetDirectoryName(ini.IniPath);
-            return directory == null ? null : Path.Combine(directory, "hMailServerApiKeys.ini");
+            return directory == null ? null : Path.Join(directory, "hMailServerApiKeys.ini");
          }
       }
 
@@ -322,9 +318,11 @@ namespace hMailServer.ControlPanel.Services
             }
             catch (IOException)
             {
+               // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
             }
             catch (UnauthorizedAccessException)
             {
+               // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
             }
          }
 
@@ -334,22 +332,22 @@ namespace hMailServer.ControlPanel.Services
          // same reason - a key that became usable before its restrictions were
          // written would be briefly unrestricted, and briefly is enough.
          bool written =
-            WritePrivateProfileString(section, "Label", label.Trim(), path) &&
-            WritePrivateProfileString(section, "Expires", expires.ToString(TimestampFormat, CultureInfo.InvariantCulture), path) &&
-            WritePrivateProfileString(section, "AllowedFrom", source, path) &&
-            WritePrivateProfileString(section, "Scope", full ? ScopeFull : ScopeReadOnly, path) &&
-            WritePrivateProfileString(section, "Domains", normalizedDomains, path) &&
-            WritePrivateProfileString(section, "Hash", hash, path);
+            ProfileApi.WriteString(section, "Label", label.Trim(), path) &&
+            ProfileApi.WriteString(section, "Expires", expires.ToString(TimestampFormat, CultureInfo.InvariantCulture), path) &&
+            ProfileApi.WriteString(section, "AllowedFrom", source, path) &&
+            ProfileApi.WriteString(section, "Scope", full ? ScopeFull : ScopeReadOnly, path) &&
+            ProfileApi.WriteString(section, "Domains", normalizedDomains, path) &&
+            ProfileApi.WriteString(section, "Hash", hash, path);
 
          // Flush the profile cache so the server's next read sees the new section.
-         WritePrivateProfileString(null, null, null, path);
+         ProfileApi.Flush(path);
 
          if (!written)
          {
             // Take the half-written section out again rather than leaving a record
             // that lists in the GUI and authenticates nothing.
-            WritePrivateProfileString(section, null, null, path);
-            WritePrivateProfileString(null, null, null, path);
+            ProfileApi.DeleteSection(section, path);
+            ProfileApi.Flush(path);
 
             return new CreateResult
             {
@@ -385,8 +383,8 @@ namespace hMailServer.ControlPanel.Services
             return false;
          }
 
-         bool deleted = WritePrivateProfileString(SectionPrefix + id, null, null, path);
-         WritePrivateProfileString(null, null, null, path);
+         bool deleted = ProfileApi.DeleteSection(SectionPrefix + id, path);
+         ProfileApi.Flush(path);
 
          if (!deleted)
          {

@@ -35,7 +35,7 @@ namespace TestBedUI
                     client.Send(message);
                 }
             }
-            catch(Exception ex)
+            catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
             {
                 MessageBox.Show(ex.Message);
             }
@@ -56,7 +56,7 @@ namespace TestBedUI
                     client.Send(message);
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
             {
                 MessageBox.Show(ex.Message);
             }

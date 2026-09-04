@@ -212,7 +212,7 @@ namespace RegressionTests.IMAP
                if (result.Contains("* VANISHED (EARLIER) 1:4"))
                   break;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
             {
                // IMAP may not be accepting connections for the first moment after the
                // restart. Anything still failing at the deadline shows up in the

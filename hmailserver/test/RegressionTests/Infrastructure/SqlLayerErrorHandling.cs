@@ -66,7 +66,7 @@ namespace RegressionTests.Infrastructure
             SingletonProvider<TestSetup>.Instance.GetApp().Database.ExecuteSQL(sql);
             return null;
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             return ex;
          }

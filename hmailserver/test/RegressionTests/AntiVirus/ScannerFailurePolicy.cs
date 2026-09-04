@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
 using System.Threading;
+using System.Linq;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
 using RegressionTests.Infrastructure;
@@ -212,15 +213,9 @@ namespace RegressionTests.AntiVirus
       {
          for (int attempt = 0; attempt < 200; attempt++)
          {
-            string log = LogHandler.ReadCurrentDefaultLog();
-            if (log.Contains(needle))
-            {
-               foreach (string line in log.Split('\n'))
-               {
-                  if (line.Contains(needle))
-                     return line;
-               }
-            }
+            string line = LogHandler.ReadCurrentDefaultLog().Split('\n').FirstOrDefault(candidate => candidate.Contains(needle));
+            if (line != null)
+               return line;
 
             Thread.Sleep(50);
          }
@@ -246,7 +241,7 @@ namespace RegressionTests.AntiVirus
          var directory = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
          while (directory != null)
          {
-            var candidate = Path.Combine(directory.FullName,
+            var candidate = Paths.Combine(directory.FullName,
                @"source\Server\hMailServer\x64\Release\hMailServer.ini");
             if (File.Exists(candidate))
                return candidate;

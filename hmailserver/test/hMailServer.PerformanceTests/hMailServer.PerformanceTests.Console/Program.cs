@@ -38,17 +38,14 @@ namespace hMailServer.PerformanceTests.Console
          Assembly assembly = Assembly.LoadFrom("hMailServer.PerformanceTests.dll");
          var allTypes = assembly.GetTypes();
 
-         foreach (Type type in allTypes)
+         foreach (Type type in allTypes.Where(type => type.BaseType == typeof (TestFixtureBase)))
          {
-            if (type.BaseType == typeof (TestFixtureBase))
-            {
-               var instance = Activator.CreateInstance(type);
+            var instance = Activator.CreateInstance(type);
 
-               ((TestFixtureBase) instance).TestFixtureSetUp();
+            ((TestFixtureBase) instance).TestFixtureSetUp();
 
-               RunFixtureTests(type, instance);
-            }
-         }  
+            RunFixtureTests(type, instance);
+         }
       }
 
       private static void RunFixtureTests(Type type, object instance)

@@ -3,6 +3,7 @@
 
 using System;
 using System.IO;
+using System.Linq;
 using NUnit.Framework;
 using RegressionTests.Shared;
 
@@ -220,13 +221,11 @@ namespace RegressionTests.Infrastructure
             if (count > 0 || expectedLoggedErrors.Length > 0)
             {
                var errorLog = LogHandler.ReadErrorLog();
-               foreach (var minidump in minidumps)
-                  if (!errorLog.Contains(minidump))
-                     throw new Exception(errorLog);
+               if (minidumps.Any(minidump => !errorLog.Contains(minidump)))
+                  throw new Exception(errorLog);
 
-               foreach (var expectedLoggedError in expectedLoggedErrors)
-                  if (!errorLog.Contains(expectedLoggedError))
-                     throw new Exception(errorLog);
+               if (expectedLoggedErrors.Any(expectedLoggedError => !errorLog.Contains(expectedLoggedError)))
+                  throw new Exception(errorLog);
             }
          });
 

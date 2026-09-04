@@ -14,7 +14,7 @@ namespace StressTest
 	public class SMTPSimulator
 	{
 		
-		ClientSocket m_oSocket;
+		readonly ClientSocket m_oSocket;
 
 		public SMTPSimulator()
 		{

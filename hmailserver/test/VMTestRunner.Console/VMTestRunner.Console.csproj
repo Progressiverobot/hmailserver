@@ -62,6 +62,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Infrastructure\ExceptionPolicy.cs" />
+    <Compile Include="Infrastructure\Paths.cs" />
     <Compile Include="..\hMailServer.Test.Infrastructure\RetryHelper.cs">
       <Link>RetryHelper.cs</Link>
     </Compile>

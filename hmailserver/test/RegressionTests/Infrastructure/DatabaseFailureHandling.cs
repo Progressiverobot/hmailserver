@@ -181,7 +181,7 @@ namespace RegressionTests.Infrastructure
          {
             _settings.TCPIPPorts.SetDefault();
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             reportedFailure = true;
          }

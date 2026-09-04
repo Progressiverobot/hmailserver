@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Linq;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
 using RegressionTests.Infrastructure;
@@ -102,12 +103,8 @@ namespace RegressionTests.Security
          var output = new System.Collections.Generic.List<byte>();
          int buffer = 0, bitsLeft = 0;
 
-         foreach (char c in input)
+         foreach (int index in input.Select(c => alphabet.IndexOf(char.ToUpperInvariant(c))).Where(index => index >= 0))
          {
-            int index = alphabet.IndexOf(char.ToUpperInvariant(c));
-            if (index < 0)
-               continue;
-
             buffer = (buffer << 5) | index;
             bitsLeft += 5;
 

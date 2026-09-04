@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System.Reflection;
+using System.Threading;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
 using RegressionTests.Infrastructure;
@@ -29,6 +30,12 @@ namespace RegressionTests.Sieve
 
       private static int accountSequence_;
 
+      // Unique per account created by this fixture, however the tests are ordered or parallelised.
+      private static int NextAccountSequence()
+      {
+         return Interlocked.Increment(ref accountSequence_);
+      }
+
       private static void SetScript(Account account, string script)
       {
          account.GetType().InvokeMember(
@@ -37,11 +44,11 @@ namespace RegressionTests.Sieve
 
       private void NewPair(out Account recipient, out Account watcher)
       {
-         accountSequence_++;
+         int sequence = NextAccountSequence();
          recipient = SingletonProvider<TestSetup>.Instance.AddAccount(
-            _domain, "sieve-ntf-rcpt-" + accountSequence_ + "@example.test", Password);
+            _domain, "sieve-ntf-rcpt-" + sequence + "@example.test", Password);
          watcher = SingletonProvider<TestSetup>.Instance.AddAccount(
-            _domain, "sieve-ntf-watch-" + accountSequence_ + "@example.test", Password);
+            _domain, "sieve-ntf-watch-" + sequence + "@example.test", Password);
 
          SetScript(recipient,
             "require \"enotify\";\r\n" +
@@ -112,9 +119,9 @@ namespace RegressionTests.Sieve
       [Description("valid_notify_method steers between the supported and unsupported method.")]
       public void ValidNotifyMethodAnswersHonestly()
       {
-         accountSequence_++;
+         int sequence = NextAccountSequence();
          Account recipient = SingletonProvider<TestSetup>.Instance.AddAccount(
-            _domain, "sieve-ntf-rcpt-" + accountSequence_ + "@example.test", Password);
+            _domain, "sieve-ntf-rcpt-" + sequence + "@example.test", Password);
          recipient.IMAPFolders.Add("MailtoOk");
          recipient.IMAPFolders.Add("XmppOk");
 

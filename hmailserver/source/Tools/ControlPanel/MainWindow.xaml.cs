@@ -576,7 +576,7 @@ namespace hMailServer.ControlPanel
             using RegistryKey key = Registry.CurrentUser.OpenSubKey(RegistryPath);
             paletteUsage_ = PaletteUsage.Deserialize(key?.GetValue(PaletteUsageValue) as string);
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             paletteUsage_ = new PaletteUsage();
          }
@@ -596,8 +596,9 @@ namespace hMailServer.ControlPanel
             using RegistryKey key = Registry.CurrentUser.CreateSubKey(RegistryPath);
             key?.SetValue(PaletteUsageValue, paletteUsage_.Serialize());
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
+            // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
          }
       }
 
@@ -635,7 +636,7 @@ namespace hMailServer.ControlPanel
          {
             VersionText.Text = "hMailServer " + (string)ServerSession.Current.Application.Version;
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             VersionText.Text = "";
          }
@@ -737,7 +738,7 @@ namespace hMailServer.ControlPanel
             {
                oldPage.OnLeave();
             }
-            catch (Exception)
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
             {
                // Leaving a page must never block navigating away from it.
             }
@@ -781,7 +782,7 @@ namespace hMailServer.ControlPanel
          {
             lifecycle.OnEnter();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             Services.Toast.Info("Could not load this page: " + ServerSession.DescribeComError(ex),
                "Server unavailable");
@@ -823,8 +824,9 @@ namespace hMailServer.ControlPanel
             if (string.Equals(key.GetValue("WindowMaximized") as string, "1", StringComparison.Ordinal))
                WindowState = WindowState.Maximized;
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
+            // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
          }
       }
 
@@ -846,8 +848,9 @@ namespace hMailServer.ControlPanel
             key.SetValue("WindowTop", (int)bounds.Top);
             key.SetValue("WindowMaximized", maximized ? "1" : "0");
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
+            // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
          }
       }
 
@@ -866,8 +869,9 @@ namespace hMailServer.ControlPanel
             using RegistryKey key = Registry.CurrentUser.OpenSubKey(RegistryPath);
             saved = key?.GetValue("Theme") as string;
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
+            // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
          }
 
          if (saved == "Light")
@@ -887,8 +891,9 @@ namespace hMailServer.ControlPanel
                ApplicationThemeManager.ApplySystemTheme();
                SystemThemeWatcher.Watch(this);
             }
-            catch (Exception)
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
             {
+               // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
             }
          }
 
@@ -928,8 +933,9 @@ namespace hMailServer.ControlPanel
          {
             SystemThemeWatcher.UnWatch(this);
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
+            // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
          }
 
          bool toLight = ApplicationThemeManager.GetAppTheme() == ApplicationTheme.Dark;
@@ -948,8 +954,9 @@ namespace hMailServer.ControlPanel
             using RegistryKey key = Registry.CurrentUser.CreateSubKey(RegistryPath);
             key?.SetValue("Theme", toLight ? "Light" : "Dark");
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
+            // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
          }
       }
    }

@@ -40,7 +40,7 @@ namespace RegressionTests.Infrastructure
             if (File.Exists(file))
                File.Delete(file);
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             // Restoring the previous state is best effort. The log cleaning below is
             // the part that must happen: an ERROR log left behind fails every fixture

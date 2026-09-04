@@ -128,7 +128,7 @@ namespace RegressionTests.Infrastructure
 
                return;
             }
-            catch (Exception)
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
             {
                Thread.Sleep(100);
             }

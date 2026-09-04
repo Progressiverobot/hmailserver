@@ -9,7 +9,6 @@ using System.ComponentModel;
 using System.Drawing;
 using System.Text;
 using System.Windows.Forms;
-using hMailServer.Shared;
 
 namespace hMailServer.Shared
 {
@@ -85,7 +84,7 @@ namespace hMailServer.Shared
                if (!currentWizPage.OnLeavePage(pageNo > _currentPage))
                   return false;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
             {
                MessageBox.Show(ex.Message);
                return false;

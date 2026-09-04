@@ -407,7 +407,7 @@ namespace DBUpdater
       private string GetScriptFileName(UpgradeScript script)
       {
          string fileName = "Upgrade" + script.From + "to" + script.To + _databaseType + ".sql";
-         string fullPath = Path.Combine(_scriptPath, fileName);
+         string fullPath = Path.Join(_scriptPath, fileName);
 
          return fullPath;
       }
@@ -426,7 +426,7 @@ namespace DBUpdater
             {
                database.BeginTransaction();
             }
-            catch (Exception e)
+            catch (Exception e) when (!ExceptionPolicy.IsFatal(e))
             {
                HandleUpgradeError(database, e, "Transaction");
                return;
@@ -436,13 +436,13 @@ namespace DBUpdater
             string prerequisitesScript = GetPrerequisitesScript();
             if (!string.IsNullOrEmpty(prerequisitesScript))
             {
-               string fullScriptPath = Path.Combine(_scriptPath, prerequisitesScript);
+               string fullScriptPath = Path.Join(_scriptPath, prerequisitesScript);
 
                try
                {
                   database.ExecuteSQLScript(fullScriptPath);
                }
-               catch (Exception ex)
+               catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
                {
                   HandleUpgradeError(database, ex, fullScriptPath);
                   return;
@@ -468,7 +468,7 @@ namespace DBUpdater
 
                   Application.DoEvents();
                }
-               catch (Exception e)
+               catch (Exception e) when (!ExceptionPolicy.IsFatal(e))
                {
                   item.SubItems.Add("Error");
 
@@ -497,7 +497,7 @@ namespace DBUpdater
             {
                database.CommitTransaction();
             }
-            catch (Exception e)
+            catch (Exception e) when (!ExceptionPolicy.IsFatal(e))
             {
                HandleUpgradeError(database, e, "Transaction");
                return;
@@ -520,7 +520,7 @@ namespace DBUpdater
             {
                reachedVersion = database.CurrentVersion;
             }
-            catch (Exception e)
+            catch (Exception e) when (!ExceptionPolicy.IsFatal(e))
             {
                ShowError("The upgrade was committed but the resulting database version could not be read: " + e.Message, "hMailServer");
                buttonClose.Enabled = true;
@@ -575,7 +575,7 @@ namespace DBUpdater
                {
                   database.ExecuteSQL(probe.Statement);
                }
-               catch (Exception e)
+               catch (Exception e) when (!ExceptionPolicy.IsFatal(e))
                {
                   // The step's script reported success, so the only way to be
                   // here is an error that [IGNORE-ERRORS] discarded. Say that
@@ -608,7 +608,7 @@ namespace DBUpdater
          {
             database.RollbackTransaction();
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             // When an error occurs in MSSQL, the rollback will be done 
             // automatically. Hence it's not always an error that we cannot
@@ -636,8 +636,9 @@ namespace DBUpdater
             if (System.IO.File.Exists(errorFile))
                System.IO.File.Delete(errorFile);
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
+            // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
 
          }
 
@@ -671,7 +672,7 @@ namespace DBUpdater
          {
             System.Diagnostics.Process.Start("notepad.exe", scriptToExecute);
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             MessageBox.Show("Notepad could not be started.");
          }

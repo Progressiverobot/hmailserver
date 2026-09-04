@@ -13,7 +13,7 @@ namespace APIDocumentationCreator
     class Parser
     {
         /* Resulting objects */
-        List<APIInterface> apiInterfaces = new List<APIInterface>();
+        readonly List<APIInterface> apiInterfaces = new List<APIInterface>();
 
         private APIInterface _currentInterface = null;
         private string _currentHelpText = "";

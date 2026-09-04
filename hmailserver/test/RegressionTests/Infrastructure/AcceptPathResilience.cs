@@ -5,8 +5,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
-using System.Runtime.InteropServices;
 using System.Text;
+using System.Linq;
 using hMailServer;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
@@ -23,8 +23,6 @@ namespace RegressionTests.Infrastructure
    [TestFixture]
    public class AcceptPathResilience : TestFixtureBase
    {
-      [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-      private static extern bool WritePrivateProfileString(string section, string key, string value, string filePath);
 
       // Long enough that the hold is unmistakably still in force while the probe
       // below runs, short enough that a failing build recovers by itself.
@@ -46,18 +44,15 @@ namespace RegressionTests.Infrastructure
          string programDirectory = _application.Settings.Directories.ProgramDirectory;
          string[] candidates =
          {
-            Path.Combine(programDirectory, "hMailServer.ini"),
-            Path.Combine(programDirectory, "Bin", "hMailServer.ini"),
+            Paths.Combine(programDirectory, "hMailServer.ini"),
+            Paths.Combine(programDirectory, "Bin", "hMailServer.ini"),
          };
 
          var wroteAny = false;
-         foreach (var iniPath in candidates)
+         foreach (var iniPath in candidates.Where(File.Exists))
          {
-            if (!File.Exists(iniPath))
-               continue;
-
             Assert.IsTrue(
-               WritePrivateProfileString("Settings", "BlockedIPHoldSeconds", seconds.ToString(), iniPath),
+               IniFile.WritePrivateProfileString("Settings", "BlockedIPHoldSeconds", seconds.ToString(), iniPath),
                "Failed to write BlockedIPHoldSeconds to " + iniPath + ".");
             wroteAny = true;
          }
@@ -153,7 +148,7 @@ namespace RegressionTests.Infrastructure
                {
                   blocked.Close();
                }
-               catch (Exception)
+               catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
                {
                   // Closing a socket the server has already dropped is not a failure.
                }

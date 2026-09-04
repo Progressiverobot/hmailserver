@@ -45,7 +45,7 @@ namespace RegressionTests.Infrastructure
       [Description("A restore reassigns every database identity and the mail store is still found by name - the property a backend migration relies on")]
       public void RestoreReassignsIdentitiesAndTheMailStoreIsStillFoundByName()
       {
-         var backupDirectory = Path.Combine(Path.GetTempPath(), TestSetup.UniqueString());
+         var backupDirectory = Paths.Combine(Path.GetTempPath(), TestSetup.UniqueString());
          Directory.CreateDirectory(backupDirectory);
 
          try
@@ -70,7 +70,7 @@ namespace RegressionTests.Infrastructure
             // characters - the filename starts with '{', so they are at index 1 and 2.
             // Not an id anywhere in it.
             var fileName = Path.GetFileName(originalMessageFile);
-            var expectedFile = Path.Combine(
+            var expectedFile = Paths.Combine(
                _settings.Directories.DataDirectory,
                domainName,
                "portability",
@@ -181,7 +181,7 @@ namespace RegressionTests.Infrastructure
                if (contents.IndexOf("BACKUP ERROR:", StringComparison.Ordinal) > 0)
                   Assert.Fail("Backup failed: " + contents);
             }
-            catch (Exception)
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
             {
                // The server still has the log file open, or has not created it yet.
             }
@@ -217,7 +217,7 @@ namespace RegressionTests.Infrastructure
                if (startTime.Length > 0 && startTime != startTimeBeforeRestore)
                   return;
             }
-            catch (Exception)
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
             {
                // The server is mid-restart.
             }

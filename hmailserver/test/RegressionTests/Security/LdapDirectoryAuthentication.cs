@@ -8,9 +8,9 @@ using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
+using System.Linq;
 using hMailServer;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
@@ -68,9 +68,6 @@ namespace RegressionTests.Security
       // compared and the LDAP code being dead.
       private const string LocalPassword = "local-hash-only";
 
-      [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-      private static extern bool WritePrivateProfileString(string section, string key, string value, string filePath);
-
       #region ini plumbing
 
       /// <summary>
@@ -85,19 +82,14 @@ namespace RegressionTests.Security
       {
          bool wroteAny = false;
 
-         foreach (string directory in IniFileSetting.CandidateDirectories())
+         foreach (string iniPath in IniFileSetting.ExistingIniFiles())
          {
-            string iniPath = Path.Combine(directory, "hMailServer.ini");
-
-            if (!File.Exists(iniPath))
-               continue;
-
-            Assert.IsTrue(WritePrivateProfileString("LDAP", key, value, iniPath),
+            Assert.IsTrue(IniFile.WritePrivateProfileString("LDAP", key, value, iniPath),
                "Failed to write [LDAP] " + key + " to " + iniPath + ".");
 
             // The value has to be on disk before the server looks at the file's
             // timestamp; WritePrivateProfileString caches otherwise.
-            WritePrivateProfileString(null, null, null, iniPath);
+            IniFile.WritePrivateProfileString(null, null, null, iniPath);
 
             wroteAny = true;
          }
@@ -617,7 +609,7 @@ namespace RegressionTests.Security
                {
                   client = _listener.AcceptTcpClient();
                }
-               catch
+               catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
                {
                   return; // the listener was stopped
                }
@@ -636,19 +628,19 @@ namespace RegressionTests.Security
             _running = false;
 
             try { _listener.Stop(); }
-            catch { }
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }
 
             lock (_lock)
             {
                foreach (TcpClient client in _accepted)
                {
                   try { client.Close(); }
-                  catch { }
+                  catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }
                }
             }
 
             try { _thread.Join(2000); }
-            catch { }
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }
          }
       }
 
@@ -763,7 +755,7 @@ namespace RegressionTests.Security
                {
                   client = _listener.AcceptTcpClient();
                }
-               catch
+               catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
                {
                   return; // the listener was stopped
                }
@@ -841,7 +833,7 @@ namespace RegressionTests.Security
                   }
                }
             }
-            catch (Exception e)
+            catch (Exception e) when (!ExceptionPolicy.IsFatal(e))
             {
                // Never allowed to take the test process down; the transcript is what a
                // failing assertion prints.
@@ -936,21 +928,13 @@ namespace RegressionTests.Security
             {
                _assertionValuesSeen.AddRange(values);
 
-               foreach (KeyValuePair<string, string> user in _users)
-               {
-                  foreach (string value in values)
-                  {
-                     // Exact equality, not a substring test. A substring test would
-                     // make the injection assertion meaningless: the escaped filter
-                     // still CONTAINS the injected user name, it just carries it as one
-                     // literal value that no attribute equals.
-                     if (string.Equals(value, user.Key, StringComparison.OrdinalIgnoreCase))
-                     {
-                        matches.Add(user.Value);
-                        break;
-                     }
-                  }
-               }
+               // Exact equality, not a substring test. A substring test would
+               // make the injection assertion meaningless: the escaped filter
+               // still CONTAINS the injected user name, it just carries it as one
+               // literal value that no attribute equals.
+               matches.AddRange(_users
+                  .Where(user => values.Any(value => string.Equals(value, user.Key, StringComparison.OrdinalIgnoreCase)))
+                  .Select(user => user.Value));
             }
 
             Record("search [" + string.Join(",", values.ToArray()) + "] -> " + matches.Count + " entries");
@@ -1232,10 +1216,10 @@ namespace RegressionTests.Security
             _running = false;
 
             try { _listener.Stop(); }
-            catch { }
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }
 
             try { _thread.Join(2000); }
-            catch { }
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }
          }
       }
 

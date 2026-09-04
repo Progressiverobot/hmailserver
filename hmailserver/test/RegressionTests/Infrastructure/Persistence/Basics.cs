@@ -306,9 +306,9 @@ namespace RegressionTests.Infrastructure.Persistence
          var message = account.IMAPFolders.get_ItemByName("Inbox").Messages[0];
 
          // Move the message file to another folder.
-         var domainPath = Path.Combine(_application.Settings.Directories.DataDirectory, _domain.Name);
-         var accountPath = Path.Combine(domainPath, "test");
-         var fileName = Path.Combine(accountPath, "randomMail.eml");
+         var domainPath = Paths.Combine(_application.Settings.Directories.DataDirectory, _domain.Name);
+         var accountPath = Paths.Combine(domainPath, "test");
+         var fileName = Paths.Combine(accountPath, "randomMail.eml");
          File.Move(message.Filename, fileName);
 
          // Update the database with the full path.
@@ -326,7 +326,7 @@ namespace RegressionTests.Infrastructure.Persistence
          {
             account.Save();
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             thrown = true;
          }
@@ -345,7 +345,7 @@ namespace RegressionTests.Infrastructure.Persistence
          {
             _domain.Save();
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             thrown = true;
          }

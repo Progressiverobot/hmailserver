@@ -75,7 +75,7 @@ namespace DataDirectorySynchronizer.Pages
             labelStatus.Text = "The synchronization has completed.";
 
          }
-         catch (Exception e)
+         catch (Exception e) when (!ExceptionPolicy.IsFatal(e))
          {
             MessageBox.Show(e.Message + Environment.NewLine + e.StackTrace);
          }
@@ -132,7 +132,7 @@ namespace DataDirectorySynchronizer.Pages
                   Marshal.ReleaseComObject(domain);
                }
             }
-            catch (Exception)
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
             {
                AddProcessedFile(domainFolder.FullName, false);
             }
@@ -153,7 +153,7 @@ namespace DataDirectorySynchronizer.Pages
 
                Marshal.ReleaseComObject(account);
             }
-            catch (Exception)
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
             {
                AddProcessedFile(directory.FullName, false);
             }
@@ -172,7 +172,7 @@ namespace DataDirectorySynchronizer.Pages
                ProcessFilesInFolder(accountSubFolder, accountID);
             }
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             AddProcessedFile(folder.FullName, false);
          }

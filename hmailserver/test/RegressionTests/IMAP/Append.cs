@@ -186,7 +186,7 @@ namespace RegressionTests.IMAP
       private string GetPublicDirectory()
       {
          var dataDir = _settings.Directories.DataDirectory;
-         var publicDir = Path.Combine(dataDir, _settings.PublicFolderDiskName);
+         var publicDir = Paths.Combine(dataDir, _settings.PublicFolderDiskName);
          return publicDir;
       }
    }

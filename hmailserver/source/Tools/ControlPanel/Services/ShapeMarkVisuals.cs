@@ -82,10 +82,8 @@ namespace hMailServer.ControlPanel.Services
 
          Shape_(path, mark);
 
-         if (IsStrokeOnly(mark))
-            path.Stroke = brush;
-         else
-            path.Fill = brush;
+         // The brush goes to whichever of the two the mark is drawn with.
+         path.SetValue(IsStrokeOnly(mark) ? Shape.StrokeProperty : Shape.FillProperty, brush);
 
          return path;
       }

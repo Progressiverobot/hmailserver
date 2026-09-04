@@ -5,7 +5,7 @@ namespace ImportTool.MboxImport
 {
    partial class ucMboxProgress
    {
-      private System.ComponentModel.IContainer components = null;
+      private readonly System.ComponentModel.IContainer components = null;
 
       protected override void Dispose(bool disposing)
       {

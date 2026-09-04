@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System.Reflection;
+using System.Linq;
 using NUnit.Framework;
 using RegressionTests.Shared;
 
@@ -59,10 +60,8 @@ namespace RegressionTests.Sieve
             "Return-Path: <friend@example.test>\r\n" +
             "From: \"A Friend\" <friend@example.test>\r\n" +
             "To: user@example.test\r\n" +
-            "Subject: Lunch?\r\n";
-
-         foreach (string extra in extraHeaders)
-            headers += extra + "\r\n";
+            "Subject: Lunch?\r\n" +
+            string.Concat(extraHeaders.Select(extra => extra + "\r\n"));
 
          return headers + "\r\nAre you free on Thursday?";
       }

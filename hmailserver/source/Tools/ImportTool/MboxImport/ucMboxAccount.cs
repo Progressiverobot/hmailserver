@@ -10,8 +10,8 @@ namespace ImportTool.MboxImport
 {
    public partial class ucMboxAccount : UserControl, IWizardPage
    {
-      internal static string SelectedAccount;
-      internal static int SelectedAccountID;
+      internal string SelectedAccount { get; private set; }
+      internal int SelectedAccountID { get; private set; }
 
       public ucMboxAccount()
       {

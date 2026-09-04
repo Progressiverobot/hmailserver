@@ -3,9 +3,7 @@
 
 using System;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
 using System.ServiceProcess;
-using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -167,10 +165,10 @@ namespace hMailServer.ControlPanel.Views
          }
 
          public override void Save(IniFeatureStore store)
-            => store.WriteBool(Key, box_.IsChecked == true);
+            => store.WriteBool(Key, box_.IsChecked is true);
 
          public override string LiveValue
-            => box_ == null ? null : (box_.IsChecked == true ? "1" : "0");
+            => box_ == null ? null : (box_.IsChecked is true ? "1" : "0");
 
          public override void OnEditorChanged(Action handler)
          {
@@ -500,57 +498,26 @@ namespace hMailServer.ControlPanel.Views
       /// </summary>
       private static class IniDirect
       {
-         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-         private static extern int GetPrivateProfileString(string section, string key, string defaultValue,
-            StringBuilder result, int size, string filePath);
-
-         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-         private static extern bool WritePrivateProfileString(string section, string key, string value, string filePath);
-
-         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-         private static extern int GetPrivateProfileSection(string section, char[] result, int size, string filePath);
-
-         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-         private static extern bool WritePrivateProfileSection(string section, string value, string filePath);
-
          public static string ReadValue(string iniPath, string section, string key, string defaultValue)
          {
             if (string.IsNullOrEmpty(iniPath))
                return defaultValue;
-            var buffer = new StringBuilder(4096);
-            GetPrivateProfileString(section, key, defaultValue, buffer, buffer.Capacity, iniPath);
-            return buffer.ToString();
+            return ProfileApi.ReadString(section, key, defaultValue, iniPath, 4096);
          }
 
          public static void WriteValue(string iniPath, string section, string key, string value)
          {
             if (string.IsNullOrEmpty(iniPath))
                throw new InvalidOperationException("hMailServer.INI was not found on this machine.");
-            WritePrivateProfileString(section, key, value, iniPath);
+            ProfileApi.WriteString(section, key, value, iniPath);
          }
 
          /// <summary>The key=value lines of one section, in file order.</summary>
          public static List<string> ReadSectionLines(string iniPath, string section)
          {
-            var lines = new List<string>();
             if (string.IsNullOrEmpty(iniPath))
-               return lines;
-
-            // 32767 characters is the documented ceiling for this API.
-            var buffer = new char[32767];
-            int copied = GetPrivateProfileSection(section, buffer, buffer.Length, iniPath);
-
-            int start = 0;
-            for (int i = 0; i < copied; i++)
-            {
-               if (buffer[i] != '\0')
-                  continue;
-               if (i > start)
-                  lines.Add(new string(buffer, start, i - start));
-               start = i + 1;
-            }
-
-            return lines;
+               return new List<string>();
+            return ProfileApi.ReadSectionLines(section, iniPath);
          }
 
          /// <summary>Replaces one section's lines wholesale (empty list clears it).</summary>
@@ -558,13 +525,7 @@ namespace hMailServer.ControlPanel.Views
          {
             if (string.IsNullOrEmpty(iniPath))
                throw new InvalidOperationException("hMailServer.INI was not found on this machine.");
-
-            // The API wants "line\0line\0\0"; the marshaller appends one
-            // terminator, so an explicit trailing '\0' completes the pair. An
-            // empty section is a lone '\0', which the marshaller turns into the
-            // required double terminator.
-            string joined = lines.Count == 0 ? "\0" : string.Join("\0", lines) + "\0";
-            WritePrivateProfileSection(section, joined, iniPath);
+            ProfileApi.WriteSectionLines(section, lines, iniPath);
          }
       }
 
@@ -1263,16 +1224,18 @@ namespace hMailServer.ControlPanel.Views
                }
             }
 
-            foreach (int protocol in new[] { ServerSession.SessionImap, ServerSession.SessionPop3, ServerSession.SessionSmtp })
+            // The first protocol, in this order of preference, that lends a certificate.
+            int? lendingCertificateId = new[] { ServerSession.SessionImap, ServerSession.SessionPop3, ServerSession.SessionSmtp }
+               .Where(certificateIdByProtocol.ContainsKey)
+               .Select(protocol => (int?)certificateIdByProtocol[protocol])
+               .FirstOrDefault();
+            if (lendingCertificateId.HasValue)
             {
-               if (!certificateIdByProtocol.TryGetValue(protocol, out int certificateId))
-                  continue;
-
-               string name = usableCertificateNames[certificateId];
-               return name.Length > 0 ? name : "#" + certificateId;
+               string name = usableCertificateNames[lendingCertificateId.Value];
+               return name.Length > 0 ? name : "#" + lendingCertificateId.Value;
             }
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             return null;
          }
@@ -2927,7 +2890,7 @@ namespace hMailServer.ControlPanel.Views
             {
                state = row.Def.Compute();
             }
-            catch
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
             {
                // A warning must never take the page down; a state it cannot
                // evaluate is a state it does not report.
@@ -2990,7 +2953,7 @@ namespace hMailServer.ControlPanel.Views
                foreach (Setting setting in card.Settings)
                   setting.Save(store_);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not save: " + ex.Message, "Control Panel",
                MessageBoxButton.OK, MessageBoxImage.Error);
@@ -3077,7 +3040,7 @@ namespace hMailServer.ControlPanel.Views
          {
             return "the elevation prompt was cancelled.";
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             return ex.GetBaseException().Message;
          }

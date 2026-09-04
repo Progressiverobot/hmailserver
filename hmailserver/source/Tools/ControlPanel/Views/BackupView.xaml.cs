@@ -64,7 +64,7 @@ namespace hMailServer.ControlPanel.Views
             CheckCompress.IsChecked = (bool)backup.CompressDestinationFiles;
             ServerSession.Release(backup);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             SubtitleText.Text = "Could not read the backup settings: " + ex.Message;
          }
@@ -81,21 +81,21 @@ namespace hMailServer.ControlPanel.Views
          try
          {
             if (iniStore_.IsAvailable)
-               iniStore_.WriteBool("BackupMessagesDBOnly", CheckMessagesDbOnly.IsChecked == true);
+               iniStore_.WriteBool("BackupMessagesDBOnly", CheckMessagesDbOnly.IsChecked is true);
 
             dynamic backup = ServerSession.Current.Application.Settings.Backup;
             // IInterfaceBackupSettings has no Save method: each property setter
             // writes straight through to the server's settings store, so the
             // assignments above are already persisted.
             backup.Destination = DestinationBox.Text.Trim();
-            backup.BackupDomains = CheckDomains.IsChecked == true;
-            backup.BackupMessages = CheckMessages.IsChecked == true;
-            backup.BackupSettings = CheckSettings.IsChecked == true;
-            backup.CompressDestinationFiles = CheckCompress.IsChecked == true;
+            backup.BackupDomains = CheckDomains.IsChecked is true;
+            backup.BackupMessages = CheckMessages.IsChecked is true;
+            backup.BackupSettings = CheckSettings.IsChecked is true;
+            backup.CompressDestinationFiles = CheckCompress.IsChecked is true;
             ServerSession.Release(backup);
             return true;
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not save the backup settings: " + ex.Message, "Control Panel");
             return false;
@@ -146,7 +146,7 @@ namespace hMailServer.ControlPanel.Views
             SubtitleText.Text = "Backup started " + DateTime.Now.ToLongTimeString() +
                                 " - runs in the background on the server.";
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not start the backup: " + ex.Message, "Control Panel");
          }
@@ -170,15 +170,15 @@ namespace hMailServer.ControlPanel.Views
          {
             dynamic manager = ServerSession.Current.Application.BackupManager;
             dynamic backup = manager.LoadBackup(backupFile);
-            backup.RestoreDomains = RestoreDomains.IsChecked == true;
-            backup.RestoreMessages = RestoreMessages.IsChecked == true;
-            backup.RestoreSettings = RestoreSettings.IsChecked == true;
+            backup.RestoreDomains = RestoreDomains.IsChecked is true;
+            backup.RestoreMessages = RestoreMessages.IsChecked is true;
+            backup.RestoreSettings = RestoreSettings.IsChecked is true;
             backup.StartRestore();
             ServerSession.Release(backup);
             ServerSession.Release(manager);
             SubtitleText.Text = "Restore started - runs in the background on the server.";
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not start the restore: " + ex.Message, "Control Panel");
          }
@@ -217,7 +217,7 @@ namespace hMailServer.ControlPanel.Views
             iniStore_.WriteString("ScheduledBackupKeepCount", keepCount.ToString(CultureInfo.InvariantCulture));
             iniStore_.WriteString("ScheduledBackupMaxAgeDays", maxAgeDays.ToString(CultureInfo.InvariantCulture));
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not write to hMailServer.ini: " + ex.Message, "Control Panel");
             return;
@@ -350,19 +350,19 @@ namespace hMailServer.ControlPanel.Views
 
             try
             {
-               foreach (string name in System.IO.Directory.EnumerateFiles(destination)
-                  .Select(System.IO.Path.GetFileName))
+               var newest = System.IO.Directory.EnumerateFiles(destination)
+                  .Select(System.IO.Path.GetFileName)
+                  .Select(name => (Name: name, IsArchive: TryParseArchiveName(name, out DateTime created), Created: created))
+                  .Where(archive => archive.IsArchive)
+                  .MaxBy(archive => archive.Created);
+               if (newest.Name != null)
                {
-                  if (TryParseArchiveName(name, out DateTime created) &&
-                      (newestName == null || created > newestTime))
-                  {
-                     newestName = name;
-                     newestTime = created;
-                  }
+                  newestName = newest.Name;
+                  newestTime = newest.Created;
                }
                destinationReadable = true;
             }
-            catch (Exception)
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
             {
                destinationReadable = false;
             }
@@ -428,7 +428,7 @@ namespace hMailServer.ControlPanel.Views
             ServerSession.Release(backup);
             return destination.Trim();
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             return null;
          }

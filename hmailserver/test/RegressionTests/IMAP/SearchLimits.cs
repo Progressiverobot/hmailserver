@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System.IO;
-using System.Runtime.InteropServices;
 using System.Text;
+using System.Linq;
 using NUnit.Framework;
 using RegressionTests.Infrastructure;
 using RegressionTests.Shared;
@@ -37,8 +37,6 @@ namespace RegressionTests.IMAP
    [TestFixture]
    public class SearchLimits : TestFixtureBase
    {
-      [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-      private static extern bool WritePrivateProfileString(string section, string key, string value, string filePath);
 
       private const string Needle = "SearchLimitsNeedleToken";
 
@@ -54,21 +52,18 @@ namespace RegressionTests.IMAP
          string programDirectory = _application.Settings.Directories.ProgramDirectory;
          string[] candidates =
          {
-            Path.Combine(programDirectory, "hMailServer.ini"),
-            Path.Combine(programDirectory, "Bin", "hMailServer.ini"),
+            Paths.Combine(programDirectory, "hMailServer.ini"),
+            Paths.Combine(programDirectory, "Bin", "hMailServer.ini"),
          };
 
          bool wroteAny = false;
-         foreach (string iniPath in candidates)
+         foreach (string iniPath in candidates.Where(File.Exists))
          {
-            if (!File.Exists(iniPath))
-               continue;
-
             Assert.IsTrue(
-               WritePrivateProfileString("Settings", "IMAPSearchTimeout", timeoutSeconds.ToString(), iniPath),
+               IniFile.WritePrivateProfileString("Settings", "IMAPSearchTimeout", timeoutSeconds.ToString(), iniPath),
                "Failed to write IMAPSearchTimeout to " + iniPath + ".");
             Assert.IsTrue(
-               WritePrivateProfileString("Settings", "IMAPSearchMaxMegabytes", maxMegabytes.ToString(), iniPath),
+               IniFile.WritePrivateProfileString("Settings", "IMAPSearchMaxMegabytes", maxMegabytes.ToString(), iniPath),
                "Failed to write IMAPSearchMaxMegabytes to " + iniPath + ".");
             wroteAny = true;
          }

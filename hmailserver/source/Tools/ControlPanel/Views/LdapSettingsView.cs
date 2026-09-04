@@ -50,7 +50,7 @@ namespace hMailServer.ControlPanel.Views
    ///    says "live within two seconds" where the other pages say "restart the
    ///    service".
    /// </summary>
-   public class LdapSettingsView : UserControl, IPageLifecycle
+   public partial class LdapSettingsView : UserControl, IPageLifecycle
    {
       // The shipped filter, character for character from LdapSettings.cpp. Shown as
       // the placeholder and used by the connection test when the box is empty,
@@ -704,13 +704,6 @@ namespace hMailServer.ControlPanel.Views
       // silently land where the server never looks for it. The store still answers
       // "where is the INI"; the section-aware reads and writes live here.
 
-      [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-      private static extern int GetPrivateProfileString(string section, string key, string defaultValue,
-         StringBuilder result, int size, string filePath);
-
-      [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-      private static extern bool WritePrivateProfileString(string section, string key, string value, string filePath);
-
       private string IniRead_(string key, string fallback)
       {
          if (!store_.IsAvailable)
@@ -719,9 +712,7 @@ namespace hMailServer.ControlPanel.Views
          // 4096 characters, the same buffer size LdapSettings::ReadString_ uses, so
          // this page sees exactly the value (and exactly the truncation) the server
          // sees.
-         var buffer = new StringBuilder(4096);
-         GetPrivateProfileString(IniSection, key, fallback, buffer, buffer.Capacity, store_.IniPath);
-         return buffer.ToString().Trim();
+         return ProfileApi.ReadString(IniSection, key, fallback, store_.IniPath, 4096).Trim();
       }
 
       private int IniReadInt_(string key, int fallback)
@@ -741,7 +732,7 @@ namespace hMailServer.ControlPanel.Views
          if (!store_.IsAvailable)
             throw new InvalidOperationException("hMailServer.INI was not found on this machine.");
 
-         if (!WritePrivateProfileString(IniSection, key, value, store_.IniPath))
+         if (!ProfileApi.WriteString(IniSection, key, value, store_.IniPath))
             throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error(),
                "Could not write " + key + " to " + store_.IniPath);
       }
@@ -826,7 +817,7 @@ namespace hMailServer.ControlPanel.Views
          }
 
          string newServicePassword = servicePassword_.Password;
-         if (newServicePassword.Length > 0 && clearServicePassword_.IsChecked == true)
+         if (newServicePassword.Length > 0 && clearServicePassword_.IsChecked is true)
          {
             MessageBox.Show("A new service account password has been typed AND \"remove the stored password\" is "
                + "ticked. Untick one of them - guessing which was meant is not this page's decision to make.",
@@ -836,12 +827,12 @@ namespace hMailServer.ControlPanel.Views
 
          try
          {
-            IniWrite_("Enabled", enabled_.IsChecked == true ? "1" : "0");
+            IniWrite_("Enabled", enabled_.IsChecked is true ? "1" : "0");
             IniWrite_("Server", server_.Text.Trim());
             IniWrite_("Port", hasPort ? port.ToString() : "0");
             IniWrite_("Security", SelectedTag_(security_, 2).ToString());
-            IniWrite_("VerifyCertificate", verifyCertificate_.IsChecked == true ? "1" : "0");
-            IniWrite_("AllowUnprotectedPassword", allowUnprotected_.IsChecked == true ? "1" : "0");
+            IniWrite_("VerifyCertificate", verifyCertificate_.IsChecked is true ? "1" : "0");
+            IniWrite_("AllowUnprotectedPassword", allowUnprotected_.IsChecked is true ? "1" : "0");
             IniWrite_("BindMethod", SelectedTag_(bindMethod_, 0).ToString());
             IniWrite_("SearchBase", searchBase_.Text.Trim());
             IniWrite_("UserSearchFilter", userSearchFilter_.Text.Trim());
@@ -851,15 +842,15 @@ namespace hMailServer.ControlPanel.Views
             // Blank keeps the stored secret; the checkbox is the only way to remove
             // it. ServiceDomain is deliberately never written - see the note beside
             // it.
-            if (clearServicePassword_.IsChecked == true)
+            if (clearServicePassword_.IsChecked is true)
                IniWrite_("ServicePassword", "");
             else if (newServicePassword.Length > 0)
                IniWrite_("ServicePassword", newServicePassword);
 
             IniWrite_("TimeoutSeconds", (hasTimeout ? timeoutSeconds : 10).ToString());
-            IniWrite_("FallbackToWindowsLogon", fallback_.IsChecked == true ? "1" : "0");
+            IniWrite_("FallbackToWindowsLogon", fallback_.IsChecked is true ? "1" : "0");
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not save: " + ex.Message, "Control Panel", MessageBoxButton.OK, MessageBoxImage.Error);
             return;
@@ -971,11 +962,11 @@ namespace hMailServer.ControlPanel.Views
       {
          var snapshot = new Snapshot
          {
-            Enabled = enabled_.IsChecked == true,
+            Enabled = enabled_.IsChecked is true,
             Server = server_.Text.Trim(),
             Security = SelectedTag_(security_, 2),
-            VerifyCertificate = verifyCertificate_.IsChecked == true,
-            AllowUnprotectedPassword = allowUnprotected_.IsChecked == true,
+            VerifyCertificate = verifyCertificate_.IsChecked is true,
+            AllowUnprotectedPassword = allowUnprotected_.IsChecked is true,
             BindMethod = SelectedTag_(bindMethod_, 0),
             SearchBase = searchBase_.Text.Trim(),
             UserSearchFilter = userSearchFilter_.Text.Trim(),
@@ -1155,7 +1146,7 @@ namespace hMailServer.ControlPanel.Views
             LdapProbeResult result = await Task.Run(() => LdapProbe.Run(config, username, domain, password));
             ShowTestResult_(result.Level, result.Text);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             // Mirror of the authenticator's outer barrier: an unexpected failure is
             // an infrastructure answer, never a crash of the page.
@@ -1194,7 +1185,7 @@ namespace hMailServer.ControlPanel.Views
       /// wrong" are completely different problems, and the LogonUser path this
       /// replaces cannot tell them apart at all.
       /// </summary>
-      private static class LdapProbe
+      private static partial class LdapProbe
       {
          // winldap.h option and result constants, by value.
          private const int LDAP_OPT_TIMELIMIT = 0x04;
@@ -1254,72 +1245,72 @@ namespace hMailServer.ControlPanel.Views
          private static readonly IntPtr AcceptAnyCertificatePointer_ =
             Marshal.GetFunctionPointerForDelegate(AcceptAnyCertificate_);
 
-         [DllImport("wldap32.dll", CharSet = CharSet.Unicode)]
-         private static extern IntPtr ldap_initW(string hostName, uint portNumber);
+         [LibraryImport("wldap32.dll", StringMarshalling = StringMarshalling.Utf16)]
+         private static partial IntPtr ldap_initW(string hostName, uint portNumber);
 
-         [DllImport("wldap32.dll", CharSet = CharSet.Unicode)]
-         private static extern IntPtr ldap_sslinitW(string hostName, uint portNumber, int secure);
+         [LibraryImport("wldap32.dll", StringMarshalling = StringMarshalling.Utf16)]
+         private static partial IntPtr ldap_sslinitW(string hostName, uint portNumber, int secure);
 
-         [DllImport("wldap32.dll")]
-         private static extern uint ldap_set_option(IntPtr session, int option, ref int value);
+         [LibraryImport("wldap32.dll")]
+         private static partial uint ldap_set_option(IntPtr session, int option, ref int value);
 
-         [DllImport("wldap32.dll")]
-         private static extern uint ldap_set_option(IntPtr session, int option, IntPtr value);
+         [LibraryImport("wldap32.dll")]
+         private static partial uint ldap_set_option(IntPtr session, int option, IntPtr value);
 
-         [DllImport("wldap32.dll", EntryPoint = "ldap_set_option")]
-         private static extern uint ldap_set_option_ptr(IntPtr session, int option, ref IntPtr value);
+         [LibraryImport("wldap32.dll", EntryPoint = "ldap_set_option")]
+         private static partial uint ldap_set_option_ptr(IntPtr session, int option, ref IntPtr value);
 
-         [DllImport("wldap32.dll")]
-         private static extern uint ldap_connect(IntPtr session, ref LDAP_TIMEVAL timeout);
+         [LibraryImport("wldap32.dll")]
+         private static partial uint ldap_connect(IntPtr session, ref LDAP_TIMEVAL timeout);
 
-         [DllImport("wldap32.dll", CharSet = CharSet.Unicode)]
-         private static extern uint ldap_start_tls_sW(IntPtr session, out uint serverReturnValue, out IntPtr result,
+         [LibraryImport("wldap32.dll", StringMarshalling = StringMarshalling.Utf16)]
+         private static partial uint ldap_start_tls_sW(IntPtr session, out uint serverReturnValue, out IntPtr result,
             IntPtr serverControls, IntPtr clientControls);
 
-         [DllImport("wldap32.dll", CharSet = CharSet.Unicode)]
-         private static extern uint ldap_simple_bindW(IntPtr session, string dn, IntPtr password);
+         [LibraryImport("wldap32.dll", StringMarshalling = StringMarshalling.Utf16)]
+         private static partial uint ldap_simple_bindW(IntPtr session, string dn, IntPtr password);
 
-         [DllImport("wldap32.dll", CharSet = CharSet.Unicode)]
-         private static extern uint ldap_bind_sW(IntPtr session, string dn, ref SEC_WINNT_AUTH_IDENTITY_W credentials, uint method);
+         [LibraryImport("wldap32.dll", StringMarshalling = StringMarshalling.Utf16)]
+         private static partial uint ldap_bind_sW(IntPtr session, string dn, ref SEC_WINNT_AUTH_IDENTITY_W credentials, uint method);
 
-         [DllImport("wldap32.dll")]
-         private static extern uint ldap_result(IntPtr session, uint messageId, uint all, ref LDAP_TIMEVAL timeout, out IntPtr result);
+         [LibraryImport("wldap32.dll")]
+         private static partial uint ldap_result(IntPtr session, uint messageId, uint all, ref LDAP_TIMEVAL timeout, out IntPtr result);
 
-         [DllImport("wldap32.dll", CharSet = CharSet.Unicode)]
-         private static extern uint ldap_parse_resultW(IntPtr session, IntPtr resultMessage, out uint returnCode,
+         [LibraryImport("wldap32.dll", StringMarshalling = StringMarshalling.Utf16)]
+         private static partial uint ldap_parse_resultW(IntPtr session, IntPtr resultMessage, out uint returnCode,
             IntPtr matchedDns, out IntPtr errorMessage, IntPtr referrals, IntPtr serverControls, byte freeIt);
 
-         [DllImport("wldap32.dll", CharSet = CharSet.Unicode)]
-         private static extern uint ldap_search_ext_sW(IntPtr session, string baseDn, uint scope, string filter,
+         [LibraryImport("wldap32.dll", StringMarshalling = StringMarshalling.Utf16)]
+         private static partial uint ldap_search_ext_sW(IntPtr session, string baseDn, uint scope, string filter,
             IntPtr attributes, uint attributesOnly, IntPtr serverControls, IntPtr clientControls,
             ref LDAP_TIMEVAL timeout, uint sizeLimit, out IntPtr result);
 
-         [DllImport("wldap32.dll")]
-         private static extern uint ldap_count_entries(IntPtr session, IntPtr result);
+         [LibraryImport("wldap32.dll")]
+         private static partial uint ldap_count_entries(IntPtr session, IntPtr result);
 
-         [DllImport("wldap32.dll")]
-         private static extern IntPtr ldap_first_entry(IntPtr session, IntPtr result);
+         [LibraryImport("wldap32.dll")]
+         private static partial IntPtr ldap_first_entry(IntPtr session, IntPtr result);
 
-         [DllImport("wldap32.dll", CharSet = CharSet.Unicode)]
-         private static extern IntPtr ldap_get_dnW(IntPtr session, IntPtr entry);
+         [LibraryImport("wldap32.dll", StringMarshalling = StringMarshalling.Utf16)]
+         private static partial IntPtr ldap_get_dnW(IntPtr session, IntPtr entry);
 
-         [DllImport("wldap32.dll", CharSet = CharSet.Unicode)]
-         private static extern void ldap_memfreeW(IntPtr value);
+         [LibraryImport("wldap32.dll", StringMarshalling = StringMarshalling.Utf16)]
+         private static partial void ldap_memfreeW(IntPtr value);
 
-         [DllImport("wldap32.dll")]
-         private static extern uint ldap_msgfree(IntPtr result);
+         [LibraryImport("wldap32.dll")]
+         private static partial uint ldap_msgfree(IntPtr result);
 
-         [DllImport("wldap32.dll")]
-         private static extern uint ldap_abandon(IntPtr session, uint messageId);
+         [LibraryImport("wldap32.dll")]
+         private static partial uint ldap_abandon(IntPtr session, uint messageId);
 
-         [DllImport("wldap32.dll")]
-         private static extern uint ldap_unbind_s(IntPtr session);
+         [LibraryImport("wldap32.dll")]
+         private static partial uint ldap_unbind_s(IntPtr session);
 
-         [DllImport("wldap32.dll")]
-         private static extern uint LdapGetLastError();
+         [LibraryImport("wldap32.dll")]
+         private static partial uint LdapGetLastError();
 
-         [DllImport("wldap32.dll", CharSet = CharSet.Unicode)]
-         private static extern IntPtr ldap_err2stringW(uint error);
+         [LibraryImport("wldap32.dll", StringMarshalling = StringMarshalling.Utf16)]
+         private static partial IntPtr ldap_err2stringW(uint error);
 
          private enum Outcome
          {

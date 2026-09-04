@@ -49,7 +49,7 @@ namespace SQLScriptCreator
 
 
          }
-         catch (Exception e)
+         catch (Exception e) when (!ExceptionPolicy.IsFatal(e))
          {
             Console.WriteLine(e.Message);
             return -1;

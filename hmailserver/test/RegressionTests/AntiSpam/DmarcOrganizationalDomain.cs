@@ -66,7 +66,7 @@ namespace RegressionTests.AntiSpam
       {
          get
          {
-            return Path.GetFullPath(Path.Combine(TestContext.CurrentContext.TestDirectory,
+            return Path.GetFullPath(Paths.Combine(TestContext.CurrentContext.TestDirectory,
                                                  @"..\..\..\..\..\.."));
          }
       }
@@ -75,7 +75,7 @@ namespace RegressionTests.AntiSpam
       {
          get
          {
-            return Path.Combine(RepositoryRoot,
+            return Paths.Combine(RepositoryRoot,
                @"hmailserver\source\Server\Common\AntiSpam\DMARC\PublicSuffixListData.h");
          }
       }
@@ -106,10 +106,8 @@ namespace RegressionTests.AntiSpam
          var result = new List<string>();
          bool inArray = false;
 
-         foreach (string rawLine in lines)
+         foreach (string line in lines.Select(rawLine => rawLine.Trim()))
          {
-            string line = rawLine.Trim();
-
             if (line == "const wchar_t* const " + name + "[] =")
             {
                inArray = true;

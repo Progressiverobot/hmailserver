@@ -7,6 +7,8 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Linq;
+using System.Threading;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
 using RegressionTests.Infrastructure;
@@ -43,6 +45,12 @@ namespace RegressionTests.SMTP
       private const string Password = "test";
 
       private static int accountSequence_;
+
+      // Unique per account created by this fixture, however the tests are ordered or parallelised.
+      private static int NextAccountSequence()
+      {
+         return Interlocked.Increment(ref accountSequence_);
+      }
 
       /// <summary>
       ///    One MIME part of the report: its header block and its body, as
@@ -119,12 +127,12 @@ namespace RegressionTests.SMTP
 
       private static ReportPart PartWithContentType(string report, string contentType)
       {
-         foreach (ReportPart part in PartsOf(report))
-            if (part.Headers.IndexOf("Content-Type: " + contentType, StringComparison.OrdinalIgnoreCase) >= 0)
-               return part;
+         ReportPart part = PartsOf(report).FirstOrDefault(candidate =>
+            candidate.Headers.IndexOf("Content-Type: " + contentType, StringComparison.OrdinalIgnoreCase) >= 0);
+         if (part == null)
+            Assert.Fail("The report carries no " + contentType + " part:\r\n" + report);
 
-         Assert.Fail("The report carries no " + contentType + " part:\r\n" + report);
-         return null;
+         return part;
       }
 
       /// <summary>
@@ -136,13 +144,13 @@ namespace RegressionTests.SMTP
       {
          string deliveryStatus = PartWithContentType(report, "message/delivery-status").Body;
 
-         foreach (string group in deliveryStatus.Split(new[] { "\r\n\r\n" }, StringSplitOptions.None))
-            if (group.IndexOf("Final-Recipient: rfc822; " + address, StringComparison.OrdinalIgnoreCase) >= 0)
-               return group;
+         string group = deliveryStatus.Split(new[] { "\r\n\r\n" }, StringSplitOptions.None).FirstOrDefault(candidate =>
+            candidate.IndexOf("Final-Recipient: rfc822; " + address, StringComparison.OrdinalIgnoreCase) >= 0);
+         if (group == null)
+            Assert.Fail("The delivery-status part names no recipient group for " + address +
+                        ". The part was:\r\n" + deliveryStatus);
 
-         Assert.Fail("The delivery-status part names no recipient group for " + address +
-                     ". The part was:\r\n" + deliveryStatus);
-         return null;
+         return group;
       }
 
       /// <summary>
@@ -218,12 +226,12 @@ namespace RegressionTests.SMTP
 
       private void NewSenderAndFullMailbox(out Account sender, out Account recipient)
       {
-         accountSequence_++;
+         int sequence = NextAccountSequence();
 
          sender = SingletonProvider<TestSetup>.Instance.AddAccount(
-            _domain, "dsn-sender-" + accountSequence_ + "@example.test", Password);
+            _domain, "dsn-sender-" + sequence + "@example.test", Password);
          recipient = SingletonProvider<TestSetup>.Instance.AddAccount(
-            _domain, "dsn-full-" + accountSequence_ + "@example.test", Password);
+            _domain, "dsn-full-" + sequence + "@example.test", Password);
 
          recipient.MaxSize = 1;
          recipient.Save();
@@ -303,10 +311,10 @@ namespace RegressionTests.SMTP
       [Description("A remote server's 550 at RCPT TO becomes 5.1.1, with its own reply quoted as the Diagnostic-Code.")]
       public void ARemotePermanentRefusalCarriesTheRemotesOwnDiagnostic()
       {
-         accountSequence_++;
+         int sequence = NextAccountSequence();
 
          Account sender = SingletonProvider<TestSetup>.Instance.AddAccount(
-            _domain, "dsn-relay-" + accountSequence_ + "@example.test", Password);
+            _domain, "dsn-relay-" + sequence + "@example.test", Password);
 
          const string RemoteAddress = "test@dummy-example.com";
 
@@ -364,12 +372,12 @@ namespace RegressionTests.SMTP
       [Description("A Sieve reject becomes 5.7.1 - refused by policy - which is neither a mailbox problem nor a bad address.")]
       public void ASieveRejectIsReportedAsDeliveryNotAuthorized()
       {
-         accountSequence_++;
+         int sequence = NextAccountSequence();
 
          Account sender = SingletonProvider<TestSetup>.Instance.AddAccount(
-            _domain, "dsn-rej-sender-" + accountSequence_ + "@example.test", Password);
+            _domain, "dsn-rej-sender-" + sequence + "@example.test", Password);
          Account recipient = SingletonProvider<TestSetup>.Instance.AddAccount(
-            _domain, "dsn-rej-rcpt-" + accountSequence_ + "@example.test", Password);
+            _domain, "dsn-rej-rcpt-" + sequence + "@example.test", Password);
 
          recipient.GetType().InvokeMember(
             "SieveScript", BindingFlags.SetProperty, null, recipient,

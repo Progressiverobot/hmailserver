@@ -92,7 +92,7 @@ namespace hMailServer.ControlPanel.Views
             }
             status_.Text = count + (count == 1 ? " public folder." : " public folders.");
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             status_.Text = "Could not load public folders: " + ex.Message;
          }
@@ -114,7 +114,7 @@ namespace hMailServer.ControlPanel.Views
             dynamic created = folders.Add(name.Trim());
             ServerSession.Release(created);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not create the folder: " + ex.Message, "Control Panel");
          }
@@ -143,7 +143,7 @@ namespace hMailServer.ControlPanel.Views
             folder.Delete();
             ServerSession.Release(folder);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not delete the folder: " + ex.Message, "Control Panel");
          }

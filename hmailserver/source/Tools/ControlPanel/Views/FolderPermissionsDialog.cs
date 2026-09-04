@@ -152,7 +152,7 @@ namespace hMailServer.ControlPanel.Views
             ServerSession.Release(perms);
             ServerSession.Release(folder);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not load permissions: " + ex.Message, "Control Panel");
          }
@@ -182,13 +182,13 @@ namespace hMailServer.ControlPanel.Views
       private static string SafeAccount(dynamic p)
       {
          try { dynamic a = p.Account; string addr = (string)a.Address; ServerSession.Release(a); return addr; }
-         catch (Exception) { return "(account #" + (int)p.PermissionAccountID + ")"; }
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { return "(account #" + (int)p.PermissionAccountID + ")"; }
       }
 
       private static string SafeGroup(dynamic p)
       {
          try { dynamic g = p.Group; string n = (string)g.Name; ServerSession.Release(g); return "Group: " + n; }
-         catch (Exception) { return "(group #" + (int)p.PermissionGroupID + ")"; }
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { return "(group #" + (int)p.PermissionGroupID + ")"; }
       }
 
       private void DeleteSelected()
@@ -206,7 +206,7 @@ namespace hMailServer.ControlPanel.Views
             ServerSession.Release(perms);
             ServerSession.Release(folder);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not delete the permission: " + ex.Message, "Control Panel");
          }
@@ -237,7 +237,7 @@ namespace hMailServer.ControlPanel.Views
                ServerSession.Release(perms);
                ServerSession.Release(folder);
             }
-            catch (Exception) { }
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }
             finally { ServerSession.Release(folders); }
          }
 
@@ -271,7 +271,7 @@ namespace hMailServer.ControlPanel.Views
             ServerSession.Release(perms);
             ServerSession.Release(folder);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not save the permission: " + ex.Message, "Control Panel");
          }
@@ -301,7 +301,7 @@ namespace hMailServer.ControlPanel.Views
             ServerSession.Release(domain);
             return id;
          }
-         catch (Exception) { return 0; }
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { return 0; }
          finally { ServerSession.Release(domains); }
       }
 
@@ -321,7 +321,7 @@ namespace hMailServer.ControlPanel.Views
                   return id;
             }
          }
-         catch (Exception) { }
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }
          finally { ServerSession.Release(groups); }
          return 0;
       }
@@ -415,7 +415,7 @@ namespace hMailServer.ControlPanel.Views
          Subject = subject_.Text.Trim();
          int value = 0;
          foreach ((CheckBox box, int bit) in flagBoxes_)
-            if (box.IsChecked == true)
+            if (box.IsChecked is true)
                value |= bit;
          Value = value;
          DialogResult = true;

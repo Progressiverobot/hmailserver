@@ -140,7 +140,7 @@ namespace hMailServer.ControlPanel.Views
             bounce_.Text = (string)l.BounceAddress ?? "";
             ServerSession.Release(l);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not load the list: " + ex.Message, "Control Panel");
             Close();
@@ -157,11 +157,11 @@ namespace hMailServer.ControlPanel.Views
          try
          {
             dynamic l = OpenList(domains);
-            l.Active = active_.IsChecked == true;
+            l.Active = active_.IsChecked is true;
             if (addressBox_.Text.Trim().Length > 0)
                l.Address = addressBox_.Text.Trim();
             l.Mode = ComboValue(mode_);
-            l.RequireSMTPAuth = requireAuth_.IsChecked == true;
+            l.RequireSMTPAuth = requireAuth_.IsChecked is true;
             l.RequireSenderAddress = requireSender_.Text.Trim();
             l.ModeratorAddress = moderator_.Text.Trim();
             l.BounceAddress = bounce_.Text.Trim();
@@ -169,7 +169,7 @@ namespace hMailServer.ControlPanel.Views
             ServerSession.Release(l);
             Close();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not save the list: " + ex.Message, "Control Panel");
          }

@@ -11,6 +11,7 @@ using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading;
+using System.Linq;
 using hMailServer;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
@@ -53,12 +54,12 @@ namespace RegressionTests.SSL
 
       private static string ExampleCertificatePath
       {
-         get { return Path.Combine(SslSetup.GetSslCertPath(), "example.crt"); }
+         get { return Paths.Combine(SslSetup.GetSslCertPath(), "example.crt"); }
       }
 
       private static string ExamplePrivateKeyPath
       {
-         get { return Path.Combine(SslSetup.GetSslCertPath(), "example.key"); }
+         get { return Paths.Combine(SslSetup.GetSslCertPath(), "example.key"); }
       }
 
       private static TCPIPPort FindPortByNumber(TCPIPPorts ports, int portNumber)
@@ -288,11 +289,8 @@ namespace RegressionTests.SSL
          }
          finally
          {
-            foreach (var id in savedPortIds)
-            {
-               if (id != 0)
-                  _settings.TCPIPPorts.DeleteByDBID(id);
-            }
+            foreach (var id in savedPortIds.Where(id => id != 0))
+               _settings.TCPIPPorts.DeleteByDBID(id);
 
             _settings.SSLCertificates.Clear();
          }
@@ -349,7 +347,7 @@ namespace RegressionTests.SSL
                    "for a certificate.")]
       public void ThePolicyAndCAFileSurviveAnXmlBackupAndRestore()
       {
-         var backupDir = Path.Combine(Path.GetTempPath(), "hmailserver-mtls-backup-" + TestSetup.UniqueString());
+         var backupDir = Paths.Combine(Path.GetTempPath(), "hmailserver-mtls-backup-" + TestSetup.UniqueString());
          Directory.CreateDirectory(backupDir);
 
          var portNumber = TestSetup.GetNextFreePort();
@@ -658,7 +656,7 @@ namespace RegressionTests.SSL
 
                   return Encoding.ASCII.GetString(buffer, 0, read);
                }
-               catch (Exception)
+               catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
                {
                   // A handshake alert or a connection closed before the banner:
                   // the server refused the session.
@@ -747,7 +745,7 @@ namespace RegressionTests.SSL
 
       private static string WriteAuthorityPemFile(X509Certificate2 authority)
       {
-         var path = Path.Combine(Path.GetTempPath(),
+         var path = Paths.Combine(Path.GetTempPath(),
             "hmailserver-client-ca-" + TestSetup.UniqueString() + ".pem");
 
          var pem = "-----BEGIN CERTIFICATE-----\r\n" +
@@ -774,7 +772,7 @@ namespace RegressionTests.SSL
                if (contents.IndexOf("BACKUP ERROR:", StringComparison.Ordinal) > 0)
                   return false;
             }
-            catch (Exception)
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
             {
                // The log file may not exist yet, or the writer may still hold it.
             }
@@ -796,7 +794,7 @@ namespace RegressionTests.SSL
                if (startTime.Length > 0 && startTime != startTimeBeforeRestore)
                   return;
             }
-            catch (Exception)
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
             {
                // The COM call can fail transiently while the servers restart.
             }

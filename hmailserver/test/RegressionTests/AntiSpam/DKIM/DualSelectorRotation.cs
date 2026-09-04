@@ -43,9 +43,9 @@ namespace RegressionTests.AntiSpam.DKIM
    {
       private static string GetPrivateKeyFile()
       {
-         var sslPath = Path.Combine(TestContext.CurrentContext.TestDirectory, "..\\..\\..\\..\\SSL examples");
+         var sslPath = Paths.Combine(TestContext.CurrentContext.TestDirectory, "..\\..\\..\\..\\SSL examples");
 
-         var exampleKeyFile = Path.Combine(sslPath, "example.key");
+         var exampleKeyFile = Paths.Combine(sslPath, "example.key");
          if (!File.Exists(exampleKeyFile))
             throw new Exception("Example key file could not be found.");
 
@@ -201,7 +201,7 @@ namespace RegressionTests.AntiSpam.DKIM
       public void PromoteOntoAMissingKeyFileFailsAndLeavesBothSlotsUntouched()
       {
          var keyFile = GetPrivateKeyFile();
-         var missingKeyFile = Path.Combine(Path.GetTempPath(),
+         var missingKeyFile = Paths.Combine(Path.GetTempPath(),
             "hmailserver-no-such-dkim-key-" + TestSetup.UniqueString() + ".key");
 
          _domain.DKIMSelector = "PrimarySelector";
@@ -242,7 +242,7 @@ namespace RegressionTests.AntiSpam.DKIM
       public void PromoteSwapsThePairInMemoryAndPersistsOnlyOnSave()
       {
          var oldKeyFile = GetPrivateKeyFile();
-         var stagedKeyFile = Path.Combine(Path.GetTempPath(),
+         var stagedKeyFile = Paths.Combine(Path.GetTempPath(),
             "hmailserver-staged-dkim-" + TestSetup.UniqueString() + ".key");
 
          File.Copy(oldKeyFile, stagedKeyFile, true);

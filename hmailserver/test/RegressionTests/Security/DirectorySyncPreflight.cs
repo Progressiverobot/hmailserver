@@ -5,7 +5,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using hMailServer;
@@ -71,9 +70,6 @@ namespace RegressionTests.Security
       // pressed teaches people to ignore that log.
       private static readonly string[] LdapErrorCodes = { "HM5920", "HM5921", "HM5922", "HM5923", "HM5924" };
 
-      [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-      private static extern bool WritePrivateProfileString(string section, string key, string value, string filePath);
-
       #region ini plumbing
 
       /// <summary>
@@ -87,19 +83,14 @@ namespace RegressionTests.Security
       {
          bool wroteAny = false;
 
-         foreach (string directory in IniFileSetting.CandidateDirectories())
+         foreach (string iniPath in IniFileSetting.ExistingIniFiles())
          {
-            string iniPath = Path.Combine(directory, "hMailServer.ini");
-
-            if (!File.Exists(iniPath))
-               continue;
-
-            Assert.IsTrue(WritePrivateProfileString("LDAP", key, value, iniPath),
+            Assert.IsTrue(IniFile.WritePrivateProfileString("LDAP", key, value, iniPath),
                "Failed to write [LDAP] " + key + " to " + iniPath + ".");
 
             // The value has to be on disk before the server looks at the file's
             // timestamp; WritePrivateProfileString caches otherwise.
-            WritePrivateProfileString(null, null, null, iniPath);
+            IniFile.WritePrivateProfileString(null, null, null, iniPath);
 
             wroteAny = true;
          }

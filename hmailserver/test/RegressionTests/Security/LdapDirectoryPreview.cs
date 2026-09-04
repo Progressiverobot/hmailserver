@@ -6,7 +6,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using NUnit.Framework;
@@ -76,13 +75,6 @@ namespace RegressionTests.Security
       // log.
       private static readonly string[] LdapErrorCodes = { "HM5920", "HM5921", "HM5922", "HM5923", "HM5924" };
 
-      [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-      private static extern bool WritePrivateProfileString(string section, string key, string value, string filePath);
-
-      [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-      private static extern uint GetPrivateProfileString(string section, string key, string defaultValue,
-                                                         StringBuilder returnedString, uint size, string filePath);
-
       #region ini plumbing
 
       /// <summary>
@@ -101,19 +93,14 @@ namespace RegressionTests.Security
       {
          bool wroteAny = false;
 
-         foreach (string directory in IniFileSetting.CandidateDirectories())
+         foreach (string iniPath in IniFileSetting.ExistingIniFiles())
          {
-            string iniPath = Path.Combine(directory, "hMailServer.ini");
-
-            if (!File.Exists(iniPath))
-               continue;
-
-            Assert.IsTrue(WritePrivateProfileString("LDAP", key, value, iniPath),
+            Assert.IsTrue(IniFile.WritePrivateProfileString("LDAP", key, value, iniPath),
                "Failed to write [LDAP] " + key + " to " + iniPath + ".");
 
             // The value has to be on disk before the server looks at the file's
             // timestamp; WritePrivateProfileString caches otherwise.
-            WritePrivateProfileString(null, null, null, iniPath);
+            IniFile.WritePrivateProfileString(null, null, null, iniPath);
 
             wroteAny = true;
          }
@@ -127,18 +114,8 @@ namespace RegressionTests.Security
       /// </summary>
       private static string ReadLdapSetting(string key)
       {
-         foreach (string directory in IniFileSetting.CandidateDirectories())
-         {
-            string iniPath = Path.Combine(directory, "hMailServer.ini");
-
-            if (!File.Exists(iniPath))
-               continue;
-
-            var buffer = new StringBuilder(4096);
-            GetPrivateProfileString("LDAP", key, string.Empty, buffer, (uint) buffer.Capacity, iniPath);
-
-            return buffer.ToString();
-         }
+         foreach (string iniPath in IniFileSetting.ExistingIniFiles())
+            return IniFile.GetValue("LDAP", key, string.Empty, iniPath);
 
          Assert.Fail("Could not locate an existing hMailServer.ini to read.");
          return string.Empty;

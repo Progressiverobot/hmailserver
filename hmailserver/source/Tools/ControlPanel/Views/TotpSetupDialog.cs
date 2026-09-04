@@ -149,7 +149,7 @@ namespace hMailServer.ControlPanel.Views
          copy.Click += (s, e) =>
          {
             try { if (!string.IsNullOrEmpty(secret_.Text)) Clipboard.SetText(secret_.Text.Replace(" ", "")); }
-            catch (Exception) { }
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }
          };
          Grid.SetColumn(copy, 1);
          keyRow.Children.Add(copy);
@@ -199,7 +199,7 @@ namespace hMailServer.ControlPanel.Views
             bmp.Freeze();
             qrImage_.Source = bmp;
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             qrImage_.Source = null;
          }
@@ -240,7 +240,7 @@ namespace hMailServer.ControlPanel.Views
          {
             MessageBox.Show("Changing two-factor authentication settings requires administrator rights. Restart the Control Panel as an administrator and try again.", Title);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show(ex.Message, Title);
          }

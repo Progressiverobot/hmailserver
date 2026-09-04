@@ -15,7 +15,7 @@ namespace TranslationExtractor
    {
       private static string TranslationFolder;
 
-      private static string TranslationScript =
+      private static readonly string TranslationScript =
          "https://www.hmailserver.com/devnet/translation_getlanguage.php?language={0}";
 
       private static void Main(string[] args)
@@ -24,7 +24,7 @@ namespace TranslationExtractor
 
          TranslationFolder = args[0];
 
-         if (Directory.Exists(TranslationFolder) == false)
+         if (!Directory.Exists(TranslationFolder))
          {
             Console.WriteLine(string.Format("Translation folder {0} does not exist.", TranslationFolder));
             Environment.Exit(-1);
@@ -44,7 +44,7 @@ namespace TranslationExtractor
          {
             var content = client.GetStringAsync(url).GetAwaiter().GetResult();
 
-            var targetFile = Path.Combine(targetDir, string.Format("{0}.ini", language));
+            var targetFile = Paths.Combine(targetDir, string.Format("{0}.ini", language));
 
             File.WriteAllText(targetFile, content, Encoding.UTF8);
          }

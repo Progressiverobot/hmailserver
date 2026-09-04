@@ -3,6 +3,7 @@
 
 using System;
 using System.IO;
+using System.Linq;
 using NUnit.Framework;
 using RegressionTests.Shared;
 
@@ -93,10 +94,10 @@ namespace RegressionTests.Infrastructure
          {
             var errorLog = LogHandler.ReadErrorLog();
 
-            foreach (var text in expected)
-               if (!errorLog.Contains(text))
-                  throw new Exception(
-                     string.Format("The ERROR log does not contain \"{0}\". It contains:\r\n{1}", text, errorLog));
+            string missingText = expected.FirstOrDefault(text => !errorLog.Contains(text));
+            if (missingText != null)
+               throw new Exception(
+                  string.Format("The ERROR log does not contain \"{0}\". It contains:\r\n{1}", missingText, errorLog));
          });
       }
 
@@ -180,7 +181,7 @@ namespace RegressionTests.Infrastructure
          // 120 MB, and boost::filesystem::file_size reports the full length either way.
          for (var i = 1; i <= 4; i++)
          {
-            var name = Path.Combine(LogDirectory, string.Format("minidump_bytebudget_{0}.dmp", i));
+            var name = Paths.Combine(LogDirectory, string.Format("minidump_bytebudget_{0}.dmp", i));
 
             using (var stream = new FileStream(name, FileMode.Create, FileAccess.Write))
                stream.SetLength(dumpSize);

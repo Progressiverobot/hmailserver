@@ -8,6 +8,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
+using System.Linq;
 using NUnit.Framework;
 
 namespace RegressionTests.Shared
@@ -79,7 +80,7 @@ namespace RegressionTests.Shared
             {
                client = listener_.AcceptTcpClient();
             }
-            catch
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
             {
                return;
             }
@@ -115,11 +116,9 @@ namespace RegressionTests.Shared
 
                         if (headerEnd >= 0)
                         {
-                           foreach (string line in sofar.Substring(0, headerEnd).Split('\n'))
-                           {
-                              if (line.StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase))
-                                 int.TryParse(line.Substring(15).Trim(), out contentLength);
-                           }
+                           foreach (string line in sofar.Substring(0, headerEnd).Split('\n')
+                              .Where(line => line.StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase)))
+                              int.TryParse(line.Substring("Content-Length:".Length).Trim(), out contentLength);
                         }
                      }
 
@@ -145,7 +144,7 @@ namespace RegressionTests.Shared
                   stream.Flush();
                }
             }
-            catch
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
             {
                // A test that has moved on closes the socket under us. Not a failure.
             }
@@ -160,8 +159,9 @@ namespace RegressionTests.Shared
          {
             listener_.Stop();
          }
-         catch
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
+            // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
          }
       }
    }

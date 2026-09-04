@@ -220,7 +220,7 @@ namespace hMailServer.ControlPanel.Views
             {
                Clipboard.SetText(newKeyToken_.Text);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
             {
                // Another process can hold the clipboard open. Saying so is better
                // than a button that silently did nothing with a value that cannot
@@ -718,7 +718,7 @@ namespace hMailServer.ControlPanel.Views
             result = new ApiKeyRequest
             {
                Label = labelBox.Text.Trim(),
-               Full = full.IsChecked == true,
+               Full = full.IsChecked is true,
                // End of the chosen day rather than midnight at its start: a key
                // asked to last until the 30th that stopped working on the 29th
                // would be a day short of what was chosen.

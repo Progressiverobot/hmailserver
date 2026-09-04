@@ -101,11 +101,11 @@ namespace RegressionTests.SSL
       /// </summary>
       private static Tuple<string, string> WriteEncryptedKeyPairToDisk()
       {
-         string directory = Path.Combine(Path.GetTempPath(), "hMailServerEncryptedKeyTest");
+         string directory = Paths.Combine(Path.GetTempPath(), "hMailServerEncryptedKeyTest");
          Directory.CreateDirectory(directory);
 
-         string certificateFile = Path.Combine(directory, "encrypted-key-test.crt");
-         string keyFile = Path.Combine(directory, "encrypted-key-test.key");
+         string certificateFile = Paths.Combine(directory, "encrypted-key-test.crt");
+         string keyFile = Paths.Combine(directory, "encrypted-key-test.key");
 
          File.WriteAllText(certificateFile, CertificatePem);
          File.WriteAllText(keyFile, EncryptedPrivateKeyPem);
@@ -221,12 +221,15 @@ namespace RegressionTests.SSL
          }
          catch (AuthenticationException)
          {
+            // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
          }
          catch (Win32Exception)
          {
+            // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
          }
          catch (IOException)
          {
+            // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
          }
          catch (DeliveryFailedException)
          {

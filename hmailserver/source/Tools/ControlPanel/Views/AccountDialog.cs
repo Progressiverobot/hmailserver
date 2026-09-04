@@ -404,7 +404,7 @@ namespace hMailServer.ControlPanel.Views
       /// </summary>
       private void RefreshDirectoryEffect_()
       {
-         if (isAd_.IsChecked != true)
+         if (isAd_.IsChecked is not true)
          {
             directoryEffect_.Text = "";
             return;
@@ -537,7 +537,7 @@ namespace hMailServer.ControlPanel.Views
             ServerSession.Release(a);
             folderStatus_.Text = count + (count == 1 ? " folder." : " folders.");
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             folderStatus_.Text = "Could not load folders: " + ex.Message;
          }
@@ -563,7 +563,7 @@ namespace hMailServer.ControlPanel.Views
             ServerSession.Release(folders);
             ServerSession.Release(a);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not create the folder: " + ex.Message, "Control Panel");
          }
@@ -597,7 +597,7 @@ namespace hMailServer.ControlPanel.Views
             ServerSession.Release(folders);
             ServerSession.Release(a);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not delete the folder: " + ex.Message, "Control Panel");
          }
@@ -622,7 +622,7 @@ namespace hMailServer.ControlPanel.Views
             ServerSession.Release(a);
             folderStatus_.Text = "Mailbox emptied.";
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not empty the mailbox: " + ex.Message, "Control Panel");
          }
@@ -643,7 +643,7 @@ namespace hMailServer.ControlPanel.Views
             ServerSession.Release(a);
             folderStatus_.Text = "Mailbox unlocked.";
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not unlock the mailbox: " + ex.Message, "Control Panel");
          }
@@ -708,7 +708,7 @@ namespace hMailServer.ControlPanel.Views
             spamDelete_.Text = ((int)a.SpamDeleteThreshold).ToString();
             firstName_.Text = (string)a.PersonFirstName ?? "";
             lastName_.Text = (string)a.PersonLastName ?? "";
-            try { lastLogon_.Text = Convert.ToString(a.LastLogonTime); } catch { lastLogon_.Text = "Never"; }
+            try { lastLogon_.Text = Convert.ToString(a.LastLogonTime); } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { lastLogon_.Text = "Never"; }
             if (string.IsNullOrWhiteSpace(lastLogon_.Text)) lastLogon_.Text = "Never";
 
             forwardOn_.IsChecked = (bool)a.ForwardEnabled;
@@ -731,7 +731,7 @@ namespace hMailServer.ControlPanel.Views
                vacationBeginDate_.SelectedDate =
                   DateTime.TryParse(beginText, out DateTime begin) ? begin : (DateTime?)null;
             }
-            catch { vacationBeginDate_.SelectedDate = null; }
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { vacationBeginDate_.SelectedDate = null; }
             vacationAbortSpam_.IsChecked = (bool)a.VacationMessageAbortSpamFlagged;
 
             signatureOn_.IsChecked = (bool)a.SignatureEnabled;
@@ -739,7 +739,7 @@ namespace hMailServer.ControlPanel.Views
             signatureHtml_.Text = (string)a.SignatureHTML ?? "";
 
             // SieveScript is a file-backed property added in 6.x; tolerate older servers.
-            try { sieveScript_.Text = (string)a.SieveScript ?? ""; } catch { sieveScript_.Text = ""; }
+            try { sieveScript_.Text = (string)a.SieveScript ?? ""; } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { sieveScript_.Text = ""; }
 
             // Remembered so Save can tell an edited script from an untouched one and
             // write the file only when it actually changed - see the note there.
@@ -751,7 +751,7 @@ namespace hMailServer.ControlPanel.Views
 
             ServerSession.Release(a);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not load the account: " + ex.Message, "Control Panel");
             Close();
@@ -768,7 +768,7 @@ namespace hMailServer.ControlPanel.Views
          password_.Password = pw;
          generatedShow_.Text = pw;
          generatedShow_.Visibility = Visibility.Visible;
-         try { Clipboard.SetText(pw); } catch (Exception) { }
+         try { Clipboard.SetText(pw); } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }
          UpdatePasswordStrength();
       }
 
@@ -842,12 +842,12 @@ namespace hMailServer.ControlPanel.Views
             dynamic a = OpenAccount(domains);
             if (renaming)
                a.Address = newAddress;
-            a.Active = active_.IsChecked == true;
+            a.Active = active_.IsChecked is true;
             int lvl = ComboValue(adminLevel_, -1);
             if (lvl >= 0) a.AdminLevel = lvl;
             if (hasQuota)
                a.MaxSize = quotaV;
-            a.AntiSpamEnabled = spamFilterOn_.IsChecked == true;
+            a.AntiSpamEnabled = spamFilterOn_.IsChecked is true;
             if (int.TryParse(spamMark_.Text.Trim(), out int spamMarkV)) a.SpamMarkThreshold = spamMarkV;
             if (int.TryParse(spamDelete_.Text.Trim(), out int spamDeleteV)) a.SpamDeleteThreshold = spamDeleteV;
             a.PersonFirstName = firstName_.Text.Trim();
@@ -855,15 +855,15 @@ namespace hMailServer.ControlPanel.Views
             if (password_.Password.Length > 0)
                a.Password = password_.Password;
 
-            a.ForwardEnabled = forwardOn_.IsChecked == true;
+            a.ForwardEnabled = forwardOn_.IsChecked is true;
             a.ForwardAddress = forwardTo_.Text.Trim();
-            a.ForwardKeepOriginal = forwardKeep_.IsChecked == true;
-            a.ForwardAbortSpamFlagged = forwardAbortSpam_.IsChecked == true;
+            a.ForwardKeepOriginal = forwardKeep_.IsChecked is true;
+            a.ForwardAbortSpamFlagged = forwardAbortSpam_.IsChecked is true;
 
-            a.VacationMessageIsOn = vacationOn_.IsChecked == true;
+            a.VacationMessageIsOn = vacationOn_.IsChecked is true;
             a.VacationSubject = vacationSubject_.Text;
             a.VacationMessage = vacationBody_.Text;
-            a.VacationMessageExpires = vacationExpires_.IsChecked == true;
+            a.VacationMessageExpires = vacationExpires_.IsChecked is true;
             if (vacationExpiresDate_.SelectedDate.HasValue)
                a.VacationMessageExpiresDate = vacationExpiresDate_.SelectedDate.Value.ToString("yyyy-MM-dd");
             try
@@ -871,14 +871,14 @@ namespace hMailServer.ControlPanel.Views
                if (vacationBeginDate_.SelectedDate.HasValue)
                   a.VacationMessageBeginDate = vacationBeginDate_.SelectedDate.Value.ToString("yyyy-MM-dd");
             }
-            catch { /* a server without schema 6012 has nowhere to put it */ }
-            a.VacationMessageAbortSpamFlagged = vacationAbortSpam_.IsChecked == true;
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* a server without schema 6012 has nowhere to put it */ }
+            a.VacationMessageAbortSpamFlagged = vacationAbortSpam_.IsChecked is true;
 
-            a.SignatureEnabled = signatureOn_.IsChecked == true;
+            a.SignatureEnabled = signatureOn_.IsChecked is true;
             a.SignaturePlainText = signaturePlain_.Text;
             a.SignatureHTML = signatureHtml_.Text;
 
-            a.IsAD = isAd_.IsChecked == true;
+            a.IsAD = isAd_.IsChecked is true;
             a.ADDomain = adDomain_.Text.Trim();
             a.ADUsername = adUser_.Text.Trim();
 
@@ -902,13 +902,13 @@ namespace hMailServer.ControlPanel.Views
             if (sieveText != (loadedSieveScript_ ?? ""))
             {
                // Tolerate older servers, which do not have this property at all.
-               try { a.SieveScript = sieveText; } catch { }
+               try { a.SieveScript = sieveText; } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }
             }
 
             ServerSession.Release(a);
             Close();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not save the account: " + ex.Message, "Control Panel");
          }

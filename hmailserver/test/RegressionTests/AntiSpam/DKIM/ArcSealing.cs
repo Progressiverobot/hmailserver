@@ -4,8 +4,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
+using System.Linq;
+using System.Text;
 using NUnit.Framework;
 using RegressionTests.Infrastructure;
 using RegressionTests.Shared;
@@ -32,8 +33,6 @@ namespace RegressionTests.AntiSpam.DKIM
    [TestFixture]
    public class ArcSealing : TestFixtureBase
    {
-      [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-      private static extern bool WritePrivateProfileString(string section, string key, string value, string filePath);
 
       private const string ExternalSender = "alice@external-sender.example";
 
@@ -45,18 +44,15 @@ namespace RegressionTests.AntiSpam.DKIM
          string programDirectory = _application.Settings.Directories.ProgramDirectory;
          string[] candidates =
          {
-            Path.Combine(programDirectory, "hMailServer.ini"),
-            Path.Combine(programDirectory, "Bin", "hMailServer.ini"),
+            Paths.Combine(programDirectory, "hMailServer.ini"),
+            Paths.Combine(programDirectory, "Bin", "hMailServer.ini"),
          };
 
          bool wroteAny = false;
-         foreach (string iniPath in candidates)
+         foreach (string iniPath in candidates.Where(File.Exists))
          {
-            if (!File.Exists(iniPath))
-               continue;
-
             Assert.IsTrue(
-               WritePrivateProfileString("Settings", key, value, iniPath),
+               IniFile.WritePrivateProfileString("Settings", key, value, iniPath),
                "Failed to write " + key + " to " + iniPath + ".");
             wroteAny = true;
          }
@@ -66,9 +62,9 @@ namespace RegressionTests.AntiSpam.DKIM
 
       private static string GetPrivateKeyFile()
       {
-         var sslPath = Path.Combine(TestContext.CurrentContext.TestDirectory, "..\\..\\..\\..\\SSL examples");
+         var sslPath = Paths.Combine(TestContext.CurrentContext.TestDirectory, "..\\..\\..\\..\\SSL examples");
 
-         var exampleKeyFile = Path.Combine(sslPath, "example.key");
+         var exampleKeyFile = Paths.Combine(sslPath, "example.key");
          if (!File.Exists(exampleKeyFile))
             throw new Exception("Example key file could not be found.");
 
@@ -123,7 +119,7 @@ namespace RegressionTests.AntiSpam.DKIM
       /// </summary>
       private static string ExtractHeader(string messageData, string fieldName)
       {
-         string value = null;
+         StringBuilder value = null;
 
          foreach (string rawLine in messageData.Replace("\r\n", "\n").Split('\n'))
          {
@@ -131,21 +127,21 @@ namespace RegressionTests.AntiSpam.DKIM
             {
                if (rawLine.StartsWith(" ") || rawLine.StartsWith("\t"))
                {
-                  value += " " + rawLine.Trim();
+                  value.Append(" ").Append(rawLine.Trim());
                   continue;
                }
 
-               return value;
+               return value.ToString();
             }
 
             if (rawLine.Length == 0)
                break;
 
             if (rawLine.StartsWith(fieldName + ":", StringComparison.OrdinalIgnoreCase))
-               value = rawLine.Substring(fieldName.Length + 1).Trim();
+               value = new StringBuilder(rawLine.Substring(fieldName.Length + 1).Trim());
          }
 
-         return value;
+         return value?.ToString();
       }
 
       [Test]

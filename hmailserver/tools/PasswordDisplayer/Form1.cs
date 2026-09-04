@@ -13,17 +13,11 @@ using System.Text;
 using System.Windows.Forms;
 using Microsoft.Win32;
 using System.IO;
-using System.Runtime.InteropServices;
 
 namespace PasswordDisplayer
 {
    public partial class formDatabasePassword : Form
    {
-      [DllImport("kernel32")]
-      private static extern int GetPrivateProfileString(string section,
-               string key, string def, StringBuilder retVal,
-          int size, string filePath);
-
       public formDatabasePassword()
       {
          InitializeComponent();
@@ -31,9 +25,7 @@ namespace PasswordDisplayer
 
       public string IniReadValue(string fileName, string Section, string Key)
       {
-         StringBuilder temp = new StringBuilder(255);
-         int i = GetPrivateProfileString(Section, Key, "", temp, 255, fileName);
-         return temp.ToString();
+         return IniFile.GetValue(Section, Key, "", fileName);
 
       }
 
@@ -43,8 +35,8 @@ namespace PasswordDisplayer
          // Locate hMailServer.ini
          RegistryKey key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\hMailServer");
          string installDir = key.GetValue( "InstallLocation" ) as string;
-         string binDir = Path.Combine(installDir, "Bin");
-         string iniFile = Path.Combine(binDir, "hMailServer.ini");
+         string binDir = Paths.Combine(installDir, "Bin");
+         string iniFile = Paths.Combine(binDir, "hMailServer.ini");
 
          // Read the database password.
          string encryptedPassword = IniReadValue(iniFile, "Database", "password");

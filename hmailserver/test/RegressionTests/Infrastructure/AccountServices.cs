@@ -614,16 +614,12 @@ namespace RegressionTests.Infrastructure
          CustomAsserts.AssertRecipientsInDeliveryQueue(0);
          Pop3ClientSimulator.AssertMessageCount(account2.Address, "test", 1);
 
-         var domainDir = Path.Combine(_settings.Directories.DataDirectory, "example.test");
-         var userDir = Path.Combine(domainDir, "Forward1");
+         var domainDir = Paths.Combine(_settings.Directories.DataDirectory, "example.test");
+         var userDir = Paths.Combine(domainDir, "Forward1");
 
          var dirs = Directory.GetDirectories(userDir);
          foreach (var dir in dirs)
-         {
-            var files = Directory.GetFiles(dir);
-
-            Assert.AreEqual(0, files.Length);
-         }
+            Assert.AreEqual(0, Directory.GetFiles(dir).Length);
       }
 
       [Test]

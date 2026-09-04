@@ -198,7 +198,7 @@ namespace hMailServer.ControlPanel.Services
                   {
                      Release((object)dead);
                   }
-                  catch (Exception)
+                  catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
                   {
                      // Releasing a proxy whose server has already gone can throw;
                      // the reconnect itself has still succeeded.
@@ -326,7 +326,7 @@ namespace hMailServer.ControlPanel.Services
             return controller.Status == ServiceControllerStatus.Running ||
                    controller.Status == ServiceControllerStatus.StartPending;
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             // Service not installed under that name, or no rights to query it.
             return true;
@@ -369,7 +369,7 @@ namespace hMailServer.ControlPanel.Services
          {
             return (int)app.ServerState == StateRunning;
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             return false;
          }
@@ -410,7 +410,7 @@ namespace hMailServer.ControlPanel.Services
             _ = (int)app_.ServerState;
             return true;
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             // A transport failure means the link really is gone. Anything else
             // is the server answering - most likely this session is not a server
@@ -458,7 +458,7 @@ namespace hMailServer.ControlPanel.Services
                : ex.Message;
             return false;
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             error = ex.Message;
             return false;
@@ -471,7 +471,7 @@ namespace hMailServer.ControlPanel.Services
          {
             Reconnected?.Invoke(this);
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             // A misbehaving listener must not turn a successful reconnect into
             // a failed one.
@@ -530,13 +530,13 @@ namespace hMailServer.ControlPanel.Services
          {
             return (int)status.SessionCount[sessionType];
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             try
             {
                return (int)status.SessionCount(sessionType);
             }
-            catch (Exception)
+            catch (Exception innerFatalCheck) when (!ExceptionPolicy.IsFatal(innerFatalCheck))
             {
                return 0;
             }

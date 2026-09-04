@@ -9,6 +9,7 @@ using System.Net;
 using System.IO;
 using System.Text;
 using System.Threading;
+using System.Linq;
 
 namespace StressTest
 {
@@ -32,10 +33,8 @@ namespace StressTest
             //iphe = Dns.GetHostEntry("hmailserver.no-ip.org");
             iphe = Dns.GetHostEntry("localhost");
 			
-			foreach(IPAddress ipad in iphe.AddressList)
+			foreach (IPEndPoint ipe in iphe.AddressList.Select(ipad => new IPEndPoint(ipad, iPort)))
 			{
-				IPEndPoint ipe = new IPEndPoint(ipad, iPort);
-
 				Socket tmpS = new Socket(ipe.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
 
 				try

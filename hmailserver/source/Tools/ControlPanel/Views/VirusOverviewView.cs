@@ -155,7 +155,7 @@ namespace hMailServer.ControlPanel.Views
 
             CountFetchAccounts(config);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             failedReads_++;
             firstError_ ??= ServerSession.DescribeComError(ex);
@@ -175,7 +175,7 @@ namespace hMailServer.ControlPanel.Views
          {
             return read();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             failedReads_++;
             firstError_ ??= ServerSession.DescribeComError(ex);
@@ -191,7 +191,7 @@ namespace hMailServer.ControlPanel.Views
             collection = open();
             return (int)collection.Count;
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             failedReads_++;
             firstError_ ??= ServerSession.DescribeComError(ex);
@@ -294,7 +294,7 @@ namespace hMailServer.ControlPanel.Views
                }
             }
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             // Counted as one failed read rather than several: the page still has
             // everything else, and the fetch-account note simply does not appear.

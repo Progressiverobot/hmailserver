@@ -162,7 +162,7 @@ namespace hMailServer.ControlPanel.Views
                   dynamic account = member.Account;
                   label = account == null ? null : (string)account.Address;
                }
-               catch
+               catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
                {
                   label = null;
                }
@@ -178,7 +178,7 @@ namespace hMailServer.ControlPanel.Views
                ? "This group has no accounts in it, so any permission granted to it currently applies to nobody."
                : count + (count == 1 ? " account is a member." : " accounts are members.");
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             status_.Text = "The group members could not be read: " + ServerSession.DescribeComError(ex);
          }
@@ -250,7 +250,7 @@ namespace hMailServer.ControlPanel.Views
 
             Reload();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("The account could not be added to the group: " + ServerSession.DescribeComError(ex), "Control Panel");
          }
@@ -277,7 +277,7 @@ namespace hMailServer.ControlPanel.Views
             group.Members.DeleteByDBID(memberIds_[index]);
             Reload();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("The account could not be removed from the group: " + ServerSession.DescribeComError(ex), "Control Panel");
          }

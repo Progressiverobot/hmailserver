@@ -23,7 +23,7 @@ namespace SQLScriptCreator.Statements
       public bool Unique { get; set; }
       public bool Clustered { get; set; }
 
-      private List<Column> _columns;
+      private readonly List<Column> _columns;
       public List<Column> Columns
       {
          get

@@ -175,7 +175,7 @@ namespace hMailServer.ControlPanel.Services
          {
             pem = File.ReadAllText(path);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             health.CertificateFile = new CertificateFinding(StatusLevel.Information, "Cannot read",
                "The certificate file exists but could not be read from this panel (" + ex.Message
@@ -190,7 +190,7 @@ namespace hMailServer.ControlPanel.Services
             // standard fullchain.pem is the leaf - the one whose dates matter.
             certificate = X509Certificate2.CreateFromPem(pem);
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             health.CertificateFile = new CertificateFinding(StatusLevel.Critical, "Not a PEM certificate",
                "The file could not be parsed as a PEM certificate. The server loads certificates in PEM format "
@@ -273,7 +273,7 @@ namespace hMailServer.ControlPanel.Services
          {
             encrypted = LooksLikeEncryptedPem(path);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             health.PrivateKeyFile = new CertificateFinding(StatusLevel.Information, "Cannot read",
                "The key file exists but could not be read from this panel (" + ex.Message
@@ -301,7 +301,7 @@ namespace hMailServer.ControlPanel.Services
          {
             return File.ReadAllText(path);
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             return null;
          }
@@ -346,25 +346,20 @@ namespace hMailServer.ControlPanel.Services
          {
             certificatePublic = certificate.PublicKey.ExportSubjectPublicKeyInfo();
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             health.Pair = new CertificateFinding(StatusLevel.Information, "Cannot check",
                "The certificate's public key could not be exported for comparison.");
             return;
          }
 
-         if (keyPublic.AsSpan().SequenceEqual(certificatePublic))
-         {
-            health.Pair = new CertificateFinding(StatusLevel.Good, "Matches the certificate",
-               "The private key's public half is identical to the certificate's public key - the pair belongs together.");
-         }
-         else
-         {
-            health.Pair = new CertificateFinding(StatusLevel.Critical, "Does not match the certificate",
+         health.Pair = keyPublic.AsSpan().SequenceEqual(certificatePublic)
+            ? new CertificateFinding(StatusLevel.Good, "Matches the certificate",
+               "The private key's public half is identical to the certificate's public key - the pair belongs together.")
+            : new CertificateFinding(StatusLevel.Critical, "Does not match the certificate",
                "The private key does not belong to this certificate: their public keys differ. The pair will "
                + "not load (server error 5113) and every TLS port using this certificate will fail to start. "
                + "Point this entry at the key file that was generated with this certificate.");
-         }
       }
 
       /// <summary>
@@ -380,7 +375,7 @@ namespace hMailServer.ControlPanel.Services
             rsa.ImportFromPem(keyPem);
             return rsa.ExportSubjectPublicKeyInfo();
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             // Not RSA; try the other type the server commonly serves.
          }
@@ -391,7 +386,7 @@ namespace hMailServer.ControlPanel.Services
             ecdsa.ImportFromPem(keyPem);
             return ecdsa.ExportSubjectPublicKeyInfo();
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             return null;
          }

@@ -88,17 +88,13 @@ namespace RegressionTests.IMAP
          simulator.Connect();
          simulator.LogonWithLiteral(account.Address, "test");
 
-         var folderName = "";
-         for (var i = 0; i < 255; i++)
-            folderName = folderName + "A";
+         var folderName = new string('A', 255);
 
          var result = simulator.Send("A01 CREATE " + folderName);
          Assert.IsTrue(result.Contains("A01 OK"));
          Assert.IsTrue(simulator.SelectFolder(folderName));
 
-         folderName = "";
-         for (var i = 0; i < 256; i++)
-            folderName = folderName + "A";
+         folderName = new string('A', 256);
 
          result = simulator.Send("A01 CREATE " + folderName);
          Assert.IsTrue(result.Contains("A01 NO"));

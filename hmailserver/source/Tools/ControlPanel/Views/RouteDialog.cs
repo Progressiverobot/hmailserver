@@ -203,7 +203,7 @@ namespace hMailServer.ControlPanel.Views
             LoadAddresses(r);
             ServerSession.Release(r);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not load the route: " + ex.Message, "Control Panel");
             Close();
@@ -235,12 +235,12 @@ namespace hMailServer.ControlPanel.Views
             r.Description = description_.Text.Trim();
             if (hasTries) r.NumberOfTries = triesV;
             if (hasMinutes) r.MinutesBetweenTry = minutesV;
-            r.AllAddresses = allAddresses_.IsChecked == true;
+            r.AllAddresses = allAddresses_.IsChecked is true;
             int cs = ComboValue(connSecurity_);
             r.ConnectionSecurity = cs;
-            r.TreatSenderAsLocalDomain = treatSenderLocal_.IsChecked == true;
-            r.TreatRecipientAsLocalDomain = treatRecipientLocal_.IsChecked == true;
-            r.RelayerRequiresAuth = requiresAuth_.IsChecked == true;
+            r.TreatSenderAsLocalDomain = treatSenderLocal_.IsChecked is true;
+            r.TreatRecipientAsLocalDomain = treatRecipientLocal_.IsChecked is true;
+            r.RelayerRequiresAuth = requiresAuth_.IsChecked is true;
             r.RelayerAuthUsername = authUser_.Text.Trim();
             if (authPassword_.Password.Length > 0)
                r.SetRelayerAuthPassword(authPassword_.Password);
@@ -248,7 +248,7 @@ namespace hMailServer.ControlPanel.Views
             ServerSession.Release(r);
             Close();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not save the route: " + ex.Message, "Control Panel");
          }
@@ -329,7 +329,7 @@ namespace hMailServer.ControlPanel.Views
             }
             ServerSession.Release(r);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not add the address: " + ex.Message, "Control Panel");
             return;
@@ -364,7 +364,7 @@ namespace hMailServer.ControlPanel.Views
             }
             ServerSession.Release(r);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not remove the address: " + ex.Message, "Control Panel");
             return;

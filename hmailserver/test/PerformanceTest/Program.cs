@@ -42,7 +42,7 @@ namespace PerformanceTest
 
             stopwatch.Stop();
 
-            Console.WriteLine("Passed time: " + stopwatch.Elapsed.TotalSeconds.ToString());
+            Console.WriteLine("Passed time: " + stopwatch.Elapsed.TotalSeconds);
 
 
             

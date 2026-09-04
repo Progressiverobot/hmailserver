@@ -34,10 +34,10 @@ namespace RegressionTests.AntiSpam.DKIM
       private const string OutlookSelectorName = "selector1._domainkey.outlook.com";
 
       private const string OutlookSelectorKey =
-         "v=DKIM1;k=rsa;p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvWyktrIL8DO/+UGvMbv7cPd/Xogpbs7pgVw8" +
-         "y9ldO6AAMmg8+ijENl/c7Fb1MfKM7uG3LMwAr0dVVKyM+mbkoX2k5L7lsROQr0Z9gGSpu7xrnZOa58+/pIhd2Xk/DFPpa5+T" +
-         "KbWodbsSZPRN8z0RY5x59jdzSclXlEyN9mEZdmOiKTsOP6A7vQxfSya9jg5N81dfNNvP7HnWejMMsKyIMrXptxOhIBuEYH67" +
-         "JDe98QgX14oHvGM2Uz53if/SW8MF09rYh9sp4ZsaWLIg6T343JzlbtrsGRGCDJ9JPpxRWZimtz+Up/BlKzT6sCCrBihb/Bi3" +
+         "v=DKIM1;k=rsa;p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvWyktrIL8DO/+UGvMbv7cPd/Xogpbs7pgVw8" +
+         "y9ldO6AAMmg8+ijENl/c7Fb1MfKM7uG3LMwAr0dVVKyM+mbkoX2k5L7lsROQr0Z9gGSpu7xrnZOa58+/pIhd2Xk/DFPpa5+T" +
+         "KbWodbsSZPRN8z0RY5x59jdzSclXlEyN9mEZdmOiKTsOP6A7vQxfSya9jg5N81dfNNvP7HnWejMMsKyIMrXptxOhIBuEYH67" +
+         "JDe98QgX14oHvGM2Uz53if/SW8MF09rYh9sp4ZsaWLIg6T343JzlbtrsGRGCDJ9JPpxRWZimtz+Up/BlKzT6sCCrBihb/Bi3" +
          "pZiEBB4Ui/vruL5RCQIDAQAB;n=2048,1452627113,1468351913";
 
       private FakeDnsServer dns_;
@@ -58,14 +58,12 @@ namespace RegressionTests.AntiSpam.DKIM
       [OneTimeTearDown]
       public void RestoreTheSystemResolver()
       {
-         try
+         // The fake resolver stays up until the server is back on the system one, so
+         // the restart never runs against a dead resolver.
+         using (dns_)
          {
             ServerIniFile.SetSetting("DNSServer", null);
             RestartServerAndReacquireCom();
-         }
-         finally
-         {
-            dns_?.Dispose();
          }
       }
 

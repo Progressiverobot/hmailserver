@@ -11,9 +11,13 @@ namespace ImportTool.MboxImport
 {
    public partial class ucMboxProgress : UserControl, IWizardPage
    {
-      public ucMboxProgress()
+      // The page that chose the destination account; this page imports into it.
+      private readonly ucMboxAccount accountPage_;
+
+      public ucMboxProgress(ucMboxAccount accountPage)
       {
          InitializeComponent();
+         accountPage_ = accountPage;
       }
 
       public string Title
@@ -29,7 +33,7 @@ namespace ImportTool.MboxImport
          {
             RunImport();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             AddToLog("The import failed: " + ex.Message);
          }
@@ -61,7 +65,7 @@ namespace ImportTool.MboxImport
 
          // The COM import requires the message file to already be located in
          // the account's folder inside the data directory.
-         var destinationDirectory = GetAccountDirectory(application);
+         var destinationDirectory = GetAccountDirectory(application, accountPage_.SelectedAccount);
          Directory.CreateDirectory(destinationDirectory);
 
          progressFiles.Minimum = 0;
@@ -100,7 +104,7 @@ namespace ImportTool.MboxImport
                      Application.DoEvents();
                   });
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
             {
                failed++;
                AddToLog(Path.GetFileName(file) + " failed: " + ex.Message);
@@ -121,19 +125,19 @@ namespace ImportTool.MboxImport
          // is moved (and renamed) by the import, after which a failure would
          // leave it orphaned at a path we no longer know.
          var guid = Guid.NewGuid().ToString().ToUpperInvariant();
-         var subDirectory = Path.Combine(destinationDirectory, guid.Substring(0, 2));
+         var subDirectory = Path.Join(destinationDirectory, guid.Substring(0, 2));
          Directory.CreateDirectory(subDirectory);
 
-         var fileName = Path.Combine(subDirectory, "{" + guid + "}.eml");
+         var fileName = Path.Join(subDirectory, "{" + guid + "}.eml");
 
          File.WriteAllBytes(fileName, messageBytes);
 
          try
          {
-            if (utilities.ImportMessageFromFileToIMAPFolder(fileName, ucMboxAccount.SelectedAccountID, folderName))
+            if (utilities.ImportMessageFromFileToIMAPFolder(fileName, accountPage_.SelectedAccountID, folderName))
                return true;
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             AddToLog("A message failed to import: " + ex.Message);
          }
@@ -144,22 +148,23 @@ namespace ImportTool.MboxImport
          {
             File.Delete(fileName);
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
+            // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
          }
 
          return false;
       }
 
-      private static string GetAccountDirectory(hMailServer.Application application)
+      private static string GetAccountDirectory(hMailServer.Application application, string selectedAccount)
       {
          var dataDirectory = application.Settings.Directories.DataDirectory;
 
-         var parts = ucMboxAccount.SelectedAccount.Split('@');
+         var parts = selectedAccount.Split('@');
          if (parts.Length != 2)
-            throw new InvalidOperationException("Unexpected account address: " + ucMboxAccount.SelectedAccount);
+            throw new InvalidOperationException("Unexpected account address: " + selectedAccount);
 
-         return Path.Combine(dataDirectory, parts[1], parts[0]);
+         return Path.Join(dataDirectory, parts[1], parts[0]);
       }
 
       private void AddToLog(string message)

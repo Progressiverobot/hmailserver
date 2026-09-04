@@ -443,14 +443,7 @@ namespace hMailServer.ControlPanel.Services
 
       private static int Min(params int[] scores)
       {
-         int best = SearchTerms.NoMatch;
-         foreach (int score in scores)
-         {
-            if (score < best)
-               best = score;
-         }
-
-         return best;
+         return scores.Aggregate(SearchTerms.NoMatch, Math.Min);
       }
    }
 }

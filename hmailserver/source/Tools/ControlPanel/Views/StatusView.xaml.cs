@@ -71,7 +71,7 @@ namespace hMailServer.ControlPanel.Views
                app.Start();
             }
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             // The likeliest failure is rights: pausing requires an administrator-level
             // COM session. Said outright rather than as a raw HRESULT.
@@ -140,7 +140,7 @@ namespace hMailServer.ControlPanel.Views
             SetValue_(VersionValue, "Version",
                (string)app.Version + " (" + (string)app.VersionArchitecture + ")");
          }
-         catch (Exception) { SetValue_(VersionValue, "Version", "-"); }
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { SetValue_(VersionValue, "Version", "-"); }
 
          try
          {
@@ -148,7 +148,7 @@ namespace hMailServer.ControlPanel.Views
             SetValue_(StateValue, "State", ServerStateName(state));
             UpdatePauseButton_(state);
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             SetValue_(StateValue, "State", "-");
             PauseButton.IsEnabled = false;
@@ -165,7 +165,7 @@ namespace hMailServer.ControlPanel.Views
             SetValue_(DbVersionValue, "Database schema version", ((int)db.CurrentVersion).ToString());
             ServerSession.Release(db);
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             SetValue_(DbTypeValue, "Database type", "-");
             SetValue_(DbHostValue, "Database host", "-");
@@ -186,7 +186,7 @@ namespace hMailServer.ControlPanel.Views
             SetValue_(StartedValue, "Started", string.IsNullOrEmpty(snap.StartTime) ? "-" : snap.StartTime);
             SetValue_(UptimeValue, "Uptime", FormatUptime(snap.StartTime));
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             SetValue_(ProcessedValue, "Processed messages", "-");
             SetValue_(SpamValue, "Spam removed", "-");
@@ -269,7 +269,7 @@ namespace hMailServer.ControlPanel.Views
                ServerSession.Release(settings);
             }
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             AddWarning("Info", "Could not evaluate all warnings: " + ex.Message);
             return;

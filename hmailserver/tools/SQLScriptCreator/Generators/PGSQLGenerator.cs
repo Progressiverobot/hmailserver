@@ -64,7 +64,7 @@ namespace SQLScriptCreator.Generators
             statement.Unique ? "UNIQUE" : "",
             statement.Name,
             statement.Table,
-            columnList.ToString());
+            columnList);
 
          return new List<string>() { sb.ToString() };
       }
@@ -83,7 +83,7 @@ namespace SQLScriptCreator.Generators
       public List<string> GenerateRawSQLStatement(RawSQL statement)
       {
          if (statement.Engines.Count > 0 &&
-            statement.Engines.Contains("PGSQL") == false)
+            !statement.Engines.Contains("PGSQL"))
             return new List<string>() { };
 
          return new List<string>() { statement.Statement };

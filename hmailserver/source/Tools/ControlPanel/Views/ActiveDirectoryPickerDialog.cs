@@ -233,7 +233,7 @@ namespace hMailServer.ControlPanel.Views
             domainBox_.SelectedIndex = 0;
             status_.Text = "Enter part of a name and press Search, or search with an empty box to list all users.";
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             status_.Text = "Could not list domains — " + ServerSession.DescribeComError(ex);
          }
@@ -262,7 +262,7 @@ namespace hMailServer.ControlPanel.Views
                ? "No matching accounts in " + domain + "."
                : users.Count + " account(s) found" + (users.Count >= 1000 ? " (showing first 1000 — refine your search)" : "") + ".";
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             status_.Text = "Search failed — " + ServerSession.DescribeComError(ex);
          }

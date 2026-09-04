@@ -22,7 +22,7 @@ namespace VMTestRunner.Console
       {
          NLog.Targets.Target.Register<StatusLineConsoleTarget>("StatusLineConsole");
          NLog.LogManager.Configuration = new NLog.Config.XmlLoggingConfiguration(
-            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "NLog.config"));
+            Paths.Combine(AppDomain.CurrentDomain.BaseDirectory, "NLog.config"));
 
          return Parser.Default.ParseArguments<Options>(args)
             .MapResult(
@@ -77,7 +77,7 @@ namespace VMTestRunner.Console
                   successEvent.Properties["success"] = true;
                   Logger.Log(successEvent);
                }
-               catch (Exception ex)
+               catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
                {
                   Logger.Error($"Test {localIndex} failed.");
                   var exLines = ex.ToString().Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);

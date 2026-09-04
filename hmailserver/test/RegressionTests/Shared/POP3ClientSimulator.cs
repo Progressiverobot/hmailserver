@@ -130,15 +130,10 @@ namespace RegressionTests.Shared
                throw new Exception(string.Format("Message with index {0} does not exist.", index));
             }
 
-            var data = _tcpConnection.Receive();
+            result.Append(_tcpConnection.Receive());
 
-            eofCheck += data;
-
-            if (eofCheck.Length > 25)
-               // Only save the end of the string.
-               eofCheck = eofCheck.Substring(eofCheck.Length - 25);
-
-            result.Append(data);
+            // Only the end of the string can hold the terminator.
+            eofCheck = result.Length > 25 ? result.ToString(result.Length - 25, 25) : result.ToString();
          }
 
          return result.ToString();
@@ -146,22 +141,9 @@ namespace RegressionTests.Shared
 
       public string LIST()
       {
-         var sRetVal = "";
-
          _tcpConnection.Send("LIST\r\n");
 
-         while (sRetVal.IndexOf("\r\n.\r\n") < 0)
-         {
-            if (sRetVal.IndexOf("-ERR No such message") >= 0)
-            {
-               _tcpConnection.Disconnect();
-               return "";
-            }
-
-            sRetVal += _tcpConnection.Receive();
-         }
-
-         return sRetVal;
+         return ReceiveMultiLine(string.Empty, disconnectOnMissingMessage: true);
       }
 
 
@@ -186,22 +168,9 @@ namespace RegressionTests.Shared
 
       public string UIDL()
       {
-         var sRetVal = "";
-
          _tcpConnection.Send("UIDL\r\n");
 
-         while (sRetVal.IndexOf("\r\n.\r\n") < 0)
-         {
-            if (sRetVal.IndexOf("-ERR No such message") >= 0)
-            {
-               _tcpConnection.Disconnect();
-               return "";
-            }
-
-            sRetVal += _tcpConnection.Receive();
-         }
-
-         return sRetVal;
+         return ReceiveMultiLine(string.Empty, disconnectOnMissingMessage: true);
       }
 
       public string UIDL(int index)
@@ -245,15 +214,35 @@ namespace RegressionTests.Shared
          else
             _tcpConnection.Send("TOP " + index + "\r\n");
 
-         var sRetVal = _tcpConnection.Receive();
-         while (sRetVal.IndexOf("\r\n.\r\n") < 0)
-         {
-            if (sRetVal.IndexOf("-ERR No such message") >= 0) return sRetVal;
+         return ReceiveMultiLine(_tcpConnection.Receive(), disconnectOnMissingMessage: false);
+      }
 
-            sRetVal += _tcpConnection.Receive();
+      /// <summary>
+      ///    Reads a multi-line response up to its terminating line. A "-ERR No such
+      ///    message" reply ends the read early: LIST and UIDL then drop the connection
+      ///    and answer nothing, TOP answers the error reply itself.
+      /// </summary>
+      private string ReceiveMultiLine(string alreadyReceived, bool disconnectOnMissingMessage)
+      {
+         var received = new StringBuilder(alreadyReceived);
+         var response = alreadyReceived;
+
+         while (response.IndexOf("\r\n.\r\n") < 0)
+         {
+            if (response.IndexOf("-ERR No such message") >= 0)
+            {
+               if (!disconnectOnMissingMessage)
+                  return response;
+
+               _tcpConnection.Disconnect();
+               return "";
+            }
+
+            received.Append(_tcpConnection.Receive());
+            response = received.ToString();
          }
 
-         return sRetVal;
+         return response;
       }
 
 

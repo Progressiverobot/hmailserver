@@ -37,7 +37,7 @@ namespace ConfigureInstallation
          }
 
          // Write C++ version header file.
-         string cppVersionFile = Path.Combine(rootDir, @"hmailserver\source\Server\Common\Application\Version.h");
+         string cppVersionFile = Paths.Combine(rootDir, @"hmailserver\source\Server\Common\Application\Version.h");
          if (!File.Exists(cppVersionFile))
          {
             Console.WriteLine("Version file {0} was not found.", cppVersionFile);
@@ -54,14 +54,14 @@ namespace ConfigureInstallation
          File.WriteAllText(cppVersionFile, versionContent);
 
          // Write C++ version header file.
-         string phpVersionFile = Path.Combine(rootDir, @"hmailserver\source\WebAdmin\include_versioncheck.php");
+         string phpVersionFile = Paths.Combine(rootDir, @"hmailserver\source\WebAdmin\include_versioncheck.php");
 
          Console.WriteLine("Writing php version info to {0}", phpVersionFile);
          var phpVersionContent = string.Format("<?php\r\ndefine('REQUIRED_VERSION', '{0}-B{1}');\r\n?>", version, build);
          File.WriteAllText(phpVersionFile, phpVersionContent);
 
          // Write installation program verison
-         if (!ConfigureInstallationFile(Path.Combine(rootDir, @"hmailserver\Installation\section_setup_64.iss"), version, build, true))
+         if (!ConfigureInstallationFile(Paths.Combine(rootDir, @"hmailserver\Installation\section_setup_64.iss"), version, build, true))
             return -1;
 
          Console.WriteLine("All done. Exiting.");

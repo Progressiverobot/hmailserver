@@ -6,9 +6,9 @@ using System;
 using System.Globalization;
 using System.IO;
 using System.Net.Sockets;
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
+using System.Linq;
 using NUnit.Framework;
 using RegressionTests.Shared;
 
@@ -42,26 +42,20 @@ namespace RegressionTests.Security
       private const string PolicyUrl =
          "https://github.com/Progressiverobot/hmailserver/blob/master/.github/SECURITY.md";
 
-      [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-      private static extern bool WritePrivateProfileString(string section, string key, string value, string filePath);
-
       private void WriteSetting(string key, string value)
       {
          string programDirectory = _application.Settings.Directories.ProgramDirectory;
          string[] candidates =
          {
-            Path.Combine(programDirectory, "hMailServer.ini"),
-            Path.Combine(programDirectory, "Bin", "hMailServer.ini"),
+            Paths.Combine(programDirectory, "hMailServer.ini"),
+            Paths.Combine(programDirectory, "Bin", "hMailServer.ini"),
          };
 
          bool wroteAny = false;
-         foreach (string iniPath in candidates)
+         foreach (string iniPath in candidates.Where(File.Exists))
          {
-            if (!File.Exists(iniPath))
-               continue;
-
             Assert.IsTrue(
-               WritePrivateProfileString("Settings", key, value, iniPath),
+               IniFile.WritePrivateProfileString("Settings", key, value, iniPath),
                "Failed to write " + key + " to " + iniPath + ".");
             wroteAny = true;
          }
@@ -127,14 +121,11 @@ namespace RegressionTests.Security
 
       private static string FieldValue(string body, string field)
       {
-         foreach (string raw in body.Split('\n'))
-         {
-            string line = raw.Trim();
-            if (line.StartsWith(field + ":", StringComparison.OrdinalIgnoreCase))
-               return line.Substring(field.Length + 1).Trim();
-         }
-
-         return null;
+         return body.Split('\n')
+            .Select(raw => raw.Trim())
+            .Where(line => line.StartsWith(field + ":", StringComparison.OrdinalIgnoreCase))
+            .Select(line => line.Substring(field.Length + 1).Trim())
+            .FirstOrDefault();
       }
 
       [SetUp]
