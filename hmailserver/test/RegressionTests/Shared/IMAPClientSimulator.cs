@@ -615,6 +615,18 @@ namespace RegressionTests.Shared
          return _tcpConnection.ReadUntil(characters);
       }
 
+      /// <summary>
+      ///    Reads until any one of the given strings has arrived. Use this rather
+      ///    than ReceiveUntil when the server may legitimately answer with EITHER
+      ///    a continuation or a tagged refusal: waiting for the continuation alone
+      ///    against a server that refused the command blocks in the socket read
+      ///    forever, which turns a failing test into a hung run.
+      /// </summary>
+      public string ReceiveUntilAny(params string[] candidates)
+      {
+         return _tcpConnection.ReadUntil(new List<string>(candidates));
+      }
+
       private void AssertFolderExists(string folderName)
       {
          // wait for the folder to appear.
