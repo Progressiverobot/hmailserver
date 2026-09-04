@@ -19,13 +19,39 @@ namespace HM
 	   virtual ~PersistentIMAPFolder();
    public:
 
+      // Deletes one folder, its subfolders and everything in them. Unless
+      // forceDelete is set the inbox is emptied and kept rather than deleted: it is
+      // the one folder an account cannot be without. This is the path IMAP DELETE
+      // and IMAPFolder.Delete take, so a folder that carries a special-use
+      // designation IS deleted here - a client that asks for its \Trash to go gets
+      // what it asked for. Keeping designated folders is what DeleteByAccount does.
       static bool DeleteObject(std::shared_ptr<IMAPFolder> pFolder);
       static bool DeleteObject(std::shared_ptr<IMAPFolder> pFolder, bool forceDelete);
       static bool SaveObject(std::shared_ptr<IMAPFolder> pFolder, String &errorMessage, PersistenceMode mode);
       static bool SaveObject(std::shared_ptr<IMAPFolder> pFolder);
+
+      // Empties an account. Every message goes; so does every folder except the inbox
+      // and the folders with a special-use designation, which are emptied and kept -
+      // the client that created (or was given) its Sent and Trash expects them to
+      // outlive Account.DeleteMessages, the way the inbox always has. A parent that
+      // has a kept folder beneath it is kept too, emptied, so that the kept folder is
+      // never left pointing at a parent row that no longer exists.
       static bool DeleteByAccount(__int64 iAccountID);
 
+      // The same with forceDelete set: nothing is kept. Used when the account itself
+      // is being deleted.
+      static bool DeleteByAccount(__int64 iAccountID, bool forceDelete);
+
       static bool GetExistsFolderContainingCharacter(String theChar);
+
+   private:
+
+      // The one implementation behind the three public entry points. keepSpecialUse
+      // is only ever set by DeleteByAccount; kept reports whether this folder's row
+      // survived, which a parent needs to know to decide about its own.
+      static bool DeleteObject_(std::shared_ptr<IMAPFolder> pFolder, bool forceDelete, bool keepSpecialUse, bool &kept);
+
+   public:
 
       static unsigned int GetUniqueMessageID(__int64 accountID, __int64 folderID);
 

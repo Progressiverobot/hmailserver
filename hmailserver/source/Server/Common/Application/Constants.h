@@ -147,6 +147,11 @@
 
 #define PROPERTY_IPV6_PREFERRED  _T("IPv6Preferred")
 
+// Create Drafts, Sent, Trash and Junk, each designated for RFC 6154, when an
+// account is created. Off by default: an account created while it is off gets
+// an inbox only, exactly as before. Upstream #550.
+#define PROPERTY_CREATE_DEFAULT_SPECIAL_USE_FOLDERS  _T("CreateDefaultSpecialUseFolders")
+
 #define PROPERTY_TLSOPTIONS                     _T("TlsOptions")
 
 // 6006 adds hm_imapfolders.folderspecialuse (RFC 6154 SPECIAL-USE).
@@ -165,4 +170,4 @@
 //      administrator names the sealers to trust. The rows exist rather than being
 //      absent-with-a-default because PropertySet reports error 5015 on every read of
 //      a missing property, which would fill the error log on ARC-bearing mail.
-#define REQUIRED_DB_VERSION            6025
+#define REQUIRED_DB_VERSION            6026

@@ -101,7 +101,7 @@ Technology
 | MySQL/MariaDB client | MariaDB Connector/C, shipped as `libmysql.dll` with auth plugins — works with MySQL 8 `caching_sha2_password` and MariaDB `ed25519`/`gssapi` out of the box |
 | Administration GUI and tools | C# / .NET 10 (WPF, Fluent design) |
 | Extensibility | COM/IDispatch API, plus a REST administration API |
-| Schema | Database version 6025, upgradeable from every earlier hMailServer release |
+| Schema | Database version 6026, upgradeable from every earlier hMailServer release |
 
 **Quality gates.** Every release ships SPDX and CycloneDX SBOMs (Syft). The repository runs CodeQL analysis, Dependabot CVE alerts with grouped update pull requests, a dependency-review gate on pull requests, an installer smoke test that installs the built installer on a clean machine and verifies the service comes up, and a monthly comparison against the original upstream repository so nothing landing there is missed.
 

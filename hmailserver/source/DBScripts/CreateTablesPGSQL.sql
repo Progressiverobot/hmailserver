@@ -875,6 +875,8 @@ insert into hm_settings (settingname, settingstring, settinginteger) values ('as
 
 insert into hm_settings (settingname, settingstring, settinginteger) values ('IPv6Preferred', '', 0);
 
+insert into hm_settings (settingname, settingstring, settinginteger) values ('CreateDefaultSpecialUseFolders', '', 0);
+
 insert into hm_settings (settingname, settingstring, settinginteger) values ('TlsOptions', '', 0);
 
 insert into hm_tcpipports (portprotocol, portnumber, portaddress1, portaddress2, portconnectionsecurity, portsslcertificateid) values (1, 25, 0, NULL, 0, 0);
@@ -959,4 +961,4 @@ create table hm_messageindexstate
 
 CREATE INDEX idx_hm_messageindexstate ON hm_messageindexstate (misaccountid);
 
-insert into hm_dbversion values (6025);
+insert into hm_dbversion values (6026);

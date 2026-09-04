@@ -1128,6 +1128,7 @@ namespace hMailServer.ControlPanel.Views
          imap.Settings.Add(new ComBool { Path = "IMAPQuotaEnabled", Label = "QUOTA" });
          imap.Settings.Add(new ComBool { Path = "IMAPSortEnabled", Label = "SORT" });
          imap.Settings.Add(new ComBool { Path = "IMAPACLEnabled", Label = "ACL (shared folder permissions)" });
+         imap.Settings.Add(new ComBool { Path = "CreateDefaultSpecialUseFoldersEnabled", Label = "Create Drafts, Sent, Trash and Junk for new accounts" });
          imap.Settings.Add(new ComBool { Path = "IMAPSASLPlainEnabled", Label = "Allow SASL PLAIN authentication" });
          imap.Settings.Add(new ComBool { Path = "IMAPSASLInitialResponseEnabled", Label = "Allow SASL initial client response" });
          imap.Settings.Add(new ComText { Path = "IMAPPublicFolderName", Label = "Public folder name" });

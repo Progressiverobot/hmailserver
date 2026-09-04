@@ -72,6 +72,13 @@ namespace HM
 
       static bool ReadObject(std::shared_ptr<Account> pAccount,const SQLCommand &command);
 
+      // Creates Drafts, Sent, Trash and Junk for a new account, each with its RFC 6154
+      // designation stored on the row. Only called when the setting is on. A folder
+      // that cannot be created is reported and skipped; the account is not rolled
+      // back for it, because an account with an inbox is usable and one that was
+      // deleted again is not.
+      static void CreateDefaultSpecialUseFolders_(const Account &account);
+
       static void MarkPasswordUpgradePending_(__int64 accountID);
       static void ClearPasswordUpgradePending_(__int64 accountID);
 

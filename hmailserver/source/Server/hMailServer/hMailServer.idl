@@ -786,6 +786,16 @@ interface IInterfaceSettings : IDispatch{
    [id(114), helpstring("Creates and updates accounts to match the LDAP directory. This call never deletes an account or its mail; the most it does is mark one inactive.")]
       HRESULT ApplyDirectorySync([in] BSTR DomainName, [in] VARIANT_BOOL DisableMissing, [out] BSTR *ResultText, [out, retval] VARIANT_BOOL *pResult);
 
+   // Off by default. An account created while this is off gets an inbox only, as it
+   // always has; a client then creates Drafts, Sent, Trash and Junk itself under
+   // whatever names it prefers. With it on, the four are created at account creation
+   // and designated for RFC 6154 (\Drafts \Sent \Trash \Junk), which is what
+   // Thunderbird and Apple Mail look for on first connect. The designated folders
+   // survive Account.DeleteMessages - they are emptied, like the inbox - and go with
+   // the account when it is deleted.
+   [propget, id(115), helpstring("Create Drafts, Sent, Trash and Junk, designated for RFC 6154 SPECIAL-USE, when an account is created. Off by default.")] HRESULT CreateDefaultSpecialUseFoldersEnabled([out, retval] VARIANT_BOOL *pVal);
+   [propput, id(115), helpstring("Create Drafts, Sent, Trash and Junk, designated for RFC 6154 SPECIAL-USE, when an account is created. Off by default.")] HRESULT CreateDefaultSpecialUseFoldersEnabled([in] VARIANT_BOOL newVal);
+
 };
 
 
