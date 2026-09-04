@@ -12,12 +12,15 @@ name: DCO
 #     to add one would assert something nobody said at the time.
 #   * Bots are exempt (Dependabot cannot sign off, and its commits are
 #     dependency bumps with no authorship to certify).
-#   * The repository owner is exempt too. Their commits are the project's own,
-#     and the release flow lands them through pull requests they open and merge
-#     themselves - a red check there would mean either signing off on every
-#     release commit as a formality or bypassing the check, and a check that
-#     is routinely bypassed teaches everyone to ignore it. The DCO is about
-#     recording OUTSIDE contributors' agreement, and that is where it applies.
+#   * Owners and members of the organisation are exempt too. Their commits
+#     are the project's own, and the release flow lands them through pull
+#     requests they open and merge themselves - a red check there would mean
+#     either signing off on every release commit as a formality or bypassing
+#     the check, and a check that is routinely bypassed teaches everyone to
+#     ignore it. The DCO is about recording OUTSIDE contributors' agreement,
+#     and that is where it applies. The test is the pull request's
+#     author_association (OWNER / MEMBER), not a login: github.repository_owner
+#     is the organisation's name, which no person's login equals.
 #
 # No third-party action: the check is thirty lines of shell over `git log`,
 # which is easier to audit than a pinned SHA and has nothing to update.
@@ -35,7 +38,8 @@ jobs:
     runs-on: ubuntu-latest
     if: >-
       github.event.pull_request.user.login != 'dependabot[bot]' &&
-      github.event.pull_request.user.login != github.repository_owner
+      github.event.pull_request.author_association != 'OWNER' &&
+      github.event.pull_request.author_association != 'MEMBER'
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
