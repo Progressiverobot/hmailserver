@@ -89,9 +89,11 @@ def run(case):
     send(b"QUIT\r\n")
     try:
         recv()
-    except Exception as quit_error:
+    except OSError as quit_error:
         # The server may close the socket without answering QUIT; that is not
         # part of what this case measures, so it is noted rather than fatal.
+        # Only socket failures are expected here (socket.timeout and
+        # socket.error are OSError); anything else is a bug and propagates.
         print(f"CASE {case}: no reply to QUIT ({quit_error})")
     s.close()
 
