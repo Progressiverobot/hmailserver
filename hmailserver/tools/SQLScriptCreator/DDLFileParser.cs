@@ -14,7 +14,7 @@ namespace SQLScriptCreator
 {
    class DDLFileParser
    {
-      private string _inputFile;
+      private readonly string _inputFile;
 
       public DDLFileParser(string inputFile)
       {

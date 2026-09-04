@@ -39,7 +39,7 @@ namespace hMailServer.ControlPanel.Services
          {
             Service.Show(title, message, appearance, null, TimeSpan.FromSeconds(3));
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             // Never let a UI confirmation crash a successful save.
          }

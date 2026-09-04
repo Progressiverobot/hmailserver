@@ -12,9 +12,11 @@ namespace ImportTool.MboxImport
       {
          InitializeComponent();
 
+         var accountPage = new ucMboxAccount();
+
          wizard.AddPage(new ucMboxSelect());
-         wizard.AddPage(new ucMboxAccount());
-         wizard.AddPage(new ucMboxProgress());
+         wizard.AddPage(accountPage);
+         wizard.AddPage(new ucMboxProgress(accountPage));
       }
 
       private void wizard_OnCancel(object sender, EventArgs e)

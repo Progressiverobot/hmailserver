@@ -14,7 +14,7 @@ namespace VMTestRunner.Console
 
       public static void AddAll(List<TestEnvironment> listEnvironments)
       {
-         string jsonPath = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "TestEnvironments.json");
+         string jsonPath = Paths.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "TestEnvironments.json");
          string json = File.ReadAllText(jsonPath);
 
          var items = JsonConvert.DeserializeObject<List<EnvironmentDto>>(json);
@@ -49,10 +49,10 @@ namespace VMTestRunner.Console
       private static string GetMySQLLib()
       {
          string currentDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-         var librariesDir = Path.Combine(currentDir, @"..\..\..\..\..\..\libraries");
-         var libMySqlDir = Path.Combine(librariesDir, "mariadb-connector-c-3.4.9");
+         var librariesDir = Paths.Combine(currentDir, @"..\..\..\..\..\..\libraries");
+         var libMySqlDir = Paths.Combine(librariesDir, "mariadb-connector-c-3.4.9");
 
-         string name = Path.Combine(libMySqlDir, "libmySQL.dll");
+         string name = Paths.Combine(libMySqlDir, "libmySQL.dll");
 
          if (!File.Exists(name))
          {

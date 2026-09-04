@@ -81,7 +81,7 @@ namespace hMailServer.ControlPanel.Services
                break;
             }
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             info.Error = ex.Message;
          }

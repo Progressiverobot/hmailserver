@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System;
-using System.Runtime.InteropServices;
+using System.Management;
 using hMailServer;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
@@ -248,25 +248,22 @@ namespace RegressionTests.Security
          }
       }
 
-      // NetGetJoinInformation, asked the same way the server asks it, so the test agrees
-      // with the code under test rather than guessing from an environment variable.
-      private const int NetSetupDomainName = 3;
-
-      [DllImport("netapi32.dll", CharSet = CharSet.Unicode)]
-      private static extern int NetGetJoinInformation(string server, out IntPtr name, out int status);
-
-      [DllImport("netapi32.dll")]
-      private static extern int NetApiBufferFree(IntPtr buffer);
-
+      // Win32_ComputerSystem.PartOfDomain is the join state itself - the same fact the
+      // server reads through NetGetJoinInformation - so the test agrees with the code
+      // under test rather than guessing from an environment variable.
       private static bool IsThisComputerDomainJoined()
       {
-         if (NetGetJoinInformation(null, out IntPtr name, out int status) != 0)
-            return false;
+         using (var searcher = new ManagementObjectSearcher("SELECT PartOfDomain FROM Win32_ComputerSystem"))
+         using (ManagementObjectCollection systems = searcher.Get())
+         {
+            foreach (ManagementBaseObject system in systems)
+            {
+               using (system)
+                  return system["PartOfDomain"] is bool joined && joined;
+            }
+         }
 
-         if (name != IntPtr.Zero)
-            NetApiBufferFree(name);
-
-         return status == NetSetupDomainName;
+         return false;
       }
 
       private static int CountOccurrences(string text, string value)

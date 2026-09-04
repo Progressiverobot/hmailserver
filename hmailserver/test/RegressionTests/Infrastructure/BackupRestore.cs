@@ -23,14 +23,14 @@ namespace RegressionTests.Infrastructure
       }
 
       private string _backupDir;
-      private static string _folderCreationTime;
+      private string _folderCreationTime;
       private bool _backupMessages = true;
       private readonly int _fetchAccountPort = TestSetup.GetNextFreePort();
 
       public void InitializeBackupSettings()
       {
          _application = SingletonProvider<TestSetup>.Instance.GetApp();
-         SetBackupDir(Path.Combine(Path.GetTempPath(), TestSetup.UniqueString()));
+         SetBackupDir(Paths.Combine(Path.GetTempPath(), TestSetup.UniqueString()));
 
          var dirInfo = new DirectoryInfo(_backupDir);
          dirInfo.Create();
@@ -78,7 +78,7 @@ namespace RegressionTests.Infrastructure
 
                if (contents.IndexOf("BACKUP ERROR:") > 0) return false;
             }
-            catch (Exception)
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
             {
                // probably a share access violation.
             }
@@ -102,7 +102,7 @@ namespace RegressionTests.Infrastructure
                if (startTime.Length > 0 && startTime != lastServerStartTime)
                   return;
             }
-            catch (Exception)
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
             {
                // probably a share access violation.
             }

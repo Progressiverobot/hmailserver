@@ -6,6 +6,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using System.Text;
 using NUnit.Framework;
 using RegressionTests.Infrastructure;
 
@@ -394,20 +395,22 @@ namespace RegressionTests.Shared
 
       public bool EndIdle(bool force, out string output)
       {
-         output = string.Empty;
+         var received = new StringBuilder();
 
-         if (force == false) output = _tcpConnection.Receive();
+         if (!force) received.Append(_tcpConnection.Receive());
 
          _tcpConnection.Send("DONE\r\n");
 
          for (var i = 0; i < 10; i++)
          {
-            output += _tcpConnection.Receive();
+            received.Append(_tcpConnection.Receive());
 
+            output = received.ToString();
             if (output.Contains("OK IDLE terminated"))
                return true;
          }
 
+         output = received.ToString();
          return false;
       }
 
@@ -578,6 +581,7 @@ namespace RegressionTests.Shared
          var commandName = command.Substring(0, command.IndexOf(" "));
 
          var result = Send(command);
+         var received = new StringBuilder(result);
 
          var expectingLiteral = result.StartsWith("+ Ready");
 
@@ -590,9 +594,10 @@ namespace RegressionTests.Shared
                 GetPendingDataExists())
          {
             if (expectingLiteral)
-               result = Send(literalData);
+               received.Clear().Append(Send(literalData));
             else
-               result += Receive();
+               received.Append(Receive());
+            result = received.ToString();
 
             if (!_tcpConnection.IsConnected)
                return result;

@@ -3,6 +3,7 @@
 
 using System;
 using System.Threading;
+using System.Linq;
 using hMailServer;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
@@ -44,26 +45,14 @@ namespace RegressionTests.IMAP
       /// </summary>
       private static string ListLineFor(string response, string folderName)
       {
-         foreach (var line in response.Split(new[] {"\r\n"}, StringSplitOptions.RemoveEmptyEntries))
-         {
-            if (line.StartsWith("* LIST ") && line.EndsWith("\"" + folderName + "\""))
-               return line;
-         }
-
-         return null;
+         return response.Split(new[] {"\r\n"}, StringSplitOptions.RemoveEmptyEntries)
+            .FirstOrDefault(line => line.StartsWith("* LIST ") && line.EndsWith("\"" + folderName + "\""));
       }
 
       private static int CountListLinesFor(string response, string folderName)
       {
-         var count = 0;
-
-         foreach (var line in response.Split(new[] {"\r\n"}, StringSplitOptions.RemoveEmptyEntries))
-         {
-            if (line.StartsWith("* LIST ") && line.EndsWith("\"" + folderName + "\""))
-               count++;
-         }
-
-         return count;
+         return response.Split(new[] {"\r\n"}, StringSplitOptions.RemoveEmptyEntries)
+            .Count(line => line.StartsWith("* LIST ") && line.EndsWith("\"" + folderName + "\""));
       }
 
       private static string RequireListLine(string response, string folderName)

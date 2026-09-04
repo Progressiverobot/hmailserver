@@ -11,8 +11,8 @@ namespace ImportTool.TextImport
 {
    public partial class ucTextSelect : UserControl, IWizardPage
    {
-      internal static string SelectedFile;
-      internal static string SelectedDomain;
+      internal string SelectedFile { get; private set; }
+      internal string SelectedDomain { get; private set; }
 
       public ucTextSelect()
       {

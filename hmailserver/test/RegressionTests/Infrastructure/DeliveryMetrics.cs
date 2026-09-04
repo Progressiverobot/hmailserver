@@ -5,8 +5,8 @@
 using System;
 using System.IO;
 using System.Net.Sockets;
-using System.Runtime.InteropServices;
 using System.Text;
+using System.Linq;
 using NUnit.Framework;
 using RegressionTests.Shared;
 
@@ -22,26 +22,20 @@ namespace RegressionTests.Infrastructure
    {
       private const int MetricsPort = 9099;
 
-      [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-      private static extern bool WritePrivateProfileString(string section, string key, string value, string filePath);
-
       private void WriteSetting(string key, string value)
       {
          string programDirectory = _application.Settings.Directories.ProgramDirectory;
          string[] candidates =
          {
-            Path.Combine(programDirectory, "hMailServer.ini"),
-            Path.Combine(programDirectory, "Bin", "hMailServer.ini"),
+            Paths.Combine(programDirectory, "hMailServer.ini"),
+            Paths.Combine(programDirectory, "Bin", "hMailServer.ini"),
          };
 
          bool wroteAny = false;
-         foreach (string iniPath in candidates)
+         foreach (string iniPath in candidates.Where(File.Exists))
          {
-            if (!File.Exists(iniPath))
-               continue;
-
             Assert.IsTrue(
-               WritePrivateProfileString("Settings", key, value, iniPath),
+               IniFile.WritePrivateProfileString("Settings", key, value, iniPath),
                "Failed to write " + key + " to " + iniPath + ".");
             wroteAny = true;
          }
@@ -52,19 +46,12 @@ namespace RegressionTests.Infrastructure
       // Parses a Prometheus counter value from a /metrics body. Returns -1 if absent.
       private static int ParseCounter(string body, string name)
       {
-         foreach (string raw in body.Split('\n'))
-         {
-            string line = raw.Trim();
-            if (line.StartsWith(name + " "))
-            {
-               string[] parts = line.Split(' ');
-               int value;
-               if (parts.Length >= 2 && int.TryParse(parts[parts.Length - 1], out value))
-                  return value;
-            }
-         }
-
-         return -1;
+         // The sample's value is the last token of the first line for the name that parses.
+         return body.Split('\n')
+            .Select(raw => raw.Trim())
+            .Where(line => line.StartsWith(name + " "))
+            .Select(line => int.TryParse(line.Substring(line.LastIndexOf(' ') + 1), out int value) ? value : (int?)null)
+            .FirstOrDefault(value => value.HasValue) ?? -1;
       }
 
       private static string ScrapeMetrics()

@@ -33,7 +33,7 @@ namespace RegressionTests.Infrastructure
       [SetUp]
       public new void SetUp()
       {
-         archiveRoot_ = Path.Combine(Path.GetTempPath(), "hmail-archive-retention-" + Guid.NewGuid().ToString("N"));
+         archiveRoot_ = Paths.Combine(Path.GetTempPath(), "hmail-archive-retention-" + Guid.NewGuid().ToString("N"));
          Directory.CreateDirectory(archiveRoot_);
       }
 
@@ -48,7 +48,7 @@ namespace RegressionTests.Infrastructure
             if (archiveRoot_ != null && Directory.Exists(archiveRoot_))
                Directory.Delete(archiveRoot_, true);
          }
-         catch
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             // A leftover temp directory is not worth failing a test over.
          }
@@ -56,7 +56,7 @@ namespace RegressionTests.Infrastructure
 
       private string Plant(string relativePath, int daysOld)
       {
-         string full = Path.Combine(archiveRoot_, relativePath);
+         string full = Paths.Combine(archiveRoot_, relativePath);
          Directory.CreateDirectory(Path.GetDirectoryName(full));
          File.WriteAllText(full, "From: someone@example.test\r\n\r\nArchived.\r\n");
          File.SetLastWriteTimeUtc(full, DateTime.UtcNow.AddDays(-daysOld));

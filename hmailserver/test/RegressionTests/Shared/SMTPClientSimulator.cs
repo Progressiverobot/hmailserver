@@ -124,7 +124,7 @@ namespace RegressionTests.Shared
          _tcpConnection.Send("MAIL FROM:<" + sFrom + ">\r\n");
          sData = _tcpConnection.Receive();
 
-         var sCommaSeparatedRecipients = "";
+         var acceptedRecipients = new List<string>();
          foreach (var sRecipient in lstRecipients)
          {
             _tcpConnection.Send("RCPT TO:<" + sRecipient + ">\r\n");
@@ -133,11 +133,10 @@ namespace RegressionTests.Shared
             if (!sData.StartsWith("250"))
                throw new DeliveryFailedException("Unexpected response from server: " + sData);
 
-            if (sCommaSeparatedRecipients.Length > 0)
-               sCommaSeparatedRecipients += ", ";
-
-            sCommaSeparatedRecipients += sRecipient;
+            acceptedRecipients.Add(sRecipient);
          }
+
+         var sCommaSeparatedRecipients = string.Join(", ", acceptedRecipients);
 
          // Select inbox
          _tcpConnection.Send("DATA\r\n");
@@ -217,9 +216,8 @@ namespace RegressionTests.Shared
             SendAndReceive("EHLO example.com\r\n");
          }
 
-         if (!string.IsNullOrEmpty(username))
-            if (!Logon(EncodeBase64(username), EncodeBase64(password), out errorMessage))
-               throw new DeliveryFailedException("Login failed: " + errorMessage);
+         if (!string.IsNullOrEmpty(username) && !Logon(EncodeBase64(username), EncodeBase64(password), out errorMessage))
+            throw new DeliveryFailedException("Login failed: " + errorMessage);
 
          _tcpConnection.Send("HELO example.com\r\n");
          var helloResponse = _tcpConnection.Receive();
@@ -302,7 +300,7 @@ namespace RegressionTests.Shared
 
          _tcpConnection.Send("RCPT TO:<" + sTo + ">\r\n");
          sData = _tcpConnection.Receive();
-         if (sData.StartsWith("2") == false)
+         if (!sData.StartsWith("2"))
             throw new DeliveryFailedException("Unexpected response from server: " + sData);
 
          // Send the message.

@@ -182,8 +182,8 @@ namespace RegressionTests.API
 
          SSLCertificate certificate = _settings.SSLCertificates.Add();
          certificate.Name = "SrvRecordsTest";
-         certificate.CertificateFile = Path.Combine(sslPath, "example.crt");
-         certificate.PrivateKeyFile = Path.Combine(sslPath, "example.key");
+         certificate.CertificateFile = Paths.Combine(sslPath, "example.crt");
+         certificate.PrivateKeyFile = Paths.Combine(sslPath, "example.key");
          certificate.Save();
 
          try

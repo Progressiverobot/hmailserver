@@ -141,7 +141,7 @@ namespace hMailServer.ControlPanel.Views
                ServerSession.Release(passwords);
             }
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             status_.Text = ServerSession.DescribeComError(ex);
          }
@@ -337,7 +337,7 @@ namespace hMailServer.ControlPanel.Views
             Reload();
             status_.Text = "Created \"" + name + "\". Enter it in the client as that account's password.";
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             status_.Text = ServerSession.DescribeComError(ex);
          }
@@ -380,7 +380,7 @@ namespace hMailServer.ControlPanel.Views
 
             Reload();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             status_.Text = ServerSession.DescribeComError(ex);
          }
@@ -414,7 +414,7 @@ namespace hMailServer.ControlPanel.Views
 
             Reload();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             status_.Text = ServerSession.DescribeComError(ex);
          }
@@ -427,7 +427,7 @@ namespace hMailServer.ControlPanel.Views
             Clipboard.SetText(issuedValue_.Text);
             status_.Text = "Copied.";
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             status_.Text = "Could not copy: " + ex.Message;
          }

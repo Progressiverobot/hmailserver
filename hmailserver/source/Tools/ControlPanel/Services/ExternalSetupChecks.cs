@@ -207,7 +207,7 @@ namespace hMailServer.ControlPanel.Services
          {
             return read();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             failedReads_++;
             firstError_ ??= ServerSession.DescribeComError(ex);
@@ -262,7 +262,7 @@ namespace hMailServer.ControlPanel.Services
                }
             }
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             failedReads_++;
             firstError_ ??= ServerSession.DescribeComError(ex);
@@ -336,7 +336,7 @@ namespace hMailServer.ControlPanel.Services
             rsa.ImportFromPem(pem);
             return "v=DKIM1; p=" + Convert.ToBase64String(rsa.ExportSubjectPublicKeyInfo());
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             return null;
          }
@@ -1117,7 +1117,7 @@ namespace hMailServer.ControlPanel.Services
                   {
                      encrypted = LooksLikeEncryptedPem(keyFile);
                   }
-                  catch (Exception)
+                  catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
                   {
                      // Readable by the service is what matters, but unreadable by
                      // this panel still means the state cannot be reported.
@@ -1141,7 +1141,7 @@ namespace hMailServer.ControlPanel.Services
                      string password = (string)cert.PrivateKeyPassword;
                      passwordSet = !string.IsNullOrEmpty(password);
                   }
-                  catch (Exception)
+                  catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
                   {
                      passwordKnown = false;
                   }
@@ -1162,7 +1162,7 @@ namespace hMailServer.ControlPanel.Services
                }
             }
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             failedReads_++;
             firstError_ ??= ServerSession.DescribeComError(ex);
@@ -1324,7 +1324,7 @@ namespace hMailServer.ControlPanel.Services
                      // usable bundle must contain at least one CERTIFICATE block.
                      looksLikePem = File.ReadAllText(caFile).Contains("-----BEGIN CERTIFICATE-----");
                   }
-                  catch (Exception)
+                  catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
                   {
                      item.Add(SetupItemState.CannotTell, label + ": the CA file exists but could not be read from this panel.");
                      continue;
@@ -1351,7 +1351,7 @@ namespace hMailServer.ControlPanel.Services
             if (withPolicy == 0)
                item.Add(SetupItemState.NotNeeded, "No port has a client certificate policy, so no CA bundle or client certificates are required.");
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             failedReads_++;
             firstError_ ??= ServerSession.DescribeComError(ex);

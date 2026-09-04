@@ -25,7 +25,7 @@ namespace MemoryTests
             int iMemoryUsageAfter = Utilities.GetMemoryUsage();
             int iBytesDiff = iMemoryUsageAfter - iMemoryUsageBefore;
             if (iBytesDiff > test.MaxIncrease)
-                throw new Exception("Memory leak found: " + iBytesDiff.ToString() + " bytes leaked");
+                throw new Exception("Memory leak found: " + iBytesDiff + " bytes leaked");
         }        
     }
 }

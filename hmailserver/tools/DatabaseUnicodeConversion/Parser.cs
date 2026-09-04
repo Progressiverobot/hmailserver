@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using System.IO;
+using System.Linq;
 using Microsoft.VisualBasic;
  
 namespace DatabaseUnicodeConversion
@@ -36,14 +37,14 @@ namespace DatabaseUnicodeConversion
             if (File.Exists(sOutputFile))
                 File.Delete(sOutputFile);
 
-            sFileContents = "";
+            var output = new StringBuilder();
             foreach (string command in outCommands)
             {
-                sFileContents += command + Environment.NewLine + "";
-                sFileContents += Environment.NewLine;
+                output.Append(command).Append(Environment.NewLine);
+                output.Append(Environment.NewLine);
             }
 
-            sFileContents = sFileContents.Replace("---", "");
+            sFileContents = output.ToString().Replace("---", "");
 
             File.WriteAllText(sOutputFile, sFileContents);
         }
@@ -75,10 +76,8 @@ namespace DatabaseUnicodeConversion
             string tableName = "";
 
 
-            foreach (string line in lines)
+            foreach (string trimmedLine in lines.Select(line => line.TrimStart(' ', '\t')))
             {
-                string trimmedLine = line.TrimStart(" \t".ToCharArray());
-
                 if (trimmedLine.StartsWith("create table"))
                 {
                     int iTableNameStart = command.IndexOf("create table") + "create table".Length + 1;

@@ -9,6 +9,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
+using System.Linq;
 using NUnit.Framework;
 using RegressionTests.Infrastructure;
 using RegressionTests.Shared;
@@ -65,9 +66,6 @@ namespace RegressionTests.API
       // The name the server gives its API key store, alongside hMailServer.ini.
       private const string KeyStoreFileName = "hMailServerApiKeys.ini";
 
-      [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-      private static extern bool WritePrivateProfileString(string section, string key, string value, string filePath);
-
       // Both of these moved to Shared/IniFileSetting once the listener TLS tests
       // needed them too; the local names are kept so the call sites below read the
       // same as they always did. The DllImport above stays, because the API key store
@@ -86,14 +84,9 @@ namespace RegressionTests.API
       // null until then.
       private string FindKeyStore()
       {
-         foreach (string directory in CandidateDirectories())
-         {
-            string candidate = Path.Combine(directory, KeyStoreFileName);
-            if (File.Exists(candidate))
-               return candidate;
-         }
-
-         return null;
+         return CandidateDirectories()
+            .Select(directory => Paths.Combine(directory, KeyStoreFileName))
+            .FirstOrDefault(File.Exists);
       }
 
       private void DeleteKeyStore()
@@ -113,7 +106,7 @@ namespace RegressionTests.API
          Assert.IsNotNull(store, "The API key store was not created. Looked for " + KeyStoreFileName + ".");
 
          Assert.IsTrue(
-            WritePrivateProfileString("Key." + id, field, value, store),
+            IniFile.WritePrivateProfileString("Key." + id, field, value, store),
             "Failed to write " + field + " for key " + id + " in " + store + ".");
 
          // Flush this process's profile cache to disk. WritePrivateProfileString
@@ -121,7 +114,7 @@ namespace RegressionTests.API
          // file's bytes rather than going through the profile API, so without
          // this the server can still read the old value and the test that ages a
          // key past its expiry would assert against stale data.
-         WritePrivateProfileString(null, null, null, store);
+         IniFile.WritePrivateProfileString(null, null, null, store);
       }
 
       // Issues one minimal HTTP/1.0 request against the REST listener and

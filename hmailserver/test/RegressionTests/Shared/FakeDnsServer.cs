@@ -170,9 +170,11 @@ namespace RegressionTests.Shared
             }
             catch (SocketException)
             {
+               // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
             }
             catch (ObjectDisposedException)
             {
+               // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
             }
          }
       }
@@ -198,12 +200,15 @@ namespace RegressionTests.Shared
             }
             catch (SocketException)
             {
+               // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
             }
             catch (ObjectDisposedException)
             {
+               // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
             }
             catch (IOException)
             {
+               // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
             }
          }
       }

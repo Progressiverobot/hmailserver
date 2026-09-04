@@ -3,9 +3,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System.IO;
-using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
+using System.Linq;
 using hMailServer;
 using NUnit.Framework;
 using RegressionTests.Infrastructure;
@@ -38,8 +38,6 @@ namespace RegressionTests.Security
    [TestFixture]
    public class PasswordHashUpgrade : TestFixtureBase
    {
-      [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-      private static extern bool WritePrivateProfileString(string section, string key, string value, string filePath);
 
       // Crypt::EncryptionType
       private const int CryptNone = 0;
@@ -128,18 +126,15 @@ namespace RegressionTests.Security
          string programDirectory = _application.Settings.Directories.ProgramDirectory;
          string[] candidates =
          {
-            Path.Combine(programDirectory, "hMailServer.ini"),
-            Path.Combine(programDirectory, "Bin", "hMailServer.ini"),
+            Paths.Combine(programDirectory, "hMailServer.ini"),
+            Paths.Combine(programDirectory, "Bin", "hMailServer.ini"),
          };
 
          bool wroteAny = false;
-         foreach (string iniPath in candidates)
+         foreach (string iniPath in candidates.Where(File.Exists))
          {
-            if (!File.Exists(iniPath))
-               continue;
-
             Assert.IsTrue(
-               WritePrivateProfileString("Settings", "MinimumAcceptedHashAlgorithm", value.ToString(), iniPath),
+               IniFile.WritePrivateProfileString("Settings", "MinimumAcceptedHashAlgorithm", value.ToString(), iniPath),
                "Failed to write MinimumAcceptedHashAlgorithm to " + iniPath + ".");
             wroteAny = true;
          }

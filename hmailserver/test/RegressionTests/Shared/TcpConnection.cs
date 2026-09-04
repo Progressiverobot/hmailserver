@@ -12,6 +12,7 @@ using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading;
+using System.Linq;
 
 namespace RegressionTests.Shared
 {
@@ -87,7 +88,7 @@ namespace RegressionTests.Shared
 
             if (!_tcpClient.Connected) return false;
          }
-         catch
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             return false;
          }
@@ -201,17 +202,19 @@ namespace RegressionTests.Shared
       {
          var stopTime = DateTime.Now + timeout;
 
-         var result = Receive();
+         var received = new StringBuilder(Receive());
 
          while (DateTime.Now < stopTime)
          {
+            var result = received.ToString();
+
             if (result.Contains(text))
                return result;
 
             if (!_tcpClient.Connected)
                return "";
 
-            result += Receive();
+            received.Append(Receive());
 
             Thread.Sleep(10);
          }
@@ -222,17 +225,18 @@ namespace RegressionTests.Shared
 
       public string ReadUntil(List<string> possibleReplies)
       {
-         var result = Receive();
+         var received = new StringBuilder(Receive());
 
          for (var i = 0; i < 1000; i++)
          {
-            foreach (var s in possibleReplies)
-               if (result.Contains(s))
-                  return result;
+            var result = received.ToString();
+
+            if (possibleReplies.Any(result.Contains))
+               return result;
 
             Thread.Sleep(10);
 
-            result += Receive();
+            received.Append(Receive());
          }
 
          throw new InvalidOperationException("Timeout while waiting for server response");

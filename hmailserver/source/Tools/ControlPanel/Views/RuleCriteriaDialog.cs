@@ -140,7 +140,7 @@ namespace hMailServer.ControlPanel.Views
             }
             ServerSession.Release(rule);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not load the criterion: " + ex.Message, "Control Panel");
             Close();
@@ -191,7 +191,7 @@ namespace hMailServer.ControlPanel.Views
             ServerSession.Release(rule);
             Close();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not save the criterion: " + ex.Message, "Control Panel");
          }

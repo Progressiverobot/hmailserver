@@ -70,7 +70,7 @@ namespace SQLScriptCreator.Generators
             statement.Unique ? "UNIQUE" : "",
             statement.Name,
             statement.Table,
-            columnList.ToString());
+            columnList);
 
          return new List<string>() { sb.ToString() };
       }
@@ -89,17 +89,12 @@ namespace SQLScriptCreator.Generators
       public List<string> GenerateRawSQLStatement(RawSQL statement)
       {
          if (statement.Engines.Count > 0 &&
-             statement.Engines.Contains("MySQL") == false)
+             !statement.Engines.Contains("MySQL"))
             return new List<string>() { };
 
-         if (statement.Statement.Contains(";"))
-         {
-            // Multiple statements.
-            if (!statement.Statement.Contains(StatementSeparator))
-            {
-               throw new Exception("RawSQL statement with multiple statements must contain statement separator." + Environment.NewLine + statement.Statement);
-            }
-         }
+         // Multiple statements have to be separated for the script runner.
+         if (statement.Statement.Contains(";") && !statement.Statement.Contains(StatementSeparator))
+            throw new Exception("RawSQL statement with multiple statements must contain statement separator." + Environment.NewLine + statement.Statement);
 
          return new List<string>() { statement.Statement };
       }

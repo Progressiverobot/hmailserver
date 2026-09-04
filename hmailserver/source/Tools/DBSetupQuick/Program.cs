@@ -36,7 +36,7 @@ namespace DBSetupQuick
             // Database upgrader. Resolve relative to this executable rather than
             // the working directory, which the installer leaves unspecified.
             System.Diagnostics.ProcessStartInfo upgradeProcess = new System.Diagnostics.ProcessStartInfo();
-            upgradeProcess.FileName = System.IO.Path.Combine(AppContext.BaseDirectory, "DBUpdater.exe");
+            upgradeProcess.FileName = System.IO.Path.Join(AppContext.BaseDirectory, "DBUpdater.exe");
 
             // Means that it should automatically exit if already up to date. This is always
             // the case when we launch it via 'quick'.
@@ -62,7 +62,7 @@ namespace DBSetupQuick
 
             return p.ExitCode;
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             Console.Error.WriteLine("Failed to start DBUpdater.exe: " + ex.Message);
 
@@ -108,7 +108,7 @@ namespace DBSetupQuick
 
             return 0;
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             Console.Error.WriteLine("Failed to create the hMailServer database: " + ex.Message);
 

@@ -51,6 +51,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ExceptionPolicy.cs" />
     <Compile Include="formMain.cs">
       <SubType>Form</SubType>
     </Compile>

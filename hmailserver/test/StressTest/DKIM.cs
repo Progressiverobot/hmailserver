@@ -43,7 +43,7 @@ namespace StressTest
             hMailServer.AntiSpam antiSpam = _application.Settings.AntiSpam;
 
             string folderGood = Path.GetFullPath("../../../TestData/DKIM/Good");
-            string path = Path.Combine(TestContext.CurrentContext.TestDirectory, folderGood);
+            string path = Paths.Combine(TestContext.CurrentContext.TestDirectory, folderGood);
             string[] files = Directory.GetFiles(folderGood);
 
             foreach (string file in files)
@@ -63,7 +63,7 @@ namespace StressTest
             hMailServer.AntiSpam antiSpam = _application.Settings.AntiSpam;
 
             string folderMissingBH = Path.GetFullPath("../../../TestData/DKIM/Neutral - Missing bodyhash");
-            string path = Path.Combine(TestContext.CurrentContext.TestDirectory, folderMissingBH);
+            string path = Paths.Combine(TestContext.CurrentContext.TestDirectory, folderMissingBH);
             string[] files = Directory.GetFiles(path);
 
             foreach (string file in files)
@@ -79,7 +79,7 @@ namespace StressTest
             hMailServer.AntiSpam antiSpam = _application.Settings.AntiSpam;
 
             string folder = Path.GetFullPath("../../../TestData/DKIM/Unsupported");
-            string path = Path.Combine(TestContext.CurrentContext.TestDirectory, folder);
+            string path = Paths.Combine(TestContext.CurrentContext.TestDirectory, folder);
             string[] files = Directory.GetFiles(path);
 
             foreach (string file in files)
@@ -98,7 +98,7 @@ namespace StressTest
            
 
            string folder = Path.GetFullPath("../../../TestData/DKIM/PermFail");
-           string path = Path.Combine(TestContext.CurrentContext.TestDirectory, folder);
+           string path = Paths.Combine(TestContext.CurrentContext.TestDirectory, folder);
            string[] files = Directory.GetFiles(path);
 
            foreach (string file in files)

@@ -109,7 +109,7 @@ namespace hMailServer.ControlPanel.Services
             // lookup matters most. DNS_QUERY_TREAT_AS_FQDN: without it the
             // resolver may append this machine's DNS suffix and answer for a
             // different name than the one the administrator actually published.
-            int status = DnsQuery_W(host.Trim(), DnsTypeText,
+            int status = DnsApi.DnsQuery_W(host.Trim(), DnsTypeText,
                DnsQueryBypassCache | DnsQueryTreatAsFqdn, IntPtr.Zero, out records, IntPtr.Zero);
 
             if (status == DnsErrorRcodeNameError || status == DnsInfoNoRecords)
@@ -136,7 +136,7 @@ namespace hMailServer.ControlPanel.Services
             result.Status = result.Records.Count > 0 ? LookupStatus.Found : LookupStatus.NoRecord;
             return result;
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             // Contract: never throw into the caller. Whatever went wrong locally
             // is a failed lookup, not a statement about the record.
@@ -148,7 +148,7 @@ namespace hMailServer.ControlPanel.Services
          finally
          {
             if (records != IntPtr.Zero)
-               DnsRecordListFree(records, DnsFreeRecordList);
+               DnsApi.DnsRecordListFree(records, DnsFreeRecordList);
          }
       }
 
@@ -232,14 +232,6 @@ namespace hMailServer.ControlPanel.Services
          public uint Ttl;
          public uint Reserved;
       }
-
-      [DllImport("dnsapi.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
-      private static extern int DnsQuery_W(
-         string name, ushort type, uint options,
-         IntPtr extra, out IntPtr queryResults, IntPtr reserved);
-
-      [DllImport("dnsapi.dll")]
-      private static extern void DnsRecordListFree(IntPtr recordList, int freeType);
 
       private static void ReadTxtRecords(IntPtr first, List<string> into)
       {

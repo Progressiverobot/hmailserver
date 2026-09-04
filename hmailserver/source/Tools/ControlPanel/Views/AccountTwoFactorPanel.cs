@@ -91,7 +91,7 @@ namespace hMailServer.ControlPanel.Views
                ServerSession.Release(account);
             }
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             status_.Text = ServerSession.DescribeComError(ex);
          }
@@ -143,7 +143,7 @@ namespace hMailServer.ControlPanel.Views
 
             Reload();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             status_.Text = ServerSession.DescribeComError(ex);
          }
@@ -185,7 +185,7 @@ namespace hMailServer.ControlPanel.Views
 
             Reload();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             status_.Text = ServerSession.DescribeComError(ex);
          }

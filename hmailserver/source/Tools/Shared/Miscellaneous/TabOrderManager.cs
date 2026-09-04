@@ -196,7 +196,7 @@ namespace hMailServer.Shared
 
             return curTabIndex;
          }
-         catch (Exception e)
+         catch (Exception e) when (!ExceptionPolicy.IsFatal(e))
          {
             Debug.Assert(false, "Exception in TabOrderManager.SetTabOrder:  " + e.Message);
             return 0;

@@ -104,7 +104,7 @@ namespace RegressionTests.SMTP
       public void TestSingleBlockedAttachment()
       {
          var attachmentName = Guid.NewGuid() + ".dll";
-         var tempFile = Path.Combine(Path.GetTempPath(), attachmentName);
+         var tempFile = Paths.Combine(Path.GetTempPath(), attachmentName);
          File.WriteAllText(tempFile, "A");
 
          try
@@ -140,8 +140,8 @@ namespace RegressionTests.SMTP
       {
          var attachment1Name = Guid.NewGuid() + ".dll";
          var attachment2Name = Guid.NewGuid() + ".dll";
-         var tempFile1 = Path.Combine(Path.GetTempPath(), attachment1Name);
-         var tempFile2 = Path.Combine(Path.GetTempPath(), attachment2Name);
+         var tempFile1 = Paths.Combine(Path.GetTempPath(), attachment1Name);
+         var tempFile2 = Paths.Combine(Path.GetTempPath(), attachment2Name);
          File.WriteAllText(tempFile1, "A");
          File.WriteAllText(tempFile2, "A");
 
@@ -329,7 +329,7 @@ namespace RegressionTests.SMTP
       public void TestBlockedAttachmentWithUnicodeInName()
       {
          var attachmentName = Guid.NewGuid() + "漢語.dll";
-         var tempFile = Path.Combine(Path.GetTempPath(), attachmentName);
+         var tempFile = Paths.Combine(Path.GetTempPath(), attachmentName);
          File.WriteAllText(tempFile, "A");
 
          try

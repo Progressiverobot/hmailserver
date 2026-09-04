@@ -7,6 +7,9 @@
     <Nullable>disable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <IsPackable>false</IsPackable>
+    <!-- ProfileApi (linked below) declares its kernel32 calls with LibraryImport,
+         whose generated marshalling is unsafe code. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <RootNamespace>hMailServer.ControlPanel.Tests</RootNamespace>
   </PropertyGroup>
 
@@ -36,6 +39,8 @@
          drive a sentence shown to an administrator, so both are worth testing
          without a WPF page around them. -->
     <Compile Include="..\ControlPanel\Services\WindowsServiceInfo.cs" />
+    <!-- The fatal-exception filter those linked files put on their catch clauses. -->
+    <Compile Include="..\ControlPanel\Services\ExceptionPolicy.cs" />
     <!-- The REST API key store. Every rule in it - the token's shape, the digest,
          what makes a label, a domain list or a source restriction acceptable - has
          to agree with RestApiServer, and a disagreement produces a key that is
@@ -44,6 +49,7 @@
          with it because ApiKeyStore locates the store file through it. -->
     <Compile Include="..\ControlPanel\Services\ApiKeyStore.cs" />
     <Compile Include="..\ControlPanel\Services\IniFeatureStore.cs" />
+    <Compile Include="..\ControlPanel\Services\ProfileApi.cs" />
     <!-- Matching a configured port row against the machine's open ports. Both ways
          of getting it wrong cost something: a live port reported as down sends
          somebody hunting for a conflict that does not exist, and a dead port

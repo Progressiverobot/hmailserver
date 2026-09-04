@@ -7,6 +7,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Threading;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
+using hMailServer.ControlPanel.Services;
 
 namespace hMailServer.ControlPanel
 {
@@ -63,17 +64,17 @@ namespace hMailServer.ControlPanel
       {
          try
          {
-            string dir = Path.Combine(
+            string dir = Path.Join(
                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                "hMailServer", "ControlPanel");
             Directory.CreateDirectory(dir);
 
-            string path = Path.Combine(dir, "control-panel-errors.log");
+            string path = Path.Join(dir, "control-panel-errors.log");
             File.AppendAllText(path,
                string.Format("[{0:yyyy-MM-dd HH:mm:ss}] {1}{2}{2}", DateTime.Now, ex, Environment.NewLine));
             return path;
          }
-         catch
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             return "(the log file could not be written)";
          }
@@ -94,8 +95,9 @@ namespace hMailServer.ControlPanel
                Process.Start(psi);
             }
          }
-         catch
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
+            // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
          }
 
          Shutdown();

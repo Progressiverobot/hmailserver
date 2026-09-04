@@ -16,7 +16,7 @@ namespace VMTestRunner.Console
       public static string GetFixturePath()
       {
          string currentDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-         string fixturePath = Path.Combine(currentDir, @"..\..\..\..\..\RegressionTests");
+         string fixturePath = Paths.Combine(currentDir, @"..\..\..\..\..\RegressionTests");
 
          DirectoryInfo dir = new DirectoryInfo(fixturePath);
          FileInfo[] files = dir.GetFiles("RegressionTests.sln");
@@ -35,7 +35,7 @@ namespace VMTestRunner.Console
       public static string GetTestFolder()
       {
          string currentDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-         string fixturePath = Path.Combine(currentDir, @"..\..\..\..\");
+         string fixturePath = Paths.Combine(currentDir, @"..\..\..\..\");
 
          return Path.GetFullPath(fixturePath);
       }

@@ -552,15 +552,7 @@ namespace hMailServer.ControlPanel.Services
       /// <summary>The single worst note, for a one-line summary. Normal when there is nothing to say.</summary>
       public static StatusLevel WorstLevel(SpamPipelineConfig config)
       {
-         StatusLevel worst = StatusLevel.Normal;
-
-         foreach (SpamPipelineNote note in Notes(config))
-         {
-            if (note.Level > worst)
-               worst = note.Level;
-         }
-
-         return worst;
+         return Notes(config).Aggregate(StatusLevel.Normal, (worst, note) => note.Level > worst ? note.Level : worst);
       }
 
       private static string Score(int score) => score.ToString();

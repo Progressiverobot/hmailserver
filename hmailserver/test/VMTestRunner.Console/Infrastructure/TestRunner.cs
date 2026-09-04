@@ -37,14 +37,14 @@ namespace VMTestRunner.Console
          _softwareUnderTest = softwareUnderTest;
          _testIndex = testIndex;
 
-         var packagePath = Path.Combine(Environment.CurrentDirectory, NuGetPackagesRelativePath);
+         var packagePath = Paths.Combine(Environment.CurrentDirectory, NuGetPackagesRelativePath);
 
-         _nUnitConsolePath = Path.Combine(packagePath, NUnitConsoleRunnerPackagePath);
+         _nUnitConsolePath = Paths.Combine(packagePath, NUnitConsoleRunnerPackagePath);
 
          if (!Directory.Exists(_nUnitConsolePath))
             throw new InvalidOperationException($"NUnit console not found in {_nUnitConsolePath}");
 
-         _nUnitPath = Path.Combine(packagePath, NUnitPackagePath);
+         _nUnitPath = Paths.Combine(packagePath, NUnitPackagePath);
 
          if (!Directory.Exists(_nUnitPath))
             throw new InvalidOperationException($"NUnit not found in {_nUnitPath}");
@@ -60,7 +60,7 @@ namespace VMTestRunner.Console
          var vm = new HyperV(_testIndex);
 
          var currentDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-         var testAssemblyDirectory = Path.Combine(currentDirectory, RegressionTestsBinRelativePath);
+         var testAssemblyDirectory = Paths.Combine(currentDirectory, RegressionTestsBinRelativePath);
 
          var testAssemblyNames = new string[]
             {
@@ -75,7 +75,7 @@ namespace VMTestRunner.Console
 
          string softwareUnderTestSilentParmas = "/SILENT /LOG=\"C:\\setup.log\"";
 
-         string sslFolder = Path.Combine(TestSettings.GetTestFolder(), "SSL examples");
+         string sslFolder = Paths.Combine(TestSettings.GetTestFolder(), "SSL examples");
 
          vm.OpenVM(_environment.VMName);
 
@@ -101,15 +101,15 @@ namespace VMTestRunner.Console
             vm.CopyFolderToGuest(_nUnitPath, guestTestPath);
 
             foreach (var testAssemblyName in testAssemblyNames)
-               vm.CopyFileToGuest(Path.Combine(testAssemblyDirectory, testAssemblyName), Path.Combine(guestTestPath, testAssemblyName));
+               vm.CopyFileToGuest(Paths.Combine(testAssemblyDirectory, testAssemblyName), Paths.Combine(guestTestPath, testAssemblyName));
 
-            vm.CopyFileToGuest(Path.Combine(currentDirectory, RunTestScriptName), Path.Combine(guestTestPath, RunTestScriptName));
+            vm.CopyFileToGuest(Paths.Combine(currentDirectory, RunTestScriptName), Paths.Combine(guestTestPath, RunTestScriptName));
 
             // Other required stuff.
             vm.CopyFolderToGuest(sslFolder, @"C:\SSL examples");
 
-            vm.CopyFileToGuest(softwareUnderTestFullPath, Path.Combine(guestTestPath, softwareUnderTestName));
-            vm.RunProgramInGuest(Path.Combine(guestTestPath, softwareUnderTestName), softwareUnderTestSilentParmas);
+            vm.CopyFileToGuest(softwareUnderTestFullPath, Paths.Combine(guestTestPath, softwareUnderTestName));
+            vm.RunProgramInGuest(Paths.Combine(guestTestPath, softwareUnderTestName), softwareUnderTestSilentParmas);
 
             foreach (var copyOperation in _environment.PostInstallFileCopy)
                vm.CopyFileToGuest(copyOperation.From, copyOperation.To);
@@ -125,13 +125,13 @@ namespace VMTestRunner.Console
             }
 
             // Run NUnit
-            vm.RunProgramInGuest(Path.Combine(guestTestPath, RunTestScriptName), "");
+            vm.RunProgramInGuest(Paths.Combine(guestTestPath, RunTestScriptName), "");
 
             // Collect results.
             string localResultFile = Path.GetTempFileName() + ".xml";
             string localLogFile = Path.GetTempFileName() + ".log";
-            vm.CopyFileToHost(Path.Combine(guestTestPath, "TestResult.xml"), localResultFile);
-            vm.CopyFileToHost(Path.Combine(guestTestPath, "TestResult.log"), localLogFile);
+            vm.CopyFileToHost(Paths.Combine(guestTestPath, "TestResult.xml"), localResultFile);
+            vm.CopyFileToHost(Paths.Combine(guestTestPath, "TestResult.log"), localLogFile);
 
             var doc = new XmlDocument();
             doc.Load(localResultFile);
@@ -152,7 +152,7 @@ namespace VMTestRunner.Console
             {
                vm.PowerOff();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
             {
                Logger.Error(ex, "Unable to power off VM. Maybe it's not powered on?");
             }
@@ -163,7 +163,7 @@ namespace VMTestRunner.Console
       {
          string currentDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
 
-         var localExecutable = Path.Combine(currentDir,
+         var localExecutable = Paths.Combine(currentDir,
             @"..\..\..\..\..\..\source\Server\hMailServer\x64\Release\hMailServer.exe");
 
          if (!File.Exists(localExecutable))
@@ -195,8 +195,9 @@ namespace VMTestRunner.Console
                if (pingResultData.Contains("Reply from "))
                   return;
             }
-            catch (Exception)
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
             {
+               // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
             }
 
             Thread.Sleep(TimeSpan.FromSeconds(2));

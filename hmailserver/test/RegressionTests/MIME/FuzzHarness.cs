@@ -54,19 +54,19 @@ namespace RegressionTests.MIME
       {
          get
          {
-            return Path.GetFullPath(Path.Combine(TestContext.CurrentContext.TestDirectory,
+            return Path.GetFullPath(Paths.Combine(TestContext.CurrentContext.TestDirectory,
                                                  @"..\..\..\..\..\.."));
          }
       }
 
       private static string FuzzRoot
       {
-         get { return Path.Combine(RepositoryRoot, "fuzz"); }
+         get { return Paths.Combine(RepositoryRoot, "fuzz"); }
       }
 
       private static string ReadFuzzFile(string relativePath)
       {
-         string path = Path.Combine(FuzzRoot, relativePath);
+         string path = Paths.Combine(FuzzRoot, relativePath);
          Assert.IsTrue(File.Exists(path),
             "Missing fuzzing harness file: " + path +
             ". The harness is documented in hmailserver\\docs\\Fuzzing.md.");
@@ -84,13 +84,8 @@ namespace RegressionTests.MIME
       {
          var builder = new StringBuilder();
 
-         foreach (string line in script.Split('\n'))
-         {
-            if (line.TrimStart().StartsWith("#"))
-               continue;
-
+         foreach (string line in script.Split('\n').Where(line => !line.TrimStart().StartsWith("#")))
             builder.AppendLine(line);
-         }
 
          return builder.ToString();
       }
@@ -111,7 +106,7 @@ namespace RegressionTests.MIME
          var files = new List<FileInfo>();
          foreach (string relativeRoot in roots)
          {
-            var directory = new DirectoryInfo(Path.Combine(RepositoryRoot, relativeRoot));
+            var directory = new DirectoryInfo(Paths.Combine(RepositoryRoot, relativeRoot));
             Assert.IsTrue(directory.Exists,
                "make-corpus.ps1 reads seed messages from " + relativeRoot +
                ", which does not exist. Fix the list in make-corpus.ps1 - an empty seed corpus makes a fuzz run prove nothing.");
@@ -146,7 +141,7 @@ namespace RegressionTests.MIME
          Assert.IsTrue(sources.Any(source => source.EndsWith(@"Common\Mime\Mime.cpp", StringComparison.OrdinalIgnoreCase)),
             "build-fuzz.ps1 no longer compiles Common\\Mime\\Mime.cpp - the fuzz targets would not be exercising the MIME parser at all.");
 
-         var missing = sources.Where(source => !File.Exists(Path.Combine(RepositoryRoot, source))).ToList();
+         var missing = sources.Where(source => !File.Exists(Paths.Combine(RepositoryRoot, source))).ToList();
 
          Assert.IsEmpty(missing,
             "build-fuzz.ps1 compiles files that do not exist: " + string.Join(", ", missing) +
@@ -175,7 +170,7 @@ namespace RegressionTests.MIME
             @"README.md"
          };
 
-         var missing = required.Where(relative => !File.Exists(Path.Combine(FuzzRoot, relative))).ToList();
+         var missing = required.Where(relative => !File.Exists(Paths.Combine(FuzzRoot, relative))).ToList();
 
          Assert.IsEmpty(missing, "Missing from fuzz\\: " + string.Join(", ", missing));
       }
@@ -305,8 +300,8 @@ namespace RegressionTests.MIME
       [Description("Replays the seed corpus through the built fuzz targets under AddressSanitizer. Skipped when the targets are not built.")]
       public void TestBuiltTargetsSurviveTheSeedCorpus()
       {
-         string binDirectory = Path.Combine(FuzzRoot, "bin");
-         string seedsRoot = Path.Combine(FuzzRoot, @"corpus\seeds");
+         string binDirectory = Paths.Combine(FuzzRoot, "bin");
+         string seedsRoot = Paths.Combine(FuzzRoot, @"corpus\seeds");
 
          var targets = new Dictionary<string, string>
          {
@@ -315,8 +310,8 @@ namespace RegressionTests.MIME
             { "mime_decode_fuzzer", "decode" }
          };
 
-         var available = targets.Where(target => File.Exists(Path.Combine(binDirectory, target.Key + ".exe")) &&
-                                                 Directory.Exists(Path.Combine(seedsRoot, target.Value)))
+         var available = targets.Where(target => File.Exists(Paths.Combine(binDirectory, target.Key + ".exe")) &&
+                                                 Directory.Exists(Paths.Combine(seedsRoot, target.Value)))
                                 .ToList();
 
          if (available.Count == 0)
@@ -327,15 +322,15 @@ namespace RegressionTests.MIME
 
          foreach (var target in available)
          {
-            string executable = Path.Combine(binDirectory, target.Key + ".exe");
-            string seeds = Path.Combine(seedsRoot, target.Value);
+            string executable = Paths.Combine(binDirectory, target.Key + ".exe");
+            string seeds = Paths.Combine(seedsRoot, target.Value);
 
             // libFuzzer's first positional argument is the corpus it may write
             // to, so it gets a scratch directory; the seeds are passed after it
             // and are only read. -runs=0 executes every corpus file once and
             // exits, which is the documented way to use a fuzz target as a
             // regression test.
-            string scratch = Path.Combine(Path.GetTempPath(), "hm-fuzz-replay-" + Guid.NewGuid().ToString("N"));
+            string scratch = Paths.Combine(Path.GetTempPath(), "hm-fuzz-replay-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(scratch);
 
             try
@@ -353,7 +348,7 @@ namespace RegressionTests.MIME
             }
             finally
             {
-               try { Directory.Delete(scratch, true); } catch (IOException) { }
+               try { Directory.Delete(scratch, true); } catch (IOException) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }
             }
          }
       }
@@ -389,7 +384,7 @@ namespace RegressionTests.MIME
 
             if (!process.WaitForExit((int) timeout.TotalMilliseconds))
             {
-               try { process.Kill(); } catch (InvalidOperationException) { }
+               try { process.Kill(); } catch (InvalidOperationException) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }
 
                lock (output)
                   output.AppendLine("[timed out after " + timeout.TotalSeconds + "s and was killed]");

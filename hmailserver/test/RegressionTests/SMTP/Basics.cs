@@ -10,6 +10,7 @@ using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
+using System.Linq;
 using hMailServer;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
@@ -1389,10 +1390,8 @@ namespace RegressionTests.SMTP
 
       private static string Attribute(string message, string key)
       {
-         foreach (var part in message.Split(','))
-            if (part.StartsWith(key + "="))
-               return part.Substring(key.Length + 1);
-         return "";
+         string part = message.Split(',').FirstOrDefault(candidate => candidate.StartsWith(key + "="));
+         return part == null ? "" : part.Substring(key.Length + 1);
       }
 
       private static byte[] Hmac(byte[] key, string data)

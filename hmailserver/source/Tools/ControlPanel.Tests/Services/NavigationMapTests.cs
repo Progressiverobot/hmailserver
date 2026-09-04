@@ -451,7 +451,7 @@ namespace hMailServer.ControlPanel.Tests.Services
          if (controlPanel == null)
             return null;
 
-         string path = Path.Combine(controlPanel, relativePath);
+         string path = Path.Join(controlPanel, relativePath);
          return File.Exists(path) ? File.ReadAllText(path) : null;
       }
 
@@ -462,8 +462,8 @@ namespace hMailServer.ControlPanel.Tests.Services
 
          while (directory != null)
          {
-            string candidate = Path.Combine(directory.FullName, "ControlPanel");
-            if (Directory.Exists(Path.Combine(candidate, "Views")))
+            string candidate = Path.Join(directory.FullName, "ControlPanel");
+            if (Directory.Exists(Path.Join(candidate, "Views")))
                return candidate;
 
             directory = directory.Parent;

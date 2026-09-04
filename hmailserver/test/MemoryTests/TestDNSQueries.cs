@@ -11,8 +11,8 @@ namespace MemoryTests
 {
     class TestDNSQueries
     {
-        hMailServer.Application application;
-        hMailServer.Utilities utilities;
+        readonly hMailServer.Application application;
+        readonly hMailServer.Utilities utilities;
 
         public TestDNSQueries(hMailServer.Application app)
         {

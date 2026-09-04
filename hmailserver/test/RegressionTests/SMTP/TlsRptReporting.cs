@@ -82,8 +82,8 @@ namespace RegressionTests.SMTP
                var sslPath = SslSetup.GetSslCertPath();
                certificate = _settings.SSLCertificates.Add();
                certificate.Name = "TlsRptReporting";
-               certificate.CertificateFile = Path.Combine(sslPath, "example.crt");
-               certificate.PrivateKeyFile = Path.Combine(sslPath, "example.key");
+               certificate.CertificateFile = Paths.Combine(sslPath, "example.crt");
+               certificate.PrivateKeyFile = Paths.Combine(sslPath, "example.key");
                certificate.Save();
 
                // Port 25 plays the remote MX. STARTTLS-required rather than
@@ -264,7 +264,7 @@ namespace RegressionTests.SMTP
 
          while (directory != null)
          {
-            var candidate = Path.Combine(directory.FullName,
+            var candidate = Paths.Combine(directory.FullName,
                @"source\Server\hMailServer\x64\Release\hMailServer.ini");
 
             if (File.Exists(candidate))
@@ -336,9 +336,11 @@ namespace RegressionTests.SMTP
                }
                catch (SocketException)
                {
+                  // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
                }
                catch (ObjectDisposedException)
                {
+                  // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
                }
             }
          }
@@ -364,12 +366,15 @@ namespace RegressionTests.SMTP
                }
                catch (SocketException)
                {
+                  // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
                }
                catch (ObjectDisposedException)
                {
+                  // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
                }
                catch (IOException)
                {
+                  // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
                }
             }
          }

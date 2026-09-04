@@ -174,7 +174,7 @@ namespace hMailServer.ControlPanel.Views
 
             ServerSession.Release(rule);
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             // leave lists as built so far
          }
@@ -208,8 +208,9 @@ namespace hMailServer.ControlPanel.Views
                case 10: text += " " + (string)a.Value; break;
             }
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
+            // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
          }
          return text;
       }
@@ -230,7 +231,7 @@ namespace hMailServer.ControlPanel.Views
             action(rule);
             ServerSession.Release(rule);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Rule operation failed: " + ex.Message, "Control Panel");
          }
@@ -285,7 +286,7 @@ namespace hMailServer.ControlPanel.Views
             rule.Save();
             ServerSession.Release(rule);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not create the rule: " + ex.Message, "Control Panel");
             return;
@@ -316,7 +317,7 @@ namespace hMailServer.ControlPanel.Views
                ServerSession.Release(rule);
             }
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not change the match mode: " + ex.Message, "Control Panel");
          }
@@ -358,7 +359,7 @@ namespace hMailServer.ControlPanel.Views
             ServerSession.Release(criterias);
             ServerSession.Release(rule);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not remove the criterion: " + ex.Message, "Control Panel");
          }
@@ -402,7 +403,7 @@ namespace hMailServer.ControlPanel.Views
             ServerSession.Release(actions);
             ServerSession.Release(rule);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not remove the action: " + ex.Message, "Control Panel");
          }
@@ -436,7 +437,7 @@ namespace hMailServer.ControlPanel.Views
             ServerSession.Release(actions);
             ServerSession.Release(rule);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not move the action: " + ex.Message, "Control Panel");
          }

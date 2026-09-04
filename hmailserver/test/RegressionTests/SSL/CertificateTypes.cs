@@ -18,7 +18,7 @@ namespace RegressionTests.SSL
       [Description("Test that loading a private key with password does not hang")]
       public void SetupSSLCertificateWithPassword()
       {
-         var sslPath = Path.Combine(SslSetup.GetSslCertPath(), "WithPassword");
+         var sslPath = Paths.Combine(SslSetup.GetSslCertPath(), "WithPassword");
 
          var sslCertificate = _application.Settings.SSLCertificates.Add();
          sslCertificate.Name = "Example";

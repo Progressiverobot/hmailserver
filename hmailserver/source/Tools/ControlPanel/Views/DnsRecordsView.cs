@@ -199,13 +199,12 @@ namespace hMailServer.ControlPanel.Views
          domainCombo_.Items.Clear();
          foreach (DomainInfo domain in domains_)
          {
-            var item = new ComboBoxItem
+            domainCombo_.Items.Add(new ComboBoxItem
             {
                Content = domain.Name + (domain.Active ? "" : " (inactive)"),
                Tag = domain.Name,
                FontSize = Typography.Body
-            };
-            domainCombo_.Items.Add(item);
+            });
          }
 
          if (domainCombo_.Items.Count > 0)
@@ -265,7 +264,7 @@ namespace hMailServer.ControlPanel.Views
                }
             }
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             failedReads_++;
             firstError_ ??= ServerSession.DescribeComError(ex);
@@ -286,7 +285,7 @@ namespace hMailServer.ControlPanel.Views
          {
             return ((string)domain.DKIMSecondarySelector ?? "").Trim();
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             return "";
          }
@@ -311,7 +310,7 @@ namespace hMailServer.ControlPanel.Views
             serverHostName_ = ((string)settings.HostName ?? "").Trim();
             serverHostNameKnown_ = true;
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             failedReads_++;
             firstError_ ??= ServerSession.DescribeComError(ex);
@@ -711,7 +710,7 @@ namespace hMailServer.ControlPanel.Views
                ServerSession.Release(domains);
             }
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not generate and store the DKIM key: " + ServerSession.DescribeComError(ex), "Control Panel");
             return;
@@ -737,7 +736,7 @@ namespace hMailServer.ControlPanel.Views
                ServerSession.Release(domains);
             }
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not enable DKIM signing: " + ServerSession.DescribeComError(ex), "Control Panel");
             return;
@@ -760,7 +759,7 @@ namespace hMailServer.ControlPanel.Views
             rsa.ImportFromPem(pem);
             return "v=DKIM1; k=rsa; p=" + Convert.ToBase64String(rsa.ExportSubjectPublicKeyInfo());
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             return null;
          }
@@ -1178,7 +1177,7 @@ namespace hMailServer.ControlPanel.Views
                + domainName + ", the HTTPS listener is not running (WebServicesHttpsPort=0 is the shipped default), or a "
                + "certificate that does not cover mta-sts." + domainName + ". Checked from this machine only.");
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             SetResultOn(mark, text, StatusLevel.Information, "Lookup failed",
                "The fetch itself failed: " + ex.Message + " This says nothing about the policy.");
@@ -1650,7 +1649,7 @@ namespace hMailServer.ControlPanel.Views
          IntPtr records = IntPtr.Zero;
          try
          {
-            int status = DnsQuery_W(domain.Trim(), DnsTypeMx,
+            int status = DnsApi.DnsQuery_W(domain.Trim(), DnsTypeMx,
                DnsQueryBypassCache | DnsQueryTreatAsFqdn, IntPtr.Zero, out records, IntPtr.Zero);
 
             if (status != 0)
@@ -1686,14 +1685,14 @@ namespace hMailServer.ControlPanel.Views
 
             return results.OrderBy(r => r.Key).Select(r => r.Value).Distinct().ToList();
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             return new List<string>();
          }
          finally
          {
             if (records != IntPtr.Zero)
-               DnsRecordListFree(records, DnsFreeRecordList);
+               DnsApi.DnsRecordListFree(records, DnsFreeRecordList);
          }
       }
 
@@ -1715,14 +1714,6 @@ namespace hMailServer.ControlPanel.Views
          public uint Ttl;
          public uint Reserved;
       }
-
-      [DllImport("dnsapi.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
-      private static extern int DnsQuery_W(
-         string name, ushort type, uint options,
-         IntPtr extra, out IntPtr queryResults, IntPtr reserved);
-
-      [DllImport("dnsapi.dll")]
-      private static extern void DnsRecordListFree(IntPtr recordList, int freeType);
 
       // ---- shared UI helpers -------------------------------------------------------
 
@@ -1782,7 +1773,7 @@ namespace hMailServer.ControlPanel.Views
 
       private static void CopyToClipboard(string text)
       {
-         try { if (!string.IsNullOrEmpty(text)) Clipboard.SetText(text); } catch (Exception) { }
+         try { if (!string.IsNullOrEmpty(text)) Clipboard.SetText(text); } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }
       }
 
       /// <summary>A button that opens the page owning a related setting - the same

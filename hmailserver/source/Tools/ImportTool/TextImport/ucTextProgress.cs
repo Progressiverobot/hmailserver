@@ -11,9 +11,13 @@ namespace ImportTool.TextImport
 {
    public partial class ucTextProgress : UserControl, IWizardPage
    {
-      public ucTextProgress()
+      // The page that chose the file and the domain; this page imports them.
+      private readonly ucTextSelect selectPage_;
+
+      public ucTextProgress(ucTextSelect selectPage)
       {
          InitializeComponent();
+         selectPage_ = selectPage;
       }
 
       public string Title
@@ -29,7 +33,7 @@ namespace ImportTool.TextImport
          {
             RunImport();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             AddToLog("The import failed: " + ex.Message);
          }
@@ -44,13 +48,13 @@ namespace ImportTool.TextImport
       {
          var parser = new TextFileParser();
 
-         AddToLog("Reading " + ucTextSelect.SelectedFile + "...");
-         parser.ParseFile(ucTextSelect.SelectedFile);
+         AddToLog("Reading " + selectPage_.SelectedFile + "...");
+         parser.ParseFile(selectPage_.SelectedFile);
 
          foreach (var error in parser.Errors)
             AddToLog("Line " + error.LineNumber + " skipped: " + error.Reason);
 
-         var domain = Globals.GetApp().Domains.get_ItemByName(ucTextSelect.SelectedDomain);
+         var domain = Globals.GetApp().Domains.get_ItemByName(selectPage_.SelectedDomain);
          var accounts = domain.Accounts;
 
          var created = 0;
@@ -59,7 +63,7 @@ namespace ImportTool.TextImport
 
          foreach (var entry in parser.Accounts)
          {
-            var address = entry.Name + "@" + ucTextSelect.SelectedDomain;
+            var address = entry.Name + "@" + selectPage_.SelectedDomain;
 
             try
             {
@@ -80,7 +84,7 @@ namespace ImportTool.TextImport
                else
                   created++;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
             {
                failed++;
                AddToLog(address + " failed: " + ex.Message);
@@ -108,7 +112,7 @@ namespace ImportTool.TextImport
          {
             return accounts.get_ItemByAddress(address);
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             // The COM API reports a missing account as an error.
             return null;

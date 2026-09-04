@@ -4,12 +4,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System;
-using System.Runtime.InteropServices;
-using System.Text;
 using System.Threading;
 using hMailServer;
 using NUnit.Framework;
-using RegressionTests.Shared;
+using RegressionTests.Shared;
+using System.Globalization;
+using Microsoft.Win32;
 
 namespace RegressionTests.IMAP
 {
@@ -27,7 +27,7 @@ namespace RegressionTests.IMAP
 
       private void AssertAllMessagesIndexed()
       {
-         if (_indexing.Enabled == false)
+         if (!_indexing.Enabled)
             _indexing.Enabled = true;
 
          _indexing.Index();
@@ -370,23 +370,18 @@ namespace RegressionTests.IMAP
          Assert.AreEqual(result, resultAfter);
       }
 
-      // P/Invoke signature
-      [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-      private static extern int GetSystemDefaultLocaleName(
-         [Out] StringBuilder lpLocaleName,
-         int cchLocaleName
-      );
-
-
+      // The system locale - the one GetSystemDefaultLocaleName reports and the one
+      // the server sorts with - is kept in the registry as a hexadecimal LCID.
       private string GetSystemLocaleName()
       {
-         const int LOCALE_NAME_MAX_LENGTH = 85; // Max length per Windows API docs
-         var localeName = new StringBuilder(LOCALE_NAME_MAX_LENGTH);
+         using (RegistryKey key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Nls\Language"))
+         {
+            string lcid = key == null ? null : key.GetValue("Default") as string;
+            if (string.IsNullOrEmpty(lcid))
+               throw new InvalidOperationException("Unable to read system locale.");
 
-         var result = GetSystemDefaultLocaleName(localeName, LOCALE_NAME_MAX_LENGTH);
-         if (result > 0)
-            return localeName.ToString();
-         throw new InvalidOperationException("Unable to read system locale.");
+            return new CultureInfo(int.Parse(lcid, NumberStyles.HexNumber)).Name;
+         }
       }
    }
 }

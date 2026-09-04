@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Text.RegularExpressions;
+using System.Linq;
 using hMailServer;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
@@ -278,17 +279,13 @@ namespace RegressionTests.Rules
          ImapClientSimulator.AssertMessageCount("ruletest@example.test", "test", "Inbox", 2);
 
          var fileCount = 0;
-         var domainDir = Path.Combine(_application.Settings.Directories.DataDirectory, "example.test");
-         var userDir = Path.Combine(domainDir, "ruletest");
+         var domainDir = Paths.Combine(_application.Settings.Directories.DataDirectory, "example.test");
+         var userDir = Paths.Combine(domainDir, "ruletest");
 
          RetryHelper.TryAction(TimeSpan.FromSeconds(10), () =>
          {
             var dirs = Directory.GetDirectories(userDir);
-            foreach (var dir in dirs)
-            {
-               var files = Directory.GetFiles(dir);
-               fileCount += files.Length;
-            }
+            fileCount += dirs.Sum(dir => Directory.GetFiles(dir).Length);
 
             RetryableAssert.AreEqual(2, fileCount);
          });

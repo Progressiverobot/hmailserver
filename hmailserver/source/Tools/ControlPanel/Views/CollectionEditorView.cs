@@ -254,14 +254,14 @@ namespace hMailServer.ControlPanel.Views
                foreach (FieldSpec f in spec_.Fields)
                {
                   try { row.Values[f.Prop] = GetProp(item, f.Prop); }
-                  catch (Exception) { row.Values[f.Prop] = null; }
+                  catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { row.Values[f.Prop] = null; }
                }
                rows_.Add(row);
                ServerSession.Release(item);
             }
             status_.Text = "Loaded from server.";
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             status_.Text = "Could not load — " + ServerSession.DescribeComError(ex);
          }
@@ -319,7 +319,7 @@ namespace hMailServer.ControlPanel.Views
             item.Save();
             status_.Text = (existing == null ? "Added" : "Saved") + " at " + DateTime.Now.ToLongTimeString() + ".";
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not save: " + ex.Message, "Control Panel");
          }
@@ -354,7 +354,7 @@ namespace hMailServer.ControlPanel.Views
                item.Delete();
             status_.Text = "Deleted.";
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not delete: " + ex.Message, "Control Panel");
          }
@@ -385,7 +385,7 @@ namespace hMailServer.ControlPanel.Views
       private static int TryGetId(dynamic item)
       {
          try { return (int)GetProp(item, "ID"); }
-         catch (Exception) { return -1; }
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { return -1; }
       }
 
       internal static object GetProp(object owner, string name)
@@ -430,12 +430,15 @@ namespace hMailServer.ControlPanel.Views
                }
                catch (FormatException)
                {
+                  // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
                }
                catch (InvalidCastException)
                {
+                  // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
                }
                catch (OverflowException)
                {
+                  // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
                }
             }
 

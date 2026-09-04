@@ -197,11 +197,11 @@ namespace hMailServer.ControlPanel.Views
             spam_.IsChecked = (bool)r.EnableSpamProtection;
             virus_.IsChecked = (bool)r.EnableAntiVirus;
             expires_.IsChecked = (bool)r.Expires;
-            try { expiresTime_.Text = Convert.ToString(r.ExpiresTime); } catch { expiresTime_.Text = ""; }
+            try { expiresTime_.Text = Convert.ToString(r.ExpiresTime); } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { expiresTime_.Text = ""; }
 
             ServerSession.Release(r);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not load the range: " + ex.Message, "Control Panel");
             Close();
@@ -225,34 +225,34 @@ namespace hMailServer.ControlPanel.Views
             if (upper_.Text.Trim().Length > 0) r.UpperIP = upper_.Text.Trim();
             if (int.TryParse(priority_.Text.Trim(), out int prio)) r.Priority = prio;
 
-            r.AllowSMTPConnections = smtp_.IsChecked == true;
-            r.AllowIMAPConnections = imap_.IsChecked == true;
-            r.AllowPOP3Connections = pop3_.IsChecked == true;
+            r.AllowSMTPConnections = smtp_.IsChecked is true;
+            r.AllowIMAPConnections = imap_.IsChecked is true;
+            r.AllowPOP3Connections = pop3_.IsChecked is true;
 
-            r.AllowDeliveryFromLocalToLocal = ll_.IsChecked == true;
-            r.AllowDeliveryFromLocalToRemote = lr_.IsChecked == true;
-            r.AllowDeliveryFromRemoteToLocal = rl_.IsChecked == true;
-            r.AllowDeliveryFromRemoteToRemote = rr_.IsChecked == true;
+            r.AllowDeliveryFromLocalToLocal = ll_.IsChecked is true;
+            r.AllowDeliveryFromLocalToRemote = lr_.IsChecked is true;
+            r.AllowDeliveryFromRemoteToLocal = rl_.IsChecked is true;
+            r.AllowDeliveryFromRemoteToRemote = rr_.IsChecked is true;
 
-            r.RequireSMTPAuthLocalToLocal = authLL_.IsChecked == true;
-            r.RequireSMTPAuthLocalToExternal = authLE_.IsChecked == true;
-            r.RequireSMTPAuthExternalToLocal = authEL_.IsChecked == true;
-            r.RequireSMTPAuthExternalToExternal = authEE_.IsChecked == true;
-            r.RequireSSLTLSForAuth = tlsAuth_.IsChecked == true;
+            r.RequireSMTPAuthLocalToLocal = authLL_.IsChecked is true;
+            r.RequireSMTPAuthLocalToExternal = authLE_.IsChecked is true;
+            r.RequireSMTPAuthExternalToLocal = authEL_.IsChecked is true;
+            r.RequireSMTPAuthExternalToExternal = authEE_.IsChecked is true;
+            r.RequireSSLTLSForAuth = tlsAuth_.IsChecked is true;
 
-            r.EnableSpamProtection = spam_.IsChecked == true;
-            r.EnableAntiVirus = virus_.IsChecked == true;
-            r.Expires = expires_.IsChecked == true;
-            if (expires_.IsChecked == true && expiresTime_.Text.Trim().Length > 0)
+            r.EnableSpamProtection = spam_.IsChecked is true;
+            r.EnableAntiVirus = virus_.IsChecked is true;
+            r.Expires = expires_.IsChecked is true;
+            if (expires_.IsChecked is true && expiresTime_.Text.Trim().Length > 0)
             {
-               try { r.ExpiresTime = expiresTime_.Text.Trim(); } catch (Exception) { }
+               try { r.ExpiresTime = expiresTime_.Text.Trim(); } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }
             }
 
             r.Save();
             ServerSession.Release(r);
             Close();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not save the range: " + ex.Message, "Control Panel");
          }

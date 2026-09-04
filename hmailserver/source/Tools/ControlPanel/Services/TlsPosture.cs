@@ -448,15 +448,7 @@ namespace hMailServer.ControlPanel.Services
       /// <summary>The single worst note, for a one-line summary.</summary>
       public static StatusLevel WorstLevel(TlsPostureConfig config)
       {
-         StatusLevel worst = StatusLevel.Normal;
-
-         foreach (TlsPostureNote note in Notes(config))
-         {
-            if (note.Level > worst)
-               worst = note.Level;
-         }
-
-         return worst;
+         return Notes(config).Aggregate(StatusLevel.Normal, (worst, note) => note.Level > worst ? note.Level : worst);
       }
 
       /// <summary>

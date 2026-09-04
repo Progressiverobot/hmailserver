@@ -72,10 +72,7 @@ namespace RegressionTests.API
 
          // Validate that the 6 remaining are the expected ones
          foreach (var messageToSave in messagesToSave)
-         {
-            var message = messages.get_ItemByDBID(messageToSave);
-            Assert.IsNotNull(message);
-         }
+            Assert.IsNotNull(messages.get_ItemByDBID(messageToSave));
       }
    }
 }

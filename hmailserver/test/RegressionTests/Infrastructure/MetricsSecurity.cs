@@ -8,10 +8,10 @@ using System.Globalization;
 using System.IO;
 using System.Net.Security;
 using System.Net.Sockets;
-using System.Runtime.InteropServices;
 using System.Security.Authentication;
 using System.Text;
 using System.Threading;
+using System.Linq;
 using NUnit.Framework;
 using RegressionTests.Shared;
 using RegressionTests.SSL;
@@ -74,26 +74,20 @@ namespace RegressionTests.Infrastructure
       private const string BasicUser = "prometheus";
       private const string BasicPassword = "scrape-pw-8b41";
 
-      [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-      private static extern bool WritePrivateProfileString(string section, string key, string value, string filePath);
-
       private void WriteSetting(string key, string value)
       {
          string programDirectory = _application.Settings.Directories.ProgramDirectory;
          string[] candidates =
          {
-            Path.Combine(programDirectory, "hMailServer.ini"),
-            Path.Combine(programDirectory, "Bin", "hMailServer.ini"),
+            Paths.Combine(programDirectory, "hMailServer.ini"),
+            Paths.Combine(programDirectory, "Bin", "hMailServer.ini"),
          };
 
          bool wroteAny = false;
-         foreach (string iniPath in candidates)
+         foreach (string iniPath in candidates.Where(File.Exists))
          {
-            if (!File.Exists(iniPath))
-               continue;
-
             Assert.IsTrue(
-               WritePrivateProfileString("Settings", key, value, iniPath),
+               IniFile.WritePrivateProfileString("Settings", key, value, iniPath),
                "Failed to write " + key + " to " + iniPath + ".");
             wroteAny = true;
          }
@@ -190,50 +184,8 @@ namespace RegressionTests.Infrastructure
             // server's own five-second request deadline.
             client.ReceiveTimeout = 20000;
 
-            Stream transport = client.GetStream();
-            SslStream sslStream = null;
-
-            try
+            using (Stream transport = useTls ? OpenTls(client.GetStream(), port) : client.GetStream())
             {
-               if (useTls)
-               {
-                  // Certificate errors are accepted on purpose: the example
-                  // certificate in "SSL examples" is self-signed and is not issued
-                  // for 127.0.0.1. What is being tested is that a TLS handshake
-                  // completes at all and that HTTP flows inside it, not PKI.
-                  //
-                  // TLS 1.2 is pinned rather than left to the platform default so the
-                  // handshake cannot fail for a reason outside this fixture - the
-                  // listener's floor is TLS 1.2 and the process-wide
-                  // ServicePointManager default is not this fixture's to rely on.
-                  sslStream = new SslStream(transport, false, (sender, certificate, chain, errors) => true);
-
-                  try
-                  {
-                     sslStream.AuthenticateAsClient("localhost", null, SslProtocols.Tls12, false);
-                  }
-                  catch (AuthenticationException ex)
-                  {
-                     // Reported as an explained failure rather than left as a raw
-                     // SSPI exception, because this is the precise point at which the
-                     // unfixed listener fails: it has no SSL_CTX at all, so it reads
-                     // the ClientHello as an HTTP request line, 404s it and closes.
-                     Assert.Fail("The TLS handshake against the metrics listener on port " + port +
-                        " did not complete: " + ex.Message +
-                        ". The listener must serve HTTPS when MetricsServerCertificateFile and " +
-                        "MetricsServerPrivateKeyFile are configured.");
-                  }
-                  catch (IOException ex)
-                  {
-                     Assert.Fail("The TLS handshake against the metrics listener on port " + port +
-                        " was abandoned by the server: " + ex.Message +
-                        ". The listener must serve HTTPS when MetricsServerCertificateFile and " +
-                        "MetricsServerPrivateKeyFile are configured.");
-                  }
-
-                  transport = sslStream;
-               }
-
                // Timed from here rather than from the connect, so the measurement is
                // request-to-response and does not include ConnectWithRetry's backoff
                // after a restart. Two tests assert on it, and they are about whether
@@ -304,12 +256,48 @@ namespace RegressionTests.Infrastructure
                   return result;
                }
             }
-            finally
-            {
-               if (sslStream != null)
-                  sslStream.Dispose();
-            }
          }
+      }
+
+      // TLS over an open connection. Certificate errors are accepted on purpose: the
+      // example certificate in "SSL examples" is self-signed and is not issued for
+      // 127.0.0.1. What is being tested is that a TLS handshake completes at all and
+      // that HTTP flows inside it, not PKI.
+      //
+      // TLS 1.2 is pinned rather than left to the platform default so the handshake
+      // cannot fail for a reason outside this fixture - the listener's floor is TLS
+      // 1.2 and the process-wide ServicePointManager default is not this fixture's to
+      // rely on.
+      private static Stream OpenTls(Stream transport, int port)
+      {
+         var sslStream = new SslStream(transport, false, (sender, certificate, chain, errors) => true);
+
+         try
+         {
+            sslStream.AuthenticateAsClient("localhost", null, SslProtocols.Tls12, false);
+         }
+         catch (AuthenticationException ex)
+         {
+            // Reported as an explained failure rather than left as a raw SSPI
+            // exception, because this is the precise point at which the unfixed
+            // listener fails: it has no SSL_CTX at all, so it reads the ClientHello
+            // as an HTTP request line, 404s it and closes.
+            sslStream.Dispose();
+            Assert.Fail("The TLS handshake against the metrics listener on port " + port +
+               " did not complete: " + ex.Message +
+               ". The listener must serve HTTPS when MetricsServerCertificateFile and " +
+               "MetricsServerPrivateKeyFile are configured.");
+         }
+         catch (IOException ex)
+         {
+            sslStream.Dispose();
+            Assert.Fail("The TLS handshake against the metrics listener on port " + port +
+               " was abandoned by the server: " + ex.Message +
+               ". The listener must serve HTTPS when MetricsServerCertificateFile and " +
+               "MetricsServerPrivateKeyFile are configured.");
+         }
+
+         return sslStream;
       }
 
       // Connects, absorbing the bind race immediately after a service restart. A
@@ -366,25 +354,14 @@ namespace RegressionTests.Infrastructure
       // Value of one exact series identity in an exposition body, or NaN when absent.
       private static double ParseSeries(string body, string identity)
       {
-         foreach (string raw in body.Split('\n'))
-         {
-            string line = raw.Trim();
-            if (line.Length == 0 || line.StartsWith("#", StringComparison.Ordinal))
-               continue;
-
-            int space = line.LastIndexOf(' ');
-            if (space <= 0 || space == line.Length - 1)
-               continue;
-
-            if (line.Substring(0, space) != identity)
-               continue;
-
-            double parsed;
-            if (double.TryParse(line.Substring(space + 1), NumberStyles.Float, CultureInfo.InvariantCulture, out parsed))
-               return parsed;
-         }
-
-         return double.NaN;
+         // A sample line is "<identity> <value>"; comments and blank lines are skipped.
+         return body.Split('\n')
+            .Select(raw => raw.Trim())
+            .Where(line => line.Length > 0 && !line.StartsWith("#", StringComparison.Ordinal))
+            .Select(line => (Line: line, Space: line.LastIndexOf(' ')))
+            .Where(sample => sample.Space > 0 && sample.Space < sample.Line.Length - 1 && sample.Line.Substring(0, sample.Space) == identity)
+            .Select(sample => double.TryParse(sample.Line.Substring(sample.Space + 1), NumberStyles.Float, CultureInfo.InvariantCulture, out double parsed) ? parsed : (double?)null)
+            .FirstOrDefault(value => value.HasValue) ?? double.NaN;
       }
 
       private static void AssertCarriesNoExposition(HttpResult result, string because)
@@ -680,8 +657,8 @@ namespace RegressionTests.Infrastructure
       [Description("The metrics listener serves HTTPS from a context built by SslContextInitializer, refuses plain HTTP on that port, and does not move the mail TLS counters")]
       public void MetricsListenerServesTlsWithoutCountingItAsMailTls()
       {
-         string certificate = Path.Combine(SslSetup.GetSslCertPath(), "example.crt");
-         string privateKey = Path.Combine(SslSetup.GetSslCertPath(), "example.key");
+         string certificate = Paths.Combine(SslSetup.GetSslCertPath(), "example.crt");
+         string privateKey = Paths.Combine(SslSetup.GetSslCertPath(), "example.key");
 
          Assert.IsTrue(File.Exists(certificate), "Certificate " + certificate + " was not found.");
          Assert.IsTrue(File.Exists(privateKey), "Private key " + privateKey + " was not found.");

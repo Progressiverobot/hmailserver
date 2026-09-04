@@ -100,7 +100,7 @@ namespace RegressionTests.Shared
 
             HandleClients();
          }
-         catch (Exception e)
+         catch (Exception e) when (!ExceptionPolicy.IsFatal(e))
          {
             _workerThreadException = e;
          }

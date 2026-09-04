@@ -227,7 +227,7 @@ namespace hMailServer.ControlPanel.Views
                   save.InitialDirectory = dir;
             }
          }
-         catch (Exception) { }
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }
 
          if (save.ShowDialog() != true)
             return;
@@ -244,7 +244,7 @@ namespace hMailServer.ControlPanel.Views
                             "Value:      " + result.DnsTxtValue;
             dkimDnsPanel_.Visibility = Visibility.Visible;
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not generate the DKIM key: " + ex.Message, "Control Panel");
          }
@@ -447,7 +447,7 @@ namespace hMailServer.ControlPanel.Views
          System.Windows.Automation.AutomationProperties.SetAutomationId(dkimCopy, "DkimCopyDns");
          dkimCopy.Click += (s, e) =>
          {
-            try { if (!string.IsNullOrEmpty(dkimDnsValue_)) Clipboard.SetText(dkimDnsValue_); } catch (Exception) { }
+            try { if (!string.IsNullOrEmpty(dkimDnsValue_)) Clipboard.SetText(dkimDnsValue_); } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }
          };
          dkimDnsPanel_.Children.Add(dkimCopy);
          panel.Children.Add(dkimDnsPanel_);
@@ -629,7 +629,7 @@ namespace hMailServer.ControlPanel.Views
                   save.InitialDirectory = dir;
             }
          }
-         catch (Exception) { }
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }
 
          if (save.ShowDialog() != true)
             return;
@@ -640,7 +640,7 @@ namespace hMailServer.ControlPanel.Views
             generated = DkimKeyGenerator.Generate(selector, domainName_);
             System.IO.File.WriteAllText(save.FileName, generated.PrivateKeyPem);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not generate the DKIM key: " + ex.Message, "Control Panel");
             return;
@@ -655,7 +655,7 @@ namespace hMailServer.ControlPanel.Views
             d.Save();
             ServerSession.Release(d);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not stage the rotation on the server: " + ServerSession.DescribeComError(ex),
                "Control Panel");
@@ -827,7 +827,7 @@ namespace hMailServer.ControlPanel.Views
                "Keep the old DNS record (" + oldHost + ") for a few more days while mail signed with the old key is " +
                "still in transit, then remove it.", "Control Panel");
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not promote the staged key: " + ServerSession.DescribeComError(ex), "Control Panel");
          }
@@ -855,7 +855,7 @@ namespace hMailServer.ControlPanel.Views
             d.Save();
             ServerSession.Release(d);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not cancel the rotation: " + ServerSession.DescribeComError(ex), "Control Panel");
             return;
@@ -924,7 +924,7 @@ namespace hMailServer.ControlPanel.Views
             // The same record format DkimKeyGenerator emits when a key is first made.
             return "v=DKIM1; k=rsa; p=" + Convert.ToBase64String(rsa.ExportSubjectPublicKeyInfo());
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             return null;
          }
@@ -988,7 +988,7 @@ namespace hMailServer.ControlPanel.Views
 
       private static void CopyToClipboard(string text)
       {
-         try { if (!string.IsNullOrEmpty(text)) Clipboard.SetText(text); } catch (Exception) { }
+         try { if (!string.IsNullOrEmpty(text)) Clipboard.SetText(text); } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }
       }
 
       private void Load()
@@ -1059,12 +1059,12 @@ namespace hMailServer.ControlPanel.Views
                stagedSelector = ((string)d.DKIMSecondarySelector ?? "").Trim();
                stagedKeyFile = ((string)d.DKIMSecondaryPrivateKeyFile ?? "").Trim();
             }
-            catch (Exception) { }
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }
             RestoreStagedRotation(stagedSelector, stagedKeyFile);
 
             ServerSession.Release(d);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not load the domain: " + ex.Message, "Control Panel");
             Close();
@@ -1118,34 +1118,34 @@ namespace hMailServer.ControlPanel.Views
             dynamic d = domains.ItemByName[domainName_];
             if (renaming)
                d.Name = newName;
-            d.Active = active_.IsChecked == true;
+            d.Active = active_.IsChecked is true;
             d.Postmaster = postmaster_.Text.Trim();
             d.ADDomainName = adDomain_.Text.Trim();
 
             if (hasMs) d.MaxSize = msV;
             if (hasMms) d.MaxMessageSize = mmsV;
             if (hasMas) d.MaxAccountSize = masV;
-            d.MaxNumberOfAccountsEnabled = maxAccountsOn_.IsChecked == true;
+            d.MaxNumberOfAccountsEnabled = maxAccountsOn_.IsChecked is true;
             if (hasMna) d.MaxNumberOfAccounts = mnaV;
-            d.MaxNumberOfAliasesEnabled = maxAliasesOn_.IsChecked == true;
+            d.MaxNumberOfAliasesEnabled = maxAliasesOn_.IsChecked is true;
             if (hasMnal) d.MaxNumberOfAliases = mnalV;
-            d.MaxNumberOfDistributionListsEnabled = maxDistsOn_.IsChecked == true;
+            d.MaxNumberOfDistributionListsEnabled = maxDistsOn_.IsChecked is true;
             if (hasMnd) d.MaxNumberOfDistributionLists = mndV;
-            d.PlusAddressingEnabled = plusAddressingOn_.IsChecked == true;
+            d.PlusAddressingEnabled = plusAddressingOn_.IsChecked is true;
             if (plusChar_.Text.Length > 0) d.PlusAddressingCharacter = plusChar_.Text;
-            d.AntiSpamEnableGreylisting = greylisting_.IsChecked == true;
+            d.AntiSpamEnableGreylisting = greylisting_.IsChecked is true;
 
-            d.SignatureEnabled = signatureOn_.IsChecked == true;
+            d.SignatureEnabled = signatureOn_.IsChecked is true;
             int sm = ComboValue(signatureMethod_);
             if (sm > 0) d.SignatureMethod = sm;
-            d.AddSignaturesToReplies = signReplies_.IsChecked == true;
-            d.AddSignaturesToLocalMail = signLocal_.IsChecked == true;
+            d.AddSignaturesToReplies = signReplies_.IsChecked is true;
+            d.AddSignaturesToLocalMail = signLocal_.IsChecked is true;
             d.SignaturePlainText = signaturePlain_.Text;
             d.SignatureHTML = signatureHtml_.Text;
 
             d.RelayHost = relayHost_.Text.Trim();
             d.RelayPort = relayPortValue;
-            d.RelayRequiresAuthentication = relayAuthOn_.IsChecked == true;
+            d.RelayRequiresAuthentication = relayAuthOn_.IsChecked is true;
             d.RelayUsername = relayUser_.Text.Trim();
             int rs = ComboValue(relaySecurity_);
             if (rs >= 0) d.RelayConnectionSecurity = rs;
@@ -1155,15 +1155,15 @@ namespace hMailServer.ControlPanel.Views
             if (relayPassword_.Password.Length > 0)
                d.RelayPassword = relayPassword_.Password;
 
-            d.VacationMessageIsOn = oooOn_.IsChecked == true;
+            d.VacationMessageIsOn = oooOn_.IsChecked is true;
             d.VacationSubject = oooSubject_.Text.Trim();
             d.VacationMessage = oooMessage_.Text;
             d.VacationInternalSubject = oooInternalSubject_.Text.Trim();
             d.VacationInternalMessage = oooInternalMessage_.Text;
-            d.VacationExternalOverride = oooExternalOverride_.IsChecked == true;
+            d.VacationExternalOverride = oooExternalOverride_.IsChecked is true;
 
-            d.DKIMSignEnabled = dkimOn_.IsChecked == true;
-            d.DKIMSignAliasesEnabled = dkimAliases_.IsChecked == true;
+            d.DKIMSignEnabled = dkimOn_.IsChecked is true;
+            d.DKIMSignAliasesEnabled = dkimAliases_.IsChecked is true;
             d.DKIMSelector = dkimSelector_.Text.Trim();
             d.DKIMPrivateKeyFile = dkimKeyFile_.Text.Trim();
             int hc = ComboValue(dkimHeaderCanon_);
@@ -1177,7 +1177,7 @@ namespace hMailServer.ControlPanel.Views
             ServerSession.Release(d);
             Close();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not save the domain: " + ex.Message, "Control Panel");
          }

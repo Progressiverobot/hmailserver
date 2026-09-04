@@ -13,6 +13,7 @@ using System.IO;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Net.Mail;
+using System.Linq;
 using RegressionTests.Infrastructure;
 using RegressionTests.Shared;
 using Attachment = System.Net.Mail.Attachment;
@@ -59,7 +60,7 @@ namespace StressTest
          Console.WriteLine("Elapsed time: " + sw.Elapsed.TotalSeconds);
 
          string dataDir =
-             Path.Combine(SingletonProvider<TestSetup>.Instance.GetApp().Settings.Directories.DataDirectory, "example.test");
+             Paths.Combine(SingletonProvider<TestSetup>.Instance.GetApp().Settings.Directories.DataDirectory, "example.test");
 
          // Check number of accounts.
          RetryHelper.TryAction(() =>
@@ -114,7 +115,7 @@ namespace StressTest
          Console.WriteLine("Elapsed time: " + sw.Elapsed.TotalSeconds);
 
          string dataDir =
-             Path.Combine(SingletonProvider<TestSetup>.Instance.GetApp().Settings.Directories.DataDirectory, "example.test");
+             Paths.Combine(SingletonProvider<TestSetup>.Instance.GetApp().Settings.Directories.DataDirectory, "example.test");
 
          // Check number of accounts.
          RetryHelper.TryAction(() =>
@@ -175,9 +176,9 @@ namespace StressTest
       public void TestSend200KMessages()
       {
          string dataDir =
-             Path.Combine(SingletonProvider<TestSetup>.Instance.GetApp().Settings.Directories.DataDirectory, "example.test");
+             Paths.Combine(SingletonProvider<TestSetup>.Instance.GetApp().Settings.Directories.DataDirectory, "example.test");
 
-         string accountDir = Path.Combine(dataDir, "test");
+         string accountDir = Paths.Combine(dataDir, "test");
 
          int memoryUsage = Shared.GetCurrentMemoryUsage();
          int maxMemoryUsage = memoryUsage + 20;
@@ -221,9 +222,9 @@ namespace StressTest
       public void TestSendAttachments()
       {
          string dataDir =
-             Path.Combine(SingletonProvider<TestSetup>.Instance.GetApp().Settings.Directories.DataDirectory, "example.test");
+             Paths.Combine(SingletonProvider<TestSetup>.Instance.GetApp().Settings.Directories.DataDirectory, "example.test");
 
-         string accountDir = Path.Combine(dataDir, "test");
+         string accountDir = Paths.Combine(dataDir, "test");
 
          int memoryUsage = Shared.GetCurrentMemoryUsage();
          int maxMemoryUsage = memoryUsage + 5;
@@ -287,7 +288,7 @@ namespace StressTest
             {
                socket.Send(sb.ToString());
             }
-            catch (Exception)
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
             {
                return;
             }
@@ -348,7 +349,7 @@ namespace StressTest
             {
                socket.Send(sb.ToString());
             }
-            catch (Exception)
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
             {
                return;
             }
@@ -404,7 +405,7 @@ namespace StressTest
             {
                socket.Send(sb.ToString());
             }
-            catch (Exception)
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
             {
                return;
             }
@@ -437,9 +438,9 @@ namespace StressTest
          SingletonProvider<TestSetup>.Instance.GetApp().Settings.AntiSpam.SpamAssassinEnabled = true;
 
          string dataDir =
-             Path.Combine(SingletonProvider<TestSetup>.Instance.GetApp().Settings.Directories.DataDirectory, "example.test");
+             Paths.Combine(SingletonProvider<TestSetup>.Instance.GetApp().Settings.Directories.DataDirectory, "example.test");
 
-         string accountDir = Path.Combine(dataDir, "test");
+         string accountDir = Paths.Combine(dataDir, "test");
 
          int memoryUsage = Shared.GetCurrentMemoryUsage();
          int maxMemoryUsage = memoryUsage + 2;
@@ -491,11 +492,7 @@ namespace StressTest
 
          int totalCount = 0;
 
-         foreach (string subFolder in accountFolders)
-         {
-            string[] filesInSubFolder = Directory.GetFiles(subFolder);
-            totalCount += filesInSubFolder.Length;
-         }
+         totalCount += accountFolders.Sum(subFolder => Directory.GetFiles(subFolder).Length);
 
          totalCount += files.Length;
          return totalCount;

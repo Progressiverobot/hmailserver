@@ -26,13 +26,7 @@ namespace APIDocumentationCreator
 
         public APIProperty GetProperty(string name)
         {
-            foreach (APIProperty property in Properties)
-            {
-                if (property.Name == name)
-                    return property;
-            }
-
-            return null;
+            return Properties.FirstOrDefault(property => property.Name == name);
         }
 
     }

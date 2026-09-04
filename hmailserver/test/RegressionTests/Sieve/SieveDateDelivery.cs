@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System.Reflection;
+using System.Threading;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
 using RegressionTests.Infrastructure;
@@ -46,11 +47,17 @@ namespace RegressionTests.Sieve
       // address can only be added once per fixture set-up.
       private static int accountSequence_;
 
+      // Unique per account created by this fixture, however the tests are ordered or parallelised.
+      private static int NextAccountSequence()
+      {
+         return Interlocked.Increment(ref accountSequence_);
+      }
+
       private bool FilesIntoMatchedFolder(string script, string extraHeaders = "")
       {
-         accountSequence_++;
+         int sequence = NextAccountSequence();
          Account recipient = SingletonProvider<TestSetup>.Instance.AddAccount(
-            _domain, "sieve-date-" + accountSequence_ + "@example.test", Password);
+            _domain, "sieve-date-" + sequence + "@example.test", Password);
 
          recipient.IMAPFolders.Add(TargetFolder);
 

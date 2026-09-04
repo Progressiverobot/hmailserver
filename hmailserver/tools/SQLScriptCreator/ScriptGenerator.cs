@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2010 Martin Knafve / hMailServer.com.  
+﻿// Copyright (c) 2010 Martin Knafve / hMailServer.com.
 // https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -14,8 +14,8 @@ namespace SQLScriptCreator.Statements
 {
    class ScriptGenerator
    {
-      private List<IStatement> _statements;
-      private string _outputDir;
+      private readonly List<IStatement> _statements;
+      private readonly string _outputDir;
 
       public ScriptGenerator(List<IStatement> statements, string outputDir)
       {
@@ -31,22 +31,26 @@ namespace SQLScriptCreator.Statements
          generators.Add(new MySQLGenerator());
          generators.Add(new PGSQLGenerator());
 
-         Dictionary<string, string> scripts = new Dictionary<string, string>();
+         Dictionary<string, StringBuilder> scripts = new Dictionary<string, StringBuilder>();
          foreach (IStatement statement in _statements)
          {
             bool found = false;
 
             foreach (IGenerator generator in generators)
             {
-               string sqlString = "";
+               StringBuilder sqlString;
+               if (!scripts.TryGetValue(generator.Name, out sqlString))
+               {
+                  sqlString = new StringBuilder();
+                  scripts[generator.Name] = sqlString;
+               }
 
                if (statement is AddColumn)
                {
                   foreach (string singleStatement in generator.GenerateAddColumnStatement(statement as AddColumn))
                   {
                      found = true;
-                     sqlString += singleStatement;
-                     sqlString += generator.StatementSeparator;
+                     sqlString.Append(singleStatement).Append(generator.StatementSeparator);
                   }
                }
                else if (statement is RenameColumn)
@@ -54,8 +58,7 @@ namespace SQLScriptCreator.Statements
                   foreach (string singleStatement in generator.GenerateRenameColumnStatement(statement as RenameColumn))
                   {
                      found = true;
-                     sqlString += singleStatement;
-                     sqlString += generator.StatementSeparator;
+                     sqlString.Append(singleStatement).Append(generator.StatementSeparator);
                   }
                }
                else if (statement is CreateIndex)
@@ -63,8 +66,7 @@ namespace SQLScriptCreator.Statements
                   foreach (string singleStatement in generator.GenerateCreateIndexStatement(statement as CreateIndex))
                   {
                      found = true;
-                     sqlString += singleStatement;
-                     sqlString += generator.StatementSeparator;
+                     sqlString.Append(singleStatement).Append(generator.StatementSeparator);
                   }
                }
                else if (statement is DropColumnObjects)
@@ -72,8 +74,7 @@ namespace SQLScriptCreator.Statements
                   foreach (string singleStatement in generator.GenerateDropColumnObjectsStatement(statement as DropColumnObjects))
                   {
                      found = true;
-                     sqlString += singleStatement;
-                     sqlString += generator.StatementSeparator;
+                     sqlString.Append(singleStatement).Append(generator.StatementSeparator);
                   }
                }
                else if (statement is DropColumnObjects)
@@ -81,8 +82,7 @@ namespace SQLScriptCreator.Statements
                   foreach (string singleStatement in generator.GenerateDropColumnObjectsStatement(statement as DropColumnObjects))
                   {
                      found = true;
-                     sqlString += singleStatement;
-                     sqlString += generator.StatementSeparator;
+                     sqlString.Append(singleStatement).Append(generator.StatementSeparator);
                   }
                }
                else if (statement is RawSQL)
@@ -97,28 +97,19 @@ namespace SQLScriptCreator.Statements
                      if (trimmedResult.EndsWith(";"))
                         throw new Exception("RawSQL statement terminated. Last statement should not be terminated: " + Environment.NewLine + trimmedResult);
 
-                     sqlString += trimmedResult;
-                     sqlString += generator.StatementSeparator;
+                     sqlString.Append(trimmedResult).Append(generator.StatementSeparator);
                   }
                }
                else
                   throw new Exception("Unknown statement type:" + statement.GetType().Name);
-                              
-
-               if (scripts.ContainsKey(generator.Name))
-                  scripts[generator.Name] += sqlString;
-               else
-                  scripts[generator.Name] = sqlString;
-
-
             }
 
 
-            if (found == false)
+            if (!found)
             {
                throw new Exception("SQL not generated for statement: " + statement.GetType().Name);
             }
-            
+
          }
 
          foreach (var script in scripts)
@@ -126,11 +117,11 @@ namespace SQLScriptCreator.Statements
             string engineName = script.Key;
             string fileName = string.Format("UpgradeXtoY{0}.sql", script.Key);
 
-            fileName = Path.Combine(_outputDir, fileName);
+            fileName = Paths.Combine(_outputDir, fileName);
             if (File.Exists(fileName))
                File.Delete(fileName);
 
-            File.WriteAllText(fileName, script.Value, Encoding.ASCII);
+            File.WriteAllText(fileName, script.Value.ToString(), Encoding.ASCII);
          }
       }
    }

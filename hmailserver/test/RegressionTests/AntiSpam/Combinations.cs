@@ -6,6 +6,7 @@
 using NUnit.Framework;
 using RegressionTests.Infrastructure;
 using RegressionTests.Shared;
+using System.Linq;
 
 namespace RegressionTests.AntiSpam
 {
@@ -175,12 +176,10 @@ namespace RegressionTests.AntiSpam
 
          Assert.AreNotEqual(0, scored.Count, "no spam test ran at all");
 
-         var withScore = new System.Collections.Generic.List<string>();
-         foreach (System.Text.RegularExpressions.Match m in scored)
-         {
-            if (int.Parse(m.Groups[1].Value) != 0)
-               withScore.Add(m.Value);
-         }
+         var withScore = scored.Cast<System.Text.RegularExpressions.Match>()
+            .Where(m => int.Parse(m.Groups[1].Value) != 0)
+            .Select(m => m.Value)
+            .ToList();
 
          Assert.AreEqual(1, withScore.Count,
             "exactly one test should have scored before the pipeline stopped, but these did: " +

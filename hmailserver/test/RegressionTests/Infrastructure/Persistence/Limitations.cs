@@ -30,7 +30,7 @@ namespace RegressionTests.Infrastructure.Persistence
             da.AliasName = "example.test";
             da.Save();
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             return;
          }
@@ -50,7 +50,7 @@ namespace RegressionTests.Infrastructure.Persistence
          {
             da.Save();
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             return;
          }
@@ -78,7 +78,7 @@ namespace RegressionTests.Infrastructure.Persistence
          {
             SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "test1@example.test", "secret1", 32);
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             return;
          }
@@ -97,7 +97,7 @@ namespace RegressionTests.Infrastructure.Persistence
             var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "test1@example.test", "secret1",
                0);
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             return;
          }
@@ -120,7 +120,7 @@ namespace RegressionTests.Infrastructure.Persistence
          {
             SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "test4@example.test", "secret1");
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             return;
          }
@@ -144,7 +144,7 @@ namespace RegressionTests.Infrastructure.Persistence
          {
             SingletonProvider<TestSetup>.Instance.AddAlias(_domain, "test5@example.test", "test@example.test");
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             return;
          }
@@ -167,7 +167,7 @@ namespace RegressionTests.Infrastructure.Persistence
          {
             SingletonProvider<TestSetup>.Instance.AddDistributionList(_domain, "test3@example.test", recipients);
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             return;
          }
@@ -213,7 +213,7 @@ namespace RegressionTests.Infrastructure.Persistence
          {
             SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "test4@example.test", "secret1", 10);
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             return;
          }
@@ -231,7 +231,7 @@ namespace RegressionTests.Infrastructure.Persistence
          {
             SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "test1@example.test", "secret1", 0);
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             return;
          }
@@ -249,7 +249,7 @@ namespace RegressionTests.Infrastructure.Persistence
          {
             SingletonProvider<TestSetup>.Instance.AddDomain(domains, "test2.com");
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             return;
          }
@@ -270,7 +270,7 @@ namespace RegressionTests.Infrastructure.Persistence
          {
             domain.Save();
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             return;
          }
@@ -291,7 +291,7 @@ namespace RegressionTests.Infrastructure.Persistence
          {
             SingletonProvider<TestSetup>.Instance.AddDomain(domains, "test2.com");
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             return;
          }
@@ -326,7 +326,7 @@ namespace RegressionTests.Infrastructure.Persistence
          {
             SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "test@example.test", "secret2");
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             return;
          }
@@ -343,7 +343,7 @@ namespace RegressionTests.Infrastructure.Persistence
          {
             SingletonProvider<TestSetup>.Instance.AddAlias(_domain, "test@example.test", "secret2");
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             return;
          }
@@ -362,7 +362,7 @@ namespace RegressionTests.Infrastructure.Persistence
          {
             SingletonProvider<TestSetup>.Instance.AddDistributionList(_domain, "test@example.test", recipients);
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             return;
          }
@@ -379,7 +379,7 @@ namespace RegressionTests.Infrastructure.Persistence
          {
             SingletonProvider<TestSetup>.Instance.AddGroup("test@example.test");
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             return;
          }

@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Linq;
 using hMailServer;
 using RegressionTests.Shared;
 
@@ -202,7 +203,7 @@ namespace RegressionTests.ExternalAccounts
                _tcpConnection.Send(chunkText);
                sent += chunkText.Length;
             }
-            catch (Exception)
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
             {
                // Expected once the client has had enough and closed the connection -
                // which is the whole point of the test.
@@ -283,9 +284,9 @@ namespace RegressionTests.ExternalAccounts
          _acceptedDeletions.Sort();
          _acceptedDeletions.Reverse();
 
-         foreach (var messageNumber in _acceptedDeletions)
-            if (messageNumber >= 1 && messageNumber <= _messages.Count)
-               _messages.RemoveAt(messageNumber - 1);
+         // Highest first (sorted above), so a removal never shifts a lower number.
+         foreach (var messageNumber in _acceptedDeletions.Where(number => number >= 1 && number <= _messages.Count))
+            _messages.RemoveAt(messageNumber - 1);
 
          _acceptedDeletions.Clear();
       }

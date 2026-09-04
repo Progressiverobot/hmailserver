@@ -5,6 +5,7 @@
 
 using System;
 using System.IO;
+using System.Linq;
 using NUnit.Framework;
 using RegressionTests.Infrastructure;
 using RegressionTests.Shared;
@@ -231,16 +232,13 @@ namespace RegressionTests.API
 
          var lines = messageText.Split(Environment.NewLine.ToCharArray());
 
-         foreach (var line in lines)
-            if (line.ToLower().StartsWith("subject: "))
-            {
-               var subject = line.Substring("subject: ".Length + 1);
+         var subjectLine = lines.FirstOrDefault(line => line.ToLower().StartsWith("subject: "));
+         Assert.IsNotNull(subjectLine, "The message has no Subject header:\r\n" + messageText);
 
-               // encoded part should not contain space.
-               Assert.IsFalse(subject.Contains(" "));
+         var subject = subjectLine.Substring("subject: ".Length + 1);
 
-               break;
-            }
+         // encoded part should not contain space.
+         Assert.IsFalse(subject.Contains(" "));
       }
 
       [Test]
@@ -262,7 +260,7 @@ namespace RegressionTests.API
 
          var attachmentName = "本本本.zip";
 
-         var filename = Path.Combine(Path.GetTempPath(), attachmentName);
+         var filename = Paths.Combine(Path.GetTempPath(), attachmentName);
          File.WriteAllText(filename, "tjena moss");
 
          var message = new hMailServer.Message();
@@ -288,7 +286,7 @@ namespace RegressionTests.API
 
          var swedish = "abc.zip";
          var attachmentName = swedish + ".zip";
-         var filename = Path.Combine(Path.GetTempPath(), attachmentName);
+         var filename = Paths.Combine(Path.GetTempPath(), attachmentName);
          File.WriteAllText(filename, swedish);
 
 
@@ -368,7 +366,7 @@ namespace RegressionTests.API
          var swedishAndChinese = "ÅÄÖ汉语";
          var attachmentName = swedishAndChinese + ".zip";
 
-         var filename = Path.Combine(Path.GetTempPath(), attachmentName);
+         var filename = Paths.Combine(Path.GetTempPath(), attachmentName);
          File.WriteAllText(filename, swedishAndChinese);
 
          var message = new hMailServer.Message();

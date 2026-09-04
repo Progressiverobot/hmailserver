@@ -41,7 +41,7 @@ namespace RegressionTests.Infrastructure
             {
                action();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
             {
                failure = ex;
             }
@@ -261,8 +261,9 @@ namespace RegressionTests.Infrastructure
                   new SmtpClientSimulator().Send(
                      "test@example.test", account.Address, "Midflight", "Midflight");
                }
-               catch
+               catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
                {
+                  // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
                }
             });
 

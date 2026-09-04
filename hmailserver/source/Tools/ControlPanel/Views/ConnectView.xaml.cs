@@ -75,7 +75,7 @@ namespace hMailServer.ControlPanel.Views
             ServerSession.SetCurrent(session);
             onConnected_();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             // Connect reports its own failures through the out parameter, so
             // reaching here means something further out went wrong. Showing it

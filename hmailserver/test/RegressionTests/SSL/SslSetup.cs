@@ -61,7 +61,7 @@ namespace RegressionTests.SSL
 
       public static string GetSslCertPath()
       {
-         var sslPath = Path.Combine(TestContext.CurrentContext.TestDirectory, "..\\..\\..\\..\\SSL examples");
+         var sslPath = Paths.Combine(TestContext.CurrentContext.TestDirectory, "..\\..\\..\\..\\SSL examples");
 
          return sslPath;
       }
@@ -69,7 +69,7 @@ namespace RegressionTests.SSL
       private static string GetCertificatePfx()
       {
          var sslPath = GetSslCertPath();
-         return Path.Combine(sslPath, "localhost.pfx");
+         return Paths.Combine(sslPath, "localhost.pfx");
       }
 
       public static X509Certificate2 GetCertificate()
@@ -88,8 +88,8 @@ namespace RegressionTests.SSL
       {
          var sslPath = GetSslCertPath();
 
-         var exampleCert = Path.Combine(sslPath, "example.crt");
-         var exampleKey = Path.Combine(sslPath, "example.key");
+         var exampleCert = Paths.Combine(sslPath, "example.crt");
+         var exampleKey = Paths.Combine(sslPath, "example.key");
 
          if (!File.Exists(exampleCert))
             Assert.Fail("Certificate " + exampleCert + " was not found");

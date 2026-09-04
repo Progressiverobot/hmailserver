@@ -230,7 +230,7 @@ namespace hMailServer.ControlPanel.Views
             }
             ServerSession.Release(rule);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not load the action: " + ex.Message, "Control Panel");
             Close();
@@ -263,14 +263,14 @@ namespace hMailServer.ControlPanel.Views
                {
                   case 2:
                      a.To = to_.Text.Trim();
-                     a.AbortSpamFlagged = abortSpam_.IsChecked == true;
+                     a.AbortSpamFlagged = abortSpam_.IsChecked is true;
                      break;
                   case 3:
                      a.FromName = fromName_.Text.Trim();
                      a.FromAddress = fromAddress_.Text.Trim();
                      a.Subject = subject_.Text;
                      a.Body = body_.Text;
-                     a.AbortSpamFlagged = abortSpam_.IsChecked == true;
+                     a.AbortSpamFlagged = abortSpam_.IsChecked is true;
                      break;
                   case 4:
                      a.IMAPFolder = imapFolder_.Text.Trim();
@@ -300,7 +300,7 @@ namespace hMailServer.ControlPanel.Views
             ServerSession.Release(rule);
             Close();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not save the action: " + ex.Message, "Control Panel");
          }

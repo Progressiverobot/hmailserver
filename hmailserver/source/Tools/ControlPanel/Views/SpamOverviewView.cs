@@ -170,7 +170,7 @@ namespace hMailServer.ControlPanel.Views
             CountList(() => antiSpam.GreyListingWhiteAddresses, false, out _, out int greyList);
             config.GreylistWhiteListEntries = greyList;
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             failedReads_++;
             firstError_ ??= ServerSession.DescribeComError(ex);
@@ -190,7 +190,7 @@ namespace hMailServer.ControlPanel.Views
          {
             return read();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             failedReads_++;
             firstError_ ??= ServerSession.DescribeComError(ex);
@@ -239,7 +239,7 @@ namespace hMailServer.ControlPanel.Views
                }
             }
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             failedReads_++;
             firstError_ ??= ServerSession.DescribeComError(ex);

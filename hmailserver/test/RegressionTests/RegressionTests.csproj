@@ -216,6 +216,7 @@
       <Private>True</Private>
     </Reference>
     <Reference Include="System" />
+    <Reference Include="System.Management" />
     <Reference Include="System.Buffers, Version=4.0.5.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51">
       <HintPath>..\packages\System.Buffers.4.6.1\lib\net462\System.Buffers.dll</HintPath>
       <Private>True</Private>
@@ -390,6 +391,9 @@
     <Compile Include="Infrastructure\Persistence\DomainNameValidation.cs" />
     <None Include="Resources\MessageWithInvalidDkim.eml" />
     <None Include="Resources\MessageWithValidDkim.eml" />
+    <Compile Include="Shared\ExceptionPolicy.cs" />
+    <Compile Include="Shared\IniFile.cs" />
+    <Compile Include="Shared\Paths.cs" />
     <Compile Include="Shared\FakeDnsServer.cs" />
     <Compile Include="Shared\FakeFilterEngine.cs" />
     <Compile Include="Shared\ServerIniFile.cs" />

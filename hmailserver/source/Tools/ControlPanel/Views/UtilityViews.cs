@@ -123,7 +123,7 @@ namespace hMailServer.ControlPanel.Views
             relay.Save();
             ServerSession.Release(relay);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not add the relay: " + ex.Message, "Control Panel");
             return;
@@ -165,7 +165,7 @@ namespace hMailServer.ControlPanel.Views
                ServerSession.Release(relay);
             }
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not delete the relay: " + ex.Message, "Control Panel");
          }
@@ -218,7 +218,7 @@ namespace hMailServer.ControlPanel.Views
          run.Click += async (s, e) => await RunQuery();
          actions.Children.Add(run);
          var copy = new Wpf.Ui.Controls.Button { Content = "Copy", Margin = new Thickness(8, 0, 0, 0) };
-         copy.Click += (s, e) => { try { if (output_.Text.Length > 0) Clipboard.SetText(output_.Text); } catch (Exception) { } };
+         copy.Click += (s, e) => { try { if (output_.Text.Length > 0) Clipboard.SetText(output_.Text); } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ } };
          actions.Children.Add(copy);
          Grid.SetColumn(actions, 1);
          inputRow.Children.Add(actions);
@@ -294,7 +294,7 @@ namespace hMailServer.ControlPanel.Views
 
             output_.Text = report.ToString();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             output_.Text = "Query failed: " + ServerSession.DescribeComError(ex);
          }
@@ -402,7 +402,7 @@ namespace hMailServer.ControlPanel.Views
                ? "Sendout queued " + DateTime.Now.ToLongTimeString() + "."
                : "The server did not queue the sendout. Check the address wildcard and the hMailServer error log.";
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Sendout failed: " + ex.Message, "Control Panel");
          }
@@ -499,7 +499,7 @@ namespace hMailServer.ControlPanel.Views
          run.Click += async (s, e) => await Run();
          actions.Children.Add(run);
          var copy = new Wpf.Ui.Controls.Button { Content = "Copy", Margin = new Thickness(8, 0, 0, 0) };
-         copy.Click += (s, e) => { try { if (output_.Text.Length > 0) Clipboard.SetText(output_.Text); } catch (Exception) { } };
+         copy.Click += (s, e) => { try { if (output_.Text.Length > 0) Clipboard.SetText(output_.Text); } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ } };
          actions.Children.Add(copy);
          Grid.SetColumn(actions, 2);
          inputRow.Children.Add(actions);
@@ -597,8 +597,9 @@ namespace hMailServer.ControlPanel.Views
             }
             ServerSession.Release(domains);
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
+            // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
          }
       }
 
@@ -627,9 +628,9 @@ namespace hMailServer.ControlPanel.Views
                   dynamic result = results.Item[i];
                   string name = "", details = "";
                   bool? success = null;
-                  try { name = (string)result.Name; } catch (Exception) { }
-                  try { success = (bool)result.Result; } catch (Exception) { }
-                  try { details = (string)result.ExecutionDetails; } catch (Exception) { }
+                  try { name = (string)result.Name; } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }
+                  try { success = (bool)result.Result; } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }
+                  try { details = (string)result.ExecutionDetails; } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }
 
                   string state = success == null ? "[ ?? ]   " : success.Value ? "[ OK ]   " : "[FAIL]   ";
                   text.AppendLine(state + name);
@@ -643,7 +644,7 @@ namespace hMailServer.ControlPanel.Views
                ServerSession.Release(diagnostics);
                return text.Length > 0 ? text.ToString() : "No diagnostic results returned.";
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
             {
                return "Diagnostics failed: " + ex.Message;
             }
@@ -714,7 +715,7 @@ namespace hMailServer.ControlPanel.Views
                consistencyList_.Visibility = Visibility.Visible;
             }
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             // Nothing awaits the load started from OnEnter, so report the failure
             // on the page rather than losing it in an unobserved task.
@@ -754,7 +755,7 @@ namespace hMailServer.ControlPanel.Views
             };
          }
 
-         string path = System.IO.Path.Combine(logFolder, Services.MessageStoreConsistencyReport.FileName);
+         string path = System.IO.Path.Join(logFolder, Services.MessageStoreConsistencyReport.FileName);
          string enabledNote = enabled
             ? ""
             // Asked for by nav key rather than spelled out, so that renaming the
@@ -783,7 +784,7 @@ namespace hMailServer.ControlPanel.Views
             using var reader = new System.IO.StreamReader(stream);
             text = reader.ReadToEnd();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             return new ConsistencyResult
             {
@@ -834,13 +835,13 @@ namespace hMailServer.ControlPanel.Views
             // administrator with an "Open with" dialog and no report.
             Process.Start(new ProcessStartInfo(reportPath_) { UseShellExecute = true });
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             try
             {
                Process.Start(new ProcessStartInfo("explorer.exe", "/select,\"" + reportPath_ + "\"") { UseShellExecute = true });
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
             {
                MessageBox.Show("Could not open " + reportPath_ + ": " + ex.Message, "Control Panel");
             }

@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Text;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
 using RegressionTests.Shared;
@@ -50,31 +51,31 @@ namespace RegressionTests.Installation
       {
          get
          {
-            return Path.GetFullPath(Path.Combine(TestContext.CurrentContext.TestDirectory,
+            return Path.GetFullPath(Paths.Combine(TestContext.CurrentContext.TestDirectory,
                                                  @"..\..\..\..\..\.."));
          }
       }
 
       private static string InstallationRoot
       {
-         get { return Path.Combine(RepositoryRoot, @"hmailserver\installation"); }
+         get { return Paths.Combine(RepositoryRoot, @"hmailserver\installation"); }
       }
 
       private static string SourceRoot
       {
-         get { return Path.Combine(RepositoryRoot, @"hmailserver\source"); }
+         get { return Paths.Combine(RepositoryRoot, @"hmailserver\source"); }
       }
 
       private static string ReadRepositoryFile(string relativePath)
       {
-         string path = Path.Combine(RepositoryRoot, relativePath);
+         string path = Paths.Combine(RepositoryRoot, relativePath);
          Assert.IsTrue(File.Exists(path), "Missing file: " + path);
          return File.ReadAllText(path);
       }
 
       private static string ReadInstallerScript(string fileName)
       {
-         return ReadRepositoryFile(Path.Combine(@"hmailserver\installation", fileName));
+         return ReadRepositoryFile(Paths.Combine(@"hmailserver\installation", fileName));
       }
 
       private static IEnumerable<FileInfo> InstallerScripts()
@@ -127,22 +128,20 @@ namespace RegressionTests.Installation
 
       private static string EvaluateDefine(string expression, Dictionary<string, string> known)
       {
-         var value = string.Empty;
+         var value = new StringBuilder();
 
          // No literal in these scripts contains a '+', so splitting on it is safe.
-         foreach (string rawTerm in expression.Split('+'))
+         foreach (string term in expression.Split('+').Select(rawTerm => rawTerm.Trim()))
          {
-            string term = rawTerm.Trim();
-
             if (term.Length >= 2 && term.StartsWith("\"") && term.EndsWith("\""))
-               value += term.Substring(1, term.Length - 2);
+               value.Append(term, 1, term.Length - 2);
             else if (known.TryGetValue(term, out string knownValue))
-               value += knownValue;
+               value.Append(knownValue);
             else
                return null;
          }
 
-         return value;
+         return value.ToString();
       }
 
       private static string ResolveIspp(string text, Dictionary<string, string> defines)
@@ -298,21 +297,18 @@ namespace RegressionTests.Installation
          // create script but has its own upgrade scripts, because SQL CE rejects most
          // of the DDL the full product accepts.
          string[] engines = { "MSSQL", "MSSQLCE", "MySQL", "PGSQL" };
-         string scriptDirectory = Path.Combine(SourceRoot, "DBScripts");
+         string scriptDirectory = Paths.Combine(SourceRoot, "DBScripts");
          var missing = new List<string>();
 
-         foreach (var step in steps)
+         // 5002 is where the four-engine era starts; before that only MSSQL and
+         // MySQL scripts exist, and no supported installation is that old.
+         foreach (var step in steps.Where(step => step.To >= 5002))
          {
-            // 5002 is where the four-engine era starts; before that only MSSQL and
-            // MySQL scripts exist, and no supported installation is that old.
-            if (step.To < 5002)
-               continue;
-
             foreach (string engine in engines)
             {
                string name = "Upgrade" + step.From + "to" + step.To + engine + ".sql";
 
-               if (!File.Exists(Path.Combine(scriptDirectory, name)))
+               if (!File.Exists(Paths.Combine(scriptDirectory, name)))
                   missing.Add(name);
             }
          }
@@ -327,7 +323,7 @@ namespace RegressionTests.Installation
          // version the server rejects even though every script ran.
          foreach (string engine in engines)
          {
-            string upgrade = File.ReadAllText(Path.Combine(scriptDirectory,
+            string upgrade = File.ReadAllText(Paths.Combine(scriptDirectory,
                "Upgrade" + steps.Last().From + "to" + steps.Last().To + engine + ".sql"));
 
             Assert.IsTrue(Regex.IsMatch(upgrade, @"hm_dbversion\s+set\s+value\s*=\s*" + requiredVersion),
@@ -337,7 +333,7 @@ namespace RegressionTests.Installation
 
          foreach (string createScript in new[] { "CreateTablesMSSQL.sql", "CreateTablesMYSQL.sql", "CreateTablesPGSQL.sql" })
          {
-            string create = File.ReadAllText(Path.Combine(scriptDirectory, createScript));
+            string create = File.ReadAllText(Paths.Combine(scriptDirectory, createScript));
 
             Assert.IsTrue(Regex.IsMatch(create, @"hm_dbversion\s+values\s*\(\s*" + requiredVersion + @"\s*\)"),
                createScript + " does not create hm_dbversion at " + requiredVersion +
@@ -443,12 +439,10 @@ namespace RegressionTests.Installation
                ? text.Substring(sectionStart, nextSection.Index + 1)
                : text.Substring(sectionStart);
 
-            foreach (string entry in section.Split('\n').Select(line => line.Trim()))
+            foreach (string entry in section.Split('\n').Select(line => line.Trim())
+               .Where(line => line.StartsWith("Type:", StringComparison.OrdinalIgnoreCase) ||
+                              line.StartsWith("Name:", StringComparison.OrdinalIgnoreCase)))
             {
-               if (!entry.StartsWith("Type:", StringComparison.OrdinalIgnoreCase) &&
-                   !entry.StartsWith("Name:", StringComparison.OrdinalIgnoreCase))
-                  continue;
-
                bool recursive = entry.IndexOf("filesandordirs", StringComparison.OrdinalIgnoreCase) >= 0;
 
                foreach (string protectedPath in protectedPaths)
@@ -487,11 +481,8 @@ namespace RegressionTests.Installation
          // Directory keys and the administrator password are defaults for a fresh
          // installation only. ProgramFolder is the deliberate exception: it has to
          // follow the installation directory, which the user may have changed.
-         foreach (string entry in entries)
+         foreach (string entry in entries.Where(entry => !Regex.IsMatch(entry, @"Key:\s*""(ProgramFolder|ValidLanguages)""", RegexOptions.IgnoreCase)))
          {
-            if (Regex.IsMatch(entry, @"Key:\s*""(ProgramFolder|ValidLanguages)""", RegexOptions.IgnoreCase))
-               continue;
-
             Assert.IsTrue(entry.IndexOf("createkeyifdoesntexist", StringComparison.OrdinalIgnoreCase) >= 0,
                "[INI] entry overwrites an existing value on upgrade: " + entry +
                ". Add createkeyifdoesntexist, or an administrator's customised setting is replaced by the " +
@@ -600,7 +591,7 @@ namespace RegressionTests.Installation
 
          foreach (string project in projects)
          {
-            string text = File.ReadAllText(Path.Combine(SourceRoot, @"Tools", project));
+            string text = File.ReadAllText(Paths.Combine(SourceRoot, @"Tools", project));
             Match element = Regex.Match(text, @"<Version>(.+?)</Version>");
 
             Assert.IsTrue(element.Success, project + " has no <Version> element.");
@@ -648,7 +639,7 @@ namespace RegressionTests.Installation
          // The two halves are separate files and either one alone leaves the hang in
          // place, so both are asserted here rather than in two fixtures that could
          // pass independently while the product still waits forever.
-         string quick = File.ReadAllText(Path.Combine(SourceRoot, @"Tools\DBSetupQuick\Program.cs"));
+         string quick = File.ReadAllText(Paths.Combine(SourceRoot, @"Tools\DBSetupQuick\Program.cs"));
          Match upgrade = Regex.Match(quick, @"private static int UpgradeDatabase\(\)(.*?)\n      \}",
                                      RegexOptions.Singleline);
 
@@ -658,7 +649,7 @@ namespace RegressionTests.Installation
             "DBUpdater authenticates before it can move the schema, so without it an unattended " +
             "upgrade falls through to a modal dialog nobody is there to answer.");
 
-         string authenticator = File.ReadAllText(Path.Combine(SourceRoot, @"Tools\Shared\Miscellaneous\Authenticator.cs"));
+         string authenticator = File.ReadAllText(Paths.Combine(SourceRoot, @"Tools\Shared\Miscellaneous\Authenticator.cs"));
          int silent = authenticator.IndexOf("IsSilent()", StringComparison.Ordinal);
          int dialog = authenticator.IndexOf("formEnterPassword", StringComparison.Ordinal);
 

@@ -200,7 +200,7 @@ End Sub
             status_.Text = File.Exists(scriptPath_) ? "Loaded from disk." : "File does not exist yet; saving will create it.";
             editor_.IsEnabled = true;
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             // Keep the editor disabled: enabling it after a failed load would let a
             // save overwrite the file on disk with the empty text shown here.
@@ -220,12 +220,12 @@ End Sub
             if (!string.IsNullOrWhiteSpace(file) && Path.IsPathRooted(file))
                return file;
             if (!string.IsNullOrWhiteSpace(dir) && !string.IsNullOrWhiteSpace(file))
-               return Path.Combine(dir, file);
+               return Path.Join(dir, file);
             if (!string.IsNullOrWhiteSpace(dir))
-               return Path.Combine(dir, "EventHandlers.vbs");
+               return Path.Join(dir, "EventHandlers.vbs");
             return null;
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             return null;
          }
@@ -248,7 +248,7 @@ End Sub
 
             File.WriteAllText(scriptPath_, editor_.Text);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not write the script file: " + ex.Message, "Control Panel");
             return;
@@ -259,12 +259,12 @@ End Sub
          {
             scripting.Reload();
             string result = "";
-            try { result = (string)scripting.CheckSyntax(); } catch (Exception) { }
+            try { result = (string)scripting.CheckSyntax(); } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }
             status_.Text = string.IsNullOrWhiteSpace(result)
                ? "Saved and reloaded at " + DateTime.Now.ToLongTimeString() + ". No syntax errors."
                : "Saved. Compiler reported: " + result;
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             status_.Text = "Saved, but reload failed: " + ex.Message;
          }
@@ -284,7 +284,7 @@ End Sub
                ? "No syntax errors reported."
                : "Compiler reported: " + result;
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             status_.Text = "Syntax check failed: " + ex.Message;
          }

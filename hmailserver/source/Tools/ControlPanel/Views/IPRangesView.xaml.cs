@@ -100,7 +100,7 @@ namespace hMailServer.ControlPanel.Views
             SavePermsButton.IsEnabled = true;
             ServerSession.Release(range);
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             SavePermsButton.IsEnabled = false;
          }
@@ -135,19 +135,19 @@ namespace hMailServer.ControlPanel.Views
             if (range == null)
                return;
 
-            range.AllowSMTPConnections = PermSmtp.IsChecked == true;
-            range.AllowIMAPConnections = PermImap.IsChecked == true;
-            range.AllowPOP3Connections = PermPop3.IsChecked == true;
-            range.RequireSSLTLSForAuth = PermTlsAuth.IsChecked == true;
-            range.AllowDeliveryFromLocalToLocal = PermLL.IsChecked == true;
-            range.AllowDeliveryFromLocalToRemote = PermLR.IsChecked == true;
-            range.AllowDeliveryFromRemoteToLocal = PermRL.IsChecked == true;
-            range.AllowDeliveryFromRemoteToRemote = PermRR.IsChecked == true;
+            range.AllowSMTPConnections = PermSmtp.IsChecked is true;
+            range.AllowIMAPConnections = PermImap.IsChecked is true;
+            range.AllowPOP3Connections = PermPop3.IsChecked is true;
+            range.RequireSSLTLSForAuth = PermTlsAuth.IsChecked is true;
+            range.AllowDeliveryFromLocalToLocal = PermLL.IsChecked is true;
+            range.AllowDeliveryFromLocalToRemote = PermLR.IsChecked is true;
+            range.AllowDeliveryFromRemoteToLocal = PermRL.IsChecked is true;
+            range.AllowDeliveryFromRemoteToRemote = PermRR.IsChecked is true;
             range.Save();
             ServerSession.Release(range);
             PermHeader.Text = "Permissions - " + row.Name + " (saved)";
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not save the permissions: " + ex.Message, "Control Panel");
          }
@@ -200,7 +200,7 @@ namespace hMailServer.ControlPanel.Views
             range.Save();
             ServerSession.Release(range);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not add the range: " + ex.Message, "Control Panel");
             return;
@@ -237,7 +237,7 @@ namespace hMailServer.ControlPanel.Views
          {
             ranges.SetDefault();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show(ex.Message, "Control Panel", MessageBoxButton.OK, MessageBoxImage.Error);
          }
@@ -274,7 +274,7 @@ namespace hMailServer.ControlPanel.Views
                ServerSession.Release(range);
             }
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not delete the range: " + ex.Message, "Control Panel");
          }

@@ -8,6 +8,7 @@ using System.IO;
 using System.Reflection;
 using System.Text;
 using System.Threading;
+using System.Linq;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
 using RegressionTests.Infrastructure;
@@ -133,11 +134,8 @@ namespace RegressionTests.Sieve
       {
          var keys = new HashSet<string>();
 
-         foreach (string line in File.ReadAllLines(path))
+         foreach (string line in File.ReadAllLines(path).Where(line => line.Length > 0 && line[0] != '#'))
          {
-            if (line.Length == 0 || line[0] == '#')
-               continue;
-
             int space = line.IndexOf(' ');
             if (space > 0)
                keys.Add(line.Substring(space + 1).Trim());

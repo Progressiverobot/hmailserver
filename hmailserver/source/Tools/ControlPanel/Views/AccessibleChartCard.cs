@@ -886,7 +886,7 @@ namespace hMailServer.ControlPanel.Views
                : table.Rows.Count.ToString("N0", CultureInfo.CurrentCulture)
                  + " samples copied to the clipboard.", definition_.Title);
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             // Another process can hold the clipboard open; that is not worth a
             // dialog, and the table itself is still on screen to read.

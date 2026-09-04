@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System.IO;
-using System.Runtime.InteropServices;
+using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 
 namespace RegressionTests.Shared
@@ -24,13 +25,6 @@ namespace RegressionTests.Shared
    /// </summary>
    public static class IniFileSetting
    {
-      [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-      private static extern bool WritePrivateProfileString(string section, string key, string value, string filePath);
-
-      [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-      private static extern uint GetPrivateProfileString(string section, string key, string defaultValue,
-                                                         System.Text.StringBuilder returnedString, uint size,
-                                                         string filePath);
 
       /// <summary>
       ///    Every directory an hMailServer.ini may live in for this install. Both are
@@ -44,8 +38,18 @@ namespace RegressionTests.Shared
          return new[]
          {
             programDirectory,
-            Path.Combine(programDirectory, "Bin"),
+            Paths.Combine(programDirectory, "Bin"),
          };
+      }
+
+      /// <summary>
+      ///    The hMailServer.ini files that actually exist, out of the candidates above.
+      /// </summary>
+      public static IEnumerable<string> ExistingIniFiles()
+      {
+         return CandidateDirectories()
+            .Select(directory => Paths.Combine(directory, "hMailServer.ini"))
+            .Where(File.Exists);
       }
 
       /// <summary>
@@ -58,20 +62,15 @@ namespace RegressionTests.Shared
       {
          bool wroteAny = false;
 
-         foreach (string directory in CandidateDirectories())
+         foreach (string iniPath in ExistingIniFiles())
          {
-            string iniPath = Path.Combine(directory, "hMailServer.ini");
-
-            if (!File.Exists(iniPath))
-               continue;
-
             Assert.IsTrue(
-               WritePrivateProfileString("Settings", key, value, iniPath),
+               IniFile.WritePrivateProfileString("Settings", key, value, iniPath),
                "Failed to write " + key + " to " + iniPath + ".");
 
             // The value has to be on disk before the service is reinitialized and
             // reads it; WritePrivateProfileString caches otherwise.
-            WritePrivateProfileString(null, null, null, iniPath);
+            IniFile.WritePrivateProfileString(null, null, null, iniPath);
 
             wroteAny = true;
          }
@@ -89,18 +88,8 @@ namespace RegressionTests.Shared
       /// </summary>
       public static string Read(string key)
       {
-         foreach (string directory in CandidateDirectories())
-         {
-            string iniPath = Path.Combine(directory, "hMailServer.ini");
-
-            if (!File.Exists(iniPath))
-               continue;
-
-            var buffer = new System.Text.StringBuilder(4096);
-            GetPrivateProfileString("Settings", key, string.Empty, buffer, (uint) buffer.Capacity, iniPath);
-
-            return buffer.ToString();
-         }
+         foreach (string iniPath in ExistingIniFiles())
+            return IniFile.GetValue("Settings", key, string.Empty, iniPath);
 
          Assert.Fail("Could not locate an existing hMailServer.ini to read.");
          return string.Empty;
@@ -119,18 +108,13 @@ namespace RegressionTests.Shared
       {
          bool deletedAny = false;
 
-         foreach (string directory in CandidateDirectories())
+         foreach (string iniPath in ExistingIniFiles())
          {
-            string iniPath = Path.Combine(directory, "hMailServer.ini");
-
-            if (!File.Exists(iniPath))
-               continue;
-
             Assert.IsTrue(
-               WritePrivateProfileString("Settings", key, null, iniPath),
+               IniFile.WritePrivateProfileString("Settings", key, null, iniPath),
                "Failed to delete " + key + " from " + iniPath + ".");
 
-            WritePrivateProfileString(null, null, null, iniPath);
+            IniFile.WritePrivateProfileString(null, null, null, iniPath);
 
             deletedAny = true;
          }

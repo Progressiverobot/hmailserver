@@ -110,7 +110,7 @@ namespace StressTest
             {
                socket.Send(sb.ToString());
             }
-            catch (Exception)
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
             {
                return;
             }

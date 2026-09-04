@@ -52,7 +52,7 @@ namespace hMailServer.ControlPanel.Services
             reason = "";
             return true;
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             reason = "Active Directory is not reachable from this computer — " +
                      ServerSession.DescribeComError(ex);
@@ -76,7 +76,7 @@ namespace hMailServer.ControlPanel.Services
             defaultNc = rootDse.Properties["defaultNamingContext"].Value as string;
             configNc = rootDse.Properties["configurationNamingContext"].Value as string;
          }
-         catch
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             // Not domain-joined / unreachable — nothing to enumerate.
             return domains;
@@ -105,7 +105,7 @@ namespace hMailServer.ControlPanel.Services
                      domains.Add(dns);
                }
             }
-            catch
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
             {
                // Fall through to the default-domain fallback below.
             }

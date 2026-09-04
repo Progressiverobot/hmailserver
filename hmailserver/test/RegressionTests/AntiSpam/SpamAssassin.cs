@@ -235,7 +235,7 @@ namespace RegressionTests.AntiSpam
          {
             scoreStart = sMessageContents.IndexOf(":", scoreStart) + 2;
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             Assert.Fail(sMessageContents);
          }
@@ -338,7 +338,7 @@ namespace RegressionTests.AntiSpam
                serviceController.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(60));
             }
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             Assert.Inconclusive("Unable to stop SpamAssassin process. Is SpamAssassin installed?");
          }
@@ -364,7 +364,7 @@ namespace RegressionTests.AntiSpam
                return result.AsyncWaitHandle.WaitOne(500) && client.Connected;
             }
          }
-         catch
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             return false;
          }
@@ -394,7 +394,7 @@ namespace RegressionTests.AntiSpam
       [Description("With SAMoveVsCopy the SpamAssassin result replaces the message atomically, and the message survives")]
       public void SpamAssassinResultIsWrittenBackWhenMoveIsUsed()
       {
-         string iniPath = System.IO.Path.Combine(
+         string iniPath = Paths.Combine(
             _application.Settings.Directories.ProgramDirectory, "hMailServer.ini");
          if (!System.IO.File.Exists(iniPath))
             Assert.Ignore("hMailServer.ini is not next to the running executable in this layout.");
@@ -429,20 +429,14 @@ namespace RegressionTests.AntiSpam
 
       private static class NativeMethods
       {
-         [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
-         private static extern bool WritePrivateProfileString(string section, string key, string value, string filePath);
-
-         [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
-         private static extern uint GetPrivateProfileString(string section, string key, string defaultValue,
-            System.Text.StringBuilder returnValue, uint size, string filePath);
 
          public static bool SetIniValue(string section, string key, string value, string filePath)
-            => WritePrivateProfileString(section, key, value, filePath);
+            => IniFile.WritePrivateProfileString(section, key, value, filePath);
 
          public static string GetIniValue(string section, string key, string defaultValue, string filePath)
          {
             var buffer = new System.Text.StringBuilder(256);
-            GetPrivateProfileString(section, key, defaultValue, buffer, (uint) buffer.Capacity, filePath);
+            IniFile.GetPrivateProfileString(section, key, defaultValue, buffer, (uint) buffer.Capacity, filePath);
             return buffer.ToString();
          }
       }

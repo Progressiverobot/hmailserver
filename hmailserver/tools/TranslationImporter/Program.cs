@@ -45,12 +45,9 @@ namespace TranslationImporter
 
          string [] lines = contents.Split("\r\n".ToCharArray());
 
-         string completeStatement = "";
-         foreach (string line in lines)
+         var completeStatement = new StringBuilder();
+         foreach (string line in lines.Where(line => !string.IsNullOrEmpty(line)))
          {
-            if (string.IsNullOrEmpty(line))
-               continue;
-
             int equalsPos = line.IndexOf("=");
             if (equalsPos <= 0)
                continue;
@@ -68,10 +65,10 @@ namespace TranslationImporter
 
 
 
-            completeStatement += sqlStatement + ";";
+            completeStatement.Append(sqlStatement).Append(";");
          }
 
-         MySqlCommand command = new MySqlCommand(completeStatement, conn);
+         MySqlCommand command = new MySqlCommand(completeStatement.ToString(), conn);
          command.ExecuteNonQuery();
       }
    }

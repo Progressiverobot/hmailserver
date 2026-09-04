@@ -53,6 +53,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ExceptionPolicy.cs" />
+    <Compile Include="Paths.cs" />
     <Compile Include="DDLFileParser.cs" />
     <Compile Include="Generators\IGenerator.cs" />
     <Compile Include="Generators\MSSQLGenerator.cs" />

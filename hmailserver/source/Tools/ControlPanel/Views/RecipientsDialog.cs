@@ -166,8 +166,9 @@ namespace hMailServer.ControlPanel.Views
                ServerSession.Release(list);
             }
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
+            // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
          }
          finally
          {
@@ -198,7 +199,7 @@ namespace hMailServer.ControlPanel.Views
                ServerSession.Release(list);
             }
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not add the recipient: " + ex.Message, "Control Panel");
          }
@@ -253,7 +254,7 @@ namespace hMailServer.ControlPanel.Views
                ServerSession.Release(list);
             }
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not add all recipients: " + ServerSession.DescribeComError(ex), "Control Panel");
          }
@@ -300,7 +301,7 @@ namespace hMailServer.ControlPanel.Views
                ServerSession.Release(list);
             }
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not remove the recipient: " + ex.Message, "Control Panel");
          }

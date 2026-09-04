@@ -6,6 +6,7 @@
 using System;
 using System.Security.Cryptography;
 using System.Text;
+using System.Linq;
 using hMailServer;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
@@ -98,7 +99,7 @@ namespace RegressionTests.IMAP
                {
                   last = simulator.Send("A" + i + " LOGIN capimap@example.test wrongpassword");
                }
-               catch (Exception)
+               catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
                {
                   disconnected = true;
                   break;
@@ -2149,7 +2150,7 @@ namespace RegressionTests.IMAP
          simulator.Logon("outofbounds@example.test", "test");
 
          var s = simulator.Send("A01 RENAME TEST");
-         if (s.StartsWith("A01 BAD") == false)
+         if (s.StartsWith("A01 !BAD"))
             throw new Exception("ERROR - Out of bounds test failed");
       }
 
@@ -2748,10 +2749,8 @@ namespace RegressionTests.IMAP
 
       private static string Attribute(string message, string key)
       {
-         foreach (var part in message.Split(','))
-            if (part.StartsWith(key + "="))
-               return part.Substring(key.Length + 1);
-         return "";
+         string part = message.Split(',').FirstOrDefault(candidate => candidate.StartsWith(key + "="));
+         return part == null ? "" : part.Substring(key.Length + 1);
       }
 
       private static byte[] Hmac(byte[] key, string data)

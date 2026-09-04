@@ -96,7 +96,7 @@ namespace RegressionTests.SMTP
             var message = Pop3ClientSimulator.AssertGetFirstMessageText(_account.Address, "test");
             Assert.IsTrue(message.Contains(" with ESMTPSA"));
          }
-         catch (Exception e)
+         catch (Exception e) when (!ExceptionPolicy.IsFatal(e))
          {
             Assert.Fail(e.ToString());
          }
@@ -119,7 +119,7 @@ namespace RegressionTests.SMTP
             Assert.IsTrue(message.Contains("cipher="));
             Assert.IsTrue(message.Contains("bits="));
          }
-         catch (Exception e)
+         catch (Exception e) when (!ExceptionPolicy.IsFatal(e))
          {
             Assert.Fail(e.ToString());
          }
@@ -141,7 +141,7 @@ namespace RegressionTests.SMTP
             var message = Pop3ClientSimulator.AssertGetFirstMessageText(_account.Address, "test");
             Assert.IsFalse(message.Contains("cipher\r\n"));
          }
-         catch (Exception e)
+         catch (Exception e) when (!ExceptionPolicy.IsFatal(e))
          {
             Assert.Fail(e.ToString());
          }

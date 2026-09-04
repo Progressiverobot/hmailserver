@@ -14,6 +14,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
+using System.Linq;
 using hMailServer;
 using NUnit.Framework;
 using RegressionTests.Infrastructure;
@@ -106,7 +107,7 @@ namespace RegressionTests.Shared
                ServiceRestartDetector.ExpectedProcessId = null;
                return;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
             {
                last = ex;
                Thread.Sleep(500);
@@ -243,7 +244,7 @@ namespace RegressionTests.Shared
          if (_settings.IMAPHierarchyDelimiter != ".")
             _settings.IMAPHierarchyDelimiter = ".";
 
-         if (_settings.IMAPACLEnabled != true)
+         if (!_settings.IMAPACLEnabled)
             _settings.IMAPACLEnabled = true;
 
          if (_settings.MaxMessageSize != 20480)
@@ -320,12 +321,11 @@ namespace RegressionTests.Shared
 
          if (application.ServerState == eServerState.hStateStopped)
             application.Start();
-         else if (application.ServerState == eServerState.hStateRunning)
-            if (restartRequired)
-            {
-               application.Stop();
-               application.Start();
-            }
+         else if (application.ServerState == eServerState.hStateRunning && restartRequired)
+         {
+            application.Stop();
+            application.Start();
+         }
 
          CustomAsserts.AssertRecipientsInDeliveryQueue(0);
 
@@ -355,7 +355,7 @@ namespace RegressionTests.Shared
             }
          }
 
-         if (blockExists == false)
+         if (!blockExists)
          {
             var item = antiVirusSettings.BlockedAttachments.Add();
             item.Description = "Batch scripts";
@@ -407,7 +407,7 @@ namespace RegressionTests.Shared
          while (folders.Count > 0)
             folders.DeleteByDBID(folders[0].ID);
 
-         var publicFolderPath = Path.Combine(_settings.Directories.DataDirectory, "#Public");
+         var publicFolderPath = Paths.Combine(_settings.Directories.DataDirectory, "#Public");
          if (Directory.Exists(publicFolderPath))
             Directory.Delete(publicFolderPath, true);
       }
@@ -789,26 +789,19 @@ namespace RegressionTests.Shared
 
          var allAddresses = new StringBuilder();
 
-         foreach (NetworkInterface ni in NetworkInterface.GetAllNetworkInterfaces())
+         foreach (NetworkInterface ni in NetworkInterface.GetAllNetworkInterfaces().Where(ni => ni.OperationalStatus == OperationalStatus.Up))
          {
-            if (ni.OperationalStatus != OperationalStatus.Up)
-               continue;
-
-            foreach (UnicastIPAddressInformation ipInfo in ni.GetIPProperties().UnicastAddresses)
+            foreach (IPAddress ip in ni.GetIPProperties().UnicastAddresses.Select(ipInfo => ipInfo.Address))
             {
-               IPAddress ip = ipInfo.Address;
                allAddresses.AppendLine($"Family: {ip.AddressFamily}, Address: {ip}");
 
-               if (ip.AddressFamily == AddressFamily.InterNetwork)
+               // Only private IPv4 networks. The machine may have several private addresses
+               // (LAN, VPN tunnels, virtual switches); the server does not listen on all
+               // of them, so probe SMTP to find one where it is actually reachable.
+               if (ip.AddressFamily == AddressFamily.InterNetwork && IsPrivateIp(ip) && CanConnectToLocalServer(ip))
                {
-                  // Only private networks. The machine may have several private addresses
-                  // (LAN, VPN tunnels, virtual switches); the server does not listen on all
-                  // of them, so probe SMTP to find one where it is actually reachable.
-                  if (IsPrivateIp(ip) && CanConnectToLocalServer(ip))
-                  {
-                     _localIpAddress = ip;
-                     return ip;
-                  }
+                  _localIpAddress = ip;
+                  return ip;
                }
             }
          }

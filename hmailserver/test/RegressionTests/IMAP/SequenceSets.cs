@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System;
+using System.Linq;
 using NUnit.Framework;
 using RegressionTests.Infrastructure;
 using RegressionTests.Shared;
@@ -38,15 +39,8 @@ namespace RegressionTests.IMAP
 
       private static int CountUntaggedResponses(string response, string responseName)
       {
-         var count = 0;
-
-         foreach (var line in response.Split(new[] {"\r\n"}, StringSplitOptions.RemoveEmptyEntries))
-         {
-            if (line.StartsWith("* ") && line.Contains(" " + responseName + " "))
-               count++;
-         }
-
-         return count;
+         return response.Split(new[] {"\r\n"}, StringSplitOptions.RemoveEmptyEntries)
+            .Count(line => line.StartsWith("* ") && line.Contains(" " + responseName + " "));
       }
 
       private static int CountOccurrences(string text, string value)

@@ -4,6 +4,7 @@
 
 using System.IO;
 using System.Reflection;
+using System.Threading;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
 using RegressionTests.Infrastructure;
@@ -31,6 +32,12 @@ namespace RegressionTests.Sieve
 
       private static int accountSequence_;
 
+      // Unique per account created by this fixture, however the tests are ordered or parallelised.
+      private static int NextAccountSequence()
+      {
+         return Interlocked.Increment(ref accountSequence_);
+      }
+
       private static void SetScript(Account account, string script)
       {
          account.GetType().InvokeMember(
@@ -50,24 +57,24 @@ namespace RegressionTests.Sieve
          string domain = account.Address.Substring(account.Address.IndexOf('@') + 1);
          string localPart = account.Address.Substring(0, account.Address.IndexOf('@'));
 
-         string scriptsDir = Path.Combine(dataDir, "Sieve", domain, localPart, "scripts");
+         string scriptsDir = Paths.Combine(dataDir, "Sieve", domain, localPart, "scripts");
          Directory.CreateDirectory(scriptsDir);
-         File.WriteAllText(Path.Combine(scriptsDir, name + ".sieve"), content);
+         File.WriteAllText(Paths.Combine(scriptsDir, name + ".sieve"), content);
       }
 
       private void StoreGlobalScript(string name, string content)
       {
          string dataDir = _settings.Directories.DataDirectory;
-         string globalDir = Path.Combine(dataDir, "Sieve", "_global");
+         string globalDir = Paths.Combine(dataDir, "Sieve", "_global");
          Directory.CreateDirectory(globalDir);
-         File.WriteAllText(Path.Combine(globalDir, name + ".sieve"), content);
+         File.WriteAllText(Paths.Combine(globalDir, name + ".sieve"), content);
       }
 
       private Account NewRecipient(string activeScript, params string[] folders)
       {
-         accountSequence_++;
+         int sequence = NextAccountSequence();
          Account recipient = SingletonProvider<TestSetup>.Instance.AddAccount(
-            _domain, "sieve-inc-" + accountSequence_ + "@example.test", Password);
+            _domain, "sieve-inc-" + sequence + "@example.test", Password);
 
          foreach (string folder in folders)
             recipient.IMAPFolders.Add(folder);

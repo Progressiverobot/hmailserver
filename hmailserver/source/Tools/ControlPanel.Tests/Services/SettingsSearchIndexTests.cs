@@ -80,24 +80,18 @@ namespace hMailServer.ControlPanel.Tests.Services
 
          var expected = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-         string featureSource = File.ReadAllText(Path.Combine(controlPanel, "Views", "FeatureSettingsView.xaml.cs"));
-         foreach (Match m in Regex.Matches(featureSource, "Key = \"([^\"]+)\"[^}]*?Label = \"([^\"]*)\""))
-         {
-            if (!string.IsNullOrWhiteSpace(m.Groups[2].Value))
-               expected.Add(m.Groups[1].Value);
-         }
+         string featureSource = File.ReadAllText(Path.Join(controlPanel, "Views", "FeatureSettingsView.xaml.cs"));
+         expected.UnionWith(Regex.Matches(featureSource, "Key = \"([^\"]+)\"[^}]*?Label = \"([^\"]*)\"")
+            .Where(m => !string.IsNullOrWhiteSpace(m.Groups[2].Value))
+            .Select(m => m.Groups[1].Value));
 
-         string serverSource = File.ReadAllText(Path.Combine(controlPanel, "Views", "ServerSettingsView.xaml.cs"));
-         foreach (Match m in Regex.Matches(serverSource, "Path = \"([^\"]+)\",\\s*Label = \"([^\"]*)\""))
-         {
-            if (!string.IsNullOrWhiteSpace(m.Groups[2].Value))
-               expected.Add(m.Groups[1].Value);
-         }
-         foreach (Match m in Regex.Matches(serverSource, "Label = \"([^\"]*)\",\\s*Path = \"([^\"]+)\""))
-         {
-            if (!string.IsNullOrWhiteSpace(m.Groups[1].Value))
-               expected.Add(m.Groups[2].Value);
-         }
+         string serverSource = File.ReadAllText(Path.Join(controlPanel, "Views", "ServerSettingsView.xaml.cs"));
+         expected.UnionWith(Regex.Matches(serverSource, "Path = \"([^\"]+)\",\\s*Label = \"([^\"]*)\"")
+            .Where(m => !string.IsNullOrWhiteSpace(m.Groups[2].Value))
+            .Select(m => m.Groups[1].Value));
+         expected.UnionWith(Regex.Matches(serverSource, "Label = \"([^\"]*)\",\\s*Path = \"([^\"]+)\"")
+            .Where(m => !string.IsNullOrWhiteSpace(m.Groups[1].Value))
+            .Select(m => m.Groups[2].Value));
 
          var indexed = new HashSet<string>(SettingsSearchIndex.Entries.Select(e => e.Key), StringComparer.OrdinalIgnoreCase);
 
@@ -207,19 +201,17 @@ namespace hMailServer.ControlPanel.Tests.Services
          var indexed = new HashSet<string>(SettingsSearchIndex.Entries.Select(e => e.Key), StringComparer.OrdinalIgnoreCase);
          var missing = new List<string>();
 
-         foreach (string file in Directory.GetFiles(Path.Combine(controlPanel, "Views"), "*.cs"))
+         foreach (string file in Directory.GetFiles(Path.Join(controlPanel, "Views"), "*.cs"))
          {
             // The two table-driven views are covered by Index_MatchesTheSettingsPages.
             string name = Path.GetFileName(file);
             if (name.StartsWith("FeatureSettingsView.") || name.StartsWith("ServerSettingsView."))
                continue;
 
-            foreach (Match m in Regex.Matches(File.ReadAllText(file), "\\.(?:Read|Write)(?:Bool|String|Int|Number)\\(\\s*\"([^\"]+)\""))
-            {
-               string key = m.Groups[1].Value;
-               if (!indexed.Contains(key))
-                  missing.Add(name + ": " + key);
-            }
+            missing.AddRange(Regex.Matches(File.ReadAllText(file), "\\.(?:Read|Write)(?:Bool|String|Int|Number)\\(\\s*\"([^\"]+)\"")
+               .Select(m => m.Groups[1].Value)
+               .Where(key => !indexed.Contains(key))
+               .Select(key => name + ": " + key));
          }
 
          Assert.True(missing.Count == 0,
@@ -306,7 +298,7 @@ namespace hMailServer.ControlPanel.Tests.Services
          if (controlPanel == null)
             return null;
 
-         string path = Path.Combine(controlPanel, "MainWindow.xaml.cs");
+         string path = Path.Join(controlPanel, "MainWindow.xaml.cs");
          return File.Exists(path) ? File.ReadAllText(path) : null;
       }
 
@@ -317,8 +309,8 @@ namespace hMailServer.ControlPanel.Tests.Services
 
          while (directory != null)
          {
-            string candidate = Path.Combine(directory.FullName, "ControlPanel");
-            if (Directory.Exists(Path.Combine(candidate, "Views")))
+            string candidate = Path.Join(directory.FullName, "ControlPanel");
+            if (Directory.Exists(Path.Join(candidate, "Views")))
                return candidate;
 
             directory = directory.Parent;

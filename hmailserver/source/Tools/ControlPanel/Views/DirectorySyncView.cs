@@ -4,8 +4,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices;
-using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -441,13 +439,6 @@ namespace hMailServer.ControlPanel.Views
       // Control Panel that cannot reach the INI can still run a synchronisation - it
       // just cannot change what the synchronisation selects.
 
-      [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-      private static extern int GetPrivateProfileString(string section, string key, string defaultValue,
-         StringBuilder result, int size, string filePath);
-
-      [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-      private static extern bool WritePrivateProfileString(string section, string key, string value, string filePath);
-
       private string IniRead_(string key, string fallback)
       {
          if (!store_.IsAvailable)
@@ -455,9 +446,7 @@ namespace hMailServer.ControlPanel.Views
 
          // 4096, the same buffer LdapSettings::ReadString_ uses, so this page sees
          // exactly the value - and exactly the truncation - the server sees.
-         var buffer = new StringBuilder(4096);
-         GetPrivateProfileString(IniSection, key, fallback, buffer, buffer.Capacity, store_.IniPath);
-         return buffer.ToString().Trim();
+         return ProfileApi.ReadString(IniSection, key, fallback, store_.IniPath, 4096).Trim();
       }
 
       private void Load_()
@@ -506,16 +495,16 @@ namespace hMailServer.ControlPanel.Views
 
          try
          {
-            WritePrivateProfileString(IniSection, "SyncFilter", filter_.Text.Trim(), store_.IniPath);
-            WritePrivateProfileString(IniSection, "SyncMailAttribute", mailAttribute_.Text.Trim(), store_.IniPath);
-            WritePrivateProfileString(IniSection, "SyncUsernameAttribute", usernameAttribute_.Text.Trim(), store_.IniPath);
-            WritePrivateProfileString(IniSection, "SyncDisplayNameAttribute", displayNameAttribute_.Text.Trim(), store_.IniPath);
-            WritePrivateProfileString(IniSection, "SyncMaxUsers", maxUsers_.Text.Trim(), store_.IniPath);
-            WritePrivateProfileString(IniSection, "SyncScheduleMinutes", scheduleMinutes_.Text.Trim(), store_.IniPath);
+            ProfileApi.WriteString(IniSection, "SyncFilter", filter_.Text.Trim(), store_.IniPath);
+            ProfileApi.WriteString(IniSection, "SyncMailAttribute", mailAttribute_.Text.Trim(), store_.IniPath);
+            ProfileApi.WriteString(IniSection, "SyncUsernameAttribute", usernameAttribute_.Text.Trim(), store_.IniPath);
+            ProfileApi.WriteString(IniSection, "SyncDisplayNameAttribute", displayNameAttribute_.Text.Trim(), store_.IniPath);
+            ProfileApi.WriteString(IniSection, "SyncMaxUsers", maxUsers_.Text.Trim(), store_.IniPath);
+            ProfileApi.WriteString(IniSection, "SyncScheduleMinutes", scheduleMinutes_.Text.Trim(), store_.IniPath);
 
             // Flush the cache the API keeps, so the value is on disk before the server
             // next compares the file's write time.
-            WritePrivateProfileString(null, null, null, store_.IniPath);
+            ProfileApi.Flush(store_.IniPath);
 
             footerStatus_.Text = "Saved. The server picks the selection up within two seconds; a change to the "
                                  + "schedule needs a service restart.";
@@ -524,7 +513,7 @@ namespace hMailServer.ControlPanel.Views
             // it no longer describes what Apply would do.
             InvalidatePreview_();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             footerStatus_.Text = "Could not save: " + ex.Message;
          }
@@ -569,7 +558,7 @@ namespace hMailServer.ControlPanel.Views
                   if (!string.IsNullOrEmpty(linked) && linked.Trim().Length > 0)
                      domainChoice_.Items.Add((string)domain.Name);
                }
-               catch
+               catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
                {
                   // One domain that cannot be read costs that domain's row, not the
                   // list. A page that threw here would be unusable because of a single
@@ -588,7 +577,7 @@ namespace hMailServer.ControlPanel.Views
             // already correct.
             domainsRead_ = true;
          }
-         catch
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             // No server connection. The state card says so, and says it is a
             // connection problem rather than a configuration one; the list keeps its
@@ -681,7 +670,7 @@ namespace hMailServer.ControlPanel.Views
          // values below then differ; Save_ also invalidates explicitly, so it holds
          // even for a save that writes the same values back.
          return (domainChoice_.SelectedIndex <= 0 ? "" : (string)domainChoice_.SelectedItem)
-                + "|" + (disableMissing_.IsChecked == true ? "1" : "0")
+                + "|" + (disableMissing_.IsChecked is true ? "1" : "0")
                 + "|" + IniRead_("SyncFilter", "")
                 + "|" + IniRead_("SyncMailAttribute", "mail")
                 + "|" + IniRead_("SyncUsernameAttribute", "sAMAccountName")
@@ -705,7 +694,7 @@ namespace hMailServer.ControlPanel.Views
       private async Task RunAsync_(bool apply)
       {
          string domain = domainChoice_.SelectedIndex <= 0 ? "" : (string)domainChoice_.SelectedItem;
-         bool disableMissing = disableMissing_.IsChecked == true;
+         bool disableMissing = disableMissing_.IsChecked is true;
          string options = CurrentOptions_();
 
          previewButton_.IsEnabled = false;
@@ -740,7 +729,7 @@ namespace hMailServer.ControlPanel.Views
                previewedOptions_ = null;
             }
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             summaryText_.Text = "The run failed: " + ServerSession.DescribeComError(ex);
             previewedOptions_ = null;
@@ -766,7 +755,7 @@ namespace hMailServer.ControlPanel.Views
 
          MessageBoxResult answer = MessageBox.Show(
             "This creates and updates mailboxes on the server to match the directory"
-            + (disableMissing_.IsChecked == true
+            + (disableMissing_.IsChecked is true
                ? ", and marks accounts inactive when their directory entry has gone."
                : ". No account will be disabled.")
             + "\r\n\r\nNo message is deleted and no account is removed. Continue?",
@@ -809,18 +798,15 @@ namespace hMailServer.ControlPanel.Views
          {
             settings = ServerSession.Current.Application.Settings;
 
-            // Written out long-hand rather than as a ternary, and `text` initialised
-            // rather than merely declared. Both are because the call is dispatched
-            // dynamically: definite-assignment analysis cannot see through a dynamic
-            // invocation, so an out parameter it fills does not count as assigned at
-            // compile time.
+            // `text` is initialised rather than merely declared because the call is
+            // dispatched dynamically: definite-assignment analysis cannot see through
+            // a dynamic invocation, so an out parameter it fills does not count as
+            // assigned at compile time.
             string text = string.Empty;
-            bool ok;
 
-            if (apply)
-               ok = (bool)settings.ApplyDirectorySync(domain, disableMissing, out text);
-            else
-               ok = (bool)settings.PreviewDirectorySync(domain, disableMissing, out text);
+            bool ok = apply
+               ? (bool)settings.ApplyDirectorySync(domain, disableMissing, out text)
+               : (bool)settings.PreviewDirectorySync(domain, disableMissing, out text);
 
             return Tuple.Create(ok, text ?? string.Empty);
          }

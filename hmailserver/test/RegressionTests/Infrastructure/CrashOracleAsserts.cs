@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using NUnit.Framework;
 using RegressionTests.Shared;
 
@@ -43,7 +44,7 @@ namespace RegressionTests.Infrastructure
       {
          var logDirectory = SingletonProvider<TestSetup>.Instance.GetApp().Settings.Directories.LogDirectory;
 
-         return Path.Combine(logDirectory, MarkerFileName);
+         return Paths.Combine(logDirectory, MarkerFileName);
       }
 
       /// <summary>
@@ -67,22 +68,11 @@ namespace RegressionTests.Infrastructure
             contents = textReader.ReadToEnd();
          }
 
-         var records = new List<string>();
-
-         foreach (var raw in contents.Split('\n'))
-         {
-            var line = raw.Trim();
-
-            if (line.Length == 0)
-               continue;
-
-            if (kind != null && !line.Contains(" " + kind + " "))
-               continue;
-
-            records.Add(line);
-         }
-
-         return records.ToArray();
+         return contents.Split('\n')
+            .Select(raw => raw.Trim())
+            .Where(line => line.Length > 0)
+            .Where(line => kind == null || line.Contains(" " + kind + " "))
+            .ToArray();
       }
 
       public static void Clear()
@@ -135,7 +125,7 @@ namespace RegressionTests.Infrastructure
 
          try
          {
-            var archived = Path.Combine(
+            var archived = Paths.Combine(
                Path.GetDirectoryName(file),
                string.Format("crash-oracle.{0:yyyyMMdd-HHmmss-fff}.log", DateTime.Now));
 
@@ -197,12 +187,9 @@ namespace RegressionTests.Infrastructure
          {
             var records = ReadRecords(kind);
 
-            foreach (var record in records)
-               if (record.Contains(expectedContent))
-               {
-                  found = record;
-                  return;
-               }
+            found = records.FirstOrDefault(record => record.Contains(expectedContent));
+            if (found != null)
+               return;
 
             throw new Exception(string.Format(
                "No {0} record containing '{1}' in {2}. Records found: {3}",

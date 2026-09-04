@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System.Reflection;
+using System.Threading;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
 using RegressionTests.Infrastructure;
@@ -31,6 +32,12 @@ namespace RegressionTests.Sieve
 
       private static int accountSequence_;
 
+      // Unique per account created by this fixture, however the tests are ordered or parallelised.
+      private static int NextAccountSequence()
+      {
+         return Interlocked.Increment(ref accountSequence_);
+      }
+
       private static void SetScript(Account account, string script)
       {
          account.GetType().InvokeMember(
@@ -39,9 +46,9 @@ namespace RegressionTests.Sieve
 
       private Account NewRecipient(string script)
       {
-         accountSequence_++;
+         int sequence = NextAccountSequence();
          Account recipient = SingletonProvider<TestSetup>.Instance.AddAccount(
-            _domain, "sieve-dup-" + accountSequence_ + "@example.test", Password);
+            _domain, "sieve-dup-" + sequence + "@example.test", Password);
 
          recipient.IMAPFolders.Add(TargetFolder);
          SetScript(recipient, script);

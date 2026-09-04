@@ -161,8 +161,9 @@ namespace RegressionTests.SMTP
             {
                _stream.Dispose();
             }
-            catch
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
             {
+               // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
             }
 
             _client.Close();

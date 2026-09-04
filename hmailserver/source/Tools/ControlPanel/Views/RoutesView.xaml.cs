@@ -92,7 +92,7 @@ namespace hMailServer.ControlPanel.Views
             route.Save();
             ServerSession.Release(route);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not add the route: " + ex.Message, "Control Panel");
             return;
@@ -143,7 +143,7 @@ namespace hMailServer.ControlPanel.Views
                ServerSession.Release(route);
             }
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not delete the route: " + ex.Message, "Control Panel");
          }

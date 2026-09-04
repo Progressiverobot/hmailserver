@@ -109,7 +109,7 @@ namespace RegressionTests.Security
          _settings.AutoBanOnLogonFailure = false;
          _settings.ClearLogonFailureList();
 
-         _es256PublicKeyPath = Path.Combine(
+         _es256PublicKeyPath = Paths.Combine(
             _application.Settings.Directories.ProgramDirectory, "hm_oauth2_test_es256.pem");
 
          using (ECDsa ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256))
@@ -152,7 +152,7 @@ namespace RegressionTests.Security
          _settings.AutoBanOnLogonFailure = false;
          _settings.ClearLogonFailureList();
 
-         _es256PublicKeyPath = Path.Combine(
+         _es256PublicKeyPath = Paths.Combine(
             _application.Settings.Directories.ProgramDirectory, "hm_oauth2_test_es256_denied.pem");
 
          using (ECDsa ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256))
@@ -196,7 +196,7 @@ namespace RegressionTests.Security
          _settings.AutoBanOnLogonFailure = false;
          _settings.ClearLogonFailureList();
 
-         _es256PublicKeyPath = Path.Combine(
+         _es256PublicKeyPath = Paths.Combine(
             _application.Settings.Directories.ProgramDirectory, "hm_oauth2_test_es256_rsakey.pem");
 
          using (ECDsa ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256))

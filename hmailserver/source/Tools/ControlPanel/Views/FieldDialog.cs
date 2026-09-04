@@ -113,7 +113,7 @@ namespace hMailServer.ControlPanel.Views
                   else
                      AutomationProperties.SetAutomationId(box, prop);
                   host.Children.Add(box);
-                  committers_.Add(() => { Result[prop] = box.IsChecked == true; return true; });
+                  committers_.Add(() => { Result[prop] = box.IsChecked is true; return true; });
                   break;
                }
             case CollectionEditorView.FieldKind.Combo:
@@ -175,7 +175,7 @@ namespace hMailServer.ControlPanel.Views
                {
                   host.Children.Add(Label(f.Label));
                   double cur = 0;
-                  try { cur = Convert.ToDouble(current ?? 0); } catch (Exception) { cur = 0; }
+                  try { cur = Convert.ToDouble(current ?? 0); } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { cur = 0; }
                   var box = new Wpf.Ui.Controls.NumberBox
                   {
                      Value = cur,

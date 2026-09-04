@@ -8,7 +8,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System;
-using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Win32;
@@ -167,9 +166,6 @@ namespace hMailServer.ControlPanel.Services
       private const string RegistryKeyPath = @"SOFTWARE\hMailServer";
       private const string RegistryValueName = "AdminTotpSecret";
 
-      private const int CryptProtectUiForbidden = 0x1;
-      private const int CryptProtectLocalMachine = 0x4;
-
       public static bool IsConfigured() => !string.IsNullOrEmpty(ReadSecret());
 
       public static string ReadSecret()
@@ -188,7 +184,7 @@ namespace hMailServer.ControlPanel.Services
                return unprotected == null ? null : Encoding.ASCII.GetString(unprotected);
             }
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             return null;
          }
@@ -213,75 +209,34 @@ namespace hMailServer.ControlPanel.Services
          }
       }
 
-      // ---- DPAPI (machine scope) via crypt32.dll ----
-
-      [StructLayout(LayoutKind.Sequential)]
-      private struct DataBlob
-      {
-         public int cbData;
-         public IntPtr pbData;
-      }
-
-      [DllImport("crypt32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-      private static extern bool CryptProtectData(
-         ref DataBlob pDataIn, string szDataDescr, IntPtr pOptionalEntropy,
-         IntPtr pvReserved, IntPtr pPromptStruct, int dwFlags, ref DataBlob pDataOut);
-
-      [DllImport("crypt32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-      private static extern bool CryptUnprotectData(
-         ref DataBlob pDataIn, IntPtr ppszDataDescr, IntPtr pOptionalEntropy,
-         IntPtr pvReserved, IntPtr pPromptStruct, int dwFlags, ref DataBlob pDataOut);
-
-      [DllImport("kernel32.dll")]
-      private static extern IntPtr LocalFree(IntPtr hMem);
+      // ---- DPAPI (machine scope) ----
+      //
+      // ProtectedData is the framework's wrapper around the same CryptProtectData /
+      // CryptUnprotectData calls this file used to declare itself, with the same
+      // flags (machine scope, UI forbidden) and no entropy, so a secret protected
+      // by an earlier Control Panel still unprotects here and vice versa.
 
       private static byte[] Protect(byte[] data)
       {
-         var inBlob = new DataBlob();
-         var outBlob = new DataBlob();
          try
          {
-            inBlob.pbData = Marshal.AllocHGlobal(data.Length);
-            inBlob.cbData = data.Length;
-            Marshal.Copy(data, 0, inBlob.pbData, data.Length);
-
-            if (!CryptProtectData(ref inBlob, null, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero,
-                  CryptProtectLocalMachine | CryptProtectUiForbidden, ref outBlob))
-               return null;
-
-            byte[] result = new byte[outBlob.cbData];
-            Marshal.Copy(outBlob.pbData, result, 0, outBlob.cbData);
-            return result;
+            return ProtectedData.Protect(data, null, DataProtectionScope.LocalMachine);
          }
-         finally
+         catch (CryptographicException)
          {
-            if (inBlob.pbData != IntPtr.Zero) Marshal.FreeHGlobal(inBlob.pbData);
-            if (outBlob.pbData != IntPtr.Zero) LocalFree(outBlob.pbData);
+            return null;
          }
       }
 
       private static byte[] Unprotect(byte[] data)
       {
-         var inBlob = new DataBlob();
-         var outBlob = new DataBlob();
          try
          {
-            inBlob.pbData = Marshal.AllocHGlobal(data.Length);
-            inBlob.cbData = data.Length;
-            Marshal.Copy(data, 0, inBlob.pbData, data.Length);
-
-            if (!CryptUnprotectData(ref inBlob, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero,
-                  CryptProtectLocalMachine | CryptProtectUiForbidden, ref outBlob))
-               return null;
-
-            byte[] result = new byte[outBlob.cbData];
-            Marshal.Copy(outBlob.pbData, result, 0, outBlob.cbData);
-            return result;
+            return ProtectedData.Unprotect(data, null, DataProtectionScope.LocalMachine);
          }
-         finally
+         catch (CryptographicException)
          {
-            if (inBlob.pbData != IntPtr.Zero) Marshal.FreeHGlobal(inBlob.pbData);
-            if (outBlob.pbData != IntPtr.Zero) LocalFree(outBlob.pbData);
+            return null;
          }
       }
    }

@@ -137,7 +137,7 @@ namespace hMailServer.ControlPanel.Views
                ServerSession.Release(aliases);
                ServerSession.Release(domain);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
             {
                error = ServerSession.DescribeComError(ex);
             }
@@ -173,7 +173,7 @@ namespace hMailServer.ControlPanel.Views
                ServerSession.Release(lists);
                ServerSession.Release(domain);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
             {
                error = ServerSession.DescribeComError(ex);
             }
@@ -213,7 +213,7 @@ namespace hMailServer.ControlPanel.Views
             ServerSession.Release(aliases);
             ServerSession.Release(domain);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not create the alias: " + ex.Message, "Control Panel");
             return;
@@ -257,7 +257,7 @@ namespace hMailServer.ControlPanel.Views
             ServerSession.Release(aliases);
             ServerSession.Release(domain);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not delete the alias: " + ex.Message, "Control Panel");
          }
@@ -288,7 +288,7 @@ namespace hMailServer.ControlPanel.Views
             ServerSession.Release(lists);
             ServerSession.Release(domain);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not create the list: " + ex.Message, "Control Panel");
             return;
@@ -353,7 +353,7 @@ namespace hMailServer.ControlPanel.Views
             ServerSession.Release(lists);
             ServerSession.Release(domain);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not delete the list: " + ex.Message, "Control Panel");
          }
@@ -454,7 +454,7 @@ namespace hMailServer.ControlPanel.Views
 
             domains.DeleteByDBID(domainId);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not delete the domain: " + ex.Message, "Control Panel");
          }
@@ -484,7 +484,7 @@ namespace hMailServer.ControlPanel.Views
             domain.Save();
             ServerSession.Release(domain);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             // Without this, a duplicate name - the likeliest failure - took the
             // whole window down instead of saying so.
@@ -504,7 +504,7 @@ namespace hMailServer.ControlPanel.Views
       {
          string pw = Services.PasswordGenerator.Generate(16);
          NewAccountPassword.Password = pw;
-         try { Clipboard.SetText(pw); } catch (Exception) { }
+         try { Clipboard.SetText(pw); } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }
          Services.Toast.Info("Generated password copied to clipboard \u2014 reveal it with the eye icon.", "Password");
       }
 
@@ -534,7 +534,7 @@ namespace hMailServer.ControlPanel.Views
             ServerSession.Release(accounts);
             ServerSession.Release(domain);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not create the account: " + ex.Message, "Control Panel");
             return;
@@ -581,7 +581,7 @@ namespace hMailServer.ControlPanel.Views
             ServerSession.Release(accounts);
             ServerSession.Release(domain);
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             MessageBox.Show("Could not delete the account: " + ex.Message, "Control Panel");
          }

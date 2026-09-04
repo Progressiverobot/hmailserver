@@ -195,16 +195,13 @@ namespace VMTestRunner.Console
 
          CreateDirectory(destination);
 
-         foreach (string fileName in Directory.GetFiles(source))
-         {
-            var fileInfo = new FileInfo(fileName);
-            CopyFileToGuest(fileInfo.FullName, Path.Combine(destination, fileInfo.Name));
-         }
+         foreach (FileInfo fileInfo in new DirectoryInfo(source).GetFiles())
+            CopyFileToGuest(fileInfo.FullName, Paths.Combine(destination, fileInfo.Name));
 
          foreach (string subDir in Directory.GetDirectories(source))
          {
             var dirInfo = new DirectoryInfo(subDir);
-            CopyFolderToGuest(subDir, Path.Combine(destination, dirInfo.Name));
+            CopyFolderToGuest(subDir, Paths.Combine(destination, dirInfo.Name));
          }
       }
 

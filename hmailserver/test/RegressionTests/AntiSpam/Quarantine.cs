@@ -55,15 +55,13 @@ namespace RegressionTests.AntiSpam
       [OneTimeTearDown]
       public void RestoreTheSystemResolver()
       {
-         try
+         // The fake resolver stays up until the server is back on the system one, so
+         // the restart never runs against a dead resolver.
+         using (dns_)
          {
             ServerIniFile.SetSetting("DNSServer", null);
             ServerIniFile.SetSetting("QuarantineEnabled", null);
             RestartServerAndReacquireCom();
-         }
-         finally
-         {
-            dns_?.Dispose();
          }
       }
 
@@ -273,7 +271,7 @@ namespace RegressionTests.AntiSpam
 
          // The file goes with the row. A file with no row is invisible and nothing
          // would ever sweep it.
-         string quarantineDirectory = Path.Combine(_application.Settings.Directories.DataDirectory, "Quarantine");
+         string quarantineDirectory = Paths.Combine(_application.Settings.Directories.DataDirectory, "Quarantine");
 
          if (Directory.Exists(quarantineDirectory))
          {

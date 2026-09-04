@@ -70,7 +70,7 @@ namespace hMailServer.ControlPanel.Services
             if (!string.IsNullOrEmpty(parent) && Directory.Exists(parent))
                return parent;
          }
-         catch
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             // Ignore malformed paths; just open the dialog at its default location.
          }

@@ -160,7 +160,7 @@ namespace RegressionTests.Shared
 
                LogHandler.ClearErrorLogUntilSettled();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
             {
                Console.WriteLine("Could not clean up after this test's failure: " + ex.Message);
             }

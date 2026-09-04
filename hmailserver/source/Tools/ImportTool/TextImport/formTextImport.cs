@@ -12,8 +12,10 @@ namespace ImportTool.TextImport
       {
          InitializeComponent();
 
-         wizard.AddPage(new ucTextSelect());
-         wizard.AddPage(new ucTextProgress());
+         var selectPage = new ucTextSelect();
+
+         wizard.AddPage(selectPage);
+         wizard.AddPage(new ucTextProgress(selectPage));
       }
 
       private void wizard_OnCancel(object sender, EventArgs e)

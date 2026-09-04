@@ -84,7 +84,7 @@ namespace RegressionTests.Infrastructure
 
          while (directory != null)
          {
-            var candidate = Path.Combine(directory.FullName,
+            var candidate = Paths.Combine(directory.FullName,
                @"source\Server\hMailServer\x64\Release\hMailServer.ini");
 
             if (File.Exists(candidate))
@@ -309,6 +309,7 @@ namespace RegressionTests.Infrastructure
                }
                catch (ObjectDisposedException)
                {
+                  // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
                }
             }
          }
@@ -340,12 +341,15 @@ namespace RegressionTests.Infrastructure
                }
                catch (SocketException)
                {
+                  // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
                }
                catch (ObjectDisposedException)
                {
+                  // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
                }
                catch (IOException)
                {
+                  // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
                }
             }
          }

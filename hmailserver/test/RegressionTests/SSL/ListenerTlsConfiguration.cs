@@ -55,12 +55,12 @@ namespace RegressionTests.SSL
          // failure that is certain to be rejected by both implementations, so the
          // test distinguishes them by *how* the rejection is reported rather than by
          // whether it happens.
-         get { return Path.Combine(Path.GetTempPath(), "hmailserver-no-such-certificate.pem"); }
+         get { return Paths.Combine(Path.GetTempPath(), "hmailserver-no-such-certificate.pem"); }
       }
 
       private string MissingPrivateKey
       {
-         get { return Path.Combine(Path.GetTempPath(), "hmailserver-no-such-key.pem"); }
+         get { return Paths.Combine(Path.GetTempPath(), "hmailserver-no-such-key.pem"); }
       }
 
       [SetUp]
@@ -143,12 +143,12 @@ namespace RegressionTests.SSL
 
       private static string ExampleCertificate
       {
-         get { return Path.Combine(SslSetup.GetSslCertPath(), "example.crt"); }
+         get { return Paths.Combine(SslSetup.GetSslCertPath(), "example.crt"); }
       }
 
       private static string ExamplePrivateKey
       {
-         get { return Path.Combine(SslSetup.GetSslCertPath(), "example.key"); }
+         get { return Paths.Combine(SslSetup.GetSslCertPath(), "example.key"); }
       }
 
       private static void AssertListenerPrefersPostQuantum(int port, string listenerName)

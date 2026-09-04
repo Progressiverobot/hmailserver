@@ -27,20 +27,18 @@ namespace StressTest
          _settings.MaxMessageSize = 0;
 
          // create a 200mb attachment
-         var largeFile = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+         var largeFile = Paths.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
 
          try
          {
 
-            for (int i = 0; i < 10; i++)
-            {
-               var sb = new StringBuilder();
-               for (int c = 0; c < 350000; c++)
-                  sb.Append("012345678901234567890123456789012345678901234567890123456789");
+            var chunk = new StringBuilder();
+            for (int c = 0; c < 350000; c++)
+               chunk.Append("012345678901234567890123456789012345678901234567890123456789");
+            string chunkText = chunk.ToString();
 
-            
-               File.AppendAllText(largeFile, sb.ToString());
-            }
+            for (int i = 0; i < 10; i++)
+               File.AppendAllText(largeFile, chunkText);
 
             using (var mail = new MailMessage())
             {

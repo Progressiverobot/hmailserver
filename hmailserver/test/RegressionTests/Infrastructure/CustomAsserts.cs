@@ -7,6 +7,7 @@ using System.Diagnostics;
 using System.IO;
 using System.ServiceProcess;
 using System.Threading;
+using System.Linq;
 using hMailServer;
 using NUnit.Framework;
 using RegressionTests.Shared;
@@ -74,10 +75,7 @@ namespace RegressionTests.Infrastructure
       {
          var processlist = Process.GetProcesses();
 
-         var spamdRunning = false;
-         foreach (var theprocess in processlist)
-            if (theprocess.ProcessName == "spamd")
-               spamdRunning = true;
+         var spamdRunning = processlist.Any(process => process.ProcessName == "spamd");
 
          if (!spamdRunning)
          {
@@ -88,7 +86,7 @@ namespace RegressionTests.Infrastructure
                if (serviceController.Status != ServiceControllerStatus.Running)
                   serviceController.Start();
             }
-            catch (Exception)
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
             {
                Assert.Inconclusive("Unable to start SpamAssassin process. Is SpamAssassin installed?");
             }
@@ -107,7 +105,7 @@ namespace RegressionTests.Infrastructure
                      return;
                }
             }
-            catch
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
             {
                // not ready yet
             }
@@ -178,9 +176,8 @@ namespace RegressionTests.Infrastructure
       {
          var processlist = Process.GetProcesses();
 
-         foreach (var theprocess in processlist)
-            if (theprocess.ProcessName == "clamd")
-               return;
+         if (processlist.Any(process => process.ProcessName == "clamd"))
+            return;
 
          // Check if we can launch it...
          var startInfo = new ProcessStartInfo();
@@ -202,7 +199,7 @@ namespace RegressionTests.Infrastructure
 
             Assert.Fail("ClamD process not starting up.");
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             Assert.Inconclusive("Unable to start ClamD process. Is ClamAV installed?");
          }
@@ -268,8 +265,9 @@ namespace RegressionTests.Infrastructure
             {
                return folders.get_ItemByName(folderName);
             }
-            catch (Exception)
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
             {
+               // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
             }
 
             timeout--;
@@ -299,8 +297,9 @@ namespace RegressionTests.Infrastructure
                   return;
                }
             }
-            catch (Exception)
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
             {
+               // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
             }
 
             timeout--;
@@ -348,8 +347,8 @@ namespace RegressionTests.Infrastructure
          var domain = account.Address.Substring(account.Address.IndexOf("@") + 1);
          var mailbox = account.Address.Substring(0, account.Address.IndexOf("@"));
 
-         var domainDir = Path.Combine(settings.Directories.DataDirectory, domain);
-         var userDir = Path.Combine(domainDir, mailbox);
+         var domainDir = Paths.Combine(settings.Directories.DataDirectory, domain);
+         var userDir = Paths.Combine(domainDir, mailbox);
 
          AssertFilesInDirectory(userDir, expectedFileCount);
       }
@@ -362,11 +361,7 @@ namespace RegressionTests.Infrastructure
          {
             var dirs = Directory.GetDirectories(directory);
 
-            foreach (var dir in dirs)
-            {
-               var files = Directory.GetFiles(dir);
-               count += files.Length;
-            }
+            count += dirs.Sum(dir => Directory.GetFiles(dir).Length);
          }
 
          Assert.AreEqual(expectedFileCount, count);

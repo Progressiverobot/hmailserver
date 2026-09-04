@@ -213,7 +213,7 @@ namespace hMailServer.ControlPanel.Services
                      {
                         selected.BringIntoView();
                      }
-                     catch (Exception)
+                     catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
                      {
                         // A tab removed between the post and the callback. Losing
                         // the scroll position is not worth taking the dialog down.

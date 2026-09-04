@@ -126,7 +126,7 @@ namespace hMailServer.ControlPanel.Views
 
             SubtitleText.Text = "Live server statistics - last update " + nowLocal.ToLongTimeString();
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             SubtitleText.Text = "Connection to the server lost.";
             timer_.Stop();
@@ -230,7 +230,7 @@ namespace hMailServer.ControlPanel.Views
             {
                checks = ExternalSetupChecks.Run();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
             {
                // Run() degrades per-item rather than throwing, so this is belt
                // and braces - but a dashboard that dies building a summary card

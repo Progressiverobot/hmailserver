@@ -67,7 +67,7 @@ namespace hMailServer.ControlPanel.Views
             SubtitleText.Text = "Delivery retriggered for message " + row.Id + ".";
             Reload();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             SubtitleText.Text = "Could not retrigger delivery: " + ex.Message;
          }
@@ -93,7 +93,7 @@ namespace hMailServer.ControlPanel.Views
             SubtitleText.Text = "Message " + row.Id + " removed.";
             Reload();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             SubtitleText.Text = "Could not remove the message: " + ex.Message;
          }
@@ -130,7 +130,7 @@ namespace hMailServer.ControlPanel.Views
                ? "The delivery queue is empty."
                : rows.Count + " message(s) waiting for delivery.";
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             SubtitleText.Text = "Could not read the queue: " + ex.Message;
          }

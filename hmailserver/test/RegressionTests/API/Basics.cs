@@ -247,7 +247,7 @@ namespace RegressionTests.API
 
             Assert.Fail("Didn't throw");
          }
-         catch (Exception)
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
             // should throw => ok
          }
@@ -449,10 +449,10 @@ namespace RegressionTests.API
          Pop3ClientSimulator.AssertMessageCount(account.Address, "test", 1);
 
          // Create another message on disk and import it.
-         var domainPath = Path.Combine(_application.Settings.Directories.DataDirectory, "example.test");
-         var accountPath = Path.Combine(domainPath, "test");
+         var domainPath = Paths.Combine(_application.Settings.Directories.DataDirectory, "example.test");
+         var accountPath = Paths.Combine(domainPath, "test");
          Directory.CreateDirectory(accountPath);
-         var fileName = Path.Combine(accountPath, "something.eml");
+         var fileName = Paths.Combine(accountPath, "something.eml");
          File.WriteAllText(fileName, messageText);
          Assert.IsTrue(_application.Utilities.ImportMessageFromFile(fileName, account.ID));
 
