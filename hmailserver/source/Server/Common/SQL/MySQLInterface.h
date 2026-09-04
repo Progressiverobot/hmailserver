@@ -26,6 +26,7 @@ struct hm_st_mysql_field {
 // against any MySQL/MariaDB account type (caching_sha2_password, ed25519, gssapi, ...).
 #define HM_MYSQL_PLUGIN_DIR    22
 #define HM_MYSQL_DEFAULT_AUTH  23
+#define HM_MYSQL_OPT_SSL_ENFORCE 38
 
 typedef hm_MYSQL* STDCALL hm_mysql_real_connect(hm_MYSQL *,const char *,const char *,const char *,const char *, unsigned int,const char *,unsigned long);
 typedef void STDCALL hm_mysql_close(hm_MYSQL *);

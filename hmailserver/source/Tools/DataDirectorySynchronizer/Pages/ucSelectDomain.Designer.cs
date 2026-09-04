@@ -36,19 +36,20 @@ namespace DataDirectorySynchronizer.Pages
          this.columnDomainName = new System.Windows.Forms.ColumnHeader();
          this.buttonSelectAll = new System.Windows.Forms.Button();
          this.buttonSelectNone = new System.Windows.Forms.Button();
+         this.checkPublicFolders = new System.Windows.Forms.CheckBox();
          this.SuspendLayout();
-         // 
+         //
          // labelSelectDomain
-         // 
+         //
          this.labelSelectDomain.AutoSize = true;
          this.labelSelectDomain.Location = new System.Drawing.Point(25, 16);
          this.labelSelectDomain.Name = "labelSelectDomain";
-         this.labelSelectDomain.Size = new System.Drawing.Size(212, 13);
+         this.labelSelectDomain.Size = new System.Drawing.Size(268, 13);
          this.labelSelectDomain.TabIndex = 5;
-         this.labelSelectDomain.Text = "Select the domain you want to synchronize.";
-         // 
+         this.labelSelectDomain.Text = "Select the domains and folders you want to synchronize.";
+         //
          // listViewDomains
-         // 
+         //
          this.listViewDomains.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom)
                      | System.Windows.Forms.AnchorStyles.Left)
                      | System.Windows.Forms.AnchorStyles.Right)));
@@ -62,14 +63,14 @@ namespace DataDirectorySynchronizer.Pages
          this.listViewDomains.TabIndex = 7;
          this.listViewDomains.UseCompatibleStateImageBehavior = false;
          this.listViewDomains.View = System.Windows.Forms.View.Details;
-         // 
+         //
          // columnDomainName
-         // 
+         //
          this.columnDomainName.Text = "Domain name";
          this.columnDomainName.Width = 250;
-         // 
+         //
          // buttonSelectAll
-         // 
+         //
          this.buttonSelectAll.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
          this.buttonSelectAll.Location = new System.Drawing.Point(29, 274);
          this.buttonSelectAll.Name = "buttonSelectAll";
@@ -78,9 +79,9 @@ namespace DataDirectorySynchronizer.Pages
          this.buttonSelectAll.Text = "Select all";
          this.buttonSelectAll.UseVisualStyleBackColor = true;
          this.buttonSelectAll.Click += new System.EventHandler(this.buttonSelectAll_Click);
-         // 
+         //
          // buttonSelectNone
-         // 
+         //
          this.buttonSelectNone.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
          this.buttonSelectNone.Location = new System.Drawing.Point(166, 274);
          this.buttonSelectNone.Name = "buttonSelectNone";
@@ -89,11 +90,23 @@ namespace DataDirectorySynchronizer.Pages
          this.buttonSelectNone.Text = "Select none";
          this.buttonSelectNone.UseVisualStyleBackColor = true;
          this.buttonSelectNone.Click += new System.EventHandler(this.buttonSelectNone_Click);
-         // 
+         //
+         // checkPublicFolders
+         //
+         this.checkPublicFolders.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+         this.checkPublicFolders.AutoSize = true;
+         this.checkPublicFolders.Location = new System.Drawing.Point(310, 282);
+         this.checkPublicFolders.Name = "checkPublicFolders";
+         this.checkPublicFolders.Size = new System.Drawing.Size(140, 17);
+         this.checkPublicFolders.TabIndex = 10;
+         this.checkPublicFolders.Text = "Include public folders";
+         this.checkPublicFolders.UseVisualStyleBackColor = true;
+         //
          // ucSelectDomain
-         // 
+         //
          this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
          this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+         this.Controls.Add(this.checkPublicFolders);
          this.Controls.Add(this.buttonSelectNone);
          this.Controls.Add(this.buttonSelectAll);
          this.Controls.Add(this.listViewDomains);
@@ -112,5 +125,6 @@ namespace DataDirectorySynchronizer.Pages
       private System.Windows.Forms.ColumnHeader columnDomainName;
       private System.Windows.Forms.Button buttonSelectAll;
       private System.Windows.Forms.Button buttonSelectNone;
+      private System.Windows.Forms.CheckBox checkPublicFolders;
    }
 }

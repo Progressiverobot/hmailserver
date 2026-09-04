@@ -80,6 +80,19 @@ namespace HM
          }
       }
 
+      // Not referenced in the database, and under the public folder tree. Which
+      // public IMAP folder a file there belongs to is not part of its path on disk -
+      // every public folder's messages share the one #Public directory - so there is
+      // no way to tell, and the code below would guess: relocate the file and, given
+      // an account id, file it into that account's inbox while the file itself stayed
+      // behind under #Public. Refusing is the only honest answer; the synchronizer
+      // reports the file as skipped, which is what it already does for anything it
+      // cannot place. Upstream #601.
+      String publicFolderPath = FileUtilities::Combine(dataDirectory, IMAPConfiguration::GetPublicFolderDiskName());
+
+      if (originalFullPath.StartsWith(publicFolderPath + FileUtilities::PathSeparator))
+         return false;
+
       String newFullPath = originalFullPath;
 
       // Construct a partial file name.

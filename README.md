@@ -98,7 +98,7 @@ Technology
 | Cryptography | OpenSSL 4.0.x |
 | Async I/O | Boost 1.91 (Asio) |
 | Databases | MySQL, MariaDB, MS SQL Server, PostgreSQL 18 (libpq), and the embedded SQL CE for zero-configuration installs |
-| MySQL/MariaDB client | MariaDB Connector/C, shipped as `libmysql.dll` with auth plugins — works with MySQL 8 `caching_sha2_password` and MariaDB `ed25519`/`gssapi` out of the box |
+| MySQL/MariaDB client | MariaDB Connector/C, shipped as `libmysql.dll` with auth plugins — works with MySQL 8 `caching_sha2_password` and MariaDB `ed25519`/`gssapi` out of the box. It requires TLS from the server by default; `AllowUnencryptedConnection=1` under `[Database]` lets it fall back to plaintext for a server that has none |
 | Administration GUI and tools | C# / .NET 10 (WPF, Fluent design) |
 | Extensibility | COM/IDispatch API, plus a REST administration API |
 | Schema | Database version 6026, upgradeable from every earlier hMailServer release |

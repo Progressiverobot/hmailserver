@@ -60,7 +60,7 @@ Choosing a target
 |---|---|
 | **MS SQL Server** (including Express and LocalDB) | You already run SQL Server, or you want the strongest transaction support of the four. Note that the session runs at READ UNCOMMITTED. |
 | **PostgreSQL** | You want the best-behaved backend in this codebase. It is the only one of the four where DDL is transactional, so a failed schema upgrade rolls back cleanly. |
-| **MySQL / MariaDB** | You already run it. Make sure every table ends up InnoDB — the server only issues transactions if they all report it at connect time, and silently does not if any table does not. |
+| **MySQL / MariaDB** | You already run it. Make sure every table ends up InnoDB — the server only issues transactions if they all report it at connect time, and silently does not if any table does not. The bundled client requires TLS from the server by default and says so if it is missing; a server that genuinely has none needs `AllowUnencryptedConnection=1` under `[Database]` in hMailServer.ini. |
 | **SQL Server Compact** | Only if you are migrating *to* a test rig. It is the default and it is the one real dependency liability in this tree; see the SQL Server Compact row in [Roadmap.md](../../Roadmap.md) for the three defects that are specific to it. |
 
 The schema is created for you either way — you do not need to run the SQL scripts
