@@ -321,6 +321,14 @@ public:
 
       IDispatch *ScriptDispatch = NULL;
 
+      // No engine, no procedures. Initiate() can fail to create the engine
+      // (a missing or policy-blocked VBScript/JScript engine), and
+      // ScriptServer::DoesFunctionExist_ reaches here regardless of whether it
+      // succeeded, so this used to dereference a null CComPtr during a script
+      // reload. Upstream #583.
+      if (!engine_)
+         return false;
+
       // An engine whose script was interrupted may not hand back a dispatch at
       // all, so the result is checked rather than dereferenced blind. The
       // reference is owned by this function and must be released either way.

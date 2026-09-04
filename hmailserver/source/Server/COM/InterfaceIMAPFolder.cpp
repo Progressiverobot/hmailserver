@@ -257,9 +257,14 @@ STDMETHODIMP InterfaceIMAPFolder::Delete()
 
       if (!parent_collection_)
          return HM::PersistentIMAPFolder::DeleteObject(object_) ? S_OK : S_FALSE;
-      
-      parent_collection_->DeleteItemByDBID(object_->GetID());
-   
+
+      // The result used to be discarded, so a refused deletion - the inbox,
+      // which the persistence layer keeps, or a database error - answered S_OK
+      // and the caller removed the folder from its own view of the tree while
+      // the row stayed behind (upstream #534, the COM half).
+      if (!parent_collection_->DeleteItemByDBID(object_->GetID()))
+         return COMError::GenerateError("The folder could not be deleted.");
+
       return S_OK;
    }
    catch (...)

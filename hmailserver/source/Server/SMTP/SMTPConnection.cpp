@@ -265,6 +265,14 @@ namespace HM
          ResetLoginCredentials_();
          ResetCurrentMessage_();
 
+         // Back to the just-greeted state, not merely a clean transaction: the
+         // comment above says the greeting is discarded, but until now the
+         // state machine stayed in HEADER, so MAIL FROM was accepted on the
+         // encrypted session with helo_host_ empty - which skipped the HELO
+         // host spam test and the OnHELO/OnEHLO script events for that session.
+         // RFC 3207 section 4.2 requires the client to EHLO again (upstream #605).
+         current_state_ = INITIAL;
+
          EnqueueRead();
       }
    }
@@ -2423,9 +2431,14 @@ namespace HM
       bdat_chunk_size_ = 0;
       bdat_chunk_remaining_ = 0;
 
-      // Switch back to normal ASCII mode and start of session, in
-      // case we are in binary transmission mode.
-      current_state_ = HEADER;
+      // Switch back to normal ASCII mode and the start of a transaction, in
+      // case we are in binary transmission mode - but never promote a session
+      // that has not been greeted. RSET is valid before EHLO (RFC 5321 section
+      // 4.1.4) and used to move the state to HEADER on its own, so RSET then
+      // MAIL FROM skipped the greeting entirely, with the same consequences as
+      // the STARTTLS case in OnHandshakeCompleted (upstream #604/#605).
+      if (current_state_ != INITIAL)
+         current_state_ = HEADER;
    }
 
 

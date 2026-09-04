@@ -156,8 +156,15 @@ jobs:
               echo "Note: could not create the 'upstream' label (it may already exist)."
             fi
 
-            number=$(gh issue create --title "${title}" --body "${BODY}" \
-              | grep -oE '[0-9]+$' | tail -1)
+            # REST rather than `gh issue create`: the latter goes through the
+            # GraphQL createIssue mutation, which the workflow token is refused
+            # for ("Resource not accessible by integration") even with
+            # issues: write granted above - measured on the 1 September 2026
+            # run, which had computed 71 upstream commits and then lost them
+            # all on this line. The REST endpoint honours the same permission
+            # and answers with the issue number directly.
+            number=$(gh api "repos/${GITHUB_REPOSITORY}/issues" \
+              -f title="${title}" -f body="${BODY}" --jq '.number')
             echo "Opened tracking issue #${number:-(number not parsed)}."
 
             if [ -n "${number}" ]; then

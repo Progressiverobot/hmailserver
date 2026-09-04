@@ -185,5 +185,58 @@ namespace RegressionTests.SSL.StartTls
          var default_log = LogHandler.ReadCurrentDefaultLog();
          Assert.IsFalse(default_log.Contains("RSET"));
       }
+
+      /// <summary>
+      ///    RFC 3207 section 4.2: the handshake resets the session to the
+      ///    just-greeted state and the client must EHLO again. Until the port of
+      ///    upstream #605 the state machine stayed in the transaction state, so
+      ///    MAIL FROM went through on the encrypted session with the HELO host
+      ///    already forgotten - which skipped the HELO-host spam test and the
+      ///    OnHELO/OnEHLO script events for that session.
+      /// </summary>
+      [Test]
+      [Description("MAIL FROM straight after the TLS handshake, without a fresh EHLO, is a bad sequence of commands.")]
+      public void MailFromWithoutAFreshEhloAfterStartTlsIsRefused()
+      {
+         var smtpClientSimulator = new TcpConnection();
+         smtpClientSimulator.Connect(25002);
+         smtpClientSimulator.Receive();
+         var capabilities = smtpClientSimulator.SendAndReceive("EHLO example.com\r\n");
+         Assert.IsTrue(capabilities.Contains("STARTTLS"));
+
+         smtpClientSimulator.SendAndReceive("STARTTLS\r\n");
+         smtpClientSimulator.HandshakeAsClient();
+
+         var mailFrom = smtpClientSimulator.SendAndReceive("MAIL FROM:<test@example.com>\r\n");
+         StringAssert.StartsWith("503", mailFrom,
+            "The greeting is discarded by STARTTLS, so a transaction may not start until the client has said EHLO again. Got: " + mailFrom);
+
+         // And after the fresh EHLO the same command is fine.
+         smtpClientSimulator.SendAndReceive("EHLO example.com\r\n");
+         mailFrom = smtpClientSimulator.SendAndReceive("MAIL FROM:<test@example.com>\r\n");
+         StringAssert.StartsWith("250", mailFrom, "After EHLO the transaction must start normally. Got: " + mailFrom);
+      }
+
+      /// <summary>
+      ///    The same hole from the other direction, and it needs no TLS at all:
+      ///    RSET is valid before EHLO (RFC 5321 section 4.1.4) and used to move
+      ///    the state machine into the transaction state by itself (upstream
+      ///    #604).
+      /// </summary>
+      [Test]
+      [Description("RSET before any EHLO must not open a transaction: MAIL FROM afterwards is still a bad sequence of commands.")]
+      public void ResetBeforeTheGreetingDoesNotSkipIt()
+      {
+         var smtpClientSimulator = new TcpConnection();
+         smtpClientSimulator.Connect(25);
+         smtpClientSimulator.Receive();
+
+         var reset = smtpClientSimulator.SendAndReceive("RSET\r\n");
+         StringAssert.StartsWith("250", reset, "RSET is permitted before EHLO and must succeed. Got: " + reset);
+
+         var mailFrom = smtpClientSimulator.SendAndReceive("MAIL FROM:<test@example.com>\r\n");
+         StringAssert.StartsWith("503", mailFrom,
+            "No EHLO or HELO has been given, so MAIL FROM must be refused. Got: " + mailFrom);
+      }
    }
 }

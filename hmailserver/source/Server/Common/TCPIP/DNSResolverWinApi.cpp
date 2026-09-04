@@ -435,6 +435,17 @@ namespace HM
       {
          String name = pDnsRecord->pName;
 
+         // A PTR answer's owner name may come back fully qualified with the
+         // trailing dot ("1.0.0.127.in-addr.arpa.") while the query was built
+         // without it, and the equality filter below then dropped every reverse
+         // lookup on such hosts - an empty PTR result that fails open in the
+         // HELO/reverse-DNS spam tests (upstream #609).
+         if (pDnsRecord->wType == DNS_TYPE_PTR &&
+             name.GetLength() > 0 && name.Right(1) == _T("."))
+         {
+            name = name.Mid(0, name.GetLength() - 1);
+         }
+
          if (pDnsRecord->wType == resourceType &&
              query.Equals(name))
          {
