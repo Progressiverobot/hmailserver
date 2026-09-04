@@ -35,16 +35,16 @@ namespace DBUpdater
 
             hMailServer.Application application = new hMailServer.Application();
 
-             try
-             {
-                 application.Connect();
-             }
-             catch (Exception ex)
-             {
-                 if (!ex.Message.Contains(databaseOldErrorMessage))
-                     throw;
+            try
+            {
+               application.Connect();
+            }
+            catch (Exception ex)
+            {
+               if (!ex.Message.Contains(databaseOldErrorMessage))
+                  throw;
 
-             }
+            }
 
 
             int from = application.Database.CurrentVersion;

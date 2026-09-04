@@ -73,7 +73,7 @@ namespace DBSetup.Pages
                break;
          }
 
-         if (textServerPort.Text.Length == 0 || 
+         if (textServerPort.Text.Length == 0 ||
              textServerPort.Number == 3306 ||
              textServerPort.Number == 5432)
          {
@@ -111,7 +111,7 @@ namespace DBSetup.Pages
          _state["ServerAddress"] = textServerAddress.Text;
          _state["ServerPort"] = textServerPort.Text;
          _state["DatabaseName"] = textDatabaseName.Text;
-         
+
          _state["Authentication"] = radioUseServerAuthentication.Checked ? "Server" : "Windows";
 
          _state["Username"] = textUsername.Text;

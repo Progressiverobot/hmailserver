@@ -123,15 +123,15 @@ namespace hMailServer.ControlPanel.Views
             try
             {
                dynamic c = criterias.ItemByDBID[criteriaId_];
-               if ((bool) c.UsePredefined)
-                  SelectCombo(field_, (int) c.PredefinedField);
+               if ((bool)c.UsePredefined)
+                  SelectCombo(field_, (int)c.PredefinedField);
                else
                {
                   SelectCombo(field_, 0);
-                  header_.Text = (string) c.HeaderField ?? "";
+                  header_.Text = (string)c.HeaderField ?? "";
                }
-               SelectCombo(match_, (int) c.MatchType);
-               value_.Text = (string) c.MatchValue ?? "";
+               SelectCombo(match_, (int)c.MatchType);
+               value_.Text = (string)c.MatchValue ?? "";
                ServerSession.Release(c);
             }
             finally
@@ -234,9 +234,9 @@ namespace hMailServer.ControlPanel.Views
       private static void SelectCombo(ComboBox combo, int value)
       {
          foreach (ComboBoxItem item in combo.Items)
-            if ((int) item.Tag == value) { combo.SelectedItem = item; return; }
+            if ((int)item.Tag == value) { combo.SelectedItem = item; return; }
       }
 
-      private static int ComboValue(ComboBox combo) => combo.SelectedItem is ComboBoxItem item ? (int) item.Tag : 0;
+      private static int ComboValue(ComboBox combo) => combo.SelectedItem is ComboBoxItem item ? (int)item.Tag : 0;
    }
 }

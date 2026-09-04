@@ -74,7 +74,7 @@ namespace hMailServer.ControlPanel.Views
             dynamic account = OpenAccount();
             try
             {
-               bool enabled = (bool) account.TOTPEnabled;
+               bool enabled = (bool)account.TOTPEnabled;
 
                status_.Text = enabled
                   ? "A second factor is enrolled. This account's own password no longer signs in to mail "
@@ -118,7 +118,7 @@ namespace hMailServer.ControlPanel.Views
             dynamic account = OpenAccount();
             try
             {
-               string uri = (string) account.EnrolTOTP();
+               string uri = (string)account.EnrolTOTP();
                account.Save();
 
                ShowQr(uri);

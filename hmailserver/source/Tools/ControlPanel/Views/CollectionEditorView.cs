@@ -125,8 +125,8 @@ namespace hMailServer.ControlPanel.Views
          else
          {
             var head = new StackPanel();
-            head.Children.Add(new TextBlock { Text = spec_.Title, Style = (Style) FindResource("PageTitle") });
-            head.Children.Add(new TextBlock { Text = spec_.Subtitle, Style = (Style) FindResource("PageSubtitle") });
+            head.Children.Add(new TextBlock { Text = spec_.Title, Style = (Style)FindResource("PageTitle") });
+            head.Children.Add(new TextBlock { Text = spec_.Subtitle, Style = (Style)FindResource("PageSubtitle") });
             root.Children.Add(head);
          }
 
@@ -246,7 +246,7 @@ namespace hMailServer.ControlPanel.Views
          try
          {
             collection = spec_.GetCollection();
-            int count = (int) collection.Count;
+            int count = (int)collection.Count;
             for (int i = 0; i < count; i++)
             {
                dynamic item = collection.Item[i];
@@ -267,7 +267,7 @@ namespace hMailServer.ControlPanel.Views
          }
          finally
          {
-            ServerSession.Release((object) collection);
+            ServerSession.Release((object)collection);
          }
 
          countBadge_.Text = rows_.Count == 1
@@ -325,8 +325,8 @@ namespace hMailServer.ControlPanel.Views
          }
          finally
          {
-            ServerSession.Release((object) item);
-            ServerSession.Release((object) collection);
+            ServerSession.Release((object)item);
+            ServerSession.Release((object)collection);
          }
 
          Reload();
@@ -360,8 +360,8 @@ namespace hMailServer.ControlPanel.Views
          }
          finally
          {
-            ServerSession.Release((object) item);
-            ServerSession.Release((object) collection);
+            ServerSession.Release((object)item);
+            ServerSession.Release((object)collection);
          }
 
          Reload();
@@ -369,7 +369,7 @@ namespace hMailServer.ControlPanel.Views
 
       private dynamic FindById(dynamic collection, int id)
       {
-         int count = (int) collection.Count;
+         int count = (int)collection.Count;
          for (int i = 0; i < count; i++)
          {
             dynamic item = collection.Item[i];
@@ -384,7 +384,7 @@ namespace hMailServer.ControlPanel.Views
 
       private static int TryGetId(dynamic item)
       {
-         try { return (int) GetProp(item, "ID"); }
+         try { return (int)GetProp(item, "ID"); }
          catch (Exception) { return -1; }
       }
 

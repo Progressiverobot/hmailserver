@@ -83,11 +83,11 @@ namespace hMailServer.ControlPanel.Views
          dynamic folders = ServerSession.Current.Application.Settings.PublicFolders;
          try
          {
-            int count = (int) folders.Count;
+            int count = (int)folders.Count;
             for (int i = 0; i < count; i++)
             {
                dynamic f = folders.Item[i];
-               list_.Items.Add((string) f.Name);
+               list_.Items.Add((string)f.Name);
                ServerSession.Release(f);
             }
             status_.Text = count + (count == 1 ? " public folder." : " public folders.");

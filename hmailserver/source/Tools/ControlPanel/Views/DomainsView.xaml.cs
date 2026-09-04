@@ -54,11 +54,11 @@ namespace hMailServer.ControlPanel.Views
          dynamic domains = ServerSession.Current.Application.Domains;
          try
          {
-            int count = (int) domains.Count;
+            int count = (int)domains.Count;
             for (int i = 0; i < count; i++)
             {
                dynamic domain = domains.Item[i];
-               rows.Add(new DomainRow { Name = (string) domain.Name, Active = (bool) domain.Active });
+               rows.Add(new DomainRow { Name = (string)domain.Name, Active = (bool)domain.Active });
                ServerSession.Release(domain);
             }
          }
@@ -123,14 +123,14 @@ namespace hMailServer.ControlPanel.Views
             {
                dynamic domain = OpenSelectedDomain(domains);
                dynamic aliases = domain.Aliases;
-               int count = (int) aliases.Count;
+               int count = (int)aliases.Count;
                for (int i = 0; i < count; i++)
                {
                   dynamic alias = aliases.Item[i];
                   rows.Add(new AliasRow
                   {
-                     Name = (string) alias.Name,
-                     Display = (string) alias.Name + "  →  " + (string) alias.Value
+                     Name = (string)alias.Name,
+                     Display = (string)alias.Name + "  →  " + (string)alias.Value
                   });
                   ServerSession.Release(alias);
                }
@@ -163,11 +163,11 @@ namespace hMailServer.ControlPanel.Views
             {
                dynamic domain = OpenSelectedDomain(domains);
                dynamic lists = domain.DistributionLists;
-               int count = (int) lists.Count;
+               int count = (int)lists.Count;
                for (int i = 0; i < count; i++)
                {
                   dynamic list = lists.Item[i];
-                  rows.Add((string) list.Address);
+                  rows.Add((string)list.Address);
                   ServerSession.Release(list);
                }
                ServerSession.Release(lists);
@@ -242,11 +242,11 @@ namespace hMailServer.ControlPanel.Views
          {
             dynamic domain = OpenSelectedDomain(domains);
             dynamic aliases = domain.Aliases;
-            int count = (int) aliases.Count;
+            int count = (int)aliases.Count;
             for (int i = 0; i < count; i++)
             {
                dynamic alias = aliases.Item[i];
-               if ((string) alias.Name == name)
+               if ((string)alias.Name == name)
                {
                   alias.Delete();
                   ServerSession.Release(alias);
@@ -338,11 +338,11 @@ namespace hMailServer.ControlPanel.Views
          {
             dynamic domain = OpenSelectedDomain(domains);
             dynamic lists = domain.DistributionLists;
-            int count = (int) lists.Count;
+            int count = (int)lists.Count;
             for (int i = 0; i < count; i++)
             {
                dynamic list = lists.Item[i];
-               if ((string) list.Address == address)
+               if ((string)list.Address == address)
                {
                   list.Delete();
                   ServerSession.Release(list);
@@ -384,11 +384,11 @@ namespace hMailServer.ControlPanel.Views
          {
             dynamic domain = domains.ItemByName[domainName];
             dynamic accounts = domain.Accounts;
-            int count = (int) accounts.Count;
+            int count = (int)accounts.Count;
             for (int i = 0; i < count; i++)
             {
                dynamic account = accounts.Item[i];
-               rows.Add(new AccountRow { Address = (string) account.Address, Active = (bool) account.Active });
+               rows.Add(new AccountRow { Address = (string)account.Address, Active = (bool)account.Active });
                ServerSession.Release(account);
             }
             ServerSession.Release(accounts);
@@ -433,9 +433,9 @@ namespace hMailServer.ControlPanel.Views
             dynamic domain = domains.ItemByName[name];
             try
             {
-               domainId = (int) domain.ID;
+               domainId = (int)domain.ID;
                dynamic accounts = domain.Accounts;
-               accountCount = (int) accounts.Count;
+               accountCount = (int)accounts.Count;
                ServerSession.Release(accounts);
             }
             finally

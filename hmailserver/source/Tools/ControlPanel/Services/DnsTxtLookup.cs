@@ -245,7 +245,7 @@ namespace hMailServer.ControlPanel.Services
       {
          int headerSize = Marshal.SizeOf<DnsRecordHeader>();
 
-         for (IntPtr cursor = first; cursor != IntPtr.Zero; )
+         for (IntPtr cursor = first; cursor != IntPtr.Zero;)
          {
             DnsRecordHeader header = Marshal.PtrToStructure<DnsRecordHeader>(cursor);
 

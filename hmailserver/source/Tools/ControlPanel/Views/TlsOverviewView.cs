@@ -129,12 +129,12 @@ namespace hMailServer.ControlPanel.Views
          {
             settings = ServerSession.Current.Application.Settings;
 
-            config.Tls10Enabled = Read(() => (bool) settings.TlsVersion10Enabled);
-            config.Tls11Enabled = Read(() => (bool) settings.TlsVersion11Enabled);
-            config.Tls12Enabled = Read(() => (bool) settings.TlsVersion12Enabled);
-            config.Tls13Enabled = Read(() => (bool) settings.TlsVersion13Enabled);
-            config.CipherList = Read(() => (string) settings.SslCipherList) ?? "";
-            config.VerifyRemoteCertificates = Read(() => (bool) settings.VerifyRemoteSslCertificate);
+            config.Tls10Enabled = Read(() => (bool)settings.TlsVersion10Enabled);
+            config.Tls11Enabled = Read(() => (bool)settings.TlsVersion11Enabled);
+            config.Tls12Enabled = Read(() => (bool)settings.TlsVersion12Enabled);
+            config.Tls13Enabled = Read(() => (bool)settings.TlsVersion13Enabled);
+            config.CipherList = Read(() => (string)settings.SslCipherList) ?? "";
+            config.VerifyRemoteCertificates = Read(() => (bool)settings.VerifyRemoteSslCertificate);
 
             // The certificate files live beside the server. Read remotely, the file
             // checks are meaningless - and quietly reporting "missing" for a file
@@ -156,7 +156,7 @@ namespace hMailServer.ControlPanel.Views
          }
          finally
          {
-            ServerSession.Release((object) settings);
+            ServerSession.Release((object)settings);
          }
 
          return config;
@@ -174,7 +174,7 @@ namespace hMailServer.ControlPanel.Views
          try
          {
             certificates = settings.SSLCertificates;
-            int count = (int) certificates.Count;
+            int count = (int)certificates.Count;
 
             for (int i = 0; i < count; i++)
             {
@@ -186,15 +186,15 @@ namespace hMailServer.ControlPanel.Views
 
                   var entry = new TlsCertificate
                   {
-                     Id = (int) certificate.ID,
-                     Name = (string) certificate.Name ?? ""
+                     Id = (int)certificate.ID,
+                     Name = (string)certificate.Name ?? ""
                   };
 
                   if (config.CertificateFilesReadable)
                   {
                      CertificateHealth health = CertificateInspector.Inspect(
-                        (string) certificate.CertificateFile,
-                        (string) certificate.PrivateKeyFile,
+                        (string)certificate.CertificateFile,
+                        (string)certificate.PrivateKeyFile,
                         true);
 
                      entry.DaysRemaining = health.DaysRemaining;
@@ -209,7 +209,7 @@ namespace hMailServer.ControlPanel.Views
                }
                finally
                {
-                  ServerSession.Release((object) certificate);
+                  ServerSession.Release((object)certificate);
                }
             }
          }
@@ -220,7 +220,7 @@ namespace hMailServer.ControlPanel.Views
          }
          finally
          {
-            ServerSession.Release((object) certificates);
+            ServerSession.Release((object)certificates);
          }
       }
 
@@ -239,7 +239,7 @@ namespace hMailServer.ControlPanel.Views
          try
          {
             ports = settings.TCPIPPorts;
-            int count = (int) ports.Count;
+            int count = (int)ports.Count;
 
             for (int i = 0; i < count; i++)
             {
@@ -252,7 +252,7 @@ namespace hMailServer.ControlPanel.Views
                   // eSessionType: 1 SMTP, 3 POP3, 5 IMAP. Anything else is a session
                   // type IOService refuses to build a server for, so it is named
                   // rather than guessed at.
-                  int protocol = (int) port.Protocol;
+                  int protocol = (int)port.Protocol;
                   string protocolName = protocol switch
                   {
                      1 => "SMTP",
@@ -261,14 +261,14 @@ namespace hMailServer.ControlPanel.Views
                      _ => "Unknown (" + protocol + ")"
                   };
 
-                  int certificateId = (int) port.SSLCertificateID;
-                  var security = (TlsListenerSecurity) (int) port.ConnectionSecurity;
+                  int certificateId = (int)port.SSLCertificateID;
+                  var security = (TlsListenerSecurity)(int)port.ConnectionSecurity;
 
                   var listener = new TlsListener
                   {
                      Protocol = protocolName,
-                     Address = (string) port.Address ?? "",
-                     Port = (int) port.PortNumber,
+                     Address = (string)port.Address ?? "",
+                     Port = (int)port.PortNumber,
                      Security = security,
                      CertificateName = CertificateNameFor(config, certificateId)
                   };
@@ -284,7 +284,7 @@ namespace hMailServer.ControlPanel.Views
                }
                finally
                {
-                  ServerSession.Release((object) port);
+                  ServerSession.Release((object)port);
                }
             }
          }
@@ -295,7 +295,7 @@ namespace hMailServer.ControlPanel.Views
          }
          finally
          {
-            ServerSession.Release((object) ports);
+            ServerSession.Release((object)ports);
          }
       }
 
@@ -332,7 +332,7 @@ namespace hMailServer.ControlPanel.Views
          try
          {
             ranges = settings.SecurityRanges;
-            int count = (int) ranges.Count;
+            int count = (int)ranges.Count;
             config.RangesTotal = count;
 
             for (int i = 0; i < count; i++)
@@ -343,12 +343,12 @@ namespace hMailServer.ControlPanel.Views
                {
                   range = ranges.Item[i];
 
-                  if ((bool) range.RequireSSLTLSForAuth)
+                  if ((bool)range.RequireSSLTLSForAuth)
                      config.RangesRequiringTlsForAuth++;
                }
                finally
                {
-                  ServerSession.Release((object) range);
+                  ServerSession.Release((object)range);
                }
             }
          }
@@ -359,7 +359,7 @@ namespace hMailServer.ControlPanel.Views
          }
          finally
          {
-            ServerSession.Release((object) ranges);
+            ServerSession.Release((object)ranges);
          }
       }
 

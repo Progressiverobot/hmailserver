@@ -554,7 +554,7 @@ namespace hMailServer.ControlPanel.Views
          {
             domains = ServerSession.Current.Application.Domains;
 
-            int count = (int) domains.Count;
+            int count = (int)domains.Count;
 
             for (int i = 0; i < count; i++)
             {
@@ -564,10 +564,10 @@ namespace hMailServer.ControlPanel.Views
                {
                   domain = domains.Item[i];
 
-                  string linked = (string) domain.ADDomainName;
+                  string linked = (string)domain.ADDomainName;
 
                   if (!string.IsNullOrEmpty(linked) && linked.Trim().Length > 0)
-                     domainChoice_.Items.Add((string) domain.Name);
+                     domainChoice_.Items.Add((string)domain.Name);
                }
                catch
                {
@@ -577,7 +577,7 @@ namespace hMailServer.ControlPanel.Views
                }
                finally
                {
-                  ServerSession.Release((object) domain);
+                  ServerSession.Release((object)domain);
                }
             }
 
@@ -596,7 +596,7 @@ namespace hMailServer.ControlPanel.Views
          }
          finally
          {
-            ServerSession.Release((object) domains);
+            ServerSession.Release((object)domains);
          }
 
          domainChoice_.SelectedIndex = 0;
@@ -680,7 +680,7 @@ namespace hMailServer.ControlPanel.Views
          // changed when it did not. A save does invalidate the preview, because the
          // values below then differ; Save_ also invalidates explicitly, so it holds
          // even for a save that writes the same values back.
-         return (domainChoice_.SelectedIndex <= 0 ? "" : (string) domainChoice_.SelectedItem)
+         return (domainChoice_.SelectedIndex <= 0 ? "" : (string)domainChoice_.SelectedItem)
                 + "|" + (disableMissing_.IsChecked == true ? "1" : "0")
                 + "|" + IniRead_("SyncFilter", "")
                 + "|" + IniRead_("SyncMailAttribute", "mail")
@@ -704,7 +704,7 @@ namespace hMailServer.ControlPanel.Views
 
       private async Task RunAsync_(bool apply)
       {
-         string domain = domainChoice_.SelectedIndex <= 0 ? "" : (string) domainChoice_.SelectedItem;
+         string domain = domainChoice_.SelectedIndex <= 0 ? "" : (string)domainChoice_.SelectedItem;
          bool disableMissing = disableMissing_.IsChecked == true;
          string options = CurrentOptions_();
 
@@ -818,15 +818,15 @@ namespace hMailServer.ControlPanel.Views
             bool ok;
 
             if (apply)
-               ok = (bool) settings.ApplyDirectorySync(domain, disableMissing, out text);
+               ok = (bool)settings.ApplyDirectorySync(domain, disableMissing, out text);
             else
-               ok = (bool) settings.PreviewDirectorySync(domain, disableMissing, out text);
+               ok = (bool)settings.PreviewDirectorySync(domain, disableMissing, out text);
 
             return Tuple.Create(ok, text ?? string.Empty);
          }
          finally
          {
-            ServerSession.Release((object) settings);
+            ServerSession.Release((object)settings);
          }
       }
 

@@ -212,7 +212,7 @@ namespace hMailServer.ControlPanel.Views
          {
             int select = 0;
             for (int i = 0; i < domainCombo_.Items.Count; i++)
-               if (string.Equals((string) ((ComboBoxItem) domainCombo_.Items[i]).Tag, previous, StringComparison.OrdinalIgnoreCase))
+               if (string.Equals((string)((ComboBoxItem)domainCombo_.Items[i]).Tag, previous, StringComparison.OrdinalIgnoreCase))
                   select = i;
             domainCombo_.SelectedIndex = select;   // fires BuildCards
          }
@@ -227,7 +227,7 @@ namespace hMailServer.ControlPanel.Views
       }
 
       private string SelectedDomainName()
-         => domainCombo_.SelectedItem is ComboBoxItem item ? (string) item.Tag : null;
+         => domainCombo_.SelectedItem is ComboBoxItem item ? (string)item.Tag : null;
 
       private DomainInfo SelectedDomain()
       {
@@ -242,7 +242,7 @@ namespace hMailServer.ControlPanel.Views
          try
          {
             domains = ServerSession.Current.Application.Domains;
-            int count = (int) domains.Count;
+            int count = (int)domains.Count;
             for (int i = 0; i < count; i++)
             {
                dynamic domain = domains.Item[i];
@@ -250,18 +250,18 @@ namespace hMailServer.ControlPanel.Views
                {
                   result.Add(new DomainInfo
                   {
-                     Name = ((string) domain.Name ?? "").Trim(),
-                     Active = (bool) domain.Active,
-                     Postmaster = ((string) domain.Postmaster ?? "").Trim(),
-                     DkimEnabled = (bool) domain.DKIMSignEnabled,
-                     DkimSelector = ((string) domain.DKIMSelector ?? "").Trim(),
-                     DkimKeyFile = ((string) domain.DKIMPrivateKeyFile ?? "").Trim(),
+                     Name = ((string)domain.Name ?? "").Trim(),
+                     Active = (bool)domain.Active,
+                     Postmaster = ((string)domain.Postmaster ?? "").Trim(),
+                     DkimEnabled = (bool)domain.DKIMSignEnabled,
+                     DkimSelector = ((string)domain.DKIMSelector ?? "").Trim(),
+                     DkimKeyFile = ((string)domain.DKIMPrivateKeyFile ?? "").Trim(),
                      DkimSecondarySelector = ReadSecondarySelector(domain)
                   });
                }
                finally
                {
-                  ServerSession.Release((object) domain);
+                  ServerSession.Release((object)domain);
                }
             }
          }
@@ -272,7 +272,7 @@ namespace hMailServer.ControlPanel.Views
          }
          finally
          {
-            ServerSession.Release((object) domains);
+            ServerSession.Release((object)domains);
          }
          return result;
       }
@@ -284,7 +284,7 @@ namespace hMailServer.ControlPanel.Views
       {
          try
          {
-            return ((string) domain.DKIMSecondarySelector ?? "").Trim();
+            return ((string)domain.DKIMSecondarySelector ?? "").Trim();
          }
          catch (Exception)
          {
@@ -308,7 +308,7 @@ namespace hMailServer.ControlPanel.Views
          try
          {
             settings = ServerSession.Current.Application.Settings;
-            serverHostName_ = ((string) settings.HostName ?? "").Trim();
+            serverHostName_ = ((string)settings.HostName ?? "").Trim();
             serverHostNameKnown_ = true;
          }
          catch (Exception ex)
@@ -318,7 +318,7 @@ namespace hMailServer.ControlPanel.Views
          }
          finally
          {
-            ServerSession.Release((object) settings);
+            ServerSession.Release((object)settings);
          }
       }
 
@@ -428,7 +428,7 @@ namespace hMailServer.ControlPanel.Views
          await RunCheck(block, domainName, () =>
          {
             DnsTxtLookup.LookupResult result = DnsTxtLookup.Query(domainName);
-            return (Action) (() =>
+            return (Action)(() =>
             {
                if (result.Status == DnsTxtLookup.LookupStatus.Failed)
                {
@@ -608,7 +608,7 @@ namespace hMailServer.ControlPanel.Views
                // Presence-only: the record can be looked up but not compared, and
                // a record that cannot be verified must not unlock the enable step.
                DnsTxtLookup.LookupResult found = DnsTxtLookup.Query(host);
-               return (Action) (() =>
+               return (Action)(() =>
                {
                   switch (found.Status)
                   {
@@ -629,7 +629,7 @@ namespace hMailServer.ControlPanel.Views
             }
 
             DnsTxtLookup.MatchResult result = DnsTxtLookup.CheckExpected(host, expected);
-            return (Action) (() =>
+            return (Action)(() =>
             {
                bool matches = result.Status == DnsTxtLookup.MatchStatus.FoundAndMatches;
 
@@ -815,7 +815,7 @@ namespace hMailServer.ControlPanel.Views
          await RunCheck(block, host, () =>
          {
             DnsTxtLookup.LookupResult result = DnsTxtLookup.Query(host);
-            return (Action) (() =>
+            return (Action)(() =>
             {
                if (result.Status == DnsTxtLookup.LookupStatus.Failed)
                {
@@ -1067,7 +1067,7 @@ namespace hMailServer.ControlPanel.Views
          await RunCheck(block, host, () =>
          {
             DnsTxtLookup.LookupResult result = DnsTxtLookup.Query(host);
-            return (Action) (() =>
+            return (Action)(() =>
             {
                if (result.Status == DnsTxtLookup.LookupStatus.Failed)
                {
@@ -1128,7 +1128,7 @@ namespace hMailServer.ControlPanel.Views
          {
             HttpResponseMessage response = await http_.GetAsync(url);
 
-            int code = (int) response.StatusCode;
+            int code = (int)response.StatusCode;
 
             if (code >= 300 && code < 400)
             {
@@ -1297,7 +1297,7 @@ namespace hMailServer.ControlPanel.Views
          await RunCheck(block, host, () =>
          {
             DnsTxtLookup.LookupResult result = DnsTxtLookup.Query(host);
-            return (Action) (() =>
+            return (Action)(() =>
             {
                if (result.Status == DnsTxtLookup.LookupStatus.Failed)
                {
@@ -1658,7 +1658,7 @@ namespace hMailServer.ControlPanel.Views
 
             int headerSize = Marshal.SizeOf<DnsRecordHeader>();
 
-            for (IntPtr cursor = records; cursor != IntPtr.Zero; )
+            for (IntPtr cursor = records; cursor != IntPtr.Zero;)
             {
                DnsRecordHeader header = Marshal.PtrToStructure<DnsRecordHeader>(cursor);
 

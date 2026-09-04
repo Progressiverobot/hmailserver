@@ -85,7 +85,7 @@ namespace hMailServer.ControlPanel.Services
             return;
          }
 
-         IniFeatureStore.ComReadSetting = key => (string) session.Application.Settings.GetIniSetting(key);
+         IniFeatureStore.ComReadSetting = key => (string)session.Application.Settings.GetIniSetting(key);
 
          // Always SetIniSetting, including for an empty value, because that is
          // precisely what the local file path does - WritePrivateProfileString with
@@ -178,7 +178,7 @@ namespace hMailServer.ControlPanel.Services
                   if (attempt < total - 1 && !IsServerReady(app))
                   {
                      error = "the server is still starting up.";
-                     Release((object) app);
+                     Release((object)app);
                      continue;
                   }
 
@@ -196,7 +196,7 @@ namespace hMailServer.ControlPanel.Services
                   // IsTransportFailure and DescribeComError are concerned.
                   try
                   {
-                     Release((object) dead);
+                     Release((object)dead);
                   }
                   catch (Exception)
                   {
@@ -242,7 +242,7 @@ namespace hMailServer.ControlPanel.Services
 
             if (e is COMException com)
             {
-               switch ((uint) com.ErrorCode)
+               switch ((uint)com.ErrorCode)
                {
                   case 0x800706BA: // RPC_S_SERVER_UNAVAILABLE
                   case 0x800706BE: // RPC_S_CALL_FAILED
@@ -367,7 +367,7 @@ namespace hMailServer.ControlPanel.Services
       {
          try
          {
-            return (int) app.ServerState == StateRunning;
+            return (int)app.ServerState == StateRunning;
          }
          catch (Exception)
          {
@@ -407,7 +407,7 @@ namespace hMailServer.ControlPanel.Services
             // has gone. What changed is that "it answered" is the liveness signal,
             // not "it answered Running". Readiness after a service RESTART is a
             // different question and is still asked separately by IsServerReady.
-            _ = (int) app_.ServerState;
+            _ = (int)app_.ServerState;
             return true;
          }
          catch (Exception ex)
@@ -446,7 +446,7 @@ namespace hMailServer.ControlPanel.Services
                return false;
             }
 
-            Release((object) account);
+            Release((object)account);
 
             app = instance;
             return true;
@@ -499,16 +499,16 @@ namespace hMailServer.ControlPanel.Services
          {
             var snap = new StatusSnapshot
             {
-               ProcessedMessages = (long) status.ProcessedMessages,
-               SpamBlocked = (long) status.RemovedSpamMessages,
-               VirusesRemoved = (long) status.RemovedViruses,
+               ProcessedMessages = (long)status.ProcessedMessages,
+               SpamBlocked = (long)status.RemovedSpamMessages,
+               VirusesRemoved = (long)status.RemovedViruses,
                SmtpSessions = ReadSessionCount(status, SessionSmtp),
                ImapSessions = ReadSessionCount(status, SessionImap),
                Pop3Sessions = ReadSessionCount(status, SessionPop3),
-               StartTime = (string) status.StartTime ?? ""
+               StartTime = (string)status.StartTime ?? ""
             };
 
-            string queue = (string) status.UndeliveredMessages ?? "";
+            string queue = (string)status.UndeliveredMessages ?? "";
             var rows = queue.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
             snap.QueueLength = rows.Length;
             if (includeQueueRows)
@@ -528,13 +528,13 @@ namespace hMailServer.ControlPanel.Services
          // indexer form binds as DISPATCH_PROPERTYGET.
          try
          {
-            return (int) status.SessionCount[sessionType];
+            return (int)status.SessionCount[sessionType];
          }
          catch (Exception)
          {
             try
             {
-               return (int) status.SessionCount(sessionType);
+               return (int)status.SessionCount(sessionType);
             }
             catch (Exception)
             {

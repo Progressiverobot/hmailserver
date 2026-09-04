@@ -104,22 +104,22 @@ namespace hMailServer.ControlPanel.Views
             dynamic passwords = OpenCollection();
             try
             {
-               int count = (int) passwords.Count;
+               int count = (int)passwords.Count;
 
                for (int i = 0; i < count; i++)
                {
                   dynamic item = passwords[i];
                   try
                   {
-                     string lastUsed = (string) item.LastUsedTime;
+                     string lastUsed = (string)item.LastUsedTime;
 
                      rows.Add(new CredentialRow
                      {
-                        Name = (string) item.Name,
-                        Active = (bool) item.Active,
-                        CreatedTime = (string) item.CreatedTime,
+                        Name = (string)item.Name,
+                        Active = (bool)item.Active,
+                        CreatedTime = (string)item.CreatedTime,
                         LastUsed = lastUsed,
-                        Id = (int) item.ID
+                        Id = (int)item.ID
                      });
                   }
                   finally
@@ -317,7 +317,7 @@ namespace hMailServer.ControlPanel.Views
                try
                {
                   item.Name = name;
-                  string clearText = (string) item.Generate();
+                  string clearText = (string)item.Generate();
                   item.Save();
 
                   issuedValue_.Text = clearText;
@@ -365,7 +365,7 @@ namespace hMailServer.ControlPanel.Views
                dynamic item = passwords.ItemByDBID[id];
                try
                {
-                  item.Active = !(bool) item.Active;
+                  item.Active = !(bool)item.Active;
                   item.Save();
                }
                finally

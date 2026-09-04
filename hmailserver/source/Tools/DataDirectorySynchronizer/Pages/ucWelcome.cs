@@ -19,7 +19,7 @@ namespace DataDirectorySynchronizer.Pages
 
       public void OnShowPage(Dictionary<string, string> _state)
       {
-         
+
       }
 
       public bool OnLeavePage(bool next)

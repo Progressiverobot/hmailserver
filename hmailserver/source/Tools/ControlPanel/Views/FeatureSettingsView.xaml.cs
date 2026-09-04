@@ -340,12 +340,12 @@ namespace hMailServer.ControlPanel.Views
 
          public override void Save(IniFeatureStore store)
          {
-            int value = combo_.SelectedItem is ComboBoxItem cbi ? (int) cbi.Tag : Default;
+            int value = combo_.SelectedItem is ComboBoxItem cbi ? (int)cbi.Tag : Default;
             store.Write(Key, value.ToString());
          }
 
          public override string LiveValue
-            => combo_?.SelectedItem is ComboBoxItem cbi ? ((int) cbi.Tag).ToString() : null;
+            => combo_?.SelectedItem is ComboBoxItem cbi ? ((int)cbi.Tag).ToString() : null;
 
          public override void OnEditorChanged(Action handler)
          {
@@ -1208,23 +1208,23 @@ namespace hMailServer.ControlPanel.Views
          try
          {
             certificates = ServerSession.Current.Application.Settings.SSLCertificates;
-            int certificateCount = (int) certificates.Count;
+            int certificateCount = (int)certificates.Count;
             for (int i = 0; i < certificateCount; i++)
             {
                dynamic certificate = certificates.Item[i];
                try
                {
-                  string certificateFile = ((string) certificate.CertificateFile ?? "").Trim();
-                  string privateKeyFile = ((string) certificate.PrivateKeyFile ?? "").Trim();
+                  string certificateFile = ((string)certificate.CertificateFile ?? "").Trim();
+                  string privateKeyFile = ((string)certificate.PrivateKeyFile ?? "").Trim();
 
                   if (certificateFile.Length == 0 || privateKeyFile.Length == 0)
                      continue;
 
-                  usableCertificateNames[(int) certificate.ID] = (string) certificate.Name ?? "";
+                  usableCertificateNames[(int)certificate.ID] = (string)certificate.Name ?? "";
                }
                finally
                {
-                  ServerSession.Release((object) certificate);
+                  ServerSession.Release((object)certificate);
                }
             }
 
@@ -1236,14 +1236,14 @@ namespace hMailServer.ControlPanel.Views
             var certificateIdByProtocol = new Dictionary<int, int>();
 
             ports = ServerSession.Current.Application.Settings.TCPIPPorts;
-            int portCount = (int) ports.Count;
+            int portCount = (int)ports.Count;
             for (int i = 0; i < portCount; i++)
             {
                dynamic port = ports.Item[i];
                try
                {
-                  int security = (int) port.ConnectionSecurity;
-                  int certificateId = (int) port.SSLCertificateID;
+                  int security = (int)port.ConnectionSecurity;
+                  int certificateId = (int)port.SSLCertificateID;
 
                   // Only a port that will actually perform a handshake has a
                   // certificate to lend: security 0 is plaintext.
@@ -1253,13 +1253,13 @@ namespace hMailServer.ControlPanel.Views
                   if (!usableCertificateNames.ContainsKey(certificateId))
                      continue;
 
-                  int protocol = (int) port.Protocol;
+                  int protocol = (int)port.Protocol;
                   if (!certificateIdByProtocol.ContainsKey(protocol))
                      certificateIdByProtocol[protocol] = certificateId;
                }
                finally
                {
-                  ServerSession.Release((object) port);
+                  ServerSession.Release((object)port);
                }
             }
 
@@ -1278,8 +1278,8 @@ namespace hMailServer.ControlPanel.Views
          }
          finally
          {
-            ServerSession.Release((object) ports);
-            ServerSession.Release((object) certificates);
+            ServerSession.Release((object)ports);
+            ServerSession.Release((object)certificates);
          }
 
          return "";

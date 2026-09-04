@@ -97,108 +97,108 @@ namespace hMailServer.ControlPanel.Views
          switch (f.Kind)
          {
             case CollectionEditorView.FieldKind.Bool:
-            {
-               var box = new CheckBox
                {
-                  Content = f.Label,
-                  IsChecked = current is bool b && b,
-                  FontSize = Typography.Body,
-                  Margin = new Thickness(0, 6, 0, 10)
-               };
-               // A checkbox is named by its Content, so it only needs an override
-               // when the name was qualified to tell it from an identically worded
-               // field elsewhere in the dialog.
-               if (!string.Equals(accessibleName, f.Label, StringComparison.Ordinal))
-                  Describe(box, prop, accessibleName);
-               else
-                  AutomationProperties.SetAutomationId(box, prop);
-               host.Children.Add(box);
-               committers_.Add(() => { Result[prop] = box.IsChecked == true; return true; });
-               break;
-            }
-            case CollectionEditorView.FieldKind.Combo:
-            {
-               host.Children.Add(Label(f.Label));
-               var combo = new ComboBox { FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 10) };
-               int sel = current is int ci ? ci : Convert.ToInt32(current ?? 0);
-               foreach ((int Value, string Label) opt in f.Options)
-               {
-                  var item = new ComboBoxItem { Content = opt.Label, Tag = opt.Value };
-                  combo.Items.Add(item);
-                  if (opt.Value == sel)
-                     combo.SelectedItem = item;
+                  var box = new CheckBox
+                  {
+                     Content = f.Label,
+                     IsChecked = current is bool b && b,
+                     FontSize = Typography.Body,
+                     Margin = new Thickness(0, 6, 0, 10)
+                  };
+                  // A checkbox is named by its Content, so it only needs an override
+                  // when the name was qualified to tell it from an identically worded
+                  // field elsewhere in the dialog.
+                  if (!string.Equals(accessibleName, f.Label, StringComparison.Ordinal))
+                     Describe(box, prop, accessibleName);
+                  else
+                     AutomationProperties.SetAutomationId(box, prop);
+                  host.Children.Add(box);
+                  committers_.Add(() => { Result[prop] = box.IsChecked == true; return true; });
+                  break;
                }
-               if (combo.SelectedItem == null && combo.Items.Count > 0)
-                  combo.SelectedIndex = 0;
-               Describe(combo, prop, accessibleName);
-               host.Children.Add(combo);
-               committers_.Add(() =>
+            case CollectionEditorView.FieldKind.Combo:
                {
-                  Result[prop] = combo.SelectedItem is ComboBoxItem cbi ? (int) cbi.Tag : 0;
-                  return true;
-               });
-               break;
-            }
+                  host.Children.Add(Label(f.Label));
+                  var combo = new ComboBox { FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 10) };
+                  int sel = current is int ci ? ci : Convert.ToInt32(current ?? 0);
+                  foreach ((int Value, string Label) opt in f.Options)
+                  {
+                     var item = new ComboBoxItem { Content = opt.Label, Tag = opt.Value };
+                     combo.Items.Add(item);
+                     if (opt.Value == sel)
+                        combo.SelectedItem = item;
+                  }
+                  if (combo.SelectedItem == null && combo.Items.Count > 0)
+                     combo.SelectedIndex = 0;
+                  Describe(combo, prop, accessibleName);
+                  host.Children.Add(combo);
+                  committers_.Add(() =>
+                  {
+                     Result[prop] = combo.SelectedItem is ComboBoxItem cbi ? (int)cbi.Tag : 0;
+                     return true;
+                  });
+                  break;
+               }
             case CollectionEditorView.FieldKind.Multiline:
-            {
-               host.Children.Add(Label(f.Label));
-               var box = new TextBox
                {
-                  Text = Convert.ToString(current) ?? "",
-                  FontSize = Typography.Body,
-                  AcceptsReturn = true,
-                  TextWrapping = TextWrapping.Wrap,
-                  MinLines = 4,
-                  MaxLines = 10,
-                  Margin = new Thickness(0, 0, 0, 10)
-               };
-               Describe(box, prop, accessibleName);
-               host.Children.Add(box);
-               committers_.Add(() => { Result[prop] = box.Text; return true; });
-               break;
-            }
+                  host.Children.Add(Label(f.Label));
+                  var box = new TextBox
+                  {
+                     Text = Convert.ToString(current) ?? "",
+                     FontSize = Typography.Body,
+                     AcceptsReturn = true,
+                     TextWrapping = TextWrapping.Wrap,
+                     MinLines = 4,
+                     MaxLines = 10,
+                     Margin = new Thickness(0, 0, 0, 10)
+                  };
+                  Describe(box, prop, accessibleName);
+                  host.Children.Add(box);
+                  committers_.Add(() => { Result[prop] = box.Text; return true; });
+                  break;
+               }
             case CollectionEditorView.FieldKind.Password:
-            {
-               host.Children.Add(Label(f.Label));
-               var box = new Wpf.Ui.Controls.PasswordBox
                {
-                  Password = Convert.ToString(current) ?? "",
-                  FontSize = Typography.Body,
-                  Margin = new Thickness(0, 0, 0, 10)
-               };
-               Describe(box, prop, accessibleName);
-               host.Children.Add(box);
-               committers_.Add(() => { Result[prop] = box.Password; return true; });
-               break;
-            }
+                  host.Children.Add(Label(f.Label));
+                  var box = new Wpf.Ui.Controls.PasswordBox
+                  {
+                     Password = Convert.ToString(current) ?? "",
+                     FontSize = Typography.Body,
+                     Margin = new Thickness(0, 0, 0, 10)
+                  };
+                  Describe(box, prop, accessibleName);
+                  host.Children.Add(box);
+                  committers_.Add(() => { Result[prop] = box.Password; return true; });
+                  break;
+               }
             case CollectionEditorView.FieldKind.Number:
-            {
-               host.Children.Add(Label(f.Label));
-               double cur = 0;
-               try { cur = Convert.ToDouble(current ?? 0); } catch (Exception) { cur = 0; }
-               var box = new Wpf.Ui.Controls.NumberBox
                {
-                  Value = cur,
-                  MaxDecimalPlaces = 0,
-                  SmallChange = 1,
-                  LargeChange = 10,
-                  FontSize = Typography.Body,
-                  Margin = new Thickness(0, 0, 0, 10)
-               };
-               Describe(box, prop, accessibleName);
-               host.Children.Add(box);
-               committers_.Add(() => { Result[prop] = (int) (box.Value ?? 0); return true; });
-               break;
-            }
+                  host.Children.Add(Label(f.Label));
+                  double cur = 0;
+                  try { cur = Convert.ToDouble(current ?? 0); } catch (Exception) { cur = 0; }
+                  var box = new Wpf.Ui.Controls.NumberBox
+                  {
+                     Value = cur,
+                     MaxDecimalPlaces = 0,
+                     SmallChange = 1,
+                     LargeChange = 10,
+                     FontSize = Typography.Body,
+                     Margin = new Thickness(0, 0, 0, 10)
+                  };
+                  Describe(box, prop, accessibleName);
+                  host.Children.Add(box);
+                  committers_.Add(() => { Result[prop] = (int)(box.Value ?? 0); return true; });
+                  break;
+               }
             default:
-            {
-               host.Children.Add(Label(f.Label));
-               var box = new TextBox { Text = Convert.ToString(current) ?? "", FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 10) };
-               Describe(box, prop, accessibleName);
-               host.Children.Add(box);
-               committers_.Add(() => { Result[prop] = box.Text; return true; });
-               break;
-            }
+               {
+                  host.Children.Add(Label(f.Label));
+                  var box = new TextBox { Text = Convert.ToString(current) ?? "", FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 10) };
+                  Describe(box, prop, accessibleName);
+                  host.Children.Add(box);
+                  committers_.Add(() => { Result[prop] = box.Text; return true; });
+                  break;
+               }
          }
       }
 

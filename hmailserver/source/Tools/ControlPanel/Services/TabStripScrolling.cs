@@ -77,13 +77,13 @@ namespace hMailServer.ControlPanel.Services
          element.SetValue(LeftButtonProperty, value);
 
       public static ButtonBase GetLeftButton(DependencyObject element) =>
-         (ButtonBase) element.GetValue(LeftButtonProperty);
+         (ButtonBase)element.GetValue(LeftButtonProperty);
 
       public static void SetRightButton(DependencyObject element, ButtonBase value) =>
          element.SetValue(RightButtonProperty, value);
 
       public static ButtonBase GetRightButton(DependencyObject element) =>
-         (ButtonBase) element.GetValue(RightButtonProperty);
+         (ButtonBase)element.GetValue(RightButtonProperty);
 
       private static void OnButtonChanged(DependencyObject target, DependencyPropertyChangedEventArgs args)
       {

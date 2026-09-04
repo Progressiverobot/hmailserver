@@ -262,7 +262,7 @@ namespace hMailServer.ControlPanel.Services
          {
             try
             {
-               ((EventHandler) handler)(null, EventArgs.Empty);
+               ((EventHandler)handler)(null, EventArgs.Empty);
             }
             catch (Exception ex)
             {
@@ -297,7 +297,7 @@ namespace hMailServer.ControlPanel.Services
 
       private static uint ToArgb(Color color)
       {
-         return ((uint) color.A << 24) | ((uint) color.R << 16) | ((uint) color.G << 8) | color.B;
+         return ((uint)color.A << 24) | ((uint)color.R << 16) | ((uint)color.G << 8) | color.B;
       }
 
       private static bool IsLight()
@@ -325,6 +325,6 @@ namespace hMailServer.ControlPanel.Services
          Application.Current.Resources[key] = new SolidColorBrush(color);
       }
 
-      private static Color Hex(string hex) => (Color) ColorConverter.ConvertFromString(hex);
+      private static Color Hex(string hex) => (Color)ColorConverter.ConvertFromString(hex);
    }
 }

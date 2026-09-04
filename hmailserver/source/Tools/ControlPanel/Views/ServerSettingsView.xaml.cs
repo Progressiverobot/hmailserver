@@ -138,7 +138,7 @@ namespace hMailServer.ControlPanel.Views
          {
             object value = ReadEditor();
             if (value is long n)
-               SetProperty(owner, property, (int) n);
+               SetProperty(owner, property, (int)n);
             else
                SetProperty(owner, property, value);
          }
@@ -199,7 +199,7 @@ namespace hMailServer.ControlPanel.Views
          /// <summary>Current text in the editor (for live test buttons).</summary>
          public string CurrentText
             => number_ != null
-               ? ((long) (number_.Value ?? 0)).ToString()
+               ? ((long)(number_.Value ?? 0)).ToString()
                : (box_?.Text?.Trim() ?? "");
 
          /// <summary>Overwrites the editor text (for preset pickers / auto-detect).</summary>
@@ -304,7 +304,7 @@ namespace hMailServer.ControlPanel.Views
          {
             if (Numeric)
             {
-               long number = number_ != null ? (long) (number_.Value ?? 0) : 0L;
+               long number = number_ != null ? (long)(number_.Value ?? 0) : 0L;
                return number * Divisor;
             }
             return box_.Text.Trim();
@@ -423,7 +423,7 @@ namespace hMailServer.ControlPanel.Views
             return panel;
          }
 
-         public override object ReadEditor() => (long) (number_?.Value ?? Default);
+         public override object ReadEditor() => (long)(number_?.Value ?? Default);
 
          /// <summary>Persists to hMailServer.ini. Save_Click calls this instead
          /// of the COM write path.</summary>
@@ -433,7 +433,7 @@ namespace hMailServer.ControlPanel.Views
             if (store == null || !store.IsAvailable || number_ == null)
                return;
 
-            store.Write(Path, ((long) (number_.Value ?? Default)).ToString());
+            store.Write(Path, ((long)(number_.Value ?? Default)).ToString());
          }
 
          /// <summary>Shared store, assigned by the view when the page is built.</summary>
@@ -488,14 +488,14 @@ namespace hMailServer.ControlPanel.Views
             return panel;
          }
 
-         public override object ReadEditor() => (long) (number_?.Value ?? Default);
+         public override object ReadEditor() => (long)(number_?.Value ?? Default);
 
          public void SaveToIni()
          {
             if (IniStore == null || !IniStore.IsAvailable || number_ == null)
                return;
 
-            IniStore.WriteTo(Section, Path, ((long) (number_.Value ?? Default)).ToString());
+            IniStore.WriteTo(Section, Path, ((long)(number_.Value ?? Default)).ToString());
          }
       }
 
@@ -607,7 +607,7 @@ namespace hMailServer.ControlPanel.Views
 
          /// <summary>The value currently selected, or 0 before the editor is built.</summary>
          public int SelectedValue
-            => combo_?.SelectedItem is ComboBoxItem cbi ? (int) cbi.Tag : 0;
+            => combo_?.SelectedItem is ComboBoxItem cbi ? (int)cbi.Tag : 0;
 
          public override FrameworkElement CreateEditor(object value)
          {
@@ -632,7 +632,7 @@ namespace hMailServer.ControlPanel.Views
          }
 
          public override object ReadEditor()
-            => combo_.SelectedItem is ComboBoxItem cbi ? (int) cbi.Tag : 0;
+            => combo_.SelectedItem is ComboBoxItem cbi ? (int)cbi.Tag : 0;
       }
 
       private class ComPassword : ComSetting
@@ -1559,7 +1559,7 @@ namespace hMailServer.ControlPanel.Views
             {
                dynamic a = ServerSession.Current.Application.Settings.AntiSpam;
                try { a.ClearGreyListingTriplets(); return (true, "Greylisting triplets cleared."); }
-               finally { ServerSession.Release((object) a); }
+               finally { ServerSession.Release((object)a); }
             }
          });
          Tab("Greylisting").Cards.Add(grey);
@@ -1982,7 +1982,7 @@ namespace hMailServer.ControlPanel.Views
                   return (true, "Counted logon failures cleared. Addresses already banned stay banned until their " +
                                 "\"Auto-ban:\" range expires - delete it on the IP ranges page to release one now.");
                }
-               finally { ServerSession.Release((object) s); }
+               finally { ServerSession.Release((object)s); }
             }
          });
          Tab("Auto-ban").Cards.Add(ban);
@@ -2837,8 +2837,8 @@ namespace hMailServer.ControlPanel.Views
          try
          {
             object[] args = { host, port, "" };
-            object ret = ((object) antispam).GetType().InvokeMember(
-               "TestSpamAssassinConnection", BindingFlags.InvokeMethod, null, (object) antispam, args);
+            object ret = ((object)antispam).GetType().InvokeMember(
+               "TestSpamAssassinConnection", BindingFlags.InvokeMethod, null, (object)antispam, args);
             bool ok = ret is bool b && b;
             string msg = args.Length > 2 ? args[2] as string : null;
             if (string.IsNullOrEmpty(msg))
@@ -2847,7 +2847,7 @@ namespace hMailServer.ControlPanel.Views
          }
          finally
          {
-            ServerSession.Release((object) antispam);
+            ServerSession.Release((object)antispam);
          }
       }
 
@@ -2869,7 +2869,7 @@ namespace hMailServer.ControlPanel.Views
          dynamic cache = ServerSession.Current.Application.Settings.Cache;
          try
          {
-            if (!(bool) cache.Enabled)
+            if (!(bool)cache.Enabled)
             {
                return "Caching is switched off, so every domain, account, alias and distribution-list lookup goes to "
                       + "the database. There are no hit rates to report.";
@@ -2885,9 +2885,9 @@ namespace hMailServer.ControlPanel.Views
                ("Distribution lists", "DistributionListHitRate", "DistributionListCacheSizeKb", "DistributionListCacheMaxSizeKb")
             })
             {
-               int rate = (int) ComProperty_(cache, rateProperty);
-               int sizeKb = (int) ComProperty_(cache, sizeProperty);
-               int capKb = (int) ComProperty_(cache, capProperty);
+               int rate = (int)ComProperty_(cache, rateProperty);
+               int sizeKb = (int)ComProperty_(cache, sizeProperty);
+               int capKb = (int)ComProperty_(cache, capProperty);
 
                string line = name + ": ";
 
@@ -2925,7 +2925,7 @@ namespace hMailServer.ControlPanel.Views
          }
          finally
          {
-            ServerSession.Release((object) cache);
+            ServerSession.Release((object)cache);
          }
       }
 
@@ -2954,7 +2954,7 @@ namespace hMailServer.ControlPanel.Views
          dynamic indexing = ServerSession.Current.Application.Settings.MessageIndexing;
          try
          {
-            return ((long) (int) indexing.TotalMessageCount, (long) (int) indexing.TotalIndexedCount);
+            return ((long)(int)indexing.TotalMessageCount, (long)(int)indexing.TotalIndexedCount);
          }
          catch (Exception)
          {
@@ -2962,7 +2962,7 @@ namespace hMailServer.ControlPanel.Views
          }
          finally
          {
-            ServerSession.Release((object) indexing);
+            ServerSession.Release((object)indexing);
          }
       }
 
@@ -3002,7 +3002,7 @@ namespace hMailServer.ControlPanel.Views
          dynamic indexing = ServerSession.Current.Application.Settings.MessageIndexing;
          try
          {
-            return (bool) indexing.Enabled;
+            return (bool)indexing.Enabled;
          }
          catch (Exception)
          {
@@ -3012,7 +3012,7 @@ namespace hMailServer.ControlPanel.Views
          }
          finally
          {
-            ServerSession.Release((object) indexing);
+            ServerSession.Release((object)indexing);
          }
       }
 
@@ -3032,7 +3032,7 @@ namespace hMailServer.ControlPanel.Views
          }
          finally
          {
-            ServerSession.Release((object) indexing);
+            ServerSession.Release((object)indexing);
          }
 
          // The counts are read after signalling but describe the state BEFORE the
@@ -3078,7 +3078,7 @@ namespace hMailServer.ControlPanel.Views
          }
          finally
          {
-            ServerSession.Release((object) indexing);
+            ServerSession.Release((object)indexing);
          }
 
          return (true, "The index has been emptied and the indexer asked to rebuild it. The rebuild runs in the "
@@ -3114,12 +3114,12 @@ namespace hMailServer.ControlPanel.Views
          {
             // eUpdateIMAPFolderUID = 1. The only operation the enum defines; the
             // server answers "Unknown maintenance operation" for anything else.
-            ((object) utilities).GetType().InvokeMember(
-               "PerformMaintenance", BindingFlags.InvokeMethod, null, (object) utilities, new object[] { 1 });
+            ((object)utilities).GetType().InvokeMember(
+               "PerformMaintenance", BindingFlags.InvokeMethod, null, (object)utilities, new object[] { 1 });
          }
          finally
          {
-            ServerSession.Release((object) utilities);
+            ServerSession.Release((object)utilities);
          }
 
          return (true, "The folder UID counters have been recalculated. Clients that cached the old values will "
@@ -3155,8 +3155,8 @@ namespace hMailServer.ControlPanel.Views
          try
          {
             object[] args = { host, port, "" };
-            object ret = ((object) av).GetType().InvokeMember(
-               "TestClamAVScanner", BindingFlags.InvokeMethod, null, (object) av, args);
+            object ret = ((object)av).GetType().InvokeMember(
+               "TestClamAVScanner", BindingFlags.InvokeMethod, null, (object)av, args);
             bool ok = ret is bool b && b;
             string msg = args.Length > 2 ? args[2] as string : null;
             if (string.IsNullOrEmpty(msg))
@@ -3165,7 +3165,7 @@ namespace hMailServer.ControlPanel.Views
          }
          finally
          {
-            ServerSession.Release((object) av);
+            ServerSession.Release((object)av);
          }
       }
 
@@ -3178,8 +3178,8 @@ namespace hMailServer.ControlPanel.Views
          try
          {
             object[] args = { executable, database ?? "", "" };
-            object ret = ((object) av).GetType().InvokeMember(
-               "TestClamWinScanner", BindingFlags.InvokeMethod, null, (object) av, args);
+            object ret = ((object)av).GetType().InvokeMember(
+               "TestClamWinScanner", BindingFlags.InvokeMethod, null, (object)av, args);
             bool ok = ret is bool b && b;
             string msg = args.Length > 2 ? args[2] as string : null;
             if (string.IsNullOrEmpty(msg))
@@ -3188,7 +3188,7 @@ namespace hMailServer.ControlPanel.Views
          }
          finally
          {
-            ServerSession.Release((object) av);
+            ServerSession.Release((object)av);
          }
       }
 

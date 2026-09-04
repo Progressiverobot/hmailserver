@@ -144,13 +144,13 @@ namespace hMailServer.ControlPanel.Views
             dynamic group = OpenGroup();
             dynamic members = group.Members;
 
-            int count = (int) members.Count;
+            int count = (int)members.Count;
 
             for (int i = 0; i < count; i++)
             {
                dynamic member = members[i];
 
-               int memberId = (int) member.ID;
+               int memberId = (int)member.ID;
                string label;
 
                // Account is a COM property that resolves the stored AccountID. It can
@@ -160,7 +160,7 @@ namespace hMailServer.ControlPanel.Views
                try
                {
                   dynamic account = member.Account;
-                  label = account == null ? null : (string) account.Address;
+                  label = account == null ? null : (string)account.Address;
                }
                catch
                {
@@ -168,7 +168,7 @@ namespace hMailServer.ControlPanel.Views
                }
 
                if (string.IsNullOrWhiteSpace(label))
-                  label = "(account " + (int) member.AccountID + " no longer exists)";
+                  label = "(account " + (int)member.AccountID + " no longer exists)";
 
                memberIds_.Add(memberId);
                list_.Items.Add(label);
@@ -190,16 +190,16 @@ namespace hMailServer.ControlPanel.Views
          var addresses = new List<string>();
 
          dynamic domains = ServerSession.Current.Application.Domains;
-         int domainCount = (int) domains.Count;
+         int domainCount = (int)domains.Count;
 
          for (int d = 0; d < domainCount; d++)
          {
             dynamic domain = domains[d];
             dynamic accounts = domain.Accounts;
-            int accountCount = (int) accounts.Count;
+            int accountCount = (int)accounts.Count;
 
             for (int a = 0; a < accountCount; a++)
-               addresses.Add((string) accounts[a].Address);
+               addresses.Add((string)accounts[a].Address);
          }
 
          addresses.Sort(StringComparer.OrdinalIgnoreCase);
@@ -230,12 +230,12 @@ namespace hMailServer.ControlPanel.Views
             // Already a member? Adding a duplicate row would grant nothing extra and
             // leave two rows to remove later, so it is refused with an explanation
             // rather than silently ignored.
-            int existing = (int) members.Count;
-            int accountId = (int) account.ID;
+            int existing = (int)members.Count;
+            int accountId = (int)account.ID;
 
             for (int i = 0; i < existing; i++)
             {
-               if ((int) members[i].AccountID == accountId)
+               if ((int)members[i].AccountID == accountId)
                {
                   MessageBox.Show(address + " is already a member of this group.", "Control Panel");
                   return;
@@ -262,7 +262,7 @@ namespace hMailServer.ControlPanel.Views
          if (index < 0 || index >= memberIds_.Count)
             return;
 
-         string label = (string) list_.Items[index];
+         string label = (string)list_.Items[index];
 
          if (MessageBox.Show("Remove " + label + " from " + groupName_ + "?\r\n\r\n"
                              + "Any access this group has been granted stops applying to that account.",

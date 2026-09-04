@@ -123,37 +123,37 @@ namespace hMailServer.ControlPanel.Views
             settings = ServerSession.Current.Application.Settings;
             antiSpam = settings.AntiSpam;
 
-            config.MarkThreshold = Read(() => (int) antiSpam.SpamMarkThreshold);
-            config.DeleteThreshold = Read(() => (int) antiSpam.SpamDeleteThreshold);
-            config.MaxScanKilobytes = Read(() => (int) antiSpam.MaximumMessageSize);
-            config.BlockedSenderCount = Read(() => (int) antiSpam.BlockedSenders.Count);
+            config.MarkThreshold = Read(() => (int)antiSpam.SpamMarkThreshold);
+            config.DeleteThreshold = Read(() => (int)antiSpam.SpamDeleteThreshold);
+            config.MaxScanKilobytes = Read(() => (int)antiSpam.MaximumMessageSize);
+            config.BlockedSenderCount = Read(() => (int)antiSpam.BlockedSenders.Count);
 
-            config.AddSpamHeader = Read(() => (bool) antiSpam.AddHeaderSpam);
-            config.AddReasonHeader = Read(() => (bool) antiSpam.AddHeaderReason);
-            config.PrependSubject = Read(() => (bool) antiSpam.PrependSubject);
+            config.AddSpamHeader = Read(() => (bool)antiSpam.AddHeaderSpam);
+            config.AddReasonHeader = Read(() => (bool)antiSpam.AddHeaderReason);
+            config.PrependSubject = Read(() => (bool)antiSpam.PrependSubject);
 
-            config.CheckHeloHost = Read(() => (bool) antiSpam.CheckHostInHelo);
-            config.HeloHostScore = Read(() => (int) antiSpam.CheckHostInHeloScore);
-            config.CheckPtr = Read(() => (bool) antiSpam.CheckPTR);
-            config.PtrScore = Read(() => (int) antiSpam.CheckPTRScore);
-            config.CheckSenderMx = Read(() => (bool) antiSpam.UseMXChecks);
-            config.SenderMxScore = Read(() => (int) antiSpam.UseMXChecksScore);
-            config.CheckSpf = Read(() => (bool) antiSpam.UseSPF);
-            config.SpfScore = Read(() => (int) antiSpam.UseSPFScore);
+            config.CheckHeloHost = Read(() => (bool)antiSpam.CheckHostInHelo);
+            config.HeloHostScore = Read(() => (int)antiSpam.CheckHostInHeloScore);
+            config.CheckPtr = Read(() => (bool)antiSpam.CheckPTR);
+            config.PtrScore = Read(() => (int)antiSpam.CheckPTRScore);
+            config.CheckSenderMx = Read(() => (bool)antiSpam.UseMXChecks);
+            config.SenderMxScore = Read(() => (int)antiSpam.UseMXChecksScore);
+            config.CheckSpf = Read(() => (bool)antiSpam.UseSPF);
+            config.SpfScore = Read(() => (int)antiSpam.UseSPFScore);
 
-            config.VerifyDkim = Read(() => (bool) antiSpam.DKIMVerificationEnabled);
-            config.DkimFailureScore = Read(() => (int) antiSpam.DKIMVerificationFailureScore);
-            config.EvaluateDmarc = Read(() => (bool) antiSpam.DMARCEnabled);
-            config.DmarcFailureScore = Read(() => (int) antiSpam.DMARCFailureScore);
+            config.VerifyDkim = Read(() => (bool)antiSpam.DKIMVerificationEnabled);
+            config.DkimFailureScore = Read(() => (int)antiSpam.DKIMVerificationFailureScore);
+            config.EvaluateDmarc = Read(() => (bool)antiSpam.DMARCEnabled);
+            config.DmarcFailureScore = Read(() => (int)antiSpam.DMARCFailureScore);
 
-            config.SpamAssassinEnabled = Read(() => (bool) antiSpam.SpamAssassinEnabled);
-            config.SpamAssassinMergesScore = Read(() => (bool) antiSpam.SpamAssassinMergeScore);
-            config.SpamAssassinScore = Read(() => (int) antiSpam.SpamAssassinScore);
-            config.SpamAssassinHost = Read(() => (string) antiSpam.SpamAssassinHost) ?? "";
+            config.SpamAssassinEnabled = Read(() => (bool)antiSpam.SpamAssassinEnabled);
+            config.SpamAssassinMergesScore = Read(() => (bool)antiSpam.SpamAssassinMergeScore);
+            config.SpamAssassinScore = Read(() => (int)antiSpam.SpamAssassinScore);
+            config.SpamAssassinHost = Read(() => (string)antiSpam.SpamAssassinHost) ?? "";
 
-            config.GreylistingEnabled = Read(() => (bool) antiSpam.GreyListingEnabled);
-            config.BypassGreylistingOnSpfPass = Read(() => (bool) antiSpam.BypassGreylistingOnSPFSuccess);
-            config.BypassGreylistingOnSenderMx = Read(() => (bool) antiSpam.BypassGreylistingOnMailFromMX);
+            config.GreylistingEnabled = Read(() => (bool)antiSpam.GreyListingEnabled);
+            config.BypassGreylistingOnSpfPass = Read(() => (bool)antiSpam.BypassGreylistingOnSPFSuccess);
+            config.BypassGreylistingOnSenderMx = Read(() => (bool)antiSpam.BypassGreylistingOnMailFromMX);
 
             CountList(() => antiSpam.DNSBlackLists, true, out int dnsblActive, out int dnsblTotal);
             config.ActiveDnsBlackLists = dnsblActive;
@@ -177,8 +177,8 @@ namespace hMailServer.ControlPanel.Views
          }
          finally
          {
-            ServerSession.Release((object) antiSpam);
-            ServerSession.Release((object) settings);
+            ServerSession.Release((object)antiSpam);
+            ServerSession.Release((object)settings);
          }
 
          return config;
@@ -217,7 +217,7 @@ namespace hMailServer.ControlPanel.Views
          try
          {
             collection = open();
-            total = (int) collection.Count;
+            total = (int)collection.Count;
 
             if (!entriesHaveAnActiveFlag)
             {
@@ -230,12 +230,12 @@ namespace hMailServer.ControlPanel.Views
                dynamic item = collection.Item[i];
                try
                {
-                  if ((bool) item.Active)
+                  if ((bool)item.Active)
                      active++;
                }
                finally
                {
-                  ServerSession.Release((object) item);
+                  ServerSession.Release((object)item);
                }
             }
          }
@@ -246,7 +246,7 @@ namespace hMailServer.ControlPanel.Views
          }
          finally
          {
-            ServerSession.Release((object) collection);
+            ServerSession.Release((object)collection);
          }
       }
 

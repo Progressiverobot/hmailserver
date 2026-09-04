@@ -170,11 +170,11 @@ namespace hMailServer.ControlPanel.Views
 
       private dynamic FindRoute(dynamic routes)
       {
-         int count = (int) routes.Count;
+         int count = (int)routes.Count;
          for (int i = 0; i < count; i++)
          {
             dynamic r = routes.Item[i];
-            if ((string) r.DomainName == domainName_)
+            if ((string)r.DomainName == domainName_)
                return r;
             ServerSession.Release(r);
          }
@@ -188,18 +188,18 @@ namespace hMailServer.ControlPanel.Views
          {
             dynamic r = FindRoute(routes);
             if (r == null) { Close(); return; }
-            routeId_ = (int) r.ID;
-            host_.Text = (string) r.TargetSMTPHost ?? "";
-            port_.Text = ((int) r.TargetSMTPPort).ToString();
-            description_.Text = (string) r.Description ?? "";
-            tries_.Text = ((int) r.NumberOfTries).ToString();
-            minutes_.Text = ((int) r.MinutesBetweenTry).ToString();
-            allAddresses_.IsChecked = (bool) r.AllAddresses;
-            SelectCombo(connSecurity_, (int) r.ConnectionSecurity);
-            treatSenderLocal_.IsChecked = (bool) r.TreatSenderAsLocalDomain;
-            treatRecipientLocal_.IsChecked = (bool) r.TreatRecipientAsLocalDomain;
-            requiresAuth_.IsChecked = (bool) r.RelayerRequiresAuth;
-            authUser_.Text = (string) r.RelayerAuthUsername ?? "";
+            routeId_ = (int)r.ID;
+            host_.Text = (string)r.TargetSMTPHost ?? "";
+            port_.Text = ((int)r.TargetSMTPPort).ToString();
+            description_.Text = (string)r.Description ?? "";
+            tries_.Text = ((int)r.NumberOfTries).ToString();
+            minutes_.Text = ((int)r.MinutesBetweenTry).ToString();
+            allAddresses_.IsChecked = (bool)r.AllAddresses;
+            SelectCombo(connSecurity_, (int)r.ConnectionSecurity);
+            treatSenderLocal_.IsChecked = (bool)r.TreatSenderAsLocalDomain;
+            treatRecipientLocal_.IsChecked = (bool)r.TreatRecipientAsLocalDomain;
+            requiresAuth_.IsChecked = (bool)r.RelayerRequiresAuth;
+            authUser_.Text = (string)r.RelayerAuthUsername ?? "";
             LoadAddresses(r);
             ServerSession.Release(r);
          }
@@ -273,11 +273,11 @@ namespace hMailServer.ControlPanel.Views
          dynamic addresses = route.Addresses;
          try
          {
-            int count = (int) addresses.Count;
+            int count = (int)addresses.Count;
             for (int i = 0; i < count; i++)
             {
                dynamic a = addresses.Item[i];
-               addressList_.Items.Add(new AddrItem { Id = (int) a.ID, Address = (string) a.Address });
+               addressList_.Items.Add(new AddrItem { Id = (int)a.ID, Address = (string)a.Address });
                ServerSession.Release(a);
             }
          }
@@ -412,9 +412,9 @@ namespace hMailServer.ControlPanel.Views
       private static void SelectCombo(ComboBox combo, int value)
       {
          foreach (ComboBoxItem item in combo.Items)
-            if ((int) item.Tag == value) { combo.SelectedItem = item; return; }
+            if ((int)item.Tag == value) { combo.SelectedItem = item; return; }
       }
 
-      private static int ComboValue(ComboBox combo) => combo.SelectedItem is ComboBoxItem item ? (int) item.Tag : 0;
+      private static int ComboValue(ComboBox combo) => combo.SelectedItem is ComboBoxItem item ? (int)item.Tag : 0;
    }
 }

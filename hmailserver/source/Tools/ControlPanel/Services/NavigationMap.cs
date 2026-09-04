@@ -332,7 +332,7 @@ namespace hMailServer.ControlPanel.Services
 
       private static IReadOnlyList<string> Split(string pipeSeparated)
          => string.IsNullOrEmpty(pipeSeparated)
-            ? (IReadOnlyList<string>) Array.Empty<string>()
+            ? (IReadOnlyList<string>)Array.Empty<string>()
             : pipeSeparated.Split('|').Select(s => s.Trim()).Where(s => s.Length > 0).ToList();
 
       /// <summary>

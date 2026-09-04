@@ -10,17 +10,17 @@ using System.Windows.Forms;
 
 namespace hMailServer.Shared
 {
-    public class WaitCursor : IDisposable
-    {
-        public WaitCursor()
-        {
-            Cursor.Current = Cursors.WaitCursor;
-        }
+   public class WaitCursor : IDisposable
+   {
+      public WaitCursor()
+      {
+         Cursor.Current = Cursors.WaitCursor;
+      }
 
-        public void Dispose()
-        {
-            Cursor.Current = Cursors.Default;
+      public void Dispose()
+      {
+         Cursor.Current = Cursors.Default;
 
-        }
-    }
+      }
+   }
 }

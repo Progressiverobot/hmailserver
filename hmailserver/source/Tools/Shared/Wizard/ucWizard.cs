@@ -19,8 +19,8 @@ namespace hMailServer.Shared
       private readonly Dictionary<string, string> _state;
       private int _currentPage;
 
-      public delegate void PageChangedEventHandler (int currentPage, int lastPage);
-      
+      public delegate void PageChangedEventHandler(int currentPage, int lastPage);
+
       public event EventHandler Cancel;
       public event PageChangedEventHandler PageChanged;
 
@@ -69,8 +69,8 @@ namespace hMailServer.Shared
       {
          if (panelMiddle.Controls.Count > 0)
          {
-            UserControl currentPage = (UserControl) panelMiddle.Controls[0];
-            IWizardPage currentWizPage = (IWizardPage) currentPage;
+            UserControl currentPage = (UserControl)panelMiddle.Controls[0];
+            IWizardPage currentWizPage = (IWizardPage)currentPage;
 
             bool nextEnabled = buttonNext.Enabled;
             bool previousEnabled = buttonPrevious.Enabled;
@@ -105,7 +105,7 @@ namespace hMailServer.Shared
          _currentPage = pageNo;
 
          UserControl page = _pages[_currentPage];
-         IWizardPage wizPage = (IWizardPage) page;
+         IWizardPage wizPage = (IWizardPage)page;
 
          new TabOrderManager(page).SetTabOrder(TabOrderManager.TabScheme.AcrossFirst);
 
@@ -122,7 +122,7 @@ namespace hMailServer.Shared
          wizPage.OnShowPage(_state);
 
          if (PageChanged != null)
-            PageChanged(_currentPage+1, _pages.Count);
+            PageChanged(_currentPage + 1, _pages.Count);
 
          return true;
       }
@@ -182,6 +182,6 @@ namespace hMailServer.Shared
          buttonNext.Text = _currentPage != _pages.Count - 1 ? "Next >" : "Close";
       }
 
-      
+
    }
 }

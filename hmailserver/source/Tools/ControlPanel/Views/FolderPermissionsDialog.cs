@@ -141,11 +141,11 @@ namespace hMailServer.ControlPanel.Views
          {
             dynamic folder = OpenFolder(folders);
             dynamic perms = folder.Permissions;
-            int count = (int) perms.Count;
+            int count = (int)perms.Count;
             for (int i = 0; i < count; i++)
             {
                dynamic p = perms.Item[i];
-               ids_.Add((int) p.ID);
+               ids_.Add((int)p.ID);
                list_.Items.Add(Describe(p));
                ServerSession.Release(p);
             }
@@ -164,14 +164,14 @@ namespace hMailServer.ControlPanel.Views
 
       private static string Describe(dynamic p)
       {
-         int type = (int) p.PermissionType;
+         int type = (int)p.PermissionType;
          string subject = type switch
          {
             0 => SafeAccount(p),
             1 => SafeGroup(p),
             _ => "Anyone"
          };
-         int value = (int) p.Value;
+         int value = (int)p.Value;
          var rights = new List<string>();
          foreach ((string label, int bit) in Flags)
             if ((value & bit) != 0)
@@ -181,14 +181,14 @@ namespace hMailServer.ControlPanel.Views
 
       private static string SafeAccount(dynamic p)
       {
-         try { dynamic a = p.Account; string addr = (string) a.Address; ServerSession.Release(a); return addr; }
-         catch (Exception) { return "(account #" + (int) p.PermissionAccountID + ")"; }
+         try { dynamic a = p.Account; string addr = (string)a.Address; ServerSession.Release(a); return addr; }
+         catch (Exception) { return "(account #" + (int)p.PermissionAccountID + ")"; }
       }
 
       private static string SafeGroup(dynamic p)
       {
-         try { dynamic g = p.Group; string n = (string) g.Name; ServerSession.Release(g); return "Group: " + n; }
-         catch (Exception) { return "(group #" + (int) p.PermissionGroupID + ")"; }
+         try { dynamic g = p.Group; string n = (string)g.Name; ServerSession.Release(g); return "Group: " + n; }
+         catch (Exception) { return "(group #" + (int)p.PermissionGroupID + ")"; }
       }
 
       private void DeleteSelected()
@@ -230,9 +230,9 @@ namespace hMailServer.ControlPanel.Views
                dynamic folder = OpenFolder(folders);
                dynamic perms = folder.Permissions;
                dynamic p = perms.ItemByDBID(existingId);
-               int type = (int) p.PermissionType;
+               int type = (int)p.PermissionType;
                string subject = type == 0 ? SafeAccount(p) : type == 1 ? StripGroup(SafeGroup(p)) : "";
-               dlg.Initialize(type, subject, (int) p.Value);
+               dlg.Initialize(type, subject, (int)p.Value);
                ServerSession.Release(p);
                ServerSession.Release(perms);
                ServerSession.Release(folder);
@@ -295,7 +295,7 @@ namespace hMailServer.ControlPanel.Views
             dynamic domain = domains.ItemByName[domainName];
             dynamic accounts = domain.Accounts;
             dynamic account = accounts.ItemByAddress[address];
-            int id = (int) account.ID;
+            int id = (int)account.ID;
             ServerSession.Release(account);
             ServerSession.Release(accounts);
             ServerSession.Release(domain);
@@ -310,12 +310,12 @@ namespace hMailServer.ControlPanel.Views
          dynamic groups = ServerSession.Current.Application.Settings.Groups;
          try
          {
-            int count = (int) groups.Count;
+            int count = (int)groups.Count;
             for (int i = 0; i < count; i++)
             {
                dynamic g = groups.Item[i];
-               bool match = string.Equals((string) g.Name, name, StringComparison.OrdinalIgnoreCase);
-               int id = match ? (int) g.ID : 0;
+               bool match = string.Equals((string)g.Name, name, StringComparison.OrdinalIgnoreCase);
+               int id = match ? (int)g.ID : 0;
                ServerSession.Release(g);
                if (match)
                   return id;
@@ -386,7 +386,7 @@ namespace hMailServer.ControlPanel.Views
       public void Initialize(int type, string subject, int value)
       {
          foreach (ComboBoxItem item in typeCombo_.Items)
-            if ((int) item.Tag == type)
+            if ((int)item.Tag == type)
                typeCombo_.SelectedItem = item;
          subject_.Text = subject ?? "";
          foreach ((CheckBox box, int bit) in flagBoxes_)
@@ -396,7 +396,7 @@ namespace hMailServer.ControlPanel.Views
 
       private void UpdateSubjectState()
       {
-         int type = typeCombo_.SelectedItem is ComboBoxItem cbi ? (int) cbi.Tag : 0;
+         int type = typeCombo_.SelectedItem is ComboBoxItem cbi ? (int)cbi.Tag : 0;
          bool needsSubject = type != 2; // Anyone needs no subject
          subjectLabel_.Text = type == 1 ? "Group name" : "Account address";
          subjectLabel_.Visibility = needsSubject ? Visibility.Visible : Visibility.Collapsed;
@@ -411,7 +411,7 @@ namespace hMailServer.ControlPanel.Views
 
       private void Commit()
       {
-         SelectedType = typeCombo_.SelectedItem is ComboBoxItem cbi ? (int) cbi.Tag : 0;
+         SelectedType = typeCombo_.SelectedItem is ComboBoxItem cbi ? (int)cbi.Tag : 0;
          Subject = subject_.Text.Trim();
          int value = 0;
          foreach ((CheckBox box, int bit) in flagBoxes_)

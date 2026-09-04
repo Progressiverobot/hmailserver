@@ -453,7 +453,7 @@ namespace DBUpdater
 
             foreach (ListViewItem item in listRequiredUpgrades.Items)
             {
-               UpgradeScript script = (UpgradeScript) item.Tag;
+               UpgradeScript script = (UpgradeScript)item.Tag;
 
                string scriptToExecute = GetScriptFileName(script);
 
@@ -567,7 +567,7 @@ namespace DBUpdater
 
          foreach (ListViewItem item in listRequiredUpgrades.Items)
          {
-            UpgradeScript script = (UpgradeScript) item.Tag;
+            UpgradeScript script = (UpgradeScript)item.Tag;
 
             foreach (SchemaProbe probe in SchemaVerification.GetProbesFor(script.To))
             {
@@ -671,7 +671,7 @@ namespace DBUpdater
          {
             System.Diagnostics.Process.Start("notepad.exe", scriptToExecute);
          }
-         catch (Exception )
+         catch (Exception)
          {
             MessageBox.Show("Notepad could not be started.");
          }

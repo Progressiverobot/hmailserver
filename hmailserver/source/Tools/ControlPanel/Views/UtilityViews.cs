@@ -89,11 +89,11 @@ namespace hMailServer.ControlPanel.Views
          dynamic relays = ServerSession.Current.Application.Settings.IncomingRelays;
          try
          {
-            int count = (int) relays.Count;
+            int count = (int)relays.Count;
             for (int i = 0; i < count; i++)
             {
                dynamic relay = relays.Item[i];
-               rows.Add((string) relay.Name + "   (" + (string) relay.LowerIP + " - " + (string) relay.UpperIP + ")");
+               rows.Add((string)relay.Name + "   (" + (string)relay.LowerIP + " - " + (string)relay.UpperIP + ")");
                ServerSession.Release(relay);
             }
          }
@@ -152,11 +152,11 @@ namespace hMailServer.ControlPanel.Views
          dynamic relays = ServerSession.Current.Application.Settings.IncomingRelays;
          try
          {
-            int count = (int) relays.Count;
+            int count = (int)relays.Count;
             for (int i = 0; i < count; i++)
             {
                dynamic relay = relays.Item[i];
-               if ((string) relay.Name == relayName)
+               if ((string)relay.Name == relayName)
                {
                   relay.Delete();
                   ServerSession.Release(relay);
@@ -258,11 +258,11 @@ namespace hMailServer.ControlPanel.Views
                try
                {
                   utilities = ServerSession.Current.Application.Utilities;
-                  return (string) utilities.ResolveMXRecords(domain);
+                  return (string)utilities.ResolveMXRecords(domain);
                }
                finally
                {
-                  ServerSession.Release((object) utilities);
+                  ServerSession.Release((object)utilities);
                }
             });
 
@@ -393,7 +393,7 @@ namespace hMailServer.ControlPanel.Views
          try
          {
             dynamic utilities = ServerSession.Current.Application.Utilities;
-            bool queued = (bool) utilities.EmailAllAccounts(wildcard_.Text, fromAddress_.Text.Trim(), fromName_.Text.Trim(),
+            bool queued = (bool)utilities.EmailAllAccounts(wildcard_.Text, fromAddress_.Text.Trim(), fromName_.Text.Trim(),
                subject_.Text, body_.Text);
             ServerSession.Release(utilities);
             // The server reports failure through the return value rather than an
@@ -476,8 +476,11 @@ namespace hMailServer.ControlPanel.Views
          var title = new TextBlock { Text = "Diagnostics" };
          title.SetResourceReference(StyleProperty, "PageTitle");
          header.Children.Add(title);
-         var sub = new TextBlock { Text = "Runs the server's built-in connectivity and configuration checks (outbound port 25, MX resolution, backup directory, IP configuration). " +
-            "The message-store consistency scan below is a separate read-only background task - the server runs it at start-up and hourly and records what it found in a recovery report." };
+         var sub = new TextBlock
+         {
+            Text = "Runs the server's built-in connectivity and configuration checks (outbound port 25, MX resolution, backup directory, IP configuration). " +
+            "The message-store consistency scan below is a separate read-only background task - the server runs it at start-up and hourly and records what it found in a recovery report."
+         };
          sub.SetResourceReference(StyleProperty, "PageSubtitle");
          header.Children.Add(sub);
          grid.Children.Add(header);
@@ -586,10 +589,10 @@ namespace hMailServer.ControlPanel.Views
          try
          {
             dynamic domains = ServerSession.Current.Application.Domains;
-            if ((int) domains.Count > 0)
+            if ((int)domains.Count > 0)
             {
                dynamic first = domains.Item[0];
-               localDomain_.Text = (string) first.Name;
+               localDomain_.Text = (string)first.Name;
                ServerSession.Release(first);
             }
             ServerSession.Release(domains);
@@ -618,15 +621,15 @@ namespace hMailServer.ControlPanel.Views
                dynamic results = diagnostics.PerformTests();
 
                var text = new System.Text.StringBuilder();
-               int count = (int) results.Count;
+               int count = (int)results.Count;
                for (int i = 0; i < count; i++)
                {
                   dynamic result = results.Item[i];
                   string name = "", details = "";
                   bool? success = null;
-                  try { name = (string) result.Name; } catch (Exception) { }
-                  try { success = (bool) result.Result; } catch (Exception) { }
-                  try { details = (string) result.ExecutionDetails; } catch (Exception) { }
+                  try { name = (string)result.Name; } catch (Exception) { }
+                  try { success = (bool)result.Result; } catch (Exception) { }
+                  try { details = (string)result.ExecutionDetails; } catch (Exception) { }
 
                   string state = success == null ? "[ ?? ]   " : success.Value ? "[ OK ]   " : "[FAIL]   ";
                   text.AppendLine(state + name);

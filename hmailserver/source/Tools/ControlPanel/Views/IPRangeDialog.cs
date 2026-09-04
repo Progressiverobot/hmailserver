@@ -155,11 +155,11 @@ namespace hMailServer.ControlPanel.Views
 
       private dynamic FindRange(dynamic ranges)
       {
-         int count = (int) ranges.Count;
+         int count = (int)ranges.Count;
          for (int i = 0; i < count; i++)
          {
             dynamic r = ranges.Item[i];
-            if ((int) r.ID == rangeId_)
+            if ((int)r.ID == rangeId_)
                return r;
             ServerSession.Release(r);
          }
@@ -174,29 +174,29 @@ namespace hMailServer.ControlPanel.Views
             dynamic r = FindRange(ranges);
             if (r == null) { Close(); return; }
 
-            name_.Text = (string) r.Name ?? "";
-            lower_.Text = (string) r.LowerIP ?? "";
-            upper_.Text = (string) r.UpperIP ?? "";
-            priority_.Text = ((int) r.Priority).ToString();
+            name_.Text = (string)r.Name ?? "";
+            lower_.Text = (string)r.LowerIP ?? "";
+            upper_.Text = (string)r.UpperIP ?? "";
+            priority_.Text = ((int)r.Priority).ToString();
 
-            smtp_.IsChecked = (bool) r.AllowSMTPConnections;
-            imap_.IsChecked = (bool) r.AllowIMAPConnections;
-            pop3_.IsChecked = (bool) r.AllowPOP3Connections;
+            smtp_.IsChecked = (bool)r.AllowSMTPConnections;
+            imap_.IsChecked = (bool)r.AllowIMAPConnections;
+            pop3_.IsChecked = (bool)r.AllowPOP3Connections;
 
-            ll_.IsChecked = (bool) r.AllowDeliveryFromLocalToLocal;
-            lr_.IsChecked = (bool) r.AllowDeliveryFromLocalToRemote;
-            rl_.IsChecked = (bool) r.AllowDeliveryFromRemoteToLocal;
-            rr_.IsChecked = (bool) r.AllowDeliveryFromRemoteToRemote;
+            ll_.IsChecked = (bool)r.AllowDeliveryFromLocalToLocal;
+            lr_.IsChecked = (bool)r.AllowDeliveryFromLocalToRemote;
+            rl_.IsChecked = (bool)r.AllowDeliveryFromRemoteToLocal;
+            rr_.IsChecked = (bool)r.AllowDeliveryFromRemoteToRemote;
 
-            authLL_.IsChecked = (bool) r.RequireSMTPAuthLocalToLocal;
-            authLE_.IsChecked = (bool) r.RequireSMTPAuthLocalToExternal;
-            authEL_.IsChecked = (bool) r.RequireSMTPAuthExternalToLocal;
-            authEE_.IsChecked = (bool) r.RequireSMTPAuthExternalToExternal;
-            tlsAuth_.IsChecked = (bool) r.RequireSSLTLSForAuth;
+            authLL_.IsChecked = (bool)r.RequireSMTPAuthLocalToLocal;
+            authLE_.IsChecked = (bool)r.RequireSMTPAuthLocalToExternal;
+            authEL_.IsChecked = (bool)r.RequireSMTPAuthExternalToLocal;
+            authEE_.IsChecked = (bool)r.RequireSMTPAuthExternalToExternal;
+            tlsAuth_.IsChecked = (bool)r.RequireSSLTLSForAuth;
 
-            spam_.IsChecked = (bool) r.EnableSpamProtection;
-            virus_.IsChecked = (bool) r.EnableAntiVirus;
-            expires_.IsChecked = (bool) r.Expires;
+            spam_.IsChecked = (bool)r.EnableSpamProtection;
+            virus_.IsChecked = (bool)r.EnableAntiVirus;
+            expires_.IsChecked = (bool)r.Expires;
             try { expiresTime_.Text = Convert.ToString(r.ExpiresTime); } catch { expiresTime_.Text = ""; }
 
             ServerSession.Release(r);

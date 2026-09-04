@@ -524,12 +524,12 @@ namespace hMailServer.ControlPanel.Views
          {
             dynamic a = OpenAccount(domains);
             dynamic folders = a.IMAPFolders;
-            int count = (int) folders.Count;
+            int count = (int)folders.Count;
             for (int i = 0; i < count; i++)
             {
                dynamic f = folders.Item[i];
-               string name = (string) f.Name;
-               bool sub = (bool) f.Subscribed;
+               string name = (string)f.Name;
+               bool sub = (bool)f.Subscribed;
                folderList_.Items.Add(sub ? name : name + "  (not subscribed)");
                ServerSession.Release(f);
             }
@@ -699,55 +699,55 @@ namespace hMailServer.ControlPanel.Views
          try
          {
             dynamic a = OpenAccount(domains);
-            active_.IsChecked = (bool) a.Active;
-            addressBox_.Text = (string) a.Address ?? address_;
-            SelectCombo(adminLevel_, (int) a.AdminLevel);
-            quota_.Text = ((int) a.MaxSize).ToString();
-            spamFilterOn_.IsChecked = (bool) a.AntiSpamEnabled;
-            spamMark_.Text = ((int) a.SpamMarkThreshold).ToString();
-            spamDelete_.Text = ((int) a.SpamDeleteThreshold).ToString();
-            firstName_.Text = (string) a.PersonFirstName ?? "";
-            lastName_.Text = (string) a.PersonLastName ?? "";
+            active_.IsChecked = (bool)a.Active;
+            addressBox_.Text = (string)a.Address ?? address_;
+            SelectCombo(adminLevel_, (int)a.AdminLevel);
+            quota_.Text = ((int)a.MaxSize).ToString();
+            spamFilterOn_.IsChecked = (bool)a.AntiSpamEnabled;
+            spamMark_.Text = ((int)a.SpamMarkThreshold).ToString();
+            spamDelete_.Text = ((int)a.SpamDeleteThreshold).ToString();
+            firstName_.Text = (string)a.PersonFirstName ?? "";
+            lastName_.Text = (string)a.PersonLastName ?? "";
             try { lastLogon_.Text = Convert.ToString(a.LastLogonTime); } catch { lastLogon_.Text = "Never"; }
             if (string.IsNullOrWhiteSpace(lastLogon_.Text)) lastLogon_.Text = "Never";
 
-            forwardOn_.IsChecked = (bool) a.ForwardEnabled;
-            forwardTo_.Text = (string) a.ForwardAddress ?? "";
-            forwardKeep_.IsChecked = (bool) a.ForwardKeepOriginal;
-            forwardAbortSpam_.IsChecked = (bool) a.ForwardAbortSpamFlagged;
+            forwardOn_.IsChecked = (bool)a.ForwardEnabled;
+            forwardTo_.Text = (string)a.ForwardAddress ?? "";
+            forwardKeep_.IsChecked = (bool)a.ForwardKeepOriginal;
+            forwardAbortSpam_.IsChecked = (bool)a.ForwardAbortSpamFlagged;
 
-            vacationOn_.IsChecked = (bool) a.VacationMessageIsOn;
-            vacationSubject_.Text = (string) a.VacationSubject ?? "";
-            vacationBody_.Text = (string) a.VacationMessage ?? "";
-            vacationExpires_.IsChecked = (bool) a.VacationMessageExpires;
-            string expiryText = (string) a.VacationMessageExpiresDate ?? "";
+            vacationOn_.IsChecked = (bool)a.VacationMessageIsOn;
+            vacationSubject_.Text = (string)a.VacationSubject ?? "";
+            vacationBody_.Text = (string)a.VacationMessage ?? "";
+            vacationExpires_.IsChecked = (bool)a.VacationMessageExpires;
+            string expiryText = (string)a.VacationMessageExpiresDate ?? "";
             vacationExpiresDate_.SelectedDate =
-               DateTime.TryParse(expiryText, out DateTime expiry) ? expiry : (DateTime?) null;
+               DateTime.TryParse(expiryText, out DateTime expiry) ? expiry : (DateTime?)null;
 
             // Added alongside schema 6012; tolerate a server that predates it.
             try
             {
-               string beginText = (string) a.VacationMessageBeginDate ?? "";
+               string beginText = (string)a.VacationMessageBeginDate ?? "";
                vacationBeginDate_.SelectedDate =
-                  DateTime.TryParse(beginText, out DateTime begin) ? begin : (DateTime?) null;
+                  DateTime.TryParse(beginText, out DateTime begin) ? begin : (DateTime?)null;
             }
             catch { vacationBeginDate_.SelectedDate = null; }
-            vacationAbortSpam_.IsChecked = (bool) a.VacationMessageAbortSpamFlagged;
+            vacationAbortSpam_.IsChecked = (bool)a.VacationMessageAbortSpamFlagged;
 
-            signatureOn_.IsChecked = (bool) a.SignatureEnabled;
-            signaturePlain_.Text = (string) a.SignaturePlainText ?? "";
-            signatureHtml_.Text = (string) a.SignatureHTML ?? "";
+            signatureOn_.IsChecked = (bool)a.SignatureEnabled;
+            signaturePlain_.Text = (string)a.SignaturePlainText ?? "";
+            signatureHtml_.Text = (string)a.SignatureHTML ?? "";
 
             // SieveScript is a file-backed property added in 6.x; tolerate older servers.
-            try { sieveScript_.Text = (string) a.SieveScript ?? ""; } catch { sieveScript_.Text = ""; }
+            try { sieveScript_.Text = (string)a.SieveScript ?? ""; } catch { sieveScript_.Text = ""; }
 
             // Remembered so Save can tell an edited script from an untouched one and
             // write the file only when it actually changed - see the note there.
             loadedSieveScript_ = sieveScript_.Text;
 
-            isAd_.IsChecked = (bool) a.IsAD;
-            adDomain_.Text = (string) a.ADDomain ?? "";
-            adUser_.Text = (string) a.ADUsername ?? "";
+            isAd_.IsChecked = (bool)a.IsAD;
+            adDomain_.Text = (string)a.ADDomain ?? "";
+            adUser_.Text = (string)a.ADUsername ?? "";
 
             ServerSession.Release(a);
          }
@@ -1004,7 +1004,7 @@ namespace hMailServer.ControlPanel.Views
       private static void SelectCombo(ComboBox combo, int value)
       {
          foreach (ComboBoxItem item in combo.Items)
-            if ((int) item.Tag == value)
+            if ((int)item.Tag == value)
             {
                combo.SelectedItem = item;
                return;
@@ -1012,6 +1012,6 @@ namespace hMailServer.ControlPanel.Views
       }
 
       private static int ComboValue(ComboBox combo, int fallback) =>
-         combo.SelectedItem is ComboBoxItem item ? (int) item.Tag : fallback;
+         combo.SelectedItem is ComboBoxItem item ? (int)item.Tag : fallback;
    }
 }

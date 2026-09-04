@@ -146,7 +146,7 @@ namespace hMailServer.ControlPanel.Services
       /// <summary>Converts a 0xAARRGGBB palette value to a WPF colour.</summary>
       public static Color ToColor(uint argb)
       {
-         return Color.FromArgb((byte) (argb >> 24), (byte) (argb >> 16), (byte) (argb >> 8), (byte) argb);
+         return Color.FromArgb((byte)(argb >> 24), (byte)(argb >> 16), (byte)(argb >> 8), (byte)argb);
       }
 
       /// <summary>A frozen brush for a 0xAARRGGBB palette value.</summary>

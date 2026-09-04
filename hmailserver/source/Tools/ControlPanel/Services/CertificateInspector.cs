@@ -200,7 +200,7 @@ namespace hMailServer.ControlPanel.Services
 
          DateTime expires = certificate.NotAfter;   // local time
          DateTime now = DateTime.Now;
-         int daysRemaining = (int) Math.Floor((expires - now).TotalDays);
+         int daysRemaining = (int)Math.Floor((expires - now).TotalDays);
 
          health.ExpiresOn = expires;
          health.DaysRemaining = daysRemaining;
@@ -209,7 +209,7 @@ namespace hMailServer.ControlPanel.Services
 
          if (expires < now)
          {
-            int daysAgo = Math.Max(0, (int) Math.Floor((now - expires).TotalDays));
+            int daysAgo = Math.Max(0, (int)Math.Floor((now - expires).TotalDays));
             health.CertificateFile = new CertificateFinding(StatusLevel.Critical,
                "Expired " + date + " (" + Days_(daysAgo) + " ago)",
                "The certificate expired on " + date + ". The server still loads it and its ports still start "

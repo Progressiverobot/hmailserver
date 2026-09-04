@@ -57,11 +57,11 @@ namespace hMailServer.ControlPanel.Views
          try
          {
             dynamic backup = ServerSession.Current.Application.Settings.Backup;
-            DestinationBox.Text = (string) backup.Destination ?? "";
-            CheckDomains.IsChecked = (bool) backup.BackupDomains;
-            CheckMessages.IsChecked = (bool) backup.BackupMessages;
-            CheckSettings.IsChecked = (bool) backup.BackupSettings;
-            CheckCompress.IsChecked = (bool) backup.CompressDestinationFiles;
+            DestinationBox.Text = (string)backup.Destination ?? "";
+            CheckDomains.IsChecked = (bool)backup.BackupDomains;
+            CheckMessages.IsChecked = (bool)backup.BackupMessages;
+            CheckSettings.IsChecked = (bool)backup.BackupSettings;
+            CheckCompress.IsChecked = (bool)backup.CompressDestinationFiles;
             ServerSession.Release(backup);
          }
          catch (Exception ex)
@@ -424,7 +424,7 @@ namespace hMailServer.ControlPanel.Views
          try
          {
             dynamic backup = ServerSession.Current.Application.Settings.Backup;
-            string destination = (string) backup.Destination ?? "";
+            string destination = (string)backup.Destination ?? "";
             ServerSession.Release(backup);
             return destination.Trim();
          }
@@ -564,17 +564,17 @@ namespace hMailServer.ControlPanel.Views
 
          if (age.TotalHours < 1)
          {
-            int minutes = (int) age.TotalMinutes;
+            int minutes = (int)age.TotalMinutes;
             return minutes == 1 ? "1 minute ago" : minutes + " minutes ago";
          }
 
          if (age.TotalDays < 2)
          {
-            int hours = (int) age.TotalHours;
+            int hours = (int)age.TotalHours;
             return hours == 1 ? "1 hour ago" : hours + " hours ago";
          }
 
-         return (int) age.TotalDays + " days ago";
+         return (int)age.TotalDays + " days ago";
       }
    }
 

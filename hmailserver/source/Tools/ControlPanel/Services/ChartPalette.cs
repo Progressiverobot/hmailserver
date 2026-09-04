@@ -295,7 +295,7 @@ namespace hMailServer.ControlPanel.Services
                // under SMTP on the three-series Active sessions chart, over the top of
                // the IMAP and POP3 lines, on a default install. Never in High Contrast,
                // where a wash fights the system palette rather than helping.
-               highContrast || seriesNames.Count > 1 ? (byte) 0 : (byte) 70));
+               highContrast || seriesNames.Count > 1 ? (byte)0 : (byte)70));
          }
 
          return result;
@@ -335,7 +335,7 @@ namespace hMailServer.ControlPanel.Services
          return 0xFF000000u
               | (Mix((overlayArgb >> 16) & 0xFF, (backdropArgb >> 16) & 0xFF, alpha) << 16)
               | (Mix((overlayArgb >> 8) & 0xFF, (backdropArgb >> 8) & 0xFF, alpha) << 8)
-              |  Mix(overlayArgb & 0xFF, backdropArgb & 0xFF, alpha);
+              | Mix(overlayArgb & 0xFF, backdropArgb & 0xFF, alpha);
       }
 
       /// <summary>
@@ -543,9 +543,9 @@ namespace hMailServer.ControlPanel.Services
 
       private static double RelativeLuminance_(uint argb)
       {
-         double r = Channel_((byte) (argb >> 16));
-         double g = Channel_((byte) (argb >> 8));
-         double b = Channel_((byte) argb);
+         double r = Channel_((byte)(argb >> 16));
+         double g = Channel_((byte)(argb >> 8));
+         double b = Channel_((byte)argb);
 
          return 0.2126 * r + 0.7152 * g + 0.0722 * b;
       }
