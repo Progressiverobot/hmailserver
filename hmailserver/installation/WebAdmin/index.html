@@ -182,12 +182,32 @@ let view="dash", pollTimer=null;
 async function api(path,opts={}){
   const res=await fetch(path,{...opts,headers:{...(opts.headers||{}),"Authorization":"Basic "+auth}});
   if(res.status===401) throw new Error("auth");
-  if(!res.ok){let t=await res.text();throw new Error(t||res.status)}
+  if(!res.ok){
+    // A refused request answers {"error":"<a sentence written for the administrator>"};
+    // that sentence is the message. The whole exchange goes to the console for diagnosis.
+    let body="";
+    try{body=await res.text();}catch(_){}
+    let message="";
+    try{message=String(JSON.parse(body).error||"");}catch(_){}
+    console.error("API request failed",{path,status:res.status,body});
+    throw new Error(message||("HTTP "+res.status));
+  }
   const text=await res.text();
   return text?JSON.parse(text):{};
 }
 function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");
   clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),2600)}
+
+/* Server-provided values (domain names, addresses, queue entries, TLSA records) are
+   rendered into HTML, so every one of them goes through this first. */
+function escHtml(v){
+  return String(v)
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;")
+    .replace(/'/g,"&#39;");
+}
 
 /* ---------- Theme ---------- */
 const savedTheme=localStorage.getItem("hmsTheme")||"dark";
@@ -236,9 +256,25 @@ async function render(silent){
   }catch(err){
     if(err.message==="auth"){sessionStorage.removeItem("hmsAuth");location.reload();return;}
     $("#connState").textContent="Connection problem";
-    if(!silent)$("#content").innerHTML='<div class="empty">Could not reach the server: '+err.message+'</div>';
+    if(!silent)$("#content").innerHTML='<div class="empty">Could not reach the server: '+escHtml(err.message)+'</div>';
   }
 }
+
+/* Buttons inside a rendered view carry their arguments as data attributes and are
+   handled here, so no server-provided value is ever placed inside inline JavaScript,
+   where an HTML entity in an account address would be decoded before the handler
+   is parsed. */
+$("#content").addEventListener("click",e=>{
+  const b=e.target.closest("button[data-act]");if(!b)return;
+  const d=b.dataset;
+  if(d.act==="accounts")showAccounts(d.domain);
+  else if(d.act==="domains")render();
+  else if(d.act==="add")addAccount(d.domain);
+  else if(d.act==="del")delAccount(d.address,d.domain);
+  else if(d.act==="retry")retryMsg(d.id);
+  else if(d.act==="delmsg")delMsg(d.id);
+  else if(d.act==="copy")navigator.clipboard.writeText($("#tlsaPre").textContent).then(()=>toast("Copied to clipboard"));
+});
 
 /* ---------- Views ---------- */
 function animateNum(el,target){
@@ -274,46 +310,46 @@ async function renderDash(update){
   animateNum($("#sesImap"),s.sessions.imap);
   animateNum($("#sesPop3"),s.sessions.pop3);
   const states={0:"Unknown",1:"Stopped",2:"Starting",3:"Running",4:"Stopping"};
-  $("#kpiState").innerHTML=s.state===3?'<span class="badge good">Running</span>':'<span class="badge warn">'+(states[s.state]||("State "+s.state))+'</span>';
+  $("#kpiState").innerHTML=s.state===3?'<span class="badge good">Running</span>':'<span class="badge warn">'+escHtml(states[s.state]||("State "+s.state))+'</span>';
 }
 
 async function renderDomains(){
   const d=await api("/api/v1/domains");
   const list=Array.isArray(d)?d:(d.domains||[]);
   const rows=list.map(x=>`
-    <tr><td><b>${x.name}</b></td>
+    <tr><td><b>${escHtml(x.name)}</b></td>
         <td>${x.active?'<span class="badge good">Active</span>':'<span class="badge warn">Disabled</span>'}</td>
-        <td style="text-align:right"><button class="btn ghost sm" onclick="showAccounts('${x.name}')">Accounts ›</button></td></tr>`).join("");
+        <td style="text-align:right"><button class="btn ghost sm" data-act="accounts" data-domain="${escHtml(x.name)}">Accounts ›</button></td></tr>`).join("");
   $("#content").innerHTML=`<div class="card view">
     <table><thead><tr><th>Domain</th><th>Status</th><th></th></tr></thead>
     <tbody>${rows||'<tr><td colspan="3" class="empty">No domains configured.</td></tr>'}</tbody></table></div>`;
 }
 
-window.showAccounts=async function(domain){
+async function showAccounts(domain){
   const a=await api("/api/v1/domains/"+encodeURIComponent(domain)+"/accounts");
   const list=Array.isArray(a)?a:(a.accounts||[]);
   const rows=list.map(x=>`
-    <tr><td><b>${x.address}</b></td>
+    <tr><td><b>${escHtml(x.address)}</b></td>
         <td>${x.active?'<span class="badge good">Active</span>':'<span class="badge warn">Disabled</span>'}</td>
-        <td style="text-align:right"><button class="btn danger sm" onclick="delAccount('${x.address}','${domain}')">Delete</button></td></tr>`).join("");
+        <td style="text-align:right"><button class="btn danger sm" data-act="del" data-address="${escHtml(x.address)}" data-domain="${escHtml(domain)}">Delete</button></td></tr>`).join("");
   $("#content").innerHTML=`
   <div class="view">
-    <button class="btn ghost sm" onclick="render()">‹ All domains</button>
-    <div class="sect"><h2>${domain} — accounts</h2>
+    <button class="btn ghost sm" data-act="domains">‹ All domains</button>
+    <div class="sect"><h2>${escHtml(domain)} — accounts</h2>
       <div class="card"><table><thead><tr><th>Address</th><th>Status</th><th></th></tr></thead>
       <tbody>${rows||'<tr><td colspan="3" class="empty">No accounts.</td></tr>'}</tbody></table></div>
     </div>
     <div class="sect"><h2>New account</h2>
       <div class="card" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
-        <input id="newAddr" placeholder="user@${domain}" style="flex:1;min-width:220px">
+        <input id="newAddr" placeholder="user@${escHtml(domain)}" style="flex:1;min-width:220px">
         <input id="newPass" type="password" placeholder="Password" style="flex:1;min-width:160px">
-        <button class="btn" onclick="addAccount('${domain}')">Create account</button>
+        <button class="btn" data-act="add" data-domain="${escHtml(domain)}">Create account</button>
       </div>
     </div>
   </div>`;
-};
+}
 
-window.addAccount=async function(domain){
+async function addAccount(domain){
   const address=$("#newAddr").value.trim(),password=$("#newPass").value;
   if(!address||!password){toast("Address and password are required");return}
   try{
@@ -321,29 +357,29 @@ window.addAccount=async function(domain){
       {method:"POST",body:JSON.stringify({address:address,password:password})});
     toast("Account created: "+address);showAccounts(domain);
   }catch(e){toast("Create failed: "+e.message)}
-};
+}
 
-window.delAccount=async function(address,domain){
+async function delAccount(address,domain){
   if(!confirm("Delete "+address+"?"))return;
   try{await api("/api/v1/accounts/"+encodeURIComponent(address),{method:"DELETE"});
     toast("Deleted "+address);showAccounts(domain);
   }catch(e){toast("Delete failed: "+e.message)}
-};
+}
 
 async function renderQueue(){
   const q=await api("/api/v1/queue");
   const rows=(q.messages||[]).map(x=>`
-    <tr><td>${x.id}</td><td>${x.from||"—"}</td><td>${x.recipients||"—"}</td><td>${x.next_try||"—"}</td>
+    <tr><td>${escHtml(x.id)}</td><td>${escHtml(x.from||"—")}</td><td>${escHtml(x.recipients||"—")}</td><td>${escHtml(x.next_try||"—")}</td>
         <td style="text-align:right;white-space:nowrap">
-          <button class="btn ghost sm" onclick="retryMsg(${x.id})">Retry now</button>
-          <button class="btn danger sm" onclick="delMsg(${x.id})">Delete</button></td></tr>`).join("");
+          <button class="btn ghost sm" data-act="retry" data-id="${escHtml(x.id)}">Retry now</button>
+          <button class="btn danger sm" data-act="delmsg" data-id="${escHtml(x.id)}">Delete</button></td></tr>`).join("");
   $("#content").innerHTML=`<div class="card view">
     <table><thead><tr><th>ID</th><th>From</th><th>To</th><th>Next try</th><th></th></tr></thead>
     <tbody>${rows||'<tr><td colspan="5" class="empty">The delivery queue is empty. ✦</td></tr>'}</tbody></table></div>`;
 }
-window.retryMsg=async function(id){try{await api("/api/v1/queue/"+id+"/retry",{method:"POST"});toast("Delivery retriggered");renderQueue()}catch(e){toast("Failed: "+e.message)}};
-window.delMsg=async function(id){if(!confirm("Remove message "+id+" from the queue?"))return;
-  try{await api("/api/v1/queue/"+id,{method:"DELETE"});toast("Message removed");renderQueue()}catch(e){toast("Failed: "+e.message)}};
+async function retryMsg(id){try{await api("/api/v1/queue/"+encodeURIComponent(id)+"/retry",{method:"POST"});toast("Delivery retriggered");renderQueue()}catch(e){toast("Failed: "+e.message)}}
+async function delMsg(id){if(!confirm("Remove message "+id+" from the queue?"))return;
+  try{await api("/api/v1/queue/"+encodeURIComponent(id),{method:"DELETE"});toast("Message removed");renderQueue()}catch(e){toast("Failed: "+e.message)}}
 
 async function renderTlsa(){
   const t=await api("/api/v1/tlsa");
@@ -351,8 +387,8 @@ async function renderTlsa(){
   $("#content").innerHTML=`<div class="view">
     <div class="card"><p style="color:var(--muted);font-size:13px;margin-bottom:14px">
       Publish-ready DANE TLSA records for your certificates. Add these to DNS (with DNSSEC) to enable DANE validation by sending servers.</p>
-      <pre id="tlsaPre">${recs||"No TLSA records available — assign an SSL certificate first."}</pre>
-      <div style="margin-top:12px"><button class="btn ghost sm" onclick="navigator.clipboard.writeText($('#tlsaPre').textContent).then(()=>toast('Copied to clipboard'))">Copy all</button></div>
+      <pre id="tlsaPre">${escHtml(recs||"No TLSA records available — assign an SSL certificate first.")}</pre>
+      <div style="margin-top:12px"><button class="btn ghost sm" data-act="copy">Copy all</button></div>
     </div></div>`;
 }
 

@@ -48,6 +48,10 @@ already cost a release cycle or nearly shipped a defect.
 7. **Version stamp**: `Version.h` (version, numeric, build),
    `section_setup_64.iss`, all seven `.csproj` `<Version>` values. Verify
    nothing else still carries the old version: `git grep <old-version>`.
+   In `section_setup_64.iss` the `VersionInfoVersion` fourth component stays
+   `0`: the build number lives in `Version.h` and the tag, and a build-only
+   re-cut (the common case) must not have to touch the installer script or
+   the seven `.csproj` files, whose versions are also `<version>.0`.
 8. **Build everything at the stamped version**: `build.ps1 -Configuration
    Release`, `build-tools.ps1 -Configuration Release`, ControlPanel
    `dotnet publish` to its `publish\` folder (build-tools does not cover it),

@@ -19,6 +19,7 @@ import time
 
 HOST, PORT = "127.0.0.2", 2525
 RCPT = "test@pipelining.example.test"
+VALID_CASES = ("crlf", "barelf", "midlf", "params")
 
 def build(case):
     headers = (b"From: bench@example.org\r\n"
@@ -38,15 +39,32 @@ def build(case):
 def run(case):
     msg = build(case)
     s = socket.create_connection((HOST, PORT), timeout=30)
-    r = s.recv(4096)
-    transcript = [("<", r)]
+
+    def recv_replies(expected=1):
+        """Reads whole SMTP replies. A reply ends with a line whose three-digit
+        code is followed by a space ("NNN-" lines continue it), and a reply can
+        arrive split across reads. The pipelined case sends three commands in one
+        segment and gets three replies back, so the reader waits for as many
+        final lines as replies are expected before returning what it has."""
+        data = b""
+        while True:
+            finals = sum(1 for line in data.split(b"\r\n")[:-1]
+                         if len(line) >= 3 and line[:3].isdigit() and line[3:4] != b"-")
+            if finals >= expected:
+                return data
+            chunk = s.recv(4096)
+            if not chunk:
+                return data
+            data += chunk
+
+    transcript = [("<", recv_replies())]
 
     def send(b):
         transcript.append((">", b))
         s.sendall(b)
 
-    def recv():
-        r = s.recv(4096)
+    def recv(expected=1):
+        r = recv_replies(expected)
         transcript.append(("<", r))
         return r
 
@@ -57,7 +75,7 @@ def run(case):
         # Pipelined: everything up to and including DATA in one segment.
         send(b"MAIL FROM:<bench@example.org> SIZE=" + str(size).encode() +
              b" BODY=8BITMIME\r\nRCPT TO:<" + RCPT.encode() + b">\r\nDATA\r\n")
-        recv()  # 250/250/354 possibly split
+        recv(3)  # 250, 250 and 354: three replies to one segment, possibly split
         time.sleep(0.3)
     else:
         send(b"MAIL FROM:<bench@example.org>\r\n"); recv()
@@ -87,6 +105,11 @@ def run(case):
     return ok
 
 if __name__ == "__main__":
-    cases = sys.argv[1:] or ["crlf", "barelf", "midlf", "params"]
+    cases = sys.argv[1:] or list(VALID_CASES)
+    invalid = [c for c in cases if c not in VALID_CASES]
+    if invalid:
+        print("ERROR: unsupported case name(s): " + ", ".join(invalid)
+              + ". Supported cases: " + ", ".join(VALID_CASES), file=sys.stderr)
+        sys.exit(2)
     results = {c: run(c) for c in cases}
     print("SUMMARY:", results)
