@@ -84,6 +84,7 @@ EXIT 0
       <TreatWarningAsError>true</TreatWarningAsError>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <ControlFlowGuard>Guard</ControlFlowGuard>
       <AdditionalOptions>/Zm200 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <ResourceCompile>
@@ -92,7 +93,7 @@ EXIT 0
       <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Link>
-      <AdditionalOptions>/ignore:4099 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/ignore:4099 /guard:cf %(AdditionalOptions)</AdditionalOptions>
       <AdditionalDependencies>Adsiid.lib;activeds.lib;IPHlpAPI.lib;Dnsapi.lib;Ws2_32.lib;libpq.lib;libcrypto.lib;libssl.lib;crypt32.lib;Secur32.lib;Netapi32.lib;wldap32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <ShowProgress>NotSet</ShowProgress>
       <OutputFile>$(OutDir)hMailServer.exe</OutputFile>
@@ -153,6 +154,14 @@ EXIT 0
       <TreatWarningAsError>true</TreatWarningAsError>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <!-- Control Flow Guard (issue #45): every indirect call through a
+         function pointer or vtable is checked against the set of valid call
+         targets, so a hijacked pointer in the SMTP, IMAP, POP3 or MIME parsers
+         terminates the process instead of running attacker-chosen code. Set on
+         both the compiler and the linker - either one alone silently does
+         nothing. Does not disturb /Brepro: the guard tables are a function of
+         the code, not of the build time. -->
+      <ControlFlowGuard>Guard</ControlFlowGuard>
       <AdditionalOptions>/Zm200 /Brepro /d1trimfile:$(SolutionDir) %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <ResourceCompile>
@@ -161,7 +170,7 @@ EXIT 0
       <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Link>
-      <AdditionalOptions>/ignore:4099 /Brepro /pdbaltpath:%_PDB% %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/ignore:4099 /guard:cf /Brepro /pdbaltpath:%_PDB% %(AdditionalOptions)</AdditionalOptions>
       <AdditionalDependencies>libcrypto.lib;libssl.lib;Adsiid.lib;activeds.lib;IPHlpAPI.lib;Dnsapi.lib;Ws2_32.lib;libpq.lib;crypt32.lib;Secur32.lib;Netapi32.lib;wldap32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(OutDir)hMailServer.exe</OutputFile>
       <AdditionalLibraryDirectories>$(hMailServerLibs)\boost_1_91_0\stage\lib;$(hMailServerLibs)\openssl-4.0.1\out64\lib;$(hMailServerLibs)\postgresql-18.3\builddir\src\interfaces\libpq;$(BOOST_LIBS_PATH);$(OPENSSL_LIBS_PATH);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>

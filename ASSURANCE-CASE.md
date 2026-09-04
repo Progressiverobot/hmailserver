@@ -304,12 +304,25 @@ credible.
 - **Statement coverage is not uniform.** The .NET Control Panel is measured
   for coverage in CI; the native server is not currently measured, so the
   regression suite's coverage of the C++ code is not quantified.
-- **The build is not bit-for-bit reproducible.** A third party cannot
-  currently rebuild a released binary and confirm it matches. Artifact
-  signatures establish *who published* a binary, not that it corresponds to
-  the source.
-- **Control Flow Guard is not enabled.** `/guard:cf` is a candidate hardening
-  addition and is not currently on.
+- **Reproducibility has been shown on one toolchain only.** Since 22 August
+  2026 two clean Release builds of the same tree produce a byte-identical
+  `hMailServer.exe` (`/Brepro`, `/d1trimfile`, `/pdbaltpath`,
+  `OPENSSL_NO_FILENAMES`; RELEASE.md step 8 repeats the check for every
+  release and the notes carry the hash). What has not happened is an
+  independent rebuild on a second machine with an independently built OpenSSL,
+  Boost and libpq, so a third party's ability to confirm a released binary
+  still rests on matching this toolchain exactly. Artifact signatures establish
+  *who published* a binary; the hash lets anyone with the toolchain check that
+  it corresponds to the source.
+- **Control Flow Guard is on, and its cost is small but real.** Since 6.2.23
+  Alpha 2 the server is compiled and linked with `/guard:cf` (Release and
+  Debug), so an indirect call through a corrupted function pointer or vtable -
+  the natural target of a memory-safety defect in the SMTP, IMAP, POP3 or MIME
+  parsers - terminates the process rather than transferring control. The
+  regression gate ran at the same length as before within its normal variance
+  (see the 6.2.23 Alpha 2 release notes for the measured figures). CFG is a
+  mitigation, not a boundary: a defect that overwrites data rather than a
+  pointer is unaffected.
 - **Bus factor is 1.** A single maintainer performs security triage and
   releases. See [GOVERNANCE.md](GOVERNANCE.md) — a slow security response is a
   realistic failure mode.
