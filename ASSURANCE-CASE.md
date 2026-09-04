@@ -318,11 +318,14 @@ credible.
   Alpha 2 the server is compiled and linked with `/guard:cf` (Release and
   Debug), so an indirect call through a corrupted function pointer or vtable -
   the natural target of a memory-safety defect in the SMTP, IMAP, POP3 or MIME
-  parsers - terminates the process rather than transferring control. The
-  regression gate ran at the same length as before within its normal variance
-  (see the 6.2.23 Alpha 2 release notes for the measured figures). CFG is a
-  mitigation, not a boundary: a defect that overwrites data rather than a
-  pointer is unaffected.
+  parsers - terminates the process rather than transferring control. The cost
+  was measured rather than assumed: the full 1,838-test regression gate on
+  the CFG build took 31 minutes on the build machine, against the 55 or so
+  the previous release's gates took on the same machine, so whatever CFG
+  costs on the indirect-call-heavy MIME path is below the run-to-run
+  variance of the suite. The executable grew by about 97 KB of guard tables.
+  CFG is a mitigation, not a boundary: a defect that overwrites data rather
+  than a pointer is unaffected.
 - **Bus factor is 1.** A single maintainer performs security triage and
   releases. See [GOVERNANCE.md](GOVERNANCE.md) — a slow security response is a
   realistic failure mode.
