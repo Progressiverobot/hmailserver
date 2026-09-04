@@ -61,6 +61,11 @@ namespace HM
       download_finalized_(true),
       finalization_enqueued_tick_(0)
    {
+      // Neither listing exists yet. Pointing each iterator at its own container's
+      // end() is what makes the "nothing left" comparisons below well-defined before
+      // the first UIDL response arrives.
+      cur_download_ = uidlresponse_.end();
+      cur_cleanup_ = downloaded_messages_.end();
 
       /*
       RFC 1939, Basic Operation
@@ -557,7 +562,7 @@ namespace HM
          LOG_APPLICATION(message);
       }
 
-      cur_message_ = uidlresponse_.begin();
+      cur_download_ = uidlresponse_.begin();
 
       RequestNextMessage_();
    }
@@ -662,9 +667,9 @@ namespace HM
    bool
    POP3ClientConnection::RequestNextMessage_()
    {
-      while (cur_message_ != uidlresponse_.end())
+      while (cur_download_ != uidlresponse_.end())
       {
-         String sCurrentUID = (*cur_message_).second;
+         String sCurrentUID = (*cur_download_).second;
 
          // Check if the current message is already in the list
          // of fetch UID's
@@ -697,7 +702,7 @@ namespace HM
             // drop it later on when purging the mailbox. (We only purge
             // items we have downloaded). And since it was downloaded during
             // a previous session, we can safely drop it..
-            int iID = (*cur_message_).first;
+            int iID = (*cur_download_).first;
             downloaded_messages_[iID] = sCurrentUID;
 
             // The message has already been downloaded. Give scripts a chance
@@ -711,7 +716,7 @@ namespace HM
 
             current_message_ = std::shared_ptr<Message> (new Message);
 
-            int iMessageIdx = (*cur_message_).first;
+            int iMessageIdx = (*cur_download_).first;
 
             String sResponse;
             sResponse.Format(_T("RETR %d"), iMessageIdx);
@@ -736,12 +741,12 @@ namespace HM
             return true;
          }
       
-         cur_message_++;
+         cur_download_++;
 
       }
 
       // We reached the end of the message list.
-      if (cur_message_ == uidlresponse_.end())
+      if (cur_download_ == uidlresponse_.end())
       {
          StartMailboxCleanup_();
       }
@@ -753,7 +758,7 @@ namespace HM
    void
    POP3ClientConnection::StartMailboxCleanup_()
    {
-      cur_message_ = downloaded_messages_.begin();
+      cur_cleanup_ = downloaded_messages_.begin();
       SetReceiveBinary(false);
 
       MailboxCleanup_();
@@ -762,11 +767,11 @@ namespace HM
    void
    POP3ClientConnection::MailboxCleanup_()
    {
-      while (cur_message_ != downloaded_messages_.end())
+      while (cur_cleanup_ != downloaded_messages_.end())
       {
          bool bRet = MessageCleanup_();
 
-         cur_message_++;
+         cur_cleanup_++;
 
          if (bRet)
          {
@@ -841,8 +846,8 @@ namespace HM
       if (CommandIsSuccessfull_(sData))
       {
          // Log that this message has been downloaded.
-         int iID = (*cur_message_).first;
-         String sCurrentUID = (*cur_message_).second;
+         int iID = (*cur_download_).first;
+         String sCurrentUID = (*cur_download_).second;
          downloaded_messages_[iID] = sCurrentUID;
 
          return;
@@ -868,7 +873,7 @@ namespace HM
 
       String message =
          Formatter::Format("The remote POP3 server refused to send message {0} of external account {1}, so it has been skipped. The remaining messages are still being collected. Server response: {2}",
-            (*cur_message_).first, account_->GetName(), response);
+            (*cur_download_).first, account_->GetName(), response);
 
       LOG_APPLICATION(message);
    }
@@ -1074,8 +1079,8 @@ namespace HM
             // rather than inside ParseRETRResponse_ because that runs before this check:
             // requesting the next message there would clear retr_failed_ too early and
             // this code would then treat the leftover bytes as the start of a message.
-            if (cur_message_ != uidlresponse_.end())
-               cur_message_++;
+            if (cur_download_ != uidlresponse_.end())
+               cur_download_++;
 
             RequestNextMessage_();
 
@@ -1225,7 +1230,7 @@ namespace HM
          // should we scan this message for virus later on?
          current_message_->SetFlagVirusScan(account_->GetUseAntiVirus());
 
-         FireOnExternalAccountDownload_(current_message_, (*cur_message_).second);
+         FireOnExternalAccountDownload_(current_message_, (*cur_download_).second);
 
          // the message was not classified as spam which we should delete.
          if (!SaveMessage_())
@@ -1258,7 +1263,7 @@ namespace HM
       SetReceiveBinary(false);
 
       // Move on to the next message to download
-      cur_message_++;
+      cur_download_++;
 
       RequestNextMessage_();
 
@@ -1467,10 +1472,10 @@ namespace HM
    void
    POP3ClientConnection::MarkCurrentMessageAsRead_()
    {
-      if (cur_message_ == uidlresponse_.end())
+      if (cur_download_ == uidlresponse_.end())
          return;
 
-      String sUID = (*cur_message_).second;
+      String sUID = (*cur_download_).second;
 
       // Recorded even when this message is about to be deleted from the remote server.
       //
@@ -1496,8 +1501,8 @@ namespace HM
    bool
    POP3ClientConnection::MessageCleanup_()
    {
-      int iIndex = (*cur_message_).first;
-      String sUID = (*cur_message_).second;
+      int iIndex = (*cur_cleanup_).first;
+      String sUID = (*cur_cleanup_).second;
 
       int iDaysToKeep = GetDaysToKeep_(sUID);
 

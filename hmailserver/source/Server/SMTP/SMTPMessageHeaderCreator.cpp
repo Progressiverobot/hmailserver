@@ -25,10 +25,11 @@
 
 namespace HM
 {
-   SMTPMessageHeaderCreator::SMTPMessageHeaderCreator(const String &username, const AnsiString &remote_ip_address, bool is_authenticated, String helo_host, std::shared_ptr<MimeHeader> original_headers, std::shared_ptr<Message> message, int session_id) :
+   SMTPMessageHeaderCreator::SMTPMessageHeaderCreator(const String &username, const AnsiString &remote_ip_address, bool is_authenticated, bool is_message_submission, String helo_host, std::shared_ptr<MimeHeader> original_headers, std::shared_ptr<Message> message, int session_id) :
       username_(username),
       remote_ip_address_(remote_ip_address),
       is_authenticated_(is_authenticated),
+      is_message_submission_(is_message_submission),
       original_headers_(original_headers),
       helo_host_(helo_host),
       ptr_host_("Unknown"),
@@ -79,8 +80,21 @@ namespace HM
 
       String sComputerName = Utilities::ComputerName();
 
-      // Add Message-ID header if it does not exist.
-      if (!original_headers_->FieldExists("Message-ID"))
+      // Add a Message-ID if the message has none - but only when this server is
+      // acting as the message's submission server (RFC 6409 section 8.1): the client
+      // authenticated, or it sends as one of our own domains from an IP range that
+      // does not require it to. Under the default ranges that second case is the
+      // server itself - web sites, scripts and the COM API submitting over localhost,
+      // most of which never generate an id of their own.
+      //
+      // When another server relays a message to us we are a relay, not a submission
+      // server, and add trace fields only. Inserting an id there hid from every check
+      // downstream that the message arrived without one: SpamAssassin's MISSING_MID
+      // could never fire here, because this ran before the post-transmission spam
+      // tests. Every consumer of the header in this tree - the Sieve duplicate test,
+      // IMAP THREAD, ENVELOPE, DKIM and ARC signing - already treats an absent
+      // Message-ID as the routine case it is on the wider Internet. Upstream #552.
+      if (is_message_submission_ && !original_headers_->FieldExists("Message-ID"))
       {
          String sTemp;
          sTemp.Format(_T("Message-ID: %s\r\n"), Utilities::GenerateMessageID().c_str());

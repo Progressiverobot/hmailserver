@@ -309,6 +309,13 @@ namespace HM
 
       bool trace_headers_written_;
 
+      // True when this server is the message submission server (RFC 6409) for the
+      // current message rather than a relay: the client authenticated, or it sends
+      // as one of our domains from a range that does not require it to. Decided when
+      // a recipient is accepted; the header creator uses it to decide whether a
+      // missing Message-ID is ours to supply.
+      bool message_submission_;
+
       String username_;
       String password_;
 
