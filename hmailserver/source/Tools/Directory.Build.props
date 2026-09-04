@@ -1,0 +1,19 @@
+<Project>
+  <!--
+    Applies to every C# project under source/Tools (the Control Panel, its
+    tests, and the setup and migration tools). One property, for one reason:
+
+    EnableWindowsTargeting lets `dotnet restore` succeed on a non-Windows
+    machine for a project that targets net10.0-windows. Nothing here can RUN
+    off Windows - the tools are WPF and WinForms - but GitHub's automatic
+    dependency submission restores every project on a Linux runner to record
+    the NuGet graph, and without this property that restore fails with
+    NETSDK1100 on the first Windows-targeting project it meets, so the
+    submission was red on every push and the dependency graph never received
+    the transitive packages (measured on the 28 August 2026 runs). On Windows
+    the property is inert.
+  -->
+  <PropertyGroup>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+  </PropertyGroup>
+</Project>
