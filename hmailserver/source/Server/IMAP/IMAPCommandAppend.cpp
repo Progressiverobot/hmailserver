@@ -81,6 +81,23 @@ namespace HM
       replace_mode_ = false;
       replace_target_.reset();
 
+      // RFC 6855 section 4 (UTF8=ACCEPT): a client may send the message as
+      //
+      //    APPEND mailbox [flags] [date] UTF8 (~{n}
+      //
+      // with the closing ")" following the octets on the wire. Thunderbird 128+
+      // does exactly this for every Sent copy once UTF8=ACCEPT is enabled, and
+      // the simple parser refused the line outright - its parenthesis count is
+      // odd until the octets have gone by - so the server answered "BAD APPEND
+      // Command requires at least 2 parameter" and no Sent copy was ever stored
+      // (issue #53). The wrapper is stripped here, leaving the plain literal8
+      // form the rest of this handler already understands, and the ")" is taken
+      // from the continuation text once the octets have arrived.
+      String sCommand = pArgument->Command();
+      utf8_wrapped_literal_ = StripUtf8LiteralWrapper_(sCommand);
+      if (utf8_wrapped_literal_)
+         pArgument->Command(sCommand);
+
       std::shared_ptr<IMAPSimpleCommandParser> pParser = std::shared_ptr<IMAPSimpleCommandParser>(new IMAPSimpleCommandParser());
 
       pParser->Parse(pArgument);
@@ -608,6 +625,24 @@ namespace HM
       String continuation = line;
       continuation.Trim();
 
+      // The message just received was sent as UTF8 (~{n}): its closing ")" is
+      // the first thing on the line after the octets. Anything else means the
+      // client and server disagree about where the message ended, and the only
+      // safe answer is to stop rather than store bytes under the wrong framing.
+      if (utf8_wrapped_literal_)
+      {
+         utf8_wrapped_literal_ = false;
+
+         if (continuation.IsEmpty() || continuation.GetAt(0) != ')')
+         {
+            TerminateWithProtocolError_(pConnection, " BAD APPEND UTF8 literal is not closed.\r\n");
+            return;
+         }
+
+         continuation = continuation.Mid(1);
+         continuation.Trim();
+      }
+
       if (continuation.IsEmpty())
       {
          FinalizeCommand_(pConnection);
@@ -654,6 +689,26 @@ namespace HM
          create_time_to_set_.TrimLeft();
          continuation = continuation.Mid(dateEnd + 1);
          continuation.Trim();
+      }
+
+      // RFC 6855: a later message of a MULTIAPPEND may be wrapped the same way
+      // as the first - "UTF8 (~{n}" with the ")" after its octets.
+      if (continuation.GetLength() >= 6 &&
+          continuation.Mid(0, 4).CompareNoCase(_T("UTF8")) == 0 &&
+          (continuation.GetAt(4) == ' ' || continuation.GetAt(4) == '('))
+      {
+         String wrapped = continuation.Mid(4);
+         wrapped.TrimLeft();
+
+         if (wrapped.GetLength() < 1 || wrapped.GetAt(0) != '(')
+         {
+            TerminateWithProtocolError_(pConnection, " BAD APPEND continuation must be a literal.\r\n");
+            return;
+         }
+
+         continuation = wrapped.Mid(1);
+         continuation.TrimLeft();
+         utf8_wrapped_literal_ = true;
       }
 
       // RFC 3516: the literal8 form "~{n}" is accepted wherever a literal is.
@@ -740,6 +795,70 @@ namespace HM
 
       if (!nonSynchronizingLiteral)
          pConnection->SendAsciiData("+ Ready for literal data\r\n");
+   }
+
+   bool
+   IMAPCommandAppend::StripUtf8LiteralWrapper_(String &command)
+   //---------------------------------------------------------------------------
+   // DESCRIPTION:
+   // Recognises a command line ending in the RFC 6855 form
+   //
+   //    ... UTF8 (~{n}      or      ... UTF8 (~{n+}
+   //
+   // and rewrites it to end in the bare literal8 (~{n} / ~{n+}) instead, so the
+   // simple command parser - which counts parentheses across the whole line -
+   // accepts it. Returns true when the wrapper was present. Deliberately narrow:
+   // the literal must be the last thing on the line, its size must be digits
+   // (with the optional RFC 7888 "+"), and UTF8 must be a word of its own.
+   //---------------------------------------------------------------------------
+   {
+      if (command.Right(1) != _T("}"))
+         return false;
+
+      int braceOpen = command.ReverseFind(_T("{"));
+      if (braceOpen < 0)
+         return false;
+
+      // Only a size goes between the braces.
+      String size = command.Mid(braceOpen + 1, command.GetLength() - braceOpen - 2);
+      if (size.Right(1) == _T("+"))
+         size = size.Mid(0, size.GetLength() - 1);
+
+      if (size.IsEmpty())
+         return false;
+
+      for (int i = 0; i < size.GetLength(); i++)
+      {
+         wchar_t ch = size.GetAt(i);
+         if (ch < '0' || ch > '9')
+            return false;
+      }
+
+      int literalStart = braceOpen;
+      if (literalStart > 0 && command.GetAt(literalStart - 1) == '~')
+         literalStart--;
+
+      if (literalStart < 1 || command.GetAt(literalStart - 1) != '(')
+         return false;
+
+      int keywordEnd = literalStart - 1;
+      while (keywordEnd > 0 && command.GetAt(keywordEnd - 1) == ' ')
+         keywordEnd--;
+
+      const int keywordLength = 4;
+      if (keywordEnd < keywordLength)
+         return false;
+
+      int keywordStart = keywordEnd - keywordLength;
+      if (command.Mid(keywordStart, keywordLength).CompareNoCase(_T("UTF8")) != 0)
+         return false;
+
+      // "UTF8" has to be a separate word, not the tail of a folder name.
+      if (keywordStart > 0 && command.GetAt(keywordStart - 1) != ' ')
+         return false;
+
+      command = command.Mid(0, keywordStart) + command.Mid(literalStart);
+      return true;
    }
 
    void

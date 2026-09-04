@@ -307,6 +307,7 @@
     <Compile Include="Infrastructure\WindowsEventLog.cs" />
     <Compile Include="Infrastructure\PrivacyTools.cs" />
     <Compile Include="IMAP\CapabilityAuthAdvertisement.cs" />
+    <Compile Include="IMAP\Utf8Append.cs" />
     <Compile Include="IMAP\MasterUserImpersonation.cs" />
     <Compile Include="Infrastructure\SqlLayerErrorHandling.cs" />
     <Compile Include="Infrastructure\WorkQueueLifecycle.cs" />
