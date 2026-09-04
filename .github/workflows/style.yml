@@ -6,8 +6,9 @@ name: Coding style
 # editorconfig-checker validates every text file against .editorconfig
 # (indentation style, trailing whitespace, final newline).
 #
-# Style exceptions live in .ecrc / .editorconfig, in the repository, where
-# they are visible and reviewable — not in anyone's local settings.
+# Style exceptions live in .editorconfig-checker.json and .editorconfig, in the
+# repository, where they are visible and reviewable — not in anyone's local
+# settings.
 
 on:
   push:
@@ -35,10 +36,20 @@ jobs:
       # binary 'ec-linux-amd64*' not found" before checking a single file.
       # 3.11.3 is the last release that still ships the old name. Bump this
       # together with the action, once an action release understands 4.x.
-      - name: Check files against .editorconfig
+      #
+      # The action only INSTALLS the checker (it downloads the release, renames
+      # the binary to editorconfig-checker and puts it on PATH); it never runs
+      # it. From the day this job was written until 4 September 2026 every run
+      # was green without a single file having been checked. The run step
+      # below is the check. It reads .editorconfig-checker.json at the repository
+      # root, which says what is excluded and why.
+      - name: Install editorconfig-checker
         uses: editorconfig-checker/action-editorconfig-checker@840e866d93b8e032123c23bac69dece044d4d84c # v2.2.0
         with:
           version: v3.11.3
+
+      - name: Check files against .editorconfig
+        run: editorconfig-checker
 
   license-headers:
     name: SPDX identifier on every source file
