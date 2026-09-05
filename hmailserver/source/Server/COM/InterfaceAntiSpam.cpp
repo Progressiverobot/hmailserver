@@ -11,6 +11,7 @@
 #include "../Common/AntiSpam/SpamAssassin/SpamAssassinTestConnect.h"
 
 #include "../Common/AntiSpam/AntiSpamConfiguration.h"
+#include "../Common/Application/IniFileSettings.h"
 #include "../Common/AntiSpam/DKIM/DKIM.h"
 
 #include "..\Common\BO\WhiteListAddresses.h"
@@ -774,6 +775,11 @@ STDMETHODIMP InterfaceAntiSpam::get_DNSBlackLists(IInterfaceDNSBlackLists **pVal
    }
 }
 
+// The recipient tarpit. These two properties were stubs marked obsolete from 5.x
+// until 5 September 2026 - reads answered 0 and writes were ignored - and are real
+// again, backed by SmtpTarpitDelaySeconds / SmtpTarpitCount in hMailServer.ini
+// rather than by the settings rows 5.4 deleted. See SMTPConnection::TarpitRecipient_.
+
 STDMETHODIMP InterfaceAntiSpam::get_TarpitDelay(long *pVal)
 {
    try
@@ -781,7 +787,7 @@ STDMETHODIMP InterfaceAntiSpam::get_TarpitDelay(long *pVal)
       if (!config_)
          return GetAccessDenied();
 
-      *pVal = 0;
+      *pVal = HM::IniFileSettings::Instance()->GetSmtpTarpitDelaySeconds();
       return S_OK;
    }
    catch (...)
@@ -797,7 +803,12 @@ STDMETHODIMP InterfaceAntiSpam::put_TarpitDelay(long newVal)
       if (!config_)
          return GetAccessDenied();
 
-      // OBSOLETE: To be removed in v6.
+      if (newVal < 0 || newVal > HM::IniFileSettings::TARPIT_MAX_SECONDS)
+         return COMError::GenerateError("TarpitDelay must be between 0 and 30 seconds.");
+
+      if (!HM::IniFileSettings::Instance()->SetSmtpTarpitDelaySeconds((int) newVal))
+         return COMError::GenerateError("The setting could not be written to hMailServer.INI. Nothing has been changed.");
+
       return S_OK;
    }
    catch (...)
@@ -813,8 +824,7 @@ STDMETHODIMP InterfaceAntiSpam::get_TarpitCount(long *pVal)
       if (!config_)
          return GetAccessDenied();
 
-      // OBSOLETE: To be removed in v6.
-      *pVal = 0;
+      *pVal = HM::IniFileSettings::Instance()->GetSmtpTarpitCount();
       return S_OK;
    }
    catch (...)
@@ -830,7 +840,12 @@ STDMETHODIMP InterfaceAntiSpam::put_TarpitCount(long newVal)
       if (!config_)
          return GetAccessDenied();
 
-      // OBSOLETE: To be removed in v6.
+      if (newVal < 0)
+         return COMError::GenerateError("TarpitCount cannot be negative.");
+
+      if (!HM::IniFileSettings::Instance()->SetSmtpTarpitCount((int) newVal))
+         return COMError::GenerateError("The setting could not be written to hMailServer.INI. Nothing has been changed.");
+
       return S_OK;
    }
    catch (...)

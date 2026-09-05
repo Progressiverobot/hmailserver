@@ -38,6 +38,13 @@ namespace HM
 
    private:
 
+      // The administrator credential: the ini password, and - when one is enrolled
+      // (IniFileSettings::GetAdministratorTotpSecret) - a TOTP code. codePresented
+      // says which overload the caller came through: without a code, an enrolled
+      // administrator is refused outright, so a stolen password is not a
+      // credential on its own. Sets account_ on success.
+      void AuthenticateAdministrator_(const String &sPassword, const String &sCode, bool codePresented);
+
       std::shared_ptr<const Account> account_;
    };
 }

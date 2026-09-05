@@ -10,6 +10,7 @@
 #include "OtelTracer.h"
 #include "OtelTraceContext.h"
 #include "Crypt.h"
+#include "Totp.h"
 #include "AccountLogon.h"
 #include "AcmeClient.h"
 #include "WebServicesServer.h"
@@ -979,14 +980,22 @@ namespace HM
    AnsiString
    RestApiServer::GetAuthorizationHeader_(const AnsiString &request)
    {
+      return GetHeader_(request, "authorization");
+   }
+
+   AnsiString
+   RestApiServer::GetHeader_(const AnsiString &request, const AnsiString &lowerCaseName)
+   {
       AnsiString lowerRequest = request;
       lowerRequest.MakeLower();
 
-      int headerPosition = lowerRequest.Find("\r\nauthorization:");
+      const AnsiString needle = "\r\n" + lowerCaseName + ":";
+
+      int headerPosition = lowerRequest.Find(needle);
       if (headerPosition < 0)
          return "";
 
-      int valueStart = headerPosition + 16;
+      int valueStart = headerPosition + needle.GetLength();
       int lineEnd = request.Find("\r\n", valueStart);
       if (lineEnd < 0)
          return "";
@@ -1038,7 +1047,9 @@ namespace HM
          AnsiString encodedCredentials = headerValue.Mid(6);
          encodedCredentials.Trim();
 
-         if (AuthenticateBasic_(encodedCredentials))
+         const BasicResult basic = AuthenticateBasic_(encodedCredentials, request);
+
+         if (basic == BasicAccepted)
          {
             // The administrator password is the full-authority credential and
             // always has been. It is not read-only and it is not restricted to
@@ -1051,44 +1062,79 @@ namespace HM
             return caller;
          }
 
+         if (basic == BasicCodeMissing)
+         {
+            // The password was right and no code came with it: a client that has
+            // not been told a second factor is enrolled, not a guess. Said so in
+            // the log (this is exactly when the administrator needs telling) and
+            // in the response, and not counted towards the auto-ban.
+            LOG_APPLICATION("REST API: the administrator password was accepted but a second factor is enrolled and no X-hMailServer-OTP header carried a code.");
+            caller.second_factor_required = true;
+            return caller;
+         }
+
          // A rejected credential leaves a trace, so repeated guessing against an
          // exposed management port is at least visible to the administrator.
          // (Presenting no credential at all is normal for the login page and is
-         // deliberately not logged here.)
-         LOG_APPLICATION("REST API: administrator authentication failed.");
+         // deliberately not logged here.) A wrong code is a guess at six digits
+         // and is counted like any other wrong credential.
+         if (basic == BasicCodeWrong)
+         {
+            LOG_APPLICATION("REST API: the administrator password was accepted but the one-time code in X-hMailServer-OTP was not.");
+            caller.second_factor_required = true;
+         }
+         else
+         {
+            LOG_APPLICATION("REST API: administrator authentication failed.");
+         }
+
          RegisterAuthenticationFailure_(peer_address);
       }
 
       return caller;
    }
 
-   bool
-   RestApiServer::AuthenticateBasic_(const AnsiString &encodedCredentials)
+   RestApiServer::BasicResult
+   RestApiServer::AuthenticateBasic_(const AnsiString &encodedCredentials, const AnsiString &request)
    {
       // An empty value is refused before the decoder sees it, rather than
       // relying on what MimeCodeBase64 does with a zero-length input.
       if (encodedCredentials.IsEmpty())
-         return false;
+         return BasicRefused;
 
       AnsiString credentials = Base64::Decode(encodedCredentials, encodedCredentials.GetLength());
 
       int separatorPosition = credentials.Find(":");
       if (separatorPosition <= 0)
-         return false;
+         return BasicRefused;
 
       String username = credentials.Mid(0, separatorPosition);
       String password = credentials.Mid(separatorPosition + 1);
 
       if (username.CompareNoCase(_T("administrator")) != 0)
-         return false;
+         return BasicRefused;
 
       String correctPassword = IniFileSettings::Instance()->GetAdministratorPassword();
       if (correctPassword.IsEmpty())
-         return false;
+         return BasicRefused;
 
       Crypt::EncryptionType hashType = Crypt::Instance()->GetHashType(correctPassword);
 
-      return Crypt::Instance()->Validate(password, correctPassword, hashType);
+      if (!Crypt::Instance()->Validate(password, correctPassword, hashType))
+         return BasicRefused;
+
+      // The second factor, once the password has been accepted - the same order
+      // COMAuthentication uses, for the same reason: what is said about the code
+      // is said only to somebody who holds the password.
+      const String secret = IniFileSettings::Instance()->GetAdministratorTotpSecret();
+      if (secret.IsEmpty())
+         return BasicAccepted;
+
+      const AnsiString code = GetHeader_(request, "x-hmailserver-otp");
+      if (code.IsEmpty())
+         return BasicCodeMissing;
+
+      return Totp::VerifyCode(AnsiString(secret), code) ? BasicAccepted : BasicCodeWrong;
    }
 
    bool
@@ -1455,7 +1501,7 @@ namespace HM
          Caller caller = Authenticate_(request, peer_address);
 
          if (caller.result == AuthenticationFailed)
-            return BuildUnauthorizedResponse_();
+            return BuildUnauthorizedResponse_(caller.second_factor_required);
 
          // After authentication, so the budget belongs to the credential rather
          // than to a source address, and before routing, so that being over it
@@ -1490,7 +1536,7 @@ namespace HM
          AuthorizationResult authorization = Authorize_(caller, route, refusalReason);
 
          if (authorization == AuthorizationUnauthenticated)
-            return BuildUnauthorizedResponse_();
+            return BuildUnauthorizedResponse_(false);
 
          if (authorization == AuthorizationForbidden)
          {
@@ -1958,7 +2004,7 @@ namespace HM
    }
 
    AnsiString
-   RestApiServer::BuildUnauthorizedResponse_()
+   RestApiServer::BuildUnauthorizedResponse_(bool secondFactorRequired)
    {
       // One response for every possible authentication problem: no credential,
       // a wrong administrator password, an unknown API key, an expired key and
@@ -1966,13 +2012,24 @@ namespace HM
       // the caller that the token was valid but expired, or valid but presented
       // from the wrong network, would confirm a working secret.
       //
+      // The one exception is deliberate: when the administrator PASSWORD was
+      // accepted and the one-time code was what was missing or wrong, the
+      // response carries "X-hMailServer-OTP: required" - the shape GitHub's API
+      // uses - so a client knows to ask its user for the code. That confirms
+      // the password to somebody who already holds it, and nothing to anybody
+      // else.
+      //
       // The challenge advertises Basic only, exactly as before, so browsers
       // reaching the management interface keep prompting as they always have.
-      const AnsiString body = "{\"error\":\"authentication failed\"}";
+      const AnsiString body = secondFactorRequired
+         ? "{\"error\":\"authentication failed\",\"second_factor\":\"required\"}"
+         : "{\"error\":\"authentication failed\"}";
 
       AnsiString response;
       response += "HTTP/1.0 401 Unauthorized\r\n";
       response += "WWW-Authenticate: Basic realm=\"hMailServer\"\r\n";
+      if (secondFactorRequired)
+         response += "X-hMailServer-OTP: required\r\n";
       response += "Content-Type: application/json\r\n";
       response.AppendFormat("Content-Length: %d\r\n", body.GetLength());
       response += "Connection: close\r\n\r\n";

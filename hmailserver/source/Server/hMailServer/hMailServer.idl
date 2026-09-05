@@ -795,6 +795,8 @@ interface IInterfaceSettings : IDispatch{
    // the account when it is deleted.
    [propget, id(115), helpstring("Create Drafts, Sent, Trash and Junk, designated for RFC 6154 SPECIAL-USE, when an account is created. Off by default.")] HRESULT CreateDefaultSpecialUseFoldersEnabled([out, retval] VARIANT_BOOL *pVal);
    [propput, id(115), helpstring("Create Drafts, Sent, Trash and Junk, designated for RFC 6154 SPECIAL-USE, when an account is created. Off by default.")] HRESULT CreateDefaultSpecialUseFoldersEnabled([in] VARIANT_BOOL newVal);
+   [id(116), helpstring("Enrols a second factor on the administrator credential and returns the otpauth:// URI to show as a QR code. The secret is inside that URI and is not retrievable afterwards; it is enforced at once, on the COM API and the REST API alike. Server administrators only, and the administrator password must be set.")] HRESULT EnrolAdministratorTOTP([out, retval] BSTR *pVal);
+   [id(117), helpstring("Removes the administrator credential's second factor; the password alone authenticates again at once. Server administrators only.")] HRESULT DisableAdministratorTOTP();
 
 };
 
@@ -1700,6 +1702,7 @@ interface IInterfaceApplication : IDispatch{
    // values are what keep late binding stable; position is what keeps early
    // binding stable, and only one of the two is visible in a diff.
    [id(21), helpstring("Authenticate the client, presenting a TOTP code. An account with a second factor enrolled cannot be authenticated by password alone - a mail client has nowhere to type a code, which is what app passwords exist for, and this is the one path that can.")] HRESULT AuthenticateWithCode([in] BSTR Username, [in] BSTR Password, [in] BSTR Code, [out, retval] IInterfaceAccount** pAccount);
+   [propget, id(22), helpstring("True when the administrator credential has a second factor enrolled. While it does, Authenticate refuses the administrator and AuthenticateWithCode is the one way in; the REST API's Basic credential needs an X-hMailServer-OTP header carrying the code. Readable before authenticating, so a client knows to ask for the code.")] HRESULT AdministratorTOTPEnabled([out, retval] VARIANT_BOOL *pVal);
 };
 
 [
@@ -2552,10 +2555,10 @@ interface IInterfaceAntiSpam : IDispatch
    [propput, id(20), helpstring("Antispam: Use MX checks  (score).")] HRESULT UseMXChecksScore([in] long  newVal);
 
    [propget, id(21), helpstring("Antispam: DNS black lists collection.")] HRESULT DNSBlackLists([out, retval] IInterfaceDNSBlackLists* *pVal);
-   [propget, id(22), helpstring("Tarpit delay (Obsolete: No longer used).")] HRESULT TarpitDelay([out, retval] long *pVal);
-   [propput, id(22), helpstring("Tarpit delay (Obsolete: No longer used).")] HRESULT TarpitDelay([in] long newVal);
-   [propget, id(23), helpstring("Tarpit count (Obsolete: No longer used).")] HRESULT TarpitCount([out, retval] long *pVal);
-   [propput, id(23), helpstring("Tarpit count (Obsolete: No longer used).")] HRESULT TarpitCount([in] long newVal);
+   [propget, id(22), helpstring("Recipient tarpit: seconds each RCPT TO past TarpitCount waits for its reply in an unauthenticated session (0-30; 0 = off). Stored as SmtpTarpitDelaySeconds in hMailServer.ini.")] HRESULT TarpitDelay([out, retval] long *pVal);
+   [propput, id(22), helpstring("Recipient tarpit: seconds each RCPT TO past TarpitCount waits for its reply in an unauthenticated session (0-30; 0 = off). Stored as SmtpTarpitDelaySeconds in hMailServer.ini.")] HRESULT TarpitDelay([in] long newVal);
+   [propget, id(23), helpstring("Recipient tarpit: how many recipients a message may name before TarpitDelay applies to each further one (0 = off). Stored as SmtpTarpitCount in hMailServer.ini.")] HRESULT TarpitCount([out, retval] long *pVal);
+   [propput, id(23), helpstring("Recipient tarpit: how many recipients a message may name before TarpitDelay applies to each further one (0 = off). Stored as SmtpTarpitCount in hMailServer.ini.")] HRESULT TarpitCount([in] long newVal);
 
    [propget, id(24), helpstring("Antispam: Enable SpamAssassin integration")] HRESULT SpamAssassinEnabled([out, retval] VARIANT_BOOL *pVal);
    [propput, id(24), helpstring("Antispam: Enable SpamAssassin integration")] HRESULT SpamAssassinEnabled([in] VARIANT_BOOL newVal);

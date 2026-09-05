@@ -182,6 +182,8 @@ END_COM_MAP()
    STDMETHOD(put_AddDeliveredToHeader)(/*[in]*/ VARIANT_BOOL newVal);
 
    STDMETHOD(SetAdministratorPassword)(/*[in]*/ BSTR newVal);
+   STDMETHOD(EnrolAdministratorTOTP)(/*[out, retval]*/ BSTR *pVal);
+   STDMETHOD(DisableAdministratorTOTP)();
 
    STDMETHOD(get_PublicFolders)(/*[out, retval]*/ IInterfaceIMAPFolders** pVal);
 

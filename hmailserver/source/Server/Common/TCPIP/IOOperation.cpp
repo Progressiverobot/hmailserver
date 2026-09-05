@@ -26,7 +26,14 @@ namespace HM
       type_(type),
       string_(string)
    {
-      
+
+   }
+
+   IOOperation::IOOperation(OperationType type, int delaySeconds) :
+      type_(type),
+      delay_seconds_(delaySeconds)
+   {
+
    }
 
    IOOperation::~IOOperation(void)

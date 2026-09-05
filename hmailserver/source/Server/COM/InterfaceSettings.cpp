@@ -14,6 +14,7 @@
 
 #include "../Common/Application/ACLManager.h"
 #include "../Common/Application/IniSettingStore.h"
+#include "../Common/Util/Totp.h"
 #include "../Common/LDAP/LdapClient.h"
 #include "../Common/LDAP/LdapSettings.h"
 #include "../Common/LDAP/DirectorySync.h"
@@ -1029,7 +1030,65 @@ STDMETHODIMP InterfaceSettings::SetAdministratorPassword(BSTR newVal)
       
    
       ini_file_settings_->SetAdministratorPassword(newVal);
-   
+
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceSettings::EnrolAdministratorTOTP(BSTR *pVal)
+{
+   try
+   {
+      if (!config_)
+         return GetAccessDenied();
+
+      if (!GetIsServerAdmin())
+         return GetAccessDenied();
+
+      // A second factor guards a password. With no password set, anyone
+      // authenticates anonymously (COMAuthentication::AttempAnonymousAuthentication)
+      // and a code would guard nothing.
+      if (ini_file_settings_->GetAdministratorPassword().IsEmpty())
+         return COMError::GenerateError("Set the administrator password first. A second factor protects a password, and there is none to protect.");
+
+      HM::AnsiString secret = HM::Totp::GenerateSecret();
+
+      if (secret.IsEmpty())
+         return COMError::GenerateError("The random number generator failed, so no second factor was enrolled. Nothing has been stored. See the hMailServer error log.");
+
+      if (!ini_file_settings_->SetAdministratorTotpSecret(HM::String(secret)))
+         return COMError::GenerateError("The secret could not be written to hMailServer.INI. The account the server runs as needs write access to that file. Nothing has been changed.");
+
+      // The URI carries the secret, and this is the only moment it leaves the
+      // server. Enforced from this moment: the session that enrolled stays
+      // authenticated, and the next logon needs the code.
+      *pVal = HM::String(HM::Totp::BuildOtpAuthUri("Administrator", secret)).AllocSysString();
+
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceSettings::DisableAdministratorTOTP()
+{
+   try
+   {
+      if (!config_)
+         return GetAccessDenied();
+
+      if (!GetIsServerAdmin())
+         return GetAccessDenied();
+
+      if (!ini_file_settings_->SetAdministratorTotpSecret(HM::String()))
+         return COMError::GenerateError("The secret could not be removed from hMailServer.INI. The account the server runs as needs write access to that file. Nothing has been changed.");
+
       return S_OK;
    }
    catch (...)

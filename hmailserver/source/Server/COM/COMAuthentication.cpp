@@ -10,6 +10,7 @@
 #include "..\Common\Util\PasswordValidator.h"
 #include "..\Common\Util\Totp.h"
 #include "..\Common\Util\Crypt.h"
+#include "..\Common\Application\IniFileSettings.h"
 
 #include "COMError.h"
 
@@ -38,33 +39,9 @@ namespace HM
 
       if (sUsername.CompareNoCase(_T("administrator")) == 0)
       {
-         String sPasswordCorrect = HM::IniFileSettings::Instance()->GetAdministratorPassword();
-
-         if (sPasswordCorrect.IsEmpty())
-         {
-            // The administrators password has not been set yet. It's likely
-            // that we have just installed or upgraded hMailServer.
-            
-            // Has the empty password, so we can compare. The upgrade tool first
-            // tries to authenticate with an empty password.
-            sPasswordCorrect = HM::Crypt::Instance()->EnCrypt(sPasswordCorrect, HM::Crypt::ETSHA256);
-         }
-
-         
-         Crypt::EncryptionType type = HM::Crypt::Instance()->GetHashType(sPasswordCorrect);
-
-         // Validate the password.
-         if (HM::Crypt::Instance()->Validate(sPassword, sPasswordCorrect, type))
-         {
-            // Create a dummy account since the administrator
-            // does not have a real email account.
-
-            account_ = std::shared_ptr<Account> 
-               (
-                  new Account("Administrator", Account::ServerAdmin)
-               );
-
-         }
+         // No code on this overload: satisfiable only while no second factor is
+         // enrolled on the administrator credential.
+         AuthenticateAdministrator_(sPassword, String(), false);
       }
       else
       {
@@ -86,11 +63,12 @@ namespace HM
    std::shared_ptr<const HM::Account>
    COMAuthentication::Authenticate(const String &sUsername, const String &sPassword, const String &sCode)
    {
-      // The administrator is not a mailbox account and has no per-account second
-      // factor - the Control Panel's own TOTP protects that logon, client-side, and
-      // is a separate mechanism. Delegated unchanged so this overload is a drop-in.
       if (sUsername.CompareNoCase(_T("administrator")) == 0)
-         return Authenticate(sUsername, sPassword);
+      {
+         account_.reset();
+         AuthenticateAdministrator_(sPassword, sCode, true);
+         return account_;
+      }
 
       account_.reset();
 
@@ -115,12 +93,62 @@ namespace HM
       return account_;
    }
 
-   void 
+   void
+   COMAuthentication::AuthenticateAdministrator_(const String &sPassword, const String &sCode, bool codePresented)
+   {
+      String sPasswordCorrect = HM::IniFileSettings::Instance()->GetAdministratorPassword();
+
+      if (sPasswordCorrect.IsEmpty())
+      {
+         // The administrators password has not been set yet. It's likely
+         // that we have just installed or upgraded hMailServer.
+
+         // Has the empty password, so we can compare. The upgrade tool first
+         // tries to authenticate with an empty password.
+         sPasswordCorrect = HM::Crypt::Instance()->EnCrypt(sPasswordCorrect, HM::Crypt::ETSHA256);
+      }
+
+      Crypt::EncryptionType type = HM::Crypt::Instance()->GetHashType(sPasswordCorrect);
+
+      // Validate the password.
+      if (!HM::Crypt::Instance()->Validate(sPassword, sPasswordCorrect, type))
+         return;
+
+      // The second factor, checked only once the password has been accepted, so
+      // that a wrong password and a missing code are answered identically from
+      // outside (both: no account) and the log line below is written only for
+      // somebody who holds the password. That is exactly when the administrator
+      // needs to be told, and never in response to a guess.
+      const String secret = HM::IniFileSettings::Instance()->GetAdministratorTotpSecret();
+
+      if (!secret.IsEmpty())
+      {
+         if (!codePresented)
+         {
+            LOG_APPLICATION("Administrator logon refused: the password was correct but a second factor is enrolled and no code was presented. Authenticate with a code (Application.AuthenticateWithCode).");
+            return;
+         }
+
+         if (!HM::Totp::VerifyCode(AnsiString(secret), AnsiString(sCode)))
+         {
+            LOG_APPLICATION("Administrator logon refused: the password was correct but the one-time code was not.");
+            return;
+         }
+      }
+
+      // Create a dummy account since the administrator
+      // does not have a real email account.
+      account_ = std::shared_ptr<Account>(new Account("Administrator", Account::ServerAdmin));
+   }
+
+   void
    COMAuthentication::AttempAnonymousAuthentication()
    {
-      // No authentication is required if the administration password is empty.
+      // No authentication is required if the administration password is empty -
+      // and, since a second factor guards a password, only while there is none of
+      // those either.
       String sAdminPassword = HM::IniFileSettings::Instance()->GetAdministratorPassword();
-      if (sAdminPassword.IsEmpty())
+      if (sAdminPassword.IsEmpty() && HM::IniFileSettings::Instance()->GetAdministratorTotpSecret().IsEmpty())
       {
          // Create a dummy account since the administrator
          // does not have a real email account.

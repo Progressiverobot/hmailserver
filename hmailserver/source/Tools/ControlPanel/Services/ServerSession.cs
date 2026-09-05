@@ -101,12 +101,31 @@ namespace hMailServer.ControlPanel.Services
             session.Application.Settings.SetIniSetting(key, value ?? "");
       }
 
+      /// <summary>
+      /// Set by the most recent failed <see cref="Connect(string,string,string,out string)"/>
+      /// when the administrator password was accepted but the server also requires
+      /// a one-time code. The caller prompts for one and calls the code overload.
+      /// It says nothing about whether the password was right - a wrong password
+      /// with a factor enrolled sets it too - so the caller must prompt at most once.
+      /// </summary>
+      public bool SecondFactorRequired { get; private set; }
+
       public bool Connect(string host, string userName, string password, out string error)
+      {
+         return Connect(host, userName, password, null, out error);
+      }
+
+      public bool Connect(string host, string userName, string password, string code, out string error)
       {
          string normalizedHost = string.IsNullOrWhiteSpace(host) ? "localhost" : host;
 
-         if (!Open(normalizedHost, userName, password, out dynamic app, out error))
+         if (!Open(normalizedHost, userName, password, code, out dynamic app, out bool secondFactorRequired, out error))
+         {
+            SecondFactorRequired = secondFactorRequired;
             return false;
+         }
+
+         SecondFactorRequired = false;
 
          lock (gate_)
          {
@@ -164,7 +183,11 @@ namespace hMailServer.ControlPanel.Services
                   if (attempt > 0 && retryDelay > TimeSpan.Zero)
                      Thread.Sleep(retryDelay);
 
-                  if (!Open(Host, UserName, password, out dynamic app, out error))
+                  // No code: a silent reconnect cannot produce a fresh one-time
+                  // code, so a server with administrator 2FA enrolled will not
+                  // re-authenticate this way. The link stays broken and the user
+                  // reconnects manually through the connect screen, which prompts.
+                  if (!Open(Host, UserName, password, null, out dynamic app, out bool _, out error))
                      continue;
 
                   // The service reports "running" to the SCM well before
@@ -420,10 +443,25 @@ namespace hMailServer.ControlPanel.Services
          }
       }
 
-      private static bool Open(string host, string userName, string password, out dynamic app, out string error)
+      /// <summary>
+      /// The COM proxy, typed dynamic at its source. Everything on it is late
+      /// bound - this tool ships without the interop assembly on purpose - and
+      /// nothing static is known about an out-of-process COM proxy, which this
+      /// method's return type says. Activator.CreateInstance's own return type is
+      /// object, and a static analyzer that sees that flow straight into a dynamic
+      /// member call reports a call that "object" cannot satisfy.
+      /// </summary>
+      private static dynamic ActivateApplication(Type comType)
+      {
+         return Activator.CreateInstance(comType);
+      }
+
+      private static bool Open(string host, string userName, string password, string code,
+         out dynamic app, out bool secondFactorRequired, out string error)
       {
          app = null;
          error = null;
+         secondFactorRequired = false;
 
          try
          {
@@ -437,12 +475,35 @@ namespace hMailServer.ControlPanel.Services
                return false;
             }
 
-            dynamic instance = Activator.CreateInstance(comType);
-            dynamic account = instance.Authenticate(userName, password);
+            dynamic instance = ActivateApplication(comType);
+
+            dynamic account = string.IsNullOrEmpty(code)
+               ? instance.Authenticate(userName, password)
+               : instance.AuthenticateWithCode(userName, password, code);
 
             if (account == null)
             {
-               error = "Authentication failed. Check the user name and password.";
+               // The server does not say whether the password was right or the
+               // code was missing - both return null. But it will say, without a
+               // credential, whether the administrator has a factor enrolled, and
+               // when one does and no code was presented, that is worth telling
+               // the caller so it can ask for a code. A wrong password sets this
+               // too, so the caller must prompt only once.
+               try
+               {
+                  if (string.Equals(userName, "administrator", StringComparison.OrdinalIgnoreCase)
+                      && string.IsNullOrEmpty(code)
+                      && (bool)instance.AdministratorTOTPEnabled)
+                     secondFactorRequired = true;
+               }
+               catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
+               {
+                  // An older server has no such property; treat it as no factor.
+               }
+
+               error = secondFactorRequired
+                  ? "This server requires a one-time code for the administrator."
+                  : "Authentication failed. Check the user name and password.";
                return false;
             }
 
