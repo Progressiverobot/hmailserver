@@ -6,6 +6,8 @@
 #include "stdafx.h"
 
 #include "PersistentMessage.h"
+#include "../Application/IniFileSettings.h"
+#include "../Util/Strings/Formatter.h"
 #include "PersistentDomain.h"
 #include "PersistentAccount.h"
 #include "PersistentIMAPFolder.h"
@@ -542,7 +544,7 @@ namespace HM
    }
 
    std::shared_ptr<Message>
-   PersistentMessage::CopyFromQueueToInbox(std::shared_ptr<Message> sourceMessage, std::shared_ptr<const Account> destinationAccount)
+   PersistentMessage::CopyFromQueueToInbox(std::shared_ptr<Message> sourceMessage, std::shared_ptr<const Account> destinationAccount, const String &linkFrom, bool &linked)
    {
       std::shared_ptr<Message> messageCopy = CreateCopy_(sourceMessage, (int) destinationAccount->GetID());
       messageCopy->SetState(Message::Delivered);
@@ -561,7 +563,21 @@ namespace HM
       const String destinationFile = GetFileName(destinationAccount, messageCopy, AccountFolder);
       String destinationPath = FileUtilities::GetFilePath(destinationFile);
 
-      if (!FileUtilities::Copy(sourceFile, destinationFile, true))
+      // One file, this recipient's name for it - when LocalDelivery has a finished
+      // copy to link from (DeliveryHardLinks). Every rewrite of a message file is
+      // a temporary file renamed into place, so a change to one recipient's copy
+      // never reaches the others. Falls back to a copy of the queue file when the
+      // link cannot be made (another volume, the 1023-name limit of NTFS, a file
+      // system without links), which is exactly the behaviour without the setting.
+      linked = false;
+      if (!linkFrom.IsEmpty())
+      {
+         FileUtilities::CreateDirectory(destinationPath);
+         linked = ::CreateHardLink(destinationFile, linkFrom, NULL) != FALSE;
+         LOG_DEBUG(Formatter::Format(linked ? "Local copy {0} is a name for {1}." : "Local copy {0} could not be linked from {1} (Windows error {2}); copied instead.", destinationFile, linkFrom, (int) GetLastError()));
+      }
+
+      if (!linked && !FileUtilities::Copy(sourceFile, destinationFile, true))
       {
          std::shared_ptr<Message> pEmpty;
          return pEmpty;

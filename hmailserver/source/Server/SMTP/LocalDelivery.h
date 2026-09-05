@@ -143,7 +143,19 @@ namespace HM
       // working if that canonicalisation were ever removed.
       static bool ListContains_(const std::vector<String> &values, const String &value);
 
-      std::shared_ptr<Message>  CreateAccountLevelMessage_(std::shared_ptr<Message> pOriginalMessage, std::shared_ptr<const Account> pRecipientAccount, bool reuseMessage, const String &sOriginalAddress);
+      std::shared_ptr<Message>  CreateAccountLevelMessage_(std::shared_ptr<Message> pOriginalMessage, std::shared_ptr<const Account> pRecipientAccount, bool reuseMessage, const String &sOriginalAddress, bool &tracedAlready);
+
+      // DeliveryHardLinks. Every local copy gets its trace headers by a rewrite, and
+      // a rewrite of a name is a new file, so a link from the queue file never
+      // survives delivery. The template is one finished copy - a second name for
+      // the queue file with the trace headers written to it - from which every
+      // sharing recipient's file is linked; made on first use, removed when the
+      // delivery is over, its content living on under the recipients' names.
+      bool SharingPossible_(std::shared_ptr<const Account> account) const;
+      String SharedTemplate_(std::shared_ptr<const Account> account);
+      String shared_template_;
+      bool shared_template_failed_ = false;
+      bool current_copy_traced_ = false;
 
       const String &_sendersIP;
       const std::shared_ptr<Message> original_message_;

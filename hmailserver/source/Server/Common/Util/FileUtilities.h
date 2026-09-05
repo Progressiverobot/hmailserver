@@ -37,6 +37,15 @@ namespace HM
       static bool WriteToFile(const String &sFilename, const String &sData, bool bUnicode);
       static bool WriteToFile(const String &sFilename, const AnsiString &sData);
 
+      // Writes to a temporary name beside the file and renames it into place, so
+      // the file on disk is always either the old content or the new, never a
+      // truncated middle - and so a file that has more than one name (a hard
+      // link) is replaced under this name alone, the other names keeping the old
+      // content. This is what makes one message file with N recipients' names
+      // safe to share: a rewrite of one recipient's copy is a copy-on-write by
+      // construction. The temporary name is unique per call.
+      static bool WriteToFileAtomically(const String &sFilename, const AnsiString &sData);
+
       // The size of a file, or 0 when it cannot be read. long is 32 bits here, so a
       // size over LONG_MAX is SATURATED rather than truncated - see the definition
       // for why the previous truncation turned three "> maximum" guards into

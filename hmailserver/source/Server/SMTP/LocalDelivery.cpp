@@ -34,6 +34,7 @@
 #include "../common/Util/TraceHeaderWriter.h"
 #include "../common/Util/MessageUtilities.h"
 #include "../common/Util/FileUtilities.h"
+#include "../common/Application/IniFileSettings.h"
 #include "../common/Util/Parsing/StringParser.h"
 #include "../common/Sieve/SieveStorage.h"
 #include "../common/Sieve/SieveScript.h"
@@ -134,9 +135,81 @@ namespace HM
          iterRecipient = vecRecipients.erase(iterRecipient);
       }
 
+      // The template's name goes; the content stays under the recipients' names.
+      if (!shared_template_.IsEmpty())
+      {
+         FileUtilities::DeleteFile(shared_template_);
+         shared_template_ = _T("");
+      }
+
       LOG_DEBUG("Local delivery completed");
 
       return messageReused;
+   }
+
+   bool
+   LocalDelivery::SharingPossible_(std::shared_ptr<const Account> account) const
+   {
+      // One file for several recipients is possible only when every recipient's
+      // copy would be the same bytes at delivery: no Delivered-To header (it names
+      // the recipient), and no forward on the account, which re-sends the copy
+      // before its trace headers are written.
+      if (!IniFileSettings::Instance()->GetDeliveryHardLinks())
+         return false;
+
+      if (Configuration::Instance()->GetSMTPConfiguration()->GetAddDeliveredToHeader())
+      {
+         // Said once per delivery, because an operator who set DeliveryHardLinks and
+         // sees no sharing should be able to find out why from the log.
+         LOG_DEBUG("DeliveryHardLinks is set but AddDeliveredToHeader is on, and Delivered-To names each recipient: every local copy is written on its own.");
+         return false;
+      }
+
+      if (account->GetForwardEnabled() && !account->GetForwardAddress().IsEmpty())
+         return false;
+
+      return true;
+   }
+
+   String
+   LocalDelivery::SharedTemplate_(std::shared_ptr<const Account> account)
+   {
+      if (!SharingPossible_(account) || shared_template_failed_)
+         return String();
+
+      if (!shared_template_.IsEmpty())
+         return shared_template_;
+
+      // A second name for the queue file, then the trace headers written to it.
+      // The rewrite is a temporary file renamed over this name, so the template
+      // becomes a file of its own with Return-Path and the queue file is untouched
+      // - it may still be going to external recipients as it is.
+      const String queueFile = PersistentMessage::GetFileName(original_message_);
+      const String templateFile = queueFile + _T(".delivered");
+
+      if (::CreateHardLink(templateFile, queueFile, NULL) == FALSE)
+      {
+         LOG_DEBUG(Formatter::Format("Delivery template: no link from {0} to {1} (Windows error {2}); every copy will be written.", queueFile, templateFile, (int) GetLastError()));
+         shared_template_failed_ = true;
+         return String();
+      }
+      LOG_DEBUG(Formatter::Format("Delivery template {0} made; the local copies will be names for it.", templateFile));
+
+      std::vector<std::pair<AnsiString, AnsiString> > fieldsToWrite;
+      String sFromAddress = original_message_->GetFromAddress();
+      AnsiString sReturnPath = sFromAddress.IsEmpty() ? "<>" : "<" + sFromAddress + ">";
+      fieldsToWrite.push_back(std::make_pair("Return-Path", sReturnPath));
+
+      TraceHeaderWriter writer;
+      if (!writer.Write(templateFile, original_message_, fieldsToWrite))
+      {
+         FileUtilities::DeleteFile(templateFile);
+         shared_template_failed_ = true;
+         return String();
+      }
+
+      shared_template_ = templateFile;
+      return shared_template_;
    }
 
 
@@ -156,9 +229,12 @@ namespace HM
       // We should reuse the message file if only one recipient
       // exists. Reusing message file is good for performance since
       // we don't have to create a new file on disk.
-      messageReused = iNoOfRecipients == 1;
+      // ... unless earlier recipients share a template, in which case this one
+      // shares it too and the queue file is deleted by the caller as usual.
+      messageReused = iNoOfRecipients == 1 && shared_template_.IsEmpty();
 
-      std::shared_ptr<Message> accountLevelMessage = CreateAccountLevelMessage_(original_message_, account, messageReused, sOriginalAddress);
+      current_copy_traced_ = false;
+      std::shared_ptr<Message> accountLevelMessage = CreateAccountLevelMessage_(original_message_, account, messageReused, sOriginalAddress, current_copy_traced_);
       if (!accountLevelMessage)
       {
          String errorMessage;
@@ -346,8 +422,11 @@ namespace HM
          return false;
       }
 
-      // Do the final delivery of the message.
-      AddTraceHeaders_(account, accountLevelMessage, sOriginalAddress);
+      // Do the final delivery of the message. A copy linked from the delivery
+      // template already carries its trace headers, and writing them again would
+      // be a rewrite that gives this recipient a file of its own.
+      if (!current_copy_traced_)
+         AddTraceHeaders_(account, accountLevelMessage, sOriginalAddress);
 
       // Evaluate the recipient account's Sieve script (if any). It may fire
       // redirect actions, choose a fileinto folder, and/or cancel the local copy
@@ -862,7 +941,7 @@ namespace HM
    }
 
    std::shared_ptr<Message> 
-   LocalDelivery::CreateAccountLevelMessage_(std::shared_ptr<Message> pOriginalMessage, std::shared_ptr<const Account> pRecipientAccount, bool reuseMessage, const String &sOriginalAddress)
+   LocalDelivery::CreateAccountLevelMessage_(std::shared_ptr<Message> pOriginalMessage, std::shared_ptr<const Account> pRecipientAccount, bool reuseMessage, const String &sOriginalAddress, bool &tracedAlready)
    {
       // Copy the original message to the new message. Also copy the message
       // file unless we should reuse the old one.
@@ -893,7 +972,9 @@ namespace HM
       }
       else
       {
-         pNewMessage = PersistentMessage::CopyFromQueueToInbox(pOriginalMessage, pRecipientAccount);
+         bool linked = false;
+         pNewMessage = PersistentMessage::CopyFromQueueToInbox(pOriginalMessage, pRecipientAccount, SharedTemplate_(pRecipientAccount), linked);
+         tracedAlready = linked;
 
          // The copy fails when the data volume is full or the file is locked by
          // another process. Returning empty lets the caller's existing handling
