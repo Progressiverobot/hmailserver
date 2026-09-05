@@ -1605,6 +1605,30 @@ namespace hMailServer.ControlPanel.Views
                     "reads from the same volume; against a remote spamd it is the wrong choice.",
             IniStore = iniStore_
          });
+         // The User: header of the spamd request. spamd applies per-user preferences to
+         // the user a request names and its global configuration to a request that names
+         // nobody; until these two existed every scan named nobody.
+         sa.Settings.Add(new IniText
+         {
+            Path = "SpamAssassinUser",
+            Label = "Profile to scan as (spamd User: header; empty = spamd's global configuration)",
+            Blurb = "The name spamd looks up its per-user preferences for - a user_prefs file or a row in its SQL " +
+                    "preference store. Leave empty unless spamd has been set up for it: a spamd told to change " +
+                    "to a user it cannot find may refuse the scan, and an unscanned message is delivered as if " +
+                    "SpamAssassin were unreachable.",
+            IniStore = iniStore_
+         });
+         sa.Settings.Add(new IniBool
+         {
+            Path = "SpamAssassinUserFromRecipient",
+            Label = "Scan a message with a single recipient as that recipient",
+            Default = false,
+            Blurb = "Sends the recipient's address as the User: header, so spamd applies that mailbox's own " +
+                    "preferences - the shape a virtual-user spamd (--virtual-config-dir with %u or %d) expects. " +
+                    "A scan runs once per message, not once per recipient, so a message to several people " +
+                    "cannot be scanned under any one of their preferences and uses the profile above instead.",
+            IniStore = iniStore_
+         });
          Tab("SpamAssassin").Cards.Add(sa);
 
          var hook = Card("External filtering engine (rspamd and anything else that speaks HTTP)",

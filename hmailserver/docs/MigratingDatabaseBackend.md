@@ -58,8 +58,8 @@ Choosing a target
 
 | Target | Choose it when |
 |---|---|
-| **MS SQL Server** (including Express and LocalDB) | You already run SQL Server, or you want the strongest transaction support of the four. Note that the session runs at READ UNCOMMITTED. |
-| **PostgreSQL** | You want the best-behaved backend in this codebase. It is the only one of the four where DDL is transactional, so a failed schema upgrade rolls back cleanly. |
+| **MS SQL Server** (including Express and LocalDB) | You already run SQL Server, or you want the strongest transaction support of the four. Note that the session runs at READ UNCOMMITTED. Encryption is the provider's own keywords: `ConnectionStringOptions=Encrypt=yes;TrustServerCertificate=no` under `[Database]` is appended verbatim to the connection string. |
+| **PostgreSQL** | You want the best-behaved backend in this codebase. It is the only one of the four where DDL is transactional, so a failed schema upgrade rolls back cleanly. To require and verify TLS to it, set `PostgreSQLSslMode=verify-full` and `PostgreSQLSslRootCert=<path to the CA file>` under `[Database]`; without them libpq encrypts when the server offers it and verifies nothing. |
 | **MySQL / MariaDB** | You already run it. Make sure every table ends up InnoDB — the server only issues transactions if they all report it at connect time, and silently does not if any table does not. The bundled client requires TLS from the server by default and says so if it is missing; a server that genuinely has none needs `AllowUnencryptedConnection=1` under `[Database]` in hMailServer.ini. |
 | **SQL Server Compact** | Only if you are migrating *to* a test rig. It is the default and it is the one real dependency liability in this tree; see the SQL Server Compact row in [Roadmap.md](../../Roadmap.md) for the three defects that are specific to it. |
 

@@ -21,6 +21,10 @@ namespace HM
          std::shared_ptr<bool> testCompleted);
       ~SpamAssassinClient(void);
 
+      // The User: header of the PROCESS request - the user whose preferences spamd
+      // applies to this scan. Empty sends no header. Set before Connect.
+      void SetUser(const AnsiString &user) { user_ = user; }
+
       virtual void ParseData(const AnsiString &Request);
       virtual void ParseData(std::shared_ptr<ByteBuffer> pBuf);
 
@@ -49,6 +53,7 @@ namespace HM
       String command_buffer_;
 
       String message_file_;
+      AnsiString user_;
 	   __int64 spam_dsize_;      // Content-length spamd reported; < 0 until a valid header is parsed
 	   __int64 message_size_;
       std::shared_ptr<File> result_;

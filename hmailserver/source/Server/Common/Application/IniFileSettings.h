@@ -149,6 +149,21 @@ namespace HM
       // server is a choice written in the ini rather than a silent downgrade. See
       // MySQLConnection::Connect for the client option it sets.
       bool GetDatabaseAllowUnencryptedConnection() const { return database_allow_unencrypted_connection_; }
+
+      // [Database] PostgreSQLSslMode and PostgreSQLSslRootCert: libpq's sslmode and
+      // sslrootcert connection parameters, from this file rather than from PGSSLMODE in
+      // the service's environment. Empty leaves libpq's own default, prefer - encrypted
+      // when the server offers it, verified never. verify-full with a root certificate is
+      // what makes the connection one the administrator can trust rather than hope for.
+      // See PGConnection::Connect, which refuses a mode it does not know.
+      String GetDatabasePostgreSQLSslMode() const { return database_postgresql_ssl_mode_; }
+      String GetDatabasePostgreSQLSslRootCert() const { return database_postgresql_ssl_root_cert_; }
+
+      // [Database] ConnectionStringOptions: appended verbatim to the OLE DB connection
+      // string of an MS SQL Server backend. Encryption and certificate verification are
+      // the provider's own keywords there (Encrypt=yes;TrustServerCertificate=no for
+      // MSOLEDBSQL), and any list of them written here would only ever lag the provider.
+      String GetDatabaseConnectionStringOptions() const { return database_connection_string_options_; }
       
       bool GetAddXAuthUserHeader() {return add_xauth_user_header_; }
       String GetDaemonAddressDomain() const { return daemonaddress_domain_; }
@@ -220,6 +235,14 @@ namespace HM
       int GetSMTPCMaxTimeout () {return smtpcmax_timeout_; }
       int GetSAMinTimeout () {return samin_timeout_; }
       int GetSAMaxTimeout () {return samax_timeout_; }
+
+      // [Settings] SpamAssassinUser: the User: header of every spamd PROCESS request,
+      // which is the user whose preferences spamd applies to the scan. Empty, the
+      // default, sends no header, so an existing spamd sees exactly what it always did.
+      // [Settings] SpamAssassinUserFromRecipient=1 names the recipient instead when the
+      // message has exactly one; see SpamTestSpamAssassin::RunTest for why one is the limit.
+      String GetSpamAssassinUser() const { return spamassassin_user_; }
+      bool GetSpamAssassinUserFromRecipient() const { return spamassassin_user_from_recipient_; }
       int GetFinalizationTimeout () {return finalization_timeout_; }
       int GetClamMinTimeout () {return clam_min_timeout_; }
       int GetClamMaxTimeout () {return clam_max_timeout_; }
@@ -821,6 +844,9 @@ namespace HM
       int no_of_dbconnection_attempts_;
       int no_of_dbconnection_attempts_Delay;
       bool database_allow_unencrypted_connection_;
+      String database_postgresql_ssl_mode_;
+      String database_postgresql_ssl_root_cert_;
+      String database_connection_string_options_;
       bool add_xauth_user_header_;
       String daemonaddress_domain_;
       bool add_xoriginal_rcpt_to_header_;	  
@@ -883,6 +909,8 @@ namespace HM
       int smtpcmax_timeout_;
       int samin_timeout_;
       int samax_timeout_;
+      String spamassassin_user_;
+      bool spamassassin_user_from_recipient_;
       int finalization_timeout_;
       int clam_min_timeout_;
       int clam_max_timeout_;

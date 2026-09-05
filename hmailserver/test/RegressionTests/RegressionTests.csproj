@@ -347,6 +347,7 @@
     <Compile Include="AntiSpam\SenderBlacklist.cs" />
     <Compile Include="AntiSpam\PerAccountSpamSettings.cs" />
     <Compile Include="AntiSpam\SpamAssassin.cs" />
+    <Compile Include="AntiSpam\SpamAssassinUserHeader.cs" />
     <Compile Include="API\Basics.cs" />
     <Compile Include="Infrastructure\Cache.cs" />
     <Compile Include="Infrastructure\CustomAsserts.cs" />
@@ -641,6 +642,7 @@
     <Compile Include="IMAP\SearchLimits.cs" />
     <Compile Include="Infrastructure\CrashOracleAsserts.cs" />
     <Compile Include="Infrastructure\CustomDnsServer.cs" />
+    <Compile Include="Infrastructure\SpamdSimulator.cs" />
     <Compile Include="Infrastructure\CrashOracleTests.cs" />
     <Compile Include="Sieve\ManageSieveTls.cs" />
     <Compile Include="SSL\ListenerTlsConfiguration.cs" />

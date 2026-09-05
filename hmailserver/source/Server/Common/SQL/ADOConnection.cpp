@@ -12,6 +12,7 @@
 #include "Macros/MSSQLMacroExpander.h"
 #include "ADOInt64Helper.h"
 #include "../Util/Registry.h"
+#include "../Application/IniFileSettings.h"
 
 using namespace std;
 
@@ -134,6 +135,19 @@ namespace HM
       if (!sServerFailoverPartner.IsEmpty())
       {
          sConnectionString.append("FailoverPartner=" + sServerFailoverPartner + ";");
+      }
+
+      // [Database] ConnectionStringOptions, verbatim. Encrypting and verifying an MS SQL
+      // connection is a matter of the provider's own keywords - Encrypt=yes and
+      // TrustServerCertificate=no for MSOLEDBSQL - so the administrator writes those,
+      // and anything else the provider understands, rather than this code keeping a
+      // list that would only ever lag the provider.
+      String sOptions = IniFileSettings::Instance()->GetDatabaseConnectionStringOptions();
+      if (!sOptions.IsEmpty())
+      {
+         sConnectionString.append(sOptions);
+         if (sOptions.Right(1) != _T(";"))
+            sConnectionString.append(_T(";"));
       }
 
       BSTR bsConnection = sConnectionString.AllocSysString();
