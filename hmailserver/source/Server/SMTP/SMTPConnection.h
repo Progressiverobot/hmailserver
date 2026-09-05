@@ -275,6 +275,7 @@ namespace HM
       bool GetDoSpamProtection_();
 
       bool GetIsLocalSender_();
+      bool ArchiveScopeIncludesMessage_();
 
       bool GetAuthIsEnabled_();
 

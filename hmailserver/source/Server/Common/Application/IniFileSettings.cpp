@@ -77,6 +77,7 @@ namespace HM
       blocked_iphold_seconds_(0),
       smtpdmax_size_drop_(0),
       backup_messages_dbonly_(false),
+      backup_verify_restore_(true),
       add_xauth_user_ip_(false),
       use_dns_cache_(true),
       // The Windows event log sink's two settings are read on the ERROR path,
@@ -303,6 +304,19 @@ namespace HM
       if (archive_dir_.Right(1) == _T("\\"))
          archive_dir_ = archive_dir_.Left(archive_dir_.GetLength() -1);
       archive_hardlinks_ =  ReadIniSettingInteger_("Settings", "ArchiveHardLinks", 0) == 1;
+
+      // Comma-separated, case-insensitive, whitespace tolerated. Kept lower-cased
+      // so that IsArchiveDomain is one lookup.
+      archive_domains_.clear();
+      std::vector<String> archiveDomains = StringParser::SplitString(ReadIniSettingString_("Settings", "ArchiveDomains", ""), ",");
+      for (size_t i = 0; i < archiveDomains.size(); i++)
+      {
+         String domain = archiveDomains[i];
+         domain.Trim();
+
+         if (!domain.IsEmpty())
+            archive_domains_.insert(domain.ToLower());
+      }
       pop3dmin_timeout_ =  ReadIniSettingInteger_("Settings", "POP3DMinTimeout", 10);
       pop3dmax_timeout_ =  ReadIniSettingInteger_("Settings", "POP3DMaxTimeout",600);
       pop3cmin_timeout_ =  ReadIniSettingInteger_("Settings", "POP3CMinTimeout", 30);
@@ -453,6 +467,7 @@ namespace HM
       blocked_iphold_seconds_ =  ReadIniSettingInteger_("Settings", "BlockedIPHoldSeconds",0);
       smtpdmax_size_drop_ =  ReadIniSettingInteger_("Settings", "SMTPDMaxSizeDrop",0);
       backup_messages_dbonly_ =  ReadIniSettingInteger_("Settings", "BackupMessagesDBOnly",0) == 1;
+      backup_verify_restore_ = ReadIniSettingInteger_("Settings", "BackupVerifyRestore", 1) == 1;
       add_xauth_user_ip_ =  ReadIniSettingInteger_("Settings", "AddXAuthUserIP",1) == 1;
       add_xoriginal_rcpt_to_header_ = ReadIniSettingInteger_("Settings", "AddXOriginalRcptTo", 0) == 1;
       use_dns_cache_ = ReadIniSettingInteger_("Settings", "UseDNSCache", 1) == 1;
@@ -1360,5 +1375,18 @@ namespace HM
       }
 
       return authDisabledOnPorts;
+   }
+
+   bool
+   IniFileSettings::IsArchiveDomain(const String &domain) const
+   {
+      if (archive_domains_.empty())
+         return true;
+
+      String lowered = domain;
+      lowered.Trim();
+      lowered.ToLower();
+
+      return archive_domains_.find(lowered) != archive_domains_.end();
    }
 }
