@@ -366,7 +366,16 @@ namespace hMailServer.ControlPanel.Services
                Page("queue", "Delivery queue",
                   "Messages still waiting to be delivered, why each is waiting, and when it will be retried.",
                   aliases: "Spool|Stuck mail|Pending mail|Outbound queue|Retry|Not delivered|Backlog",
-                  seeAlso: "logs|delivery|status"),
+                  seeAlso: "logs|delivery|status|stalledmail"),
+
+               // The guide to mail that stops moving on a healthy-looking server,
+               // as a page with a button beside each step. The queue shows that a
+               // message is waiting; this is what to do when the reason is not on
+               // the queue page - which is the case the guide was written for.
+               Page("stalledmail", "Diagnosing stalled mail",
+                  "Mail is not moving and nothing has crashed: which half has stalled, the log lines that name the cause, and the setting that bounds each stage.",
+                  aliases: "Stalled mail|Slow mail|Mail is stalled|Timed out while sending end of data|Accepted but never delivered|Hung|Wedged|Stall diagnosis|Diagnosing slow mail",
+                  seeAlso: "queue|logs|diagnostics"),
 
                // Next to the queue on purpose: the two answer the same question at
                // different moments. The queue says where a message is now; the trace

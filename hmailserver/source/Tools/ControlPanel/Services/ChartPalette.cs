@@ -246,17 +246,17 @@ namespace hMailServer.ControlPanel.Services
          ShapeMark.Cross
       };
 
-      // Same hues as the ThemeTokens status palette, so a green line and a green
+      // The status hues come from StatusPalette, so a green line and a green
       // "success" label are the same green. Each of these clears 4.5:1 against a
       // white surface; each of the dark set clears it against #1B1B1B.
       private static readonly uint[] LightSeriesColors =
       {
-         0xFF2F6FE0, 0xFF1A7F37, 0xFF6639BA, 0xFF9A6700, 0xFFCF222E
+         0xFF2F6FE0, StatusPalette.LightSuccess, 0xFF6639BA, StatusPalette.LightWarning, StatusPalette.LightDanger
       };
 
       private static readonly uint[] DarkSeriesColors =
       {
-         0xFF4C8DFF, 0xFF3FB950, 0xFFA371F7, 0xFFD29922, 0xFFF85149
+         0xFF4C8DFF, StatusPalette.DarkSuccess, 0xFFA371F7, StatusPalette.DarkWarning, StatusPalette.DarkDanger
       };
 
       /// <summary>
