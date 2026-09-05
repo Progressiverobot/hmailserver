@@ -67,11 +67,16 @@ jobs:
         with:
           results_file: scorecard-results.sarif
           results_format: sarif
-          # publish_results uploads to the public OpenSSF API so the score can be
-          # shown as a badge. Left off deliberately: this is a mail server fork
-          # and there is no reason to publish repository telemetry to a third
-          # party to get a number we can read ourselves in code scanning.
-          publish_results: false
+          # publish_results uploads the result to the public OpenSSF API, which is
+          # what the README's badge and the scorecard.dev viewer read: without it
+          # the viewer answers "project not found" and the badge is a grey
+          # "unknown". Nothing leaves that is not already public - Scorecard
+          # reads the repository through GitHub's API, and the API only accepts
+          # the upload from a run on the default branch of a workflow it has
+          # verified (one job on ubuntu-latest, these four steps, read-only
+          # permissions plus id-token and security-events), so this job has to
+          # keep that shape.
+          publish_results: true
 
       - name: Upload SARIF to code scanning
         uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
