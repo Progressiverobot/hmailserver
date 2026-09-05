@@ -327,7 +327,7 @@ namespace HM
 
          if (vecResult.size() != 2)
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
          
@@ -337,19 +337,19 @@ namespace HM
 
          if ((*iterFirst)->sPersonalName != _T("Test2 Testar"))
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
 
          if ((*iterFirst)->sMailboxName != _T("testa"))
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
 
          if ((*iterFirst)->sDomainName != _T("testy.com"))
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
 
@@ -367,7 +367,7 @@ namespace HM
 
          if (vecResult.size() != 2)
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
          
@@ -377,19 +377,19 @@ namespace HM
 
          if ((*iterFirst)->sPersonalName != _T("Test2 Testar"))
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
 
          if ((*iterFirst)->sMailboxName != _T("testa"))
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
 
          if ((*iterFirst)->sDomainName != _T("testy.com"))
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
 
@@ -407,7 +407,7 @@ namespace HM
 
          if (vecResult.size() != 2)
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
          
@@ -416,19 +416,19 @@ namespace HM
 
          if ((*iterFirst)->sPersonalName != _T("Martin Knafve"))
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
 
          if ((*iterFirst)->sMailboxName != _T("martin"))
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
 
          if ((*iterFirst)->sDomainName != _T("example.test"))
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
 
@@ -436,19 +436,19 @@ namespace HM
 
          if ((*iterFirst)->sPersonalName != _T("Test2 Testar"))
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
 
          if ((*iterFirst)->sMailboxName != _T("testa"))
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
 
          if ((*iterFirst)->sDomainName != _T("testy.com"))
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
 
@@ -466,7 +466,7 @@ namespace HM
 
          if (vecResult.size() != 2)
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
          
@@ -475,19 +475,19 @@ namespace HM
 
          if ((*iterFirst)->sPersonalName != _T("MartinKnafve"))
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
 
          if ((*iterFirst)->sMailboxName != _T("martin"))
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
 
          if ((*iterFirst)->sDomainName != _T("example.test"))
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
 
@@ -495,19 +495,19 @@ namespace HM
 
          if ((*iterFirst)->sPersonalName != _T("EyyAo"))
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
 
          if ((*iterFirst)->sMailboxName != _T("testa"))
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
 
          if ((*iterFirst)->sDomainName != _T("testy.com"))
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
 
@@ -522,7 +522,7 @@ namespace HM
          std::vector<std::shared_ptr<Address> > vecResult = pParser->ParseList(sTestStr);
          if (vecResult.size() != 1)
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
          
@@ -548,7 +548,7 @@ namespace HM
 
          if (vecResult.size() != 5)
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
          
@@ -562,19 +562,19 @@ namespace HM
 
          if ((*iterFirst)->sPersonalName != _T("Kalle"))
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
 
          if ((*iterFirst)->sMailboxName != _T(""))
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
 
          if ((*iterFirst)->sDomainName != _T(""))
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
 
@@ -593,7 +593,7 @@ namespace HM
 
       if (vecResult.size() != 1)
       {
-         assert(0);
+         HM_ASSERT(0);
          throw;
       }
 
@@ -601,19 +601,19 @@ namespace HM
 
       if ((*iterFirst)->sPersonalName != sFullname)
       {
-         assert(0);
+         HM_ASSERT(0);
          throw;
       }
 
       if ((*iterFirst)->sMailboxName != sUser)
       {
-         assert(0);
+         HM_ASSERT(0);
          throw;
       }
 
       if ((*iterFirst)->sDomainName != sDomain)
       {
-         assert(0);
+         HM_ASSERT(0);
          throw;
       }
 

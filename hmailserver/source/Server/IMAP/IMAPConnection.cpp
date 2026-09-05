@@ -913,7 +913,7 @@ namespace HM
    {
       if (!GetIsIdling())
       {
-         assert(0);
+         HM_ASSERT(0);
          return;
       }
 

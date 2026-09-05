@@ -121,3 +121,47 @@ STDMETHODIMP InterfaceDiagnostics::put_TestDomainName(BSTR newVal)
    }
 }
 
+
+STDMETHODIMP InterfaceDiagnostics::get_AssertionsEnabled(VARIANT_BOOL *pVal)
+{
+   try
+   {
+      // Readable without authenticating: it says which kind of binary this is,
+      // not anything about its data, and the regression suite reads it to know
+      // what TriggerAssertion below must be expected to do.
+#if defined(HM_KEEP_ASSERTIONS)
+      *pVal = VARIANT_TRUE;
+#else
+      *pVal = VARIANT_FALSE;
+#endif
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceDiagnostics::TriggerAssertion()
+{
+   try
+   {
+      if (!authentication_)
+         return GetAccessDenied();
+
+      if (!authentication_->GetIsServerAdmin())
+         return authentication_->GetAccessDenied();
+
+      // Only the reporting build does anything here. In Debug HM_ASSERT is the
+      // CRT assert, which would abort the server, and that is not a diagnostic
+      // anybody asks for over COM.
+#if defined(HM_KEEP_ASSERTIONS)
+      HM_ASSERT(false && "Diagnostics.TriggerAssertion: an assertion failed on purpose");
+#endif
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}

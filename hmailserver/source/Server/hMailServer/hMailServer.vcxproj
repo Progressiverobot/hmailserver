@@ -186,6 +186,14 @@ EXIT 0
       <Command>call "$(ProjectDir)post-build.bat" "$(hMailServerLibs)" "$(OutDir)" "$(TargetPath)" "$(IntDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
+  <!-- build.ps1 -Asserts: a Release build that keeps its assertions, reported through
+       ErrorManager instead of compiled out (StdAfx.h HM_ASSERT). The dynamic-analysis
+       build for the pre-release suite run and the fuzz hunt; never the binary that ships. -->
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64' and '$(KeepAssertions)'=='true'">
+    <ClCompile>
+      <PreprocessorDefinitions>HM_KEEP_ASSERTIONS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\Common\AntiSpam\AntiSpamConfiguration.cpp" />
     <ClCompile Include="..\Common\AntiSpam\DKIM\Canonicalization.cpp" />

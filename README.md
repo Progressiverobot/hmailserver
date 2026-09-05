@@ -10,7 +10,7 @@ This repository is a maintained fork of the original project, which is no longer
 
 **[Download the latest release](https://github.com/Progressiverobot/hmailserver/releases/latest)** — a single `hMailServer-x.y.z-x64.exe` installer. Upgrading in place preserves your configuration and mail; the database upgrade chain is continuous from every earlier hMailServer version.
 
-Every release is validated by the full regression suite before it ships — the complete suite, run against the exact binary being released, with live SpamAssassin and ClamAV (real EICAR detection), DMARC evaluated against live DNS, and TLS 1.2/1.3 handshakes end to end. Nothing is skipped or mocked.
+Every release is validated by the full regression suite before it ships — the complete suite, run against the exact binary being released, with live SpamAssassin and ClamAV (real EICAR detection), DMARC evaluated against live DNS, and TLS 1.2/1.3 handshakes end to end. Nothing is skipped or mocked. Before that run, the same suite runs once more on a build that keeps every internal assertion and reports a violated one to the ERROR log (`build\build.ps1 -Configuration Release -Asserts`), so the invariants the shipped binary compiles out are still exercised by every test.
 
 **What changed in each version** is on the [Releases page](https://github.com/Progressiverobot/hmailserver/releases). What is planned next, and what is deliberately not, is in [Roadmap.md](Roadmap.md). The release process itself is documented in [RELEASE.md](RELEASE.md), and the codebase map is in [ARCHITECTURE.md](ARCHITECTURE.md).
 
@@ -288,6 +288,7 @@ The repository contains build scripts which locate the prerequisites automatical
 
    <pre>
    powershell.exe -NoProfile -ExecutionPolicy Bypass -File build\build.ps1        # builds hMailServer.exe
+   powershell.exe -NoProfile -ExecutionPolicy Bypass -File build\build.ps1 -Configuration Release -Asserts   # the dynamic-analysis build: assertions kept, reported as HM6364, never shipped
    powershell.exe -NoProfile -ExecutionPolicy Bypass -File build\post-build.ps1   # copies DLLs, registers the COM server (elevates via UAC)
    powershell.exe -NoProfile -ExecutionPolicy Bypass -File build\build-tests.ps1  # builds the regression test solution
    powershell.exe -NoProfile -ExecutionPolicy Bypass -File build\run-tests.ps1    # runs the regression tests

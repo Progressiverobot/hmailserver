@@ -34,7 +34,7 @@ namespace HM
    {
       if (pRecipient->GetID() == 0)
       {
-         assert(0);
+         HM_ASSERT(0);
          return false;
       }
 

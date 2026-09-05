@@ -32,7 +32,7 @@ using namespace std;
 #if !defined(ASSERT)
 #if defined(_DEBUG)
 	#include <assert.h>
-	#define ASSERT(exp)	assert(exp)
+	#define ASSERT(exp)	HM_ASSERT(exp)
 #else
 	#define ASSERT(exp)	((void)0)
 #endif

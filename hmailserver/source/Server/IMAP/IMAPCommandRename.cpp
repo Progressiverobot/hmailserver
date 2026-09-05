@@ -147,7 +147,7 @@ namespace HM
          if (bDestinationIsPublic)
          {
             // We are not allowed to add new root folders.
-            assert(0);
+            HM_ASSERT(0);
          }
          else
          {

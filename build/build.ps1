@@ -3,7 +3,11 @@
 
 Param(
 	[string]$Configuration = 'Debug',
-	[switch]$Clean
+	[switch]$Clean,
+	# Keep the server's assertions in a Release build, reported through the ERROR log
+	# (HM6364) rather than compiled out. The dynamic-analysis build: run the full suite
+	# on it before a release and expect no HM6364 line. Never the binary that ships.
+	[switch]$Asserts
 )
 
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Definition
@@ -45,13 +49,24 @@ $msbuildArgs = @(
 	'/p:PostBuildEventUseInBuild=false'
 )
 
+$logSuffix = ''
+if ($Asserts) {
+	if ($Configuration -ne 'Release') {
+		Write-Error "-Asserts applies to the Release configuration (Debug keeps its assertions already)."
+		exit 3
+	}
+	$msbuildArgs += '/p:KeepAssertions=true'
+	$logSuffix = '-asserts'
+	Write-Host 'Assertions are KEPT in this Release build (-Asserts): a violated HM_ASSERT is reported as HM6364 in the ERROR log. This is the dynamic-analysis build, not the one that ships.' -ForegroundColor Yellow
+}
+
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
 
 # $logsDir was created above and nothing was ever written to it. A server build
 # emits warnings worth grepping after the fact, and a failure worth reading once
 # the console has scrolled, so the output goes to a file as well as the terminal.
 # $LASTEXITCODE still carries MSBuild's own exit code through the pipeline.
-$msbuildLog = Join-Path $logsDir "build-$Configuration.log"
+$msbuildLog = Join-Path $logsDir "build-$Configuration$logSuffix.log"
 
 & "$msbuild" @msbuildArgs *>&1 | Tee-Object -FilePath $msbuildLog
 

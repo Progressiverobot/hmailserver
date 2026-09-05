@@ -249,7 +249,7 @@ namespace HM
       }
 
       // What state are we in?
-      assert(0);
+      HM_ASSERT(0);
       return INVALID;
    }
 
@@ -409,7 +409,7 @@ namespace HM
             EnqueueWrite_("-ERR Invalid command in current state." );
             return ResultNormalResponse;  
          default:
-            assert(0); // What command is this?
+            HM_ASSERT(0); // What command is this?
             EnqueueWrite_("-ERR Invalid command in current state." );
             return ResultNormalResponse;  
       }

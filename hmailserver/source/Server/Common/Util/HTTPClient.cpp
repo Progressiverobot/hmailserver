@@ -139,7 +139,7 @@ namespace HM
       {
          // Something failed. Maybe the network was not available, or the server
          // was down. Since this is a very non-critical task, we continue silently.
-         assert(0);
+         HM_ASSERT(0);
          return false;
       }
    }

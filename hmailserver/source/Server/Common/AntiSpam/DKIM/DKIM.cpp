@@ -424,7 +424,7 @@ namespace HM
          {
             if (!Verify(message))
             {
-               assert(0);
+               HM_ASSERT(0);
             }
          }
       */

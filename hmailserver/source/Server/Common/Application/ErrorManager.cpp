@@ -437,4 +437,26 @@ namespace HM
    }
 
 
+   void
+   AssertionFailed(const char *expression, const char *file, int line)
+   {
+      // The Release-with-assertions build (StdAfx.h HM_ASSERT, build.ps1 -Asserts)
+      // lands here for every violated assertion. Reported, not aborted - see the
+      // note in StdAfx.h - and guarded against itself: an assertion inside the
+      // reporting path would otherwise recurse without end.
+      static thread_local bool reporting = false;
+      if (reporting)
+         return;
+
+      reporting = true;
+
+      String message;
+      message.Format(_T("Assertion failed: %hs (%hs, line %d). This binary keeps its assertions (build.ps1 -Asserts); the server carried on past this one."),
+         expression ? expression : "", file ? file : "", line);
+
+      ErrorManager::Instance()->ReportError(ErrorManager::Critical, 6364, "HM_ASSERT", message);
+
+      reporting = false;
+   }
+
 }

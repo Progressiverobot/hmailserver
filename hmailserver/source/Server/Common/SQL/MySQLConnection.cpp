@@ -322,7 +322,7 @@ namespace HM
             return DALUnknown;
          }
 
-         assert(0); // Should never get here
+         HM_ASSERT(0); // Should never get here
          return DALSuccess;
       }
       catch (...)

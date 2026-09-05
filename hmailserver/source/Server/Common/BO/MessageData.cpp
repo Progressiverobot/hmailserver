@@ -567,7 +567,7 @@ namespace HM
       // Create the brand new part...
       if (sContentType.CompareNoCase(_T("text/plain")) == 0)
       {
-         assert (textPart == 0);
+         HM_ASSERT(textPart == 0);
 
          if (setAttachments.size() == 0 && !htmlPart)
          {
@@ -593,7 +593,7 @@ namespace HM
       }
       else if (sContentType.CompareNoCase(_T("text/html")) == 0)
       {
-         assert (htmlPart == 0);
+         HM_ASSERT(htmlPart == 0);
 
          if (setAttachments.size() == 0 && !textPart)
          {

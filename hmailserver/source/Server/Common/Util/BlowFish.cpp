@@ -351,17 +351,17 @@ namespace HM
    {
       BlowFishEncryptor * pBL = new BlowFishEncryptor();
       if (pBL->DecryptFromString(pBL->EncryptToString(_T("Hejsan"))).CompareNoCase(_T("Hejsan")) != 0)
-         assert(0);
+         HM_ASSERT(0);
 
       if (pBL->DecryptFromString(pBL->EncryptToString(_T("dcidjea"))).CompareNoCase(_T("dcidjea")) != 0)
-         assert(0);
+         HM_ASSERT(0);
 
       for (int i = 0; i < 10; i++)
       {
          String sPassword = PasswordGenerator::Generate();
          if (pBL->DecryptFromString(pBL->EncryptToString(sPassword)).CompareNoCase(sPassword) != 0)
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
       }

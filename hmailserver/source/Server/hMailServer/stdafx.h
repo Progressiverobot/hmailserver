@@ -93,6 +93,46 @@
 #endif
 
 
+// Assertions in the server: HM_ASSERT, in three modes.
+//
+//   Debug                         the CRT assert, as it always was.
+//   Release                       nothing - the shipped binary keeps no assertion,
+//                                 as it never has.
+//   Release + HM_KEEP_ASSERTIONS  (build.ps1 -Asserts) a violated assertion is
+//                                 reported through ErrorManager as Critical
+//                                 HM6364 naming the expression, file and line,
+//                                 and execution continues.
+//
+// Reported rather than aborted, on purpose: a full regression run on that build
+// then attributes every violation to the test that provoked it - the ERROR log
+// is checked before each test - instead of ending at the first one, and a
+// service with no console never sits behind an assertion dialog. That build is
+// the dynamic-analysis build; it is never the one that ships.
+//
+// A macro of our own rather than a redefined assert, because <cassert> is
+// designed to be included any number of times and redefines assert on every
+// inclusion according to NDEBUG: a redefinition placed here would be undone by
+// the next Boost header that pulls it in. Nothing later can undo HM_ASSERT.
+// The uppercase ASSERT the MIME and string sources use is the same thing
+// under its older name.
+namespace HM
+{
+   void AssertionFailed(const char *expression, const char *file, int line);
+}
+
+#if defined(HM_KEEP_ASSERTIONS)
+   #define HM_ASSERT(expression) ((expression) ? (void) 0 : HM::AssertionFailed(#expression, __FILE__, __LINE__))
+#elif defined(_DEBUG)
+   #include <assert.h>
+   #define HM_ASSERT(expression) assert(expression)
+#else
+   #define HM_ASSERT(expression) ((void) 0)
+#endif
+
+#ifndef ASSERT
+   #define ASSERT(expression) HM_ASSERT(expression)
+#endif
+
 // Start: Common files
    #include "..\Common\Util\StdString.h"
 

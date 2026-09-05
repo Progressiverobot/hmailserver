@@ -60,6 +60,9 @@ public:
    STDMETHOD(get_TestDomainName)(/*[out, retval]*/ BSTR *pVal);
    STDMETHOD(put_TestDomainName)(/*[in]*/ BSTR newVal);
 
+   STDMETHOD(get_AssertionsEnabled)(/*[out, retval]*/ VARIANT_BOOL *pVal);
+   STDMETHOD(TriggerAssertion)();
+
    HM::Diagnostic diagnostics_;
 };
 

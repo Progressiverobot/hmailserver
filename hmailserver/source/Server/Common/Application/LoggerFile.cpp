@@ -75,7 +75,7 @@ HIS_LoggerFile::WriteData_(HIS_String sFilename, HIS_String sData)
 
    if (handleFile == INVALID_HANDLE_VALUE) 
    { 
-      assert(0);
+      HM_ASSERT(0);
    } 
    
    int iErrNo = GetLastError() ;

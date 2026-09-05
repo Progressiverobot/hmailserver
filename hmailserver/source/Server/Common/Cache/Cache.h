@@ -364,7 +364,7 @@ namespace HM
 #ifdef DEBUG
       if (pObject->GetID() == 0)
       {
-         assert(0);
+         HM_ASSERT(0);
       }
 #endif
 

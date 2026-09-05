@@ -126,7 +126,7 @@ namespace HM
             result = "False";
          break;
       default:
-         assert(0);
+         HM_ASSERT(0);
       }
 
       return result;

@@ -1367,7 +1367,7 @@ namespace HM
    void 
    POP3ClientConnection::ParseMessageHeaders_()
    {
-      assert(current_message_);
+      HM_ASSERT(current_message_);
 
       String fileName = PersistentMessage::GetFileName(current_message_);
 

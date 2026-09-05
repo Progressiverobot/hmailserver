@@ -90,7 +90,7 @@ namespace HM
          }
       default:
          {
-            assert(0);
+            HM_ASSERT(0);
          }
       }
 
@@ -137,7 +137,7 @@ namespace HM
          }
       default:
          {
-            assert(0);
+            HM_ASSERT(0);
          }
       }
 
@@ -219,7 +219,7 @@ namespace HM
             }
             break;
          default:
-            assert(0);
+            HM_ASSERT(0);
       }
       
       return "";

@@ -32,7 +32,7 @@ namespace HM
 
       if ( !SUCCEEDED( hr ) )
       {
-         assert(0);
+         HM_ASSERT(0);
       }  
 
       bConnected = false;
@@ -70,7 +70,7 @@ namespace HM
       }
       catch ( ... )
       {
-         assert(0);
+         HM_ASSERT(0);
       }
 
       bConnected = false;
@@ -112,7 +112,7 @@ namespace HM
 
       if (bConnected)
       {
-         assert(0); // --- Already connected!
+         HM_ASSERT(0); // --- Already connected!
          return Connected;
       }
 

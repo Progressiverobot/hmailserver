@@ -607,7 +607,7 @@ inline const Type& SSMAX(const Type& arg1, const Type& arg2)
 
 		#ifndef ASSERT
 			#include <assert.h>
-			#define ASSERT(f) assert((f))
+			#define ASSERT(f) HM_ASSERT((f))
 		#endif
 		#ifndef VERIFY
 			#ifdef _DEBUG

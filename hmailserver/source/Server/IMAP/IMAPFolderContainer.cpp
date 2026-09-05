@@ -132,7 +132,7 @@ namespace HM
          std::shared_ptr<IMAPFolder> folder = GetPublicFolders()->GetItemByDBIDRecursive(folderID);
          if (!folder)
          {
-            assert(0);
+            HM_ASSERT(0);
             return;
          }
 
@@ -151,7 +151,7 @@ namespace HM
          std::shared_ptr<IMAPFolder> folder = (*iter).second->GetItemByDBIDRecursive(folderID);
          if (!folder)
          {
-            assert(0);
+            HM_ASSERT(0);
             return;
          }
 
@@ -168,7 +168,7 @@ namespace HM
          std::shared_ptr<IMAPFolder> folder = GetPublicFolders()->GetItemByDBIDRecursive(folderID);
          if (!folder)
          {
-            assert(0);
+            HM_ASSERT(0);
             return;
          }
 
@@ -186,7 +186,7 @@ namespace HM
          std::shared_ptr<IMAPFolder> folder = (*iter).second->GetItemByDBIDRecursive(folderID);
          if (!folder)
          {
-            assert(0);
+            HM_ASSERT(0);
             return;
          }
 

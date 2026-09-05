@@ -53,8 +53,8 @@ namespace HM
    void
    IMAPNotificationClient::SubscribeMessageChanges(__int64 accountID, __int64 folderID)
    {
-      assert(accountID >= 0);
-      assert(folderID > 0);
+      HM_ASSERT(accountID >= 0);
+      HM_ASSERT(folderID > 0);
 
       account_id_ = accountID;
       folder_id_ = folderID;
@@ -66,9 +66,9 @@ namespace HM
    void
    IMAPNotificationClient::UnsubscribeMessageChanges()
    {
-      assert(account_id_ >= 0);
-      assert(folder_id_ > 0);
-      assert(message_change_subscription_id_ > 0);
+      HM_ASSERT(account_id_ >= 0);
+      HM_ASSERT(folder_id_ > 0);
+      HM_ASSERT(message_change_subscription_id_ > 0);
 
       // Since we don't want to look at he folder any more,
       // we're not interested in any updates.

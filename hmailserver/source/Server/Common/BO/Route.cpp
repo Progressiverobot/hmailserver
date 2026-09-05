@@ -40,7 +40,7 @@ namespace HM
    {
        if (!addresses_)
        {
-          assert(id_);
+          HM_ASSERT(id_);
           addresses_ = std::shared_ptr<RouteAddresses>(new RouteAddresses(id_));
 
           addresses_->Refresh();

@@ -3200,6 +3200,8 @@ interface IInterfaceDiagnostics : IDispatch
    [propput, id(2), helpstring("Gets or sets the local domain name to perform tests on.")] HRESULT LocalDomainName([in] BSTR newVal);
    [propget, id(3), helpstring("Gets or sets the test domain name to perform tests on.")] HRESULT TestDomainName([out, retval] BSTR *pVal);
    [propput, id(3), helpstring("Gets or sets the test domain name to perform tests on.")] HRESULT TestDomainName([in] BSTR newVal);
+   [propget, id(4), helpstring("True when this server binary keeps its assertions and reports a violated one as HM6364 (a Release build made with build.ps1 -Asserts). The shipped binary answers false.")] HRESULT AssertionsEnabled([out, retval] VARIANT_BOOL *pVal);
+   [id(5), helpstring("Fails one assertion on purpose so the reporting path can be exercised: on a build that keeps assertions it writes HM6364 to the ERROR log and returns; on the shipped binary it does nothing. Server administrators only.")] HRESULT TriggerAssertion();
 
 };
 
