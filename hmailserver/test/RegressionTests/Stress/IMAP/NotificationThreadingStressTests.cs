@@ -5,6 +5,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Text;
 using System.Threading;
 using NUnit.Framework;
 using RegressionTests.Infrastructure;
@@ -213,7 +214,7 @@ namespace RegressionTests.Stress.IMAP
 
             simulator.Disconnect();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             Record(failures, "Idler aborted: " + ex.Message);
          }
@@ -247,7 +248,7 @@ namespace RegressionTests.Stress.IMAP
 
             simulator.Disconnect();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             Record(failures, "Churner aborted: " + ex.Message);
          }
@@ -285,7 +286,7 @@ namespace RegressionTests.Stress.IMAP
 
             simulator.Disconnect();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             Record(failures, "Notifier aborted: " + ex.Message);
          }
@@ -305,7 +306,7 @@ namespace RegressionTests.Stress.IMAP
                Interlocked.Increment(ref state.Deliveries);
             }
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             Record(failures, "Delivery aborted: " + ex.Message);
          }
@@ -330,14 +331,14 @@ namespace RegressionTests.Stress.IMAP
       private static string ReceiveUntil(ImapClientSimulator simulator, string text, TimeSpan timeout)
       {
          var deadline = DateTime.UtcNow + timeout;
-         var result = string.Empty;
+         var result = new StringBuilder();
 
          while (DateTime.UtcNow < deadline)
          {
-            result += simulator.Receive();
+            result.Append(simulator.Receive());
 
-            if (result.Contains(text))
-               return result;
+            if (result.ToString().Contains(text))
+               return result.ToString();
          }
 
          throw new TimeoutException("Timeout while waiting for: " + text);
