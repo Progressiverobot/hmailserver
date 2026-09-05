@@ -14,6 +14,9 @@
 
 
 #include <boost/atomic.hpp>
+#include <boost/asio/strand.hpp>
+#include <boost/asio/bind_executor.hpp>
+#include <boost/asio/dispatch.hpp>
 
 using boost::asio::ip::tcp;
 
@@ -241,6 +244,11 @@ namespace HM
 
       void ProcessOperationQueue_(int recurse_level);
 
+      // Runs ProcessOperationQueue_ inside strand_: inline when the caller is already
+      // in it (a completion handler), queued to an I/O thread otherwise (a notifying
+      // thread, a timer of another connection, the COM thread).
+      void DispatchOperationQueue_();
+
       void Disconnect();
       void Shutdown(boost::asio::socket_base::shutdown_type);
       
@@ -277,6 +285,19 @@ namespace HM
       void ReportError(ErrorManager::eSeverity sev, int code, const String &context, const String &message, const boost::system::system_error &error);
       void ReportError(ErrorManager::eSeverity sev, int code, const String &context, const String &message, const boost::system::error_code &error);
       void ReportError(ErrorManager::eSeverity sev, int code, const String &context, const String &message);
+
+      // Every asynchronous operation on the two sockets and the two timers is
+      // initiated and completed inside this strand. Boost's rule for ssl::stream is
+      // exactly that ("all asynchronous operations are performed within the same
+      // implicit or explicit strand"), and until 5 September 2026 nothing here
+      // honoured it: a write initiated from another thread - an IMAP notification
+      // delivered to an idling session - could drive the SSL engine while this
+      // connection's own read was mid-decrypt on an I/O thread, which corrupts it.
+      // Completions are bound to the strand (bind_executor), so the composed
+      // operations' internal steps run in it too; initiations from outside go
+      // through DispatchOperationQueue_. Declared before the sockets: it is built
+      // from the same io_context and must outlive nothing they do.
+      boost::asio::strand<boost::asio::io_context::executor_type> strand_;
 
       boost::asio::ip::tcp::socket socket_;
       ssl_socket ssl_socket_;

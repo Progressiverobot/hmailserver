@@ -47,6 +47,7 @@ namespace HM
                                 std::shared_ptr<Event> disconnected,
                                 AnsiString expected_remote_hostname) :
       connection_security_(connection_security),
+      strand_(boost::asio::make_strand(io_context)),
       socket_(io_context),
       ssl_socket_(socket_, context),
       resolver_(io_context),
@@ -199,7 +200,8 @@ namespace HM
       // Attempt a connection to the first endpoint in the list. Each endpoint
       // will be tried until we successfully establish a connection.
       socket_.async_connect(ep,
-               std::bind(&TCPConnection::AsyncConnectCompleted, shared_from_this(), std::placeholders::_1));
+               boost::asio::bind_executor(strand_,
+                  std::bind(&TCPConnection::AsyncConnectCompleted, shared_from_this(), std::placeholders::_1)));
 
       return true;
    }
@@ -278,8 +280,9 @@ namespace HM
       // never consume beyond it.
       boost::asio::async_read(socket_, boost::asio::buffer(proxy_read_chunk_),
          boost::asio::transfer_exactly(bytesNeeded),
-         std::bind(&TCPConnection::AsyncProxyHeaderReadCompleted, shared_from_this(),
-            std::placeholders::_1, std::placeholders::_2));
+         boost::asio::bind_executor(strand_,
+            std::bind(&TCPConnection::AsyncProxyHeaderReadCompleted, shared_from_this(),
+               std::placeholders::_1, std::placeholders::_2)));
    }
 
    void
@@ -473,7 +476,18 @@ namespace HM
    }
    
 
-   void 
+   void
+   TCPConnection::DispatchOperationQueue_()
+   {
+      // dispatch, not post: a caller that is already inside the strand - every
+      // completion handler - runs the queue at once, as it always has; a caller
+      // outside it is queued behind whatever this connection is doing, which is
+      // what makes a foreign thread's write safe on a TLS stream. The shared_ptr
+      // keeps the connection alive until the queued call has run.
+      boost::asio::dispatch(strand_, std::bind(&TCPConnection::ProcessOperationQueue_, shared_from_this(), 0));
+   }
+
+   void
    TCPConnection::Shutdown(boost::asio::socket_base::shutdown_type what)
    {
       boost::system::error_code ignored_error;
@@ -496,7 +510,7 @@ namespace HM
       std::shared_ptr<IOOperation> operation = std::shared_ptr<IOOperation>(new IOOperation(IOOperation::BCTDisconnect, pBuf));
       operation_queue_.Push(operation);
 
-      ProcessOperationQueue_(0);
+      DispatchOperationQueue_();
    }
 
 
@@ -530,7 +544,7 @@ namespace HM
       std::shared_ptr<IOOperation> operation = std::shared_ptr<IOOperation>(new IOOperation(IOOperation::BCTHandshake, pBuf));
       operation_queue_.Push(operation);
 
-      ProcessOperationQueue_(0);
+      DispatchOperationQueue_();
    }
 
 
@@ -667,8 +681,9 @@ namespace HM
       boost::asio::ssl::stream_base::server;
 
       ssl_socket_.async_handshake(handshakeType,
-         std::bind(&TCPConnection::AsyncHandshakeCompleted, shared_from_this(),
-         std::placeholders::_1));
+         boost::asio::bind_executor(strand_,
+            std::bind(&TCPConnection::AsyncHandshakeCompleted, shared_from_this(),
+               std::placeholders::_1)));
    }
 
 
@@ -817,7 +832,7 @@ namespace HM
       std::shared_ptr<IOOperation> operation = std::shared_ptr<IOOperation>(new IOOperation(IOOperation::BCTShutdownSend, pBuf));
       operation_queue_.Push(operation);
 
-      ProcessOperationQueue_(0);
+      DispatchOperationQueue_();
    }
 
    void 
@@ -834,7 +849,7 @@ namespace HM
       std::shared_ptr<IOOperation> operation = std::shared_ptr<IOOperation>(new IOOperation(IOOperation::BCTRead, delimitor));
       operation_queue_.Push(operation);
 
-      ProcessOperationQueue_(0);
+      DispatchOperationQueue_();
    }
 
    void
@@ -849,7 +864,7 @@ namespace HM
       std::shared_ptr<IOOperation> operation = std::shared_ptr<IOOperation>(new IOOperation(IOOperation::BCTRead, AnsiString()));
       operation_queue_.Push(operation);
 
-      ProcessOperationQueue_(0);
+      DispatchOperationQueue_();
    }
 
    void
@@ -893,10 +908,13 @@ namespace HM
    {
       UpdateAutoLogoutTimer();
 
-      std::function<void (const boost::system::error_code&, size_t)> AsyncReadCompletedFunction =
-         std::bind(&TCPConnection::AsyncReadCompleted, shared_from_this(), 
-         std::placeholders::_1,
-         std::placeholders::_2);
+      // Not a std::function: type erasure would drop the executor binding, and the
+      // completion - and every internal step of the composed read - must run in
+      // the strand.
+      auto AsyncReadCompletedFunction = boost::asio::bind_executor(strand_,
+         std::bind(&TCPConnection::AsyncReadCompleted, shared_from_this(),
+            std::placeholders::_1,
+            std::placeholders::_2));
 
       if (exact_read_target_ > 0)
       {
@@ -1157,7 +1175,7 @@ namespace HM
       std::shared_ptr<IOOperation> operation = std::shared_ptr<IOOperation>(new IOOperation(IOOperation::BCTWrite, pBuffer));
 
       operation_queue_.Push(operation);
-      ProcessOperationQueue_(0);
+      DispatchOperationQueue_();
    }
 
    void 
@@ -1165,10 +1183,10 @@ namespace HM
    {
       UpdateAutoLogoutTimer();
 
-      std::function<void (const boost::system::error_code&, size_t)> AsyncWriteCompletedFunction =
+      auto AsyncWriteCompletedFunction = boost::asio::bind_executor(strand_,
          std::bind(&TCPConnection::AsyncWriteCompleted, shared_from_this(),
-         std::placeholders::_1,
-         std::placeholders::_2);
+            std::placeholders::_1,
+            std::placeholders::_2));
 
       if (is_ssl_)
          boost::asio::async_write
@@ -1459,8 +1477,9 @@ namespace HM
 
       session_ceiling_timer_.expires_after(std::chrono::seconds(session_ceiling_seconds_));
 
-      session_ceiling_timer_.async_wait(std::bind(&TCPConnection::OnSessionCeilingReached,
-         std::weak_ptr<TCPConnection>(shared_from_this()), std::placeholders::_1));
+      session_ceiling_timer_.async_wait(boost::asio::bind_executor(strand_,
+         std::bind(&TCPConnection::OnSessionCeilingReached,
+            std::weak_ptr<TCPConnection>(shared_from_this()), std::placeholders::_1)));
    }
 
    void
@@ -1498,7 +1517,8 @@ namespace HM
       // Put a timeout...
       timer_.expires_after(std::chrono::seconds(timeout_));
 
-      timer_.async_wait(std::bind(&TCPConnection::OnTimeout, std::weak_ptr<TCPConnection>(shared_from_this()), std::placeholders::_1));
+      timer_.async_wait(boost::asio::bind_executor(strand_,
+         std::bind(&TCPConnection::OnTimeout, std::weak_ptr<TCPConnection>(shared_from_this()), std::placeholders::_1)));
    }
 
    void
