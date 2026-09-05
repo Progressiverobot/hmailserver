@@ -35,6 +35,9 @@ namespace HM
       greylisting_expiration_interval_(240),
       preferred_hash_algorithm_(3),
       minimum_accepted_hash_algorithm_(0),
+      password_hash_iterations_(0),
+      password_hash_memory_kib_(0),
+      password_hash_time_cost_(0),
       dnsbl_checks_after_mail_from_(false),
       log_level_(0),
       max_log_line_len_(500),
@@ -203,6 +206,18 @@ namespace HM
       // (see Crypt::EnCrypt/Validate). Empty disables it (no behaviour change). It only
       // affects Argon2id hashes so PBKDF2 stays usable as the SCRAM SaltedPassword.
       password_pepper_ = ReadIniSettingString_("Settings", "PasswordPepper", "");
+
+      // Work factors for new password hashes. 0 is the built-in default: 210,000
+      // PBKDF2 iterations, and 19,456 KiB with 2 passes for Argon2id, the OWASP
+      // recommended minimum. Bounded at both ends because both ends are a failure -
+      // below the floor is a hash an attacker brute-forces at leisure, above the
+      // ceiling is a logon the server cannot afford, since every verification runs on
+      // a connection thread. The ceilings match what ValidatePBKDF2 and
+      // ValidateArgon2id will verify at all. Out of range is reported and read as
+      // the default, the way PreferredHashAlgorithm above is.
+      password_hash_iterations_ = ReadPasswordHashWorkFactor_("PasswordHashIterations", 10000, 10000000);
+      password_hash_memory_kib_ = ReadPasswordHashWorkFactor_("PasswordHashMemoryKB", 4096, 1048576);
+      password_hash_time_cost_ = ReadPasswordHashWorkFactor_("PasswordHashTimeCost", 1, 20);
 
       // OAuth2 bearer-token authentication (SASL XOAUTH2 / OAUTHBEARER). Disabled by
       // default. When enabled, presented JWT bearer tokens are verified locally against
@@ -680,7 +695,27 @@ namespace HM
       DiskSpace::InvalidateCache();
    }
 
-   bool 
+   int
+   IniFileSettings::ReadPasswordHashWorkFactor_(const String &sKey, int minimum, int maximum)
+   {
+      int value = ReadIniSettingInteger_("Settings", sKey, 0);
+
+      if (value == 0)
+         return 0;
+
+      if (value >= minimum && value <= maximum)
+         return value;
+
+      String message;
+      message.Format(_T("%s is set to %d, which is outside the range %d to %d this server will derive a password hash with. Using the built-in default instead. Set it to 0 to choose the default deliberately."),
+                     sKey.c_str(), value, minimum, maximum);
+
+      ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5561, "IniFileSettings::LoadSettings", message);
+
+      return 0;
+   }
+
+   bool
    IniFileSettings::GetDatabaseSettingsExists()
    {
       if (sqldbtype_ == HM::DatabaseSettings::TypeUnknown)

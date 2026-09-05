@@ -21,6 +21,7 @@
 #include "../LDAP/LdapSettings.h"
 #include "../Util/SSPIValidation.h"
 #include "../Util/Crypt.h"
+#include "../Util/Hashing/HashCreator.h"
 #include "../Scripting/Result.h"
 #include "../Scripting/Events.h"
 #include "PasswordHistory.h"
@@ -515,7 +516,18 @@ namespace HM
 
       bool storedIsWeaker = preferredHashAlgorithm > currentEncryption;
 
-      if (!storedIsUnencrypted && !storedIsWeaker)
+      // The same scheme, derived with a lower work factor than the ini asks for now:
+      // a cost raised after the hash was stored. Upward only, like the scheme itself -
+      // a cost LOWERED later leaves stored hashes as they are and applies to new
+      // ones, so an administrator who backs out of an expensive setting is not
+      // rewarded with a rewrite of every password to something weaker. The stored
+      // value is the hash text itself for every hashed scheme; ReadObject re-hashes
+      // only the clear-text case, which the pending flag above accounts for.
+      bool storedIsCheaper = !storedIsUnencrypted && !storedIsWeaker &&
+                             preferredHashAlgorithm == currentEncryption &&
+                             HashCreator::NeedsRehash(AnsiString(pAccount->GetPassword()));
+
+      if (!storedIsUnencrypted && !storedIsWeaker && !storedIsCheaper)
          return currentEncryption;
 
       int storedEncryption = storedIsUnencrypted ? (int) Crypt::ETNone : currentEncryption;
@@ -554,8 +566,12 @@ namespace HM
       }
 
       String sMessage;
-      sMessage.Format(_T("Upgraded the stored password hash for account %s from type %d to type %d."),
-         pAccount->GetAddress().c_str(), storedEncryption, preferredHashAlgorithm);
+      if (storedIsCheaper)
+         sMessage.Format(_T("Re-derived the stored password hash for account %s (type %d) under the configured work factor."),
+            pAccount->GetAddress().c_str(), preferredHashAlgorithm);
+      else
+         sMessage.Format(_T("Upgraded the stored password hash for account %s from type %d to type %d."),
+            pAccount->GetAddress().c_str(), storedEncryption, preferredHashAlgorithm);
       LOG_APPLICATION(sMessage);
 
       return preferredHashAlgorithm;
