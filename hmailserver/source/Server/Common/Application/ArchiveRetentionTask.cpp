@@ -4,6 +4,7 @@
 
 #include "StdAfx.h"
 #include "ArchiveRetentionTask.h"
+#include "../Persistence/PersistentArchiveIndex.h"
 
 #include "IniFileSettings.h"
 
@@ -83,12 +84,21 @@ namespace HM
             if (lastWrite >= cutoff)
                continue;
 
+            // A legal hold is the one thing older than the retention that stays:
+            // the index is asked before the file is touched.
+            const String archivedPath = current.wstring().c_str();
+            if (PersistentArchiveIndex::IsHeld(archivedPath))
+               continue;
+
             boost::filesystem::remove(current, error_code);
 
             if (error_code)
                error_code.clear();
             else
+            {
                deleted++;
+               PersistentArchiveIndex::RemoveByPath(archivedPath);
+            }
          }
 
          return deleted;

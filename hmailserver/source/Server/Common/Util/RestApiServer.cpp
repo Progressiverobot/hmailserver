@@ -31,6 +31,7 @@
 #include "../BO/RuleActions.h"
 #include "../BO/RuleAction.h"
 #include "../Persistence/PersistentSecurityRange.h"
+#include "../Persistence/PersistentArchiveIndex.h"
 #include "../Persistence/PersistentDistributionList.h"
 #include "../Persistence/PersistentDistributionListRecipient.h"
 #include "../Application/ObjectCache.h"
@@ -1663,6 +1664,14 @@ namespace HM
             return HandleBackupStatus_();
          case RouteSettingsGet:
             return HandleSettings_();
+         case RouteArchiveSearch:
+            return HandleArchiveSearch_(caller.domains, route.query);
+         case RouteArchiveGet:
+            return HandleArchiveGet_(caller.domains, route.archive_id);
+         case RouteArchiveHold:
+            return HandleArchiveHold_(caller.domains, route.archive_id, true);
+         case RouteArchiveRelease:
+            return HandleArchiveHold_(caller.domains, route.archive_id, false);
          case RouteOpenApi:
             return HandleOpenApi_();
 
@@ -1986,6 +1995,37 @@ namespace HM
          route.kind = RouteSettingsGet;
          return;
       }
+      const AnsiString archivePath = "/api/v1/archive";
+      if (method == "GET" && path == archivePath)
+      {
+         route.kind = RouteArchiveSearch;
+         return;
+      }
+      if (path.StartsWith(archivePath + "/"))
+      {
+         AnsiString remainder = path.Mid(archivePath.GetLength() + 1);
+         if (remainder.EndsWith("/hold") && (method == "POST" || method == "DELETE"))
+         {
+            AnsiString idPart = remainder.Mid(0, remainder.GetLength() - AnsiString("/hold").GetLength());
+            __int64 archiveId = 0;
+            if (idPart.Find("/") < 0 && ParseQueueId(idPart, archiveId))
+            {
+               route.kind = method == "POST" ? RouteArchiveHold : RouteArchiveRelease;
+               route.archive_id = archiveId;
+               return;
+            }
+         }
+         if (method == "GET" && remainder.Find("/") < 0)
+         {
+            __int64 archiveId = 0;
+            if (ParseQueueId(remainder, archiveId))
+            {
+               route.kind = RouteArchiveGet;
+               route.archive_id = archiveId;
+               return;
+            }
+         }
+      }
       if (method == "GET" && path == "/api/v1/openapi.json")
          route.kind = RouteOpenApi;
    }
@@ -2030,6 +2070,8 @@ namespace HM
       case RouteListCreate:
       case RouteListDelete:
       case RouteBackupStart:
+      case RouteArchiveHold:
+      case RouteArchiveRelease:
          return true;
 
       default:
@@ -4148,6 +4190,69 @@ namespace HM
       return values;
    }
 
+   // ------------------------------------------------------------------------
+   // The archive index (roadmap row 1024). Domain scope is decided here rather
+   // than in Authorize_, because the domain is in the query or in the row:
+   // a domain-restricted key searches one of its own domains and touches only
+   // rows in them; the Inbound copies belong to no domain and are the
+   // administrator's alone.
+
+   AnsiString
+   RestApiServer::HandleArchiveSearch_(const std::vector<String> &domains, const AnsiString &query)
+   {
+      PersistentArchiveIndex::Criteria criteria;
+      criteria.domain = String(QueryParameter_(query, "domain"));
+      criteria.mailbox = String(QueryParameter_(query, "mailbox"));
+      criteria.sender = String(QueryParameter_(query, "sender"));
+      criteria.recipient = String(QueryParameter_(query, "recipient"));
+      criteria.subject = String(QueryParameter_(query, "subject"));
+      criteria.since = String(QueryParameter_(query, "since"));
+      criteria.until = String(QueryParameter_(query, "until"));
+      criteria.holdOnly = QueryParameter_(query, "hold") == "1";
+      AnsiString limit = QueryParameter_(query, "limit");
+      if (!limit.IsEmpty())
+         criteria.maxRows = atoi(limit.c_str());
+
+      if (!domains.empty())
+      {
+         if (criteria.domain.IsEmpty())
+            return BuildForbiddenResponse_("this api key is restricted to named domains; name one of them in the domain parameter");
+         if (!IsDomainAllowed_(domains, criteria.domain))
+            return BuildForbiddenResponse_("this api key is not permitted for that domain");
+      }
+
+      std::vector<PersistentArchiveIndex::Entry> entries;
+      if (!PersistentArchiveIndex::Search(criteria, entries))
+         return BuildResponse_(500, "{\"error\":\"the archive index could not be read\"}");
+      return BuildResponse_(200, PersistentArchiveIndex::ToJson(entries));
+   }
+
+   AnsiString
+   RestApiServer::HandleArchiveGet_(const std::vector<String> &domains, __int64 archiveId)
+   {
+      PersistentArchiveIndex::Entry entry;
+      if (!PersistentArchiveIndex::Get(archiveId, entry))
+         return BuildResponse_(404, "{\"error\":\"archive entry not found\"}");
+      if (!domains.empty() && (entry.domain.IsEmpty() || !IsDomainAllowed_(domains, entry.domain)))
+         return BuildForbiddenResponse_("this api key is not permitted for that domain");
+      return BuildResponse_(200, PersistentArchiveIndex::ToJson(entry));
+   }
+
+   AnsiString
+   RestApiServer::HandleArchiveHold_(const std::vector<String> &domains, __int64 archiveId, bool hold)
+   {
+      PersistentArchiveIndex::Entry entry;
+      if (!PersistentArchiveIndex::Get(archiveId, entry))
+         return BuildResponse_(404, "{\"error\":\"archive entry not found\"}");
+      if (!domains.empty() && (entry.domain.IsEmpty() || !IsDomainAllowed_(domains, entry.domain)))
+         return BuildForbiddenResponse_("this api key is not permitted for that domain");
+      if (!PersistentArchiveIndex::SetHold(archiveId, hold))
+         return BuildResponse_(500, "{\"error\":\"the hold could not be changed\"}");
+
+      LOG_APPLICATION("RestApi: Archive entry " + StringParser::IntToString((int) archiveId) + (hold ? " placed on hold." : " released from hold."));
+      return BuildResponse_(200, hold ? "{\"hold\":true}" : "{\"hold\":false}");
+   }
+
    AnsiString
    RestApiServer::HandleOpenApi_()
    {
@@ -4199,6 +4304,11 @@ namespace HM
          "\"get\":{\"summary\":\"The backup manager's status text and the last lines of the backup log\",\"responses\":{\"200\":{\"description\":\"status (the last failure reason, if any) and log (the backup log's tail, newest last)\"}}},"
          "\"post\":{\"summary\":\"Start a backup with the configured settings\",\"description\":\"Runs on the maintenance queue; poll GET for the outcome.\",\"responses\":{\"202\":{\"description\":\"Started\"},\"409\":{\"description\":\"A backup or restore is already running, or the backup is not configured\"}}}},"
          "\"/api/v1/settings\":{\"get\":{\"summary\":\"A read-only snapshot of the server-wide settings\",\"description\":\"Host name, default domain, size and connection limits, the relay host, the conversation-logging switches. No secrets. Server-wide; refused for domain-restricted keys.\",\"responses\":{\"200\":{\"description\":\"The snapshot\"}}}},"
+         "\"/api/v1/archive\":{\"get\":{\"summary\":\"Search the archive index\",\"description\":\"Query parameters: domain and mailbox (exact), sender, recipient and subject (contains), since and until (YYYY-MM-DD HH:MM:SS), hold=1 for held copies only, limit (1-1000, default 200). Newest first. A domain-restricted key must name one of its domains.\",\"responses\":{\"200\":{\"description\":\"Array of archive entries: id, time, domain, mailbox, direction, sender, recipients, subject, message_id, path, size, hold\"},\"403\":{\"description\":\"A domain-restricted key without a domain of its own\"}}}},"
+         "\"/api/v1/archive/{id}\":{\"get\":{\"summary\":\"One archive entry\",\"responses\":{\"200\":{\"description\":\"The entry\"},\"404\":{\"description\":\"Unknown id\"}}}},"
+         "\"/api/v1/archive/{id}/hold\":{"
+         "\"post\":{\"summary\":\"Put an archived copy on legal hold\",\"description\":\"A held copy is never removed by the retention sweep or by an address erasure.\",\"responses\":{\"200\":{\"description\":\"Held\"},\"404\":{\"description\":\"Unknown id\"}}},"
+         "\"delete\":{\"summary\":\"Lift the hold\",\"responses\":{\"200\":{\"description\":\"Released\"},\"404\":{\"description\":\"Unknown id\"}}}},"
          "\"/api/v1/openapi.json\":{\"get\":{\"summary\":\"This document\",\"responses\":{\"200\":{\"description\":\"The OpenAPI description\"}}}}"
          "},"
          "\"components\":{\"securitySchemes\":{"

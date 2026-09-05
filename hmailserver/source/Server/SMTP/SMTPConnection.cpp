@@ -9,6 +9,7 @@
 #include <Boost/Regex.hpp>
 
 #include "../common/bo/MessageData.h"
+#include "../common/persistence/PersistentArchiveIndex.h"
 
 #include "../common/Cache/CacheContainer.h"
 #include "../common/Util/PasswordValidator.h"
@@ -1837,6 +1838,34 @@ namespace HM
          String sFileNameExclPath = FileUtilities::GetFileNameFromFullPath(_messageFileName);
          String sMessageArchivePath;
          String sFromAddress1 = current_message_->GetFromAddress();
+
+         // The index row for each copy (hm_archiveindex, schema 6029): the envelope
+         // and three headers, so the archive can be searched, held and pruned by
+         // record rather than only by walking the tree. The header is read once
+         // here for every copy this message produces.
+         AnsiString archiveHeaderText = PersistentMessage::LoadHeader(_messageFileName, false);
+         MimeHeader archiveHeader;
+         archiveHeader.Load(archiveHeaderText, archiveHeaderText.GetLength(), true);
+         String archiveSubject = archiveHeader.GetUnicodeFieldValue("Subject");
+         String archiveMessageId = archiveHeader.GetRawFieldValue("Message-ID");
+         String archiveRecipients;
+         for (std::shared_ptr<MessageRecipient> archiveRecipient : current_message_->GetRecipients()->GetVector())
+         {
+            if (!archiveRecipients.IsEmpty())
+               archiveRecipients += _T(",");
+            archiveRecipients += archiveRecipient->GetAddress();
+         }
+         const __int64 archiveSize = current_message_->GetSize();
+         auto recordArchiveCopy = [&](int direction, const String &domain, const String &mailbox, const String &path)
+         {
+            // A file with no row is still archived; a row for a file that was never
+            // written would be a record of nothing, so the file is checked first.
+            if (!FileUtilities::Exists(path))
+               return;
+            PersistentArchiveIndex::Record(direction, domain, mailbox, sFromAddress1, archiveRecipients,
+                                           archiveSubject, archiveMessageId, path, archiveSize);
+         };
+
          std::vector<String> vecParams1 = StringParser::SplitString(sFromAddress1,  "@");
 
          // We need exactly 2 or not an email address
@@ -1863,6 +1892,7 @@ namespace HM
                LOG_SMTP(GetSessionID(), GetIPAddressString(), "Local sender: " + sFromAddress1 + ". Putting in user folder: " + sMessageArchivePath);
 
                FileUtilities::Copy(_messageFileName, sMessageArchivePath, true);
+               recordArchiveCopy(PersistentArchiveIndex::DirectionSent, sSenderDomain, sSenderName, sMessageArchivePath);
             }
             else
             {
@@ -1872,6 +1902,7 @@ namespace HM
                sMessageArchivePath = sArchiveDir + "\\Inbound\\" + sFileNameExclPath;
 
                FileUtilities::Copy(_messageFileName, sMessageArchivePath, true);
+               recordArchiveCopy(PersistentArchiveIndex::DirectionInbound, _T(""), _T(""), sMessageArchivePath);
             }
 
             // What each recipient's copy is made from: the first copy when there is
@@ -1929,6 +1960,7 @@ namespace HM
                      {
                         FileUtilities::Copy(sArchiveSource, sMessageArchivePath2, true);
                      }
+                     recordArchiveCopy(PersistentArchiveIndex::DirectionReceived, sRecipientDomain, sRecipientName, sMessageArchivePath2);
                   }
                   else if (bDomainIsLocal)
                   {

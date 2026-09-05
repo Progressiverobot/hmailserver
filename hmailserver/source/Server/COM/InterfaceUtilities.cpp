@@ -8,6 +8,7 @@
 #include "../Common/Util/AddressTraceEraser.h"
 #include "../Common/Application/MailboxRetentionTask.h"
 #include "../Common/Application/MetricsHistoryTask.h"
+#include "../Common/Persistence/PersistentArchiveIndex.h"
 #include "../Common/TCPIP/DNSResolver.h"
 #include "../Common/TCPIP/HostNameAndIpAddress.h"
 #include "../Common/util/ServiceManager.h"
@@ -697,3 +698,63 @@ STDMETHODIMP InterfaceUtilities::PerformMaintenance(eMaintenanceOperation operat
    }
 }
 
+STDMETHODIMP InterfaceUtilities::SearchArchive(BSTR Domain, BSTR Mailbox, BSTR Sender, BSTR Recipient, BSTR Subject, BSTR Since, BSTR Until, VARIANT_BOOL HoldOnly, long MaxRows, BSTR *Json)
+{
+   try
+   {
+      if (!Json)
+         return COMError::GenerateGenericMessage();
+
+      if (!authentication_->GetIsServerAdmin())
+         return authentication_->GetAccessDenied();
+
+      HM::PersistentArchiveIndex::Criteria criteria;
+      criteria.domain = Domain;
+      criteria.mailbox = Mailbox;
+      criteria.sender = Sender;
+      criteria.recipient = Recipient;
+      criteria.subject = Subject;
+      criteria.since = Since;
+      criteria.until = Until;
+      criteria.holdOnly = HoldOnly == VARIANT_TRUE;
+      criteria.maxRows = MaxRows;
+
+      std::vector<HM::PersistentArchiveIndex::Entry> entries;
+      HM::PersistentArchiveIndex::Search(criteria, entries);
+
+      HM::String json = HM::PersistentArchiveIndex::ToJson(entries);
+      *Json = json.AllocSysString();
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceUtilities::SetArchiveHold(long ArchiveID, VARIANT_BOOL Hold, VARIANT_BOOL *Found)
+{
+   try
+   {
+      if (!Found)
+         return COMError::GenerateGenericMessage();
+
+      *Found = VARIANT_FALSE;
+
+      if (!authentication_->GetIsServerAdmin())
+         return authentication_->GetAccessDenied();
+
+      HM::PersistentArchiveIndex::Entry entry;
+      if (!HM::PersistentArchiveIndex::Get(ArchiveID, entry))
+         return S_OK;
+
+      if (HM::PersistentArchiveIndex::SetHold(ArchiveID, Hold == VARIANT_TRUE))
+         *Found = VARIANT_TRUE;
+
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}

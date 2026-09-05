@@ -4,6 +4,7 @@
 #include "StdAfx.h"
 
 #include "AddressTraceEraser.h"
+#include "../Persistence/PersistentArchiveIndex.h"
 
 #include "FileUtilities.h"
 #include "../Application/Application.h"
@@ -240,6 +241,10 @@ namespace HM
          failed = true;
          return 0;
       }
+
+      // The index rows that name the address go with the files, held copies
+      // excepted: a hold is a promise that nothing removes the record.
+      PersistentArchiveIndex::RemoveByAddress(address);
 
       const String userArchive = archiveDir + _T("\\") + domainPart + _T("\\") + localPart;
 
