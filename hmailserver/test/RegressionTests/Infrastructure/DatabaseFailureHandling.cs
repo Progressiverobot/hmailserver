@@ -87,7 +87,14 @@ namespace RegressionTests.Infrastructure
          // The second message must not arrive carrying the first one's UID. An IMAP
          // client that already has UID N will not fetch a different message with UID N,
          // so the delivered-but-invisible outcome is the one being ruled out here.
-         CustomAsserts.AssertReportedError("HM5205");
+         //
+         // HM6081 is the delivery thread's last word - the message could not be saved
+         // and its file was removed - and it is written a moment after HM5205. Waiting
+         // for both before the error log is consumed is what keeps that last line from
+         // landing in a fresh log after the consume, where the next test's setup would
+         // find it and fail for an error that was expected here. Seen once in a full
+         // gate on 5 September 2026.
+         CustomAsserts.AssertReportedError("HM5205", "HM6081");
 
          var folder = account.IMAPFolders.get_ItemByName("INBOX");
 
