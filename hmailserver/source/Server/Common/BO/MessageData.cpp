@@ -8,6 +8,7 @@
 
 #include "../Mime/Mime.h"
 #include "../Mime/MimeCode.h"
+#include "../Util/Charset.h"
 #include "../BO/Message.h"
 #include "../BO/Attachments.h"
 #include "../Util/Time.h"
@@ -444,7 +445,75 @@ namespace HM
          pHTMLPart->SetRawText(sModifiedBody);
    }
 
-   std::shared_ptr<MimeBody> 
+   String
+   MessageData::GetAttachmentText() const
+   {
+      // Walk every part. IsAttachment() is the MIME layer's own rule: a
+      // Content-Disposition of attachment, or any discrete type other than text
+      // that has no disposition at all. The body parts SEARCH already scans are
+      // text parts that are NOT attachments, so this collects exactly the
+      // complement: the text-typed parts that ARE attachments.
+      const int MaxCharacters = 1024 * 1024;
+      String result;
+      if (!mime_mail_)
+         return result;
+
+      std::vector<std::shared_ptr<MimeBody> > pending;
+      pending.push_back(mime_mail_);
+      while (!pending.empty())
+      {
+         std::shared_ptr<MimeBody> part = pending.back();
+         pending.pop_back();
+
+         for (std::shared_ptr<MimeBody> child = part->FindFirstPart(); child; child = part->FindNextPart())
+         {
+            pending.push_back(child);
+
+            if (!child->IsAttachment())
+               continue;
+            if (child->GetMainType() != "text")
+               continue;
+
+            // GetUnicodeText decodes the transfer encoding only when the part
+            // declares a charset, and a text attachment most often does not: its
+            // Content-Type carries just the file name, so a base64 minutes.txt
+            // would come back as base64. Decode it here and read it as UTF-8, of
+            // which the RFC 2046 default of US-ASCII is a subset.
+            String text;
+            if (!child->GetCharset().empty())
+               text = child->GetUnicodeText();
+            else
+            {
+               AnsiString raw = child->GetRawText();
+               if (!raw.IsEmpty())
+               {
+                  AnsiString decoded;
+                  MimeCodeBase *coder = MimeEnvironment::CreateCoder(child->GetTransferEncoding());
+                  coder->SetInput(raw, raw.GetLength(), false);
+                  coder->GetOutput(decoded);
+                  delete coder;
+                  text = Charset::ToWideChar(decoded, "utf-8");
+               }
+            }
+            if (text.IsEmpty())
+               continue;
+
+            if (result.GetLength() + text.GetLength() > MaxCharacters)
+            {
+               result += text.Mid(0, MaxCharacters - result.GetLength());
+               return result;
+            }
+            // A separator, so a word at the end of one file and one at the start
+            // of the next never merge into a token neither file contains.
+            if (!result.IsEmpty())
+               result += _T("\n");
+            result += text;
+         }
+      }
+      return result;
+   }
+
+   std::shared_ptr<MimeBody>
    MessageData::FindPartNoRecurse(std::shared_ptr<MimeBody> parent, const AnsiString &sType) const
    {
       std::shared_ptr<MimeBody> pPart = parent->FindFirstPart();
