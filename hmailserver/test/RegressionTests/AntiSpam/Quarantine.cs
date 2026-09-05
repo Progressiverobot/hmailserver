@@ -36,33 +36,24 @@ namespace RegressionTests.AntiSpam
       private const string SpamBody =
          "This is a test message with a SURBL url: -> http://surbl-org-permanent-test-point.com/ <-";
 
-      private FakeDnsServer dns_;
       private Account _recipient;
 
       [OneTimeSetUp]
-      public void PointTheServerAtALocalResolver()
+      public void ServeTheNamesThisFixtureNeeds()
       {
          // The verdict has to be real - this fixture is about what happens AFTER a
          // message is judged spam - but it must not depend on a live blacklist, for
          // the reasons recorded against every other fixture that used to.
-         dns_ = new FakeDnsServer().WithA(SurblTestPoint, "127.0.0.2");
-
-         ServerIniFile.SetSetting("DNSServer", "127.0.0.1");
-
-         RestartServerAndReacquireCom();
+         SuiteDns.Zone.WithA(SurblTestPoint, "127.0.0.2");
       }
 
       [OneTimeTearDown]
-      public void RestoreTheSystemResolver()
+      public void RestoreTheDefaults()
       {
-         // The fake resolver stays up until the server is back on the system one, so
-         // the restart never runs against a dead resolver.
-         using (dns_)
-         {
-            ServerIniFile.SetSetting("DNSServer", null);
-            ServerIniFile.SetSetting("QuarantineEnabled", null);
-            RestartServerAndReacquireCom();
-         }
+         SuiteDns.Reset();
+
+         ServerIniFile.SetSetting("QuarantineEnabled", null);
+         RestartServerAndReacquireCom();
       }
 
       [SetUp]

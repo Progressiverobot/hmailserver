@@ -28,12 +28,10 @@ namespace RegressionTests.AntiSpam
       // 127.0.0.2 is what a URI blacklist returns for a listed name.
       private const string SurblTestPoint = "surbl-org-permanent-test-point.com.multi.surbl.org";
 
-      private FakeDnsServer dns_;
-
       [OneTimeSetUp]
-      public void PointTheServerAtALocalResolver()
+      public void ServeTheNamesThisFixtureNeeds()
       {
-         dns_ = new FakeDnsServer()
+         SuiteDns.Zone
             .WithA(SurblTestPoint, "127.0.0.2")
             // TestMissingMXRecord needs one domain that HAS an MX and one that does
             // not, and it uses microsoft.com for the first. Served, because the
@@ -41,22 +39,12 @@ namespace RegressionTests.AntiSpam
             // reaches the server at all.
             .WithMx("microsoft.com", 10, "mx.microsoft.test")
             .WithA("mx.microsoft.test", "192.0.2.40");
-
-         ServerIniFile.SetSetting("DNSServer", "127.0.0.1");
-
-         RestartServerAndReacquireCom();
       }
 
       [OneTimeTearDown]
-      public void RestoreTheSystemResolver()
+      public void ForgetThem()
       {
-         // The fake resolver stays up until the server is back on the system one, so
-         // the restart never runs against a dead resolver.
-         using (dns_)
-         {
-            ServerIniFile.SetSetting("DNSServer", null);
-            RestartServerAndReacquireCom();
-         }
+         SuiteDns.Reset();
       }
 
       [SetUp]
@@ -155,12 +143,10 @@ namespace RegressionTests.AntiSpam
             "SpamProtectionLineEndings@example.test", "INBOX",
             "This is a test message\r consisting of incorrect lines"));
 
-
          CustomAsserts.Throws<DeliveryFailedException>(
             () => smtpClientSimulator.Send("SpamProtectionLineEndings@example.test",
                "SpamProtectionLineEndings@example.test", "INBOX",
                "This is a test message\n consisting of incorrect lines"));
-
 
          CustomAsserts.Throws<DeliveryFailedException>(() => smtpClientSimulator.Send(
             "SpamProtectionLineEndings@example.test",
@@ -356,7 +342,6 @@ namespace RegressionTests.AntiSpam
          // Send a messages to this account.
          var smtpClientSimulator = new SmtpClientSimulator();
 
-
          smtpClientSimulator.Send("surbltest@example.test", "surbltest@example.test", "SURBL-No-Match",
             "This is a test message without a SURBL url.");
 
@@ -365,7 +350,6 @@ namespace RegressionTests.AntiSpam
              sMessageContents.Contains("X-hMailServer-Spam") ||
              sMessageContents.Contains("ThisIsSpam"))
             throw new Exception("Non-Spam message detected as spam");
-
 
          smtpClientSimulator.Send("surbltest@example.test", "surbltest@example.test", "SURBL-Match",
             "This is a test message with a SURBL url: -> http://surbl-org-permanent-test-point.com/ <-");
@@ -570,7 +554,6 @@ namespace RegressionTests.AntiSpam
       {
          LogHandler.DeleteCurrentDefaultLog();
 
-
          // Create a test account
          // Fetch the default domain
          var account1 = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "surbltest@example.test", "test");
@@ -676,7 +659,6 @@ namespace RegressionTests.AntiSpam
 
          surblServer.Active = false;
          surblServer.Save();
-
 
          Assert.IsTrue(LogHandler.DefaultLogContains("SURBL: 3 unique domain addresses found."));
          Assert.IsTrue(LogHandler.DefaultLogContains("Found URL: secunia.com"));

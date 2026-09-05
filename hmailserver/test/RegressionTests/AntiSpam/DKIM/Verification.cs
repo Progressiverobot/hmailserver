@@ -40,31 +40,19 @@ namespace RegressionTests.AntiSpam.DKIM
          "JDe98QgX14oHvGM2Uz53if/SW8MF09rYh9sp4ZsaWLIg6T343JzlbtrsGRGCDJ9JPpxRWZimtz+Up/BlKzT6sCCrBihb/Bi3" +
          "pZiEBB4Ui/vruL5RCQIDAQAB;n=2048,1452627113,1468351913";
 
-      private FakeDnsServer dns_;
-
       [OneTimeSetUp]
-      public void PointTheServerAtALocalResolver()
+      public void ServeTheSelectorThisFixtureNeeds()
       {
-         dns_ = new FakeDnsServer().WithTxt(OutlookSelectorName, OutlookSelectorKey);
-
          // Every other name answers NODATA, which is what the rest of this fixture wants:
          // "no key for signature" (RFC 6376 6.1.2) is a PERMANENT failure, so a selector
          // that does not exist is a definite verdict rather than a lookup to wait for.
-         ServerIniFile.SetSetting("DNSServer", "127.0.0.1");
-
-         RestartServerAndReacquireCom();
+         SuiteDns.Zone.WithTxt(OutlookSelectorName, OutlookSelectorKey);
       }
 
       [OneTimeTearDown]
-      public void RestoreTheSystemResolver()
+      public void ForgetIt()
       {
-         // The fake resolver stays up until the server is back on the system one, so
-         // the restart never runs against a dead resolver.
-         using (dns_)
-         {
-            ServerIniFile.SetSetting("DNSServer", null);
-            RestartServerAndReacquireCom();
-         }
+         SuiteDns.Reset();
       }
 
       [SetUp]
@@ -83,7 +71,6 @@ namespace RegressionTests.AntiSpam.DKIM
       {
          _antiSpam.DKIMVerificationEnabled = true;
          _antiSpam.DKIMVerificationFailureScore = 100;
-
 
          var account1 = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "test@example.test", "test");
          CustomAsserts.Throws<DeliveryFailedException>(() =>

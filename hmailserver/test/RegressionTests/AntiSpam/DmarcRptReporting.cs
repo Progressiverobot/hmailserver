@@ -120,7 +120,7 @@ namespace RegressionTests.AntiSpam
          // The zone this test needs, served locally: each policy domain publishes
          // p=none with a rua, and exactly one of the two external domains publishes the
          // RFC 7489 7.1 consent record that authorizes reports to be sent to it.
-         using (var fakeDns = new FakeDnsServer()
+         SuiteDns.Zone
             // example.test publishes a bare policy of its own, and it has to: under the
             // RFC 9989 tree walk the organizational domain is the record found at the
             // FEWEST labels, so with nothing published here sender-dom.example.test
@@ -138,124 +138,122 @@ namespace RegressionTests.AntiSpam
 
             // The signing key for the seed below, so one row in the internal report
             // is a DKIM pass with a selector to name rather than another fail.
-            .WithTxt("reportsel._domainkey." + InternalPolicyDomain, "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAit1HZshVeIm3Yu3dBqKzIAQDM+k5hPu+S9RzJeaFnPQw888jfvuBQkVTinZWn65X4TLhcEjsV7iDgWzVhcEKUUphhpR9i+JgOjncOSxs7zvv2xOpFuYweOqVrWV9brr8DEt3f+MdfYUiz62toL82Za447DOhNI/YAVEJqCmgbeSycN2emmZC6Z8dXV7fxKM3IeJ6G8hVLbvWhZe8fHkJ0+tJXeARBHhowFW1VXgkOGOHFtPjpmNrJRbbDKf8+IqyUk9uV51y3GEIunovr1Yc3vvExpXwWLZIdqKtvGVFBxyvTtuAmtw7Ebmz0evN41wH7vTWgui0VgsZqNIIUwz+fQIDAQAB"))
+            .WithTxt("reportsel._domainkey." + InternalPolicyDomain, "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAit1HZshVeIm3Yu3dBqKzIAQDM+k5hPu+S9RzJeaFnPQw888jfvuBQkVTinZWn65X4TLhcEjsV7iDgWzVhcEKUUphhpR9i+JgOjncOSxs7zvv2xOpFuYweOqVrWV9brr8DEt3f+MdfYUiz62toL82Za447DOhNI/YAVEJqCmgbeSycN2emmZC6Z8dXV7fxKM3IeJ6G8hVLbvWhZe8fHkJ0+tJXeARBHhowFW1VXgkOGOHFtPjpmNrJRbbDKf8+IqyUk9uV51y3GEIunovr1Yc3vvExpXwWLZIdqKtvGVFBxyvTtuAmtw7Ebmz0evN41wH7vTWgui0VgsZqNIIUwz+fQIDAQAB");
+         try
          {
-            try
+            ServerIniFile.SetSetting("DNSQueryTimeout", "5");
+            ServerIniFile.SetSetting("DmarcRptFromAddress", "postmaster@example.test");
+
+            RestartServerAndReacquireCom();
+
+            // Three inbound messages, one per policy domain. Each From
+            // domain publishes p=none, so every seed is delivered and every
+            // evaluation is recorded; none of the domains has SPF or DKIM,
+            // so each records an aligned-fail row - the row a domain owner
+            // deploys DMARC to see.
+            SendSeed_(InternalPolicyDomain);
+            SendSeed_(ExternalUnverifiedPolicyDomain);
+            SendSeed_(ExternalVerifiedPolicyDomain);
+
+            // ...and one that is really signed, by a key this test publishes, so
+            // the report has a passing DKIM row. Everything else here produces
+            // failures, and a report where nothing ever passes cannot show
+            // whether the selector is being recorded or merely omitted.
+            SmtpClientSimulator.StaticSendRaw("bounce@unaligned-envelope.test", "seedrcpt@example.test",
+                                              SignedSeed);
+
+            // The seeds are in the mailbox, so their spam-time evaluations -
+            // which run before delivery - are all recorded.
+            Pop3ClientSimulator.AssertMessageCount("seedrcpt@example.test", "test", 4);
+
+            int reportCount = (int) _application.Utilities.SendDmarcReports(true);
+
+            ClassicAssert.AreEqual(2, reportCount,
+               "Two reports: the internal rua target and the external-verified one. " +
+               "The external target without a _report._dmarc authorization record must be skipped.");
+
+            Pop3ClientSimulator.AssertMessageCount("dmarcreports@example.test", "test", 2);
+
+            var reports = new List<string>
             {
-               ServerIniFile.SetSetting("DNSServer", "127.0.0.1");
-               ServerIniFile.SetSetting("DNSQueryTimeout", "5");
-               ServerIniFile.SetSetting("DmarcRptFromAddress", "postmaster@example.test");
+               Pop3ClientSimulator.AssertGetFirstMessageText("dmarcreports@example.test", "test"),
+               Pop3ClientSimulator.AssertGetFirstMessageText("dmarcreports@example.test", "test")
+            };
 
-               RestartServerAndReacquireCom();
+            string combined = reports[0] + "\n===\n" + reports[1];
 
-               // Three inbound messages, one per policy domain. Each From
-               // domain publishes p=none, so every seed is delivered and every
-               // evaluation is recorded; none of the domains has SPF or DKIM,
-               // so each records an aligned-fail row - the row a domain owner
-               // deploys DMARC to see.
-               SendSeed_(InternalPolicyDomain);
-               SendSeed_(ExternalUnverifiedPolicyDomain);
-               SendSeed_(ExternalVerifiedPolicyDomain);
+            StringAssert.Contains("<domain>" + InternalPolicyDomain + "</domain>", combined,
+               "The internal-target policy domain must be reported. Got: " + combined);
+            StringAssert.Contains("<domain>" + ExternalVerifiedPolicyDomain + "</domain>", combined,
+               "The external-verified policy domain must be reported. Got: " + combined);
+            ClassicAssert.IsFalse(combined.Contains(ExternalUnverifiedPolicyDomain),
+               "The unverified external target must not have produced a report - this is the " +
+               "RFC 7489 7.1 mail-cannon control. Got: " + combined);
 
-               // ...and one that is really signed, by a key this test publishes, so
-               // the report has a passing DKIM row. Everything else here produces
-               // failures, and a report where nothing ever passes cannot show
-               // whether the selector is being recorded or merely omitted.
-               SmtpClientSimulator.StaticSendRaw("bounce@unaligned-envelope.test", "seedrcpt@example.test",
-                                                 SignedSeed);
+            string internalReport = reports[0].Contains("<domain>" + InternalPolicyDomain + "</domain>")
+               ? reports[0]
+               : reports[1];
 
-               // The seeds are in the mailbox, so their spam-time evaluations -
-               // which run before delivery - are all recorded.
-               Pop3ClientSimulator.AssertMessageCount("seedrcpt@example.test", "test", 4);
+            // The RFC 7489 7.2.1.1 envelope.
+            StringAssert.Contains("Report Domain: " + InternalPolicyDomain, internalReport,
+               "The subject must carry the policy domain. Got: " + internalReport);
+            StringAssert.Contains("!" + InternalPolicyDomain + "!", internalReport,
+               "The attachment filename carries receiver!policy-domain!begin!end. Got: " + internalReport);
 
-               int reportCount = (int) _application.Utilities.SendDmarcReports(true);
+            // And the Appendix C body.
+            StringAssert.Contains("<org_name>", internalReport, "Got: " + internalReport);
+            StringAssert.Contains("<email>postmaster@example.test</email>", internalReport,
+               "The configured sender is the report contact. Got: " + internalReport);
+            StringAssert.Contains("<p>none</p>", internalReport,
+               "The published policy travels in policy_published. Got: " + internalReport);
+            StringAssert.Contains("<source_ip>127.0.0.1</source_ip>", internalReport,
+               "The row must carry the connecting address. Got: " + internalReport);
+            StringAssert.Contains("<disposition>none</disposition>", internalReport,
+               "p=none evaluated to disposition none. Got: " + internalReport);
+            StringAssert.Contains("<dkim>fail</dkim>", internalReport,
+               "No DKIM signature can align. Got: " + internalReport);
+            StringAssert.Contains("<spf>fail</spf>", internalReport,
+               "An envelope from another organizational domain can never align, whatever " +
+               "the raw SPF result was. Got: " + internalReport);
+            StringAssert.Contains("<spf><domain>unaligned-envelope.test</domain>", internalReport,
+               "auth_results carries the RAW SPF identity - the envelope domain - which is " +
+               "exactly what policy_evaluated's aligned verdict above is not. Got: " + internalReport);
+            StringAssert.Contains("<header_from>" + InternalPolicyDomain + "</header_from>", internalReport,
+               "The identifiers block names the From domain. Got: " + internalReport);
 
-               ClassicAssert.AreEqual(2, reportCount,
-                  "Two reports: the internal rua target and the external-verified one. " +
-                  "The external target without a _report._dmarc authorization record must be skipped.");
+            // The selector, which is what turns "something of yours signed this"
+            // into "this key signed this" - the difference between a report a
+            // domain owner can read and one they can act on during a rotation or
+            // after a key is compromised.
+            StringAssert.Contains("<selector>reportsel</selector>", internalReport,
+               "auth_results/dkim should name the selector that signed (RFC 7489 Appendix C). Got: " +
+               internalReport);
 
-               Pop3ClientSimulator.AssertMessageCount("dmarcreports@example.test", "test", 2);
+            // ...and the SPF identity's scope, which says WHICH identity was
+            // evaluated. Without it a reader cannot tell an envelope-sender check
+            // from a HELO one.
+            StringAssert.Contains("<scope>mfrom</scope>", internalReport,
+               "auth_results/spf should say which identity SPF was evaluated on. Got: " + internalReport);
 
-               var reports = new List<string>
-               {
-                  Pop3ClientSimulator.AssertGetFirstMessageText("dmarcreports@example.test", "test"),
-                  Pop3ClientSimulator.AssertGetFirstMessageText("dmarcreports@example.test", "test")
-               };
+            // The pop is destructive by design: nothing new has been
+            // recorded, so a second call has nothing to send.
+            ClassicAssert.AreEqual(0, (int) _application.Utilities.SendDmarcReports(true),
+               "The first call popped the day; with no evaluations since, the second has nothing.");
+         }
+         finally
+         {
+            SuiteDns.Reset();
 
-               string combined = reports[0] + "\n===\n" + reports[1];
+            ServerIniFile.SetSetting("DNSQueryTimeout", null);
+            ServerIniFile.SetSetting("DmarcRptFromAddress", null);
 
-               StringAssert.Contains("<domain>" + InternalPolicyDomain + "</domain>", combined,
-                  "The internal-target policy domain must be reported. Got: " + combined);
-               StringAssert.Contains("<domain>" + ExternalVerifiedPolicyDomain + "</domain>", combined,
-                  "The external-verified policy domain must be reported. Got: " + combined);
-               ClassicAssert.IsFalse(combined.Contains(ExternalUnverifiedPolicyDomain),
-                  "The unverified external target must not have produced a report - this is the " +
-                  "RFC 7489 7.1 mail-cannon control. Got: " + combined);
-
-               string internalReport = reports[0].Contains("<domain>" + InternalPolicyDomain + "</domain>")
-                  ? reports[0]
-                  : reports[1];
-
-               // The RFC 7489 7.2.1.1 envelope.
-               StringAssert.Contains("Report Domain: " + InternalPolicyDomain, internalReport,
-                  "The subject must carry the policy domain. Got: " + internalReport);
-               StringAssert.Contains("!" + InternalPolicyDomain + "!", internalReport,
-                  "The attachment filename carries receiver!policy-domain!begin!end. Got: " + internalReport);
-
-               // And the Appendix C body.
-               StringAssert.Contains("<org_name>", internalReport, "Got: " + internalReport);
-               StringAssert.Contains("<email>postmaster@example.test</email>", internalReport,
-                  "The configured sender is the report contact. Got: " + internalReport);
-               StringAssert.Contains("<p>none</p>", internalReport,
-                  "The published policy travels in policy_published. Got: " + internalReport);
-               StringAssert.Contains("<source_ip>127.0.0.1</source_ip>", internalReport,
-                  "The row must carry the connecting address. Got: " + internalReport);
-               StringAssert.Contains("<disposition>none</disposition>", internalReport,
-                  "p=none evaluated to disposition none. Got: " + internalReport);
-               StringAssert.Contains("<dkim>fail</dkim>", internalReport,
-                  "No DKIM signature can align. Got: " + internalReport);
-               StringAssert.Contains("<spf>fail</spf>", internalReport,
-                  "An envelope from another organizational domain can never align, whatever " +
-                  "the raw SPF result was. Got: " + internalReport);
-               StringAssert.Contains("<spf><domain>unaligned-envelope.test</domain>", internalReport,
-                  "auth_results carries the RAW SPF identity - the envelope domain - which is " +
-                  "exactly what policy_evaluated's aligned verdict above is not. Got: " + internalReport);
-               StringAssert.Contains("<header_from>" + InternalPolicyDomain + "</header_from>", internalReport,
-                  "The identifiers block names the From domain. Got: " + internalReport);
-
-               // The selector, which is what turns "something of yours signed this"
-               // into "this key signed this" - the difference between a report a
-               // domain owner can read and one they can act on during a rotation or
-               // after a key is compromised.
-               StringAssert.Contains("<selector>reportsel</selector>", internalReport,
-                  "auth_results/dkim should name the selector that signed (RFC 7489 Appendix C). Got: " +
-                  internalReport);
-
-               // ...and the SPF identity's scope, which says WHICH identity was
-               // evaluated. Without it a reader cannot tell an envelope-sender check
-               // from a HELO one.
-               StringAssert.Contains("<scope>mfrom</scope>", internalReport,
-                  "auth_results/spf should say which identity SPF was evaluated on. Got: " + internalReport);
-
-               // The pop is destructive by design: nothing new has been
-               // recorded, so a second call has nothing to send.
-               ClassicAssert.AreEqual(0, (int) _application.Utilities.SendDmarcReports(true),
-                  "The first call popped the day; with no evaluations since, the second has nothing.");
-            }
-            finally
-            {
-               ServerIniFile.SetSetting("DNSServer", null);
-               ServerIniFile.SetSetting("DNSQueryTimeout", null);
-               ServerIniFile.SetSetting("DmarcRptFromAddress", null);
-
-               // Restart before any COM restore - proxies taken before the
-               // mid-test restart point at the old process (the TLS-RPT
-               // fixture's first run proved what happens otherwise). Nothing
-               // else needs restoring: no ports, certificates or IP ranges
-               // were touched, and PerformBasicSetup resets the anti-spam
-               // settings for the next fixture.
-               RestartServerAndReacquireCom();
-            }
+            // Restart before any COM restore - proxies taken before the
+            // mid-test restart point at the old process (the TLS-RPT
+            // fixture's first run proved what happens otherwise). Nothing
+            // else needs restoring: no ports, certificates or IP ranges
+            // were touched, and PerformBasicSetup resets the anti-spam
+            // settings for the next fixture.
+            RestartServerAndReacquireCom();
          }
       }
 

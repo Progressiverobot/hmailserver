@@ -26,28 +26,16 @@ namespace RegressionTests.AntiSpam
       // it as a whitelisting fault.
       private const string SurblTestPoint = "surbl-org-permanent-test-point.com.multi.surbl.org";
 
-      private FakeDnsServer dns_;
-
       [OneTimeSetUp]
-      public void PointTheServerAtALocalResolver()
+      public void ServeTheNamesThisFixtureNeeds()
       {
-         dns_ = new FakeDnsServer().WithA(SurblTestPoint, "127.0.0.2");
-
-         ServerIniFile.SetSetting("DNSServer", "127.0.0.1");
-
-         RestartServerAndReacquireCom();
+         SuiteDns.Zone.WithA(SurblTestPoint, "127.0.0.2");
       }
 
       [OneTimeTearDown]
-      public void RestoreTheSystemResolver()
+      public void ForgetThem()
       {
-         // The fake resolver stays up until the server is back on the system one, so
-         // the restart never runs against a dead resolver.
-         using (dns_)
-         {
-            ServerIniFile.SetSetting("DNSServer", null);
-            RestartServerAndReacquireCom();
-         }
+         SuiteDns.Reset();
       }
 
       [SetUp]
@@ -161,7 +149,6 @@ namespace RegressionTests.AntiSpam
          Pop3ClientSimulator.AssertMessageCount("whitelist@example.test", "test", 1);
       }
 
-
       [Test]
       public void TestWildcardEscapedCharacters()
       {
@@ -210,7 +197,6 @@ namespace RegressionTests.AntiSpam
          address.Description = "Test";
          address.Save();
 
-
          // Enable SURBL.
          var surblServer = _antiSpam.SURBLServers[0];
          surblServer.Active = true;
@@ -231,7 +217,6 @@ namespace RegressionTests.AntiSpam
 
          Pop3ClientSimulator.AssertMessageCount("whitelist@example.test", "test", 2);
       }
-
 
       [Test]
       public void TestWildcardSingleQuote()
@@ -556,7 +541,6 @@ namespace RegressionTests.AntiSpam
          var message = Pop3ClientSimulator.AssertGetFirstMessageText("whitelist@example.test", "test");
          Assert.IsFalse(message.Contains("X-hMailServer-Reason-Score"));
       }
-
 
       private string[] GetAllLocalAddresses(AddressFamily family)
       {

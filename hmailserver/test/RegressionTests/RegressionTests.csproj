@@ -400,6 +400,7 @@
     <Compile Include="Shared\IniFile.cs" />
     <Compile Include="Shared\Paths.cs" />
     <Compile Include="Shared\FakeDnsServer.cs" />
+    <Compile Include="Shared\SuiteDns.cs" />
     <Compile Include="Shared\FakeFilterEngine.cs" />
     <Compile Include="Shared\FakeHttpEndpoint.cs" />
     <Compile Include="Shared\ServerIniFile.cs" />

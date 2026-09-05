@@ -35,12 +35,10 @@ namespace RegressionTests.POP3.Fetching
       private const string HeloHost = "mail.hmailserver.com";
       private const string HeloHostAddress = "192.0.2.30";
 
-      private FakeDnsServer dns_;
-
       [OneTimeSetUp]
-      public void PointTheServerAtALocalResolver()
+      public void ServeTheNamesThisFixtureNeeds()
       {
-         dns_ = new FakeDnsServer()
+         SuiteDns.Zone
             .WithA("localhost", "127.0.0.1")
             .WithA(HeloHost, HeloHostAddress)
             .WithTxt("openspf.org", "v=spf1 -all")
@@ -49,22 +47,12 @@ namespace RegressionTests.POP3.Fetching
             // the fixture's one positive blacklist answer. 127.0.0.2 is what a URI
             // blacklist returns for a listed name.
             .WithA("surbl-org-permanent-test-point.com.multi.surbl.org", "127.0.0.2");
-
-         ServerIniFile.SetSetting("DNSServer", "127.0.0.1");
-
-         RestartServerAndReacquireCom();
       }
 
       [OneTimeTearDown]
-      public void RestoreTheSystemResolver()
+      public void ForgetThem()
       {
-         // The fake resolver stays up until the server is back on the system one, so
-         // the restart never runs against a dead resolver.
-         using (dns_)
-         {
-            ServerIniFile.SetSetting("DNSServer", null);
-            RestartServerAndReacquireCom();
-         }
+         SuiteDns.Reset();
       }
 
       private static FetchAccount CreateFetchAccount(Account account, int port, bool antiSpam, bool antiVirus)
@@ -232,7 +220,6 @@ namespace RegressionTests.POP3.Fetching
          fa.Delete();
       }
 
-
       [Test]
       public void TestDelete()
       {
@@ -265,7 +252,6 @@ namespace RegressionTests.POP3.Fetching
             fa.ProcessMIMERecipients = false;
             fa.DaysToKeepMessages = -1;
             fa.Save();
-
 
             fa.DownloadNow();
 
@@ -314,7 +300,6 @@ namespace RegressionTests.POP3.Fetching
             fa.ProcessMIMERecipients = false;
             fa.DaysToKeepMessages = -1;
             fa.Save();
-
 
             fa.DownloadNow();
 
@@ -549,7 +534,6 @@ namespace RegressionTests.POP3.Fetching
             _domain.Postmaster = catchallAccount.Address;
             _domain.Save();
 
-
             var fa = account1.FetchAccounts.Add();
 
             fa.Enabled = true;
@@ -639,7 +623,6 @@ namespace RegressionTests.POP3.Fetching
          _application.Settings.AntiSpam.AddHeaderSpam = true;
          _application.Settings.AntiSpam.PrependSubject = true;
          _application.Settings.AntiSpam.PrependSubjectText = "ThisIsSpam";
-
 
          _application.Settings.AntiSpam.UseSPF = true;
          _application.Settings.AntiSpam.UseSPFScore = 5;
@@ -759,7 +742,6 @@ namespace RegressionTests.POP3.Fetching
          _application.Settings.AntiSpam.PrependSubject = true;
          _application.Settings.AntiSpam.PrependSubjectText = "ThisIsSpam";
 
-
          var surblServer = _application.Settings.AntiSpam.SURBLServers[0];
          surblServer.Active = true;
          surblServer.Score = 5;
@@ -808,7 +790,6 @@ namespace RegressionTests.POP3.Fetching
             Assert.IsTrue(downloadedMessage.Contains("X-hMailServer-Spam: YES"));
          }
       }
-
 
       [Test]
       public void TestSpamProtectionPreTransmissionHELODelete()
@@ -1096,7 +1077,6 @@ namespace RegressionTests.POP3.Fetching
          }
       }
 
-
       [Test]
       [Description("Issue 14, Potentially invalid sender address when fetching from external account")]
       public void TestFetchMessageWithValidFromAddress()
@@ -1108,7 +1088,6 @@ namespace RegressionTests.POP3.Fetching
                                      "Hello!");
 
          var messages = new List<string> { message };
-
 
          var port = TestSetup.GetNextFreePort();
          using (var pop3Server = new Pop3ServerSimulator(1, port, messages))
@@ -1156,7 +1135,6 @@ namespace RegressionTests.POP3.Fetching
                                      "Hello!");
 
          var messages = new List<string> { message };
-
 
          var port = TestSetup.GetNextFreePort();
          using (var pop3Server = new Pop3ServerSimulator(1, port, messages))

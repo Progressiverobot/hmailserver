@@ -185,14 +185,17 @@ what it can and names the rest:
 - **A stale ERROR log.** One fixture writes a deliberate scanner error and
   removes it in teardown. Left behind, it fails every fixture's setup in the
   next run - the observed shape is 100% of tests failing before doing anything.
-- **Test-only settings left in `hMailServer.ini`.** Fixtures that point the
-  resolver at a fake DNS server on 127.0.0.1, enable the quarantine, set a POP3
-  login delay, a password policy, PROXY-protocol trust, or an OTLP endpoint all
-  put the key back in teardown. Any of them surviving fails tests that never
-  mention the setting: every DNS lookup waits for the query timeout; every
-  anti-spam refusal becomes an acceptance; every connection from the trusted
-  address is dropped before the banner. The server caches the INI at start, so
-  after `-Clean` restart the service.
+- **Test-only settings left in `hMailServer.ini`.** The suite points the
+  resolver at its own fake DNS server on 127.0.0.1 for the whole run
+  (`Shared/SuiteDns.cs`, a `[SetUpFixture]`: NODATA for every name a fixture
+  has not added, the SURBL test point and localhost seeded) and puts
+  `DNSServer` back when the run ends; fixtures that enable the quarantine, set
+  a POP3 login delay, a password policy, PROXY-protocol trust, or an OTLP
+  endpoint put their key back in teardown. Any of them surviving fails tests
+  that never mention the setting: every DNS lookup waits for the query timeout;
+  every anti-spam refusal becomes an acceptance; every connection from the
+  trusted address is dropped before the banner. The server caches the INI at
+  start, so after `-Clean` restart the service.
 - **Orphan domain directories in the data folder.** Several persistence
   fixtures rename the test domain, and the rename moves its directory. Killed
   mid-rename, the directory survives with no domain row, and every later run of
