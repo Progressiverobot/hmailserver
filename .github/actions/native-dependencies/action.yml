@@ -49,10 +49,10 @@ inputs:
 
 outputs:
   openssl-dir:
-    description: The OpenSSL folder under libs-path, e.g. openssl-4.0.1.
+    description: The OpenSSL folder under libs-path, e.g. openssl-4.0.2.
     value: ${{ steps.versions.outputs.openssl_dir }}
   boost-dir:
-    description: The Boost folder under libs-path, e.g. boost_1_91_0.
+    description: The Boost folder under libs-path, e.g. boost_1_92_0.
     value: ${{ steps.versions.outputs.boost_dir }}
   postgresql-dir:
     description: The PostgreSQL folder under libs-path, e.g. postgresql-18.3.

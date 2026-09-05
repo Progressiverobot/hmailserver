@@ -25,14 +25,14 @@
         automatically via vswhere).
 
 .PARAMETER Version
-    The OpenSSL version to build, e.g. 4.0.1. Must match 4.x.y.
+    The OpenSSL version to build, e.g. 4.0.2. Must match 4.x.y.
 
 .PARAMETER Sha256
     The SHA-256 of openssl-<Version>.tar.gz, for a version the digest table below does
     not know yet. Take it from the .sha256 file published beside the release.
 
 .EXAMPLE
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -File libraries\build-openssl.ps1 -Version 4.0.1
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File libraries\build-openssl.ps1 -Version 4.0.2
 #>
 [CmdletBinding()]
 param(
@@ -55,6 +55,7 @@ $PSNativeCommandUseErrorActionPreference = $false
 # published on https://github.com/openssl/openssl/releases. See Get-PinnedDigest.
 $Digests = @{
     '4.0.1' = '2db3f3a0d6ea4b59e1f094ace2c8cd536dffb87cdc39084c5afa1e6f7f37dd09'
+    '4.0.2' = '736b467530f916737b7031310ccb21d8218c6229e61e8e160cd1d3458cd543a8'
 }
 
 # --- Set up a build log ---------------------------------------------------------

@@ -99,7 +99,7 @@ Technology
 |---|---|
 | Server core | C++, built with Visual Studio 2026 (platform toolset v145), 64-bit only |
 | Cryptography | OpenSSL 4.0.x. Not an LTS branch: it leaves support on 14 May 2027, and the decision is recorded here rather than left for that month. OpenSSL's release policy puts an LTS in April of every odd-numbered year, so the next lands in April 2027; the plan is to move to it within a month of its release. If anything in the 4.x line has proved unstable by then, the fallback is a step back to 3.5 LTS (supported to 8 April 2030) |
-| Async I/O | Boost 1.91 (Asio) |
+| Async I/O | Boost 1.92 (Asio) |
 | Databases | MySQL, MariaDB, MS SQL Server, PostgreSQL 18 (libpq), and the embedded SQL CE for zero-configuration installs |
 | MySQL/MariaDB client | MariaDB Connector/C, shipped as `libmysql.dll` with auth plugins — works with MySQL 8 `caching_sha2_password` and MariaDB `ed25519`/`gssapi` out of the box. It requires TLS from the server by default; `AllowUnencryptedConnection=1` under `[Database]` lets it fall back to plaintext for a server that has none |
 | Database transport | Encrypted and verified from `hMailServer.ini`: `PostgreSQLSslMode` (libpq's `sslmode`, up to `verify-full`) and `PostgreSQLSslRootCert` for PostgreSQL, `ConnectionStringOptions` (the provider's own keywords, e.g. `Encrypt=yes;TrustServerCertificate=no`) for MS SQL Server, and TLS required by default for MySQL/MariaDB - all under `[Database]` |
@@ -218,8 +218,8 @@ Create an environment variable named hMailServerLibs pointing at a folder where 
 The repository carries one script per library. Each downloads the source archive of the version hMailServer is pinned to, verifies it against the SHA-256 recorded in the script, and builds it into the layout the project file expects. Run them in this order from the repository root, with Perl on `%PATH%` (OpenSSL and PostgreSQL need it) and, for PostgreSQL, Python with Meson and Ninja (`py -m pip install meson ninja`) and [winflexbison](https://github.com/lexxmark/winflexbison/releases) on `%PATH%`:
 
    <pre>
-   powershell.exe -NoProfile -ExecutionPolicy Bypass -File libraries\build-openssl.ps1 -Version 4.0.1
-   powershell.exe -NoProfile -ExecutionPolicy Bypass -File libraries\build-boost.ps1 -Version 1.91.0
+   powershell.exe -NoProfile -ExecutionPolicy Bypass -File libraries\build-openssl.ps1 -Version 4.0.2
+   powershell.exe -NoProfile -ExecutionPolicy Bypass -File libraries\build-boost.ps1 -Version 1.92.0
    powershell.exe -NoProfile -ExecutionPolicy Bypass -File libraries\build-pgsql.ps1 -Version 18.3
    </pre>
 
@@ -228,7 +228,7 @@ The repository carries one script per library. Each downloads the source archive
 Building OpenSSL
 ----------------
 1. Download OpenSSL 4.0.x from http://www.openssl.org/source/ and put it into %hMailServerLibs%\<OpenSSL-Version>.
-   You should now have a folder named %hMailServerLibs%\<OpenSSL-version>, for example C:\Dev\hMailLibs\openssl-4.0.1
+   You should now have a folder named %hMailServerLibs%\<OpenSSL-version>, for example C:\Dev\hMailLibs\openssl-4.0.2
 2. Start a x64 Native Tools Command Prompt for VS2026.
 3. Change dir to %hMailServerLibs%\<OpenSSL-version>.
 3. Run the following commands:
@@ -256,7 +256,7 @@ Building PostgreSQL
    set hMailServerLibs=%cd%
    set CC=cl
    cd postgresql-18.3
-   meson setup builddir --buildtype=release -Dssl=openssl -Dauto_features=disabled -Dextra_include_dirs=%hMailServerLibs%\openssl-4.0.1\out64\include -Dextra_lib_dirs=%hMailServerLibs%\openssl-4.0.1\out64\lib
+   meson setup builddir --buildtype=release -Dssl=openssl -Dauto_features=disabled -Dextra_include_dirs=%hMailServerLibs%\openssl-4.0.2\out64\include -Dextra_lib_dirs=%hMailServerLibs%\openssl-4.0.2\out64\lib
    meson compile -C builddir src/interfaces/libpq/libpq:shared_library
    </pre>
 
@@ -266,8 +266,8 @@ Building PostgreSQL
 
 Building Boost
 --------------
-1. Download Boost 1.91.0 from http://www.boost.org/ and put it into %hMailServerLibs%\<Boost-Version>.
-   You should now have a folder named %hMailServerLibs%\<Boost-Version>, for example C:\Dev\hMailLibs\boost_1_91_0
+1. Download Boost 1.92.0 from http://www.boost.org/ and put it into %hMailServerLibs%\<Boost-Version>.
+   You should now have a folder named %hMailServerLibs%\<Boost-Version>, for example C:\Dev\hMailLibs\boost_1_92_0
 2. Start a x64 Native Tools Command Prompt for VS2026.
 3. Change dir to %hMailServerLibs%\<Boost-Version>.
 4. Run the following commands:

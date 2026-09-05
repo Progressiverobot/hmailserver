@@ -21,8 +21,8 @@
     Output is one 'name=value' line per value, and, when running inside GitHub Actions
     ($env:GITHUB_OUTPUT set), the same lines are appended there as step outputs:
 
-        openssl=4.0.1               openssl_dir=openssl-4.0.1
-        boost=1.91.0                boost_dir=boost_1_91_0
+        openssl=4.0.2               openssl_dir=openssl-4.0.2
+        boost=1.92.0                boost_dir=boost_1_92_0
         postgresql=18.3             postgresql_dir=postgresql-18.3
 
     The *_dir values are the folder names under %hMailServerLibs% that the build scripts
@@ -67,13 +67,13 @@ function Get-PinnedVersion
 }
 
 # The same version strings the library build scripts and the project file use:
-# openssl-4.0.1, boost_1_91_0 and postgresql-18.3 in the project's include and library
+# openssl-4.0.2, boost_1_92_0 and postgresql-18.3 in the project's include and library
 # paths.
 $openssl = Get-PinnedVersion -Text $vcxprojText -Pattern 'openssl-(\d+\.\d+\.\d+)' -Description 'OpenSSL' -Source $vcxproj
 $boostUnderscored = Get-PinnedVersion -Text $vcxprojText -Pattern 'boost_(\d+_\d+_\d+)' -Description 'Boost' -Source $vcxproj
 $postgresql = Get-PinnedVersion -Text $vcxprojText -Pattern 'postgresql-(\d+\.\d+)' -Description 'PostgreSQL' -Source $vcxproj
 
-# Boost is pinned as a folder name with underscores (boost_1_91_0); build-boost.ps1 takes
+# Boost is pinned as a folder name with underscores (boost_1_92_0); build-boost.ps1 takes
 # the dotted form.
 $boost = $boostUnderscored -replace '_', '.'
 

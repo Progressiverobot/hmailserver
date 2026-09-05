@@ -18,7 +18,7 @@
     Usage from a build script:
 
         . (Join-Path -Path $PSScriptRoot -ChildPath "build-common.ps1")
-        Start-BuildLog -LogPath (Join-Path $PSScriptRoot "build-openssl.log") -Title "OpenSSL 4.0.1 build log"
+        Start-BuildLog -LogPath (Join-Path $PSScriptRoot "build-openssl.log") -Title "OpenSSL 4.0.2 build log"
         $libsPath = Resolve-HMailServerLibs
         $vsInstall = Resolve-VcVars64
         Get-SourceArchive -Url $tarUrl -SrcDir $srcDir -LibsPath $libsPath -Sha256 $digest
@@ -365,7 +365,7 @@ function Get-SourceArchive
         Remove-Item -LiteralPath $SrcDir -Recurse -Force
     }
 
-    # Name the local tarball after the URL's file (e.g. boost_1_91_0.tar.gz).
+    # Name the local tarball after the URL's file (e.g. boost_1_92_0.tar.gz).
     $tarPath = Join-Path -Path $LibsPath -ChildPath (Split-Path -Leaf $Url)
 
     Write-Log "Downloading $Url"

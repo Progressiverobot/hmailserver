@@ -63,7 +63,7 @@ $dependencies = @(
    },
    @{
       Name    = 'boost'
-      # boost_1_91_0 -> 1.91.0
+      # boost_1_92_0 -> 1.92.0
       Pattern = 'boost_(\d+)_(\d+)_(\d+)'
       Purl    = 'pkg:generic/boost@{0}'
       Cpe     = 'cpe:2.3:a:boost:boost:{0}:*:*:*:*:*:*:*'

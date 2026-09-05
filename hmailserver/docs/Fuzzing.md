@@ -192,7 +192,7 @@ touches the installed service, so it cannot disturb a regression run in progress
 **Boost**: two of the compiled translation units use header-only Boost
 (`boost::regex` in `RegularExpression.cpp`, `boost::tokenizer` and
 `boost::lexical_cast` in `StringParser.cpp`). The script picks them up from
-`%hMailServerLibs%\boost_1_91_0` like the main build does, or from
+`%hMailServerLibs%\boost_1_92_0` like the main build does, or from
 `-BoostInclude <dir>`. No Boost library is linked.
 
 Running it
@@ -397,7 +397,7 @@ Checked 13 August 2026. Confirmed present and as described: `/EHa`
 copy into `Problematic messages`; the three targets and the ten translation units
 `build-fuzz.ps1` compiles; `/MT` as the default `-RuntimeLibrary` and the ASan DLL
 copied for both; `_DISABLE_STRING_ANNOTATION` / `_DISABLE_VECTOR_ANNOTATION`;
-Boost from `%hMailServerLibs%\boost_1_91_0` or `-BoostInclude`; `run-fuzz.ps1`'s
+Boost from `%hMailServerLibs%\boost_1_92_0` or `-BoostInclude`; `run-fuzz.ps1`'s
 `-Target` / `-Minutes` / `-Jobs` / `-Replay` / `-Reproduce` and `-error_exitcode=77`;
 `kMaxTraversalDepth` and `hm_fuzz::ExerciseBody` in `fuzz_mime_common`;
 `mime_header_fuzzer`'s three shapes including `Utilities::GetMimeHeader`'s truncated
