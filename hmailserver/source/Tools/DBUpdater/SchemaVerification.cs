@@ -313,7 +313,16 @@ namespace DBUpdater
          new SchemaProbe(6028, "hm_metricsamples.metricsamplename",
                          "update hm_metricsamples set metricsamplename = metricsamplename where 1 = 0"),
          new SchemaProbe(6028, "hm_metricsamples.metricsamplevalue",
-                         "update hm_metricsamples set metricsamplevalue = metricsamplevalue where 1 = 0")
+                         "update hm_metricsamples set metricsamplevalue = metricsamplevalue where 1 = 0"),
+
+         // Upgrade6028to6029* - the archive index. One probe per column the
+         // archiver writes and the sweep reads.
+         new SchemaProbe(6029, "hm_archiveindex.archivepath",
+                         "update hm_archiveindex set archivepath = archivepath where 1 = 0"),
+         new SchemaProbe(6029, "hm_archiveindex.archivehold",
+                         "update hm_archiveindex set archivehold = archivehold where 1 = 0"),
+         new SchemaProbe(6029, "hm_archiveindex.archivemessageid",
+                         "update hm_archiveindex set archivemessageid = archivemessageid where 1 = 0")
       };
 
       /// <summary>

@@ -140,17 +140,22 @@ namespace HM
          RouteBackupStart,
          RouteBackupStatus,
          RouteSettingsGet,
+         RouteArchiveSearch,
+         RouteArchiveGet,
+         RouteArchiveHold,
+         RouteArchiveRelease,
          RouteOpenApi
       };
 
       struct Route
       {
-         Route() : kind(RouteUnknown), message_id(0), range_id(0) { }
+         Route() : kind(RouteUnknown), message_id(0), range_id(0), archive_id(0) { }
 
          RouteKind kind;
          AnsiString identifier;   // domain name, account address or api key id
          __int64 message_id;
          __int64 range_id;        // an IP range id, for the routes that name one
+         __int64 archive_id;      // an archive index row id, for the routes that name one
          AnsiString query;        // the part after "?", for the routes that take one
       };
 
@@ -322,6 +327,9 @@ namespace HM
       AnsiString HandleBackupStart_();
       AnsiString HandleBackupStatus_();
       AnsiString HandleSettings_();
+      AnsiString HandleArchiveSearch_(const std::vector<String> &domains, const AnsiString &query);
+      AnsiString HandleArchiveGet_(const std::vector<String> &domains, __int64 archiveId);
+      AnsiString HandleArchiveHold_(const std::vector<String> &domains, __int64 archiveId, bool hold);
       static bool GetJsonBoolValue_(const AnsiString &json, const AnsiString &key, bool defaultValue);
       static std::vector<AnsiString> GetJsonStringArray_(const AnsiString &json, const AnsiString &key);
       static bool IsSafeLogName_(const AnsiString &name);

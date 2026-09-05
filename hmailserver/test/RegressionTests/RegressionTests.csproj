@@ -532,6 +532,7 @@
     <Compile Include="Security\Tarpits.cs" />
     <Compile Include="Security\AuthenticatedSenderCheck.cs" />
     <Compile Include="Infrastructure\MetricsHistory.cs" />
+    <Compile Include="Infrastructure\ArchiveIndexTests.cs" />
     <Compile Include="Security\AdministratorTwoFactor.cs" />
     <Compile Include="Security\OAuth2Introspection.cs" />
     <Compile Include="Security\OAuth2BearerEs256.cs" />
@@ -636,6 +637,7 @@
     <Compile Include="API\ClientDiscovery.cs" />
     <Compile Include="API\RestApiApiKeys.cs" />
     <Compile Include="API\RestApiCoverage.cs" />
+    <Compile Include="API\RestApiArchive.cs" />
     <Compile Include="Infrastructure\PrometheusConventions.cs" />
     <Compile Include="SMTP\DistributionListHeaders.cs" />
     <Compile Include="SMTP\TlsRptInertReporting.cs" />
