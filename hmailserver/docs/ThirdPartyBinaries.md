@@ -45,11 +45,13 @@ outside the tree under `%hMailServerLibs%`, and
 DLLs into the output directory. That is why Scorecard does not flag them, and
 it is the model the rest of this list should be judged against.
 
-It is worth being precise about one thing, because the file name invites the
-opposite assumption: `libraries/build-dependencies.ps1` **downloads nothing**.
-It builds Boost from a directory the developer has already populated. No script
-in this repository fetches any of the 40 files below. Every one of them is
-committed, and every one of them is used directly from the tree.
+It is worth being precise about one thing. The three scripts that build those
+libraries - `libraries/build-openssl.ps1`, `build-boost.ps1` and
+`build-pgsql.ps1` - do download: each fetches one source archive from the
+project's own release server, verifies it against a SHA-256 pinned in the
+script, and builds it outside the tree. Nothing they fetch is committed, and no
+script in this repository fetches any of the 40 files below. Every one of those
+is committed, and every one of them is used directly from the tree.
 
 So the answer to "which of these could simply be fetched instead of committed"
 is: mechanically, none are today. The interesting question is which *should*

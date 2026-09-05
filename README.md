@@ -207,9 +207,19 @@ Using winget:
 3rd party libraries
 -------------------
 
-Some 3rd party libraries which hMailServer relies on are large and updated frequently. Rather than including these large libraries into the hMailServer git repository, they have to be downloaded and built, currently manually. When you build hMailServer, Visual Studio will use a system environment variable, named hMailServerLibs, to locate these libraries.
+Some 3rd party libraries which hMailServer relies on are large and updated frequently. Rather than including these large libraries into the hMailServer git repository, they are downloaded and built outside the tree. When you build hMailServer, Visual Studio will use a system environment variable, named hMailServerLibs, to locate these libraries.
 
 Create an environment variable named hMailServerLibs pointing at a folder where you will store hMailServer libraries, such as C:\Dev\hMailLibs.
+
+The repository carries one script per library. Each downloads the source archive of the version hMailServer is pinned to, verifies it against the SHA-256 recorded in the script, and builds it into the layout the project file expects. Run them in this order from the repository root, with Perl on `%PATH%` (OpenSSL and PostgreSQL need it) and, for PostgreSQL, Python with Meson and Ninja (`py -m pip install meson ninja`) and [winflexbison](https://github.com/lexxmark/winflexbison/releases) on `%PATH%`:
+
+   <pre>
+   powershell.exe -NoProfile -ExecutionPolicy Bypass -File libraries\build-openssl.ps1 -Version 4.0.1
+   powershell.exe -NoProfile -ExecutionPolicy Bypass -File libraries\build-boost.ps1 -Version 1.91.0
+   powershell.exe -NoProfile -ExecutionPolicy Bypass -File libraries\build-pgsql.ps1 -Version 18.3
+   </pre>
+
+`build\Get-LibraryVersions.ps1` prints the versions the project file currently pins. The same three scripts build the libraries for the continuous-integration server build (`.github/workflows/server-build.yml`), which caches the result per version, so a version bump is an edit to `hMailServer.vcxproj` and to the digest table of the matching script. The sections below record what the scripts do, for anyone who would rather do it by hand.
 
 Building OpenSSL
 ----------------
@@ -242,11 +252,11 @@ Building PostgreSQL
    set hMailServerLibs=%cd%
    set CC=cl
    cd postgresql-18.3
-   meson setup builddir --buildtype=release -Dssl=openssl -Dextra_include_dirs=%hMailServerLibs%\openssl-4.0.1\out64\include -Dextra_lib_dirs=%hMailServerLibs%\openssl-4.0.1\out64\lib
+   meson setup builddir --buildtype=release -Dssl=openssl -Dauto_features=disabled -Dextra_include_dirs=%hMailServerLibs%\openssl-4.0.1\out64\include -Dextra_lib_dirs=%hMailServerLibs%\openssl-4.0.1\out64\lib
    meson compile -C builddir src/interfaces/libpq/libpq:shared_library
    </pre>
 
-**NOTE:** The `-Dextra_include_dirs` and `-Dextra_lib_dirs` flags ensure meson links against the specific OpenSSL version built above. Verify that no other OpenSSL installation appears earlier in `%PATH%` (e.g. from Git for Windows or other tools), as meson may pick up the wrong version.
+**NOTE:** The `-Dextra_include_dirs` and `-Dextra_lib_dirs` flags ensure meson links against the specific OpenSSL version built above. Verify that no other OpenSSL installation appears earlier in `%PATH%` (e.g. from Git for Windows or other tools), as meson may pick up the wrong version; `build-pgsql.ps1` points meson's pkg-config and CMake lookups at the OpenSSL above and then checks the built DLL's imports with `dumpbin`. `-Dauto_features=disabled` switches every optional dependency off, so the libpq.dll that results depends on the two OpenSSL DLLs and on nothing else that would have to be shipped beside it.
 
 **TIP:** You can use [Dependencies](https://github.com/lucasg/Dependencies/releases) to verify that the built `libpq.dll` links against the correct OpenSSL DLLs (`libcrypto-4-x64.dll` / `libssl-4-x64.dll`) and not some other version found elsewhere on the system.
 

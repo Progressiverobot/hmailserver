@@ -92,3 +92,6 @@ CLAUDE.md
 # Python bytecode. The three .py files under build/ are imported by their own
 # dry-run tooling now and then, and the interpreter leaves this behind.
 __pycache__/
+
+# Transcripts the libraries/build-*.ps1 dependency builds write next to themselves.
+libraries/build-*.log

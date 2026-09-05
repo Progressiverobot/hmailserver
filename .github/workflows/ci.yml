@@ -4,10 +4,11 @@ name: CI
 # every push / PR, and verifies the committed generated code still matches its
 # sources. This catches C# regressions cheaply. The tools build against
 # the checked-in COM interop wrapper (source/Tools/Interop), so no registered
-# typelib is needed. The C++ server build + the 1049-test regression suite need
-# the prebuilt native libraries (OpenSSL 4.0.x, Boost 1.91, PostgreSQL 18 libpq —
-# see libraries/build-dependencies.ps1) and a database service, so they run in the
-# separate, manually-triggered server-build workflow.
+# typelib is needed. The C++ server is compiled by server-build.yml, which
+# builds the native libraries it links against (OpenSSL, Boost, PostgreSQL's
+# libpq - see libraries/build-*.ps1) on a hosted runner and caches them; the
+# regression suite needs a database service and the installed service, and
+# still runs on the maintainer's machine.
 
 on:
   push:

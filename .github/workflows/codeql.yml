@@ -2,36 +2,34 @@ name: CodeQL
 
 # Static analysis for both languages in this repository.
 #
-# C# (the Control Panel) runs on every push and pull request. It builds on a
-# GitHub-hosted runner in a couple of minutes, so it is cheap enough to gate
-# changes on.
+# C# (the Control Panel and the setup and migration tools) runs on every push
+# and pull request. It builds on a GitHub-hosted runner in a couple of minutes,
+# so it is cheap enough to gate changes on.
 #
 # C++ (the mail server - every protocol parser, and the whole surface that faces
-# the internet) runs weekly and on demand, and deliberately NOT on push or pull
-# request. That trade-off costs something, so the reasoning is recorded here
-# rather than left to be rediscovered:
+# the internet) runs on every push to master, weekly, and on demand, and
+# deliberately NOT on pull requests. It builds on the same GitHub-hosted
+# windows-2025-vs2026 runner as server-build.yml, with the same native
+# dependencies restored from the same caches, so the reasons this used to be a
+# weekly-only job - one self-hosted machine that was never registered, shared
+# with the regression suite - are gone. What remains is the cost of the analysis
+# itself:
 #
-#   * The server cannot be built on a GitHub-hosted runner at all. It needs the
-#     v145 toolset from Visual Studio 2026 and the prebuilt native dependencies
-#     (boost_1_91_0, openssl-4.0.1, postgresql-18.3) that $(hMailServerLibs)
-#     points at. See .github/workflows/server-build.yml, which carries the same
-#     requirement and the same [self-hosted, windows] label. There is one such
-#     machine, and it is also the machine that runs the regression suite.
 #   * CodeQL builds its database by tracing the compiler, so it needs a FULL
-#     build every time. An incremental build that skips up-to-date files
-#     produces an empty database and the analysis fails outright with "No source
-#     code was seen during the build". That means 516 translation units from
-#     cold, on every run, with the extractor inside every cl.exe invocation.
-#
-# Putting that on every push would queue pull requests behind a multi-hour job
-# on a single machine, and would collide with the regression suite that shares
-# it. Weekly plus on-demand is the honest answer.
+#     build every time: 516 translation units under the extractor, which is
+#     several times slower than the plain build, and then query evaluation over
+#     6.1 MB of C++. An hour or so per run on a hosted runner, against a few
+#     minutes for the C# job.
+#   * A pull request's alerts would be attributed to the branch, and then again
+#     to master when it merges. Analysing master on every push gives one
+#     analysis per merged change, which is what the code-scanning alerts are
+#     keyed on.
 #
 # The cost of that choice, stated plainly: an alert introduced by a pull request
-# is not seen until the next weekly run on master, and is then attributed to
-# master rather than to the change that introduced it. When a change touches the
-# protocol parsers, run this workflow by hand against the branch
-# (workflow_dispatch) before merging rather than waiting for the schedule.
+# is not seen until the push to master that merges it, and is then attributed
+# to that merge rather than to the review. When a change touches the protocol
+# parsers, run this workflow by hand against the branch (workflow_dispatch)
+# before merging rather than waiting for the merge.
 
 on:
   push:
@@ -161,50 +159,50 @@ jobs:
 
   cpp:
     name: Analyze (c-cpp)
-    # Schedule and manual dispatch only - see the header. A push or pull_request
-    # run of this job would sit on the one self-hosted machine for hours.
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: [self-hosted, windows]
-    # A cold traced build of 516 translation units plus query evaluation over
-    # 6.1 MB of C++. Bounded so a wedged run cannot hold the runner for a day.
-    timeout-minutes: 360
+    # Push to master, schedule and manual dispatch only - see the header.
+    if: github.event_name != 'pull_request'
+    # The runner image is written once, here: it is both the label the job runs
+    # on and part of every library cache key the native-dependencies action
+    # builds, and `runs-on` does not accept the `env` context. `name:` above
+    # keeps the matrix value out of the job title in the web UI.
+    strategy:
+      matrix:
+        image: [windows-2025-vs2026]
+    runs-on: ${{ matrix.image }}
+    # A cold run builds the three native libraries first (30-45 minutes), then
+    # traces 516 translation units and evaluates the queries. Bounded so a
+    # wedged run cannot hold a runner for the day.
+    timeout-minutes: 240
     permissions:
       security-events: write
       actions: read
       contents: read
     env:
-      # inputs.configuration is empty on a scheduled run, and build.ps1 defaults
-      # to Debug when handed an empty string - which would quietly analyse the
-      # _DEBUG preprocessor path instead of the one that ships.
+      # Where the library build scripts download and build into; the build
+      # scripts and hMailServer.vcxproj both read this variable.
+      hMailServerLibs: C:\hMailLibs
+      # inputs.configuration is empty on a scheduled run or a push, and
+      # build.ps1 defaults to Debug when handed an empty string - which would
+      # quietly analyse the _DEBUG preprocessor path instead of the one that
+      # ships.
       BUILD_CONFIGURATION: ${{ inputs.configuration || 'Release' }}
-      # MSBuild keeps its worker nodes alive between invocations by default. A
-      # node left over from an earlier job on this runner was started outside
-      # CodeQL's tracer, so anything it compiles is invisible to the extractor -
-      # which shows up as a partial database rather than as an error.
-      MSBUILDDISABLENODEREUSE: '1'
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      # Fail here with a legible message rather than 500 lines into MSBuild.
-      # server-build.yml also warns about each individual dependency folder;
-      # this checks only the condition that makes the build impossible rather
-      # than merely likely to fail at link time.
-      - name: Verify native dependencies
-        shell: powershell
-        run: |
-          if (-not $env:hMailServerLibs) { throw "hMailServerLibs is not set on this runner. See .github/workflows/server-build.yml for what this runner needs." }
-          if (-not (Test-Path $env:hMailServerLibs)) { throw "hMailServerLibs path '$($env:hMailServerLibs)' does not exist." }
-          Write-Host "hMailServerLibs = $($env:hMailServerLibs)"
-
-      # The service on this runner runs from this checkout's build output, so
-      # the linker cannot replace hMailServer.exe while it is running. The
-      # project's own pre-build event does a NET STOP for exactly this reason,
-      # but build.ps1 suppresses pre- and post-build events, so it happens here
-      # instead - the same way server-build.yml handles it.
-      - name: Stop hMailServer service (free the executable)
-        shell: powershell
-        run: Stop-Service hMailServer -ErrorAction SilentlyContinue
+      # Before CodeQL's init, deliberately: init puts the tracer into the
+      # environment of every later step, and OpenSSL, Boost and libpq compiled
+      # under it would be extracted into the database - hours of tracing for
+      # three libraries this repository does not own, with their findings
+      # filed against it. Built or restored here, they are just files on disk
+      # when the traced build links against them.
+      - name: Restore or build the native dependencies
+        uses: ./.github/actions/native-dependencies
+        with:
+          libs-path: ${{ env.hMailServerLibs }}
+          runner-image: ${{ matrix.image }}
 
       # security-extended rather than security-and-quality, deliberately, and
       # this is the one place the two languages are configured differently:
@@ -231,27 +229,29 @@ jobs:
           config-file: ./.github/codeql/codeql-config.yml
           queries: security-extended
 
-      # -Clean is not optional. This runner reuses its workspace between runs,
-      # so without it MSBuild skips every up-to-date translation unit, the
-      # extractor sees nothing, and the analyze step below fails with "No source
-      # code was seen during the build" - the classic CodeQL C++ failure on a
-      # self-hosted runner, and one that reads like a CodeQL bug rather than an
-      # incremental build.
+      # A fresh runner has no build output, so every translation unit is
+      # compiled and the extractor sees all of them. (On the self-hosted runner
+      # this replaced, a reused workspace made -Clean necessary: MSBuild would
+      # skip every up-to-date file and the analysis failed with "No source code
+      # was seen during the build".) build.ps1 disables the pre- and post-build
+      # events, so nothing here stops or starts a service.
       - name: Build server under CodeQL tracing
-        shell: powershell
-        run: ./build/build.ps1 -Configuration $env:BUILD_CONFIGURATION -Clean
+        shell: pwsh
+        run: |
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File build\build.ps1 -Configuration $env:BUILD_CONFIGURATION
+          if ($LASTEXITCODE -ne 0) { throw "build.ps1 failed with exit code $LASTEXITCODE" }
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
         with:
           category: "/language:c-cpp"
 
-      - name: Restart hMailServer service
-        if: ${{ always() }}
-        shell: powershell
-        run: |
-          Start-Service hMailServer -ErrorAction SilentlyContinue
-          $service = Get-Service hMailServer -ErrorAction SilentlyContinue
-          if (-not $service -or $service.Status -ne 'Running') {
-            Write-Warning "hMailServer is not running. A build that failed after the clean step leaves the output directory empty, so the service binary may be missing - rerun server-build.yml to restore it."
-          }
+      - name: Upload the build logs
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: codeql-cpp-build-logs
+          path: |
+            logs/build-*.log
+            libraries/build-*.log
+          if-no-files-found: ignore
