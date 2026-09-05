@@ -16,6 +16,7 @@
 #include "../common/Util/AccountLockout.h"
 #include "../Common/AntiSpam/QuarantineStore.h"
 #include "../common/Util/OAuth2TokenValidator.h"
+#include "../common/Util/ClientCertificateIdentity.h"
 #include "../common/Util/Crypt.h"
 #include "../common/Util/Hashing/ScramSha256.h"
 #include "../common/persistence/PersistentMessage.h"
@@ -459,7 +460,22 @@ namespace HM
    {
       LogClientCommand_(sRequest);
 
-      if (sRequest.GetLength() > 510)
+      // 510 octets is RFC 5321's command line, and it is enough for every command but
+      // AUTH: a SASL initial response or continuation is as long as the mechanism
+      // makes it (RFC 4954 section 4 says so in as many words), and an RS256 bearer
+      // token from a real identity provider is over a kilobyte before XOAUTH2
+      // base64-encodes it again - so the limit that protected the parser from an evil
+      // user also refused every such token with "Line too long". The AUTH command and
+      // the states that are waiting for a SASL response get 12288 octets, RFC 5034's
+      // figure for the same line on POP3.
+      const bool saslLine =
+         current_state_ == SMTPUSERNAME || current_state_ == SMTPUPASSWORD ||
+         current_state_ == SMTPSCRAMFIRST || current_state_ == SMTPSCRAMFINAL || current_state_ == SMTPSCRAMACK ||
+         current_state_ == SMTPBEARERRESPONSE || current_state_ == SMTPEXTERNALRESPONSE ||
+         (sRequest.GetLength() >= 5 && sRequest.Left(5).CompareNoCase("AUTH ") == 0);
+      const int maxLength = saslLine ? 12288 : 510;
+
+      if (sRequest.GetLength() > maxLength)
       {
          // This line is too long... is this an evil user?
          SendResponse_(500, _T("5.5.2"), _T("Line too long."));
@@ -592,6 +608,11 @@ namespace HM
          case SMTPBEARERRESPONSE:
             {
                AuthenticateUsingBearer_(sRequest);
+               break;
+            }
+         case SMTPEXTERNALRESPONSE:
+            {
+               AuthenticateUsingExternal_(sRequest);
                break;
             }
          default:
@@ -2559,6 +2580,13 @@ namespace HM
          if (OAuth2TokenValidator::IsEnabled() && (!OAuth2TokenValidator::RequireTLS() || IsSSLConnection()))
             sAuth += " XOAUTH2 OAUTHBEARER";
 
+         // EXTERNAL (RFC 4422 Appendix A): the client's proof is the certificate the
+         // handshake verified against this port's CA, so the mechanism exists on a
+         // connection exactly when such a certificate names an address. Offered to
+         // nobody else - there is nothing they could answer with.
+         if (!GetVerifiedClientCertificateIdentities().empty())
+            sAuth += " EXTERNAL";
+
          sData += sAuth;
       }
 
@@ -3694,6 +3722,35 @@ namespace HM
          return;
       }
 
+      if (sAuthenticationType == _T("EXTERNAL"))
+      {
+         // Offered only on a connection whose client certificate verified and names an
+         // address (see the EHLO response); asked for on any other, there is nothing
+         // to authenticate with, and the answer is the one every unoffered mechanism
+         // gets.
+         if (GetVerifiedClientCertificateIdentities().empty())
+         {
+            SendErrorResponse_(504, "Authentication mechanism not supported.");
+            return;
+         }
+
+         requestedAuthenticationType_ = AUTH_EXTERNAL;
+
+         if (vecParams.size() >= 3)
+         {
+            // Initial response supplied inline with the AUTH command - "=" for an
+            // empty one (RFC 4954 section 4).
+            AuthenticateUsingExternal_(vecParams[2]);
+         }
+         else
+         {
+            EnqueueWrite_("334 ");
+            current_state_ = SMTPEXTERNALRESPONSE;
+         }
+
+         return;
+      }
+
       SendErrorResponse_(504, "Authentication mechanism not supported.");
    }
 
@@ -3985,6 +4042,56 @@ namespace HM
       bool disconnect = false;
       accountLogon.RegisterFailedLogin(GetRemoteEndpointAddress(), sLoginName, disconnect, false);
 
+      authentication_failure_count_++;
+
+      if (disconnect || authentication_failure_count_ >= 10)
+      {
+         SendErrorResponse_(535, "Authentication failed. Too many invalid logon attempts.");
+         pending_disconnect_ = true;
+         EnqueueDisconnect();
+         return;
+      }
+
+      RestartAuthentication_();
+   }
+
+   void
+   SMTPConnection::AuthenticateUsingExternal_(const String &sLine)
+   {
+      // A bare "*" cancels the SASL exchange (RFC 4954).
+      if (sLine == _T("*"))
+      {
+         ResetLoginCredentials_();
+         SendErrorResponse_(501, "Authentication cancelled.");
+         return;
+      }
+
+      // The response is the authorization identity the client wants, base64, or
+      // nothing at all - an empty continuation line, or "=" as the inline form of an
+      // empty initial response - for "whoever the certificate says".
+      String sAuthzid;
+      if (!sLine.IsEmpty() && sLine != _T("="))
+         StringParser::Base64Decode(sLine, sAuthzid);
+
+      String sLoginName;
+      bool disconnect = false;
+      std::shared_ptr<const Account> pAccount = ClientCertificateIdentity::Logon(
+         GetVerifiedClientCertificateIdentities(), sAuthzid, GetRemoteEndpointAddress(), sLoginName, disconnect);
+
+      username_ = sLoginName;
+      isAuthenticated_ = pAccount != nullptr;
+
+      FireOnClientLogon_(sLoginName, isAuthenticated_);
+
+      if (pAccount)
+      {
+         SendResponse_(235, _T("2.7.0"), _T("authenticated."));
+         current_state_ = HEADER;
+         return;
+      }
+
+      // The per-IP accounting has been fed by Logon; this is the per-connection cap,
+      // the same one every other mechanism applies.
       authentication_failure_count_++;
 
       if (disconnect || authentication_failure_count_ >= 10)

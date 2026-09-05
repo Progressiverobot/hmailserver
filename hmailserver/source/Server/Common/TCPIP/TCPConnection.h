@@ -159,6 +159,13 @@ namespace HM
       // TCP/IP log by AsyncHandshakeCompleted.
       AnsiString GetVerifiedClientCertificateSubject() const { return verified_client_certificate_subject_; }
 
+      // The addresses that certificate names (ClientCertificateIdentity::Extract), for
+      // SASL EXTERNAL: the mechanism is offered when this is non-empty, and the logon
+      // maps one of these to a mailbox. Empty when no certificate verified, and
+      // empty for a verified certificate that names no address - such a certificate
+      // proves the client is someone the CA vouches for, but not which mailbox.
+      const std::vector<AnsiString> &GetVerifiedClientCertificateIdentities() const { return verified_client_certificate_identities_; }
+
       int GetSessionID();
 
    protected:
@@ -348,6 +355,7 @@ namespace HM
       // Set only for an inbound session whose client certificate verified
       // against the port's CA bundle; see GetVerifiedClientCertificateSubject.
       AnsiString verified_client_certificate_subject_;
+      std::vector<AnsiString> verified_client_certificate_identities_;
 
       // PROXY protocol state (inbound sessions from a trusted proxy only).
       bool proxy_protocol_expected_ = false;

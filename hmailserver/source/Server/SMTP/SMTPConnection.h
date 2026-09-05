@@ -220,6 +220,7 @@ namespace HM
       // Authenticates using a PLAIN line.
 
       void AuthenticateUsingBearer_(const String &sLine);
+      void AuthenticateUsingExternal_(const String &sLine);
       // Authenticates using a SASL XOAUTH2 / OAUTHBEARER (RFC 7628) client response.
 
       std::shared_ptr<const Account> LookupActiveAccount_(const String &sAddress);
@@ -289,7 +290,8 @@ namespace HM
          SMTPSCRAMFINAL = 9,   // awaiting the SCRAM client-final message
          SMTPSCRAMACK = 10,    // awaiting the empty ack after the server-final message
          SMTPBEARERRESPONSE = 11, // awaiting the SASL XOAUTH2 / OAUTHBEARER client response
-         BDATDATA = 12         // RFC 3030: receiving the octets of a BDAT chunk
+         BDATDATA = 12,        // RFC 3030: receiving the octets of a BDAT chunk
+         SMTPEXTERNALRESPONSE = 13 // awaiting the SASL EXTERNAL authorization identity
       };
   
       enum AuthenticationType
@@ -299,6 +301,7 @@ namespace HM
          AUTH_LOGIN = 3,
          AUTH_SCRAM_SHA256 = 4,
          AUTH_BEARER = 5,
+         AUTH_EXTERNAL = 6,
       };
 
       

@@ -108,6 +108,12 @@ namespace HM
           (!OAuth2TokenValidator::RequireTLS() || pConnection->IsSSLConnection()))
 	      sResponse += " AUTH=XOAUTH2 AUTH=OAUTHBEARER";
 
+      // EXTERNAL (RFC 4422 Appendix A): the client's proof is the certificate the
+      // handshake verified against this port's CA, so the mechanism exists on a
+      // connection exactly when such a certificate names an address.
+      if (authAvailable && !pConnection->GetVerifiedClientCertificateIdentities().empty())
+	      sResponse += " AUTH=EXTERNAL";
+
       if (pConfig->GetUseIMAPSASLInitialResponse())
 	      sResponse += " SASL-IR";
 

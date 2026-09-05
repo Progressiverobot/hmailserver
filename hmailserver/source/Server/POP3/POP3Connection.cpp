@@ -17,6 +17,7 @@
 #include "../common/Util/Hashing/ScramSha256.h"
 #include "../common/Util/Parsing/StringParser.h"
 #include "../common/Util/OAuth2TokenValidator.h"
+#include "../common/Util/ClientCertificateIdentity.h"
 #include "../common/Application/IniFileSettings.h"
 #include "../Common/Application/TimeoutCalculator.h"
 
@@ -60,6 +61,7 @@ namespace HM
       authentication_failure_count_(0),
       sasl_plain_pending_(false),
       sasl_bearer_pending_(false),
+      sasl_external_pending_(false),
       utf8_enabled_(false),
       mailbox_locked_(false)
    {
@@ -285,7 +287,18 @@ namespace HM
    {
       LogClientCommand_(Request);
 
-      if (Request.GetLength() > 500)
+      // 500 octets is generous for every POP3 command but one. A SASL initial response
+      // or continuation carries a credential that is as long as the mechanism makes
+      // it, and an RS256 bearer token from a real identity provider is over a
+      // kilobyte before it is base64-encoded again for XOAUTH2 - so the limit that
+      // protected the parser from an evil user also refused every such token with
+      // "Line too long". RFC 5034 section 4 puts the AUTH line at up to 12288 octets,
+      // which is what an AUTH command or a pending SASL exchange gets here.
+      const bool saslLine = scram_session_ || sasl_plain_pending_ || sasl_bearer_pending_ || sasl_external_pending_ ||
+         (Request.GetLength() >= 5 && Request.Left(5).CompareNoCase("AUTH ") == 0);
+      const int maxLength = saslLine ? 12288 : 500;
+
+      if (Request.GetLength() > maxLength)
       {
          // This line is too long... is this an evil user?
          EnqueueWrite_("-ERR Line too long.");
@@ -317,6 +330,17 @@ namespace HM
             return ResultNormalResponse;
          }
          return ProcessAuthBearer_(Request);
+      }
+
+      if (sasl_external_pending_)
+      {
+         sasl_external_pending_ = false;
+         if (Request == "*")
+         {
+            EnqueueWrite_("-ERR Authentication cancelled.");
+            return ResultNormalResponse;
+         }
+         return ProcessAuthExternal_(Request);
       }
       
       String sCommand;
@@ -466,6 +490,12 @@ namespace HM
          // only over TLS.
          if (OAuth2TokenValidator::IsEnabled() && (!OAuth2TokenValidator::RequireTLS() || IsSSLConnection()))
             capabilities+=" XOAUTH2 OAUTHBEARER";
+
+         // EXTERNAL (RFC 4422 Appendix A): the client's proof is the certificate the
+         // handshake verified against this port's CA, so the mechanism exists on a
+         // connection exactly when such a certificate names an address.
+         if (!GetVerifiedClientCertificateIdentities().empty())
+            capabilities+=" EXTERNAL";
 
          capabilities+="\r\n";
       }
@@ -832,6 +862,9 @@ namespace HM
          if (OAuth2TokenValidator::IsEnabled() && (!OAuth2TokenValidator::RequireTLS() || IsSSLConnection()))
             sMechanisms += "XOAUTH2\r\nOAUTHBEARER\r\n";
 
+         if (!GetVerifiedClientCertificateIdentities().empty())
+            sMechanisms += "EXTERNAL\r\n";
+
          EnqueueWrite_("+OK List of SASL mechanisms follows\r\n" + sMechanisms + ".");
          return ResultNormalResponse;
       }
@@ -903,6 +936,25 @@ namespace HM
          if (hasInitialResponse)
             return ProcessScramClientFirst_(initialResponse);
 
+         EnqueueWrite_("+ ");
+         return ResultNormalResponse;
+      }
+
+      if (mechanism == _T("EXTERNAL"))
+      {
+         // Offered only on a connection whose client certificate verified against the
+         // port's CA and names an address (see CAPA); on any other there is nothing to
+         // authenticate with.
+         if (GetVerifiedClientCertificateIdentities().empty())
+         {
+            EnqueueWrite_("-ERR Unsupported authentication mechanism.");
+            return ResultNormalResponse;
+         }
+
+         if (hasInitialResponse)
+            return ProcessAuthExternal_(initialResponse);
+
+         sasl_external_pending_ = true;
          EnqueueWrite_("+ ");
          return ResultNormalResponse;
       }
@@ -1029,6 +1081,42 @@ namespace HM
          }
 
          EnqueueWrite_("-ERR [AUTH] Invalid authentication token.");
+         return ResultNormalResponse;
+      }
+
+      account_ = pAccount;
+      return HandleSuccessfulLogin_();
+   }
+
+   POP3Connection::ParseResult
+   POP3Connection::ProcessAuthExternal_(const String &sBase64)
+   {
+      // The response is the authorization identity the client wants, base64, or
+      // nothing - an empty line, or "=" - for "whoever the certificate says".
+      String sAuthzid;
+      if (!sBase64.IsEmpty() && sBase64 != _T("="))
+         StringParser::Base64Decode(sBase64, sAuthzid);
+
+      String sLoginName;
+      bool disconnect = false;
+      std::shared_ptr<const Account> pAccount = ClientCertificateIdentity::Logon(
+         GetVerifiedClientCertificateIdentities(), sAuthzid, GetRemoteEndpointAddress(), sLoginName, disconnect);
+
+      username_ = sLoginName;
+
+      FireOnClientLogon_(sLoginName, pAccount != nullptr);
+
+      if (!pAccount)
+      {
+         // The per-IP accounting has been fed by Logon; this is the per-connection cap.
+         authentication_failure_count_++;
+         if (disconnect || authentication_failure_count_ >= 10)
+         {
+            EnqueueWrite_("-ERR [AUTH] The client certificate does not identify an account. Too many invalid logon attempts.");
+            return ResultDisconnect;
+         }
+
+         EnqueueWrite_("-ERR [AUTH] The client certificate does not identify an account.");
          return ResultNormalResponse;
       }
 
