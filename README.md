@@ -79,7 +79,7 @@ Mail filtering and routing
 
 * **Sieve** (RFC 5228) — a standards-based interpreter runs each account's active script during delivery (`keep`, `fileinto`, `discard`, `redirect`, implicit keep, plus the `copy`, `relational`, `subaddress`, `imap4flags` and `vacation` extensions), with an optional **ManageSieve** (RFC 5804) listener so clients can manage scripts over TCP.
 * The original rules engine, with global and per-account rules, regular-expression criteria and scripted actions.
-* Server-side **event scripts** (VBScript/JScript) on connection, HELO, DATA, accept and delivery events.
+* Server-side **event scripts** (VBScript/JScript) on connection, HELO, DATA, accept and delivery events, with `ScriptAllowedObjects` bounding which COM classes a script may create.
 * Routes, aliases, distribution lists, catch-all addresses and plus-addressing.
 * Multiple smart hosts with automatic failover: separate several hosts with `|` in the relayer field and delivery moves to the next when one cannot be reached.
 
@@ -447,6 +447,13 @@ Administration and monitoring:
                                  ; searchable over COM (Utilities.SearchArchive) and REST, a copy can be put
                                  ; on legal hold (Utilities.SetArchiveHold), and a held copy is never removed
                                  ; by ArchiveRetentionDays or by an address erasure
+   ScriptAllowedObjects=*        ; the COM classes an event script may create with CreateObject (VBScript) or
+                                 ; new ActiveXObject (JScript): * (the default when absent) = any class, as before;
+                                 ; empty = none; otherwise a comma-separated list of ProgIDs or {CLSID}s, e.g.
+                                 ; WScript.Shell,MSXML2.ServerXMLHTTP (what the Control Panel's script templates
+                                 ; use). A denied class fails in the script with error 429 and is named in the
+                                 ; application log. Scripts still run in-process as the service account: this
+                                 ; bounds what a script can reach, not what the service can
    OutboundPipelining=1          ; RFC 2920 on the delivery client: when the remote advertises PIPELINING, send
                                  ; MAIL FROM, every RCPT TO and the data command in one flight and read the
                                  ; replies back in order. 0 = one command per reply, as before

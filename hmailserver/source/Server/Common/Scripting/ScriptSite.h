@@ -34,7 +34,11 @@
 #pragma once
 
 #include <activscp.h>
+#include <urlmon.h>
+#include <objsafe.h>
+#include <servprov.h>
 #include "ScriptObjectContainer.h"
+#include "ScriptObjectPolicy.h"
 
 
 
@@ -275,6 +279,30 @@ public:
       USES_CONVERSION;
       HR(engine_.CoCreateInstance(T2COLE(pszLanguage)));
 
+      // An engine consults its host's security manager (IInternetHostSecurityManager
+      // below, answered from ScriptAllowedObjects) only when told to, through its
+      // own IObjectSafety with INTERFACE_USES_SECURITY_MANAGER. Told only when the
+      // list restricts something, so an unrestricted server runs its scripts by the
+      // exact path it always did. An engine that cannot be told cannot be bounded,
+      // and a bound the administrator asked for is not silently dropped: the
+      // script does not run, and the error log says why.
+      if (!HM::ScriptObjectPolicy::IsUnrestricted())
+      {
+         CComQIPtr<IObjectSafety> safety = engine_;
+         HRESULT safetyResult = safety ? safety->SetInterfaceSafetyOptions(IID_IActiveScript,
+            INTERFACE_USES_SECURITY_MANAGER, INTERFACE_USES_SECURITY_MANAGER) : E_NOINTERFACE;
+         if (FAILED(safetyResult))
+         {
+            HM::String message;
+            message.Format(_T("ScriptAllowedObjects cannot be enforced: the %s engine does not accept a host security manager (0x%08X). No script runs until the setting is * or the engine is replaced."),
+                           pszLanguage, safetyResult);
+            HM::Logger::Instance()->LogError(message);
+            last_error_message_ = message;
+            engine_.Release();
+            return safetyResult;
+         }
+      }
+
       //if (lstrcmp(pszLanguage, _T("JScript")) == 0)
       //{
       //   // Set the JScript version to use - see https://docs.microsoft.com/en-us/scripting/winscript/reference/iactivescriptproperty-setproperty
@@ -450,6 +478,121 @@ protected:
 };
 
 /////////////////////////////////////////////////////////////////////////////
+// IInternetHostSecurityManager
+//
+// The script engines ask their host before CreateObject (VBScript) or new
+// ActiveXObject (JScript) instantiates a class: ProcessUrlAction with
+// URLACTION_ACTIVEX_RUN and the CLSID, and then QueryCustomPolicy with
+// GUID_CUSTOM_CONFIRMOBJECTSAFETY for the object they made. A site without this
+// interface lets them create anything, which is what every hMailServer did until
+// now; with it, the answer comes from ScriptAllowedObjects. A denied class fails
+// inside the script with the engine's own "can't create object" error (429),
+// which the script can trap like any other failure, and one application-log line
+// names the class and the setting.
+
+class ATL_NO_VTABLE IInternetHostSecurityManagerImpl : public IInternetHostSecurityManager
+{
+public:
+   STDMETHOD(GetSecurityId)(BYTE * /*pbSecurityId*/, DWORD * /*pcbSecurityId*/, DWORD_PTR /*dwReserved*/)
+   {
+      return E_NOTIMPL;
+   }
+
+   STDMETHOD(ProcessUrlAction)(DWORD dwAction, BYTE *pPolicy, DWORD cbPolicy, BYTE *pContext, DWORD cbContext, DWORD /*dwFlags*/, DWORD /*dwReserved*/)
+   {
+      if (pPolicy == NULL || cbPolicy < sizeof(DWORD))
+         return E_INVALIDARG;
+
+      DWORD policy = URLPOLICY_ALLOW;
+      if (dwAction == URLACTION_ACTIVEX_RUN)
+      {
+         CLSID clsid = {0};
+         if (pContext != NULL && cbContext >= sizeof(CLSID))
+            memcpy(&clsid, pContext, sizeof(CLSID));
+
+         if (!ClassAllowed_(clsid))
+            policy = URLPOLICY_DISALLOW;
+      }
+
+      *reinterpret_cast<DWORD*>(pPolicy) = policy;
+      HM::String what;
+      what.Format(_T("url action 0x%04X: %s"), (unsigned) dwAction, policy == URLPOLICY_ALLOW ? _T("allowed") : _T("refused"));
+      Trace_(what, cbContext);
+      return policy == URLPOLICY_ALLOW ? S_OK : S_FALSE;
+   }
+
+   STDMETHOD(QueryCustomPolicy)(REFGUID guidKey, BYTE **ppPolicy, DWORD *pcbPolicy, BYTE *pContext, DWORD cbContext, DWORD /*dwReserved*/)
+   {
+      if (ppPolicy == NULL || pcbPolicy == NULL)
+         return E_POINTER;
+      *ppPolicy = NULL;
+      *pcbPolicy = 0;
+
+      // GUID_CUSTOM_CONFIRMOBJECTSAFETY, objsafe.h: "may the script use the object it
+      // has just created". Answered here for the same reason ProcessUrlAction is:
+      // left to the engine's default, it would refuse every class not marked safe
+      // for scripting - Scripting.FileSystemObject among them - whatever the list
+      // says. Any other question is the engine's.
+      // {10200490-fa38-11d0-ac0e-00a0c90fffc0}: urlmon.h declares the constant and no
+      // import library the SDK ships defines it, so the value is written here - read
+      // back from what the engine asks, since the value in circulation was wrong.
+      static const GUID ConfirmObjectSafety = { 0x10200490, 0xfa38, 0x11d0, { 0xac, 0x0e, 0x00, 0xa0, 0xc9, 0x0f, 0xff, 0xc0 } };
+      OLECHAR asked[64] = {0};
+      StringFromGUID2(guidKey, asked, sizeof(asked) / sizeof(asked[0]));
+      if (!IsEqualGUID(guidKey, ConfirmObjectSafety))
+      {
+         Trace_(HM::String(_T("custom policy ")) + asked + _T(" left to the engine"), cbContext);
+         return INET_E_DEFAULT_ACTION;
+      }
+
+      // The context is objsafe.h's CONFIRMSAFETY - the class, the object and flags -
+      // and the class is its first field. Only the class is read and only the
+      // class's size is required: the engine passes the structure with a size
+      // short of the padded sizeof, and a strict check denied every listed class.
+      DWORD policy = URLPOLICY_DISALLOW;
+      if (pContext != NULL && cbContext >= sizeof(CLSID))
+      {
+         CLSID clsid = {0};
+         memcpy(&clsid, pContext, sizeof(CLSID));
+         if (ClassAllowed_(clsid))
+            policy = URLPOLICY_ALLOW;
+      }
+
+      *ppPolicy = static_cast<BYTE*>(CoTaskMemAlloc(sizeof(DWORD)));
+      if (*ppPolicy == NULL)
+         return E_OUTOFMEMORY;
+      *reinterpret_cast<DWORD*>(*ppPolicy) = policy;
+      *pcbPolicy = sizeof(DWORD);
+      Trace_(policy == URLPOLICY_ALLOW ? _T("confirm object safety: allowed") : _T("confirm object safety: refused"), cbContext);
+      return S_OK;
+   }
+
+private:
+   // What the engine asked and what it was told, in the debug log.
+   static void Trace_(const HM::String &what, DWORD contextBytes)
+   {
+      if (!(HM::Logger::Instance()->GetLogMask() & HM::Logger::LSDebug))
+         return;
+      HM::String message;
+      message.Format(_T("Script host: %s (%u context bytes)."), what.c_str(), (unsigned) contextBytes);
+      HM::Logger::Instance()->LogDebug(message);
+   }
+
+   static bool ClassAllowed_(REFCLSID clsid)
+   {
+      HM::String objectName;
+      if (HM::ScriptObjectPolicy::IsAllowed(clsid, objectName))
+         return true;
+
+      HM::String message;
+      message.Format(_T("Script denied: CreateObject of %s is not in ScriptAllowedObjects."), objectName.c_str());
+      if (HM::Logger::Instance()->GetLogMask() & HM::Logger::LSApplication)
+         HM::Logger::Instance()->LogApplication(message);
+      return false;
+   }
+};
+
+/////////////////////////////////////////////////////////////////////////////
 // CScriptSiteBasic
 //
 // This is the minimum code needed to run a script engine. It has no support
@@ -472,14 +615,33 @@ protected:
 
 class ATL_NO_VTABLE CScriptSiteBasic :
    public CComObjectRootEx<CComSingleThreadModel>,
-   public CScriptSiteImpl
+   public CScriptSiteImpl,
+   public IInternetHostSecurityManagerImpl,
+   public IServiceProvider
 {
 public:
    DECLARE_PROTECT_FINAL_CONSTRUCT()
    BEGIN_COM_MAP(CScriptSiteBasic)
       COM_INTERFACE_ENTRY(IActiveScriptSite)
       COM_INTERFACE_ENTRY(IActiveScriptSiteWindow)
+      COM_INTERFACE_ENTRY(IInternetHostSecurityManager)
+      COM_INTERFACE_ENTRY(IServiceProvider)
    END_COM_MAP()
+
+   // An engine may ask for the security manager as a service
+   // (SID_SInternetHostSecurityManager, whose value is the interface's IID) rather
+   // than as an interface on the site; both roads lead to the same object.
+   STDMETHOD(QueryService)(REFGUID guidService, REFIID riid, void **ppv)
+   {
+      if (ppv == NULL)
+         return E_POINTER;
+      *ppv = NULL;
+
+      if (IsEqualGUID(guidService, __uuidof(IInternetHostSecurityManager)))
+         return GetUnknown()->QueryInterface(riid, ppv);
+
+      return E_NOINTERFACE;
+   }
 };
 
 

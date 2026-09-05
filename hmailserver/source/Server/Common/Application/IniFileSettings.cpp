@@ -381,6 +381,9 @@ namespace HM
       // and the sender would have bounced the mail instead of retrying.
       db_connection_acquire_timeout_ =  ReadIniSettingInteger_("Settings", "DBConnectionAcquireTimeout", 60);
       script_timeout_ =  ReadIniSettingInteger_("Settings", "ScriptTimeout", 60);
+      // Absent means "*": a key that appears in an upgrade must not break the
+      // scripts an installation already runs. Present and empty means none.
+      script_allowed_objects_ = ReadIniSettingString_("Settings", "ScriptAllowedObjects", "*");
       external_process_timeout_ =  ReadIniSettingInteger_("Settings", "ExternalProcessTimeout", 300);
 
       // Async work-queue health. The stall threshold is how long every worker may

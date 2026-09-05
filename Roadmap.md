@@ -70,7 +70,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Routing, queue and delivery](#routing-queue-and-delivery) | 24 | – | 0 | 1 |
 | [Administration, API and Control Panel](#administration-api-and-control-panel) | 69 | – | 1 | – |
 | [Observability and diagnostics](#observability-and-diagnostics) | 38 | – | – | 1 |
-| [Extensibility and scripting](#extensibility-and-scripting) | 39 | – | 1 | – |
+| [Extensibility and scripting](#extensibility-and-scripting) | 40 | – | – | – |
 | [Build, testing and supply chain](#build-testing-and-supply-chain) | 11 | – | 0 | – |
 | [Cross-cutting and platform](#cross-cutting-and-platform) | 10 | 1 | 1 | – |
 | **Forward-looking** | | | | |
@@ -78,7 +78,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 8 | – | – | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 7 | 1 | – | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 7 | 1 | 1 | – |
-| **Total** | **779** | **9** | **26** | **31** |
+| **Total** | **780** | **9** | **25** | **31** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage, the administration surface and the core protocol layer are the
@@ -1035,7 +1035,7 @@ the source, not from documentation.
 
 ### Extensibility and scripting
 
-39 shipped · 0 underway · 1 not started · 0 deferred
+40 shipped · 0 underway · 0 not started · 0 deferred
 
 | | Capability | Detail |
 |:-:|---|---|
@@ -1077,7 +1077,7 @@ the source, not from documentation.
 | ✅ | VBScript and JScript event scripting | Windows Active Scripting (IActiveScript) engine created by CoCreateInstance on the language name; only the literal settings "VBScript" and "JScript" are recognised… |
 | ✅ | Watchdog limitation: blocked COM calls | An interrupt aborts script execution but cannot release a handler blocked inside a COM call (e.g. a synchronous ServerXMLHTTP to a dead host) - the limit is documented in the error text the admin receives |
 | ✅ | External filter hook (rspamd / MTA-hook style) | Shipped 20 August 2026 and inert until `FilterHookUrl` names an engine: the accepted message is POSTed to it with the envelope, connecting address and HELO as request headers — the shape rspamd's own check endpoint expects — and the verdict comes back as a score, so it lands alongside SPF, DKIM and DMARC and the administrator's existing thresholds decide what happens. Milter itself stays declined; the row above says why the HTTP shape was chosen over it. |
-| ⬜ | Script sandboxing / capability restriction | None: scripts run in-process under the service account with unrestricted CreateObject (the shipped Control Panel templates use WScript.Shell and MSXML2.ServerXMLHTTP); the only bound is the wall-clock watchdog. No allow-list… |
+| ✅ | Script sandboxing / capability restriction | None: scripts run in-process under the service account with unrestricted CreateObject (the shipped Control Panel templates use WScript.Shell and MSXML2.ServerXMLHTTP); the only bound is the wall-clock watchdog. No allow-list… **An allow-list shipped 5 September 2026: `ScriptAllowedObjects`.** The script site implements `IInternetHostSecurityManager`, which VBScript's `CreateObject` and JScript's `new ActiveXObject` consult before instantiating a class: `*` (the default when the key is absent) allows every class as before, empty allows none, otherwise exactly the listed ProgIDs and `{CLSID}`s. A denied class fails inside the script with the engine's own error 429 and one application-log line names the class and the setting. Still true, and written beside the key: scripts run in-process under the service account, so the list bounds what a script can reach, not what the service can - a process-level sandbox would be a different design. `API/ScriptObjectPolicy` (5 tests) proves the denial, the allow, the CLSID form, JScript and the unrestricted default. |
 | ✅ | XCLIENT / PROXY protocol — shipped 21 Aug 2026, both off by default | Put a load balancer, a TLS terminator or a Postfix relay in front of the SMTP listener and every connection appeared to come from **it**. That is not one missing feature, it is **DNSBL, SPF, greylisting, auto-ban and the IP-range rules all quietly evaluating the wrong address while still reporting success** — and the `Received:` header recording the lie. Both mechanisms now exist: PROXY protocol **v1 and v2** (consumed before the TLS handshake and before the greeting) and Postfix **XCLIENT** (`ADDR NAME PORT PROTO HELO LOGIN`, answered with a fresh 220 so the upstream re-EHLOs). **The security rule is the whole feature**: a peer that can rewrite its own source address has defeated every IP-based control here, so both are off by default, the trusted list is **empty by default**, and every trust decision is made against the **real TCP peer** — never an address a header just supplied, so chained proxies cannot bootstrap trust. A malformed entry in the list matches **nothing** rather than everything. XCLIENT is not even *advertised* to an untrusted peer, because advertising it invites the attempt and leaks the deployment shape; a PROXY header from an untrusted peer **drops the connection** rather than being ignored, since ignoring it would leave the real client's commands being read as the proxy's. The rewrite lands before everything that consumes the address, and the security range is **re-read for the asserted client**, so an auto-ban range still bites through the proxy. Two operational consequences are stated rather than hidden: trust is per-source, not per-port, so a listed proxy **must** send the header on every connection; and the upstream has to be configured to send one at all (HAProxy `send-proxy`), which this server cannot check. |
 
 ### Build, testing and supply chain
