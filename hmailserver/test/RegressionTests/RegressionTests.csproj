@@ -634,6 +634,7 @@
     <Compile Include="Sieve\ManageSieveAutoBan.cs" />
     <Compile Include="API\ClientDiscovery.cs" />
     <Compile Include="API\RestApiApiKeys.cs" />
+    <Compile Include="API\RestApiCoverage.cs" />
     <Compile Include="Infrastructure\PrometheusConventions.cs" />
     <Compile Include="SMTP\DistributionListHeaders.cs" />
     <Compile Include="SMTP\TlsRptInertReporting.cs" />

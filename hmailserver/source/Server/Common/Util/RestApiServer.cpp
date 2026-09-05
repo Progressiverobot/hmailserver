@@ -18,6 +18,30 @@
 #include "../AntiSpam/QuarantineStore.h"
 #include "../BO/Aliases.h"
 #include "../BO/Alias.h"
+#include "../BO/SecurityRanges.h"
+#include "../BO/SecurityRange.h"
+#include "../BO/DistributionLists.h"
+#include "../BO/DistributionList.h"
+#include "../BO/DistributionListRecipients.h"
+#include "../BO/DistributionListRecipient.h"
+#include "../BO/Rules.h"
+#include "../BO/Rule.h"
+#include "../BO/RuleCriterias.h"
+#include "../BO/RuleCriteria.h"
+#include "../BO/RuleActions.h"
+#include "../BO/RuleAction.h"
+#include "../Persistence/PersistentSecurityRange.h"
+#include "../Persistence/PersistentDistributionList.h"
+#include "../Persistence/PersistentDistributionListRecipient.h"
+#include "../Application/ObjectCache.h"
+#include "../Application/BackupManager.h"
+#include "../Application/IniFileSettings.h"
+#include "../TCPIP/IPAddress.h"
+#include "../../SMTP/SMTPConfiguration.h"
+#include "../../IMAP/IMAPConfiguration.h"
+#include "../../POP3/POP3Configuration.h"
+#include "FileInfo.h"
+#include <fstream>
 #include "FileUtilities.h"
 #include "Time.h"
 #include "Encoding/Base64.h"
@@ -1611,6 +1635,34 @@ namespace HM
          case RouteAliasList:
             return HandleListAliases_(String(route.identifier));
 
+         case RouteIpRangeList:
+            return HandleListIpRanges_();
+         case RouteIpRangeCreate:
+            return HandleCreateIpRange_(GetRequestBody_(request));
+         case RouteIpRangeDelete:
+            return HandleDeleteIpRange_(route.range_id);
+         case RouteListList:
+            return HandleListLists_(String(route.identifier));
+         case RouteListCreate:
+            return HandleCreateList_(String(route.identifier), GetRequestBody_(request));
+         case RouteListDelete:
+            return HandleDeleteList_(String(route.identifier));
+         case RouteCertificateList:
+            return HandleListCertificates_();
+         case RouteDkimGet:
+            return HandleDkim_(String(route.identifier));
+         case RouteRuleList:
+            return HandleListRules_();
+         case RouteLogList:
+            return HandleListLogs_();
+         case RouteLogTail:
+            return HandleLogTail_(route.identifier, route.query);
+         case RouteBackupStart:
+            return HandleBackupStart_();
+         case RouteBackupStatus:
+            return HandleBackupStatus_();
+         case RouteSettingsGet:
+            return HandleSettings_();
          case RouteOpenApi:
             return HandleOpenApi_();
 
@@ -1832,6 +1884,108 @@ namespace HM
          }
       }
 
+      // Wave 88: the surfaces that were COM-only.
+      const AnsiString ipRangesPath = "/api/v1/ipranges";
+      if (path == ipRangesPath)
+      {
+         if (method == "GET")
+            route.kind = RouteIpRangeList;
+         else if (method == "POST")
+            route.kind = RouteIpRangeCreate;
+         return;
+      }
+      if (method == "DELETE" && path.StartsWith(ipRangesPath + "/"))
+      {
+         AnsiString idPart = path.Mid(ipRangesPath.GetLength() + 1);
+         __int64 rangeId = 0;
+         if (idPart.Find("/") < 0 && ParseQueueId(idPart, rangeId))
+         {
+            route.kind = RouteIpRangeDelete;
+            route.range_id = rangeId;
+            return;
+         }
+      }
+      if (path.StartsWith(domainsPrefix) && path.EndsWith("/lists"))
+      {
+         AnsiString domainName = path.Mid(domainsPrefix.GetLength(),
+            path.GetLength() - domainsPrefix.GetLength() - AnsiString("/lists").GetLength());
+         if (!domainName.IsEmpty() && domainName.Find("/") < 0)
+         {
+            if (method == "GET")
+            {
+               route.kind = RouteListList;
+               route.identifier = domainName;
+               return;
+            }
+            if (method == "POST")
+            {
+               route.kind = RouteListCreate;
+               route.identifier = domainName;
+               return;
+            }
+         }
+      }
+      const AnsiString listsPrefix = "/api/v1/lists/";
+      if (method == "DELETE" && path.StartsWith(listsPrefix))
+      {
+         AnsiString address = path.Mid(listsPrefix.GetLength());
+         if (!address.IsEmpty() && address.Find("/") < 0)
+         {
+            route.kind = RouteListDelete;
+            route.identifier = address;
+            return;
+         }
+      }
+      if (method == "GET" && path.StartsWith(domainsPrefix) && path.EndsWith("/dkim"))
+      {
+         AnsiString domainName = path.Mid(domainsPrefix.GetLength(),
+            path.GetLength() - domainsPrefix.GetLength() - AnsiString("/dkim").GetLength());
+         if (!domainName.IsEmpty() && domainName.Find("/") < 0)
+         {
+            route.kind = RouteDkimGet;
+            route.identifier = domainName;
+            return;
+         }
+      }
+      if (method == "GET" && path == "/api/v1/certificates")
+      {
+         route.kind = RouteCertificateList;
+         return;
+      }
+      if (method == "GET" && path == "/api/v1/rules")
+      {
+         route.kind = RouteRuleList;
+         return;
+      }
+      if (method == "GET" && path == "/api/v1/logs")
+      {
+         route.kind = RouteLogList;
+         return;
+      }
+      const AnsiString logsPrefix = "/api/v1/logs/";
+      if (method == "GET" && path.StartsWith(logsPrefix))
+      {
+         AnsiString name = path.Mid(logsPrefix.GetLength());
+         if (!name.IsEmpty() && name.Find("/") < 0)
+         {
+            route.kind = RouteLogTail;
+            route.identifier = name;
+            return;
+         }
+      }
+      if (path == "/api/v1/backup")
+      {
+         if (method == "POST")
+            route.kind = RouteBackupStart;
+         else if (method == "GET")
+            route.kind = RouteBackupStatus;
+         return;
+      }
+      if (method == "GET" && path == "/api/v1/settings")
+      {
+         route.kind = RouteSettingsGet;
+         return;
+      }
       if (method == "GET" && path == "/api/v1/openapi.json")
          route.kind = RouteOpenApi;
    }
@@ -1871,6 +2025,11 @@ namespace HM
       case RouteQueueDelete:
       case RouteQuarantineRelease:
       case RouteQuarantineDelete:
+      case RouteIpRangeCreate:
+      case RouteIpRangeDelete:
+      case RouteListCreate:
+      case RouteListDelete:
+      case RouteBackupStart:
          return true;
 
       default:
@@ -1949,6 +2108,26 @@ namespace HM
          refusalReason = "this api key is restricted to named domains, and the quarantine is server-wide";
          return AuthorizationForbidden;
       }
+      switch (route.kind)
+      {
+      case RouteIpRangeList:
+      case RouteIpRangeCreate:
+      case RouteIpRangeDelete:
+      case RouteCertificateList:
+      case RouteRuleList:
+      case RouteLogList:
+      case RouteLogTail:
+      case RouteBackupStart:
+      case RouteBackupStatus:
+      case RouteSettingsGet:
+         // IP ranges, certificates, global rules, the logs, the backup and the
+         // server settings are all server-wide: none of them belongs to a domain,
+         // and the logs in particular carry every domain's traffic.
+         refusalReason = "this api key is restricted to named domains, and that resource is server-wide";
+         return AuthorizationForbidden;
+      default:
+         break;
+      }
 
       String targetDomain;
 
@@ -1957,7 +2136,13 @@ namespace HM
       case RouteAccountList:
       case RouteAccountCreate:
       case RouteAliasList:
+      case RouteListList:
+      case RouteListCreate:
+      case RouteDkimGet:
          targetDomain = String(route.identifier);
+         break;
+      case RouteListDelete:
+         targetDomain = StringParser::ExtractDomain(String(route.identifier));
          break;
 
       case RouteAccountDelete:
@@ -2001,12 +2186,14 @@ namespace HM
       {
       case 200: statusText = "OK"; break;
       case 201: statusText = "Created"; break;
+      case 202: statusText = "Accepted"; break;
       case 400: statusText = "Bad Request"; break;
       case 403: statusText = "Forbidden"; break;
       case 404: statusText = "Not Found"; break;
       case 409: statusText = "Conflict"; break;
       case 413: statusText = "Payload Too Large"; break;
       case 429: statusText = "Too Many Requests"; break;
+      case 503: statusText = "Service Unavailable"; break;
       default:  statusText = "Internal Server Error"; statusCode = 500; break;
       }
 
@@ -3165,6 +3352,802 @@ namespace HM
       return BuildResponse_(200, body);
    }
 
+   // ------------------------------------------------------------------------
+   // Wave 88: the surfaces that were COM-only. Same shape as the routes above:
+   // a 404 names what was not found, a 400 names what was wrong with the body,
+   // every string goes through JsonEscape_, and nothing here is reachable
+   // except through the dispatch in ProcessRequest_ after Authorize_.
+
+   AnsiString
+   RestApiServer::HandleListIpRanges_()
+   {
+      SecurityRanges ranges;
+      ranges.Refresh();
+
+      AnsiString body = "[";
+      int count = 0;
+      for (int i = 0; i < ranges.GetCount(); i++)
+      {
+         std::shared_ptr<SecurityRange> range = ranges.GetItem(i);
+         if (!range)
+            continue;
+
+         if (count > 0)
+            body += ",";
+
+         AnsiString entry;
+         entry.Format("{\"id\":%I64d,\"name\":\"%hs\",\"lower\":\"%hs\",\"upper\":\"%hs\",\"priority\":%d",
+            range->GetID(),
+            JsonEscape_(AnsiString(range->GetName())).c_str(),
+            JsonEscape_(AnsiString(range->GetLowerIPString())).c_str(),
+            JsonEscape_(AnsiString(range->GetUpperIPString())).c_str(),
+            (int) range->GetPriority());
+         // The flags one at a time: Format has a fixed arity and this row has
+         // more of them than it takes.
+         auto flag = [&entry](const char *name, bool value)
+         {
+            entry += ",\"";
+            entry += name;
+            entry += value ? "\":true" : "\":false";
+         };
+         flag("allow_smtp", range->GetAllowSMTP());
+         flag("allow_imap", range->GetAllowIMAP());
+         flag("allow_pop3", range->GetAllowPOP3());
+         flag("deliver_local_to_local", range->GetAllowOption(SecurityRange::IPRANGE_RELAY_LOCAL_TO_LOCAL));
+         flag("deliver_local_to_remote", range->GetAllowOption(SecurityRange::IPRANGE_RELAY_LOCAL_TO_REMOTE));
+         flag("deliver_remote_to_local", range->GetAllowOption(SecurityRange::IPRANGE_RELAY_REMOTE_TO_LOCAL));
+         flag("deliver_remote_to_remote", range->GetAllowOption(SecurityRange::IPRANGE_RELAY_REMOTE_TO_REMOTE));
+         flag("require_auth_local_to_local", range->GetRequireSMTPAuthLocalToLocal());
+         flag("require_auth_local_to_remote", range->GetRequireSMTPAuthLocalToExternal());
+         flag("require_auth_remote_to_local", range->GetRequireSMTPAuthExternalToLocal());
+         flag("require_auth_remote_to_remote", range->GetRequireSMTPAuthExternalToExternal());
+         flag("require_tls_for_auth", range->GetRequireTLSForAuth());
+         flag("spam_protection", range->GetSpamProtection());
+         flag("virus_protection", range->GetVirusProtection());
+         flag("expires", range->GetExpires());
+         entry += "}";
+         body += entry;
+         count++;
+      }
+      body += "]";
+      return BuildResponse_(200, body);
+   }
+
+   AnsiString
+   RestApiServer::HandleCreateIpRange_(const AnsiString &requestBody)
+   {
+      AnsiString name = GetJsonStringValue_(requestBody, "name");
+      AnsiString lowerText = GetJsonStringValue_(requestBody, "lower");
+      AnsiString upperText = GetJsonStringValue_(requestBody, "upper");
+      if (name.IsEmpty() || lowerText.IsEmpty() || upperText.IsEmpty())
+         return BuildResponse_(400, "{\"error\":\"name, lower and upper are required\"}");
+
+      IPAddress lower;
+      IPAddress upper;
+      if (!lower.TryParse(lowerText) || !upper.TryParse(upperText))
+         return BuildResponse_(400, "{\"error\":\"lower and upper must be IP addresses\"}");
+
+      long priority = 0;
+      {
+         // A number in the body is not a string, so read it the way the
+         // integer routes do: everything after the key up to the next separator.
+         AnsiString needle = "\"priority\"";
+         int keyPosition = requestBody.Find(needle);
+         if (keyPosition >= 0)
+         {
+            int colon = requestBody.Find(":", keyPosition + needle.GetLength());
+            if (colon >= 0)
+            {
+               AnsiString digits;
+               for (int i = colon + 1; i < requestBody.GetLength(); i++)
+               {
+                  char c = requestBody[i];
+                  if (c == ' ' || c == '\t')
+                     continue;
+                  if ((c >= '0' && c <= '9') || (c == '-' && digits.IsEmpty()))
+                  {
+                     digits += c;
+                     continue;
+                  }
+                  break;
+               }
+               if (!digits.IsEmpty())
+                  priority = atol(digits.c_str());
+            }
+         }
+      }
+
+      std::shared_ptr<SecurityRange> range(new SecurityRange);
+      range->SetName(String(name));
+      range->SetLowerIP(lower);
+      range->SetUpperIP(upper);
+      range->SetPriority(priority);
+      range->SetAllowSMTP(GetJsonBoolValue_(requestBody, "allow_smtp", true));
+      range->SetAllowIMAP(GetJsonBoolValue_(requestBody, "allow_imap", true));
+      range->SetAllowPOP3(GetJsonBoolValue_(requestBody, "allow_pop3", true));
+      range->SetAllowRelayL2L(GetJsonBoolValue_(requestBody, "deliver_local_to_local", true));
+      range->SetAllowRelayL2R(GetJsonBoolValue_(requestBody, "deliver_local_to_remote", false));
+      range->SetAllowRelayR2L(GetJsonBoolValue_(requestBody, "deliver_remote_to_local", true));
+      range->SetAllowRelayR2R(GetJsonBoolValue_(requestBody, "deliver_remote_to_remote", false));
+      range->SetRequireSMTPAuthLocalToLocal(GetJsonBoolValue_(requestBody, "require_auth_local_to_local", false));
+      range->SetRequireSMTPAuthLocalToExternal(GetJsonBoolValue_(requestBody, "require_auth_local_to_remote", true));
+      range->SetRequireSMTPAuthExternalToLocal(GetJsonBoolValue_(requestBody, "require_auth_remote_to_local", false));
+      range->SetRequireSMTPAuthExternalToExternal(GetJsonBoolValue_(requestBody, "require_auth_remote_to_remote", true));
+      range->SetRequireTLSForAuth(GetJsonBoolValue_(requestBody, "require_tls_for_auth", false));
+      range->SetSpamProtection(GetJsonBoolValue_(requestBody, "spam_protection", true));
+      range->SetVirusProtection(GetJsonBoolValue_(requestBody, "virus_protection", true));
+
+      String result;
+      if (!PersistentSecurityRange::SaveObject(range, result, PersistenceModeNormal))
+      {
+         AnsiString error;
+         error.Format("{\"error\":\"%hs\"}", JsonEscape_(AnsiString(result)).c_str());
+         return BuildResponse_(400, error);
+      }
+
+      LOG_APPLICATION("RestApi: IP range '" + range->GetName() + "' created.");
+
+      AnsiString body;
+      body.Format("{\"id\":%I64d}", range->GetID());
+      return BuildResponse_(201, body);
+   }
+
+   AnsiString
+   RestApiServer::HandleDeleteIpRange_(__int64 rangeId)
+   {
+      SecurityRanges ranges;
+      ranges.Refresh();
+      std::shared_ptr<SecurityRange> range = ranges.GetItemByDBID(rangeId);
+      if (!range)
+         return BuildResponse_(404, "{\"error\":\"ip range not found\"}");
+
+      String name = range->GetName();
+      if (!ranges.DeleteItemByDBID(rangeId))
+         return BuildResponse_(500, "{\"error\":\"the range could not be deleted\"}");
+
+      LOG_APPLICATION("RestApi: IP range '" + name + "' deleted.");
+      return BuildResponse_(200, "{\"deleted\":true}");
+   }
+
+   AnsiString
+   RestApiServer::HandleListLists_(const String &domainName)
+   {
+      Domains domains;
+      domains.Refresh();
+      std::shared_ptr<Domain> domain = domains.GetItemByName(domainName);
+      if (!domain)
+         return BuildResponse_(404, "{\"error\":\"domain not found\"}");
+
+      DistributionLists lists(domain->GetID());
+      lists.Refresh();
+
+      AnsiString body = "[";
+      int count = 0;
+      for (int i = 0; i < lists.GetCount(); i++)
+      {
+         std::shared_ptr<DistributionList> list = lists.GetItem(i);
+         if (!list)
+            continue;
+
+         AnsiString members = "[";
+         std::shared_ptr<DistributionListRecipients> recipients = list->GetMembers();
+         if (recipients)
+         {
+            int memberCount = 0;
+            for (int m = 0; m < recipients->GetCount(); m++)
+            {
+               std::shared_ptr<DistributionListRecipient> recipient = recipients->GetItem(m);
+               if (!recipient)
+                  continue;
+               if (memberCount > 0)
+                  members += ",";
+               members += "\"" + JsonEscape_(AnsiString(recipient->GetAddress())) + "\"";
+               memberCount++;
+            }
+         }
+         members += "]";
+
+         if (count > 0)
+            body += ",";
+
+         AnsiString entry;
+         entry.Format("{\"address\":\"%hs\",\"active\":%hs,\"require_auth\":%hs,\"members\":%hs}",
+            JsonEscape_(AnsiString(list->GetAddress())).c_str(),
+            list->GetActive() ? "true" : "false",
+            list->GetRequireAuth() ? "true" : "false",
+            members.c_str());
+         body += entry;
+         count++;
+      }
+      body += "]";
+      return BuildResponse_(200, body);
+   }
+
+   AnsiString
+   RestApiServer::HandleCreateList_(const String &domainName, const AnsiString &requestBody)
+   {
+      AnsiString address = GetJsonStringValue_(requestBody, "address");
+      if (address.IsEmpty())
+         return BuildResponse_(400, "{\"error\":\"address is required\"}");
+
+      String addressDomain = StringParser::ExtractDomain(String(address));
+      if (addressDomain.CompareNoCase(domainName) != 0)
+         return BuildResponse_(400, "{\"error\":\"address does not belong to the domain\"}");
+
+      Domains domains;
+      domains.Refresh();
+      std::shared_ptr<Domain> domain = domains.GetItemByName(domainName);
+      if (!domain)
+         return BuildResponse_(404, "{\"error\":\"domain not found\"}");
+
+      DistributionLists lists(domain->GetID());
+      lists.Refresh();
+      if (lists.GetItemByAddress(String(address)))
+         return BuildResponse_(409, "{\"error\":\"a list with that address exists\"}");
+
+      std::shared_ptr<DistributionList> list(new DistributionList);
+      list->SetDomainID(domain->GetID());
+      list->SetAddress(String(address));
+      list->SetActive(true);
+      list->SetRequireAuth(GetJsonBoolValue_(requestBody, "require_auth", false));
+      list->SetListMode(DistributionList::LMPublic);
+
+      String error;
+      if (!PersistentDistributionList::SaveObject(list, error, PersistenceModeNormal))
+      {
+         AnsiString body;
+         body.Format("{\"error\":\"%hs\"}", JsonEscape_(AnsiString(error)).c_str());
+         return BuildResponse_(400, body);
+      }
+
+      std::vector<AnsiString> members = GetJsonStringArray_(requestBody, "members");
+      int saved = 0;
+      for (const AnsiString &member : members)
+      {
+         if (member.IsEmpty())
+            continue;
+         std::shared_ptr<DistributionListRecipient> recipient(new DistributionListRecipient);
+         recipient->SetListID(list->GetID());
+         recipient->SetAddress(String(member));
+         if (PersistentDistributionListRecipient::SaveObject(recipient))
+            saved++;
+      }
+
+      LOG_APPLICATION("RestApi: Distribution list '" + list->GetAddress() + "' created with " + StringParser::IntToString(saved) + " member(s).");
+
+      AnsiString body;
+      body.Format("{\"address\":\"%hs\",\"members\":%d}", JsonEscape_(address).c_str(), saved);
+      return BuildResponse_(201, body);
+   }
+
+   AnsiString
+   RestApiServer::HandleDeleteList_(const String &address)
+   {
+      String domainName = StringParser::ExtractDomain(address);
+      Domains domains;
+      domains.Refresh();
+      std::shared_ptr<Domain> domain = domains.GetItemByName(domainName);
+      if (!domain)
+         return BuildResponse_(404, "{\"error\":\"list not found\"}");
+
+      DistributionLists lists(domain->GetID());
+      lists.Refresh();
+      std::shared_ptr<DistributionList> list = lists.GetItemByAddress(address);
+      if (!list)
+         return BuildResponse_(404, "{\"error\":\"list not found\"}");
+
+      if (!lists.DeleteItemByDBID(list->GetID()))
+         return BuildResponse_(500, "{\"error\":\"the list could not be deleted\"}");
+
+      LOG_APPLICATION("RestApi: Distribution list '" + address + "' deleted.");
+      return BuildResponse_(200, "{\"deleted\":true}");
+   }
+
+   AnsiString
+   RestApiServer::HandleListCertificates_()
+   {
+      std::shared_ptr<SSLCertificates> certificates = Configuration::Instance()->GetSSLCertificates();
+      if (!certificates)
+         return BuildResponse_(200, "[]");
+      certificates->Refresh();
+
+      AnsiString body = "[";
+      int count = 0;
+      for (int i = 0; i < certificates->GetCount(); i++)
+      {
+         std::shared_ptr<SSLCertificate> certificate = certificates->GetItem(i);
+         if (!certificate)
+            continue;
+         if (count > 0)
+            body += ",";
+         // The private key password is deliberately not here: a listing is for
+         // finding out what the server has, not for lifting what unlocks it.
+         AnsiString entry;
+         entry.Format("{\"id\":%I64d,\"name\":\"%hs\",\"certificate_file\":\"%hs\",\"private_key_file\":\"%hs\"}",
+            certificate->GetID(),
+            JsonEscape_(AnsiString(certificate->GetName())).c_str(),
+            JsonEscape_(AnsiString(certificate->GetCertificateFile())).c_str(),
+            JsonEscape_(AnsiString(certificate->GetPrivateKeyFile())).c_str());
+         body += entry;
+         count++;
+      }
+      body += "]";
+      return BuildResponse_(200, body);
+   }
+
+   AnsiString
+   RestApiServer::HandleDkim_(const String &domainName)
+   {
+      Domains domains;
+      domains.Refresh();
+      std::shared_ptr<Domain> domain = domains.GetItemByName(domainName);
+      if (!domain)
+         return BuildResponse_(404, "{\"error\":\"domain not found\"}");
+
+      AnsiString body;
+      body.Format("{\"domain\":\"%hs\",\"enabled\":%hs,\"selector\":\"%hs\",\"sign_aliases\":%hs,\"private_key_file\":\"%hs\"}",
+         JsonEscape_(AnsiString(domain->GetName())).c_str(),
+         domain->GetDKIMEnabled() ? "true" : "false",
+         JsonEscape_(domain->GetDKIMSelector()).c_str(),
+         domain->GetDKIMAliasesEnabled() ? "true" : "false",
+         JsonEscape_(AnsiString(domain->GetDKIMPrivateKeyFile())).c_str());
+      return BuildResponse_(200, body);
+   }
+
+   namespace
+   {
+      const char *RuleFieldName(RuleCriteria::PredefinedField field)
+      {
+         switch (field)
+         {
+         case RuleCriteria::FTFrom: return "from";
+         case RuleCriteria::FTTo: return "to";
+         case RuleCriteria::FTCC: return "cc";
+         case RuleCriteria::FTSubject: return "subject";
+         case RuleCriteria::FTBody: return "body";
+         case RuleCriteria::FTMessageSize: return "message_size";
+         case RuleCriteria::FTRecipientList: return "recipient_list";
+         case RuleCriteria::FTDeliveryAttempts: return "delivery_attempts";
+         default: return "unknown";
+         }
+      }
+
+      const char *RuleMatchName(RuleCriteria::MatchType match)
+      {
+         switch (match)
+         {
+         case RuleCriteria::Equals: return "equals";
+         case RuleCriteria::Contains: return "contains";
+         case RuleCriteria::LessThan: return "less_than";
+         case RuleCriteria::GreaterThan: return "greater_than";
+         case RuleCriteria::MatchesRegEx: return "regex";
+         case RuleCriteria::NotContains: return "not_contains";
+         case RuleCriteria::NotEquals: return "not_equals";
+         case RuleCriteria::Wildcard: return "wildcard";
+         default: return "none";
+         }
+      }
+
+      const char *RuleActionName(RuleAction::Type type)
+      {
+         switch (type)
+         {
+         case RuleAction::Delete: return "delete";
+         case RuleAction::Forward: return "forward";
+         case RuleAction::Reply: return "reply";
+         case RuleAction::MoveToIMAPFolder: return "move_to_folder";
+         case RuleAction::ScriptFunction: return "script_function";
+         case RuleAction::StopRuleProcessing: return "stop";
+         case RuleAction::SetHeaderValue: return "set_header";
+         case RuleAction::SendUsingRoute: return "send_using_route";
+         case RuleAction::CreateCopy: return "copy";
+         case RuleAction::BindToAddress: return "bind_to_address";
+         default: return "unknown";
+         }
+      }
+   }
+
+   AnsiString
+   RestApiServer::HandleListRules_()
+   {
+      // The global rules, from the cache the delivery path itself reads, so the
+      // answer is what is in force and not a second reading of the table.
+      std::shared_ptr<Rules> rules = ObjectCache::Instance()->GetGlobalRules();
+      if (!rules)
+         return BuildResponse_(200, "[]");
+
+      AnsiString body = "[";
+      int count = 0;
+      for (int i = 0; i < rules->GetCount(); i++)
+      {
+         std::shared_ptr<Rule> rule = rules->GetItem(i);
+         if (!rule)
+            continue;
+
+         AnsiString criteria = "[";
+         std::shared_ptr<RuleCriterias> criterias = rule->GetCriterias();
+         if (criterias)
+         {
+            int criterionCount = 0;
+            for (int c = 0; c < criterias->GetCount(); c++)
+            {
+               std::shared_ptr<RuleCriteria> criterion = criterias->GetItem(c);
+               if (!criterion)
+                  continue;
+               if (criterionCount > 0)
+                  criteria += ",";
+               AnsiString entry;
+               entry.Format("{\"field\":\"%hs\",\"header\":\"%hs\",\"match\":\"%hs\",\"value\":\"%hs\"}",
+                  criterion->GetUsePredefined() ? RuleFieldName(criterion->GetPredefinedField()) : "header",
+                  JsonEscape_(AnsiString(criterion->GetHeaderField())).c_str(),
+                  RuleMatchName(criterion->GetMatchType()),
+                  JsonEscape_(AnsiString(criterion->GetMatchValue())).c_str());
+               criteria += entry;
+               criterionCount++;
+            }
+         }
+         criteria += "]";
+
+         AnsiString actions = "[";
+         std::shared_ptr<RuleActions> ruleActions = rule->GetActions();
+         if (ruleActions)
+         {
+            int actionCount = 0;
+            for (int a = 0; a < ruleActions->GetCount(); a++)
+            {
+               std::shared_ptr<RuleAction> action = ruleActions->GetItem(a);
+               if (!action)
+                  continue;
+               if (actionCount > 0)
+                  actions += ",";
+               // One "value" per action, the one that matters for its type - the
+               // folder for a move, the address for a forward, the function for a
+               // script, the route for send-using-route - so the listing reads
+               // without a schema per action.
+               AnsiString value;
+               switch (action->GetType())
+               {
+               case RuleAction::MoveToIMAPFolder: value = AnsiString(action->GetIMAPFolder()); break;
+               case RuleAction::Forward: value = AnsiString(action->GetTo()); break;
+               case RuleAction::ScriptFunction: value = AnsiString(action->GetScriptFunction()); break;
+               case RuleAction::SetHeaderValue: value = AnsiString(action->GetSubject()); break;
+               case RuleAction::CreateCopy: value = AnsiString(action->GetIMAPFolder()); break;
+               default: break;
+               }
+               AnsiString entry;
+               entry.Format("{\"type\":\"%hs\",\"value\":\"%hs\"}",
+                  RuleActionName(action->GetType()), JsonEscape_(value).c_str());
+               actions += entry;
+               actionCount++;
+            }
+         }
+         actions += "]";
+
+         if (count > 0)
+            body += ",";
+         AnsiString entry;
+         entry.Format("{\"id\":%I64d,\"name\":\"%hs\",\"active\":%hs,\"all_criteria\":%hs,\"criteria\":%hs,\"actions\":%hs}",
+            rule->GetID(),
+            JsonEscape_(AnsiString(rule->GetName())).c_str(),
+            rule->GetActive() ? "true" : "false",
+            rule->GetUseAND() ? "true" : "false",
+            criteria.c_str(), actions.c_str());
+         body += entry;
+         count++;
+      }
+      body += "]";
+      return BuildResponse_(200, body);
+   }
+
+   bool
+   RestApiServer::IsSafeLogName_(const AnsiString &name)
+   {
+      // A log file name and nothing else: no separators, no dot-dot, no leading
+      // dot, and the .log suffix the logger writes. The list route is the only
+      // source of names a client should have, and this is what it hands out.
+      if (name.IsEmpty() || name.GetLength() > 128)
+         return false;
+      if (!name.EndsWith(".log"))
+         return false;
+      if (name.Find("..") >= 0 || name[0] == '.')
+         return false;
+      for (int i = 0; i < name.GetLength(); i++)
+      {
+         char c = name[i];
+         bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+                   c == '_' || c == '-' || c == '.';
+         if (!ok)
+            return false;
+      }
+      return true;
+   }
+
+   AnsiString
+   RestApiServer::HandleListLogs_()
+   {
+      String directory = IniFileSettings::Instance()->GetLogDirectory();
+      std::vector<FileInfo> files = FileUtilities::GetFilesInDirectory(directory, _T(".*\\.log"));
+
+      AnsiString body = "[";
+      int count = 0;
+      for (FileInfo &file : files)
+      {
+         AnsiString name(file.GetName());
+         if (!IsSafeLogName_(name))
+            continue;
+         String path = FileUtilities::Combine(directory, file.GetName());
+         unsigned __int64 size = 0;
+         FileUtilities::FileSize64(path, size);
+         if (count > 0)
+            body += ",";
+         AnsiString entry;
+         entry.Format("{\"name\":\"%hs\",\"size\":%I64u,\"created\":\"%hs\"}",
+            JsonEscape_(name).c_str(),
+            size,
+            JsonEscape_(AnsiString(Time::GetTimeStampFromDateTime(file.GetCreateTime()))).c_str());
+         body += entry;
+         count++;
+      }
+      body += "]";
+      return BuildResponse_(200, body);
+   }
+
+   AnsiString
+   RestApiServer::HandleLogTail_(const AnsiString &name, const AnsiString &query)
+   {
+      if (!IsSafeLogName_(name))
+         return BuildResponse_(400, "{\"error\":\"not a log file name\"}");
+
+      int lines = 200;
+      AnsiString linesText = QueryParameter_(query, "lines");
+      if (!linesText.IsEmpty())
+      {
+         lines = atoi(linesText.c_str());
+         if (lines < 1)
+            lines = 1;
+         if (lines > 2000)
+            lines = 2000;
+      }
+
+      String path = FileUtilities::Combine(IniFileSettings::Instance()->GetLogDirectory(), String(name));
+      if (!FileUtilities::Exists(path))
+         return BuildResponse_(404, "{\"error\":\"no such log file\"}");
+
+      // Read the tail only: a busy day's log is hundreds of megabytes and the
+      // request thread is the single REST worker. 512 KB holds 2000 lines of
+      // anything this logger writes.
+      const std::streamoff MaxBytes = 512 * 1024;
+      std::ifstream stream(path.c_str(), std::ios::binary);
+      if (!stream)
+         return BuildResponse_(404, "{\"error\":\"no such log file\"}");
+      // The backup log is written as UTF-16 with a byte-order mark; the others
+      // are narrow. Decode by what the file says it is, not by its name.
+      unsigned char bom[2] = { 0, 0 };
+      stream.read(reinterpret_cast<char *>(bom), 2);
+      bool utf16 = stream.gcount() == 2 && bom[0] == 0xFF && bom[1] == 0xFE;
+      stream.clear();
+      stream.seekg(0, std::ios::end);
+      std::streamoff size = stream.tellg();
+      std::streamoff start = size > MaxBytes ? size - MaxBytes : 0;
+      if (utf16 && (start % 2) != 0)
+         start++;   // stay on a code-unit boundary
+      stream.seekg(start, std::ios::beg);
+      std::string chunk;
+      chunk.resize(static_cast<size_t>(size - start));
+      if (!chunk.empty())
+         stream.read(&chunk[0], chunk.size());
+
+      std::string text;
+      if (utf16)
+      {
+         size_t offset = start == 0 ? 2 : 0;
+         if (chunk.size() > offset)
+         {
+            std::wstring wide(reinterpret_cast<const wchar_t *>(chunk.data() + offset), (chunk.size() - offset) / 2);
+            AnsiString narrow(String(wide.c_str()));
+            text = narrow.c_str();
+         }
+      }
+      else
+      {
+         text.swap(chunk);
+      }
+
+      std::vector<std::string> all;
+      size_t position = 0;
+      while (position < text.size())
+      {
+         size_t end = text.find('\n', position);
+         if (end == std::string::npos)
+            end = text.size();
+         std::string line = text.substr(position, end - position);
+         if (!line.empty() && line[line.size() - 1] == '\r')
+            line.erase(line.size() - 1);
+         all.push_back(line);
+         position = end + 1;
+      }
+      // A partial first line when the tail started mid-line, and a trailing
+      // empty one from the final newline, are both noise.
+      if (start > 0 && !all.empty())
+         all.erase(all.begin());
+      if (!all.empty() && all.back().empty())
+         all.pop_back();
+
+      size_t first = all.size() > static_cast<size_t>(lines) ? all.size() - lines : 0;
+      AnsiString body;
+      body.Format("{\"name\":\"%hs\",\"lines\":[", JsonEscape_(name).c_str());
+      for (size_t i = first; i < all.size(); i++)
+      {
+         if (i > first)
+            body += ",";
+         body += "\"" + JsonEscape_(AnsiString(all[i].c_str())) + "\"";
+      }
+      body += "]}";
+      return BuildResponse_(200, body);
+   }
+
+   AnsiString
+   RestApiServer::HandleBackupStart_()
+   {
+      std::shared_ptr<BackupManager> manager = Application::Instance()->GetBackupManager();
+      if (!manager)
+         return BuildResponse_(503, "{\"error\":\"the backup manager is not running\"}");
+
+      if (!manager->StartBackup())
+      {
+         AnsiString body;
+         body.Format("{\"error\":\"the backup did not start\",\"status\":\"%hs\"}",
+            JsonEscape_(AnsiString(manager->GetStatus())).c_str());
+         return BuildResponse_(409, body);
+      }
+
+      LOG_APPLICATION("RestApi: Backup started.");
+      return BuildResponse_(202, "{\"started\":true}");
+   }
+
+   AnsiString
+   RestApiServer::HandleBackupStatus_()
+   {
+      std::shared_ptr<BackupManager> manager = Application::Instance()->GetBackupManager();
+      if (!manager)
+         return BuildResponse_(503, "{\"error\":\"the backup manager is not running\"}");
+
+      // The manager's status text holds the last failure reason; the progress
+      // of a backup goes to the backup log, which is what the Control Panel and
+      // the regression fixtures read. Both are here: status, and the last
+      // twenty lines of hmailserver_backup.log, newest last.
+      AnsiString body;
+      body.Format("{\"status\":\"%hs\",\"log\":[", JsonEscape_(AnsiString(manager->GetStatus())).c_str());
+
+      String logPath = FileUtilities::Combine(IniFileSettings::Instance()->GetLogDirectory(), _T("hmailserver_backup.log"));
+      if (FileUtilities::Exists(logPath))
+      {
+         AnsiString text(FileUtilities::ReadCompleteTextFile(logPath));
+         std::vector<AnsiString> lines;
+         int position = 0;
+         while (position < text.GetLength())
+         {
+            int end = text.Find("\n", position);
+            if (end < 0)
+               end = text.GetLength();
+            AnsiString line = text.Mid(position, end - position);
+            line.TrimRight("\r");
+            if (!line.IsEmpty())
+               lines.push_back(line);
+            position = end + 1;
+         }
+         size_t first = lines.size() > 20 ? lines.size() - 20 : 0;
+         for (size_t i = first; i < lines.size(); i++)
+         {
+            if (i > first)
+               body += ",";
+            body += "\"" + JsonEscape_(lines[i]) + "\"";
+         }
+      }
+      body += "]}";
+      return BuildResponse_(200, body);
+   }
+
+   AnsiString
+   RestApiServer::HandleSettings_()
+   {
+      // A snapshot of the settings an operator asks about first, and nothing
+      // that unlocks anything: no passwords, no keys, no tokens. Writing
+      // settings stays with COM and the Control Panel, where each one is
+      // validated by the code that owns it.
+      Configuration *configuration = Configuration::Instance();
+      std::shared_ptr<SMTPConfiguration> smtp = configuration->GetSMTPConfiguration();
+      std::shared_ptr<IMAPConfiguration> imap = configuration->GetIMAPConfiguration();
+      std::shared_ptr<POP3Configuration> pop3 = configuration->GetPOP3Configuration();
+
+      AnsiString body;
+      body.Format("{\"host_name\":\"%hs\",\"default_domain\":\"%hs\",\"max_message_size_kb\":%d,"
+                  "\"max_smtp_connections\":%d,\"max_imap_connections\":%d,\"max_pop3_connections\":%d,"
+                  "\"smtp_relayer\":\"%hs\",\"smtp_relayer_port\":%d,"
+                  "\"log_smtp_conversations\":%hs,\"log_imap_conversations\":%hs}",
+         JsonEscape_(AnsiString(configuration->GetHostName())).c_str(),
+         JsonEscape_(AnsiString(configuration->GetDefaultDomain())).c_str(),
+         smtp ? smtp->GetMaxMessageSize() : 0,
+         smtp ? smtp->GetMaxSMTPConnections() : 0,
+         imap ? (int) imap->GetMaxIMAPConnections() : 0,
+         pop3 ? (int) pop3->GetMaxPOP3Connections() : 0,
+         smtp ? JsonEscape_(AnsiString(smtp->GetSMTPRelayer())).c_str() : "",
+         smtp ? (int) smtp->GetSMTPRelayerPort() : 0,
+         configuration->GetLogSMTPConversations() ? "true" : "false",
+         configuration->GetLogIMAPConversations() ? "true" : "false");
+      return BuildResponse_(200, body);
+   }
+
+   bool
+   RestApiServer::GetJsonBoolValue_(const AnsiString &json, const AnsiString &key, bool defaultValue)
+   {
+      AnsiString needle = "\"" + key + "\"";
+      int keyPosition = json.Find(needle);
+      if (keyPosition < 0)
+         return defaultValue;
+      int colon = json.Find(":", keyPosition + needle.GetLength());
+      if (colon < 0)
+         return defaultValue;
+      for (int i = colon + 1; i < json.GetLength(); i++)
+      {
+         char c = json[i];
+         if (c == ' ' || c == '\t' || c == '\r' || c == '\n')
+            continue;
+         if (json.Mid(i, 4) == "true")
+            return true;
+         if (json.Mid(i, 5) == "false")
+            return false;
+         break;
+      }
+      return defaultValue;
+   }
+
+   std::vector<AnsiString>
+   RestApiServer::GetJsonStringArray_(const AnsiString &json, const AnsiString &key)
+   {
+      // The strings of a flat array: "members":["a@x","b@x"]. Nothing nested,
+      // which is all the bodies this server accepts contain.
+      std::vector<AnsiString> values;
+      AnsiString needle = "\"" + key + "\"";
+      int keyPosition = json.Find(needle);
+      if (keyPosition < 0)
+         return values;
+      int open = json.Find("[", keyPosition + needle.GetLength());
+      if (open < 0)
+         return values;
+      int close = json.Find("]", open);
+      if (close < 0)
+         return values;
+
+      AnsiString current;
+      bool inString = false;
+      for (int i = open + 1; i < close; i++)
+      {
+         char c = json[i];
+         if (inString)
+         {
+            if (c == '\\' && i + 1 < close)
+            {
+               current += json[i + 1];
+               i++;
+               continue;
+            }
+            if (c == '\"')
+            {
+               values.push_back(current);
+               current = "";
+               inString = false;
+               continue;
+            }
+            current += c;
+            continue;
+         }
+         if (c == '\"')
+            inString = true;
+      }
+      return values;
+   }
+
    AnsiString
    RestApiServer::HandleOpenApi_()
    {
@@ -3199,6 +4182,23 @@ namespace HM
          "\"get\":{\"summary\":\"List API keys\",\"description\":\"Administrator password only.\",\"responses\":{\"200\":{\"description\":\"Array of keys, never the clear-text tokens\"}}},"
          "\"post\":{\"summary\":\"Create an API key\",\"description\":\"Administrator password only. The token is returned once, at creation.\",\"responses\":{\"201\":{\"description\":\"Created\"}}}},"
          "\"/api/v1/apikeys/{id}\":{\"delete\":{\"summary\":\"Revoke an API key\",\"description\":\"Administrator password only.\",\"responses\":{\"200\":{\"description\":\"Revoked\"}}}},"
+         "\"/api/v1/ipranges\":{"
+         "\"get\":{\"summary\":\"List the IP ranges\",\"description\":\"Server-wide; refused for domain-restricted keys.\",\"responses\":{\"200\":{\"description\":\"Array of ranges with their permissions\"}}},"
+         "\"post\":{\"summary\":\"Create an IP range\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"name\",\"lower\",\"upper\"],\"properties\":{\"name\":{\"type\":\"string\"},\"lower\":{\"type\":\"string\"},\"upper\":{\"type\":\"string\"},\"priority\":{\"type\":\"integer\"},\"allow_smtp\":{\"type\":\"boolean\"},\"allow_imap\":{\"type\":\"boolean\"},\"allow_pop3\":{\"type\":\"boolean\"},\"deliver_local_to_local\":{\"type\":\"boolean\"},\"deliver_local_to_remote\":{\"type\":\"boolean\"},\"deliver_remote_to_local\":{\"type\":\"boolean\"},\"deliver_remote_to_remote\":{\"type\":\"boolean\"},\"require_auth_local_to_local\":{\"type\":\"boolean\"},\"require_auth_local_to_remote\":{\"type\":\"boolean\"},\"require_auth_remote_to_local\":{\"type\":\"boolean\"},\"require_auth_remote_to_remote\":{\"type\":\"boolean\"},\"require_tls_for_auth\":{\"type\":\"boolean\"},\"spam_protection\":{\"type\":\"boolean\"},\"virus_protection\":{\"type\":\"boolean\"}}}}}},\"responses\":{\"201\":{\"description\":\"Created, with its id\"},\"400\":{\"description\":\"Missing name or an address that does not parse\"}}}},"
+         "\"/api/v1/ipranges/{id}\":{\"delete\":{\"summary\":\"Delete an IP range\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"Unknown id\"}}}},"
+         "\"/api/v1/domains/{domain}/lists\":{"
+         "\"get\":{\"summary\":\"List the distribution lists in a domain, with their members\",\"responses\":{\"200\":{\"description\":\"Array of lists\"},\"404\":{\"description\":\"Unknown domain\"}}},"
+         "\"post\":{\"summary\":\"Create a distribution list\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"address\"],\"properties\":{\"address\":{\"type\":\"string\"},\"members\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"require_auth\":{\"type\":\"boolean\"}}}}}},\"responses\":{\"201\":{\"description\":\"Created\"},\"400\":{\"description\":\"Missing address, or one outside the domain\"},\"404\":{\"description\":\"Unknown domain\"},\"409\":{\"description\":\"A list with that address exists\"}}}},"
+         "\"/api/v1/lists/{address}\":{\"delete\":{\"summary\":\"Delete a distribution list\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"Unknown list\"}}}},"
+         "\"/api/v1/certificates\":{\"get\":{\"summary\":\"List the SSL certificates\",\"description\":\"Names and file paths, never a private key password. Server-wide; refused for domain-restricted keys.\",\"responses\":{\"200\":{\"description\":\"Array of certificates\"}}}},"
+         "\"/api/v1/domains/{domain}/dkim\":{\"get\":{\"summary\":\"The DKIM signing configuration of a domain\",\"responses\":{\"200\":{\"description\":\"enabled, selector, sign_aliases and the private key file\"},\"404\":{\"description\":\"Unknown domain\"}}}},"
+         "\"/api/v1/rules\":{\"get\":{\"summary\":\"List the global rules with their criteria and actions\",\"description\":\"Read-only. Server-wide; refused for domain-restricted keys.\",\"responses\":{\"200\":{\"description\":\"Array of rules\"}}}},"
+         "\"/api/v1/logs\":{\"get\":{\"summary\":\"List the log files\",\"description\":\"Server-wide; refused for domain-restricted keys.\",\"responses\":{\"200\":{\"description\":\"Array of files with size and creation time\"}}}},"
+         "\"/api/v1/logs/{name}\":{\"get\":{\"summary\":\"The last lines of a log file\",\"description\":\"Query parameter lines (default 200, at most 2000). The name must be one the list returns; anything with a path in it is refused.\",\"responses\":{\"200\":{\"description\":\"The lines, newest last\"},\"400\":{\"description\":\"Not a log file name\"},\"404\":{\"description\":\"No such log file\"}}}},"
+         "\"/api/v1/backup\":{"
+         "\"get\":{\"summary\":\"The backup manager's status text and the last lines of the backup log\",\"responses\":{\"200\":{\"description\":\"status (the last failure reason, if any) and log (the backup log's tail, newest last)\"}}},"
+         "\"post\":{\"summary\":\"Start a backup with the configured settings\",\"description\":\"Runs on the maintenance queue; poll GET for the outcome.\",\"responses\":{\"202\":{\"description\":\"Started\"},\"409\":{\"description\":\"A backup or restore is already running, or the backup is not configured\"}}}},"
+         "\"/api/v1/settings\":{\"get\":{\"summary\":\"A read-only snapshot of the server-wide settings\",\"description\":\"Host name, default domain, size and connection limits, the relay host, the conversation-logging switches. No secrets. Server-wide; refused for domain-restricted keys.\",\"responses\":{\"200\":{\"description\":\"The snapshot\"}}}},"
          "\"/api/v1/openapi.json\":{\"get\":{\"summary\":\"This document\",\"responses\":{\"200\":{\"description\":\"The OpenAPI description\"}}}}"
          "},"
          "\"components\":{\"securitySchemes\":{"

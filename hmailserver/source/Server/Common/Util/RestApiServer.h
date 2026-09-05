@@ -123,16 +123,34 @@ namespace HM
          RouteQuarantineRelease,
          RouteQuarantineDelete,
          RouteAliasList,
+         // Wave 88: the surfaces that were COM-only. Server-wide ones are refused
+         // for domain-restricted keys in Authorize_; the list routes are scoped to
+         // their domain the way the alias and account routes are.
+         RouteIpRangeList,
+         RouteIpRangeCreate,
+         RouteIpRangeDelete,
+         RouteListList,
+         RouteListCreate,
+         RouteListDelete,
+         RouteCertificateList,
+         RouteDkimGet,
+         RouteRuleList,
+         RouteLogList,
+         RouteLogTail,
+         RouteBackupStart,
+         RouteBackupStatus,
+         RouteSettingsGet,
          RouteOpenApi
       };
 
       struct Route
       {
-         Route() : kind(RouteUnknown), message_id(0) { }
+         Route() : kind(RouteUnknown), message_id(0), range_id(0) { }
 
          RouteKind kind;
          AnsiString identifier;   // domain name, account address or api key id
          __int64 message_id;
+         __int64 range_id;        // an IP range id, for the routes that name one
          AnsiString query;        // the part after "?", for the routes that take one
       };
 
@@ -290,6 +308,23 @@ namespace HM
       AnsiString HandleQuarantineRelease_(__int64 id);
       AnsiString HandleQuarantineDelete_(__int64 id);
       AnsiString HandleListAliases_(const String &domainName);
+      AnsiString HandleListIpRanges_();
+      AnsiString HandleCreateIpRange_(const AnsiString &requestBody);
+      AnsiString HandleDeleteIpRange_(__int64 rangeId);
+      AnsiString HandleListLists_(const String &domainName);
+      AnsiString HandleCreateList_(const String &domainName, const AnsiString &requestBody);
+      AnsiString HandleDeleteList_(const String &address);
+      AnsiString HandleListCertificates_();
+      AnsiString HandleDkim_(const String &domainName);
+      AnsiString HandleListRules_();
+      AnsiString HandleListLogs_();
+      AnsiString HandleLogTail_(const AnsiString &name, const AnsiString &query);
+      AnsiString HandleBackupStart_();
+      AnsiString HandleBackupStatus_();
+      AnsiString HandleSettings_();
+      static bool GetJsonBoolValue_(const AnsiString &json, const AnsiString &key, bool defaultValue);
+      static std::vector<AnsiString> GetJsonStringArray_(const AnsiString &json, const AnsiString &key);
+      static bool IsSafeLogName_(const AnsiString &name);
       AnsiString HandleOpenApi_();
 
       // True if the id names a message that is really in the delivery queue.
