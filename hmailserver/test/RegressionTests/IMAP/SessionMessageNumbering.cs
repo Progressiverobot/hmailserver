@@ -6,6 +6,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -554,17 +555,17 @@ namespace RegressionTests.IMAP
       /// </summary>
       private static string SearchResult(string response, string tag)
       {
-         foreach (var line in response.Split(new[] {"\r\n"}, StringSplitOptions.RemoveEmptyEntries))
-         {
-            if (!line.StartsWith("* SEARCH") && !line.StartsWith("* SORT"))
-               continue;
+         var line = response.Split(new[] {"\r\n"}, StringSplitOptions.RemoveEmptyEntries)
+            .FirstOrDefault(l => l.StartsWith("* SEARCH") || l.StartsWith("* SORT"));
 
-            var separator = line.IndexOf(' ', 2);
-            return line.Substring(separator + 1).Trim();
+         if (line == null)
+         {
+            Assert.Fail("No untagged response found for " + tag + ". " + response);
+            return null;
          }
 
-         Assert.Fail("No untagged response found for " + tag + ". " + response);
-         return null;
+         var separator = line.IndexOf(' ', 2);
+         return line.Substring(separator + 1).Trim();
       }
 
       private static string ReceiveUntil(ImapClientSimulator simulator, string text)
