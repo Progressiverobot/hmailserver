@@ -372,6 +372,7 @@
     <Compile Include="Sieve\SieveEnvironmentDelivery.cs" />
     <Compile Include="Sieve\SieveIncludeDelivery.cs" />
     <Compile Include="Sieve\SieveMailboxDelivery.cs" />
+    <Compile Include="Sieve\SieveEnvelopeDelivery.cs" />
     <Compile Include="Sieve\SieveNotifyDelivery.cs" />
     <Compile Include="SMTP\OutboundXOAuth2.cs" />
     <Compile Include="SMTP\OutboundSize.cs" />

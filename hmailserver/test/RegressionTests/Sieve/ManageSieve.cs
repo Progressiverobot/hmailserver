@@ -296,10 +296,11 @@ namespace RegressionTests.Sieve
                // auto-submitted trigger is never notified about.
                StringAssert.Contains("enotify", greeting);
 
-               // Still absent on purpose: envelope is implemented and evaluated, and is
-               // held back until a test proves the envelope TEST command itself works.
-               // If somebody adds it here, that test should exist first.
-               StringAssert.DoesNotContain("envelope", greeting);
+               // envelope followed on 5 September 2026, with SieveEnvelopeDelivery.cs
+               // behind it - the envelope sender against a From header naming someone
+               // else, the envelope recipient against a To header naming a list, :domain,
+               // the null sender of a bounce, and the negative control.
+               StringAssert.Contains("envelope", greeting);
 
                // CAPABILITY before auth is allowed.
                string capability = session.SendCommand("CAPABILITY");
