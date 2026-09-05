@@ -1,4 +1,4 @@
-// Copyright (c) 2010 Martin Knafve / hMailServer.com.  
+// Copyright (c) 2010 Martin Knafve / hMailServer.com.
 // https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -8,6 +8,11 @@
 #include "IMAPConnection.h"
 
 #include "MessagesContainer.h"
+#include "IMAPFolderView.h"
+#include "IMAPNotificationClient.h"
+
+#include "../Common/BO/Messages.h"
+#include "../Common/BO/Message.h"
 
 #include "../Common/BO/IMAPFolder.h"
 
@@ -34,7 +39,7 @@ namespace HM
       }
 
       // Iterate through mail boxes and delete messages marked for deletion.
-      std::shared_ptr<IMAPFolder> pCurFolder = pConnection->GetCurrentFolder();   
+      std::shared_ptr<IMAPFolder> pCurFolder = pConnection->GetCurrentFolder();
 
       if (!pCurFolder)
          return IMAPResult(IMAPResult::ResultNo, "No folder selected.");
@@ -42,71 +47,76 @@ namespace HM
       if (!pConnection->CheckPermission(pCurFolder, ACLPermission::PermissionExpunge))
          return IMAPResult(IMAPResult::ResultBad, "ACL: Expunge permission denied (Required for EXPUNGE command).");
 
-      std::vector<__int64> expunged_messages_uid;
-      std::vector<__int64> expunged_messages_index;
-      std::vector<__int64> vanished_uids;
+      std::shared_ptr<IMAPFolderView> view = pConnection->GetCurrentFolderView();
 
-      std::function<bool(int, std::shared_ptr<Message>)> filter = [&expunged_messages_index, &expunged_messages_uid, &vanished_uids](int index, std::shared_ptr<Message> message)
-      {
-         if (message->GetFlagDeleted())
-         {
-            expunged_messages_index.push_back(index);
-            expunged_messages_uid.push_back(message->GetID());
-            vanished_uids.push_back(message->GetUID());
-            return true;
-         }
-
-         return false;
-      };
+      if (!view)
+         return IMAPResult(IMAPResult::ResultNo, "No folder selected.");
 
       auto messages = MessagesContainer::Instance()->GetMessages(pCurFolder->GetAccountID(), pCurFolder->GetID());
-      messages->DeleteMessages(filter);
 
-      String sResponse;
+      // EXPUNGE may report new messages as well, so take them into the view first.
+      view->AppendNewMessages(messages);
 
-      if (pConnection->GetQResyncEnabled() && !vanished_uids.empty())
+      // Only messages this session knows about are expunged here: the client has not
+      // been told about the others, so their sequence numbers would mean nothing to it.
+      std::vector<std::pair<int, IMAPViewEntry> > entries = view->GetAllEntries();
+
+      std::set<__int64> view_message_ids;
+      for (const std::pair<int, IMAPViewEntry> &entry : entries)
+         view_message_ids.insert(entry.second.message_id);
+
+      std::map<__int64, std::shared_ptr<Message> > view_messages = messages->GetCopyByIds(view_message_ids);
+
+      std::set<__int64> messages_to_delete;
+
+      for (const std::pair<int, IMAPViewEntry> &entry : entries)
       {
-         // RFC 7162 (QRESYNC): report expunges as a single "* VANISHED" with a UID set
-         // instead of one "* n EXPUNGE" line per message.
-         sResponse.Format(_T("* VANISHED %s\r\n"), IMAPConnection::CompactUidSet(vanished_uids).c_str());
-      }
-      else
-      {
-         auto iterExpunged = expunged_messages_index.begin();
-         while (iterExpunged != expunged_messages_index.end())
+         auto iter = view_messages.find(entry.second.message_id);
+
+         if (iter == view_messages.end())
          {
-            String sTemp;
-            sTemp.Format(_T("* %d EXPUNGE\r\n"), (*iterExpunged));
-            sResponse += sTemp;
-            iterExpunged++;
+            // Expunged by another session. Reported below, together with this one's.
+            view->MarkVanished(entry.second.message_id);
+            continue;
          }
+
+         if ((*iter).second->GetFlagDeleted())
+            messages_to_delete.insert(entry.second.message_id);
       }
 
-      pConnection->SendAsciiData(sResponse);
+      std::vector<__int64> deleted_message_ids = messages->DeleteMessagesById(messages_to_delete);
 
-      if (!expunged_messages_uid.empty())
+      // EXPUNGE is a point where an untagged EXPUNGE may be sent, so whatever earlier
+      // commands found gone joins this one: the client learns of both at once.
+      std::vector<__int64> ids_to_report = deleted_message_ids;
+      std::vector<__int64> vanished_elsewhere = view->TakeVanished();
+      ids_to_report.insert(ids_to_report.end(), vanished_elsewhere.begin(), vanished_elsewhere.end());
+
+      std::vector<unsigned int> expunged_uids;
+      std::vector<int> expunged_sequences = view->RemoveMessages(ids_to_report, &expunged_uids);
+
+      pConnection->RemoveRecentMessages(ids_to_report);
+
+      String sResponse = IMAPNotificationClient::FormatExpungeResponses(pConnection, expunged_sequences, expunged_uids);
+
+      if (!sResponse.IsEmpty())
+         pConnection->SendAsciiData(sResponse);
+
+      if (!deleted_message_ids.empty())
       {
-         // Through the connection, under its state lock. Erasing from a COPY used to
-         // leave the expunged messages in the session's \Recent set, so RECENT kept
-         // reporting new mail that no longer existed (and could exceed EXISTS); a
-         // bare reference fixed that and left the set open to a notifying thread
-         // reading it mid-erase.
-         for (__int64 messageUid : expunged_messages_uid)
-            pConnection->RemoveRecentMessage(messageUid);
-         
-
-         // Messages have been expunged
-         // Notify the mailbox notifier that the mailbox contents have changed.
-         std::shared_ptr<ChangeNotification> pNotification = 
-            std::shared_ptr<ChangeNotification>(new ChangeNotification(pCurFolder->GetAccountID(), pCurFolder->GetID(), ChangeNotification::NotificationMessageDeleted, expunged_messages_index));
+         // Messages have been expunged. Notify the mailbox notifier that the mailbox
+         // contents have changed - with message ids, which every other session turns
+         // into its own numbers. The view is updated first, and no connection lock is
+         // held: the notification is delivered synchronously, into the other sessions.
+         std::shared_ptr<ChangeNotification> pNotification =
+            std::shared_ptr<ChangeNotification>(new ChangeNotification(pCurFolder->GetAccountID(), pCurFolder->GetID(), ChangeNotification::NotificationMessageDeleted, deleted_message_ids));
 
          Application::Instance()->GetNotificationServer()->SendNotification(pConnection->GetNotificationClient(), pNotification);
       }
 
-
       // We're done.
       sResponse = pArgument->Tag() + " OK EXPUNGE Completed\r\n";
-      pConnection->SendAsciiData(sResponse);   
+      pConnection->SendAsciiData(sResponse);
 
       return IMAPResult();
    }

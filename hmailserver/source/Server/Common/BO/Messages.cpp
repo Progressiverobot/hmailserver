@@ -1,4 +1,4 @@
-// Copyright (c) 2010 Martin Knafve / hMailServer.com.  
+// Copyright (c) 2010 Martin Knafve / hMailServer.com.
 // https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -27,7 +27,7 @@ namespace HM
 
    Messages::~Messages()
    {
-   
+
    }
 
    std::vector<std::shared_ptr<Message>>
@@ -47,6 +47,56 @@ namespace HM
 
    }
 
+   std::map<__int64, std::shared_ptr<Message>>
+   Messages::GetCopyByIds(const std::set<__int64> &message_ids) const
+   {
+      boost::lock_guard<boost::recursive_mutex> guard(_mutex);
+
+      std::map<__int64, std::shared_ptr<Message>> result;
+
+      for (std::shared_ptr<Message> message : vecObjects)
+      {
+         if (message_ids.find(message->GetID()) == message_ids.end())
+            continue;
+
+         result[message->GetID()] = std::shared_ptr<Message>(new Message(*message.get()));
+      }
+
+      return result;
+   }
+
+   std::map<__int64, std::shared_ptr<Message>>
+   Messages::GetItemsByIds(const std::set<__int64> &message_ids) const
+   {
+      boost::lock_guard<boost::recursive_mutex> guard(_mutex);
+
+      std::map<__int64, std::shared_ptr<Message>> result;
+
+      for (std::shared_ptr<Message> message : vecObjects)
+      {
+         if (message_ids.find(message->GetID()) == message_ids.end())
+            continue;
+
+         result[message->GetID()] = message;
+      }
+
+      return result;
+   }
+
+   std::shared_ptr<Message>
+   Messages::GetCopyByDBID(__int64 message_id) const
+   {
+      boost::lock_guard<boost::recursive_mutex> guard(_mutex);
+
+      for (std::shared_ptr<Message> message : vecObjects)
+      {
+         if (message->GetID() == message_id)
+            return std::shared_ptr<Message>(new Message(*message.get()));
+      }
+
+      return std::shared_ptr<Message>();
+   }
+
    long
    Messages::GetNoOfSeen() const
    {
@@ -56,7 +106,7 @@ namespace HM
 
       for(std::shared_ptr<Message> oMessage : vecObjects)
       {
-         if (oMessage->GetFlagSeen()) 
+         if (oMessage->GetFlagSeen())
             lNoOfSeen ++;
       }
 
@@ -164,26 +214,38 @@ namespace HM
       }
 
       LOG_DEBUG("Messages::~Save()");
-   
+
    }
 
-   void
-   Messages::DeleteMessages(std::function<bool(int, std::shared_ptr<Message>)> &filter)
+   std::vector<__int64>
+   Messages::DeleteMessagesById(const std::set<__int64> &message_ids)
+   {
+      std::function<bool(std::shared_ptr<Message>)> filter = [&message_ids](std::shared_ptr<Message> message)
+      {
+         return message_ids.find(message->GetID()) != message_ids.end();
+      };
+
+      return DeleteMessages(filter);
+   }
+
+   std::vector<__int64>
+   Messages::DeleteMessages(const std::function<bool(std::shared_ptr<Message>)> &filter)
    {
       boost::lock_guard<boost::recursive_mutex> guard(_mutex);
 
-      std::vector<int> vecExpungedMessages;
+      std::vector<__int64> deleted_message_ids;
       auto iterMessage = vecObjects.begin();
 
-      int index = 0;
       while (iterMessage != vecObjects.end())
       {
-         index++;
-
          std::shared_ptr<Message> message = (*iterMessage);
 
-         if (filter(index, message))
+         if (filter(message))
          {
+            // Read before the delete: PersistentMessage::DeleteObject resets the id, and
+            // the id is what every session's view is keyed on.
+            const __int64 message_id = message->GetID();
+
             // This is what an IMAP EXPUNGE runs, and the delete was unchecked while
             // the erase below happened regardless - so a message the database refused
             // to delete was still removed from the collection, the client was sent an
@@ -196,19 +258,21 @@ namespace HM
             if (!PersistentMessage::DeleteObject(message))
             {
                ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6107, "Messages::DeleteMessages",
-                  Formatter::Format("Message {0} could not be deleted, so it has been kept rather than reported to the client as expunged.", message->GetID()));
+                  Formatter::Format("Message {0} could not be deleted, so it has been kept rather than reported to the client as expunged.", message_id));
 
                iterMessage++;
                continue;
             }
 
+            deleted_message_ids.push_back(message_id);
+
             iterMessage = vecObjects.erase(iterMessage);
-            index--;
          }
          else
             iterMessage++;
       }
 
+      return deleted_message_ids;
    }
 
 
@@ -224,7 +288,7 @@ namespace HM
       if (retrieveQueue && last_refreshed_uid_ > 0)
       {
          /*
-            We can't do partial refreshes of messages in the queue. Why? 
+            We can't do partial refreshes of messages in the queue. Why?
             Because we use the message UID to determine which part of the
             queue we need to read from the database, and UID's aren't given
             to messages before they are inserted into the queue.
@@ -238,7 +302,7 @@ namespace HM
 
       // Build SQL statement that will be used to fetch list of messages.
       String sSQL;
-      sSQL = "select * from hm_messages where "; 
+      sSQL = "select * from hm_messages where ";
 
       if (retrieveQueue)
          sSQL += " messagetype = 1 ";
@@ -246,21 +310,21 @@ namespace HM
       {
          // Messages connected to a specific account
          sSQL += _T(" messageaccountid = @MESSAGEACCOUNTID ");
-         command.AddParameter("@MESSAGEACCOUNTID", account_id_); 
+         command.AddParameter("@MESSAGEACCOUNTID", account_id_);
       }
-  
+
       // Should we fetch a specific folder?
       if (folder_id_ != -1)
       {
          sSQL.AppendFormat(_T(" and messagefolderid = @MESSAGEFOLDERID "));
-         command.AddParameter("@MESSAGEFOLDERID", folder_id_); 
+         command.AddParameter("@MESSAGEFOLDERID", folder_id_);
       }
 
       // Should we do an incremental refresh?
       if (last_refreshed_uid_ > 0)
       {
          sSQL.AppendFormat(_T(" and messageuid > @MESSAGEUID "));
-         command.AddParameter("@MESSAGEUID", last_refreshed_uid_); 
+         command.AddParameter("@MESSAGEUID", last_refreshed_uid_);
       }
 
       if (retrieveQueue)
@@ -299,7 +363,7 @@ namespace HM
          {
             std::shared_ptr<Message> msg = std::shared_ptr<Message> (new Message(false));
             PersistentMessage::ReadObject(pRS, msg, false);
-                  
+
             vecObjects.push_back(msg);
 
             lRecCount--;
@@ -312,7 +376,7 @@ namespace HM
       }
    }
 
-   void  
+   void
    Messages::RemoveRecentFlags()
    {
       boost::lock_guard<boost::recursive_mutex> guard(_mutex);
@@ -352,7 +416,7 @@ namespace HM
       return true;
    }
 
-   void 
+   void
    Messages::Remove(__int64 iDBID)
    //---------------------------------------------------------------------------()
    // DESCRIPTION:

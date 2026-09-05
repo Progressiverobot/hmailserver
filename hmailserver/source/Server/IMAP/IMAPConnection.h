@@ -1,4 +1,4 @@
-// Copyright (c) 2010 Martin Knafve / hMailServer.com.  
+// Copyright (c) 2010 Martin Knafve / hMailServer.com.
 // https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -22,6 +22,7 @@ namespace HM
    class IMAPCommandArgument;
    class Message;
    class Messages;
+   class IMAPFolderView;
    class IMAPMailboxChangeNotifier;
    class IMailboxChangeClient;
    class ScramSha256;
@@ -33,7 +34,7 @@ namespace HM
       String Command;
       String Tag;
       String EntireLine;
-      
+
       std::vector<String> vecLiteralData;
    };
 
@@ -41,7 +42,7 @@ namespace HM
    {
    public:
       IMAPConnection(ConnectionSecurity connection_security,
-         boost::asio::io_context& io_context, 
+         boost::asio::io_context& io_context,
          boost::asio::ssl::context& context);
 	   virtual ~IMAPConnection();
       void Initialize();
@@ -99,7 +100,7 @@ namespace HM
       void ParseData(const AnsiString &Request);
       void ParseData(std::shared_ptr<ByteBuffer> pByteBuffer);
       void SendAsciiData(const AnsiString & sData);
-      
+
       std::shared_ptr<const Account> GetAccount() { return account_; }
 
       // The account whose DIRECTORY holds the messages of the folder currently
@@ -116,13 +117,13 @@ namespace HM
       // any DESTINATION folder (APPEND/COPY/MOVE); the one above only answers for
       // the selected folder.
       std::shared_ptr<const Account> GetAccountOwningFolder(std::shared_ptr<IMAPFolder> folder);
-      
+
       void RefreshIMAPFolders();
       void NotifyFolderChange(eIMAPCommandType active_command);
-      
+
       std::shared_ptr<IMAPFolders> GetAccountFolders() const { return imap_folders_;}
       std::shared_ptr<IMAPFolders> GetPublicFolders() const { return public_imap_folders_;}
-      
+
       std::shared_ptr<IMAPFolder> GetFolderByFullPath(const String &sFolderName);
       std::shared_ptr<IMAPFolder> GetFolderByFullPath(std::vector<String> &vecFolderPath);
 
@@ -138,12 +139,18 @@ namespace HM
 
       std::shared_ptr<IMAPFolder> GetCurrentFolder() const;
 
+      // This session's view of the selected folder - its own sequence numbering. Null
+      // when no folder is selected. See IMAPFolderView.h.
+      std::shared_ptr<IMAPFolderView> GetCurrentFolderView() const;
+
       bool CheckPermission(std::shared_ptr<IMAPFolder> pFolder, int iPermission);
       void CheckFolderPermissions(std::shared_ptr<IMAPFolder> pFolder, bool &readAccess, bool &writeAccess);
 
       void CloseCurrentFolder();
-      void SetCurrentFolder(std::shared_ptr<IMAPFolder> pFolder, bool readOnly);
-   
+      // The messages are what the view is built from: the caller has just loaded them
+      // (and consumed their \Recent flags), so the view and the SELECT response agree.
+      void SetCurrentFolder(std::shared_ptr<IMAPFolder> pFolder, bool readOnly, std::shared_ptr<Messages> messages);
+
       void SendResponseString(const String &sTag, const String &sResponse, const String &sMessage);
 
       bool GetIsIdling() const;
@@ -240,11 +247,12 @@ namespace HM
       std::shared_ptr<IMAPNotificationClient> GetNotificationClient() {return notification_client_;}
 
       void StartHandshake();
-	 
+
 	  void SetRecentMessages(const std::set<__int64> &messages);
       void ClearRecentMessages();
       void AddRecentMessage(__int64 message_id);
       void RemoveRecentMessage(__int64 message_id);
+      void RemoveRecentMessages(const std::vector<__int64> &message_ids);
       bool IsRecentMessage(__int64 message_id) const;
       size_t GetRecentMessageCount() const;
 
@@ -267,10 +275,10 @@ namespace HM
       virtual AnsiString GetOtelOperationName_(const AnsiString &sData) const;
 
       void LogClientCommand_(const String &sClientData);
-      
+
       virtual void OnExcessiveDataReceived();
       virtual void OnConnectionTimeout();
-            
+
       eIMAPCommandType GetCommandType(String & sCommand);
 
       std::map<eIMAPCommandType, std::shared_ptr<IMAPCommand> > mapCommandHandlers;
@@ -314,6 +322,7 @@ namespace HM
 
       // Folder info
       std::shared_ptr<IMAPFolder> current_folder_;
+      std::shared_ptr<IMAPFolderView> current_folder_view_;
       bool current_folder_read_only_;
 
       String command_buffer_;
@@ -345,5 +354,5 @@ namespace HM
 
       int log_level_;
    };
-   
+
 }

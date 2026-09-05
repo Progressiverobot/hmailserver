@@ -484,6 +484,7 @@
   <ItemGroup>
     <Compile Include="API\Message.cs" />
     <Compile Include="IMAP\SpecialUse.cs" />
+    <Compile Include="IMAP\SessionMessageNumbering.cs" />
     <Compile Include="IMAP\ACL.cs" />
   </ItemGroup>
   <ItemGroup>

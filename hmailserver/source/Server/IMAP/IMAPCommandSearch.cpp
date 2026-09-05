@@ -1,4 +1,4 @@
-// Copyright (c) 2010 Martin Knafve / hMailServer.com.  
+// Copyright (c) 2010 Martin Knafve / hMailServer.com.
 // https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -7,6 +7,7 @@
 
 #include "IMAPCommandSEARCH.h"
 #include "IMAPConnection.h"
+#include "IMAPFolderView.h"
 #include "IMAPSort.h"
 #include "IMAPSortParser.h"
 #include "IMAPThread.h"
@@ -254,7 +255,7 @@ namespace HM
 
    IMAPCommandSEARCH::~IMAPCommandSEARCH()
    {
-      
+
    }
 
    IMAPResult
@@ -389,29 +390,36 @@ namespace HM
       if (!pCurFolder)
          return IMAPResult(IMAPResult::ResultBad, "No selected folder");
 
-      std::vector<std::shared_ptr<Message>> messages = pCurFolder->GetMessages()->GetCopy();
+      // Searched in this session's view, with this session's numbering: a message another
+      // session expunged since this client was last told is still a member of the view,
+      // and one appended since is not until the client hears of it.
+      std::shared_ptr<IMAPFolderView> view = pConnection->GetCurrentFolderView();
 
-      message_count_ = (int) messages.size();
-      max_uid_ = 0;
-      for(std::shared_ptr<Message> pMessage : messages)
-      {
-         // Scanned rather than read off the last message: the collection is not
-         // guaranteed to be ordered by UID.
-         if ((int) pMessage->GetUID() > max_uid_)
-            max_uid_ = (int) pMessage->GetUID();
-      }
+      if (!view)
+         return IMAPResult(IMAPResult::ResultBad, "No selected folder");
+
+      std::vector<std::pair<int, IMAPViewEntry> > entries = view->GetAllEntries();
+
+      std::set<__int64> entry_ids;
+      for (const std::pair<int, IMAPViewEntry> &entry : entries)
+         entry_ids.insert(entry.second.message_id);
+
+      std::map<__int64, std::shared_ptr<Message> > messagesById = pCurFolder->GetMessages()->GetCopyByIds(entry_ids);
+
+      message_count_ = (int) entries.size();
+      max_uid_ = (int) view->GetHighestUID();
 
       std::vector<String> sMatchingVec;
       // RFC 5182 (SEARCHRES): UIDs of the matched messages in ascending order, used when SAVE
       // is requested. Captured regardless of UID/sequence mode so "$" stays stable.
       std::vector<__int64> sMatchingUids;
-      if (messages.size() > 0)
+      if (!entries.empty())
       {
          // Iterate through the messages and see which ones match.
          std::vector<std::pair<int, std::shared_ptr<Message> > > vecMatchingMessages;
 
          int index = 0;
-         for(std::shared_ptr<Message> pMessage : messages)
+         for (const std::pair<int, IMAPViewEntry> &entry : entries)
          {
             // Checked before this message is examined rather than after it, so the
             // check only ever stops work that is still to come. A search whose last
@@ -421,10 +429,23 @@ namespace HM
             if (BoundExceeded_())
                return AbortSearch_(pConnection, index);
 
+            index = entry.first;
+
+            auto iter = messagesById.find(entry.second.message_id);
+
+            if (iter == messagesById.end())
+            {
+               // Expunged by another session: it cannot match, and the client is told
+               // the next time an untagged EXPUNGE may be sent.
+               view->MarkVanished(entry.second.message_id);
+               continue;
+            }
+
+            std::shared_ptr<Message> pMessage = (*iter).second;
+
             const String fileName = PersistentMessage::GetFileName(pConnection->GetAccountOwningCurrentFolder(), pMessage);
 
-            index++;
-            if (pMessage && DoesMessageMatch_(pConnection, pParser->GetCriteria(), fileName, pMessage, index))
+            if (DoesMessageMatch_(pConnection, pParser->GetCriteria(), fileName, pMessage, index))
             {
                // Yup we got a match.
                vecMatchingMessages.push_back(make_pair(index, pMessage));
@@ -497,7 +518,7 @@ namespace HM
          // after SEARCH/SORT below. That's why we add the white space here.
          sMatching = " " + StringParser::JoinVector(sMatchingVec, " ") ;
       }
-      
+
       String sResponse;
       if (is_esearch_)
       {
@@ -586,7 +607,7 @@ namespace HM
          pConnection->SetSavedSearchResult(savedUids);
       }
 
-      if (!is_uid_) 
+      if (!is_uid_)
          // if this is a UID command, IMAPCommandUID takes care of the below line.
          sResponse += pArgument->Tag() + " OK Search completed\r\n";
 
@@ -1163,7 +1184,7 @@ namespace HM
       String sCreationDate = pMessage->GetCreateTime();
 
       DateTime dt = Time::GetDateFromSystemDate(sCreationDate);
-      DateTime criteriaDate = Time::GetDateFromIMAP(pCriteria->GetText()); 
+      DateTime criteriaDate = Time::GetDateFromIMAP(pCriteria->GetText());
 
       bool bMatch = false;
       if (dt.GetYear() == criteriaDate.GetYear() &&
@@ -1408,7 +1429,7 @@ namespace HM
 
       if (pCriteria->GetPositive())
       {
-         if (!sHeader.ContainsNoCase(sTextToFind) && 
+         if (!sHeader.ContainsNoCase(sTextToFind) &&
              !sBody.ContainsNoCase(sTextToFind) &&
              !sHTMLBody.ContainsNoCase(sTextToFind))
              return false;
@@ -1432,7 +1453,7 @@ namespace HM
       std::vector<String> split = pCriteria->GetSequenceSet();
 
       bool found = IMAPListLookup::IsItemInList(split, (int) pMessage->GetUID(), max_uid_);
-      
+
       if (pCriteria->GetPositive())
          return found;
       else
@@ -1458,7 +1479,7 @@ namespace HM
    {
       String sHeaderField = pCriteria->GetHeaderField();
       String sTextToFind = pCriteria->GetText();
-      
+
       String sHeaderFieldValue = GetHeaderValue_(fileName, pMessage, sHeaderField);
 
       if (sHeaderFieldValue.ContainsNoCase(sTextToFind))
@@ -1467,7 +1488,7 @@ namespace HM
          return !pCriteria->GetPositive();
    }
 
-   bool 
+   bool
    IMAPCommandSEARCH::IsMessageRecent_(std::shared_ptr<IMAPConnection> pConnection, __int64 message_uid)
    {
       return pConnection->IsRecentMessage(message_uid);
@@ -1480,7 +1501,7 @@ namespace HM
       {
          return message_data_->GetFieldValue(sHeaderField);
       }
-      
+
       if (!mime_header_)
       {
          // Load header

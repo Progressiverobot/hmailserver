@@ -1,4 +1,4 @@
-// Copyright (c) 2010 Martin Knafve / hMailServer.com.  
+// Copyright (c) 2010 Martin Knafve / hMailServer.com.
 // https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -75,7 +75,7 @@ STDMETHODIMP InterfaceMessages::get_ItemByDBID(hyper DBID, IInterfaceMessage **p
       if (!messages_)
          return GetAccessDenied();
 
-      //	
+      //
 
       CComObject<InterfaceMessage>* pInterfaceMessage = new CComObject<InterfaceMessage>();
       pInterfaceMessage->SetAuthentication(authentication_);
@@ -156,7 +156,7 @@ STDMETHODIMP InterfaceMessages::DeleteByDBID(hyper lDBID)
 
       // Expunge the mailbox. Will cause the message to be
       // deleted from disk and database.
-      std::function<bool(int, std::shared_ptr<HM::Message>)> filter = [lDBID](int index, std::shared_ptr<HM::Message> message)
+      std::function<bool(std::shared_ptr<HM::Message>)> filter = [lDBID](std::shared_ptr<HM::Message> message)
       {
          if (message->GetID() == lDBID)
          {
@@ -168,7 +168,7 @@ STDMETHODIMP InterfaceMessages::DeleteByDBID(hyper lDBID)
 
       messages_->DeleteMessages(filter);
 
-      // If we're aren't browsing in the message cache already, 
+      // If we're aren't browsing in the message cache already,
       // we need to delete the message from the cache now. This
       // is needed if the messages are accessed using the
       // Account.Messages property. When messages are accessed

@@ -1,4 +1,4 @@
-// Copyright (c) 2010 Martin Knafve / hMailServer.com.  
+// Copyright (c) 2010 Martin Knafve / hMailServer.com.
 // https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -6,6 +6,7 @@
 #include "stdafx.h"
 #include "IMAPCommandRangeAction.h"
 #include "IMAPConnection.h"
+#include "IMAPFolderView.h"
 #include "../Common/BO/Messages.h"
 #include "../Common/BO/Message.h"
 #include "../Common/BO/IMAPFolder.h"
@@ -22,7 +23,7 @@ namespace HM
       is_uid_(false),
       uidplus_dest_uidvalidity_(0)
    {
-    
+
    }
 
    IMAPCommandRangeAction::~IMAPCommandRangeAction()
@@ -36,69 +37,50 @@ namespace HM
       is_uid_ = bIsUID;
    }
 
-   bool 
+   bool
    IMAPCommandRangeAction::GetIsUID()
    {
       return is_uid_;
    }
 
-   unsigned int
-   IMAPCommandRangeAction::GetMaxUid_(const std::vector<std::shared_ptr<Message>> &messages)
-   {
-      // Scanned rather than read off the last element: the collection is not
-      // guaranteed to be ordered by UID, and a COPY can introduce a message
-      // whose UID is lower than its predecessor's.
-      unsigned int maxUid = 0;
-
-      for (const std::shared_ptr<Message> &message : messages)
-      {
-         unsigned int uid = message->GetUID();
-
-         if (uid > maxUid)
-            maxUid = uid;
-      }
-
-      return maxUid;
-   }
-
    IMAPResult
    IMAPCommandRangeAction::DoForMails(std::shared_ptr<IMAPConnection> pConnection, const String &sMailNos, std::shared_ptr<IMAPCommandArgument> pArgument)
    {
-      long lColonPos = -1;
+      std::shared_ptr<IMAPFolderView> view = pConnection->GetCurrentFolderView();
+      std::shared_ptr<IMAPFolder> pCurFolder = pConnection->GetCurrentFolder();
+
+      if (!view || !pCurFolder)
+         return IMAPResult(IMAPResult::ResultNo, "No folder selected.");
 
       // RFC 5182 (SEARCHRES): "$" references the result saved by "SEARCH RETURN (SAVE)".
-      // Expand it here, the single chokepoint for FETCH/STORE/COPY/MOVE sequence-sets, so
+      // Expanded here, the single chokepoint for FETCH/STORE/COPY/MOVE sequence-sets, so
       // every consumer sees a concrete set. The saved result is stored as UIDs; for a
-      // sequence-number command they are mapped to the current message positions. An empty
-      // saved result expands to "0", which matches nothing (the command succeeds, no-op).
+      // sequence-number command they are mapped to the positions THIS SESSION knows them
+      // by. An empty saved result expands to "0", which matches nothing.
       String sExpandedMailNos = sMailNos;
       if (sExpandedMailNos.Find(_T("$")) >= 0)
       {
          const std::vector<__int64> &savedUids = pConnection->GetSavedSearchResult();
          std::vector<String> tokens;
 
-         if (is_uid_)
+         for (__int64 uid : savedUids)
          {
-            for (__int64 uid : savedUids)
+            if (is_uid_)
             {
                String s;
                s.Format(_T("%I64d"), uid);
                tokens.push_back(s);
+               continue;
             }
-         }
-         else if (pConnection->GetCurrentFolder())
-         {
-            std::shared_ptr<Messages> messages = pConnection->GetCurrentFolder()->GetMessages();
-            for (__int64 uid : savedUids)
+
+            int sequence = 0;
+            IMAPViewEntry entry;
+
+            if (view->GetEntryByUID((unsigned int) uid, sequence, entry))
             {
-               unsigned int foundIndex = 0;
-               std::shared_ptr<Message> message = messages->GetItemByUID((unsigned int) uid, foundIndex);
-               if (message)
-               {
-                  String s;
-                  s.Format(_T("%u"), foundIndex);
-                  tokens.push_back(s);
-               }
+               String s;
+               s.Format(_T("%d"), sequence);
+               tokens.push_back(s);
             }
          }
 
@@ -106,156 +88,150 @@ namespace HM
          sExpandedMailNos.Replace(_T("$"), sSubstitution.c_str());
       }
 
-      std::vector<String> sSplitted = StringParser::SplitString(sExpandedMailNos, ",");
+      // Resolved against this session's view, so the numbers mean the messages they meant
+      // when the client was told about them, whatever other sessions have done to the
+      // folder since (RFC 3501 2.3.1.2; upstream #458).
+      std::vector<std::pair<int, IMAPViewEntry> > targets = ResolveTargets_(view, sExpandedMailNos);
 
-      if (is_uid_)
+      if (targets.empty())
+         return IMAPResult();
+
+      std::set<__int64> message_ids;
+      for (const std::pair<int, IMAPViewEntry> &target : targets)
+         message_ids.insert(target.second.message_id);
+
+      std::shared_ptr<Messages> messages = pCurFolder->GetMessages();
+
+      std::map<__int64, std::shared_ptr<Message> > resolved = UsesLiveMessages()
+         ? messages->GetItemsByIds(message_ids)
+         : messages->GetCopyByIds(message_ids);
+
+      // A message in this session's view but no longer in the folder was expunged by
+      // another session, and this client has not been told - it is told the next time an
+      // untagged EXPUNGE may be sent. What the command does about it depends on how it
+      // was addressed: the UID variants ignore it (RFC 3501 6.4.8), the others by policy.
+      MissingMessagePolicy policy = is_uid_ ? MissingMessagePolicy::Ignore : GetMissingMessagePolicy();
+
+      bool any_missing = false;
+
+      for (const std::pair<int, IMAPViewEntry> &target : targets)
       {
-         for(String sCur : sSplitted)
+         if (resolved.find(target.second.message_id) != resolved.end())
+            continue;
+
+         view->MarkVanished(target.second.message_id);
+         any_missing = true;
+      }
+
+      if (any_missing && policy == MissingMessagePolicy::FailBeforeActing)
+         return IMAPResult(IMAPResult::ResultNo, "[EXPUNGEISSUED] Some of the messages no longer exist.");
+
+      for (const std::pair<int, IMAPViewEntry> &target : targets)
+      {
+         auto iter = resolved.find(target.second.message_id);
+
+         if (iter == resolved.end())
+            continue;
+
+         IMAPResult result = DoAction(pConnection, target.first, (*iter).second, pArgument);
+
+         if (result.GetResult() != IMAPResult::ResultOK)
+            return result;
+      }
+
+      if (any_missing && policy == MissingMessagePolicy::ReportAfterActing)
+         return IMAPResult(IMAPResult::ResultNo, "[EXPUNGEISSUED] Some of the messages no longer exist.");
+
+      return IMAPResult();
+   }
+
+   std::vector<std::pair<int, IMAPViewEntry> >
+   IMAPCommandRangeAction::ResolveTargets_(std::shared_ptr<IMAPFolderView> view, const String &sMailNos)
+   {
+      std::vector<std::pair<int, IMAPViewEntry> > targets;
+
+      const unsigned int highestUid = view->GetHighestUID();
+      const int messageCount = view->GetMessageCount();
+
+      std::vector<String> sSplitted = StringParser::SplitString(sMailNos, ",");
+
+      for (String sCur : sSplitted)
+      {
+         long lColonPos = sCur.Find(_T(":"));
+
+         String sFirstPart = lColonPos >= 0 ? sCur.Mid(0, lColonPos) : sCur;
+         String sSecondPart = lColonPos >= 0 ? sCur.Mid(lColonPos + 1) : sCur;
+
+         bool firstIsStar = sFirstPart == _T("*");
+         bool secondIsStar = sSecondPart == _T("*");
+
+         if (is_uid_)
          {
-            lColonPos = sCur.Find(_T(":"));
+            // RFC 3501: "*" is the largest UID in use - on either side of the colon, and
+            // a range is valid in either order, so "*:1" is the whole mailbox and a bare
+            // "*" is the last message. An empty mailbox has no largest UID, so "*" must
+            // match nothing there. As the END of a range it is left unbounded rather
+            // than pinned to the largest UID, so "5:*" also reaches a message the view
+            // took in after the client last asked.
+            if ((firstIsStar || secondIsStar) && highestUid == 0)
+               continue;
 
             if (lColonPos >= 0)
             {
-               String sFirstPart = sCur.Mid(0, lColonPos);
-               String sSecondPart = sCur.Mid(lColonPos + 1);
+               unsigned int startUid = firstIsStar ? highestUid : (unsigned int) _ttoi(sFirstPart);
+               unsigned int endUid = secondIsStar ? 0xFFFFFFFFu : (unsigned int) _ttoi(sSecondPart);
 
-               std::vector<std::shared_ptr<Message>> messages = pConnection->GetCurrentFolder()->GetMessages()->GetCopy();
+               if (endUid < startUid)
+                  std::swap(startUid, endUid);
 
-               // RFC 3501: "*" is the largest UID in use - on EITHER side of the
-               // colon - and a range is valid in either order, so "*:1" means the
-               // whole mailbox. Resolving "*" only as the range end left it as 0
-               // everywhere else, which made "UID FETCH *" a silent no-op and
-               // "UID STORE *:* +FLAGS (\Deleted)" flag the entire mailbox.
-               const unsigned int maxUid = GetMaxUid_(messages);
-
-               unsigned int lStartDBID = sFirstPart == _T("*") ? maxUid : (unsigned int) _ttoi(sFirstPart);
-               unsigned int lEndDBID = sSecondPart == _T("*") ? maxUid : (unsigned int) _ttoi(sSecondPart);
-
-               if (lEndDBID < lStartDBID)
-                  std::swap(lStartDBID, lEndDBID);
-
-               // An empty mailbox has no largest UID, so "*" must match nothing.
-               if (maxUid == 0 && (sFirstPart == _T("*") || sSecondPart == _T("*")))
-                  continue;
-
-               int index = 0;
-               for(std::shared_ptr<Message> pMessage: messages)
-               {
-                  index++;
-                  unsigned int uid = pMessage->GetUID();
-
-                  if (uid >= lStartDBID)
-                  {
-                     if (uid <= lEndDBID)
-                     {
-                        // UID doesn't fail just because the message is missing.
-                        // This is why we don't check the return value.
-                        IMAPResult result = DoAction(pConnection, index, pMessage, pArgument);
-                        if (result.GetResult() != IMAPResult::ResultOK)
-                        {
-                           return result;
-                        }
-                     }
-                  }
-               }
-
+               for (const std::pair<int, IMAPViewEntry> &entry : view->GetEntriesByUIDRange(startUid, endUid))
+                  targets.push_back(entry);
             }
-            else 
+            else
             {
-               std::shared_ptr<Messages> messages = pConnection->GetCurrentFolder()->GetMessages();
-
-               // A bare "*" addresses the message with the largest UID.
-               unsigned int uid = sCur == _T("*")
-                  ? GetMaxUid_(messages->GetCopy())
-                  : (unsigned int) _ttoi(sCur);
+               unsigned int uid = firstIsStar ? highestUid : (unsigned int) _ttoi(sCur);
 
                if (uid == 0)
                   continue;
 
-               unsigned int foundIndex = 0;
-               std::shared_ptr<Message> message = messages->GetItemByUID(uid, foundIndex);
-               if (!message)
-                  continue;
-               
-               IMAPResult result = DoAction(pConnection, foundIndex, message, pArgument);
-               if (result.GetResult() != IMAPResult::ResultOK)
-               {
-                  return result;
-               }
+               int sequence = 0;
+               IMAPViewEntry entry;
+
+               if (view->GetEntryByUID(uid, sequence, entry))
+                  targets.push_back(std::make_pair(sequence, entry));
             }
-         }            
-
-      }
-      else
-      {
-         for(String sCur: sSplitted)
+         }
+         else
          {
-            lColonPos = sCur.Find(_T(":"));
-
+            // Sequence numbers: "*" is the highest one in this session's view, on either
+            // side of the colon, and a range is valid in either order.
             if (lColonPos >= 0)
             {
-               String sFirstPart = sCur.Mid(0, lColonPos);
-               String sSecondPart = sCur.Mid(lColonPos + 1);
+               int startIndex = firstIsStar ? messageCount : _ttoi(sFirstPart);
+               int endIndex = secondIsStar ? messageCount : _ttoi(sSecondPart);
 
-               auto vecMessages = pConnection->GetCurrentFolder()->GetMessages()->GetCopy();
+               if (endIndex < startIndex)
+                  std::swap(startIndex, endIndex);
 
-               // See the UID branch above: "*" is the highest message sequence
-               // number on either side of the colon, and ranges are valid in
-               // either order.
-               const int maxSequenceNumber = (int) vecMessages.size();
-
-               int lStartIndex = sFirstPart == _T("*") ? maxSequenceNumber : _ttoi(sFirstPart);
-               int lEndIndex = sSecondPart == _T("*") ? maxSequenceNumber : _ttoi(sSecondPart);
-
-               if (lEndIndex < lStartIndex)
-                  std::swap(lStartIndex, lEndIndex);
-
-               int index = 0;
-               for(std::shared_ptr<Message> message : vecMessages)
-               {
-                  index++;
-
-                  if (index >= lStartIndex)
-                  {
-                     if (index <= lEndIndex)
-                     {
-                        IMAPResult result = DoAction(pConnection, index, message, pArgument);
-                        if (result.GetResult() != IMAPResult::ResultOK)
-                        {
-                           return result;
-                        }
-                     }
-                  }
-               }
-
+               for (const std::pair<int, IMAPViewEntry> &entry : view->GetEntriesBySequenceRange(startIndex, endIndex))
+                  targets.push_back(entry);
             }
-            else 
+            else
             {
-               std::shared_ptr<Messages> messages = pConnection->GetCurrentFolder()->GetMessages();
+               int sequence = firstIsStar ? messageCount : _ttoi(sCur);
 
-               // A bare "*" addresses the last message in the mailbox.
-               int messageIndex = sCur == _T("*") ? messages->GetCount() : _ttoi(sCur);
-
-               if (messageIndex <= 0)
+               if (sequence <= 0)
                   continue;
 
-               std::shared_ptr<Message> pMessage = messages->GetItem(messageIndex-1);
+               IMAPViewEntry entry;
 
-               if (!pMessage)
-                  continue;
-
-               IMAPResult result = DoAction(pConnection, messageIndex, pMessage, pArgument);
-               if (result.GetResult() != IMAPResult::ResultOK)
-               {
-                  return result;
-               }
+               if (view->GetEntryBySequence(sequence, entry))
+                  targets.push_back(std::make_pair(sequence, entry));
             }
-         }   
-
+         }
       }
 
-      return IMAPResult();
-
+      return targets;
    }
 
    void

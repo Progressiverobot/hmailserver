@@ -1,4 +1,4 @@
-// Copyright (c) 2010 Martin Knafve / hMailServer.com.  
+// Copyright (c) 2010 Martin Knafve / hMailServer.com.
 // https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -9,6 +9,7 @@
 #include "IMAPSimpleCommandParser.h"
 #include "IMAPConfiguration.h"
 #include "MessagesContainer.h"
+#include "IMAPFolderView.h"
 
 #include "../Common/Application/ACLManager.h"
 #include "../Common/BO/ACLPermission.h"
@@ -80,7 +81,7 @@ namespace HM
       String sFolderName = pParser->GetParamValue(pArgument, 0);
       if (sFolderName == Configuration::Instance()->GetIMAPConfiguration()->GetIMAPPublicFolderName())
          return IMAPResult(IMAPResult::ResultBad, "SELECT Only sub folders of the root shared folder can be selected.");
-         
+
       std::shared_ptr<IMAPFolder> pSelectedFolder = pConnection->GetFolderByFullPath(sFolderName);
       if (!pSelectedFolder)
       {
@@ -112,14 +113,19 @@ namespace HM
          return IMAPResult(IMAPResult::ResultBad, "ACL: Read permission denied (Required for SELECT command).");
       }
 
-      pConnection->SetCurrentFolder(pSelectedFolder, false);
+      // Close the previously selected folder before loading this one, so that
+      // re-selecting the same folder still clears its recent flags first.
+      pConnection->CloseCurrentFolder();
 
       std::set<__int64> recent_messages;
       auto messages = MessagesContainer::Instance()->GetMessages(pSelectedFolder->GetAccountID(), pSelectedFolder->GetID(), recent_messages, true);
 
+      pConnection->SetCurrentFolder(pSelectedFolder, false, messages);
       pConnection->SetRecentMessages(recent_messages);
 
-      long lCount = messages->GetCount();
+      // The count is this session's view of the folder - the numbering every response
+      // to this session uses from here on.
+      long lCount = pConnection->GetCurrentFolderView()->GetMessageCount();
       // RFC 3501: [UNSEEN] carries a message SEQUENCE NUMBER, not a UID. Sending
       // a UID sent clients that jump to the first unseen message to a message
       // that does not exist.
@@ -140,16 +146,16 @@ namespace HM
 
 	   sResponse += _T("* FLAGS (\\Deleted \\Seen \\Draft \\Answered \\Flagged)\r\n");
 
-      sRespTemp.Format(_T("* OK [UIDVALIDITY %d] current uidvalidity\r\n"), pSelectedFolder->GetCreationTime().ToInt());   
+      sRespTemp.Format(_T("* OK [UIDVALIDITY %d] current uidvalidity\r\n"), pSelectedFolder->GetCreationTime().ToInt());
       sResponse += sRespTemp;
-      
+
       if (lFirstUnseenID > 0 && !pConnection->GetImap4Rev2Enabled())
       {
          // RFC 9051 (IMAP4rev2): the [UNSEEN] response code on SELECT was removed.
          sRespTemp.Format(_T("* OK [UNSEEN %d] unseen messages\r\n"), lFirstUnseenID);
          sResponse += sRespTemp;
       }
-      
+
       sRespTemp.Format(_T("* OK [UIDNEXT %d] next uid\r\n"), pSelectedFolder->GetCurrentUID()+1);
       sResponse += sRespTemp;
 
@@ -248,8 +254,8 @@ namespace HM
          sResponse += pArgument->Tag() + _T(" OK [READ-ONLY] SELECT completed\r\n");
 
 
-      pConnection->SendAsciiData(sResponse);   
- 
+      pConnection->SendAsciiData(sResponse);
+
       return IMAPResult();
    }
 }
