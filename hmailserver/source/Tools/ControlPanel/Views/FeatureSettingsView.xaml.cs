@@ -2596,7 +2596,8 @@ namespace hMailServer.ControlPanel.Views
                         Label = "Password hash for new or changed account passwords",
                         Options = new (int, string)[]
                         {
-                           (5, "Argon2id (strongest)"),
+                           (5, "Argon2id (memory-hard, recommended)"),
+                           (7, "scrypt (memory-hard, RFC 7914)"),
                            (4, "PBKDF2 (default)"),
                            (3, "SHA-256"),
                            (2, "MD5 (legacy)"),
@@ -2613,7 +2614,7 @@ namespace hMailServer.ControlPanel.Views
                            (0, "Accept any stored hash"),
                            (3, "SHA-256 or stronger"),
                            (4, "PBKDF2 or stronger"),
-                           (5, "Argon2id only")
+                           (5, "Argon2id or scrypt only")
                         }
                      },
                      new SecretSetting { Key = "PasswordPepper", Label = "Password pepper — WARNING: set before creating accounts; changing it later invalidates ALL existing passwords", Hint = "Server-wide secret mixed into password hashes" },

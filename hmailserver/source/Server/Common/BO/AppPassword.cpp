@@ -105,7 +105,7 @@ namespace HM
       // preferred algorithm is a configured integer, so it is checked rather than
       // trusted, because "the setting was 0" must not silently become "the
       // credential is in the clear".
-      if (type != Crypt::ETPBKDF2 && type != Crypt::ETArgon2id &&
+      if (type != Crypt::ETPBKDF2 && type != Crypt::ETArgon2id && type != Crypt::ETScrypt &&
           type != Crypt::ETSHA256 && type != Crypt::ETMD5)
       {
          type = Crypt::ETArgon2id;
@@ -118,7 +118,11 @@ namespace HM
       // correctly - while quietly issuing app passwords under exactly that scheme.
       int minimum = IniFileSettings::Instance()->GetMinimumAcceptedHashAlgorithm();
 
-      if (minimum > (int) type && minimum <= (int) Crypt::ETArgon2id)
+      const bool minimumIsAPasswordScheme =
+         minimum == (int) Crypt::ETSHA256 || minimum == (int) Crypt::ETPBKDF2 ||
+         minimum == (int) Crypt::ETArgon2id || minimum == (int) Crypt::ETScrypt;
+
+      if (minimumIsAPasswordScheme && Crypt::StrengthRank(minimum) > Crypt::StrengthRank((int) type))
          type = (Crypt::EncryptionType) minimum;
 
       hash_ = Crypt::Instance()->EnCrypt(clearText, type);

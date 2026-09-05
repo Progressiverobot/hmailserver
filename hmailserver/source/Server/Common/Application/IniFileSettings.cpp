@@ -193,10 +193,10 @@ namespace HM
       // account passwords and app passwords in a form anybody with the database can
       // read back. Reported rather than silently corrected, because an administrator
       // who set this deliberately is owed an explanation of why it did not take.
-      if (preferred_hash_algorithm_ < 3 || preferred_hash_algorithm_ > 5)
+      if (preferred_hash_algorithm_ < 3 || preferred_hash_algorithm_ > 7 || preferred_hash_algorithm_ == 6)
       {
          String message;
-         message.Format(_T("PreferredHashAlgorithm is set to %d, which is not a password-hashing scheme this server will store a new secret under (0 is no hashing, 1 is reversible, 2 is MD5). Using 4 (PBKDF2) instead. Set it to 3 (SHA256), 4 (PBKDF2) or 5 (Argon2id) to choose deliberately."),
+         message.Format(_T("PreferredHashAlgorithm is set to %d, which is not a password-hashing scheme this server will store a new secret under (0 is no hashing, 1 is reversible, 2 is MD5, 6 is the machine-bound DPAPI scheme for stored secrets). Using 4 (PBKDF2) instead. Set it to 3 (SHA256), 4 (PBKDF2), 5 (Argon2id) or 7 (scrypt) to choose deliberately."),
                         preferred_hash_algorithm_);
 
          ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5528, "IniFileSettings::LoadSettings", message);
@@ -205,8 +205,9 @@ namespace HM
       }
 
       // Minimum password hash scheme an account may use to authenticate. Accounts
-      // whose stored hash is weaker than this (Crypt::EncryptionType ordering) are
-      // refused. 0 (ETNone) disables the policy and preserves prior behaviour.
+      // whose stored hash is weaker than this (Crypt::StrengthRank ordering, under
+      // which Argon2id and scrypt are peers) are refused. 0 (ETNone) disables the
+      // policy and preserves prior behaviour.
       minimum_accepted_hash_algorithm_ = ReadIniSettingInteger_("Settings", "MinimumAcceptedHashAlgorithm", 0);
 
       // Optional server-wide secret ("pepper") HMAC-mixed into Argon2id password hashes

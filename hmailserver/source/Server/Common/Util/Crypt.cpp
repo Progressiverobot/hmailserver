@@ -66,6 +66,14 @@ namespace HM
             AnsiString result = HashCreator::GenerateArgon2id(input);
             return result;
          }
+      case ETScrypt:
+         {
+            // Peppered like Argon2id: neither scheme can serve SCRAM, so there is no
+            // SaltedPassword to keep unpeppered.
+            AnsiString input = ApplyPepper_(sInput);
+            AnsiString result = HashCreator::GenerateScrypt(input);
+            return result;
+         }
       case ETDPAPI:
          {
             if (sInput.IsEmpty())
@@ -121,6 +129,12 @@ namespace HM
             AnsiString ansiHash = originalHash;
             return HashCreator::ValidateArgon2id(ansiPassword, ansiHash);
          }
+      case ETScrypt:
+         {
+            AnsiString ansiPassword = ApplyPepper_(password);
+            AnsiString ansiHash = originalHash;
+            return HashCreator::ValidateScrypt(ansiPassword, ansiHash);
+         }
       default:
          {
             assert(0);
@@ -131,7 +145,29 @@ namespace HM
 
    }
 
-   Crypt::EncryptionType 
+   int
+   Crypt::StrengthRank(int encryptionType)
+   {
+      switch (encryptionType)
+      {
+      case ETBlowFish:
+         return 1;
+      case ETMD5:
+         return 2;
+      case ETSHA256:
+         return 3;
+      case ETPBKDF2:
+         return 4;
+      case ETArgon2id:
+      case ETScrypt:
+         return 5;
+      default:
+         // ETNone, ETDPAPI (stored secrets, not passwords) and anything unknown.
+         return 0;
+      }
+   }
+
+   Crypt::EncryptionType
    Crypt::GetHashType(const String &hash)
    {
       AnsiString ansiHash = hash;
@@ -140,6 +176,8 @@ namespace HM
 
       if (HashCreator::IsArgon2idHash(ansiHash))
          return ETArgon2id;
+      if (HashCreator::IsScryptHash(ansiHash))
+         return ETScrypt;
 
       int length = hash.GetLength();
       if (length == 32)

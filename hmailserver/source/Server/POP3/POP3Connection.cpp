@@ -1345,7 +1345,7 @@ namespace HM
       // PBKDF2 hash, so when the administrator requires a stronger hash type than PBKDF2
       // no account is eligible. Returning an empty handle makes the exchange a forced
       // failure (the same as an unknown account) rather than revealing the policy.
-      if (IniFileSettings::Instance()->GetMinimumAcceptedHashAlgorithm() > Crypt::ETPBKDF2)
+      if (Crypt::StrengthRank(IniFileSettings::Instance()->GetMinimumAcceptedHashAlgorithm()) > Crypt::StrengthRank(Crypt::ETPBKDF2))
          return std::shared_ptr<const Account>();
 
       if (pAccount->GetPasswordEncryption() != Crypt::ETPBKDF2)

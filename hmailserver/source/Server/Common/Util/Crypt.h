@@ -23,10 +23,20 @@ namespace HM
          ETSHA256 = 3,
          ETPBKDF2 = 4,
          ETArgon2id = 5,
-         ETDPAPI = 6
+         ETDPAPI = 6,
+         // scrypt (RFC 7914), the third strong KDF. 7 rather than 6 because DPAPI took
+         // 6 first, and the numbers are what the ini and the database store.
+         ETScrypt = 7
       };
 
       EncryptionType GetHashType(const String &hash);
+
+      // Where a scheme stands when one is compared with another: the enum values are
+      // storage identifiers, not an order. Argon2id and scrypt are peers - both
+      // memory-hard, neither an upgrade of the other - so a preference for one
+      // leaves accounts stored under the other alone, and a minimum of either
+      // accepts both. DPAPI is not a password scheme and ranks with "none".
+      static int StrengthRank(int encryptionType);
 
       String EnCrypt(const String &sInput, EncryptionType iType) const;
       String DeCrypt(const String &sInput, EncryptionType iType) const;
@@ -47,7 +57,7 @@ namespace HM
    private:
 
       // Applies the optional server-wide password pepper (HMAC-SHA256 under the
-      // configured secret) ahead of Argon2id hashing/verification. Returns the
+      // configured secret) ahead of Argon2id and scrypt hashing/verification. Returns the
       // password unchanged when no pepper is configured.
       AnsiString ApplyPepper_(const AnsiString &password) const;
 
