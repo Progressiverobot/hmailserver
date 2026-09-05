@@ -29,7 +29,7 @@ namespace HM
       if (!pConnection->IsAuthenticated())
          return IMAPResult(IMAPResult::ResultNo, "Authenticate first");
 
-      if (!Configuration::Instance()->GetIMAPConfiguration()->GetUseIMAPACL())
+      if (!ACLManager::GetAclEnforcementEnabled())
          return IMAPResult(IMAPResult::ResultBad, "ACL is not enabled.");
 
       std::shared_ptr<IMAPSimpleCommandParser> pParser = std::shared_ptr<IMAPSimpleCommandParser>(new IMAPSimpleCommandParser());

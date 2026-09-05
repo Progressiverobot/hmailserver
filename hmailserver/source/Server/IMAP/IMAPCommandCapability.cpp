@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "stdafx.h"
+#include "../Common/Application/ACLManager.h"
 #include "IMAPCommandCapability.h"
 #include "IMAPCommandAppend.h"
 #include "IMAPConnection.h"
@@ -46,7 +47,7 @@ namespace HM
       // advertises THREAD at all; REFERENCES is the one clients actually want.
       sResponse += " THREAD=ORDEREDSUBJECT THREAD=REFERENCES";
 
-      if (pConfig->GetUseIMAPACL())
+      if (ACLManager::GetAclEnforcementEnabled())
          sResponse += " ACL";
 
       if (pConnection->GetConnectionSecurity() == CSSTARTTLSOptional ||

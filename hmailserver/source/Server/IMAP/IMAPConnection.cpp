@@ -1125,10 +1125,9 @@ namespace HM
          // server resolves paths through here - so refusing here makes "no
          // rights" and "no such folder" the same answer everywhere, instead of
          // relying on each command to remember to hide its refusal. One
-         // decision, asked of ACLManager.
-         ACLManager aclManager;
-         std::shared_ptr<ACLPermission> pPermission = aclManager.GetPermissionForFolder(account_->GetID(), pFolder);
-         if (!pPermission || !pPermission->GetAllow(ACLPermission::PermissionLookup))
+         // decision, asked of ACLManager - as a delegated right, so that with
+         // enforcement off nobody's folders resolve under "#Users".
+         if (!ACLManager::CheckDelegatedRight(account_->GetID(), pFolder, ACLPermission::PermissionLookup))
             continue;
 
          return pFolder;
@@ -1470,54 +1469,15 @@ namespace HM
    bool
    IMAPConnection::CheckPermission(std::shared_ptr<IMAPFolder> pFolder, int iPermission)
    {
-      // One decision, asked rather than re-derived. See ACLManager for why the copy
-      // that used to be here was a problem.
-      if (!ACLManager::GetAclEnforcementEnabled())
-      {
-         // Access control has been disabled. Allow everything.
-         return true;
-      }
-
-      ACLManager aclManager;
-      std::shared_ptr<ACLPermission> pPermission = aclManager.GetPermissionForFolder(account_->GetID(), pFolder);
-      if (!pPermission)
-         return false;
-
-      if (pPermission->GetAllow((ACLPermission::ePermission) iPermission))
-         return true;
-
-      return false;
+      // Not a decision: the decision is ACLManager's (see its header, and
+      // build/check-authz-choke-point.py). This only names the logged-in account.
+      return ACLManager::CheckPermission(account_->GetID(), pFolder, iPermission);
    }
 
    void
    IMAPConnection::CheckFolderPermissions(std::shared_ptr<IMAPFolder> pFolder, bool &readAccess, bool &writeAccess)
    {
-      // Default no access.
-      readAccess = false;
-      writeAccess = false;
-
-      // The second of the two copies this replaces. Both read the same setting and
-      // each decided for itself what "allow everything" meant.
-      if (!ACLManager::GetAclEnforcementEnabled())
-      {
-         // Access control has been disabled. Allow everything.
-         readAccess = true;
-         writeAccess = true;
-
-         return;
-      }
-
-      ACLManager aclManager;
-      std::shared_ptr<ACLPermission> pPermission = aclManager.GetPermissionForFolder(account_->GetID(), pFolder);
-      if (!pPermission)
-         return;
-
-      readAccess = pPermission->GetAllow(ACLPermission::PermissionRead);
-      writeAccess = pPermission->GetAllow(ACLPermission::PermissionWriteOthers) ||
-         pPermission->GetAllow(ACLPermission::PermissionWriteSeen) ||
-         pPermission->GetAllow(ACLPermission::PermissionWriteDeleted) ||
-         pPermission->GetAllow(ACLPermission::PermissionInsert) ||
-         pPermission->GetAllow(ACLPermission::PermissionExpunge);
+      ACLManager::GetReadWriteAccess(account_->GetID(), pFolder, readAccess, writeAccess);
    }
 
    bool

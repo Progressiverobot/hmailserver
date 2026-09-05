@@ -76,9 +76,10 @@ namespace HM
 
       if (pFolder->IsPublicFolder())
       {
-         ACLManager aclManager;
-         std::shared_ptr<ACLPermission> pPermission = aclManager.GetPermissionForFolder(iAccountID, pFolder);
-         if (!pPermission || !pPermission->GetAllow((ACLPermission::ePermission) ACLPermission::PermissionInsert))
+         // The one decision, asked of ACLManager: with enforcement off a public
+         // folder is open, here as in every IMAP command, rather than closed for
+         // want of rows nobody is enforcing.
+         if (!ACLManager::CheckPermission(iAccountID, pFolder, ACLPermission::PermissionInsert))
             return false;
       }
 
@@ -124,13 +125,8 @@ namespace HM
 
       if (pFolder && pFolder->IsPublicFolder())
       {
-         // Do we have permissions to append?
-         ACLManager aclManager;
-         std::shared_ptr<ACLPermission> pPermission = aclManager.GetPermissionForFolder(iAccountID, pFolder);
-         if (!pPermission)
-            return false;
-
-         if (!pPermission->GetAllow((ACLPermission::ePermission) ACLPermission::PermissionInsert))
+         // Do we have permissions to append? One decision, ACLManager's.
+         if (!ACLManager::CheckPermission(iAccountID, pFolder, ACLPermission::PermissionInsert))
             return false;
       }
 
@@ -151,14 +147,8 @@ namespace HM
                   return false;
                }
 
-               // Do we have permissions to append?
-               ACLManager aclManager;
-               std::shared_ptr<ACLPermission> pPermission = aclManager.GetPermissionForFolder(iAccountID, pTempFolder);
-
-               if (!pPermission)
-                  return false;
-
-               if (!pPermission->GetAllow((ACLPermission::ePermission) ACLPermission::PermissionCreate))
+               // Do we have permissions to create it? One decision, ACLManager's.
+               if (!ACLManager::CheckPermission(iAccountID, pTempFolder, ACLPermission::PermissionCreate))
                   return false;
             }
          }

@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "stdafx.h"
+#include "../Common/Application/ACLManager.h"
 
 #include "IMAPCommandGetAcl.h"
 #include "IMAPConnection.h"
@@ -29,7 +30,7 @@ namespace HM
       if (!pConnection->IsAuthenticated())
          return IMAPResult(IMAPResult::ResultNo, "Authenticate first");
 
-      if (!Configuration::Instance()->GetIMAPConfiguration()->GetUseIMAPACL())
+      if (!ACLManager::GetAclEnforcementEnabled())
          return IMAPResult(IMAPResult::ResultBad, "ACL is not enabled.");
 
       std::shared_ptr<IMAPSimpleCommandParser> pParser = std::shared_ptr<IMAPSimpleCommandParser>(new IMAPSimpleCommandParser());

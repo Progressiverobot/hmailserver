@@ -71,6 +71,11 @@ jobs:
       - name: Every Control Panel caption carries an Alt-key mnemonic
         run: python3 build/check-mnemonics.py
 
+      # "May account A do X to folder F" is answered by ACLManager and nowhere else;
+      # a second decision-maker is how mail servers serve other people's mail.
+      - name: Every folder-access decision is ACLManager's
+        run: python3 build/check-authz-choke-point.py
+
   dotnet-format:
     name: dotnet format leaves the C# tree unchanged
     # Written on 21 August 2026 and taken out of the same commit, because the

@@ -134,12 +134,16 @@ namespace HM
 
       bool anyFolderVisible = false;
 
-     ACLManager aclManager;
       for(std::shared_ptr<IMAPFolder> currentFolder : pStartFolders->GetSnapshot())
       {
-         // Check if the user has access to this folder. Otherwise just skip it.
-         std::shared_ptr<ACLPermission> pPermission = aclManager.GetPermissionForFolder(iAccountID, currentFolder);
-         if (!pPermission || !pPermission->GetAllow(ACLPermission::PermissionLookup))
+         // Check if the user has access to this folder. Otherwise just skip it. The
+         // lookup right is asked of ACLManager as any other: on the account's own
+         // tree and the public tree it is CheckPermission (everything visible when
+         // enforcement is off), under "#Users" it is a right the owner granted.
+         bool visible = currentFolder->GetAccountID() != 0 && currentFolder->GetAccountID() != iAccountID
+            ? ACLManager::CheckDelegatedRight(iAccountID, currentFolder, ACLPermission::PermissionLookup)
+            : ACLManager::CheckPermission(iAccountID, currentFolder, ACLPermission::PermissionLookup);
+         if (!visible)
          {
             continue;
          }
