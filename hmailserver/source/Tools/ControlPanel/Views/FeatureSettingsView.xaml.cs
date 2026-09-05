@@ -1834,6 +1834,19 @@ namespace hMailServer.ControlPanel.Views
                      new TextSetting { Key = "MetricsServerPort", Default = "0", Label = "Metrics port (0 = disabled)", Placeholder = "9090" },
                      new TextSetting
                      {
+                        Key = "MetricsHistoryDays",
+                        Default = "7",
+                        Label = "Keep metric history for (days; 0 = do not record)",
+                        Placeholder = "7",
+                        Blurb = "Once a minute the server writes one row per metric - sessions, messages processed, delivered, " +
+                                "deferred and bounced, spam and viruses, authentication and TLS outcomes, missing message files - " +
+                                "to hm_metricsamples, and keeps them this many days. It is what the dashboard's 24 hours, 7 days " +
+                                "and 30 days views and GET /api/v1/metrics/history read. A week of minute-resolution history is " +
+                                "about a hundred and forty thousand small rows. 0 turns the sampler off. Applies after a service " +
+                                "restart."
+                     },
+                     new TextSetting
+                     {
                         Key = "MetricsServerBindAddress",
                         Default = "127.0.0.1",
                         Label = "Metrics bind address",

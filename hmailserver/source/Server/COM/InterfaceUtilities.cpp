@@ -7,6 +7,7 @@
 #include "InterfaceUtilities.h"
 #include "../Common/Util/AddressTraceEraser.h"
 #include "../Common/Application/MailboxRetentionTask.h"
+#include "../Common/Application/MetricsHistoryTask.h"
 #include "../Common/TCPIP/DNSResolver.h"
 #include "../Common/TCPIP/HostNameAndIpAddress.h"
 #include "../Common/util/ServiceManager.h"
@@ -193,6 +194,53 @@ STDMETHODIMP InterfaceUtilities::RunMessageRetention(long *DeletedCount)
          return authentication_->GetAccessDenied();
 
       *DeletedCount = HM::MailboxRetentionTask::Sweep();
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceUtilities::SampleMetricsNow(long *RowsWritten)
+{
+   try
+   {
+      if (!RowsWritten)
+         return COMError::GenerateGenericMessage();
+
+      *RowsWritten = 0;
+
+      if (!authentication_->GetIsServerAdmin())
+         return authentication_->GetAccessDenied();
+
+      *RowsWritten = HM::MetricsHistoryTask::SampleNow();
+
+      if (*RowsWritten > 0)
+         HM::MetricsHistoryTask::Prune();
+
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceUtilities::GetMetricHistory(BSTR Metric, long MinutesBack, long BucketMinutes, BSTR *Json)
+{
+   try
+   {
+      if (!Json)
+         return COMError::GenerateGenericMessage();
+
+      if (!authentication_->GetIsServerAdmin())
+         return authentication_->GetAccessDenied();
+
+      HM::String metric = Metric;
+      HM::String json = HM::MetricsHistoryTask::QueryAsJson(metric, MinutesBack, BucketMinutes);
+
+      *Json = json.AllocSysString();
       return S_OK;
    }
    catch (...)

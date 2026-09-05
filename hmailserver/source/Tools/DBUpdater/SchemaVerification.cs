@@ -304,7 +304,16 @@ namespace DBUpdater
          new SchemaProbe(6025, "hm_distributionlists.distributionlistmoderatoraddress",
                          "update hm_distributionlists set distributionlistmoderatoraddress = distributionlistmoderatoraddress where 1 = 0"),
          new SchemaProbe(6025, "hm_distributionlists.distributionlistbounceaddress",
-                         "update hm_distributionlists set distributionlistbounceaddress = distributionlistbounceaddress where 1 = 0")
+                         "update hm_distributionlists set distributionlistbounceaddress = distributionlistbounceaddress where 1 = 0"),
+
+         // Upgrade6027to6028* - the metric history. One probe per column the
+         // sampler writes: a half-applied step fails on the first missing one.
+         new SchemaProbe(6028, "hm_metricsamples.metricsampletime",
+                         "update hm_metricsamples set metricsampletime = metricsampletime where 1 = 0"),
+         new SchemaProbe(6028, "hm_metricsamples.metricsamplename",
+                         "update hm_metricsamples set metricsamplename = metricsamplename where 1 = 0"),
+         new SchemaProbe(6028, "hm_metricsamples.metricsamplevalue",
+                         "update hm_metricsamples set metricsamplevalue = metricsamplevalue where 1 = 0")
       };
 
       /// <summary>

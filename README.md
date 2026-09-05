@@ -87,6 +87,7 @@ Operations and observability
 ----------------------------
 
 * **Prometheus** `/metrics` (database pool, TLS handshakes, delivery queue, authentication outcomes, delivery outcomes, command and query latency) with Kubernetes-style `/livez`, `/readyz` and `/healthz` probes.
+* **Metric history**: one sample per metric per minute kept in the database (`MetricsHistoryDays`, a week by default), read back averaged per minute, ten minutes or hour by the Control Panel dashboard's 24 h / 7 d / 30 d views, by `GET /api/v1/metrics/history?metric=…&range=24h|7d|30d` and by `Utilities.GetMetricHistory` over COM.
 * **OpenTelemetry** export over OTLP/HTTP for all three signals - traces (`/v1/traces`), metrics (`/v1/metrics`) and logs (`/v1/logs`) - each with its own endpoint setting and each off until it is set. The exported metrics are the same counters the Prometheus `/metrics` endpoint serves, under the same names, rather than a second tally. Inbound W3C `traceparent` is honoured on HTTP and on SMTP (where it travels as a message header), and emitted onward, so a message keeps one trace across hops. Plus message-to-session correlation IDs.
 * Optional **JSON-structured logs**, log retention, per-service log files, and a slow-query log with every SQL string literal redacted.
 * Per-stage timing of message acceptance, so a slow scanner, DNS lookup or event script is identified by name in the log rather than appearing as an unexplained pause. Acceptance is also bounded: if it runs past its deadline the sender gets a temporary `451` and retries, instead of waiting for a reply that never comes. Every wait that can hold a pooled thread - scanners, DNS, event scripts, external processes, outbound sessions - has a ceiling, and the work queue reports which task is holding each thread when they are all busy. See [diagnosing slow or stalled mail](hmailserver/docs/DiagnosingStalledMail.md).
@@ -382,6 +383,9 @@ Administration and monitoring:
    RestApiCertificateFile=       ; PEM; falls back to the ACME certificate
    RestApiPrivateKeyFile=
    MetricsServerPort=0           ; Prometheus metrics endpoint (/metrics) + health probes
+   MetricsHistoryDays=7          ; keep one sample per metric per minute in hm_metricsamples for N days: what the
+                                 ; dashboard's 24 h / 7 d / 30 d views and GET /api/v1/metrics/history read
+                                 ; (0 = do not record)
    MetricsServerBindAddress=127.0.0.1
    MetricsServerAuthToken=       ; Bearer token for /metrics. REQUIRED on a non-loopback bind: without a
                                  ; credential /metrics answers 503 there. /livez, /readyz and /healthz are

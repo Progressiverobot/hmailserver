@@ -66,6 +66,7 @@
 #include "LogRetentionTask.h"
 #include "ArchiveRetentionTask.h"
 #include "MailboxRetentionTask.h"
+#include "MetricsHistoryTask.h"
 #include "IMAPExpungeRetentionTask.h"
 #include "MessageStoreConsistencyTask.h"
 #include "WorkQueueHealthTask.h"
@@ -674,6 +675,18 @@ namespace HM
       mailboxRetentionTask->SetReoccurance(ScheduledTask::RunInfinitely);
       mailboxRetentionTask->SetMinutesBetweenRun(6 * 60);
       scheduler_->ScheduleTask(mailboxRetentionTask);
+
+      // Metric history: one row per metric per minute, kept MetricsHistoryDays.
+      // The task no-ops when that is 0. A sample at startup as well, so the
+      // history shows the restart as the drop in every counter that it is.
+      std::shared_ptr<MetricsHistoryTask> metricsHistoryStartupTask = std::shared_ptr<MetricsHistoryTask>(new MetricsHistoryTask);
+      metricsHistoryStartupTask->SetReoccurance(ScheduledTask::RunOnce);
+      scheduler_->ScheduleTask(metricsHistoryStartupTask);
+
+      std::shared_ptr<MetricsHistoryTask> metricsHistoryTask = std::shared_ptr<MetricsHistoryTask>(new MetricsHistoryTask);
+      metricsHistoryTask->SetReoccurance(ScheduledTask::RunInfinitely);
+      metricsHistoryTask->SetMinutesBetweenRun(1);
+      scheduler_->ScheduleTask(metricsHistoryTask);
 
       // QRESYNC expunge records: cap hm_imapexpunged at IMAPExpungeRetentionRecords
       // per mailbox and drop rows whose folder no longer exists. Same startup-plus-

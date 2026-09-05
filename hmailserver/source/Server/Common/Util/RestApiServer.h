@@ -118,6 +118,7 @@ namespace HM
          RouteQueueDelete,
          RouteTlsa,
          RouteSrv,
+         RouteMetricsHistory,
          RouteQuarantineList,
          RouteQuarantineRelease,
          RouteQuarantineDelete,
@@ -132,6 +133,7 @@ namespace HM
          RouteKind kind;
          AnsiString identifier;   // domain name, account address or api key id
          __int64 message_id;
+         AnsiString query;        // the part after "?", for the routes that take one
       };
 
       // One record in the API key store. Never holds the clear-text token.
@@ -281,6 +283,8 @@ namespace HM
       // per-domain records exactly as HandleListDomains_ filters the domain
       // listing, and for the same reason.
       static AnsiString HandleSrv_(const std::vector<String> &allowedDomains);
+      static AnsiString HandleMetricsHistory_(const AnsiString &query);
+      static AnsiString QueryParameter_(const AnsiString &query, const AnsiString &name);
 
       AnsiString HandleListQuarantine_();
       AnsiString HandleQuarantineRelease_(__int64 id);

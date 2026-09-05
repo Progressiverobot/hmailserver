@@ -113,6 +113,7 @@ namespace hMailServer.ControlPanel.Services
          new SettingEntry("Bind address", "RestApiBindAddress", "api"),
          new SettingEntry("HTTP Basic password for /metrics", "MetricsServerAuthPassword", "api"),
          new SettingEntry("HTTP Basic user name for /metrics (empty = Basic off)", "MetricsServerAuthUsername", "api"),
+         new SettingEntry("Keep metric history for (days; 0 = do not record)", "MetricsHistoryDays", "api"),
          new SettingEntry("Log database queries slower than N ms (0 = off)", "SlowQueryLogMilliseconds", "api"),
          new SettingEntry("ManageSieve bind address", "ManageSieveServerBindAddress", "api"),
          new SettingEntry("ManageSieve port (0 = disabled)", "ManageSieveServerPort", "api"),

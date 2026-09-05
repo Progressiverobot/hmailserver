@@ -81,6 +81,7 @@ namespace HM
       outbound_pipelining_(true),
       outbound_chunking_(true),
       smtp_authenticated_sender_check_(false),
+      metrics_history_days_(7),
       add_xauth_user_ip_(false),
       use_dns_cache_(true),
       // The Windows event log sink's two settings are read on the ERROR path,
@@ -704,6 +705,9 @@ namespace HM
       outbound_pipelining_ = ReadIniSettingInteger_("Settings", "OutboundPipelining", 1) == 1;
       outbound_chunking_ = ReadIniSettingInteger_("Settings", "OutboundChunking", 1) == 1;
       smtp_authenticated_sender_check_ = ReadIniSettingInteger_("Settings", "SmtpAuthenticatedSenderCheck", 0) == 1;
+      metrics_history_days_ = ReadIniSettingInteger_("Settings", "MetricsHistoryDays", 7);
+      if (metrics_history_days_ < 0)
+         metrics_history_days_ = 0;
       batv_secret_ = ReadIniSettingString_("Settings", "BATVSecret", "");
       max_submissions_per_ip_per_minute_ = ReadIniSettingInteger_("Settings", "MaxSubmissionsPerIPPerMinute", 0);
       pop3_login_delay_seconds_ = ReadIniSettingInteger_("Settings", "Pop3LoginDelaySeconds", 0);
