@@ -1070,6 +1070,21 @@ namespace hMailServer.ControlPanel.Views
                     "service restart.",
             IniStore = iniStore_
          });
+         smtp.Settings.Add(new IniBool
+         {
+            Path = "SmtpAuthenticatedSenderCheck",
+            Label = "An authenticated session may only send as an address its account owns or has been granted",
+            Default = false,
+            Blurb = "With this on, MAIL FROM in an authenticated session must be the account's own address, an " +
+                    "alias that resolves to it, or another mailbox whose owner has granted the account the " +
+                    "post (p) right on their INBOX - which is how Send-As for a shared mailbox is granted, from " +
+                    "any IMAP client's ACL editor (SETACL) or over the COM API. Anything else is refused with " +
+                    "550 5.7.1 before a byte of the message is accepted, so one compromised or careless account " +
+                    "can no longer send as every other. Off by default because nothing constrained this before " +
+                    "and an installation may depend on that; the null sender is always allowed. Unauthenticated " +
+                    "sessions are unaffected. Applies after a service restart.",
+            IniStore = iniStore_
+         });
          smtp.Settings.Add(new IniNumber
          {
             Path = "QuotaWarningPercent",

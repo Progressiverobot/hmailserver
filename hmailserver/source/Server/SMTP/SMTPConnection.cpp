@@ -73,6 +73,12 @@
 #include "../Common/SQL/DatabaseUnavailableMarker.h"
 
 #include "SMTPConnection.h"
+#include "../Common/Application/ACLManager.h"
+#include "../IMAP/IMAPFolderContainer.h"
+#include "../Common/BO/IMAPFolders.h"
+#include "../Common/BO/IMAPFolder.h"
+#include "../Common/BO/ACLPermission.h"
+#include "../Common/BO/Alias.h"
 #include "SMTPConfiguration.h"
 #include "SMTPMessageHeaderCreator.h"
 #include "DistributionListSender.h"
@@ -745,6 +751,24 @@ namespace HM
 
       if (!CheckIfValidSenderAddress(sFromAddress))
          return;
+
+      // An authenticated session may only send as an address its account owns or
+      // has been granted, when SmtpAuthenticatedSenderCheck is on. Off by default,
+      // because until 5 September 2026 nothing constrained this at all and an
+      // installation may depend on that; on, it is what makes a Send-As grant on
+      // a shared mailbox mean something - and what stops one compromised account
+      // sending as every other.
+      if (isAuthenticated_ && IniFileSettings::Instance()->GetSmtpAuthenticatedSenderCheck())
+      {
+         String reason;
+
+         if (!AuthenticatedSenderPermitted_(sFromAddress, reason))
+         {
+            LOG_SMTP(GetSessionID(), GetIPAddressString(), "MAIL FROM refused: " + reason);
+            SendResponse_(550, _T("5.7.1"), _T("Sender address rejected: not owned by the authenticated account and not granted to it."));
+            return;
+         }
+      }
 
       // Per-IP submission rate shaping (anti-abuse). A configured [Settings]
       // MaxSubmissionsPerIPPerMinute caps how many message transactions a single
@@ -4877,6 +4901,75 @@ namespace HM
       - the domain-part of the email matches an active local domain.
       - the sender address matches a route address.
    */
+   bool
+   SMTPConnection::AuthenticatedSenderPermitted_(const String &sender, String &reason)
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // Whether the authenticated account may put this address in MAIL FROM. Its own
+   // address, always; an alias that resolves to it, always; another account's
+   // address when that account has granted it the post (p) right on its INBOX.
+   // That is the one RFC 4314 right whose subject is sending mail on a mailbox's
+   // behalf, IMAP itself never enforces it, and any IMAP client's SETACL can
+   // spell it - so it is the Send-As grant, with no new right to invent. The null
+   // sender is allowed: an authenticated client may send a bounce.
+   //---------------------------------------------------------------------------()
+   {
+      if (sender.IsEmpty())
+         return true;
+
+      std::shared_ptr<DomainAliases> domainAliases = ObjectCache::Instance()->GetDomainAliases();
+
+      String account = domainAliases->ApplyAliasesOnAddress(DefaultDomain::ApplyDefaultDomain(username_));
+      String claimed = domainAliases->ApplyAliasesOnAddress(sender);
+
+      if (claimed.CompareNoCase(account) == 0)
+         return true;
+
+      // An alias, followed to what it stands for. A chain is followed a few hops
+      // and no further: an alias pointing at an alias is a configuration, a loop
+      // is a mistake, and neither should cost more than a moment here.
+      String resolved = claimed;
+
+      for (int hop = 0; hop < 5; hop++)
+      {
+         std::shared_ptr<const Alias> alias = CacheContainer::Instance()->GetAlias(resolved);
+
+         if (!alias || !alias->GetIsActive())
+            break;
+
+         resolved = domainAliases->ApplyAliasesOnAddress(alias->GetValue());
+
+         if (resolved.CompareNoCase(account) == 0)
+            return true;
+      }
+
+      // Somebody else's address: allowed when they said so, on their INBOX and
+      // nowhere else - a right granted on a sub-folder is a right on that folder.
+      std::shared_ptr<const Account> owner = CacheContainer::Instance()->GetAccount(resolved);
+      std::shared_ptr<const Account> self = CacheContainer::Instance()->GetAccount(account);
+
+      if (owner && self && owner->GetID() != self->GetID())
+      {
+         std::shared_ptr<IMAPFolders> ownerFolders = IMAPFolderContainer::Instance()->GetFoldersForAccount(owner->GetID());
+         std::shared_ptr<IMAPFolder> inbox = ownerFolders ? ownerFolders->GetFolderByName(_T("INBOX")) : std::shared_ptr<IMAPFolder>();
+
+         if (inbox)
+         {
+            ACLManager aclManager;
+            std::shared_ptr<ACLPermission> permission = aclManager.GetPermissionForFolder(self->GetID(), inbox);
+
+            if (permission && permission->GetAllow(ACLPermission::PermissionPost))
+               return true;
+         }
+
+         reason = "the authenticated account " + account + " has not been granted the post (p) right on the INBOX of " + resolved + ".";
+         return false;
+      }
+
+      reason = "the authenticated account " + account + " does not own " + claimed + ", and no account with that address has granted it anything.";
+      return false;
+   }
+
    bool
    SMTPConnection::ArchiveScopeIncludesMessage_()
    //---------------------------------------------------------------------------()
