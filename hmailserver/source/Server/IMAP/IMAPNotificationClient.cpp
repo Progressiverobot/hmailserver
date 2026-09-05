@@ -103,6 +103,10 @@ namespace HM
       if (!parentConnection)
          return;
 
+      // This is not the connection's own thread. Hold its state lock across the
+      // idling check and the send, so the folder cannot be closed in between.
+      IMAPConnection::StateLock lock(parentConnection->GetStateMutex());
+
       if (parentConnection->GetIsIdling())
       {
          try
@@ -142,6 +146,11 @@ namespace HM
       if (!connection)
          return;
 
+      // Lock order is always the connection's state lock before mutex_;
+      // OnNotification takes them in that order too (through
+      // CacheChangeNotification_). Reversing it here would deadlock against a
+      // notification arriving on another thread.
+      IMAPConnection::StateLock stateLock(connection->GetStateMutex());
       boost::lock_guard<boost::recursive_mutex> guard(mutex_);
 
       int lastExists = -1;
@@ -165,7 +174,7 @@ namespace HM
                std::shared_ptr<Messages> pMessages = currentFolder->GetMessages();
                pMessages->Refresh(false);
                lastExists = pMessages->GetCount();
-               lastRecent = (int)connection->GetRecentMessages().size();
+               lastRecent = (int)connection->GetRecentMessageCount();
                break;
             }
          case ChangeNotification::NotificationMessageDeleted:
@@ -182,7 +191,7 @@ namespace HM
                   // Send EXISTS
                   std::shared_ptr<Messages> pMessages = currentFolder->GetMessages();
                   lastExists = pMessages->GetCount();
-                  lastRecent = (int)connection->GetRecentMessages().size();
+                  lastRecent = (int)connection->GetRecentMessageCount();
 
                   break;
                }
@@ -250,7 +259,7 @@ namespace HM
          {
             std::shared_ptr<Messages> pMessages = currentFolder->GetMessages();
             SendEXISTS_(pMessages->GetCount());
-            SendRECENT_((int)connection->GetRecentMessages().size());
+            SendRECENT_((int)connection->GetRecentMessageCount());
             break;
          }
       case ChangeNotification::NotificationMessageDeleted:
@@ -261,7 +270,7 @@ namespace HM
             // Send EXISTS
             std::shared_ptr<Messages> pMessages = currentFolder->GetMessages();
             SendEXISTS_(pMessages->GetCount());
-            SendRECENT_((int)connection->GetRecentMessages().size());
+            SendRECENT_((int)connection->GetRecentMessageCount());
 
             break;
          }

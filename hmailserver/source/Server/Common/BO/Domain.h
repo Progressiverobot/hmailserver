@@ -295,6 +295,12 @@ namespace HM
       String vacation_internal_message_;
       bool vacation_external_override_;
 
+      // Guards the lazy creation of the collections below. A Domain is shared by
+      // every session of every account in it, and two sessions asking for a
+      // collection that does not exist yet each built a private one - two Accounts
+      // objects for one domain, one of which the other never saw (upstream #566).
+      boost::recursive_mutex collections_mutex_;
+
       std::shared_ptr<Accounts> accounts_;
       std::shared_ptr<Aliases> aliases_;
       std::shared_ptr<DistributionLists> distribution_lists_;

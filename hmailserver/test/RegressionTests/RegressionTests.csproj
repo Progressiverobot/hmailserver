@@ -530,6 +530,8 @@
     <Compile Include="SSL\ScramPlusSmtp.cs" />
     <Compile Include="SSL\ScramPlusPop3.cs" />
     <Compile Include="Stress\StabilitySanityTests.cs" />
+    <Compile Include="Stress\IMAP\ConcurrentConnectionsStressTests.cs" />
+    <Compile Include="Stress\IMAP\NotificationThreadingStressTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="IMAP\HierarchyDelimiter.cs" />

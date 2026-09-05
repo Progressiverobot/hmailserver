@@ -19,6 +19,8 @@ namespace HM
 
       virtual void AddItem(std::shared_ptr<T> pObject)
       {
+         boost::lock_guard<boost::recursive_mutex> guard(_mutex);
+
          vecObjects.push_back(pObject);
       }
 
@@ -36,6 +38,18 @@ namespace HM
 
       std::vector<std::shared_ptr<T> > &GetVector() {return vecObjects; }
       const std::vector<std::shared_ptr<T> > &GetConstVector() const {return vecObjects; }
+
+      // A copy of the items, taken under the lock. A caller that may run while
+      // another thread adds to or removes from this collection - anything that
+      // reads a shared configuration list or an account's folder tree from a
+      // session - must iterate this rather than GetVector, whose reference is
+      // invalidated by the first push_back on the other thread (upstream #566).
+      std::vector<std::shared_ptr<T> > GetSnapshot() const
+      {
+         boost::lock_guard<boost::recursive_mutex> guard(_mutex);
+
+         return vecObjects;
+      }
 
       // Locked like every other accessor here. It used to read vecObjects.size()
       // bare, which was survivable while callers were on the collection's own

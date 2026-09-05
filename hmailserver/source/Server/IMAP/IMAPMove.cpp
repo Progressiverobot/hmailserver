@@ -147,16 +147,9 @@ namespace HM
 
       if (!expunged_messages_uid.empty())
       {
-         // Reference, not a copy - see IMAPCommandExpunge: erasing from a copy
-         // leaves moved messages in the session's \Recent set.
-         auto &recent_messages = pConnection->GetRecentMessages();
-
+         // Through the connection, under its state lock - see IMAPCommandExpunge.
          for (__int64 messageUid : expunged_messages_uid)
-         {
-            auto recent_messages_it = recent_messages.find(messageUid);
-            if (recent_messages_it != recent_messages.end())
-               recent_messages.erase(recent_messages_it);
-         }
+            pConnection->RemoveRecentMessage(messageUid);
 
          // Notify the mailbox notifier that the source folder contents changed.
          std::shared_ptr<ChangeNotification> pNotification = 

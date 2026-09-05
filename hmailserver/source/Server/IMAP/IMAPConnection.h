@@ -126,7 +126,17 @@ namespace HM
       std::shared_ptr<IMAPFolder> GetFolderByFullPath(const String &sFolderName);
       std::shared_ptr<IMAPFolder> GetFolderByFullPath(std::vector<String> &vecFolderPath);
 
-      std::shared_ptr<IMAPFolder> GetCurrentFolder() { return current_folder_; }
+      // The selected folder, the read-only flag, the idling flag and the session's
+      // \Recent set are read by notification clients running on OTHER connections'
+      // threads - a delivery to this mailbox notifies every session that has it
+      // selected, synchronously, on the delivering thread. Every accessor below takes
+      // state_mutex_, and IMAPNotificationClient holds it across a notification so
+      // the folder cannot be closed between its idling check and its send.
+      // Lock order, everywhere: this lock first, then the notification client's own.
+      typedef boost::lock_guard<boost::recursive_mutex> StateLock;
+      boost::recursive_mutex& GetStateMutex() const { return state_mutex_; }
+
+      std::shared_ptr<IMAPFolder> GetCurrentFolder() const;
 
       bool CheckPermission(std::shared_ptr<IMAPFolder> pFolder, int iPermission);
       void CheckFolderPermissions(std::shared_ptr<IMAPFolder> pFolder, bool &readAccess, bool &writeAccess);
@@ -225,14 +235,18 @@ namespace HM
       void FireOnClientLogon(const String &sUsername, bool isAuthenticated);
 
       bool IsAuthenticated();
-      bool GetCurrentFolderReadOnly() {return current_folder_read_only_; }
+      bool GetCurrentFolderReadOnly() const;
 
       std::shared_ptr<IMAPNotificationClient> GetNotificationClient() {return notification_client_;}
 
       void StartHandshake();
 	 
 	  void SetRecentMessages(const std::set<__int64> &messages);
-      std::set<__int64>& GetRecentMessages();
+      void ClearRecentMessages();
+      void AddRecentMessage(__int64 message_id);
+      void RemoveRecentMessage(__int64 message_id);
+      bool IsRecentMessage(__int64 message_id) const;
+      size_t GetRecentMessageCount() const;
 
 
       void SetCommandBuffer(const String &sval);
@@ -293,6 +307,10 @@ namespace HM
       std::shared_ptr<IMAPFolders> public_imap_folders_;
 
       std::shared_ptr<ChangeNotification> delayed_change_notification_;
+
+      // Guards current_folder_, current_folder_read_only_, is_idling_ and
+      // recent_messages_. See GetStateMutex.
+      mutable boost::recursive_mutex state_mutex_;
 
       // Folder info
       std::shared_ptr<IMAPFolder> current_folder_;

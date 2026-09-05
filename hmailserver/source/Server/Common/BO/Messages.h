@@ -43,7 +43,9 @@ namespace HM
 
       void DeleteMessages(std::function<bool(int, std::shared_ptr<Message>)> &filter);
 
-      void Refresh(bool update_recent_flags);
+      // False when the messages could not be loaded, so the caller can retry
+      // instead of treating an empty collection as an empty folder.
+      bool Refresh(bool update_recent_flags);
 
       void AddToCollection(std::shared_ptr<DALRecordset> pRS);
       
