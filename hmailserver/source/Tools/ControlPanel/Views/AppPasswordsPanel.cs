@@ -249,10 +249,10 @@ namespace hMailServer.ControlPanel.Views
          });
          newName_.Text = "";
          toolbar.Children.Add(newName_);
-         toolbar.Children.Add(MakeButton("Create", Wpf.Ui.Controls.ControlAppearance.Primary, (_, _) => Create()));
-         toolbar.Children.Add(MakeButton("Revoke / restore", Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => ToggleActive()));
-         toolbar.Children.Add(MakeButton("Delete", Wpf.Ui.Controls.ControlAppearance.Danger, (_, _) => Delete()));
-         toolbar.Children.Add(MakeButton("Refresh", Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => Reload()));
+         toolbar.Children.Add(MakeButton("_Create", Wpf.Ui.Controls.ControlAppearance.Primary, (_, _) => Create()));
+         toolbar.Children.Add(MakeButton("Re_voke / restore", Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => ToggleActive()));
+         toolbar.Children.Add(MakeButton("_Delete", Wpf.Ui.Controls.ControlAppearance.Danger, (_, _) => Delete()));
+         toolbar.Children.Add(MakeButton("_Refresh", Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => Reload()));
          root.Children.Add(toolbar);
 
          var card = new Border { Padding = new Thickness(8) };
@@ -272,7 +272,7 @@ namespace hMailServer.ControlPanel.Views
          };
          issued.Children.Add(issuedTitle);
          issued.Children.Add(issuedValue_);
-         var copy = MakeButton("Copy", Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => CopyIssued());
+         var copy = MakeButton("Cop_y", Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => CopyIssued());
          copy.Margin = new Thickness(0, 8, 0, 0);
          copy.HorizontalAlignment = HorizontalAlignment.Left;
          issued.Children.Add(copy);

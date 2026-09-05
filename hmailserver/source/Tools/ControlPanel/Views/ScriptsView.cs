@@ -91,9 +91,9 @@ namespace hMailServer.ControlPanel.Views
          };
          toolbar.Children.Add(templateCombo);
 
-         toolbar.Children.Add(MakeButton("Save & reload", Wpf.Ui.Controls.ControlAppearance.Primary, (_, _) => SaveScript()));
-         toolbar.Children.Add(MakeButton("Check syntax", Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => CheckSyntax()));
-         toolbar.Children.Add(MakeButton("Reload from disk", Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => LoadScript()));
+         toolbar.Children.Add(MakeButton("_Save & reload", Wpf.Ui.Controls.ControlAppearance.Primary, (_, _) => SaveScript()));
+         toolbar.Children.Add(MakeButton("_Check syntax", Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => CheckSyntax()));
+         toolbar.Children.Add(MakeButton("_Reload from disk", Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => LoadScript()));
          root.Children.Add(toolbar);
 
          var card = new Border { Padding = new Thickness(8) };

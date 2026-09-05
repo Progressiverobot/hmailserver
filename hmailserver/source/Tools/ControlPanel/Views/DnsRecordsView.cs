@@ -127,7 +127,7 @@ namespace hMailServer.ControlPanel.Views
 
          var refresh = new Wpf.Ui.Controls.Button
          {
-            Content = "Refresh",
+            Content = "_Refresh",
             VerticalAlignment = VerticalAlignment.Top,
             Margin = new Thickness(12, 4, 0, 0)
          };
@@ -524,7 +524,7 @@ namespace hMailServer.ControlPanel.Views
             System.Windows.Automation.AutomationProperties.SetAutomationId(selectorBox, "dns-records-dkim-selector");
             selectorRow.Children.Add(selectorBox);
 
-            var generate = new Wpf.Ui.Controls.Button { Content = "Generate key pair…", Margin = new Thickness(8, 0, 0, 0) };
+            var generate = new Wpf.Ui.Controls.Button { Content = "_Generate key pair…", Margin = new Thickness(8, 0, 0, 0) };
             System.Windows.Automation.AutomationProperties.SetName(generate, "Generate a DKIM key pair for " + domain.Name);
             System.Windows.Automation.AutomationProperties.SetAutomationId(generate, "dns-records-dkim-generate");
             generate.Click += (s, e) => GenerateDkim(domain.Name, selectorBox.Text.Trim());
@@ -578,7 +578,7 @@ namespace hMailServer.ControlPanel.Views
          {
             enable = new Wpf.Ui.Controls.Button
             {
-               Content = "Enable DKIM signing",
+               Content = "_Enable DKIM signing",
                Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
                IsEnabled = false,
                Margin = new Thickness(0, 8, 0, 0),
@@ -940,7 +940,7 @@ namespace hMailServer.ControlPanel.Views
          BuildMtaStsPolicyPreview(domain.Name, policyBox, policyNote);
 
          // ---- fetch what is actually served ----
-         var fetchButton = new Wpf.Ui.Controls.Button { Content = "Check policy (HTTPS)", Margin = new Thickness(0, 4, 0, 0) };
+         var fetchButton = new Wpf.Ui.Controls.Button { Content = "Check _policy (HTTPS)", Margin = new Thickness(0, 4, 0, 0) };
          System.Windows.Automation.AutomationProperties.SetName(fetchButton,
             "Fetch the MTA-STS policy for " + domain.Name + " over HTTPS and show what is served");
          System.Windows.Automation.AutomationProperties.SetAutomationId(fetchButton, "dns-records-mtasts-fetch");
@@ -1402,7 +1402,7 @@ namespace hMailServer.ControlPanel.Views
          System.Windows.Automation.AutomationProperties.SetAutomationId(heloBox, "dns-records-ptr-helo");
          content.Children.Add(heloBox);
 
-         var copy = new Wpf.Ui.Controls.Button { Content = "Copy host name", Margin = new Thickness(0, 0, 0, 6) };
+         var copy = new Wpf.Ui.Controls.Button { Content = "Copy _host name", Margin = new Thickness(0, 0, 0, 6) };
          System.Windows.Automation.AutomationProperties.SetName(copy, "Copy the HELO host name");
          System.Windows.Automation.AutomationProperties.SetAutomationId(copy, "dns-records-ptr-copy");
          bool copyable = serverHostNameKnown_ && serverHostName_.Length > 0;
@@ -1503,13 +1503,13 @@ namespace hMailServer.ControlPanel.Views
 
          var copyRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 4) };
 
-         var copyHost = new Wpf.Ui.Controls.Button { Content = "Copy host" };
+         var copyHost = new Wpf.Ui.Controls.Button { Content = "Copy host" };   // per record: no access key, the rows are reached with the arrow keys
          System.Windows.Automation.AutomationProperties.SetName(copyHost, "Copy the " + recordName + " record host name");
          System.Windows.Automation.AutomationProperties.SetAutomationId(copyHost, idPrefix + "-copy-host");
          copyHost.Click += (s, e) => CopyToClipboard(block.HostBox.Text);
          copyRow.Children.Add(copyHost);
 
-         block.CopyValue = new Wpf.Ui.Controls.Button { Content = "Copy value", Margin = new Thickness(8, 0, 0, 0), IsEnabled = valueCopyable };
+         block.CopyValue = new Wpf.Ui.Controls.Button { Content = "Copy value", Margin = new Thickness(8, 0, 0, 0), IsEnabled = valueCopyable };   // per record: no access key, the rows are reached with the arrow keys
          System.Windows.Automation.AutomationProperties.SetName(block.CopyValue, "Copy the " + recordName + " record value");
          System.Windows.Automation.AutomationProperties.SetAutomationId(block.CopyValue, idPrefix + "-copy-value");
          if (!valueCopyable)
@@ -1520,7 +1520,7 @@ namespace hMailServer.ControlPanel.Views
          block.CopyValue.Click += (s, e) => { if (block.CopyValue.IsEnabled) CopyToClipboard(block.ValueBox.Text); };
          copyRow.Children.Add(block.CopyValue);
 
-         block.Check = new Wpf.Ui.Controls.Button { Content = "Check", Margin = new Thickness(8, 0, 0, 0) };
+         block.Check = new Wpf.Ui.Controls.Button { Content = "Check", Margin = new Thickness(8, 0, 0, 0) };   // per record: no access key, the rows are reached with the arrow keys
          System.Windows.Automation.AutomationProperties.SetName(block.Check, "Check whether the " + recordName + " record is published in DNS");
          System.Windows.Automation.AutomationProperties.SetAutomationId(block.Check, idPrefix + "-check");
          copyRow.Children.Add(block.Check);

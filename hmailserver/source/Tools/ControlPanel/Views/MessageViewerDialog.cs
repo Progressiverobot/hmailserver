@@ -73,7 +73,7 @@ namespace hMailServer.ControlPanel.Views
          root.Children.Add(contentBorder);
 
          var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
-         var copy = new Wpf.Ui.Controls.Button { Content = "Copy", Margin = new Thickness(0, 0, 8, 0) };
+         var copy = new Wpf.Ui.Controls.Button { Content = "_Copy", Margin = new Thickness(0, 0, 8, 0) };
          copy.Click += (s, e) =>
          {
             try { Clipboard.SetText(content.Text); } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }

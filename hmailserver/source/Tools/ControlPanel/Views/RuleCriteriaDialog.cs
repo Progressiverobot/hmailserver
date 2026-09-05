@@ -49,7 +49,7 @@ namespace hMailServer.ControlPanel.Views
          root.Children.Add(header);
 
          var body = new StackPanel();
-         body.Children.Add(Label("Field", field_));
+         body.Children.Add(Label("_Field", field_));
          field_.Items.Add(Combo("From", 1));
          field_.Items.Add(Combo("To", 2));
          field_.Items.Add(Combo("CC", 3));
@@ -62,11 +62,11 @@ namespace hMailServer.ControlPanel.Views
          field_.SelectionChanged += (s, e) => UpdateVisibility();
          body.Children.Add(field_);
 
-         headerPanel_.Children.Add(Label("Header name (e.g. X-Spam-Status)", header_));
+         headerPanel_.Children.Add(Label("_Header name (e.g. X-Spam-Status)", header_));
          headerPanel_.Children.Add(Input(header_));
          body.Children.Add(headerPanel_);
 
-         body.Children.Add(Label("Match type", match_));
+         body.Children.Add(Label("_Match type", match_));
          match_.Items.Add(Combo("equals", 1));
          match_.Items.Add(Combo("contains", 2));
          match_.Items.Add(Combo("is less than", 3));
@@ -77,7 +77,7 @@ namespace hMailServer.ControlPanel.Views
          match_.Items.Add(Combo("matches wildcard", 8));
          body.Children.Add(match_);
 
-         body.Children.Add(Label("Value", value_));
+         body.Children.Add(Label("_Value", value_));
          body.Children.Add(Input(value_));
 
          var scroll = new ScrollViewer { Content = body, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
@@ -86,7 +86,7 @@ namespace hMailServer.ControlPanel.Views
 
          var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
          // Enter saves, Escape cancels. Neither worked before.
-         var save = new Wpf.Ui.Controls.Button { Content = "Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
+         var save = new Wpf.Ui.Controls.Button { Content = "_Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
          save.Click += (s, e) => Save();
          var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel", IsCancel = true };
          cancel.Click += (s, e) => Close();
@@ -210,11 +210,12 @@ namespace hMailServer.ControlPanel.Views
       /// </summary>
       private static TextBlock Label(string text, FrameworkElement editor = null)
       {
-         var t = new TextBlock { Text = text, FontSize = Typography.Label, Margin = new Thickness(0, 8, 0, 4) };
+         var t = new TextBlock { FontSize = Typography.Label, Margin = new Thickness(0, 8, 0, 4) };
          t.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
+         Mnemonic.Apply(t, text, editor);
 
          if (editor != null)
-            AutomationProperties.SetName(editor, AccessibleNames.Qualify(text, ""));
+            AutomationProperties.SetName(editor, AccessibleNames.Qualify(MnemonicText.Strip(text), ""));
 
          return t;
       }

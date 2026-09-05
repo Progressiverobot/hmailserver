@@ -106,11 +106,11 @@ namespace hMailServer.ControlPanel.Views
          panel.Children.Add(list_);
 
          var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-         var add = new Wpf.Ui.Controls.Button { Content = "Add", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80 };
+         var add = new Wpf.Ui.Controls.Button { Content = "_Add", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80 };
          add.Click += (s, e) => AddOrEdit(-1);
-         var edit = new Wpf.Ui.Controls.Button { Content = "Edit", Margin = new Thickness(0, 0, 8, 0), MinWidth = 80 };
+         var edit = new Wpf.Ui.Controls.Button { Content = "_Edit", Margin = new Thickness(0, 0, 8, 0), MinWidth = 80 };
          edit.Click += (s, e) => { if (list_.SelectedIndex >= 0) AddOrEdit(ids_[list_.SelectedIndex]); };
-         var del = new Wpf.Ui.Controls.Button { Content = "Delete", Appearance = Wpf.Ui.Controls.ControlAppearance.Danger, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80 };
+         var del = new Wpf.Ui.Controls.Button { Content = "_Delete", Appearance = Wpf.Ui.Controls.ControlAppearance.Danger, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80 };
          del.Click += (s, e) => DeleteSelected();
          // IsCancel only. "Add" is deliberately not the default button: Enter with a
          // row selected in the list must not open the add dialog, and the list's own
@@ -350,14 +350,14 @@ namespace hMailServer.ControlPanel.Views
          SetResourceReference(Control.BackgroundProperty, "ApplicationBackgroundBrush");
 
          var panel = new StackPanel { Margin = new Thickness(20) };
-         panel.Children.Add(Label("Applies to", typeCombo_));
+         panel.Children.Add(Label("Applies _to", typeCombo_));
          foreach ((int value, string label) in types)
             typeCombo_.Items.Add(new ComboBoxItem { Content = label, Tag = value });
          typeCombo_.SelectedIndex = 0;
          typeCombo_.SelectionChanged += (s, e) => UpdateSubjectState();
          panel.Children.Add(typeCombo_);
 
-         subjectLabel_ = Label("Account address", subject_);
+         subjectLabel_ = Label("_Account address", subject_);
          panel.Children.Add(subjectLabel_);
          panel.Children.Add(subject_);
 
@@ -371,7 +371,7 @@ namespace hMailServer.ControlPanel.Views
 
          var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
          // Enter saves, Escape cancels. Neither worked before.
-         var ok = new Wpf.Ui.Controls.Button { Content = "Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80, IsDefault = true };
+         var ok = new Wpf.Ui.Controls.Button { Content = "_Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80, IsDefault = true };
          ok.Click += (s, e) => Commit();
          var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel", MinWidth = 80, IsCancel = true };
          cancel.Click += (s, e) => Close();
@@ -429,11 +429,12 @@ namespace hMailServer.ControlPanel.Views
       /// </summary>
       private static TextBlock Label(string text, FrameworkElement editor = null)
       {
-         var t = new TextBlock { Text = text, FontSize = Typography.Label, Margin = new Thickness(0, 6, 0, 4) };
+         var t = new TextBlock { FontSize = Typography.Label, Margin = new Thickness(0, 6, 0, 4) };
          t.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
+         Mnemonic.Apply(t, text, editor);
 
          if (editor != null)
-            System.Windows.Automation.AutomationProperties.SetName(editor, AccessibleNames.Qualify(text, ""));
+            System.Windows.Automation.AutomationProperties.SetName(editor, AccessibleNames.Qualify(MnemonicText.Strip(text), ""));
 
          return t;
       }

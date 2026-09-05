@@ -67,7 +67,7 @@
                     <DataGridTextColumn Header="Certificate" Binding="{Binding Certificate}" Width="*" />
                 </DataGrid.Columns>
             </DataGrid>
-            <TextBlock x:Name="EmptyStatus" Visibility="Collapsed"
+            <TextBlock x:Name="EmptyStatus" AutomationProperties.LiveSetting="Polite" Visibility="Collapsed"
                        HorizontalAlignment="Center" VerticalAlignment="Center"
                        FontSize="14" Opacity="0.7" TextWrapping="Wrap" TextAlignment="Center"
                        Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
@@ -106,11 +106,11 @@
                         <ComboBoxItem Content="STARTTLS (optional)" />
                         <ComboBoxItem Content="STARTTLS (required)" />
                     </ComboBox>
-                    <ui:Button Grid.Column="4" Content="Add" Appearance="Primary" Click="Add_Click" Margin="0,0,8,0" />
-                    <ui:Button Grid.Column="5" Content="Properties" Click="Edit_Click" Margin="0,0,8,0" />
-                    <ui:Button Grid.Column="6" Content="Delete selected" Appearance="Secondary"
+                    <ui:Button Grid.Column="4" Content="_Add" Appearance="Primary" Click="Add_Click" Margin="0,0,8,0" />
+                    <ui:Button Grid.Column="5" Content="_Properties" Click="Edit_Click" Margin="0,0,8,0" />
+                    <ui:Button Grid.Column="6" Content="_Delete selected" Appearance="Secondary"
                                Foreground="{DynamicResource AppDangerBrush}" Click="Delete_Click" Margin="0,0,8,0" />
-                    <ui:Button Grid.Column="7" Content="Restore defaults" Click="RestoreDefaults_Click"
+                    <ui:Button Grid.Column="7" Content="_Restore defaults" Click="RestoreDefaults_Click"
                                ToolTip="Replaces every port with the standard set: SMTP 25 and 587, POP3 110, IMAP 143, all without connection security." />
                 </Grid>
             </StackPanel>

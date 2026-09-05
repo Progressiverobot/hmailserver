@@ -159,15 +159,15 @@ namespace hMailServer.ControlPanel.Views
          var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
          Grid.SetColumn(actions, 1);
          if (spec_.CanAdd)
-            actions.Children.Add(MakeButton("Add", ControlAppearance.Primary, SymbolRegular.Add24, (_, _) => OpenDialog(null)));
-         actions.Children.Add(MakeButton("Edit", ControlAppearance.Secondary, SymbolRegular.Edit24, (_, _) => EditSelected()));
+            actions.Children.Add(MakeButton("_Add", ControlAppearance.Primary, SymbolRegular.Add24, (_, _) => OpenDialog(null)));
+         actions.Children.Add(MakeButton("_Edit", ControlAppearance.Secondary, SymbolRegular.Edit24, (_, _) => EditSelected()));
          if (spec_.CanDelete)
          {
-            var del = MakeButton("Delete", ControlAppearance.Secondary, SymbolRegular.Delete24, (_, _) => DeleteSelected());
+            var del = MakeButton("_Delete", ControlAppearance.Secondary, SymbolRegular.Delete24, (_, _) => DeleteSelected());
             del.Foreground = Services.ThemeTokens.Danger;
             actions.Children.Add(del);
          }
-         actions.Children.Add(MakeButton("Refresh", ControlAppearance.Secondary, SymbolRegular.ArrowSync24, (_, _) => Reload()));
+         actions.Children.Add(MakeButton("_Refresh", ControlAppearance.Secondary, SymbolRegular.ArrowSync24, (_, _) => Reload()));
          toolbar.Children.Add(actions);
          Grid.SetRow(toolbar, 1);
          root.Children.Add(toolbar);

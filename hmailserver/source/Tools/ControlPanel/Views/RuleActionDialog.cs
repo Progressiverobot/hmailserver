@@ -21,7 +21,7 @@ namespace hMailServer.ControlPanel.Views
       private readonly ComboBox type_ = new() { FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 12) };
 
       private readonly TextBox to_ = new();
-      private readonly CheckBox abortSpam_ = new() { Content = "Abort on messages marked as spam", FontSize = Typography.Body, Margin = new Thickness(0, 4, 0, 0) };
+      private readonly CheckBox abortSpam_ = new() { Content = "Abort on messages _marked as spam", FontSize = Typography.Body, Margin = new Thickness(0, 4, 0, 0) };
       private readonly TextBox fromName_ = new();
       private readonly TextBox fromAddress_ = new();
       private readonly TextBox subject_ = new();
@@ -69,7 +69,7 @@ namespace hMailServer.ControlPanel.Views
          root.Children.Add(header);
 
          var body = new StackPanel();
-         body.Children.Add(Label("Action", type_));
+         body.Children.Add(Label("_Action", type_));
          type_.Items.Add(Combo("Delete e-mail", 1));
          type_.Items.Add(Combo("Forward e-mail", 2));
          type_.Items.Add(Combo("Reply", 3));
@@ -86,47 +86,47 @@ namespace hMailServer.ControlPanel.Views
          body.Children.Add(type_);
 
          // Forward
-         forwardPanel_.Children.Add(Label("To", to_));
+         forwardPanel_.Children.Add(Label("_To", to_));
          forwardPanel_.Children.Add(Input(to_));
          forwardPanel_.Children.Add(abortSpam_);
          body.Children.Add(forwardPanel_);
 
          // Reply
-         replyPanel_.Children.Add(Label("From (name)", fromName_));
+         replyPanel_.Children.Add(Label("From (_name)", fromName_));
          replyPanel_.Children.Add(Input(fromName_));
-         replyPanel_.Children.Add(Label("From (address)", fromAddress_));
+         replyPanel_.Children.Add(Label("From (a_ddress)", fromAddress_));
          replyPanel_.Children.Add(Input(fromAddress_));
-         replyPanel_.Children.Add(Label("Subject", subject_));
+         replyPanel_.Children.Add(Label("Su_bject", subject_));
          replyPanel_.Children.Add(Input(subject_));
-         replyPanel_.Children.Add(Label("Body", body_));
+         replyPanel_.Children.Add(Label("Bod_y", body_));
          Input(body_);
          replyPanel_.Children.Add(body_);
          body.Children.Add(replyPanel_);
 
          // Move to folder
-         folderPanel_.Children.Add(Label("IMAP folder (e.g. INBOX.Archive)", imapFolder_));
+         folderPanel_.Children.Add(Label("_IMAP folder (e.g. INBOX.Archive)", imapFolder_));
          folderPanel_.Children.Add(Input(imapFolder_));
          body.Children.Add(folderPanel_);
 
          // Script
-         scriptPanel_.Children.Add(Label("Script function", scriptFunction_));
+         scriptPanel_.Children.Add(Label("Script _function", scriptFunction_));
          scriptPanel_.Children.Add(Input(scriptFunction_));
          body.Children.Add(scriptPanel_);
 
          // Set header
-         headerPanel_.Children.Add(Label("Header name", headerName_));
+         headerPanel_.Children.Add(Label("_Header name", headerName_));
          headerPanel_.Children.Add(Input(headerName_));
-         headerPanel_.Children.Add(Label("Value", value_));
+         headerPanel_.Children.Add(Label("_Value", value_));
          headerPanel_.Children.Add(Input(value_));
          body.Children.Add(headerPanel_);
 
          // Route
-         routePanel_.Children.Add(Label("Route", route_));
+         routePanel_.Children.Add(Label("_Route", route_));
          routePanel_.Children.Add(route_);
          body.Children.Add(routePanel_);
 
          // Bind to address
-         bindPanel_.Children.Add(Label("IP address", bindAddress_));
+         bindPanel_.Children.Add(Label("I_P address", bindAddress_));
          bindPanel_.Children.Add(Input(bindAddress_));
          body.Children.Add(bindPanel_);
 
@@ -140,7 +140,7 @@ namespace hMailServer.ControlPanel.Views
          // Enter saves, Escape cancels. Neither worked before. Safe alongside the
          // multi-line reply body: a TextBox with AcceptsReturn handles Enter itself
          // and marks the key handled, so it never reaches the default button.
-         var save = new Wpf.Ui.Controls.Button { Content = "Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
+         var save = new Wpf.Ui.Controls.Button { Content = "_Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
          save.Click += (s, e) => Save();
          var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel", IsCancel = true };
          cancel.Click += (s, e) => Close();
@@ -320,11 +320,12 @@ namespace hMailServer.ControlPanel.Views
       /// </summary>
       private static TextBlock Label(string text, FrameworkElement editor = null)
       {
-         var t = new TextBlock { Text = text, FontSize = Typography.Label, Margin = new Thickness(0, 8, 0, 4) };
+         var t = new TextBlock { FontSize = Typography.Label, Margin = new Thickness(0, 8, 0, 4) };
          t.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
+         Mnemonic.Apply(t, text, editor);
 
          if (editor != null)
-            AutomationProperties.SetName(editor, AccessibleNames.Qualify(text, ""));
+            AutomationProperties.SetName(editor, AccessibleNames.Qualify(MnemonicText.Strip(text), ""));
 
          return t;
       }

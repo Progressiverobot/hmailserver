@@ -59,12 +59,12 @@ namespace hMailServer.ControlPanel.Views
          Grid.SetColumn(upper_, 2);
          row.Children.Add(upper_);
 
-         var add = new Wpf.Ui.Controls.Button { Content = "Add", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0) };
+         var add = new Wpf.Ui.Controls.Button { Content = "_Add", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0) };
          add.Click += (s, e) => Add();
          Grid.SetColumn(add, 3);
          row.Children.Add(add);
 
-         var del = new Wpf.Ui.Controls.Button { Content = "Delete selected", Appearance = Wpf.Ui.Controls.ControlAppearance.Danger };
+         var del = new Wpf.Ui.Controls.Button { Content = "_Delete selected", Appearance = Wpf.Ui.Controls.ControlAppearance.Danger };
          del.Click += (s, e) => DeleteSelected();
          Grid.SetColumn(del, 4);
          row.Children.Add(del);
@@ -214,10 +214,10 @@ namespace hMailServer.ControlPanel.Views
          inputRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
          inputRow.Children.Add(domain_);
          var actions = new StackPanel { Orientation = Orientation.Horizontal };
-         var run = new Wpf.Ui.Controls.Button { Content = "Query", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary };
+         var run = new Wpf.Ui.Controls.Button { Content = "_Query", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary };
          run.Click += async (s, e) => await RunQuery();
          actions.Children.Add(run);
-         var copy = new Wpf.Ui.Controls.Button { Content = "Copy", Margin = new Thickness(8, 0, 0, 0) };
+         var copy = new Wpf.Ui.Controls.Button { Content = "_Copy", Margin = new Thickness(8, 0, 0, 0) };
          copy.Click += (s, e) => { try { if (output_.Text.Length > 0) Clipboard.SetText(output_.Text); } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ } };
          actions.Children.Add(copy);
          Grid.SetColumn(actions, 1);
@@ -357,7 +357,7 @@ namespace hMailServer.ControlPanel.Views
 
          var send = new Wpf.Ui.Controls.Button
          {
-            Content = "Send to all matching accounts",
+            Content = "_Send to all matching accounts",
             Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
             Margin = new Thickness(0, 14, 0, 0)
          };
@@ -452,10 +452,10 @@ namespace hMailServer.ControlPanel.Views
          MaxHeight = 260,
          Visibility = Visibility.Collapsed
       };
-      private readonly Wpf.Ui.Controls.Button consistencyRefresh_ = new() { Content = "Refresh" };
+      private readonly Wpf.Ui.Controls.Button consistencyRefresh_ = new() { Content = "Re_fresh" };
       private readonly Wpf.Ui.Controls.Button consistencyOpen_ = new()
       {
-         Content = "Open report",
+         Content = "_Open report",
          Margin = new Thickness(8, 0, 0, 0),
          IsEnabled = false
       };
@@ -495,10 +495,10 @@ namespace hMailServer.ControlPanel.Views
          Grid.SetColumn(testDomain_, 1);
          inputRow.Children.Add(testDomain_);
          var actions = new StackPanel { Orientation = Orientation.Horizontal };
-         var run = new Wpf.Ui.Controls.Button { Content = "Run diagnostics", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary };
+         var run = new Wpf.Ui.Controls.Button { Content = "_Run diagnostics", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary };
          run.Click += async (s, e) => await Run();
          actions.Children.Add(run);
-         var copy = new Wpf.Ui.Controls.Button { Content = "Copy", Margin = new Thickness(8, 0, 0, 0) };
+         var copy = new Wpf.Ui.Controls.Button { Content = "_Copy", Margin = new Thickness(8, 0, 0, 0) };
          copy.Click += (s, e) => { try { if (output_.Text.Length > 0) Clipboard.SetText(output_.Text); } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ } };
          actions.Children.Add(copy);
          Grid.SetColumn(actions, 2);

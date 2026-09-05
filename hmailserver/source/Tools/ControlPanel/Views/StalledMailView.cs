@@ -108,7 +108,7 @@ namespace hMailServer.ControlPanel.Views
          var row = new StackPanel { Orientation = Orientation.Horizontal };
          var enable = new Wpf.Ui.Controls.Button
          {
-            Content = "Turn on debug logging now",
+            Content = "_Turn on debug logging now",
             Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
             Margin = new Thickness(0, 4, 8, 0)
          };
@@ -116,7 +116,7 @@ namespace hMailServer.ControlPanel.Views
          enable.Click += (s, e) => SetDebugLogging(true);
          row.Children.Add(enable);
 
-         var disable = new Wpf.Ui.Controls.Button { Content = "Turn it off again", Margin = new Thickness(0, 4, 8, 0) };
+         var disable = new Wpf.Ui.Controls.Button { Content = "Turn it _off again", Margin = new Thickness(0, 4, 8, 0) };
          AutomationProperties.SetName(disable, "Turn debug logging off again");
          disable.Click += (s, e) => SetDebugLogging(false);
          row.Children.Add(disable);
@@ -234,7 +234,7 @@ namespace hMailServer.ControlPanel.Views
             "eventually arrives, arrives twice, or never arrives.");
          var content = (StackPanel)card.Child;
 
-         var open = new Wpf.Ui.Controls.Button { Content = "Open the full guide (DiagnosingStalledMail.md)", Margin = new Thickness(0, 6, 8, 0) };
+         var open = new Wpf.Ui.Controls.Button { Content = "Open the full _guide (DiagnosingStalledMail.md)", Margin = new Thickness(0, 6, 8, 0) };
          AutomationProperties.SetName(open, "Open the full guide on GitHub");
          open.Click += (s, e) => OpenGuide();
          content.Children.Add(open);
@@ -312,7 +312,9 @@ namespace hMailServer.ControlPanel.Views
 
       private static TextBlock Heading(string text)
       {
-         return new TextBlock { Text = text, FontSize = Typography.Body, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 4, 0, 4) };
+         var block = new TextBlock { Text = text, FontSize = Typography.Body, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 4, 0, 4) };
+         AutomationProperties.SetHeadingLevel(block, AutomationHeadingLevel.Level2);   // the page title is level 1
+         return block;
       }
 
       private static TextBlock Body(string text)

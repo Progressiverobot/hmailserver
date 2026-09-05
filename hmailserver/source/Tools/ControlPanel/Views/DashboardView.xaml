@@ -40,7 +40,7 @@
                         <TextBlock x:Name="AttentionSummary" Grid.Column="2" FontSize="14"
                                    FontWeight="SemiBold" TextWrapping="Wrap"
                                    Text="Checking what this server still needs done outside it…" />
-                        <ui:Button x:Name="OpenExternalSetupButton" Grid.Column="3" Content="External setup…"
+                        <ui:Button x:Name="OpenExternalSetupButton" Grid.Column="3" Content="_External setup…"
                                    Appearance="Transparent" FontSize="12" Padding="8,3,8,3"
                                    VerticalAlignment="Top" Cursor="Hand" Click="OpenExternalSetup_Click"
                                    ToolTip="Open External setup, the full checklist of what this server needs done outside it"

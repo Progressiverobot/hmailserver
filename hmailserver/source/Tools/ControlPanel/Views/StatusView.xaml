@@ -19,12 +19,12 @@
                            Style="{StaticResource PageSubtitle}" />
             </StackPanel>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
-                <ui:Button x:Name="PauseButton" Content="Pause" Click="PauseResume_Click" IsEnabled="False"
+                <ui:Button x:Name="PauseButton" Content="_Pause" Click="PauseResume_Click" IsEnabled="False"
                            Margin="0,0,8,0"
                            ToolTip="Stops the mail server engine while the Windows service keeps running: no new connections are accepted and nothing is delivered until it is resumed.">
                     <ui:Button.Icon><ui:SymbolIcon x:Name="PauseButtonIcon" Symbol="Pause24" /></ui:Button.Icon>
                 </ui:Button>
-                <ui:Button Content="Refresh" Click="Refresh_Click">
+                <ui:Button Content="_Refresh" Click="Refresh_Click">
                     <ui:Button.Icon><ui:SymbolIcon Symbol="ArrowClockwise24" /></ui:Button.Icon>
                 </ui:Button>
             </StackPanel>

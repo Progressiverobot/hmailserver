@@ -37,7 +37,7 @@
                      that jumps as soon as you click it reads as instability, which
                      is the opposite of what a progress indicator is for. -->
                 <Grid Height="38">
-                    <ui:Button x:Name="ConnectButton" Content="Connect" Appearance="Primary"
+                    <ui:Button x:Name="ConnectButton" Content="_Connect" Appearance="Primary"
                                HorizontalAlignment="Stretch" Height="38" Click="Connect_Click" />
                     <StackPanel x:Name="BusyPanel" Orientation="Horizontal" Visibility="Collapsed"
                                 HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -48,7 +48,7 @@
                     </StackPanel>
                 </Grid>
 
-                <TextBlock x:Name="ErrorText" Foreground="{DynamicResource AppDangerBrush}" FontSize="12" Margin="0,12,0,0"
+                <TextBlock x:Name="ErrorText" AutomationProperties.LiveSetting="Assertive" Foreground="{DynamicResource AppDangerBrush}" FontSize="12" Margin="0,12,0,0"
                            TextWrapping="Wrap" Visibility="Collapsed" />
 
                 <ui:HyperlinkButton Content="Set up two-factor authentication…" Click="Totp_Click"

@@ -38,7 +38,7 @@
                     <DataGridTextColumn Header="Auth" Binding="{Binding Auth}" Width="80" />
                 </DataGrid.Columns>
             </DataGrid>
-            <TextBlock x:Name="EmptyStatus" Visibility="Collapsed"
+            <TextBlock x:Name="EmptyStatus" AutomationProperties.LiveSetting="Polite" Visibility="Collapsed"
                        HorizontalAlignment="Center" VerticalAlignment="Center"
                        FontSize="14" Opacity="0.7" TextWrapping="Wrap" TextAlignment="Center"
                        Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
@@ -60,9 +60,9 @@
                     <ui:TextBox x:Name="NewDomain" PlaceholderText="Domain (e.g. partner.com)" Margin="0,0,8,0" />
                     <ui:TextBox x:Name="NewHost" Grid.Column="1" PlaceholderText="Target SMTP host" Margin="0,0,8,0" />
                     <ui:TextBox x:Name="NewPort" Grid.Column="2" PlaceholderText="Port" Text="25" Margin="0,0,8,0" />
-                    <ui:Button Grid.Column="3" Content="Add" Appearance="Primary" Click="Add_Click" Margin="0,0,8,0" />
-                    <ui:Button Grid.Column="4" Content="Properties" Click="Edit_Click" Margin="0,0,8,0" />
-                    <ui:Button Grid.Column="5" Content="Delete selected" Appearance="Danger" Click="Delete_Click" />
+                    <ui:Button Grid.Column="3" Content="_Add" Appearance="Primary" Click="Add_Click" Margin="0,0,8,0" />
+                    <ui:Button Grid.Column="4" Content="_Properties" Click="Edit_Click" Margin="0,0,8,0" />
+                    <ui:Button Grid.Column="5" Content="_Delete selected" Appearance="Danger" Click="Delete_Click" />
                 </Grid>
             </StackPanel>
         </Border>

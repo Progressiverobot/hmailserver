@@ -91,7 +91,7 @@ namespace hMailServer.ControlPanel.Views
 
          var add = new Wpf.Ui.Controls.Button
          {
-            Content = "Add account…",
+            Content = "_Add account…",
             Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
             Margin = new Thickness(0, 0, 8, 0),
             MinWidth = 110
@@ -103,7 +103,7 @@ namespace hMailServer.ControlPanel.Views
 
          var remove = new Wpf.Ui.Controls.Button
          {
-            Content = "Remove",
+            Content = "_Remove",
             Appearance = Wpf.Ui.Controls.ControlAppearance.Danger,
             Margin = new Thickness(0, 0, 8, 0),
             MinWidth = 90
@@ -362,7 +362,7 @@ namespace hMailServer.ControlPanel.Views
 
          var ok = new Wpf.Ui.Controls.Button
          {
-            Content = "Add",
+            Content = "_Add",
             Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
             Margin = new Thickness(0, 0, 8, 0),
             MinWidth = 80,

@@ -258,7 +258,7 @@ namespace hMailServer.ControlPanel.Views
          copyButton_.Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary;
          copyButton_.FontSize = Typography.Caption;
          copyButton_.Padding = new Thickness(10, 4, 10, 4);
-         copyButton_.Content = "Copy";
+         copyButton_.Content = "Copy";   // per card: no access key, the rows are reached with the arrow keys
          copyButton_.Margin = new Thickness(6, 0, 0, 0);
          copyButton_.ToolTip = "Copy every sample of " + definition_.Title.ToLowerInvariant()
             + " to the clipboard as tab-separated text";
@@ -864,7 +864,7 @@ namespace hMailServer.ControlPanel.Views
 
       private void UpdateViewButton_()
       {
-         viewButton_.Content = tableVisible_ ? "Show chart" : "Show table";
+         viewButton_.Content = tableVisible_ ? "Show chart" : "Show table";   // per card: no access key, the rows are reached with the arrow keys
          viewButton_.ToolTip = tableVisible_
             ? "Show " + definition_.Title.ToLowerInvariant() + " as a chart"
             : "Show every " + definition_.Title.ToLowerInvariant() + " sample as a table of numbers";

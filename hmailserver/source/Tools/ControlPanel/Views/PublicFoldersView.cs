@@ -49,10 +49,10 @@ namespace hMailServer.ControlPanel.Views
 
          var toolbar = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 0, 0, 12) };
          Grid.SetRow(toolbar, 1);
-         toolbar.Children.Add(MakeButton("Add folder", Wpf.Ui.Controls.ControlAppearance.Primary, (_, _) => AddFolder()));
-         toolbar.Children.Add(MakeButton("Permissions", Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => EditPermissions()));
-         toolbar.Children.Add(MakeButton("Delete", Wpf.Ui.Controls.ControlAppearance.Danger, (_, _) => DeleteFolder()));
-         toolbar.Children.Add(MakeButton("Refresh", Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => Reload()));
+         toolbar.Children.Add(MakeButton("_Add folder", Wpf.Ui.Controls.ControlAppearance.Primary, (_, _) => AddFolder()));
+         toolbar.Children.Add(MakeButton("_Permissions", Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => EditPermissions()));
+         toolbar.Children.Add(MakeButton("_Delete", Wpf.Ui.Controls.ControlAppearance.Danger, (_, _) => DeleteFolder()));
+         toolbar.Children.Add(MakeButton("_Refresh", Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => Reload()));
          root.Children.Add(toolbar);
 
          var card = new Border { Padding = new Thickness(8) };
