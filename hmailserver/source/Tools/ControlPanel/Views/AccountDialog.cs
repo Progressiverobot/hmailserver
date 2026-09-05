@@ -32,6 +32,7 @@ namespace hMailServer.ControlPanel.Views
       private readonly TextBox addressBox_ = NewInput();
       private readonly ComboBox adminLevel_ = new();
       private readonly TextBox quota_ = NewInput();
+      private readonly TextBox retentionDays_ = NewInput();
       private readonly CheckBox spamFilterOn_ = new() { Content = "Apply the server's spam filtering to this account", FontSize = Typography.Body };
       private readonly TextBox spamMark_ = NewInput();
       private readonly TextBox spamDelete_ = NewInput();
@@ -193,6 +194,8 @@ namespace hMailServer.ControlPanel.Views
          panel.Children.Add(adminLevel_);
          panel.Children.Add(Label("Quota (MB, 0 = unlimited)", quota_));
          panel.Children.Add(Input(quota_));
+         panel.Children.Add(Label("Delete messages older than (days; 0 = the domain's policy, -1 = keep forever)", retentionDays_));
+         panel.Children.Add(Input(retentionDays_));
          panel.Children.Add(Label("First name", firstName_));
          panel.Children.Add(Input(firstName_));
          panel.Children.Add(Label("Last name", lastName_));
@@ -703,6 +706,7 @@ namespace hMailServer.ControlPanel.Views
             addressBox_.Text = (string)a.Address ?? address_;
             SelectCombo(adminLevel_, (int)a.AdminLevel);
             quota_.Text = ((int)a.MaxSize).ToString();
+            retentionDays_.Text = ((int)a.MessageRetentionDays).ToString();
             spamFilterOn_.IsChecked = (bool)a.AntiSpamEnabled;
             spamMark_.Text = ((int)a.SpamMarkThreshold).ToString();
             spamDelete_.Text = ((int)a.SpamDeleteThreshold).ToString();
@@ -796,7 +800,8 @@ namespace hMailServer.ControlPanel.Views
 
       private void Save()
       {
-         if (!NumericField.TryValidate(quota_.Text, "Maximum size (MB)", 0, int.MaxValue, out int quotaV, out bool hasQuota, out string error))
+         if (!NumericField.TryValidate(quota_.Text, "Maximum size (MB)", 0, int.MaxValue, out int quotaV, out bool hasQuota, out string error)
+          || !NumericField.TryValidate(retentionDays_.Text, "Delete messages older than (days)", -1, int.MaxValue, out int retentionV, out bool hasRetention, out error))
          {
             status_.Text = error;
             return;
@@ -847,6 +852,8 @@ namespace hMailServer.ControlPanel.Views
             if (lvl >= 0) a.AdminLevel = lvl;
             if (hasQuota)
                a.MaxSize = quotaV;
+            if (hasRetention)
+               a.MessageRetentionDays = retentionV;
             a.AntiSpamEnabled = spamFilterOn_.IsChecked is true;
             if (int.TryParse(spamMark_.Text.Trim(), out int spamMarkV)) a.SpamMarkThreshold = spamMarkV;
             if (int.TryParse(spamDelete_.Text.Trim(), out int spamDeleteV)) a.SpamDeleteThreshold = spamDeleteV;

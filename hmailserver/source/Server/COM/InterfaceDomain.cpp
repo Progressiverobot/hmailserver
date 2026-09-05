@@ -517,6 +517,46 @@ STDMETHODIMP InterfaceDomain::put_MaxMessageSize(long pVal)
    }
 }
 
+STDMETHODIMP InterfaceDomain::get_MessageRetentionDays(long *pVal)
+{
+   try
+   {
+      if (!object_)
+         return GetAccessDenied();
+
+      *pVal = object_->GetMessageRetentionDays();
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceDomain::put_MessageRetentionDays(long pVal)
+{
+   try
+   {
+      if (!object_)
+         return GetAccessDenied();
+
+      // A policy that deletes users' mail is the server administrator's to set, like
+      // the domain's size limit.
+      if (!authentication_->GetIsServerAdmin())
+         return authentication_->GetAccessDenied();
+
+      if (pVal < 0)
+         return COMError::GenerateError("MessageRetentionDays must be 0 (no policy) or a number of days.");
+
+      object_->SetMessageRetentionDays(pVal);
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
 STDMETHODIMP InterfaceDomain::get_MaxSize(long *pVal)
 {
    try

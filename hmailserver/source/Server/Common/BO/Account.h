@@ -58,6 +58,12 @@ namespace HM
       void SetAccountMaxSize(long newVal) {account_max_size_ = newVal; }
       long GetAccountMaxSize() const {return account_max_size_;}
 
+      // Days delivered messages are kept before the retention sweep removes them:
+      // 0 = the domain's policy, -1 = keep forever, else the number of days. See
+      // MailboxRetentionTask.
+      int GetMessageRetentionDays() const { return message_retention_days_; }
+      void SetMessageRetentionDays(int days) { message_retention_days_ = days; }
+
       bool GetVacationMessageIsOn() const; 
       void SetVacationMessageIsOn(bool bNewVal);
 
@@ -185,6 +191,7 @@ namespace HM
       
       unsigned int account_max_size_;
       // Maximum account size. MB
+      int message_retention_days_;
 
       long password_encryption_;
 

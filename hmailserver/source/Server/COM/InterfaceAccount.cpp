@@ -751,6 +751,45 @@ STDMETHODIMP InterfaceAccount::get_Messages(IInterfaceMessages **pVal)
    }
 }
 
+STDMETHODIMP InterfaceAccount::get_MessageRetentionDays(long *pVal)
+{
+   try
+   {
+      if (!object_)
+         return GetAccessDenied();
+
+      *pVal = object_->GetMessageRetentionDays();
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceAccount::put_MessageRetentionDays(long pVal)
+{
+   try
+   {
+      if (!object_)
+         return GetAccessDenied();
+
+      // Same authority as the account's size limit: the domain administrator's.
+      if (!authentication_->GetIsDomainAdmin())
+         return authentication_->GetAccessDenied();
+
+      if (pVal < -1)
+         return COMError::GenerateError("MessageRetentionDays must be -1 (keep forever), 0 (the domain's policy) or a number of days.");
+
+      object_->SetMessageRetentionDays(pVal);
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
 STDMETHODIMP InterfaceAccount::get_MaxSize(long *pVal)
 {
    try

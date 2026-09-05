@@ -180,6 +180,7 @@ create table hm_accounts (
 	accountaddomain nvarchar(255) not null ,
 	accountadusername nvarchar(255) not null,
 	accountmaxsize int not null,
+	accountmessageretentiondays int not null default 0,
 	accountvacationmessageon tinyint not null,
 	accountvacationmessage nvarchar(1000) not null,
 	accountvacationsubject nvarchar(200) not null,
@@ -231,6 +232,7 @@ create table hm_domains (
 	domainactive tinyint not null,
 	domainpostmaster nvarchar(80) not null,
 	domainmaxsize int not null,
+	domainmessageretentiondays int not null default 0,
 	domainaddomain nvarchar(255) not null,
 	domainmaxmessagesize int not null,
 	domainuseplusaddressing  tinyint not null,
@@ -1139,4 +1141,4 @@ create table hm_messageindexstate
 
 CREATE INDEX idx_hm_messageindexstate ON hm_messageindexstate (misaccountid)
 
-insert into hm_dbversion values (6026)
+insert into hm_dbversion values (6027)

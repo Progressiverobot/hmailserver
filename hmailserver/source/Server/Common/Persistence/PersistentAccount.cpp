@@ -231,6 +231,7 @@ namespace HM
       pAccount->SetIsAD(pRS->GetLongValue("accountisad") ? true : false);
       pAccount->SetPassword(pRS->GetStringValue("accountpassword"));
       pAccount->SetAccountMaxSize(pRS->GetLongValue("accountmaxsize"));
+      pAccount->SetMessageRetentionDays(pRS->GetLongValue("accountmessageretentiondays"));
 
       pAccount->SetVacationMessageIsOn(pRS->GetLongValue("accountvacationmessageon") ? true : false);
       pAccount->SetVacationMessage(pRS->GetStringValue("accountvacationmessage"));
@@ -428,6 +429,7 @@ namespace HM
       oStatement.AddColumn("accountaddomain", pAccount->GetADDomain());
       oStatement.AddColumn("accountadusername", pAccount->GetADUsername());
       oStatement.AddColumn("accountmaxsize", pAccount->GetAccountMaxSize());
+      oStatement.AddColumn("accountmessageretentiondays", pAccount->GetMessageRetentionDays());
 
       oStatement.AddColumn("accountvacationmessageon", pAccount->GetVacationMessageIsOn());
       oStatement.AddColumn("accountvacationmessage", pAccount->GetVacationMessage());

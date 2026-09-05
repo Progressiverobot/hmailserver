@@ -36,6 +36,7 @@ namespace hMailServer.ControlPanel.Views
       private readonly TextBox maxSize_ = NewInput();
       private readonly TextBox maxMessageSize_ = NewInput();
       private readonly TextBox maxAccountSize_ = NewInput();
+      private readonly TextBox retentionDays_ = NewInput();
       private readonly CheckBox maxAccountsOn_ = new() { Content = "Limit number of accounts", FontSize = Typography.Body };
       private readonly TextBox maxAccounts_ = NewInput();
       private readonly CheckBox maxAliasesOn_ = new() { Content = "Limit number of aliases", FontSize = Typography.Body };
@@ -292,6 +293,8 @@ namespace hMailServer.ControlPanel.Views
          panel.Children.Add(Input(maxMessageSize_));
          panel.Children.Add(Label("Maximum size for accounts created in this domain (MB, 0 = unlimited)", maxAccountSize_));
          panel.Children.Add(Input(maxAccountSize_));
+         panel.Children.Add(Label("Delete messages in this domain's mailboxes older than (days; 0 = no policy, an account's own value overrides it)", retentionDays_));
+         panel.Children.Add(Input(retentionDays_));
          panel.Children.Add(Separator());
          panel.Children.Add(maxAccountsOn_);
          panel.Children.Add(Input(maxAccounts_));
@@ -1005,6 +1008,7 @@ namespace hMailServer.ControlPanel.Views
             maxSize_.Text = ((int)d.MaxSize).ToString();
             maxMessageSize_.Text = ((int)d.MaxMessageSize).ToString();
             maxAccountSize_.Text = ((int)d.MaxAccountSize).ToString();
+            retentionDays_.Text = ((int)d.MessageRetentionDays).ToString();
             maxAccountsOn_.IsChecked = (bool)d.MaxNumberOfAccountsEnabled;
             maxAccounts_.Text = ((int)d.MaxNumberOfAccounts).ToString();
             maxAliasesOn_.IsChecked = (bool)d.MaxNumberOfAliasesEnabled;
@@ -1080,6 +1084,7 @@ namespace hMailServer.ControlPanel.Views
          if (!NumericField.TryValidate(maxSize_.Text, "Maximum domain size (MB)", 0, int.MaxValue, out int msV, out bool hasMs, out string error)
           || !NumericField.TryValidate(maxMessageSize_.Text, "Maximum message size (KB)", 0, int.MaxValue, out int mmsV, out bool hasMms, out error)
           || !NumericField.TryValidate(maxAccountSize_.Text, "Maximum account size (MB)", 0, int.MaxValue, out int masV, out bool hasMas, out error)
+          || !NumericField.TryValidate(retentionDays_.Text, "Delete messages older than (days)", 0, int.MaxValue, out int retentionV, out bool hasRetention, out error)
           || !NumericField.TryValidate(maxAccounts_.Text, "Maximum number of accounts", 0, int.MaxValue, out int mnaV, out bool hasMna, out error)
           || !NumericField.TryValidate(maxAliases_.Text, "Maximum number of aliases", 0, int.MaxValue, out int mnalV, out bool hasMnal, out error)
           || !NumericField.TryValidate(maxDists_.Text, "Maximum number of distribution lists", 0, int.MaxValue, out int mndV, out bool hasMnd, out error)
@@ -1125,6 +1130,7 @@ namespace hMailServer.ControlPanel.Views
             if (hasMs) d.MaxSize = msV;
             if (hasMms) d.MaxMessageSize = mmsV;
             if (hasMas) d.MaxAccountSize = masV;
+            if (hasRetention) d.MessageRetentionDays = retentionV;
             d.MaxNumberOfAccountsEnabled = maxAccountsOn_.IsChecked is true;
             if (hasMna) d.MaxNumberOfAccounts = mnaV;
             d.MaxNumberOfAliasesEnabled = maxAliasesOn_.IsChecked is true;

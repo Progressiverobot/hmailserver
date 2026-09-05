@@ -6,6 +6,7 @@
 #include "stdafx.h"
 #include "InterfaceUtilities.h"
 #include "../Common/Util/AddressTraceEraser.h"
+#include "../Common/Application/MailboxRetentionTask.h"
 #include "../Common/TCPIP/DNSResolver.h"
 #include "../Common/TCPIP/HostNameAndIpAddress.h"
 #include "../Common/util/ServiceManager.h"
@@ -169,6 +170,29 @@ STDMETHODIMP InterfaceUtilities::SendDmarcReports(VARIANT_BOOL IncludeCurrentDay
 
       *ReportCount = HM::DmarcRptReporterTask::SendReportsNow(IncludeCurrentDay != VARIANT_FALSE);
 
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceUtilities::RunMessageRetention(long *DeletedCount)
+{
+   try
+   {
+      if (!DeletedCount)
+         return COMError::GenerateGenericMessage();
+
+      *DeletedCount = 0;
+
+      // Deletes mail across every domain with a policy, so it is the server
+      // administrator's call, the same as setting the policy.
+      if (!authentication_->GetIsServerAdmin())
+         return authentication_->GetAccessDenied();
+
+      *DeletedCount = HM::MailboxRetentionTask::Sweep();
       return S_OK;
    }
    catch (...)

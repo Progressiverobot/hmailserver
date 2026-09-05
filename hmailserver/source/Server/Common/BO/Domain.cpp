@@ -29,6 +29,7 @@ namespace HM
       plus_addressing_char_("+"),
       anti_spam_options_(1),
       max_size_mb_(0),
+      message_retention_days_(0),
       enable_signature_(false),
       signature_method_(SMSetIfNotSpecifiedInAccount),
       add_signatures_to_local_mail_(true),

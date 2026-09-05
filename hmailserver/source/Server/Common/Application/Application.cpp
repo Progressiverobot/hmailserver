@@ -65,6 +65,7 @@
 #include "RemoveExpiredRecords.h"
 #include "LogRetentionTask.h"
 #include "ArchiveRetentionTask.h"
+#include "MailboxRetentionTask.h"
 #include "IMAPExpungeRetentionTask.h"
 #include "MessageStoreConsistencyTask.h"
 #include "WorkQueueHealthTask.h"
@@ -660,6 +661,19 @@ namespace HM
       archiveRetentionTask->SetReoccurance(ScheduledTask::RunInfinitely);
       archiveRetentionTask->SetMinutesBetweenRun(12 * 60);
       scheduler_->ScheduleTask(archiveRetentionTask);
+
+      // Mailbox retention: delivered mail older than a domain's or account's
+      // MessageRetentionDays. The task no-ops for every mailbox without a policy,
+      // which is all of them until an administrator sets one; every six hours, so a
+      // policy takes effect the day it is set rather than the day after.
+      std::shared_ptr<MailboxRetentionTask> mailboxRetentionStartupTask = std::shared_ptr<MailboxRetentionTask>(new MailboxRetentionTask);
+      mailboxRetentionStartupTask->SetReoccurance(ScheduledTask::RunOnce);
+      scheduler_->ScheduleTask(mailboxRetentionStartupTask);
+
+      std::shared_ptr<MailboxRetentionTask> mailboxRetentionTask = std::shared_ptr<MailboxRetentionTask>(new MailboxRetentionTask);
+      mailboxRetentionTask->SetReoccurance(ScheduledTask::RunInfinitely);
+      mailboxRetentionTask->SetMinutesBetweenRun(6 * 60);
+      scheduler_->ScheduleTask(mailboxRetentionTask);
 
       // QRESYNC expunge records: cap hm_imapexpunged at IMAPExpungeRetentionRecords
       // per mailbox and drop rows whose folder no longer exists. Same startup-plus-
