@@ -1,29 +1,30 @@
-name: Server build & regression tests
+name: Server build
 
-# Builds the native C++ hMailServer service and (optionally) runs the regression
-# suite.
+# Compiles the native C++ mail server on a GitHub-hosted runner, on every push to master
+# and every pull request. It is the compile gate for the half of the repository that the
+# other workflows never touch: ci.yml builds the .NET tools, codeql.yml's C# job builds
+# the Control Panel, and until this workflow moved to hosted runners the server itself was
+# only ever compiled on the maintainer's machine. The previous version of this file needed
+# a self-hosted runner that was never registered, so it had never run.
 #
-# This workflow REQUIRES a self-hosted Windows runner. The GitHub-hosted runners
-# cannot build the server because it needs:
-#   * Visual Studio 2026 Build Tools — platform toolset v145 (MSVC 14.51); and
-#   * the prebuilt native dependencies (boost_1_91_0, openssl-4.0.1,
-#     postgresql-18.3) pointed to by the machine environment variable
-#     hMailServerLibs (see libraries/build-dependencies.ps1 and
-#     the maintainer's environment notes).
+# What makes the server buildable here is windows-2025-vs2026: Visual Studio 2026 with the
+# v145 toolset and ATL that hMailServer.vcxproj is pinned to. The three native libraries
+# it links against - OpenSSL, Boost and PostgreSQL's libpq - are not on any image, so the
+# native-dependencies action builds them from source with libraries/build-*.ps1 and caches
+# each one under the version the project pins. A run that finds its caches warm restores
+# them in a minute or two and spends its time on the server; a cold run pays 30-45 minutes
+# to build the libraries first. The caches are keyed on the pinned versions, the build
+# scripts and the runner image, so a library bump rebuilds exactly what it changes.
 #
-# Set up a self-hosted runner with the labels [self-hosted, windows] on a machine
-# that has the build prerequisites above. The "Build server" job only needs the
-# toolchain + dependencies and is the primary compile gate.
-#
-# Running the regression suite (run_tests = true) additionally needs:
-#   * the runner process to be elevated (post-build.ps1 registers the COM server
-#     and the steps control the Windows service);
-#   * the hMailServer Windows service installed on the runner, with its image path
-#     pointing at this checkout's build output; and
-#   * a reachable database plus the test-environment integrations that the full
-#     898/898 result depends on (ClamAV, SpamAssassin, AddXOriginalRcptTo).
+# Built but not tested: the regression suite needs the hMailServer service installed and
+# a database, which is a different job on a different day. The test solution is not built
+# either, because its COM reference resolves through the registered type library.
 
 on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
   workflow_dispatch:
     inputs:
       configuration:
@@ -31,74 +32,118 @@ on:
         type: choice
         options: [Release, Debug]
         default: Release
-      run_tests:
-        description: 'Also build and run the regression suite (needs DB + deployed service on the runner)'
-        type: boolean
-        default: false
 
+# Read-only token. Nothing here writes to the repository; checkout is the only consumer.
 permissions:
   contents: read
 
+concurrency:
+  group: server-build-${{ github.ref }}
+  # Superseding a branch build is what this is for. master is exempt: its builds are the
+  # ones whose artifacts and caches every later run starts from.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
+env:
+  # Where the library build scripts download and build into. Anywhere outside the working
+  # directory will do; the build scripts and hMailServer.vcxproj both read this variable.
+  hMailServerLibs: C:\hMailLibs
+  # inputs.configuration is empty on a push or pull request, and build.ps1 defaults to
+  # Debug when handed an empty string - which is not the configuration that ships.
+  BUILD_CONFIGURATION: ${{ inputs.configuration || 'Release' }}
+
 jobs:
   server-build:
-    name: Build server (VS 2026 / v145)
-    runs-on: [self-hosted, windows]
+    name: Build server
+    # The runner image is written once, here. It is both the label the job runs on and part
+    # of every library cache key, and `runs-on` does not accept the `env` context - only
+    # `matrix` and a few others - so a one-entry matrix is what makes the two the same
+    # string. `name:` above keeps the matrix value out of the job title in the web UI.
+    strategy:
+      matrix:
+        image: [windows-2025-vs2026]
+    runs-on: ${{ matrix.image }}
+    # A cold run builds three libraries and then the server; warm runs take a fraction.
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: pwsh
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Nothing here pushes; leaving the token in .git/config would only widen what a
+          # later step - or a build script - could reach.
+          persist-credentials: false
 
-      - name: Verify native dependencies
-        shell: powershell
+      - name: Restore or build the native dependencies
+        id: libs
+        uses: ./.github/actions/native-dependencies
+        with:
+          libs-path: ${{ env.hMailServerLibs }}
+          runner-image: ${{ matrix.image }}
+
+      # build.ps1 disables the pre- and post-build events, so the runner is spared the
+      # 'NET STOP hMailServer' and the DLL copies of a developer machine. Warnings are
+      # errors in the project itself (TreatWarningAsError), so a new warning fails here.
+      - name: Build the server
         run: |
-          if (-not $env:hMailServerLibs) { throw "hMailServerLibs is not set on this runner." }
-          if (-not (Test-Path $env:hMailServerLibs)) { throw "hMailServerLibs path '$($env:hMailServerLibs)' does not exist." }
-          foreach ($d in 'boost_1_91_0', 'openssl-4.0.1', 'postgresql-18.3') {
-            if (-not (Test-Path (Join-Path $env:hMailServerLibs $d))) {
-              Write-Warning "Expected dependency folder not found under hMailServerLibs: $d (the build may fail to link)."
-            }
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File build\build.ps1 -Configuration $env:BUILD_CONFIGURATION
+          if ($LASTEXITCODE -ne 0) { throw "build.ps1 failed with exit code $LASTEXITCODE" }
+
+      # The executable, its symbols, the type library MIDL wrote and the DLLs post-build.bat
+      # would copy beside it on a developer machine: what a run of this commit would put in
+      # the program folder, minus the MariaDB connector that is vendored under libraries/.
+      - name: Collect the server binaries
+        env:
+          OPENSSL_DIR: ${{ steps.libs.outputs.openssl-dir }}
+          POSTGRESQL_DIR: ${{ steps.libs.outputs.postgresql-dir }}
+        run: |
+          $outDir = "hmailserver\source\Server\hMailServer\x64\$env:BUILD_CONFIGURATION"
+          $intDir = "hmailserver\source\Server\hMailServer\hMailServer\x64\$env:BUILD_CONFIGURATION"
+          $staging = Join-Path $env:RUNNER_TEMP 'server'
+          New-Item -ItemType Directory -Force -Path $staging | Out-Null
+
+          foreach ($file in @('hMailServer.exe', 'hMailServer.pdb')) {
+              $path = Join-Path $outDir $file
+              if (-not (Test-Path $path)) { throw "The build did not produce $path" }
+              Copy-Item $path $staging
           }
-          Write-Host "hMailServerLibs = $($env:hMailServerLibs)"
 
-      - name: Stop hMailServer service (free the executable)
-        shell: powershell
-        run: Stop-Service hMailServer -ErrorAction SilentlyContinue
+          $tlb = Join-Path $intDir 'hMailServer.tlb'
+          if (-not (Test-Path $tlb)) { throw "MIDL did not produce $tlb" }
+          Copy-Item $tlb $staging
 
-      - name: Build server (warnings = errors via /WX in the project)
-        shell: powershell
-        run: ./build/build.ps1 -Configuration ${{ github.event.inputs.configuration }}
+          # These come from our own library builds at a fixed path, so a missing one means
+          # the layout or the cache pruning changed.
+          $major = ($env:OPENSSL_DIR -replace '^openssl-', '').Split('.')[0]
+          $dlls = @(
+              "$env:OPENSSL_DIR\out64\bin\libcrypto-$major-x64.dll",
+              "$env:OPENSSL_DIR\out64\bin\libssl-$major-x64.dll",
+              "$env:POSTGRESQL_DIR\builddir\src\interfaces\libpq\libpq.dll"
+          ) | ForEach-Object { Join-Path $env:hMailServerLibs $_ }
+          foreach ($dll in $dlls) {
+              if (-not (Test-Path $dll)) { throw "Expected runtime DLL was not found: $dll" }
+              Copy-Item $dll $staging
+          }
 
-      - name: Build regression tests
-        if: ${{ github.event.inputs.run_tests == 'true' }}
-        shell: powershell
-        run: ./build/build-tests.ps1
+          Get-ChildItem $staging | Select-Object Name, Length | Format-Table -AutoSize | Out-String
 
-      - name: Deploy & register COM (post-build)
-        if: ${{ github.event.inputs.run_tests == 'true' }}
-        shell: powershell
-        run: ./build/post-build.ps1 -Configuration ${{ github.event.inputs.configuration }}
-
-      - name: Start hMailServer service
-        if: ${{ github.event.inputs.run_tests == 'true' }}
-        shell: powershell
-        run: |
-          Remove-Item 'C:\HM\Logs\ERROR_hmailserver_*.log' -ErrorAction SilentlyContinue
-          Start-Service hMailServer
-          Start-Sleep -Seconds 5
-
-      - name: Run regression suite
-        if: ${{ github.event.inputs.run_tests == 'true' }}
-        shell: powershell
-        run: ./build/run-tests.ps1
-
-      - name: Upload test results
-        if: ${{ always() && github.event.inputs.run_tests == 'true' }}
+      - name: Upload the server binaries
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: regression-test-results
-          path: TestResult.xml
-          if-no-files-found: ignore
+          name: hMailServer-${{ env.BUILD_CONFIGURATION }}-x64-${{ github.sha }}
+          path: ${{ runner.temp }}/server
+          if-no-files-found: error
+          retention-days: 14
 
-      - name: Restart hMailServer service
-        if: ${{ always() }}
-        shell: powershell
-        run: Start-Service hMailServer -ErrorAction SilentlyContinue
+      # MSBuild's log for the server and the library scripts' transcripts, which is where
+      # a failure twenty minutes into nmake actually says what went wrong.
+      - name: Upload the build logs
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: server-build-logs
+          path: |
+            logs/build-*.log
+            libraries/build-*.log
+          if-no-files-found: ignore

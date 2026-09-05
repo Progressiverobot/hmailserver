@@ -1,0 +1,275 @@
+name: Native dependencies
+description: >-
+  Restores the three native libraries the C++ server links against - OpenSSL, Boost and
+  PostgreSQL's libpq - from the Actions cache, or builds them from source with the
+  libraries/build-*.ps1 scripts and caches the result. For GitHub-hosted
+  windows-2025-vs2026 runners.
+
+# Shared by server-build.yml and the C++ job of codeql.yml, so the two cannot drift: one
+# place decides how the libraries are built, pruned, keyed and cached.
+#
+# One cache per library, so bumping one version does not throw the others away. Each key
+# carries the pinned version (read from hMailServer.vcxproj by build/Get-LibraryVersions.ps1),
+# the scripts that produce the build, and the runner image; libpq links against OpenSSL, so
+# its key carries that version too, and Boost's carries the toolset its libraries are
+# name-tagged with.
+#
+# Deliberately no restore-keys: a partial match would restore a tree built from a different
+# version or toolset, which is worse than rebuilding.
+#
+# Restore and save are separate actions rather than the combined actions/cache, because the
+# combined one saves in a post step that has no idea whether the job succeeded. A library
+# build that died halfway would have its half-built tree stored under the key that means
+# "this library is built", and with no restore-keys to fall back to, every later run on the
+# branch would restore that and fail at link time instead of rebuilding. The matching save
+# steps sit after each build below, and only run when it worked.
+#
+# Each build step prunes its tree before it is saved. What is kept is exactly what
+# hMailServer.vcxproj and post-build.bat reference; the rest is source and intermediates
+# that would multiply the cache size (Boost alone is about 2 GB unpruned against a few
+# hundred MB pruned). Pruning runs inside the build step so that a prune which removes too
+# much fails the step, and the save below is then skipped along with it.
+#
+# The version and folder name reach the scripts as environment variables rather than being
+# pasted into the script body: the value is what varies, and it has no business being able
+# to change what the shell parses.
+
+inputs:
+  libs-path:
+    description: >-
+      The folder the libraries are built into. hMailServer.vcxproj reads it from the
+      hMailServerLibs environment variable, which the calling job must also set.
+    required: false
+    default: C:\hMailLibs
+  runner-image:
+    description: >-
+      The runner image label the job runs on. It is part of every cache key, so a library
+      built on one image is never restored on another.
+    required: true
+
+outputs:
+  openssl-dir:
+    description: The OpenSSL folder under libs-path, e.g. openssl-4.0.1.
+    value: ${{ steps.versions.outputs.openssl_dir }}
+  boost-dir:
+    description: The Boost folder under libs-path, e.g. boost_1_91_0.
+    value: ${{ steps.versions.outputs.boost_dir }}
+  postgresql-dir:
+    description: The PostgreSQL folder under libs-path, e.g. postgresql-18.3.
+    value: ${{ steps.versions.outputs.postgresql_dir }}
+
+runs:
+  using: composite
+  steps:
+    # Fail here with a legible message rather than twenty minutes into a library build.
+    # hMailServer.vcxproj is pinned to PlatformToolset v145 with UseOfAtl=Static, so the
+    # 14.5x compiler and its ATL both have to be there; the windows-2025-vs2026 image
+    # carries both as of September 2026, and nothing here silently falls back to another
+    # toolset if it stops doing so.
+    - name: Check the toolchain
+      shell: pwsh
+      run: |
+        $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+        $instance = (& $vswhere -products '*' -version '[18.0,19.0)' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -format json | Out-String | ConvertFrom-Json) | Select-Object -First 1
+        if (-not $instance) { throw "No Visual Studio 2026 with the x64 C++ toolchain was found on this runner." }
+        "Building with $($instance.displayName) $($instance.installationVersion)"
+
+        $toolset = Get-ChildItem (Join-Path $instance.installationPath 'VC\Tools\MSVC') -Directory -Filter '14.5*' |
+            Where-Object { Test-Path (Join-Path $_.FullName 'bin\Hostx64\x64\cl.exe') } |
+            Select-Object -First 1
+        if (-not $toolset) {
+            $present = (Get-ChildItem (Join-Path $instance.installationPath 'VC\Tools\MSVC') -Directory -ErrorAction SilentlyContinue | ForEach-Object { $_.Name }) -join ', '
+            throw "The v145 (14.5x) toolset is not installed in $($instance.installationPath) - the toolsets found there are: $present."
+        }
+        "v145 toolset: $($toolset.Name)"
+
+        $hasAtl = (Test-Path (Join-Path $toolset.FullName 'atlmfc\include\atlbase.h')) -and
+                  (Test-Path (Join-Path $toolset.FullName 'atlmfc\lib\x64\atls.lib'))
+        if (-not $hasAtl) { throw "ATL for the $($toolset.Name) toolset is not installed (no atlmfc under $($toolset.FullName)); hMailServer.vcxproj is UseOfAtl=Static and cannot compile without it. Add Microsoft.VisualStudio.Component.VC.ATL to the installation." }
+        "ATL: present"
+
+    - name: Create the library folder
+      shell: pwsh
+      env:
+        hMailServerLibs: ${{ inputs.libs-path }}
+      run: New-Item -ItemType Directory -Force -Path $env:hMailServerLibs | Out-Null
+
+    - name: Read the pinned library versions
+      id: versions
+      shell: pwsh
+      run: |
+        powershell.exe -NoProfile -ExecutionPolicy Bypass -File build\Get-LibraryVersions.ps1
+        if ($LASTEXITCODE -ne 0) { throw "Get-LibraryVersions.ps1 failed with exit code $LASTEXITCODE" }
+
+    - name: Restore OpenSSL
+      id: cache-openssl
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ inputs.libs-path }}\${{ steps.versions.outputs.openssl_dir }}
+        key: openssl-${{ steps.versions.outputs.openssl }}-${{ inputs.runner-image }}-${{ hashFiles('libraries/build-openssl.ps1', 'libraries/build-common.ps1') }}
+
+    - name: Restore Boost
+      id: cache-boost
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ inputs.libs-path }}\${{ steps.versions.outputs.boost_dir }}
+        key: boost-${{ steps.versions.outputs.boost }}-msvc14.5-${{ inputs.runner-image }}-${{ hashFiles('libraries/build-boost.ps1', 'libraries/build-common.ps1') }}
+
+    - name: Restore PostgreSQL (libpq)
+      id: cache-pgsql
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ inputs.libs-path }}\${{ steps.versions.outputs.postgresql_dir }}
+        key: pgsql-${{ steps.versions.outputs.postgresql }}-ssl${{ steps.versions.outputs.openssl }}-${{ inputs.runner-image }}-${{ hashFiles('libraries/build-pgsql.ps1', 'libraries/build-common.ps1') }}
+
+    - name: Build OpenSSL
+      if: steps.cache-openssl.outputs.cache-hit != 'true'
+      shell: pwsh
+      env:
+        hMailServerLibs: ${{ inputs.libs-path }}
+        LIB_VERSION: ${{ steps.versions.outputs.openssl }}
+        LIB_DIR: ${{ steps.versions.outputs.openssl_dir }}
+      run: |
+        powershell.exe -NoProfile -ExecutionPolicy Bypass -File libraries\build-openssl.ps1 -Version $env:LIB_VERSION
+        if ($LASTEXITCODE -ne 0) { throw "build-openssl.ps1 failed with exit code $LASTEXITCODE" }
+
+        # hMailServer.vcxproj, libpq and post-build.bat reference only the out64 install prefix.
+        $major = $env:LIB_VERSION.Split('.')[0]
+        $root = Join-Path $env:hMailServerLibs $env:LIB_DIR
+        Get-ChildItem $root -Force | Where-Object { $_.Name -ne 'out64' } | Remove-Item -Recurse -Force
+        foreach ($required in @('out64\include\openssl\ssl.h', 'out64\lib\libssl.lib', 'out64\lib\libcrypto.lib', "out64\bin\libssl-$major-x64.dll", "out64\bin\libcrypto-$major-x64.dll")) {
+            if (-not (Test-Path (Join-Path $root $required))) { throw "Pruning removed something needed: $required" }
+        }
+
+    - name: Save OpenSSL
+      if: success() && steps.cache-openssl.outputs.cache-hit != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ inputs.libs-path }}\${{ steps.versions.outputs.openssl_dir }}
+        key: ${{ steps.cache-openssl.outputs.cache-primary-key }}
+
+    - name: Build Boost
+      if: steps.cache-boost.outputs.cache-hit != 'true'
+      shell: pwsh
+      env:
+        hMailServerLibs: ${{ inputs.libs-path }}
+        LIB_VERSION: ${{ steps.versions.outputs.boost }}
+        LIB_DIR: ${{ steps.versions.outputs.boost_dir }}
+      run: |
+        powershell.exe -NoProfile -ExecutionPolicy Bypass -File libraries\build-boost.ps1 -Version $env:LIB_VERSION
+        if ($LASTEXITCODE -ne 0) { throw "build-boost.ps1 failed with exit code $LASTEXITCODE" }
+
+        # hMailServer.vcxproj references only the headers (boost_<ver>) and stage\lib.
+        $root = Join-Path $env:hMailServerLibs $env:LIB_DIR
+        Get-ChildItem $root -Force | Where-Object { $_.Name -notin @('boost', 'stage') } | Remove-Item -Recurse -Force
+        if (-not (Test-Path (Join-Path $root 'boost\version.hpp'))) { throw "Pruning removed the Boost headers." }
+        if (-not (Get-ChildItem (Join-Path $root 'stage\lib') -Filter '*vc145*.lib')) { throw "No vc145-tagged libraries in stage\lib - Boost was built with the wrong toolset." }
+
+    - name: Save Boost
+      if: success() && steps.cache-boost.outputs.cache-hit != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ inputs.libs-path }}\${{ steps.versions.outputs.boost_dir }}
+        key: ${{ steps.cache-boost.outputs.cache-primary-key }}
+
+    # PostgreSQL's Meson build needs three things the image does not carry: flex and bison
+    # (as winflexbison), and Meson itself. Ninja is on the image, but the version pip pins
+    # here is the one the maintainer's machine builds with. The winflexbison archive is
+    # verified against its digest for the same reason the source tarballs are; it goes
+    # under the library folder, outside every cached tree, and onto PATH for the steps
+    # that follow. Only paid for when libpq actually has to be built.
+    - name: Install the libpq build tools
+      if: steps.cache-pgsql.outputs.cache-hit != 'true'
+      shell: pwsh
+      env:
+        hMailServerLibs: ${{ inputs.libs-path }}
+        WINFLEXBISON_URL: https://github.com/lexxmark/winflexbison/releases/download/v2.5.25/win_flex_bison-2.5.25.zip
+        WINFLEXBISON_SHA256: 8d324b62be33604b2c45ad1dd34ab93d722534448f55a16ca7292de32b6ac135
+        MESON_VERSION: 1.11.1
+        NINJA_VERSION: 1.13.0
+      run: |
+        $tools = Join-Path $env:hMailServerLibs 'tools\winflexbison'
+        $zip = Join-Path $env:RUNNER_TEMP 'win_flex_bison.zip'
+        $ProgressPreference = 'SilentlyContinue'
+        Invoke-WebRequest -Uri $env:WINFLEXBISON_URL -OutFile $zip
+        $actual = (Get-FileHash -Path $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($actual -ne $env:WINFLEXBISON_SHA256) { throw "The winflexbison download does not match its pinned SHA-256 (expected $env:WINFLEXBISON_SHA256, got $actual)." }
+        Expand-Archive -Path $zip -DestinationPath $tools -Force
+        foreach ($exe in @('win_flex.exe', 'win_bison.exe')) {
+            if (-not (Test-Path (Join-Path $tools $exe))) { throw "$exe was not in the winflexbison archive." }
+        }
+        Add-Content -Path $env:GITHUB_PATH -Value $tools
+        "winflexbison: $tools"
+
+        python -m pip install --disable-pip-version-check --quiet "meson==$env:MESON_VERSION" "ninja==$env:NINJA_VERSION"
+        if ($LASTEXITCODE -ne 0) { throw "pip could not install meson $env:MESON_VERSION and ninja $env:NINJA_VERSION (exit code $LASTEXITCODE)." }
+        "meson $(meson --version), ninja $(ninja --version)"
+
+    - name: Build PostgreSQL (libpq)
+      if: steps.cache-pgsql.outputs.cache-hit != 'true'
+      shell: pwsh
+      env:
+        hMailServerLibs: ${{ inputs.libs-path }}
+        LIB_VERSION: ${{ steps.versions.outputs.postgresql }}
+        LIB_DIR: ${{ steps.versions.outputs.postgresql_dir }}
+        OPENSSL_VERSION: ${{ steps.versions.outputs.openssl }}
+      run: |
+        powershell.exe -NoProfile -ExecutionPolicy Bypass -File libraries\build-pgsql.ps1 -Version $env:LIB_VERSION -OpenSSLVersion $env:OPENSSL_VERSION
+        if ($LASTEXITCODE -ne 0) { throw "build-pgsql.ps1 failed with exit code $LASTEXITCODE" }
+
+        # Keep the built libpq plus the headers the project includes (src\include and
+        # src\interfaces\libpq); the rest of the PostgreSQL source tree and of the Meson
+        # build directory is not referenced. Drop the siblings at each level of the two
+        # folder chains rather than picking files out, so a layout change fails the check
+        # below instead of quietly caching an empty tree.
+        $root = Join-Path $env:hMailServerLibs $env:LIB_DIR
+        Get-ChildItem $root -Force | Where-Object { $_.Name -notin @('builddir', 'src') } | Remove-Item -Recurse -Force
+        Get-ChildItem (Join-Path $root 'src') -Force | Where-Object { $_.Name -notin @('include', 'interfaces') } | Remove-Item -Recurse -Force
+        Get-ChildItem (Join-Path $root 'src\interfaces') -Force | Where-Object { $_.Name -ne 'libpq' } | Remove-Item -Recurse -Force
+        Get-ChildItem (Join-Path $root 'builddir') -Force | Where-Object { $_.Name -ne 'src' } | Remove-Item -Recurse -Force
+        Get-ChildItem (Join-Path $root 'builddir\src') -Force | Where-Object { $_.Name -ne 'interfaces' } | Remove-Item -Recurse -Force
+        Get-ChildItem (Join-Path $root 'builddir\src\interfaces') -Force | Where-Object { $_.Name -ne 'libpq' } | Remove-Item -Recurse -Force
+        Get-ChildItem (Join-Path $root 'builddir\src\interfaces\libpq') -Force | Where-Object { $_.Name -notin @('libpq.dll', 'libpq.lib', 'libpq.pdb') } | Remove-Item -Recurse -Force
+        foreach ($required in @('builddir\src\interfaces\libpq\libpq.dll', 'builddir\src\interfaces\libpq\libpq.lib', 'src\interfaces\libpq\libpq-fe.h', 'src\include\postgres_ext.h')) {
+            if (-not (Test-Path (Join-Path $root $required))) { throw "Pruning removed something needed: $required" }
+        }
+
+    - name: Save PostgreSQL (libpq)
+      if: success() && steps.cache-pgsql.outputs.cache-hit != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ inputs.libs-path }}\${{ steps.versions.outputs.postgresql_dir }}
+        key: ${{ steps.cache-pgsql.outputs.cache-primary-key }}
+
+    # Whether restored or just built, the layout the project file links against has to be
+    # there before MSBuild is asked to find it - a cache entry saved from a run whose
+    # prune step was later changed, say, would otherwise surface as an unresolved external
+    # a thousand lines into the link.
+    - name: Verify the library layout
+      shell: pwsh
+      env:
+        hMailServerLibs: ${{ inputs.libs-path }}
+        OPENSSL_DIR: ${{ steps.versions.outputs.openssl_dir }}
+        OPENSSL_VERSION: ${{ steps.versions.outputs.openssl }}
+        BOOST_DIR: ${{ steps.versions.outputs.boost_dir }}
+        POSTGRESQL_DIR: ${{ steps.versions.outputs.postgresql_dir }}
+      run: |
+        $major = $env:OPENSSL_VERSION.Split('.')[0]
+        $required = @(
+            "$env:OPENSSL_DIR\out64\include\openssl\ssl.h",
+            "$env:OPENSSL_DIR\out64\lib\libssl.lib",
+            "$env:OPENSSL_DIR\out64\lib\libcrypto.lib",
+            "$env:OPENSSL_DIR\out64\bin\libssl-$major-x64.dll",
+            "$env:OPENSSL_DIR\out64\bin\libcrypto-$major-x64.dll",
+            "$env:BOOST_DIR\boost\version.hpp",
+            "$env:POSTGRESQL_DIR\src\interfaces\libpq\libpq-fe.h",
+            "$env:POSTGRESQL_DIR\src\include\postgres_ext.h",
+            "$env:POSTGRESQL_DIR\builddir\src\interfaces\libpq\libpq.lib",
+            "$env:POSTGRESQL_DIR\builddir\src\interfaces\libpq\libpq.dll"
+        )
+        $missing = @($required | Where-Object { -not (Test-Path (Join-Path $env:hMailServerLibs $_)) })
+        if ($missing) { throw "The library folder $env:hMailServerLibs is missing: $($missing -join ', ')" }
+
+        $boostLibs = @(Get-ChildItem (Join-Path $env:hMailServerLibs "$env:BOOST_DIR\stage\lib") -Filter 'libboost_*-vc145-*.lib')
+        if ($boostLibs.Count -lt 10) { throw "Expected the five Boost libraries in both variants under $env:BOOST_DIR\stage\lib, found $($boostLibs.Count) vc145-tagged files." }
+        "Libraries under $env:hMailServerLibs are complete: $env:OPENSSL_DIR, $env:BOOST_DIR ($($boostLibs.Count) staged libraries), $env:POSTGRESQL_DIR"
