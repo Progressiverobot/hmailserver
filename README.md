@@ -299,6 +299,8 @@ Configuration reference
 
 Most of the settings above are configured in `Bin\hMailServer.INI` under `[Settings]`, or interactively in the Control Panel under **Settings** (which edits the same settings and offers to restart the service). All settings below show their default values.
 
+This block lists the keys an operator is most likely to need and is not the whole file: about ninety further keys - the timeout family, the quarantine, message-trace, filter-hook, password-policy, account-lockout and OAuth2 groups, and the classic keys carried over from 6.2.10 - are documented one row each, with their defaults, bounds and the code that reads them, on the wiki's [Settings Reference](https://github.com/Progressiverobot/hmailserver/wiki/Settings-Reference). The Control Panel's search box finds every key on either list.
+
 Transport security and authentication:
 
    <pre>
