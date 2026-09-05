@@ -67,7 +67,7 @@ Account security and authentication
 * **OAuth2 / OpenID Connect** bearer tokens — SASL XOAUTH2 and OAUTHBEARER (RFC 7628) — validated against an external identity provider's signing key.
 * **LDAP directory authentication** against Active Directory or any LDAP directory, so accounts authenticate with their domain password. Simple bind and SASL Negotiate; LDAPS and StartTLS; certificate validation on by default, and a password is never sent over an unprotected connection unless that is explicitly permitted. Unlike the Windows-logon path it needs no domain-joined host, which is the usual situation for a mail server in a DMZ. Infrastructure failures are reported separately from wrong passwords, so a directory outage does not read as a hundred users mistyping. Off by default: the whole `[LDAP]` ini section is absent until you add it.
 * **LDAP directory provisioning** — the directory as an account source, not only as a password check. Preview reports exactly which mailboxes the directory says should exist and changes nothing; apply then creates and updates them. The two share one decider, so a preview cannot describe an action the apply would not take. A domain takes part only if its Active Directory domain name is set, which makes provisioning opt-in per domain and keeps a search base pointed one level too high from provisioning into unrelated hosted domains. Nothing is ever deleted: the most it does is mark an account inactive, and only when asked — never on a truncated or empty enumeration, and never for a domain in which nothing was seen. An optional unattended schedule (`[LDAP] SyncScheduleMinutes`, off by default) creates and updates but never disables. Verified end to end against a live Windows Server 2025 domain controller.
-* **Argon2id** and **PBKDF2-HMAC-SHA256** password hashing, with transparent upgrade on login, a minimum-accepted-hash policy, and an optional server-side pepper.
+* **Argon2id** and **PBKDF2-HMAC-SHA256** password hashing, with tunable work factors, transparent upgrade on login (of the scheme, and of a hash cheaper than the configured work factor), a minimum-accepted-hash policy, and an optional server-side pepper.
 * Full RFC 4013 SASLprep of non-ASCII credentials on the PLAIN and LOGIN paths (SCRAM usernames are matched as sent).
 * Optional **TOTP two-factor authentication** for administrative logon.
 
@@ -437,6 +437,13 @@ Administration and monitoring:
                                  ; older than the retained history gets a full resync, never a wrong one.
                                  ; 0 = keep everything, which also defers the prune at the first start after
                                  ; an upgrade on a long-lived installation
+   PasswordHashIterations=0      ; PBKDF2 iterations for NEW password hashes (0 = the built-in 210,000; 10,000 to
+                                 ; 10,000,000). A stored hash carries its own count, so raising this never breaks
+                                 ; a logon: a cheaper hash is re-derived on the next successful logon, a costlier
+                                 ; one is left alone - lowering it affects new hashes only. Out of range is
+                                 ; reported and read as 0
+   PasswordHashMemoryKB=0        ; Argon2id memory for new hashes, in KiB (0 = 19,456; 4,096 to 1,048,576)
+   PasswordHashTimeCost=0        ; Argon2id passes for new hashes (0 = 2; 1 to 20). Same re-derive rule as above
    DmarcRptSchemaVersion=1       ; which spelling of the DMARC aggregate report this server SENDS: 1 = RFC 7489
                                  ; Appendix C (what every report consumer deployed today parses), 2 = RFC 9990.
                                  ; Anything else is reported as an error and treated as 1 - a typo must not

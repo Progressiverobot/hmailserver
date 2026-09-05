@@ -48,6 +48,20 @@ namespace HM
       // optional server-wide password pepper (Crypt::ApplyPepper_).
       static AnsiString ComputeHMACSHA256Hex(const AnsiString &key, const AnsiString &data);
 
+      // The work factors new hashes are derived with: [Settings] PasswordHashIterations,
+      // PasswordHashMemoryKB and PasswordHashTimeCost, or the defaults below where a
+      // key is 0 or the ini has not been read. Bounds are enforced where the ini is
+      // read, so these only ever return a value Validate* would accept.
+      static int ConfiguredPBKDF2Iterations();
+      static int ConfiguredArgon2idMemoryKiB();
+      static int ConfiguredArgon2idTimeCost();
+
+      // True when a stored PBKDF2 or Argon2id hash was derived with a lower work
+      // factor than is configured now, so the next successful logon should re-derive
+      // it. Never true for a costlier hash - lowering a setting affects new hashes
+      // only - and never for a hash of any other scheme.
+      static bool NeedsRehash(const AnsiString &storedHash);
+
    private:
    
       AnsiString GetSalt_(const AnsiString &inputString);

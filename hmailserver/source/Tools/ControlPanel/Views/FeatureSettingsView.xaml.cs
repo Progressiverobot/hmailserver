@@ -2575,8 +2575,8 @@ namespace hMailServer.ControlPanel.Views
                cards_.Add(new CardDef
                {
                   Title = "Password storage",
-                  Blurb = "How account passwords are hashed, and the weakest stored hash still allowed to log on. " +
-                          "Existing passwords keep their current hash until they are next changed.",
+                  Blurb = "How account passwords are hashed, how much work a new hash costs, and the weakest stored hash still allowed to log on. " +
+                          "Existing passwords keep their current hash until they are next changed - or, when a work factor was raised, until they are next used to log on.",
                   Settings =
                   {
                      new ChoiceSetting
@@ -2606,7 +2606,10 @@ namespace hMailServer.ControlPanel.Views
                            (5, "Argon2id only")
                         }
                      },
-                     new SecretSetting { Key = "PasswordPepper", Label = "Password pepper — WARNING: set before creating accounts; changing it later invalidates ALL existing passwords", Hint = "Server-wide secret mixed into password hashes" }
+                     new SecretSetting { Key = "PasswordPepper", Label = "Password pepper — WARNING: set before creating accounts; changing it later invalidates ALL existing passwords", Hint = "Server-wide secret mixed into password hashes" },
+                     new TextSetting { Key = "PasswordHashIterations", Default = "0", Placeholder = "0 = 210,000", Label = "PBKDF2 iterations for new hashes (0 = the built-in 210,000; 10,000 to 10,000,000)", Hint = "A stored hash carries its own count, so raising this never breaks a logon: a cheaper hash is re-derived on the next successful logon, a costlier one is left alone" },
+                     new TextSetting { Key = "PasswordHashMemoryKB", Default = "0", Placeholder = "0 = 19,456", Label = "Argon2id memory for new hashes, in KiB (0 = the built-in 19,456; 4,096 to 1,048,576)", Hint = "Every logon verification allocates this much memory on a connection thread" },
+                     new TextSetting { Key = "PasswordHashTimeCost", Default = "0", Placeholder = "0 = 2", Label = "Argon2id passes for new hashes (0 = the built-in 2; 1 to 20)", Hint = "Same re-derive rule as the iterations above" }
                   }
                });
                cards_.Add(new CardDef

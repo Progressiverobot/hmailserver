@@ -159,6 +159,18 @@ namespace HM
       int GetPreferredHashAlgorithm() {return preferred_hash_algorithm_;}
       int GetMinimumAcceptedHashAlgorithm() {return minimum_accepted_hash_algorithm_;}
       String GetPasswordPepper() {return password_pepper_;}
+
+      // Work factors for NEW password hashes, from [Settings]: PasswordHashIterations
+      // (PBKDF2), PasswordHashMemoryKB and PasswordHashTimeCost (Argon2id). 0 means
+      // HashCreator's built-in default. A stored hash carries its own parameters, so
+      // raising one of these never breaks a logon: a hash cheaper than the configured
+      // value is re-derived on the next successful logon (PasswordValidator), and a
+      // costlier one is left alone - lowering a value affects new hashes only, the
+      // same never-downgrade rule the scheme itself follows. Upstream #554, without
+      // its schema rows and its rewrite of every stored hash into PHC format.
+      int GetPasswordHashIterations() const { return password_hash_iterations_; }
+      int GetPasswordHashMemoryKiB() const { return password_hash_memory_kib_; }
+      int GetPasswordHashTimeCost() const { return password_hash_time_cost_; }
       bool GetOAuth2Enabled() {return oauth2_enabled_;}
       bool GetOAuth2RequireTLS() {return oauth2_require_tls_;}
       String GetOAuth2AllowedAlgorithms() {return oauth2_allowed_algorithms_;}
@@ -765,6 +777,10 @@ namespace HM
       String ReadIniSettingString_(const String &sSection, const String &sKey, const String &sDefault);
       int ReadIniSettingInteger_(const String &sSection, const String &sKey, int iDefault);
 
+      // A [Settings] work factor: 0 (the default, meaning "built-in") or a value within
+      // [minimum, maximum]. Anything else is reported and read as 0.
+      int ReadPasswordHashWorkFactor_(const String &sKey, int minimum, int maximum);
+
       /// <summary>
       /// The reconciled [Settings] values, or empty before LoadDatabaseSettings has
       /// run. Consulted ONLY for the [Settings] section: the keys that are needed to
@@ -819,6 +835,10 @@ namespace HM
       int minimum_accepted_hash_algorithm_;
 
       String password_pepper_;
+
+      int password_hash_iterations_;
+      int password_hash_memory_kib_;
+      int password_hash_time_cost_;
 
       bool oauth2_enabled_;
       bool oauth2_require_tls_;

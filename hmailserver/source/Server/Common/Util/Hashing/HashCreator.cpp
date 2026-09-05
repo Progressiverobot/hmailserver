@@ -17,6 +17,7 @@
 #include <openssl/hmac.h>
 
 #include "HashCreator.h"
+#include "../../Application/IniFileSettings.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -158,15 +159,17 @@ namespace HM
       if (RAND_bytes(salt, sizeof(salt)) != 1)
          return "";
 
+      int iterations = ConfiguredPBKDF2Iterations();
+
       unsigned char key[PBKDF2_KEY_BYTES];
       if (PKCS5_PBKDF2_HMAC(password.c_str(), password.GetLength(),
                             salt, sizeof(salt),
-                            PBKDF2_DEFAULT_ITERATIONS, EVP_sha256(),
+                            iterations, EVP_sha256(),
                             sizeof(key), key) != 1)
          return "";
 
       AnsiString result;
-      result.Format("$h1$%d$%hs$%hs", (int) PBKDF2_DEFAULT_ITERATIONS,
+      result.Format("$h1$%d$%hs$%hs", iterations,
          BytesToHex(salt, sizeof(salt)).c_str(),
          BytesToHex(key, sizeof(key)).c_str());
 
@@ -226,22 +229,73 @@ namespace HM
       if (RAND_bytes(salt, sizeof(salt)) != 1)
          return "";
 
+      int memoryKiB = ConfiguredArgon2idMemoryKiB();
+      int timeCost = ConfiguredArgon2idTimeCost();
+
       unsigned char key[ARGON2_KEY_BYTES];
       if (!DeriveArgon2id(password, salt, sizeof(salt),
-                          (uint32_t) ARGON2_DEFAULT_MEMORY_KIB,
-                          (uint32_t) ARGON2_DEFAULT_TIME_COST,
+                          (uint32_t) memoryKiB,
+                          (uint32_t) timeCost,
                           (uint32_t) ARGON2_DEFAULT_PARALLELISM,
                           key, sizeof(key)))
          return "";
 
       AnsiString result;
       result.Format("$a2$%d$%d$%d$%hs$%hs",
-         (int) ARGON2_DEFAULT_MEMORY_KIB, (int) ARGON2_DEFAULT_TIME_COST, (int) ARGON2_DEFAULT_PARALLELISM,
+         memoryKiB, timeCost, (int) ARGON2_DEFAULT_PARALLELISM,
          BytesToHex(salt, sizeof(salt)).c_str(),
          BytesToHex(key, sizeof(key)).c_str());
 
       OPENSSL_cleanse(key, sizeof(key));
       return result;
+   }
+
+   int
+   HashCreator::ConfiguredPBKDF2Iterations()
+   {
+      int configured = IniFileSettings::Instance()->GetPasswordHashIterations();
+      return configured > 0 ? configured : (int) PBKDF2_DEFAULT_ITERATIONS;
+   }
+
+   int
+   HashCreator::ConfiguredArgon2idMemoryKiB()
+   {
+      int configured = IniFileSettings::Instance()->GetPasswordHashMemoryKiB();
+      return configured > 0 ? configured : (int) ARGON2_DEFAULT_MEMORY_KIB;
+   }
+
+   int
+   HashCreator::ConfiguredArgon2idTimeCost()
+   {
+      int configured = IniFileSettings::Instance()->GetPasswordHashTimeCost();
+      return configured > 0 ? configured : (int) ARGON2_DEFAULT_TIME_COST;
+   }
+
+   bool
+   HashCreator::NeedsRehash(const AnsiString &storedHash)
+   {
+      std::vector<AnsiString> parts = StringParser::SplitString(storedHash, "$");
+
+      if (IsPBKDF2Hash(storedHash))
+      {
+         // "", "h1", iterations, salt, key
+         if (parts.size() != 5)
+            return false;
+
+         return atoi(parts[2].c_str()) < ConfiguredPBKDF2Iterations();
+      }
+
+      if (IsArgon2idHash(storedHash))
+      {
+         // "", "a2", memory, time, parallelism, salt, key
+         if (parts.size() != 7)
+            return false;
+
+         return atoi(parts[2].c_str()) < ConfiguredArgon2idMemoryKiB() ||
+                atoi(parts[3].c_str()) < ConfiguredArgon2idTimeCost();
+      }
+
+      return false;
    }
 
    bool
@@ -424,6 +478,22 @@ namespace HM
       if (HashCreator::ValidatePBKDF2("The quick brown fox jumps over the lazy dog", argon2Hash))
          throw 0;
       if (HashCreator::ValidateArgon2id("The quick brown fox jumps over the lazy dog", pbkdf2Hash))
+         throw 0;
+
+      // A hash derived under the current work factors is never asked to be re-derived,
+      // a cheaper one is, and a costlier one is not (lowering a setting is not a
+      // downgrade of what is already stored).
+      if (HashCreator::NeedsRehash(pbkdf2Hash) || HashCreator::NeedsRehash(argon2Hash))
+         throw 0;
+      if (!HashCreator::NeedsRehash("$h1$1000$00$00"))
+         throw 0;
+      if (HashCreator::NeedsRehash("$h1$99999999$00$00"))
+         throw 0;
+      if (!HashCreator::NeedsRehash("$a2$1024$1$1$00$00"))
+         throw 0;
+      if (HashCreator::NeedsRehash("$a2$1048576$20$1$00$00"))
+         throw 0;
+      if (HashCreator::NeedsRehash("not a hash at all"))
          throw 0;
 
       // HMAC-SHA256 known-answer test (RFC-style vector) for the password pepper helper.
