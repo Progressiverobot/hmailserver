@@ -1278,7 +1278,10 @@ namespace HM
 
       int iHeaderEnd = -1;
 
-      BYTE buf[iReadBufferSize + 1];
+      // On the heap: 50 KB on the stack of an IOCP or delivery thread is a
+      // quarter of what some of them have, and this runs on every message read.
+      std::vector<BYTE> bufferStorage(iReadBufferSize + 1);
+      BYTE *buf = &bufferStorage[0];
 
       unsigned long nbytes = 0;
       BOOL bMoreData = TRUE;
@@ -1365,7 +1368,10 @@ namespace HM
 
       int iHeaderEnd = -1;
 
-      BYTE buf[iReadBufferSize + 1];
+      // On the heap: 50 KB on the stack of an IOCP or delivery thread is a
+      // quarter of what some of them have, and this runs on every message read.
+      std::vector<BYTE> bufferStorage(iReadBufferSize + 1);
+      BYTE *buf = &bufferStorage[0];
 
       unsigned long nbytes = 0;
       int nBytesSent = 0;

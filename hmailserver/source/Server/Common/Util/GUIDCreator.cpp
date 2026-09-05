@@ -26,11 +26,13 @@ namespace HM
    String
    GUIDCreator::GetGUID()
    {
-      GUID uuid;
-      CoCreateGuid(&uuid);
+      GUID uuid = { 0 };
+      if (FAILED(CoCreateGuid(&uuid)))
+         return "";
 
-      wchar_t szGUID[39];
-      StringFromGUID2 (uuid, szGUID, 39);
+      wchar_t szGUID[39] = { 0 };
+      if (StringFromGUID2(uuid, szGUID, 39) == 0)
+         return "";
 
       return szGUID;
    }

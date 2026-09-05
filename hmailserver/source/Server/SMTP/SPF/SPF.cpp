@@ -67,12 +67,16 @@ namespace HM
       // to a binary form. We use the SPF library to
       // do this.
 
+      CT2A senderIp(sSenderIP);
+      CT2A senderEmail(sSenderEmail);
+      CT2A heloHost(sHeloHost);
+
       char BinaryIP[100];
-      if (SPFStringToAddr(T2A(sSenderIP),family,BinaryIP)==NULL)
+      if (SPFStringToAddr(senderIp, family, BinaryIP) == NULL)
          return Neutral;
 
       const char* explain;
-      int result=SPFQuery(family,BinaryIP,T2A(sSenderEmail),NULL,T2A(sHeloHost),NULL,&explain);
+      int result = SPFQuery(family, BinaryIP, senderEmail, NULL, heloHost, NULL, &explain);
 
       if (explain != NULL)
       {
@@ -101,14 +105,18 @@ namespace HM
 
       int family = sSenderIP.Find(_T(":")) >= 0 ? AF_INET6 : AF_INET;
 
+      CT2A senderIp(sSenderIP);
+      CT2A senderEmail(sSenderEmail);
+      CT2A heloHost(sHeloHost);
+
       char BinaryIP[100];
-      if (SPFStringToAddr(T2A(sSenderIP), family, BinaryIP) == NULL)
+      if (SPFStringToAddr(senderIp, family, BinaryIP) == NULL)
          return SPF_PermError;
 
       AnsiString policy = sPolicy;
 
-      return SPFQuery(family, BinaryIP, T2A(sSenderEmail), policy.c_str(),
-                      T2A(sHeloHost), NULL, NULL);
+      return SPFQuery(family, BinaryIP, senderEmail, policy.c_str(),
+                      heloHost, NULL, NULL);
    }
 
    void SPFTester::Test()

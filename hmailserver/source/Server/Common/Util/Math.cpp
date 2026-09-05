@@ -35,7 +35,8 @@ namespace HM
          doComplete5 += 5.0f;
 
       doComplete5 /= 10.0f;
-      modff(doComplete5, &doComplete5i);
+      // The integer part, through the out-parameter; the returned fraction is not wanted.
+      (void) modff(doComplete5, &doComplete5i);
 
       return doComplete5i / powf(10.0f, (float) num_digits);
    }
