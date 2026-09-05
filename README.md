@@ -490,7 +490,8 @@ Administration and monitoring:
                                  ; Appendix C (what every report consumer deployed today parses), 2 = RFC 9990.
                                  ; Anything else is reported as an error and treated as 1 - a typo must not
                                  ; decide what goes on the wire
-   IndexerFullText=0             ; build a term index behind IMAP SEARCH BODY/TEXT. Off by default: it costs a
+   IndexerFullText=0             ; build a term index behind IMAP SEARCH BODY/TEXT - the bodies and the text-bearing
+                                 ; attachments (text/*: .txt, .csv, .html, .ics), which the scan reads too. Off by default: it costs a
                                  ; term table of a few kilobytes per message and a backfill pass over every
                                  ; message already delivered, which is an administrator's decision and never an
                                  ; upgrade's. Results are identical on and off - the index only narrows what the

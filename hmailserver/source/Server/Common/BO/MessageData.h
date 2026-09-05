@@ -53,6 +53,14 @@ namespace HM
       void SetFrom(const String &sFrom);
 
       String GetHTMLBody() const;
+
+      // The decoded text of every attachment whose media type is text - a .txt,
+      // a .csv, an .html, a .ics - concatenated, for SEARCH BODY/TEXT and the
+      // full-text index. Never a binary part: bytes that happen to spell a word
+      // inside an executable are not text a person could read. Bounded, because
+      // a message can carry a very large text attachment and the searcher and
+      // the indexer both hold the result in memory.
+      String GetAttachmentText() const;
       void SetHTMLBody(const String &sHTMLBody);
       
       String GetBody() const;

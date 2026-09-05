@@ -1169,7 +1169,12 @@ namespace HM
       String sBody = message_data_->GetBody();
       String sHTMLBody = message_data_->GetHTMLBody();
 
-      String sTextToSearchIn = sBody + sHTMLBody;
+      // The text-bearing attachments too (RFC 3501 6.4.4: BODY searches the
+      // body of the message, and a text file a person attached is as much a
+      // part of what they wrote as the paragraph above it). The indexer
+      // tokenises the same concatenation, so the index can narrow this scan
+      // without ever excluding a message the scan would have found.
+      String sTextToSearchIn = sBody + sHTMLBody + message_data_->GetAttachmentText();
       String sTextToFind = pCriteria->GetText();
 
       if (sTextToSearchIn.ContainsNoCase(sTextToFind))
@@ -1424,6 +1429,7 @@ namespace HM
       String sHeader = message_data_->GetHeader();
       String sBody = message_data_->GetBody();
       String sHTMLBody = message_data_->GetHTMLBody();
+      String sAttachmentText = message_data_->GetAttachmentText();
 
       String sTextToFind = pCriteria->GetText();
 
@@ -1431,7 +1437,8 @@ namespace HM
       {
          if (!sHeader.ContainsNoCase(sTextToFind) &&
              !sBody.ContainsNoCase(sTextToFind) &&
-             !sHTMLBody.ContainsNoCase(sTextToFind))
+             !sHTMLBody.ContainsNoCase(sTextToFind) &&
+             !sAttachmentText.ContainsNoCase(sTextToFind))
              return false;
       }
       else

@@ -268,7 +268,10 @@ namespace HM
             // token. Concatenation can only merge tokens, never split them,
             // and the searcher's needles are substring (LIKE) probes, so a
             // merged token still answers for its halves.
-            String searchableText = messageData->GetHeader() + messageData->GetBody() + messageData->GetHTMLBody();
+            // The text-bearing attachments as well, in the same concatenation the
+            // BODY scan reads: the index may only ever exclude, so it has to know
+            // about every piece of text the scan would search.
+            String searchableText = messageData->GetHeader() + messageData->GetBody() + messageData->GetHTMLBody() + messageData->GetAttachmentText();
 
             PersistentMessageIndex::TokenizeForIndex(searchableText, maxTerms, terms, overflowed);
          }
