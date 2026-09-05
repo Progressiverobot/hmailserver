@@ -166,18 +166,17 @@ namespace HM
       // merely parse would put a control in front of the user that quietly has no
       // effect, which is worse than not offering it at all.
       //
-      // SieveParser::IsSupportedExtension deliberately accepts more than this: the
-      // engine also implements "vacation", "imap4flags" and "envelope", and each
-      // needs exactly one more step in the delivery path before it is real:
-      //
-      //   envelope    ... must pass the SMTP envelope into the evaluator, so that
-      //               envelope "to" works without the Delivered-To header, which
-      //               is off in the shipped configuration. LocalDelivery now does
-      //               pass the envelope in - it had to, because RFC 5230 4.5's
-      //               recipient check for vacation depends on it - so this one is
-      //               close, but "close" is not the bar this comment sets: it goes
-      //               in when a test proves the envelope test command itself works,
-      //               not when the plumbing that would let it work exists.
+      // SieveParser::IsSupportedExtension may accept more than this, and did for a
+      // while: "vacation", "imap4flags" and "envelope" were each implemented and
+      // evaluated before their delivery-side step existed, and each waited here
+      // until it did. envelope was the last: LocalDelivery had passed the SMTP
+      // envelope into the evaluator since RFC 5230 4.5's recipient check for
+      // vacation needed it, which made the test command work, but "the plumbing
+      // exists" was not the bar - a test proving the test command itself was. It
+      // moved in on 5 September 2026 with SieveEnvelopeDelivery.cs behind it: the
+      // envelope sender against a From header naming someone else, the envelope
+      // recipient against a To header naming a list, :domain, the null sender of
+      // a bounce matching "", and the negative control.
       //
       // Move a name in here in the same commit that lands its delivery-side step.
       // Not before.
@@ -329,7 +328,7 @@ namespace HM
       // scheme this server cannot notify by is refused at upload with the scheme
       // named. End-to-end tests in SieveNotifyDelivery.cs assert the notification
       // ARRIVES in the target mailbox with the loop markers on it.
-      const char *AdvertisedSieveExtensions = "fileinto copy relational subaddress vacation vacation-seconds imap4flags body mailbox regex ihave environment date index spamtest spamtestplus duplicate editheader variables reject ereject include enotify";
+      const char *AdvertisedSieveExtensions = "fileinto copy relational subaddress vacation vacation-seconds imap4flags body mailbox regex ihave environment date index spamtest spamtestplus duplicate editheader variables reject ereject include enotify envelope";
 
       AnsiString EscapeQuoted(const String &value)
       {
