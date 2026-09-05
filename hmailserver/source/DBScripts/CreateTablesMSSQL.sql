@@ -1141,4 +1141,16 @@ create table hm_messageindexstate
 
 CREATE INDEX idx_hm_messageindexstate ON hm_messageindexstate (misaccountid)
 
-insert into hm_dbversion values (6027)
+create table hm_metricsamples
+(
+	metricsampleid int identity(1,1) not null,
+	metricsampletime datetime not null,
+	metricsamplename nvarchar(64) not null,
+	metricsamplevalue float not null
+)
+
+ALTER TABLE hm_metricsamples ADD CONSTRAINT hm_metricsamples_pk PRIMARY KEY NONCLUSTERED (metricsampleid)
+
+CREATE CLUSTERED INDEX idx_hm_metricsamples_name_time ON hm_metricsamples (metricsamplename, metricsampletime)
+
+insert into hm_dbversion values (6028)

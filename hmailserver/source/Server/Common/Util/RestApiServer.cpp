@@ -6,6 +6,7 @@
 #include "StdAfx.h"
 
 #include "RestApiServer.h"
+#include "../Application/MetricsHistoryTask.h"
 #include "ServerStatus.h"
 #include "OtelTracer.h"
 #include "OtelTraceContext.h"
@@ -1468,10 +1469,15 @@ namespace HM
       AnsiString method = requestParts[0];
       AnsiString path = requestParts[1];
 
-      // Strip any query string.
+      // Strip the query string from the path, keeping it for the routes that
+      // take one.
+      AnsiString query;
       int queryPosition = path.Find("?");
       if (queryPosition >= 0)
+      {
+         query = path.Mid(queryPosition + 1);
          path = path.Mid(0, queryPosition);
+      }
 
       // OpenTelemetry: span this request, continuing the caller's trace when a
       // valid traceparent header arrived and starting a fresh local one when it
@@ -1527,6 +1533,7 @@ namespace HM
 
          Route route;
          ParseRoute_(method, path, route);
+         route.query = query;
 
          // The single authorisation choke point. Every route is decided here,
          // by kind, before any handler runs - so a handler cannot be reached by
@@ -1589,6 +1596,8 @@ namespace HM
 
          case RouteSrv:
             return HandleSrv_(caller.domains);
+         case RouteMetricsHistory:
+            return HandleMetricsHistory_(route.query);
 
          case RouteQuarantineList:
             return HandleListQuarantine_();
@@ -1762,6 +1771,12 @@ namespace HM
       if (method == "GET" && path == "/api/v1/srv")
       {
          route.kind = RouteSrv;
+         return;
+      }
+
+      if (method == "GET" && path == "/api/v1/metrics/history")
+      {
+         route.kind = RouteMetricsHistory;
          return;
       }
 
@@ -3179,6 +3194,7 @@ namespace HM
          "\"/api/v1/domains/{domain}/aliases\":{\"get\":{\"summary\":\"List aliases in a domain\",\"responses\":{\"200\":{\"description\":\"Array of aliases\"},\"404\":{\"description\":\"Unknown domain\"}}}},"
          "\"/api/v1/tlsa\":{\"get\":{\"summary\":\"Recommended DANE TLSA records for the configured certificates\",\"responses\":{\"200\":{\"description\":\"Array of TLSA records\"}}}},"
          "\"/api/v1/srv\":{\"get\":{\"summary\":\"Recommended client-discovery SRV records (RFC 6186/8314 and Outlook autodiscover) for the enabled listeners\",\"description\":\"One record set per active domain; a domain-restricted key sees only its own domains. Only services that are enabled and not loopback-bound are advertised.\",\"responses\":{\"200\":{\"description\":\"Array of SRV records\"}}}},"
+         "\"/api/v1/metrics/history\":{\"get\":{\"summary\":\"The history of one metric\",\"description\":\"Query parameters: metric (a name from the exporter without the hmailserver_ prefix, e.g. sessions_smtp or processed_messages_total) and range (24h, 7d or 30d - samples averaged per minute, per ten minutes or per hour). Counters are totals; a rate is the difference between two samples. Empty when MetricsHistoryDays is 0.\",\"responses\":{\"200\":{\"description\":\"The samples\"},\"400\":{\"description\":\"Unknown metric or range\"}}}},"
          "\"/api/v1/apikeys\":{"
          "\"get\":{\"summary\":\"List API keys\",\"description\":\"Administrator password only.\",\"responses\":{\"200\":{\"description\":\"Array of keys, never the clear-text tokens\"}}},"
          "\"post\":{\"summary\":\"Create an API key\",\"description\":\"Administrator password only. The token is returned once, at creation.\",\"responses\":{\"201\":{\"description\":\"Created\"}}}},"
@@ -3248,6 +3264,102 @@ namespace HM
          JsonEscape_(hostName).c_str(), count, items.c_str());
 
       return BuildResponse_(200, body);
+   }
+
+   AnsiString
+   RestApiServer::QueryParameter_(const AnsiString &query, const AnsiString &name)
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // The value of one query-string parameter, or "". Enough decoding for the
+   // values these routes take (a metric name, a range): '+' and %XX. Anything a
+   // caller could smuggle past that is refused by the handler's own validation.
+   //---------------------------------------------------------------------------()
+   {
+      std::vector<AnsiString> pairs = StringParser::SplitString(query, "&");
+
+      for (const AnsiString &pair : pairs)
+      {
+         int equals = pair.Find("=");
+         AnsiString key = equals >= 0 ? pair.Mid(0, equals) : pair;
+
+         if (key.CompareNoCase(name) != 0)
+            continue;
+
+         AnsiString raw = equals >= 0 ? pair.Mid(equals + 1) : AnsiString();
+         AnsiString value;
+
+         for (int i = 0; i < raw.GetLength(); i++)
+         {
+            char c = raw.GetAt(i);
+
+            if (c == '+')
+            {
+               value += " ";
+            }
+            else if (c == '%' && i + 2 < raw.GetLength())
+            {
+               char hex[3] = { raw.GetAt(i + 1), raw.GetAt(i + 2), 0 };
+               value += (char) strtol(hex, nullptr, 16);
+               i += 2;
+            }
+            else
+            {
+               value += c;
+            }
+         }
+
+         return value;
+      }
+
+      return "";
+   }
+
+   AnsiString
+   RestApiServer::HandleMetricsHistory_(const AnsiString &query)
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // GET /api/v1/metrics/history?metric=<name>&range=24h|7d|30d. The three ranges
+   // are the three views: a minute, ten minutes and an hour per point, so that
+   // each answer is at most a few hundred points however long the retention.
+   //---------------------------------------------------------------------------()
+   {
+      AnsiString metric = QueryParameter_(query, "metric");
+      AnsiString range = QueryParameter_(query, "range");
+
+      if (metric.IsEmpty() || !MetricsHistoryTask::IsMetricName(String(metric)))
+      {
+         AnsiString names;
+
+         for (const AnsiString &name : MetricsHistoryTask::MetricNames())
+            names += (names.IsEmpty() ? "\"" : ",\"") + name + "\"";
+
+         return BuildResponse_(400, "{\"error\":\"unknown metric\",\"metrics\":[" + names + "]}");
+      }
+
+      int minutesBack = 24 * 60;
+      int bucketMinutes = 1;
+
+      if (range.IsEmpty() || range.CompareNoCase("24h") == 0)
+      {
+         minutesBack = 24 * 60;
+         bucketMinutes = 1;
+      }
+      else if (range.CompareNoCase("7d") == 0)
+      {
+         minutesBack = 7 * 24 * 60;
+         bucketMinutes = 10;
+      }
+      else if (range.CompareNoCase("30d") == 0)
+      {
+         minutesBack = 30 * 24 * 60;
+         bucketMinutes = 60;
+      }
+      else
+      {
+         return BuildResponse_(400, "{\"error\":\"unknown range: use 24h, 7d or 30d\"}");
+      }
+
+      return BuildResponse_(200, MetricsHistoryTask::QueryAsJson(String(metric), minutesBack, bucketMinutes));
    }
 
    AnsiString

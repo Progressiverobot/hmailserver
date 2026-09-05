@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System;
+using System.Globalization;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Automation;
@@ -39,6 +41,23 @@ namespace hMailServer.ControlPanel.Views
       private long lastProcessed_ = -1;
       private DateTime lastSampleUtc_ = DateTime.MinValue;
 
+      // The range selector. "live" shows the two cards above, fed every two
+      // seconds from Status and holding three minutes; the other ranges show two
+      // cards of the same shape loaded from the history the server keeps
+      // (MetricsHistoryDays), through Utilities.GetMetricHistory.
+      private readonly StackPanel rangeBar_ = new() { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
+      private readonly TextBlock rangeNote_ = new()
+      {
+         FontSize = Typography.Caption,
+         Opacity = 0.75,
+         VerticalAlignment = VerticalAlignment.Center,
+         TextWrapping = TextWrapping.Wrap,
+         Margin = new Thickness(12, 0, 0, 0)
+      };
+      private string range_ = "live";
+      private AccessibleChartCard historyThroughput_;
+      private AccessibleChartCard historySessions_;
+
       public DashboardView()
       {
          InitializeComponent();
@@ -64,8 +83,163 @@ namespace hMailServer.ControlPanel.Views
          ChartsGrid.Children.Add(throughputCard_);
          ChartsGrid.Children.Add(sessionsCard_);
 
+         BuildRangeSelector_();
+
          timer_ = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
          timer_.Tick += (s, e) => Refresh();
+      }
+
+      private void BuildRangeSelector_()
+      {
+         rangeBar_.Children.Add(new TextBlock
+         {
+            Text = "Show",
+            FontSize = Typography.Body,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 8, 0)
+         });
+
+         foreach ((string key, string label) in new[] { ("live", "Live"), ("24h", "24 hours"), ("7d", "7 days"), ("30d", "30 days") })
+         {
+            var button = new Wpf.Ui.Controls.Button
+            {
+               Content = label,
+               Appearance = key == "live" ? Wpf.Ui.Controls.ControlAppearance.Primary : Wpf.Ui.Controls.ControlAppearance.Secondary,
+               Margin = new Thickness(0, 0, 6, 0),
+               Tag = key
+            };
+            AutomationProperties.SetName(button, "Show " + label);
+            button.Click += (s, e) => ShowRange_(key);
+            rangeBar_.Children.Add(button);
+         }
+
+         rangeBar_.Children.Add(rangeNote_);
+
+         var parent = (Panel)ChartsGrid.Parent;
+         parent.Children.Insert(parent.Children.IndexOf(ChartsGrid), rangeBar_);
+      }
+
+      private void ShowRange_(string range)
+      {
+         range_ = range;
+
+         foreach (Wpf.Ui.Controls.Button button in rangeBar_.Children.OfType<Wpf.Ui.Controls.Button>())
+            button.Appearance = (string)button.Tag == range ? Wpf.Ui.Controls.ControlAppearance.Primary : Wpf.Ui.Controls.ControlAppearance.Secondary;
+
+         ChartsGrid.Children.Clear();
+
+         if (range == "live")
+         {
+            historyThroughput_ = null;
+            historySessions_ = null;
+            rangeNote_.Text = "";
+            ChartsGrid.Children.Add(throughputCard_);
+            ChartsGrid.Children.Add(sessionsCard_);
+            return;
+         }
+
+         int minutes = range == "30d" ? 30 * 24 * 60 : range == "7d" ? 7 * 24 * 60 : 24 * 60;
+         int bucket = range == "30d" ? 60 : range == "7d" ? 10 : 1;
+
+         try
+         {
+            dynamic utilities = ServerSession.Current.Application.Utilities;
+
+            // Throughput is a total; the chart wants a rate. The difference between
+            // consecutive buckets over the bucket length is messages per minute, and
+            // a drop (a restart reset the counter) is shown as zero rather than as a
+            // negative rate.
+            (bool enabled, int retention, var processed) = Samples_((string)utilities.GetMetricHistory("processed_messages_total", minutes, bucket));
+            var smtp = Samples_((string)utilities.GetMetricHistory("sessions_smtp", minutes, bucket)).samples;
+            var imap = Samples_((string)utilities.GetMetricHistory("sessions_imap", minutes, bucket)).samples;
+            var pop3 = Samples_((string)utilities.GetMetricHistory("sessions_pop3", minutes, bucket)).samples;
+
+            if (!enabled)
+            {
+               rangeNote_.Text = "The server keeps no history: MetricsHistoryDays is 0 in hMailServer.ini. Set it to the days to keep and restart the service.";
+               ChartsGrid.Children.Add(throughputCard_);
+               ChartsGrid.Children.Add(sessionsCard_);
+               return;
+            }
+
+            historyThroughput_ = new AccessibleChartCard(ChartCatalog.DashboardThroughput, Math.Max(2, processed.Count))
+            {
+               EmptyText = "No samples in this range yet",
+               Height = 340,
+               Margin = new Thickness(0, 0, 12, 0)
+            };
+
+            for (int i = 1; i < processed.Count; i++)
+            {
+               double rate = Math.Max(0, processed[i].value - processed[i - 1].value) / bucket;
+               historyThroughput_.Push(processed[i].time, rate);
+            }
+
+            var times = smtp.Select(x => x.time).Union(imap.Select(x => x.time)).Union(pop3.Select(x => x.time)).OrderBy(t => t).ToList();
+            var smtpByTime = smtp.ToDictionary(x => x.time, x => x.value);
+            var imapByTime = imap.ToDictionary(x => x.time, x => x.value);
+            var pop3ByTime = pop3.ToDictionary(x => x.time, x => x.value);
+
+            historySessions_ = new AccessibleChartCard(ChartCatalog.DashboardSessions, Math.Max(2, times.Count))
+            {
+               EmptyText = "No samples in this range yet",
+               Height = 340
+            };
+
+            foreach (DateTime time in times)
+            {
+               historySessions_.Push(time,
+                  smtpByTime.TryGetValue(time, out double a) ? a : (double?)null,
+                  imapByTime.TryGetValue(time, out double b) ? b : (double?)null,
+                  pop3ByTime.TryGetValue(time, out double c) ? c : (double?)null);
+            }
+
+            Grid.SetColumn(historyThroughput_, 0);
+            Grid.SetColumn(historySessions_, 1);
+            ChartsGrid.Children.Add(historyThroughput_);
+            ChartsGrid.Children.Add(historySessions_);
+
+            string per = bucket == 1 ? "minute" : bucket == 10 ? "ten minutes" : "hour";
+            rangeNote_.Text = processed.Count == 0
+               ? "No samples in this range yet: the server records one a minute and keeps " + retention + " days."
+               : "One point per " + per + ", from the " + retention + "-day history the server keeps. Throughput is the change in the processed-messages total per minute.";
+         }
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
+         {
+            rangeNote_.Text = "Could not load the history: " + ex.Message;
+            ChartsGrid.Children.Add(throughputCard_);
+            ChartsGrid.Children.Add(sessionsCard_);
+         }
+      }
+
+      // The JSON Utilities.GetMetricHistory returns, as points. Times are as the
+      // server's database stored them: its own clock, shown as it is.
+      private static (bool enabled, int retention, System.Collections.Generic.List<(DateTime time, double value)> samples) Samples_(string json)
+      {
+         var samples = new System.Collections.Generic.List<(DateTime time, double value)>();
+         bool enabled = false;
+         int retention = 0;
+
+         using (JsonDocument document = JsonDocument.Parse(json))
+         {
+            JsonElement root = document.RootElement;
+            enabled = root.TryGetProperty("enabled", out JsonElement enabledElement) && enabledElement.GetBoolean();
+            retention = root.TryGetProperty("retention_days", out JsonElement retentionElement) ? retentionElement.GetInt32() : 0;
+
+            if (root.TryGetProperty("samples", out JsonElement array))
+            {
+               foreach (JsonElement sample in array.EnumerateArray())
+               {
+                  string time = sample.GetProperty("time").GetString() ?? "";
+                  double value = sample.GetProperty("value").GetDouble();
+
+                  if (DateTime.TryParseExact(time, "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsed))
+                     samples.Add((parsed, value));
+               }
+            }
+         }
+
+         return (enabled, retention, samples);
       }
 
       public void OnEnter()

@@ -947,4 +947,14 @@ create table hm_messageindexstate
 
 CREATE INDEX idx_hm_messageindexstate ON hm_messageindexstate (misaccountid);
 
-insert into hm_dbversion values (6027);
+create table hm_metricsamples
+(
+	metricsampleid int auto_increment not null, primary key(`metricsampleid`), unique(`metricsampleid`),
+	metricsampletime datetime not null,
+	metricsamplename varchar(64) not null,
+	metricsamplevalue double not null
+) DEFAULT CHARSET=utf8;
+
+CREATE INDEX idx_hm_metricsamples_name_time ON hm_metricsamples (metricsamplename, metricsampletime);
+
+insert into hm_dbversion values (6028);

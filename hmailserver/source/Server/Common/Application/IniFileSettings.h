@@ -345,6 +345,13 @@ namespace HM
       // installation may depend on that; on, a compromised or careless account
       // can no longer send as anyone it likes, and a Send-As grant means something.
       bool GetSmtpAuthenticatedSenderCheck() const { return smtp_authenticated_sender_check_; }
+
+      // How many days of metric samples hm_metricsamples keeps: one row per metric
+      // per minute, read back by the Control Panel's dashboard and
+      // /api/v1/metrics/history. 7 by default - a week of minute-resolution
+      // history is fourteen metrics times ten thousand rows, which is small - and
+      // 0 turns the sampler off.
+      int GetMetricsHistoryDays() const { return metrics_history_days_; }
       String GetBATVSecret() const { return batv_secret_; }
       // Rate shaping (0 = unlimited / disabled).
       int GetMaxSubmissionsPerIPPerMinute() const { return max_submissions_per_ip_per_minute_; }
@@ -1026,6 +1033,7 @@ namespace HM
       bool outbound_pipelining_;
       bool outbound_chunking_;
       bool smtp_authenticated_sender_check_;
+      int metrics_history_days_;
       String batv_secret_;
       int max_submissions_per_ip_per_minute_;
       int pop3_login_delay_seconds_;
