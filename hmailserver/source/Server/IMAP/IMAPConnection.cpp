@@ -1,4 +1,4 @@
-// Copyright (c) 2010 Martin Knafve / hMailServer.com.  
+// Copyright (c) 2010 Martin Knafve / hMailServer.com.
 // https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -57,7 +57,7 @@
 namespace HM
 {
    IMAPConnection::IMAPConnection(ConnectionSecurity connection_security,
-         boost::asio::io_context& io_context, 
+         boost::asio::io_context& io_context,
          boost::asio::ssl::context& context) :
       TCPConnection(connection_security, io_context, context, std::shared_ptr<Event>(), ""),
       is_idling_(false),
@@ -111,7 +111,7 @@ namespace HM
 
       if (GetConnectionSecurity() == CSNone ||
           GetConnectionSecurity() == CSSTARTTLSOptional ||
-          GetConnectionSecurity() == CSSTARTTLSRequired)      
+          GetConnectionSecurity() == CSSTARTTLSRequired)
       {
          SendBanner_();
       }
@@ -120,7 +120,7 @@ namespace HM
    void
    IMAPConnection::OnHandshakeCompleted()
    {
-      if (GetConnectionSecurity() == CSSSL)      
+      if (GetConnectionSecurity() == CSSSL)
          SendBanner_();
       else if (GetConnectionSecurity() == CSSTARTTLSOptional ||
                GetConnectionSecurity() == CSSTARTTLSRequired)
@@ -129,7 +129,7 @@ namespace HM
       }
    }
 
-   void 
+   void
    IMAPConnection::SendBanner_()
    {
       String sWelcome = Configuration::Instance()->GetIMAPConfiguration()->GetWelcomeMessage();
@@ -148,7 +148,7 @@ namespace HM
       EnqueueRead();
    }
 
-   AnsiString 
+   AnsiString
    IMAPConnection::GetCommandSeparator() const
    {
       return "\r\n";
@@ -193,7 +193,7 @@ namespace HM
       return std::static_pointer_cast<IMAPCommandAppend>((*iterCommandHandler).second);
    }
 
-   void 
+   void
    IMAPConnection::ParseData(std::shared_ptr<ByteBuffer> pByteBuffer)
    {
       auto iterCommandHandler = mapCommandHandlers.find(IMAP_APPEND);
@@ -214,7 +214,7 @@ namespace HM
          EnqueueRead();
    }
 
-   bool 
+   bool
    IMAPConnection::InternalParseData(const AnsiString &Request)
    {
       LogClientCommand_(Request);
@@ -265,7 +265,7 @@ namespace HM
          if (AskForLiteralData_(sCommand))
          {
             // The client is not permitted to send the octets of the literal unless
-            // the server indicates that it expects it. 
+            // the server indicates that it expects it.
             return true;
          }
       }
@@ -327,7 +327,7 @@ namespace HM
                String sRemainingOnLine = sLine.Mid(iLiteralBytesToReceive);
                iLiteralBytesToReceive = GetLiteralSize_(sRemainingOnLine);
 
-               sCommand += sRemainingOnLine; 
+               sCommand += sRemainingOnLine;
             }
             else
             {
@@ -347,7 +347,7 @@ namespace HM
       return AnswerCommand(pCommand);
    }
 
-   bool 
+   bool
    IMAPConnection::AskForLiteralData_(const String &sInput)
    //---------------------------------------------------------------------------()
    // DESCRIPTION:
@@ -389,11 +389,11 @@ namespace HM
             return true;
          }
       }
-      
+
       return false;
    }
 
-   void 
+   void
    IMAPConnection::LogClientCommand_(const String &sClientData)
    //---------------------------------------------------------------------------()
    // DESCRIPTION:
@@ -407,7 +407,7 @@ namespace HM
 
       if (IsReceivingLiteralDataForLoginCommand_())
       {
-         // we're receiving literal data for the login command. 
+         // we're receiving literal data for the login command.
          // check if we've received the passwords yet.
          int wordsFound = 1;
          int length = command_buffer_.GetLength();
@@ -429,7 +429,7 @@ namespace HM
          {
             sLogData = "***";
          }
-         
+
       }
 
       // SASL (AUTHENTICATE) carries credentials the LOGIN masking above does not
@@ -469,7 +469,7 @@ namespace HM
       // Append
       sLogData = "RECEIVED: " + sLogData;
 
-      LOG_IMAP(GetSessionID(), GetIPAddressString(), sLogData);      
+      LOG_IMAP(GetSessionID(), GetIPAddressString(), sLogData);
    }
 
    int
@@ -486,9 +486,9 @@ namespace HM
       // the append command, we take care of parsing up until the message literal
       // size. This means that if the folder name is sent as a separate literal,
       // the IMAPConnection class takes care of it.
-      // 
+      //
       // The reason is that we don't want to keep the entire message in memory
-      // at once (which IMAPCommandAppend handles for us) but we still want the 
+      // at once (which IMAPCommandAppend handles for us) but we still want the
       // normal parsing to take place prior to message receiving.
       //
       int iFullCommandStartPos = command_buffer_.Find(_T(" "))+1;
@@ -517,7 +517,7 @@ namespace HM
       {
          return 0;
       }
-      
+
       if (sCommand.Right(1) != _T("}"))
          return 0;
 
@@ -619,7 +619,7 @@ namespace HM
       ScriptServer::Instance()->FireEvent(ScriptServer::EventOnClientLogon, sEventCaller, pContainer);
    }
 
-   void 
+   void
    IMAPConnection::Logout(const String &goodbyeMessage)
    {
       CloseCurrentFolder();
@@ -627,7 +627,7 @@ namespace HM
       std::shared_ptr<const Account> account;
       SetAccount_(account),
 
-      SendAsciiData(goodbyeMessage);   
+      SendAsciiData(goodbyeMessage);
 
       Disconnect_();
    }
@@ -647,7 +647,7 @@ namespace HM
       account_.reset();
       imap_folders_.reset();
       public_imap_folders_.reset();
-      recent_messages_.clear();
+      ClearRecentMessages();
       saved_search_result_.clear();
       scram_session_.reset();
    }
@@ -685,7 +685,7 @@ namespace HM
       EnqueueWrite(sData);
    }
 
-   IMAPConnection::eIMAPCommandType 
+   IMAPConnection::eIMAPCommandType
    IMAPConnection::GetCommandType(String & sCommand)
    {
       sCommand.ToUpper();
@@ -802,10 +802,10 @@ namespace HM
       else
          sCommandName = sCommandValue;
 
-      if (is_idling_)
+      if (GetIsIdling())
       {
          EndIdleMode_();
-         
+
          // Remove command
          return true;
       }
@@ -814,7 +814,7 @@ namespace HM
       {
          // No space found in the command line.
          SendAsciiData(sCommandValue + " BAD NULL COMMAND\r\n");
-         
+
          // Remove this command since it's no good.
          return true;
       }
@@ -822,7 +822,7 @@ namespace HM
       eIMAPCommandType eCommand = GetCommandType(sCommandName);
 
       bool bHandlerFound = false;
-      
+
       auto iterCommandHandler = mapCommandHandlers.find(eCommand);
 
       if (iterCommandHandler != mapCommandHandlers.end())
@@ -830,7 +830,7 @@ namespace HM
       else
       {
          // Find handler in the static space.
-         iterCommandHandler = mapStaticHandlers.find(eCommand);     
+         iterCommandHandler = mapStaticHandlers.find(eCommand);
 
          if (iterCommandHandler != mapStaticHandlers.end())
             bHandlerFound = true;
@@ -843,13 +843,13 @@ namespace HM
          throw std::logic_error(Formatter::FormatAsAnsi("Handler for {0} was not found.", sCommandName));
       }
 
-      
+
       std::shared_ptr<IMAPCommand> pCommand = (*iterCommandHandler).second;
 
       std::shared_ptr<IMAPCommandArgument> pArgument = std::shared_ptr<IMAPCommandArgument> (new IMAPCommandArgument);
       pArgument->Command(sCommandValue);
       pArgument->Tag(sCommandTag);
-      
+
       // Add literals.
       auto iterStr = command->vecLiteralData.begin();
       while (iterStr != command->vecLiteralData.end())
@@ -857,9 +857,9 @@ namespace HM
          pArgument->AddLiteral(*iterStr);
          iterStr++;
       }
-      
+
       bool postReceive = false;
-      
+
       // Report updates on the current folder.
       if (current_folder_)
       {
@@ -881,7 +881,7 @@ namespace HM
       }
       else if (result.GetResult() == IMAPResult::ResultOKSupressRead)
       {
-         /* We're either disconnecting, or we're starting a TLS session */ 
+         /* We're either disconnecting, or we're starting a TLS session */
       }
       else if (result.GetResult() == IMAPResult::ResultBad)
       {
@@ -902,14 +902,14 @@ namespace HM
       return postReceive;
    }
 
-   void 
+   void
    IMAPConnection::EndIdleMode_()
    //---------------------------------------------------------------------------()
    // DESCRIPTION:
    // Quits idle mode.
    //---------------------------------------------------------------------------()
    {
-      if (!is_idling_)
+      if (!GetIsIdling())
       {
          assert(0);
          return;
@@ -1006,7 +1006,7 @@ namespace HM
       return owner;
    }
 
-   std::shared_ptr<IMAPFolder> 
+   std::shared_ptr<IMAPFolder>
    IMAPConnection::GetFolderByFullPath(const String &sFolderName)
    {
       String hierarchyDelimiter = Configuration::Instance()->GetIMAPConfiguration()->GetHierarchyDelimiter();
@@ -1136,7 +1136,7 @@ namespace HM
    }
 
    void
-   IMAPConnection::SendResponseString(const String &sTag, const String &sResponse, const String &sMessage) 
+   IMAPConnection::SendResponseString(const String &sTag, const String &sResponse, const String &sMessage)
    //---------------------------------------------------------------------------()
    // DESCRIPTION:
    // Guess...
@@ -1146,41 +1146,74 @@ namespace HM
       SendAsciiData(sEntireString);
    }
 
+   std::shared_ptr<IMAPFolder>
+   IMAPConnection::GetCurrentFolder() const
+   {
+      StateLock lock(state_mutex_);
+      return current_folder_;
+   }
+
+   bool
+   IMAPConnection::GetCurrentFolderReadOnly() const
+   {
+      StateLock lock(state_mutex_);
+      return current_folder_read_only_;
+   }
+
    void
    IMAPConnection::CloseCurrentFolder()
    {
-      if (!current_folder_)
-         return;
+      std::shared_ptr<IMAPFolder> closedFolder;
+      bool readOnly = false;
+
+      {
+         // Unload the folder under the lock, so a notification client on another
+         // thread either completes against the old folder or finds it already gone.
+         // Nothing slow in here, and nothing that takes another lock: the
+         // unsubscribe below takes the notification server's, and a notifying
+         // thread holds that one while it asks for ours.
+         StateLock lock(state_mutex_);
+
+         if (!current_folder_)
+            return;
+
+         closedFolder = current_folder_;
+         readOnly = current_folder_read_only_;
+
+         current_folder_.reset();
+      }
 
       notification_client_->UnsubscribeMessageChanges();
 
       // Set the recent flag on all messages in the folder. Since the user has been notified
       // about these messages, they are no longer recent. This doesn't happen if the folder
       // is in read-only mode - if it has been selected using the EXAMINE command.
-      if (!current_folder_read_only_)
+      if (!readOnly)
       {
-         current_folder_->GetMessages()->RemoveRecentFlags();
+         closedFolder->GetMessages()->RemoveRecentFlags();
       }
-
-      // Unload the folder.
-      current_folder_.reset();
    }
 
    void
    IMAPConnection::SetCurrentFolder(std::shared_ptr<IMAPFolder> pFolder, bool readOnly)
    {
-      // First close the currently set folder. This will cause an unsubscribe from the 
+      // First close the currently set folder. This will cause an unsubscribe from the
       // current folder to be made and \recent flags to be removed.
       CloseCurrentFolder();
 
-      // Select the new folder
-      current_folder_ = pFolder;
-      current_folder_read_only_ = readOnly;
-
-      // Subscribe to changes in the new folder.
-      if (current_folder_)
       {
-         notification_client_->SubscribeMessageChanges(current_folder_->GetAccountID(), pFolder->GetID());
+         // Select the new folder.
+         StateLock lock(state_mutex_);
+
+         current_folder_ = pFolder;
+         current_folder_read_only_ = readOnly;
+      }
+
+      // Subscribe after the folder is visible, so a notification arriving at once
+      // finds it - and outside the lock, for the order given in CloseCurrentFolder.
+      if (pFolder)
+      {
+         notification_client_->SubscribeMessageChanges(pFolder->GetAccountID(), pFolder->GetID());
       }
    }
 
@@ -1380,13 +1413,14 @@ namespace HM
       return sResult;
    }
 
-   void 
+   void
    IMAPConnection::SetIsIdling(bool bNewVal)
    //---------------------------------------------------------------------------()
    // DESCRIPTION:
-   // Switch in or out idling mode. 
+   // Switch in or out idling mode.
    //---------------------------------------------------------------------------()
    {
+      StateLock lock(state_mutex_);
       is_idling_ = bNewVal;
    }
 
@@ -1394,13 +1428,14 @@ namespace HM
    IMAPConnection::GetIsIdling() const
    //---------------------------------------------------------------------------()
    // DESCRIPTION:
-   // Switch in or out idling mode. 
+   // Switch in or out idling mode.
    //---------------------------------------------------------------------------()
    {
+      StateLock lock(state_mutex_);
       return is_idling_;
    }
 
-   void 
+   void
    IMAPConnection::SetDelayedChangeNotification(std::shared_ptr<ChangeNotification> pNotification)
    //---------------------------------------------------------------------------()
    // DESCRIPTION:
@@ -1411,7 +1446,7 @@ namespace HM
       delayed_change_notification_ = pNotification;
    }
 
-   bool 
+   bool
    IMAPConnection::CheckPermission(std::shared_ptr<IMAPFolder> pFolder, int iPermission)
    {
       // One decision, asked rather than re-derived. See ACLManager for why the copy
@@ -1464,7 +1499,7 @@ namespace HM
          pPermission->GetAllow(ACLPermission::PermissionExpunge);
    }
 
-   bool 
+   bool
    IMAPConnection::IsAuthenticated()
    {
       return account_ != 0;
@@ -1486,16 +1521,46 @@ namespace HM
       EnqueueHandshake();
    }
 
-   void 
+   void
    IMAPConnection::SetRecentMessages(const std::set<__int64> &messages)
    {
+      StateLock lock(state_mutex_);
       recent_messages_ = messages;
    }
 
-   std::set<__int64>& 
-   IMAPConnection::GetRecentMessages()
+   void
+   IMAPConnection::ClearRecentMessages()
    {
-      return recent_messages_;
+      StateLock lock(state_mutex_);
+      recent_messages_.clear();
+   }
+
+   void
+   IMAPConnection::AddRecentMessage(__int64 message_id)
+   {
+      StateLock lock(state_mutex_);
+      recent_messages_.insert(message_id);
+   }
+
+   void
+   IMAPConnection::RemoveRecentMessage(__int64 message_id)
+   {
+      StateLock lock(state_mutex_);
+      recent_messages_.erase(message_id);
+   }
+
+   bool
+   IMAPConnection::IsRecentMessage(__int64 message_id) const
+   {
+      StateLock lock(state_mutex_);
+      return recent_messages_.find(message_id) != recent_messages_.end();
+   }
+
+   size_t
+   IMAPConnection::GetRecentMessageCount() const
+   {
+      StateLock lock(state_mutex_);
+      return recent_messages_.size();
    }
 }
 

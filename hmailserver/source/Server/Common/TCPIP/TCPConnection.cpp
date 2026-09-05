@@ -965,7 +965,11 @@ namespace HM
          if (connection_state_ != StateConnected)
          {
             // The read failed, but we've already started the disconnection. So we should not log the failure
-            // or enqueue a new disconnect.
+            // or enqueue a new disconnect. The read is still done, though: retire it and let whatever is
+            // queued behind it - the disconnect itself - run. Left "ongoing", it blocked every later
+            // operation on the queue until the connection timed out (upstream #580).
+            operation_queue_.Pop(IOOperation::BCTRead);
+            ProcessOperationQueue_(0);
             return;
          }
 
@@ -1017,6 +1021,9 @@ namespace HM
             }
             catch (DisconnectedException&)
             {
+               // Retire the read on the way out, as the paths below do; the queue must
+               // not remember a read that will never complete (upstream #580).
+               operation_queue_.Pop(IOOperation::BCTRead);
                throw;
             }
             catch (...)
@@ -1085,6 +1092,9 @@ namespace HM
             }
             catch (DisconnectedException&)
             {
+               // Retire the read on the way out, as the paths below do; the queue must
+               // not remember a read that will never complete (upstream #580).
+               operation_queue_.Pop(IOOperation::BCTRead);
                throw;
             }
             catch (...)

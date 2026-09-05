@@ -136,7 +136,11 @@ namespace HM
       AnsiString folder_name_;
 
       std::shared_ptr<Messages> messages_;
-      std::shared_ptr<IMAPFolders> sub_folders_;   
+      std::shared_ptr<IMAPFolders> sub_folders_;
+
+      // Connections share IMAPFolder instances, so the lazy creation of the
+      // subfolder collection has to be serialised (upstream #566).
+      boost::recursive_mutex sub_folders_mutex_;
  
       DateTime create_time_;
    };

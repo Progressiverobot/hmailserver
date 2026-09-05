@@ -949,7 +949,7 @@ namespace HM
 
          savedMessages.push_back(pending.message);
          savedUids.push_back((__int64) pending.message->GetUID());
-         pConnection->GetRecentMessages().insert(pending.message->GetID());
+         pConnection->AddRecentMessage(pending.message->GetID());
       }
 
       MessagesContainer::Instance()->SetFolderNeedsRefresh(destination_folder_->GetID());
@@ -960,7 +960,7 @@ namespace HM
       {
          std::shared_ptr<Messages> messages = destination_folder_->GetMessages();
          sResponse += IMAPNotificationClient::GenerateExistsString(messages->GetCount());
-         sResponse += IMAPNotificationClient::GenerateRecentString((int) pConnection->GetRecentMessages().size());
+         sResponse += IMAPNotificationClient::GenerateRecentString((int) pConnection->GetRecentMessageCount());
       }
 
       // RFC 8508 (REPLACE): the replacement is safely stored, so the replaced
@@ -1007,10 +1007,7 @@ namespace HM
                   sResponse += sExpunge;
                }
 
-               auto &recentMessages = pConnection->GetRecentMessages();
-               auto recentIterator = recentMessages.find(targetId);
-               if (recentIterator != recentMessages.end())
-                  recentMessages.erase(recentIterator);
+               pConnection->RemoveRecentMessage(targetId);
 
                std::shared_ptr<ChangeNotification> pDeleteNotification =
                   std::shared_ptr<ChangeNotification>(new ChangeNotification(selectedFolder->GetAccountID(), selectedFolder->GetID(), ChangeNotification::NotificationMessageDeleted, expungedIndexes));

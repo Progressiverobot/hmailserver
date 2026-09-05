@@ -115,7 +115,7 @@ namespace HM
          bool queryingSelectedFolder = pCurrentFolder && pCurrentFolder->GetID() == pTheFolder->GetID();
 
          long lNoOfRecent = queryingSelectedFolder
-            ? (long) pConnection->GetRecentMessages().size()
+            ? (long) pConnection->GetRecentMessageCount()
             : (long) pMessages->GetRecentMessageIDs().size();
 
          sTemp.Format(_T("RECENT %d"), lNoOfRecent);

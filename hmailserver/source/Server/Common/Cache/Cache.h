@@ -53,6 +53,12 @@ namespace HM
 
       void Add(std::shared_ptr<T> pObject);
 
+      // Adds the object unless one with the same id is cached already, and returns
+      // whichever is in the cache afterwards. The lookup and the add are one
+      // critical section, which is what a caller that has just looked and found
+      // nothing needs: another thread may have added the same id in between.
+      std::shared_ptr<T> AddIfNotExists(std::shared_ptr<T> pObject);
+
    private:
 
       void ResetEstimatedSizeIfEmpty_();
@@ -324,6 +330,25 @@ namespace HM
       }
 
       return nullptr;
+   }
+
+   template <class T>
+   std::shared_ptr<T>
+   Cache<T>::AddIfNotExists(std::shared_ptr<T> pObject)
+   {
+      boost::lock_guard<boost::recursive_mutex> guard(_mutex);
+
+      if (!enabled_)
+         return pObject;
+
+      std::shared_ptr<T> existing = GetItemBy_<id>(objects_, pObject->GetID());
+
+      if (existing)
+         return existing;
+
+      Add(pObject);
+
+      return pObject;
    }
 
    template <class T> 

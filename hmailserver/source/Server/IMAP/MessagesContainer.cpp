@@ -49,8 +49,11 @@ namespace HM
       {
          auto messages = std::shared_ptr<Messages>(new Messages(account_id, folder_id));
 
-         cached_messages = std::make_shared<CachedMessages>(messages);
-         messages_cache_.Add(cached_messages);
+         // Another session may have cached this folder between the lookup above and
+         // here. Whichever entry wins is the one every session must share: two
+         // Messages collections for one folder is two views of one mailbox, each
+         // missing what the other loaded (upstream #566).
+         cached_messages = messages_cache_.AddIfNotExists(std::make_shared<CachedMessages>(messages));
       }
 
       size_t estimated_size_before = cached_messages->GetEstimatedCachingSize();

@@ -54,7 +54,7 @@ namespace HM
       // nothing of forceDelete and would keep the inbox even when the account itself
       // is going. This local tree is discarded afterwards, so what the walk leaves in
       // it does not matter; the callers uncache the account's folders.
-      std::vector<std::shared_ptr<IMAPFolder> > &folders = accountFolders.GetVector();
+      std::vector<std::shared_ptr<IMAPFolder> > folders = accountFolders.GetSnapshot();
       for (std::shared_ptr<IMAPFolder> folder : folders)
       {
          bool kept = false;
@@ -97,7 +97,7 @@ namespace HM
       // that a kept subfolder can keep its parent: a designated folder two levels
       // down whose parent row was deleted would be an orphan nothing could reach.
       bool subfolderKept = false;
-      std::vector<std::shared_ptr<IMAPFolder> > &subFolders = pFolder->GetSubFolders()->GetVector();
+      std::vector<std::shared_ptr<IMAPFolder> > subFolders = pFolder->GetSubFolders()->GetSnapshot();
       for (std::shared_ptr<IMAPFolder> subFolder : subFolders)
       {
          bool thisSubfolderKept = false;
