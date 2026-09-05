@@ -21,13 +21,17 @@ namespace RegressionTests.SMTP
    /// in it. Such a message MUST be transmitted with BDAT (byte-counted,
    /// byte-transparent); a DATA command in the transaction is answered 503.
    ///
-   /// Scope, stated plainly: this server accepts BINARYMIME for LOCAL delivery
-   /// only. Its delivery client transmits via DATA, which binary content does not
-   /// survive, and down-conversion is not implemented - so a recipient requiring
-   /// onward relay is refused at RCPT TO with 554 5.6.3 (conversion required but
-   /// not supported), and an indirect route outward (e.g. a distribution list
-   /// with an external member) is refused at delivery time with the same code as
-   /// a DSN.
+   /// Scope, stated plainly. Since 5 September 2026 the delivery client sends BDAT
+   /// (OutboundChunking), so a binary message CAN be relayed - to a remote that
+   /// advertises BINARYMIME and CHUNKING both - and an AUTHENTICATED submission
+   /// naming a recipient that requires onward relay is accepted and relayed as it
+   /// is. Down-conversion is still not implemented, so a remote that lacks either
+   /// extension gets no MAIL FROM and the sender, our own user, gets the DSN with
+   /// 554 5.6.3 (conversion required but not supported). An UNAUTHENTICATED
+   /// transaction is still refused at RCPT TO with that code: its sender is
+   /// whoever the peer claimed, and a DSN to them would be backscatter. An indirect
+   /// route outward (e.g. a distribution list with an external member) meets the
+   /// same delivery-time decision.
    ///
    /// Retrieval choice for the fidelity tests: IMAP FETCH BODY[], not POP3 RETR.
    /// POP3 is line-oriented (dot-stuffed, terminated by CRLF.CRLF), so it cannot
@@ -427,8 +431,9 @@ namespace RegressionTests.SMTP
       }
 
       [Test]
-      [Description("A recipient requiring onward relay is refused at RCPT TO with 554 5.6.3 when the " +
-                   "transaction declared BODY=BINARYMIME - and accepted without the declaration (the control).")]
+      [Description("An UNAUTHENTICATED transaction declaring BODY=BINARYMIME has a recipient requiring onward " +
+                   "relay refused at RCPT TO with 554 5.6.3 - and accepted without the declaration (the control). " +
+                   "A DSN to a sender the peer merely claimed would be backscatter, so the refusal stays at the door.")]
       public void TestRelayRecipientRefusedAtRcptWith554_5_6_3()
       {
          SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "binarymime-sender@example.test", "test");
@@ -468,6 +473,142 @@ namespace RegressionTests.SMTP
          }
 
          CustomAsserts.AssertRecipientsInDeliveryQueue(0);
+      }
+
+      private static byte[] BuildAsciiControlMessage(string from, string to)
+      {
+         // Bare CR, bare LF and NUL - the octets DATA cannot carry - but nothing
+         // above 0x7F, because the simulated remote decodes what it receives as
+         // text and this test compares it as text. The fidelity of the full octet
+         // range through BDAT is TestBinaryMessageDeliveredByteForByteViaBdat's job.
+         return Ascii(
+            "Subject: BINARYMIME relay\r\n" +
+            "From: <" + from + ">\r\n" +
+            "To: <" + to + ">\r\n" +
+            "\r\n" +
+            "bare-lf\nbare-cr\rnul\0dot-line\r\n.\r\nRELAY-END-MARKER\r\n");
+      }
+
+      private static void AuthenticateRaw(RawSocketClient smtp, string user, string password)
+      {
+         smtp.SendAscii("AUTH LOGIN\r\n");
+         Assert.IsTrue(smtp.ReadSmtpResponse().StartsWith("334"), "AUTH LOGIN was not offered a username prompt.");
+         smtp.SendAscii(Convert.ToBase64String(Ascii(user)) + "\r\n");
+         Assert.IsTrue(smtp.ReadSmtpResponse().StartsWith("334"), "AUTH LOGIN was not offered a password prompt.");
+         smtp.SendAscii(Convert.ToBase64String(Ascii(password)) + "\r\n");
+         string outcome = smtp.ReadSmtpResponse();
+         Assert.IsTrue(outcome.StartsWith("235"), "Authentication failed: " + outcome);
+      }
+
+      [Test]
+      [Description("An AUTHENTICATED submission declaring BODY=BINARYMIME may name a recipient requiring onward " +
+                   "relay, and the message is relayed as it is: BODY=BINARYMIME on the remote's MAIL FROM and one " +
+                   "BDAT chunk carrying bare CR, bare LF and NUL untouched - to a remote that advertises " +
+                   "BINARYMIME and CHUNKING.")]
+      public void TestAuthenticatedBinarySubmissionIsRelayedViaBdat()
+      {
+         const string sender = "binarymime-relay@example.test";
+         const string recipient = "someone@dummy-example.com";
+
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, sender, "test");
+
+         byte[] message = BuildAsciiControlMessage(sender, recipient);
+         int port = TestSetup.GetNextFreePort();
+
+         using (var server = new SmtpServerSimulator(1, port))
+         {
+            server.AdvertiseChunking = true;
+            server.AdvertiseBinaryMime = true;
+            server.AddRecipientResult(new Dictionary<string, int> { { recipient, 250 } });
+            server.StartListen();
+
+            TestSetup.AddRoutePointingAtLocalhost(5, port, false);
+
+            using (var smtp = ConnectAndEhloRaw())
+            {
+               AuthenticateRaw(smtp, sender, "test");
+
+               smtp.SendAscii("MAIL FROM:<" + sender + "> BODY=BINARYMIME\r\n");
+               Assert.IsTrue(smtp.ReadSmtpResponse().StartsWith("250"), "BODY=BINARYMIME was not accepted.");
+
+               smtp.SendAscii("RCPT TO:<" + recipient + ">\r\n");
+               string rcpt = smtp.ReadSmtpResponse();
+               Assert.IsTrue(rcpt.StartsWith("250"),
+                  "An authenticated submission may relay a binary message, so the recipient must be accepted. Got: " + rcpt);
+
+               SendBdatChunk(smtp, message, true);
+               smtp.SendAscii("QUIT\r\n");
+            }
+
+            server.WaitForCompletion();
+
+            Assert.IsTrue(server.MailFromCommand.ToUpperInvariant().Contains("BODY=BINARYMIME"),
+               "The remote must be told the body is binary. MAIL FROM was: " + server.MailFromCommand);
+            Assert.AreEqual(1, server.BdatCommands.Count,
+               "One BDAT chunk, marked LAST. Commands: " + string.Join(" | ", server.CommandsReceived));
+            Assert.IsTrue(server.CommandsReceived.TrueForAll(c => c != "DATA"), "DATA must not carry a binary body.");
+
+            string expectedTail = Encoding.ASCII.GetString(message);
+            Assert.IsTrue(server.MessageData.EndsWith(expectedTail),
+               "The relayed chunk must end with the submitted octets exactly - bare CR, bare LF, NUL and the " +
+               "dot line untouched. The remote received:\r\n" + server.MessageData.Replace("\0", "<NUL>"));
+
+            CustomAsserts.AssertRecipientsInDeliveryQueue(0);
+         }
+      }
+
+      [Test]
+      [Description("An AUTHENTICATED binary submission to a remote that advertises CHUNKING but not BINARYMIME " +
+                   "is refused at delivery - no MAIL FROM reaches it - and the sender, who is our own user, gets " +
+                   "the DSN with status 5.6.3.")]
+      public void TestAuthenticatedBinaryRelayToARemoteWithoutBinaryMimeBounces()
+      {
+         const string sender = "binarymime-relay2@example.test";
+         const string recipient = "someone@dummy-example.com";
+
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, sender, "test");
+
+         byte[] message = BuildAsciiControlMessage(sender, recipient);
+         int port = TestSetup.GetNextFreePort();
+
+         using (var server = new SmtpServerSimulator(1, port))
+         {
+            server.AdvertiseChunking = true;
+            server.AddRecipientResult(new Dictionary<string, int> { { recipient, 250 } });
+            server.StartListen();
+
+            TestSetup.AddRoutePointingAtLocalhost(5, port, false);
+
+            using (var smtp = ConnectAndEhloRaw())
+            {
+               AuthenticateRaw(smtp, sender, "test");
+
+               smtp.SendAscii("MAIL FROM:<" + sender + "> BODY=BINARYMIME\r\n");
+               Assert.IsTrue(smtp.ReadSmtpResponse().StartsWith("250"), "BODY=BINARYMIME was not accepted.");
+
+               smtp.SendAscii("RCPT TO:<" + recipient + ">\r\n");
+               Assert.IsTrue(smtp.ReadSmtpResponse().StartsWith("250"), "The relay recipient was not accepted.");
+
+               SendBdatChunk(smtp, message, true);
+               smtp.SendAscii("QUIT\r\n");
+            }
+
+            server.WaitForCompletion();
+
+            Assert.AreEqual("", server.MailFromCommand,
+               "No MAIL FROM may reach a remote that cannot take a binary body. Got: " + server.MailFromCommand);
+
+            CustomAsserts.AssertRecipientsInDeliveryQueue(0);
+
+            string bounce = Pop3ClientSimulator.AssertGetFirstMessageText(sender, "test");
+            Assert.IsTrue(bounce.Contains("5.6.3"),
+               "The sender must get the DSN with status 5.6.3 (conversion required but not supported).\r\n" + bounce);
+
+            // The refusal reports HM6340 to the error log on purpose, so an
+            // administrator learns which message could not be relayed and why.
+            // Consumed here, or it fails the next test's setup.
+            CustomAsserts.AssertReportedError("HM6340");
+         }
       }
 
       [Test]

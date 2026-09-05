@@ -438,6 +438,12 @@ Administration and monitoring:
    ArchiveDomains=               ; comma-separated domains whose mail ArchiveDir keeps (empty = every message).
                                  ; A message is archived only when its local sender or a recipient belongs to a
                                  ; listed domain, and only the copies for listed domains are made
+   OutboundPipelining=1          ; RFC 2920 on the delivery client: when the remote advertises PIPELINING, send
+                                 ; MAIL FROM, every RCPT TO and the data command in one flight and read the
+                                 ; replies back in order. 0 = one command per reply, as before
+   OutboundChunking=1            ; RFC 3030 on the delivery client: when the remote advertises CHUNKING, send the
+                                 ; message as one BDAT ... LAST chunk (no 354 wait, no dot-stuffing; also what
+                                 ; lets a BINARYMIME message be relayed). 0 = DATA, as before
    LogDeleteDays=0               ; prune hMailServer's own date-stamped logs older than N days (0 = keep all)
    ShutdownDrainSeconds=0        ; on stop, wait up to N seconds for active sessions to finish (0 = stop immediately)
    MessageStoreFsync=0           ; force each received message to physical disk before it is acknowledged (1 = on)

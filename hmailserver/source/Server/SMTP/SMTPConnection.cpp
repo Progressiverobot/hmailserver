@@ -1331,30 +1331,36 @@ namespace HM
          message_submission_ = true;
 
       // RFC 3030 section 4: a BINARYMIME message must not be sent to a server that
-      // has not advertised BINARYMIME, and this server's delivery client cannot
-      // send one to any server - it transmits via DATA only, which cannot carry
-      // bare CR, bare LF or NUL octets, and down-conversion (re-encoding binary
-      // parts to base64) is not implemented. So a recipient that would require
-      // onward relay is refused HERE, synchronously, with the RFC's own permanent
-      // code: 554 5.6.3, conversion required but not supported. Refusing at RCPT
-      // is strictly kinder than the alternative the RFC also allows
-      // (accept-then-bounce): the sending client learns before transferring a
-      // single content octet, and no DSN backscatter is generated. Local
-      // recipients in the same transaction are unaffected and deliver normally.
+      // has not advertised BINARYMIME, and until 5 September 2026 this server's
+      // delivery client could not send one to any server - it transmitted via DATA
+      // only. It sends BDAT now (OutboundChunking), so a binary message CAN be
+      // relayed, to a remote that advertises BINARYMIME and CHUNKING both; to one
+      // that does not, delivery refuses it with the RFC's own permanent code, 554
+      // 5.6.3, as a DSN to the envelope sender. That DSN decides where the refusal
+      // belongs. For an AUTHENTICATED submission the envelope sender is our own
+      // user, so accepting here and letting delivery decide costs an honest bounce
+      // when the remote cannot take it and works when it can. For anything else -
+      // an unauthenticated range that may relay, an inbound peer - the sender is
+      // whoever the peer claimed, a DSN to them is backscatter, and refusing at
+      // RCPT stays strictly kinder: the sending client learns before transferring
+      // a content octet, and nothing is generated to anyone. Local recipients in
+      // the same transaction are unaffected either way.
       //
       // Known gap, stated plainly: an address treated as local HERE (so accepted)
       // can still route outward later - a distribution list with external members,
       // a local alias resolving to an external address, a route whose recipients
-      // are treated as local, an account forward, a rule or mirror. Those are
-      // refused at delivery time by SMTPClientConnection with the same 554 5.6.3
-      // (as a DSN), for as long as the message's binary mark survives - see
-      // Message::SetBinaryMime for the persistence limitation.
-      if (binarymime_requested_ && !localDelivery)
+      // are treated as local, an account forward, a rule or mirror. Those meet the
+      // same delivery-time decision in SMTPClientConnection, for as long as the
+      // message's binary mark survives - see Message::SetBinaryMime for the
+      // persistence limitation.
+      bool binaryRelayPossible = isAuthenticated_ && IniFileSettings::Instance()->GetOutboundChunking();
+
+      if (binarymime_requested_ && !localDelivery && !binaryRelayPossible)
       {
          AWStats::LogDeliveryFailure(GetIPAddressString(), current_message_->GetFromAddress(), sRecipientAddress, 554, current_message_->GetID());
 
          SendResponse_(554, _T("5.6.3"),
-            _T("Conversion required but not supported. This server accepts BODY=BINARYMIME for local delivery only; it cannot relay a binary message onward. Re-encode the content (for example as base64) and send it without BODY=BINARYMIME."));
+            _T("Conversion required but not supported. This server relays a binary message onward only for an authenticated submission, and only to a receiving server that advertises BINARYMIME and CHUNKING; from here it accepts BODY=BINARYMIME for local delivery only. Authenticate, or re-encode the content (for example as base64) and send it without BODY=BINARYMIME."));
          return;
       }
 

@@ -330,6 +330,13 @@ namespace HM
       String GetSRSSecret() const { return srs_secret_; }
       // BATV (Bounce Address Tag Validation, prvs) for backscatter protection.
       bool GetBATVEnabled() const { return batv_enabled_; }
+
+      // RFC 2920 and RFC 3030 on the outbound client, each used only when the
+      // remote advertises it. On by default: pipelining removes a round trip per
+      // envelope command and chunking removes the 354 wait and the dot-stuffing.
+      // Off is for a remote that advertises what it cannot do.
+      bool GetOutboundPipelining() const { return outbound_pipelining_; }
+      bool GetOutboundChunking() const { return outbound_chunking_; }
       String GetBATVSecret() const { return batv_secret_; }
       // Rate shaping (0 = unlimited / disabled).
       int GetMaxSubmissionsPerIPPerMinute() const { return max_submissions_per_ip_per_minute_; }
@@ -1008,6 +1015,8 @@ namespace HM
       bool srs_enabled_;
       String srs_secret_;
       bool batv_enabled_;
+      bool outbound_pipelining_;
+      bool outbound_chunking_;
       String batv_secret_;
       int max_submissions_per_ip_per_minute_;
       int pop3_login_delay_seconds_;

@@ -78,6 +78,8 @@ namespace HM
       smtpdmax_size_drop_(0),
       backup_messages_dbonly_(false),
       backup_verify_restore_(true),
+      outbound_pipelining_(true),
+      outbound_chunking_(true),
       add_xauth_user_ip_(false),
       use_dns_cache_(true),
       // The Windows event log sink's two settings are read on the ERROR path,
@@ -698,6 +700,8 @@ namespace HM
       srs_enabled_ = ReadIniSettingInteger_("Settings", "SRSEnabled", 0) == 1;
       srs_secret_ = ReadIniSettingString_("Settings", "SRSSecret", "");
       batv_enabled_ = ReadIniSettingInteger_("Settings", "BATVEnabled", 0) == 1;
+      outbound_pipelining_ = ReadIniSettingInteger_("Settings", "OutboundPipelining", 1) == 1;
+      outbound_chunking_ = ReadIniSettingInteger_("Settings", "OutboundChunking", 1) == 1;
       batv_secret_ = ReadIniSettingString_("Settings", "BATVSecret", "");
       max_submissions_per_ip_per_minute_ = ReadIniSettingInteger_("Settings", "MaxSubmissionsPerIPPerMinute", 0);
       pop3_login_delay_seconds_ = ReadIniSettingInteger_("Settings", "Pop3LoginDelaySeconds", 0);
