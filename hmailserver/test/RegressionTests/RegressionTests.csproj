@@ -397,6 +397,7 @@
     <Compile Include="Shared\Paths.cs" />
     <Compile Include="Shared\FakeDnsServer.cs" />
     <Compile Include="Shared\FakeFilterEngine.cs" />
+    <Compile Include="Shared\FakeHttpEndpoint.cs" />
     <Compile Include="Shared\ServerIniFile.cs" />
     <Compile Include="Shared\DeliveryFailedException.cs" />
     <Compile Include="Shared\RetryableAssert.cs" />
@@ -518,6 +519,8 @@
     <Compile Include="Security\AutoBan.cs" />
     <Compile Include="Security\HashPolicy.cs" />
     <Compile Include="Security\OAuth2Bearer.cs" />
+    <Compile Include="Security\OAuth2Jwks.cs" />
+    <Compile Include="Security\OAuth2Introspection.cs" />
     <Compile Include="Security\OAuth2BearerEs256.cs" />
     <Compile Include="Security\SecretProtection.cs" />
     <Compile Include="Security\PasswordPepper.cs" />

@@ -36,6 +36,9 @@ namespace HM
       preferred_hash_algorithm_(3),
       minimum_accepted_hash_algorithm_(0),
       password_hash_iterations_(0),
+      oauth2_jwks_cache_seconds_(3600),
+      oauth2_introspection_cache_seconds_(300),
+      oauth2_introspection_fail_open_(false),
       password_hash_memory_kib_(0),
       password_hash_time_cost_(0),
       dnsbl_checks_after_mail_from_(false),
@@ -248,6 +251,20 @@ namespace HM
       oauth2_audience_ = ReadIniSettingString_("Settings", "OAuth2Audience", "");
       // Claim that carries the account's e-mail address / login name.
       oauth2_username_claim_ = ReadIniSettingString_("Settings", "OAuth2UsernameClaim", "email");
+      // RFC 7517 JWK Set: where the provider publishes its current signing keys, so a
+      // key rotation needs no hand-copied PEM file. Empty keeps the PEM file the only
+      // source. https, or plain http to a loopback address only.
+      oauth2_jwks_url_ = ReadIniSettingString_("Settings", "OAuth2JwksUrl", "");
+      oauth2_jwks_cache_seconds_ = ReadIniSettingInteger_("Settings", "OAuth2JwksCacheSeconds", 3600);
+      // RFC 7662 token introspection: the provider's live word on whether a token
+      // that verified is still active, which is the only check that sees a
+      // revocation. Empty = no such check. An unanswerable check refuses the token
+      // unless FailOpen=1, the way RFC 7662 reads.
+      oauth2_introspection_url_ = ReadIniSettingString_("Settings", "OAuth2IntrospectionUrl", "");
+      oauth2_introspection_client_id_ = ReadIniSettingString_("Settings", "OAuth2IntrospectionClientId", "");
+      oauth2_introspection_client_secret_ = ReadIniSettingString_("Settings", "OAuth2IntrospectionClientSecret", "");
+      oauth2_introspection_cache_seconds_ = ReadIniSettingInteger_("Settings", "OAuth2IntrospectionCacheSeconds", 300);
+      oauth2_introspection_fail_open_ = ReadIniSettingInteger_("Settings", "OAuth2IntrospectionFailOpen", 0) == 1;
 
       // Protect reversible secrets at rest (the database password in this INI plus
       // the DB-stored route/fetch/relayer passwords) with machine-scoped Windows

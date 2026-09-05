@@ -5,6 +5,8 @@
 #include "StdAfx.h"
 
 #include "OAuth2TokenValidator.h"
+#include "JwksKeySet.h"
+#include "TokenIntrospection.h"
 
 #include "Unicode.h"
 #include "Hashing/HashCreator.h"
@@ -147,6 +149,15 @@ namespace HM
       if (config.username_claim.IsEmpty())
          config.username_claim = "email";
 
+      config.jwks_url = ini->GetOAuth2JwksUrl();
+      config.jwks_cache_seconds = ini->GetOAuth2JwksCacheSeconds();
+
+      config.introspection_url = ini->GetOAuth2IntrospectionUrl();
+      Unicode::WideToMultiByte(ini->GetOAuth2IntrospectionClientId(), config.introspection_client_id);
+      Unicode::WideToMultiByte(ini->GetOAuth2IntrospectionClientSecret(), config.introspection_client_secret);
+      config.introspection_cache_seconds = ini->GetOAuth2IntrospectionCacheSeconds();
+      config.introspection_fail_open = ini->GetOAuth2IntrospectionFailOpen();
+
       return config;
    }
 
@@ -216,7 +227,7 @@ namespace HM
       if (algUpper == "HS256")
          signatureValid = VerifyHs256_(signingInput, signature, config.hmac_secret);
       else if (algUpper == "RS256")
-         signatureValid = VerifyWithPublicKey_(signingInput, signature, config.rsa_public_key_file, EVP_PKEY_RSA);
+         signatureValid = VerifyAsymmetric_(config, header.get<std::string>("kid", "").c_str(), signingInput, signature, EVP_PKEY_RSA, out_error);
       else if (algUpper == "ES256")
       {
          // JWS carries an ECDSA signature as the raw R||S pair while OpenSSL verifies
@@ -232,7 +243,7 @@ namespace HM
             return false;
          }
 
-         signatureValid = VerifyWithPublicKey_(signingInput, der, config.rsa_public_key_file, EVP_PKEY_EC);
+         signatureValid = VerifyAsymmetric_(config, header.get<std::string>("kid", "").c_str(), signingInput, der, EVP_PKEY_EC, out_error);
       }
       else
       {
@@ -242,9 +253,13 @@ namespace HM
 
       if (!signatureValid)
       {
-         out_error = "JWT signature verification failed.";
+         // VerifyAsymmetric_ leaves the JWK Set's reason when the key could not even
+         // be found; a key that was found and did not verify says so plainly.
+         if (out_error.IsEmpty())
+            out_error = "JWT signature verification failed.";
          return false;
       }
+      out_error.Empty();
 
       boost::property_tree::ptree payload;
       if (!ParseJson(payloadJson, payload))
@@ -304,10 +319,53 @@ namespace HM
          return false;
       }
 
+      // Everything above is what the token says about itself. Introspection, when
+      // configured, is what the provider says about it now - the only check that sees
+      // a revocation.
+      if (!config.introspection_url.IsEmpty())
+      {
+         AnsiString reason;
+         if (!TokenIntrospection::Instance()->IsActive(config, sToken, (__int64) *exp, reason))
+         {
+            out_error = "JWT refused by token introspection: " + reason + ".";
+            return false;
+         }
+      }
+
       String username;
       Unicode::MultiByteToWide(claimValue, username);
       out_username = username;
       return true;
+   }
+
+   bool
+   OAuth2TokenValidator::VerifyAsymmetric_(const OAuth2Config &config, const AnsiString &kid, const AnsiString &sSigningInput,
+                                           const AnsiString &sSignature, int expectedKeyType, AnsiString &out_error)
+   {
+      out_error.Empty();
+
+      if (!config.jwks_url.IsEmpty())
+      {
+         EVP_PKEY *key = nullptr;
+         AnsiString jwksError;
+         if (JwksKeySet::Instance()->GetKey(config.jwks_url, config.jwks_cache_seconds, kid, expectedKeyType, &key, jwksError))
+         {
+            const bool verified = VerifyWithKey_(sSigningInput, sSignature, key);
+            EVP_PKEY_free(key);
+            if (verified)
+               return true;
+         }
+         else if (config.rsa_public_key_file.IsEmpty())
+         {
+            out_error = "JWT signing key not found: " + jwksError;
+            return false;
+         }
+
+         // The PEM file is the administrator's second source; a key the JWK Set does
+         // not (or no longer) hold may still be the one they configured by hand.
+      }
+
+      return VerifyWithPublicKey_(sSigningInput, sSignature, config.rsa_public_key_file, expectedKeyType);
    }
 
    bool
@@ -496,11 +554,23 @@ namespace HM
          return false;
       }
 
+      const bool result = VerifyWithKey_(sSigningInput, sSignature, pkey);
+
+      EVP_PKEY_free(pkey);
+      return result;
+   }
+
+   bool
+   OAuth2TokenValidator::VerifyWithKey_(const AnsiString &sSigningInput, const AnsiString &sSignature, EVP_PKEY *key)
+   {
+      if (key == nullptr)
+         return false;
+
       bool result = false;
       EVP_MD_CTX *ctx = EVP_MD_CTX_new();
       if (ctx != nullptr)
       {
-         if (EVP_DigestVerifyInit(ctx, nullptr, EVP_sha256(), nullptr, pkey) == 1 &&
+         if (EVP_DigestVerifyInit(ctx, nullptr, EVP_sha256(), nullptr, key) == 1 &&
              EVP_DigestVerifyUpdate(ctx, sSigningInput.c_str(), sSigningInput.GetLength()) == 1)
          {
             int rc = EVP_DigestVerifyFinal(ctx, (const unsigned char *) sSignature.c_str(), sSignature.GetLength());
@@ -509,7 +579,6 @@ namespace HM
          EVP_MD_CTX_free(ctx);
       }
 
-      EVP_PKEY_free(pkey);
       return result;
    }
 
