@@ -99,6 +99,7 @@ Technology
 | Async I/O | Boost 1.91 (Asio) |
 | Databases | MySQL, MariaDB, MS SQL Server, PostgreSQL 18 (libpq), and the embedded SQL CE for zero-configuration installs |
 | MySQL/MariaDB client | MariaDB Connector/C, shipped as `libmysql.dll` with auth plugins — works with MySQL 8 `caching_sha2_password` and MariaDB `ed25519`/`gssapi` out of the box. It requires TLS from the server by default; `AllowUnencryptedConnection=1` under `[Database]` lets it fall back to plaintext for a server that has none |
+| Database transport | Encrypted and verified from `hMailServer.ini`: `PostgreSQLSslMode` (libpq's `sslmode`, up to `verify-full`) and `PostgreSQLSslRootCert` for PostgreSQL, `ConnectionStringOptions` (the provider's own keywords, e.g. `Encrypt=yes;TrustServerCertificate=no`) for MS SQL Server, and TLS required by default for MySQL/MariaDB - all under `[Database]` |
 | Administration GUI and tools | C# / .NET 10 (WPF, Fluent design) |
 | Extensibility | COM/IDispatch API, plus a REST administration API |
 | Schema | Database version 6026, upgradeable from every earlier hMailServer release |
@@ -477,6 +478,15 @@ Administration and monitoring:
    IMAPSearchMaxMegabytes=2048   ; message content one IMAP SEARCH may read and parse (0 = no limit)
                                  ; SEARCH BODY/TEXT reads every message in the mailbox, so these bound what a single
                                  ; authenticated command can cost; raise them for mailboxes of several hundred thousand messages
+   SpamAssassinUser=             ; sent to spamd as the User: header of every scan, so spamd applies that user's
+                                 ; preferences (a user_prefs file, or its SQL preference store) instead of its
+                                 ; global configuration. Empty (the default) sends no header, which is what every
+                                 ; earlier release did; a spamd that cannot change to the user named may refuse
+                                 ; the scan, so set this only for a spamd prepared for it
+   SpamAssassinUserFromRecipient=0 ; 1 = a message with exactly one recipient is scanned as that recipient (its
+                                 ; address as the User: header - the shape a virtual-user spamd expects). A scan
+                                 ; runs once per message, so a message to several recipients falls back to
+                                 ; SpamAssassinUser, or to no header
    ManageSieveServerPort=0       ; ManageSieve (RFC 5804) script-management service (0 = disabled, standard port 4190)
    ManageSieveServerBindAddress=127.0.0.1  ; STARTTLS is offered when a TLS certificate is configured, and an
                                  ; IP range can require TLS before authentication; otherwise SASL PLAIN

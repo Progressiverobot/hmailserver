@@ -20,6 +20,10 @@
 
 #include "../BO/MessageData.h"
 #include "../BO/Message.h"
+#include "../BO/MessageRecipients.h"
+#include "../BO/MessageRecipient.h"
+#include "../Application/IniFileSettings.h"
+#include "../Util/Unicode.h"
 #include "../Util/event.h"
 #include "../Util/TraceHeaderWriter.h"
 #include "../Persistence/PersistentMessage.h"
@@ -104,6 +108,19 @@ namespace HM
          ErrorManager::Instance()->ReportError(ErrorManager::High, 5507, "SpamTestSpamAssassin::RunTest", message);
          return setSpamTestResults;  
       }
+
+      // The user spamd scans as - the one whose preferences it applies. A scan runs once
+      // per message, so a message to several recipients has no one user whose
+      // preferences would be the honest choice: it is scanned as the fixed profile, or
+      // as nobody, the way every message was before these settings existed.
+      String spamd_user = IniFileSettings::Instance()->GetSpamAssassinUser();
+      if (IniFileSettings::Instance()->GetSpamAssassinUserFromRecipient())
+      {
+         const std::vector<std::shared_ptr<MessageRecipient> > &recipients = pMessage->GetRecipients()->GetVector();
+         if (recipients.size() == 1 && recipients[0])
+            spamd_user = recipients[0]->GetAddress();
+      }
+      pSAClient->SetUser(Unicode::ToANSI(spamd_user));
 
       // Here we handle of the ownership to the TCPIP-connection layer.
       if (pSAClient->Connect(ip_address, iPort, IPAddress()))

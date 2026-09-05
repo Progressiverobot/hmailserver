@@ -62,6 +62,7 @@ namespace HM
       smtpcmax_timeout_(0),
       samin_timeout_(0),
       samax_timeout_(0),
+      spamassassin_user_from_recipient_(false),
       clam_min_timeout_(0),
       clam_max_timeout_(0),
       samove_vs_copy_(false),
@@ -149,6 +150,9 @@ namespace HM
       no_of_dbconnection_attempts_ = ReadIniSettingInteger_("Database", "ConnectionAttempts", 6);  
       no_of_dbconnection_attempts_Delay = ReadIniSettingInteger_("Database", "ConnectionAttemptsDelay", 5);  
       database_allow_unencrypted_connection_ = ReadIniSettingInteger_("Database", "AllowUnencryptedConnection", 0) == 1;
+      database_postgresql_ssl_mode_ = ReadIniSettingString_("Database", "PostgreSQLSslMode", "");
+      database_postgresql_ssl_root_cert_ = ReadIniSettingString_("Database", "PostgreSQLSslRootCert", "");
+      database_connection_string_options_ = ReadIniSettingString_("Database", "ConnectionStringOptions", "");
       
       if (sqldbtype_ == HM::DatabaseSettings::TypeMSSQLCompactEdition)
       {
@@ -290,6 +294,24 @@ namespace HM
       smtpcmax_timeout_ =  ReadIniSettingInteger_("Settings", "SMTPCMaxTimeout",600);
       samin_timeout_ =  ReadIniSettingInteger_("Settings", "SAMinTimeout", 30);
       samax_timeout_ =  ReadIniSettingInteger_("Settings", "SAMaxTimeout",90);
+
+      // The spamd User: header. The value goes onto the wire as a protocol header line,
+      // so a control character in it would end that line early or start another one;
+      // refused rather than sent, with the reason reported, because a header spamd
+      // rejects is a scan that never happens.
+      spamassassin_user_ = ReadIniSettingString_("Settings", "SpamAssassinUser", "");
+      for (int i = 0; i < spamassassin_user_.GetLength(); i++)
+      {
+         const wchar_t ch = spamassassin_user_[i];
+         if (ch < 0x20 || ch == 0x7F)
+         {
+            ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5562, "IniFileSettings::LoadSettings",
+               "SpamAssassinUser in hMailServer.ini contains a control character and has been ignored; no User: header is sent to spamd.");
+            spamassassin_user_ = "";
+            break;
+         }
+      }
+      spamassassin_user_from_recipient_ = ReadIniSettingInteger_("Settings", "SpamAssassinUserFromRecipient", 0) == 1;
       // Upper bound, in seconds, on the accept/save work that runs after end-of-data
       // and holds the thread that sends the "250". Past this the message is refused
       // with a temporary 451 so the sending MTA retries, rather than the reply

@@ -8,6 +8,7 @@
 #include "PGRecordset.h"
 #include "DatabaseSettings.h"
 #include "..\Util\Unicode.h"
+#include "../Application/IniFileSettings.h"
 #include "Macros/PGSQLMacroExpander.h"
 
 #ifdef _DEBUG
@@ -60,6 +61,46 @@ namespace HM
             sConnectionString += " dbname='postgres'";
          else
             sConnectionString += " dbname='" + sDatabase + "'";
+
+         // TLS to the server, from hMailServer.ini rather than from PGSSLMODE in the
+         // service's environment. libpq's own default is prefer: encrypted when the
+         // server offers it, verified never. A mode this code does not know is a
+         // refused connection with the reason in the log, not a silent fall-back to
+         // that default - a typo in the one setting that is supposed to require
+         // verification must not switch verification off.
+         String sslMode = IniFileSettings::Instance()->GetDatabasePostgreSQLSslMode();
+         if (!sslMode.IsEmpty())
+         {
+            static const wchar_t *knownModes[] = { L"disable", L"allow", L"prefer", L"require", L"verify-ca", L"verify-full" };
+            bool known = false;
+            for (const wchar_t *mode : knownModes)
+            {
+               if (sslMode.CompareNoCase(mode) == 0)
+               {
+                  sslMode = mode;
+                  known = true;
+               }
+            }
+
+            if (!known)
+            {
+               sErrorMessage = "PostgreSQLSslMode in hMailServer.ini is '" + sslMode + "'; it must be one of disable, allow, prefer, require, verify-ca or verify-full. The connection was not attempted.";
+               ErrorManager::Instance()->ReportError(ErrorManager::Critical, 5563, "PGConnection::Connect", sErrorMessage);
+               return TemporaryFailure;
+            }
+
+            sConnectionString += " sslmode='" + sslMode + "'";
+         }
+
+         // A Windows path, so the backslashes have to be doubled: inside a single-quoted
+         // conninfo value libpq reads a backslash as an escape.
+         String sslRootCert = IniFileSettings::Instance()->GetDatabasePostgreSQLSslRootCert();
+         if (!sslRootCert.IsEmpty())
+         {
+            sslRootCert.Replace(_T("\\"), _T("\\\\"));
+            sslRootCert.Replace(_T("'"), _T("\\'"));
+            sConnectionString += " sslrootcert='" + sslRootCert + "'";
+         }
 
          dbconn_ = PQconnectdb(Unicode::ToANSI(sConnectionString));
 

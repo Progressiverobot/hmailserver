@@ -69,6 +69,13 @@ namespace HM
 	  String sConLen;
 	  sConLen.Format(_T("Content-length: %I64d\r\n"), message_size_);
 	  EnqueueWrite(sConLen);
+
+     // RFC-less but documented in spamd's protocol notes: "User: <name>" selects the
+     // preferences the scan runs under. Only sent when configured, so a spamd that was
+     // never told about users keeps seeing the request it always saw.
+     if (!user_.IsEmpty())
+        EnqueueWrite("User: " + user_ + "\r\n");
+
 	  EnqueueWrite("\r\n");
      SendFileContents_(message_file_);
    }
