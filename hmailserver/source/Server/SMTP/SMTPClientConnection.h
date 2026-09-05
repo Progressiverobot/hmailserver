@@ -97,6 +97,14 @@ namespace HM
       void UpdateRecipientWithError_(int iErrorCode, const AnsiString &sResponse,std::shared_ptr<MessageRecipient> pRecipient, bool bPreConnectError, const String &enhancedStatusCode, bool responseIsRemoteReply);
 
       std::shared_ptr<MessageRecipient> GetNextRecipient_();
+
+      bool PipeliningAvailable_() const;
+      bool ChunkingAvailable_() const;
+      void SendPipelinedEnvelope_();
+      void SendDataCommand_(bool pipelined);
+      void StartBdat_();
+      void ReadAndSendRaw_();
+      bool ProtocolEnvelopePipelined_(int code, const AnsiString &request);
       void UpdateSuccessfulRecipients_();
 
       enum ConnectionState
@@ -115,7 +123,20 @@ namespace HM
          DATASENT = 8,
          QUITSENT = 14,
          STARTTLSSENT = 15,
-         XOAUTH2SENT = 16
+         XOAUTH2SENT = 16,
+
+         // RFC 2920: MAIL FROM, every RCPT TO and the data command went out in one
+         // flight; the replies are counted back in the same order.
+         ENVELOPEPIPELINED = 17,
+
+         // RFC 3030: the BDAT chunk is queued or sent; the next reply is its result.
+         BDATSENT = 18,
+
+         // A pipelined DATA was accepted with 354 after MAIL FROM or every RCPT TO
+         // had failed: an empty body was sent to end the transaction where the
+         // remote expects it to end (RFC 2920 3.2), and whatever it replies, QUIT
+         // follows.
+         DATAABANDONED = 19
       };
 
       void SetState_(ConnectionState eCurState);
@@ -143,11 +164,32 @@ namespace HM
       // 0 = advertised with no fixed limit, >0 = the advertised maximum.
       __int64 remote_size_limit_ = -1;
 
-      // RFC 3030: whether the remote's EHLO advertised BINARYMIME. Recorded only
-      // to make the refusal in ProtocolSendMailFrom_ honest about WHY a binary
-      // message cannot be sent - this client transmits via DATA only, so it
-      // cannot deliver a BINARYMIME message even to a remote that accepts them.
+      // RFC 3030: whether the remote's EHLO advertised BINARYMIME. With CHUNKING
+      // advertised as well (and OutboundChunking on), a message that arrived as
+      // BINARYMIME is relayed as it is - BODY=BINARYMIME on MAIL FROM and the raw
+      // bytes in a BDAT chunk. Without both, ProtocolSendMailFrom_ refuses it, and
+      // this flag makes the refusal honest about why.
       bool remote_supports_binarymime_ = false;
+
+      // RFC 2920 and RFC 3030, read from the EHLO reply. Pipelining sends the whole
+      // envelope and the data command in one flight and counts the replies back;
+      // chunking replaces DATA - its 354 round trip and its dot-stuffing - with
+      // BDAT <size> LAST followed by the message's bytes as they are.
+      bool remote_supports_pipelining_ = false;
+      bool remote_supports_chunking_ = false;
+
+      // The pipelined envelope: how many replies are owed (MAIL FROM, one per RCPT
+      // TO, the data command), how many have arrived, whether MAIL FROM was
+      // refused - in which case the RCPT and data replies are consumed and
+      // ignored, every recipient already carrying the real error - and the
+      // command each reply answers, so a bounce quotes the right one.
+      unsigned int pipeline_replies_expected_ = 0;
+      unsigned int pipeline_replies_seen_ = 0;
+      bool pipeline_mail_failed_ = false;
+      std::vector<AnsiString> pipeline_commands_;
+
+      // Whether the data command in flight is BDAT rather than DATA.
+      bool using_bdat_ = false;
 
       String username_;
       String password_;

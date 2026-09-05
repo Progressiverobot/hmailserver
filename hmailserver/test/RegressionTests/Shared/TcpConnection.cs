@@ -242,6 +242,24 @@ namespace RegressionTests.Shared
          throw new InvalidOperationException("Timeout while waiting for server response");
       }
 
+      /// <summary>
+      ///    True when at least one byte can be read within the timeout; false when
+      ///    the window passed with nothing, or the peer has gone. What a simulated
+      ///    server uses to see whether a client sent more before waiting for a reply.
+      /// </summary>
+      public bool WaitForData(TimeSpan timeout)
+      {
+         if (!_tcpClient.Connected)
+            return false;
+
+         int microseconds = (int) Math.Min(int.MaxValue, timeout.TotalMilliseconds * 1000);
+
+         if (!_tcpClient.Client.Poll(microseconds, SelectMode.SelectRead))
+            return false;
+
+         return _tcpClient.Available > 0;
+      }
+
       public string Receive()
       {
          var messageData = new StringBuilder();

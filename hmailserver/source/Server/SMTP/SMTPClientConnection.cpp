@@ -196,6 +196,7 @@ namespace HM
          current_state_ == MAILFROMSENT ||
          current_state_ == DATACOMMANDSENT ||
          current_state_ == DATASENT ||
+         current_state_ == BDATSENT ||
          current_state_ == PASSWORDSENT;
 
       if (ifFailureFailAllRecipientsAndQuit)
@@ -264,6 +265,17 @@ namespace HM
          return true;
       case RCPTTOSENT:
          ProtocolRcptToSent_(iCode, Request);
+         return true;
+      case ENVELOPEPIPELINED:
+         return ProtocolEnvelopePipelined_(iCode, Request);
+      case BDATSENT:
+         // The chunk was accepted - a refusal was caught above - so the
+         // transaction is complete for every recipient accepted at RCPT TO.
+         SendQUIT_();
+         UpdateSuccessfulRecipients_();
+         return true;
+      case DATAABANDONED:
+         SendQUIT_();
          return true;
       case QUITSENT:
          // We just received a reply on our QUIT. Time to disconnect.
@@ -338,8 +350,7 @@ namespace HM
          }
          else
          {
-            EnqueueWrite_("DATA");
-            current_state_ = DATACOMMANDSENT;
+            SendDataCommand_(false);
          }
          
       }
@@ -396,18 +407,26 @@ namespace HM
       // BEFORE its bytes are transferred rather than after.
       remote_size_limit_ = -1;
       remote_supports_binarymime_ = false;
+      remote_supports_pipelining_ = false;
+      remote_supports_chunking_ = false;
       std::vector<AnsiString> ehloLines = StringParser::SplitString(request, "\r\n");
       for (const AnsiString &line : ehloLines)
       {
-         // RFC 3030: an exact-keyword match ("250-BINARYMIME" / "250 BINARYMIME"),
-         // not a substring scan, so an unrelated capability containing the word
-         // cannot count as support. Informational only - see the member.
+         // Exact-keyword matches ("250-BINARYMIME" / "250 BINARYMIME"), not
+         // substring scans, so an unrelated capability containing the word cannot
+         // count as support. BINARYMIME, PIPELINING (RFC 2920) and CHUNKING (RFC
+         // 3030) each change what the envelope and the body transmission look like
+         // - see the members.
          if (line.GetLength() >= 4)
          {
             AnsiString keyword = line.Mid(4);
             keyword.Trim();
             if (keyword.CompareNoCase("BINARYMIME") == 0)
                remote_supports_binarymime_ = true;
+            if (keyword.CompareNoCase("PIPELINING") == 0)
+               remote_supports_pipelining_ = true;
+            if (keyword.CompareNoCase("CHUNKING") == 0)
+               remote_supports_chunking_ = true;
          }
 
          // A capability line is "250-SIZE 52428800" or "250 SIZE" - four digits,
@@ -516,18 +535,23 @@ namespace HM
       // a local distribution list with an external member, a local alias
       // resolving to an external address, a route whose recipients are treated
       // as local, a forward, a rule or a mirror.
-      if (delivery_message_ && delivery_message_->GetBinaryMime())
+      bool binaryMime = delivery_message_ && delivery_message_->GetBinaryMime();
+
+      // A binary body can only travel in a BDAT chunk, so relaying one needs the
+      // remote to advertise BINARYMIME and CHUNKING both - and chunking to be on.
+      if (binaryMime && !(remote_supports_binarymime_ && ChunkingAvailable_()))
       {
          String errorMessage = remote_supports_binarymime_
-            ? _T("This message was received as BINARYMIME (raw binary content, RFC 3030) and cannot be relayed: the receiving server does advertise BINARYMIME, but this server's delivery client transmits via DATA only and cannot send binary content. Conversion required but not supported.")
+            ? _T("This message was received as BINARYMIME (raw binary content, RFC 3030) and cannot be relayed: the receiving server advertises BINARYMIME but not CHUNKING (or OutboundChunking is off on this server), and a binary body can only be transmitted in a BDAT chunk. Conversion required but not supported.")
             : _T("This message was received as BINARYMIME (raw binary content, RFC 3030) and cannot be relayed: the receiving server did not advertise BINARYMIME, and converting the content to a 7-bit-safe encoding is not supported. Conversion required but not supported.");
 
          // Loud on purpose (HM6340): every occurrence is a permanently bounced
          // message, and the administrator reading the error log should not have
          // to reconstruct the cause from the DSN alone.
          String logMessage;
-         logMessage.Format(_T("Message %I64d was received with BODY=BINARYMIME and had a recipient requiring onward relay (via a distribution list, forward, rule or mirror). It was not transmitted and a DSN (554 5.6.3) was generated. This server cannot relay binary messages; the sender must re-encode the content."),
-            delivery_message_->GetID());
+         logMessage.Format(_T("Message %I64d was received with BODY=BINARYMIME and had a recipient requiring onward relay. It was not transmitted and a DSN (554 5.6.3) was generated: a binary message can only be relayed to a receiving server that advertises BINARYMIME and CHUNKING (and only while OutboundChunking is on), and this one %s. The sender must re-encode the content for that destination."),
+            delivery_message_->GetID(),
+            remote_supports_binarymime_ ? _T("advertises BINARYMIME but not CHUNKING, or OutboundChunking is off") : _T("does not advertise BINARYMIME"));
          ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6340, "SMTPClientConnection::ProtocolSendMailFrom_", logMessage);
 
          UpdateAllRecipientsWithError_(554, errorMessage, false, _T("5.6.3"), false);
@@ -589,8 +613,252 @@ namespace HM
          sData += sizeParameter;
       }
 
+      if (binaryMime)
+         sData += " BODY=BINARYMIME";
+
       EnqueueWrite_(sData);
       current_state_ = MAILFROMSENT;
+
+      if (PipeliningAvailable_())
+         SendPipelinedEnvelope_();
+   }
+
+   bool
+   SMTPClientConnection::PipeliningAvailable_() const
+   {
+      return remote_supports_pipelining_ && IniFileSettings::Instance()->GetOutboundPipelining();
+   }
+
+   bool
+   SMTPClientConnection::ChunkingAvailable_() const
+   {
+      return remote_supports_chunking_ && IniFileSettings::Instance()->GetOutboundChunking();
+   }
+
+   void
+   SMTPClientConnection::SendPipelinedEnvelope_()
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // RFC 2920. MAIL FROM has just been queued; every RCPT TO and the data command
+   // follow it without waiting for a reply, and ProtocolEnvelopePipelined_ counts
+   // the replies back in the same order. One round trip for the whole envelope
+   // instead of one per command - which, on a distant or slow remote, is most of
+   // what a delivery costs. The command behind each reply is kept so that a
+   // bounce quotes the command the remote actually refused.
+   //---------------------------------------------------------------------------()
+   {
+      pipeline_commands_.clear();
+      pipeline_commands_.push_back(last_sent_data_);
+
+      for (std::shared_ptr<MessageRecipient> recipient : recipients_)
+      {
+         EnqueueWrite_("RCPT TO:<" + recipient->GetAddress() + ">");
+         pipeline_commands_.push_back(last_sent_data_);
+      }
+
+      pipeline_replies_expected_ = 1 + (unsigned int) recipients_.size() + 1;
+      pipeline_replies_seen_ = 0;
+      pipeline_mail_failed_ = false;
+
+      current_state_ = ENVELOPEPIPELINED;
+
+      SendDataCommand_(true);
+      pipeline_commands_.push_back(last_sent_data_);
+   }
+
+   void
+   SMTPClientConnection::SendDataCommand_(bool pipelined)
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // DATA, or BDAT when the remote advertises CHUNKING. On the one-command-at-a-
+   // time path this also moves the state on; on the pipelined path the counting
+   // state stays until every reply is in.
+   //---------------------------------------------------------------------------()
+   {
+      if (ChunkingAvailable_())
+      {
+         if (!pipelined)
+            current_state_ = BDATSENT;
+
+         StartBdat_();
+         return;
+      }
+
+      EnqueueWrite_("DATA");
+
+      if (!pipelined)
+         current_state_ = DATACOMMANDSENT;
+   }
+
+   void
+   SMTPClientConnection::StartBdat_()
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // RFC 3030: one BDAT chunk carrying the whole message, marked LAST. No 354 to
+   // wait for and no dot-stuffing - the bytes go as they are, which is also what
+   // makes a message received as BINARYMIME relayable at all. The chunk is
+   // streamed the way DATA's body is, a buffer at a time from OnDataSent, but
+   // past TransparentTransmissionBuffer, whose transparency BDAT does not have.
+   // The reply is read by whoever armed the read for the command: it arrives
+   // once the remote has consumed the chunk.
+   //---------------------------------------------------------------------------()
+   {
+      const String fileName = PersistentMessage::GetFileName(delivery_message_);
+
+      bool file_opened = false;
+
+      try
+      {
+         file_opened = current_file_.Open(fileName, File::OTReadOnly);
+      }
+      catch (...)
+      {
+         file_opened = false;
+      }
+
+      if (!file_opened)
+      {
+         bool missing = !FileUtilities::Exists(fileName);
+
+         FailDeliveryDueToUnreadableFile_(fileName,
+            missing ? _T("does not exist") : _T("could not be opened"), missing);
+         return;
+      }
+
+      unsigned __int64 size = 0;
+
+      if (!FileUtilities::FileSize64(fileName, size) || size == 0)
+      {
+         FailDeliveryDueToUnreadableFile_(fileName, _T("is empty"), false);
+         return;
+      }
+
+      using_bdat_ = true;
+
+      String command;
+      command.Format(_T("BDAT %I64u LAST"), size);
+      EnqueueWrite_(command);
+
+      ReadAndSendRaw_();
+   }
+
+   void
+   SMTPClientConnection::ReadAndSendRaw_()
+   {
+      // A session that ended mid-chunk - a refusal read early, a timeout - must
+      // not have the rest of the chunk sent behind its QUIT.
+      if (current_state_ != BDATSENT && current_state_ != ENVELOPEPIPELINED)
+      {
+         current_file_.Close();
+         return;
+      }
+
+      std::shared_ptr<ByteBuffer> pBuffer = current_file_.ReadChunk(GetBufferSize());
+
+      if (pBuffer->GetSize() > 0)
+      {
+         EnqueueWrite(pBuffer);
+         return;
+      }
+
+      current_file_.Close();
+   }
+
+   bool
+   SMTPClientConnection::ProtocolEnvelopePipelined_(int code, const AnsiString &request)
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // One reply of a pipelined envelope, matched to its command by position: the
+   // first answers MAIL FROM, then one per RCPT TO in the order they were sent,
+   // then the data command's. RFC 2920 3.2: every status is checked; a MAIL FROM
+   // failure means the RCPT and data replies are consumed and ignored (they are
+   // 503s, and every recipient already carries the real error); and a DATA that
+   // was accepted with 354 when there is nothing to send is closed with an empty
+   // body rather than left open. Returns whether the caller should arm the next
+   // read - false once the body transmission has taken over, since it arms its
+   // own when the body has gone.
+   //---------------------------------------------------------------------------()
+   {
+      unsigned int index = pipeline_replies_seen_++;
+      bool positive = IsPositiveCompletion(code);
+
+      if (index < pipeline_commands_.size())
+         last_sent_data_ = pipeline_commands_[index];
+
+      if (index == 0)
+      {
+         if (!positive)
+         {
+            pipeline_mail_failed_ = true;
+            UpdateAllRecipientsWithError_(code, request, false,
+               DeliveryFailure::EnhancedStatusFromSmtpReply(code, request, false), true);
+         }
+
+         return true;
+      }
+
+      if (index + 1 < pipeline_replies_expected_)
+      {
+         if (!pipeline_mail_failed_ && index - 1 < recipients_.size())
+         {
+            std::shared_ptr<MessageRecipient> recipient = recipients_[index - 1];
+
+            if (positive)
+               actual_recipients_.insert(recipient);
+            else
+               UpdateRecipientWithError_(code, request, recipient, false,
+                  DeliveryFailure::EnhancedStatusFromSmtpReply(code, request, true), true);
+         }
+
+         return true;
+      }
+
+      // The data command's reply.
+      bool nothingToSend = pipeline_mail_failed_ || actual_recipients_.empty();
+
+      if (using_bdat_)
+      {
+         // The chunk went out with the envelope; this reply is the remote's
+         // verdict on the whole transaction.
+         if (!nothingToSend)
+         {
+            if (positive)
+               UpdateSuccessfulRecipients_();
+            else
+               UpdateAllRecipientsWithError_(code, request, false,
+                  DeliveryFailure::EnhancedStatusFromSmtpReply(code, request, false), true);
+         }
+
+         SendQUIT_();
+         return true;
+      }
+
+      if (nothingToSend)
+      {
+         if (code == 354)
+         {
+            EnqueueWrite_(".");
+            current_state_ = DATAABANDONED;
+         }
+         else
+         {
+            SendQUIT_();
+         }
+
+         return true;
+      }
+
+      if (code != 354)
+      {
+         UpdateAllRecipientsWithError_(code, request, false,
+            DeliveryFailure::EnhancedStatusFromSmtpReply(code, request, false), true);
+         SendQUIT_();
+         return true;
+      }
+
+      current_state_ = DATACOMMANDSENT;
+      ProtocolData_();
+      return false;
    }
 
    bool
@@ -1022,7 +1290,10 @@ namespace HM
       if (!current_file_.IsOpen())
          return;
 
-      ReadAndSend_();
+      if (using_bdat_)
+         ReadAndSendRaw_();
+      else
+         ReadAndSend_();
    }
 
 
