@@ -4,7 +4,8 @@
     x:Class="hMailServer.ControlPanel.Views.SslCertificatesView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:local="clr-namespace:hMailServer.ControlPanel.Views">
 
     <Grid Margin="26,20">
         <Grid.RowDefinitions>
@@ -58,7 +59,7 @@
                     </DataGridTemplateColumn>
                 </DataGrid.Columns>
             </DataGrid>
-            <TextBlock x:Name="EmptyStatus" Visibility="Collapsed"
+            <TextBlock x:Name="EmptyStatus" AutomationProperties.LiveSetting="Polite" Visibility="Collapsed"
                        HorizontalAlignment="Center" VerticalAlignment="Center"
                        FontSize="14" Opacity="0.7" TextWrapping="Wrap" TextAlignment="Center"
                        Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
@@ -73,15 +74,15 @@
                 <TextBlock x:Name="DetailsTitle" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,8" />
                 <StackPanel x:Name="DetailsLines" />
 
-                <TextBlock Text="Private key passphrase" FontSize="14" FontWeight="SemiBold" Margin="0,12,0,4" />
+                <TextBlock Text="Private _key passphrase" local:Mnemonic.Target="{Binding ElementName=PassphraseBox}" FontSize="14" FontWeight="SemiBold" Margin="0,12,0,4" />
                 <TextBlock FontSize="12" Opacity="0.75" TextWrapping="Wrap" Margin="0,0,0,8"
                            Text="Only needed when the key file is encrypted: with an encrypted key and no passphrase, the key does not load (server error 6170) and every TLS port using this certificate does not start - inbound mail on those ports stops. The passphrase is a secret: it is stored protected on the server and never displayed here again, and saving a new one replaces whatever was stored before." />
                 <StackPanel Orientation="Horizontal">
                     <ui:PasswordBox x:Name="PassphraseBox" Width="280" PlaceholderText="New passphrase"
                                     AutomationProperties.Name="New private key passphrase for the selected certificate" />
-                    <ui:Button Content="Save passphrase" Appearance="Primary" Margin="8,0,0,0" Click="SavePassphrase_Click"
+                    <ui:Button Content="Save _passphrase" Appearance="Primary" Margin="8,0,0,0" Click="SavePassphrase_Click"
                                AutomationProperties.Name="Save the private key passphrase for the selected certificate" />
-                    <ui:Button Content="Remove stored passphrase" Margin="8,0,0,0" Click="ClearPassphrase_Click"
+                    <ui:Button Content="_Remove stored passphrase" Margin="8,0,0,0" Click="ClearPassphrase_Click"
                                AutomationProperties.Name="Remove the stored private key passphrase from the selected certificate" />
                 </StackPanel>
             </StackPanel>
@@ -110,9 +111,9 @@
                                 AutomationProperties.Name="Private key file for the new certificate" />
                     <ui:Button Grid.Column="4" Content="…" Click="BrowseKey_Click" Margin="0,0,8,0"
                                AutomationProperties.Name="Browse for the private key file" />
-                    <ui:Button Grid.Column="5" Content="Add" Appearance="Primary" Click="Add_Click" Margin="0,0,8,0"
+                    <ui:Button Grid.Column="5" Content="_Add" Appearance="Primary" Click="Add_Click" Margin="0,0,8,0"
                                AutomationProperties.Name="Add the certificate" />
-                    <ui:Button Grid.Column="6" Content="Delete selected" Appearance="Danger" Click="Delete_Click"
+                    <ui:Button Grid.Column="6" Content="_Delete selected" Appearance="Danger" Click="Delete_Click"
                                AutomationProperties.Name="Delete the selected certificate" />
                 </Grid>
                 <StackPanel Orientation="Horizontal" Margin="0,8,0,0">

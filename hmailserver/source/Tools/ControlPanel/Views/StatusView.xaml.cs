@@ -90,14 +90,14 @@ namespace hMailServer.ControlPanel.Views
          switch (state)
          {
             case ServerStateRunning_:
-               PauseButton.Content = "Pause";
+               PauseButton.Content = "_Pause";
                PauseButtonIcon.Symbol = Wpf.Ui.Controls.SymbolRegular.Pause24;
                PauseButton.IsEnabled = true;
                break;
             case ServerStateStopped_:
                // The glyph swaps with the verb - a "Resume" button wearing a
                // pause icon says two things at once, and one of them is wrong.
-               PauseButton.Content = "Resume";
+               PauseButton.Content = "_Resume";
                PauseButtonIcon.Symbol = Wpf.Ui.Controls.SymbolRegular.Play24;
                PauseButton.IsEnabled = true;
                break;
@@ -107,7 +107,7 @@ namespace hMailServer.ControlPanel.Views
                break;
          }
 
-         AutomationProperties.SetName(PauseButton, (string)PauseButton.Content + " the mail server engine");
+         AutomationProperties.SetName(PauseButton, MnemonicText.Strip((string)PauseButton.Content) + " the mail server engine");
       }
 
       private static string DatabaseTypeName(int type) => type switch

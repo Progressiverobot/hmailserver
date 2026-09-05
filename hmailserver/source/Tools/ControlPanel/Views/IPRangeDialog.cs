@@ -27,27 +27,27 @@ namespace hMailServer.ControlPanel.Views
       private readonly TextBox priority_ = new();
 
       // Connections
-      private readonly CheckBox smtp_ = new() { Content = "Allow SMTP connections", FontSize = Typography.Body };
-      private readonly CheckBox imap_ = new() { Content = "Allow IMAP connections", FontSize = Typography.Body };
-      private readonly CheckBox pop3_ = new() { Content = "Allow POP3 connections", FontSize = Typography.Body };
+      private readonly CheckBox smtp_ = new() { Content = "Allow SM_TP connections", FontSize = Typography.Body };
+      private readonly CheckBox imap_ = new() { Content = "Allow _IMAP connections", FontSize = Typography.Body };
+      private readonly CheckBox pop3_ = new() { Content = "Allow _POP3 connections", FontSize = Typography.Body };
 
       // Relaying
-      private readonly CheckBox ll_ = new() { Content = "Local to local", FontSize = Typography.Body };
-      private readonly CheckBox lr_ = new() { Content = "Local to external (relay out)", FontSize = Typography.Body };
-      private readonly CheckBox rl_ = new() { Content = "External to local", FontSize = Typography.Body };
-      private readonly CheckBox rr_ = new() { Content = "External to external (open relay!)", FontSize = Typography.Body };
+      private readonly CheckBox ll_ = new() { Content = "_Local to local", FontSize = Typography.Body };
+      private readonly CheckBox lr_ = new() { Content = "Local to _external (relay out)", FontSize = Typography.Body };
+      private readonly CheckBox rl_ = new() { Content = "E_xternal to local", FontSize = Typography.Body };
+      private readonly CheckBox rr_ = new() { Content = "External to external (_open relay!)", FontSize = Typography.Body };
 
       // SMTP authentication required
-      private readonly CheckBox authLL_ = new() { Content = "Require auth: local to local", FontSize = Typography.Body };
-      private readonly CheckBox authLE_ = new() { Content = "Require auth: local to external", FontSize = Typography.Body };
-      private readonly CheckBox authEL_ = new() { Content = "Require auth: external to local", FontSize = Typography.Body };
-      private readonly CheckBox authEE_ = new() { Content = "Require auth: external to external", FontSize = Typography.Body };
-      private readonly CheckBox tlsAuth_ = new() { Content = "Require SSL/TLS when authenticating", FontSize = Typography.Body };
+      private readonly CheckBox authLL_ = new() { Content = "Require auth: _local to local", FontSize = Typography.Body };
+      private readonly CheckBox authLE_ = new() { Content = "Require auth: local to _external", FontSize = Typography.Body };
+      private readonly CheckBox authEL_ = new() { Content = "Require auth: e_xternal to local", FontSize = Typography.Body };
+      private readonly CheckBox authEE_ = new() { Content = "Require auth: external to exte_rnal", FontSize = Typography.Body };
+      private readonly CheckBox tlsAuth_ = new() { Content = "Require SSL/_TLS when authenticating", FontSize = Typography.Body };
 
       // Protection + expiry
-      private readonly CheckBox spam_ = new() { Content = "Enable anti-spam for this range", FontSize = Typography.Body };
-      private readonly CheckBox virus_ = new() { Content = "Enable anti-virus for this range", FontSize = Typography.Body };
-      private readonly CheckBox expires_ = new() { Content = "This range expires", FontSize = Typography.Body };
+      private readonly CheckBox spam_ = new() { Content = "Enable _anti-spam for this range", FontSize = Typography.Body };
+      private readonly CheckBox virus_ = new() { Content = "Enable anti-_virus for this range", FontSize = Typography.Body };
+      private readonly CheckBox expires_ = new() { Content = "This range _expires", FontSize = Typography.Body };
       private readonly TextBox expiresTime_ = new();
 
       public IPRangeDialog(Window owner, int rangeId)
@@ -81,7 +81,7 @@ namespace hMailServer.ControlPanel.Views
 
          var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
          // Enter saves, Escape cancels. Neither worked before.
-         var save = new Wpf.Ui.Controls.Button { Content = "Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
+         var save = new Wpf.Ui.Controls.Button { Content = "_Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
          save.Click += (s, e) => Save();
          var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel", IsCancel = true };
          cancel.Click += (s, e) => Close();
@@ -97,13 +97,13 @@ namespace hMailServer.ControlPanel.Views
       private ScrollViewer BuildGeneral()
       {
          var p = Panel();
-         p.Children.Add(Label("Name", name_));
+         p.Children.Add(Label("_Name", name_));
          p.Children.Add(Input(name_));
-         p.Children.Add(Label("Lower IP address", lower_));
+         p.Children.Add(Label("_Lower IP address", lower_));
          p.Children.Add(Input(lower_));
-         p.Children.Add(Label("Upper IP address", upper_));
+         p.Children.Add(Label("_Upper IP address", upper_));
          p.Children.Add(Input(upper_));
-         p.Children.Add(Label("Priority (higher wins when ranges overlap)", priority_));
+         p.Children.Add(Label("_Priority (higher wins when ranges overlap)", priority_));
          p.Children.Add(Input(priority_));
          return Scroll(p);
       }
@@ -148,7 +148,7 @@ namespace hMailServer.ControlPanel.Views
          p.Children.Add(virus_);
          p.Children.Add(Separator());
          p.Children.Add(expires_);
-         p.Children.Add(Label("Expiry time (YYYY-MM-DD HH:MM:SS)", expiresTime_));
+         p.Children.Add(Label("Expiry _time (YYYY-MM-DD HH:MM:SS)", expiresTime_));
          p.Children.Add(Input(expiresTime_));
          return Scroll(p);
       }
@@ -277,11 +277,12 @@ namespace hMailServer.ControlPanel.Views
       /// </summary>
       private static TextBlock Label(string text, FrameworkElement editor = null)
       {
-         var t = new TextBlock { Text = text, FontSize = Typography.Label, Margin = new Thickness(0, 8, 0, 4) };
+         var t = new TextBlock { FontSize = Typography.Label, Margin = new Thickness(0, 8, 0, 4) };
          t.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
+         Mnemonic.Apply(t, text, editor);
 
          if (editor != null)
-            AutomationProperties.SetName(editor, AccessibleNames.Qualify(text, ""));
+            AutomationProperties.SetName(editor, AccessibleNames.Qualify(MnemonicText.Strip(text), ""));
 
          return t;
       }

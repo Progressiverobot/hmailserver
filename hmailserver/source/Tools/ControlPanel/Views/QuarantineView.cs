@@ -397,10 +397,10 @@ namespace hMailServer.ControlPanel.Views
          root.Children.Add(hint);
 
          var toolbar = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 10) };
-         toolbar.Children.Add(MakeButton("Release", Wpf.Ui.Controls.ControlAppearance.Primary, (_, _) => ReleaseSelected()));
-         toolbar.Children.Add(MakeButton("Delete", Wpf.Ui.Controls.ControlAppearance.Danger, (_, _) => DeleteSelected()));
-         toolbar.Children.Add(MakeButton("Remove expired", Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => SweepExpired()));
-         toolbar.Children.Add(MakeButton("Refresh", Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => Reload()));
+         toolbar.Children.Add(MakeButton("_Release", Wpf.Ui.Controls.ControlAppearance.Primary, (_, _) => ReleaseSelected()));
+         toolbar.Children.Add(MakeButton("_Delete", Wpf.Ui.Controls.ControlAppearance.Danger, (_, _) => DeleteSelected()));
+         toolbar.Children.Add(MakeButton("Remove _expired", Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => SweepExpired()));
+         toolbar.Children.Add(MakeButton("Re_fresh", Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => Reload()));
          root.Children.Add(toolbar);
 
          var card = new Border { Padding = new Thickness(8) };

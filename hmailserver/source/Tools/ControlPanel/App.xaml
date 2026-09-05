@@ -120,6 +120,8 @@
             </Style>
 
             <Style x:Key="PageTitle" TargetType="TextBlock">
+                <!-- A page title is the page's level-1 heading: screen readers navigate by headings, and without this a page has none. -->
+                <Setter Property="AutomationProperties.HeadingLevel" Value="Level1" />
                 <Setter Property="FontSize" Value="28" />
                 <Setter Property="FontWeight" Value="SemiBold" />
                 <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />

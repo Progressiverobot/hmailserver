@@ -65,6 +65,12 @@ jobs:
       - name: Every source file carries a copyright line and an SPDX identifier
         run: python3 build/add-license-headers.py --check
 
+      # Every static caption in the Control Panel carries an Alt-key mnemonic and
+      # no two that can be on screen together share one. Half a set is worse than
+      # none, so a new button without one fails here with its file and line.
+      - name: Every Control Panel caption carries an Alt-key mnemonic
+        run: python3 build/check-mnemonics.py
+
   dotnet-format:
     name: dotnet format leaves the C# tree unchanged
     # Written on 21 August 2026 and taken out of the same commit, because the

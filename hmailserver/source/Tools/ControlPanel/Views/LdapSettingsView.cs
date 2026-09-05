@@ -186,13 +186,13 @@ namespace hMailServer.ControlPanel.Views
 
          var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
 
-         var reload = new Wpf.Ui.Controls.Button { Content = "Reload", Margin = new Thickness(0, 0, 8, 0) };
+         var reload = new Wpf.Ui.Controls.Button { Content = "_Reload", Margin = new Thickness(0, 0, 8, 0) };
          System.Windows.Automation.AutomationProperties.SetName(reload, "Re-read the LDAP settings from hMailServer.INI");
          System.Windows.Automation.AutomationProperties.SetAutomationId(reload, "ldap-reload");
          reload.Click += (s, e) => Load_();
          buttons.Children.Add(reload);
 
-         saveButton_ = new Wpf.Ui.Controls.Button { Content = "Save changes", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary };
+         saveButton_ = new Wpf.Ui.Controls.Button { Content = "_Save changes", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary };
          System.Windows.Automation.AutomationProperties.SetName(saveButton_, "Save the LDAP settings to hMailServer.INI");
          System.Windows.Automation.AutomationProperties.SetAutomationId(saveButton_, "ldap-save");
          saveButton_.Click += (s, e) => Save_();
@@ -256,14 +256,14 @@ namespace hMailServer.ControlPanel.Views
          string automationId, string caption, string placeholder = "")
       {
          var panel = new StackPanel { Margin = new Thickness(0, 0, 0, 12) };
-         panel.Children.Add(new TextBlock { Text = label, FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 4) });
+         panel.Children.Add(Mnemonic.Apply(new TextBlock { FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 4) }, label, box));
 
          box.FontSize = Typography.Body;
          box.MaxWidth = 520;
          box.MinWidth = 320;
          box.HorizontalAlignment = HorizontalAlignment.Left;
          box.PlaceholderText = placeholder;
-         System.Windows.Automation.AutomationProperties.SetName(box, label);
+         System.Windows.Automation.AutomationProperties.SetName(box, MnemonicText.Strip(label));
          System.Windows.Automation.AutomationProperties.SetAutomationId(box, automationId);
          panel.Children.Add(box);
 
@@ -298,7 +298,7 @@ namespace hMailServer.ControlPanel.Views
          string automationId, string caption, params (int Value, string Text)[] options)
       {
          var panel = new StackPanel { Margin = new Thickness(0, 0, 0, 12) };
-         panel.Children.Add(new TextBlock { Text = label, FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 4) });
+         panel.Children.Add(Mnemonic.Apply(new TextBlock { FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 4) }, label, combo));
 
          combo.FontSize = Typography.Body;
          combo.MinWidth = 320;
@@ -307,7 +307,7 @@ namespace hMailServer.ControlPanel.Views
          foreach ((int value, string text) in options)
             combo.Items.Add(new ComboBoxItem { Content = text, Tag = value });
 
-         System.Windows.Automation.AutomationProperties.SetName(combo, label);
+         System.Windows.Automation.AutomationProperties.SetName(combo, MnemonicText.Strip(label));
          System.Windows.Automation.AutomationProperties.SetAutomationId(combo, automationId);
          panel.Children.Add(combo);
 
@@ -384,24 +384,24 @@ namespace hMailServer.ControlPanel.Views
          Border card = Card_("Directory server", null, out StackPanel content);
 
          content.Children.Add(LabelledCheck_(enabled_,
-            "Use LDAP directory authentication (Enabled)",
+            "_Use LDAP directory authentication (Enabled)",
             "ldap-enabled",
             "Off by default, and inert when off: directory-linked accounts are then validated the old way, through "
             + "Windows logon. When on, the same accounts - the ones with the Directory tab filled in - are validated "
             + "by an LDAP bind against the server below instead. Non-directory accounts are never affected either way."));
 
-         content.Children.Add(LabelledBox_("Directory server host name (Server)", server_, "ldap-server",
+         content.Children.Add(LabelledBox_("Directory server _host name (Server)", server_, "ldap-server",
             "Required. The Active Directory domain controller or other LDAP server to bind against. For LDAPS the "
             + "name must match the server's certificate, so use the DNS name, not an IP address.",
             placeholder: "dc01.example.local"));
 
-         content.Children.Add(LabelledBox_("Port (Port)", port_, "ldap-port",
+         content.Children.Add(LabelledBox_("_Port (Port)", port_, "ldap-port",
             "Leave empty (or 0) for automatic: 636 when the connection security is LDAPS, 389 otherwise. The port is "
             + "derived from the security setting so that choosing LDAPS and forgetting the port cannot attempt TLS "
             + "against the cleartext port, which fails in a way that looks like a certificate problem.",
             placeholder: "Automatic - 636 for LDAPS, 389 otherwise"));
 
-         content.Children.Add(LabelledCombo_("Connection security (Security)", security_, "ldap-security",
+         content.Children.Add(LabelledCombo_("_Connection security (Security)", security_, "ldap-security",
             "LDAPS is the default. A number in the INI that is not one of these three is read as LDAPS, so a typo "
             + "cannot silently weaken the transport - and whatever this is set to, a password is never sent over an "
             + "unprotected connection unless that is explicitly allowed below.",
@@ -410,14 +410,14 @@ namespace hMailServer.ControlPanel.Views
             (0, "Unprotected LDAP - cleartext (lab networks only)")));
 
          content.Children.Add(LabelledCheck_(verifyCertificate_,
-            "Verify the directory server's certificate (VerifyCertificate)",
+            "_Verify the directory server's certificate (VerifyCertificate)",
             "ldap-verify-certificate",
             "On by default, and only an explicit 0 in the INI turns it off. Turned off, the encrypted connection no "
             + "longer proves it reaches YOUR directory: anyone who can intercept it can present any certificate and "
             + "collect every password sent over it. The server notes the disabling in its application log once per "
             + "service start. Only meaningful for LDAPS and StartTLS."));
 
-         content.Children.Add(LabelledBox_("Timeout in seconds (TimeoutSeconds)", timeout_, "ldap-timeout",
+         content.Children.Add(LabelledBox_("Time_out in seconds (TimeoutSeconds)", timeout_, "ldap-timeout",
             "Default 10, allowed range 1 to 90. The server reads values below 1 as 10 and clamps values above 90, "
             + "because \"wait forever\" for an unreachable directory is how connection threads get exhausted.",
             placeholder: "10"));
@@ -431,7 +431,7 @@ namespace hMailServer.ControlPanel.Views
             "Two bind methods, and the difference matters more than it looks: one sends the password to the "
             + "directory, the other never puts it on the wire at all.", out StackPanel content);
 
-         content.Children.Add(LabelledCombo_("Bind method (BindMethod)", bindMethod_, "ldap-bind-method",
+         content.Children.Add(LabelledCombo_("_Bind method (BindMethod)", bindMethod_, "ldap-bind-method",
             "Simple is the default. Negotiate runs an SSPI exchange (Kerberos, falling back to NTLM) that never "
             + "transmits the password and signs the connection - it is the only method a default-configured modern "
             + "domain controller accepts when it has no certificate installed, it needs no search, no SearchBase and "
@@ -440,7 +440,7 @@ namespace hMailServer.ControlPanel.Views
             (1, "Negotiate (Kerberos/NTLM) - the password never crosses the network")));
 
          content.Children.Add(LabelledCheck_(allowUnprotected_,
-            "Allow sending the password over an unprotected connection (AllowUnprotectedPassword)",
+            "_Allow sending the password over an unprotected connection (AllowUnprotectedPassword)",
             "ldap-allow-unprotected",
             "Off by default. With unprotected LDAP and a simple bind, the server does NOT send the password and does "
             + "NOT guess what you meant: it refuses the logon and reports the contradiction, once per minute. Turning "
@@ -456,12 +456,12 @@ namespace hMailServer.ControlPanel.Views
             + "compute it from a template - and Negotiate needs neither, because SSPI authenticates by user name and "
             + "domain, which the account already carries.", out StackPanel content);
 
-         content.Children.Add(LabelledBox_("Search base (SearchBase)", searchBase_, "ldap-search-base",
+         content.Children.Add(LabelledBox_("Search bas_e (SearchBase)", searchBase_, "ldap-search-base",
             "Where the search starts, e.g. DC=example,DC=local. Required in search mode - that is, when the bind "
             + "method is Simple and no DN template is set.",
             placeholder: "DC=example,DC=local"));
 
-         content.Children.Add(LabelledBox_("User search filter (UserSearchFilter)", userSearchFilter_, "ldap-user-search-filter",
+         content.Children.Add(LabelledBox_("User search _filter (UserSearchFilter)", userSearchFilter_, "ldap-user-search-filter",
             "Left empty, the server uses the shipped filter shown in grey - objectCategory first because it is "
             + "indexed in Active Directory, and sAMAccountName because that is what the account's Directory tab "
             + "stores. %u is the account's Active Directory user name, %d its AD domain, %m its full mail address; "
@@ -469,7 +469,7 @@ namespace hMailServer.ControlPanel.Views
             + "filter that matches more than one entry authenticates nobody, by design.",
             placeholder: DefaultUserSearchFilter));
 
-         content.Children.Add(LabelledBox_("User DN template (UserDnTemplate)", userDnTemplate_, "ldap-user-dn-template",
+         content.Children.Add(LabelledBox_("User _DN template (UserDnTemplate)", userDnTemplate_, "ldap-user-dn-template",
             "The other way to reach a DN: set this and the server skips the search - and with it the need for a "
             + "SearchBase and a service account. A UPN works against Active Directory. Same %u, %d, %m placeholders, "
             + "escaped for a distinguished name.",
@@ -485,7 +485,7 @@ namespace hMailServer.ControlPanel.Views
             + "that may read the directory. Negotiate and DN-template configurations need none of this.",
             out StackPanel content);
 
-         content.Children.Add(LabelledBox_("Service account user name (ServiceUsername)", serviceUsername_, "ldap-service-username",
+         content.Children.Add(LabelledBox_("Service account user _name (ServiceUsername)", serviceUsername_, "ldap-service-username",
             "Whatever your directory accepts for a simple bind: a UPN (svc-mail@example.local), DOMAIN\\name, or a "
             + "full DN. Left empty, the server searches anonymously - which usually fails against Active Directory, "
             + "with a reported reason that names this setting.",
@@ -517,7 +517,7 @@ namespace hMailServer.ControlPanel.Views
          content.Children.Add(passwordPanel);
 
          content.Children.Add(LabelledCheck_(clearServicePassword_,
-            "Remove the stored service account password when saving",
+            "Remove the stored service account pass_word when saving",
             "ldap-clear-service-password",
             "The blank-keeps-it rule above means there would otherwise be no way to delete a stored password from "
             + "this page - for instance after switching to Negotiate or a DN template, neither of which needs one."));
@@ -542,7 +542,7 @@ namespace hMailServer.ControlPanel.Views
          Border card = Card_("If the directory cannot answer", null, out StackPanel content);
 
          content.Children.Add(LabelledCheck_(fallback_,
-            "Retry through Windows logon when the directory is unavailable (FallbackToWindowsLogon)",
+            "Retr_y through Windows logon when the directory is unavailable (FallbackToWindowsLogon)",
             "ldap-fallback",
             "Off by default. When off, an unreachable directory refuses the logon and the server reports the real "
             + "reason (throttled to once per minute per distinct problem) instead of retrying through Windows logon "
@@ -616,12 +616,12 @@ namespace hMailServer.ControlPanel.Views
             + "machine and the hMailServer service differently can make the two disagree.",
             out StackPanel content);
 
-         content.Children.Add(LabelledBox_("User name to look up", testUsername_, "ldap-test-username",
+         content.Children.Add(LabelledBox_("User name to _look up", testUsername_, "ldap-test-username",
             "The Active Directory user name (sAMAccountName) - the same value the account's Directory tab holds. "
             + "Optional: left empty, the test stops after the connection and service-credential stages.",
             placeholder: "jsmith"));
 
-         content.Children.Add(LabelledBox_("AD domain of that user", testDomain_, "ldap-test-domain",
+         content.Children.Add(LabelledBox_("AD do_main of that user", testDomain_, "ldap-test-domain",
             "Used for the %d placeholder and for a Negotiate bind (NTLM needs it on a host that is not "
             + "domain-joined). The server takes this from the account's Directory tab; type the same value here.",
             placeholder: "EXAMPLE"));
@@ -646,7 +646,7 @@ namespace hMailServer.ControlPanel.Views
          passwordPanel.Children.Add(testPassword_);
          content.Children.Add(passwordPanel);
 
-         testButton_ = new Wpf.Ui.Controls.Button { Content = "Test connection" };
+         testButton_ = new Wpf.Ui.Controls.Button { Content = "_Test connection" };
          System.Windows.Automation.AutomationProperties.SetName(testButton_, "Test the directory connection with the values on this page");
          System.Windows.Automation.AutomationProperties.SetAutomationId(testButton_, "ldap-test-button");
          testButton_.Click += async (s, e) => await RunTest_();

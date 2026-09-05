@@ -40,12 +40,12 @@
         </Border>
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,12,0,12">
-            <ui:Button Content="Move up" Click="MoveUp_Click" Margin="0,0,8,0" />
-            <ui:Button Content="Move down" Click="MoveDown_Click" Margin="0,0,8,0" />
-            <ui:Button Content="Enable / disable" Click="Toggle_Click" Margin="0,0,8,0" />
-            <ui:Button Content="Delete rule" Appearance="Danger" Click="Delete_Click" Margin="0,0,24,0" />
+            <ui:Button Content="Move _up" Click="MoveUp_Click" Margin="0,0,8,0" />
+            <ui:Button Content="Move _down" Click="MoveDown_Click" Margin="0,0,8,0" />
+            <ui:Button Content="Ena_ble / disable" Click="Toggle_Click" Margin="0,0,8,0" />
+            <ui:Button Content="De_lete rule" Appearance="Danger" Click="Delete_Click" Margin="0,0,24,0" />
             <ui:TextBox x:Name="NewRuleName" PlaceholderText="New rule name" AutomationProperties.Name="New rule name" Width="180" Margin="0,0,8,0" />
-            <ui:Button Content="Add rule" Appearance="Primary" Click="AddRule_Click" />
+            <ui:Button Content="_Add rule" Appearance="Primary" Click="AddRule_Click" />
         </StackPanel>
 
         <Grid Grid.Row="3">
@@ -76,9 +76,9 @@
                         </DataGrid.Columns>
                     </DataGrid>
                     <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,8,0,0">
-                        <ui:Button Content="Add…" Appearance="Primary" Click="AddCriterion_Click" Margin="0,0,8,0" />
-                        <ui:Button Content="Edit…" Click="EditCriterion_Click" Margin="0,0,8,0" />
-                        <ui:Button Content="Remove" Appearance="Danger" Click="RemoveCriterion_Click" />
+                        <ui:Button Content="Add _criterion…" Appearance="Primary" Click="AddCriterion_Click" Margin="0,0,8,0" />
+                        <ui:Button Content="_Edit criterion…" Click="EditCriterion_Click" Margin="0,0,8,0" />
+                        <ui:Button Content="_Remove criterion" Appearance="Danger" Click="RemoveCriterion_Click" />
                     </StackPanel>
                 </Grid>
             </Border>
@@ -101,11 +101,11 @@
                         </DataGrid.Columns>
                     </DataGrid>
                     <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,8,0,0">
-                        <ui:Button Content="Add…" Appearance="Primary" Click="AddAction_Click" Margin="0,0,8,0" />
-                        <ui:Button Content="Edit…" Click="EditAction_Click" Margin="0,0,8,0" />
-                        <ui:Button Content="Remove" Appearance="Danger" Click="RemoveAction_Click" Margin="0,0,8,0" />
-                        <ui:Button Content="Up" Click="ActionUp_Click" Margin="0,0,8,0" />
-                        <ui:Button Content="Down" Click="ActionDown_Click" />
+                        <ui:Button Content="Add ac_tion…" Appearance="Primary" Click="AddAction_Click" Margin="0,0,8,0" />
+                        <ui:Button Content="Ed_it action…" Click="EditAction_Click" Margin="0,0,8,0" />
+                        <ui:Button Content="Re_move action" Appearance="Danger" Click="RemoveAction_Click" Margin="0,0,8,0" />
+                        <ui:Button Content="U_p" Click="ActionUp_Click" Margin="0,0,8,0" />
+                        <ui:Button Content="Dow_n" Click="ActionDown_Click" />
                     </StackPanel>
                 </Grid>
             </Border>

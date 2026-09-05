@@ -73,19 +73,19 @@ namespace hMailServer.ControlPanel.Views
          };
          bottom.Children.Add(addBox_);
 
-         var addButton = new Wpf.Ui.Controls.Button { Content = "Add", Margin = new Thickness(8, 0, 0, 0) };
+         var addButton = new Wpf.Ui.Controls.Button { Content = "_Add", Margin = new Thickness(8, 0, 0, 0) };
          addButton.Click += (s, e) => AddRecipient();
          Grid.SetColumn(addButton, 1);
          bottom.Children.Add(addButton);
 
-         var adButton = new Wpf.Ui.Controls.Button { Content = "Add from AD\u2026", Margin = new Thickness(8, 0, 0, 0) };
+         var adButton = new Wpf.Ui.Controls.Button { Content = "Add from A_D\u2026", Margin = new Thickness(8, 0, 0, 0) };
          adButton.Click += (s, e) => ImportFromActiveDirectory();
          Grid.SetColumn(adButton, 2);
          bottom.Children.Add(adButton);
 
          var removeButton = new Wpf.Ui.Controls.Button
          {
-            Content = "Remove selected",
+            Content = "_Remove selected",
             Margin = new Thickness(8, 0, 0, 0),
             Appearance = Wpf.Ui.Controls.ControlAppearance.Danger
          };

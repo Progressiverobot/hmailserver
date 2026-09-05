@@ -21,11 +21,11 @@
         <TabControl x:Name="SettingsTabs" Grid.Row="1" Background="Transparent" BorderThickness="0" Padding="0,8,0,0" />
 
         <Grid Grid.Row="2" Margin="0,14,12,0">
-            <TextBlock x:Name="StatusText" VerticalAlignment="Center"
+            <TextBlock x:Name="StatusText" AutomationProperties.LiveSetting="Polite" VerticalAlignment="Center"
                        Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" />
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <ui:Button Content="Reload" Margin="0,0,8,0" Click="Reload_Click" />
-                <ui:Button x:Name="SaveButton" Content="Save changes" Appearance="Primary" Click="Save_Click" />
+                <ui:Button Content="_Reload" Margin="0,0,8,0" Click="Reload_Click" />
+                <ui:Button x:Name="SaveButton" Content="_Save changes" Appearance="Primary" Click="Save_Click" />
             </StackPanel>
         </Grid>
     </Grid>

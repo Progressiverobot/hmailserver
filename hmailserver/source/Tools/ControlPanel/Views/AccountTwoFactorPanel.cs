@@ -53,8 +53,8 @@ namespace hMailServer.ControlPanel.Views
          enrolCard_ = new Border { Padding = new Thickness(12), Margin = new Thickness(0, 12, 0, 0), Visibility = Visibility.Collapsed };
          enrolCard_.SetResourceReference(StyleProperty, "Card");
 
-         enrol_ = MakeButton("Enrol a second factor", Wpf.Ui.Controls.ControlAppearance.Primary, (_, _) => Enrol());
-         disable_ = MakeButton("Remove", Wpf.Ui.Controls.ControlAppearance.Danger, (_, _) => Disable());
+         enrol_ = MakeButton("_Enrol a second factor", Wpf.Ui.Controls.ControlAppearance.Primary, (_, _) => Enrol());
+         disable_ = MakeButton("_Remove", Wpf.Ui.Controls.ControlAppearance.Danger, (_, _) => Disable());
 
          Build();
       }

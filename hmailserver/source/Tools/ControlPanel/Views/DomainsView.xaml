@@ -93,7 +93,7 @@
                     </ListView>
                     <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="4,10,0,2">
                         <ui:TextBox x:Name="NewDomainBox" PlaceholderText="newdomain.com" Width="180" />
-                        <ui:Button Content="Add domain" Margin="8,0,0,0" Click="AddDomain_Click" />
+                        <ui:Button Content="_Add domain" Margin="8,0,0,0" Click="AddDomain_Click" />
                     </StackPanel>
                 </Grid>
             </Border>
@@ -173,9 +173,9 @@
                         </Grid.ColumnDefinitions>
                         <ui:TextBox x:Name="NewAccountBox" PlaceholderText="user@domain" Margin="0,0,8,0" />
                         <ui:PasswordBox x:Name="NewAccountPassword" Grid.Column="1" PlaceholderText="Password" Margin="0,0,8,0" />
-                        <ui:Button Grid.Column="2" Content="Generate" Margin="0,0,8,0" Click="GenerateAccountPassword_Click"
+                        <ui:Button Grid.Column="2" Content="_Generate" Margin="0,0,8,0" Click="GenerateAccountPassword_Click"
                                    ToolTip="Generate a strong password (copied to clipboard)" />
-                        <ui:Button Grid.Column="3" Content="Create account" Appearance="Primary" Click="AddAccount_Click" />
+                        <ui:Button Grid.Column="3" Content="_Create account" Appearance="Primary" Click="AddAccount_Click" />
                     </Grid>
                 </Grid>
             </Border>
@@ -211,7 +211,7 @@
                                 </DataTemplate>
                             </ListView.ItemTemplate>
                         </ListView>
-                        <TextBlock x:Name="AliasStatus" Grid.Row="1" Visibility="Collapsed"
+                        <TextBlock x:Name="AliasStatus" AutomationProperties.LiveSetting="Polite" Grid.Row="1" Visibility="Collapsed"
                                    HorizontalAlignment="Center" VerticalAlignment="Center"
                                    TextWrapping="Wrap" TextAlignment="Center" FontSize="12" Opacity="0.7"
                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="12" />
@@ -223,7 +223,7 @@
                             </Grid.ColumnDefinitions>
                             <ui:TextBox x:Name="NewAliasName" PlaceholderText="alias@domain" FontSize="12" Margin="0,0,6,0" />
                             <ui:TextBox x:Name="NewAliasValue" Grid.Column="1" PlaceholderText="target@anywhere" FontSize="12" Margin="0,0,6,0" />
-                            <ui:Button Grid.Column="2" Content="Add" FontSize="12" Click="AddAlias_Click"
+                            <ui:Button Grid.Column="2" Content="Add a_lias" FontSize="12" Click="AddAlias_Click"
                                        AutomationProperties.Name="Add alias" />
                         </Grid>
                     </Grid>
@@ -259,7 +259,7 @@
                                 </DataTemplate>
                             </ListView.ItemTemplate>
                         </ListView>
-                        <TextBlock x:Name="DistStatus" Grid.Row="1" Visibility="Collapsed"
+                        <TextBlock x:Name="DistStatus" AutomationProperties.LiveSetting="Polite" Grid.Row="1" Visibility="Collapsed"
                                    HorizontalAlignment="Center" VerticalAlignment="Center"
                                    TextWrapping="Wrap" TextAlignment="Center" FontSize="12" Opacity="0.7"
                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="12" />
@@ -269,7 +269,7 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <ui:TextBox x:Name="NewDistAddress" PlaceholderText="list@domain" FontSize="12" Margin="0,0,6,0" />
-                            <ui:Button Grid.Column="1" Content="Add" FontSize="12" Click="AddDistList_Click"
+                            <ui:Button Grid.Column="1" Content="Add li_st" FontSize="12" Click="AddDistList_Click"
                                        AutomationProperties.Name="Add distribution list" />
                         </Grid>
                     </Grid>

@@ -19,7 +19,7 @@ namespace hMailServer.ControlPanel.Views
       private readonly string domainName_;
 
       // General
-      private readonly CheckBox active_ = new() { Content = "Domain enabled", FontSize = Typography.Body };
+      private readonly CheckBox active_ = new() { Content = "Domain _enabled", FontSize = Typography.Body };
       private readonly TextBox name_ = NewInput();
       private readonly TextBox postmaster_ = NewInput();
       private readonly TextBox adDomain_ = NewInput();
@@ -37,21 +37,21 @@ namespace hMailServer.ControlPanel.Views
       private readonly TextBox maxMessageSize_ = NewInput();
       private readonly TextBox maxAccountSize_ = NewInput();
       private readonly TextBox retentionDays_ = NewInput();
-      private readonly CheckBox maxAccountsOn_ = new() { Content = "Limit number of accounts", FontSize = Typography.Body };
+      private readonly CheckBox maxAccountsOn_ = new() { Content = "_Limit number of accounts", FontSize = Typography.Body };
       private readonly TextBox maxAccounts_ = NewInput();
-      private readonly CheckBox maxAliasesOn_ = new() { Content = "Limit number of aliases", FontSize = Typography.Body };
+      private readonly CheckBox maxAliasesOn_ = new() { Content = "Limit number of al_iases", FontSize = Typography.Body };
       private readonly TextBox maxAliases_ = NewInput();
-      private readonly CheckBox maxDistsOn_ = new() { Content = "Limit number of distribution lists", FontSize = Typography.Body };
+      private readonly CheckBox maxDistsOn_ = new() { Content = "Limit _number of distribution lists", FontSize = Typography.Body };
       private readonly TextBox maxDists_ = NewInput();
-      private readonly CheckBox plusAddressingOn_ = new() { Content = "Enable plus addressing", FontSize = Typography.Body };
+      private readonly CheckBox plusAddressingOn_ = new() { Content = "_Enable plus addressing", FontSize = Typography.Body };
       private readonly TextBox plusChar_ = NewInput();
-      private readonly CheckBox greylisting_ = new() { Content = "Enable greylisting for this domain", FontSize = Typography.Body };
+      private readonly CheckBox greylisting_ = new() { Content = "Enable _greylisting for this domain", FontSize = Typography.Body };
 
       // Signature
-      private readonly CheckBox signatureOn_ = new() { Content = "Add signature to outgoing messages", FontSize = Typography.Body };
+      private readonly CheckBox signatureOn_ = new() { Content = "_Add signature to outgoing messages", FontSize = Typography.Body };
       private readonly ComboBox signatureMethod_ = new();
-      private readonly CheckBox signReplies_ = new() { Content = "Add signature to replies", FontSize = Typography.Body };
-      private readonly CheckBox signLocal_ = new() { Content = "Add signature to local e-mail", FontSize = Typography.Body };
+      private readonly CheckBox signReplies_ = new() { Content = "Add signature to _replies", FontSize = Typography.Body };
+      private readonly CheckBox signLocal_ = new() { Content = "Add signature to _local e-mail", FontSize = Typography.Body };
       private readonly TextBox signaturePlain_ = NewMemo();
       private readonly TextBox signatureHtml_ = NewMemo();
 
@@ -59,27 +59,27 @@ namespace hMailServer.ControlPanel.Views
       // Domain-wide out-of-office. The server sends this only for accounts that
       // have no vacation message of their own; the override below additionally
       // replaces an account's personal text for senders outside this server.
-      private readonly CheckBox oooOn_ = new() { Content = "Send a domain-wide out-of-office reply", FontSize = Typography.Body };
+      private readonly CheckBox oooOn_ = new() { Content = "Send a _domain-wide out-of-office reply", FontSize = Typography.Body };
       private readonly TextBox oooSubject_ = NewInput();
       private readonly TextBox oooMessage_ = NewMemo();
       private readonly TextBox oooInternalSubject_ = NewInput();
       private readonly TextBox oooInternalMessage_ = NewMemo();
       private readonly CheckBox oooExternalOverride_ = new()
       {
-         Content = "Outside senders always get the domain's text, even when the account has its own",
+         Content = "_Outside senders always get the domain's text, even when the account has its own",
          FontSize = Typography.Body
       };
 
       private readonly TextBox relayHost_ = NewInput();
       private readonly TextBox relayPort_ = NewInput();
-      private readonly CheckBox relayAuthOn_ = new() { Content = "The relay requires authentication", FontSize = Typography.Body };
+      private readonly CheckBox relayAuthOn_ = new() { Content = "The relay requires _authentication", FontSize = Typography.Body };
       private readonly TextBox relayUser_ = NewInput();
       private readonly PasswordBox relayPassword_ = new() { FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 10) };
       private readonly ComboBox relaySecurity_ = new();
 
       // DKIM
-      private readonly CheckBox dkimOn_ = new() { Content = "Enable DKIM signing", FontSize = Typography.Body };
-      private readonly CheckBox dkimAliases_ = new() { Content = "Sign aliases too", FontSize = Typography.Body };
+      private readonly CheckBox dkimOn_ = new() { Content = "_Enable DKIM signing", FontSize = Typography.Body };
+      private readonly CheckBox dkimAliases_ = new() { Content = "Sign aliases _too", FontSize = Typography.Body };
       private readonly TextBox dkimSelector_ = NewInput();
       private readonly TextBox dkimKeyFile_ = NewInput();
       private readonly ComboBox dkimHeaderCanon_ = new();
@@ -164,7 +164,7 @@ namespace hMailServer.ControlPanel.Views
          root.Children.Add(tabs);
 
          var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-         var save = new Wpf.Ui.Controls.Button { Content = "Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
+         var save = new Wpf.Ui.Controls.Button { Content = "_Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
          save.Click += (s, e) => Save();
          var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel", IsCancel = true };
          cancel.Click += (s, e) => Close();
@@ -188,15 +188,15 @@ namespace hMailServer.ControlPanel.Views
       {
          var panel = TabPanel();
          panel.Children.Add(active_);
-         panel.Children.Add(Label("Domain name (changing it renames the domain and moves every account, alias and list with it)", name_));
+         panel.Children.Add(Label("_Domain name (changing it renames the domain and moves every account, alias and list with it)", name_));
          panel.Children.Add(Input(name_));
-         panel.Children.Add(Label("Postmaster address (mail to unknown recipients is redirected here)", postmaster_));
+         panel.Children.Add(Label("_Postmaster address (mail to unknown recipients is redirected here)", postmaster_));
          panel.Children.Add(Input(postmaster_));
          panel.Children.Add(Label("Active Directory domain (for AD-synchronised domains; optional)"));
          var adRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 12) };
          adDomain_.MinWidth = 320;
          adRow.Children.Add(adDomain_);
-         var adBrowse = new Wpf.Ui.Controls.Button { Content = "Browse…", Margin = new Thickness(8, 0, 0, 0) };
+         var adBrowse = new Wpf.Ui.Controls.Button { Content = "_Browse…", Margin = new Thickness(8, 0, 0, 0) };
          adBrowse.Click += BrowseAdDomain;
          adRow.Children.Add(adBrowse);
          panel.Children.Add(adRow);
@@ -287,13 +287,13 @@ namespace hMailServer.ControlPanel.Views
       private ScrollViewer BuildLimits()
       {
          var panel = TabPanel();
-         panel.Children.Add(Label("Maximum domain size (MB, 0 = unlimited)", maxSize_));
+         panel.Children.Add(Label("Maximum _domain size (MB, 0 = unlimited)", maxSize_));
          panel.Children.Add(Input(maxSize_));
-         panel.Children.Add(Label("Maximum message size (KB, 0 = unlimited)", maxMessageSize_));
+         panel.Children.Add(Label("Maximum _message size (KB, 0 = unlimited)", maxMessageSize_));
          panel.Children.Add(Input(maxMessageSize_));
-         panel.Children.Add(Label("Maximum size for accounts created in this domain (MB, 0 = unlimited)", maxAccountSize_));
+         panel.Children.Add(Label("Maximum size for _accounts created in this domain (MB, 0 = unlimited)", maxAccountSize_));
          panel.Children.Add(Input(maxAccountSize_));
-         panel.Children.Add(Label("Delete messages in this domain's mailboxes older than (days; 0 = no policy, an account's own value overrides it)", retentionDays_));
+         panel.Children.Add(Label("Delete messages in this domain's mailboxes _older than (days; 0 = no policy, an account's own value overrides it)", retentionDays_));
          panel.Children.Add(Input(retentionDays_));
          panel.Children.Add(Separator());
          panel.Children.Add(maxAccountsOn_);
@@ -304,7 +304,7 @@ namespace hMailServer.ControlPanel.Views
          panel.Children.Add(Input(maxDists_));
          panel.Children.Add(Separator());
          panel.Children.Add(plusAddressingOn_);
-         panel.Children.Add(Label("Plus addressing character", plusChar_));
+         panel.Children.Add(Label("_Plus addressing character", plusChar_));
          panel.Children.Add(Input(plusChar_));
          panel.Children.Add(greylisting_);
          return Scroll(panel);
@@ -319,13 +319,13 @@ namespace hMailServer.ControlPanel.Views
 
          var panel = TabPanel();
          panel.Children.Add(signatureOn_);
-         panel.Children.Add(Label("Signature method", signatureMethod_));
+         panel.Children.Add(Label("Signature _method", signatureMethod_));
          panel.Children.Add(signatureMethod_);
          panel.Children.Add(signReplies_);
          panel.Children.Add(signLocal_);
-         panel.Children.Add(Label("Plain-text signature", signaturePlain_));
+         panel.Children.Add(Label("_Plain-text signature", signaturePlain_));
          panel.Children.Add(signaturePlain_);
-         panel.Children.Add(Label("HTML signature", signatureHtml_));
+         panel.Children.Add(Label("_HTML signature", signatureHtml_));
          panel.Children.Add(signatureHtml_);
          return Scroll(panel);
       }
@@ -348,17 +348,17 @@ namespace hMailServer.ControlPanel.Views
             "exactly as it did before this setting existed. A route still wins over both, because a route " +
             "is a statement about the destination."));
          panel.Children.Add(Separator());
-         panel.Children.Add(Label("Relay host (empty = use the server-wide relayer)", relayHost_));
+         panel.Children.Add(Label("_Relay host (empty = use the server-wide relayer)", relayHost_));
          panel.Children.Add(Input(relayHost_));
-         panel.Children.Add(Label("Port (0 = 25)", relayPort_));
+         panel.Children.Add(Label("_Port (0 = 25)", relayPort_));
          panel.Children.Add(Input(relayPort_));
-         panel.Children.Add(Label("Connection security", relaySecurity_));
+         panel.Children.Add(Label("_Connection security", relaySecurity_));
          panel.Children.Add(relaySecurity_);
          panel.Children.Add(Separator());
          panel.Children.Add(relayAuthOn_);
-         panel.Children.Add(Label("User name", relayUser_));
+         panel.Children.Add(Label("_User name", relayUser_));
          panel.Children.Add(Input(relayUser_));
-         panel.Children.Add(Label("Password (leave blank to keep the stored one)", relayPassword_));
+         panel.Children.Add(Label("Pass_word (leave blank to keep the stored one)", relayPassword_));
          panel.Children.Add(relayPassword_);
          return Scroll(panel);
       }
@@ -376,18 +376,18 @@ namespace hMailServer.ControlPanel.Views
             "marked Auto-Submitted so two servers cannot loop."));
          panel.Children.Add(Separator());
          panel.Children.Add(oooOn_);
-         panel.Children.Add(Label("Subject", oooSubject_));
+         panel.Children.Add(Label("Su_bject", oooSubject_));
          panel.Children.Add(Input(oooSubject_));
-         panel.Children.Add(Label("Message", oooMessage_));
+         panel.Children.Add(Label("_Message", oooMessage_));
          panel.Children.Add(oooMessage_);
          panel.Children.Add(Separator());
          panel.Children.Add(Label(
             "Optional different text for local senders - colleagues can be told more than strangers. " +
             "Empty means everyone gets the text above. Note this identifies the sender's ADDRESS, which is " +
             "forgeable: treat it as a courtesy, never as a place for anything confidential."));
-         panel.Children.Add(Label("Subject for local senders (empty = same as above)", oooInternalSubject_));
+         panel.Children.Add(Label("Subject for _local senders (empty = same as above)", oooInternalSubject_));
          panel.Children.Add(Input(oooInternalSubject_));
-         panel.Children.Add(Label("Message for local senders (empty = same as above)", oooInternalMessage_));
+         panel.Children.Add(Label("Message for local s_enders (empty = same as above)", oooInternalMessage_));
          panel.Children.Add(oooInternalMessage_);
          panel.Children.Add(Separator());
          panel.Children.Add(oooExternalOverride_);
@@ -413,7 +413,7 @@ namespace hMailServer.ControlPanel.Views
          var panel = TabPanel();
          panel.Children.Add(dkimOn_);
          panel.Children.Add(dkimAliases_);
-         panel.Children.Add(Label("Selector", dkimSelector_));
+         panel.Children.Add(Label("Se_lector", dkimSelector_));
          panel.Children.Add(Input(dkimSelector_));
          panel.Children.Add(Label("Private key file"));
          var dkimKeyRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
@@ -421,7 +421,7 @@ namespace hMailServer.ControlPanel.Views
          dkimKeyFile_.MinWidth = 320;
          dkimKeyFile_.Margin = new Thickness(0);
          dkimKeyRow.Children.Add(dkimKeyFile_);
-         var dkimBrowse = new Wpf.Ui.Controls.Button { Content = "Browse…", Margin = new Thickness(8, 0, 0, 0) };
+         var dkimBrowse = new Wpf.Ui.Controls.Button { Content = "B_rowse…", Margin = new Thickness(8, 0, 0, 0) };
          System.Windows.Automation.AutomationProperties.SetAutomationId(dkimBrowse, "DkimKeyBrowse");
          dkimBrowse.Click += (s, e) =>
          {
@@ -434,7 +434,7 @@ namespace hMailServer.ControlPanel.Views
 
          var dkimGen = new Wpf.Ui.Controls.Button
          {
-            Content = "Generate key pair\u2026",
+            Content = "_Generate key pair\u2026",
             Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
             Margin = new Thickness(0, 0, 0, 8)
          };
@@ -446,7 +446,7 @@ namespace hMailServer.ControlPanel.Views
          dkimDnsPanel_.Children.Add(Label("Publish this DNS TXT record at your DNS provider, then enable DKIM:"));
          dkimDns_.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
          dkimDnsPanel_.Children.Add(dkimDns_);
-         var dkimCopy = new Wpf.Ui.Controls.Button { Content = "Copy DNS value", Margin = new Thickness(0, 0, 0, 0) };
+         var dkimCopy = new Wpf.Ui.Controls.Button { Content = "_Copy DNS value", Margin = new Thickness(0, 0, 0, 0) };
          System.Windows.Automation.AutomationProperties.SetAutomationId(dkimCopy, "DkimCopyDns");
          dkimCopy.Click += (s, e) =>
          {
@@ -455,11 +455,11 @@ namespace hMailServer.ControlPanel.Views
          dkimDnsPanel_.Children.Add(dkimCopy);
          panel.Children.Add(dkimDnsPanel_);
 
-         panel.Children.Add(Label("Header canonicalization", dkimHeaderCanon_));
+         panel.Children.Add(Label("_Header canonicalization", dkimHeaderCanon_));
          panel.Children.Add(dkimHeaderCanon_);
-         panel.Children.Add(Label("Body canonicalization", dkimBodyCanon_));
+         panel.Children.Add(Label("_Body canonicalization", dkimBodyCanon_));
          panel.Children.Add(dkimBodyCanon_);
-         panel.Children.Add(Label("Signing algorithm", dkimAlgorithm_));
+         panel.Children.Add(Label("Signing _algorithm", dkimAlgorithm_));
          panel.Children.Add(dkimAlgorithm_);
 
          panel.Children.Add(Separator());
@@ -513,7 +513,7 @@ namespace hMailServer.ControlPanel.Views
          rotSelector_.Margin = new Thickness(0);
          System.Windows.Automation.AutomationProperties.SetAutomationId(rotSelector_, "DkimRotationSelector");
          startRow.Children.Add(rotSelector_);
-         var start = new Wpf.Ui.Controls.Button { Content = "Generate and stage key…", Margin = new Thickness(8, 0, 0, 0) };
+         var start = new Wpf.Ui.Controls.Button { Content = "Generate and stage _key…", Margin = new Thickness(8, 0, 0, 0) };
          System.Windows.Automation.AutomationProperties.SetAutomationId(start, "DkimRotationStart");
          start.Click += (s, e) => StartRotation();
          startRow.Children.Add(start);
@@ -535,18 +535,18 @@ namespace hMailServer.ControlPanel.Views
          rotStagedPanel_.Children.Add(rotDnsValue_);
 
          var copyRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 4) };
-         var copyHost = new Wpf.Ui.Controls.Button { Content = "Copy host" };
+         var copyHost = new Wpf.Ui.Controls.Button { Content = "Copy h_ost" };
          System.Windows.Automation.AutomationProperties.SetAutomationId(copyHost, "DkimRotationCopyHost");
          copyHost.Click += (s, e) => CopyToClipboard(rotDnsHost_.Text);
          copyRow.Children.Add(copyHost);
-         var copyValue = new Wpf.Ui.Controls.Button { Content = "Copy value", Margin = new Thickness(8, 0, 0, 0) };
+         var copyValue = new Wpf.Ui.Controls.Button { Content = "Copy _value", Margin = new Thickness(8, 0, 0, 0) };
          System.Windows.Automation.AutomationProperties.SetAutomationId(copyValue, "DkimRotationCopyValue");
          copyValue.Click += (s, e) => CopyToClipboard(rotExpectedTxt_);
          copyRow.Children.Add(copyValue);
          rotStagedPanel_.Children.Add(copyRow);
 
          rotStagedPanel_.Children.Add(Label("4. Check that the record is visible in DNS:"));
-         rotCheck_ = new Wpf.Ui.Controls.Button { Content = "Check DNS" };
+         rotCheck_ = new Wpf.Ui.Controls.Button { Content = "Check D_NS" };
          System.Windows.Automation.AutomationProperties.SetAutomationId(rotCheck_, "DkimRotationCheck");
          rotCheck_.Click += async (s, e) => await CheckRotationDns();
          rotStagedPanel_.Children.Add(rotCheck_);
@@ -572,7 +572,7 @@ namespace hMailServer.ControlPanel.Views
          // propagation completes.
          rotPromote_ = new Wpf.Ui.Controls.Button
          {
-            Content = "Promote…",
+            Content = "_Promote…",
             Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
             IsEnabled = false,
             ToolTip = "Enabled once \"Check DNS\" has confirmed the published record matches the staged key."
@@ -582,7 +582,7 @@ namespace hMailServer.ControlPanel.Views
          rotPromote_.Click += (s, e) => PromoteRotation();
          promoteRow.Children.Add(rotPromote_);
 
-         var cancelRotation = new Wpf.Ui.Controls.Button { Content = "Cancel rotation…", Margin = new Thickness(8, 0, 0, 0) };
+         var cancelRotation = new Wpf.Ui.Controls.Button { Content = "Cancel rotat_ion…", Margin = new Thickness(8, 0, 0, 0) };
          System.Windows.Automation.AutomationProperties.SetAutomationId(cancelRotation, "DkimRotationCancel");
          cancelRotation.Click += (s, e) => CancelRotation();
          promoteRow.Children.Add(cancelRotation);
@@ -1237,11 +1237,12 @@ namespace hMailServer.ControlPanel.Views
       /// </summary>
       private static TextBlock Label(string text, FrameworkElement editor = null)
       {
-         var t = new TextBlock { Text = text, FontSize = Typography.Label, Margin = new Thickness(0, 8, 0, 4) };
+         var t = new TextBlock { FontSize = Typography.Label, Margin = new Thickness(0, 8, 0, 4) };
          t.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
+         Mnemonic.Apply(t, text, editor);
 
          if (editor != null)
-            AutomationProperties.SetName(editor, AccessibleNames.Qualify(text, ""));
+            AutomationProperties.SetName(editor, AccessibleNames.Qualify(MnemonicText.Strip(text), ""));
 
          return t;
       }

@@ -263,9 +263,9 @@ namespace hMailServer.ControlPanel.Views
          });
          address_.KeyDown += (_, e) => { if (e.Key == System.Windows.Input.Key.Enter) Search(); };
          toolbar.Children.Add(address_);
-         toolbar.Children.Add(MakeButton("Search", Wpf.Ui.Controls.ControlAppearance.Primary, (_, _) => Search()));
-         toolbar.Children.Add(MakeButton("Follow this message", Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => FollowSelected()));
-         toolbar.Children.Add(MakeButton("Remove expired", Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => SweepExpired()));
+         toolbar.Children.Add(MakeButton("_Search", Wpf.Ui.Controls.ControlAppearance.Primary, (_, _) => Search()));
+         toolbar.Children.Add(MakeButton("_Follow this message", Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => FollowSelected()));
+         toolbar.Children.Add(MakeButton("_Remove expired", Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => SweepExpired()));
          root.Children.Add(toolbar);
 
          BuildColumns();

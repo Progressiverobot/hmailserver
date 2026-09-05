@@ -42,7 +42,7 @@
                     <DataGridTextColumn Header="POP3" Binding="{Binding Pop3}" Width="70" />
                 </DataGrid.Columns>
             </DataGrid>
-            <TextBlock x:Name="EmptyStatus" Visibility="Collapsed"
+            <TextBlock x:Name="EmptyStatus" AutomationProperties.LiveSetting="Polite" Visibility="Collapsed"
                        HorizontalAlignment="Center" VerticalAlignment="Center"
                        FontSize="14" Opacity="0.7" TextWrapping="Wrap" TextAlignment="Center"
                        Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
@@ -53,21 +53,21 @@
             <StackPanel>
                 <TextBlock x:Name="PermHeader" Text="Permissions (select a range)" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,12" />
                 <UniformGrid Columns="4" Margin="0,0,0,12">
-                    <CheckBox x:Name="PermSmtp" Content="Allow SMTP" FontSize="14" Margin="0,0,12,8" />
-                    <CheckBox x:Name="PermImap" Content="Allow IMAP" FontSize="14" Margin="0,0,12,8" />
-                    <CheckBox x:Name="PermPop3" Content="Allow POP3" FontSize="14" Margin="0,0,12,8" />
-                    <CheckBox x:Name="PermTlsAuth" Content="Require TLS for auth" FontSize="14" Margin="0,0,12,8" />
-                    <CheckBox x:Name="PermLL" Content="Deliver local → local" FontSize="14" Margin="0,0,12,0" />
-                    <CheckBox x:Name="PermLR" Content="Deliver local → remote" FontSize="14" Margin="0,0,12,0" />
-                    <CheckBox x:Name="PermRL" Content="Deliver remote → local" FontSize="14" Margin="0,0,12,0" />
-                    <CheckBox x:Name="PermRR" Content="Deliver remote → remote (relay)" FontSize="14" Margin="0,0,12,0" />
+                    <CheckBox x:Name="PermSmtp" Content="Allow _SMTP" FontSize="14" Margin="0,0,12,8" />
+                    <CheckBox x:Name="PermImap" Content="Allow _IMAP" FontSize="14" Margin="0,0,12,8" />
+                    <CheckBox x:Name="PermPop3" Content="Allow _POP3" FontSize="14" Margin="0,0,12,8" />
+                    <CheckBox x:Name="PermTlsAuth" Content="Require _TLS for auth" FontSize="14" Margin="0,0,12,8" />
+                    <CheckBox x:Name="PermLL" Content="Deliver _local → local" FontSize="14" Margin="0,0,12,0" />
+                    <CheckBox x:Name="PermLR" Content="Deliver local → _remote" FontSize="14" Margin="0,0,12,0" />
+                    <CheckBox x:Name="PermRL" Content="_Deliver remote → local" FontSize="14" Margin="0,0,12,0" />
+                    <CheckBox x:Name="PermRR" Content="Deliver remote → remote (rela_y)" FontSize="14" Margin="0,0,12,0" />
                 </UniformGrid>
                 <StackPanel Orientation="Horizontal">
-                    <ui:Button x:Name="SavePermsButton" Content="Save permissions" Appearance="Primary" Click="SavePerms_Click" IsEnabled="False" Margin="0,0,8,0" />
-                    <ui:Button Content="Properties…" Click="Edit_Click" Margin="0,0,8,0" />
-                    <ui:Button Content="Delete selected range" Appearance="Secondary"
+                    <ui:Button x:Name="SavePermsButton" Content="Sa_ve permissions" Appearance="Primary" Click="SavePerms_Click" IsEnabled="False" Margin="0,0,8,0" />
+                    <ui:Button Content="Pr_operties…" Click="Edit_Click" Margin="0,0,8,0" />
+                    <ui:Button Content="Delete selected ra_nge" Appearance="Secondary"
                                Foreground="{DynamicResource AppDangerBrush}" Click="Delete_Click" Margin="0,0,8,0" />
-                    <ui:Button Content="Restore defaults" Click="RestoreDefaults_Click"
+                    <ui:Button Content="Restore de_faults" Click="RestoreDefaults_Click"
                                ToolTip="Replaces every range with the standard two: 'My computer' (127.0.0.1) and 'Internet' (everything else)." />
                 </StackPanel>
             </StackPanel>
@@ -88,7 +88,7 @@
                     <ui:TextBox x:Name="NewLower" Grid.Column="1" PlaceholderText="Lower IP (e.g. 10.0.0.0)" Margin="0,0,8,0" />
                     <ui:TextBox x:Name="NewUpper" Grid.Column="2" PlaceholderText="Upper IP (e.g. 10.0.0.255)" Margin="0,0,8,0" />
                     <ui:TextBox x:Name="NewPriority" Grid.Column="3" PlaceholderText="Priority" Text="15" Margin="0,0,8,0" />
-                    <ui:Button Grid.Column="4" Content="Add" Appearance="Primary" Click="Add_Click" />
+                    <ui:Button Grid.Column="4" Content="_Add" Appearance="Primary" Click="Add_Click" />
                 </Grid>
             </StackPanel>
         </Border>

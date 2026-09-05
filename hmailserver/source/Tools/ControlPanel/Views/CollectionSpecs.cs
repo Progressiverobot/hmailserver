@@ -322,7 +322,7 @@ namespace hMailServer.ControlPanel.Views
 
          membersButton_ = new Wpf.Ui.Controls.Button
          {
-            Content = "Members…",
+            Content = "_Members…",
             MinWidth = 110,
             IsEnabled = false
          };

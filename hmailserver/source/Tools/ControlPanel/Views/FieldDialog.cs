@@ -73,7 +73,7 @@ namespace hMailServer.ControlPanel.Views
             HorizontalAlignment = HorizontalAlignment.Right,
             Margin = new Thickness(0, 8, 0, 0)
          };
-         var ok = new Button { Content = "Save", Appearance = ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), MinWidth = 88, IsDefault = true };
+         var ok = new Button { Content = "_Save", Appearance = ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), MinWidth = 88, IsDefault = true };
          ok.Click += (_, _) =>
          {
             if (committers_.Any(commit => !commit()))

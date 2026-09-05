@@ -21,16 +21,16 @@ namespace hMailServer.ControlPanel.Views
       private readonly Wpf.Ui.Controls.TextBox description_ = new();
       private readonly Wpf.Ui.Controls.TextBox tries_ = new();
       private readonly Wpf.Ui.Controls.TextBox minutes_ = new();
-      private readonly CheckBox allAddresses_ = new() { Content = "Deliver to all addresses (not only known accounts)", FontSize = Typography.Body };
+      private readonly CheckBox allAddresses_ = new() { Content = "Deliver to _all addresses (not only known accounts)", FontSize = Typography.Body };
 
       private readonly ListBox addressList_ = new() { Height = 200, FontSize = Typography.Body };
       private readonly Wpf.Ui.Controls.TextBox newAddress_ = new();
 
       private readonly ComboBox connSecurity_ = new();
-      private readonly CheckBox treatSenderLocal_ = new() { Content = "Treat sender domain as local", FontSize = Typography.Body };
-      private readonly CheckBox treatRecipientLocal_ = new() { Content = "Treat recipient domain as local", FontSize = Typography.Body };
+      private readonly CheckBox treatSenderLocal_ = new() { Content = "Treat sender domain as _local", FontSize = Typography.Body };
+      private readonly CheckBox treatRecipientLocal_ = new() { Content = "Treat _recipient domain as local", FontSize = Typography.Body };
 
-      private readonly CheckBox requiresAuth_ = new() { Content = "Target server requires authentication", FontSize = Typography.Body };
+      private readonly CheckBox requiresAuth_ = new() { Content = "Target server requires _authentication", FontSize = Typography.Body };
       private readonly Wpf.Ui.Controls.TextBox authUser_ = new();
       private readonly Wpf.Ui.Controls.PasswordBox authPassword_ = new();
 
@@ -72,7 +72,7 @@ namespace hMailServer.ControlPanel.Views
          root.Children.Add(tabs);
 
          var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-         var save = new Wpf.Ui.Controls.Button { Content = "Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
+         var save = new Wpf.Ui.Controls.Button { Content = "_Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
          save.Click += (s, e) => Save();
          var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel", IsCancel = true };
          cancel.Click += (s, e) => Close();
@@ -95,11 +95,11 @@ namespace hMailServer.ControlPanel.Views
       private ScrollViewer BuildGeneral()
       {
          var p = TabPanel();
-         p.Children.Add(Label("Target SMTP host", host_));
+         p.Children.Add(Label("_Target SMTP host", host_));
          p.Children.Add(Input(host_));
-         p.Children.Add(Label("Target SMTP port", port_));
+         p.Children.Add(Label("Target SMTP _port", port_));
          p.Children.Add(Input(port_));
-         p.Children.Add(Label("Description", description_));
+         p.Children.Add(Label("_Description", description_));
          p.Children.Add(Input(description_));
          return Scroll(p);
       }
@@ -107,9 +107,9 @@ namespace hMailServer.ControlPanel.Views
       private ScrollViewer BuildDelivery()
       {
          var p = TabPanel();
-         p.Children.Add(Label("Number of delivery retries", tries_));
+         p.Children.Add(Label("_Number of delivery retries", tries_));
          p.Children.Add(Input(tries_));
-         p.Children.Add(Label("Minutes between retries", minutes_));
+         p.Children.Add(Label("_Minutes between retries", minutes_));
          p.Children.Add(Input(minutes_));
          p.Children.Add(allAddresses_);
          return Scroll(p);
@@ -126,9 +126,9 @@ namespace hMailServer.ControlPanel.Views
          newAddress_.Width = 320;
          Input(newAddress_);
          newAddress_.Margin = new Thickness(0, 0, 8, 0);
-         var addBtn = new Wpf.Ui.Controls.Button { Content = "Add", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0) };
+         var addBtn = new Wpf.Ui.Controls.Button { Content = "_Add", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0) };
          addBtn.Click += (s, e) => AddAddress();
-         var removeBtn = new Wpf.Ui.Controls.Button { Content = "Remove" };
+         var removeBtn = new Wpf.Ui.Controls.Button { Content = "_Remove" };
          removeBtn.Click += (s, e) => RemoveAddress();
          addRow.Children.Add(newAddress_);
          addRow.Children.Add(addBtn);
@@ -147,7 +147,7 @@ namespace hMailServer.ControlPanel.Views
          connSecurity_.Margin = new Thickness(0, 0, 0, 8);
 
          var p = TabPanel();
-         p.Children.Add(Label("Connection security", connSecurity_));
+         p.Children.Add(Label("_Connection security", connSecurity_));
          p.Children.Add(connSecurity_);
          p.Children.Add(treatSenderLocal_);
          p.Children.Add(treatRecipientLocal_);
@@ -158,7 +158,7 @@ namespace hMailServer.ControlPanel.Views
       {
          var p = TabPanel();
          p.Children.Add(requiresAuth_);
-         p.Children.Add(Label("User name", authUser_));
+         p.Children.Add(Label("_User name", authUser_));
          p.Children.Add(Input(authUser_));
          p.Children.Add(Label("Password (leave empty to keep current)"));
          authPassword_.FontSize = Typography.Body;
@@ -388,11 +388,12 @@ namespace hMailServer.ControlPanel.Views
       /// </summary>
       private static TextBlock Label(string text, FrameworkElement editor = null)
       {
-         var t = new TextBlock { Text = text, FontSize = Typography.Label, Margin = new Thickness(0, 8, 0, 4) };
+         var t = new TextBlock { FontSize = Typography.Label, Margin = new Thickness(0, 8, 0, 4) };
          t.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
+         Mnemonic.Apply(t, text, editor);
 
          if (editor != null)
-            AutomationProperties.SetName(editor, AccessibleNames.Qualify(text, ""));
+            AutomationProperties.SetName(editor, AccessibleNames.Qualify(MnemonicText.Strip(text), ""));
 
          return t;
       }

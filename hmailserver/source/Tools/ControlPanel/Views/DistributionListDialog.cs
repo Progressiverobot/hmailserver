@@ -19,10 +19,10 @@ namespace hMailServer.ControlPanel.Views
       private readonly string domainName_;
       private readonly string address_;
 
-      private readonly CheckBox active_ = new() { Content = "List is active", FontSize = Typography.Body };
+      private readonly CheckBox active_ = new() { Content = "List is _active", FontSize = Typography.Body };
       private readonly TextBox addressBox_ = new();
       private readonly ComboBox mode_ = new();
-      private readonly CheckBox requireAuth_ = new() { Content = "Require SMTP authentication to send to the list", FontSize = Typography.Body };
+      private readonly CheckBox requireAuth_ = new() { Content = "Require SMTP au_thentication to send to the list", FontSize = Typography.Body };
       private readonly TextBox requireSender_ = new();
       private readonly TextBox moderator_ = new();
       private readonly TextBox bounce_ = new();
@@ -45,7 +45,7 @@ namespace hMailServer.ControlPanel.Views
          panel.Children.Add(header);
 
          panel.Children.Add(active_);
-         panel.Children.Add(Label("List address", addressBox_));
+         panel.Children.Add(Label("_List address", addressBox_));
          panel.Children.Add(Input(addressBox_));
 
          // Four modes, not five. There used to be a fifth - "Anyone with a server
@@ -70,7 +70,7 @@ namespace hMailServer.ControlPanel.Views
          mode_.Items.Add(Combo("Anyone in the domain can send", 3));
          mode_.FontSize = Typography.Body;
          mode_.Margin = new Thickness(0, 0, 0, 8);
-         panel.Children.Add(Label("Who may send to this list", mode_));
+         panel.Children.Add(Label("_Who may send to this list", mode_));
          panel.Children.Add(mode_);
          panel.Children.Add(new TextBlock
          {
@@ -84,17 +84,17 @@ namespace hMailServer.ControlPanel.Views
          });
 
          panel.Children.Add(requireAuth_);
-         panel.Children.Add(Label("Require sender address (empty = any)", requireSender_));
+         panel.Children.Add(Label("_Require sender address (empty = any)", requireSender_));
          panel.Children.Add(Input(requireSender_));
 
-         panel.Children.Add(Label("Moderator (empty = no moderation)", moderator_));
+         panel.Children.Add(Label("_Moderator (empty = no moderation)", moderator_));
          panel.Children.Add(Input(moderator_));
          panel.Children.Add(Note(
             "With a moderator set, a sender the rules above refuse is forwarded to the moderator " +
             "instead of being rejected. The moderator approves by resending the message to the " +
             "list from an authenticated session."));
 
-         panel.Children.Add(Label("Bounce address (empty = bounces go to the poster)", bounce_));
+         panel.Children.Add(Label("_Bounce address (empty = bounces go to the poster)", bounce_));
          panel.Children.Add(Input(bounce_));
          panel.Children.Add(Note(
             "Used as the envelope sender of every copy the list sends, so delivery failures - a " +
@@ -103,7 +103,7 @@ namespace hMailServer.ControlPanel.Views
 
          var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
          // Enter saves, Escape cancels. Neither worked before.
-         var save = new Wpf.Ui.Controls.Button { Content = "Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80, IsDefault = true };
+         var save = new Wpf.Ui.Controls.Button { Content = "_Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80, IsDefault = true };
          save.Click += (s, e) => Save();
          var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel", MinWidth = 80, IsCancel = true };
          cancel.Click += (s, e) => Close();
@@ -188,11 +188,12 @@ namespace hMailServer.ControlPanel.Views
       /// </summary>
       private static TextBlock Label(string text, FrameworkElement editor = null)
       {
-         var t = new TextBlock { Text = text, FontSize = Typography.Label, Margin = new Thickness(0, 8, 0, 4) };
+         var t = new TextBlock { FontSize = Typography.Label, Margin = new Thickness(0, 8, 0, 4) };
          t.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
+         Mnemonic.Apply(t, text, editor);
 
          if (editor != null)
-            AutomationProperties.SetName(editor, AccessibleNames.Qualify(text, ""));
+            AutomationProperties.SetName(editor, AccessibleNames.Qualify(MnemonicText.Strip(text), ""));
 
          return t;
       }

@@ -71,7 +71,7 @@ namespace hMailServer.ControlPanel.Views
 
          var refresh = new Wpf.Ui.Controls.Button
          {
-            Content = "Refresh",
+            Content = "_Refresh",
             VerticalAlignment = VerticalAlignment.Top,
             Margin = new Thickness(12, 4, 0, 0)
          };

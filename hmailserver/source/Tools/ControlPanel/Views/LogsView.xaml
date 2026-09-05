@@ -19,10 +19,10 @@
                            Style="{StaticResource PageSubtitle}" />
             </StackPanel>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
-                <ui:Button x:Name="PauseButton" Content="Pause" Click="Pause_Click" Margin="0,0,8,0">
+                <ui:Button x:Name="PauseButton" Content="_Pause" Click="Pause_Click" Margin="0,0,8,0">
                     <ui:Button.Icon><ui:SymbolIcon x:Name="PauseButtonIcon" Symbol="Pause24" /></ui:Button.Icon>
                 </ui:Button>
-                <ui:Button Content="Clear" Click="Clear_Click">
+                <ui:Button Content="_Clear" Click="Clear_Click">
                     <ui:Button.Icon><ui:SymbolIcon Symbol="Broom24" /></ui:Button.Icon>
                 </ui:Button>
             </StackPanel>

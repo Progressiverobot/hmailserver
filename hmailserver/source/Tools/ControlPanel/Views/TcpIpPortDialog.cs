@@ -49,12 +49,12 @@ namespace hMailServer.ControlPanel.Views
          protocol_.Items.Add(Combo("POP3", ServerSession.SessionPop3));
          protocol_.Items.Add(Combo("IMAP", ServerSession.SessionImap));
          StyleCombo(protocol_);
-         panel.Children.Add(Label("Protocol", protocol_));
+         panel.Children.Add(Label("_Protocol", protocol_));
          panel.Children.Add(protocol_);
 
-         panel.Children.Add(Label("Bind address", address_));
+         panel.Children.Add(Label("_Bind address", address_));
          panel.Children.Add(Input(address_));
-         panel.Children.Add(Label("Port", port_));
+         panel.Children.Add(Label("P_ort", port_));
          panel.Children.Add(Input(port_));
 
          security_.Items.Add(Combo("None", 0));
@@ -62,11 +62,11 @@ namespace hMailServer.ControlPanel.Views
          security_.Items.Add(Combo("STARTTLS (optional)", 2));
          security_.Items.Add(Combo("STARTTLS (required)", 3));
          StyleCombo(security_);
-         panel.Children.Add(Label("Connection security", security_));
+         panel.Children.Add(Label("_Connection security", security_));
          panel.Children.Add(security_);
 
          StyleCombo(certificate_);
-         panel.Children.Add(Label("SSL certificate (required for SSL/TLS and STARTTLS)", certificate_));
+         panel.Children.Add(Label("SSL c_ertificate (required for SSL/TLS and STARTTLS)", certificate_));
          panel.Children.Add(certificate_);
 
          // Client certificates (mutual TLS), per port. The three options are the
@@ -76,7 +76,7 @@ namespace hMailServer.ControlPanel.Views
          clientCertPolicy_.Items.Add(Combo("Request (verify and log, never refuse)", 1));
          clientCertPolicy_.Items.Add(Combo("Require (refuse a connection without a trusted certificate)", 2));
          StyleCombo(clientCertPolicy_);
-         panel.Children.Add(Label("Client certificate policy (mutual TLS)", clientCertPolicy_));
+         panel.Children.Add(Label("Client certificate polic_y (mutual TLS)", clientCertPolicy_));
          AutomationProperties.SetHelpText(clientCertPolicy_,
             "Request asks every client for a certificate, verifies and logs one if it is offered, and never " +
             "refuses the connection - use it to inventory which clients would survive Require before enforcing " +
@@ -84,14 +84,14 @@ namespace hMailServer.ControlPanel.Views
             "CA bundle below.");
          panel.Children.Add(clientCertPolicy_);
 
-         panel.Children.Add(Label("CA certificate bundle (PEM) that client certificates must chain to", clientCertCaFile_));
+         panel.Children.Add(Label("C_A certificate bundle (PEM) that client certificates must chain to", clientCertCaFile_));
          var caRow = new Grid();
          caRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
          caRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
          Input(clientCertCaFile_);
          Grid.SetColumn(clientCertCaFile_, 0);
          caRow.Children.Add(clientCertCaFile_);
-         var caBrowse = new Wpf.Ui.Controls.Button { Content = "Browse…", Margin = new Thickness(8, 0, 0, 4), VerticalAlignment = VerticalAlignment.Top };
+         var caBrowse = new Wpf.Ui.Controls.Button { Content = "B_rowse…", Margin = new Thickness(8, 0, 0, 4), VerticalAlignment = VerticalAlignment.Top };
          AutomationProperties.SetAutomationId(caBrowse, "ClientCertCaBrowse");
          AutomationProperties.SetName(caBrowse, "Browse for a CA certificate bundle file");
          caBrowse.Click += (s, e) =>
@@ -134,7 +134,7 @@ namespace hMailServer.ControlPanel.Views
          // only way out is the mouse or Alt+F4 is a dialog a keyboard user is stuck
          // in, and the two properties that fix it are the ones the account and domain
          // dialogs already set.
-         var save = new Wpf.Ui.Controls.Button { Content = "Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80, IsDefault = true };
+         var save = new Wpf.Ui.Controls.Button { Content = "_Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80, IsDefault = true };
          save.Click += (s, e) => Save();
          var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel", MinWidth = 80, IsCancel = true };
          cancel.Click += (s, e) => Close();
@@ -314,11 +314,12 @@ namespace hMailServer.ControlPanel.Views
       /// </summary>
       private static TextBlock Label(string text, FrameworkElement editor = null)
       {
-         var t = new TextBlock { Text = text, FontSize = Typography.Label, Margin = new Thickness(0, 8, 0, 4) };
+         var t = new TextBlock { FontSize = Typography.Label, Margin = new Thickness(0, 8, 0, 4) };
          t.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
+         Mnemonic.Apply(t, text, editor);
 
          if (editor != null)
-            AutomationProperties.SetName(editor, AccessibleNames.Qualify(text, ""));
+            AutomationProperties.SetName(editor, AccessibleNames.Qualify(MnemonicText.Strip(text), ""));
 
          return t;
       }

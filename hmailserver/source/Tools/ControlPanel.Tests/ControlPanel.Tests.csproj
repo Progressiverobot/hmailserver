@@ -28,6 +28,7 @@
        running a High Contrast theme. -->
   <ItemGroup>
     <Compile Include="..\ControlPanel\Services\AccessibleNames.cs" />
+    <Compile Include="..\ControlPanel\Services\MnemonicText.cs" />
     <Compile Include="..\ControlPanel\Services\SettingClaims.cs" />
     <Compile Include="..\ControlPanel\Services\ChartPalette.cs" />
     <Compile Include="..\ControlPanel\Services\StatusPalette.cs" />

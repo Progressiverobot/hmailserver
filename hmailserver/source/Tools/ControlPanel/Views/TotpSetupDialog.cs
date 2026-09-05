@@ -145,7 +145,7 @@ namespace hMailServer.ControlPanel.Views
          secret_.HorizontalAlignment = HorizontalAlignment.Stretch;
          Grid.SetColumn(secret_, 0);
          keyRow.Children.Add(secret_);
-         var copy = new Wpf.Ui.Controls.Button { Content = "Copy", Margin = new Thickness(8, 0, 0, 0) };
+         var copy = new Wpf.Ui.Controls.Button { Content = "_Copy", Margin = new Thickness(8, 0, 0, 0) };
          copy.Click += (s, e) =>
          {
             try { if (!string.IsNullOrEmpty(secret_.Text)) Clipboard.SetText(secret_.Text.Replace(" ", "")); }
@@ -162,7 +162,7 @@ namespace hMailServer.ControlPanel.Views
          {
             status_.Text = "Two-factor authentication is currently enabled. Enter a valid code to turn it off.";
             enrolPanel_.Visibility = Visibility.Collapsed;
-            action_.Content = "Disable two-factor authentication";
+            action_.Content = "_Disable two-factor authentication";
             pendingSecret_ = null;
          }
          else
@@ -172,7 +172,7 @@ namespace hMailServer.ControlPanel.Views
             secret_.Text = FormatSecret(pendingSecret_);
             ShowQr(Totp.BuildOtpAuthUri("hMailServer Control Panel", pendingSecret_));
             enrolPanel_.Visibility = Visibility.Visible;
-            action_.Content = "Enable two-factor authentication";
+            action_.Content = "_Enable two-factor authentication";
          }
 
          code_.Text = "";

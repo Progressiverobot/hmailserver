@@ -159,7 +159,7 @@ namespace hMailServer.ControlPanel.Views
 
          var create = new Wpf.Ui.Controls.Button
          {
-            Content = "Create a key…",
+            Content = "_Create a key…",
             Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
             Margin = new Thickness(0, 0, 8, 0)
          };
@@ -168,7 +168,7 @@ namespace hMailServer.ControlPanel.Views
          create.Click += (s, e) => CreateKey_();
          buttons.Children.Add(create);
 
-         var reload = new Wpf.Ui.Controls.Button { Content = "Reload" };
+         var reload = new Wpf.Ui.Controls.Button { Content = "_Reload" };
          System.Windows.Automation.AutomationProperties.SetName(reload, "Re-read the key store from disk");
          System.Windows.Automation.AutomationProperties.SetAutomationId(reload, "apikeys-reload");
          reload.Click += (s, e) => Reload_();
@@ -208,7 +208,7 @@ namespace hMailServer.ControlPanel.Views
 
          var copy = new Wpf.Ui.Controls.Button
          {
-            Content = "Copy to clipboard",
+            Content = "Copy to clip_board",
             Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
             Margin = new Thickness(0, 0, 8, 0)
          };
@@ -232,7 +232,7 @@ namespace hMailServer.ControlPanel.Views
          };
          buttons.Children.Add(copy);
 
-         var done = new Wpf.Ui.Controls.Button { Content = "I have copied it" };
+         var done = new Wpf.Ui.Controls.Button { Content = "_I have copied it" };
          System.Windows.Automation.AutomationProperties.SetName(done, "Hide the new API key");
          System.Windows.Automation.AutomationProperties.SetAutomationId(done, "apikeys-dismiss");
          done.Click += (s, e) => HideNewKey_();
@@ -487,7 +487,7 @@ namespace hMailServer.ControlPanel.Views
          Grid.SetColumn(details, 0);
          grid.Children.Add(details);
 
-         var revoke = new Wpf.Ui.Controls.Button
+         var revoke = new Wpf.Ui.Controls.Button   // per row: no access key, the rows are reached with the arrow keys
          {
             Content = "Revoke",
             Appearance = Wpf.Ui.Controls.ControlAppearance.Danger,
@@ -623,7 +623,7 @@ namespace hMailServer.ControlPanel.Views
          panel.Children.Add(Caption_("What it may do"));
          var readOnly = new RadioButton
          {
-            Content = "Read-only - can list and read, and is refused every request that changes something",
+            Content = "_Read-only - can list and read, and is refused every request that changes something",
             IsChecked = true,
             Margin = new Thickness(0, 0, 0, 4)
          };
@@ -632,7 +632,7 @@ namespace hMailServer.ControlPanel.Views
 
          var full = new RadioButton
          {
-            Content = "Full authority - can create, change and delete",
+            Content = "_Full authority - can create, change and delete",
             Margin = new Thickness(0, 0, 0, 12)
          };
          System.Windows.Automation.AutomationProperties.SetAutomationId(full, "apikeys-dialog-full");
@@ -671,7 +671,7 @@ namespace hMailServer.ControlPanel.Views
 
          var ok = new Wpf.Ui.Controls.Button
          {
-            Content = "Create key",
+            Content = "_Create key",
             Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
             Margin = new Thickness(0, 0, 8, 0),
             MinWidth = 100,

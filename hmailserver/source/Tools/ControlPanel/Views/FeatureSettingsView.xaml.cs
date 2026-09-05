@@ -428,7 +428,7 @@ namespace hMailServer.ControlPanel.Views
                Grid.SetColumn(box_, 0);
                row.Children.Add(box_);
 
-               var generate = new Wpf.Ui.Controls.Button
+               var generate = new Wpf.Ui.Controls.Button   // per setting: no access key, the rows are reached with the arrow keys
                {
                   Content = "Generate",
                   Margin = new Thickness(8, 0, 0, 0),
@@ -686,7 +686,7 @@ namespace hMailServer.ControlPanel.Views
             };
             row.Children.Add(text);
 
-            var button = new Wpf.Ui.Controls.Button
+            var button = new Wpf.Ui.Controls.Button   // per setting: no access key, the rows are reached with the arrow keys
             {
                Content = "Open…",
                Appearance = Wpf.Ui.Controls.ControlAppearance.Transparent,

@@ -140,13 +140,13 @@ namespace hMailServer.ControlPanel.Views
          {
             status_.Text = "A second factor is enrolled. Every sign-in with the administrator credential - this tool, the COM API and the REST API - needs a code. Enter a current code to turn it off.";
             enrolPanel_.Visibility = Visibility.Collapsed;
-            action_.Content = "Disable second factor";
+            action_.Content = "_Disable second factor";
          }
          else
          {
             status_.Text = "Add the key below to an authenticator app, then confirm with a code. Once enrolled, the administrator password alone will not sign in - the COM API and REST API will need a code too. Keep the key somewhere safe: if you lose the authenticator, a local administrator must clear AdministratorTotpSecret from hMailServer.ini to recover.";
             EnsureEnrolled();
-            action_.Content = "Confirm and enable";
+            action_.Content = "Confirm and _enable";
          }
 
          code_.Text = "";
@@ -286,7 +286,7 @@ namespace hMailServer.ControlPanel.Views
          secretBox_.HorizontalAlignment = HorizontalAlignment.Stretch;
          Grid.SetColumn(secretBox_, 0);
          keyRow.Children.Add(secretBox_);
-         var copy = new Wpf.Ui.Controls.Button { Content = "Copy", Margin = new Thickness(8, 0, 0, 0) };
+         var copy = new Wpf.Ui.Controls.Button { Content = "_Copy", Margin = new Thickness(8, 0, 0, 0) };
          copy.Click += (s, e) =>
          {
             try { if (!string.IsNullOrEmpty(secretBox_.Text)) Clipboard.SetText(secretBox_.Text.Replace(" ", "")); }

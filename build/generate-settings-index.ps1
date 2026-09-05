@@ -67,6 +67,17 @@ function Add-Entry($list, $label, $key, $page) {
 # On a hand-written page the on-screen wording lives in the XAML and the setting
 # it writes lives in the code-behind; the x:Name of the control is what ties the
 # two together, so that is what these two helpers key on.
+# A caption carries its Alt-key mnemonic as an underscore before the letter
+# ("_Reload", "Save s_ettings"); a doubled underscore is a literal one. The index
+# is what search matches against and what the palette shows, so it holds the
+# caption as a person reads it - the same rule Services/MnemonicText.cs applies.
+function Remove-Mnemonic([string] $text) {
+   $literal = [char] 0xE000
+   $text = $text.Replace('__', [string] $literal)
+   $text = [regex]::Replace($text, '_(?=\S)', '', 1)
+   return $text.Replace([string] $literal, '_')
+}
+
 function Get-XamlLabels($xamlText) {
    $labels = @{}
    $pending = $null
@@ -84,7 +95,7 @@ function Get-XamlLabels($xamlText) {
       # blocks are explanatory notes and bindings are not captions.
       if ($tag -like '*TextBlock') {
          if ($textMatch.Success) {
-            $caption = [System.Net.WebUtility]::HtmlDecode($textMatch.Groups[1].Value).Trim()
+            $caption = Remove-Mnemonic ([System.Net.WebUtility]::HtmlDecode($textMatch.Groups[1].Value).Trim())
             if ($caption.Length -gt 0 -and $caption.Length -le 60 -and -not $caption.StartsWith('{')) {
                $pending = $caption
             }
@@ -96,7 +107,7 @@ function Get-XamlLabels($xamlText) {
       $name = $nameMatch.Groups[1].Value
 
       if ($contentMatch.Success -and -not $contentMatch.Groups[1].Value.StartsWith('{')) {
-         $labels[$name] = [System.Net.WebUtility]::HtmlDecode($contentMatch.Groups[1].Value).Trim()
+         $labels[$name] = Remove-Mnemonic ([System.Net.WebUtility]::HtmlDecode($contentMatch.Groups[1].Value).Trim())
       }
       elseif ($pending -and $tag -match '(TextBox|PasswordBox|ComboBox|NumberBox)$' -and $attrs -notmatch 'PlaceholderText=') {
          # A placeholder means the box is a "create a new one" field on a list

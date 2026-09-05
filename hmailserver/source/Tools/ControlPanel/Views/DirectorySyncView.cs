@@ -181,14 +181,14 @@ namespace hMailServer.ControlPanel.Views
          string automationId, string caption, string placeholder = "")
       {
          var panel = new StackPanel { Margin = new Thickness(0, 0, 0, 12) };
-         panel.Children.Add(new TextBlock { Text = label, FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 4) });
+         panel.Children.Add(Mnemonic.Apply(new TextBlock { FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 4) }, label, box));
 
          box.FontSize = Typography.Body;
          box.MaxWidth = 620;
          box.MinWidth = 320;
          box.HorizontalAlignment = HorizontalAlignment.Left;
          box.PlaceholderText = placeholder;
-         System.Windows.Automation.AutomationProperties.SetName(box, label);
+         System.Windows.Automation.AutomationProperties.SetName(box, MnemonicText.Strip(label));
          System.Windows.Automation.AutomationProperties.SetAutomationId(box, automationId);
          System.Windows.Automation.AutomationProperties.SetHelpText(box, caption);
          panel.Children.Add(box);
@@ -232,7 +232,7 @@ namespace hMailServer.ControlPanel.Views
             + "not Windows will not have sAMAccountName and needs the attribute names changed.",
             out StackPanel content);
 
-         content.Children.Add(LabelledBox_("Search filter", filter_, "dirsync-filter",
+         content.Children.Add(LabelledBox_("Search _filter", filter_, "dirsync-filter",
             "The LDAP filter that selects the people who should have a mailbox. The default takes enabled person "
             + "objects that carry a mail address - which deliberately excludes disabled leavers, service accounts "
             + "and computers, all of which a broader filter would provision mailboxes for.",
@@ -248,23 +248,23 @@ namespace hMailServer.ControlPanel.Views
             placeholder: "(&(objectClass=user)(objectCategory=person)(mail=*)"
                          + "(!(userAccountControl:1.2.840.113556.1.4.803:=2)))"));
 
-         content.Children.Add(LabelledBox_("Address attribute", mailAttribute_, "dirsync-mail-attribute",
+         content.Children.Add(LabelledBox_("Address attri_bute", mailAttribute_, "dirsync-mail-attribute",
             "Which attribute holds the mailbox address. proxyAddresses is understood: its scheme prefix is removed "
             + "and the primary SMTP: value is preferred over the lower-case aliases.",
             placeholder: "mail"));
 
-         content.Children.Add(LabelledBox_("Logon name attribute", usernameAttribute_, "dirsync-username-attribute",
+         content.Children.Add(LabelledBox_("_Logon name attribute", usernameAttribute_, "dirsync-username-attribute",
             "Which attribute holds the name the person logs in with. This is what is stored against the account and "
             + "what the directory is asked about at every logon afterwards, so guessing it from the address is not "
             + "good enough - an entry that does not carry it is reported rather than provisioned.",
             placeholder: "sAMAccountName"));
 
-         content.Children.Add(LabelledBox_("Display name attribute", displayNameAttribute_, "dirsync-displayname-attribute",
+         content.Children.Add(LabelledBox_("_Display name attribute", displayNameAttribute_, "dirsync-displayname-attribute",
             "Split into first and last name, and only ever written to an account that has neither. A name typed here "
             + "by an administrator is never overwritten by the directory.",
             placeholder: "displayName"));
 
-         content.Children.Add(LabelledBox_("Maximum entries to read", maxUsers_, "dirsync-max-users",
+         content.Children.Add(LabelledBox_("_Maximum entries to read", maxUsers_, "dirsync-max-users",
             "A ceiling on one pass, so a search base pointed one level too high cannot be answered by reading an "
             + "entire forest. If it is hit, the run says so and disables nothing at all - beyond the limit, an entry "
             + "that exists is indistinguishable from one that was deleted.",
@@ -307,7 +307,7 @@ namespace hMailServer.ControlPanel.Views
          });
          content.Children.Add(domainPanel);
 
-         disableMissing_.Content = "Also mark accounts inactive when their directory entry has gone";
+         disableMissing_.Content = "Also mark accounts _inactive when their directory entry has gone";
          disableMissing_.FontSize = Typography.Body;
          disableMissing_.Margin = new Thickness(0, 0, 0, 4);
          System.Windows.Automation.AutomationProperties.SetName(disableMissing_,
@@ -336,7 +336,7 @@ namespace hMailServer.ControlPanel.Views
 
          previewButton_ = new Wpf.Ui.Controls.Button
          {
-            Content = "Preview",
+            Content = "_Preview",
             Margin = new Thickness(0, 0, 8, 0),
             Appearance = Wpf.Ui.Controls.ControlAppearance.Primary
          };
@@ -346,7 +346,7 @@ namespace hMailServer.ControlPanel.Views
          previewButton_.Click += async (s, e) => await RunAsync_(false);
          buttons.Children.Add(previewButton_);
 
-         applyButton_ = new Wpf.Ui.Controls.Button { Content = "Apply", IsEnabled = false };
+         applyButton_ = new Wpf.Ui.Controls.Button { Content = "_Apply", IsEnabled = false };
          System.Windows.Automation.AutomationProperties.SetName(applyButton_,
             "Create and update the accounts the preview listed");
          System.Windows.Automation.AutomationProperties.SetAutomationId(applyButton_, "dirsync-apply");
@@ -383,7 +383,7 @@ namespace hMailServer.ControlPanel.Views
             + "only after a preview has told you what it is going to do.",
             out StackPanel content);
 
-         content.Children.Add(LabelledBox_("Run every (minutes)", scheduleMinutes_, "dirsync-schedule",
+         content.Children.Add(LabelledBox_("Run _every (minutes)", scheduleMinutes_, "dirsync-schedule",
             "0 switches the schedule off, which is the default and is what every existing installation stays at. "
             + "Values between 1 and 14 are treated as 15, and anything over a week as a week. This one needs a "
             + "service restart: the task is registered when the server starts.",
@@ -406,7 +406,7 @@ namespace hMailServer.ControlPanel.Views
 
          var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
 
-         var reload = new Wpf.Ui.Controls.Button { Content = "Reload", Margin = new Thickness(0, 0, 8, 0) };
+         var reload = new Wpf.Ui.Controls.Button { Content = "_Reload", Margin = new Thickness(0, 0, 8, 0) };
          System.Windows.Automation.AutomationProperties.SetName(reload, "Re-read these settings from hMailServer.INI");
          System.Windows.Automation.AutomationProperties.SetAutomationId(reload, "dirsync-reload");
          reload.Click += (s, e) => Load_();
@@ -414,7 +414,7 @@ namespace hMailServer.ControlPanel.Views
 
          saveButton_ = new Wpf.Ui.Controls.Button
          {
-            Content = "Save changes",
+            Content = "_Save changes",
             Appearance = Wpf.Ui.Controls.ControlAppearance.Primary
          };
          System.Windows.Automation.AutomationProperties.SetName(saveButton_, "Save these settings to hMailServer.INI");
