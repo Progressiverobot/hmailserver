@@ -17,6 +17,7 @@
 #include "../common/Util/Crypt.h"
 #include "../common/Util/Hashing/ScramSha256.h"
 #include "../common/Util/OAuth2TokenValidator.h"
+#include "../common/Util/ClientCertificateIdentity.h"
 #include "../common/BO/Account.h"
 #include "../common/BO/Domain.h"
 #include "../common/BO/DomainAliases.h"
@@ -169,6 +170,70 @@ namespace HM
 				}
 
 				return IMAPResult(IMAPResult::ResultNo, "Invalid authentication token.");
+			}
+
+			pConnection->Login(pAccount);
+
+			String sResponse = pArgument->Tag() + " OK LOGIN completed\r\n";
+			pConnection->SendAsciiData(sResponse);
+
+			return IMAPResult();
+		}
+
+		if (sParam == _T("EXTERNAL"))
+		{
+			// Offered only on a connection whose client certificate verified against the
+			// port's CA and names an address (see CAPABILITY); on any other there is
+			// nothing to authenticate with.
+			if (pConnection->GetVerifiedClientCertificateIdentities().empty())
+				return IMAPResult(IMAPResult::ResultBad, "Unsupported Authenticate mechanism.");
+
+			if (paramcount == 1)
+			{
+				// No initial response: ask for one. The continuation is prefixed with "="
+				// so that an empty line - the well-formed answer for "whoever the
+				// certificate says" - does not re-parse as a command with no response
+				// and ask again forever. Whatever follows the "=" is the base64 authzid.
+				pConnection->SetCommandBuffer(pArgument->Tag() + " AUTHENTICATE EXTERNAL =");
+				pConnection->SendAsciiData("+ \r\n");
+				return IMAPResult();
+			}
+
+			String sResponse64 = pParser->GetParamValue(pArgument, 1);
+
+			// A bare "*" cancels the SASL exchange (RFC 3501).
+			if (sResponse64 == _T("*") || sResponse64 == _T("=*"))
+				return IMAPResult(IMAPResult::ResultBad, "Authentication cancelled.");
+
+			// "=" is the inline form of an empty initial response (RFC 4959), and the
+			// prefix put on a continuation above.
+			if (sResponse64.StartsWith(_T("=")))
+				sResponse64 = sResponse64.Mid(1);
+
+			String sAuthzid;
+			if (!sResponse64.IsEmpty())
+				StringParser::Base64Decode(sResponse64, sAuthzid);
+
+			String sLoginName;
+			bool disconnect = false;
+			std::shared_ptr<const Account> pAccount = ClientCertificateIdentity::Logon(
+				pConnection->GetVerifiedClientCertificateIdentities(), sAuthzid, pConnection->GetRemoteEndpointAddress(), sLoginName, disconnect);
+
+			pConnection->FireOnClientLogon(sLoginName, pAccount != nullptr);
+
+			if (!pAccount)
+			{
+				// The per-IP accounting has been fed by Logon; this is the per-connection cap.
+				if (disconnect || pConnection->RegisterAuthenticationFailure())
+				{
+					String sResponse = "* Too many invalid logon attempts.\r\n";
+					sResponse += pArgument->Tag() + " BAD Goodbye\r\n";
+					pConnection->Logout(sResponse);
+
+					return IMAPResult(IMAPResult::ResultOKSupressRead, "");
+				}
+
+				return IMAPResult(IMAPResult::ResultNo, "The client certificate does not identify an account.");
 			}
 
 			pConnection->Login(pAccount);

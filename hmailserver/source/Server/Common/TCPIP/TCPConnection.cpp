@@ -32,6 +32,8 @@
 #include <openssl/evp.h>
 #include <openssl/obj_mac.h>
 
+#include "../Util/ClientCertificateIdentity.h"
+
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
 #define new DEBUG_NEW
@@ -761,9 +763,14 @@ namespace HM
       {
          verified_client_certificate_subject_ = subject;
 
+         // The addresses the certificate names are what SASL EXTERNAL logs on with;
+         // read once here, under the same verdict, so no later code path can take
+         // an identity from a certificate that did not verify.
+         verified_client_certificate_identities_ = ClientCertificateIdentity::Extract(certificate);
+
          String message;
-         message.Format(_T("TCPConnection - Client certificate verified. Session Id: %d, Remote IP: %s, Subject: %s"),
-            session_id_, SafeGetIPAddress().c_str(), String(subject).c_str());
+         message.Format(_T("TCPConnection - Client certificate verified. Session Id: %d, Remote IP: %s, Subject: %s, Addresses: %d"),
+            session_id_, SafeGetIPAddress().c_str(), String(subject).c_str(), (int) verified_client_certificate_identities_.size());
          LOG_TCPIP(message);
       }
       else
