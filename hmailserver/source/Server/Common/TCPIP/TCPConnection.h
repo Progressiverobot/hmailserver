@@ -88,6 +88,14 @@ namespace HM
       void EnqueueShutdownSend();
       void EnqueueDisconnect();
       void EnqueueHandshake();
+
+      // Queues a pause of the given length ahead of whatever is enqueued after it -
+      // typically a refusal and the read that follows it. The pause is this
+      // connection's own timer, so no thread waits and nothing pipelined behind
+      // the command is read until it has run. The idle timeout is not pushed
+      // forward by it, so a peer being delayed is still subject to the timeout.
+      // Bounded by IOOperation's caller; a value of 0 or less queues nothing.
+      void EnqueueDelay(int seconds);
       
       IPAddress GetRemoteEndpointAddress();
       unsigned long GetLocalEndpointPort();
@@ -262,6 +270,8 @@ namespace HM
       void AsyncWrite(std::shared_ptr<ByteBuffer> buffer);
       void AsyncRead(const AnsiString &delimitor);
       void AsyncHandshake();
+      void AsyncDelay(int seconds);
+      void AsyncDelayCompleted(const boost::system::error_code& error);
 
       // After a successful inbound handshake on a port with a client-certificate
       // policy: log what the peer presented (or that it presented nothing) and
@@ -312,6 +322,9 @@ namespace HM
       boost::asio::ip::tcp::resolver resolver_;
       boost::asio::steady_timer timer_;
       boost::asio::steady_timer session_ceiling_timer_;
+      // The BCTDelay pause (see EnqueueDelay); its own timer so that arming it
+      // never disturbs the idle timeout above.
+      boost::asio::steady_timer delay_timer_;
       int session_ceiling_seconds_;
       bool session_ceiling_armed_;
       boost::asio::streambuf receive_buffer_;

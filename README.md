@@ -59,6 +59,7 @@ Sender authentication and anti-abuse
 * **SpamAssassin** integration, **DNSBL** and **SURBL** lookups, greylisting, HELO/PTR/MX sanity checks and a weighted scoring pipeline.
 * **Virus scanning** via ClamAV (clamd or clamscan) or any command-line scanner. The Control Panel's ClamAV test asks the daemon `PING` and `VERSION` before it scans, names the daemon it reached, and streams its EICAR sample from memory so the host's own antivirus cannot remove it first.
 * Attachment blocking, IP ranges with per-range policy, and connection auto-banning after repeated authentication failures.
+* **Login and recipient tarpitting**, both off by default and both a pause on the connection's own timer rather than a thread asleep: a failed logon's refusal is delayed progressively (`LogonTarpitSeconds`, on SMTP/POP3/IMAP), and recipients past a count in an unauthenticated SMTP session are held (`SmtpTarpitCount` / `SmtpTarpitDelaySeconds`).
 
 Account security and authentication
 -----------------------------------
@@ -71,7 +72,7 @@ Account security and authentication
 * **LDAP directory provisioning** — the directory as an account source, not only as a password check. Preview reports exactly which mailboxes the directory says should exist and changes nothing; apply then creates and updates them. The two share one decider, so a preview cannot describe an action the apply would not take. A domain takes part only if its Active Directory domain name is set, which makes provisioning opt-in per domain and keeps a search base pointed one level too high from provisioning into unrelated hosted domains. Nothing is ever deleted: the most it does is mark an account inactive, and only when asked — never on a truncated or empty enumeration, and never for a domain in which nothing was seen. An optional unattended schedule (`[LDAP] SyncScheduleMinutes`, off by default) creates and updates but never disables. Verified end to end against a live Windows Server 2025 domain controller.
 * **Argon2id**, **scrypt** (RFC 7914) and **PBKDF2-HMAC-SHA256** password hashing, with tunable work factors, transparent upgrade on login (of the scheme, and of a hash cheaper than the configured work factor), a minimum-accepted-hash policy, and an optional server-side pepper.
 * Full RFC 4013 SASLprep of non-ASCII credentials on the PLAIN and LOGIN paths (SCRAM usernames are matched as sent).
-* Optional **TOTP two-factor authentication** for administrative logon.
+* **TOTP two-factor authentication on the administrator credential, enforced by the server** on every surface: the COM API refuses the password alone and `AuthenticateWithCode` is the way in, and the REST API takes the code in an `X-hMailServer-OTP` header. Enrol and remove it from the Control Panel or over COM; the secret is stored machine-protected in `hMailServer.ini`.
 
 Mail filtering and routing
 --------------------------

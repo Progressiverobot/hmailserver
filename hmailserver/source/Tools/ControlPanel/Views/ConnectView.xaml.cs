@@ -66,7 +66,14 @@ namespace hMailServer.ControlPanel.Views
 
             var session = new ServerSession();
 
-            if (!session.Connect(host, user, password, out string error))
+            // session.Connect tries the password. On a server that enforces a second
+            // factor on the administrator it fails with SecondFactorRequired set, so
+            // TryWithCode_ prompts once and retries with the code. Prompting only once
+            // is deliberate: a wrong password sets the same flag, and a re-prompt loop
+            // would hide that the password was the problem. The `&&` short-circuits, so
+            // TryWithCode_ (which shows a dialog) runs only when a code is actually wanted.
+            if (!session.Connect(host, user, password, out string error)
+                && (!session.SecondFactorRequired || !TryWithCode_(session, host, user, password, out error)))
             {
                Fail_(error ?? "Connection failed.");
                return;
@@ -82,6 +89,23 @@ namespace hMailServer.ControlPanel.Views
             // beats an unhandled exception dialog over the sign-in card.
             Fail_(ex.Message);
          }
+      }
+
+      // Prompts for the administrator's one-time code and retries the connect with
+      // it. Returns false (with a reason in error) when the user cancels or the
+      // code is refused; the caller then fails the sign-in as normal.
+      private bool TryWithCode_(ServerSession session, string host, string user, string password, out string error)
+      {
+         var prompt = new TotpPromptDialog(Window.GetWindow(this));
+
+         if (prompt.ShowDialog() != true)
+         {
+            error = "Sign-in cancelled.";
+            return false;
+         }
+
+         BusyText.Text = "Signing in…";
+         return session.Connect(host, user, password, prompt.Code, out error);
       }
 
       private void Fail_(string message)

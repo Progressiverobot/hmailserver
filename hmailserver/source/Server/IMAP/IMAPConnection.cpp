@@ -14,6 +14,7 @@
 
 #include "../Common/Application/ACLManager.h"
 #include "../Common/Application/TimeoutCalculator.h"
+#include "../Common/Util/AccountLogon.h"
 
 // Business data/storage
 #include "../Common/BO/Account.h"
@@ -1532,6 +1533,12 @@ namespace HM
       // connection make an unbounded number of authentication attempts, even
       // when the auto-ban feature is disabled.
       authentication_failure_count_++;
+
+      // The logon tarpit (hMailServer.ini LogonTarpitSeconds): the tagged NO the
+      // command is about to return, or the BYE below it, waits behind a pause on
+      // the connection's own timer. See AccountLogon::TarpitDelaySeconds.
+      EnqueueDelay(AccountLogon::TarpitDelaySeconds(authentication_failure_count_));
+
       return authentication_failure_count_ >= 10;
    }
 

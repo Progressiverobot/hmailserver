@@ -120,8 +120,9 @@ namespace HM
                      case IOOperation::BCTDisconnect:   // We can't disconnect - we want timeout messages to be sent to client.
                      case IOOperation::BCTShutdownSend: // We can't disable send-mode while we're sending data. Makes no sense.
                      case IOOperation::BCTHandshake:    // We can't perform a SSL handshake while we're sending data.
+                     case IOOperation::BCTDelay:        // A pause starts once what is being sent has gone.
                         std::shared_ptr<IOOperation> empty;
-                        return empty;  
+                        return empty;
 
                   }
                   break;
@@ -133,6 +134,7 @@ namespace HM
                   case IOOperation::BCTWrite:         // We may send data while we're processing data (normal responses)
                   case IOOperation::BCTDisconnect:   // We may disconnect while we're processing data
                   case IOOperation::BCTShutdownSend: // It's OK to close the sending even though we're receiving data.
+                  case IOOperation::BCTDelay:        // A pause may start while the command that asked for it is still being processed.
                      break;
                   case IOOperation::BCTRead:      // We can not start new receives while we're processing data. Concurrent receives are not supported.
                   case IOOperation::BCTHandshake:    // We can't perform a SSL handshake while we're processing data at the same time7.
@@ -144,6 +146,7 @@ namespace HM
             case IOOperation::BCTDisconnect:   // If we're disconnecting we can't start any new operations.
             case IOOperation::BCTShutdownSend: // Shutting down Send and performing other operations at the same time is not supported.
             case IOOperation::BCTHandshake:    // Doing a handshake and sending/receiving other data at the same time is not supported
+            case IOOperation::BCTDelay:        // Nothing starts while a pause is running - that is the whole point of it.
                {
                   std::shared_ptr<IOOperation> empty;
                   return empty;  

@@ -155,9 +155,14 @@ namespace HM
       // decision is allowed to look at.
       struct Caller
       {
-         Caller() : result(AuthenticationFailed), read_only(true) { }
+         Caller() : result(AuthenticationFailed), read_only(true), second_factor_required(false) { }
 
          AuthenticationResult result;
+
+         // Set on a refusal when the administrator password was right and what
+         // was missing was the one-time code; the 401 then says so in a header,
+         // as GitHub's API does, so a client knows to ask for it.
+         bool second_factor_required;
 
          // "administrator", or "key:<id>". Identifies the credential for rate
          // accounting and for the log; never the secret itself.
@@ -200,10 +205,24 @@ namespace HM
 
       static Caller Authenticate_(const AnsiString &request, const IPAddress &peer_address);
       static bool AuthenticateBearer_(const AnsiString &token, const IPAddress &peer_address, Caller &caller);
-      static bool AuthenticateBasic_(const AnsiString &encodedCredentials);
+      // The Basic credential is the administrator password, and - once a second
+      // factor is enrolled on it - a code in the X-hMailServer-OTP request header
+      // as well. The two code outcomes are told apart because only one of them is
+      // a guess: a missing code is a client that has not been told yet, a wrong one
+      // counts towards the per-address auto-ban like any other wrong credential.
+      enum BasicResult
+      {
+         BasicRefused,
+         BasicAccepted,
+         BasicCodeMissing,
+         BasicCodeWrong
+      };
+
+      static BasicResult AuthenticateBasic_(const AnsiString &encodedCredentials, const AnsiString &request);
 
       static AnsiString GetAuthorizationHeader_(const AnsiString &request);
-      static AnsiString BuildUnauthorizedResponse_();
+      static AnsiString GetHeader_(const AnsiString &request, const AnsiString &lowerCaseName);
+      static AnsiString BuildUnauthorizedResponse_(bool secondFactorRequired);
       static AnsiString BuildForbiddenResponse_(const AnsiString &reason);
       static AnsiString BuildTooManyRequestsResponse_();
 

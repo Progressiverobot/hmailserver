@@ -1397,6 +1397,19 @@ namespace hMailServer.ControlPanel.Views
          general.Settings.Add(new ComText { Path = "AntiSpam.MaximumMessageSize", Label = "Max message size to spam-scan (KB, 0 = unlimited)", Numeric = true });
          Tab("General").Cards.Add(general);
 
+         // Not a score: this one costs the sender time rather than points, which is
+         // why it is a card of its own rather than a row in the thresholds.
+         var tarpit = Card("Recipient tarpit",
+            "Slows a session that names more recipients than a legitimate message needs. Past the count, every further " +
+            "RCPT TO in an unauthenticated session waits the delay before it is answered - a dictionary attack or a spam " +
+            "run names hundreds of addresses and pays for each one, while a sending MTA names a handful and never " +
+            "reaches the count. Authenticated sessions and IP ranges with spam protection off are exempt. The wait is a " +
+            "timer on the connection, not a thread asleep. Takes effect at once; stored in hMailServer.ini as " +
+            "SmtpTarpitCount and SmtpTarpitDelaySeconds.");
+         tarpit.Settings.Add(new ComText { Path = "AntiSpam.TarpitCount", Label = "Recipients a message may name before the delay starts (0 = off)", Numeric = true });
+         tarpit.Settings.Add(new ComText { Path = "AntiSpam.TarpitDelay", Label = "Delay for each further recipient (seconds, at most 30; 0 = off)", Numeric = true });
+         Tab("General").Cards.Add(tarpit);
+
          // Directly under the delete threshold, because this setting changes what that
          // threshold DOES rather than adding a feature beside it.
          var quarantine = Card("Quarantine instead of refusing",
@@ -2049,6 +2062,27 @@ namespace hMailServer.ControlPanel.Views
             IniStore = iniStore_
          });
          Tab("Auto-ban").Cards.Add(lockout);
+
+         // The third measure on the same subject: auto-ban and the lockout decide
+         // WHETHER a guess is answered; this decides HOW SOON, and it applies from
+         // the first wrong password rather than after a threshold.
+         var tarpit = Card("Logon tarpit",
+            "Holds the refusal of a wrong password for a while before sending it: the first failure on a connection " +
+            "waits this many seconds, the second twice as long, and so on up to 30 seconds, on SMTP, POP3 and IMAP " +
+            "alike. A correct password is never delayed. The wait is a timer on the connection, not a thread asleep, " +
+            "so a flood of failed logons costs the server nothing but the sockets they arrive on - the reason the " +
+            "old TarpitDelay was a stub for a decade is that the naive version is a self-inflicted outage.");
+         tarpit.Settings.Add(new IniNumber
+         {
+            Path = "LogonTarpitSeconds",
+            Label = "Delay per failed logon, multiplied by the failures so far on that connection (seconds; 0 = off)",
+            Default = 0,
+            Blurb = "0 is the shipped default. 2 is a reasonable start: a mistyped password costs a person two " +
+                    "seconds once, and a password-spraying client two, four, six... seconds per guess. Applies after " +
+                    "a service restart.",
+            IniStore = iniStore_
+         });
+         Tab("Auto-ban").Cards.Add(tarpit);
       }
 
       private void BuildLogging()
@@ -2690,19 +2724,46 @@ namespace hMailServer.ControlPanel.Views
          });
          Tab("Password").Cards.Add(ageing);
 
-         var twoFactor = Card("Two-factor authentication",
-            "An optional one-time code, asked for after the password when signing in to this Control Panel. The secret " +
-            "is stored per machine under HKLM, so enabling or disabling it needs local administrator rights. It does " +
-            "not apply to the REST API or to scripts using the COM API.");
+         // The one the server enforces, first because it is the one that matters:
+         // it protects the credential itself on every surface, not just this tool.
+         var serverTwoFactor = Card("Second factor on the administrator credential (recommended)",
+            "A one-time code required in addition to the administrator password, checked by the SERVER - so it " +
+            "applies to every client of that credential: this Control Panel, scripts using the COM API, and the REST " +
+            "API (which reads the code from an X-hMailServer-OTP header). The secret is stored on the server, in " +
+            "hMailServer.ini, machine-protected. It makes the administrator password worthless on its own. Keep the " +
+            "setup key safe: if the authenticator is lost, a local administrator clears AdministratorTotpSecret from " +
+            "hMailServer.ini to recover.");
+         serverTwoFactor.Settings.Add(new ComAction
+         {
+            ButtonText = "Set up or turn off the server-enforced second factor…",
+            Action = () =>
+            {
+               new AdministratorTwoFactorDialog(Application.Current?.MainWindow).ShowDialog();
+               bool on = false;
+               try { on = (bool)ServerSession.Current.Application.AdministratorTOTPEnabled; }
+               catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Leave the summary reading "off" if the state cannot be read back. */ }
+               return on
+                  ? (true, "A second factor is enforced on the administrator credential, on every client.")
+                  : (false, "No second factor is enforced - the administrator password alone signs in.");
+            }
+         });
+         Tab("Two-factor").Cards.Add(serverTwoFactor);
+
+         var twoFactor = Card("Two-factor for this Control Panel only",
+            "An older, weaker option: a one-time code asked for after the password when signing in to THIS Control " +
+            "Panel, checked by the tool itself after the server has already accepted the password. The secret is " +
+            "stored per machine under HKLM, so enabling or disabling it needs local administrator rights, and it does " +
+            "nothing for the REST API or for scripts using the COM API. Prefer the server-enforced factor above; this " +
+            "one remains for existing setups.");
          twoFactor.Settings.Add(new ComAction
          {
-            ButtonText = "Set up or turn off two-factor authentication\u2026",
+            ButtonText = "Set up or turn off Control-Panel-only two-factor authentication…",
             Action = () =>
             {
                new TotpSetupDialog(Application.Current?.MainWindow).ShowDialog();
                return TotpManager.IsConfigured()
-                  ? (true, "Two-factor authentication is on for this Control Panel.")
-                  : (false, "Two-factor authentication is off — only the password is required.");
+                  ? (true, "Control-Panel-only two-factor authentication is on.")
+                  : (false, "Control-Panel-only two-factor authentication is off.");
             }
          });
          Tab("Two-factor").Cards.Add(twoFactor);

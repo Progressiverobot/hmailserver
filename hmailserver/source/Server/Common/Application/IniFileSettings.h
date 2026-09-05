@@ -113,6 +113,15 @@ namespace HM
 
       void SetAdministratorPassword(const String &sNewPassword);
       String GetAdministratorPassword();
+
+      // The administrator credential's second factor: a base32 TOTP secret kept
+      // under [Security] AdministratorTotpSecret in the machine-bound DPAPI
+      // envelope route passwords use (Crypt::ProtectSecret), and handed out only
+      // in the otpauth URI at enrolment. Empty means no second factor. Setting an
+      // empty string removes it - which is also the recovery for a lost
+      // authenticator: delete the key from the file, as a local administrator can.
+      String GetAdministratorTotpSecret();
+      bool SetAdministratorTotpSecret(const String &base32Secret);
       String GetLogDirectory();
 
       String GetBinDirectory();
@@ -718,6 +727,23 @@ namespace HM
       int GetAccountLockoutThreshold() const { return account_lockout_threshold_; }
       int GetAccountLockoutWindowMinutes() const { return account_lockout_window_minutes_; }
       int GetAccountLockoutMinutes() const { return account_lockout_minutes_; }
+
+      // The longest pause either tarpit will queue, whatever the ini says.
+      static const int TARPIT_MAX_SECONDS = 30;
+
+      // Logon tarpit: each failed logon's refusal on a connection waits this many
+      // seconds times the number of failures that connection has made, capped at
+      // TARPIT_MAX_SECONDS. 0 (the default) refuses at once.
+      int GetLogonTarpitSeconds() const { return logon_tarpit_seconds_; }
+
+      // Recipient tarpit: in an unauthenticated SMTP session, every RCPT TO past
+      // the first SmtpTarpitCount waits SmtpTarpitDelaySeconds before its reply.
+      // Either at 0 (the default) means no tarpit. Settable at run time through
+      // AntiSpam.TarpitCount / TarpitDelay, which is why these have setters.
+      int GetSmtpTarpitCount() const { return smtp_tarpit_count_; }
+      int GetSmtpTarpitDelaySeconds() const { return smtp_tarpit_delay_seconds_; }
+      bool SetSmtpTarpitCount(int count);
+      bool SetSmtpTarpitDelaySeconds(int seconds);
       // TLS key-exchange groups, in OpenSSL group-list syntax, most preferred
       // first. The default puts the hybrid post-quantum KEMs ahead of the
       // classical curves: a PQC-capable peer then gets a quantum-resistant
@@ -807,6 +833,10 @@ namespace HM
 
       void WriteIniSetting_(const String &sSection, const String &sKey, const String &sValue);
       void WriteIniSetting_(const String &sSection, const String &sKey, int Value);
+
+      // Holds a tarpit delay in [0, TARPIT_MAX_SECONDS]. A negative value is off;
+      // a huge one would be a pause longer than any protocol's idle timeout.
+      static int ClampTarpitSeconds_(int seconds);
       String ReadIniSettingString_(const String &sSection, const String &sKey, const String &sDefault);
       int ReadIniSettingInteger_(const String &sSection, const String &sKey, int iDefault);
 
@@ -844,6 +874,8 @@ namespace HM
       String database_directory_;
       String database_server_FailoverPartner;
       String administrator_password_;
+      // As stored: protected, not the base32 secret. See GetAdministratorTotpSecret.
+      String administrator_totp_secret_protected_;
 
       std::vector<String> valid_languages_;
 
@@ -1048,6 +1080,9 @@ namespace HM
       int account_lockout_threshold_ = 0;
       int account_lockout_window_minutes_ = 30;
       int account_lockout_minutes_ = 30;
+      int logon_tarpit_seconds_ = 0;
+      int smtp_tarpit_count_ = 0;
+      int smtp_tarpit_delay_seconds_ = 0;
       String tls_key_exchange_groups_;
       String tls_cipher_suites13_;
       bool tls_session_tickets_enabled_ = true;

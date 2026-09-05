@@ -111,6 +111,10 @@ namespace HM
       ParseResult ScramAuthFailed_();
       ParseResult FinishPasswordLogin_();
       ParseResult HandleSuccessfulLogin_();
+
+      // The logon tarpit (hMailServer.ini LogonTarpitSeconds): queues a pause on
+      // the connection ahead of the refusal rather than sleeping.
+      void TarpitFailedLogon_();
       void FireOnClientLogon_(const String &sUsername, bool isAuthenticated);
       std::shared_ptr<const Account> LookupPbkdf2Account_(const String &sAddress);
       std::shared_ptr<const Account> LookupActiveAccount_(const String &sAddress);

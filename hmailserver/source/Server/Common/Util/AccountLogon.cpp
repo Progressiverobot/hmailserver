@@ -7,6 +7,7 @@
 
 #include "AccountLogon.h"
 #include "AccountLockout.h"
+#include "../Application/IniFileSettings.h"
 #include "PasswordValidator.h"
 #include "../Persistence/PersistentLogonFailure.h"
 #include "../Persistence/PersistentAccount.h"
@@ -95,6 +96,21 @@ namespace HM
 
       std::shared_ptr<Account> empty;
       return empty;
+   }
+
+   int
+   AccountLogon::TarpitDelaySeconds(int failuresOnThisConnection)
+   {
+      const int perFailure = IniFileSettings::Instance()->GetLogonTarpitSeconds();
+
+      if (perFailure <= 0 || failuresOnThisConnection <= 0)
+         return 0;
+
+      // Multiplied in 64 bits so an absurd failure count cannot wrap the product
+      // into a small (or negative) delay; the cap is what a client ever sees.
+      const __int64 delay = static_cast<__int64>(perFailure) * failuresOnThisConnection;
+
+      return delay > IniFileSettings::TARPIT_MAX_SECONDS ? IniFileSettings::TARPIT_MAX_SECONDS : static_cast<int>(delay);
    }
 
    void

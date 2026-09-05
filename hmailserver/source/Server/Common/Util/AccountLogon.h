@@ -35,6 +35,15 @@ namespace HM
       void RegisterFailedLogin(const IPAddress &ipaddress, const String &username, bool &disconnect,
                                bool countTowardsAccountLockout = true);
 
+      // The logon tarpit: how long a connection's next refusal should wait, given
+      // how many logons it has failed so far (this one included). Progressive - the
+      // n-th failure waits n times LogonTarpitSeconds - and capped, so a session
+      // that keeps guessing is slowed by more each time without ever outlasting
+      // the protocol's idle timeout. 0 when the tarpit is off, which it is unless
+      // hMailServer.ini says otherwise. Every protocol queues the result with
+      // TCPConnection::EnqueueDelay; none of them sleeps.
+      static int TarpitDelaySeconds(int failuresOnThisConnection);
+
    private:
 
       void CreateIPRange(const IPAddress &ipaddress, const String &username, int minutes);

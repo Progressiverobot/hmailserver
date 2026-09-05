@@ -1136,6 +1136,11 @@ namespace HM
    {
       cur_no_of_rcptto_ ++;
 
+      // Before any reply below, so that every answer past the count is held -
+      // refusals included, since a refused recipient is what a dictionary attack
+      // mostly gets.
+      TarpitRecipient_();
+
       // 530 Must issue STARTTLS first
       // to every command other than NOOP, EHLO, STARTTLS, or QUIT.
       if (!CheckStartTlsRequired_())
@@ -4043,6 +4048,7 @@ namespace HM
       accountLogon.RegisterFailedLogin(GetRemoteEndpointAddress(), sLoginName, disconnect, false);
 
       authentication_failure_count_++;
+      TarpitFailedLogon_();
 
       if (disconnect || authentication_failure_count_ >= 10)
       {
@@ -4093,6 +4099,7 @@ namespace HM
       // The per-IP accounting has been fed by Logon; this is the per-connection cap,
       // the same one every other mechanism applies.
       authentication_failure_count_++;
+      TarpitFailedLogon_();
 
       if (disconnect || authentication_failure_count_ >= 10)
       {
@@ -4153,6 +4160,7 @@ namespace HM
       else
       {
          authentication_failure_count_++;
+         TarpitFailedLogon_();
 
          // Defense-in-depth on top of the per-IP auto-ban: never let a single
          // connection make an unbounded number of authentication attempts.
@@ -4198,12 +4206,45 @@ namespace HM
       }
    }
 
-   void 
+   void
    SMTPConnection::RestartAuthentication_()
    {
       ResetLoginCredentials_();
-      
+
       SendErrorResponse_(535, "Authentication failed. Restarting authentication process.");
+   }
+
+   void
+   SMTPConnection::TarpitFailedLogon_()
+   {
+      // Queued, not slept: the refusal that follows, and the read after it, wait
+      // behind the connection's own timer. See AccountLogon::TarpitDelaySeconds.
+      EnqueueDelay(AccountLogon::TarpitDelaySeconds(authentication_failure_count_));
+   }
+
+   void
+   SMTPConnection::TarpitRecipient_()
+   {
+      // The recipient tarpit: an unauthenticated session that keeps adding
+      // recipients past SmtpTarpitCount has each further RCPT reply held for
+      // SmtpTarpitDelaySeconds. Dictionary attacks and spam runs are long
+      // recipient lists from strangers; a legitimate MTA sends a handful and is
+      // never past the count. Sessions the range exempts from spam protection are
+      // exempt from this too, as they are from every other anti-spam measure.
+      if (isAuthenticated_)
+         return;
+
+      std::shared_ptr<SecurityRange> range = GetSecurityRange();
+      if (range && !range->GetSpamProtection())
+         return;
+
+      const int count = IniFileSettings::Instance()->GetSmtpTarpitCount();
+      const int delay = IniFileSettings::Instance()->GetSmtpTarpitDelaySeconds();
+
+      if (count <= 0 || delay <= 0 || cur_no_of_rcptto_ <= count)
+         return;
+
+      EnqueueDelay(delay);
    }
 
    void 
@@ -4381,6 +4422,7 @@ namespace HM
       }
 
       authentication_failure_count_++;
+      TarpitFailedLogon_();
 
       // Per-connection brute-force cap (effective even when auto-ban is disabled).
       if (disconnect || authentication_failure_count_ >= 10)

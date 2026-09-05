@@ -719,6 +719,14 @@ namespace HM
       ScriptServer::Instance()->FireEvent(ScriptServer::EventOnClientLogon, sEventCaller, pContainer);
    }
 
+   void
+   POP3Connection::TarpitFailedLogon_()
+   {
+      // Queued, not slept: the refusal that follows, and the read after it, wait
+      // behind the connection's own timer. See AccountLogon::TarpitDelaySeconds.
+      EnqueueDelay(AccountLogon::TarpitDelaySeconds(authentication_failure_count_));
+   }
+
    POP3Connection::ParseResult
    POP3Connection::FinishPasswordLogin_()
    {
@@ -743,6 +751,7 @@ namespace HM
          // connection make an unbounded number of authentication attempts, even
          // when the auto-ban feature is disabled.
          authentication_failure_count_++;
+         TarpitFailedLogon_();
          if (authentication_failure_count_ >= 10)
          {
             EnqueueWrite_("-ERR [AUTH] Invalid user name or password. Too many invalid logon attempts.");
@@ -1074,6 +1083,7 @@ namespace HM
          accountLogon.RegisterFailedLogin(GetRemoteEndpointAddress(), sAddress, disconnect, false);
 
          authentication_failure_count_++;
+         TarpitFailedLogon_();
          if (disconnect || authentication_failure_count_ >= 10)
          {
             EnqueueWrite_("-ERR [AUTH] Invalid authentication token. Too many invalid logon attempts.");
@@ -1110,6 +1120,7 @@ namespace HM
       {
          // The per-IP accounting has been fed by Logon; this is the per-connection cap.
          authentication_failure_count_++;
+         TarpitFailedLogon_();
          if (disconnect || authentication_failure_count_ >= 10)
          {
             EnqueueWrite_("-ERR [AUTH] The client certificate does not identify an account. Too many invalid logon attempts.");
@@ -1298,6 +1309,7 @@ namespace HM
       }
 
       authentication_failure_count_++;
+      TarpitFailedLogon_();
 
       // Per-connection brute-force cap (effective even when auto-ban is disabled).
       if (disconnect || authentication_failure_count_ >= 10)

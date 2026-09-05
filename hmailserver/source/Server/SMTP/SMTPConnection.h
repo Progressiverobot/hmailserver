@@ -235,6 +235,12 @@ namespace HM
       void ScramAuthFailed_();
       std::shared_ptr<const Account> LookupPbkdf2Account_(const String &sAddress);
 
+      // The two tarpits (hMailServer.ini LogonTarpitSeconds; SmtpTarpitCount and
+      // SmtpTarpitDelaySeconds). Both queue a pause on the connection rather than
+      // sleeping - see TCPConnection::EnqueueDelay.
+      void TarpitFailedLogon_();
+      void TarpitRecipient_();
+
       void FireOnClientLogon_(const String &sUsername, bool isAuthenticated);
       // Fires the OnClientLogon script event (shared by the password and SCRAM paths).
 

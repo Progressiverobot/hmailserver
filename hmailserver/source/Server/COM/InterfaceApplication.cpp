@@ -382,6 +382,25 @@ STDMETHODIMP InterfaceApplication::Authenticate(BSTR sUsername, BSTR sPassword, 
    }
 }
 
+STDMETHODIMP InterfaceApplication::get_AdministratorTOTPEnabled(VARIANT_BOOL *pVal)
+{
+   try
+   {
+      // Deliberately readable without authenticating: a client has to know
+      // whether to ask for a code before it can present the credential, and
+      // "this account has a second factor" is what every logon form reveals the
+      // moment the password is accepted anyway. The secret itself is never
+      // readable from anywhere.
+      *pVal = HM::IniFileSettings::Instance()->GetAdministratorTotpSecret().IsEmpty() ? VARIANT_FALSE : VARIANT_TRUE;
+
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
 STDMETHODIMP InterfaceApplication::get_Version(BSTR *pVal)
 {
    try

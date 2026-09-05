@@ -103,6 +103,7 @@ namespace HM
    //---------------------------------------------------------------------------()
    {
       administrator_password_ = ReadIniSettingString_("Security", "AdministratorPassword", "");
+      administrator_totp_secret_protected_ = ReadIniSettingString_("Security", "AdministratorTotpSecret", "");
 
       database_server_ = ReadIniSettingString_("Database", "Server", "");
       database_name_ = ReadIniSettingString_("Database", "Database", "");
@@ -620,6 +621,17 @@ namespace HM
       if (account_lockout_minutes_ < 1)
          account_lockout_minutes_ = 30;
 
+      // Tarpits (see AccountLogon::TarpitDelaySeconds and SMTPConnection::
+      // TarpitRecipient_). Both off by default: a delay is a policy, and the
+      // installations that upgrade onto this must behave as they did. Bounded
+      // above because a pause longer than a protocol's idle timeout is a
+      // disconnect with extra steps.
+      logon_tarpit_seconds_ = ClampTarpitSeconds_(ReadIniSettingInteger_("Settings", "LogonTarpitSeconds", 0));
+      smtp_tarpit_count_ = ReadIniSettingInteger_("Settings", "SmtpTarpitCount", 0);
+      if (smtp_tarpit_count_ < 0)
+         smtp_tarpit_count_ = 0;
+      smtp_tarpit_delay_seconds_ = ClampTarpitSeconds_(ReadIniSettingInteger_("Settings", "SmtpTarpitDelaySeconds", 0));
+
       // Hybrid post-quantum key exchange first, classical curves after it. The
       // list is only a preference order - the group actually used is negotiated,
       // so a peer that does not implement the ML-KEM hybrids picks X25519 or one
@@ -854,6 +866,41 @@ namespace HM
       return true;
    }
 
+   int
+   IniFileSettings::ClampTarpitSeconds_(int seconds)
+   {
+      if (seconds < 0)
+         return 0;
+      if (seconds > TARPIT_MAX_SECONDS)
+         return TARPIT_MAX_SECONDS;
+      return seconds;
+   }
+
+   bool
+   IniFileSettings::SetSmtpTarpitCount(int count)
+   {
+      if (count < 0)
+         count = 0;
+
+      if (!WriteSettingsValue(_T("SmtpTarpitCount"), StringParser::IntToString(count)))
+         return false;
+
+      smtp_tarpit_count_ = count;
+      return true;
+   }
+
+   bool
+   IniFileSettings::SetSmtpTarpitDelaySeconds(int seconds)
+   {
+      seconds = ClampTarpitSeconds_(seconds);
+
+      if (!WriteSettingsValue(_T("SmtpTarpitDelaySeconds"), StringParser::IntToString(seconds)))
+         return false;
+
+      smtp_tarpit_delay_seconds_ = seconds;
+      return true;
+   }
+
    bool
    IniFileSettings::RemoveSettingsValue(const String &key)
    {
@@ -1066,6 +1113,33 @@ namespace HM
       administrator_password_ = HM::Crypt::Instance()->EnCrypt(sNewPassword, HM::Crypt::ETPBKDF2);
 
       WriteIniSetting_("Security", "AdministratorPassword", administrator_password_);
+   }
+
+   String
+   IniFileSettings::GetAdministratorTotpSecret()
+   {
+      if (administrator_totp_secret_protected_.IsEmpty())
+         return String();
+
+      // Unprotected on each use rather than held in the clear: the secret is
+      // needed for a moment per administrator logon, and this process holds the
+      // plain form for exactly that moment.
+      return HM::Crypt::Instance()->UnprotectSecret(administrator_totp_secret_protected_);
+   }
+
+   bool
+   IniFileSettings::SetAdministratorTotpSecret(const String &base32Secret)
+   {
+      const String protectedSecret = base32Secret.IsEmpty() ? String() : HM::Crypt::Instance()->ProtectSecret(base32Secret);
+
+      if (!base32Secret.IsEmpty() && protectedSecret.IsEmpty())
+         return false;
+
+      if (!WritePrivateProfileString(_T("Security"), _T("AdministratorTotpSecret"), protectedSecret, GetInitializationFile()))
+         return false;
+
+      administrator_totp_secret_protected_ = protectedSecret;
+      return true;
    }
 
    void 

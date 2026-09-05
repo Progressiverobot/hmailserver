@@ -55,6 +55,7 @@ namespace HM
       resolver_(io_context),
       timer_(io_context),
       session_ceiling_timer_(io_context),
+      delay_timer_(io_context),
       session_ceiling_seconds_(0),
       session_ceiling_armed_(false),
       receive_binary_(false),
@@ -456,7 +457,12 @@ namespace HM
          }
       case IOOperation::BCTRead:
          {
-            AsyncRead(operation->GetString());               
+            AsyncRead(operation->GetString());
+            break;
+         }
+      case IOOperation::BCTDelay:
+         {
+            AsyncDelay(operation->GetDelaySeconds());
             break;
          }
       case IOOperation::BCTShutdownSend:
@@ -519,10 +525,61 @@ namespace HM
    void 
    TCPConnection::Disconnect()
    {
-      // Perform graceful shutdown. No more operations will be performed. 
+      // Perform graceful shutdown. No more operations will be performed.
       Shutdown(boost::asio::socket_base::shutdown_both);
 
       connection_state_ = StateDisconnected;
+
+      // A pause that is still running has nothing left to guard; ending it now
+      // lets the queue behind it drain (and fail, harmlessly, against the closed
+      // socket) rather than holding the session object for the rest of the delay.
+      // cancel() can throw only on a platform error cancelling the wait, which is
+      // not worth turning a disconnect into a failure over.
+      try
+      {
+         delay_timer_.cancel();
+      }
+      catch (...)
+      {
+         // Deliberately ignored: the session is going away regardless.
+      }
+   }
+
+   void
+   TCPConnection::EnqueueDelay(int seconds)
+   {
+      if (seconds <= 0)
+         return;
+
+      ThrowIfNotConnected_();
+
+      std::shared_ptr<IOOperation> operation = std::shared_ptr<IOOperation>(new IOOperation(IOOperation::BCTDelay, seconds));
+
+      operation_queue_.Push(operation);
+      DispatchOperationQueue_();
+   }
+
+   void
+   TCPConnection::AsyncDelay(int seconds)
+   {
+      // Deliberately no UpdateAutoLogoutTimer: the peer has done nothing to earn
+      // more time, and a delay longer than the idle timeout ends in the timeout.
+      delay_timer_.expires_after(std::chrono::seconds(seconds));
+
+      delay_timer_.async_wait(boost::asio::bind_executor(strand_,
+         std::bind(&TCPConnection::AsyncDelayCompleted, shared_from_this(), std::placeholders::_1)));
+   }
+
+   void
+   TCPConnection::AsyncDelayCompleted(const boost::system::error_code& error)
+   {
+      // Whether the pause ran out or was cancelled by Disconnect, it is over: retire
+      // it and let what was queued behind it run. Nothing is logged for a cancel -
+      // the disconnect that caused it has already said what it needed to.
+      (void) error;
+
+      operation_queue_.Pop(IOOperation::BCTDelay);
+      ProcessOperationQueue_(0);
    }
 
    void 
