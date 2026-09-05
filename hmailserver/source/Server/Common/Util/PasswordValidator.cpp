@@ -331,7 +331,8 @@ namespace HM
       else if (iPasswordEncryption == Crypt::ETMD5 ||
                iPasswordEncryption == Crypt::ETSHA256 ||
                iPasswordEncryption == Crypt::ETPBKDF2 ||
-               iPasswordEncryption == Crypt::ETArgon2id)
+               iPasswordEncryption == Crypt::ETArgon2id ||
+               iPasswordEncryption == Crypt::ETScrypt)
       {
          // Compare hashs
          if (!Crypt::Instance()->Validate(sPassword, sComparePassword, iPasswordEncryption))
@@ -378,7 +379,8 @@ namespace HM
       // upgrade that would satisfy the policy can only ever happen on a successful
       // login.
       int minimumAcceptedHashAlgorithm = IniFileSettings::Instance()->GetMinimumAcceptedHashAlgorithm();
-      if (minimumAcceptedHashAlgorithm > 0 && effectiveEncryption < minimumAcceptedHashAlgorithm)
+      if (minimumAcceptedHashAlgorithm > 0 &&
+          Crypt::StrengthRank(effectiveEncryption) < Crypt::StrengthRank(minimumAcceptedHashAlgorithm))
       {
          String sMessage;
          sMessage.Format(_T("Authentication refused for account %s: the stored password hash type (%d) is weaker than the configured minimum (%d). The password must be reset."),
@@ -431,7 +433,7 @@ namespace HM
          // clear-text or reversible comparison is not something to fall back to
          // quietly on an authentication path.
          if (type != Crypt::ETMD5 && type != Crypt::ETSHA256 &&
-             type != Crypt::ETPBKDF2 && type != Crypt::ETArgon2id)
+             type != Crypt::ETPBKDF2 && type != Crypt::ETArgon2id && type != Crypt::ETScrypt)
          {
             // Reported once per row per server start, not once per attempt. This runs
             // on a failed-authentication path, so an attempt-per-line message is a log
@@ -463,7 +465,8 @@ namespace HM
          // is written only when somebody presented the CORRECT app password and was
          // refused anyway, which is precisely when an administrator needs to be told,
          // and never in response to an attacker's traffic.
-         if (minimumAcceptedHashAlgorithm > 0 && (int) type < minimumAcceptedHashAlgorithm)
+         if (minimumAcceptedHashAlgorithm > 0 &&
+             Crypt::StrengthRank((int) type) < Crypt::StrengthRank(minimumAcceptedHashAlgorithm))
          {
             String message;
             message.Format(_T("App password %d for account %s is stored with hash type %d, weaker than the configured minimum (%d), and was refused even though it was correct. Delete it and issue a new one."),
@@ -490,7 +493,8 @@ namespace HM
       // ETBlowFish are recoverable rather than hashed, and ETDPAPI protects
       // machine-bound secrets (route and fetch account passwords), not account
       // passwords, so none of them is a legitimate target here.
-      if (preferredHashAlgorithm < (int) Crypt::ETMD5 || preferredHashAlgorithm > (int) Crypt::ETArgon2id)
+      if (preferredHashAlgorithm < (int) Crypt::ETMD5 || preferredHashAlgorithm > (int) Crypt::ETScrypt ||
+          preferredHashAlgorithm == (int) Crypt::ETDPAPI)
          return currentEncryption;
 
       // Never downgrade, checked before anything else and unconditionally.
@@ -505,7 +509,11 @@ namespace HM
       // a false "from type 0" line while doing it. The flag is now cleared in
       // SaveObject and DeleteObject too, but the invariant is cheap to state here and
       // must not depend on that.
-      if (preferredHashAlgorithm < currentEncryption)
+      //
+      // Compared by strength rather than by enum value: Argon2id and scrypt are
+      // peers, so a preference for one is neither an upgrade nor a downgrade of an
+      // account stored under the other, and such an account is left as it is.
+      if (Crypt::StrengthRank(preferredHashAlgorithm) < Crypt::StrengthRank(currentEncryption))
          return currentEncryption;
 
       // PersistentAccount::ReadObject re-hashes an unencrypted stored password into
@@ -514,7 +522,7 @@ namespace HM
       // instead of being detected by their type.
       bool storedIsUnencrypted = PersistentAccount::IsPasswordUpgradePending(pAccount->GetID());
 
-      bool storedIsWeaker = preferredHashAlgorithm > currentEncryption;
+      bool storedIsWeaker = Crypt::StrengthRank(preferredHashAlgorithm) > Crypt::StrengthRank(currentEncryption);
 
       // The same scheme, derived with a lower work factor than the ini asks for now:
       // a cost raised after the hash was stored. Upward only, like the scheme itself -

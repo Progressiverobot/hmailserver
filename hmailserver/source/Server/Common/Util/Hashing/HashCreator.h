@@ -44,6 +44,13 @@ namespace HM
       static bool ValidateArgon2id(const AnsiString &password, const AnsiString &storedHash);
       static bool IsArgon2idHash(const AnsiString &storedHash);
 
+      // scrypt password hashing (RFC 7914, via OpenSSL EVP_PBE_scrypt) with the
+      // OWASP parameters N=2^17, r=8, p=1 - 128 MiB per derivation. Produces a
+      // self-describing hash string: $s2$<log2 N>$<r>$<p>$<salt-hex>$<derived-key-hex>
+      static AnsiString GenerateScrypt(const AnsiString &password);
+      static bool ValidateScrypt(const AnsiString &password, const AnsiString &storedHash);
+      static bool IsScryptHash(const AnsiString &storedHash);
+
       // HMAC-SHA256 of data under key, returned as a lower-case hex string. Used by the
       // optional server-wide password pepper (Crypt::ApplyPepper_).
       static AnsiString ComputeHMACSHA256Hex(const AnsiString &key, const AnsiString &data);
@@ -85,7 +92,21 @@ namespace HM
          ARGON2_DEFAULT_PARALLELISM = 1,
          ARGON2_MAX_MEMORY_KIB = 1048576,
          ARGON2_MAX_TIME_COST = 100,
-         ARGON2_MAX_PARALLELISM = 16
+         ARGON2_MAX_PARALLELISM = 16,
+
+         // scrypt parameters. N is stored as its log2; 17 is 131072, which with r=8
+         // costs 128 MiB per derivation - OWASP's recommendation. The ceilings bound
+         // what a stored hash may ask for at verification: log2 N 20 with r 8 is
+         // 1 GiB, and anything larger is a hash nobody wrote.
+         SCRYPT_SALT_BYTES = 16,
+         SCRYPT_KEY_BYTES = 32,
+         SCRYPT_DEFAULT_LOG2_N = 17,
+         SCRYPT_DEFAULT_R = 8,
+         SCRYPT_DEFAULT_P = 1,
+         SCRYPT_MIN_LOG2_N = 10,
+         SCRYPT_MAX_LOG2_N = 20,
+         SCRYPT_MAX_R = 32,
+         SCRYPT_MAX_P = 16
       };
 
       HashType hash_type_;

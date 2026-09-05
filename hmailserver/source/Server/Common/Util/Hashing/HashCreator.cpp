@@ -250,6 +250,96 @@ namespace HM
       return result;
    }
 
+   namespace
+   {
+      // OpenSSL derives scrypt with the memory the parameters imply; this is the
+      // ceiling handed to it, sized for the largest parameters Validate accepts
+      // (log2 N 20, r 32: 128 * r * N = 4 GiB) so that the bound in ValidateScrypt is
+      // the one that refuses, with a readable reason, rather than the library.
+      const uint64_t SCRYPT_MAX_MEMORY_BYTES = 4ULL * 1024 * 1024 * 1024 + 1024 * 1024;
+
+      bool
+      DeriveScrypt(const AnsiString &password, const unsigned char *salt, size_t saltLen,
+                   uint64_t n, uint64_t r, uint64_t p, unsigned char *out, size_t outLen)
+      {
+         return EVP_PBE_scrypt(password.c_str(), (size_t) password.GetLength(),
+                               salt, saltLen, n, r, p, SCRYPT_MAX_MEMORY_BYTES,
+                               out, outLen) == 1;
+      }
+   }
+
+   AnsiString
+   HashCreator::GenerateScrypt(const AnsiString &password)
+   {
+      unsigned char salt[SCRYPT_SALT_BYTES];
+      if (RAND_bytes(salt, sizeof(salt)) != 1)
+         return "";
+
+      unsigned char key[SCRYPT_KEY_BYTES];
+      if (!DeriveScrypt(password, salt, sizeof(salt),
+                        1ULL << SCRYPT_DEFAULT_LOG2_N, SCRYPT_DEFAULT_R, SCRYPT_DEFAULT_P,
+                        key, sizeof(key)))
+         return "";
+
+      AnsiString result;
+      result.Format("$s2$%d$%d$%d$%hs$%hs",
+         (int) SCRYPT_DEFAULT_LOG2_N, (int) SCRYPT_DEFAULT_R, (int) SCRYPT_DEFAULT_P,
+         BytesToHex(salt, sizeof(salt)).c_str(),
+         BytesToHex(key, sizeof(key)).c_str());
+
+      OPENSSL_cleanse(key, sizeof(key));
+      return result;
+   }
+
+   bool
+   HashCreator::IsScryptHash(const AnsiString &storedHash)
+   {
+      return storedHash.StartsWith("$s2$");
+   }
+
+   bool
+   HashCreator::ValidateScrypt(const AnsiString &password, const AnsiString &storedHash)
+   {
+      if (!IsScryptHash(storedHash))
+         return false;
+
+      // Format: $s2$<log2 N>$<r>$<p>$<salt-hex>$<key-hex>
+      // SplitString on "$s2$..." yields: "", "s2", log2N, r, p, salt, key
+      std::vector<AnsiString> parts = StringParser::SplitString(storedHash, "$");
+      if (parts.size() != 7)
+         return false;
+
+      const int log2N = atoi(parts[2].c_str());
+      const int r = atoi(parts[3].c_str());
+      const int p = atoi(parts[4].c_str());
+
+      // Defense-in-depth bounds so a malformed stored hash cannot request an
+      // unreasonable amount of memory or time during verification.
+      if (log2N < SCRYPT_MIN_LOG2_N || log2N > SCRYPT_MAX_LOG2_N)
+         return false;
+      if (r <= 0 || r > SCRYPT_MAX_R)
+         return false;
+      if (p <= 0 || p > SCRYPT_MAX_P)
+         return false;
+
+      unsigned char salt[SCRYPT_SALT_BYTES];
+      if (!HexToBytes(parts[5], salt, sizeof(salt)))
+         return false;
+
+      unsigned char expectedKey[SCRYPT_KEY_BYTES];
+      if (!HexToBytes(parts[6], expectedKey, sizeof(expectedKey)))
+         return false;
+
+      unsigned char actualKey[SCRYPT_KEY_BYTES];
+      if (!DeriveScrypt(password, salt, sizeof(salt), 1ULL << log2N, (uint64_t) r, (uint64_t) p, actualKey, sizeof(actualKey)))
+         return false;
+
+      const bool match = CRYPTO_memcmp(actualKey, expectedKey, sizeof(actualKey)) == 0;
+      OPENSSL_cleanse(actualKey, sizeof(actualKey));
+      OPENSSL_cleanse(expectedKey, sizeof(expectedKey));
+      return match;
+   }
+
    int
    HashCreator::ConfiguredPBKDF2Iterations()
    {
