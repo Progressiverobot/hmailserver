@@ -212,6 +212,16 @@ namespace HM
       String GetFetchOAuth2Hosts() {return fetch_oauth2_hosts_;}
       String GetOAuth2Audience() {return oauth2_audience_;}
       String GetOAuth2UsernameClaim() {return oauth2_username_claim_;}
+      // [Settings] OAuth2JwksUrl / OAuth2JwksCacheSeconds: the provider's JWK Set as the
+      // signing-key source (JwksKeySet). OAuth2Introspection*: RFC 7662 revocation
+      // checks after local validation (TokenIntrospection).
+      String GetOAuth2JwksUrl() const {return oauth2_jwks_url_;}
+      int GetOAuth2JwksCacheSeconds() const {return oauth2_jwks_cache_seconds_;}
+      String GetOAuth2IntrospectionUrl() const {return oauth2_introspection_url_;}
+      String GetOAuth2IntrospectionClientId() const {return oauth2_introspection_client_id_;}
+      String GetOAuth2IntrospectionClientSecret() const {return oauth2_introspection_client_secret_;}
+      int GetOAuth2IntrospectionCacheSeconds() const {return oauth2_introspection_cache_seconds_;}
+      bool GetOAuth2IntrospectionFailOpen() const {return oauth2_introspection_fail_open_;}
       bool GetProtectStoredSecretsWithDPAPI() {return protect_stored_secrets_with_dpapi_;}
       String GetServiceAccountName() {return service_account_name_;}
       String GetServiceAccountPassword() {return service_account_password_;}
@@ -881,6 +891,13 @@ namespace HM
       String oauth2_issuer_;
       String oauth2_audience_;
       String oauth2_username_claim_;
+      String oauth2_jwks_url_;
+      int oauth2_jwks_cache_seconds_;
+      String oauth2_introspection_url_;
+      String oauth2_introspection_client_id_;
+      String oauth2_introspection_client_secret_;
+      int oauth2_introspection_cache_seconds_;
+      bool oauth2_introspection_fail_open_;
 
       bool protect_stored_secrets_with_dpapi_;
       String service_account_name_;

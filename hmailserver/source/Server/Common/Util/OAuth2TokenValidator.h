@@ -4,13 +4,15 @@
 
 #pragma once
 
+typedef struct evp_pkey_st EVP_PKEY;
+
 namespace HM
 {
    // Configuration for the OAuth2 bearer-token validator. Loaded from the [Settings]
    // OAuth2* INI keys, but passed explicitly so the validation core can be unit-tested.
    struct OAuth2Config
    {
-      OAuth2Config() : enabled(false), require_tls(true) {}
+      OAuth2Config() : enabled(false), require_tls(true), jwks_cache_seconds(3600), introspection_cache_seconds(300), introspection_fail_open(false) {}
 
       bool enabled;
       bool require_tls;
@@ -20,6 +22,20 @@ namespace HM
       AnsiString issuer;             // expected "iss" (empty = do not check)
       AnsiString audience;           // expected "aud" (empty = do not check)
       AnsiString username_claim;     // claim holding the login name (default "email")
+
+      // RFC 7517 JWK Set URL the provider publishes its signing keys at. When set, an
+      // RS256/ES256 token's "kid" selects the key from there (JwksKeySet), with the PEM
+      // file as the fallback; empty keeps the PEM file the only source.
+      String jwks_url;
+      int jwks_cache_seconds;
+
+      // RFC 7662 introspection endpoint, asked after a token verifies locally whether
+      // it is still active (TokenIntrospection); empty = no revocation check.
+      String introspection_url;
+      AnsiString introspection_client_id;
+      AnsiString introspection_client_secret;
+      int introspection_cache_seconds;
+      bool introspection_fail_open;
    };
 
    // Local verifier for OAuth2 / OpenID Connect bearer tokens presented through the
@@ -36,9 +52,12 @@ namespace HM
    //   * the configured username claim (default "email") is returned as the login
    //     identity, which the caller compares against the SASL-asserted identity.
    //
-   // The validator does not contact the identity provider; there is therefore no JWKS
-   // rotation or token-introspection support. See the administrator documentation for
-   // the [Settings] OAuth2* INI keys.
+   // Two optional round trips to the identity provider sit on top of that, both off
+   // unless configured: the signing key may come from the provider's published JWK
+   // Set instead of a hand-copied PEM file (OAuth2JwksUrl, see JwksKeySet), and a
+   // token that verified may be checked for revocation (OAuth2IntrospectionUrl, see
+   // TokenIntrospection). See the administrator documentation for the [Settings]
+   // OAuth2* INI keys.
    class OAuth2TokenValidator
    {
    public:
@@ -68,8 +87,20 @@ namespace HM
       // encoder agrees with the decoder and nothing more.
       static bool RawEcdsaSignatureToDer_(const AnsiString &raw, AnsiString &der);
 
+      // base64url (RFC 4648 section 5, unpadded) to bytes. Public because a JWK Set
+      // carries its key parameters in the same encoding.
+      static bool Base64UrlDecode(const AnsiString &sInput, AnsiString &sOutput) { return Base64UrlDecode_(sInput, sOutput); }
+
    private:
       static bool Base64UrlDecode_(const AnsiString &sInput, AnsiString &sOutput);
+      // Verifies an RS256/ES256 signature with the key the configuration provides for
+      // this token: from the JWK Set by kid when OAuth2JwksUrl is set, else - or if
+      // the set has no such key - from the PEM file. out_error is set only when the
+      // JWK Set lookup itself failed, so the log says why rather than "verification
+      // failed".
+      static bool VerifyAsymmetric_(const OAuth2Config &config, const AnsiString &kid, const AnsiString &sSigningInput,
+                                    const AnsiString &sSignature, int expectedKeyType, AnsiString &out_error);
+      static bool VerifyWithKey_(const AnsiString &sSigningInput, const AnsiString &sSignature, EVP_PKEY *key);
       static bool IsAlgorithmAllowed_(const AnsiString &sAllowList, const AnsiString &sAlg);
       static bool VerifyHs256_(const AnsiString &sSigningInput, const AnsiString &sSignature, const AnsiString &sSecret);
       // expectedKeyType is an EVP_PKEY_* id the loaded key must actually be. It is not

@@ -2555,7 +2555,17 @@ namespace hMailServer.ControlPanel.Views
                      new TextSetting { Key = "OAuth2AllowedAlgorithms", Default = "RS256", Label = "Allowed signing algorithms (comma separated)", Placeholder = "RS256, ES256" },
                      new TextSetting { Key = "OAuth2UsernameClaim", Default = "email", Label = "Claim that holds the mailbox address", Placeholder = "email" },
                      new PathSetting { Key = "OAuth2PublicKeyFile", FileFilter = "PEM/key files (*.pem;*.crt;*.cer;*.key;*.pub)|*.pem;*.crt;*.cer;*.key;*.pub|All files (*.*)|*.*", Label = "RSA/EC public key file (PEM, for RS*/ES* tokens)", Placeholder = "Path to the issuer's public key" },
-                     new SecretSetting { Key = "OAuth2HmacSecret", Label = "Shared HMAC secret (only for HS256/384/512 tokens)", Hint = "Only needed for HS* algorithms" }
+                     new SecretSetting { Key = "OAuth2HmacSecret", Label = "Shared HMAC secret (only for HS256/384/512 tokens)", Hint = "Only needed for HS* algorithms" },
+                     // The two round trips to the provider, both off unless set: its
+                     // published keys instead of a hand-copied PEM file, and a live
+                     // revocation check after a token verifies.
+                     new TextSetting { Key = "OAuth2JwksUrl", Label = "JWK Set URL (the provider's published signing keys; empty = the key file only)", Placeholder = "https://login.microsoftonline.com/<tenant>/discovery/v2.0/keys" },
+                     new TextSetting { Key = "OAuth2JwksCacheSeconds", Default = "3600", Label = "Seconds to keep the JWK Set before re-fetching (a token naming an unknown key id re-fetches at once)" },
+                     new TextSetting { Key = "OAuth2IntrospectionUrl", Label = "Token introspection endpoint (RFC 7662; empty = no revocation check)", Placeholder = "https://idp.example.com/oauth2/introspect" },
+                     new TextSetting { Key = "OAuth2IntrospectionClientId", Label = "Client id this server introspects as" },
+                     new SecretSetting { Key = "OAuth2IntrospectionClientSecret", Label = "Client secret for introspection", Hint = "Issued by the provider together with the client id" },
+                     new TextSetting { Key = "OAuth2IntrospectionCacheSeconds", Default = "300", Label = "Seconds an introspection verdict is reused (never past the token's own expiry)" },
+                     new BoolSetting { Key = "OAuth2IntrospectionFailOpen", Default = false, Label = "Accept a token when the introspection endpoint cannot answer (availability over the revocation check)" }
                   },
                   Warnings =
                   {
