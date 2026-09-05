@@ -36,6 +36,26 @@ namespace HM
       // one decision rather than one decision per protocol.
       static bool GetAclEnforcementEnabled();
 
+      // THE access decision. "May account A do X to folder F" is answered here and
+      // nowhere else: the enforcement switch, the owner's implicit full rights, the
+      // walk to the nearest ancestor that has ACL rows, and what "no rows" means are
+      // decided in one place - for IMAP, for delivery and rules, for Send-As, and
+      // for whatever web surface comes next. A new decision written anywhere else
+      // is a second decision-maker, and build/check-authz-choke-point.py fails on
+      // it. With enforcement off everything is allowed: the historical meaning of
+      // the switch ("public folders are open"), which every IMAP command has
+      // always applied and which delivery and rules now apply too instead of
+      // consulting rows nobody is enforcing.
+      static bool CheckPermission(__int64 actorAccountId, std::shared_ptr<IMAPFolder> folder, int permission);
+      static void GetReadWriteAccess(__int64 actorAccountId, std::shared_ptr<IMAPFolder> folder, bool &readAccess, bool &writeAccess);
+
+      // The same question for a right one account GRANTS another - the l right that
+      // makes a folder observable under "#Users", the p right that lets somebody
+      // send as the owner. With enforcement off there is no decision-maker, so
+      // nothing is granted: "ACL disabled" must never become "everybody may act
+      // for everybody". The owner is never a delegate of their own folder.
+      static bool CheckDelegatedRight(__int64 actorAccountId, std::shared_ptr<IMAPFolder> folder, int permission);
+
       // The IMAP name of the RFC 2342 "Other Users" namespace root - the prefix
       // under which one account's folders appear to another account that has been
       // granted rights on them: "#Users.info@example.com.INBOX".
@@ -85,6 +105,11 @@ namespace HM
          without it, delegates leave no trace but their clients cannot track
          what they have read.
       */
+      // The rights themselves, for REPORTING them (MYRIGHTS, the SELECT response):
+      // the owner's full set, else the nearest ancestor's ACL row for the account,
+      // else nothing. Not a decision - it does not look at the enforcement switch -
+      // so nothing outside this class may turn its answer into one; the guard in
+      // build/check-authz-choke-point.py names the two reporting callers.
       std::shared_ptr<ACLPermission> GetPermissionForFolder(__int64 iAccountID, std::shared_ptr<IMAPFolder> pFolder);
 
       // The ACL entries stored for exactly this folder (not inherited ones).

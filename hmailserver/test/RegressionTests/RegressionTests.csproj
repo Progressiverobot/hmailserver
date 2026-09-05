@@ -424,6 +424,7 @@
     <Compile Include="SMTP\DistributionListModeration.cs" />
     <Compile Include="IMAP\FullTextSearch.cs" />
     <Compile Include="IMAP\AttachmentTextSearch.cs" />
+    <Compile Include="IMAP\AuthorisationChokePoint.cs" />
     <Compile Include="Shared\ImapClientSimulator.cs" />
     <Compile Include="Infrastructure\IPRanges.cs" />
     <Compile Include="Infrastructure\MainOperations.cs" />

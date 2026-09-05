@@ -4985,14 +4985,11 @@ namespace HM
          std::shared_ptr<IMAPFolders> ownerFolders = IMAPFolderContainer::Instance()->GetFoldersForAccount(owner->GetID());
          std::shared_ptr<IMAPFolder> inbox = ownerFolders ? ownerFolders->GetFolderByName(_T("INBOX")) : std::shared_ptr<IMAPFolder>();
 
-         if (inbox)
-         {
-            ACLManager aclManager;
-            std::shared_ptr<ACLPermission> permission = aclManager.GetPermissionForFolder(self->GetID(), inbox);
-
-            if (permission && permission->GetAllow(ACLPermission::PermissionPost))
-               return true;
-         }
+         // A right the owner granted, asked of ACLManager as one: with enforcement
+         // off nothing is granted, because "ACL disabled" must never become
+         // "anybody may send as anybody".
+         if (inbox && ACLManager::CheckDelegatedRight(self->GetID(), inbox, ACLPermission::PermissionPost))
+            return true;
 
          reason = "the authenticated account " + account + " has not been granted the post (p) right on the INBOX of " + resolved + ".";
          return false;

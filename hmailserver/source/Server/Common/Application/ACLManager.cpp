@@ -69,6 +69,89 @@ namespace HM
       return Configuration::Instance()->GetIMAPConfiguration()->GetUseIMAPACL();
    }
 
+   bool
+   ACLManager::CheckPermission(__int64 actorAccountId, std::shared_ptr<IMAPFolder> folder, int permission)
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // The one folder-access decision. See the header.
+   //---------------------------------------------------------------------------()
+   {
+      if (!folder)
+         return false;
+
+      if (!GetAclEnforcementEnabled())
+      {
+         // Access control has been disabled. Allow everything.
+         return true;
+      }
+
+      ACLManager aclManager;
+      std::shared_ptr<ACLPermission> rights = aclManager.GetPermissionForFolder(actorAccountId, folder);
+      if (!rights)
+         return false;
+
+      return rights->GetAllow((ACLPermission::ePermission) permission);
+   }
+
+   void
+   ACLManager::GetReadWriteAccess(__int64 actorAccountId, std::shared_ptr<IMAPFolder> folder, bool &readAccess, bool &writeAccess)
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // The SELECT/EXAMINE summary of the decision above: may the account read, and
+   // may it change anything - any one of the writing rights counts.
+   //---------------------------------------------------------------------------()
+   {
+      readAccess = false;
+      writeAccess = false;
+
+      if (!folder)
+         return;
+
+      if (!GetAclEnforcementEnabled())
+      {
+         readAccess = true;
+         writeAccess = true;
+         return;
+      }
+
+      ACLManager aclManager;
+      std::shared_ptr<ACLPermission> rights = aclManager.GetPermissionForFolder(actorAccountId, folder);
+      if (!rights)
+         return;
+
+      readAccess = rights->GetAllow(ACLPermission::PermissionRead);
+      writeAccess = rights->GetAllow(ACLPermission::PermissionWriteOthers) ||
+         rights->GetAllow(ACLPermission::PermissionWriteSeen) ||
+         rights->GetAllow(ACLPermission::PermissionWriteDeleted) ||
+         rights->GetAllow(ACLPermission::PermissionInsert) ||
+         rights->GetAllow(ACLPermission::PermissionExpunge);
+   }
+
+   bool
+   ACLManager::CheckDelegatedRight(__int64 actorAccountId, std::shared_ptr<IMAPFolder> folder, int permission)
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // A right one account grants another. Off means nothing is granted. See the
+   // header.
+   //---------------------------------------------------------------------------()
+   {
+      if (!folder)
+         return false;
+
+      if (!GetAclEnforcementEnabled())
+         return false;
+
+      if (folder->GetAccountID() == actorAccountId)
+         return false;
+
+      ACLManager aclManager;
+      std::shared_ptr<ACLPermission> rights = aclManager.GetPermissionForFolder(actorAccountId, folder);
+      if (!rights)
+         return false;
+
+      return rights->GetAllow((ACLPermission::ePermission) permission);
+   }
+
    String
    ACLManager::GetOtherUsersFolderName()
    //---------------------------------------------------------------------------()
