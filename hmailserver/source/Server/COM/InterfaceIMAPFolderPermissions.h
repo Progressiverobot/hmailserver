@@ -22,15 +22,15 @@ namespace HM
 // InterfaceIMAPFolderPermissions
 
 class ATL_NO_VTABLE InterfaceIMAPFolderPermissions :
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceIMAPFolderPermissions, &CLSID_IMAPFolderPermissions>,
-	public IDispatchImpl<IInterfaceIMAPFolderPermissions, &IID_IInterfaceIMAPFolderPermissions, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceIMAPFolderPermissions, &CLSID_IMAPFolderPermissions>,
+   public IDispatchImpl<IInterfaceIMAPFolderPermissions, &IID_IInterfaceIMAPFolderPermissions, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public HM::COMAuthenticator
 {
 public:
-	InterfaceIMAPFolderPermissions()
-	{
-	}
+   InterfaceIMAPFolderPermissions()
+   {
+   }
 
    void AttachItem(std::shared_ptr<HM::IMAPFolder> folder_);
    
@@ -40,22 +40,22 @@ DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACEIMAPFOLDERPERMISSIONS)
 
 
 BEGIN_COM_MAP(InterfaceIMAPFolderPermissions)
-	COM_INTERFACE_ENTRY(IInterfaceIMAPFolderPermissions)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceIMAPFolderPermissions)
+   COM_INTERFACE_ENTRY(IDispatch)
 END_COM_MAP()
 
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
 
-	void FinalRelease()
-	{
-	}
+   void FinalRelease()
+   {
+   }
 
 public:
    STDMETHOD(get_ItemByDBID)(/*[in]*/ long DBID, /*[out, retval]*/ IInterfaceIMAPFolderPermission* *pVal);

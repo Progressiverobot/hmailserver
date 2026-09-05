@@ -139,7 +139,7 @@ namespace HM
       bool GetLogApplication() const; 
       bool GetLogTCPIP() const;
       bool GetLoggingEnabled() const;
- 	   bool GetLiveLogEnabled() const;
+      bool GetLiveLogEnabled() const;
 
       void EnableLiveLogging(bool bEnable);   
       String GetLiveLog();

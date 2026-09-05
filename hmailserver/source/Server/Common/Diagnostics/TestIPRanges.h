@@ -13,8 +13,8 @@ namespace HM
    class TestIPRanges
    {
    public:
-	   TestIPRanges();
-	   virtual ~TestIPRanges();
+      TestIPRanges();
+      virtual ~TestIPRanges();
 
       DiagnosticResult PerformTest();
 

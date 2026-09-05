@@ -28,7 +28,7 @@ namespace HM
       shared_ptr<ThreadIdentifier> GetThreadByThreadID(int iID);
 
    private:
-	   
+      
       std::set<shared_ptr<ThreadIdentifier> > current_connections_;
 
       CriticalSection crit_sec_;

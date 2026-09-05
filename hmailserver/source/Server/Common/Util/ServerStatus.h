@@ -10,8 +10,8 @@ namespace HM
    class ServerStatus : public Singleton<ServerStatus>
    {
    public:
-	   ServerStatus();
-	   virtual ~ServerStatus();
+      ServerStatus();
+      virtual ~ServerStatus();
 
       enum ServerState
       {

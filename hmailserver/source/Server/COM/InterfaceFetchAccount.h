@@ -19,9 +19,9 @@ namespace HM
 
 class ATL_NO_VTABLE InterfaceFetchAccount : 
    public COMCollectionItem<HM::FetchAccount, HM::FetchAccounts>,
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceFetchAccount, &CLSID_FetchAccount>,
-	public IDispatchImpl<IInterfaceFetchAccount, &IID_IInterfaceFetchAccount, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceFetchAccount, &CLSID_FetchAccount>,
+   public IDispatchImpl<IInterfaceFetchAccount, &IID_IInterfaceFetchAccount, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public HM::COMAuthenticator
 {
 public:
@@ -32,20 +32,20 @@ DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACEFETCHACCOUNT)
 
 
 BEGIN_COM_MAP(InterfaceFetchAccount)
-	COM_INTERFACE_ENTRY(IInterfaceFetchAccount)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceFetchAccount)
+   COM_INTERFACE_ENTRY(IDispatch)
 END_COM_MAP()
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
-	
-	void FinalRelease() 
-	{
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
+   
+   void FinalRelease() 
+   {
+   }
 
 public:
 
@@ -82,7 +82,7 @@ public:
    STDMETHOD(put_UseSSL)(/*[in]*/ VARIANT_BOOL newVal);
    STDMETHOD(Delete)();
    STDMETHOD(get_NextDownloadTime)(BSTR* pVal);
-	STDMETHOD(get_IsLocked)(VARIANT_BOOL* pVal);
+   STDMETHOD(get_IsLocked)(VARIANT_BOOL* pVal);
    STDMETHOD(get_UseAntiSpam)(/*[out, retval]*/ VARIANT_BOOL *pVal);
    STDMETHOD(put_UseAntiSpam)(/*[in]*/ VARIANT_BOOL newVal);
    STDMETHOD(get_UseAntiVirus)(/*[out, retval]*/ VARIANT_BOOL *pVal);

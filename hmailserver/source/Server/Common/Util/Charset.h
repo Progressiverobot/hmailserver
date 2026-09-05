@@ -12,8 +12,8 @@ namespace HM
    class Charset  
    {
    public:
-	   Charset();
-	   virtual ~Charset();
+      Charset();
+      virtual ~Charset();
 
 
       static bool IsProperlyEncoded(const String &sInput);

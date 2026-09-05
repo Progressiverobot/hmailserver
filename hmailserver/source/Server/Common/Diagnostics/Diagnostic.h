@@ -13,8 +13,8 @@ namespace HM
    class Diagnostic
    {
    public:
-	   Diagnostic();
-	   virtual ~Diagnostic();
+      Diagnostic();
+      virtual ~Diagnostic();
   
       void SetLocalDomain(String &sDomainName);
       void SetTestDomain(String &sTestDomainName);

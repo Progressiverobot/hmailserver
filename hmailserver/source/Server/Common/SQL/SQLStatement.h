@@ -43,9 +43,9 @@ namespace HM
          eColType iType;
       };
 
-	   SQLStatement();
+      SQLStatement();
       SQLStatement(eStatementType iType, const String &tableName);
-	   virtual ~SQLStatement();
+      virtual ~SQLStatement();
 
       void AddColumn(const String & sName, const String & sValue);
       void AddColumn(const String & sName, const String & sValue, int iMaxLength);

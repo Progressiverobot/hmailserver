@@ -10,8 +10,8 @@ namespace HM
    class Alias : public BusinessObject<Alias>
    {
    public:
-	   Alias();
-	   virtual ~Alias();
+      Alias();
+      virtual ~Alias();
 
       __int64 GetDomainID() const { return domain_id_; }
       String GetName() const { return name_; }

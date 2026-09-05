@@ -67,7 +67,7 @@ STDMETHODIMP InterfaceDomains::Refresh()
       }
       catch (...)
       {
-         return COMError::GenerateError("It was not possible to retrieve a list of domains from the database.\r\nPlease check the hMailServer log for details.");         	
+         return COMError::GenerateError("It was not possible to retrieve a list of domains from the database.\r\nPlease check the hMailServer log for details.");          
       }
    
       return S_OK;

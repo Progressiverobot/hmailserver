@@ -17,9 +17,9 @@ namespace HM
 }
 
 class ATL_NO_VTABLE InterfaceAlias : 
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceAlias, &CLSID_Alias>,
-	public IDispatchImpl<IInterfaceAlias, &IID_IInterfaceAlias, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceAlias, &CLSID_Alias>,
+   public IDispatchImpl<IInterfaceAlias, &IID_IInterfaceAlias, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public COMCollectionItem<HM::Alias, HM::Aliases>,
    public HM::COMAuthenticator,
    public ISupportErrorInfo
@@ -43,22 +43,22 @@ DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACEALIAS)
 
 
 BEGIN_COM_MAP(InterfaceAlias)
-	COM_INTERFACE_ENTRY(IInterfaceAlias)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceAlias)
+   COM_INTERFACE_ENTRY(IDispatch)
    COM_INTERFACE_ENTRY(ISupportErrorInfo)
 END_COM_MAP()
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
-	
-	void FinalRelease() 
-	{
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
+   
+   void FinalRelease() 
+   {
+   }
 
 public:
 

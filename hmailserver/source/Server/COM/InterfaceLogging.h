@@ -12,9 +12,9 @@
 // InterfaceLogging
 
 class ATL_NO_VTABLE InterfaceLogging : 
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceLogging, &CLSID_Logging>,
-	public IDispatchImpl<IInterfaceLogging, &IID_IInterfaceLogging, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceLogging, &CLSID_Logging>,
+   public IDispatchImpl<IInterfaceLogging, &IID_IInterfaceLogging, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public HM::COMAuthenticator
 {
 public:
@@ -26,21 +26,21 @@ DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACELOGGING)
 
 
 BEGIN_COM_MAP(InterfaceLogging)
-	COM_INTERFACE_ENTRY(IInterfaceLogging)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceLogging)
+   COM_INTERFACE_ENTRY(IDispatch)
 END_COM_MAP()
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
-	
-	void FinalRelease() 
-	{
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
+   
+   void FinalRelease() 
+   {
+   }
 
 public:
    STDMETHOD(get_LogDebug)(/*[out, retval]*/ VARIANT_BOOL *pVal);

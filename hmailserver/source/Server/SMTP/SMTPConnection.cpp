@@ -3564,7 +3564,7 @@ namespace HM
          SendErrorResponse_(530, "A SSL/TLS-connection is required for authentication.");
          return;
       }
-	  
+     
       // rfc4954 restrictions, After a successful AUTH command completes, 
       // a server MUST reject any further AUTH commands with a 503 reply.
       if (isAuthenticated_) 
@@ -4136,7 +4136,7 @@ namespace HM
    {
       AccountLogon accountLogon;
       bool disconnect;
-	  String sUsername = username_;
+     String sUsername = username_;
 
       std::shared_ptr<const Account> pAccount = accountLogon.Logon(GetRemoteEndpointAddress(), username_, password_, disconnect);
          

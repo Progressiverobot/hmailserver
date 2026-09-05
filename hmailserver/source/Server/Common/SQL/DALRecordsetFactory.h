@@ -10,8 +10,8 @@ namespace HM
    class DALRecordsetFactory  
    {
    public:
-	   DALRecordsetFactory();
-	   virtual ~DALRecordsetFactory();
+      DALRecordsetFactory();
+      virtual ~DALRecordsetFactory();
 
       //static std::shared_ptr<DALRecordset> CreateRecordset();
    };

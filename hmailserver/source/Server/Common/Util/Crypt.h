@@ -12,8 +12,8 @@ namespace HM
    class Crypt : public Singleton<Crypt>
    {
    public:
-	   Crypt();
-	   virtual ~Crypt();
+      Crypt();
+      virtual ~Crypt();
 
       enum EncryptionType
       {

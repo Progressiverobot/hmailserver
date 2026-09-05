@@ -53,7 +53,7 @@ namespace HM
       SMTPConnection(ConnectionSecurity connection_security,
          boost::asio::io_context& io_context, 
          boost::asio::ssl::context& context);
-	   virtual ~SMTPConnection();
+      virtual ~SMTPConnection();
       
    protected:
 

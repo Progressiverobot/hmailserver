@@ -40,7 +40,7 @@ namespace HM
       bool IndexFullTextMessages_(const std::vector<PersistentMessageIndex::IndexableMessage> &messages);
 
       boost::thread workerThread_;
-	   int iIndexRunCount;
+      int iIndexRunCount;
 
       // Counts loop iterations so the orphaned-terms sweep - a scan of the
       // whole terms table - runs on the full-index cadence rather than every

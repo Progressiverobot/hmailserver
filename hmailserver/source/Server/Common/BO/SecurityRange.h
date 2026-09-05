@@ -13,8 +13,8 @@ namespace HM
    class SecurityRange : public BusinessObject<SecurityRange>
    {
    public:
-	   SecurityRange();
-	   virtual ~SecurityRange();
+      SecurityRange();
+      virtual ~SecurityRange();
 
       enum RangeOptions
       {
@@ -40,34 +40,34 @@ namespace HM
 
 
    public:
-	   String GetLowerIPString() const ;
-	   String GetUpperIPString()const ;
-	   bool SetLowerIPString(const String & sLowerIP);
-	   bool SetUpperIPString(const String & sUpperIP);
+      String GetLowerIPString() const ;
+      String GetUpperIPString()const ;
+      bool SetLowerIPString(const String & sLowerIP);
+      bool SetUpperIPString(const String & sUpperIP);
 
-	   void SetLowerIP(const IPAddress &lNewVal){lower_ip_ = lNewVal;}
-	   void SetUpperIP(const IPAddress &lNewVal){upper_ip_ = lNewVal;}
+      void SetLowerIP(const IPAddress &lNewVal){lower_ip_ = lNewVal;}
+      void SetUpperIP(const IPAddress &lNewVal){upper_ip_ = lNewVal;}
 
       IPAddress GetLowerIP() const {return lower_ip_;}
       IPAddress GetUpperIP() const {return upper_ip_;}
 
-	   long GetOptions() const { return options_;}
-	   void SetOptions(long lNewVal) {options_ = lNewVal; }
+      long GetOptions() const { return options_;}
+      void SetOptions(long lNewVal) {options_ = lNewVal; }
 
-	   long GetPriority() const {return priority_;}
-	   void SetPriority(long lNewVal) {priority_ = lNewVal;}
+      long GetPriority() const {return priority_;}
+      void SetPriority(long lNewVal) {priority_ = lNewVal;}
 
-	   bool GetAllowSMTP() const ;
-	   void SetAllowSMTP(bool bAllow);
+      bool GetAllowSMTP() const ;
+      void SetAllowSMTP(bool bAllow);
 
-	   bool GetAllowIMAP() const ;
-	   void SetAllowIMAP(bool bAllow);
+      bool GetAllowIMAP() const ;
+      void SetAllowIMAP(bool bAllow);
 
-	   bool GetAllowPOP3() const ;
-	   void SetAllowPOP3(bool bAllow);
+      bool GetAllowPOP3() const ;
+      void SetAllowPOP3(bool bAllow);
 
-	   bool GetRequireSMTPAuthLocalToLocal() const ;
-	   void SetRequireSMTPAuthLocalToLocal(bool bAllow);
+      bool GetRequireSMTPAuthLocalToLocal() const ;
+      void SetRequireSMTPAuthLocalToLocal(bool bAllow);
 
       bool GetRequireSMTPAuthLocalToExternal() const ;
       void SetRequireSMTPAuthLocalToExternal(bool bAllow);
@@ -79,16 +79,16 @@ namespace HM
       void SetRequireSMTPAuthExternalToExternal(bool bAllow);
 
       bool GetAllowRelayL2L() const ;
-	   void SetAllowRelayL2L(bool bAllow);
+      void SetAllowRelayL2L(bool bAllow);
 
-	   bool GetAllowRelayL2R()const ;
-	   void SetAllowRelayL2R(bool bAllow);
+      bool GetAllowRelayL2R()const ;
+      void SetAllowRelayL2R(bool bAllow);
 
-	   bool GetAllowRelayR2L() const ;
-	   void SetAllowRelayR2L(bool bAllow);
+      bool GetAllowRelayR2L() const ;
+      void SetAllowRelayR2L(bool bAllow);
 
-	   bool GetAllowRelayR2R() const ;
-	   void SetAllowRelayR2R(bool bAllow);
+      bool GetAllowRelayR2R() const ;
+      void SetAllowRelayR2R(bool bAllow);
 
       bool GetSpamProtection() const ;
       void SetSpamProtection(bool bAllow);
@@ -117,16 +117,16 @@ namespace HM
 
    private:
 
-	   void SetAllowOption(int option, bool allow);
+      void SetAllowOption(int option, bool allow);
 
-	   IPAddress lower_ip_;
-	   IPAddress upper_ip_;
+      IPAddress lower_ip_;
+      IPAddress upper_ip_;
 
        // Options for this range
        long options_;
 
-	   // the priority. 0 is highest, 10 is lowest.
-	   long priority_;
+      // the priority. 0 is highest, 10 is lowest.
+      long priority_;
       
       String name_;
 

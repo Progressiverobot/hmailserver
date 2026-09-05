@@ -15,8 +15,8 @@ namespace HM
    class IMAPCommandCOPY  : public IMAPCommand
    {
    public:
-	   IMAPCommandCOPY();
-	   virtual ~IMAPCommandCOPY();
+      IMAPCommandCOPY();
+      virtual ~IMAPCommandCOPY();
 
       virtual IMAPResult ExecuteCommand(std::shared_ptr<IMAPConnection> pConnection, std::shared_ptr<IMAPCommandArgument> pArgument);
 

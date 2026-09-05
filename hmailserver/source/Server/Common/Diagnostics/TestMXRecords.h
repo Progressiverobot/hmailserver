@@ -13,8 +13,8 @@ namespace HM
    class TestMXRecords
    {
    public:
-	   TestMXRecords(const String &localDomainName);
-	   virtual ~TestMXRecords();
+      TestMXRecords(const String &localDomainName);
+      virtual ~TestMXRecords();
 
       DiagnosticResult PerformTest();
 

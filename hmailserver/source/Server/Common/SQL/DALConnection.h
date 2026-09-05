@@ -14,8 +14,8 @@ namespace HM
    class DALConnection  
    {
    public:
-	   DALConnection(std::shared_ptr<DatabaseSettings> pDatabaseSettings);
-	   virtual ~DALConnection();
+      DALConnection(std::shared_ptr<DatabaseSettings> pDatabaseSettings);
+      virtual ~DALConnection();
 
       enum ConnectionResult
       {
@@ -99,7 +99,7 @@ namespace HM
 
       virtual bool GetSupportsCommandParameters() const = 0;
 
-	   virtual bool CheckServerVersion(String &errorMessage) = 0;
+      virtual bool CheckServerVersion(String &errorMessage) = 0;
 
       // Implemented by all four backends and called by none of them. The
       // escaping that actually runs is the static SQLStatement::Escape, which

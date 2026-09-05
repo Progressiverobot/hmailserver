@@ -343,7 +343,7 @@ namespace HM
          _variant_t    vaField;
          FieldsPtr      pFields;
          FieldPtr       pField;
-         HRESULT			hr;
+         HRESULT        hr;
 
          hr = pRS->get_Fields( &pFields );
          vaField = "IDENT";

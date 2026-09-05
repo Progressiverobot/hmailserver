@@ -17,8 +17,8 @@ namespace HM
          RequiredVersion = 8
       };
 
-	   ADOConnection(std::shared_ptr<DatabaseSettings> pSettings);
-	   virtual ~ADOConnection();
+      ADOConnection(std::shared_ptr<DatabaseSettings> pSettings);
+      virtual ~ADOConnection();
 
       ConnectionResult Connect(String &sErrorMessage);
       bool Disconnect();

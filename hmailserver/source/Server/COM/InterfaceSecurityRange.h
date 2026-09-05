@@ -21,37 +21,37 @@ namespace HM
 
 class ATL_NO_VTABLE InterfaceSecurityRange : 
    public COMCollectionItem<HM::SecurityRange, HM::SecurityRanges>,
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceSecurityRange, &CLSID_SecurityRange>,
-	public IDispatchImpl<IInterfaceSecurityRange, &IID_IInterfaceSecurityRange, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceSecurityRange, &CLSID_SecurityRange>,
+   public IDispatchImpl<IInterfaceSecurityRange, &IID_IInterfaceSecurityRange, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public ISupportErrorInfo,
    public HM::COMAuthenticator
 {
 public:
-	InterfaceSecurityRange()
-	{
-	}
+   InterfaceSecurityRange()
+   {
+   }
 
 DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACESECURITYRANGE)
 
 
 BEGIN_COM_MAP(InterfaceSecurityRange)
-	COM_INTERFACE_ENTRY(IInterfaceSecurityRange)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceSecurityRange)
+   COM_INTERFACE_ENTRY(IDispatch)
    COM_INTERFACE_ENTRY(ISupportErrorInfo)
 END_COM_MAP()
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
-	
-	void FinalRelease() 
-	{
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
+   
+   void FinalRelease() 
+   {
+   }
    STDMETHOD(InterfaceSupportsErrorInfo)(REFIID riid);
 
    STDMETHOD(Save)();

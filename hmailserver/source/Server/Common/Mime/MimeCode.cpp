@@ -1,25 +1,25 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 /*
-	Copyright (c) 2003, Jeff Lee
-	All rights reserved.
+   Copyright (c) 2003, Jeff Lee
+   All rights reserved.
 
-	Redistribution and use in source and binary forms, with or without
-	modification, are permitted provided that the following conditions are met:
+   Redistribution and use in source and binary forms, with or without
+   modification, are permitted provided that the following conditions are met:
 
-	Redistributions of source code must retain the above copyright notice,
-	this list of conditions and the following disclaimer.
+   Redistributions of source code must retain the above copyright notice,
+   this list of conditions and the following disclaimer.
 
-	THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-	AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-	IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-	ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
-	LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-	CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-	SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-	INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-	CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-	ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-	POSSIBILITY OF SUCH DAMAGE.
+   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+   AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+   IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+   ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+   LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+   CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+   SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+   INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+   CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+   ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+   POSSIBILITY OF SUCH DAMAGE.
 */
 
 //
@@ -58,155 +58,155 @@ namespace HM
 
    MimeEnvironment::MimeEnvironment()
    {
-	   // initialize transfer encoding
-	   //REGISTER_MIMECODER("7bit", MimeCode7bit);
-	   //REGISTER_MIMECODER("8bit", MimeCode7bit);
-	   REGISTER_MIMECODER("quoted-printable", MimeCodeQP);
-	   REGISTER_MIMECODER("base64", MimeCodeBase64);
+      // initialize transfer encoding
+      //REGISTER_MIMECODER("7bit", MimeCode7bit);
+      //REGISTER_MIMECODER("8bit", MimeCode7bit);
+      REGISTER_MIMECODER("quoted-printable", MimeCodeQP);
+      REGISTER_MIMECODER("base64", MimeCodeBase64);
 
-	   // initialize header fields encoding
-	   REGISTER_FIELDCODER("Subject", FieldCodeText);
-	   REGISTER_FIELDCODER("Comments", FieldCodeText);
-	   REGISTER_FIELDCODER("Content-Description", FieldCodeText);
+      // initialize header fields encoding
+      REGISTER_FIELDCODER("Subject", FieldCodeText);
+      REGISTER_FIELDCODER("Comments", FieldCodeText);
+      REGISTER_FIELDCODER("Content-Description", FieldCodeText);
 
-	   REGISTER_FIELDCODER("From", FieldCodeAddress);
-	   REGISTER_FIELDCODER("To", FieldCodeAddress);
-	   REGISTER_FIELDCODER("Resent-To", FieldCodeAddress);
-	   REGISTER_FIELDCODER("Cc", FieldCodeAddress);
-	   REGISTER_FIELDCODER("Resent-Cc", FieldCodeAddress);
-	   REGISTER_FIELDCODER("Bcc", FieldCodeAddress);
-	   REGISTER_FIELDCODER("Resent-Bcc", FieldCodeAddress);
-	   REGISTER_FIELDCODER("Reply-To", FieldCodeAddress);
-	   REGISTER_FIELDCODER("Resent-Reply-To", FieldCodeAddress);
+      REGISTER_FIELDCODER("From", FieldCodeAddress);
+      REGISTER_FIELDCODER("To", FieldCodeAddress);
+      REGISTER_FIELDCODER("Resent-To", FieldCodeAddress);
+      REGISTER_FIELDCODER("Cc", FieldCodeAddress);
+      REGISTER_FIELDCODER("Resent-Cc", FieldCodeAddress);
+      REGISTER_FIELDCODER("Bcc", FieldCodeAddress);
+      REGISTER_FIELDCODER("Resent-Bcc", FieldCodeAddress);
+      REGISTER_FIELDCODER("Reply-To", FieldCodeAddress);
+      REGISTER_FIELDCODER("Resent-Reply-To", FieldCodeAddress);
 
-	   REGISTER_FIELDCODER("Content-Type", FieldCodeParameter);
-	   REGISTER_FIELDCODER("Content-Disposition", FieldCodeParameter);
+      REGISTER_FIELDCODER("Content-Type", FieldCodeParameter);
+      REGISTER_FIELDCODER("Content-Disposition", FieldCodeParameter);
    }
 
    void MimeEnvironment::SetAutoFolding(bool bAutoFolding)
    {
-	   auto_folding_ = bAutoFolding;
-	   if (!bAutoFolding)
-	   {
-		   DEREGISTER_MIMECODER("7bit");
-		   DEREGISTER_MIMECODER("8bit");
-	   }
-	   else
-	   {
-		   REGISTER_MIMECODER("7bit", MimeCode7bit);
-		   REGISTER_MIMECODER("8bit", MimeCode7bit);
-	   }
+      auto_folding_ = bAutoFolding;
+      if (!bAutoFolding)
+      {
+         DEREGISTER_MIMECODER("7bit");
+         DEREGISTER_MIMECODER("8bit");
+      }
+      else
+      {
+         REGISTER_MIMECODER("7bit", MimeCode7bit);
+         REGISTER_MIMECODER("8bit", MimeCode7bit);
+      }
    }
 
    void MimeEnvironment::RegisterCoder(const char* pszCodingName, CODER_FACTORY pfnCreateObject/*=NULL*/)
    {
-	   ASSERT(pszCodingName != NULL);
-	   auto it = coders_.begin();
-	   while (it != coders_.end())
-	   {
-		   auto it2 = it;
-		   it++;
+      ASSERT(pszCodingName != NULL);
+      auto it = coders_.begin();
+      while (it != coders_.end())
+      {
+         auto it2 = it;
+         it++;
          if (!::_stricmp(pszCodingName, (*it2).first))
-			   coders_.erase(it2);
-	   }
-	   if (pfnCreateObject != NULL)
-	   {
-		   CODER_PAIR newPair(pszCodingName, pfnCreateObject);
-		   coders_.push_front(newPair);
-	   }
+            coders_.erase(it2);
+      }
+      if (pfnCreateObject != NULL)
+      {
+         CODER_PAIR newPair(pszCodingName, pfnCreateObject);
+         coders_.push_front(newPair);
+      }
    }
 
    MimeCodeBase* MimeEnvironment::CreateCoder(const char* pszCodingName)
    {
-	   if (!pszCodingName || !::strlen(pszCodingName))
-		   pszCodingName = "7bit";
+      if (!pszCodingName || !::strlen(pszCodingName))
+         pszCodingName = "7bit";
 
-	   for (auto it=coders_.begin(); it!=coders_.end(); it++)
-	   {
-		   ASSERT((*it).first != NULL);
-		   if (!::_stricmp(pszCodingName, (*it).first))
-		   {
-			   CODER_FACTORY pfnCreateObject = (*it).second;
-			   ASSERT(pfnCreateObject != NULL);
-			   return pfnCreateObject();
-		   }
-	   }
-	   return new MimeCodeBase;		// default coder for unregistered Content-Transfer-Encoding
+      for (auto it=coders_.begin(); it!=coders_.end(); it++)
+      {
+         ASSERT((*it).first != NULL);
+         if (!::_stricmp(pszCodingName, (*it).first))
+         {
+            CODER_FACTORY pfnCreateObject = (*it).second;
+            ASSERT(pfnCreateObject != NULL);
+            return pfnCreateObject();
+         }
+      }
+      return new MimeCodeBase;      // default coder for unregistered Content-Transfer-Encoding
    }
 
 
    void MimeEnvironment::RegisterFieldCoder(const char* pszFieldName, FIELD_CODER_FACTORY pfnCreateObject/*=NULL*/)
    {
-	   ASSERT(pszFieldName != NULL);
-	   auto it = field_coders_.begin();
-	   while (it != field_coders_.end())
-	   {
-		   auto it2 = it;
-		   it++;
-		   if (!::_stricmp(pszFieldName, (*it2).first))
-			   field_coders_.erase(it2);
-	   }
-	   if (pfnCreateObject != NULL)
-	   {
-		   FIELD_CODER_PAIR newPair(pszFieldName, pfnCreateObject);
-		   field_coders_.push_front(newPair);
-	   }
+      ASSERT(pszFieldName != NULL);
+      auto it = field_coders_.begin();
+      while (it != field_coders_.end())
+      {
+         auto it2 = it;
+         it++;
+         if (!::_stricmp(pszFieldName, (*it2).first))
+            field_coders_.erase(it2);
+      }
+      if (pfnCreateObject != NULL)
+      {
+         FIELD_CODER_PAIR newPair(pszFieldName, pfnCreateObject);
+         field_coders_.push_front(newPair);
+      }
    }
 
    FieldCodeBase* MimeEnvironment::CreateFieldCoder(const char* pszFieldName)
    {
-	   ASSERT(pszFieldName != NULL);
-	   for (auto it=field_coders_.begin(); it!=field_coders_.end(); it++)
-	   {
-		   ASSERT((*it).first != NULL);
-		   if (!::_stricmp(pszFieldName, (*it).first))
-		   {
-			   FIELD_CODER_FACTORY pfnCreateObject = (*it).second;
-			   ASSERT(pfnCreateObject != NULL);
-			   return pfnCreateObject();
-		   }
-	   }
-	   return new FieldCodeBase;		// default coder for unregistered header fields
+      ASSERT(pszFieldName != NULL);
+      for (auto it=field_coders_.begin(); it!=field_coders_.end(); it++)
+      {
+         ASSERT((*it).first != NULL);
+         if (!::_stricmp(pszFieldName, (*it).first))
+         {
+            FIELD_CODER_FACTORY pfnCreateObject = (*it).second;
+            ASSERT(pfnCreateObject != NULL);
+            return pfnCreateObject();
+         }
+      }
+      return new FieldCodeBase;     // default coder for unregistered header fields
    }
 
    void MimeEnvironment::RegisterMediaType(const char* pszMediaType, BODY_PART_FACTORY pfnCreateObject/*=NULL*/)
    {
-	   ASSERT(pszMediaType != NULL);
-	   auto it = media_types_.begin();
-	   while (it != media_types_.end())
-	   {
-		   auto it2 = it;
-		   it++;
-		   if (!::_stricmp(pszMediaType, (*it2).first))
-			   media_types_.erase(it2);
-	   }
-	   if (pfnCreateObject != NULL)
-	   {
-		   MEDIA_TYPE_PAIR newPair(pszMediaType, pfnCreateObject);
-		   media_types_.push_front(newPair);
-	   }
+      ASSERT(pszMediaType != NULL);
+      auto it = media_types_.begin();
+      while (it != media_types_.end())
+      {
+         auto it2 = it;
+         it++;
+         if (!::_stricmp(pszMediaType, (*it2).first))
+            media_types_.erase(it2);
+      }
+      if (pfnCreateObject != NULL)
+      {
+         MEDIA_TYPE_PAIR newPair(pszMediaType, pfnCreateObject);
+         media_types_.push_front(newPair);
+      }
    }
 
    std::shared_ptr<MimeBody> MimeEnvironment::CreateBodyPart(const char* pszMediaType)
    {
-	   if (!pszMediaType || !::strlen(pszMediaType))
-		   pszMediaType = "text";
+      if (!pszMediaType || !::strlen(pszMediaType))
+         pszMediaType = "text";
 
-	   ASSERT(pszMediaType != NULL);
-	   for (auto it=media_types_.begin(); it!=media_types_.end(); it++)
-	   {
-		   ASSERT((*it).first != NULL);
-		   if (!::_stricmp(pszMediaType, (*it).first))
-		   {
-			   BODY_PART_FACTORY pfnCreateObject = (*it).second;
-			   ASSERT(pfnCreateObject != NULL);
-			   return pfnCreateObject();
-		   }
-	   }
+      ASSERT(pszMediaType != NULL);
+      for (auto it=media_types_.begin(); it!=media_types_.end(); it++)
+      {
+         ASSERT((*it).first != NULL);
+         if (!::_stricmp(pszMediaType, (*it).first))
+         {
+            BODY_PART_FACTORY pfnCreateObject = (*it).second;
+            ASSERT(pfnCreateObject != NULL);
+            return pfnCreateObject();
+         }
+      }
       
       std::shared_ptr<MimeBody> pBody = std::shared_ptr<MimeBody>(new MimeBody);
       return pBody;
-      //return new MimeBody;			// default body part for unregistered media type
+      //return new MimeBody;        // default body part for unregistered media type
    }
 
    //////////////////////////////////////////////////////////////////////
@@ -218,36 +218,36 @@ namespace HM
       const unsigned char* pbEnd = input_ + input_size_;
       int nLineLen = 0;
       int lastSpacePos = -1;
-	   
+      
       while (pbData < pbEnd)
-	   {
-		   unsigned char ch = *pbData;
+      {
+         unsigned char ch = *pbData;
          
-		   if (ch == '\r' || ch == '\n')
-		   {
-			   nLineLen = -1;
-			   lastSpacePos = -1;
-		   }
-		   else if (nLineLen > 0 && CMimeChar::IsSpace(ch))
+         if (ch == '\r' || ch == '\n')
+         {
+            nLineLen = -1;
+            lastSpacePos = -1;
+         }
+         else if (nLineLen > 0 && CMimeChar::IsSpace(ch))
          {
             lastSpacePos = (int) output.size();
          }
 
-		   // fold the line if it's longer than 76
-		   if (nLineLen >= MAX_MIME_LINE_LEN && lastSpacePos != -1)
-		   {
+         // fold the line if it's longer than 76
+         if (nLineLen >= MAX_MIME_LINE_LEN && lastSpacePos != -1)
+         {
             int charsSinceSpace = (int) output.size() - lastSpacePos;
             output.Insert(lastSpacePos, "\r\n");
 
             lastSpacePos = -1;
             nLineLen = charsSinceSpace + 1;
-		   }
+         }
 
          output.append(1, ch);
 
          pbData++;
-		   nLineLen++;
-	   }
+         nLineLen++;
+      }
    }
 
    //////////////////////////////////////////////////////////////////////
@@ -255,46 +255,46 @@ namespace HM
    //////////////////////////////////////////////////////////////////////
    void MimeCodeQP::Encode(AnsiString &output) const
    {
-	   static const char* s_QPTable = "0123456789ABCDEF";
+      static const char* s_QPTable = "0123456789ABCDEF";
 
-	   const unsigned char* pbData = input_;
-	   const unsigned char* pbEnd = input_ + input_size_;
-	   int nLineLen = 0;
+      const unsigned char* pbData = input_;
+      const unsigned char* pbEnd = input_ + input_size_;
+      int nLineLen = 0;
 
-	   while (pbData < pbEnd)
-	   {
-		   unsigned char ch = *pbData;
-		   bool bQuote = false, bCopy = false;
+      while (pbData < pbEnd)
+      {
+         unsigned char ch = *pbData;
+         bool bQuote = false, bCopy = false;
 
-		   // According to RFC 2045, TAB and SPACE MAY be represented as the ASCII characters.
-		   // But it MUST NOT be so represented at the end of an encoded line.
-		   if (ch == '\t' || ch == ' ')
-		   {
-			   if (pbData == pbEnd-1 || (!quote_line_break_ && *(pbData+1) == '\r'))
-				   bQuote = true;		// quote the SPACE/TAB
-			   else if (add_line_break_ && nLineLen >= MAX_MIME_LINE_LEN - 4)
-				   bQuote = true;		// any following char (max encoded cost=3) cannot push nLineLen to 76 before this space, so quoting here guarantees no literal whitespace precedes a soft break
-			   else
-				   bCopy = true;		// copy the SPACE/TAB
-		   }
-		   else if (!quote_line_break_ && (ch == '\r' || ch == '\n'))
-		   {
-			   bCopy = true;			// keep 'hard' line break
-			   nLineLen = -1;
-		   }
-		   else if (!quote_line_break_ && ch == '.')
-		   {
-			   if (pbData-input_ >= 2 && pbData+2 < pbEnd &&
-				   *(pbData-2) == '\r' && *(pbData-1) == '\n' &&
-				   *(pbData+1) == '\r' && *(pbData+2) == '\n')
-				   bQuote = true;		// avoid confusing with SMTP's message end flag
-			   else
-				   bCopy = true;
-		   }
-		   else if (ch < 33 || ch > 126 || ch == '=')
-			   bQuote = true;			// quote this character
-		   else
-			   bCopy = true;			// copy this character
+         // According to RFC 2045, TAB and SPACE MAY be represented as the ASCII characters.
+         // But it MUST NOT be so represented at the end of an encoded line.
+         if (ch == '\t' || ch == ' ')
+         {
+            if (pbData == pbEnd-1 || (!quote_line_break_ && *(pbData+1) == '\r'))
+               bQuote = true;    // quote the SPACE/TAB
+            else if (add_line_break_ && nLineLen >= MAX_MIME_LINE_LEN - 4)
+               bQuote = true;    // any following char (max encoded cost=3) cannot push nLineLen to 76 before this space, so quoting here guarantees no literal whitespace precedes a soft break
+            else
+               bCopy = true;     // copy the SPACE/TAB
+         }
+         else if (!quote_line_break_ && (ch == '\r' || ch == '\n'))
+         {
+            bCopy = true;        // keep 'hard' line break
+            nLineLen = -1;
+         }
+         else if (!quote_line_break_ && ch == '.')
+         {
+            if (pbData-input_ >= 2 && pbData+2 < pbEnd &&
+               *(pbData-2) == '\r' && *(pbData-1) == '\n' &&
+               *(pbData+1) == '\r' && *(pbData+2) == '\n')
+               bQuote = true;    // avoid confusing with SMTP's message end flag
+            else
+               bCopy = true;
+         }
+         else if (ch < 33 || ch > 126 || ch == '=')
+            bQuote = true;       // quote this character
+         else
+            bCopy = true;        // copy this character
 
          if (add_line_break_)
          {
@@ -305,58 +305,58 @@ namespace HM
             }
          }
 
-		   if (bQuote)
-		   {
+         if (bQuote)
+         {
             output.append("=");
             output.append(1, s_QPTable[(ch >> 4) & 0x0f]);
             output.append(1, s_QPTable[ch & 0x0f]);
-			   nLineLen += 3;
-		   }
-		   else if (bCopy)
-		   {
+            nLineLen += 3;
+         }
+         else if (bCopy)
+         {
             output.append(1, ch);
-			   nLineLen++;
-		   }
+            nLineLen++;
+         }
 
-		   pbData++;
-	   }
+         pbData++;
+      }
 
    }
 
    void MimeCodeQP::Decode(AnsiString &output)
    {
-	   const unsigned char* pbData = input_;
-	   const unsigned char* pbEnd = input_ + input_size_;
+      const unsigned char* pbData = input_;
+      const unsigned char* pbEnd = input_ + input_size_;
 
-	   while (pbData < pbEnd)
-	   {
-		   unsigned char ch = *pbData++;
-		   if (ch == '=')
-		   {
-			   if (pbData+2 > pbEnd)
-				   break;				// invalid endcoding
-			   ch = *pbData++;
-			   if (CMimeChar::IsHexDigit(ch))
-			   {
-				   ch -= ch > '9' ? 0x37 : '0';
+      while (pbData < pbEnd)
+      {
+         unsigned char ch = *pbData++;
+         if (ch == '=')
+         {
+            if (pbData+2 > pbEnd)
+               break;            // invalid endcoding
+            ch = *pbData++;
+            if (CMimeChar::IsHexDigit(ch))
+            {
+               ch -= ch > '9' ? 0x37 : '0';
                unsigned char charToAdd = ch << 4;
-				   ch = *pbData++;
-				   ch -= ch > '9' ? 0x37 : '0';
+               ch = *pbData++;
+               ch -= ch > '9' ? 0x37 : '0';
                charToAdd |= ch & 0x0f;
 
                output.append(1, charToAdd);
-			   }
-			   else if (ch == '\r' && *pbData == '\n')
-				   pbData++;			// Soft Line Break, eat it
-			   else					// invalid endcoding, let it go
-				   output.append(1, ch);
-		   }
+            }
+            else if (ch == '\r' && *pbData == '\n')
+               pbData++;         // Soft Line Break, eat it
+            else              // invalid endcoding, let it go
+               output.append(1, ch);
+         }
          else
          {
             output.append(1, ch);
          }
-			   
-	   }
+            
+      }
    }
 
    void MimeCodeQ::Decode(AnsiString &output)
@@ -370,7 +370,7 @@ namespace HM
          if (ch == '=')
          {
             if (pbData+2 > pbEnd)
-               break;				// invalid endcoding
+               break;            // invalid endcoding
             ch = *pbData++;
             if (CMimeChar::IsHexDigit(ch))
             {
@@ -383,8 +383,8 @@ namespace HM
                output.append(1, charToAdd);
             }
             else if (ch == '\r' && *pbData == '\n')
-               pbData++;			// Soft Line Break, eat it
-            else					// invalid endcoding, let it go
+               pbData++;         // Soft Line Break, eat it
+            else              // invalid endcoding, let it go
                output.append(1, ch);
          }
          else
@@ -408,34 +408,34 @@ namespace HM
    //////////////////////////////////////////////////////////////////////
    void MimeCodeBase64::Encode(AnsiString &result) const
    {
-	   static const char* s_Base64Table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+      static const char* s_Base64Table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
-	   size_t nFrom, nLineLen = 0;
-	   unsigned char chHigh4bits = 0;
+      size_t nFrom, nLineLen = 0;
+      unsigned char chHigh4bits = 0;
 
-	   for (nFrom=0; nFrom<input_size_; nFrom++)
-	   {
-		   unsigned char ch = input_[nFrom];
-		   switch (nFrom % 3)
-		   {
-		   case 0:
+      for (nFrom=0; nFrom<input_size_; nFrom++)
+      {
+         unsigned char ch = input_[nFrom];
+         switch (nFrom % 3)
+         {
+         case 0:
             {
                char c = s_Base64Table[ch >> 2];
                result.append(1, c);
 
-			      chHigh4bits = (ch << 4) & 0x30;
-			      break;
+               chHigh4bits = (ch << 4) & 0x30;
+               break;
             }
 
          case 1:
             {
                char c = s_Base64Table[chHigh4bits | (ch >> 4)];
                result.append(1, c);
-			      chHigh4bits = (ch << 2) & 0x3c;
-			      break;
+               chHigh4bits = (ch << 2) & 0x3c;
+               break;
             }
 
-		   default:
+         default:
             {
                char c = s_Base64Table[chHigh4bits | (ch >> 6)];
                result.append(1, c);
@@ -443,31 +443,31 @@ namespace HM
                c = s_Base64Table[ch & 0x3f];
                result.append(1, c);
 
-			      nLineLen++;
+               nLineLen++;
             }
-		   }
+         }
 
-		   nLineLen++;
+         nLineLen++;
 
-		   if (add_line_break_ && nLineLen >= MAX_MIME_LINE_LEN)
-		   {
+         if (add_line_break_ && nLineLen >= MAX_MIME_LINE_LEN)
+         {
             result.append("\r\n");
-			   nLineLen = 0;
-		   }
-	   }
+            nLineLen = 0;
+         }
+      }
 
-	   if (nFrom % 3 != 0)	// 76 = 19 * 4, so the padding wouldn't exceed 76
-	   {
+      if (nFrom % 3 != 0)  // 76 = 19 * 4, so the padding wouldn't exceed 76
+      {
          char c1 = s_Base64Table[chHigh4bits];
 
          result.append(1, c1);
-		   int nPad = 4 - (nFrom % 3) - 1;
+         int nPad = 4 - (nFrom % 3) - 1;
          result.append(nPad, '=');
-	   }
+      }
 
-	   if (add_line_break_ && nLineLen != 0)	// add CRLF
+      if (add_line_break_ && nLineLen != 0)  // add CRLF
          result.append("\r\n");
-	}
+   }
 
    // Decode a base64 stream.
    //
@@ -490,54 +490,54 @@ namespace HM
    // genuinely does end the stream - stays the one byte that stops the decode.
    void MimeCodeBase64::Decode(AnsiString &result)
    {
-	   const unsigned char* pbData = input_;
-	   const unsigned char* pbEnd = input_ + input_size_;
+      const unsigned char* pbData = input_;
+      const unsigned char* pbEnd = input_ + input_size_;
 
-	   int nFrom = 0;
-	   unsigned char chHighBits = 0;
+      int nFrom = 0;
+      unsigned char chHighBits = 0;
 
-	   while (pbData < pbEnd)
-	   {
-		   unsigned char ch = *pbData++;
+      while (pbData < pbEnd)
+      {
+         unsigned char ch = *pbData++;
 
-		   if (ch == '=')				// trailing pad: the stream really has ended
-			   break;
+         if (ch == '=')          // trailing pad: the stream really has ended
+            break;
 
-		   const int nDecodedChar = DecodeBase64Char(ch);
-		   if (nDecodedChar >= 64)		// not in the alphabet - CR, LF, space, junk
-			   continue;
+         const int nDecodedChar = DecodeBase64Char(ch);
+         if (nDecodedChar >= 64)    // not in the alphabet - CR, LF, space, junk
+            continue;
 
-		   ch = (unsigned char) nDecodedChar;
+         ch = (unsigned char) nDecodedChar;
 
-		   switch ((nFrom++) % 4)
-		   {
-		   case 0:
-			   chHighBits = ch << 2;
-			   break;
+         switch ((nFrom++) % 4)
+         {
+         case 0:
+            chHighBits = ch << 2;
+            break;
 
-		   case 1:
+         case 1:
             {
                char charToAdd = (chHighBits | (ch >> 4));
                result.append(1, charToAdd);
                chHighBits = ch << 4;
                break;
             }
-		   case 2:
+         case 2:
             {
                char charToAdd = (chHighBits | (ch >> 2));
                result.append(1, charToAdd);
                chHighBits = ch << 6;
                break;
             }
-		   default:
+         default:
             {
                char charToAdd = (chHighBits | ch);
                result.append(1, charToAdd);
                break;
             }
             
-		   }
-	   }
+         }
+      }
    }
 
    //////////////////////////////////////////////////////////////////////
@@ -545,151 +545,151 @@ namespace HM
    //////////////////////////////////////////////////////////////////////
    void MimeEncodedWord::Encode(AnsiString &output) const
    {
-	   if (charset_.empty())
+      if (charset_.empty())
       {
          MimeCodeBase::Encode(output);   
          return;
       }
 
-	   if (!input_size_)
-		   return;
+      if (!input_size_)
+         return;
 
       if (tolower(encoding_) == 'b')
       {
-		   BEncode(output);
+         BEncode(output);
          return;
       }
 
-	   QEncode(output);
+      QEncode(output);
    }
 
 
    void MimeEncodedWord::Decode(AnsiString &output)
    {
-	   charset_.clear();
-	   const char* pbData = (const char*) input_;
-	   const char* pbEnd = pbData + input_size_;
-	   
-	   while (pbData < pbEnd)
-	   {
-		   const char* pszHeaderEnd = pbData;
-		   const char* pszCodeEnd = pbEnd;
-		   int nCoding = 0, nCodeLen = (int)(pbEnd - pbData);
-		   // Three bounds problems lived in the next two lines, and AddressSanitizer
-		   // reported the first of them as a one-byte heap-buffer-overflow READ from a
-		   // 23-byte input:
-		   //
-		   //   1. pbData[1] was read when the loop only guarantees pbData < pbEnd, so a
-		   //      header whose final byte is '=' read one byte past the buffer.
-		   //   2. ::strchr scans to a NUL terminator, and this buffer has none - it is
-		   //      a length-delimited header field, not a C string. With no '?' in the
-		   //      remainder it runs off the end until it happens upon a zero byte.
-		   //      Worse, pbData+2 could itself already be past pbEnd.
-		   //   3. pszHeaderEnd[2] was dereferenced BEFORE the pszHeaderEnd+3 < pbEnd
-		   //      test that was meant to make it safe. C++ evaluates && left to right,
-		   //      so the read happened first.
-		   //
-		   // All three are the same mistake - trusting a pointer instead of the length
-		   // - and all three are reachable from any header on any received message,
-		   // which is why the check is now explicit about how many bytes it needs
-		   // before it looks at them. memchr is the bounded equivalent of strchr.
-		   if (pbEnd - pbData >= 2 && pbData[0] == '=' && pbData[1] == '?')
-		   {
-			   const size_t charsetSearchLength = static_cast<size_t>(pbEnd - (pbData + 2));
+      charset_.clear();
+      const char* pbData = (const char*) input_;
+      const char* pbEnd = pbData + input_size_;
+      
+      while (pbData < pbEnd)
+      {
+         const char* pszHeaderEnd = pbData;
+         const char* pszCodeEnd = pbEnd;
+         int nCoding = 0, nCodeLen = (int)(pbEnd - pbData);
+         // Three bounds problems lived in the next two lines, and AddressSanitizer
+         // reported the first of them as a one-byte heap-buffer-overflow READ from a
+         // 23-byte input:
+         //
+         //   1. pbData[1] was read when the loop only guarantees pbData < pbEnd, so a
+         //      header whose final byte is '=' read one byte past the buffer.
+         //   2. ::strchr scans to a NUL terminator, and this buffer has none - it is
+         //      a length-delimited header field, not a C string. With no '?' in the
+         //      remainder it runs off the end until it happens upon a zero byte.
+         //      Worse, pbData+2 could itself already be past pbEnd.
+         //   3. pszHeaderEnd[2] was dereferenced BEFORE the pszHeaderEnd+3 < pbEnd
+         //      test that was meant to make it safe. C++ evaluates && left to right,
+         //      so the read happened first.
+         //
+         // All three are the same mistake - trusting a pointer instead of the length
+         // - and all three are reachable from any header on any received message,
+         // which is why the check is now explicit about how many bytes it needs
+         // before it looks at them. memchr is the bounded equivalent of strchr.
+         if (pbEnd - pbData >= 2 && pbData[0] == '=' && pbData[1] == '?')
+         {
+            const size_t charsetSearchLength = static_cast<size_t>(pbEnd - (pbData + 2));
 
-			   pszHeaderEnd = static_cast<const char*>(::memchr(pbData + 2, '?', charsetSearchLength));
+            pszHeaderEnd = static_cast<const char*>(::memchr(pbData + 2, '?', charsetSearchLength));
 
-			   if (pszHeaderEnd != NULL && pszHeaderEnd+3 < pbEnd && pszHeaderEnd[2] == '?')
-			   {
-				   nCoding = tolower(pszHeaderEnd[1]);
-				   pszHeaderEnd += 3;
+            if (pszHeaderEnd != NULL && pszHeaderEnd+3 < pbEnd && pszHeaderEnd[2] == '?')
+            {
+               nCoding = tolower(pszHeaderEnd[1]);
+               pszHeaderEnd += 3;
 
                int iDataLength = (int) (pbEnd - pszHeaderEnd);
 
-               pszCodeEnd = StringParser::Search(pszHeaderEnd, iDataLength, "?=");	// look for the tailer
-				   if (!pszCodeEnd || pszCodeEnd >= pbEnd)
-					   pszCodeEnd = pbEnd;
-				   nCodeLen = (int)(pszCodeEnd - pszHeaderEnd);
-				   pszCodeEnd += 2;
-				   if (charset_.empty())
-				   {
-					   charset_.assign(pbData+2, pszHeaderEnd-pbData-5);
-					   encoding_ = nCoding;
-				   }
-			   }
-		   }
+               pszCodeEnd = StringParser::Search(pszHeaderEnd, iDataLength, "?=");  // look for the tailer
+               if (!pszCodeEnd || pszCodeEnd >= pbEnd)
+                  pszCodeEnd = pbEnd;
+               nCodeLen = (int)(pszCodeEnd - pszHeaderEnd);
+               pszCodeEnd += 2;
+               if (charset_.empty())
+               {
+                  charset_.assign(pbData+2, pszHeaderEnd-pbData-5);
+                  encoding_ = nCoding;
+               }
+            }
+         }
 
          
-		   int nDecoded;
-		   if (nCoding == 'b')
-		   {
-			   MimeCodeBase64 base64;
-			   base64.SetInput(pszHeaderEnd, nCodeLen, false);
-			   base64.GetOutput(output);
-		   }
-		   else if (nCoding == 'q')
-		   {
-			   MimeCodeQ qp;
-			   qp.SetInput(pszHeaderEnd, nCodeLen, false);
-			   qp.GetOutput(output);
-		   }
-		   else
-		   {
+         int nDecoded;
+         if (nCoding == 'b')
+         {
+            MimeCodeBase64 base64;
+            base64.SetInput(pszHeaderEnd, nCodeLen, false);
+            base64.GetOutput(output);
+         }
+         else if (nCoding == 'q')
+         {
+            MimeCodeQ qp;
+            qp.SetInput(pszHeaderEnd, nCodeLen, false);
+            qp.GetOutput(output);
+         }
+         else
+         {
             int iDataLength = (int) (pbEnd - pbData);
             
-			   pszCodeEnd = StringParser::Search(pbData+1, iDataLength - 1, "=?");	// find the next encoded-word
-			   if (!pszCodeEnd || pszCodeEnd >= pbEnd)
-				   pszCodeEnd = pbEnd;
-			   else if (pbData > (const char*) input_)
-			   {
-				   const char* pszSpace = pbData;
-				   while (CMimeChar::IsSpace((unsigned char)*pszSpace))
-					   pszSpace++;
-				   if (pszSpace == pszCodeEnd)	// ignore liner-white-spaces between adjacent encoded words
-					   pbData = pszCodeEnd;
-			   }
-			   
+            pszCodeEnd = StringParser::Search(pbData+1, iDataLength - 1, "=?");  // find the next encoded-word
+            if (!pszCodeEnd || pszCodeEnd >= pbEnd)
+               pszCodeEnd = pbEnd;
+            else if (pbData > (const char*) input_)
+            {
+               const char* pszSpace = pbData;
+               while (CMimeChar::IsSpace((unsigned char)*pszSpace))
+                  pszSpace++;
+               if (pszSpace == pszCodeEnd)   // ignore liner-white-spaces between adjacent encoded words
+                  pbData = pszCodeEnd;
+            }
+            
             nDecoded = (int)(pszCodeEnd - pbData);
             output.append((char*) pbData, nDecoded);
-			   
-		   }
+            
+         }
 
-		   pbData = pszCodeEnd;
-	   }
+         pbData = pszCodeEnd;
+      }
    }
 
    void MimeEncodedWord::BEncode(AnsiString &output) const
    {
       bool inputIsUTF8 = charset_.CompareNoCase("utf-8") == 0;
-	   int nCharsetLen = (int)charset_.size();
-	   int nMaxBlockSize = MAX_ENCODEDWORD_LEN - nCharsetLen - 7;	// a single encoded-word cannot exceed 75 bytes
-	   nMaxBlockSize = nMaxBlockSize / 4 * 3;
+      int nCharsetLen = (int)charset_.size();
+      int nMaxBlockSize = MAX_ENCODEDWORD_LEN - nCharsetLen - 7;  // a single encoded-word cannot exceed 75 bytes
+      nMaxBlockSize = nMaxBlockSize / 4 * 3;
 
-	   // The same over-long-charset case QEncode guards, and here it is worse than
-	   // amplification. MAX_ENCODEDWORD_LEN is 75, so a charset of 69 characters or
-	   // more makes nMaxBlockSize zero or negative; the loop below then encodes zero
-	   // bytes per iteration while appending a fresh encoded-word header each time,
-	   // so processedBytes never reaches input_size_ and it does not terminate at
-	   // all.
-	   //
-	   // The ASSERT that used to be the only thing standing here is compiled out of
-	   // the shipped Release build - which is precisely why the fuzz harness has a
-	   // separate -Asserts mode - so in production it was no protection whatsoever.
-	   // Fall back to the raw encoder for the same reasons set out in QEncode: no
-	   // legal encoded word can be built from such a charset, so the value is worth
-	   // more emitted as-is than as a stream no client can decode.
-	   if (nMaxBlockSize < 3)
-	   {
-		   MimeCodeBase::Encode(output);
-		   return;
-	   }
+      // The same over-long-charset case QEncode guards, and here it is worse than
+      // amplification. MAX_ENCODEDWORD_LEN is 75, so a charset of 69 characters or
+      // more makes nMaxBlockSize zero or negative; the loop below then encodes zero
+      // bytes per iteration while appending a fresh encoded-word header each time,
+      // so processedBytes never reaches input_size_ and it does not terminate at
+      // all.
+      //
+      // The ASSERT that used to be the only thing standing here is compiled out of
+      // the shipped Release build - which is precisely why the fuzz harness has a
+      // separate -Asserts mode - so in production it was no protection whatsoever.
+      // Fall back to the raw encoder for the same reasons set out in QEncode: no
+      // legal encoded word can be built from such a charset, so the value is worth
+      // more emitted as-is than as a stream no client can decode.
+      if (nMaxBlockSize < 3)
+      {
+         MimeCodeBase::Encode(output);
+         return;
+      }
 
-	   size_t processedBytes = 0;
+      size_t processedBytes = 0;
 
       bool firstWord = true;
 
-	   for (;;)
-	   {
+      for (;;)
+      {
          const unsigned char *thisPartStartPosition = input_ + processedBytes;
          
          // Calculate the number of input bytes to encode. It must be less than the max block size, and it must
@@ -726,90 +726,90 @@ namespace HM
 
          HM_ASSERT(inputEncodeSize == currentEncodeBlockSize);
 
-		   MimeCodeBase64 base64;
-		   base64.SetInput((const char*) thisPartStartPosition, inputEncodeSize, true);
-		   base64.AddLineBreak(false);
-		   base64.GetOutput(output);
-		   output.append("?=");
+         MimeCodeBase64 base64;
+         base64.SetInput((const char*) thisPartStartPosition, inputEncodeSize, true);
+         base64.AddLineBreak(false);
+         base64.GetOutput(output);
+         output.append("?=");
 
-		   processedBytes += inputEncodeSize;
-		   if (processedBytes >= input_size_)
-			   break;
+         processedBytes += inputEncodeSize;
+         if (processedBytes >= input_size_)
+            break;
 
          output.append(" ");
-	   }
+      }
    }
 
    void MimeEncodedWord::QEncode(AnsiString &output) const
    {
-	   static const char* s_QPTable = "0123456789ABCDEF";
+      static const char* s_QPTable = "0123456789ABCDEF";
 
-	   const unsigned char* pbData = input_;
-	   const unsigned char* pbEnd = input_ + input_size_;
+      const unsigned char* pbData = input_;
+      const unsigned char* pbEnd = input_ + input_size_;
 
       int nCodeLen, nCharsetLen = (int)charset_.size();
-	   int nLineLen = 0, nMaxLine = MAX_ENCODEDWORD_LEN - nCharsetLen - 7;
+      int nLineLen = 0, nMaxLine = MAX_ENCODEDWORD_LEN - nCharsetLen - 7;
 
-	   // A charset name long enough to leave no room is refused rather than
-	   // encoded, because the loop below has no bound of its own.
-	   //
-	   // MAX_ENCODEDWORD_LEN is 75, so a charset of 69 characters or more makes
-	   // nMaxLine zero or negative, and then `nLineLen + nCodeLen > nMaxLine` is
-	   // true on the very first byte and on every byte after it. Each iteration
-	   // therefore emits a complete encoded-word header - "=?" plus the whole
-	   // charset plus "?Q?" - for a single encoded character, so the output grows as
-	   // input_size x charset_length with nothing to stop it. The MIME fuzz harness
-	   // reached 2 GB of resident memory from a 3.4 KB input this way: an
-	   // amplification of roughly six hundred thousand to one.
-	   //
-	   // Falling back to MimeCodeBase::Encode is the honest answer, not a
-	   // workaround. No such charset exists - the longest real name is around
-	   // thirty characters - and no encoded word built from one could be legal
-	   // under RFC 2047 or decodable by any client, so emitting the value raw
-	   // conveys strictly more than emitting a stream of unusable headers. It is
-	   // also what FieldCodeBase::Encode already does when it has no charset to
-	   // work with, so the behaviour is not new.
-	   //
-	   // 3 is the minimum that guarantees progress: it is the width of one
-	   // "=XX" escape, so a byte can always be placed without re-opening a header.
-	   if (nMaxLine < 3)
-	   {
-		   MimeCodeBase::Encode(output);
-		   return;
-	   }
+      // A charset name long enough to leave no room is refused rather than
+      // encoded, because the loop below has no bound of its own.
+      //
+      // MAX_ENCODEDWORD_LEN is 75, so a charset of 69 characters or more makes
+      // nMaxLine zero or negative, and then `nLineLen + nCodeLen > nMaxLine` is
+      // true on the very first byte and on every byte after it. Each iteration
+      // therefore emits a complete encoded-word header - "=?" plus the whole
+      // charset plus "?Q?" - for a single encoded character, so the output grows as
+      // input_size x charset_length with nothing to stop it. The MIME fuzz harness
+      // reached 2 GB of resident memory from a 3.4 KB input this way: an
+      // amplification of roughly six hundred thousand to one.
+      //
+      // Falling back to MimeCodeBase::Encode is the honest answer, not a
+      // workaround. No such charset exists - the longest real name is around
+      // thirty characters - and no encoded word built from one could be legal
+      // under RFC 2047 or decodable by any client, so emitting the value raw
+      // conveys strictly more than emitting a stream of unusable headers. It is
+      // also what FieldCodeBase::Encode already does when it has no charset to
+      // work with, so the behaviour is not new.
+      //
+      // 3 is the minimum that guarantees progress: it is the width of one
+      // "=XX" escape, so a byte can always be placed without re-opening a header.
+      if (nMaxLine < 3)
+      {
+         MimeCodeBase::Encode(output);
+         return;
+      }
 
-	   while (pbData < pbEnd)
-	   {
-		   unsigned char ch = *pbData++;
-		   if (ch < 33 || ch > 126 || ch == '=' || ch == '?' || ch == '_')
-			   nCodeLen = 3;
-		   else
-			   nCodeLen = 1;
+      while (pbData < pbEnd)
+      {
+         unsigned char ch = *pbData++;
+         if (ch < 33 || ch > 126 || ch == '=' || ch == '?' || ch == '_')
+            nCodeLen = 3;
+         else
+            nCodeLen = 1;
 
-		   if (nLineLen+nCodeLen > nMaxLine)	// add encoded word tailer
-		   {
-			   output.append("?= ");
-			   nLineLen = 0;
-		   }
+         if (nLineLen+nCodeLen > nMaxLine)   // add encoded word tailer
+         {
+            output.append("?= ");
+            nLineLen = 0;
+         }
 
-		   if (!nLineLen)				// add encoded word header
-		   {
-			   output.append("=?");
+         if (!nLineLen)          // add encoded word header
+         {
+            output.append("=?");
             output.append(charset_);
             output.append("?Q?");
-		   }
+         }
 
-		   nLineLen += nCodeLen;
+         nLineLen += nCodeLen;
 
          if (nCodeLen > 1)
-		   {
+         {
             output.append("=");
             output.append(1, s_QPTable[(ch >> 4) & 0x0f]);
             output.append(1, s_QPTable[ch & 0x0f]);
-		   }
-		   else
-			   output.append(1, ch);
-	   }
+         }
+         else
+            output.append(1, ch);
+      }
 
       output.append("?=");
    }
@@ -821,66 +821,66 @@ namespace HM
    void FieldCodeBase::Encode(AnsiString &output) const
    {
 
-	   // use the global charset if there's no specified charset
-	   string strCharset = charset_;
-	   if (strCharset.empty())
-		   strCharset = MimeEnvironment::GetGlobalCharset();
-	   if (strCharset.empty() && !MimeEnvironment::AutoFolding())
-		   return MimeCodeBase::Encode(output);
+      // use the global charset if there's no specified charset
+      string strCharset = charset_;
+      if (strCharset.empty())
+         strCharset = MimeEnvironment::GetGlobalCharset();
+      if (strCharset.empty() && !MimeEnvironment::AutoFolding())
+         return MimeCodeBase::Encode(output);
 
-	   const char* pszInput = (const char*) input_;
+      const char* pszInput = (const char*) input_;
       size_t nInputSize = input_size_;
-	   int nNonAsciiChars, nDelimeter = GetDelimeter();
-	   int nLineLen = 0;
-	   
+      int nNonAsciiChars, nDelimeter = GetDelimeter();
+      int nLineLen = 0;
+      
       AnsiString strUnit;
 
-	   // divide the field into syntactic units to encode
-	   for (;;)
-	   {
-		   size_t nUnitSize = FindSymbol(pszInput, nInputSize, nDelimeter, nNonAsciiChars);
-		   if (!nNonAsciiChars || strCharset.empty())
+      // divide the field into syntactic units to encode
+      for (;;)
+      {
+         size_t nUnitSize = FindSymbol(pszInput, nInputSize, nDelimeter, nNonAsciiChars);
+         if (!nNonAsciiChars || strCharset.empty())
          {
-			   strUnit.assign(pszInput, nUnitSize);
+            strUnit.assign(pszInput, nUnitSize);
          }
-		   else
-		   {
+         else
+         {
             strUnit = "";
-			   MimeEncodedWord coder;
-			   coder.SetEncoding(SelectEncoding(nUnitSize, nNonAsciiChars), strCharset.c_str());
-			   coder.SetInput(pszInput, nUnitSize, true);
+            MimeEncodedWord coder;
+            coder.SetEncoding(SelectEncoding(nUnitSize, nNonAsciiChars), strCharset.c_str());
+            coder.SetInput(pszInput, nUnitSize, true);
             coder.GetOutput(strUnit);
-		   }
-		   if (nUnitSize < nInputSize)
-			   strUnit += pszInput[nUnitSize];		// add the following delimeter (space or special char)
+         }
+         if (nUnitSize < nInputSize)
+            strUnit += pszInput[nUnitSize];     // add the following delimeter (space or special char)
 
-		   // copy the encoded string to target buffer and perform folding if needed
-		   if (!MimeEnvironment::AutoFolding())
-		   {
+         // copy the encoded string to target buffer and perform folding if needed
+         if (!MimeEnvironment::AutoFolding())
+         {
             output.append(strUnit);
-		   }
-		   else
-		   {
-			   const char* pszData = strUnit.c_str();
-			   const char* pszEnd = pszData + strUnit.size();
+         }
+         else
+         {
+            const char* pszData = strUnit.c_str();
+            const char* pszEnd = pszData + strUnit.size();
 
             int lastSpacePos = -1;
 
-			   while (pszData < pszEnd)
-			   {
+            while (pszData < pszEnd)
+            {
                char ch = *pszData;
-				   if (ch == '\r' || ch == '\n')
-				   {
-					   nLineLen = -1;
-					   lastSpacePos = -1;
-				   }
-				   else if (nLineLen > 0 && CMimeChar::IsSpace(ch))
+               if (ch == '\r' || ch == '\n')
                {
-					   lastSpacePos = (int) output.size();
+                  nLineLen = -1;
+                  lastSpacePos = -1;
+               }
+               else if (nLineLen > 0 && CMimeChar::IsSpace(ch))
+               {
+                  lastSpacePos = (int) output.size();
                }
 
-				   if (nLineLen >= MAX_MIME_LINE_LEN && lastSpacePos != -1)		// fold at the position of the previous space
-				   {
+               if (nLineLen >= MAX_MIME_LINE_LEN && lastSpacePos != -1)    // fold at the position of the previous space
+               {
                   /*
                      2008-12-04
                      Before we used to fold using \t. Now we fold with a whitespace instead.
@@ -891,21 +891,21 @@ namespace HM
                   int charsSinceSpace = (int) output.size() - lastSpacePos;
                   output.Insert(lastSpacePos, "\r\n");
                   
-   				   lastSpacePos = -1;
-					   nLineLen = charsSinceSpace + 1;
-				   }
-				   
+                  lastSpacePos = -1;
+                  nLineLen = charsSinceSpace + 1;
+               }
+               
                output.append(1, ch);
 
                pszData++;
                nLineLen++;
-			   }
-		   }
+            }
+         }
 
-		   pszInput += nUnitSize + 1;
+         pszInput += nUnitSize + 1;
 
          if (nInputSize >= nUnitSize + 1)
-		      nInputSize -= nUnitSize + 1;
+            nInputSize -= nUnitSize + 1;
          else
             break;
 
@@ -915,72 +915,72 @@ namespace HM
 
          // fold at the position of the specific char and eat the following spaces
          /*if (IsFoldingChar(pszInput[-1]) && pbOutput+3 <= pbOutEnd)
-		   {
-			   ::memcpy(pbOutput, "\r\n\t", 3);
-			   pbOutput += 3;
-			   pbSpace = NULL;
-			   nLineLen = 1;
-			   while (nInputSize > 0 && CMimeChar::IsSpace(*pszInput))
-			   {
-				   pszInput++;
-				   nInputSize--;
-			   }
-		   }
+         {
+            ::memcpy(pbOutput, "\r\n\t", 3);
+            pbOutput += 3;
+            pbSpace = NULL;
+            nLineLen = 1;
+            while (nInputSize > 0 && CMimeChar::IsSpace(*pszInput))
+            {
+               pszInput++;
+               nInputSize--;
+            }
+         }
          */
-	   }
+      }
    }
 
    void FieldCodeBase::Decode(AnsiString &output)
    {
-	   MimeEncodedWord coder;
-	   coder.SetInput((const char*)input_, input_size_, false);
+      MimeEncodedWord coder;
+      coder.SetInput((const char*)input_, input_size_, false);
 
-	   AnsiString field;
-	   coder.GetOutput(field);
+      AnsiString field;
+      coder.GetOutput(field);
 
-	   charset_ = coder.GetCharset();
+      charset_ = coder.GetCharset();
 
-	   if (MimeEnvironment::AutoFolding())
-		   UnfoldField(field);
+      if (MimeEnvironment::AutoFolding())
+         UnfoldField(field);
 
       output.append(field);
    }
 
    void FieldCodeBase::UnfoldField(string& strField) const
    {
-	   for (;;)
-	   {
-		   string::size_type pos = strField.rfind("\r\n");
-		   if (pos == string::npos)
-			   break;
+      for (;;)
+      {
+         string::size_type pos = strField.rfind("\r\n");
+         if (pos == string::npos)
+            break;
 
-		   strField.erase(pos, 2);
+         strField.erase(pos, 2);
 
-		   int nSpaces = 0;
-		   while (CMimeChar::IsSpace((unsigned char)strField[pos+nSpaces]))
-			   nSpaces++;
-		   strField.replace(pos, nSpaces, " ");
-	   }
+         int nSpaces = 0;
+         while (CMimeChar::IsSpace((unsigned char)strField[pos+nSpaces]))
+            nSpaces++;
+         strField.replace(pos, nSpaces, " ");
+      }
    }
 
    int FieldCodeBase::FindSymbol(const char* pszData, size_t nSize, int& nDelimeter, int& nNonAscChars) const
    {
-	   nNonAscChars = 0;
-	   const char* pszDataStart = pszData;
-	   const char* pszEnd = pszData + nSize;
+      nNonAscChars = 0;
+      const char* pszDataStart = pszData;
+      const char* pszEnd = pszData + nSize;
 
-	   while (pszData < pszEnd)
-	   {
-		   char ch = *pszData;
-		   if (CMimeChar::IsNonAscii((unsigned char)ch))
-			   nNonAscChars++;
-		   else
-		   {
-			   if (ch == (char) nDelimeter)
-			   {
-				   nDelimeter = 0;		// stop at any delimeters (space or specials)
-				   break;
-			   }
+      while (pszData < pszEnd)
+      {
+         char ch = *pszData;
+         if (CMimeChar::IsNonAscii((unsigned char)ch))
+            nNonAscChars++;
+         else
+         {
+            if (ch == (char) nDelimeter)
+            {
+               nDelimeter = 0;      // stop at any delimeters (space or specials)
+               break;
+            }
 
             /*
             We used to stop at Space here, but spaces should be encoded.
@@ -990,7 +990,7 @@ namespace HM
             characters MUST NOT appear between components of an 'encoded-word'.
             */
             if (!nDelimeter && CMimeChar::IsSpecial(ch))
-			   {
+            {
                if (pszData > pszDataStart)
                {
                   char previousChar = *(pszData -1);
@@ -1003,27 +1003,27 @@ namespace HM
                
                if (nDelimeter == 0 )
                {
-				      switch (ch)
-				      {
-				      case '"':
-					      nDelimeter = '"';	// quoted-string, delimeter is '"'
-					      break;
-				      case '(':
-					      nDelimeter = ')';	// comment, delimeter is ')'
-					      break;
-				      case '<':
-					      nDelimeter = '>';	// address, delimeter is '>'
-					      break;
-				      }
+                  switch (ch)
+                  {
+                  case '"':
+                     nDelimeter = '"'; // quoted-string, delimeter is '"'
+                     break;
+                  case '(':
+                     nDelimeter = ')'; // comment, delimeter is ')'
+                     break;
+                  case '<':
+                     nDelimeter = '>'; // address, delimeter is '>'
+                     break;
+                  }
                }
 
-				   break;
-			   }
-		   }
-		   pszData++;
-	   }
+               break;
+            }
+         }
+         pszData++;
+      }
 
-	   return (int)(pszData - pszDataStart);
+      return (int)(pszData - pszDataStart);
    }
 
    AnsiString

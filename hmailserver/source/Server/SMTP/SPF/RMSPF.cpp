@@ -70,8 +70,8 @@ namespace HM { int SpfVoidLookupLimit(); }
 #else //DNSAPI_SUPP
 
 // from winerror.h
-#define DNS_ERROR_RCODE_NAME_ERROR	9003L
-#define DNS_INFO_NO_RECORDS		9501L
+#define DNS_ERROR_RCODE_NAME_ERROR  9003L
+#define DNS_INFO_NO_RECORDS      9501L
 
 #ifdef __cplusplus
 extern "C"

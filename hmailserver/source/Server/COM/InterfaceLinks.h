@@ -18,36 +18,36 @@
 // InterfaceLinks
 
 class ATL_NO_VTABLE InterfaceLinks :
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceLinks, &CLSID_Links>,
-	public IDispatchImpl<IInterfaceLinks, &IID_IInterfaceLinks, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceLinks, &CLSID_Links>,
+   public IDispatchImpl<IInterfaceLinks, &IID_IInterfaceLinks, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public HM::COMAuthenticator
 {
 public:
-	InterfaceLinks()
-	{
-	}
+   InterfaceLinks()
+   {
+   }
 
 DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACELINKS)
 
 
 BEGIN_COM_MAP(InterfaceLinks)
-	COM_INTERFACE_ENTRY(IInterfaceLinks)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceLinks)
+   COM_INTERFACE_ENTRY(IDispatch)
 END_COM_MAP()
 
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
 
-	void FinalRelease()
-	{
-	}
+   void FinalRelease()
+   {
+   }
 
 public:
 

@@ -15,8 +15,8 @@ namespace HM
    class Routes : public Collection<Route, PersistentRoute>
    {
    public:
-	   Routes();
-	   virtual ~Routes();
+      Routes();
+      virtual ~Routes();
 
       // Refreshes this collection from the database.
       void Refresh();

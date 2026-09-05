@@ -16,36 +16,36 @@
 #include "../Common/Diagnostics/DiagnosticResult.h"
 
 class ATL_NO_VTABLE InterfaceDiagnosticResult :
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceDiagnosticResult, &CLSID_DiagnosticResult>,
-	public IDispatchImpl<IInterfaceDiagnosticResult, &IID_IInterfaceDiagnosticResult, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceDiagnosticResult, &CLSID_DiagnosticResult>,
+   public IDispatchImpl<IInterfaceDiagnosticResult, &IID_IInterfaceDiagnosticResult, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public HM::COMAuthenticator
 {
 public:
-	InterfaceDiagnosticResult()
-	{
-	}
+   InterfaceDiagnosticResult()
+   {
+   }
 
 DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACEDIAGNOSTICRESULT)
 
 
 BEGIN_COM_MAP(InterfaceDiagnosticResult)
-	COM_INTERFACE_ENTRY(IInterfaceDiagnosticResult)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceDiagnosticResult)
+   COM_INTERFACE_ENTRY(IDispatch)
 END_COM_MAP()
 
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
 
-	void FinalRelease()
-	{
-	}
+   void FinalRelease()
+   {
+   }
 
 public:
 

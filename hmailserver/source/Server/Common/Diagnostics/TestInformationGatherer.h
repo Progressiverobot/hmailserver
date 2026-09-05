@@ -13,8 +13,8 @@ namespace HM
    class TestInformationGatherer
    {
    public:
-	   TestInformationGatherer();
-	   virtual ~TestInformationGatherer();
+      TestInformationGatherer();
+      virtual ~TestInformationGatherer();
 
       DiagnosticResult PerformTest();
 

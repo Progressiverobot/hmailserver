@@ -25,36 +25,36 @@
 
 class ATL_NO_VTABLE InterfaceSSLCertificate :
    public COMCollectionItem<HM::SSLCertificate, HM::SSLCertificates>,
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceSSLCertificate, &CLSID_SSLCertificate>,
-	public IDispatchImpl<IInterfaceSSLCertificate, &IID_IInterfaceSSLCertificate, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceSSLCertificate, &CLSID_SSLCertificate>,
+   public IDispatchImpl<IInterfaceSSLCertificate, &IID_IInterfaceSSLCertificate, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public HM::COMAuthenticator
 {
 public:
-	InterfaceSSLCertificate()
-	{
-	}
+   InterfaceSSLCertificate()
+   {
+   }
 
 DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACESSLCERTIFICATE)
 
 
 BEGIN_COM_MAP(InterfaceSSLCertificate)
-	COM_INTERFACE_ENTRY(IInterfaceSSLCertificate)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceSSLCertificate)
+   COM_INTERFACE_ENTRY(IDispatch)
 END_COM_MAP()
 
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
 
-	void FinalRelease()
-	{
-	}
+   void FinalRelease()
+   {
+   }
 
 public:
    STDMETHOD(Save)();

@@ -19,10 +19,10 @@ namespace HM
 
 class ATL_NO_VTABLE InterfaceAccount : 
    public COMCollectionItem<HM::Account, HM::Accounts>,
-	public CComObjectRootEx<CComSingleThreadModel>,
+   public CComObjectRootEx<CComSingleThreadModel>,
    public ISupportErrorInfo,
-	public CComCoClass<InterfaceAccount, &CLSID_Account>,
-	public IDispatchImpl<IInterfaceAccount, &IID_IInterfaceAccount, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComCoClass<InterfaceAccount, &CLSID_Account>,
+   public IDispatchImpl<IInterfaceAccount, &IID_IInterfaceAccount, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public HM::COMAuthenticator
 {
 public:
@@ -46,22 +46,22 @@ DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACEACCOUNT)
 
 
 BEGIN_COM_MAP(InterfaceAccount)
-	COM_INTERFACE_ENTRY(IInterfaceAccount)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceAccount)
+   COM_INTERFACE_ENTRY(IDispatch)
    COM_INTERFACE_ENTRY(ISupportErrorInfo)
 END_COM_MAP()
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
-	
-	void FinalRelease() 
-	{
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
+   
+   void FinalRelease() 
+   {
+   }
 
 public:
 

@@ -15,8 +15,8 @@ namespace HM
    class ISMTPCommand  
    {
    public:
-	   ISMTPCommand();
-	   virtual ~ISMTPCommand();
+      ISMTPCommand();
+      virtual ~ISMTPCommand();
 
       virtual void ExecuteCommand(SMTPConnection* pSMTPConnection ) = 0;
 

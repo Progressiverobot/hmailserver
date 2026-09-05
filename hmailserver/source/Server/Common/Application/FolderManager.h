@@ -22,7 +22,7 @@ namespace HM
 
       bool UpdateMessageFlags(int accountID, int folderID, __int64 messageID, int flags);
 
-	private:
+   private:
 
 
    };

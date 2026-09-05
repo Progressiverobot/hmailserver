@@ -13,7 +13,7 @@
 
 
 #define STRICT
-#define VC_EXTRALEAN		// Exclude rarely-used stuff from Windows headers
+#define VC_EXTRALEAN    // Exclude rarely-used stuff from Windows headers
 
 #define NOMINMAX
 
@@ -31,10 +31,10 @@
 #define NTDDI_VERSION 0x0A000002 // NTDDI_WIN10_RS1 (1607 / 14393)
 
 // START: ATL settings
-	#define _ATL_FREE_THREADEDLPCWSTR
-	#define _ATL_NO_AUTOMATIC_NAMESPACE
-	// turns off ATL's hiding of some common and often safely ignored warning messages
-	#define _ATL_ALL_WARNINGS
+   #define _ATL_FREE_THREADEDLPCWSTR
+   #define _ATL_NO_AUTOMATIC_NAMESPACE
+   // turns off ATL's hiding of some common and often safely ignored warning messages
+   #define _ATL_ALL_WARNINGS
 // END: ATL settings
 
 // Needed for rand_s() function

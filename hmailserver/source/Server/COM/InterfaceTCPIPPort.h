@@ -25,37 +25,37 @@
 class ATL_NO_VTABLE InterfaceTCPIPPort :  
    public COMCollectionItem<HM::TCPIPPort, HM::TCPIPPorts>,
    public ISupportErrorInfo,
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceTCPIPPort, &CLSID_TCPIPPort>,
-	public IDispatchImpl<IInterfaceTCPIPPort, &IID_IInterfaceTCPIPPort, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceTCPIPPort, &CLSID_TCPIPPort>,
+   public IDispatchImpl<IInterfaceTCPIPPort, &IID_IInterfaceTCPIPPort, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public HM::COMAuthenticator
 {
 public:
-	InterfaceTCPIPPort()
-	{
-	}
+   InterfaceTCPIPPort()
+   {
+   }
 
 DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACETCPIPPORT)
 
 
 BEGIN_COM_MAP(InterfaceTCPIPPort)
-	COM_INTERFACE_ENTRY(IInterfaceTCPIPPort)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceTCPIPPort)
+   COM_INTERFACE_ENTRY(IDispatch)
    COM_INTERFACE_ENTRY(ISupportErrorInfo)
 END_COM_MAP()
 
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
 
-	void FinalRelease()
-	{
-	}
+   void FinalRelease()
+   {
+   }
 
 public:
 

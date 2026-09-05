@@ -22,8 +22,8 @@ namespace HM
          RequiredVersion = 40118
       };
 
-	   MySQLConnection(std::shared_ptr<DatabaseSettings> pSettings);
-	   virtual ~MySQLConnection();
+      MySQLConnection(std::shared_ptr<DatabaseSettings> pSettings);
+      virtual ~MySQLConnection();
 
       virtual ConnectionResult Connect(String &sErrorMessage);
       virtual bool Disconnect();

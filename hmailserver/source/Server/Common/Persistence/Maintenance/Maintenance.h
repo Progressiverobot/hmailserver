@@ -11,8 +11,8 @@ namespace HM
    class Maintenance
    {
    public:
-	   Maintenance();
-	   virtual ~Maintenance();
+      Maintenance();
+      virtual ~Maintenance();
 
       enum MaintenanceOperation
       {

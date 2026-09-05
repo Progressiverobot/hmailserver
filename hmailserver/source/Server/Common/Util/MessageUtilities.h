@@ -16,10 +16,10 @@ namespace HM
    {
    public:
 
-	   MessageUtilities();
-	   virtual ~MessageUtilities();
+      MessageUtilities();
+      virtual ~MessageUtilities();
 
-		static bool MoveToIMAPFolder(std::shared_ptr<Message> pMessage, __int64 iAccountID, const String &sFolderName, bool bAutoSubscribe, bool bSetByGlobalRule,  __int64 &iResultAccount, __int64 &iResultFolder);
+      static bool MoveToIMAPFolder(std::shared_ptr<Message> pMessage, __int64 iAccountID, const String &sFolderName, bool bAutoSubscribe, bool bSetByGlobalRule,  __int64 &iResultAccount, __int64 &iResultFolder);
       // Moves a message to an IMAP folder. The message should not be saved when this
       // function is called.
       // Returns the ID of the folder the message was moved to.

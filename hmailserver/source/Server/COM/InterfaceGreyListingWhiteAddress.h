@@ -23,36 +23,36 @@
 
 class ATL_NO_VTABLE InterfaceGreyListingWhiteAddress :
    public COMCollectionItem<HM::GreyListingWhiteAddress, HM::GreyListingWhiteAddresses>,
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceGreyListingWhiteAddress, &CLSID_GreyListingWhiteAddress>,
-	public IDispatchImpl<IInterfaceGreyListingWhiteAddress, &IID_IInterfaceGreyListingWhiteAddress, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceGreyListingWhiteAddress, &CLSID_GreyListingWhiteAddress>,
+   public IDispatchImpl<IInterfaceGreyListingWhiteAddress, &IID_IInterfaceGreyListingWhiteAddress, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public HM::COMAuthenticator
 {
 public:
-	InterfaceGreyListingWhiteAddress()
-	{
-	}
+   InterfaceGreyListingWhiteAddress()
+   {
+   }
 
 DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACEGREYLISTINGWHITEADDRESS)
 
 
 BEGIN_COM_MAP(InterfaceGreyListingWhiteAddress)
-	COM_INTERFACE_ENTRY(IInterfaceGreyListingWhiteAddress)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceGreyListingWhiteAddress)
+   COM_INTERFACE_ENTRY(IDispatch)
 END_COM_MAP()
 
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
 
-	void FinalRelease()
-	{
-	}
+   void FinalRelease()
+   {
+   }
 
 public:
    STDMETHOD(Save)();

@@ -16,9 +16,9 @@ namespace HM
 }
 
 class ATL_NO_VTABLE InterfaceAccounts : 
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceAccounts, &CLSID_Accounts>,
-	public IDispatchImpl<IInterfaceAccounts, &IID_IInterfaceAccounts, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceAccounts, &CLSID_Accounts>,
+   public IDispatchImpl<IInterfaceAccounts, &IID_IInterfaceAccounts, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public HM::COMAuthenticator
 {
 public:
@@ -45,21 +45,21 @@ DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACEACCOUNTS)
 
 
 BEGIN_COM_MAP(InterfaceAccounts)
-	COM_INTERFACE_ENTRY(IInterfaceAccounts)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceAccounts)
+   COM_INTERFACE_ENTRY(IDispatch)
 END_COM_MAP()
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
-	
-	void FinalRelease() 
-	{
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
+   
+   void FinalRelease() 
+   {
+   }
 
    STDMETHOD(DeleteByDBID)(/*[in]*/ long DBID);
    STDMETHOD(get_ItemByAddress)(/*[in]*/ BSTR Address, /*[out, retval]*/ IInterfaceAccount* *pVal);

@@ -374,7 +374,7 @@ namespace HM
          _variant_t    vaField;
          FieldsPtr      pFields;
          FieldPtr       pField;
-         HRESULT			hr;
+         HRESULT        hr;
 
          hr = pRS->get_Fields( &pFields );
          vaField = "IDENT";
@@ -505,7 +505,7 @@ namespace HM
       hr = pIDBDataSourceAdmin->CreateDataSource(sizeof(dbpropset)/sizeof(dbpropset[0]),
          dbpropset, NULL, IID_IUnknown, &pIUnknownSession);
 
-	   if(FAILED(hr)) 
+      if(FAILED(hr)) 
       {
          sErrorMessage.Format(_T("CreateDataSource failed. Result: %d. Last error: %d"), hr, GetLastError());
          return false;

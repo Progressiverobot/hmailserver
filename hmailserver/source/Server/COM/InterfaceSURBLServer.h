@@ -15,36 +15,36 @@
 
 class ATL_NO_VTABLE InterfaceSURBLServer :
    public COMCollectionItem<HM::SURBLServer, HM::SURBLServers>,
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceSURBLServer, &CLSID_SURBLServer>,
-	public IDispatchImpl<IInterfaceSURBLServer, &IID_IInterfaceSURBLServer, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceSURBLServer, &CLSID_SURBLServer>,
+   public IDispatchImpl<IInterfaceSURBLServer, &IID_IInterfaceSURBLServer, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public HM::COMAuthenticator
 {
 public:
-	InterfaceSURBLServer()
-	{
-	}
+   InterfaceSURBLServer()
+   {
+   }
 
 DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACESURBLSERVER)
 
 
 BEGIN_COM_MAP(InterfaceSURBLServer)
-	COM_INTERFACE_ENTRY(IInterfaceSURBLServer)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceSURBLServer)
+   COM_INTERFACE_ENTRY(IDispatch)
 END_COM_MAP()
 
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
 
-	void FinalRelease()
-	{
-	}
+   void FinalRelease()
+   {
+   }
 
 public:
 

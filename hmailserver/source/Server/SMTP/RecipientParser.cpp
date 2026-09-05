@@ -654,8 +654,8 @@ namespace HM
          String sFormattedRequiredSender = pDA->ApplyAliasesOnAddress(pList->GetRequireAddress());
          if (sFormattedSender.CompareNoCase(sFormattedRequiredSender) != 0)
          {
-	    // Let's adjust reason to better explain sender is not seen as OWNER
-	    // and differentiate from SENDER like list member etc
+       // Let's adjust reason to better explain sender is not seen as OWNER
+       // and differentiate from SENDER like list member etc
             sErrMsg = "Not authorized owner.";
             return DP_PermissionDenied;
          }
@@ -712,7 +712,7 @@ namespace HM
          // didn't find the recipient.
          if (iterRecipient == vecRecipients.end())
          {
-	         // Let's adjust reason to better explain sender is not seen as allowed SENDER
+            // Let's adjust reason to better explain sender is not seen as allowed SENDER
             sErrMsg = "Not authorized sender.";
             return DP_PermissionDenied;
          }

@@ -13,8 +13,8 @@ namespace HM
    class TestIPv6
    {
    public:
-	   TestIPv6();
-	   virtual ~TestIPv6();
+      TestIPv6();
+      virtual ~TestIPv6();
 
       DiagnosticResult PerformTest();
 

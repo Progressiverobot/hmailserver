@@ -44,7 +44,7 @@ namespace HM
       IMAPConnection(ConnectionSecurity connection_security,
          boost::asio::io_context& io_context,
          boost::asio::ssl::context& context);
-	   virtual ~IMAPConnection();
+      virtual ~IMAPConnection();
       void Initialize();
 
       enum eIMAPCommandType
@@ -248,7 +248,7 @@ namespace HM
 
       void StartHandshake();
 
-	  void SetRecentMessages(const std::set<__int64> &messages);
+     void SetRecentMessages(const std::set<__int64> &messages);
       void ClearRecentMessages();
       void AddRecentMessage(__int64 message_id);
       void RemoveRecentMessage(__int64 message_id);

@@ -61,7 +61,7 @@ namespace HM
             }
          }
          
-		 if (isBlocked)
+       if (isBlocked)
          {
             // We have a match. No need to continue.
             break;

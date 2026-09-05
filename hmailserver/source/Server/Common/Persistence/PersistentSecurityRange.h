@@ -15,8 +15,8 @@ namespace HM
    class PersistentSecurityRange
    {
    public:
-	   PersistentSecurityRange();
-	   virtual ~PersistentSecurityRange();
+      PersistentSecurityRange();
+      virtual ~PersistentSecurityRange();
 
       static bool DeleteObject(std::shared_ptr<SecurityRange> pSR);
       static bool SaveObject(std::shared_ptr<SecurityRange> pSR);

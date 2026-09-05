@@ -13,36 +13,36 @@
 // InterfaceIncomingRelays
 
 class ATL_NO_VTABLE InterfaceIncomingRelays :
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceIncomingRelays, &CLSID_IncomingRelays>,
-	public IDispatchImpl<IInterfaceIncomingRelays, &IID_IInterfaceIncomingRelays, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceIncomingRelays, &CLSID_IncomingRelays>,
+   public IDispatchImpl<IInterfaceIncomingRelays, &IID_IInterfaceIncomingRelays, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public HM::COMAuthenticator
 {
 public:
-	InterfaceIncomingRelays()
-	{
-	}
+   InterfaceIncomingRelays()
+   {
+   }
 
 DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACEINCOMINGRELAYS)
 
 
 BEGIN_COM_MAP(InterfaceIncomingRelays)
-	COM_INTERFACE_ENTRY(IInterfaceIncomingRelays)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceIncomingRelays)
+   COM_INTERFACE_ENTRY(IDispatch)
 END_COM_MAP()
 
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
 
-	void FinalRelease()
-	{
-	}
+   void FinalRelease()
+   {
+   }
 
    STDMETHOD(get_Item)(/*[in]*/ long Index, /*[out, retval]*/ IInterfaceIncomingRelay **pVal);
    STDMETHOD(get_ItemByDBID)(/*[in]*/ long DBID, /*[out, retval]*/ IInterfaceIncomingRelay **pVal);

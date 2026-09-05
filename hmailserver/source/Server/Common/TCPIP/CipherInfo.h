@@ -51,7 +51,7 @@ namespace HM
             throw new std::logic_error("cipherinfo instance is not initialized.");
       }
 
-	   AnsiString name_;
+      AnsiString name_;
       AnsiString version_;
       int bits_;
       bool initialized_;

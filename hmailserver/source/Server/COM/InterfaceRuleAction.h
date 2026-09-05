@@ -18,35 +18,35 @@ namespace HM
 
 class ATL_NO_VTABLE InterfaceRuleAction : 
    public COMCollectionItem<HM::RuleAction, HM::RuleActions>,
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceRuleAction, &CLSID_RuleAction>,
-	public IDispatchImpl<IInterfaceRuleAction, &IID_IInterfaceRuleAction, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceRuleAction, &CLSID_RuleAction>,
+   public IDispatchImpl<IInterfaceRuleAction, &IID_IInterfaceRuleAction, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public HM::COMAuthenticator
 {
 public:
-	InterfaceRuleAction()
-	{
-	}
+   InterfaceRuleAction()
+   {
+   }
 
 DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACERULEACTION)
 
 
 BEGIN_COM_MAP(InterfaceRuleAction)
-	COM_INTERFACE_ENTRY(IInterfaceRuleAction)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceRuleAction)
+   COM_INTERFACE_ENTRY(IDispatch)
 END_COM_MAP()
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
-	
-	void FinalRelease() 
-	{
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
+   
+   void FinalRelease() 
+   {
+   }
 
 public:
    STDMETHOD(Save)();

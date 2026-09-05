@@ -13,8 +13,8 @@ namespace HM
    class PersistentLogonFailure
    {
    public:
-	   PersistentLogonFailure();
-	   virtual ~PersistentLogonFailure();
+      PersistentLogonFailure();
+      virtual ~PersistentLogonFailure();
 
       int GetCurrrentFailureCount(const IPAddress & ipaddress);
       bool AddFailure(const IPAddress &ipaddress);

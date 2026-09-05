@@ -10,8 +10,8 @@ namespace HM
    class GUIDCreator  
    {
    public:
-	   GUIDCreator();
-	   virtual ~GUIDCreator();
+      GUIDCreator();
+      virtual ~GUIDCreator();
 
       static String GetGUID();
    };

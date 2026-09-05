@@ -1058,10 +1058,10 @@ namespace HM
       if (!StringParser::WildcardMatch("Test*", "Test")) throw;
       if (StringParser::WildcardMatch("Test*", "Te")) throw;
 
-	  if (!StringParser::WildcardMatch("*two*", "one-two-three")) throw;
-	  if (StringParser::WildcardMatch("*two*", "one-three")) throw;
-	  if (StringParser::WildcardMatch("?two?", "one-two-three")) throw;
-	  if (!StringParser::WildcardMatch("?two?", "-two-")) throw;
+     if (!StringParser::WildcardMatch("*two*", "one-two-three")) throw;
+     if (StringParser::WildcardMatch("*two*", "one-three")) throw;
+     if (StringParser::WildcardMatch("?two?", "one-two-three")) throw;
+     if (!StringParser::WildcardMatch("?two?", "-two-")) throw;
 
      // Short strings.
      if (!StringParser::WildcardMatch("?", "A")) throw;

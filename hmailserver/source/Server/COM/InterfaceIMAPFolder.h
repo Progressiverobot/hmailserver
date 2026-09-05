@@ -17,39 +17,39 @@
 // InterfaceIMAPFolder
 
 class ATL_NO_VTABLE InterfaceIMAPFolder : 
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceIMAPFolder, &CLSID_IMAPFolder>,
-	public IDispatchImpl<IInterfaceIMAPFolder, &IID_IInterfaceIMAPFolder, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceIMAPFolder, &CLSID_IMAPFolder>,
+   public IDispatchImpl<IInterfaceIMAPFolder, &IID_IInterfaceIMAPFolder, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public HM::COMAuthenticator,
    public ISupportErrorInfo,
    public COMCollectionItem<HM::IMAPFolder, HM::IMAPFolders>
 
 {
 public:
-	InterfaceIMAPFolder()
-	{
-	}
+   InterfaceIMAPFolder()
+   {
+   }
 
 DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACEIMAPFOLDER)
 
 
 BEGIN_COM_MAP(InterfaceIMAPFolder)
-	COM_INTERFACE_ENTRY(IInterfaceIMAPFolder)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceIMAPFolder)
+   COM_INTERFACE_ENTRY(IDispatch)
    COM_INTERFACE_ENTRY(ISupportErrorInfo)
 END_COM_MAP()
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
-	
-	void FinalRelease() 
-	{
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
+   
+   void FinalRelease() 
+   {
+   }
 
    STDMETHOD(InterfaceSupportsErrorInfo)(REFIID riid);
 

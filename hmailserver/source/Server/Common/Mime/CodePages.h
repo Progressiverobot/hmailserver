@@ -8,8 +8,8 @@ namespace HM
    class CodePages : public Singleton<CodePages>
    {
    public:
-	   CodePages();
-	   virtual ~CodePages();
+      CodePages();
+      virtual ~CodePages();
 
       void Initialize();
 

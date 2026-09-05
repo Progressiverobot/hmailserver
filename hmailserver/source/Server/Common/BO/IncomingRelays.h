@@ -15,8 +15,8 @@ namespace HM
    class IncomingRelays : public Collection<IncomingRelay, PersistentIncomingRelay> 
    {
    public:
-	   IncomingRelays();
-	   virtual ~IncomingRelays();
+      IncomingRelays();
+      virtual ~IncomingRelays();
 
       bool Refresh();
 

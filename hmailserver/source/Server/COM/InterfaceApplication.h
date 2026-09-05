@@ -15,35 +15,35 @@ namespace HM
 }
 
 class ATL_NO_VTABLE InterfaceApplication : 
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceApplication, &CLSID_Application>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceApplication, &CLSID_Application>,
    public ISupportErrorInfo,
-	public IDispatchImpl<IInterfaceApplication, &IID_IInterfaceApplication, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>
+   public IDispatchImpl<IInterfaceApplication, &IID_IInterfaceApplication, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>
 {
 public:
-	InterfaceApplication();
+   InterfaceApplication();
 
 
 DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACEAPPLICATION)
 
 
 BEGIN_COM_MAP(InterfaceApplication)
-	COM_INTERFACE_ENTRY(IInterfaceApplication)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceApplication)
+   COM_INTERFACE_ENTRY(IDispatch)
    COM_INTERFACE_ENTRY(ISupportErrorInfo)
 END_COM_MAP()
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
-	
-	void FinalRelease() 
-	{
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
+   
+   void FinalRelease() 
+   {
+   }
 
 public:
 

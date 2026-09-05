@@ -13,8 +13,8 @@ namespace HM
    {
    public:
 
-	   IniFileSettings();
-	   virtual ~IniFileSettings();
+      IniFileSettings();
+      virtual ~IniFileSettings();
 
       void LoadSettings();
 
@@ -176,7 +176,7 @@ namespace HM
       
       bool GetAddXAuthUserHeader() {return add_xauth_user_header_; }
       String GetDaemonAddressDomain() const { return daemonaddress_domain_; }
-      bool GetAddXOriginalRcptToHeader() { return add_xoriginal_rcpt_to_header_; }	  
+      bool GetAddXOriginalRcptToHeader() { return add_xoriginal_rcpt_to_header_; }    
       int GetMaxNumberOfExternalFetchThreads() {return max_no_of_external_fetch_threads_ ;}
       bool GetGreylistingEnabledDuringRecordExpiration() {return greylisting_enabled_during_record_expiration_;}
       int GetGreylistingExpirationInterval() {return greylisting_expiration_interval_; }
@@ -891,7 +891,7 @@ namespace HM
       String database_connection_string_options_;
       bool add_xauth_user_header_;
       String daemonaddress_domain_;
-      bool add_xoriginal_rcpt_to_header_;	  
+      bool add_xoriginal_rcpt_to_header_;   
       int max_no_of_external_fetch_threads_;
 
       bool greylisting_enabled_during_record_expiration_;

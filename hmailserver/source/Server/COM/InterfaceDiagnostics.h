@@ -19,36 +19,36 @@
 // InterfaceDiagnostics
 
 class ATL_NO_VTABLE InterfaceDiagnostics :
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceDiagnostics, &CLSID_Diagnostics>,
-	public IDispatchImpl<IInterfaceDiagnostics, &IID_IInterfaceDiagnostics, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceDiagnostics, &CLSID_Diagnostics>,
+   public IDispatchImpl<IInterfaceDiagnostics, &IID_IInterfaceDiagnostics, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public HM::COMAuthenticator
 {
 public:
-	InterfaceDiagnostics()
-	{
-	}
+   InterfaceDiagnostics()
+   {
+   }
 
 DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACEDIAGNOSTICS)
 
 
 BEGIN_COM_MAP(InterfaceDiagnostics)
-	COM_INTERFACE_ENTRY(IInterfaceDiagnostics)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceDiagnostics)
+   COM_INTERFACE_ENTRY(IDispatch)
 END_COM_MAP()
 
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
 
-	void FinalRelease()
-	{
-	}
+   void FinalRelease()
+   {
+   }
 
 public:
 

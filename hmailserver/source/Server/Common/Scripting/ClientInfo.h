@@ -11,8 +11,8 @@ namespace HM
    class ClientInfo  
    {
    public:
-	   ClientInfo();
-	   virtual ~ClientInfo();
+      ClientInfo();
+      virtual ~ClientInfo();
 
       void SetIPAddress(const String &IP) { IPAddress = IP; }
       String GetIPAddress() const { return IPAddress; }

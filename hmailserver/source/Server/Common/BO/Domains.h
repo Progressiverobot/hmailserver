@@ -15,8 +15,8 @@ namespace HM
    class Domains : public Collection<Domain, PersistentDomain>
    {
    public:
-	   Domains();
-	   virtual ~Domains();
+      Domains();
+      virtual ~Domains();
 
       void Refresh();
       void Refresh(__int64 iDomainID);

@@ -14,8 +14,8 @@ namespace HM
    class Time  
    {
    public:
-	   Time();
-	   virtual ~Time();
+      Time();
+      virtual ~Time();
 
       static String GetCurrentDateTime();
       static String GetCurrentDate();

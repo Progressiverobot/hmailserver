@@ -15,8 +15,8 @@ namespace HM
    class PGRecordset  : public DALRecordset
    {
    public:
-	   PGRecordset();
-	   virtual ~PGRecordset();
+      PGRecordset();
+      virtual ~PGRecordset();
 
       virtual DALConnection::ExecutionResult TryOpen(std::shared_ptr<DALConnection> pDALConn, const SQLCommand &command, String &sErrorMessage);
       

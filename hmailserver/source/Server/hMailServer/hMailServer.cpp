@@ -59,8 +59,8 @@ namespace HM
    class ChMailServerModule : public CAtlExeModuleT< ChMailServerModule >
    {
    public :
-	   DECLARE_LIBID(LIBID_hMailServer)
-	   DECLARE_REGISTRY_APPID_RESOURCEID(IDR_HMAILSERVER, "{5EDEC473-39E0-43F6-A234-1947071721C8}")
+      DECLARE_LIBID(LIBID_hMailServer)
+      DECLARE_REGISTRY_APPID_RESOURCEID(IDR_HMAILSERVER, "{5EDEC473-39E0-43F6-A234-1947071721C8}")
       
       HRESULT PreMessageLoop(int nShowCmd) throw()
       //---------------------------------------------------------------------------//
@@ -298,8 +298,8 @@ extern "C" int WINAPI _tWinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstan
       //     This is a bit ugly but should work fine
       //     for debugging purposes.
       DEBUG_MODE = true;
-	
-	   String sErrorMessage;
+   
+      String sErrorMessage;
       if (HM::Application::Instance()->InitInstance(sErrorMessage))
       {
          // We were able to connect to the database server
@@ -336,7 +336,7 @@ extern "C" int WINAPI _tWinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstan
    {
       _AtlModule.run_as_service_ = true;
 
-	  iRet = _AtlModule.WinMain(nShowCmd);
+     iRet = _AtlModule.WinMain(nShowCmd);
      
      if (iRet != 0)
      {
@@ -344,7 +344,7 @@ extern "C" int WINAPI _tWinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstan
      }
    }
 
-	//_CrtDumpMemoryLeaks();
+   //_CrtDumpMemoryLeaks();
    
    return iRet;
 }

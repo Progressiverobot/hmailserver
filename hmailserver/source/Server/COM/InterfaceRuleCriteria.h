@@ -19,45 +19,45 @@ namespace HM
 
 class ATL_NO_VTABLE InterfaceRuleCriteria :
    public COMCollectionItem<HM::RuleCriteria, HM::RuleCriterias>,
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceRuleCriteria, &CLSID_RuleCriteria>,
-	public ISupportErrorInfo,
-	public IDispatchImpl<IInterfaceRuleCriteria, &IID_IInterfaceRuleCriteria, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceRuleCriteria, &CLSID_RuleCriteria>,
+   public ISupportErrorInfo,
+   public IDispatchImpl<IInterfaceRuleCriteria, &IID_IInterfaceRuleCriteria, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public HM::COMAuthenticator
 {
 public:
-	InterfaceRuleCriteria()
-	{
-	}
+   InterfaceRuleCriteria()
+   {
+   }
 
 DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACERULECRITERIA)
 
 
 BEGIN_COM_MAP(InterfaceRuleCriteria)
-	COM_INTERFACE_ENTRY(IInterfaceRuleCriteria)
-	COM_INTERFACE_ENTRY(IDispatch)
-	// Without this entry every COMError::GenerateError text this interface ever
-	// produced was invisible to callers - .NET surfaced a bare HRESULT - which is
-	// how the criteria length refusal was found saying nothing.
-	COM_INTERFACE_ENTRY(ISupportErrorInfo)
+   COM_INTERFACE_ENTRY(IInterfaceRuleCriteria)
+   COM_INTERFACE_ENTRY(IDispatch)
+   // Without this entry every COMError::GenerateError text this interface ever
+   // produced was invisible to callers - .NET surfaced a bare HRESULT - which is
+   // how the criteria length refusal was found saying nothing.
+   COM_INTERFACE_ENTRY(ISupportErrorInfo)
 END_COM_MAP()
 
-	STDMETHOD(InterfaceSupportsErrorInfo)(REFIID riid)
-	{
-		return riid == IID_IInterfaceRuleCriteria ? S_OK : S_FALSE;
-	}
+   STDMETHOD(InterfaceSupportsErrorInfo)(REFIID riid)
+   {
+      return riid == IID_IInterfaceRuleCriteria ? S_OK : S_FALSE;
+   }
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
-	
-	void FinalRelease() 
-	{
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
+   
+   void FinalRelease() 
+   {
+   }
 
 public:
    STDMETHOD(Save)();

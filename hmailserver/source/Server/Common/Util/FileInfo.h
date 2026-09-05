@@ -16,7 +16,7 @@ namespace HM
    class FileInfo
    {
    public:
-	   FileInfo(const String &name, const DateTime &created);
+      FileInfo(const String &name, const DateTime &created);
       FileInfo();
 
       String GetName() {return name_;}

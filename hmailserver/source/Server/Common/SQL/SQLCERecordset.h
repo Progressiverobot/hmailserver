@@ -10,8 +10,8 @@ namespace HM
    class SQLCERecordset : public DALRecordset
    {
    public:
-	   SQLCERecordset();
-	   virtual ~SQLCERecordset();
+      SQLCERecordset();
+      virtual ~SQLCERecordset();
 
       virtual DALConnection::ExecutionResult TryOpen(std::shared_ptr<DALConnection> pDALConn, const SQLCommand &command, String &sErrorMessage);
       

@@ -10,10 +10,10 @@ namespace HM
    class StringParser  
    {
    public:
-	   StringParser();
-	   virtual ~StringParser();
+      StringParser();
+      virtual ~StringParser();
 
-	   static String ExtractDomain(const String &sEMailAddress);
+      static String ExtractDomain(const String &sEMailAddress);
       static String ExtractAddress(const String &sEMailAddress);
 
       static bool IsValidEmailAddress(const String &sEmailAddress);

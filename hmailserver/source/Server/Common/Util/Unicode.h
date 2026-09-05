@@ -10,8 +10,8 @@ namespace HM
    class Unicode  
    {
    public:
-	   Unicode();
-	   virtual ~Unicode();
+      Unicode();
+      virtual ~Unicode();
 
       static AnsiString ToANSI(const String &sString);
       static bool WideToMultiByte(const String &sInput, AnsiString &sOutput);

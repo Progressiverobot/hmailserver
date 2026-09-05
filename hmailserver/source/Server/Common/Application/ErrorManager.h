@@ -11,7 +11,7 @@ namespace HM
    class ErrorManager : public Singleton<ErrorManager>
    {
    public:
-	   ErrorManager();
+      ErrorManager();
       virtual ~ErrorManager();
 
       enum eSeverity

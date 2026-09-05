@@ -22,39 +22,39 @@ namespace HM
 // InterfaceGroup
 
 class ATL_NO_VTABLE InterfaceGroup :
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceGroup, &CLSID_Group>,
-	public IDispatchImpl<IInterfaceGroup, &IID_IInterfaceGroup, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceGroup, &CLSID_Group>,
+   public IDispatchImpl<IInterfaceGroup, &IID_IInterfaceGroup, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public COMCollectionItem<HM::Group, HM::Groups>,
    public HM::COMAuthenticator,
    public ISupportErrorInfo
 {
 public:
-	InterfaceGroup()
-	{
-	}
+   InterfaceGroup()
+   {
+   }
 
 DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACEGROUP)
 
 
 BEGIN_COM_MAP(InterfaceGroup)
-	COM_INTERFACE_ENTRY(IInterfaceGroup)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceGroup)
+   COM_INTERFACE_ENTRY(IDispatch)
    COM_INTERFACE_ENTRY(ISupportErrorInfo)
 END_COM_MAP()
 
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
 
-	void FinalRelease()
-	{
-	}
+   void FinalRelease()
+   {
+   }
 
 public:
 

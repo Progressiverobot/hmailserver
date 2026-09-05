@@ -281,7 +281,7 @@ namespace HM
    {
       boost::lock_guard<boost::recursive_mutex> guard(_mutex);
 
-	  // int startTime = GetTickCount();
+     // int startTime = GetTickCount();
 
       bool retrieveQueue = account_id_ == -1;
 
@@ -355,7 +355,7 @@ namespace HM
          if (lRecCount < 0)
             lRecCount = 0;
 
-		 LOG_DEBUG("Reading messages from database.");
+       LOG_DEBUG("Reading messages from database.");
 
          vecObjects.reserve(vecObjects.size() + lRecCount);
 

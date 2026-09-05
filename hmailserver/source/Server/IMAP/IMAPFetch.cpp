@@ -699,9 +699,9 @@ namespace HM
 
          GetBytesToSend_(body.GetLength(), oPart, iByteStart, iByteCount);
 
-	 // Fix for Apple Mail BODY PEEK with start + size issue
-	 // Start was being ignored before as it was never used
-	 // Changed to mimic 4.4.4 method since iByteStart is set in GetBytesToSend_
+    // Fix for Apple Mail BODY PEEK with start + size issue
+    // Start was being ignored before as it was never used
+    // Changed to mimic 4.4.4 method since iByteStart is set in GetBytesToSend_
          pOutBuf->Add((BYTE*) body.GetBuffer() + iByteStart, iByteCount);
       }
       else if (oPart.GetShowBodyFull())
@@ -1086,19 +1086,19 @@ namespace HM
          }
 
          // Add subtype stamp.
-			String sType = oPart->GetSubType();
-			sType.ToUpper();
+         String sType = oPart->GetSubType();
+         sType.ToUpper();
 
-			String sTemp;
+         String sTemp;
          sTemp.Format(_T(" \"%s\""), sType.c_str());
-			sResult += sTemp;
+         sResult += sTemp;
 
-			if (includeExtensionData)
-			{
-				String sBoundary = oPart->GetBoundary();
+         if (includeExtensionData)
+         {
+            String sBoundary = oPart->GetBoundary();
             sTemp.Format(_T(" (\"BOUNDARY\" \"%s\") NIL NIL"), sBoundary.c_str());
-				sResult += sTemp;
-			}
+            sResult += sTemp;
+         }
          
          sResult += ")";
 
@@ -1125,9 +1125,9 @@ namespace HM
          sBodyParams.Format(_T("(\"NAME\" \"%s\")"), oPart->GetRawFilename().c_str());
       else
       {
-			String sCharset = oPart->GetCharset();
-			
-			if (sCharset.IsEmpty())
+         String sCharset = oPart->GetCharset();
+         
+         if (sCharset.IsEmpty())
          {
             // Fallback to default. One could think that the client
             // should assume this if we don't tell it, but at least

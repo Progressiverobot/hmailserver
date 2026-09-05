@@ -43,10 +43,10 @@ namespace HM
          PRSMTP = 3
       };
 
-	   PasswordRemover();
-	   virtual ~PasswordRemover();
+      PasswordRemover();
+      virtual ~PasswordRemover();
 
-			static void Remove(PRType prt, String &sClientCommand);
+         static void Remove(PRType prt, String &sClientCommand);
    private:
 
 

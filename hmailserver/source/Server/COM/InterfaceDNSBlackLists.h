@@ -12,15 +12,15 @@
 
 
 class ATL_NO_VTABLE InterfaceDNSBlackLists : 
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceDNSBlackLists, &CLSID_DNSBlackLists>,
-	public IDispatchImpl<IInterfaceDNSBlackLists, &IID_IInterfaceDNSBlackLists, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceDNSBlackLists, &CLSID_DNSBlackLists>,
+   public IDispatchImpl<IInterfaceDNSBlackLists, &IID_IInterfaceDNSBlackLists, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public HM::COMAuthenticator
 {
 public:
-	InterfaceDNSBlackLists()
-	{
-	}
+   InterfaceDNSBlackLists()
+   {
+   }
 
    bool LoadSettings();
 
@@ -28,21 +28,21 @@ DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACEDNSBLACKLISTS)
 
 
 BEGIN_COM_MAP(InterfaceDNSBlackLists)
-	COM_INTERFACE_ENTRY(IInterfaceDNSBlackLists)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceDNSBlackLists)
+   COM_INTERFACE_ENTRY(IDispatch)
 END_COM_MAP()
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
-	
-	void FinalRelease() 
-	{
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
+   
+   void FinalRelease() 
+   {
+   }
 
    STDMETHOD(Refresh)();
 

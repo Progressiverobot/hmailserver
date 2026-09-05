@@ -30,87 +30,87 @@ namespace HM
    }
 
    void
-	AntiVirusConfiguration::ClamWinEnabled(bool newVal) 
+   AntiVirusConfiguration::ClamWinEnabled(bool newVal) 
    {
-	   GetSettings_()->SetBool(PROPERTY_AV_CLAMWIN_ENABLE, newVal);
+      GetSettings_()->SetBool(PROPERTY_AV_CLAMWIN_ENABLE, newVal);
    }
 
    bool 
-	AntiVirusConfiguration::ClamWinEnabled() const
+   AntiVirusConfiguration::ClamWinEnabled() const
    {
-	   return GetSettings_()->GetBool(PROPERTY_AV_CLAMWIN_ENABLE);
+      return GetSettings_()->GetBool(PROPERTY_AV_CLAMWIN_ENABLE);
    }  
 
    void 
-	AntiVirusConfiguration::ClamWinExecutable(const String & sValue)
+   AntiVirusConfiguration::ClamWinExecutable(const String & sValue)
    {
-	   GetSettings_()->SetString(PROPERTY_AV_CLAMWIN_EXEC, sValue);
+      GetSettings_()->SetString(PROPERTY_AV_CLAMWIN_EXEC, sValue);
    }
 
    String
-	AntiVirusConfiguration::ClamWinExecutable() const
+   AntiVirusConfiguration::ClamWinExecutable() const
    {
-	   return GetSettings_()->GetString(PROPERTY_AV_CLAMWIN_EXEC);
+      return GetSettings_()->GetString(PROPERTY_AV_CLAMWIN_EXEC);
    }
 
    void 
-	AntiVirusConfiguration::ClamWinDatabase(const String & sValue)
+   AntiVirusConfiguration::ClamWinDatabase(const String & sValue)
    {
-	   GetSettings_()->SetString(PROPERTY_AV_CLAMWIN_DB, sValue);
+      GetSettings_()->SetString(PROPERTY_AV_CLAMWIN_DB, sValue);
    }
 
    String
-	AntiVirusConfiguration::ClamWinDatabase() const
+   AntiVirusConfiguration::ClamWinDatabase() const
    {
-	   return GetSettings_()->GetString(PROPERTY_AV_CLAMWIN_DB);
+      return GetSettings_()->GetString(PROPERTY_AV_CLAMWIN_DB);
    }
 
    void
-	AntiVirusConfiguration::SetCustomScannerEnabled(bool newVal) 
+   AntiVirusConfiguration::SetCustomScannerEnabled(bool newVal) 
    {
-	   GetSettings_()->SetBool(PROPERTY_USECUSTOMSCANNER, newVal);
+      GetSettings_()->SetBool(PROPERTY_USECUSTOMSCANNER, newVal);
    }
 
    bool 
-	AntiVirusConfiguration::GetCustomScannerEnabled() const
+   AntiVirusConfiguration::GetCustomScannerEnabled() const
    {
-	   return GetSettings_()->GetBool(PROPERTY_USECUSTOMSCANNER);
+      return GetSettings_()->GetBool(PROPERTY_USECUSTOMSCANNER);
    }  
 
    void 
-	AntiVirusConfiguration::SetCustomScannerExecutable(const String & sValue)
+   AntiVirusConfiguration::SetCustomScannerExecutable(const String & sValue)
    {
-	   GetSettings_()->SetString(PROPERTY_CUSTOMSCANNEREXECUTABLE, sValue);
+      GetSettings_()->SetString(PROPERTY_CUSTOMSCANNEREXECUTABLE, sValue);
    }
 
    String
-	AntiVirusConfiguration::GetCustomScannerExecutable() const
+   AntiVirusConfiguration::GetCustomScannerExecutable() const
    {
-	   return GetSettings_()->GetString(PROPERTY_CUSTOMSCANNEREXECUTABLE);
+      return GetSettings_()->GetString(PROPERTY_CUSTOMSCANNEREXECUTABLE);
    }
 
    void 
-	AntiVirusConfiguration::SetCustomScannerReturnValue(long lValue)
+   AntiVirusConfiguration::SetCustomScannerReturnValue(long lValue)
    {
-	   GetSettings_()->SetLong(PROPERTY_CUSTOMSCANNERRETURNVALUE, lValue);
+      GetSettings_()->SetLong(PROPERTY_CUSTOMSCANNERRETURNVALUE, lValue);
    }
 
    long
-	AntiVirusConfiguration::GetCustomScannerReturnValue() const
+   AntiVirusConfiguration::GetCustomScannerReturnValue() const
    {
-	   return GetSettings_()->GetLong(PROPERTY_CUSTOMSCANNERRETURNVALUE);
+      return GetSettings_()->GetLong(PROPERTY_CUSTOMSCANNERRETURNVALUE);
    }
 
    void
    AntiVirusConfiguration::SetVirusScanMaxSize(int iNewVal)
    {
-	   GetSettings_()->SetLong(PROPERTY_AV_MAXMSGSIZE, iNewVal);
+      GetSettings_()->SetLong(PROPERTY_AV_MAXMSGSIZE, iNewVal);
    }
 
    int
    AntiVirusConfiguration::GetVirusScanMaxSize() const
    {
-	   return GetSettings_()->GetLong(PROPERTY_AV_MAXMSGSIZE);
+      return GetSettings_()->GetLong(PROPERTY_AV_MAXMSGSIZE);
    }
 
    void

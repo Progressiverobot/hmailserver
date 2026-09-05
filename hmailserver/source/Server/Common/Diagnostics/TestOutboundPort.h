@@ -13,8 +13,8 @@ namespace HM
    class TestOutboundPort
    {
    public:
-	   TestOutboundPort(const String &TestDomainName);
-	   virtual ~TestOutboundPort();
+      TestOutboundPort(const String &TestDomainName);
+      virtual ~TestOutboundPort();
 
       DiagnosticResult PerformTest();
 

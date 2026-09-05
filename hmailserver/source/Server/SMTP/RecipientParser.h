@@ -15,8 +15,8 @@ namespace HM
    class RecipientParser  
    {
    public:
-	   RecipientParser();
-	   virtual ~RecipientParser();
+      RecipientParser();
+      virtual ~RecipientParser();
 
       enum DeliveryPossibility
       {

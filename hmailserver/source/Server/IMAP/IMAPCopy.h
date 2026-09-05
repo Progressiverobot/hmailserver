@@ -12,7 +12,7 @@ namespace HM
    class IMAPCopy  : public IMAPCommandRangeAction
    {
    public:
-	   IMAPCopy();
+      IMAPCopy();
 
       virtual IMAPResult DoAction(std::shared_ptr<IMAPConnection> pConnection, int messageIndex, std::shared_ptr<Message> pOldMessage, const std::shared_ptr<IMAPCommandArgument> pArgument);
 

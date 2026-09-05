@@ -11,35 +11,35 @@
 #include "../common/bo/RouteAddresses.h"
 
 class ATL_NO_VTABLE InterfaceRouteAddresses : 
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceRouteAddresses, &CLSID_RouteAddresses>,
-	public IDispatchImpl<IInterfaceRouteAddresses, &IID_IInterfaceRouteAddresses, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceRouteAddresses, &CLSID_RouteAddresses>,
+   public IDispatchImpl<IInterfaceRouteAddresses, &IID_IInterfaceRouteAddresses, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public HM::COMAuthenticator
 {
 public:
-	InterfaceRouteAddresses()
-	{
-	}
+   InterfaceRouteAddresses()
+   {
+   }
 
 DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACEROUTEADDRESSES)
 
 
 BEGIN_COM_MAP(InterfaceRouteAddresses)
-	COM_INTERFACE_ENTRY(IInterfaceRouteAddresses)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceRouteAddresses)
+   COM_INTERFACE_ENTRY(IDispatch)
 END_COM_MAP()
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
-	
-	void FinalRelease() 
-	{
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
+   
+   void FinalRelease() 
+   {
+   }
 
    STDMETHOD(get_Item)(/*[in]*/ long Index, /*[out, retval]*/ IInterfaceRouteAddress **pVal);
    STDMETHOD(get_ItemByDBID)(/*[in]*/ long lDBID, /*[out, retval]*/ IInterfaceRouteAddress **pVal);

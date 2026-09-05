@@ -10,8 +10,8 @@ namespace HM
    class LocalIPAddresses : public Singleton<LocalIPAddresses>
    {
    public:
-	   LocalIPAddresses();
-	   virtual ~LocalIPAddresses();
+      LocalIPAddresses();
+      virtual ~LocalIPAddresses();
 
       void LoadIPAddresses();
 

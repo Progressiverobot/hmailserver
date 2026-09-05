@@ -12,7 +12,7 @@ namespace HM
    class  IPAddressSQLHelper
    {
    public:
-	   IPAddressSQLHelper();
+      IPAddressSQLHelper();
 
       AnsiString GetAddress1String(const IPAddress &address) const;
       AnsiString GetAddress2String(const IPAddress &address) const;

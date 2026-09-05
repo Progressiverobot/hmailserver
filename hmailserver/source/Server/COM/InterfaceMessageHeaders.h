@@ -18,14 +18,14 @@ namespace HM
 }
 
 class ATL_NO_VTABLE InterfaceMessageHeaders :
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceMessageHeaders, &CLSID_MessageHeaders>,
-	public IDispatchImpl<IInterfaceMessageHeaders, &IID_IInterfaceMessageHeaders, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceMessageHeaders, &CLSID_MessageHeaders>,
+   public IDispatchImpl<IInterfaceMessageHeaders, &IID_IInterfaceMessageHeaders, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>
 {
 public:
-	InterfaceMessageHeaders()
-	{
-	}
+   InterfaceMessageHeaders()
+   {
+   }
 
    void AttachItem(std::shared_ptr<HM::MimeHeader> pHeader);
 
@@ -33,22 +33,22 @@ DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACEMESSAGEHEADERS)
 
 
 BEGIN_COM_MAP(InterfaceMessageHeaders)
-	COM_INTERFACE_ENTRY(IInterfaceMessageHeaders)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceMessageHeaders)
+   COM_INTERFACE_ENTRY(IDispatch)
 END_COM_MAP()
 
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
 
-	void FinalRelease()
-	{
-	}
+   void FinalRelease()
+   {
+   }
 
 public:
 

@@ -15,8 +15,8 @@ namespace HM
    class MessageAttachmentStripper  
    {
    public:
-	   MessageAttachmentStripper();
-	   virtual ~MessageAttachmentStripper();
+      MessageAttachmentStripper();
+      virtual ~MessageAttachmentStripper();
 
       static void Strip(std::shared_ptr<Message> pMessage);
    private:

@@ -351,7 +351,7 @@ namespace HM
       return name_;
    }
 
-	bool 
+   bool 
    File::Write(File &sourceFile)
    {
       while (std::shared_ptr<ByteBuffer> sourceData = sourceFile.ReadChunk(FileChunkSize))

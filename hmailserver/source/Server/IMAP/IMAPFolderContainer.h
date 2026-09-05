@@ -14,8 +14,8 @@ namespace HM
    class IMAPFolderContainer : public Singleton<IMAPFolderContainer>
    {
    public:
-	   IMAPFolderContainer();
-	   virtual ~IMAPFolderContainer();
+      IMAPFolderContainer();
+      virtual ~IMAPFolderContainer();
 
       std::shared_ptr<HM::IMAPFolders> GetFoldersForAccount(__int64 AccountID);
       // Returns a list of all folders for the specified account.

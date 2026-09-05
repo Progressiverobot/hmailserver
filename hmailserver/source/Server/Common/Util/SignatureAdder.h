@@ -15,7 +15,7 @@ namespace HM
    class SignatureAdder
    {
    public:
-	   SignatureAdder();
+      SignatureAdder();
       virtual ~SignatureAdder();
 
       bool SetSignature(std::shared_ptr<Message> message, 

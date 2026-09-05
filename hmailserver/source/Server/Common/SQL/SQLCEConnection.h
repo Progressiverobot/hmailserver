@@ -12,8 +12,8 @@ namespace HM
    class SQLCEConnection : public DALConnection, public std::enable_shared_from_this<SQLCEConnection>
    {
    public:
-	   SQLCEConnection(std::shared_ptr<DatabaseSettings> pSettings);
-	   virtual ~SQLCEConnection();
+      SQLCEConnection(std::shared_ptr<DatabaseSettings> pSettings);
+      virtual ~SQLCEConnection();
 
       ConnectionResult Connect(String &sErrorMessage);
       bool Disconnect();

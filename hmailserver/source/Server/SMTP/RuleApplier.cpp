@@ -101,8 +101,8 @@ namespace HM
    bool
    RuleApplier::ApplyRule_(std::shared_ptr<Rule> pRule, std::shared_ptr<const Account> account, std::shared_ptr<MessageData> pMsgData, bool &bContinueRuleProcessing, RuleResult &ruleResult)
    {
-		if (Logger::Instance()->GetLogDebug())
-			LOG_DEBUG(_T("Applying rule " + pRule->GetName()));
+      if (Logger::Instance()->GetLogDebug())
+         LOG_DEBUG(_T("Applying rule " + pRule->GetName()));
 
       bool bAllRequired = pRule->GetUseAND();
       bool bDoActions = false;
@@ -431,17 +431,17 @@ namespace HM
       // true = check AutoSubmitted header and do not respond if set
       if (!IsGeneratedResponseAllowed(pMsgData, true))
       {
-	      ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5065, "RuleApplier::ApplyAction_Reply", "Could not reply message. Maximum rule loop count reached or Auto-Submitted header.");
-	      return;
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5065, "RuleApplier::ApplyAction_Reply", "Could not reply message. Maximum rule loop count reached or Auto-Submitted header.");
+         return;
       }
 
       String sReplyRecipientAddress = pMsgData->GetMessage()->GetFromAddress();
 
       if (sReplyRecipientAddress.IsEmpty())
       {
-	      // We need a recipient address to be able to
-	      // send the message..
-	      return;
+         // We need a recipient address to be able to
+         // send the message..
+         return;
       }
 
       std::shared_ptr<Message> pOriginalMessage = pMsgData->GetMessage();

@@ -16,35 +16,35 @@ namespace HM
 
 class ATL_NO_VTABLE InterfaceRuleCriterias : 
    
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceRuleCriterias, &CLSID_RuleCriterias>,
-	public IDispatchImpl<IInterfaceRuleCriterias, &IID_IInterfaceRuleCriterias, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceRuleCriterias, &CLSID_RuleCriterias>,
+   public IDispatchImpl<IInterfaceRuleCriterias, &IID_IInterfaceRuleCriterias, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public HM::COMAuthenticator
 {
 public:
-	InterfaceRuleCriterias()
-	{
-	}
+   InterfaceRuleCriterias()
+   {
+   }
 
 DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACERULECRITERIAS)
 
 
 BEGIN_COM_MAP(InterfaceRuleCriterias)
-	COM_INTERFACE_ENTRY(IInterfaceRuleCriterias)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceRuleCriterias)
+   COM_INTERFACE_ENTRY(IDispatch)
 END_COM_MAP()
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
-	
-	void FinalRelease() 
-	{
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
+   
+   void FinalRelease() 
+   {
+   }
 
 public:
 

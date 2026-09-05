@@ -12,38 +12,38 @@
 // InterfaceUtilities
 
 class ATL_NO_VTABLE InterfaceUtilities : 
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceUtilities, &CLSID_Utilities>,
-	public IDispatchImpl<IInterfaceUtilities, &IID_IInterfaceUtilities, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceUtilities, &CLSID_Utilities>,
+   public IDispatchImpl<IInterfaceUtilities, &IID_IInterfaceUtilities, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public HM::COMAuthenticator,
    public ISupportErrorInfo
 
 {
 public:
-	InterfaceUtilities()
-	{
-	}
+   InterfaceUtilities()
+   {
+   }
 
 DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACEUTILITIES)
 
 
 BEGIN_COM_MAP(InterfaceUtilities)
-	COM_INTERFACE_ENTRY(IInterfaceUtilities)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceUtilities)
+   COM_INTERFACE_ENTRY(IDispatch)
    COM_INTERFACE_ENTRY(ISupportErrorInfo)
 END_COM_MAP()
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
-	
-	void FinalRelease() 
-	{
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
+   
+   void FinalRelease() 
+   {
+   }
 
 public:
    STDMETHOD(InterfaceSupportsErrorInfo)(REFIID riid);

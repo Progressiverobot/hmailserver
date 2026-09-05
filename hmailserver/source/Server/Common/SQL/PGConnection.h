@@ -14,8 +14,8 @@ namespace HM
    class PGConnection : public DALConnection
    {
    public:
-	   PGConnection(std::shared_ptr<DatabaseSettings> pSettings);
-	   virtual ~PGConnection();
+      PGConnection(std::shared_ptr<DatabaseSettings> pSettings);
+      virtual ~PGConnection();
 
       virtual ConnectionResult Connect(String &sErrorMessage);
       virtual bool Disconnect();

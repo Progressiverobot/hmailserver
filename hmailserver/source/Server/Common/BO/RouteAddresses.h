@@ -13,8 +13,8 @@ namespace HM
    class RouteAddresses : public Collection<RouteAddress, PersistentRouteAddress>
    {
    public:
-	   RouteAddresses(__int64 iRouteID);
-	   virtual ~RouteAddresses();
+      RouteAddresses(__int64 iRouteID);
+      virtual ~RouteAddresses();
 
       void Refresh();
 

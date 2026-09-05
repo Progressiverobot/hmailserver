@@ -16,8 +16,8 @@ namespace HM
    class Messages : public Collection<Message, PersistentMessage>
    {
    public:
-	   Messages(__int64 iAccountID, __int64 iFolderID);
-	   virtual ~Messages();
+      Messages(__int64 iAccountID, __int64 iFolderID);
+      virtual ~Messages();
 
       void Save();
 

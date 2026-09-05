@@ -16,8 +16,8 @@ namespace HM
    class SMTPConfiguration
    {
    public:
-	   SMTPConfiguration();
-	   virtual ~SMTPConfiguration();
+      SMTPConfiguration();
+      virtual ~SMTPConfiguration();
 
       bool Load();
 

@@ -93,7 +93,7 @@ namespace HM
             return IMAPResult(IMAPResult::ResultNo, "SETACL: The folder owner's rights are implicit and cannot be changed.");
       }
 
-	  ACLManager aclManager;
+     ACLManager aclManager;
       if (!aclManager.SetACL(pFolder, sIdentifier, sAccessRights))
          return IMAPResult(IMAPResult::ResultNo, "SetACL failed.");
 

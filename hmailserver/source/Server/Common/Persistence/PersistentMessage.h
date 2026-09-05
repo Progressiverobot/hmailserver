@@ -17,8 +17,8 @@ namespace HM
                      
    {
    public:
-	   PersistentMessage();
-	   virtual ~PersistentMessage();
+      PersistentMessage();
+      virtual ~PersistentMessage();
 
       enum FileLocation
       {  

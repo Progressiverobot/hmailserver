@@ -140,11 +140,11 @@ namespace HM
             if (lPanicLevel > 100000)
             {
                String sMessage;
-			   // NEED FOR IMPROVEMENT: User should be able to adjust max even if INI
-			   // User in forum had too many folders & this limit caused big issues
-			   // 
-			   // Better logging details so people understand what happened until fixed/adjustable
-			   sMessage.Format(_T("Unable to retrieve folder list for account. 100K+ loops trying to sort. Account: %I64d, Parent: %I64d"), account_id_, parent_folder_id_);
+            // NEED FOR IMPROVEMENT: User should be able to adjust max even if INI
+            // User in forum had too many folders & this limit caused big issues
+            // 
+            // Better logging details so people understand what happened until fixed/adjustable
+            sMessage.Format(_T("Unable to retrieve folder list for account. 100K+ loops trying to sort. Account: %I64d, Parent: %I64d"), account_id_, parent_folder_id_);
                
                ErrorManager::Instance()->ReportError(
                   ErrorManager::Medium, 5125, "IMAPFolders::Refresh()", sMessage);       

@@ -10,8 +10,8 @@ namespace HM
    class RouteAddress : public BusinessObject<RouteAddress>
    {
    public:
-	   RouteAddress();
-	   virtual ~RouteAddress();
+      RouteAddress();
+      virtual ~RouteAddress();
 
       String GetName() const {return address_; }
 

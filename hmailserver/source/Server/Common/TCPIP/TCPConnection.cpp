@@ -1650,13 +1650,13 @@ namespace HM
       ErrorManager::Instance()->ReportError(sev, code, context, formattedMessage, error);
    }
 
-	void
-	TCPConnection::ReportError(ErrorManager::eSeverity sev, int code, const String &context, const String &message, const boost::system::error_code &error)
-	{
+   void
+   TCPConnection::ReportError(ErrorManager::eSeverity sev, int code, const String &context, const String &message, const boost::system::error_code &error)
+   {
       String formattedMessage;
       formattedMessage.Format(_T("%s Remote IP: %s"), message.c_str(), SafeGetIPAddress().c_str());
       ErrorManager::Instance()->ReportError(sev, code, context, formattedMessage, error);
-	}
+   }
 
    void 
    TCPConnection::ReportError(ErrorManager::eSeverity sev, int code, const String &context, const String &message)

@@ -15,8 +15,8 @@ namespace HM
    private:
 
    public:
-	   DNSResolver();
-	   virtual ~DNSResolver();
+      DNSResolver();
+      virtual ~DNSResolver();
 
       bool GetEmailServers(const String &sDomainName, std::vector<HostNameAndIpAddress> &saFoundNames);
       bool GetMXRecords(const String &sDomain, std::vector<String> &vecFoundNames);
