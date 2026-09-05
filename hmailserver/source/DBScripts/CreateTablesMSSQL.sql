@@ -1172,4 +1172,38 @@ ALTER TABLE hm_archiveindex ADD CONSTRAINT hm_archiveindex_pk PRIMARY KEY NONCLU
 CREATE CLUSTERED INDEX idx_hm_archiveindex_domain_time ON hm_archiveindex (archivedomain, archivetime)
 CREATE INDEX idx_hm_archiveindex_path ON hm_archiveindex (archivepath)
 
-insert into hm_dbversion values (6029)
+ALTER TABLE hm_accounts WITH CHECK ADD CONSTRAINT fk_hm_accounts_domain FOREIGN KEY (accountdomainid) REFERENCES hm_domains (domainid) ON DELETE CASCADE
+
+ALTER TABLE hm_aliases WITH CHECK ADD CONSTRAINT fk_hm_aliases_domain FOREIGN KEY (aliasdomainid) REFERENCES hm_domains (domainid) ON DELETE CASCADE
+
+ALTER TABLE hm_domain_aliases WITH CHECK ADD CONSTRAINT fk_hm_domain_aliases_domain FOREIGN KEY (dadomainid) REFERENCES hm_domains (domainid) ON DELETE CASCADE
+
+ALTER TABLE hm_distributionlists WITH CHECK ADD CONSTRAINT fk_hm_distributionlists_domain FOREIGN KEY (distributionlistdomainid) REFERENCES hm_domains (domainid) ON DELETE CASCADE
+
+ALTER TABLE hm_distributionlistsrecipients WITH CHECK ADD CONSTRAINT fk_hm_dlrecipients_list FOREIGN KEY (distributionlistrecipientlistid) REFERENCES hm_distributionlists (distributionlistid) ON DELETE CASCADE
+
+ALTER TABLE hm_routeaddresses WITH CHECK ADD CONSTRAINT fk_hm_routeaddresses_route FOREIGN KEY (routeaddressrouteid) REFERENCES hm_routes (routeid) ON DELETE CASCADE
+
+ALTER TABLE hm_fetchaccounts WITH CHECK ADD CONSTRAINT fk_hm_fetchaccounts_account FOREIGN KEY (faaccountid) REFERENCES hm_accounts (accountid) ON DELETE CASCADE
+
+ALTER TABLE hm_fetchaccounts_uids WITH CHECK ADD CONSTRAINT fk_hm_fetchaccounts_uids_fa FOREIGN KEY (uidfaid) REFERENCES hm_fetchaccounts (faid) ON DELETE CASCADE
+
+ALTER TABLE hm_apppasswords WITH CHECK ADD CONSTRAINT fk_hm_apppasswords_account FOREIGN KEY (apaccountid) REFERENCES hm_accounts (accountid) ON DELETE CASCADE
+
+ALTER TABLE hm_rule_criterias WITH CHECK ADD CONSTRAINT fk_hm_rule_criterias_rule FOREIGN KEY (criteriaruleid) REFERENCES hm_rules (ruleid) ON DELETE CASCADE
+
+ALTER TABLE hm_rule_actions WITH CHECK ADD CONSTRAINT fk_hm_rule_actions_rule FOREIGN KEY (actionruleid) REFERENCES hm_rules (ruleid) ON DELETE CASCADE
+
+ALTER TABLE hm_group_members WITH CHECK ADD CONSTRAINT fk_hm_group_members_group FOREIGN KEY (membergroupid) REFERENCES hm_groups (groupid) ON DELETE CASCADE
+
+ALTER TABLE hm_passwordhistory WITH CHECK ADD CONSTRAINT fk_hm_passwordhistory_account FOREIGN KEY (phaccountid) REFERENCES hm_accounts (accountid) ON DELETE CASCADE
+
+ALTER TABLE hm_messagerecipients WITH CHECK ADD CONSTRAINT fk_hm_messagerecipients_message FOREIGN KEY (recipientmessageid) REFERENCES hm_messages (messageid) ON DELETE CASCADE
+
+ALTER TABLE hm_message_metadata WITH CHECK ADD CONSTRAINT fk_hm_message_metadata_message FOREIGN KEY (metadata_messageid) REFERENCES hm_messages (messageid) ON DELETE CASCADE
+
+ALTER TABLE hm_imapexpunged WITH CHECK ADD CONSTRAINT fk_hm_imapexpunged_folder FOREIGN KEY (expungedfolderid) REFERENCES hm_imapfolders (folderid) ON DELETE CASCADE
+
+ALTER TABLE hm_messageindexterms WITH CHECK ADD CONSTRAINT fk_hm_messageindexterms_message FOREIGN KEY (mitmessageid) REFERENCES hm_messages (messageid) ON DELETE CASCADE
+
+insert into hm_dbversion values (6030)

@@ -322,7 +322,21 @@ namespace DBUpdater
          new SchemaProbe(6029, "hm_archiveindex.archivehold",
                          "update hm_archiveindex set archivehold = archivehold where 1 = 0"),
          new SchemaProbe(6029, "hm_archiveindex.archivemessageid",
-                         "update hm_archiveindex set archivemessageid = archivemessageid where 1 = 0")
+                         "update hm_archiveindex set archivemessageid = archivemessageid where 1 = 0"),
+
+         // Upgrade6029to6030* - the foreign keys. A constraint cannot be proved by a
+         // statement that writes nothing, since only a violation makes a database
+         // complain, so these ask the catalogue through the one view all four
+         // dialects share and divide by zero when the constraint is absent. The
+         // update writes hm_dbversion's value back to itself when it is present.
+         new SchemaProbe(6030, "hm_accounts.fk_hm_accounts_domain",
+                         "update hm_dbversion set value = value / (case when exists (select 1 from information_schema.table_constraints where constraint_name = 'fk_hm_accounts_domain' and constraint_type = 'FOREIGN KEY') then 1 else 0 end)"),
+         new SchemaProbe(6030, "hm_distributionlistsrecipients.fk_hm_dlrecipients_list",
+                         "update hm_dbversion set value = value / (case when exists (select 1 from information_schema.table_constraints where constraint_name = 'fk_hm_dlrecipients_list' and constraint_type = 'FOREIGN KEY') then 1 else 0 end)"),
+         new SchemaProbe(6030, "hm_messagerecipients.fk_hm_messagerecipients_message",
+                         "update hm_dbversion set value = value / (case when exists (select 1 from information_schema.table_constraints where constraint_name = 'fk_hm_messagerecipients_message' and constraint_type = 'FOREIGN KEY') then 1 else 0 end)"),
+         new SchemaProbe(6030, "hm_messageindexterms.fk_hm_messageindexterms_message",
+                         "update hm_dbversion set value = value / (case when exists (select 1 from information_schema.table_constraints where constraint_name = 'fk_hm_messageindexterms_message' and constraint_type = 'FOREIGN KEY') then 1 else 0 end)")
       };
 
       /// <summary>
