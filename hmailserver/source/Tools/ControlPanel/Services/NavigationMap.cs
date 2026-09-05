@@ -711,13 +711,19 @@ namespace hMailServer.ControlPanel.Services
                   aliases: "Threads|Workers|Database connections|Cache|Slow server|Tuning|Concurrency|Memory",
                   seeAlso: "hardening|logging"),
 
-               Page("advanced", "Advanced & scripting",
-                  "Archiving, mirroring, the default domain, and whether server-side event scripting runs at all.",
-                  aliases: "Archive|Archiving|Mirror|Default domain|Scripting|VBScript|JScript|IPv6 preference",
+               // Was "Advanced & scripting", which named this page after the one thing
+               // it shares with its neighbour: the engine's on/off switch lives here,
+               // the script itself is edited on "Event scripts". Two names for adjacent
+               // concepts, one of them a catch-all - so this one is now what the page
+               // calls itself, and its description says where the switch is. The old
+               // title stays as an alias; the key is unchanged, so links still arrive.
+               Page("advanced", "Advanced",
+                  "Archiving, mirroring, the default domain, disk-space limits, and the switch that turns the event-scripting engine on.",
+                  aliases: "Advanced & scripting|Archive|Archiving|Mirror|Default domain|Scripting engine|Enable scripting|VBScript|JScript|IPv6 preference",
                   seeAlso: "scripts|hardening"),
 
                Page("scripts", "Event scripts",
-                  "Edit the event-handler script the server runs on delivery, logon and error events.",
+                  "Edit the event-handler script the server runs on delivery, logon and error events. The engine itself is switched on under Advanced.",
                   aliases: "EventHandlers|Scripts|OnDeliverMessage|OnClientLogon|OnAcceptMessage|VBScript|Run code on mail",
                   seeAlso: "advanced|rules"),
 

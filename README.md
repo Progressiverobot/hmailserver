@@ -57,7 +57,7 @@ Sender authentication and anti-abuse
 * **ARC** sealing (RFC 8617) so forwarded mail keeps a verifiable authentication chain — off by default (`ArcSealingEnabled`). Inbound ARC results can also recover the original authentication result so forwarding stops costing legitimate mail its DMARC pass — off until both `ASArcFilteringEnabled` and a list of trusted sealer domains are set, because anyone can seal a chain with their own key and a passing chain proves nothing on its own.
 * Optional **SRS** sender rewriting for forwarded mail (`SRSEnabled`, off by default), and optional **BATV** (`prvs`) backscatter protection.
 * **SpamAssassin** integration, **DNSBL** and **SURBL** lookups, greylisting, HELO/PTR/MX sanity checks and a weighted scoring pipeline.
-* **Virus scanning** via ClamAV (clamd or clamscan) or any command-line scanner.
+* **Virus scanning** via ClamAV (clamd or clamscan) or any command-line scanner. The Control Panel's ClamAV test asks the daemon `PING` and `VERSION` before it scans, names the daemon it reached, and streams its EICAR sample from memory so the host's own antivirus cannot remove it first.
 * Attachment blocking, IP ranges with per-range policy, and connection auto-banning after repeated authentication failures.
 
 Account security and authentication
@@ -65,10 +65,11 @@ Account security and authentication
 
 * **SCRAM-SHA-256** SASL across IMAP, SMTP submission and POP3, plus **SCRAM-SHA-256-PLUS** channel binding on all three, with deterministic anti-enumeration salts. SMTP and POP3 offer SCRAM whenever AUTH is available; on IMAP, SASL (PLAIN and SCRAM alike) sits behind one setting whose shipped default is off.
 * **OAuth2 / OpenID Connect** bearer tokens — SASL XOAUTH2 and OAUTHBEARER (RFC 7628) — validated against an external identity provider's signing key: from the provider's published JWK Set (RFC 7517, so a key rotation needs no hand-copied file; `OAuth2JwksUrl`) or a PEM file, with optional token introspection (RFC 7662; `OAuth2IntrospectionUrl`) so a revoked token stops working before it expires.
+* **Message retention** per domain and per account (`MessageRetentionDays`; the account's value overrides the domain's, -1 keeps forever): delivered mail older than the policy is removed by a six-hourly sweep through the same path an EXPUNGE takes, so quotas, QRESYNC records and open IMAP sessions all see it. Off everywhere until a number is set; `Utilities.RunMessageRetention` runs the sweep on demand.
 * **SASL EXTERNAL** (RFC 4422) on SMTP, IMAP and POP3: a client certificate that verified against the port's CA logs on as the mailbox the certificate names (a subjectAltName rfc822Name, the subject's emailAddress, or an address-shaped CN). Offered only on a connection that presented such a certificate; a certificate for one user is never a credential for another.
 * **LDAP directory authentication** against Active Directory or any LDAP directory, so accounts authenticate with their domain password. Simple bind and SASL Negotiate; LDAPS and StartTLS; certificate validation on by default, and a password is never sent over an unprotected connection unless that is explicitly permitted. Unlike the Windows-logon path it needs no domain-joined host, which is the usual situation for a mail server in a DMZ. Infrastructure failures are reported separately from wrong passwords, so a directory outage does not read as a hundred users mistyping. Off by default: the whole `[LDAP]` ini section is absent until you add it.
 * **LDAP directory provisioning** — the directory as an account source, not only as a password check. Preview reports exactly which mailboxes the directory says should exist and changes nothing; apply then creates and updates them. The two share one decider, so a preview cannot describe an action the apply would not take. A domain takes part only if its Active Directory domain name is set, which makes provisioning opt-in per domain and keeps a search base pointed one level too high from provisioning into unrelated hosted domains. Nothing is ever deleted: the most it does is mark an account inactive, and only when asked — never on a truncated or empty enumeration, and never for a domain in which nothing was seen. An optional unattended schedule (`[LDAP] SyncScheduleMinutes`, off by default) creates and updates but never disables. Verified end to end against a live Windows Server 2025 domain controller.
-* **Argon2id** and **PBKDF2-HMAC-SHA256** password hashing, with tunable work factors, transparent upgrade on login (of the scheme, and of a hash cheaper than the configured work factor), a minimum-accepted-hash policy, and an optional server-side pepper.
+* **Argon2id**, **scrypt** (RFC 7914) and **PBKDF2-HMAC-SHA256** password hashing, with tunable work factors, transparent upgrade on login (of the scheme, and of a hash cheaper than the configured work factor), a minimum-accepted-hash policy, and an optional server-side pepper.
 * Full RFC 4013 SASLprep of non-ASCII credentials on the PLAIN and LOGIN paths (SCRAM usernames are matched as sent).
 * Optional **TOTP two-factor authentication** for administrative logon.
 
@@ -96,14 +97,14 @@ Technology
 | Component | Detail |
 |---|---|
 | Server core | C++, built with Visual Studio 2026 (platform toolset v145), 64-bit only |
-| Cryptography | OpenSSL 4.0.x |
+| Cryptography | OpenSSL 4.0.x. Not an LTS branch: it leaves support on 14 May 2027, and the decision is recorded here rather than left for that month. OpenSSL's release policy puts an LTS in April of every odd-numbered year, so the next lands in April 2027; the plan is to move to it within a month of its release. If anything in the 4.x line has proved unstable by then, the fallback is a step back to 3.5 LTS (supported to 8 April 2030) |
 | Async I/O | Boost 1.91 (Asio) |
 | Databases | MySQL, MariaDB, MS SQL Server, PostgreSQL 18 (libpq), and the embedded SQL CE for zero-configuration installs |
 | MySQL/MariaDB client | MariaDB Connector/C, shipped as `libmysql.dll` with auth plugins — works with MySQL 8 `caching_sha2_password` and MariaDB `ed25519`/`gssapi` out of the box. It requires TLS from the server by default; `AllowUnencryptedConnection=1` under `[Database]` lets it fall back to plaintext for a server that has none |
 | Database transport | Encrypted and verified from `hMailServer.ini`: `PostgreSQLSslMode` (libpq's `sslmode`, up to `verify-full`) and `PostgreSQLSslRootCert` for PostgreSQL, `ConnectionStringOptions` (the provider's own keywords, e.g. `Encrypt=yes;TrustServerCertificate=no`) for MS SQL Server, and TLS required by default for MySQL/MariaDB - all under `[Database]` |
 | Administration GUI and tools | C# / .NET 10 (WPF, Fluent design) |
 | Extensibility | COM/IDispatch API, plus a REST administration API |
-| Schema | Database version 6026, upgradeable from every earlier hMailServer release |
+| Schema | Database version 6027, upgradeable from every earlier hMailServer release |
 
 **Quality gates.** Every release ships SPDX and CycloneDX SBOMs (Syft). The repository runs CodeQL analysis, Dependabot CVE alerts with grouped update pull requests, a dependency-review gate on pull requests, an installer smoke test that installs the built installer on a clean machine and verifies the service comes up, and a monthly comparison against the original upstream repository so nothing landing there is missed.
 
@@ -499,7 +500,7 @@ Administration and monitoring:
 
    The metrics listener also serves Kubernetes-style health probes: `/livez` (process liveness), `/readyz` (200 only when `StateRunning` and the database has answered a real round trip within the last 20 seconds, else 503 — and 503 while the server is draining/stopping) and `/healthz` (JSON: status, server state, database, uptime). `/metrics` exposes counters and gauges for processed/spam/virus messages, TLS handshakes (success/failure), authentication (success/failure), sessions per protocol, the start time (`hmailserver_start_time_seconds`), database connectivity (`hmailserver_database_connected`, proved by a round trip, plus pool gauges), the SMTP delivery-queue depth and oldest-message age, certificate expiry, work-queue depth, delivery outcomes (`hmailserver_messages_delivered_total`/`_deferred_total`/`_bounced_total`), the message-store consistency result (`hmailserver_messagestore_missing_files`), and per-command and per-query latency histograms (`hmailserver_command_processing_seconds`, `hmailserver_db_query_seconds`).
 
-   REST endpoints: `/api/v1/status`, `/api/v1/domains`, `/api/v1/domains/<name>/accounts` (GET/POST), `/api/v1/accounts/<address>` (DELETE), `/api/v1/queue` (GET), `/api/v1/queue/<id>/retry` (POST), `/api/v1/queue/<id>` (DELETE), `/api/v1/apikeys` (GET/POST, administrator password only), `/api/v1/apikeys/<id>` (DELETE), `/api/v1/tlsa` (GET, publish-ready DANE TLSA records).
+   REST endpoints: `/api/v1/status`, `/api/v1/domains`, `/api/v1/domains/<name>/accounts` (GET/POST), `/api/v1/accounts/<address>` (DELETE), `/api/v1/queue` (GET), `/api/v1/queue/<id>/retry` (POST), `/api/v1/queue/<id>` (DELETE), `/api/v1/apikeys` (GET/POST, administrator password only), `/api/v1/apikeys/<id>` (DELETE), `/api/v1/tlsa` (GET, publish-ready DANE TLSA records), `/api/v1/srv` (GET, client-discovery SRV records), `/api/v1/domains/<name>/aliases` (GET), `/api/v1/quarantine` (GET), `/api/v1/quarantine/<id>/release` (POST), `/api/v1/quarantine/<id>` (DELETE), and `/api/v1/openapi.json` (GET) - the OpenAPI 3.0.3 description of all of them.
 
 Secret protection and least-privilege:
 

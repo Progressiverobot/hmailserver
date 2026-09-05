@@ -69,7 +69,7 @@ namespace hMailServer.ControlPanel.Tests.Services
       [InlineData("tls", "SSL/TLS")]
       [InlineData("autoban", "Auto-ban")]
       [InlineData("performance", "Performance")]
-      [InlineData("advanced", "Advanced & scripting")]
+      [InlineData("advanced", "Advanced")]
       [InlineData("hardening", "Server limits & expert settings")]
       [InlineData("scripts", "Event scripts")]
       [InlineData("servermessages", "Server messages")]

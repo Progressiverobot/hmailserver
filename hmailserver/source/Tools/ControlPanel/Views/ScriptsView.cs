@@ -52,7 +52,7 @@ namespace hMailServer.ControlPanel.Views
          var title = new TextBlock { Text = "Event scripts" };
          title.SetResourceReference(StyleProperty, "PageTitle");
          head.Children.Add(title);
-         var sub = new TextBlock { Text = "Edit the server event-handler script (OnAcceptMessage, OnDeliveryStart, OnHELO, ...). Saving writes the file and reloads the scripting engine." };
+         var sub = new TextBlock { Text = "Edit the server event-handler script (OnAcceptMessage, OnDeliveryStart, OnHELO, ...). Saving writes the file and reloads the scripting engine. The engine's on/off switch and its language are on the Advanced page." };
          sub.SetResourceReference(StyleProperty, "PageSubtitle");
          head.Children.Add(sub);
          root.Children.Add(head);
