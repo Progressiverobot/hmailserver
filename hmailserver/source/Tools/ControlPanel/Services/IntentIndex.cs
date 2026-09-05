@@ -72,6 +72,17 @@ namespace hMailServer.ControlPanel.Services
             "Start at the delivery queue: if the message is there, the reason it has not left is there too."),
          new IntentEntry("outgoing mail is not sending", "queue",
             "Check the queue for the failure the remote server reported."),
+         // The queue says that a message is waiting; when the reason is not on that
+         // page, the diagnosis path is - which half has stalled and which log line
+         // names the cause.
+         new IntentEntry("mail is stalled", "stalledmail",
+            "Work out whether accepting or delivering has stalled, turn on the logging that names the cause, and read the lines that do."),
+         new IntentEntry("sender times out after sending a message", "stalledmail",
+            "That is the accept pipeline stalling after the 354: the stage timings in the debug log say which stage."),
+         new IntentEntry("accepted but never delivered", "stalledmail",
+            "That is the delivery half: a wedged scanner, a slow remote server, a hung external tool or the database."),
+         new IntentEntry("diagnose slow mail", "stalledmail",
+            "The guided path: which half, which log lines, and the setting that bounds each stage."),
          new IntentEntry("messages are not arriving", "logs",
             "Watch the live log while the sender retries - an inbound message that never appears was refused or never arrived."),
          new IntentEntry("find out why a message bounced", "logs",

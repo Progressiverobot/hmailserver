@@ -147,6 +147,22 @@ namespace hMailServer.ControlPanel.Services
          }
       }
 
+      /// <summary>
+      /// The three status colours for the light or the dark theme, from
+      /// <see cref="StatusPalette"/> - the one place they live, where a test holds
+      /// every pair apart for colour-blind eyes.
+      /// </summary>
+      public static (Color success, Color warning, Color danger) StatusColours(bool light)
+      {
+         (uint success, uint warning, uint danger) = StatusPalette.Argb(light);
+         return (FromArgb(success), FromArgb(warning), FromArgb(danger));
+      }
+
+      private static Color FromArgb(uint argb)
+      {
+         return Color.FromArgb((byte)(argb >> 24), (byte)(argb >> 16), (byte)(argb >> 8), (byte)argb);
+      }
+
       /// <summary>Recomputes every token colour for the current theme.</summary>
       public static void Refresh()
       {
@@ -172,9 +188,7 @@ namespace hMailServer.ControlPanel.Services
          {
             // Darker, saturated values: each clears 4.5:1 on a white surface.
             brand = Hex("#2F6FE0");
-            success = Hex("#1A7F37");
-            warning = Hex("#9A6700");
-            danger = Hex("#CF222E");
+            (success, warning, danger) = StatusColours(light: true);
             info = Hex("#6639BA");
             logDefault = Hex("#57606A");
             logSmtp = Hex("#1A7F37");
@@ -187,9 +201,7 @@ namespace hMailServer.ControlPanel.Services
          {
             // Lighter, brighter values for dark surfaces.
             brand = Hex("#4C8DFF");
-            success = Hex("#3FB950");
-            warning = Hex("#D29922");
-            danger = Hex("#F85149");
+            (success, warning, danger) = StatusColours(light: false);
             info = Hex("#A371F7");
             logDefault = Hex("#9DA7B0");
             logSmtp = Hex("#3FB950");

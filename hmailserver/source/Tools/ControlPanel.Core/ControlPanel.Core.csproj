@@ -29,6 +29,7 @@
          reach its page. -->
     <Compile Include="..\ControlPanel\Services\SearchTerms.cs" />
     <Compile Include="..\ControlPanel\Services\NavigationMap.cs" />
+    <Compile Include="..\ControlPanel\Services\WelcomeIntents.cs" />
     <Compile Include="..\ControlPanel\Services\IntentIndex.cs" />
     <Compile Include="..\ControlPanel\Services\PaletteUsage.cs" />
     <Compile Include="..\ControlPanel\Services\PaletteSearch.cs" />

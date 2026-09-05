@@ -26,11 +26,36 @@ namespace hMailServer.ControlPanel.Views
 
          panel.Children.Add(new TextBlock
          {
-            Text = "Jump straight to a task below, or press Ctrl+K to search every page.",
+            Text = "Start with what you want to do, browse by area below, or press Ctrl+K to search every page and setting.",
             FontSize = Typography.Body,
             Opacity = 0.8,
             TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 0, 0, 18)
+            Margin = new Thickness(0, 0, 0, 14)
+         });
+
+         // Keyed on intent, in the administrator's words, and short enough to scan:
+         // the twelve reasons this application gets opened, with the one that had no
+         // route at all - mail that has stalled - first. The list lives in
+         // WelcomeIntents so a test can hold every entry to a page that exists.
+         panel.Children.Add(new TextBlock
+         {
+            Text = "What do you want to do?",
+            FontSize = Typography.SectionHeading,
+            FontWeight = FontWeights.SemiBold,
+            Margin = new Thickness(0, 0, 0, 8)
+         });
+
+         var intents = new System.Windows.Controls.Primitives.UniformGrid { Columns = 2, Margin = new Thickness(0, 0, 0, 10) };
+         foreach (WelcomeIntent intent in WelcomeIntents.Entries)
+            intents.Children.Add(IntentRow(intent));
+         panel.Children.Add(intents);
+
+         panel.Children.Add(new TextBlock
+         {
+            Text = "Or browse by area",
+            FontSize = Typography.SectionHeading,
+            FontWeight = FontWeights.SemiBold,
+            Margin = new Thickness(0, 6, 0, 8)
          });
 
          var tiles = new System.Windows.Controls.Primitives.UniformGrid { Columns = 3 };
@@ -49,6 +74,45 @@ namespace hMailServer.ControlPanel.Views
          panel.Children.Add(tiles);
 
          Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+      }
+
+      /// <summary>
+      /// One intent as a wide, low button: the task in bold, what the page offers
+      /// under it. Left-aligned text, because these are read as a list rather than
+      /// glanced at as tiles.
+      /// </summary>
+      private static Wpf.Ui.Controls.Button IntentRow(WelcomeIntent intent)
+      {
+         var stack = new StackPanel();
+         stack.Children.Add(new TextBlock
+         {
+            Text = intent.Heading,
+            FontSize = 14,
+            FontWeight = FontWeights.SemiBold,
+            Margin = new Thickness(0, 0, 0, 3)
+         });
+         stack.Children.Add(new TextBlock
+         {
+            Text = intent.Blurb,
+            FontSize = Typography.Caption,
+            Opacity = 0.72,
+            TextWrapping = TextWrapping.Wrap
+         });
+
+         var btn = new Wpf.Ui.Controls.Button
+         {
+            Content = stack,
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
+            Margin = new Thickness(0, 0, 12, 10),
+            Padding = new Thickness(14, 10, 14, 10),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            VerticalContentAlignment = VerticalAlignment.Top,
+            Cursor = System.Windows.Input.Cursors.Hand
+         };
+         System.Windows.Automation.AutomationProperties.SetName(btn, intent.Heading);
+         btn.Click += (s, e) => (Application.Current.MainWindow as MainWindow)?.NavigateTo(intent.Page);
+         return btn;
       }
 
       private static Wpf.Ui.Controls.Button Tile(Wpf.Ui.Controls.SymbolRegular icon, string heading, string subtitle, string navKey)
