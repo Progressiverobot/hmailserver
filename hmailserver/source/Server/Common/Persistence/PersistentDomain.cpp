@@ -448,6 +448,7 @@ namespace HM
       pDomain->SetPlusAddressingChar(pRS->GetStringValue("domainplusaddressingchar"));
       pDomain->SetAntiSpamOptions(pRS->GetLongValue("domainantispamoptions"));
       pDomain->SetMaxSizeMB(pRS->GetLongValue("domainmaxsize"));
+      pDomain->SetMessageRetentionDays(pRS->GetLongValue("domainmessageretentiondays"));
 
       pDomain->SetEnableSignature(pRS->GetLongValue("domainenablesignature") ? true : false);
       pDomain->SetSignatureMethod((Domain::DomainSignatureMethod) pRS->GetLongValue("domainsignaturemethod"));
@@ -550,6 +551,7 @@ namespace HM
       oStatement.AddColumn("domainactive", pDomain->GetIsActive());
       oStatement.AddColumn("domainpostmaster", pDomain->GetPostmaster());
       oStatement.AddColumn("domainmaxsize", pDomain->GetMaxSizeMB());
+      oStatement.AddColumn("domainmessageretentiondays", pDomain->GetMessageRetentionDays());
       oStatement.AddColumn("domainaddomain", pDomain->GetADDomainName());
       oStatement.AddColumn("domainmaxmessagesize", pDomain->GetMaxMessageSize());
       oStatement.AddColumn("domainmaxaccountsize", pDomain->GetMaxAccountSize());

@@ -837,6 +837,8 @@ interface IInterfaceDomain : IDispatch
 		[propput, id(17), helpstring("Enable greylisting for this domain.")] HRESULT AntiSpamEnableGreylisting([in] VARIANT_BOOL newVal);
 	   [propget, id(18), helpstring("Maximum size of this domain in MB.")] HRESULT MaxSize([out, retval] long *pVal);
 	   [propput, id(18), helpstring("Maximum size of this domain in MB.")] HRESULT MaxSize([in] long pVal);
+	   [propget, id(56), helpstring("Days delivered messages are kept in this domain's mailboxes before the retention sweep removes them. 0 = no policy. An account's own MessageRetentionDays overrides it.")] HRESULT MessageRetentionDays([out, retval] long *pVal);
+	   [propput, id(56), helpstring("Days delivered messages are kept in this domain's mailboxes before the retention sweep removes them. 0 = no policy. An account's own MessageRetentionDays overrides it.")] HRESULT MessageRetentionDays([in] long pVal);
 
 	   [propget, id(19), helpstring("Current size of this domain in MB.")] HRESULT Size([out, retval] long *pVal);
       [propget, id(20), helpstring("Allocated space for this domain.")] HRESULT AllocatedSize([out, retval] hyper *pVal);
@@ -969,6 +971,8 @@ interface IInterfaceAccount : IDispatch
 	[propget, id(13), helpstring("Messages in the accounts mailbox.")] HRESULT Messages([out, retval] IInterfaceMessages** pVal);
 	[propget, id(15), helpstring("Maximum size in of the account (MB).")] HRESULT MaxSize([out, retval] long *pVal);
 	[propput, id(15), helpstring("Maximum size in of the account (MB).")] HRESULT MaxSize([in] long pVal);
+	[propget, id(50), helpstring("Days delivered messages are kept before the retention sweep removes them: 0 = the domain's policy, -1 = keep forever, else the number of days.")] HRESULT MessageRetentionDays([out, retval] long *pVal);
+	[propput, id(50), helpstring("Days delivered messages are kept before the retention sweep removes them: 0 = the domain's policy, -1 = keep forever, else the number of days.")] HRESULT MessageRetentionDays([in] long pVal);
 	[propget, id(16), helpstring("Vacation message is turned on.")] HRESULT VacationMessageIsOn([out, retval] VARIANT_BOOL *pVal);
 	[propput, id(16), helpstring("Vacation message is turned on.")] HRESULT VacationMessageIsOn([in] VARIANT_BOOL newVal);
 	[propget, id(17), helpstring("The vacation message")] HRESULT VacationMessage([out, retval] BSTR *pVal);
@@ -1218,6 +1222,7 @@ interface IInterfaceUtilities : IDispatch{
    // configured DmarcRptFromAddress has nothing to look at until tomorrow.
    [id(24), helpstring("Sends the DMARC aggregate reports (RFC 7489) collected so far to the domains that request them, rather than waiting for the hourly schedule. Set IncludeCurrentDay to also report today's still-accumulating statistics. Returns the number of reports submitted. Raises an error when DmarcRptFromAddress is not configured; requires server administrator rights.")] HRESULT SendDmarcReports([in] VARIANT_BOOL IncludeCurrentDay, [out, retval] long *ReportCount);
    [id(25), helpstring("Erases the stored traces of an email address that account deletion leaves behind: quarantine entries, message-trace rows, greylisting triplets, distribution-list memberships, aliases, and (optionally) the per-user archive tree. Deliberately separate from deleting the account. Returns how many things were removed.")] HRESULT EraseAddressTraces([in] BSTR Address, [in] VARIANT_BOOL IncludeArchive, [out, retval] long *RemovedCount);
+   [id(26), helpstring("Runs the message retention sweep now - every domain and account with a MessageRetentionDays policy - and returns how many messages it removed. The scheduled task runs the same sweep every six hours. Server administrators only.")] HRESULT RunMessageRetention([out, retval] long *DeletedCount);
 };
 
 [

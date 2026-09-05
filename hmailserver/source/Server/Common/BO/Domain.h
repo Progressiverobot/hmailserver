@@ -76,6 +76,12 @@ namespace HM
       int GetMaxSizeMB() const;
       void SetMaxSizeMB(int iNewVal);
 
+      // Days delivered messages are kept in this domain's mailboxes before the
+      // retention sweep removes them; 0 = no policy. An account's own value overrides
+      // it (see Account::GetMessageRetentionDays).
+      int GetMessageRetentionDays() const { return message_retention_days_; }
+      void SetMessageRetentionDays(int days) { message_retention_days_ = days; }
+
       bool GetEnableSignature() const;
       void SetEnableSignature(bool bNewVal);
 
@@ -269,6 +275,7 @@ namespace HM
       int active_;
       unsigned int max_message_size_;
       int max_size_mb_;
+      int message_retention_days_;
       int max_no_of_accounts_;
       int max_no_of_aliases_;
       int max_no_of_distribution_lists_;

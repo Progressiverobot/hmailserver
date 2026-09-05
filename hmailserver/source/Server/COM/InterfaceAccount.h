@@ -103,6 +103,8 @@ public:
    STDMETHOD(put_Active)(/*[in]*/ VARIANT_BOOL newVal);
    STDMETHOD(get_MaxSize)(/*[out, retval]*/ long *pVal);
    STDMETHOD(put_MaxSize)(/*[in]*/ long newVal);
+   STDMETHOD(get_MessageRetentionDays)(/*[out, retval]*/ long *pVal);
+   STDMETHOD(put_MessageRetentionDays)(/*[in]*/ long newVal);
 
    STDMETHOD(get_VacationMessageIsOn)(/*[out, retval]*/ VARIANT_BOOL *pVal);
    STDMETHOD(put_VacationMessageIsOn)(/*[in]*/ VARIANT_BOOL newVal);

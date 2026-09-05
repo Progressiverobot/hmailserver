@@ -73,6 +73,7 @@ public:
    STDMETHOD(SendTlsRptReports)(/*[in]*/ VARIANT_BOOL IncludeCurrentDay, /*[out, retval]*/ long *ReportCount);
    STDMETHOD(SendDmarcReports)(/*[in]*/ VARIANT_BOOL IncludeCurrentDay, /*[out, retval]*/ long *ReportCount);
    STDMETHOD(EraseAddressTraces)(/*[in]*/ BSTR Address, /*[in]*/ VARIANT_BOOL IncludeArchive, /*[out, retval]*/ long *RemovedCount);
+   STDMETHOD(RunMessageRetention)(/*[out, retval]*/ long *DeletedCount);
 };
 
 OBJECT_ENTRY_AUTO(__uuidof(Utilities), InterfaceUtilities)

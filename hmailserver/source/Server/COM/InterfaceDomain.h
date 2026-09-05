@@ -105,6 +105,8 @@ END_COM_MAP()
 
    STDMETHOD(get_MaxSize)(/*[out, retval]*/ long *pVal);
    STDMETHOD(put_MaxSize)(/*[in]*/ long newVal);
+   STDMETHOD(get_MessageRetentionDays)(/*[out, retval]*/ long *pVal);
+   STDMETHOD(put_MessageRetentionDays)(/*[in]*/ long newVal);
    STDMETHOD(get_MaxAccountSize)(/*[out, retval]*/ long *pVal);
    STDMETHOD(put_MaxAccountSize)(/*[in]*/ long newVal);
 

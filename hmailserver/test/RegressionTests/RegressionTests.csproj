@@ -299,6 +299,7 @@
   <ItemGroup>
     <Compile Include="MIME\MalformedInput.cs" />
     <Compile Include="Infrastructure\ArchiveRetentionTests.cs" />
+    <Compile Include="Infrastructure\MessageRetentionTests.cs" />
     <Compile Include="Infrastructure\AcceptPathResilience.cs" />
     <Compile Include="Infrastructure\BackendPortability.cs" />
     <Compile Include="Infrastructure\DatabaseFailureHandling.cs" />
