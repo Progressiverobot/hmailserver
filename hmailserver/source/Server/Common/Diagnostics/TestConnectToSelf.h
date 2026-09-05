@@ -13,8 +13,8 @@ namespace HM
    class TestConnectToSelf
    {
    public:
-	   TestConnectToSelf(const String &localDomainName);
-	   virtual ~TestConnectToSelf();
+      TestConnectToSelf(const String &localDomainName);
+      virtual ~TestConnectToSelf();
 
       DiagnosticResult PerformTest();
 

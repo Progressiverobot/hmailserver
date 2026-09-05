@@ -12,8 +12,8 @@ namespace HM
    class ServiceManager  
    {
    public:
-	   ServiceManager();
-	   virtual ~ServiceManager();
+      ServiceManager();
+      virtual ~ServiceManager();
 
       bool RegisterService(const String &ServiceName, const String &ServiceCaption);
       bool UnregisterService(const String &ServiceName);

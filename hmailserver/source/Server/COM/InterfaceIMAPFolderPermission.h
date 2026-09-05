@@ -25,9 +25,9 @@ namespace HM
 // InterfaceIMAPFolderPermission
 
 class ATL_NO_VTABLE InterfaceIMAPFolderPermission :
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceIMAPFolderPermission, &CLSID_IMAPFolderPermission>,
-	public IDispatchImpl<IInterfaceIMAPFolderPermission, &IID_IInterfaceIMAPFolderPermission, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceIMAPFolderPermission, &CLSID_IMAPFolderPermission>,
+   public IDispatchImpl<IInterfaceIMAPFolderPermission, &IID_IInterfaceIMAPFolderPermission, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public COMCollectionItem<HM::ACLPermission, HM::ACLPermissions>,
    public HM::COMAuthenticator,
    public ISupportErrorInfo
@@ -35,31 +35,31 @@ class ATL_NO_VTABLE InterfaceIMAPFolderPermission :
 public:
 
    InterfaceIMAPFolderPermission()
-	{
-	}
+   {
+   }
 
 
 DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACEIMAPFOLDERPERMISSION)
 
 
 BEGIN_COM_MAP(InterfaceIMAPFolderPermission)
-	COM_INTERFACE_ENTRY(IInterfaceIMAPFolderPermission)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceIMAPFolderPermission)
+   COM_INTERFACE_ENTRY(IDispatch)
    COM_INTERFACE_ENTRY(ISupportErrorInfo)
 END_COM_MAP()
 
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
 
-	void FinalRelease()
-	{
-	}
+   void FinalRelease()
+   {
+   }
 
 public:
 

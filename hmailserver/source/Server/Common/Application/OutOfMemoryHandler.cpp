@@ -30,34 +30,34 @@ namespace HM
 
    int OnOutOfMemory( size_t )
    {
-	  // Hopefully the scope is smaller then the buffer we've attempted to allocate
+     // Hopefully the scope is smaller then the buffer we've attempted to allocate
      boost::lock_guard<boost::recursive_mutex> guard(_outOfMemoryHandlerMutex);
 
-	  // Start of by deleting the chunk of memory
-	  // to ensure that we got something to work with.
-	  delete [] pMemoryChunk;
-	  pMemoryChunk = 0;
+     // Start of by deleting the chunk of memory
+     // to ensure that we got something to work with.
+     delete [] pMemoryChunk;
+     pMemoryChunk = 0;
 
-	  LOG_APPLICATION("OutOfMemoryHandler - hMailServer has run out of memory, clearing caches.");
+     LOG_APPLICATION("OutOfMemoryHandler - hMailServer has run out of memory, clearing caches.");
 
-	  // And now try to free up some memory.
-	  bool bCleared = false;
+     // And now try to free up some memory.
+     bool bCleared = false;
 
-	  bCleared = IMAPFolderContainer::Instance()->Clear() ? true : bCleared;
+     bCleared = IMAPFolderContainer::Instance()->Clear() ? true : bCleared;
 
-	  // If memory was cleared, allocate up the memory chunk again,
-	  // if we get here a second time.
-	  pMemoryChunk = new BYTE[1024 * 1024];
+     // If memory was cleared, allocate up the memory chunk again,
+     // if we get here a second time.
+     pMemoryChunk = new BYTE[1024 * 1024];
 
-	  // Return 1 if something was removed from cache.
-	  return bCleared ? 1 : 0;
+     // Return 1 if something was removed from cache.
+     return bCleared ? 1 : 0;
 
    }
 
    void 
    OutOfMemoryHandler::Initialize()
    {     
-	  pMemoryChunk = new BYTE[5 * 1024 * 1024];
+     pMemoryChunk = new BYTE[5 * 1024 * 1024];
 
       pOriginalNewHandler = _set_new_handler( OnOutOfMemory );
       _set_new_mode(1);

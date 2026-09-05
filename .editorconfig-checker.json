@@ -10,11 +10,15 @@
       "tabs) is still checked, as are the final newline and trailing whitespace where",
       ".editorconfig asks for them.",
       "",
-      "The excluded paths are the trees that still carry tabs from the original",
-      "hMailServer sources: 284 of the C++ server's files, two SQL CE headers under",
-      "libraries/, one installer helper and two files of an old test project. They are",
-      "excluded, not ignored: the roadmap carries the conversion, and the exclusion",
-      "comes off with it. Everything else in the repository is checked."
+      "The C++ server tree, the installer's socket-check helper and the old",
+      "TestInvalidConnections project carried tabs from the original hMailServer",
+      "sources and were excluded here until 5 September 2026, when every tab in them",
+      "was expanded to spaces (three-column stops) and the Release binary was shown",
+      "to hash identically before and after. They are checked now. The one exclusion",
+      "left is libraries/mssqlce3.5: two SQL Server Compact headers that are",
+      "Microsoft's, vendored as shipped, and a reformatted vendor header is one whose",
+      "next diff against upstream means nothing. Everything else in the repository",
+      "is checked."
    ],
    "Verbose": false,
    "Debug": false,
@@ -22,10 +26,7 @@
    "SpacesAfterTabs": false,
    "NoColor": true,
    "Exclude": [
-      "^hmailserver/source/Server/",
-      "^libraries/mssqlce3\\.5/",
-      "^hmailserver/installation/InnoSocketCheck/",
-      "^hmailserver/test/TestInvalidConnections/"
+      "^libraries/mssqlce3\\.5/"
    ],
    "AllowedContentTypes": [],
    "PassedFiles": [],

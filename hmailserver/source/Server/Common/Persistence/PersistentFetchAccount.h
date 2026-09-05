@@ -20,7 +20,7 @@ namespace HM
       static void Lock(__int64 ID);
       static void Unlock(__int64 ID);
       static void UnlockAll();
-		static bool IsLocked(__int64 ID);
+      static bool IsLocked(__int64 ID);
       static bool ReadObject(std::shared_ptr<FetchAccount> pFA, const SQLCommand& command);
       static bool ReadObject(std::shared_ptr<FetchAccount> oFA, std::shared_ptr<DALRecordset> pRS);
       static bool SaveObject(std::shared_ptr<FetchAccount> oFA, String &errorMessage,PersistenceMode mode);

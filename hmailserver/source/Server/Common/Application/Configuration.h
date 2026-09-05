@@ -33,8 +33,8 @@ namespace HM
    {
    public:
 
-	   Configuration();
-	   virtual ~Configuration();
+      Configuration();
+      virtual ~Configuration();
 
       std::shared_ptr<POP3Configuration> GetPOP3Configuration() const { return pop3_configuration_; }
       std::shared_ptr<SMTPConfiguration> GetSMTPConfiguration() const { return smtp_configuration_; }

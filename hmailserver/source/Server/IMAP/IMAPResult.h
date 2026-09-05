@@ -11,7 +11,7 @@ namespace HM
    class IMAPResult
    {
    public:
-	   enum Result
+      enum Result
       {
          ResultOK = 1,
          ResultBad = 2,
@@ -24,7 +24,7 @@ namespace HM
       IMAPResult(const IMAPResult &otherCopy);
       IMAPResult& operator= (const IMAPResult& f);
 
-	   virtual ~IMAPResult();
+      virtual ~IMAPResult();
 
       const Result& GetResult() const {return result_;}
       const AnsiString& GetMessage() const {return message_;}

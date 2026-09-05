@@ -15,35 +15,35 @@ namespace HM
 
 
 class ATL_NO_VTABLE InterfaceRuleActions : 
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceRuleActions, &CLSID_RuleActions>,
-	public IDispatchImpl<IInterfaceRuleActions, &IID_IInterfaceRuleActions, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceRuleActions, &CLSID_RuleActions>,
+   public IDispatchImpl<IInterfaceRuleActions, &IID_IInterfaceRuleActions, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public HM::COMAuthenticator
 {
 public:
-	InterfaceRuleActions()
-	{
-	}
+   InterfaceRuleActions()
+   {
+   }
 
 DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACERULEACTIONS)
 
 
 BEGIN_COM_MAP(InterfaceRuleActions)
-	COM_INTERFACE_ENTRY(IInterfaceRuleActions)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceRuleActions)
+   COM_INTERFACE_ENTRY(IDispatch)
 END_COM_MAP()
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
-	
-	void FinalRelease() 
-	{
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
+   
+   void FinalRelease() 
+   {
+   }
 
 public:
    

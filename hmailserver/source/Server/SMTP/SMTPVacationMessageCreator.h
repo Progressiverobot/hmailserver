@@ -14,7 +14,7 @@ namespace HM
    public:
 
       SMTPVacationMessageCreator();
-	   virtual ~SMTPVacationMessageCreator();
+      virtual ~SMTPVacationMessageCreator();
 
       // Composes and queues one auto-reply to sToAddress on behalf of
       // recipientAccount, carrying the given subject and body. Both the account's

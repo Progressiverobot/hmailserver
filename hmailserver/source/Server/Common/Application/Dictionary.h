@@ -10,7 +10,7 @@ namespace HM
    class Dictionary
    {
    public:
-	   Dictionary();
+      Dictionary();
       ~Dictionary();
 
       static String GetWindowsErrorDescription(int iErrorCode);

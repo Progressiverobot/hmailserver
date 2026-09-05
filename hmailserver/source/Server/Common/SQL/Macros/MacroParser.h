@@ -12,8 +12,8 @@ namespace HM
    class MacroParser
    {
    public:
-	   MacroParser(const String &macro);
-	   virtual ~MacroParser();
+      MacroParser(const String &macro);
+      virtual ~MacroParser();
 
       Macro Parse();
 

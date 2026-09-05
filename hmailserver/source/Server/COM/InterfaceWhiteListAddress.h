@@ -22,36 +22,36 @@
 
 class ATL_NO_VTABLE InterfaceWhiteListAddress :
    public COMCollectionItem<HM::WhiteListAddress, HM::WhiteListAddresses>,
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceWhiteListAddress, &CLSID_WhiteListAddress>,
-	public IDispatchImpl<IInterfaceWhiteListAddress, &IID_IInterfaceWhiteListAddress, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceWhiteListAddress, &CLSID_WhiteListAddress>,
+   public IDispatchImpl<IInterfaceWhiteListAddress, &IID_IInterfaceWhiteListAddress, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public HM::COMAuthenticator
 {
 public:
-	InterfaceWhiteListAddress()
-	{
-	}
+   InterfaceWhiteListAddress()
+   {
+   }
 
 DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACEWHITELISTADDRESS)
 
 
 BEGIN_COM_MAP(InterfaceWhiteListAddress)
-	COM_INTERFACE_ENTRY(IInterfaceWhiteListAddress)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceWhiteListAddress)
+   COM_INTERFACE_ENTRY(IDispatch)
 END_COM_MAP()
 
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
 
-	void FinalRelease()
-	{
-	}
+   void FinalRelease()
+   {
+   }
 
 public:
    STDMETHOD(Save)();

@@ -54,8 +54,8 @@ namespace HM
 
       String message_file_;
       AnsiString user_;
-	   __int64 spam_dsize_;      // Content-length spamd reported; < 0 until a valid header is parsed
-	   __int64 message_size_;
+      __int64 spam_dsize_;      // Content-length spamd reported; < 0 until a valid header is parsed
+      __int64 message_size_;
       std::shared_ptr<File> result_;
 
       // Shared with SpamTestSpamAssassin::RunTest rather than a reference to its

@@ -13,8 +13,8 @@ namespace HM
    class PersistentAlias
    {
    public:
-	   PersistentAlias();
-	   virtual ~PersistentAlias();
+      PersistentAlias();
+      virtual ~PersistentAlias();
 
       static bool DeleteObject(std::shared_ptr<Alias> pAlias);
       static bool SaveObject(std::shared_ptr<Alias> pAlias);

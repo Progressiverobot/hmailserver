@@ -22,9 +22,9 @@ namespace HM
 
 class ATL_NO_VTABLE InterfaceDomain : 
    public COMCollectionItem<HM::Domain, HM::Domains>,
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceDomain, &CLSID_Domain>,
-	public IDispatchImpl<IInterfaceDomain, &IID_IInterfaceDomain, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceDomain, &CLSID_Domain>,
+   public IDispatchImpl<IInterfaceDomain, &IID_IInterfaceDomain, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public HM::COMAuthenticator,
    public ISupportErrorInfo
 {
@@ -50,22 +50,22 @@ DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACEDOMAIN)
 
 
 BEGIN_COM_MAP(InterfaceDomain)
-	COM_INTERFACE_ENTRY(IInterfaceDomain)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceDomain)
+   COM_INTERFACE_ENTRY(IDispatch)
    COM_INTERFACE_ENTRY(ISupportErrorInfo)
 END_COM_MAP()
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
-	
-	void FinalRelease() 
-	{
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
+   
+   void FinalRelease() 
+   {
+   }
 
    STDMETHOD(InterfaceSupportsErrorInfo)(REFIID riid);
 

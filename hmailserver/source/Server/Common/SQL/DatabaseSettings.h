@@ -21,9 +21,9 @@ namespace HM
          TypeMSSQLCompactEdition = 4
       };
 
-	   DatabaseSettings(const String &sDatabaseProvider, const String &sDatabaseServer, const String &sDatabaseName, const String &sUsername, const String &sPassword,
-			const String &sDatabaseDirectory, const String &sDatabaseServerFailoverPartner, HM::DatabaseSettings::SQLDBType dbType, long lDBPort);
-	   virtual ~DatabaseSettings();
+      DatabaseSettings(const String &sDatabaseProvider, const String &sDatabaseServer, const String &sDatabaseName, const String &sUsername, const String &sPassword,
+         const String &sDatabaseDirectory, const String &sDatabaseServerFailoverPartner, HM::DatabaseSettings::SQLDBType dbType, long lDBPort);
+      virtual ~DatabaseSettings();
 
       String GetProvider() { return database_provider_; }
       String GetServer() {return database_server_; }
@@ -36,7 +36,7 @@ namespace HM
       String GetDatabaseServerFailoverPartner() const { return database_server_failover_partner_; }
    
       String GetDefaultScript();
-	  
+     
       static String GetDatabaseTypeName(HM::DatabaseSettings::SQLDBType type);
 
    private:

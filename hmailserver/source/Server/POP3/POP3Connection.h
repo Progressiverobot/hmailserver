@@ -23,7 +23,7 @@ namespace HM
       POP3Connection(ConnectionSecurity connection_security,
          boost::asio::io_context& io_context, 
          boost::asio::ssl::context& context);
-	   virtual ~POP3Connection();
+      virtual ~POP3Connection();
 
       virtual void ParseData(const AnsiString &Request);
       virtual void ParseData(std::shared_ptr<ByteBuffer> pBuffer) { };
@@ -142,7 +142,7 @@ namespace HM
       // Returns false when the message file could not be opened; the caller must
       // then send an error response instead of starting a message transfer.
       bool StartSendFile_(std::shared_ptr<Message> message);
-	  void ReadAndSend_();
+     void ReadAndSend_();
       void ResetMailbox_();
       std::shared_ptr<Message> GetMessage_(unsigned int index);
 

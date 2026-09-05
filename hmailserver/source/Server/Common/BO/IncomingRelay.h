@@ -10,17 +10,17 @@ namespace HM
    class IncomingRelay : public BusinessObject<IncomingRelay>
    {
    public:
-	   IncomingRelay();
-	   virtual ~IncomingRelay();
+      IncomingRelay();
+      virtual ~IncomingRelay();
 
    public:
-	   String GetLowerIPString() const ;
-	   String GetUpperIPString()const ;
-	   bool SetLowerIPString(const String & sLowerIP);
-	   bool SetUpperIPString(const String & sUpperIP);
+      String GetLowerIPString() const ;
+      String GetUpperIPString()const ;
+      bool SetLowerIPString(const String & sLowerIP);
+      bool SetUpperIPString(const String & sUpperIP);
 
-	   void SetLowerIP(const IPAddress &lNewVal){lower_ip_ = lNewVal;}
-	   void SetUpperIP(const IPAddress &lNewVal){upper_ip_ = lNewVal;}
+      void SetLowerIP(const IPAddress &lNewVal){lower_ip_ = lNewVal;}
+      void SetUpperIP(const IPAddress &lNewVal){upper_ip_ = lNewVal;}
       IPAddress GetLowerIP() const {return lower_ip_;}
       IPAddress GetUpperIP() const {return upper_ip_;}
 
@@ -34,9 +34,9 @@ namespace HM
       bool XMLLoadSubItems (XNode *pSecurityRangeNode, int iOptions) {return true;};
 
    protected:
-	   
-	   IPAddress lower_ip_;
-	   IPAddress upper_ip_;
+      
+      IPAddress lower_ip_;
+      IPAddress upper_ip_;
      
       String name_;
 

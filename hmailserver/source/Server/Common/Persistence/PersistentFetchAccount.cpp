@@ -54,18 +54,18 @@ namespace HM
       bool bRetVal = Application::Instance()->GetDBManager()->Execute(command);
    }
 
-	bool
-	PersistentFetchAccount::IsLocked(__int64 ID)
-	{
-		SQLCommand command("select falocked from hm_fetchaccounts where faid = @FAID");
-		command.AddParameter("@FAID", ID);
+   bool
+   PersistentFetchAccount::IsLocked(__int64 ID)
+   {
+      SQLCommand command("select falocked from hm_fetchaccounts where faid = @FAID");
+      command.AddParameter("@FAID", ID);
 
-		std::shared_ptr<DALRecordset> pRS = Application::Instance()->GetDBManager()->OpenRecordset(command);
-		if (!pRS || pRS->IsEOF())
-			return false;
+      std::shared_ptr<DALRecordset> pRS = Application::Instance()->GetDBManager()->OpenRecordset(command);
+      if (!pRS || pRS->IsEOF())
+         return false;
 
-		return pRS->GetLongValue("falocked") == 1;
-	}
+      return pRS->GetLongValue("falocked") == 1;
+   }
 
 
    bool

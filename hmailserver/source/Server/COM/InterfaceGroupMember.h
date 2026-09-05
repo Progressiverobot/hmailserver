@@ -21,37 +21,37 @@ namespace HM
 
 
 class ATL_NO_VTABLE InterfaceGroupMember :
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceGroupMember, &CLSID_GroupMember>,
-	public IDispatchImpl<IInterfaceGroupMember, &IID_IInterfaceGroupMember, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceGroupMember, &CLSID_GroupMember>,
+   public IDispatchImpl<IInterfaceGroupMember, &IID_IInterfaceGroupMember, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public COMCollectionItem<HM::GroupMember, HM::GroupMembers>,
    public HM::COMAuthenticator
 {
 public:
-	InterfaceGroupMember()
-	{
-	}
+   InterfaceGroupMember()
+   {
+   }
 
 DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACEGROUPMEMBER)
 
 
 BEGIN_COM_MAP(InterfaceGroupMember)
-	COM_INTERFACE_ENTRY(IInterfaceGroupMember)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceGroupMember)
+   COM_INTERFACE_ENTRY(IDispatch)
 END_COM_MAP()
 
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
 
-	void FinalRelease()
-	{
-	}
+   void FinalRelease()
+   {
+   }
 
 public:
    STDMETHOD(Save)();

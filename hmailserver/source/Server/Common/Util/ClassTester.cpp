@@ -72,9 +72,9 @@ namespace HM
       delete pEventTester;
 
       OutputDebugString(_T("hMailServer: Testing mime parser\n"));
-	   MimeTester *pMimeTester = new MimeTester;
+      MimeTester *pMimeTester = new MimeTester;
       pMimeTester->Test();
-	   delete pMimeTester;
+      delete pMimeTester;
 
       OutputDebugString(_T("hMailServer: Testing StringParser\n"));
       StringParserTester *pParser = new StringParserTester();

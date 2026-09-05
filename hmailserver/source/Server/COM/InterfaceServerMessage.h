@@ -23,36 +23,36 @@
 
 class ATL_NO_VTABLE InterfaceServerMessage :
    public COMCollectionItem<HM::ServerMessage, HM::ServerMessages>,
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceServerMessage, &CLSID_ServerMessage>,
-	public IDispatchImpl<IInterfaceServerMessage, &IID_IInterfaceServerMessage, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceServerMessage, &CLSID_ServerMessage>,
+   public IDispatchImpl<IInterfaceServerMessage, &IID_IInterfaceServerMessage, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public HM::COMAuthenticator
 {
 public:
-	InterfaceServerMessage()
-	{
-	}
+   InterfaceServerMessage()
+   {
+   }
 
 DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACESERVERMESSAGE)
 
 
 BEGIN_COM_MAP(InterfaceServerMessage)
-	COM_INTERFACE_ENTRY(IInterfaceServerMessage)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceServerMessage)
+   COM_INTERFACE_ENTRY(IDispatch)
 END_COM_MAP()
 
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
 
-	void FinalRelease()
-	{
-	}
+   void FinalRelease()
+   {
+   }
 
 public:
 

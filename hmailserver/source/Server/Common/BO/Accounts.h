@@ -19,9 +19,9 @@ namespace HM
    class Accounts : public Collection<Account, PersistentAccount>
    {
    public:
-	   Accounts (__int64 iDomainID);
+      Accounts (__int64 iDomainID);
       Accounts (__int64 iDomainID, __int64 iAccountID);
-	   virtual ~Accounts();
+      virtual ~Accounts();
 
       void Refresh();
   

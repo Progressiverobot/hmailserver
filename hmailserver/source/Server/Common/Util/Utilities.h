@@ -14,8 +14,8 @@ namespace HM
    class Utilities  
    {
    public:
-	   Utilities();
-	   virtual ~Utilities();
+      Utilities();
+      virtual ~Utilities();
 
       static String ComputerName();
       static String GetBinDirectory();

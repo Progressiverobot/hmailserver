@@ -13,8 +13,8 @@ namespace HM
    class POP3Sessions : public Singleton<POP3Sessions>
    {
    public:
-	   POP3Sessions();
-	   virtual ~POP3Sessions();
+      POP3Sessions();
+      virtual ~POP3Sessions();
 
       bool IsLocked(__int64 iAccount);
       bool Lock(__int64 iAccount);

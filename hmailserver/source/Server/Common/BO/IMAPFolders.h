@@ -14,10 +14,10 @@ namespace HM
    class IMAPFolders : public Collection<IMAPFolder, PersistentIMAPFolder>
    {
    public:
-	   IMAPFolders(__int64 iAccountID, __int64 iParentFolderID);
+      IMAPFolders(__int64 iAccountID, __int64 iParentFolderID);
       IMAPFolders();
 
-	   virtual ~IMAPFolders();
+      virtual ~IMAPFolders();
       void Refresh();
 
       std::shared_ptr<IMAPFolder> GetItemByDBIDRecursive(__int64 lFolderID);

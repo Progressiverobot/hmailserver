@@ -13,8 +13,8 @@ namespace HM
    class PersistentDomain
    {
    public:
-	   PersistentDomain();
-	   virtual ~PersistentDomain();
+      PersistentDomain();
+      virtual ~PersistentDomain();
 
       static bool DeleteObject(std::shared_ptr<Domain> pDomain);
       static bool SaveObject(std::shared_ptr<Domain> pDomain);

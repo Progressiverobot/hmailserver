@@ -18,8 +18,8 @@ namespace HM
    class AddresslistParser  
    {
    public:
-	   AddresslistParser();
-	   virtual ~AddresslistParser();
+      AddresslistParser();
+      virtual ~AddresslistParser();
       
   
       std::vector<std::shared_ptr<Address> > ParseList(const String &sList) const;

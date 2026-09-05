@@ -12,9 +12,9 @@
 // InterfaceScripting
 
 class ATL_NO_VTABLE InterfaceScripting : 
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceScripting, &CLSID_Scripting>,
-	public IDispatchImpl<IInterfaceScripting, &IID_IInterfaceScripting, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceScripting, &CLSID_Scripting>,
+   public IDispatchImpl<IInterfaceScripting, &IID_IInterfaceScripting, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public HM::COMAuthenticator
 {
 public:
@@ -24,28 +24,28 @@ DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACESCRIPTING)
 
 
 BEGIN_COM_MAP(InterfaceScripting)
-	COM_INTERFACE_ENTRY(IInterfaceScripting)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceScripting)
+   COM_INTERFACE_ENTRY(IDispatch)
 END_COM_MAP()
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
-	
-	void FinalRelease() 
-	{
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
+   
+   void FinalRelease() 
+   {
+   }
 
 public:
 
    bool LoadSettings();
 
    STDMETHOD(get_Enabled)(/*[out, retval]*/ VARIANT_BOOL *pVal);
-   STDMETHOD(put_Enabled)(/*[in]*/ VARIANT_BOOL newVal);	
+   STDMETHOD(put_Enabled)(/*[in]*/ VARIANT_BOOL newVal); 
 
    STDMETHOD(get_Language)(/*[out, retval]*/ BSTR *pVal);
    STDMETHOD(put_Language)(/*[in]*/ BSTR newVal);

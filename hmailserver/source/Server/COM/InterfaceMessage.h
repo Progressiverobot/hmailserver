@@ -21,9 +21,9 @@ namespace HM
 
 class ATL_NO_VTABLE InterfaceMessage : 
    public COMCollectionItem<HM::Message, HM::Messages>,
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceMessage, &CLSID_Message>,
-	public IDispatchImpl<IInterfaceMessage, &IID_IInterfaceMessage, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceMessage, &CLSID_Message>,
+   public IDispatchImpl<IInterfaceMessage, &IID_IInterfaceMessage, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public HM::COMAuthenticator,
    public ISupportErrorInfo
 {
@@ -35,21 +35,21 @@ DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACEMESSAGE)
 
 
 BEGIN_COM_MAP(InterfaceMessage)
-	COM_INTERFACE_ENTRY(IInterfaceMessage)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceMessage)
+   COM_INTERFACE_ENTRY(IDispatch)
    COM_INTERFACE_ENTRY(ISupportErrorInfo)
 END_COM_MAP()
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
-	
-	void FinalRelease() 
-	{
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
+   
+   void FinalRelease() 
+   {
+   }
 
    STDMETHOD(InterfaceSupportsErrorInfo)(REFIID riid);
 

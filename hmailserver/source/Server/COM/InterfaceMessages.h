@@ -13,35 +13,35 @@
 // InterfaceMessages
 
 class ATL_NO_VTABLE InterfaceMessages : 
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceMessages, &CLSID_Messages>,
-	public IDispatchImpl<IInterfaceMessages, &IID_IInterfaceMessages, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceMessages, &CLSID_Messages>,
+   public IDispatchImpl<IInterfaceMessages, &IID_IInterfaceMessages, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public HM::COMAuthenticator
 {
 public:
-	InterfaceMessages()
-	{
-	}
+   InterfaceMessages()
+   {
+   }
 
 DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACEMESSAGES)
 
 
 BEGIN_COM_MAP(InterfaceMessages)
-	COM_INTERFACE_ENTRY(IInterfaceMessages)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceMessages)
+   COM_INTERFACE_ENTRY(IDispatch)
 END_COM_MAP()
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
-	
-	void FinalRelease() 
-	{
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
+   
+   void FinalRelease() 
+   {
+   }
 
 public:
    STDMETHOD(DeleteByDBID)(hyper lDBID);

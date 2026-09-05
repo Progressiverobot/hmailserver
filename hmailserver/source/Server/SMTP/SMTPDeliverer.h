@@ -19,8 +19,8 @@ namespace HM
    class SMTPDeliverer
    {
    public:
-	   SMTPDeliverer();
-	   virtual ~SMTPDeliverer();
+      SMTPDeliverer();
+      virtual ~SMTPDeliverer();
 
       static void DeliverMessage(std::shared_ptr<Message> pMessage);
 

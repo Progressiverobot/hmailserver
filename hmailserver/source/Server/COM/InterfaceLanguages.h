@@ -12,35 +12,35 @@
 // InterfaceLanguages
 
 class ATL_NO_VTABLE InterfaceLanguages :
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceLanguages, &CLSID_Languages>,
-	public IDispatchImpl<IInterfaceLanguages, &IID_IInterfaceLanguages, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceLanguages, &CLSID_Languages>,
+   public IDispatchImpl<IInterfaceLanguages, &IID_IInterfaceLanguages, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>
 {
 public:
-	InterfaceLanguages()
-	{
-	}
+   InterfaceLanguages()
+   {
+   }
 
 DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACELANGUAGES)
 
 
 BEGIN_COM_MAP(InterfaceLanguages)
-	COM_INTERFACE_ENTRY(IInterfaceLanguages)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceLanguages)
+   COM_INTERFACE_ENTRY(IDispatch)
 END_COM_MAP()
 
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
 
-	void FinalRelease()
-	{
-	}
+   void FinalRelease()
+   {
+   }
 
 public:
 

@@ -13,8 +13,8 @@ namespace HM
    class TestBackupDirectory
    {
    public:
-	   TestBackupDirectory();
-	   virtual ~TestBackupDirectory();
+      TestBackupDirectory();
+      virtual ~TestBackupDirectory();
 
       DiagnosticResult PerformTest();
 

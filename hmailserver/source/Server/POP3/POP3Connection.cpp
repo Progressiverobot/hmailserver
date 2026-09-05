@@ -1623,7 +1623,7 @@ namespace HM
 
       transmission_buffer_.Append((BYTE*) responseString.GetBuffer(), responseString.GetLength());
 
-	  ReadAndSend_();
+     ReadAndSend_();
 
       return true;
    }

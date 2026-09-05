@@ -15,7 +15,7 @@ namespace HM
       FetchAccountUID (__int64 iID, __int64 iAccountID, const String &sUID, const String &sDate);
       FetchAccountUID();
 
-	  ~FetchAccountUID();
+     ~FetchAccountUID();
 
      String GetName() const { return "FetchAccountUID"; }
 

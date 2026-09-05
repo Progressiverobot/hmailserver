@@ -32,7 +32,7 @@ namespace HM
    String 
    SecurityRange::GetLowerIPString() const 
    {
-	   return lower_ip_.ToString();
+      return lower_ip_.ToString();
    }
 
    bool
@@ -58,7 +58,7 @@ namespace HM
    bool
    SecurityRange::GetAllowSMTP() const
    {
-	   return (options_ & IPRANGE_ALLOW_SMTP) ? true : false;
+      return (options_ & IPRANGE_ALLOW_SMTP) ? true : false;
    }
 
    void
@@ -68,13 +68,13 @@ namespace HM
          options_ = options_ | IPRANGE_ALLOW_SMTP;
       else
          options_ = options_ & ~IPRANGE_ALLOW_SMTP;
-	   
+      
    }
 
    bool
    SecurityRange::GetAllowIMAP() const
    {
-	   return (options_ & IPRANGE_ALLOW_IMAP) ? true : false;
+      return (options_ & IPRANGE_ALLOW_IMAP) ? true : false;
    }
 
    void
@@ -84,13 +84,13 @@ namespace HM
          options_ = options_ | IPRANGE_ALLOW_IMAP;
       else
          options_ = options_ & ~IPRANGE_ALLOW_IMAP;
-	   
+      
    }
 
    bool
    SecurityRange::GetAllowPOP3() const
    {
-	   return (options_ & IPRANGE_ALLOW_POP3) ? true : false;
+      return (options_ & IPRANGE_ALLOW_POP3) ? true : false;
    }
 
    void
@@ -100,7 +100,7 @@ namespace HM
          options_ = options_ | IPRANGE_ALLOW_POP3;
       else
          options_ = options_ & ~IPRANGE_ALLOW_POP3;
-	   
+      
    }
 
    bool
@@ -166,7 +166,7 @@ namespace HM
    bool
    SecurityRange::GetAllowRelayL2L() const
    {
-	   return (options_ & IPRANGE_RELAY_LOCAL_TO_LOCAL) ? true : false;
+      return (options_ & IPRANGE_RELAY_LOCAL_TO_LOCAL) ? true : false;
    }
 
    void
@@ -176,13 +176,13 @@ namespace HM
          options_ = options_ | IPRANGE_RELAY_LOCAL_TO_LOCAL;
       else
          options_ = options_ & ~IPRANGE_RELAY_LOCAL_TO_LOCAL;
-	   
+      
    }
 
    bool
    SecurityRange::GetAllowRelayL2R() const
    {
-	   return (options_ & IPRANGE_RELAY_LOCAL_TO_REMOTE) ? true : false;
+      return (options_ & IPRANGE_RELAY_LOCAL_TO_REMOTE) ? true : false;
    }
 
    void
@@ -192,13 +192,13 @@ namespace HM
          options_ = options_ | IPRANGE_RELAY_LOCAL_TO_REMOTE;
       else
          options_ = options_ & ~IPRANGE_RELAY_LOCAL_TO_REMOTE;
-	   
+      
    }
 
    bool
    SecurityRange::GetAllowRelayR2L() const
    {
-	   return (options_ & IPRANGE_RELAY_REMOTE_TO_LOCAL) ? true : false;
+      return (options_ & IPRANGE_RELAY_REMOTE_TO_LOCAL) ? true : false;
    }
 
    void
@@ -208,13 +208,13 @@ namespace HM
          options_ = options_ | IPRANGE_RELAY_REMOTE_TO_LOCAL;
       else
          options_ = options_ & ~IPRANGE_RELAY_REMOTE_TO_LOCAL;
-	   
+      
    }
 
    bool
    SecurityRange::GetAllowRelayR2R() const
    {
-	   return (options_ & IPRANGE_RELAY_REMOTE_TO_REMOTE) ? true : false;
+      return (options_ & IPRANGE_RELAY_REMOTE_TO_REMOTE) ? true : false;
    }
 
    void

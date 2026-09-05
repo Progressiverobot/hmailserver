@@ -45,9 +45,9 @@ namespace HM
 
    }
 
-	bool
-	MessageUtilities::FolderExistsForDelivery(__int64 iAccountID, const String &sFolderName)
-	{
+   bool
+   MessageUtilities::FolderExistsForDelivery(__int64 iAccountID, const String &sFolderName)
+   {
       String sTempFolderName = sFolderName;
       CleanIMAPFolderRuleString(sTempFolderName);
 
@@ -83,17 +83,17 @@ namespace HM
       }
 
       return true;
-	}
+   }
 
    bool
-	MessageUtilities::MoveToIMAPFolder(std::shared_ptr<Message> pMessage, __int64 iAccountID, const String &sFolderName, bool bAutoSubscribe, bool bSetByGlobalRule, __int64 &iResultAccount, __int64 &iResultFolder)
+   MessageUtilities::MoveToIMAPFolder(std::shared_ptr<Message> pMessage, __int64 iAccountID, const String &sFolderName, bool bAutoSubscribe, bool bSetByGlobalRule, __int64 &iResultAccount, __int64 &iResultFolder)
    //---------------------------------------------------------------------------()
    // DESCRIPTION:
    // Moves a message to an IMAP folder. The message should not be saved when this
    // function is called.
    // Returns the ID of the folder the message was moved to.
    //---------------------------------------------------------------------------()
-	{
+   {
       LOG_DEBUG("Moving message to " + sFolderName);
 
       // Set default values in case we fail to move the message to another folder later on.
@@ -125,7 +125,7 @@ namespace HM
       if (pFolder && pFolder->IsPublicFolder())
       {
          // Do we have permissions to append?
-		   ACLManager aclManager;
+         ACLManager aclManager;
          std::shared_ptr<ACLPermission> pPermission = aclManager.GetPermissionForFolder(iAccountID, pFolder);
          if (!pPermission)
             return false;
@@ -153,7 +153,7 @@ namespace HM
 
                // Do we have permissions to append?
                ACLManager aclManager;
-			      std::shared_ptr<ACLPermission> pPermission = aclManager.GetPermissionForFolder(iAccountID, pTempFolder);
+               std::shared_ptr<ACLPermission> pPermission = aclManager.GetPermissionForFolder(iAccountID, pTempFolder);
 
                if (!pPermission)
                   return false;
@@ -191,7 +191,7 @@ namespace HM
       LOG_DEBUG("Message moved to folder " + StringParser::IntToString(iResultFolder));
 
       return true;
-	}
+   }
 
    void
    MessageUtilities::CleanIMAPFolderRuleString(String &sIMAPFolder)

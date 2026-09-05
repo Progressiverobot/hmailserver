@@ -632,19 +632,19 @@ STDMETHODIMP InterfaceFetchAccount::get_NextDownloadTime(BSTR* pVal)
 
 STDMETHODIMP InterfaceFetchAccount::get_IsLocked(VARIANT_BOOL* pVal)
 {
-	try
-	{
-		if (!object_)
-			return GetAccessDenied();
+   try
+   {
+      if (!object_)
+         return GetAccessDenied();
 
-		bool locked = HM::PersistentFetchAccount::IsLocked(object_->GetID());
-		*pVal = locked ? VARIANT_TRUE : VARIANT_FALSE;
-		return S_OK;
-	}
-	catch (...)
-	{
-		return COMError::GenerateGenericMessage();
-	}
+      bool locked = HM::PersistentFetchAccount::IsLocked(object_->GetID());
+      *pVal = locked ? VARIANT_TRUE : VARIANT_FALSE;
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
 }
 
 STDMETHODIMP InterfaceFetchAccount::get_UseAntiSpam(VARIANT_BOOL *pVal)

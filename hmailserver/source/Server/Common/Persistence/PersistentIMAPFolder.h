@@ -15,8 +15,8 @@ namespace HM
    class PersistentIMAPFolder
    {
    private:
-	   PersistentIMAPFolder();
-	   virtual ~PersistentIMAPFolder();
+      PersistentIMAPFolder();
+      virtual ~PersistentIMAPFolder();
    public:
 
       // Deletes one folder, its subfolders and everything in them. Unless

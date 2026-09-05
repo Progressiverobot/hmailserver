@@ -13,8 +13,8 @@ namespace HM
    class PersistentRouteAddress
    {
    public:
-	   PersistentRouteAddress();
-	   virtual ~PersistentRouteAddress();
+      PersistentRouteAddress();
+      virtual ~PersistentRouteAddress();
 
       static bool SaveObject(std::shared_ptr<RouteAddress> pRA);
       static bool SaveObject(std::shared_ptr<RouteAddress> pRA, String &errorMessage, PersistenceMode mode);

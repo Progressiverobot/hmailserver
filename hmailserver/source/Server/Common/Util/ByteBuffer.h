@@ -10,8 +10,8 @@ namespace HM
    class ByteBuffer  
    {
    public:
-	   ByteBuffer();
-	   virtual ~ByteBuffer();
+      ByteBuffer();
+      virtual ~ByteBuffer();
 
       bool IsEmpty() const {return buffer_size_ == 0; }
       // Returns true if the buffer is empty.

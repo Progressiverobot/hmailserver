@@ -13,35 +13,35 @@
 // InterfaceBackup
 
 class ATL_NO_VTABLE InterfaceBackup : 
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceBackup, &CLSID_Backup>,
-	public IDispatchImpl<IInterfaceBackup, &IID_IInterfaceBackup, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceBackup, &CLSID_Backup>,
+   public IDispatchImpl<IInterfaceBackup, &IID_IInterfaceBackup, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public HM::COMAuthenticator
 {
 public:
-	InterfaceBackup()
-	{
-	}
+   InterfaceBackup()
+   {
+   }
 
 DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACEBACKUP)
 
 
 BEGIN_COM_MAP(InterfaceBackup)
-	COM_INTERFACE_ENTRY(IInterfaceBackup)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceBackup)
+   COM_INTERFACE_ENTRY(IDispatch)
 END_COM_MAP()
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
-	
-	void FinalRelease() 
-	{
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
+   
+   void FinalRelease() 
+   {
+   }
 
 public:
 

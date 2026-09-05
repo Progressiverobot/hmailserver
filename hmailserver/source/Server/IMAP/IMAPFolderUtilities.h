@@ -13,8 +13,8 @@ namespace HM
    class IMAPFolderUtilities
    {
    private:
-	   IMAPFolderUtilities();
-	   virtual ~IMAPFolderUtilities();
+      IMAPFolderUtilities();
+      virtual ~IMAPFolderUtilities();
 
    public:
 

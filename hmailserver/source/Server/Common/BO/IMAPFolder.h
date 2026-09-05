@@ -27,7 +27,7 @@ namespace HM
       IMAPFolder();
       IMAPFolder(__int64 iAccountID, __int64 iParentFolderID);
 
-	   virtual ~IMAPFolder();
+      virtual ~IMAPFolder();
 
       __int64 GetID() const { return dbid_; }
       void SetID(__int64 lNewVal) { dbid_ = lNewVal;}

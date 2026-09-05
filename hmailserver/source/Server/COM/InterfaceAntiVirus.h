@@ -9,33 +9,33 @@
 #include "../hMailServer/hMailServer.h"
 
 class ATL_NO_VTABLE InterfaceAntiVirus : 
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceAntiVirus, &CLSID_AntiVirus>,
-	public IDispatchImpl<IInterfaceAntiVirus, &IID_IInterfaceAntiVirus, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceAntiVirus, &CLSID_AntiVirus>,
+   public IDispatchImpl<IInterfaceAntiVirus, &IID_IInterfaceAntiVirus, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public HM::COMAuthenticator
 {
 public:
-	InterfaceAntiVirus();
+   InterfaceAntiVirus();
 
 DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACEANTIVIRUS)
 
 
 BEGIN_COM_MAP(InterfaceAntiVirus)
-	COM_INTERFACE_ENTRY(IInterfaceAntiVirus)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceAntiVirus)
+   COM_INTERFACE_ENTRY(IDispatch)
 END_COM_MAP()
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
-	
-	void FinalRelease() 
-	{
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
+   
+   void FinalRelease() 
+   {
+   }
 
 public:
    STDMETHOD(get_ClamWinEnabled)(/*[out, retval]*/ VARIANT_BOOL *pVal);

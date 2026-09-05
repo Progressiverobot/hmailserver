@@ -166,15 +166,15 @@ namespace HM
       }
 
       _variant_t    vaField;
-	   FieldsPtr      pFields;
-	   FieldPtr       pField;
-      HRESULT			hr;
+      FieldsPtr      pFields;
+      FieldPtr       pField;
+      HRESULT        hr;
 
       try
       {
          hr = cADORecordset->get_Fields( &pFields );
-	      vaField = FieldName;
-	      pFields->get_Item( vaField, &pField );
+         vaField = FieldName;
+         pFields->get_Item( vaField, &pField );
 
          vaField.Clear();
          if (pField)
@@ -215,13 +215,13 @@ namespace HM
       }
 
       _variant_t    vaField;
-	   FieldsPtr      pFields;
-	   FieldPtr       pField;
-      HRESULT			hr;
+      FieldsPtr      pFields;
+      FieldPtr       pField;
+      HRESULT        hr;
 
-	   hr = cADORecordset->get_Fields( &pFields );
-	   vaField = FieldName;
-	   pFields->get_Item( vaField, &pField );
+      hr = cADORecordset->get_Fields( &pFields );
+      vaField = FieldName;
+      pFields->get_Item( vaField, &pField );
 
       vaField.Clear();
       if (pField)
@@ -245,13 +245,13 @@ namespace HM
       }
 
       _variant_t     vaField;
-	   FieldsPtr      pFields;
-	   FieldPtr       pField;
-      HRESULT			hr;
+      FieldsPtr      pFields;
+      FieldPtr       pField;
+      HRESULT        hr;
 
-	   hr = cADORecordset->get_Fields( &pFields );
-	   vaField = FieldName;
-	   pFields->get_Item( vaField, &pField );
+      hr = cADORecordset->get_Fields( &pFields );
+      vaField = FieldName;
+      pFields->get_Item( vaField, &pField );
 
       vaField.Clear();
       pField->get_Value(&vaField);
@@ -283,13 +283,13 @@ namespace HM
       }
 
       _variant_t     vaField;
-	   FieldsPtr      pFields;
-	   FieldPtr       pField;
-      HRESULT			hr;
+      FieldsPtr      pFields;
+      FieldPtr       pField;
+      HRESULT        hr;
 
-	   hr = cADORecordset->get_Fields( &pFields );
-	   vaField = FieldName;
-	   pFields->get_Item( vaField, &pField );
+      hr = cADORecordset->get_Fields( &pFields );
+      vaField = FieldName;
+      pFields->get_Item( vaField, &pField );
 
       vaField.Clear();
       pField->get_Value(&vaField);
@@ -307,7 +307,7 @@ namespace HM
 
       FieldsPtr      pFields;
       FieldPtr       pField;
-      HRESULT			hr;
+      HRESULT        hr;
 
       hr = cADORecordset->get_Fields( &pFields );
 
@@ -344,7 +344,7 @@ namespace HM
       _variant_t     vaField;
       FieldsPtr      pFields;
       FieldPtr       pField;
-      HRESULT			hr;
+      HRESULT        hr;
 
       hr = cADORecordset->get_Fields( &pFields );
       vaField = FieldName;

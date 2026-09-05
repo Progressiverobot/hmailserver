@@ -12,8 +12,8 @@ namespace HM
    class NameChanger
    {
    public:
-	   NameChanger();
-	   virtual ~NameChanger();
+      NameChanger();
+      virtual ~NameChanger();
 
       bool RenameDomain(const String& oldDomainName, std::shared_ptr<Domain> pDomain, String &errorMessage);
       bool RenameAccount(const String& oldAccountName, std::shared_ptr<Account> pAccount, String &errorMessage);

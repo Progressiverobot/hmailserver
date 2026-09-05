@@ -745,7 +745,7 @@ namespace HM
          // has gotten worse than before. Overwriting with the same status may
          // remove useful error messages.
 
-         if (!bIsFatalError)	
+         if (!bIsFatalError)  
          {
             // No this is the same error level.
             return;
@@ -753,7 +753,7 @@ namespace HM
       }
 
       // Update the delivery status
-	   pRecipient->SetDeliveryResult(bIsFatalError ? MessageRecipient::ResultFatalError : MessageRecipient::ResultNonFatalError);
+      pRecipient->SetDeliveryResult(bIsFatalError ? MessageRecipient::ResultFatalError : MessageRecipient::ResultNonFatalError);
 
       last_sent_data_.TrimLeft("\r\n");
       last_sent_data_.TrimRight("\r\n");
@@ -919,7 +919,7 @@ namespace HM
       // Append the transmission buffer
       transmission_buffer_.Append(pSendBuffer, iSendBufferSize);
       
-	  ReadAndSend_();
+     ReadAndSend_();
    }
 
    //---------------------------------------------------------------------------()

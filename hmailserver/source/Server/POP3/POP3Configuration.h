@@ -12,7 +12,7 @@ namespace HM
    public:
 
       POP3Configuration();
-	   virtual ~POP3Configuration();
+      virtual ~POP3Configuration();
 
       long GetMaxPOP3Connections() const;
       void SetMaxPOP3Connections(int newVal);

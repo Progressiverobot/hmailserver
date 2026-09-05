@@ -16,7 +16,7 @@ struct hm_st_mysql_field {
    char *table;                /* Table of column if column was a field */
    char *org_table;            /* Org table name, if table was an alias */
    char *db;                   /* Database for table */
-   char *catalog;	      /* Catalog for table */
+   char *catalog;       /* Catalog for table */
    char *def;                  /* Default value (set by mysql_list_fields) */
 };
 
@@ -52,8 +52,8 @@ namespace HM
    class MySQLInterface : public Singleton<MySQLInterface>
    {
    public:
-	   MySQLInterface();
-	   virtual ~MySQLInterface();
+      MySQLInterface();
+      virtual ~MySQLInterface();
 
       bool Load(String &sErrorMessage);
       bool IsLoaded();

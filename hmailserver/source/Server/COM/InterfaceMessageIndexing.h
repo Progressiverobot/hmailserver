@@ -18,9 +18,9 @@
 // InterfaceMessageIndexing
 
 class ATL_NO_VTABLE InterfaceMessageIndexing :
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceMessageIndexing, &CLSID_MessageIndexing>,
-	public IDispatchImpl<IInterfaceMessageIndexing, &IID_IInterfaceMessageIndexing, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceMessageIndexing, &CLSID_MessageIndexing>,
+   public IDispatchImpl<IInterfaceMessageIndexing, &IID_IInterfaceMessageIndexing, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public HM::COMAuthenticator
 {
 public:
@@ -30,29 +30,29 @@ DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACEMESSAGEINDEXING)
 
 
 BEGIN_COM_MAP(InterfaceMessageIndexing)
-	COM_INTERFACE_ENTRY(IInterfaceMessageIndexing)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceMessageIndexing)
+   COM_INTERFACE_ENTRY(IDispatch)
 END_COM_MAP()
 
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
 
-	void FinalRelease()
-	{
-	}
+   void FinalRelease()
+   {
+   }
 
 public:
 
    bool LoadSettings();
 
    STDMETHOD(get_Enabled)(/*[out, retval]*/ VARIANT_BOOL *pVal);
-   STDMETHOD(put_Enabled)(/*[in]*/ VARIANT_BOOL newVal);	
+   STDMETHOD(put_Enabled)(/*[in]*/ VARIANT_BOOL newVal); 
 
    STDMETHOD(get_TotalMessageCount)(/*[out, retval]*/ long *pVal);
    STDMETHOD(get_TotalIndexedCount)(/*[out, retval]*/ long *pVal);

@@ -22,12 +22,12 @@ namespace HM
          ServerAdmin = 2
       };
 
-	   Account();
+      Account();
       Account(const String &address, AdminLevel adminLevel);
-	   Account(const Account &oldAccount);
+      Account(const Account &oldAccount);
 
       virtual ~Account();
-	   
+      
 
 
       void Initialize();

@@ -58,7 +58,7 @@ namespace HM
       if (!pSelectedFolder)
          return IMAPResult(IMAPResult::ResultBad, "Folder could not be found.");
 
-	  ACLManager aclManager;
+     ACLManager aclManager;
       std::shared_ptr<ACLPermission> pPermission = aclManager.GetPermissionForFolder(pConnection->GetAccount()->GetID(), pSelectedFolder);
       String sRightsString;
       if (pPermission)

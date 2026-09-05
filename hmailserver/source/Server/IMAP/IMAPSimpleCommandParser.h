@@ -44,8 +44,8 @@ namespace HM
    class IMAPSimpleCommandParser  
    {
    public:
-	   IMAPSimpleCommandParser();
-	   virtual ~IMAPSimpleCommandParser();
+      IMAPSimpleCommandParser();
+      virtual ~IMAPSimpleCommandParser();
 
       void Parse(std::shared_ptr<IMAPCommandArgument> pArgument);
       size_t WordCount() {return parsed_words_.size(); }

@@ -13,8 +13,8 @@ namespace HM
    class TestDataDirectory
    {
    public:
-	   TestDataDirectory();
-	   virtual ~TestDataDirectory();
+      TestDataDirectory();
+      virtual ~TestDataDirectory();
 
       DiagnosticResult PerformTest();
 

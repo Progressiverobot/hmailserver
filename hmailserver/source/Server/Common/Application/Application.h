@@ -29,8 +29,8 @@ namespace HM
    {
    public:
 
-	   Application();
-	   virtual ~Application();
+      Application();
+      virtual ~Application();
 
       static String GetExecutableName();
 

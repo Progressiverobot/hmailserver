@@ -11,8 +11,8 @@ namespace HM
    {
    public:
       
-	   IMAPFetchParser();
-	   virtual ~IMAPFetchParser();
+      IMAPFetchParser();
+      virtual ~IMAPFetchParser();
 
       enum ePartType
       {

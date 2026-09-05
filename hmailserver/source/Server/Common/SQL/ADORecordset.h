@@ -12,8 +12,8 @@ namespace HM
    class ADORecordset : public DALRecordset
    {
    public:
-	   ADORecordset();
-	   virtual ~ADORecordset();
+      ADORecordset();
+      virtual ~ADORecordset();
 
       virtual DALConnection::ExecutionResult TryOpen(std::shared_ptr<DALConnection> pConn, const SQLCommand &command, String &sErrorMessage);
       

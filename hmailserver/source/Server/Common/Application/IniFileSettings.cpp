@@ -50,7 +50,7 @@ namespace HM
       mxtries_factor_(0),
       sqldbtype_(HM::DatabaseSettings::TypeUnknown),
       sep_svc_logs_(false),
-	  rewrite_envelope_from_when_forwarding_(false),
+     rewrite_envelope_from_when_forwarding_(false),
       srs_enabled_(false),
       max_submissions_per_ip_per_minute_(0),
       max_outbound_per_destination_per_minute_(0),

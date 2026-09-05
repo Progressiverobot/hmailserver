@@ -22,36 +22,36 @@ namespace HM
 // InterfaceBlockedSenders
 
 class ATL_NO_VTABLE InterfaceBlockedSenders :
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceBlockedSenders, &CLSID_BlockedSenders>,
-	public IDispatchImpl<IInterfaceBlockedSenders, &IID_IInterfaceBlockedSenders, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceBlockedSenders, &CLSID_BlockedSenders>,
+   public IDispatchImpl<IInterfaceBlockedSenders, &IID_IInterfaceBlockedSenders, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public HM::COMAuthenticator
 {
 public:
-	InterfaceBlockedSenders()
-	{
-	}
+   InterfaceBlockedSenders()
+   {
+   }
 
 DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACEBLOCKEDSENDERS)
 
 
 BEGIN_COM_MAP(InterfaceBlockedSenders)
-	COM_INTERFACE_ENTRY(IInterfaceBlockedSenders)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceBlockedSenders)
+   COM_INTERFACE_ENTRY(IDispatch)
 END_COM_MAP()
 
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
 
-	void FinalRelease()
-	{
-	}
+   void FinalRelease()
+   {
+   }
 
 public:
    STDMETHOD(Refresh)();

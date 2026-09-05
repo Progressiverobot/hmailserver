@@ -14,8 +14,8 @@ namespace HM
       BusinessObject<T>::BusinessObject();
       virtual ~BusinessObject<T>() {};
 
-		__int64 GetID() const;
-		void SetID(__int64 iNewVal);
+      __int64 GetID() const;
+      void SetID(__int64 iNewVal);
 
    protected:
 

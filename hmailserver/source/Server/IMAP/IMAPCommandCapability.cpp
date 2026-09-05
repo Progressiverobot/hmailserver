@@ -83,7 +83,7 @@ namespace HM
          sResponse += " LOGINDISABLED";
 
       if (pConfig->GetUseIMAPSASLPlain() && authAvailable)
-	      sResponse += " AUTH=PLAIN";
+         sResponse += " AUTH=PLAIN";
 
       // SCRAM-SHA-256 (RFC 7677) never transmits the password, so it is offered
       // alongside AUTH=PLAIN whenever IMAP AUTHENTICATE is enabled.
@@ -94,28 +94,28 @@ namespace HM
       // this connection cannot use. Offering it would be defensible if the refusal were
       // per-mechanism; it is not.
       if (pConfig->GetUseIMAPSASLPlain() && authAvailable)
-	      sResponse += " AUTH=SCRAM-SHA-256";
+         sResponse += " AUTH=SCRAM-SHA-256";
 
       // SCRAM-SHA-256-PLUS (RFC 5802/5929) additionally binds the authentication to
       // the TLS channel via the server certificate, so it is only meaningful — and
       // only advertised — on a TLS connection.
       if (pConfig->GetUseIMAPSASLPlain() && pConnection->IsSSLConnection())
-	      sResponse += " AUTH=SCRAM-SHA-256-PLUS";
+         sResponse += " AUTH=SCRAM-SHA-256-PLUS";
 
       // OAuth2 bearer mechanisms (RFC 7628), advertised only when enabled and (by
       // default) only over TLS.
       if (OAuth2TokenValidator::IsEnabled() && authAvailable &&
           (!OAuth2TokenValidator::RequireTLS() || pConnection->IsSSLConnection()))
-	      sResponse += " AUTH=XOAUTH2 AUTH=OAUTHBEARER";
+         sResponse += " AUTH=XOAUTH2 AUTH=OAUTHBEARER";
 
       // EXTERNAL (RFC 4422 Appendix A): the client's proof is the certificate the
       // handshake verified against this port's CA, so the mechanism exists on a
       // connection exactly when such a certificate names an address.
       if (authAvailable && !pConnection->GetVerifiedClientCertificateIdentities().empty())
-	      sResponse += " AUTH=EXTERNAL";
+         sResponse += " AUTH=EXTERNAL";
 
       if (pConfig->GetUseIMAPSASLInitialResponse())
-	      sResponse += " SASL-IR";
+         sResponse += " SASL-IR";
 
       // RFC 6154 section 6 defines two capability names and a client needs both. Only
       // SPECIAL-USE used to be advertised, which says the attributes and the LIST

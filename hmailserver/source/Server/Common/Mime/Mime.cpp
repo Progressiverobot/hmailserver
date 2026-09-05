@@ -139,19 +139,19 @@ namespace HM
 
       bool encodedParameter;
       int nPos;
-      if (!FindParameter(pszAttr, nPos, nSize, encodedParameter))	// add new parameter
+      if (!FindParameter(pszAttr, nPos, nSize, encodedParameter)) // add new parameter
       {
          value_.reserve(value_.size() + ::strlen(pszAttr) + strValue.size() + 5);
          //if (MimeEnvironment::AutoFolding())
-         //	value_ += ";\r\n\t";
+         // value_ += ";\r\n\t";
          //else
-         //	value_ += "; ";
+         // value_ += "; ";
          value_ += "; ";
          value_ += pszAttr;
          value_ += '=';
          value_ += strValue;
       }
-      else							// update existing parameter
+      else                    // update existing parameter
          value_.replace(nPos, nSize, strValue);
    }
 
@@ -386,7 +386,7 @@ namespace HM
       // buffer.
       while (pszStart < pszLimit && CMimeChar::IsSpace((unsigned char)*pszStart))
       {
-         if (*pszStart == '\r')		// end of header ?
+         if (*pszStart == '\r')     // end of header ?
             return 0;
          pszStart = FindString(pszStart, "\r\n", pszLimit);
          if (!pszStart)
@@ -402,7 +402,7 @@ namespace HM
 
       // get the field name
       pszEnd = LineFind(pszStart, ':', pszLimit);
-      if (pszEnd != NULL)				// if colon not found, Name would be empty
+      if (pszEnd != NULL)           // if colon not found, Name would be empty
       {
          name_.assign(pszStart, (pszEnd-pszStart));
          pszStart = pszEnd + 1;
@@ -420,7 +420,7 @@ namespace HM
          pszEnd += 2;
          // pszEnd can now be exactly pszLimit, and the continuation test below reads
          // through it. A folded field is only continued by a byte that exists.
-      } while (pszEnd < pszLimit && (*pszEnd == '\t' || *pszEnd == ' '));	// linear-white-space
+      } while (pszEnd < pszLimit && (*pszEnd == '\t' || *pszEnd == ' '));  // linear-white-space
 
       // Capture the raw line before any processing (includes folding and trailing \r\n)
       raw_line_.assign(pszFieldStart, pszEnd - pszFieldStart);
@@ -496,12 +496,12 @@ namespace HM
          while (CMimeChar::IsSpace((unsigned char)*pszParms) || *pszParms == ';')
             pszParms++;
 
-         const char* pszName = pszParms;		// pszName -> attribute
+         const char* pszName = pszParms;     // pszName -> attribute
          pszParms = ::strchr(pszParms, '=');
          if (!pszParms)
             break;
 
-         pszParms++;					// pszParams -> parameter value
+         pszParms++;             // pszParams -> parameter value
          while (*pszParms == ' ' || *pszParms == '\t' && *pszParms > 0)
             pszParms++;
 
@@ -515,9 +515,9 @@ namespace HM
             return false;
 
          const char* pszParmEnd = NULL;
-         if (*pszParms == '"')		// quoted string
+         if (*pszParms == '"')      // quoted string
             pszParmEnd = ::strchr(pszParms+1, '"');
-         if (!pszParmEnd)			// non quoted string (includes RFC 2231 values like UTF-8''name)
+         if (!pszParmEnd)        // non quoted string (includes RFC 2231 values like UTF-8''name)
          {
             pszParmEnd = pszParms;
 
@@ -526,7 +526,7 @@ namespace HM
             while (*pszParmEnd && *pszParmEnd != ';')
                pszParmEnd++;
          }
-         else  pszParmEnd++;			// pszParmEnd -> end of parameter value
+         else  pszParmEnd++;        // pszParmEnd -> end of parameter value
 
          // Check if we've found a correct parameter. The parameter may be 
          // formatted in a few different ways, such as
@@ -800,7 +800,7 @@ namespace HM
    {
       static int s_nPartNumber = 0;
       char buf[80];
-      if (!pszBoundary)				// generate a new boundary delimeter
+      if (!pszBoundary)          // generate a new boundary delimeter
       {
          unsigned __int64 value = (unsigned __int64)::time(NULL) ^ (unsigned __int64)this;
          ::srand((unsigned int) value);
@@ -839,7 +839,7 @@ namespace HM
       std::vector<MimeField>::const_iterator it;
       for (it = fields_.begin(); it != fields_.end(); it++)
          nLength += (*it).GetLength();
-      return nLength + 2;				// a pair of CRLF indicate the end of header
+      return nLength + 2;           // a pair of CRLF indicate the end of header
    }
 
 
@@ -912,7 +912,7 @@ namespace HM
             return nSize;
 
          nInput += nSize;
-         fields_.push_back(fd);	// don't use SetField in case of same name fields
+         fields_.push_back(fd);  // don't use SetField in case of same name fields
       }
 
       headers_modified_ = false;
@@ -920,7 +920,7 @@ namespace HM
       // Skip the ending CRLF, but only when the buffer actually has room for
       // it; otherwise the header was truncated and we must not over-advance.
       if (nInput + 2 <= nDataSize)
-         return nInput + 2;				// skip the ending CRLF
+         return nInput + 2;            // skip the ending CRLF
 
       return nInput;
    }
@@ -1484,7 +1484,7 @@ namespace HM
       String sFileName = FileUtilities::GetFileNameFromFullPath(pszFilename);
       AnsiString sEncodedValue = MIMEUnicodeEncoder::EncodeValue(sCharset, sFileName);
 
-      SetName(sEncodedValue);				// set 'name' parameter:      
+      SetName(sEncodedValue);          // set 'name' parameter:      
 
       // Create an content-disposition header as well.
       SetRawFieldValue(CMimeConst::ContentDisposition(), CMimeConst::Inline(), "");
@@ -1670,12 +1670,12 @@ namespace HM
       std::list<std::shared_ptr<MimeBody> >::const_iterator it;
       for (it=bodies_.begin(); it!=bodies_.end(); it++)
       {
-         nLength += nBoundSize + 6;	// include 2 leading hyphens and 2 pair of CRLFs
+         nLength += nBoundSize + 6; // include 2 leading hyphens and 2 pair of CRLFs
          std::shared_ptr<MimeBody> pBP = *it;
          ASSERT(pBP != NULL);
          nLength += pBP->GetLength();
       }
-      nLength += nBoundSize + 8;		// include 2 leading hyphens, 2 trailng hyphens and 2 pair of CRLFs
+      nLength += nBoundSize + 8;    // include 2 leading hyphens, 2 trailng hyphens and 2 pair of CRLFs
       return nLength;
    }
 
@@ -1695,7 +1695,7 @@ namespace HM
       // store child body parts
       string strBoundary = GetBoundary();
       if (strBoundary.empty())
-         return;					// boundary not be set
+         return;              // boundary not be set
 
       for (BodyList::const_iterator it=bodies_.begin(); it!=bodies_.end(); it++)
       {
@@ -1710,7 +1710,7 @@ namespace HM
          output.append(boundaryLine);
 
          std::shared_ptr<MimeBody> pBP = *it;
-         ASSERT(pBP != NULL);	
+         ASSERT(pBP != NULL); 
 
          pBP->Store(output);
       }
@@ -1784,7 +1784,7 @@ namespace HM
 
       last_header_size_ = nSize;  // record for body offset calculation in LoadFromFile
 
-      const char* pszDataBegin = pszData;	// preserve start position
+      const char* pszDataBegin = pszData; // preserve start position
       pszData += nSize;
       
       if (nSize >= nDataSize)
@@ -1929,7 +1929,7 @@ namespace HM
             {
                // Include the trailing CRLF after "--boundary--" in the preserved byte range.
                last_multipart_end_ = (pszAfterClosingBoundary + 2) - pszDataBegin;
-               return (int)(pszAfterClosingBoundary + 2 - pszDataBegin);	// reach the closing boundary
+               return (int)(pszAfterClosingBoundary + 2 - pszDataBegin);   // reach the closing boundary
             }
 
             // Preserve EOF exactly as it appeared on disk when the closing
@@ -1955,7 +1955,7 @@ namespace HM
          // look for the next boundary
          const char* pszBound2 = GetBoundaryEnd(pszStart, pszEnd, strBoundary.c_str());
 
-         if (!pszBound2)				// overflow, boundary may be truncated
+         if (!pszBound2)            // overflow, boundary may be truncated
             pszBound2 = pszEnd;
          int nEntitySize = (int) (pszBound2 - pszStart);
 

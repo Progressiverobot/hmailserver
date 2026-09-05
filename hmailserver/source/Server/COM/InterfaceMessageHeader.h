@@ -21,35 +21,35 @@ namespace HM
 // InterfaceMessageHeader
 
 class ATL_NO_VTABLE InterfaceMessageHeader :
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceMessageHeader, &CLSID_MessageHeader>,
-	public IDispatchImpl<IInterfaceMessageHeader, &IID_IInterfaceMessageHeader, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceMessageHeader, &CLSID_MessageHeader>,
+   public IDispatchImpl<IInterfaceMessageHeader, &IID_IInterfaceMessageHeader, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>
 {
 public:
    InterfaceMessageHeader();
-	
+   
    void AttachItem (std::shared_ptr<HM::MimeHeader> pHeader, HM::MimeField *pField);
 
 DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACEMESSAGEHEADER)
 
 
 BEGIN_COM_MAP(InterfaceMessageHeader)
-	COM_INTERFACE_ENTRY(IInterfaceMessageHeader)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceMessageHeader)
+   COM_INTERFACE_ENTRY(IDispatch)
 END_COM_MAP()
 
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
 
-	void FinalRelease()
-	{
-	}
+   void FinalRelease()
+   {
+   }
 
 public:
    STDMETHOD(Delete)();

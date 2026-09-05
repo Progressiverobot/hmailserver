@@ -1478,7 +1478,7 @@ namespace HM
          return true;
       }
 
-	   ACLManager aclManager;
+      ACLManager aclManager;
       std::shared_ptr<ACLPermission> pPermission = aclManager.GetPermissionForFolder(account_->GetID(), pFolder);
       if (!pPermission)
          return false;

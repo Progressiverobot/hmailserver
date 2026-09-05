@@ -526,8 +526,8 @@ namespace HM
       if (!Configuration::Instance()->GetUseScriptServer())
          return;
 
-	  // JDR: stores the name of the method that is fired in the script. https://www.progressiverobot.com/forum/viewtopic.php?f=2&t=25497
-	  String event_name = _T("Unknown");
+     // JDR: stores the name of the method that is fired in the script. https://www.progressiverobot.com/forum/viewtopic.php?f=2&t=25497
+     String event_name = _T("Unknown");
 
       String script_language;
       String script_contents;
@@ -550,7 +550,7 @@ namespace HM
          script_contents = script_contents_;
       }
 
-	   LOG_DEBUG("Executing event " + event_name);
+      LOG_DEBUG("Executing event " + event_name);
 
       String sScript;
 

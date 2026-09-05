@@ -11,8 +11,8 @@ namespace HM
    class CacheConfiguration
    {
    public:
-	   CacheConfiguration();
-	   virtual ~CacheConfiguration();
+      CacheConfiguration();
+      virtual ~CacheConfiguration();
 
       bool GetUseCache() const;
       void SetUseCache(bool bNewVal);

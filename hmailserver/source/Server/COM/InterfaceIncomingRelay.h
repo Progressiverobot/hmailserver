@@ -17,36 +17,36 @@ namespace HM
 
 class ATL_NO_VTABLE InterfaceIncomingRelay :
    public COMCollectionItem<HM::IncomingRelay, HM::IncomingRelays>,
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceIncomingRelay, &CLSID_IncomingRelay>,
-	public IDispatchImpl<IInterfaceIncomingRelay, &IID_IInterfaceIncomingRelay, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceIncomingRelay, &CLSID_IncomingRelay>,
+   public IDispatchImpl<IInterfaceIncomingRelay, &IID_IInterfaceIncomingRelay, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public HM::COMAuthenticator
 {
 public:
-	InterfaceIncomingRelay()
-	{
-	}
+   InterfaceIncomingRelay()
+   {
+   }
 
 DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACEINCOMINGRELAY)
 
 
 BEGIN_COM_MAP(InterfaceIncomingRelay)
-	COM_INTERFACE_ENTRY(IInterfaceIncomingRelay)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceIncomingRelay)
+   COM_INTERFACE_ENTRY(IDispatch)
 END_COM_MAP()
 
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
 
-	void FinalRelease()
-	{
-	}
+   void FinalRelease()
+   {
+   }
 
    STDMETHOD(Save)();
 

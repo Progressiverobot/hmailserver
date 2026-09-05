@@ -19,8 +19,8 @@ namespace HM
    class IMAPCommandSEARCH : public IMAPCommand
    {
    public:
-	   IMAPCommandSEARCH(IMAPSearchCommandMode mode);
-	   virtual ~IMAPCommandSEARCH();
+      IMAPCommandSEARCH(IMAPSearchCommandMode mode);
+      virtual ~IMAPCommandSEARCH();
 
       void SetIsUID() { is_uid_ = true; }
 

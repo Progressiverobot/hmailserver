@@ -157,8 +157,8 @@ namespace HM
    class IMAPSearchParser
    {
    public:
-	   IMAPSearchParser();
-	   virtual ~IMAPSearchParser();
+      IMAPSearchParser();
+      virtual ~IMAPSearchParser();
 
       IMAPResult ParseCommand(std::shared_ptr<IMAPCommandArgument> pArgument, IMAPSearchCommandMode mode);
 

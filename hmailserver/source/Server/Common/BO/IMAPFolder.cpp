@@ -104,15 +104,15 @@ namespace HM
    IMAPFolder::GetPermissions()
    {
       // Always return a new one. Hopefully we don't have so many public folders
-	  // that this will become a performance issue.
+     // that this will become a performance issue.
       std::shared_ptr<ACLPermissions> pPermissions = std::shared_ptr<ACLPermissions>(new ACLPermissions(dbid_));
       
-	  // No point in loading list of permissions for account level folder. 
-	  // (since account level folders never have permissions set)
-	  if (IsPublicFolder())
-	  {
+     // No point in loading list of permissions for account level folder. 
+     // (since account level folders never have permissions set)
+     if (IsPublicFolder())
+     {
          pPermissions->Refresh();
-	  }
+     }
 
       return pPermissions;
    }

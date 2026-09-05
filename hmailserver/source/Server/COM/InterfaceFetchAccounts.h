@@ -13,36 +13,36 @@
 // InterfaceFetchAccounts
 
 class ATL_NO_VTABLE InterfaceFetchAccounts : 
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceFetchAccounts, &CLSID_FetchAccounts>,
-	public IDispatchImpl<IInterfaceFetchAccounts, &IID_IInterfaceFetchAccounts, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceFetchAccounts, &CLSID_FetchAccounts>,
+   public IDispatchImpl<IInterfaceFetchAccounts, &IID_IInterfaceFetchAccounts, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public HM::COMAuthenticator
 
 {
 public:
-	InterfaceFetchAccounts()
-	{
-	}
+   InterfaceFetchAccounts()
+   {
+   }
 
 DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACEFETCHACCOUNTS)
 
 
 BEGIN_COM_MAP(InterfaceFetchAccounts)
-	COM_INTERFACE_ENTRY(IInterfaceFetchAccounts)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceFetchAccounts)
+   COM_INTERFACE_ENTRY(IDispatch)
 END_COM_MAP()
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
-	
-	void FinalRelease() 
-	{
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
+   
+   void FinalRelease() 
+   {
+   }
 
    void Attach(std::shared_ptr<HM::FetchAccounts> pFetchAccounts);
 

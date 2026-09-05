@@ -39,8 +39,8 @@ namespace HM
       SetSessionCeiling(IniFileSettings::Instance()->GetSAMaxTimeout() + 30);
             
       message_file_ = sFile;
-	   spam_dsize_ = -1;
-	   message_size_ = -1;
+      spam_dsize_ = -1;
+      message_size_ = -1;
 
       *test_completed_ = false;
    }
@@ -65,10 +65,10 @@ namespace HM
       SetReceiveBinary(true);
       message_size_ = FileUtilities::FileSize(message_file_);
       EnqueueWrite("PROCESS SPAMC/1.2\r\n");
-	  //LOG_DEBUG("SENT: PROCESS SPAMC/1.2");
-	  String sConLen;
-	  sConLen.Format(_T("Content-length: %I64d\r\n"), message_size_);
-	  EnqueueWrite(sConLen);
+     //LOG_DEBUG("SENT: PROCESS SPAMC/1.2");
+     String sConLen;
+     sConLen.Format(_T("Content-length: %I64d\r\n"), message_size_);
+     EnqueueWrite(sConLen);
 
      // RFC-less but documented in spamd's protocol notes: "User: <name>" selects the
      // preferences the scan runs under. Only sent when configured, so a spamd that was
@@ -76,7 +76,7 @@ namespace HM
      if (!user_.IsEmpty())
         EnqueueWrite("User: " + user_ + "\r\n");
 
-	  EnqueueWrite("\r\n");
+     EnqueueWrite("\r\n");
      SendFileContents_(message_file_);
    }
 
@@ -286,13 +286,13 @@ namespace HM
                   "Could not copy the SpamAssassin result over the message file. The message is unchanged and is delivered without the SpamAssassin headers.");
             }
          }
-	  } 
+     } 
      else 
      {
-		 String logMessage;
-		 logMessage.Format(_T("SA: Temp file size did not match what Spamd reported! (temp: %d, spamd: %I64d). Reverting to original message file."),FileUtilities::FileSize(sTempFile),spam_dsize_);
+       String logMessage;
+       logMessage.Format(_T("SA: Temp file size did not match what Spamd reported! (temp: %d, spamd: %I64d). Reverting to original message file."),FileUtilities::FileSize(sTempFile),spam_dsize_);
          LOG_DEBUG(logMessage);
-	  }
+     }
      
      *test_completed_ = true;
    }
@@ -353,7 +353,7 @@ namespace HM
       if (!StringParser::TryParseInt(sConSize, contentLength))
       {
         LOG_DEBUG(Formatter::Format("The response from SpamAssasin was not valid. Aborting. Content-Length header not properly formatted. Expected: Content-Length:<value>, Got: {0}\r\n", secondLine));
-	     return -1;
+        return -1;
       }
 
       if (contentLength < 0)

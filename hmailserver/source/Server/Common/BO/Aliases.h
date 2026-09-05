@@ -16,8 +16,8 @@ namespace HM
    class Aliases : public Collection<Alias, PersistentAlias>
    {
    public:
-	   Aliases(__int64 iDomainID);
-	   virtual ~Aliases();
+      Aliases(__int64 iDomainID);
+      virtual ~Aliases();
 
       // Deletes all aliases in this collection
       void Refresh();

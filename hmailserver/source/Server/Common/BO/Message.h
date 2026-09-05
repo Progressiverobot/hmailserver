@@ -38,7 +38,7 @@ namespace HM
          FlagBinaryMime = 256
       };
 
-	   Message(bool generateFileName);
+      Message(bool generateFileName);
       Message(const Message& other);
       Message();
       virtual ~Message();

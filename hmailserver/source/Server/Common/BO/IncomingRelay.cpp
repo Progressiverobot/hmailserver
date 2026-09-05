@@ -27,7 +27,7 @@ namespace HM
    String 
    IncomingRelay::GetLowerIPString() const 
    {
-	   return lower_ip_.ToString();
+      return lower_ip_.ToString();
    }
 
    bool
@@ -39,7 +39,7 @@ namespace HM
    String 
    IncomingRelay::GetUpperIPString() const 
    {
-	   return upper_ip_.ToString();
+      return upper_ip_.ToString();
    }
 
 

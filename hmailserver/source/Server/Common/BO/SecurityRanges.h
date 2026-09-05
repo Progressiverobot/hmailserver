@@ -15,8 +15,8 @@ namespace HM
    class SecurityRanges : public Collection<SecurityRange, PersistentSecurityRange> 
    {
    public:
-	   SecurityRanges();
-	   virtual ~SecurityRanges();
+      SecurityRanges();
+      virtual ~SecurityRanges();
 
       void Refresh();
 

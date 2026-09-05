@@ -15,8 +15,8 @@ namespace HM
    class SMTPDeliveryManager : public Task
    {
    public:
-	   SMTPDeliveryManager();
-	   virtual ~SMTPDeliveryManager();
+      SMTPDeliveryManager();
+      virtual ~SMTPDeliveryManager();
 
       void SetDeliverMessage();
       void DoWork();

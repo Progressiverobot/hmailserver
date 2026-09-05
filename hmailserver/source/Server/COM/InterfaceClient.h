@@ -18,34 +18,34 @@ namespace HM
 }
 
 class ATL_NO_VTABLE InterfaceClient : 
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceClient, &CLSID_Client>,
-	public IDispatchImpl<IInterfaceClient, &IID_IInterfaceClient, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceClient, &CLSID_Client>,
+   public IDispatchImpl<IInterfaceClient, &IID_IInterfaceClient, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>
 {
 public:
-	InterfaceClient()
-	{
-	}
+   InterfaceClient()
+   {
+   }
 
 DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACECLIENT)
 
 
 BEGIN_COM_MAP(InterfaceClient)
-	COM_INTERFACE_ENTRY(IInterfaceClient)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceClient)
+   COM_INTERFACE_ENTRY(IDispatch)
 END_COM_MAP()
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
-	
-	void FinalRelease() 
-	{
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
+   
+   void FinalRelease() 
+   {
+   }
 
 public:
    void AttachItem(std::shared_ptr<HM::ClientInfo> pClientInfo);

@@ -12,8 +12,8 @@ namespace HM
    class MailerDaemonAddressDeterminer  
    {
    public:
-	   MailerDaemonAddressDeterminer();
-	   virtual ~MailerDaemonAddressDeterminer();
+      MailerDaemonAddressDeterminer();
+      virtual ~MailerDaemonAddressDeterminer();
 
       static String GetMailerDaemonAddress(const std::shared_ptr<Message> pOrigMessage);
       static String GetMailerDaemonAddress(const String &sOrigSender, const String &sOrigReceiver);

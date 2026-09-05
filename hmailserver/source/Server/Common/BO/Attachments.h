@@ -14,8 +14,8 @@ namespace HM
    class Attachments 
    {
    public:
-	   Attachments(std::shared_ptr<MimeBody> pMimeBody, MessageData *pMsgData);
-	   virtual ~Attachments();
+      Attachments(std::shared_ptr<MimeBody> pMimeBody, MessageData *pMsgData);
+      virtual ~Attachments();
 
       bool Add(const String &sFilename);
       bool Add(std::shared_ptr<Attachment> pAttachment);

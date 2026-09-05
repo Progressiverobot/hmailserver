@@ -127,7 +127,7 @@ namespace HM
       pNewMsgData->SetTo(sToAddress);
       pNewMsgData->SetSubject(sModifiedSubject);
       pNewMsgData->SetBody(sModifiedBody);
-	  pNewMsgData->SetAutoReplied();
+     pNewMsgData->SetAutoReplied();
       pNewMsgData->IncreaseRuleLoopCount();
 
       // Write message data. First write of a message built from nothing - see the

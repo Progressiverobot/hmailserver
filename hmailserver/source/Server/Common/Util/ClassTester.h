@@ -10,8 +10,8 @@ namespace HM
    class ClassTester  
    {
    public:
-	   ClassTester();
-	   virtual ~ClassTester();
+      ClassTester();
+      virtual ~ClassTester();
 
       void DoTests();
 

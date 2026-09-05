@@ -16,8 +16,8 @@ namespace HM
    class MySQLRecordset  : public DALRecordset
    {
    public:
-	   MySQLRecordset();
-	   virtual ~MySQLRecordset();
+      MySQLRecordset();
+      virtual ~MySQLRecordset();
 
       virtual DALConnection::ExecutionResult TryOpen(std::shared_ptr<DALConnection> pDALConn, const SQLCommand &command, String &sErrorMessage);
       

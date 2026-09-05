@@ -14,8 +14,8 @@ namespace HM
    class IMAPCommandFETCH : public HM::IMAPCommand
    {
    public:
-	   IMAPCommandFETCH();
-	   virtual ~IMAPCommandFETCH();
+      IMAPCommandFETCH();
+      virtual ~IMAPCommandFETCH();
 
       virtual IMAPResult ExecuteCommand(std::shared_ptr<IMAPConnection> pConnection, std::shared_ptr<IMAPCommandArgument> pArgument);
 

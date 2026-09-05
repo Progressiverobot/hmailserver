@@ -19,8 +19,8 @@ namespace HM
 
       bool Load();
 
-	   AntiSpamConfiguration();
-	   virtual ~AntiSpamConfiguration();
+      AntiSpamConfiguration();
+      virtual ~AntiSpamConfiguration();
 
       int GetSpamThreshold();
 

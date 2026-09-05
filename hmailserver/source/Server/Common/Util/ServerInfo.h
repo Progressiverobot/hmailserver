@@ -13,8 +13,8 @@ namespace HM
    class ServerInfo
    {
    public:
-	   ServerInfo(bool fixed, const String &host_name, const String &ip_address, int port, const String&userName, const String &passWord, ConnectionSecurity connection_security);
-	   virtual ~ServerInfo();
+      ServerInfo(bool fixed, const String &host_name, const String &ip_address, int port, const String&userName, const String &passWord, ConnectionSecurity connection_security);
+      virtual ~ServerInfo();
 
       bool GetFixed();
       String GetHostName();

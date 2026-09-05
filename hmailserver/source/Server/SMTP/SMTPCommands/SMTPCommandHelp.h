@@ -16,8 +16,8 @@ namespace HM
    class SMTPCommandHelp : public ISMTPCommand
    {
    public:
-	   SMTPCommandHelp();
-	   virtual ~SMTPCommandHelp();
+      SMTPCommandHelp();
+      virtual ~SMTPCommandHelp();
 
 
       virtual void ExecuteCommand(SMTPConnection* pSMTPConnection );

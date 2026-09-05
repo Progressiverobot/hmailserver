@@ -22,7 +22,7 @@ namespace HM
       };
 
       AntiVirusConfiguration();
-	   virtual ~AntiVirusConfiguration();
+      virtual ~AntiVirusConfiguration();
 
       bool ClamWinEnabled() const;
       void ClamWinEnabled(bool Value);

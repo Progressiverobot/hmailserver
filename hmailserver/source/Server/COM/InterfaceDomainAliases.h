@@ -16,36 +16,36 @@ namespace HM
 
 
 class ATL_NO_VTABLE InterfaceDomainAliases : 
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceDomainAliases, &CLSID_DomainAliases>,
-	public IDispatchImpl<IInterfaceDomainAliases, &IID_IInterfaceDomainAliases, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceDomainAliases, &CLSID_DomainAliases>,
+   public IDispatchImpl<IInterfaceDomainAliases, &IID_IInterfaceDomainAliases, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public HM::COMAuthenticator
 
 {
 public:
-	InterfaceDomainAliases()
-	{
-	}
+   InterfaceDomainAliases()
+   {
+   }
 
 DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACEDOMAINALIASES)
 
 
 BEGIN_COM_MAP(InterfaceDomainAliases)
-	COM_INTERFACE_ENTRY(IInterfaceDomainAliases)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceDomainAliases)
+   COM_INTERFACE_ENTRY(IDispatch)
 END_COM_MAP()
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
-	
-	void FinalRelease() 
-	{
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
+   
+   void FinalRelease() 
+   {
+   }
 
    void Attach(std::shared_ptr<HM::DomainAliases> pDomainAliases);
 

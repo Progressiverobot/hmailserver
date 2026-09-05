@@ -18,35 +18,35 @@
 // InterfaceDKIM
 
 class ATL_NO_VTABLE InterfaceDKIM :
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceDKIM, &CLSID_DKIM>,
-	public IDispatchImpl<IInterfaceDKIM, &IID_IInterfaceDKIM, &LIBID_hMailServerLib, /*wMajor =*/ 1, /*wMinor =*/ 0>
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceDKIM, &CLSID_DKIM>,
+   public IDispatchImpl<IInterfaceDKIM, &IID_IInterfaceDKIM, &LIBID_hMailServerLib, /*wMajor =*/ 1, /*wMinor =*/ 0>
 {
 public:
-	InterfaceDKIM()
-	{
-	}
+   InterfaceDKIM()
+   {
+   }
 
 DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACEDKIM)
 
 
 BEGIN_COM_MAP(InterfaceDKIM)
-	COM_INTERFACE_ENTRY(IInterfaceDKIM)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceDKIM)
+   COM_INTERFACE_ENTRY(IDispatch)
 END_COM_MAP()
 
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
 
-	void FinalRelease()
-	{
-	}
+   void FinalRelease()
+   {
+   }
 
 public:
 

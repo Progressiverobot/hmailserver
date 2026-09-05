@@ -12,8 +12,8 @@ namespace HM
    class HTTPClient  
    {
    public:
-	   HTTPClient();
-	   virtual ~HTTPClient();
+      HTTPClient();
+      virtual ~HTTPClient();
       
       bool ExecuteScript(const String &sServer, const String &sPage, AnsiString &output) const;
 

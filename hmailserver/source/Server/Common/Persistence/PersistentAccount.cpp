@@ -360,8 +360,8 @@ namespace HM
       if (!pAccount || pAccount->GetID() == 0)
          return false;
 
-	   PersistentIMAPFolder::DeleteByAccount(pAccount->GetID());
-	   
+      PersistentIMAPFolder::DeleteByAccount(pAccount->GetID());
+      
       Cache<Account>::Instance()->RemoveObject(pAccount);
       AccountSizeCache::Instance()->Reset(pAccount->GetID());
       IMAPFolderContainer::Instance()->UncacheAccount(pAccount->GetID());
@@ -531,8 +531,8 @@ namespace HM
          }
       }
 
-	   if (!bNewObject)
-		  Cache<Account>::Instance()->RemoveObject(pAccount);
+      if (!bNewObject)
+        Cache<Account>::Instance()->RemoveObject(pAccount);
 
       // A full save writes accountpassword and accountpwencryption from the in-memory
       // object, so whatever the row held before - clear text included - has just been

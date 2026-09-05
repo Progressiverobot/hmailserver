@@ -13,8 +13,8 @@ namespace HM
    class PersistentIncomingRelay
    {
    public:
-	   PersistentIncomingRelay();
-	   virtual ~PersistentIncomingRelay();
+      PersistentIncomingRelay();
+      virtual ~PersistentIncomingRelay();
 
       static bool DeleteObject(std::shared_ptr<IncomingRelay> pSR);
       static bool SaveObject(std::shared_ptr<IncomingRelay> pSR);

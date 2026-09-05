@@ -150,7 +150,7 @@ STDMETHODIMP InterfaceApplication::get_BackupManager(IInterfaceBackupManager **p
       pInterfaceBackupManager->SetAuthentication(authentication_);
       if (!pInterfaceBackupManager->LoadSettings())
          return COMError::GenerateError("Backup manager not available");
-   	  
+        
       pInterfaceBackupManager->AddRef();
       *pVal = pInterfaceBackupManager;
    

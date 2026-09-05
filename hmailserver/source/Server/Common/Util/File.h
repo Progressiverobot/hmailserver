@@ -14,8 +14,8 @@ namespace HM
    class File  
    {
    public:
-	   File();
-	   virtual ~File();
+      File();
+      virtual ~File();
 
       enum OpenType
       {

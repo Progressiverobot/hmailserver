@@ -17,7 +17,7 @@ namespace HM
    {
 
    public:
-	   StaticIMAPCommandHandlers();
+      StaticIMAPCommandHandlers();
       static std::map<IMAPConnection::eIMAPCommandType, std::shared_ptr<IMAPCommand> > &GetStaticHandlers() {return mapCommandHandlers; }
 
    private:

@@ -59,7 +59,7 @@ namespace HM
                operating_system_ = WindowsXP;
             else if(OSversion.dwMajorVersion<=4)
                operating_system_ = WindowsNT;
-            else	
+            else  
                //for unknown windows/newest windows version
                operating_system_ = Windows2003;
          }      

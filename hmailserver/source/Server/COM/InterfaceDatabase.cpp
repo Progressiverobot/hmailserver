@@ -481,7 +481,7 @@ STDMETHODIMP InterfaceDatabase::CreateInternalDatabase()
       if (!config_)
          return GetAccessDenied();
 
-   	if (!GetIsServerAdmin())
+      if (!GetIsServerAdmin())
          return GetAccessDenied();
    
       // Make sure we have the latest settings.
@@ -608,7 +608,7 @@ STDMETHODIMP InterfaceDatabase::CreateExternalDatabase(eDBtype ServerType, BSTR 
       ini_file_settings_->SetDatabaseServer(sServerName);
       ini_file_settings_->SetDatabaseName(sDatabaseName);
       ini_file_settings_->SetIsInternalDatabase(false);
-	
+   
       return S_OK;   
    }
    catch (...)

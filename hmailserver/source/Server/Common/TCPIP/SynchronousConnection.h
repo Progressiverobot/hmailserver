@@ -14,8 +14,8 @@ namespace HM
    class SynchronousConnection
    {
    public:
-	   SynchronousConnection(int timeoutSeconds);
-	   virtual ~SynchronousConnection();
+      SynchronousConnection(int timeoutSeconds);
+      virtual ~SynchronousConnection();
 
       bool Connect(const AnsiString &hostName, int port);
       bool Write(const AnsiString &data);

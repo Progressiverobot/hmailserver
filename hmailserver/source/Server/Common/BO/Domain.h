@@ -17,8 +17,8 @@ namespace HM
    class Domain : public BusinessObject<Domain>
    {
    public:
-	   Domain();
-	   virtual ~Domain();
+      Domain();
+      virtual ~Domain();
 
       enum AntiSpamOptions
       {

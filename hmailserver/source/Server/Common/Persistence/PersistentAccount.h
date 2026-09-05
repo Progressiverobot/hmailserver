@@ -13,8 +13,8 @@ namespace HM
    class PersistentAccount 
    {
    public:
-	   PersistentAccount();
-	   virtual ~PersistentAccount();
+      PersistentAccount();
+      virtual ~PersistentAccount();
 
       static bool DeleteObject(std::shared_ptr<Account> pAccount);
       static bool SaveObject(std::shared_ptr<Account> pAccount);

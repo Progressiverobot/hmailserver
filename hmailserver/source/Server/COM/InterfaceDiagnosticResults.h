@@ -18,36 +18,36 @@
 // InterfaceDiagnosticResults
 
 class ATL_NO_VTABLE InterfaceDiagnosticResults :
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceDiagnosticResults, &CLSID_DiagnosticResults>,
-	public IDispatchImpl<IInterfaceDiagnosticResults, &IID_IInterfaceDiagnosticResults, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceDiagnosticResults, &CLSID_DiagnosticResults>,
+   public IDispatchImpl<IInterfaceDiagnosticResults, &IID_IInterfaceDiagnosticResults, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public HM::COMAuthenticator
 {
 public:
-	InterfaceDiagnosticResults()
-	{
-	}
+   InterfaceDiagnosticResults()
+   {
+   }
 
 DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACEDIAGNOSTICRESULTS)
 
 
 BEGIN_COM_MAP(InterfaceDiagnosticResults)
-	COM_INTERFACE_ENTRY(IInterfaceDiagnosticResults)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceDiagnosticResults)
+   COM_INTERFACE_ENTRY(IDispatch)
 END_COM_MAP()
 
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
 
-	void FinalRelease()
-	{
-	}
+   void FinalRelease()
+   {
+   }
 
 public:
    STDMETHOD(get_Item)(/*[in]*/ long Index, /*[out, retval]*/ IInterfaceDiagnosticResult* *pVal);

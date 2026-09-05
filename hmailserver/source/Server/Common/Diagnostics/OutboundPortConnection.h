@@ -15,8 +15,8 @@ namespace HM
    class OutboundPortConnection : public ProtocolParser  
    {
    public:
-	   OutboundPortConnection();
-	   virtual ~OutboundPortConnection();
+      OutboundPortConnection();
+      virtual ~OutboundPortConnection();
 
       void OnCouldNotConnect(const AnsiString &sErrorDescription);
 

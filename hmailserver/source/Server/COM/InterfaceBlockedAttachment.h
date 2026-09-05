@@ -22,36 +22,36 @@
 
 class ATL_NO_VTABLE InterfaceBlockedAttachment :
    public COMCollectionItem<HM::BlockedAttachment, HM::BlockedAttachments>,
-	public CComObjectRootEx<CComSingleThreadModel>,
-	public CComCoClass<InterfaceBlockedAttachment, &CLSID_BlockedAttachment>,
-	public IDispatchImpl<IInterfaceBlockedAttachment, &IID_IInterfaceBlockedAttachment, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public CComObjectRootEx<CComSingleThreadModel>,
+   public CComCoClass<InterfaceBlockedAttachment, &CLSID_BlockedAttachment>,
+   public IDispatchImpl<IInterfaceBlockedAttachment, &IID_IInterfaceBlockedAttachment, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
    public HM::COMAuthenticator
 {
 public:
-	InterfaceBlockedAttachment()
-	{
-	}
+   InterfaceBlockedAttachment()
+   {
+   }
 
 DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACEBLOCKEDATTACHMENT)
 
 
 BEGIN_COM_MAP(InterfaceBlockedAttachment)
-	COM_INTERFACE_ENTRY(IInterfaceBlockedAttachment)
-	COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(IInterfaceBlockedAttachment)
+   COM_INTERFACE_ENTRY(IDispatch)
 END_COM_MAP()
 
 
 
-	DECLARE_PROTECT_FINAL_CONSTRUCT()
+   DECLARE_PROTECT_FINAL_CONSTRUCT()
 
-	HRESULT FinalConstruct()
-	{
-		return S_OK;
-	}
+   HRESULT FinalConstruct()
+   {
+      return S_OK;
+   }
 
-	void FinalRelease()
-	{
-	}
+   void FinalRelease()
+   {
+   }
 
 public:
 

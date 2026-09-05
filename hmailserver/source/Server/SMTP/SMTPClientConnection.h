@@ -23,7 +23,7 @@ namespace HM
          boost::asio::ssl::context& context,
          std::shared_ptr<Event> disconnected,
          AnsiString remote_hostname);
-	   virtual ~SMTPClientConnection();
+      virtual ~SMTPClientConnection();
 
       void OnCouldNotConnect(const AnsiString &sErrorDescription);
 
@@ -66,8 +66,8 @@ namespace HM
 
       void HandleHandshakeFailed_();
       bool InternalParseData(const AnsiString &Request);
-  	   void ReadAndSend_();
-	  
+      void ReadAndSend_();
+     
       bool IsPositiveCompletion(int iErrorCode);
       bool IsPermanentNegative(int lErrorCode);
 
@@ -101,7 +101,7 @@ namespace HM
 
       enum ConnectionState
       {
-	      HELO = 1,
+         HELO = 1,
          HELOSENT = 9,
          EHLOSENT = 10,
          AUTHLOGINSENT = 11,
