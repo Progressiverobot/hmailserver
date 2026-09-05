@@ -121,7 +121,7 @@ namespace DataDirectorySynchronizer.Pages
 
       private void IteratePublicFolder(DirectoryInfo dirRoot, string publicFolderDiskName)
       {
-         DirectoryInfo publicFolder = new DirectoryInfo(Path.Combine(dirRoot.FullName, publicFolderDiskName));
+         DirectoryInfo publicFolder = new DirectoryInfo(Path.Join(dirRoot.FullName, publicFolderDiskName));
 
          if (!publicFolder.Exists)
             return;

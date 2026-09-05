@@ -5,6 +5,7 @@
 
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 using NUnit.Framework;
@@ -188,7 +189,7 @@ namespace RegressionTests.Stress.IMAP
 
             simulator.Disconnect();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             Record(failures, "Reader aborted: " + ex.Message);
          }
@@ -215,7 +216,7 @@ namespace RegressionTests.Stress.IMAP
 
             simulator.Disconnect();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             Record(failures, "Writer aborted: " + ex.Message);
          }
@@ -247,7 +248,7 @@ namespace RegressionTests.Stress.IMAP
 
             simulator.Disconnect();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             Record(failures, "Lock holder aborted: " + ex.Message);
          }
@@ -298,7 +299,7 @@ namespace RegressionTests.Stress.IMAP
 
             simulator.Disconnect();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             Record(failures, "Mutator aborted: " + ex.Message);
          }
@@ -346,7 +347,7 @@ namespace RegressionTests.Stress.IMAP
 
             simulator.Disconnect();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             // A crashing worker drops the connection mid-command.
             Record(failures, "Reader aborted: " + ex.Message);
@@ -370,7 +371,7 @@ namespace RegressionTests.Stress.IMAP
 
             simulator.Disconnect();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             Record(failures, "Writer aborted: " + ex.Message);
          }
@@ -481,19 +482,18 @@ namespace RegressionTests.Stress.IMAP
 
                Interlocked.Increment(ref state.Lists);
 
-               foreach (var folder in stableFolders)
+               var omitted = stableFolders.FirstOrDefault(folder => !ListingContainsFolder(listing, folder));
+
+               if (omitted != null)
                {
-                  if (!ListingContainsFolder(listing, folder))
-                  {
-                     Record(failures, string.Format("LIST omitted {0}, which exists and is never modified.", folder));
-                     return;
-                  }
+                  Record(failures, string.Format("LIST omitted {0}, which exists and is never modified.", omitted));
+                  return;
                }
             }
 
             simulator.Disconnect();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             // A crashing worker drops the connection mid-command.
             Record(failures, "Reader aborted: " + ex.Message);
@@ -538,7 +538,7 @@ namespace RegressionTests.Stress.IMAP
 
             simulator.Disconnect();
          }
-         catch (Exception ex)
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             Record(failures, "Writer aborted: " + ex.Message);
          }
