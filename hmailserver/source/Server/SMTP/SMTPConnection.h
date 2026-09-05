@@ -276,6 +276,7 @@ namespace HM
 
       bool GetIsLocalSender_();
       bool ArchiveScopeIncludesMessage_();
+      bool AuthenticatedSenderPermitted_(const String &sender, String &reason);
 
       bool GetAuthIsEnabled_();
 

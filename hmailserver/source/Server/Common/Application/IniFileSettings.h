@@ -337,6 +337,14 @@ namespace HM
       // Off is for a remote that advertises what it cannot do.
       bool GetOutboundPipelining() const { return outbound_pipelining_; }
       bool GetOutboundChunking() const { return outbound_chunking_; }
+
+      // Whether an authenticated SMTP session may only put in MAIL FROM an address
+      // its account owns - its own, an alias of it - or has been granted, by the
+      // post (p) right on another account's INBOX (Send-As). Off by default,
+      // because nothing constrained this before 5 September 2026 and an
+      // installation may depend on that; on, a compromised or careless account
+      // can no longer send as anyone it likes, and a Send-As grant means something.
+      bool GetSmtpAuthenticatedSenderCheck() const { return smtp_authenticated_sender_check_; }
       String GetBATVSecret() const { return batv_secret_; }
       // Rate shaping (0 = unlimited / disabled).
       int GetMaxSubmissionsPerIPPerMinute() const { return max_submissions_per_ip_per_minute_; }
@@ -1017,6 +1025,7 @@ namespace HM
       bool batv_enabled_;
       bool outbound_pipelining_;
       bool outbound_chunking_;
+      bool smtp_authenticated_sender_check_;
       String batv_secret_;
       int max_submissions_per_ip_per_minute_;
       int pop3_login_delay_seconds_;

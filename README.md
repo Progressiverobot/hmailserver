@@ -444,6 +444,11 @@ Administration and monitoring:
    OutboundChunking=1            ; RFC 3030 on the delivery client: when the remote advertises CHUNKING, send the
                                  ; message as one BDAT ... LAST chunk (no 354 wait, no dot-stuffing; also what
                                  ; lets a BINARYMIME message be relayed). 0 = DATA, as before
+   SmtpAuthenticatedSenderCheck=0 ; 1 = an authenticated session may only put in MAIL FROM its own address, an
+                                 ; alias of it, or another mailbox whose owner granted it the post (p) right on
+                                 ; their INBOX (Send-As); anything else is refused 550 5.7.1. The null sender is
+                                 ; always allowed and unauthenticated sessions are unaffected. Off by default
+                                 ; because nothing constrained this before and an installation may rely on it
    LogDeleteDays=0               ; prune hMailServer's own date-stamped logs older than N days (0 = keep all)
    ShutdownDrainSeconds=0        ; on stop, wait up to N seconds for active sessions to finish (0 = stop immediately)
    MessageStoreFsync=0           ; force each received message to physical disk before it is acknowledged (1 = on)

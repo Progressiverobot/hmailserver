@@ -71,7 +71,7 @@ namespace hMailServer.ControlPanel.Views
          ("Keep seen/unseen state", 4),
          ("Set flags", 8),
          ("Insert / append messages", 16),
-         ("Post", 32),
+         ("Post - and send as this mailbox's address over SMTP (Send-As, when SmtpAuthenticatedSenderCheck is on)", 32),
          ("Create sub-folders", 64),
          ("Delete folder", 128),
          ("Delete messages", 256),

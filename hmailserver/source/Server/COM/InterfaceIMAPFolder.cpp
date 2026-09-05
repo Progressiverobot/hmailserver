@@ -224,12 +224,15 @@ InterfaceIMAPFolder::get_Permissions(IInterfaceIMAPFolderPermissions **pVal)
       if (!object_)
          return GetAccessDenied();
 
-      if (!object_->IsPublicFolder())
-      {
-         // This is not a public  folder. Not possible to modify permissions.
-         return COMError::GenerateError("It is only possible to modify permissions for public folders.");
-      }
-   
+      // Until 5 September 2026 this refused anything but a public folder: "It is
+      // only possible to modify permissions for public folders." That was true
+      // for as long as the server evaluated ACLs on public folders only. Since 21
+      // August 2026 a private folder's ACL is evaluated too - it is how a mailbox
+      // is shared through the other-users namespace, and how Send-As is granted
+      // (the post right on an INBOX) - so an administrator's script and the
+      // Control Panel need the same grant surface an IMAP client's SETACL has.
+      // The folder owner's own rights stay implicit; SETACL and this collection
+      // both refuse to store a row for the owner.
       CComObject<InterfaceIMAPFolderPermissions>* pItem = new CComObject<InterfaceIMAPFolderPermissions >();
       pItem->SetAuthentication(authentication_);
    
