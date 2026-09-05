@@ -1,4 +1,4 @@
-// Copyright (c) 2010 Martin Knafve / hMailServer.com.  
+// Copyright (c) 2010 Martin Knafve / hMailServer.com.
 // https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -14,9 +14,9 @@ namespace HM
 
    class IMAPConnection;
    class Message;
-   class ByteBuffer; 
+   class ByteBuffer;
    class IMAPFetchParser;
-   
+
 
    class IMAPFetch : public IMAPCommandRangeAction
    {
@@ -26,9 +26,16 @@ namespace HM
 
       virtual IMAPResult DoAction(std::shared_ptr<IMAPConnection> pConnection, int messageIndex, std::shared_ptr<Message> pMessage, const std::shared_ptr<IMAPCommandArgument> pArgument);
 
-      
+      // Fetch what still exists, then say that the rest is gone (RFC 2180 4.1.3).
+      virtual MissingMessagePolicy GetMissingMessagePolicy() const { return MissingMessagePolicy::ReportAfterActing; }
+
+      // FETCH sets \Seen on the message it returns, so it works on the object the
+      // collection holds, as the single-message form always did.
+      virtual bool UsesLiveMessages() const { return true; }
+
+
    private:
-      
+
       String CreateEnvelopeStructure_(MimeHeader& oHeader);
       String GetPartStructure_(std::shared_ptr<MimeBody> oPart, bool includeExtensionData, int iRecursion);
       String IteratePartRecursive_(std::shared_ptr<MimeBody> oPart, bool includeExtensionData, int iRecursion);

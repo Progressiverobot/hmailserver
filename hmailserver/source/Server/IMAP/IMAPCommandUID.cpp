@@ -1,4 +1,4 @@
-// Copyright (c) 2010 Martin Knafve / hMailServer.com.  
+// Copyright (c) 2010 Martin Knafve / hMailServer.com.
 // https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -14,6 +14,8 @@
 #include "IMAPCopy.h"
 #include "IMAPMove.h"
 #include "IMAPStore.h"
+#include "IMAPFolderView.h"
+#include "IMAPNotificationClient.h"
 #include "IMAPCommandSearch.h"
 
 #include "MessagesContainer.h"
@@ -82,18 +84,6 @@ namespace HM
          return ranges;
       }
 
-      unsigned int GetLargestUid_(const std::vector<std::shared_ptr<Message>> &messages)
-      {
-         unsigned int maxUid = 0;
-
-         for (const std::shared_ptr<Message> &message : messages)
-         {
-            if (message->GetUID() > maxUid)
-               maxUid = message->GetUID();
-         }
-
-         return maxUid;
-      }
    }
 
    IMAPCommandUID::IMAPCommandUID()
@@ -122,7 +112,7 @@ namespace HM
       std::shared_ptr<IMAPSimpleCommandParser> pParser = std::shared_ptr<IMAPSimpleCommandParser>(new IMAPSimpleCommandParser());
 
       pParser->Parse(pArgument);
-      
+
       if (pParser->WordCount() < 2)
          return IMAPResult(IMAPResult::ResultBad, "Command requires at least 1 parameter.");
 
@@ -285,58 +275,71 @@ namespace HM
          if (sUidSet.IsEmpty() || !StringParser::ValidateString(sUidSet, "01234567890,.:*"))
             return IMAPResult(IMAPResult::ResultBad, "Incorrect mail number");
 
-         std::vector<std::pair<unsigned int, unsigned int>> ranges =
-            ParseUidSet_(sUidSet, GetLargestUid_(pCurFolder->GetMessages()->GetCopy()));
+         std::shared_ptr<IMAPFolderView> view = pConnection->GetCurrentFolderView();
+         if (!view)
+            return IMAPResult(IMAPResult::ResultNo, "No folder selected.");
 
-         std::vector<__int64> expunged_messages_index;
-         std::vector<__int64> expunged_messages_uid;
-         std::vector<__int64> vanished_uids;
+         auto messages = MessagesContainer::Instance()->GetMessages(pCurFolder->GetAccountID(), pCurFolder->GetID());
+         view->AppendNewMessages(messages);
 
-         std::function<bool(int, std::shared_ptr<Message>)> filter = [&expunged_messages_index, &expunged_messages_uid, &vanished_uids, &ranges](int index, std::shared_ptr<Message> message)
+         // "*" is the largest UID this session knows about - see IMAPCommandRangeAction.
+         std::vector<std::pair<unsigned int, unsigned int>> ranges = ParseUidSet_(sUidSet, view->GetHighestUID());
+
+         std::set<__int64> candidate_ids;
+
+         for (const std::pair<int, IMAPViewEntry> &entry : view->GetAllEntries())
          {
-            if (!message->GetFlagDeleted())
-               return false;
+            unsigned int uid = entry.second.uid;
 
-            unsigned int uid = message->GetUID();
             for (const std::pair<unsigned int, unsigned int> &range : ranges)
             {
                if (uid >= range.first && uid <= range.second)
                {
-                  expunged_messages_index.push_back(index);
-                  expunged_messages_uid.push_back(message->GetID());
-                  vanished_uids.push_back(uid);
-                  return true;
+                  candidate_ids.insert(entry.second.message_id);
+                  break;
                }
             }
-
-            return false;
-         };
-
-         auto messages = MessagesContainer::Instance()->GetMessages(pCurFolder->GetAccountID(), pCurFolder->GetID());
-         messages->DeleteMessages(filter);
-
-         String sResponse;
-         if (pConnection->GetQResyncEnabled() && !vanished_uids.empty())
-         {
-            // RFC 7162 (QRESYNC): report expunges as a single "* VANISHED" UID set.
-            sResponse.Format(_T("* VANISHED %s\r\n"), IMAPConnection::CompactUidSet(vanished_uids).c_str());
          }
-         else
+
+         std::map<__int64, std::shared_ptr<Message> > candidates = messages->GetCopyByIds(candidate_ids);
+
+         std::set<__int64> messages_to_delete;
+
+         for (__int64 message_id : candidate_ids)
          {
-            for (__int64 expungedIndex : expunged_messages_index)
+            auto iter = candidates.find(message_id);
+
+            if (iter == candidates.end())
             {
-               String sTemp;
-               sTemp.Format(_T("* %d EXPUNGE\r\n"), (int) expungedIndex);
-               sResponse += sTemp;
+               // Expunged by another session. Reported below, together with this one's.
+               view->MarkVanished(message_id);
+               continue;
             }
+
+            if ((*iter).second->GetFlagDeleted())
+               messages_to_delete.insert(message_id);
          }
 
-         pConnection->SendAsciiData(sResponse);
+         std::vector<__int64> deleted_message_ids = messages->DeleteMessagesById(messages_to_delete);
 
-         if (!expunged_messages_uid.empty())
+         std::vector<__int64> ids_to_report = deleted_message_ids;
+         std::vector<__int64> vanished_elsewhere = view->TakeVanished();
+         ids_to_report.insert(ids_to_report.end(), vanished_elsewhere.begin(), vanished_elsewhere.end());
+
+         std::vector<unsigned int> expunged_uids;
+         std::vector<int> expunged_sequences = view->RemoveMessages(ids_to_report, &expunged_uids);
+
+         pConnection->RemoveRecentMessages(ids_to_report);
+
+         String sResponse = IMAPNotificationClient::FormatExpungeResponses(pConnection, expunged_sequences, expunged_uids);
+
+         if (!sResponse.IsEmpty())
+            pConnection->SendAsciiData(sResponse);
+
+         if (!deleted_message_ids.empty())
          {
             std::shared_ptr<ChangeNotification> pNotification =
-               std::shared_ptr<ChangeNotification>(new ChangeNotification(pCurFolder->GetAccountID(), pCurFolder->GetID(), ChangeNotification::NotificationMessageDeleted, expunged_messages_index));
+               std::shared_ptr<ChangeNotification>(new ChangeNotification(pCurFolder->GetAccountID(), pCurFolder->GetID(), ChangeNotification::NotificationMessageDeleted, deleted_message_ids));
 
             Application::Instance()->GetNotificationServer()->SendNotification(pConnection->GetNotificationClient(), pNotification);
          }
@@ -357,7 +360,7 @@ namespace HM
       long lSecWordEndPos = sCommand.Find(_T(" "), lSecWordStartPos);
       long lSecWordLength = lSecWordEndPos - lSecWordStartPos;
       String sMailNo = sCommand.Mid(lSecWordStartPos, lSecWordLength);
-      
+
       // Copy the second word containing the actual command.
       String sShowPart = sCommand.Mid(lSecWordEndPos + 1);
 
@@ -464,7 +467,7 @@ namespace HM
       }
 
       // Execute the command. If we have gotten this far, it means that the syntax
-      // of the command is correct. If we fail now, we should return NO. 
+      // of the command is correct. If we fail now, we should return NO.
       IMAPResult result = command_->DoForMails(pConnection, sMailNo, pArgument);
 
       if (result.GetResult() == IMAPResult::ResultOK)

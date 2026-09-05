@@ -1,4 +1,4 @@
-// Copyright (c) 2010 Martin Knafve / hMailServer.com.  
+// Copyright (c) 2010 Martin Knafve / hMailServer.com.
 // https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -35,20 +35,32 @@ namespace HM
       std::set<__int64> GetRecentMessageIDs() const;
 
       long GetNoOfSeen() const;
-      
+
       std::vector<std::shared_ptr<Message>> GetCopy();
+
+      // Copies of the messages with the given database ids, keyed on id, in ONE pass over
+      // the collection: a command resolving a whole message set must not scan it once per
+      // id. GetItemsByIds hands out the objects the collection holds instead, for the
+      // commands that update them (STORE, and FETCH setting \Seen).
+      std::map<__int64, std::shared_ptr<Message>> GetCopyByIds(const std::set<__int64> &message_ids) const;
+      std::map<__int64, std::shared_ptr<Message>> GetItemsByIds(const std::set<__int64> &message_ids) const;
+      std::shared_ptr<Message> GetCopyByDBID(__int64 message_id) const;
 
       std::shared_ptr<Message> GetItemByUID(unsigned int uid);
       std::shared_ptr<Message> GetItemByUID(unsigned int uid, unsigned int &foundIndex);
 
-      void DeleteMessages(std::function<bool(int, std::shared_ptr<Message>)> &filter);
+      // Deletes the messages the filter selects and returns the database ids of those
+      // actually deleted - which is what a change notification carries, since a
+      // sequence number means a different message to every session.
+      std::vector<__int64> DeleteMessages(const std::function<bool(std::shared_ptr<Message>)> &filter);
+      std::vector<__int64> DeleteMessagesById(const std::set<__int64> &message_ids);
 
       // False when the messages could not be loaded, so the caller can retry
       // instead of treating an empty collection as an empty folder.
       bool Refresh(bool update_recent_flags);
 
       void AddToCollection(std::shared_ptr<DALRecordset> pRS);
-      
+
       void Remove(__int64 iDBID);
 
       void RemoveRecentFlags();

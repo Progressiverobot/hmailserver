@@ -1,4 +1,4 @@
-// Copyright (c) 2010 Martin Knafve / hMailServer.com.  
+// Copyright (c) 2010 Martin Knafve / hMailServer.com.
 // https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -55,7 +55,7 @@ namespace HM
       return true;
    }
 
-   bool 
+   bool
    FolderManager::DeleteInboxMessages(int accountID, std::set<int> uids, const std::function<void()> &callbackEvery1000Message)
    {
       std::shared_ptr<IMAPFolders> folders = IMAPFolderContainer::Instance()->GetFoldersForAccount(accountID);
@@ -68,11 +68,9 @@ namespace HM
 
       __int64 inboxID = folder->GetID();
 
-      std::vector<__int64> affectedMessages;
-
       int count = 0;
 
-      std::function<bool(int, std::shared_ptr<Message>)> filter = [&uids, &affectedMessages, &count, &callbackEvery1000Message](int index, std::shared_ptr<Message> message)
+      std::function<bool(std::shared_ptr<Message>)> filter = [&uids, &count, &callbackEvery1000Message](std::shared_ptr<Message> message)
          {
             count++;
 
@@ -81,24 +79,19 @@ namespace HM
                callbackEvery1000Message();
             }
 
-            if (uids.find(message->GetUID()) != uids.end())
-            {
-               affectedMessages.push_back(index);
-               return true;
-            }
-            else
-            {
-               return false;
-            }
+            return uids.find(message->GetUID()) != uids.end();
          };
 
       auto messages = MessagesContainer::Instance()->GetMessages(folder->GetAccountID(), folder->GetID());
-      messages->DeleteMessages(filter);
-      
+
+      // The ids of what was deleted are what the notification carries: a POP3 session
+      // has no view, and every IMAP session that does numbers these for itself.
+      std::vector<__int64> affectedMessages = messages->DeleteMessages(filter);
+
       if (affectedMessages.size() > 0)
       {
          // Notify the mailbox notifier that the mailbox contents have changed.
-         std::shared_ptr<ChangeNotification> pNotification = 
+         std::shared_ptr<ChangeNotification> pNotification =
             std::shared_ptr<ChangeNotification>(new ChangeNotification(accountID, inboxID, ChangeNotification::NotificationMessageDeleted, affectedMessages));
 
          Application::Instance()->GetNotificationServer()->SendNotification(pNotification);
@@ -108,7 +101,7 @@ namespace HM
       return true;
    }
 
-   bool 
+   bool
    FolderManager::UpdateMessageFlags(int accountID, int folderID, __int64 messageID, int flags)
    {
       std::shared_ptr<IMAPFolders> folders;
@@ -134,5 +127,5 @@ namespace HM
    }
 
 
-   
-} 
+
+}

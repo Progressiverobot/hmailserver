@@ -1,4 +1,4 @@
-// Copyright (c) 2010 Martin Knafve / hMailServer.com.  
+// Copyright (c) 2010 Martin Knafve / hMailServer.com.
 // https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -28,11 +28,11 @@ namespace HM
 
    }
 
-   ChangeNotification::ChangeNotification(__int64 accountID, __int64 folderID, NotificationType type, const std::vector<__int64>& affectedMessages) :
+   ChangeNotification::ChangeNotification(__int64 accountID, __int64 folderID, NotificationType type, const std::vector<__int64>& affectedMessageIds) :
       account_id_(accountID),
       folder_id_(folderID),
       type_(type),
-      affected_messages_(affectedMessages)
+      affected_message_ids_(affectedMessageIds)
    {
 
    }
@@ -76,9 +76,9 @@ namespace HM
    }
 
    const std::vector<__int64>&
-   ChangeNotification::GetAffectedMessages() const
+   ChangeNotification::GetAffectedMessageIds() const
    {
-      return affected_messages_;
+      return affected_message_ids_;
    }
 
 }

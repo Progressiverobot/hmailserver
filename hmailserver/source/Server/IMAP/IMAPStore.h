@@ -1,4 +1,4 @@
-// Copyright (c) 2010 Martin Knafve / hMailServer.com.  
+// Copyright (c) 2010 Martin Knafve / hMailServer.com.
 // https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -17,6 +17,9 @@ namespace HM
 	   virtual ~IMAPStore();
 
       IMAPResult DoAction(std::shared_ptr<IMAPConnection> pConnection, int messageIndex, std::shared_ptr<Message> pMessage, const std::shared_ptr<IMAPCommandArgument> pArgument);
+
+      // STORE updates the flags on the message, so it must not work on a copy.
+      virtual bool UsesLiveMessages() const { return true; }
       static String GetMessageFlags(std::shared_ptr<Message> pMessage, int messageIndex, bool includeModSeq);
 
       // RFC 7162 (CONDSTORE): "[MODIFIED <set>] " prefix listing the messages skipped because

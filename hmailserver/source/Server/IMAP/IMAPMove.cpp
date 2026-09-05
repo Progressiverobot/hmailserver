@@ -1,4 +1,4 @@
-// Copyright (c) 2010 Martin Knafve / hMailServer.com.  
+// Copyright (c) 2010 Martin Knafve / hMailServer.com.
 // https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -16,6 +16,8 @@
 #include "../Common/Tracking/NotificationServer.h"
 
 #include "MessagesContainer.h"
+#include "IMAPFolderView.h"
+#include "IMAPNotificationClient.h"
 
 #include <algorithm>
 
@@ -28,7 +30,7 @@ namespace HM
 {
    IMAPMove::IMAPMove()
    {
-      
+
    }
 
    IMAPResult
@@ -36,11 +38,11 @@ namespace HM
    {
       if (!pArgument || !pOldMessage)
          return IMAPResult(IMAPResult::ResultBad, "Invalid parameters");
-      
+
       std::shared_ptr<IMAPSimpleCommandParser> pParser = std::shared_ptr<IMAPSimpleCommandParser>(new IMAPSimpleCommandParser());
 
       pParser->Parse(pArgument);
-      
+
       if (pParser->WordCount() <= 0)
          return IMAPResult(IMAPResult::ResultNo, "The command requires parameters.");
 
@@ -83,7 +85,7 @@ namespace HM
          return IMAPResult(IMAPResult::ResultBad, "Failed to move message");
 
       if (!pConnection->CheckPermission(pFolder, ACLPermission::PermissionWriteSeen))
-         pNewMessage->SetFlagSeen(false);  
+         pNewMessage->SetFlagSeen(false);
 
       if (!PersistentMessage::SaveObject(pNewMessage))
          return IMAPResult(IMAPResult::ResultBad, "Failed to save moved message.");
@@ -94,7 +96,7 @@ namespace HM
       MessagesContainer::Instance()->SetFolderNeedsRefresh(pFolder->GetID());
 
       // Notify any IMAP idle client watching the target folder.
-      std::shared_ptr<ChangeNotification> pNotification = 
+      std::shared_ptr<ChangeNotification> pNotification =
          std::shared_ptr<ChangeNotification>(new ChangeNotification(pFolder->GetAccountID(), pFolder->GetID(), ChangeNotification::NotificationMessageAdded));
 
       pConnection->SetDelayedChangeNotification(pNotification);
@@ -115,45 +117,37 @@ namespace HM
       if (!pCurFolder)
          return;
 
-      std::vector<__int64> expunged_messages_uid;
-      std::vector<__int64> expunged_messages_index;
+      std::shared_ptr<IMAPFolderView> view = pConnection->GetCurrentFolderView();
+      if (!view)
+         return;
 
-      std::vector<unsigned int> &moved_uids = moved_message_uids_;
-      std::function<bool(int, std::shared_ptr<Message>)> filter = [&expunged_messages_index, &expunged_messages_uid, &moved_uids](int index, std::shared_ptr<Message> message)
+      std::set<unsigned int> moved_uids(moved_message_uids_.begin(), moved_message_uids_.end());
+
+      std::function<bool(std::shared_ptr<Message>)> filter = [&moved_uids](std::shared_ptr<Message> message)
       {
-         if (std::find(moved_uids.begin(), moved_uids.end(), message->GetUID()) != moved_uids.end())
-         {
-            expunged_messages_index.push_back(index);
-            expunged_messages_uid.push_back(message->GetID());
-            return true;
-         }
-
-         return false;
+         return moved_uids.find(message->GetUID()) != moved_uids.end();
       };
 
       auto messages = MessagesContainer::Instance()->GetMessages(pCurFolder->GetAccountID(), pCurFolder->GetID());
-      messages->DeleteMessages(filter);
+      std::vector<__int64> deleted_message_ids = messages->DeleteMessages(filter);
 
-      String sResponse;
-      for (__int64 index : expunged_messages_index)
-      {
-         String sTemp;
-         sTemp.Format(_T("* %d EXPUNGE\r\n"), (int) index);
-         sResponse += sTemp;
-      }
+      // RFC 6851: the untagged EXPUNGE responses for the source folder - numbered by this
+      // session's view, or as one VANISHED under QRESYNC (RFC 6851 3.3).
+      std::vector<unsigned int> expunged_uids;
+      std::vector<int> expunged_sequences = view->RemoveMessages(deleted_message_ids, &expunged_uids);
+
+      pConnection->RemoveRecentMessages(deleted_message_ids);
+
+      String sResponse = IMAPNotificationClient::FormatExpungeResponses(pConnection, expunged_sequences, expunged_uids);
 
       if (!sResponse.IsEmpty())
          pConnection->SendAsciiData(sResponse);
 
-      if (!expunged_messages_uid.empty())
+      if (!deleted_message_ids.empty())
       {
-         // Through the connection, under its state lock - see IMAPCommandExpunge.
-         for (__int64 messageUid : expunged_messages_uid)
-            pConnection->RemoveRecentMessage(messageUid);
-
          // Notify the mailbox notifier that the source folder contents changed.
-         std::shared_ptr<ChangeNotification> pNotification = 
-            std::shared_ptr<ChangeNotification>(new ChangeNotification(pCurFolder->GetAccountID(), pCurFolder->GetID(), ChangeNotification::NotificationMessageDeleted, expunged_messages_index));
+         std::shared_ptr<ChangeNotification> pNotification =
+            std::shared_ptr<ChangeNotification>(new ChangeNotification(pCurFolder->GetAccountID(), pCurFolder->GetID(), ChangeNotification::NotificationMessageDeleted, deleted_message_ids));
 
          Application::Instance()->GetNotificationServer()->SendNotification(pConnection->GetNotificationClient(), pNotification);
       }

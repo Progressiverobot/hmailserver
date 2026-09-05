@@ -1,4 +1,4 @@
-// Copyright (c) 2010 Martin Knafve / hMailServer.com.  
+// Copyright (c) 2010 Martin Knafve / hMailServer.com.
 // https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -9,6 +9,7 @@
 #include "IMAPSimpleCommandParser.h"
 
 #include "MessagesContainer.h"
+#include "IMAPFolderView.h"
 
 #include "../Common/BO/ACLPermission.h"
 #include "../Common/BO/Account.h"
@@ -77,7 +78,7 @@ namespace HM
       // Fetch the folder
       String sFolderName = pParser->GetParamValue(pArgument, 0);
       std::shared_ptr<IMAPFolder> pSelectedFolder = pConnection->GetFolderByFullPath(sFolderName);
-      
+
       if (!pSelectedFolder)
       {
          // Also the answer for a shared ("#Users") path the caller lacks the
@@ -100,21 +101,26 @@ namespace HM
          return IMAPResult(IMAPResult::ResultBad, "ACL: Read permission denied (Required for EXAMINE command).");
       }
 
-      pConnection->SetCurrentFolder(pSelectedFolder, true);
-      
+      // Close the previously selected folder before loading this one, so that
+      // re-selecting the same folder still clears its recent flags first.
+      pConnection->CloseCurrentFolder();
+
       std::set<__int64> recent_messages;
       auto messages = MessagesContainer::Instance()->GetMessages(pSelectedFolder->GetAccountID(), pSelectedFolder->GetID(), recent_messages, false);
 
+      pConnection->SetCurrentFolder(pSelectedFolder, true, messages);
       pConnection->SetRecentMessages(recent_messages);
 
-      long lCount = messages->GetCount();
+      // The count is this session's view of the folder - the numbering every response
+      // to this session uses from here on.
+      long lCount = pConnection->GetCurrentFolderView()->GetMessageCount();
       // RFC 3501: [UNSEEN] carries a message sequence number, not a UID
       // (see IMAPCommandSelect).
       __int64 lFirstUnseenID = messages->GetFirstUnseenSequenceNumber();
       long lRecentCount = (int) recent_messages.size();
 
       String sRespTemp;
-   
+
       sRespTemp.Format(_T("* %d EXISTS\r\n"), lCount);
       String sResponse = sRespTemp; // EXISTS
 
@@ -126,8 +132,8 @@ namespace HM
       }
 
       sResponse += _T("* FLAGS (\\Deleted \\Seen \\Draft \\Answered \\Flagged)\r\n");
-   
-      sRespTemp.Format(_T("* OK [UIDVALIDITY %d] current uidvalidity\r\n"), pSelectedFolder->GetCreationTime().ToInt());   
+
+      sRespTemp.Format(_T("* OK [UIDVALIDITY %d] current uidvalidity\r\n"), pSelectedFolder->GetCreationTime().ToInt());
       sResponse += sRespTemp;
 
       if (lFirstUnseenID > 0 && !pConnection->GetImap4Rev2Enabled())
@@ -184,7 +190,7 @@ namespace HM
 
       sResponse += pArgument->Tag() + _T(" OK [READ-ONLY] EXAMINE completed\r\n");
 
-      pConnection->SendAsciiData(sResponse);   
+      pConnection->SendAsciiData(sResponse);
 
       return IMAPResult();
    }

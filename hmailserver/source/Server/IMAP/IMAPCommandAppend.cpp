@@ -1,4 +1,4 @@
-// Copyright (c) 2010 Martin Knafve / hMailServer.com.  
+// Copyright (c) 2010 Martin Knafve / hMailServer.com.
 // https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -24,6 +24,7 @@
 
 #include "IMAPSimpleCommandParser.h"
 #include "MessagesContainer.h"
+#include "IMAPFolderView.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -50,7 +51,7 @@ namespace HM
       }
    }
 
-   void 
+   void
    IMAPCommandAppend::KillCurrentMessage_()
    {
       if (!current_message_)
@@ -65,7 +66,7 @@ namespace HM
    {
       if (!pConnection->IsAuthenticated())
          return IMAPResult(IMAPResult::ResultNo, "Authenticate first");
-      
+
       current_tag_ = pArgument->Tag();
 
       // Reset these two so we don't re-use old values.
@@ -145,16 +146,18 @@ namespace HM
 
          auto currentMessages = MessagesContainer::Instance()->GetMessages(pCurrentFolder->GetAccountID(), pCurrentFolder->GetID());
 
-         if (replaceUsesUid)
-         {
-            replace_target_ = currentMessages->GetItemByUID((unsigned int) target);
-         }
-         else
-         {
-            std::vector<std::shared_ptr<Message>> messageList = currentMessages->GetCopy();
-            if (target <= (__int64) messageList.size())
-               replace_target_ = messageList[(size_t) target - 1];
-         }
+         // Resolved against this session's view, like every other message number: the
+         // number the client sent means the message it was last told is there.
+         std::shared_ptr<IMAPFolderView> view = pConnection->GetCurrentFolderView();
+         IMAPViewEntry entry;
+         int sequence = 0;
+
+         bool found = view && (replaceUsesUid
+            ? view->GetEntryByUID((unsigned int) target, sequence, entry)
+            : view->GetEntryBySequence((int) target, entry));
+
+         if (found)
+            replace_target_ = currentMessages->GetCopyByDBID(entry.message_id);
 
          if (!replace_target_)
             return IMAPResult(IMAPResult::ResultNo, "No such message.");
@@ -475,7 +478,7 @@ namespace HM
          return;
       }
    }
-   
+
    bool
    IMAPCommandAppend::WriteData_(const std::shared_ptr<IMAPConnection>  pConn, const BYTE *pBuf, size_t WriteLen)
    {
@@ -959,7 +962,15 @@ namespace HM
           pConnection->GetCurrentFolder()->GetID() == destination_folder_->GetID())
       {
          std::shared_ptr<Messages> messages = destination_folder_->GetMessages();
-         sResponse += IMAPNotificationClient::GenerateExistsString(messages->GetCount());
+
+         // Appended at the end, so this session's existing numbering is unaffected; the
+         // count reported is this session's, which may still hold messages expunged
+         // elsewhere that it has not been told about.
+         std::shared_ptr<IMAPFolderView> view = pConnection->GetCurrentFolderView();
+         if (view)
+            view->AppendNewMessages(messages);
+
+         sResponse += IMAPNotificationClient::GenerateExistsString(view ? view->GetMessageCount() : messages->GetCount());
          sResponse += IMAPNotificationClient::GenerateRecentString((int) pConnection->GetRecentMessageCount());
       }
 
@@ -971,46 +982,28 @@ namespace HM
          if (selectedFolder)
          {
             __int64 targetId = replace_target_->GetID();
-            __int64 targetUid = (__int64) replace_target_->GetUID();
 
-            std::vector<__int64> expungedIndexes;
-            std::function<bool(int, std::shared_ptr<Message>)> filter =
-               [targetId, &expungedIndexes](int index, std::shared_ptr<Message> message)
-            {
-               if (message->GetID() == targetId)
-               {
-                  expungedIndexes.push_back(index);
-                  return true;
-               }
-
-               return false;
-            };
+            std::set<__int64> target_ids;
+            target_ids.insert(targetId);
 
             auto selectedMessages = MessagesContainer::Instance()->GetMessages(selectedFolder->GetAccountID(), selectedFolder->GetID());
-            selectedMessages->DeleteMessages(filter);
+            std::vector<__int64> deleted_message_ids = selectedMessages->DeleteMessagesById(target_ids);
 
-            if (!expungedIndexes.empty())
+            std::shared_ptr<IMAPFolderView> view = pConnection->GetCurrentFolderView();
+
+            if (!deleted_message_ids.empty() && view)
             {
-               if (pConnection->GetQResyncEnabled())
-               {
-                  std::vector<__int64> vanished;
-                  vanished.push_back(targetUid);
+               // RFC 8508: the replaced message is expunged, reported by this session's
+               // own number - or as VANISHED under QRESYNC.
+               std::vector<unsigned int> expunged_uids;
+               std::vector<int> expunged_sequences = view->RemoveMessages(deleted_message_ids, &expunged_uids);
 
-                  String sVanished;
-                  sVanished.Format(_T("* VANISHED %s\r\n"), IMAPConnection::CompactUidSet(vanished).c_str());
-                  sResponse += sVanished;
-               }
-               else
-               {
-                  String sExpunge;
-                  sExpunge.Format(_T("* %d EXPUNGE\r\n"), (int) expungedIndexes[0]);
-                  sResponse += sExpunge;
-               }
+               sResponse += IMAPNotificationClient::FormatExpungeResponses(pConnection, expunged_sequences, expunged_uids);
 
-               pConnection->RemoveRecentMessage(targetId);
+               pConnection->RemoveRecentMessages(deleted_message_ids);
 
                std::shared_ptr<ChangeNotification> pDeleteNotification =
-                  std::shared_ptr<ChangeNotification>(new ChangeNotification(selectedFolder->GetAccountID(), selectedFolder->GetID(), ChangeNotification::NotificationMessageDeleted, expungedIndexes));
+                  std::shared_ptr<ChangeNotification>(new ChangeNotification(selectedFolder->GetAccountID(), selectedFolder->GetID(), ChangeNotification::NotificationMessageDeleted, deleted_message_ids));
                Application::Instance()->GetNotificationServer()->SendNotification(pConnection->GetNotificationClient(), pDeleteNotification);
             }
          }
