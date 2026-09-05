@@ -54,7 +54,7 @@ namespace HM
       {
          const ULONGLONG intervalMilliseconds = 15 * 60 * 1000;
 
-         if (check >= CheckCount)
+         if (check < 0 || check >= CheckCount)
             return false;
 
          // One slot per check. Zero means "not yet reported"; GetTickCount64 is

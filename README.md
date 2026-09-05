@@ -293,6 +293,7 @@ The repository contains build scripts which locate the prerequisites automatical
    powershell.exe -NoProfile -ExecutionPolicy Bypass -File build\post-build.ps1   # copies DLLs, registers the COM server (elevates via UAC)
    powershell.exe -NoProfile -ExecutionPolicy Bypass -File build\build-tests.ps1  # builds the regression test solution
    powershell.exe -NoProfile -ExecutionPolicy Bypass -File build\run-tests.ps1    # runs the regression tests
+   powershell.exe -NoProfile -ExecutionPolicy Bypass -File build\analyze.ps1      # the static-analysis build: MSVC /analyze, findings summarised in logs\ (rebuild normally before a gate)
    </pre>
 
 Alternatively, build from Visual Studio (started with _Run as Administrator_) or directly with MSBuild:

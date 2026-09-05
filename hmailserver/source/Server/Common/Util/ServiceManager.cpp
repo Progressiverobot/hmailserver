@@ -186,8 +186,10 @@ namespace HM
 
       memset(lpDependent, 0, memSize);
 
-      _tcscpy_s(lpDependent, memSize, _T("RPCSS"));
-      _tcscpy_s(lpDependent + 6, memSize-6, ServiceName);
+      // _tcscpy_s counts characters, not bytes: sized by memSize the second copy
+      // believed it had twice the room it had.
+      _tcscpy_s(lpDependent, iLength, _T("RPCSS"));
+      _tcscpy_s(lpDependent + 6, iLength - 6, ServiceName);
       
       int iRet = ChangeServiceConfig( 
          hService,        // handle of service 
@@ -311,6 +313,9 @@ namespace HM
             case ERROR_INVALID_PARAMETER:
                ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5061, "ServiceManager::UserControlService", "OpenSCManager failed. A specified parameter is invalid.");
                return false;
+            default:
+               ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5061, "ServiceManager::UserControlService", "OpenSCManager failed. Windows error code: " + StringParser::IntToString(err));
+               return false;
          }
 
       }
@@ -337,6 +342,10 @@ namespace HM
                return false;
             case ERROR_SERVICE_DOES_NOT_EXIST:
                ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5065, "ServiceManager::UserControlService", "OpenService failed. The specified service does not exist.");
+               return false;
+            default:
+               CloseServiceHandle(hSCManager);
+               ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5065, "ServiceManager::UserControlService", "OpenService failed. Windows error code: " + StringParser::IntToString(err));
                return false;
          }
       }

@@ -164,14 +164,15 @@ namespace HM
 
       SOCKADDR_IN addr;
       addr.sin_family = AF_INET;
-      addr.sin_addr.s_addr = inet_addr(T2A(sHostname));
+      CT2A hostname(sHostname);
+      addr.sin_addr.s_addr = inet_addr(hostname);
 
       struct hostent *host;
 
       if(addr.sin_addr.s_addr == INADDR_NONE)
       {
          host = NULL;
-         host = gethostbyname(T2A(sHostname));
+         host = gethostbyname(hostname);
          if (!host)
             return false;
 
