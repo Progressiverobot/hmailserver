@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <set>
+
 #include "../SQL/DatabaseSettings.h"
 
 namespace HM
@@ -313,6 +315,13 @@ namespace HM
       int GetBlockedIPHoldSeconds () {return blocked_iphold_seconds_; }
       int GetSMTPDMaxSizeDrop () {return smtpdmax_size_drop_; }
       bool GetBackupMessagesDBOnly () const { return backup_messages_dbonly_; }
+
+      // Whether every backup that includes messages is followed by a trial
+      // extraction of its message store and a reconciliation of the message rows
+      // against it (BackupExecuter::VerifyRestore_). On by default: a backup that
+      // has never been restored is a hope. Off for a store too large to exist
+      // twice in the temp directory for the duration of the check.
+      bool GetBackupVerifyRestore() const { return backup_verify_restore_; }
       bool GetAddXAuthUserIP () const { return add_xauth_user_ip_; }
       bool GetRewriteEnvelopeFromWhenForwarding() const { return rewrite_envelope_from_when_forwarding_; }
       void SetRewriteEnvelopeFromWhenForwarding(bool value);
@@ -408,6 +417,15 @@ namespace HM
       // that started deleting from one on upgrade would be destroying the evidence
       // it was told to keep.
       int GetArchiveRetentionDays() const { return archive_retention_days_; }
+
+      // ArchiveDomains: the domains whose mail ArchiveDir keeps. Empty, the
+      // default, means every message. Otherwise a message is archived only when
+      // its local sender or one of its recipients belongs to a listed domain, and
+      // only the copies for listed domains are made - an archive kept for a reason
+      // that applies to particular domains must not accumulate everybody else's
+      // mail on the side.
+      bool GetArchiveScoped() const { return !archive_domains_.empty(); }
+      bool IsArchiveDomain(const String &domain) const;
 
       // How long a single database statement is allowed to run, in seconds. 0 means
       // no limit.
@@ -984,6 +1002,7 @@ namespace HM
       int blocked_iphold_seconds_;
       int smtpdmax_size_drop_;
       bool backup_messages_dbonly_;
+      bool backup_verify_restore_;
       bool add_xauth_user_ip_;
       bool rewrite_envelope_from_when_forwarding_;
       bool srs_enabled_;
@@ -1008,6 +1027,7 @@ namespace HM
       bool dkim_accept_sha1_;
       int quota_warning_percent_;
       int archive_retention_days_;
+      std::set<String> archive_domains_;
       int database_statement_timeout_;
       int imap_expunge_retention_records_;
       bool metrics_per_domain_enabled_;

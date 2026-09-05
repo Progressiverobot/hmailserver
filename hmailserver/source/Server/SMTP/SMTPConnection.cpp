@@ -1791,13 +1791,20 @@ namespace HM
       // Let's archive message we just received
       String sArchiveDir = IniFileSettings::Instance()->GetArchiveDir();
 
-      if (!sArchiveDir.empty()) 
+      if (!sArchiveDir.empty() && !ArchiveScopeIncludesMessage_())
       {
-         LOG_SMTP(GetSessionID(), GetIPAddressString(), "Archiving..");      
+         // ArchiveDomains is set and nobody on this message belongs to a listed
+         // domain. An archive kept for a reason that applies to particular domains
+         // must not accumulate everybody else's mail on the side.
+         LOG_SMTP(GetSessionID(), GetIPAddressString(), "Archiving skipped: neither the sender nor any recipient belongs to a domain listed in ArchiveDomains.");
+      }
+      else if (!sArchiveDir.empty())
+      {
+         LOG_SMTP(GetSessionID(), GetIPAddressString(), "Archiving..");
 
          bool bArchiveHardlinks = IniFileSettings::Instance()->GetArchiveHardlinks();
-         String _messageFileName;
-         String sFileNameExclPath;
+         String _messageFileName = PersistentMessage::GetFileName(current_message_);
+         String sFileNameExclPath = FileUtilities::GetFileNameFromFullPath(_messageFileName);
          String sMessageArchivePath;
          String sFromAddress1 = current_message_->GetFromAddress();
          std::vector<String> vecParams1 = StringParser::SplitString(sFromAddress1,  "@");
@@ -1805,36 +1812,43 @@ namespace HM
          // We need exactly 2 or not an email address
          if (vecParams1.size() == 2)
          {
-            String sResponse;
             String sSenderName = vecParams1[0];
             sSenderName = sSenderName.ToLower();
             String sSenderDomain = vecParams1[1];
             sSenderDomain = sSenderDomain.ToLower();
             bool blocalSender1 = GetIsLocalSender_();
 
-            if (blocalSender1)
+            if (blocalSender1 && !IniFileSettings::Instance()->IsArchiveDomain(sSenderDomain))
+            {
+               // A local sender outside ArchiveDomains gets no Sent copy. The message
+               // is here because a listed recipient is on it, and that recipient's
+               // copy below is made from the message itself.
+               LOG_SMTP(GetSessionID(), GetIPAddressString(), "Local sender " + sFromAddress1 + " is outside ArchiveDomains; no Sent copy.");
+            }
+            else if (blocalSender1)
             {
                // First copy goes to local sender
-               _messageFileName = PersistentMessage::GetFileName(current_message_);
-               sFileNameExclPath = FileUtilities::GetFileNameFromFullPath(_messageFileName);
                sMessageArchivePath = sArchiveDir + "\\" + sSenderDomain + "\\" + sSenderName + "\\Sent-" + sFileNameExclPath;
 
-               LOG_SMTP(GetSessionID(), GetIPAddressString(), "Local sender: " + sFromAddress1 + ". Putting in user folder: " + sMessageArchivePath);      
+               LOG_SMTP(GetSessionID(), GetIPAddressString(), "Local sender: " + sFromAddress1 + ". Putting in user folder: " + sMessageArchivePath);
 
                FileUtilities::Copy(_messageFileName, sMessageArchivePath, true);
             }
             else
             {
-               LOG_SMTP(GetSessionID(), GetIPAddressString(), "Non local sender, putting in common Inbound folder..");      
+               LOG_SMTP(GetSessionID(), GetIPAddressString(), "Non local sender, putting in common Inbound folder..");
 
                // First copy goes to common archive folder instead
-               _messageFileName = PersistentMessage::GetFileName(current_message_);
-               sFileNameExclPath = FileUtilities::GetFileNameFromFullPath(_messageFileName);
                sMessageArchivePath = sArchiveDir + "\\Inbound\\" + sFileNameExclPath;
 
                FileUtilities::Copy(_messageFileName, sMessageArchivePath, true);
             }
 
+            // What each recipient's copy is made from: the first copy when there is
+            // one, otherwise the message itself. A hard link needs its source on the
+            // archive's volume, so when the message store is elsewhere the fallback
+            // to a copy below does the work.
+            String sArchiveSource = sMessageArchivePath.IsEmpty() ? _messageFileName : sMessageArchivePath;
             String sMessageArchivePath2;
 
             // Now create hardlink/copy for each *local* recipient
@@ -1851,41 +1865,44 @@ namespace HM
                // We need exactly 2 or not an email address
                if (vecParams1.size() == 2)
                {
-                  String sResponse;
-                  String sSenderName = vecParams1[0];
-                  sSenderName = sSenderName.ToLower();
-                  String sSenderDomain = vecParams1[1];
-                  sSenderDomain = sSenderDomain.ToLower();
+                  String sRecipientName = vecParams1[0];
+                  sRecipientName = sRecipientName.ToLower();
+                  String sRecipientDomain = vecParams1[1];
+                  sRecipientDomain = sRecipientDomain.ToLower();
 
-                  pDomaintmp = CacheContainer::Instance()->GetDomain(sSenderDomain);
+                  pDomaintmp = CacheContainer::Instance()->GetDomain(sRecipientDomain);
                   bDomainIsLocal = pDomaintmp ? true : false;
 
-                  if (bDomainIsLocal)
+                  if (bDomainIsLocal && IniFileSettings::Instance()->IsArchiveDomain(sRecipientDomain))
                   {
-                     sMessageArchivePath2 = sArchiveDir + "\\" + sSenderDomain + "\\" + sSenderName + "\\" + sFileNameExclPath;
-                     LOG_SMTP(GetSessionID(), GetIPAddressString(), "Local recipient: " + sRecipientAddress + ". Putting in user folder: " + sMessageArchivePath2);      
+                     sMessageArchivePath2 = sArchiveDir + "\\" + sRecipientDomain + "\\" + sRecipientName + "\\" + sFileNameExclPath;
+                     LOG_SMTP(GetSessionID(), GetIPAddressString(), "Local recipient: " + sRecipientAddress + ". Putting in user folder: " + sMessageArchivePath2);
 
-                     if (bArchiveHardlinks) 
+                     if (bArchiveHardlinks)
                      {
-                        FileUtilities::CreateDirectory(sArchiveDir + "\\" + sSenderDomain + "\\" + sSenderName);
+                        FileUtilities::CreateDirectory(sArchiveDir + "\\" + sRecipientDomain + "\\" + sRecipientName);
                         // This function call is odd in that original is 2nd anc destination is 1st..
-                        BOOL fCreatedLink = CreateHardLink( sMessageArchivePath2, sMessageArchivePath, NULL ); // Last is reserved, must be NULL
+                        BOOL fCreatedLink = CreateHardLink( sMessageArchivePath2, sArchiveSource, NULL ); // Last is reserved, must be NULL
 
                         if ( fCreatedLink == FALSE )
                         {
                            // If error try normal copy
-                           FileUtilities::Copy(sMessageArchivePath, sMessageArchivePath2, true);
-                           LOG_SMTP(GetSessionID(), GetIPAddressString(), "HardLink failed.. Falling back to Copy.");      
+                           FileUtilities::Copy(sArchiveSource, sMessageArchivePath2, true);
+                           LOG_SMTP(GetSessionID(), GetIPAddressString(), "HardLink failed.. Falling back to Copy.");
                         }
                         else
                         {
-                           LOG_SMTP(GetSessionID(), GetIPAddressString(), "HardLink succeeded.");      
+                           LOG_SMTP(GetSessionID(), GetIPAddressString(), "HardLink succeeded.");
                         }
                      }
                      else
                      {
-                        FileUtilities::Copy(sMessageArchivePath, sMessageArchivePath2, true);
+                        FileUtilities::Copy(sArchiveSource, sMessageArchivePath2, true);
                      }
+                  }
+                  else if (bDomainIsLocal)
+                  {
+                     LOG_SMTP(GetSessionID(), GetIPAddressString(), "Local recipient " + sRecipientAddress + " is outside ArchiveDomains; no copy.");
                   }
                }
 
@@ -1896,14 +1913,12 @@ namespace HM
          {
             // Sender is either null/blank (ie <>) or some other odd thing happed so we'll save in Error folder
             // either way as failsafe.
-            LOG_SMTP(GetSessionID(), GetIPAddressString(), "Sender is NULL or invalid. Saving to Error folder.");      
+            LOG_SMTP(GetSessionID(), GetIPAddressString(), "Sender is NULL or invalid. Saving to Error folder.");
 
-            _messageFileName = PersistentMessage::GetFileName(current_message_);
-            sFileNameExclPath = FileUtilities::GetFileNameFromFullPath(_messageFileName);
             sMessageArchivePath = sArchiveDir + "\\Error\\" + sFileNameExclPath;
             FileUtilities::Copy(_messageFileName, sMessageArchivePath, true);
          }
-      }   
+      }
 
       float dTime = ((float) GetTickCount() - (float) message_start_tc_) / (float) 1000;
       double dTCDiff = Math::Round(dTime ,3);
@@ -4856,6 +4871,42 @@ namespace HM
       - the domain-part of the email matches an active local domain.
       - the sender address matches a route address.
    */
+   bool
+   SMTPConnection::ArchiveScopeIncludesMessage_()
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // Whether ArchiveDomains lets this message into the archive at all: always when
+   // the list is empty, otherwise when the sender is local and listed, or when any
+   // recipient's domain is listed. Which copies are then made is decided per
+   // address where the copies are made.
+   //---------------------------------------------------------------------------()
+   {
+      auto ini = IniFileSettings::Instance();
+
+      if (!ini->GetArchiveScoped())
+         return true;
+
+      if (GetIsLocalSender_())
+      {
+         std::vector<String> sender = StringParser::SplitString(current_message_->GetFromAddress(), "@");
+
+         if (sender.size() == 2 && ini->IsArchiveDomain(sender[1]))
+            return true;
+      }
+
+      const std::vector<std::shared_ptr<MessageRecipient> > recipients = current_message_->GetRecipients()->GetVector();
+
+      for (size_t i = 0; i < recipients.size(); i++)
+      {
+         std::vector<String> recipient = StringParser::SplitString(recipients[i]->GetAddress(), "@");
+
+         if (recipient.size() == 2 && ini->IsArchiveDomain(recipient[1]))
+            return true;
+      }
+
+      return false;
+   }
+
    bool
    SMTPConnection::GetIsLocalSender_()
    {

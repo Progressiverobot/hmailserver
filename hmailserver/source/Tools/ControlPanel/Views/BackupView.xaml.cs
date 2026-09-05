@@ -30,6 +30,7 @@ namespace hMailServer.ControlPanel.Views
          if (iniStore_.IsAvailable)
          {
             CheckMessagesDbOnly.IsChecked = iniStore_.ReadBool("BackupMessagesDBOnly", false);
+            CheckVerifyRestore.IsChecked = iniStore_.ReadBool("BackupVerifyRestore", true);
 
             // The schedule and retention settings, with the server's own defaults:
             // time "" and everything else 0, i.e. no schedule and no pruning
@@ -44,6 +45,9 @@ namespace hMailServer.ControlPanel.Views
             CheckMessagesDbOnly.IsEnabled = false;
             MessagesDbOnlyNote.Text = "hMailServer.ini was not found on this machine, so BackupMessagesDBOnly " +
                                       "can only be changed on the server itself.";
+            CheckVerifyRestore.IsEnabled = false;
+            VerifyRestoreNote.Text = "hMailServer.ini was not found on this machine, so BackupVerifyRestore " +
+                                     "can only be changed on the server itself.";
 
             // An editor that cannot read the value back must not write it either -
             // it would misreport its own state on the next visit.
@@ -81,7 +85,10 @@ namespace hMailServer.ControlPanel.Views
          try
          {
             if (iniStore_.IsAvailable)
+            {
                iniStore_.WriteBool("BackupMessagesDBOnly", CheckMessagesDbOnly.IsChecked is true);
+               iniStore_.WriteBool("BackupVerifyRestore", CheckVerifyRestore.IsChecked is true);
+            }
 
             dynamic backup = ServerSession.Current.Application.Settings.Backup;
             // IInterfaceBackupSettings has no Save method: each property setter

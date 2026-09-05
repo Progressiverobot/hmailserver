@@ -2571,6 +2571,19 @@ namespace hMailServer.ControlPanel.Views
             BrowseFolder = true,
             IniStore = iniStore_
          });
+         archive.Settings.Add(new IniText
+         {
+            Path = "ArchiveDomains",
+            Label = "Only archive mail for these domains (comma-separated; empty = every message)",
+            Placeholder = "example.com, example.org",
+            Blurb = "An archive is usually kept for a legal or contractual reason, and that reason usually applies " +
+                    "to particular domains rather than to every domain this server hosts. With a list here a " +
+                    "message is archived only when its local sender or one of its recipients belongs to a listed " +
+                    "domain, and only the copies for listed domains are made - a listed recipient still gets " +
+                    "their copy when the sender's domain is not listed. Matched without regard to case. Applies " +
+                    "after a service restart.",
+            IniStore = iniStore_
+         });
          archive.Settings.Add(new IniBool
          {
             Path = "ArchiveHardLinks",

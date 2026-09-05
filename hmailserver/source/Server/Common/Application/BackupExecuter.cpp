@@ -34,6 +34,8 @@
 
 #include <boost/filesystem.hpp>
 
+#include <set>
+
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
 #define new DEBUG_NEW
@@ -263,6 +265,96 @@ namespace HM
    }
 
    static bool
+   MeasureTree_(const boost::filesystem::path &root, unsigned int &files, unsigned __int64 &bytes,
+      std::set<String> *names, String &failureDetail)
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // Counts the regular files under root and adds up their sizes, optionally
+   // collecting their lower-cased names. Symbolic links are neither followed nor
+   // counted: the backup copies real files, so a link inside the staged or the
+   // extracted tree would itself be a discrepancy, and the count is how it shows.
+   // Every call uses an error_code overload for the reason given at the top of
+   // this file: an exception escaping the backup task terminates the service.
+   //---------------------------------------------------------------------------()
+   {
+      boost::system::error_code error;
+      boost::filesystem::recursive_directory_iterator entry(root, boost::filesystem::directory_options::none, error);
+
+      if (error)
+      {
+         failureDetail = Formatter::Format("{0} could not be listed: {1}.", String(root.wstring()), String(error.message().c_str()));
+         return false;
+      }
+
+      boost::filesystem::recursive_directory_iterator end;
+
+      while (entry != end)
+      {
+         boost::filesystem::file_status status = entry->symlink_status(error);
+
+         if (error)
+         {
+            failureDetail = Formatter::Format("{0} could not be examined: {1}.", String(entry->path().wstring()), String(error.message().c_str()));
+            return false;
+         }
+
+         if (boost::filesystem::is_regular_file(status))
+         {
+            unsigned __int64 size = boost::filesystem::file_size(entry->path(), error);
+
+            if (error)
+            {
+               failureDetail = Formatter::Format("{0} could not be measured: {1}.", String(entry->path().wstring()), String(error.message().c_str()));
+               return false;
+            }
+
+            files++;
+            bytes += size;
+
+            if (names)
+            {
+               String name(entry->path().filename().wstring());
+               names->insert(name.ToLower());
+            }
+         }
+
+         entry.increment(error);
+
+         if (error)
+         {
+            failureDetail = Formatter::Format("{0} could not be listed: {1}.", String(root.wstring()), String(error.message().c_str()));
+            return false;
+         }
+      }
+
+      return true;
+   }
+
+   static void
+   CollectMessageFilenames_(XNode *node, std::vector<String> &filenames)
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // Every Filename a Message element in the backup index carries, wherever the
+   // element sits - an account's folders, a public folder - since Message::XMLStore
+   // is the one writer and stores the bare file name.
+   //---------------------------------------------------------------------------()
+   {
+      if (!node)
+         return;
+
+      if (node->name == _T("Message"))
+      {
+         LPXAttr filename = node->GetAttr(_T("Filename"));
+
+         if (filename && !filename->value.IsEmpty())
+            filenames.push_back(filename->value);
+      }
+
+      for (size_t i = 0; i < node->childs.size(); i++)
+         CollectMessageFilenames_(node->childs[i], filenames);
+   }
+
+   static bool
    DatabaseReadsFailed_()
    //---------------------------------------------------------------------------()
    // DESCRIPTION:
@@ -331,9 +423,11 @@ namespace HM
       Logger::Instance()->LogBackup("The incomplete archive " + sZipFile + " could not be removed. Delete it by hand - while it is there it counts as a backup for retention purposes.");
    }
 
-   BackupExecuter::BackupExecuter()
+   BackupExecuter::BackupExecuter() :
+      backup_mode_(0),
+      staged_files_(0),
+      staged_bytes_(0)
    {
-      backup_mode_ = 0;
    }
 
    BackupExecuter::~BackupExecuter(void)
@@ -604,6 +698,32 @@ namespace HM
          return false;
       }
 
+      // And then the mail inside it. Only when there is a message store to extract
+      // - BackupMessagesDBOnly writes rows and no files - and only while the
+      // administrator has not turned it off, which is said in the log rather than
+      // left to be inferred from a line that is missing.
+      if ((backup_mode_ & Backup::BOMessages) && (backup_mode_ & Backup::BODomains) && !bMessagesDBOnly)
+      {
+         if (IniFileSettings::Instance()->GetBackupVerifyRestore())
+         {
+            bool discardArchive = false;
+
+            if (!VerifyRestore_(sZipFile, pBackupNode, discardArchive))
+            {
+               if (discardArchive)
+                  DiscardIncompleteArchive_(sZipFile, zipExistedBeforeThisRun);
+               else
+                  Logger::Instance()->LogBackup("The archive " + sZipFile + " has been left in place. It has not been verified and does not count as a successful backup until one is.");
+
+               return false;
+            }
+         }
+         else
+         {
+            Logger::Instance()->LogBackup("Verified restore skipped: BackupVerifyRestore is 0, so the message store was not extracted and checked.");
+         }
+      }
+
       // Retention runs here and nowhere else. This is the one point that every
       // failure path above has already returned past, so the new archive is
       // complete on disk before anything old is even considered for deletion. That
@@ -670,9 +790,23 @@ namespace HM
       if (!bResult)
       {
          Logger::Instance()->LogBackup("Failed to delete files in backup root directory. Please see hMailServer error log.");
+         return false;
       }
 
-      return bResult;
+      // Measured now, after the root files have gone, so that this is exactly the
+      // tree about to be compressed: the number the extracted store is held to in
+      // VerifyRestore_.
+      staged_files_ = 0;
+      staged_bytes_ = 0;
+
+      String detail;
+      if (!MeasureTree_(boost::filesystem::path(sDataBackupDir.c_str()), staged_files_, staged_bytes_, 0, detail))
+      {
+         Logger::Instance()->LogBackup("Failed to measure the staged message files. Details: " + detail);
+         return false;
+      }
+
+      return true;
    }
 
    bool
@@ -725,6 +859,141 @@ namespace HM
          Application::Instance()->GetBackupManager()->OnBackupFailed(message);
 
          return false;
+      }
+
+      return true;
+   }
+
+   bool
+   BackupExecuter::VerifyRestore_(const String &sZipFile, XNode *pBackupNode, bool &discardArchive)
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // The trailing zero in 3-2-1-1-0. VerifyArchive_ proves the index can be read;
+   // this proves the mail can be got back out: the message store is extracted to a
+   // scratch directory by the same BackupRestorer a restore uses, held to exactly
+   // the files this run staged for compression, and reconciled against the
+   // message rows in the index.
+   //
+   // Two questions, with two different consequences. "Does the archive contain
+   // what this run wrote?" is a question about the archive, and a wrong answer
+   // discards it: a store that reads back with fewer files or bytes than went in
+   // is a truncated archive, whatever 7za's exit code said. "Does every message
+   // row have a file?" is a question about the server, not the archive - the rows
+   // were read before the copy started, and mail flow does not stop for a backup
+   // - so its answer is reported, with names, and never fails the backup. An
+   // archive that faithfully records a store with a file missing is exactly the
+   // backup an administrator whose store has lost a file wants to have.
+   //
+   // The cost is the extraction: for the duration of the check the message store
+   // exists twice, in the temp directory. A temp volume that cannot hold it is
+   // not a reason to fail a good backup, so that case is skipped with an
+   // explanation; BackupVerifyRestore=0 skips the step altogether.
+   //---------------------------------------------------------------------------()
+   {
+      discardArchive = false;
+
+      boost::system::error_code spaceError;
+      boost::filesystem::space_info tempSpace = boost::filesystem::space(
+         boost::filesystem::path(IniFileSettings::Instance()->GetTempDirectory().c_str()), spaceError);
+
+      // A margin for the index and the archive's own overhead; the store itself is
+      // the number that matters.
+      const unsigned __int64 margin = 64ull * 1024 * 1024;
+
+      if (!spaceError && tempSpace.available < staged_bytes_ + margin)
+      {
+         Logger::Instance()->LogBackup(Formatter::Format(
+            "Verified restore skipped: extracting the message store needs {0} byte(s) and the temp directory {1} has {2} byte(s) free. The archive index was verified; the mail inside was not. Free space there, or set BackupVerifyRestore=0 to stop this line.",
+            staged_bytes_ + margin, IniFileSettings::Instance()->GetTempDirectory(), (unsigned __int64) tempSpace.available));
+
+         return true;
+      }
+
+      Logger::Instance()->LogBackup("Verifying the backup can be restored: extracting the message store...");
+
+      std::shared_ptr<Backup> probe = std::shared_ptr<Backup>(new Backup);
+      probe->SetBackupFile(sZipFile);
+      probe->SetRestoreOptions(Backup::BODomains | Backup::BOMessages);
+
+      // The restorer removes the scratch directory when it goes out of scope. The
+      // same Prepare a restore runs: the version check, the subset checks and the
+      // extraction, so what passes here is what a restore would accept.
+      BackupRestorer restorer;
+      String failureReason;
+
+      if (!restorer.Prepare(probe, failureReason))
+      {
+         Application::Instance()->GetBackupManager()->OnBackupFailed(
+            "The backup was written but its message store could not be extracted for verification, so it has not been shown to be restorable. " + failureReason);
+
+         return false;
+      }
+
+      String store = restorer.GetStagedMessageStore();
+
+      unsigned int extractedFiles = 0;
+      unsigned __int64 extractedBytes = 0;
+      std::set<String> extractedNames;
+      String detail;
+
+      if (!MeasureTree_(boost::filesystem::path(store.c_str()), extractedFiles, extractedBytes, &extractedNames, detail))
+      {
+         Application::Instance()->GetBackupManager()->OnBackupFailed(
+            "The backup was written but its message store could not be read back after extraction, so it has not been shown to be restorable. " + detail);
+
+         return false;
+      }
+
+      if (extractedFiles != staged_files_ || extractedBytes != staged_bytes_)
+      {
+         discardArchive = true;
+
+         Application::Instance()->GetBackupManager()->OnBackupFailed(Formatter::Format(
+            "The backup was written but its message store reads back as {0} file(s) totalling {1} byte(s), where this run wrote {2} file(s) totalling {3} byte(s). The archive does not contain what was backed up and is not a usable backup.",
+            extractedFiles, extractedBytes, staged_files_, staged_bytes_));
+
+         return false;
+      }
+
+      std::vector<String> rowFiles;
+      CollectMessageFilenames_(pBackupNode, rowFiles);
+
+      const unsigned int namedLimit = 10;
+      unsigned int missing = 0;
+      String missingNames;
+
+      for (size_t i = 0; i < rowFiles.size(); i++)
+      {
+         String name = rowFiles[i];
+         name.ToLower();
+
+         if (extractedNames.find(name) != extractedNames.end())
+            continue;
+
+         missing++;
+
+         if (missing <= namedLimit)
+         {
+            if (missing > 1)
+               missingNames += _T(", ");
+
+            missingNames += rowFiles[i];
+         }
+      }
+
+      Logger::Instance()->LogBackup(Formatter::Format(
+         "Verified restore: the message store was extracted to {0} and reads back as {1} file(s) totalling {2} byte(s), exactly what this run wrote.",
+         store, extractedFiles, extractedBytes));
+
+      Logger::Instance()->LogBackup(Formatter::Format(
+         "{0} message row(s) in the index were checked against the extracted store; {1} of them have no file in this backup.",
+         (unsigned int) rowFiles.size(), missing));
+
+      if (missing > 0)
+      {
+         Logger::Instance()->LogBackup(Formatter::Format(
+            "Message row(s) whose file is not in this backup{0}: {1}. They were deleted from the message store before or while the backup ran; after a restore they are listed but cannot be fetched. Small numbers are what mail flow looks like; a large number means the backup was taken during a bulk deletion and is worth taking again.",
+            missing > namedLimit ? String(_T(" (the first ten)")) : String(_T("")), missingNames));
       }
 
       return true;

@@ -429,6 +429,15 @@ Administration and monitoring:
    ScheduledBackupKeepCount=0    ; keep at most N archives (0 = keep everything)
    ScheduledBackupMaxAgeDays=0   ; delete archives older than N days (0 = keep everything). Never applied to
                                  ; the two newest, and never before a new backup has completed successfully
+   BackupVerifyRestore=1         ; after every backup that includes messages, extract its message store to the
+                                 ; temp folder through the restore code path, hold it to exactly the files the
+                                 ; backup staged, and name every message row that has no file in the backup log.
+                                 ; The store exists twice while it runs; 0 skips it for a store the temp volume
+                                 ; cannot hold, and a temp volume that is merely short of space skips it with a
+                                 ; line in the log rather than failing the backup
+   ArchiveDomains=               ; comma-separated domains whose mail ArchiveDir keeps (empty = every message).
+                                 ; A message is archived only when its local sender or a recipient belongs to a
+                                 ; listed domain, and only the copies for listed domains are made
    LogDeleteDays=0               ; prune hMailServer's own date-stamped logs older than N days (0 = keep all)
    ShutdownDrainSeconds=0        ; on stop, wait up to N seconds for active sessions to finish (0 = stop immediately)
    MessageStoreFsync=0           ; force each received message to physical disk before it is acknowledged (1 = on)

@@ -90,6 +90,16 @@ already cost a release cycle or nearly shipped a defect.
    Release (step 8) before step 9: the assertion build is the dynamic-analysis
    build and is never the binary that ships or is hashed.
 
+8c. **Timed fuzz run on the release source** — required for every minor
+   release. On the build from step 8: `fuzz\run-fuzz.ps1 -Target
+   mime_message_fuzzer -Minutes 30`, and the same for each other harness
+   listed in `hmailserver/docs/Fuzzing.md`. A crash, a hang or a violated
+   assertion is a release blocker: minimise it, fix it, add the input to
+   `fuzz\regression`, restart at step 1. Record the harnesses, the duration
+   and the execution count in the release notes' verification line. A patch
+   release may cite the previous minor's run when none of the fuzzed parsers
+   changed; anything else runs again.
+
 9. **Full regression suite on the stamped binary** — every test, nothing
    skipped. If *anything* changes after this run, the run is void: rebuild
    and re-run. Never abort a run; if one must be stopped, expect step 4 to

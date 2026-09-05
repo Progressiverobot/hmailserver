@@ -32,6 +32,11 @@
                     <TextBlock x:Name="MessagesDbOnlyNote" MaxWidth="520" HorizontalAlignment="Left"
                                Text="hMailServer.ini setting BackupMessagesDBOnly. The backup then records which messages exist but not their contents, and a restore expects the files to still be in the data folder. Applies to backup and restore, after a service restart."
                                FontSize="12" Opacity="0.65" TextWrapping="Wrap" Margin="22,0,0,12" />
+                    <CheckBox x:Name="CheckVerifyRestore" Content="Verify each backup by extracting its message store and reconciling it against the rows"
+                              FontSize="14" Margin="22,0,0,4" />
+                    <TextBlock x:Name="VerifyRestoreNote" MaxWidth="520" HorizontalAlignment="Left"
+                               Text="hMailServer.ini setting BackupVerifyRestore, on by default. After the archive is written its message store is extracted to the temp folder through the same code a restore uses, held to exactly the files the backup staged, and every message row is checked for its file; the result is in the backup log. The store exists twice while it runs, so turn it off for a store the temp volume cannot hold. Applies after a service restart."
+                               FontSize="12" Opacity="0.65" TextWrapping="Wrap" Margin="22,0,0,12" />
                     <CheckBox x:Name="CheckSettings" Content="Back up settings" FontSize="14" Margin="0,0,0,12" />
                     <CheckBox x:Name="CheckCompress" Content="Compress destination files (zip)" FontSize="14" Margin="0,0,0,14" />
                     <StackPanel Orientation="Horizontal">
