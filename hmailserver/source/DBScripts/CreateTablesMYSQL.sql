@@ -975,4 +975,90 @@ create table hm_archiveindex
 CREATE INDEX idx_hm_archiveindex_domain_time ON hm_archiveindex (archivedomain, archivetime);
 CREATE INDEX idx_hm_archiveindex_path ON hm_archiveindex (archivepath(255));
 
-insert into hm_dbversion values (6029);
+-- Referential integrity (schema 6030): InnoDB enforces these.
+
+ALTER TABLE hm_domains ENGINE=InnoDB;
+
+ALTER TABLE hm_accounts ENGINE=InnoDB;
+
+ALTER TABLE hm_aliases ENGINE=InnoDB;
+
+ALTER TABLE hm_domain_aliases ENGINE=InnoDB;
+
+ALTER TABLE hm_distributionlists ENGINE=InnoDB;
+
+ALTER TABLE hm_distributionlistsrecipients ENGINE=InnoDB;
+
+ALTER TABLE hm_routes ENGINE=InnoDB;
+
+ALTER TABLE hm_routeaddresses ENGINE=InnoDB;
+
+ALTER TABLE hm_fetchaccounts ENGINE=InnoDB;
+
+ALTER TABLE hm_fetchaccounts_uids ENGINE=InnoDB;
+
+ALTER TABLE hm_apppasswords ENGINE=InnoDB;
+
+ALTER TABLE hm_rules ENGINE=InnoDB;
+
+ALTER TABLE hm_rule_criterias ENGINE=InnoDB;
+
+ALTER TABLE hm_rule_actions ENGINE=InnoDB;
+
+ALTER TABLE hm_groups ENGINE=InnoDB;
+
+ALTER TABLE hm_group_members ENGINE=InnoDB;
+
+ALTER TABLE hm_passwordhistory ENGINE=InnoDB;
+
+ALTER TABLE hm_messages ENGINE=InnoDB;
+
+ALTER TABLE hm_messagerecipients ENGINE=InnoDB;
+
+ALTER TABLE hm_message_metadata ENGINE=InnoDB;
+
+ALTER TABLE hm_imapfolders ENGINE=InnoDB;
+
+ALTER TABLE hm_imapexpunged ENGINE=InnoDB;
+
+ALTER TABLE hm_messageindexterms ENGINE=InnoDB;
+
+ALTER TABLE hm_messageindexstate ENGINE=InnoDB;
+
+
+
+ALTER TABLE hm_accounts ADD CONSTRAINT fk_hm_accounts_domain FOREIGN KEY (accountdomainid) REFERENCES hm_domains (domainid) ON DELETE CASCADE;
+
+ALTER TABLE hm_aliases ADD CONSTRAINT fk_hm_aliases_domain FOREIGN KEY (aliasdomainid) REFERENCES hm_domains (domainid) ON DELETE CASCADE;
+
+ALTER TABLE hm_domain_aliases ADD CONSTRAINT fk_hm_domain_aliases_domain FOREIGN KEY (dadomainid) REFERENCES hm_domains (domainid) ON DELETE CASCADE;
+
+ALTER TABLE hm_distributionlists ADD CONSTRAINT fk_hm_distributionlists_domain FOREIGN KEY (distributionlistdomainid) REFERENCES hm_domains (domainid) ON DELETE CASCADE;
+
+ALTER TABLE hm_distributionlistsrecipients ADD CONSTRAINT fk_hm_dlrecipients_list FOREIGN KEY (distributionlistrecipientlistid) REFERENCES hm_distributionlists (distributionlistid) ON DELETE CASCADE;
+
+ALTER TABLE hm_routeaddresses ADD CONSTRAINT fk_hm_routeaddresses_route FOREIGN KEY (routeaddressrouteid) REFERENCES hm_routes (routeid) ON DELETE CASCADE;
+
+ALTER TABLE hm_fetchaccounts ADD CONSTRAINT fk_hm_fetchaccounts_account FOREIGN KEY (faaccountid) REFERENCES hm_accounts (accountid) ON DELETE CASCADE;
+
+ALTER TABLE hm_fetchaccounts_uids ADD CONSTRAINT fk_hm_fetchaccounts_uids_fa FOREIGN KEY (uidfaid) REFERENCES hm_fetchaccounts (faid) ON DELETE CASCADE;
+
+ALTER TABLE hm_apppasswords ADD CONSTRAINT fk_hm_apppasswords_account FOREIGN KEY (apaccountid) REFERENCES hm_accounts (accountid) ON DELETE CASCADE;
+
+ALTER TABLE hm_rule_criterias ADD CONSTRAINT fk_hm_rule_criterias_rule FOREIGN KEY (criteriaruleid) REFERENCES hm_rules (ruleid) ON DELETE CASCADE;
+
+ALTER TABLE hm_rule_actions ADD CONSTRAINT fk_hm_rule_actions_rule FOREIGN KEY (actionruleid) REFERENCES hm_rules (ruleid) ON DELETE CASCADE;
+
+ALTER TABLE hm_group_members ADD CONSTRAINT fk_hm_group_members_group FOREIGN KEY (membergroupid) REFERENCES hm_groups (groupid) ON DELETE CASCADE;
+
+ALTER TABLE hm_passwordhistory ADD CONSTRAINT fk_hm_passwordhistory_account FOREIGN KEY (phaccountid) REFERENCES hm_accounts (accountid) ON DELETE CASCADE;
+
+ALTER TABLE hm_messagerecipients ADD CONSTRAINT fk_hm_messagerecipients_message FOREIGN KEY (recipientmessageid) REFERENCES hm_messages (messageid) ON DELETE CASCADE;
+
+ALTER TABLE hm_message_metadata ADD CONSTRAINT fk_hm_message_metadata_message FOREIGN KEY (metadata_messageid) REFERENCES hm_messages (messageid) ON DELETE CASCADE;
+
+ALTER TABLE hm_imapexpunged ADD CONSTRAINT fk_hm_imapexpunged_folder FOREIGN KEY (expungedfolderid) REFERENCES hm_imapfolders (folderid) ON DELETE CASCADE;
+
+ALTER TABLE hm_messageindexterms ADD CONSTRAINT fk_hm_messageindexterms_message FOREIGN KEY (mitmessageid) REFERENCES hm_messages (messageid) ON DELETE CASCADE;
+
+insert into hm_dbversion values (6030);
