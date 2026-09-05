@@ -397,7 +397,7 @@ namespace HM
       auto iterConnection = busy_connections_.find(pConnection);
       if (iterConnection == busy_connections_.end())
       {
-         assert(0);
+         HM_ASSERT(0);
          return;
       }
 

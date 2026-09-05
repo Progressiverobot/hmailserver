@@ -34,7 +34,7 @@ namespace HM
    bool
    PersistentAlias::DeleteObject(std::shared_ptr<Alias> pAlias)
    {
-      assert(pAlias->GetID());
+      HM_ASSERT(pAlias->GetID());
 
       bool bResult = false;
       if (pAlias->GetID() > 0)

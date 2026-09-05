@@ -81,6 +81,15 @@ already cost a release cycle or nearly shipped a defect.
    can check the published binary came from the published source. Both
    builds restart the service, so do this before step 9, never after.
 
+8b. **Full regression suite on the assertion build, first.** Build with
+   `build\build.ps1 -Configuration Release -Asserts` - the same source, with
+   every `HM_ASSERT` kept and a violated one reported as HM6364 in the ERROR
+   log instead of compiled out - and run the whole suite on it. The ERROR log
+   is checked before each test, so a violation fails the test that provoked
+   it and names the expression, file and line. Expect none. Then rebuild plain
+   Release (step 8) before step 9: the assertion build is the dynamic-analysis
+   build and is never the binary that ships or is hashed.
+
 9. **Full regression suite on the stamped binary** — every test, nothing
    skipped. If *anything* changes after this run, the run is void: rebuild
    and re-run. Never abort a run; if one must be stopped, expect step 4 to

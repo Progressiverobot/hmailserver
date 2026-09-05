@@ -724,7 +724,7 @@ namespace HM
 
          size_t inputEncodeSize = min(input_size_ - processedBytes, currentEncodeBlockSize);
 
-         assert(inputEncodeSize == currentEncodeBlockSize);
+         HM_ASSERT(inputEncodeSize == currentEncodeBlockSize);
 
 		   MimeCodeBase64 base64;
 		   base64.SetInput((const char*) thisPartStartPosition, inputEncodeSize, true);

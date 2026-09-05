@@ -169,7 +169,7 @@ namespace HM
          return IPAddress::IPV6;
       else
       {
-         assert(0);
+         HM_ASSERT(0);
          return IPAddress::Unknown;
       }
    }

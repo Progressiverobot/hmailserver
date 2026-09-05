@@ -65,7 +65,7 @@ namespace HM
    PersistentAccount::DeleteObject(std::shared_ptr<Account> pAccount)
    {
       __int64 iID = pAccount->GetID();
-      assert(iID);
+      HM_ASSERT(iID);
 
       if (iID <= 0)
          return false;
@@ -571,7 +571,7 @@ namespace HM
          iSize = (__int64) pRS->GetDoubleValue("mailboxsize");
          break;
       case DatabaseSettings::TypeUnknown:
-         assert(0);
+         HM_ASSERT(0);
       }
 
       return iSize;

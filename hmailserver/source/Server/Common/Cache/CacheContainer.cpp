@@ -114,7 +114,7 @@ namespace HM
 #ifdef _DEBUG
       if (sName.Contains(_T("@")))
       {
-         assert(0);
+         HM_ASSERT(0);
       }
 #endif
       

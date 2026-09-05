@@ -354,7 +354,12 @@ know why:
   input, all of them false.
 * **`ASSERT` is a no-op**, matching Release. `MimeBody::Load` asserts that a
   multipart part has a non-empty boundary, which is one malformed message away;
-  with asserts live, that would be the only finding you ever saw.
+  with asserts live, that would be the only finding you ever saw. The server's
+  own `HM_ASSERT` (the lowercase `assert` sites were renamed to it on 5 September
+  2026) maps onto `ASSERT` in the shim, so `-Asserts` governs both spellings.
+  The regression-suite counterpart is `build\build.ps1 -Configuration Release
+  -Asserts`, where a violated assertion is reported as HM6364 rather than
+  aborting, and the test that provoked it is the one that fails.
 * **The harness catches what production catches** and nothing more. `catch (...)`
   in `LoadFromFile` means an escaping `std::logic_error` or `std::bad_alloc` is
   not a production crash, and letting it escape the target would call `abort()`

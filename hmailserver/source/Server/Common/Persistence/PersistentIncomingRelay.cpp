@@ -29,7 +29,7 @@ namespace HM
    bool
    PersistentIncomingRelay::DeleteObject(std::shared_ptr<IncomingRelay> pSR)
    {
-      assert(pSR->GetID());
+      HM_ASSERT(pSR->GetID());
 
       bool bResult = false;
       if (pSR->GetID() > 0)

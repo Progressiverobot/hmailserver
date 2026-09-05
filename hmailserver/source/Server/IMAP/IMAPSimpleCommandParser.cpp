@@ -398,13 +398,13 @@ namespace HM
 
          if (pParser->WordCount() != 3)
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
 
          if (pParser->Word(1)->Value() != _T("PARAM1") || pParser->Word(2)->Value() != _T("PARAM2"))
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
          
@@ -420,13 +420,13 @@ namespace HM
 
          if (pParser->WordCount() != 3)
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
         
          if (pParser->Word(1)->Value() != _T("PARAM1") || pParser->Word(2)->Value() != _T("PARAM2"))
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
          
@@ -443,13 +443,13 @@ namespace HM
 
          if (pParser->WordCount() != 3)
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
         
          if (pParser->Word(1)->Value() != _T("PARAM1") || pParser->Word(2)->Value() != _T("PARAM2"))
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
          
@@ -465,13 +465,13 @@ namespace HM
 
          if (pParser->WordCount() != 3)
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
         
          if (pParser->Word(1)->Value() != _T("PARAM1") || pParser->Word(2)->Value() != _T("PARAM2"))
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
          
@@ -487,13 +487,13 @@ namespace HM
 
          if (pParser->WordCount() != 2)
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
         
          if (pParser->Word(1)->Value() != _T("PARAM1"))
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
          
@@ -509,13 +509,13 @@ namespace HM
 
          if (pParser->WordCount() != 2)
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
         
          if (pParser->Word(1)->Value() != _T("PARAMTEST"))
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
          
@@ -531,13 +531,13 @@ namespace HM
 
          if (pParser->WordCount() != 3)
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
         
          if (pParser->Word(2)->Value() != _T("I AM SICK"))
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
          
@@ -553,13 +553,13 @@ namespace HM
 
          if (pParser->WordCount() != 2)
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
         
          if (pParser->Word(1)->Value() != _T("INBOX*"))
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
          
@@ -576,13 +576,13 @@ namespace HM
 
          if (pParser->WordCount() != 2)
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
         
          if (pParser->Word(1)->Value() != _T("INBOX.\"Hej\""))
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
          
@@ -599,13 +599,13 @@ namespace HM
 
          if (pParser->WordCount() != 2)
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
         
          if (pParser->Word(1)->Value() != _T("INBOX.\""))
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
          
@@ -621,7 +621,7 @@ namespace HM
 
          if (pParser->WordCount() != 0)
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
 
@@ -639,13 +639,13 @@ namespace HM
 
          if (pParser->WordCount() != 2)
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
         
          if (pParser->Word(1)->Value() != _T("TEST"))
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
          
@@ -662,13 +662,13 @@ namespace HM
 
          if (pParser->WordCount() != 2)
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
         
          if (pParser->Word(1)->Value() != _T("\"TEST\""))
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
          
@@ -685,13 +685,13 @@ namespace HM
 
          if (pParser->WordCount() != 2)
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
         
          if (pParser->Word(1)->Value() != _T("\"TE\"()\"ST\""))
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
          
@@ -707,7 +707,7 @@ namespace HM
 
          if (pParser->WordCount() != 0)
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
 
@@ -725,7 +725,7 @@ namespace HM
 
          if (pParser->WordCount() != 0)
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
 
@@ -743,7 +743,7 @@ namespace HM
 
          if (pParser->WordCount() != 2)
          {
-            assert(0);
+            HM_ASSERT(0);
             throw;
          }
 

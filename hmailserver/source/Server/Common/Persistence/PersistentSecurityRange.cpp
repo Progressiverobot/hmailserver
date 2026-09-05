@@ -35,7 +35,7 @@ namespace HM
    bool
    PersistentSecurityRange::DeleteObject(std::shared_ptr<SecurityRange> pSR)
    {
-      assert(pSR->GetID());
+      HM_ASSERT(pSR->GetID());
 
       bool bResult = false;
       if (pSR->GetID() > 0)

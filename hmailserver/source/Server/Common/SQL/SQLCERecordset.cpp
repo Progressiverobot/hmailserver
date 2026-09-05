@@ -18,7 +18,7 @@ namespace HM
 	   /*HRESULT hr = cSQLCERecordset.CreateInstance(__uuidof(Recordset));
       if (!SUCCEEDED(hr))
       {
-         assert(0);
+         HM_ASSERT(0);
       }
 */
       cur_row_ = 0;
@@ -169,7 +169,7 @@ namespace HM
       {
          _bstr_t bstrSource( err.Source() );
          _bstr_t bstrDescription( err.Description() );
-         assert(0);
+         HM_ASSERT(0);
          return "";
       }
 

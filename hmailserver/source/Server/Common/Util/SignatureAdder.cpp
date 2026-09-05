@@ -49,7 +49,7 @@ namespace HM
    {  
       if (!message)
       {
-         assert(0);
+         HM_ASSERT(0);
          // Input error
          return false;
       }

@@ -74,7 +74,7 @@ namespace HM
          // assert is a debug-build aid and compiles to nothing in a release build,
          // where what used to follow it was a dereference of end() - a crash, in
          // the branch whose entire purpose was to say "this cannot happen".
-         assert(0);
+         HM_ASSERT(0);
 
          ErrorManager::Instance()->ReportError(ErrorManager::High, 6076, "WorkQueueManager::AddTask",
             Formatter::Format("Task {0} was discarded because work queue {1} does not exist.",

@@ -460,7 +460,7 @@ namespace HM
          ErrorManager::Instance()->ReportError(ErrorManager::Critical, 5407, "SQLStatement::GetCurrentTimestamp()", Formatter::Format("Unknown database type: {0}", DBType));   
       }
 
-      assert(0);
+      HM_ASSERT(0);
       return "";
    }
 

@@ -639,7 +639,7 @@ namespace HM
          }
       default:
          {
-            assert(0); // unknown match type?
+            HM_ASSERT(0); // unknown match type?
             return false;
          }
 

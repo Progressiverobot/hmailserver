@@ -127,6 +127,11 @@
    #define ASSERT(exp) ((void)0)
 #endif
 
+// The server's own assertion macro (StdAfx.h HM_ASSERT), which the sources this
+// harness compiles now use in place of the lowercase assert(). Same switch,
+// same semantics: live under -Asserts, nothing otherwise.
+#define HM_ASSERT(exp) ASSERT(exp)
+
 // HM::String / HM::AnsiString and the TCHAR plumbing. Real header, unmodified.
 #include "Util/StdString.h"
 

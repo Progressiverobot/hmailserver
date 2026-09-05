@@ -314,7 +314,7 @@ namespace HM
    PersistentDomain::DeleteObject(std::shared_ptr<Domain> pDomain)
    {
       __int64 iDomainID = pDomain->GetID();
-      assert(iDomainID);
+      HM_ASSERT(iDomainID);
 
       if (iDomainID > 0)
       {

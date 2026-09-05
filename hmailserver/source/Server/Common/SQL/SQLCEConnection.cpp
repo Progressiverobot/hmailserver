@@ -60,7 +60,7 @@ namespace HM
       
       if ( !SUCCEEDED( hr ) )
       {
-         assert(0);
+         HM_ASSERT(0);
       }  
 
       connected_ = false;
@@ -96,7 +96,7 @@ namespace HM
       }
       catch ( ... )
       {
-         assert(0);
+         HM_ASSERT(0);
       }
 
       connected_ = false;

@@ -156,7 +156,7 @@ namespace HM
 
       pConnection->SendAsciiData(sResponse);
 
-      assert(pParentFolderContainer->GetCount() > 0);
+      HM_ASSERT(pParentFolderContainer->GetCount() > 0);
 
       // Send a notification to everyone subscribing to this event.
       std::shared_ptr<IMAPFolder> firstFolder = pParentFolderContainer->GetItem(0);

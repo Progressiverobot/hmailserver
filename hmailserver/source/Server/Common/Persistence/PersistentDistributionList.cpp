@@ -39,7 +39,7 @@ namespace HM
    {
       if (pDistList->GetID() == 0)
       {
-         assert(0);
+         HM_ASSERT(0);
          return false;
       }
 
