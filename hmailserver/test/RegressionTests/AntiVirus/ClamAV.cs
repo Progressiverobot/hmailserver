@@ -27,6 +27,21 @@ namespace RegressionTests.AntiVirus
       private hMailServer.AntiVirus _antiVirus;
 
       [Test]
+      public void TheConnectionTestNamesTheDaemonItReached()
+      {
+         // PING and VERSION run before the EICAR scan, so the result text carries the
+         // daemon's own identity - "ClamAV 1.x/<signatures>/<date>" - and a port with
+         // something other than clamd on it is reported as exactly that.
+         string text;
+         Assert.IsTrue(_antiVirus.TestClamAVScanner("localhost", 3310, out text), text);
+         Assert.That(text, Does.Contain("ClamAV"), text);
+         Assert.That(text, Does.Contain("FOUND").Or.Contain("Eicar").IgnoreCase, text);
+
+         Assert.IsFalse(_antiVirus.TestClamAVScanner("localhost", 110, out text));
+         Assert.That(text, Does.Contain("PING"), text);
+      }
+
+      [Test]
       public void TestIncorrectPort()
       {
          _antiVirus.ClamAVEnabled = true;
