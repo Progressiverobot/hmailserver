@@ -228,7 +228,12 @@ namespace RegressionTests.Shared
          _tcpConnection.Send("MAIL FROM:<" + sFrom + ">\r\n");
          var mailFromResponse = _tcpConnection.Receive();
          if (mailFromResponse != "250 OK\r\n")
-            throw new DeliveryFailedException("Unexpected response to HELO from server: " + helloResponse);
+         {
+            // Used to quote the HELO reply here, so a refused MAIL FROM was
+            // reported as an unexpected answer to a command that had succeeded.
+            errorMessage = TrimNewlline(mailFromResponse);
+            throw new DeliveryFailedException("Unexpected response to MAIL FROM from server: " + errorMessage);
+         }
 
          _tcpConnection.Send("RCPT TO:<" + sTo + ">\r\n");
          var rcptToResponse = _tcpConnection.Receive();
