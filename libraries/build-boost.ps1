@@ -8,7 +8,7 @@
 
 .DESCRIPTION
     Downloads the Boost source for the requested version into
-    %hMailServerLibs%\boost_<underscored-Version> (e.g. boost_1_91_0), verifies it
+    %hMailServerLibs%\boost_<underscored-Version> (e.g. boost_1_92_0), verifies it
     against the SHA-256 pinned below, bootstraps b2, and builds the static,
     multithreaded x64 libraries hMailServer links against into stage\lib, matching the
     layout the project expects (boost_<ver>\stage\lib for libs, boost_<ver> itself for
@@ -26,7 +26,7 @@
         compiler hMailServer's own projects are built with.
 
 .PARAMETER Version
-    The Boost version to build, e.g. 1.91.0. Must match 1.x.y.
+    The Boost version to build, e.g. 1.92.0. Must match 1.x.y.
 
 .PARAMETER Toolset
     The b2 toolset to build with. Defaults to msvc-14.5, the v145 toolset hMailServer's
@@ -42,7 +42,7 @@
     below does not know yet. Take it from the .json file published beside the archive.
 
 .EXAMPLE
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -File libraries\build-boost.ps1 -Version 1.91.0
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File libraries\build-boost.ps1 -Version 1.92.0
 #>
 [CmdletBinding()]
 param(
@@ -72,6 +72,7 @@ $PSNativeCommandUseErrorActionPreference = $false
 # published beside it on https://archives.boost.io/release/. See Get-PinnedDigest.
 $Digests = @{
     '1.91.0' = '5734305f40a76c30f951c9abd409a45a2a19fb546efe4162119250bbe4d3a463'
+    '1.92.0' = 'c4a3b310ddd2472416e091067166b0713be97c63f38c212c484ada022fd296ce'
 }
 
 # --- Set up a build log ---------------------------------------------------------
@@ -92,7 +93,7 @@ Start-BuildLog -LogPath $logPath -Title "Boost $Version build log"
 
 $libsPath = Resolve-HMailServerLibs
 
-# Boost's source folder / tarball use underscores (boost_1_91_0), not dots.
+# Boost's source folder / tarball use underscores (boost_1_92_0), not dots.
 $underscored = $Version -replace '\.', '_'
 $srcDir = Join-Path -Path $libsPath -ChildPath "boost_$underscored"
 

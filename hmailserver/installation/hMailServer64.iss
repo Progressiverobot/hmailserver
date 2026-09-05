@@ -1,5 +1,5 @@
 #define HMAILSERVERLIBS = GetEnv("hMailServerLibs")
-#define OPENSSL_LIBS_PATH HMAILSERVERLIBS + "\openssl-4.0.1\out64\bin"
+#define OPENSSL_LIBS_PATH HMAILSERVERLIBS + "\openssl-4.0.2\out64\bin"
 #define POSTGRESQL_LIBPQ_PATH HMAILSERVERLIBS + "\postgresql-18.3\builddir\src\interfaces\libpq"
 
 ; The bundled .NET Desktop Runtime, defined in one place because it used to be

@@ -40,7 +40,7 @@
     The PostgreSQL version to build, e.g. 18.3. Must be 17.x or later.
 
 .PARAMETER OpenSSLVersion
-    The OpenSSL version to link libpq against, e.g. 4.0.1. Must correspond to an existing
+    The OpenSSL version to link libpq against, e.g. 4.0.2. Must correspond to an existing
     %hMailServerLibs%\openssl-<OpenSSLVersion>\out64 build. If omitted, the script
     auto-detects it from hMailServer.vcxproj (the openssl-<ver> the project currently
     links against).
@@ -50,7 +50,7 @@
     does not know yet. Take it from the .sha256 file published beside the archive.
 
 .EXAMPLE
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -File libraries\build-pgsql.ps1 -Version 18.3 -OpenSSLVersion 4.0.1
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File libraries\build-pgsql.ps1 -Version 18.3 -OpenSSLVersion 4.0.2
 
 .EXAMPLE
     # Auto-detect the OpenSSL version from hMailServer.vcxproj:

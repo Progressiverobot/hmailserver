@@ -191,7 +191,7 @@ Then run this script again; it prefers the Visual Studio toolchain over PATH.
 # linked, and BOOST_ALL_NO_LIB below makes sure the MSVC auto-link pragmas do
 # not try.
 if (-not $BoostInclude) {
-    if ($env:hMailServerLibs) { $BoostInclude = Join-Path $env:hMailServerLibs 'boost_1_91_0' }
+    if ($env:hMailServerLibs) { $BoostInclude = Join-Path $env:hMailServerLibs 'boost_1_92_0' }
     elseif ($env:BOOST_INCLUDE_PATH) { $BoostInclude = $env:BOOST_INCLUDE_PATH }
 }
 
