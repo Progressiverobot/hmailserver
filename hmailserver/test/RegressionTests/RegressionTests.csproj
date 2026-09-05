@@ -535,6 +535,7 @@
     <Compile Include="Infrastructure\MetricsHistory.cs" />
     <Compile Include="Infrastructure\ArchiveIndexTests.cs" />
     <Compile Include="Infrastructure\ReferentialIntegrity.cs" />
+    <Compile Include="Infrastructure\DeliveryHardLinks.cs" />
     <Compile Include="Security\AdministratorTwoFactor.cs" />
     <Compile Include="Security\OAuth2Introspection.cs" />
     <Compile Include="Security\OAuth2BearerEs256.cs" />

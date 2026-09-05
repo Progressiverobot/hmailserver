@@ -454,6 +454,13 @@ Administration and monitoring:
                                  ; use). A denied class fails in the script with error 429 and is named in the
                                  ; application log. Scripts still run in-process as the service account: this
                                  ; bounds what a script can reach, not what the service can
+   DeliveryHardLinks=0           ; a message to several local recipients is one file with a name in each
+                                 ; recipient's folder instead of a copy per recipient. Safe because every rewrite
+                                 ; of a message file is a temporary file renamed into place, so a change to one
+                                 ; copy replaces that name alone. Needs AddDeliveredToHeader off (that header
+                                 ; names each recipient; the debug log says so when it stands in the way). Off by
+                                 ; default like ArchiveHardLinks: a link is a promise nothing outside the server
+                                 ; edits a message file in place
    OutboundPipelining=1          ; RFC 2920 on the delivery client: when the remote advertises PIPELINING, send
                                  ; MAIL FROM, every RCPT TO and the data command in one flight and read the
                                  ; replies back in order. 0 = one command per reply, as before

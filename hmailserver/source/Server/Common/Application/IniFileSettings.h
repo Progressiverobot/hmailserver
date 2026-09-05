@@ -246,6 +246,15 @@ namespace HM
       int GetMXTriesFactor () {return mxtries_factor_; }
       String GetArchiveDir() const { return archive_dir_; }
       bool GetArchiveHardlinks() const { return archive_hardlinks_; }
+
+      // DeliveryHardLinks: a message to several local recipients is one file with a
+      // name in each recipient's folder rather than a copy per recipient. Safe
+      // because every rewrite of a message file is a temporary file renamed into
+      // place, which replaces one name and leaves the others with the old content.
+      // Off by default, like ArchiveHardLinks: a hard link is a promise that nothing
+      // outside the server edits a message file in place, and only the operator
+      // can make it.
+      bool GetDeliveryHardLinks() const { return delivery_hardlinks_; }
       int GetPOP3DMinTimeout () {return pop3dmin_timeout_; }
       int GetPOP3DMaxTimeout () {return pop3dmax_timeout_; }
       int GetPOP3CMinTimeout () {return pop3cmin_timeout_; }
@@ -995,6 +1004,7 @@ namespace HM
       int mxtries_factor_;
       String archive_dir_;
       bool archive_hardlinks_;
+      bool delivery_hardlinks_;
       int pop3dmin_timeout_;
       int pop3dmax_timeout_;
       int pop3cmin_timeout_;

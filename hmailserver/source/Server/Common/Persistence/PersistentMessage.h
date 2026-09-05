@@ -29,7 +29,11 @@ namespace HM
 
       static std::shared_ptr<Message> CopyToQueue(std::shared_ptr<const Account> sourceAccount, std::shared_ptr<Message> sourceMessage);
       static std::shared_ptr<Message> CopyToIMAPFolder(std::shared_ptr<Message> sourceMessage, std::shared_ptr<IMAPFolder> destinationFolder);
-      static std::shared_ptr<Message> CopyFromQueueToInbox(std::shared_ptr<Message> sourceMessage, std::shared_ptr<const Account> destinationAccount);
+      // linkFrom, when given, names a finished copy of this message (LocalDelivery's
+      // delivery template) and the recipient's file becomes another name for it;
+      // linked reports whether that happened, because a copy of the queue file
+      // still needs its trace headers and a link from the template already has them.
+      static std::shared_ptr<Message> CopyFromQueueToInbox(std::shared_ptr<Message> sourceMessage, std::shared_ptr<const Account> destinationAccount, const String &linkFrom, bool &linked);
 
       static bool DeleteObject(std::shared_ptr<Message> pMessage);
       static bool SaveObject(std::shared_ptr<Message> pMessage);

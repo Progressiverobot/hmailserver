@@ -1406,6 +1406,7 @@ namespace HM
    // write the entire header and content to file.
    bool MimeBody::SaveAllToFile(const AnsiString & pszFilename)
    {
+      LOG_DEBUG(Formatter::Format("Rewriting message file {0}.", String(pszFilename)));
       // If body content was not modified and we have a source file, serialize only
       // headers (using raw_line_ for unmodified fields) and copy body from disk.
       // This preserves exact byte sequences required for DKIM signature validity.
@@ -1434,8 +1435,10 @@ namespace HM
             return false;
          }
 
+         // Atomically, and the body was read into memory above, so the source
+         // file - normally this very file - is finished with before the rename.
          AnsiString fullMessage = headerBuffer + bodyFromDisk;
-         bool result = FileUtilities::WriteToFile(pszFilename, fullMessage);
+         bool result = FileUtilities::WriteToFileAtomically(pszFilename, fullMessage);
          if (result)
          {
             // Update source tracking so subsequent saves also use the fast path
@@ -1451,7 +1454,7 @@ namespace HM
       // Fallback: full re-serialization (body was modified or no source file available)
       AnsiString buffer;
       Store(buffer);
-      return FileUtilities::WriteToFile(pszFilename, buffer);
+      return FileUtilities::WriteToFileAtomically(pszFilename, buffer);
    }
 
    // initialize the content (attachment) by reading from a file

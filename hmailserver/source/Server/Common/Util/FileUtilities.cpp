@@ -388,6 +388,29 @@ namespace HM
    }
 
    bool
+   FileUtilities::WriteToFileAtomically(const String &sFilename, const AnsiString &sData)
+   {
+      const String temporary = sFilename + _T(".writing-") + GUIDCreator::GetGUID();
+
+      if (!WriteToFile(temporary, sData))
+      {
+         DeleteFile(temporary);
+         return false;
+      }
+
+      // Move replaces the destination in the rename itself (see its comment): the
+      // old content or the new, nothing in between, and any other name the old
+      // file had keeps the old content.
+      if (!Move(temporary, sFilename))
+      {
+         DeleteFile(temporary);
+         return false;
+      }
+
+      return true;
+   }
+
+   bool
    FileUtilities::FileSize64(const String &sFileName, unsigned __int64 &size)
    {
       size = 0;

@@ -308,6 +308,7 @@ namespace HM
       if (archive_dir_.Right(1) == _T("\\"))
          archive_dir_ = archive_dir_.Left(archive_dir_.GetLength() -1);
       archive_hardlinks_ =  ReadIniSettingInteger_("Settings", "ArchiveHardLinks", 0) == 1;
+      delivery_hardlinks_ = ReadIniSettingInteger_("Settings", "DeliveryHardLinks", 0) == 1;
 
       // Comma-separated, case-insensitive, whitespace tolerated. Kept lower-cased
       // so that IsArchiveDomain is one lookup.
