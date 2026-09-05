@@ -205,7 +205,7 @@ namespace RegressionTests.AntiSpam
          antiSpam.DMARCEnabled = true;
          antiSpam.DKIMVerificationEnabled = true;
 
-         using (var fakeDns = new FakeDnsServer()
+         SuiteDns.Zone
             // example.test publishes a policy of its own so that under the tree
             // walk it is the organizational domain of PolicyDomain - which is what
             // makes the rua target, a mailbox at example.test, an INTERNAL
@@ -215,49 +215,47 @@ namespace RegressionTests.AntiSpam
             .WithTxt("_dmarc." + PolicyDomain, DmarcPolicy)
 
             // The public half of the key the signed seed below was signed with.
-            .WithTxt("reportsel._domainkey." + PolicyDomain, "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAit1HZshVeIm3Yu3dBqKzIAQDM+k5hPu+S9RzJeaFnPQw888jfvuBQkVTinZWn65X4TLhcEjsV7iDgWzVhcEKUUphhpR9i+JgOjncOSxs7zvv2xOpFuYweOqVrWV9brr8DEt3f+MdfYUiz62toL82Za447DOhNI/YAVEJqCmgbeSycN2emmZC6Z8dXV7fxKM3IeJ6G8hVLbvWhZe8fHkJ0+tJXeARBHhowFW1VXgkOGOHFtPjpmNrJRbbDKf8+IqyUk9uV51y3GEIunovr1Yc3vvExpXwWLZIdqKtvGVFBxyvTtuAmtw7Ebmz0evN41wH7vTWgui0VgsZqNIIUwz+fQIDAQAB"))
+            .WithTxt("reportsel._domainkey." + PolicyDomain, "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAit1HZshVeIm3Yu3dBqKzIAQDM+k5hPu+S9RzJeaFnPQw888jfvuBQkVTinZWn65X4TLhcEjsV7iDgWzVhcEKUUphhpR9i+JgOjncOSxs7zvv2xOpFuYweOqVrWV9brr8DEt3f+MdfYUiz62toL82Za447DOhNI/YAVEJqCmgbeSycN2emmZC6Z8dXV7fxKM3IeJ6G8hVLbvWhZe8fHkJ0+tJXeARBHhowFW1VXgkOGOHFtPjpmNrJRbbDKf8+IqyUk9uV51y3GEIunovr1Yc3vvExpXwWLZIdqKtvGVFBxyvTtuAmtw7Ebmz0evN41wH7vTWgui0VgsZqNIIUwz+fQIDAQAB");
+         try
          {
-            try
-            {
-               ServerIniFile.SetSetting("DNSServer", "127.0.0.1");
-               ServerIniFile.SetSetting("DNSQueryTimeout", "5");
-               ServerIniFile.SetSetting("DmarcRptFromAddress", "postmaster@example.test");
-               ServerIniFile.SetSetting("DmarcRptSchemaVersion", schemaVersion);
-               ServerIniFile.SetSetting("DmarcTreeWalkEnabled", treeWalkEnabled);
+            ServerIniFile.SetSetting("DNSQueryTimeout", "5");
+            ServerIniFile.SetSetting("DmarcRptFromAddress", "postmaster@example.test");
+            ServerIniFile.SetSetting("DmarcRptSchemaVersion", schemaVersion);
+            ServerIniFile.SetSetting("DmarcTreeWalkEnabled", treeWalkEnabled);
 
-               RestartServerAndReacquireCom();
+            RestartServerAndReacquireCom();
 
-               // Two rows with deliberately different verdicts. The unsigned one
-               // fails DMARC under p=none; the signed one aligns its d= with its
-               // From and passes. Both are disposition "none" as this server
-               // records them, and separating them is the whole of what 9990's
-               // extra "pass" member buys.
-               SmtpClientSimulator.StaticSendRaw("bounce@unaligned-envelope.test", "seedrcpt@example.test",
-                                                 UnsignedSeed);
-               SmtpClientSimulator.StaticSendRaw("bounce@unaligned-envelope.test", "seedrcpt@example.test",
-                                                 SignedSeed);
+            // Two rows with deliberately different verdicts. The unsigned one
+            // fails DMARC under p=none; the signed one aligns its d= with its
+            // From and passes. Both are disposition "none" as this server
+            // records them, and separating them is the whole of what 9990's
+            // extra "pass" member buys.
+            SmtpClientSimulator.StaticSendRaw("bounce@unaligned-envelope.test", "seedrcpt@example.test",
+                                              UnsignedSeed);
+            SmtpClientSimulator.StaticSendRaw("bounce@unaligned-envelope.test", "seedrcpt@example.test",
+                                              SignedSeed);
 
-               // Both are in the mailbox, so both spam-time evaluations - which run
-               // before delivery - have been recorded.
-               Pop3ClientSimulator.AssertMessageCount("seedrcpt@example.test", "test", 2);
+            // Both are in the mailbox, so both spam-time evaluations - which run
+            // before delivery - have been recorded.
+            Pop3ClientSimulator.AssertMessageCount("seedrcpt@example.test", "test", 2);
 
-               ClassicAssert.AreEqual(1, (int) _application.Utilities.SendDmarcReports(true),
-                  "One policy domain requested reports, so one report.");
+            ClassicAssert.AreEqual(1, (int) _application.Utilities.SendDmarcReports(true),
+               "One policy domain requested reports, so one report.");
 
-               return Pop3ClientSimulator.AssertGetFirstMessageText("dmarcreports@example.test", "test");
-            }
-            finally
-            {
-               ServerIniFile.SetSetting("DNSServer", null);
-               ServerIniFile.SetSetting("DNSQueryTimeout", null);
-               ServerIniFile.SetSetting("DmarcRptFromAddress", null);
-               ServerIniFile.SetSetting("DmarcRptSchemaVersion", null);
-               ServerIniFile.SetSetting("DmarcTreeWalkEnabled", null);
+            return Pop3ClientSimulator.AssertGetFirstMessageText("dmarcreports@example.test", "test");
+         }
+         finally
+         {
+            SuiteDns.Reset();
 
-               // Restart before any COM restore - proxies taken before the mid-test
-               // restart point at the old process.
-               RestartServerAndReacquireCom();
-            }
+            ServerIniFile.SetSetting("DNSQueryTimeout", null);
+            ServerIniFile.SetSetting("DmarcRptFromAddress", null);
+            ServerIniFile.SetSetting("DmarcRptSchemaVersion", null);
+            ServerIniFile.SetSetting("DmarcTreeWalkEnabled", null);
+
+            // Restart before any COM restore - proxies taken before the mid-test
+            // restart point at the old process.
+            RestartServerAndReacquireCom();
          }
       }
 

@@ -80,48 +80,46 @@ namespace RegressionTests.AntiSpam.DKIM
          SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "dkimsha1-on@example.test", "test");
 
          ServerIniFile.SetSetting("AuthenticationResultsEnabled", "1");
-         ServerIniFile.SetSetting("DNSServer", "127.0.0.1");
          ServerIniFile.SetSetting("DNSQueryTimeout", "5");
 
-         using (new FakeDnsServer()
-            .WithTxt(Selector + "._domainkey." + SignerDomain, "v=DKIM1; k=rsa; p=" + PublicKey))
+         SuiteDns.Zone
+            .WithTxt(Selector + "._domainkey." + SignerDomain, "v=DKIM1; k=rsa; p=" + PublicKey);
+         try
          {
-            try
-            {
-               // The shipped default, made explicit - an aborted fixture could have
-               // left the escape hatch open.
-               ServerIniFile.SetSetting("DkimAcceptSha1", "0");
-               RestartServerAndReacquireCom();
+            // The shipped default, made explicit - an aborted fixture could have
+            // left the escape hatch open.
+            ServerIniFile.SetSetting("DkimAcceptSha1", "0");
+            RestartServerAndReacquireCom();
 
-               string refused = DeliverAndFetch("dkimsha1-off@example.test");
+            string refused = DeliverAndFetch("dkimsha1-off@example.test");
 
-               ClassicAssert.IsFalse(refused.Contains("dkim=pass"),
-                  "An rsa-sha1 signature must not report dkim=pass. RFC 8301 removed the algorithm " +
-                  "from DKIM because a forgeable signature is worse than none - it carries the " +
-                  "signer's domain past an aligned DMARC check.\r\n" + refused);
+            ClassicAssert.IsFalse(refused.Contains("dkim=pass"),
+               "An rsa-sha1 signature must not report dkim=pass. RFC 8301 removed the algorithm " +
+               "from DKIM because a forgeable signature is worse than none - it carries the " +
+               "signer's domain past an aligned DMARC check.\r\n" + refused);
 
-               // ...and the control that makes the assertion above mean something. The
-               // same bytes, the same key, the same message: only the setting differs.
-               // Without this, a signature that was merely broken would produce the
-               // same "not pass" and prove nothing about RFC 8301.
-               ServerIniFile.SetSetting("DkimAcceptSha1", "1");
-               RestartServerAndReacquireCom();
+            // ...and the control that makes the assertion above mean something. The
+            // same bytes, the same key, the same message: only the setting differs.
+            // Without this, a signature that was merely broken would produce the
+            // same "not pass" and prove nothing about RFC 8301.
+            ServerIniFile.SetSetting("DkimAcceptSha1", "1");
+            RestartServerAndReacquireCom();
 
-               string accepted = DeliverAndFetch("dkimsha1-on@example.test");
+            string accepted = DeliverAndFetch("dkimsha1-on@example.test");
 
-               StringAssert.Contains("dkim=pass", accepted,
-                  "With DkimAcceptSha1=1 the signature must verify. If it does not, the signature " +
-                  "itself is wrong and the refusal above was for the wrong reason - which would " +
-                  "make this fixture a test of nothing.\r\n" + accepted);
-            }
-            finally
-            {
-               ServerIniFile.SetSetting("DkimAcceptSha1", null);
-               ServerIniFile.SetSetting("AuthenticationResultsEnabled", null);
-               ServerIniFile.SetSetting("DNSServer", null);
-               ServerIniFile.SetSetting("DNSQueryTimeout", null);
-               RestartServerAndReacquireCom();
-            }
+            StringAssert.Contains("dkim=pass", accepted,
+               "With DkimAcceptSha1=1 the signature must verify. If it does not, the signature " +
+               "itself is wrong and the refusal above was for the wrong reason - which would " +
+               "make this fixture a test of nothing.\r\n" + accepted);
+         }
+         finally
+         {
+            SuiteDns.Reset();
+
+            ServerIniFile.SetSetting("DkimAcceptSha1", null);
+            ServerIniFile.SetSetting("AuthenticationResultsEnabled", null);
+            ServerIniFile.SetSetting("DNSQueryTimeout", null);
+            RestartServerAndReacquireCom();
          }
       }
    }

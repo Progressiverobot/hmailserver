@@ -171,7 +171,7 @@ namespace RegressionTests.Infrastructure
          }
          finally
          {
-            SetIniSetting("DNSServer", null);
+            SetIniSetting("DNSServer", SuiteDns.Resolver);
             SetIniSetting("DNSQueryTimeout", null);
             RestartServerAndReacquireCom();
          }
@@ -202,6 +202,9 @@ namespace RegressionTests.Infrastructure
       [Description("A structurally broken UDP response (status 9502) is retried over TCP rather than failing the lookup")]
       public void AMalformedUdpResponseIsRetriedOverTcp()
       {
+         // The suite's own zone holds 127.0.0.1:53 for the whole run; this test needs
+         // the port itself, so the zone is suspended for exactly as long as it does.
+         using (SuiteDns.Suspend())
          using (var fakeDns = new MalformedUdpDnsServer())
          {
             SetIniSetting("DNSServer", "127.0.0.1");
@@ -234,7 +237,7 @@ namespace RegressionTests.Infrastructure
             }
             finally
             {
-               SetIniSetting("DNSServer", null);
+               SetIniSetting("DNSServer", SuiteDns.Resolver);
                SetIniSetting("DNSQueryTimeout", null);
                RestartServerAndReacquireCom();
             }
@@ -558,7 +561,7 @@ namespace RegressionTests.Infrastructure
          }
          finally
          {
-            SetIniSetting("DNSServer", null);
+            SetIniSetting("DNSServer", SuiteDns.Resolver);
             SetIniSetting("DNSQueryTimeout", null);
             RestartServerAndReacquireCom();
 

@@ -99,7 +99,6 @@ namespace RegressionTests.AntiSpam
             SingletonProvider<TestSetup>.Instance.AddAccount(_domain, account, "test");
 
          ServerIniFile.SetSetting("AuthenticationResultsEnabled", "1");
-         ServerIniFile.SetSetting("DNSServer", "127.0.0.1");
          ServerIniFile.SetSetting("DNSQueryTimeout", "5");
       }
 
@@ -107,7 +106,6 @@ namespace RegressionTests.AntiSpam
       {
          ServerIniFile.SetSetting("AuthenticationResultsEnabled", null);
          ServerIniFile.SetSetting("DmarcTreeWalkEnabled", null);
-         ServerIniFile.SetSetting("DNSServer", null);
          ServerIniFile.SetSetting("DNSQueryTimeout", null);
       }
 
@@ -122,58 +120,58 @@ namespace RegressionTests.AntiSpam
          // with psd=n, and mail from below it is then governed by the policy it
          // publishes. Under the PSL the org domain of mail.division.example.test is
          // example.test, which publishes nothing at all.
-         using (var fakeDns = new FakeDnsServer()
-            .WithTxt("_dmarc.division.example.test", "v=DMARC1; p=reject; psd=n"))
+         SuiteDns.Zone
+            .WithTxt("_dmarc.division.example.test", "v=DMARC1; p=reject; psd=n");
+         try
          {
-            try
-            {
-               ServerIniFile.SetSetting("DmarcTreeWalkEnabled", "1");
+            ServerIniFile.SetSetting("DmarcTreeWalkEnabled", "1");
 
-               RestartServerAndReacquireCom();
-               fakeDns.ClearQueries();
+            RestartServerAndReacquireCom();
+            SuiteDns.Zone.ClearQueries();
 
-               string delivered = SendAndReadVerdict("walk-on@example.test",
-                                                     "mail.division.example.test",
-                                                     "unaligned-envelope.test");
+            string delivered = SendAndReadVerdict("walk-on@example.test",
+                                                  "mail.division.example.test",
+                                                  "unaligned-envelope.test");
 
-               ClassicAssert.AreEqual("dmarc=fail(p=reject)", DmarcVerdict(delivered),
-                  "The walk should have found psd=n at division.example.test, made it the " +
-                  "organizational domain of mail.division.example.test, and discovered the " +
-                  "p=reject published there. A p=reject that a receiver never looks for is a " +
-                  "domain owner's enforcement silently discarded.\r\n" + delivered);
+            ClassicAssert.AreEqual("dmarc=fail(p=reject)", DmarcVerdict(delivered),
+               "The walk should have found psd=n at division.example.test, made it the " +
+               "organizational domain of mail.division.example.test, and discovered the " +
+               "p=reject published there. A p=reject that a receiver never looks for is a " +
+               "domain owner's enforcement silently discarded.\r\n" + delivered);
 
-               // The walk asked for the name below the boundary first, and stopped AT the
-               // boundary - it must not have gone on to example.test, because psd=n is an
-               // instruction to stop, and continuing past it would find a parent's policy
-               // and apply it to a domain that has declared itself independent.
-               var asked = fakeDns.Queries
-                  .Where(q => q.StartsWith(FakeDnsServer.TypeTxt + "/_dmarc.")).ToList();
+            // The walk asked for the name below the boundary first, and stopped AT the
+            // boundary - it must not have gone on to example.test, because psd=n is an
+            // instruction to stop, and continuing past it would find a parent's policy
+            // and apply it to a domain that has declared itself independent.
+            var asked = SuiteDns.Zone.Queries
+               .Where(q => q.StartsWith(FakeDnsServer.TypeTxt + "/_dmarc.")).ToList();
 
-               ClassicAssert.IsTrue(asked.Contains(FakeDnsServer.TypeTxt + "/_dmarc.mail.division.example.test"),
-                  "The walk starts at the domain itself. Asked: " + string.Join(", ", asked));
-               ClassicAssert.IsFalse(asked.Contains(FakeDnsServer.TypeTxt + "/_dmarc.example.test"),
-                  "psd=n ends the walk, so nothing above division.example.test may be queried. " +
-                  "Asked: " + string.Join(", ", asked));
+            ClassicAssert.IsTrue(asked.Contains(FakeDnsServer.TypeTxt + "/_dmarc.mail.division.example.test"),
+               "The walk starts at the domain itself. Asked: " + string.Join(", ", asked));
+            ClassicAssert.IsFalse(asked.Contains(FakeDnsServer.TypeTxt + "/_dmarc.example.test"),
+               "psd=n ends the walk, so nothing above division.example.test may be queried. " +
+               "Asked: " + string.Join(", ", asked));
 
-               // The negative control, same zone, same message, walk off.
-               ServerIniFile.SetSetting("DmarcTreeWalkEnabled", "0");
-               RestartServerAndReacquireCom();
+            // The negative control, same zone, same message, walk off.
+            ServerIniFile.SetSetting("DmarcTreeWalkEnabled", "0");
+            RestartServerAndReacquireCom();
 
-               string withoutWalk = SendAndReadVerdict("walk-off@example.test",
-                                                       "mail.division.example.test",
-                                                       "unaligned-envelope.test");
+            string withoutWalk = SendAndReadVerdict("walk-off@example.test",
+                                                    "mail.division.example.test",
+                                                    "unaligned-envelope.test");
 
-               ClassicAssert.AreEqual("dmarc=none", DmarcVerdict(withoutWalk),
-                  "With the walk off the Public Suffix List answers example.test, which publishes " +
-                  "no policy - so the verdict is none. If this says fail, the setting is not an " +
-                  "escape hatch and the assertion above proves nothing about which mechanism " +
-                  "ran.\r\n" + withoutWalk);
-            }
-            finally
-            {
-               RestoreDefaults();
-               RestartServerAndReacquireCom();
-            }
+            ClassicAssert.AreEqual("dmarc=none", DmarcVerdict(withoutWalk),
+               "With the walk off the Public Suffix List answers example.test, which publishes " +
+               "no policy - so the verdict is none. If this says fail, the setting is not an " +
+               "escape hatch and the assertion above proves nothing about which mechanism " +
+               "ran.\r\n" + withoutWalk);
+         }
+         finally
+         {
+            SuiteDns.Reset();
+
+            RestoreDefaults();
+            RestartServerAndReacquireCom();
          }
       }
 
@@ -192,44 +190,44 @@ namespace RegressionTests.AntiSpam
          // SPF passes for the envelope domain because the evaluator gives 127.0.0.1 a
          // free pass, so the ONLY variable in the alignment is the organizational
          // domain each side resolves to.
-         using (new FakeDnsServer()
+         SuiteDns.Zone
             .WithTxt("_dmarc.hosting.test", "v=DMARC1; p=none; psd=y")
-            .WithTxt("_dmarc.a.hosting.test", "v=DMARC1; p=none"))
+            .WithTxt("_dmarc.a.hosting.test", "v=DMARC1; p=none");
+         try
          {
-            try
-            {
-               ServerIniFile.SetSetting("DmarcTreeWalkEnabled", "1");
+            ServerIniFile.SetSetting("DmarcTreeWalkEnabled", "1");
 
-               RestartServerAndReacquireCom();
+            RestartServerAndReacquireCom();
 
-               string separated = SendAndReadVerdict("psd-on@example.test",
-                                                     "a.hosting.test",
-                                                     "b.hosting.test");
+            string separated = SendAndReadVerdict("psd-on@example.test",
+                                                  "a.hosting.test",
+                                                  "b.hosting.test");
 
-               ClassicAssert.AreEqual("dmarc=fail(p=none)", DmarcVerdict(separated),
-                  "b.hosting.test is a different organization from a.hosting.test once " +
-                  "hosting.test says psd=y, so an SPF pass at b cannot align with a From at a. " +
-                  "Aligning them lets any tenant of a shared parent send as any other.\r\n" +
-                  separated);
+            ClassicAssert.AreEqual("dmarc=fail(p=none)", DmarcVerdict(separated),
+               "b.hosting.test is a different organization from a.hosting.test once " +
+               "hosting.test says psd=y, so an SPF pass at b cannot align with a From at a. " +
+               "Aligning them lets any tenant of a shared parent send as any other.\r\n" +
+               separated);
 
-               ServerIniFile.SetSetting("DmarcTreeWalkEnabled", "0");
-               RestartServerAndReacquireCom();
+            ServerIniFile.SetSetting("DmarcTreeWalkEnabled", "0");
+            RestartServerAndReacquireCom();
 
-               string aligned = SendAndReadVerdict("psd-off@example.test",
-                                                   "a.hosting.test",
-                                                   "b.hosting.test");
+            string aligned = SendAndReadVerdict("psd-off@example.test",
+                                                "a.hosting.test",
+                                                "b.hosting.test");
 
-               ClassicAssert.AreEqual("dmarc=pass", DmarcVerdict(aligned),
-                  "With the walk off, the Public Suffix List has never heard of hosting.test, so " +
-                  "it resolves both sides to hosting.test and the two tenants align. That is the " +
-                  "pre-DMARCbis behaviour, and its presence here is what shows the assertion " +
-                  "above is the walk's doing.\r\n" + aligned);
-            }
-            finally
-            {
-               RestoreDefaults();
-               RestartServerAndReacquireCom();
-            }
+            ClassicAssert.AreEqual("dmarc=pass", DmarcVerdict(aligned),
+               "With the walk off, the Public Suffix List has never heard of hosting.test, so " +
+               "it resolves both sides to hosting.test and the two tenants align. That is the " +
+               "pre-DMARCbis behaviour, and its presence here is what shows the assertion " +
+               "above is the walk's doing.\r\n" + aligned);
+         }
+         finally
+         {
+            SuiteDns.Reset();
+
+            RestoreDefaults();
+            RestartServerAndReacquireCom();
          }
       }
    }

@@ -13,6 +13,23 @@ namespace RegressionTests.AntiSpam
    [TestFixture]
    public class GreyListing : TestFixtureBase
    {
+      [OneTimeSetUp]
+      public void ServeTheNameTheBypassTestNeeds()
+      {
+         // ItShouldBePossibleToBypassGreylistingOnMessagesArrivingFromMXorA sends from
+         // localhost.hmailserver.com and expects the bypass to find the connecting
+         // address among the sender domain's A and MX records. Served locally, as the
+         // live record answers - the test used to be one of the four that still
+         // resolved live after the fixtures with zones of their own were pinned.
+         SuiteDns.Zone.WithA("localhost.hmailserver.com", "127.0.0.1");
+      }
+
+      [OneTimeTearDown]
+      public void ForgetIt()
+      {
+         SuiteDns.Reset();
+      }
+
       [SetUp]
       public new void SetUp()
       {

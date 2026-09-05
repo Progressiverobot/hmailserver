@@ -42,31 +42,18 @@ namespace RegressionTests.AntiSpam
 
       private const string CleanBody = "This is a clean test message.";
 
-      private FakeDnsServer dns_;
-
       private hMailServer.AntiSpam _antiSpam;
 
       [OneTimeSetUp]
-      public void PointTheServerAtALocalResolver()
+      public void ServeTheNamesThisFixtureNeeds()
       {
-         dns_ = new FakeDnsServer()
-            .WithA(SurblTestPoint, "127.0.0.2");
-
-         ServerIniFile.SetSetting("DNSServer", "127.0.0.1");
-
-         RestartServerAndReacquireCom();
+         SuiteDns.Zone.WithA(SurblTestPoint, "127.0.0.2");
       }
 
       [OneTimeTearDown]
-      public void RestoreTheSystemResolver()
+      public void ForgetThem()
       {
-         // The fake resolver stays up until the server is back on the system one, so
-         // the restart never runs against a dead resolver.
-         using (dns_)
-         {
-            ServerIniFile.SetSetting("DNSServer", null);
-            RestartServerAndReacquireCom();
-         }
+         SuiteDns.Reset();
       }
 
       [SetUp]

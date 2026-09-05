@@ -17,6 +17,10 @@ namespace RegressionTests.Shared
    ///    A DNS server on 127.0.0.1:53, UDP and TCP, that answers exactly what a test
    ///    tells it to and NODATA for everything else.
    ///
+   ///    Bound once for the whole run by <see cref="SuiteDns"/>, which points the
+   ///    server at it; a fixture adds the names it needs and calls SuiteDns.Reset in
+   ///    its teardown. Adding is safe while the serve threads answer.
+   ///
    ///    It exists because tests that resolve real names are not tests of this server.
    ///    Seven of them - three DKIM verification tests, two SURBL ones, the POP3
    ///    unresolvable-host test and the MX lookup - failed across two consecutive gate
@@ -43,8 +47,15 @@ namespace RegressionTests.Shared
    public sealed class FakeDnsServer : IDisposable
    {
       public const int TypeA = 1;
+      public const int TypeCname = 5;
       public const int TypeMx = 15;
       public const int TypeTxt = 16;
+
+      // CNAME targets by owner name. A query for an owner answers the CNAME and then
+      // whatever the target holds of the requested type, which is what a real server
+      // does and what the resolver follows.
+      private readonly Dictionary<string, string> cnames_ =
+         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
       private readonly Dictionary<string, List<string>> answers_ =
          new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
@@ -127,21 +138,56 @@ namespace RegressionTests.Shared
       /// </summary>
       public FakeDnsServer WithNxDomain(string name)
       {
-         nonExistent_.Add(name.TrimEnd('.').ToLowerInvariant());
+         lock (answers_)
+            nonExistent_.Add(name.TrimEnd('.').ToLowerInvariant());
+
          return this;
+      }
+
+      /// <summary>
+      ///    Makes name an alias of target. A query for name answers the CNAME and then
+      ///    the target's records of the asked-for type, under the target's name.
+      /// </summary>
+      public FakeDnsServer WithCname(string name, string target)
+      {
+         lock (answers_)
+            cnames_[name.TrimEnd('.').ToLowerInvariant()] = target.TrimEnd('.').ToLowerInvariant();
+
+         return this;
+      }
+
+      /// <summary>Forgets every record and every recorded query. The server stays bound.</summary>
+      public void Reset()
+      {
+         lock (answers_)
+         {
+            answers_.Clear();
+            nonExistent_.Clear();
+            cnames_.Clear();
+         }
+
+         ClearQueries();
       }
 
       private FakeDnsServer Add_(int type, string name, string value)
       {
          string key = Key_(type, name);
 
-         if (!answers_.TryGetValue(key, out List<string> values))
+         // Locked because, with one zone for the whole run, a fixture adds names
+         // while the serve threads are answering. Idempotent because a fixture may
+         // add a name the suite already seeds.
+         lock (answers_)
          {
-            values = new List<string>();
-            answers_[key] = values;
+            if (!answers_.TryGetValue(key, out List<string> values))
+            {
+               values = new List<string>();
+               answers_[key] = values;
+            }
+
+            if (!values.Contains(value))
+               values.Add(value);
          }
 
-         values.Add(value);
          return this;
       }
 
@@ -294,9 +340,17 @@ namespace RegressionTests.Shared
          m.Add(0);
       }
 
-      private static void WriteAnswerHeader_(List<byte> m, int recordType)
+      private static void WriteAnswerHeader_(List<byte> m, int recordType, string owner = null)
       {
-         m.Add(0xC0); m.Add(0x0C);                    // owner: the queried name
+         if (owner == null)
+         {
+            m.Add(0xC0); m.Add(0x0C);                 // owner: the queried name
+         }
+         else
+         {
+            WriteName_(m, owner);                     // owner: a CNAME target, spelled out
+         }
+
          m.Add((byte) (recordType >> 8)); m.Add((byte) (recordType & 0xFF));
          m.Add(0); m.Add(1);                          // CLASS IN
          m.Add(0); m.Add(0); m.Add(0); m.Add(60);     // TTL
@@ -310,9 +364,9 @@ namespace RegressionTests.Shared
             m.Add(b);
       }
 
-      private static void WriteTxtAnswer_(List<byte> m, string value)
+      private static void WriteTxtAnswer_(List<byte> m, string value, string owner)
       {
-         WriteAnswerHeader_(m, TypeTxt);
+         WriteAnswerHeader_(m, TypeTxt, owner);
 
          var rdata = new List<byte>();
          for (int offset = 0; offset < value.Length; offset += 255)
@@ -330,9 +384,9 @@ namespace RegressionTests.Shared
          WriteRdata_(m, rdata);
       }
 
-      private static void WriteMxAnswer_(List<byte> m, string value)
+      private static void WriteMxAnswer_(List<byte> m, string value, string owner)
       {
-         WriteAnswerHeader_(m, TypeMx);
+         WriteAnswerHeader_(m, TypeMx, owner);
 
          string[] parts = value.Split(new[] { ' ' }, 2);
          int preference = int.Parse(parts[0]);
@@ -354,9 +408,9 @@ namespace RegressionTests.Shared
          WriteRdata_(m, rdata);
       }
 
-      private static void WriteAAnswer_(List<byte> m, string address)
+      private static void WriteAAnswer_(List<byte> m, string address, string owner)
       {
-         WriteAnswerHeader_(m, TypeA);
+         WriteAnswerHeader_(m, TypeA, owner);
          WriteRdata_(m, IPAddress.Parse(address).GetAddressBytes());
       }
 
@@ -391,19 +445,41 @@ namespace RegressionTests.Shared
          lock (queries_)
             queries_.Add(Key_(type, name));
 
-         if (answers_.TryGetValue(Key_(type, name), out List<string> values) && values.Count > 0)
+         string cnameTarget;
+         List<string> values;
+         bool nonExistent;
+
+         lock (answers_)
+         {
+            cnames_.TryGetValue(name, out cnameTarget);
+            answers_.TryGetValue(Key_(type, cnameTarget ?? name), out List<string> found);
+            values = found == null ? new List<string>() : new List<string>(found);
+            nonExistent = nonExistent_.Contains(name.TrimEnd('.').ToLowerInvariant());
+         }
+
+         if (cnameTarget != null || values.Count > 0)
          {
             var m = new List<byte>();
-            WriteHeaderAndQuestion_(m, query, values.Count);
+            WriteHeaderAndQuestion_(m, query, values.Count + (cnameTarget != null ? 1 : 0));
+
+            if (cnameTarget != null)
+            {
+               // The alias first, then the target's records under the target's own
+               // name - the shape RFC 1034 3.6.2 prescribes and the resolver follows.
+               WriteAnswerHeader_(m, TypeCname);
+               var alias = new List<byte>();
+               WriteName_(alias, cnameTarget);
+               WriteRdata_(m, alias);
+            }
 
             foreach (string value in values)
             {
                if (type == TypeTxt)
-                  WriteTxtAnswer_(m, value);
+                  WriteTxtAnswer_(m, value, cnameTarget);
                else if (type == TypeMx)
-                  WriteMxAnswer_(m, value);
+                  WriteMxAnswer_(m, value, cnameTarget);
                else
-                  WriteAAnswer_(m, value);
+                  WriteAAnswer_(m, value, cnameTarget);
             }
 
             return m.ToArray();
@@ -413,7 +489,7 @@ namespace RegressionTests.Shared
          // the negative answer is cacheable (RFC 2308 again). Checked after the
          // answer table so a name can be given records and still have OTHER names
          // beneath it be absent.
-         if (nonExistent_.Contains(name.TrimEnd('.').ToLowerInvariant()))
+         if (nonExistent)
          {
             var nxdomain = new List<byte>();
             WriteHeaderAndQuestion_(nxdomain, query, 0, 1, 3);

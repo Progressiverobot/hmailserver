@@ -31,30 +31,18 @@ namespace RegressionTests.Infrastructure
       // this fixture only asks what the address IS.
       private const string MailExchangeAddress = "192.0.2.25";
 
-      private FakeDnsServer dns_;
-
       [OneTimeSetUp]
-      public void PointTheServerAtALocalResolver()
+      public void ServeTheNamesThisFixtureNeeds()
       {
-         dns_ = new FakeDnsServer()
+         SuiteDns.Zone
             .WithMx(MailDomain, 10, MailExchange)
             .WithA(MailExchange, MailExchangeAddress);
-
-         ServerIniFile.SetSetting("DNSServer", "127.0.0.1");
-
-         RestartServerAndReacquireCom();
       }
 
       [OneTimeTearDown]
-      public void RestoreTheSystemResolver()
+      public void ForgetThem()
       {
-         // The fake resolver stays up until the server is back on the system one, so
-         // the restart never runs against a dead resolver.
-         using (dns_)
-         {
-            ServerIniFile.SetSetting("DNSServer", null);
-            RestartServerAndReacquireCom();
-         }
+         SuiteDns.Reset();
       }
 
       [Test]

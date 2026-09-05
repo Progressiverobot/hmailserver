@@ -11,6 +11,25 @@ namespace RegressionTests.Infrastructure
    public class DnsResolution : TestFixtureBase
    {
       [OneTimeSetUp]
+      public void ServeTheZoneTheseLookupsNeed()
+      {
+         // hmailserver.com's live zone has exactly this shape - an MX, and a name that
+         // is a CNAME to the domain, which the resolver must follow to reach the MX.
+         // Served locally so that the test is of CNAME following, not of whether
+         // somebody else's DNS answered in time.
+         SuiteDns.Zone
+            .WithMx("hmailserver.com", 10, "mail.hmailserver.test")
+            .WithA("mail.hmailserver.test", "192.0.2.25")
+            .WithCname("cname-test.hmailserver.com", "hmailserver.com");
+      }
+
+      [OneTimeTearDown]
+      public void ForgetIt()
+      {
+         SuiteDns.Reset();
+      }
+
+      [OneTimeSetUp]
       public void OneTimeSetUp()
       {
          var application = SingletonProvider<TestSetup>.Instance.GetApp();

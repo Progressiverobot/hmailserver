@@ -647,9 +647,24 @@ namespace HM
          // RFC 7489 7.1 draws the external-destination line at the
          // organizational domain: a report mailbox on another host of the same
          // registrant needs no consent record; anywhere else does.
-         if (DmarcRptReporterTask::IsExternalDestination(_T("mail.example.com"), _T("example.com")))
+         //
+         // IsExternalDestination is GetOrganizationalDomain on both sides, and for
+         // any name of two labels or more that function asks DNS (the RFC 9989 tree
+         // walk). The check that used to sit here compared mail.example.com with
+         // example.com, and its answer was whatever the resolver made of it: under
+         // a live resolver the walk hit an error at _dmarc.com and fell back to the
+         // Public Suffix List, which put both under example.com - "not external",
+         // as asserted; under the regression suite's own zone, where nothing is
+         // published and every lookup succeeds with no records, the walk completes
+         // and each name is its own organizational domain - "external". Both are
+         // this code doing what it should with the answer it got, so the assertion
+         // was passing by accident. The organizational-domain rules are pinned by
+         // DmarcTreeWalkTester with records in memory; this pins only the
+         // comparison, with names the walk never consults DNS for (a single label
+         // consults nothing).
+         if (DmarcRptReporterTask::IsExternalDestination(_T("example"), _T("example")))
             throw 0;
-         if (!DmarcRptReporterTask::IsExternalDestination(_T("example.com"), _T("collector.example")))
+         if (!DmarcRptReporterTask::IsExternalDestination(_T("example"), _T("collector")))
             throw 0;
 
          // The report body: RFC 7489 Appendix C's members, and XML escaping of

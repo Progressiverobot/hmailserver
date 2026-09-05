@@ -55,28 +55,16 @@ namespace RegressionTests.Sieve
       // answers NODATA, which is the "not listed" the clean half of each test wants.
       private const string SurblTestPoint = "surbl-org-permanent-test-point.com.multi.surbl.org";
 
-      private FakeDnsServer dns_;
-
       [OneTimeSetUp]
-      public void PointTheServerAtALocalResolver()
+      public void ServeTheNamesThisFixtureNeeds()
       {
-         dns_ = new FakeDnsServer().WithA(SurblTestPoint, "127.0.0.2");
-
-         ServerIniFile.SetSetting("DNSServer", "127.0.0.1");
-
-         RestartServerAndReacquireCom();
+         SuiteDns.Zone.WithA(SurblTestPoint, "127.0.0.2");
       }
 
       [OneTimeTearDown]
-      public void RestoreTheSystemResolver()
+      public void ForgetThem()
       {
-         // The fake resolver stays up until the server is back on the system one, so
-         // the restart never runs against a dead resolver.
-         using (dns_)
-         {
-            ServerIniFile.SetSetting("DNSServer", null);
-            RestartServerAndReacquireCom();
-         }
+         SuiteDns.Reset();
       }
 
       private static void SetScript(Account account, string script)
