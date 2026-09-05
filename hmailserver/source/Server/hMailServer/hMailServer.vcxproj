@@ -424,6 +424,7 @@ EXIT 0
     <ClCompile Include="..\Common\Scripting\Events.cpp" />
     <ClCompile Include="..\Common\Scripting\Result.cpp" />
     <ClCompile Include="..\Common\Scripting\ScriptObjectContainer.cpp" />
+    <ClCompile Include="..\Common\Scripting\ScriptObjectPolicy.cpp" />
     <ClCompile Include="..\Common\Scripting\ScriptServer.cpp" />
     <ClCompile Include="..\Common\Sql\ADOConnection.cpp" />
     <ClCompile Include="..\Common\SQL\ADOInt64Helper.cpp" />
@@ -1032,6 +1033,7 @@ EXIT 0
     <ClInclude Include="..\Common\Scripting\Events.h" />
     <ClInclude Include="..\Common\Scripting\Result.h" />
     <ClInclude Include="..\Common\Scripting\ScriptObjectContainer.h" />
+    <ClInclude Include="..\Common\Scripting\ScriptObjectPolicy.h" />
     <ClInclude Include="..\Common\Scripting\ScriptServer.h" />
     <ClInclude Include="..\Common\Scripting\ScriptSite.h" />
     <ClInclude Include="..\Common\Sql\ADOConnection.h" />

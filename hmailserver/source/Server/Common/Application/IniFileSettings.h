@@ -273,6 +273,13 @@ namespace HM
       int GetClientSessionCeiling () {return client_session_ceiling_; }
       int GetDBConnectionAcquireTimeout () {return db_connection_acquire_timeout_; }
       int GetScriptTimeout () {return script_timeout_; }
+
+      // ScriptAllowedObjects: the COM classes an event script may create with
+      // CreateObject / new ActiveXObject, by ProgID or CLSID, comma-separated.
+      // "*" - the default when the key is absent - means any class, as before the
+      // setting existed; empty means none. Enforced by ScriptObjectPolicy through
+      // the script site's IInternetHostSecurityManager.
+      String GetScriptAllowedObjects() const { return script_allowed_objects_; }
       int GetExternalProcessTimeout () {return external_process_timeout_; }
       int GetAsyncQueueStallThreshold () {return async_queue_stall_threshold_; }
       int GetAsyncQueueReservedThreads () {return async_queue_reserved_threads_; }
@@ -1007,6 +1014,7 @@ namespace HM
       int client_session_ceiling_;
       int db_connection_acquire_timeout_;
       int script_timeout_;
+      String script_allowed_objects_;
       int external_process_timeout_;
       int async_queue_stall_threshold_;
       int async_queue_reserved_threads_;

@@ -626,6 +626,7 @@
     <Compile Include="API\RestApiQuarantineAndAliases.cs" />
     <Compile Include="API\RestApiSrvRecords.cs" />
     <Compile Include="API\ScriptReload.cs" />
+    <Compile Include="API\ScriptObjectPolicy.cs" />
     <Compile Include="AntiSpam\DKIM\ArcSealing.cs" />
     <Compile Include="POP3\ProtocolConformance.cs" />
     <Compile Include="SSL\PostQuantumKeyExchange.cs" />
