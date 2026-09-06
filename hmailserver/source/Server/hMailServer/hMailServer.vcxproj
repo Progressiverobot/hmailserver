@@ -680,6 +680,7 @@ EXIT 0
     <ClCompile Include="..\COM\InterfaceWhiteListAddresses.cpp" />
     <ClCompile Include="..\ExternalFetcher\ExternalFetch.cpp" />
     <ClCompile Include="..\ExternalFetcher\ExternalFetchClientBase.cpp" />
+    <ClCompile Include="..\ExternalFetcher\IMAPClientConnection.cpp" />
     <ClCompile Include="..\ExternalFetcher\ExternalFetchManager.cpp" />
     <ClCompile Include="..\ExternalFetcher\ExternalFetchTask.cpp" />
     <ClCompile Include="..\ExternalFetcher\FetchAccountLock.cpp" />
@@ -1296,6 +1297,7 @@ EXIT 0
     <ClInclude Include="..\COM\InterfaceWhiteListAddresses.h" />
     <ClInclude Include="..\ExternalFetcher\ExternalFetch.h" />
     <ClInclude Include="..\ExternalFetcher\ExternalFetchClientBase.h" />
+    <ClInclude Include="..\ExternalFetcher\IMAPClientConnection.h" />
     <ClInclude Include="..\ExternalFetcher\ExternalFetchManager.h" />
     <ClInclude Include="..\ExternalFetcher\ExternalFetchTask.h" />
     <ClInclude Include="..\ExternalFetcher\FetchAccountLock.h" />

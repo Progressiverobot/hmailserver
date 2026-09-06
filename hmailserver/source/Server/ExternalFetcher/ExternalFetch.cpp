@@ -12,6 +12,7 @@
 #include "../Common/TCPIP/DNSResolver.h"
 #include "../common/TCPIP/TCPConnection.h"
 #include "POP3ClientConnection.h"
+#include "IMAPClientConnection.h"
 
 
 #ifdef _DEBUG
@@ -39,13 +40,29 @@ namespace HM
       std::shared_ptr<IOService> pIOService = Application::Instance()->GetIOService();
 
       std::shared_ptr<Event> disconnectEvent = std::shared_ptr<Event>(new Event()) ;
-      std::shared_ptr<POP3ClientConnection> pClientConnection = std::shared_ptr<POP3ClientConnection> 
-         (new POP3ClientConnection(pFA, 
-                                   pFA->GetConnectionSecurity(), 
-                                   pIOService->GetIOContext(), 
-                                   pIOService->GetClientContext(), 
-                                   disconnectEvent,
-                                   pFA->GetServerAddress()));
+      // The account says which protocol its server speaks; both clients share
+      // everything that happens to a message once it has been collected.
+      std::shared_ptr<ExternalFetchClientBase> pClientConnection;
+      if (pFA->GetServerType() == FetchAccount::IMAP)
+      {
+         pClientConnection = std::shared_ptr<IMAPClientConnection>
+            (new IMAPClientConnection(pFA,
+                                      pFA->GetConnectionSecurity(),
+                                      pIOService->GetIOContext(),
+                                      pIOService->GetClientContext(),
+                                      disconnectEvent,
+                                      pFA->GetServerAddress()));
+      }
+      else
+      {
+         pClientConnection = std::shared_ptr<POP3ClientConnection>
+            (new POP3ClientConnection(pFA,
+                                      pFA->GetConnectionSecurity(),
+                                      pIOService->GetIOContext(),
+                                      pIOService->GetClientContext(),
+                                      disconnectEvent,
+                                      pFA->GetServerAddress()));
+      }
 
       DNSResolver resolver;
 
@@ -69,7 +86,7 @@ namespace HM
          // Keep a WEAK reference before dropping the strong one. The strong reference has
          // to go, as it always did, so the connection can be torn down whenever it likes;
          // the weak one exists solely so the ceiling below can tell it to.
-         std::weak_ptr<POP3ClientConnection> weakConnection = pClientConnection;
+         std::weak_ptr<ExternalFetchClientBase> weakConnection = pClientConnection;
 
          pClientConnection.reset();
 
