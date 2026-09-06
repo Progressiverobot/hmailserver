@@ -288,7 +288,7 @@ namespace HM
          return false;
       }
 
-      SetContextOptions_(context);
+      SetContextOptions_(context, true);
       SetKeyExchangeGroups_(context);
 
       SetCipherList_(context);
@@ -415,9 +415,9 @@ namespace HM
    }
 
    bool
-   SslContextInitializer::InitClient(boost::asio::ssl::context& context)
+   SslContextInitializer::InitClient(boost::asio::ssl::context& context, bool honour_legacy_toggles)
    {
-      SetContextOptions_(context);
+      SetContextOptions_(context, honour_legacy_toggles);
 
       // The key-exchange group list belongs on the client context as much as on a
       // server one, and it was only ever applied to server contexts. So
@@ -758,7 +758,7 @@ namespace HM
    }
 
    void
-   SslContextInitializer::SetContextOptions_(boost::asio::ssl::context& context)
+   SslContextInitializer::SetContextOptions_(boost::asio::ssl::context& context, bool honour_legacy_toggles)
    {
       bool tlsv10 = Configuration::Instance()->GetSslVersionEnabled(TlsVersion10);
       bool tlsv11 = Configuration::Instance()->GetSslVersionEnabled(TlsVersion11);
@@ -805,31 +805,28 @@ namespace HM
       if (tlsPrioritizeChaCha && tlsPreferServerCiphers && (tlsv12 || tlsv13))
          options = options | SSL_OP_PRIORITIZE_CHACHA;
 
-      // The same floor expressed through Boost.Asio's own option flags as well,
-      // for the reader and the analyser that see the context through that API:
-      // SSLv2 and SSLv3 never, each TLS version as the toggles say. The native
-      // mask below carries the rest - the single-use ECDH key, the server cipher
-      // preference, the ChaCha priority - which Boost has no flags for. Both
-      // calls OR into the same option word, so nothing is applied twice.
-      boost::asio::ssl::context::options boostOptions =
-         boost::asio::ssl::context::default_workarounds |
-         boost::asio::ssl::context::single_dh_use |
-         boost::asio::ssl::context::no_sslv2 |
-         boost::asio::ssl::context::no_sslv3;
-
-      if (!tlsv10)
-         boostOptions |= boost::asio::ssl::context::no_tlsv1;
-      if (!tlsv11)
-         boostOptions |= boost::asio::ssl::context::no_tlsv1_1;
-      if (!tlsv12)
-         boostOptions |= boost::asio::ssl::context::no_tlsv1_2;
-      if (!tlsv13)
-         boostOptions |= boost::asio::ssl::context::no_tlsv1_3;
-
-      context.set_options(boostOptions);
-
+      // Every context was built with HM_TLS_CONTEXT_FLOOR (see the header), which
+      // already has SSLv3, TLS 1.0 and TLS 1.1 off. The native mask adds what the
+      // toggles turn off and what Boost has no flags for; then, for the mail
+      // listeners and the mail client only, a version the toggles enable is
+      // turned back on with SSL_CTX_clear_options. Natively on purpose: the
+      // analyser that reads set_options must never see the floor lowered, and
+      // re-enabling TLS 1.0 for a 2008-era mail client is the administrator's
+      // explicit choice, written down in [Settings], not a default.
       SSL_CTX* ssl = context.native_handle();
       SSL_CTX_set_options(ssl, options);
+
+      if (honour_legacy_toggles)
+      {
+         long reenabled = 0;
+         if (tlsv10)
+            reenabled |= SSL_OP_NO_TLSv1;
+         if (tlsv11)
+            reenabled |= SSL_OP_NO_TLSv1_1;
+
+         if (reenabled != 0)
+            SSL_CTX_clear_options(ssl, reenabled);
+      }
    }
 
    AnsiString

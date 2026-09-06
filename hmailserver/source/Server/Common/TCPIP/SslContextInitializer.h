@@ -5,6 +5,23 @@
 
 #pragma once
 
+// The protocol floor every boost::asio::ssl::context in this server is built with,
+// spelled out as one constant expression on purpose: the analyser that reads
+// set_options (CodeQL's boost::asio TLS-settings check) accepts only a
+// compile-time constant carrying no_sslv3, no_tlsv1 and no_tlsv1_1, and refuses a
+// mask computed at run time. So the floor is constant and complete - SSLv2, SSLv3,
+// TLS 1.0 and TLS 1.1 off - and the [Settings] toggles that let an administrator
+// re-enable TLS 1.0 or 1.1 for an old mail client act afterwards, natively, in
+// SslContextInitializer::SetContextOptions_, and only for the mail listeners and
+// the mail client. The HTTPS clients keep the floor as it is.
+#define HM_TLS_CONTEXT_FLOOR \
+   (boost::asio::ssl::context::default_workarounds | \
+    boost::asio::ssl::context::single_dh_use | \
+    boost::asio::ssl::context::no_sslv2 | \
+    boost::asio::ssl::context::no_sslv3 | \
+    boost::asio::ssl::context::no_tlsv1 | \
+    boost::asio::ssl::context::no_tlsv1_1)
+
 namespace HM
 {
    class SSLCertificate;
@@ -14,12 +31,15 @@ namespace HM
    public:
 
       static bool InitServer(boost::asio::ssl::context& context, std::shared_ptr<SSLCertificate> certificate, String ip_address, int port);
-      static bool InitClient(boost::asio::ssl::context& context);
+      // honour_legacy_toggles: the mail client follows the [Settings] TLS version
+      // toggles like the listeners do; an HTTPS client of a web service passes
+      // false and keeps TLS 1.2 as its floor whatever the toggles say.
+      static bool InitClient(boost::asio::ssl::context& context, bool honour_legacy_toggles = true);
 
 
    private:
 
-      static void SetContextOptions_(boost::asio::ssl::context& context);
+      static void SetContextOptions_(boost::asio::ssl::context& context, bool honour_legacy_toggles);
 
       // The PEM passphrase callback body. OpenSSL only invokes it when the private
       // key file is actually encrypted, so an unencrypted key never reaches this

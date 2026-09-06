@@ -539,7 +539,7 @@ namespace HM
          // An HTTPS client of a web service: TLS 1.2 is the floor whatever the mail
          // protocol toggles allow, since there is no 2008-era CA, token issuer or
          // policy host to accommodate.
-         sslContext.set_options(boost::asio::ssl::context::default_workarounds | boost::asio::ssl::context::no_sslv2 | boost::asio::ssl::context::no_sslv3 | boost::asio::ssl::context::no_tlsv1 | boost::asio::ssl::context::no_tlsv1_1);
+         sslContext.set_options(HM_TLS_CONTEXT_FLOOR);
          sslContext.set_default_verify_paths();
 
          // Through the shared client initialiser, for the same reason the optional
@@ -549,7 +549,7 @@ namespace HM
          // connection that fetches this server's own certificate was the least
          // configured TLS in the build. InitClient does not touch the verify mode
          // or the verify callback set below, so peer verification is unaffected.
-         SslContextInitializer::InitClient(sslContext);
+         SslContextInitializer::InitClient(sslContext, false);
 
          boost::asio::ssl::stream<boost::asio::ip::tcp::socket> stream(ioContext, sslContext);
 
