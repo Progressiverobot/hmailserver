@@ -4,9 +4,9 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
-using System.Runtime.InteropServices;
-using Microsoft.Win32.SafeHandles;
+using System.Linq;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
 using RegressionTests.Shared;
@@ -29,34 +29,38 @@ namespace RegressionTests.Infrastructure
    {
       private const string Password = "test";
 
-      [StructLayout(LayoutKind.Sequential)]
-      private struct FileInformation
-      {
-         public uint FileAttributes;
-         public System.Runtime.InteropServices.ComTypes.FILETIME CreationTime;
-         public System.Runtime.InteropServices.ComTypes.FILETIME LastAccessTime;
-         public System.Runtime.InteropServices.ComTypes.FILETIME LastWriteTime;
-         public uint VolumeSerialNumber;
-         public uint FileSizeHigh;
-         public uint FileSizeLow;
-         public uint NumberOfLinks;
-         public uint FileIndexHigh;
-         public uint FileIndexLow;
-      }
-
-      [DllImport("kernel32.dll", SetLastError = true)]
-      private static extern bool GetFileInformationByHandle(SafeFileHandle handle, out FileInformation information);
-
-      // The NTFS identity of a file (volume + file index) and how many names it has.
+      // The identity of a file and how many names it has, from "fsutil hardlink list":
+      // one line per name the file has on its volume, so the sorted list of names is
+      // the identity (two paths are the same file exactly when they list the same
+      // names) and its length is the link count. Managed code and a system tool,
+      // where this used to be a P/Invoke of GetFileInformationByHandle for the same
+      // two facts.
       private static (string identity, uint links) Identify(string path)
       {
-         using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+         string fullPath = Path.GetFullPath(path);
+         var fsutil = new ProcessStartInfo("fsutil", "hardlink list \"" + fullPath + "\"")
          {
-            FileInformation information;
-            Assert.IsTrue(GetFileInformationByHandle(stream.SafeFileHandle, out information),
-               "GetFileInformationByHandle failed: " + Marshal.GetLastWin32Error());
-            return (information.VolumeSerialNumber + ":" + information.FileIndexHigh + ":" + information.FileIndexLow,
-                    information.NumberOfLinks);
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+         };
+
+         using (var process = Process.Start(fsutil))
+         {
+            string output = process.StandardOutput.ReadToEnd();
+            string errors = process.StandardError.ReadToEnd();
+            process.WaitForExit();
+            Assert.AreEqual(0, process.ExitCode, "fsutil hardlink list failed for " + path + ": " + errors + output);
+
+            var names = output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+               .Select(name => name.Trim().ToLowerInvariant())
+               .Where(name => name.Length > 0)
+               .OrderBy(name => name, StringComparer.Ordinal)
+               .ToList();
+            Assert.IsTrue(names.Count > 0, "fsutil listed no names for " + path + ": " + output);
+
+            return (Path.GetPathRoot(fullPath).ToLowerInvariant() + string.Join("|", names), (uint) names.Count);
          }
       }
 

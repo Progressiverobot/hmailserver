@@ -364,7 +364,7 @@ namespace RegressionTests.API
       [Description("A backup is started over the API with the configured settings, its status is readable, and it completes.")]
       public void BackupStartsAndReportsItsStatus()
       {
-         string directory = Path.Combine(Path.GetTempPath(), "hm-rest-backup-" + Guid.NewGuid().ToString("N"));
+         string directory = Paths.Combine(Path.GetTempPath(), "hm-rest-backup-" + Guid.NewGuid().ToString("N"));
          Directory.CreateDirectory(directory);
 
          BackupSettings backup = _settings.Backup;
@@ -406,7 +406,14 @@ namespace RegressionTests.API
             backup.BackupSettings = previousSettings;
             backup.BackupDomains = previousDomains;
             backup.BackupMessages = previousMessages;
-               try { Directory.Delete(directory, true); } catch (IOException) { }
+            try
+            {
+               Directory.Delete(directory, true);
+            }
+            catch (IOException)
+            {
+               // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
+            }
          }
       }
 

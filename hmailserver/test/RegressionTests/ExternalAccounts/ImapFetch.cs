@@ -53,12 +53,12 @@ namespace RegressionTests.ExternalAccounts
                 "Body of " + subject + ".";
       }
 
-      private static List<ScriptedImapServer.RemoteMessage> Mailbox(params string[] subjects)
+      private static ScriptedImapServer.RemoteMailbox Mailbox(params string[] subjects)
       {
-         var messages = new List<ScriptedImapServer.RemoteMessage>();
+         var mailbox = new ScriptedImapServer.RemoteMailbox();
          for (var i = 0; i < subjects.Length; i++)
-            messages.Add(new ScriptedImapServer.RemoteMessage(101 + i, MessageText(subjects[i])));
-         return messages;
+            mailbox.Add(new ScriptedImapServer.RemoteMessage(101 + i, MessageText(subjects[i])));
+         return mailbox;
       }
 
       private FetchAccount CreateImapFetchAccount(int port, int daysToKeepMessages)

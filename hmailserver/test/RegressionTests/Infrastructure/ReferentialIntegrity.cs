@@ -60,52 +60,17 @@ namespace RegressionTests.Infrastructure
          // writes it; the provider wants it plain.
          string password = Encoding.UTF8.GetString(UnprotectForMachine(Convert.FromBase64String(encoded)));
 
-         connectionString_ = "Provider=Microsoft.SQLSERVER.CE.OLEDB.4.0;Data Source=" + Path.Combine(folder, database + ".sdf") +
+         connectionString_ = "Provider=Microsoft.SQLSERVER.CE.OLEDB.4.0;Data Source=" + Paths.Combine(folder, database + ".sdf") +
                              ";SSCE:Database Password=" + password;
          return connectionString_;
       }
 
-      // CryptUnprotectData with the machine scope, called directly so that the test
-      // project needs no package for it.
-      [StructLayout(LayoutKind.Sequential)]
-      private struct DataBlob
-      {
-         public int Size;
-         public IntPtr Data;
-      }
-
-      [DllImport("crypt32.dll", SetLastError = true)]
-      private static extern bool CryptUnprotectData(ref DataBlob input, IntPtr description, IntPtr entropy, IntPtr reserved,
-         IntPtr prompt, int flags, out DataBlob output);
-
-      [DllImport("kernel32.dll")]
-      private static extern IntPtr LocalFree(IntPtr handle);
-
+      // CryptUnprotectData with the machine scope, through the framework's wrapper for
+      // the identical call (System.Security.dll, referenced by the project), so no
+      // P/Invoke is needed for it.
       private static byte[] UnprotectForMachine(byte[] envelope)
       {
-         const int LocalMachine = 0x4; // CRYPTPROTECT_LOCAL_MACHINE
-         var input = new DataBlob { Size = envelope.Length, Data = Marshal.AllocHGlobal(envelope.Length) };
-         try
-         {
-            Marshal.Copy(envelope, 0, input.Data, envelope.Length);
-            DataBlob output;
-            if (!CryptUnprotectData(ref input, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, LocalMachine, out output))
-               throw new InvalidOperationException("CryptUnprotectData failed: " + Marshal.GetLastWin32Error());
-            try
-            {
-               var plain = new byte[output.Size];
-               Marshal.Copy(output.Data, plain, 0, output.Size);
-               return plain;
-            }
-            finally
-            {
-               LocalFree(output.Data);
-            }
-         }
-         finally
-         {
-            Marshal.FreeHGlobal(input.Data);
-         }
+         return ProtectedData.Unprotect(envelope, null, DataProtectionScope.LocalMachine);
       }
 
       // "select count(*) ..." against the database file, through ADODB by late binding

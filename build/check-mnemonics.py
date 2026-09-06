@@ -78,7 +78,8 @@ def line_of(text, pos):
 
 
 def xaml_captions(path):
-    src = open(path, encoding="utf-8").read()
+    with open(path, encoding="utf-8") as handle:
+        src = handle.read()
     # DataTemplate ranges
     inside = []
     depth = 0
@@ -140,7 +141,8 @@ LITERAL = r"\"((?:[^\"\\]|\\.)*)\""
 
 
 def cs_captions(path):
-    src = open(path, encoding="utf-8").read()
+    with open(path, encoding="utf-8") as handle:
+        src = handle.read()
     classes = body_ranges(src, CLASS)
     methods = body_ranges(src, METHOD)
     lines = src.split("\n")

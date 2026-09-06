@@ -170,7 +170,14 @@ namespace RegressionTests.API
          WriteSetting("RestApiPort", "0");
          WriteSetting("ArchiveDir", "");
          _application.Reinitialize();
-         try { Directory.Delete(archiveRoot_, true); } catch (IOException) { }
+         try
+         {
+            Directory.Delete(archiveRoot_, true);
+         }
+         catch (IOException)
+         {
+            // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
+         }
       }
 
       private void ArchiveOneMessage(string subject)
@@ -267,9 +274,9 @@ namespace RegressionTests.API
          Assert.AreEqual(200, allStatus, all);
          StringAssert.Contains("\"direction\":\"inbound\"", all);
          long inboundId = 0;
-         foreach (string entry in all.Split(new[] { "{\"id\":" }, StringSplitOptions.RemoveEmptyEntries))
-            if (entry.Contains("\"direction\":\"inbound\""))
-               inboundId = long.Parse(entry.Substring(0, entry.IndexOf(',')));
+         foreach (string entry in all.Split(new[] { "{\"id\":" }, StringSplitOptions.RemoveEmptyEntries)
+                                     .Where(entry => entry.Contains("\"direction\":\"inbound\"")))
+            inboundId = long.Parse(entry.Substring(0, entry.IndexOf(',')));
          Assert.IsTrue(inboundId > 0, "the Inbound copy has a row: " + all);
          Assert.AreEqual(403, Http("GET", "/api/v1/archive/" + inboundId, bearer).status, "the Inbound copy is nobody's domain");
          Assert.AreEqual(200, Http("GET", "/api/v1/archive/" + inboundId).status, "the administrator sees it");
