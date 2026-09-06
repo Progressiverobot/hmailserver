@@ -121,6 +121,14 @@ namespace RegressionTests.Infrastructure
       {
          var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "history@example.test", "test");
 
+         // The history outlives the process and the counter does not: samples
+         // taken before the last service restart sit in the same hour with larger
+         // totals, so "last minus first" across the whole window went negative
+         // whenever a fixture had restarted the service after a busy stretch. The
+         // comparison is between the two samples this test takes, found by their
+         // position after whatever was already there.
+         int before = Values(_application.Utilities.GetMetricHistory("processed_messages_total", 60, 0)).Length;
+
          _application.Utilities.SampleMetricsNow();
 
          SmtpClientSimulator.StaticSend("sender@example.test", account.Address, "Counted", "One message.");
@@ -132,8 +140,8 @@ namespace RegressionTests.Infrastructure
          // would otherwise be one point.
          double[] values = Values(_application.Utilities.GetMetricHistory("processed_messages_total", 60, 0));
 
-         ClassicAssert.GreaterOrEqual(values.Length, 2, "Two samples were taken.");
-         ClassicAssert.GreaterOrEqual(values[values.Length - 1] - values[0], 1.0,
+         ClassicAssert.GreaterOrEqual(values.Length, before + 2, "Two samples were taken.");
+         ClassicAssert.GreaterOrEqual(values[values.Length - 1] - values[before], 1.0,
             "The total must have advanced by at least the one message delivered in between.");
       }
 

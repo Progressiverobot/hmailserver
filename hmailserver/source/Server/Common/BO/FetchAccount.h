@@ -19,6 +19,9 @@ namespace HM
       enum ServerType
       {
          POP3 = 0,
+         // The remote INBOX collected once by UID, and left intact when the account
+         // says so. See IMAPClientConnection.
+         IMAP = 1,
       };
 
 

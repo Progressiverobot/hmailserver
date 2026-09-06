@@ -27,6 +27,12 @@ namespace hMailServer.ControlPanel.Views
       /// changing the port is the single commonest way an external account is
       /// configured and then never downloads anything.
       /// </summary>
+      private static readonly (int Value, string Label)[] ServerTypeOptions =
+      {
+         (0, "POP3 - download and (unless kept for N days) delete"),
+         (1, "IMAP - the INBOX, collected once by UID; kept on the server unless Days to keep is 0")
+      };
+
       private static readonly (int Value, string Label)[] ConnectionSecurityOptions =
       {
          (0, "None - no encryption (port 110)"),
@@ -204,8 +210,8 @@ namespace hMailServer.ControlPanel.Views
       public static CollectionEditorView FetchAccounts(string domainName, string address) => new(new CollectionSpec
       {
          Title = "External accounts",
-         Subtitle = "POP3 mailboxes hMailServer downloads mail from on behalf of this account. "
-                    + "Connection security and port go together: SSL/TLS on 995, STARTTLS on 110.",
+         Subtitle = "POP3 or IMAP mailboxes hMailServer collects mail from on behalf of this account. "
+                    + "Connection security and port go together: SSL/TLS on 995 (POP3) or 993 (IMAP), STARTTLS on 110 or 143.",
          ItemNoun = "external account",
          GetCollection = () =>
          {
@@ -218,7 +224,8 @@ namespace hMailServer.ControlPanel.Views
          {
             new FieldSpec { Prop = "Enabled", Label = "Enabled", Kind = FieldKind.Bool, GridWidth = 70, Default = true },
             new FieldSpec { Prop = "Name", Label = "Name", GridWidth = 150, Default = "" },
-            new FieldSpec { Prop = "ServerAddress", Label = "POP3 server", Default = "" },
+            new FieldSpec { Prop = "ServerType", Label = "Server type", Kind = FieldKind.Combo, Options = ServerTypeOptions, GridWidth = 90, Default = 0 },
+            new FieldSpec { Prop = "ServerAddress", Label = "Server", Default = "" },
             new FieldSpec { Prop = "Port", Label = "Port", Kind = FieldKind.Number, GridWidth = 70, Default = 110 },
             new FieldSpec { Prop = "Username", Label = "User name", ShowInGrid = false, Default = "" },
             new FieldSpec { Prop = "Password", Label = "Password", Kind = FieldKind.Password, ShowInGrid = false, Default = "" },

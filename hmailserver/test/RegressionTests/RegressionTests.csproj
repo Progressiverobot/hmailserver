@@ -329,7 +329,9 @@
     <Compile Include="Domains\DomainLimitEnableFlags.cs" />
     <Compile Include="Domains\DomainRenameCascade.cs" />
     <Compile Include="ExternalAccounts\HostileRemoteServer.cs" />
+    <Compile Include="ExternalAccounts\ImapFetch.cs" />
     <Compile Include="ExternalAccounts\ScriptedPop3Server.cs" />
+    <Compile Include="ExternalAccounts\ScriptedImapServer.cs" />
     <Compile Include="Infrastructure\BackupRestoreSafety.cs" />
     <Compile Include="Infrastructure\ErrorManagerDiagnosticsTests.cs" />
     <Compile Include="Infrastructure\ExceptionHandlerDiagnosticsTests.cs" />
