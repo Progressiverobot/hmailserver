@@ -10,6 +10,7 @@ using System.Text;
 using System.Threading;
 using System.Linq;
 using NUnit.Framework;
+using NUnit.Framework.Legacy;
 using RegressionTests.Infrastructure;
 using RegressionTests.Shared;
 
@@ -84,7 +85,7 @@ namespace RegressionTests.API
       // returns the status line code, the raw response headers and the body.
       // The headers are needed as well as the body here: the whole point of the
       // RFC 6764 endpoints is the Location header.
-      private static (int status, string headers, string body) HttpGet(string path, string host)
+      private static (int status, string headers, string body) HttpGet(string path, string host, string extraHeaders = "")
       {
          using (var client = new TcpClient())
          {
@@ -110,7 +111,7 @@ namespace RegressionTests.API
             using (var memory = new MemoryStream())
             {
                byte[] request = Encoding.ASCII.GetBytes(
-                  "GET " + path + " HTTP/1.0\r\nHost: " + host + "\r\nConnection: close\r\n\r\n");
+                  "GET " + path + " HTTP/1.0\r\nHost: " + host + "\r\nConnection: close\r\n" + extraHeaders + "\r\n");
 
                stream.Write(request, 0, request.Length);
 
@@ -213,11 +214,29 @@ namespace RegressionTests.API
          LogHandler.DeleteErrorLog();
       }
 
+      // The configuration profile is served over HTTPS only. This listener is plain
+      // HTTP, so the tests say what a TLS-terminating proxy in front of it would say.
+      private static (int status, string headers, string body) HttpsGet(string path, string host)
+      {
+         return HttpGet(path, host, "X-Forwarded-Proto: https\r\n");
+      }
+
+      [Test]
+      [Description("A .mobileconfig asked for over plain HTTP, with no proxy saying otherwise, is refused with the reason - the profile decides which servers get the user's password")]
+      public void MobileConfigIsRefusedOverPlainHttp()
+      {
+         (int status, string headers, string body) response = HttpGet("/email.mobileconfig", "example.test");
+         Assert.AreEqual(403, response.status, "Body: " + response.body);
+         StringAssert.Contains("HTTPS", response.body);
+         StringAssert.Contains("X-Forwarded-Proto", response.body);
+         Assert.IsFalse(response.body.Contains("<plist"), "No profile at all over plain HTTP. Body: " + response.body);
+      }
+
       [Test]
       [Description("An Apple .mobileconfig profile is served with the Apple content type and a complete mail payload")]
       public void MobileConfigProfileIsServed()
       {
-         (int status, string headers, string body) response = HttpGet("/email.mobileconfig", "example.test");
+         (int status, string headers, string body) response = HttpsGet("/email.mobileconfig", "example.test");
 
          Assert.AreEqual(200, response.status, "A configuration profile should be served. Body: " + response.body);
 
@@ -251,7 +270,7 @@ namespace RegressionTests.API
          Assert.AreEqual(200, autoconfig.status, "Body: " + autoconfig.body);
 
          (int status, string headers, string body) profile =
-            HttpGet("/email.mobileconfig", "example.test");
+            HttpsGet("/email.mobileconfig", "example.test");
 
          Assert.AreEqual(200, profile.status, "Body: " + profile.body);
 
@@ -271,8 +290,8 @@ namespace RegressionTests.API
       [Description("The PayloadUUID is stable across requests, so reinstalling replaces the profile instead of duplicating the account")]
       public void MobileConfigUuidIsStableAcrossRequests()
       {
-         (int status, string headers, string body) first = HttpGet("/email.mobileconfig", "example.test");
-         (int status, string headers, string body) second = HttpGet("/email.mobileconfig", "example.test");
+         (int status, string headers, string body) first = HttpsGet("/email.mobileconfig", "example.test");
+         (int status, string headers, string body) second = HttpsGet("/email.mobileconfig", "example.test");
 
          Assert.AreEqual(200, first.status, "Body: " + first.body);
          Assert.AreEqual(200, second.status, "Body: " + second.body);
@@ -290,14 +309,14 @@ namespace RegressionTests.API
       public void MobileConfigPrefillsOnlyASuppliedAddress()
       {
          (int status, string headers, string body) withAddress =
-            HttpGet("/email.mobileconfig?emailaddress=someone%40example.test", "example.test");
+            HttpsGet("/email.mobileconfig?emailaddress=someone%40example.test", "example.test");
 
          Assert.AreEqual(200, withAddress.status, "Body: " + withAddress.body);
          Assert.AreEqual("someone@example.test", PlistValue(withAddress.body, "EmailAddress", "string"),
             "Body: " + withAddress.body);
 
          (int status, string headers, string body) withoutAddress =
-            HttpGet("/email.mobileconfig", "example.test");
+            HttpsGet("/email.mobileconfig", "example.test");
 
          Assert.AreEqual(200, withoutAddress.status, "Body: " + withoutAddress.body);
 

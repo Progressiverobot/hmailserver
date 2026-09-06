@@ -645,6 +645,7 @@ namespace HM
 
                auto context = std::shared_ptr<boost::asio::ssl::context>(
                   new boost::asio::ssl::context(boost::asio::ssl::context::sslv23));
+               context->set_options(boost::asio::ssl::context::default_workarounds | boost::asio::ssl::context::no_sslv2 | boost::asio::ssl::context::no_sslv3);
 
                if (SslContextInitializer::InitServer(*context, certificate, bind_address, https_port))
                {
@@ -811,7 +812,7 @@ namespace HM
                request);
 
             AnsiString response = requestOk
-               ? ProcessRequest_(request)
+               ? ProcessRequest_(request, true)
                : BuildResponse_(400, "text/plain", "malformed request");
 
             SSL_write(tlsSession, response.c_str(), response.GetLength());
@@ -830,7 +831,7 @@ namespace HM
          request);
 
       AnsiString response = requestOk
-         ? ProcessRequest_(request)
+         ? ProcessRequest_(request, false)
          : BuildResponse_(400, "text/plain", "malformed request");
 
       send(client_socket, response.c_str(), response.GetLength(), 0);
@@ -840,7 +841,7 @@ namespace HM
    }
 
    AnsiString
-   WebServicesServer::ProcessRequest_(const AnsiString &request)
+   WebServicesServer::ProcessRequest_(const AnsiString &request, bool over_tls)
    {
       int lineEnd = request.Find("\r\n");
       if (lineEnd < 0)
@@ -915,7 +916,19 @@ namespace HM
             // are served, because both are what people link to in practice.
             if (method == "GET" &&
                 (path == "/email.mobileconfig" || path == "/mail/config.mobileconfig"))
+            {
+               // Over TLS only. The profile tells a device which servers to trust
+               // with the user's password, and a profile fetched over plain HTTP
+               // can be rewritten on the way by anyone on the path. A proxy that
+               // terminated TLS in front of this listener says so with
+               // X-Forwarded-Proto; without either, the request is sent on to the
+               // HTTPS listener when one is configured and refused with the reason
+               // when none is.
+               if (!RequestArrivedOverHttps_(request, over_tls))
+                  return RefusePlainHttpProfile_(host, path, query);
+
                return HandleMobileConfig_(host, query);
+            }
 
             // Outlook autodiscover (POX). Outlook POSTs; accept GET too.
             AnsiString lowerPath = path;
@@ -942,6 +955,7 @@ namespace HM
       case 200: statusText = "OK"; break;
       case 301: statusText = "Moved Permanently"; break;
       case 400: statusText = "Bad Request"; break;
+      case 403: statusText = "Forbidden"; break;
       case 404: statusText = "Not Found"; break;
       default:  statusText = "Internal Server Error"; status_code = 500; break;
       }
@@ -994,6 +1008,67 @@ namespace HM
          host = host.Mid(0, portPosition);
 
       return host;
+   }
+
+   bool
+   WebServicesServer::RequestArrivedOverHttps_(const AnsiString &request, bool over_tls)
+   {
+      if (over_tls)
+         return true;
+
+      // X-Forwarded-Proto is the de facto header for this (RFC 7239's Forwarded
+      // is rarer in practice); the first value is the protocol the client used,
+      // a chain of proxies appends its own after a comma.
+      AnsiString lowerRequest = request;
+      lowerRequest.MakeLower();
+
+      int headerPosition = lowerRequest.Find("\r\nx-forwarded-proto:");
+      if (headerPosition < 0)
+         return false;
+
+      int valueStart = headerPosition + 20;
+      int lineEnd = lowerRequest.Find("\r\n", valueStart);
+      if (lineEnd < 0)
+         return false;
+
+      AnsiString value = lowerRequest.Mid(valueStart, lineEnd - valueStart);
+      int comma = value.Find(",");
+      if (comma >= 0)
+         value = value.Mid(0, comma);
+      value.Trim();
+
+      return value == "https";
+   }
+
+   AnsiString
+   WebServicesServer::RefusePlainHttpProfile_(const AnsiString &host, const AnsiString &path, const AnsiString &query)
+   {
+      int httpsPort = IniFileSettings::Instance()->GetWebServicesHttpsPort();
+      if (httpsPort > 0 && !host.IsEmpty())
+      {
+         AnsiString location = "https://" + host;
+         if (httpsPort != 443)
+         {
+            AnsiString port;
+            port.Format(":%d", httpsPort);
+            location += port;
+         }
+         location += path;
+         if (!query.IsEmpty())
+            location += "?" + query;
+
+         // The host came off a header line and the path and query off the
+         // request line, so none of them can hold a line break - but a Location
+         // header is built from them, and the check is cheaper than the
+         // assumption. Anything odd falls through to the refusal below.
+         if (location.Find("\r") < 0 && location.Find("\n") < 0 && location.Find(" ") < 0)
+            return BuildRedirectResponse_(location);
+      }
+
+      return BuildResponse_(403, "text/plain",
+         "The configuration profile is served over HTTPS only. A profile fetched over plain HTTP could be altered on the way "
+         "to point the device at another server with the user's password. Configure WebServicesHttpsPort, or put a "
+         "TLS-terminating proxy in front of this listener that sets X-Forwarded-Proto: https.\r\n");
    }
 
    AnsiString

@@ -766,6 +766,7 @@ namespace HM
 
             auto context = std::shared_ptr<boost::asio::ssl::context>(
                new boost::asio::ssl::context(boost::asio::ssl::context::sslv23));
+            context->set_options(boost::asio::ssl::context::default_workarounds | boost::asio::ssl::context::no_sslv2 | boost::asio::ssl::context::no_sslv3);
 
             if (!SslContextInitializer::InitServer(*context, certificate, bind_address, port))
             {
@@ -3985,7 +3986,12 @@ namespace HM
          size_t offset = start == 0 ? 2 : 0;
          if (chunk.size() > offset)
          {
-            std::wstring wide(reinterpret_cast<const wchar_t *>(chunk.data() + offset), (chunk.size() - offset) / 2);
+            // Copied rather than reinterpreted: the chunk is a byte buffer at whatever
+            // alignment the read left it, and a wchar_t view of such a buffer is what
+            // the string-type-conversion check rightly refuses.
+            std::wstring wide((chunk.size() - offset) / 2, L'\0');
+            if (!wide.empty())
+               memcpy(&wide[0], chunk.data() + offset, wide.size() * sizeof(wchar_t));
             AnsiString narrow(String(wide.c_str()));
             text = narrow.c_str();
          }

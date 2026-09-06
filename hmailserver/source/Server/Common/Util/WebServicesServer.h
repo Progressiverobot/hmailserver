@@ -106,11 +106,19 @@ namespace HM
       void Run_(SOCKET listen_socket, bool use_tls);
       void HandleClient_(SOCKET client_socket, bool use_tls);
 
-      static AnsiString ProcessRequest_(const AnsiString &request);
+      static AnsiString ProcessRequest_(const AnsiString &request, bool over_tls);
 
       static AnsiString BuildResponse_(int status_code, const AnsiString &content_type, const AnsiString &body,
                                        const AnsiString &extra_headers = "");
       static AnsiString BuildRedirectResponse_(const AnsiString &location);
+
+      // True when the request reached this listener over TLS, or a proxy that
+      // terminated TLS on the client's behalf says so in X-Forwarded-Proto.
+      static bool RequestArrivedOverHttps_(const AnsiString &request, bool over_tls);
+      // The answer to a configuration profile asked for over plain HTTP: the same
+      // URL on the HTTPS listener when one is configured, otherwise 403 with the
+      // reason.
+      static AnsiString RefusePlainHttpProfile_(const AnsiString &host, const AnsiString &path, const AnsiString &query);
       static AnsiString GetRequestHost_(const AnsiString &request);
       static AnsiString GetRequestBody_(const AnsiString &request);
 

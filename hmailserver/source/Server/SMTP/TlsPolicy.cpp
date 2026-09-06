@@ -373,6 +373,10 @@ namespace HM
             resolver.resolve(std::string(narrowHost.c_str()), "443");
 
          boost::asio::ssl::context sslContext(boost::asio::ssl::context::tls_client);
+         // An HTTPS client of a web service: TLS 1.2 is the floor whatever the mail
+         // protocol toggles allow, since there is no 2008-era CA, token issuer or
+         // policy host to accommodate.
+         sslContext.set_options(boost::asio::ssl::context::default_workarounds | boost::asio::ssl::context::no_sslv2 | boost::asio::ssl::context::no_sslv3 | boost::asio::ssl::context::no_tlsv1 | boost::asio::ssl::context::no_tlsv1_1);
          sslContext.set_default_verify_paths();
 
          boost::asio::ssl::stream<boost::asio::ip::tcp::socket> stream(ioContext, sslContext);

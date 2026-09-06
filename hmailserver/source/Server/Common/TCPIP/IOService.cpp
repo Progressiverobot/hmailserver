@@ -39,7 +39,9 @@ namespace HM
        work_guard_(boost::asio::make_work_guard(io_context_)),
        client_context_(boost::asio::ssl::context::sslv23)
    {
-
+      // The floor no setting can lower, set the moment the context exists; the
+      // shared initialiser applies the configured TLS versions on top.
+      client_context_.set_options(boost::asio::ssl::context::default_workarounds | boost::asio::ssl::context::no_sslv2 | boost::asio::ssl::context::no_sslv3);
    }
 
    IOService::~IOService(void)
