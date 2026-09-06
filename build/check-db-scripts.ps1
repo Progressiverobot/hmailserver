@@ -108,6 +108,59 @@ if ($result.Failures -eq 0) {
     $version = $rs.Fields.Item(0).Value
     $rs.Close()
     Write-Host ("  OK    CreateTablesMSSQL.sql builds a database ({0} statements, schema {1})" -f $result.Run, $version)
+
+    # ---- every schema probe, against this correct database, through the same
+    # provider the server uses
+    #
+    # DBUpdater proves each upgrade step with a probe from SchemaVerification.cs, and
+    # a probe has one job: fail only when the object is missing. Run here against a
+    # database that has everything, every probe must succeed - one that fails is a
+    # statement the backend cannot execute, and in the field it reads as a failed
+    # upgrade of a database that is fine. That is what 6.2.25 shipped for SQL Server
+    # Compact (issue #114): the 6030 probes used "case when exists (subquery)", which
+    # takes the Compact Edition OLE DB provider down with an access violation, so every
+    # Compact Edition upgrade through 6030 was reported as having failed after it had
+    # succeeded. A provider crash ends this process too, which fails the check just
+    # as a caught error does.
+    #
+    # The negative control below is the other half: the 6030 probe shape, pointed at
+    # a constraint that does not exist, must FAIL, or the probes prove nothing.
+    $probesSource = Join-Path $repoRoot 'hmailserver\source\Tools\DBUpdater\SchemaVerification.cs'
+    $probesText = Get-Content -LiteralPath $probesSource -Raw
+    $probes = [regex]::Matches($probesText, 'new\s+SchemaProbe\(\s*(\d+)\s*,\s*"([^"]+)"\s*,\s*"([^"]+)"\s*\)')
+    $probeFailures = 0
+    foreach ($probe in $probes) {
+        $statement = $probe.Groups[3].Value
+        try {
+            $conn.Execute($statement) | Out-Null
+        }
+        catch {
+            $probeFailures++
+            $message = $_.Exception.Message
+            try { $message = $conn.Errors.Item(0).Description } catch { }
+            Write-Host ("  FAIL  probe for {0} (schema {1}) fails on a correct database: {2}" -f $probe.Groups[2].Value, $probe.Groups[1].Value, $message) -ForegroundColor Red
+            Write-Host ("        {0}" -f $statement) -ForegroundColor Red
+        }
+    }
+    if ($probeFailures -eq 0) {
+        Write-Host ("  OK    all {0} schema probes succeed on the fresh database" -f $probes.Count)
+    }
+    $failures += $probeFailures
+
+    $control = ($probes | Where-Object { $_.Groups[1].Value -eq '6030' } | Select-Object -First 1).Groups[3].Value
+    if ($control) {
+        $control = $control -replace "constraint_name = '[^']+'", "constraint_name = 'fk_no_such_constraint'"
+        $controlFailed = $false
+        try { $conn.Execute($control) | Out-Null } catch { $controlFailed = $true }
+        if ($controlFailed) {
+            Write-Host '  OK    the constraint probe fails for a constraint that does not exist (negative control)'
+        }
+        else {
+            $failures++
+            Write-Host '  FAIL  the constraint probe SUCCEEDS for a constraint that does not exist - it proves nothing' -ForegroundColor Red
+            Write-Host ("        {0}" -f $control) -ForegroundColor Red
+        }
+    }
 }
 
 $conn.Close()
