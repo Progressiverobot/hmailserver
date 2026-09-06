@@ -108,8 +108,12 @@ function Test-ClangSanitizerRuntime {
 
 # True when the current process already has the MSVC build environment.
 function Test-VsDevEnvironment {
-    if ($env:VCToolsInstallDir) { return $true }
-    return [bool](Get-Command link.exe -ErrorAction SilentlyContinue)
+    # VCToolsInstallDir is what vcvars64.bat sets, and the only reliable sign.
+    # This used to accept "link.exe is on PATH" as well, and an LLVM or Swift
+    # toolchain puts a link.exe on PATH without any of the MSVC library paths -
+    # so the import was skipped, clang-cl found the CRT by its own detection,
+    # and the link failed on stl_asan.lib, which lives only in the MSVC lib dir.
+    return [bool]$env:VCToolsInstallDir
 }
 
 # Runs vcvars64.bat in a child cmd and copies the resulting environment into this

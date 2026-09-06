@@ -817,16 +817,19 @@ namespace HM
       // Automatic certificate renewal via ACME (Let's Encrypt).
       if (IniFileSettings::Instance()->GetAcmeEnabled())
       {
-         // Check immediately at startup...
-         std::shared_ptr<AcmeRenewalTask> acmeStartupTask = std::shared_ptr<AcmeRenewalTask>(new AcmeRenewalTask);
-         acmeStartupTask->SetReoccurance(ScheduledTask::RunOnce);
-         scheduler_->ScheduleTask(acmeStartupTask);
-
-         // ...and then once an hour.
+         // Once an hour...
          std::shared_ptr<AcmeRenewalTask> acmeTask = std::shared_ptr<AcmeRenewalTask>(new AcmeRenewalTask);
          acmeTask->SetReoccurance(ScheduledTask::RunInfinitely);
          acmeTask->SetMinutesBetweenRun(60);
          scheduler_->ScheduleTask(acmeTask);
+
+         // ...and immediately at startup. Queued last: a RunOnce task goes straight
+         // onto the maintenance queue, and this one can end in a restart of the
+         // servers (a certificate issued but never deployed is deployed by it),
+         // which must not race the scheduling still going on here.
+         std::shared_ptr<AcmeRenewalTask> acmeStartupTask = std::shared_ptr<AcmeRenewalTask>(new AcmeRenewalTask);
+         acmeStartupTask->SetReoccurance(ScheduledTask::RunOnce);
+         scheduler_->ScheduleTask(acmeStartupTask);
       }
 
    }
@@ -950,6 +953,11 @@ namespace HM
    String
    Application::Reinitialize()
    {
+      // One restart at a time: see the member's comment in Application.h. A
+      // second caller waits for the first to finish and then restarts again,
+      // which is what it asked for.
+      boost::lock_guard<boost::mutex> guard(reinitialize_mutex_);
+
       StopServers();
       ExitInstance();
 

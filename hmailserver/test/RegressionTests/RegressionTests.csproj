@@ -339,6 +339,7 @@
     <Compile Include="SMTP\EsmtpConformance.cs" />
     <Compile Include="SMTP\StartTlsAlreadyActive.cs" />
     <Compile Include="Security\TlsAcmeRenewal.cs" />
+    <Compile Include="Security\TlsAcmeDeployment.cs" />
     <Compile Include="Security\TlsCertificateValidity.cs" />
     <Compile Include="Security\TlsProtocolVersions.cs" />
     <Compile Include="API\StatusTests.cs" />
