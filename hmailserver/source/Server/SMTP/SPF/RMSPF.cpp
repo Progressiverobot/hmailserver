@@ -1902,11 +1902,14 @@ dnsrec** datapp, int datasize)
 #endif //SPFCACHE
          if (datalen + addrlen <= datasize)
          {
+            // addrlen bytes into a buffer of datasize bytes, the guard above
+            // being the whole proof; a memcpy for both families rather than a
+            // type-punned 32-bit store at an address that is only ever 4-aligned
+            // by accident.
             if (ipv6)
-               memcpy((char*)datap + datalen, &dnsp->Data.AAAA.Ip6Address, 16);
+               memcpy((char*)datap + datalen, &dnsp->Data.AAAA.Ip6Address, addrlen);
             else
-               *(uint32*)((char*)datap + datalen) =
-               *(uint32*)&dnsp->Data.A.IpAddress;
+               memcpy((char*)datap + datalen, &dnsp->Data.A.IpAddress, addrlen);
          }
          datalen += addrlen;
       }

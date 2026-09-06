@@ -88,20 +88,12 @@ namespace HM
          address_ = boost::asio::ip::make_address_v6(addressString, error);
       else
       {
-         // Windows 2000 Workaround:
-         // On Windows 2000, WSAStringToAddress won't be able to parse the address
-         // 255.255.255.255. This is a bug in Windows 2000, which appears to be fixed
-         // in later versions. It does work properly on Windows XP.
-         // According to Wine guys...
-         // http://www.winehq.org/pipermail/wine-patches/2005-August/020220.html
-         // .. this appears to be a known bug.
-         // So we just do a hack to get around it.
-         //
-         if (addressString == "255.255.255.255")
-            SetIPV4Address_(0xFFFFFFFF);
-         else
-            address_ = boost::asio::ip::make_address_v4(addressString, error);
-
+         // This used to special-case "255.255.255.255" for Windows 2000, whose
+         // WSAStringToAddress could not parse it. Boost's make_address_v4 does not
+         // go through that function and has parsed the broadcast address on every
+         // Windows this server has run on, and the comparison it replaced was a
+         // string that arrived off the wire deciding the code path.
+         address_ = boost::asio::ip::make_address_v4(addressString, error);
       }
 
       if (error)

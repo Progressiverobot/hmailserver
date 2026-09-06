@@ -490,6 +490,7 @@ namespace HM
 
          std::shared_ptr<boost::asio::ssl::context> context =
             std::shared_ptr<boost::asio::ssl::context>(new boost::asio::ssl::context(boost::asio::ssl::context::sslv23));
+         context->set_options(boost::asio::ssl::context::default_workarounds | boost::asio::ssl::context::no_sslv2 | boost::asio::ssl::context::no_sslv3);
 
          // Same method (sslv23 plus the option mask below), same settings, same
          // function as TCPServer::Run uses for the mailbox protocols.

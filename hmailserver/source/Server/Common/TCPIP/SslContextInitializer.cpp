@@ -805,6 +805,29 @@ namespace HM
       if (tlsPrioritizeChaCha && tlsPreferServerCiphers && (tlsv12 || tlsv13))
          options = options | SSL_OP_PRIORITIZE_CHACHA;
 
+      // The same floor expressed through Boost.Asio's own option flags as well,
+      // for the reader and the analyser that see the context through that API:
+      // SSLv2 and SSLv3 never, each TLS version as the toggles say. The native
+      // mask below carries the rest - the single-use ECDH key, the server cipher
+      // preference, the ChaCha priority - which Boost has no flags for. Both
+      // calls OR into the same option word, so nothing is applied twice.
+      boost::asio::ssl::context::options boostOptions =
+         boost::asio::ssl::context::default_workarounds |
+         boost::asio::ssl::context::single_dh_use |
+         boost::asio::ssl::context::no_sslv2 |
+         boost::asio::ssl::context::no_sslv3;
+
+      if (!tlsv10)
+         boostOptions |= boost::asio::ssl::context::no_tlsv1;
+      if (!tlsv11)
+         boostOptions |= boost::asio::ssl::context::no_tlsv1_1;
+      if (!tlsv12)
+         boostOptions |= boost::asio::ssl::context::no_tlsv1_2;
+      if (!tlsv13)
+         boostOptions |= boost::asio::ssl::context::no_tlsv1_3;
+
+      context.set_options(boostOptions);
+
       SSL_CTX* ssl = context.native_handle();
       SSL_CTX_set_options(ssl, options);
    }
