@@ -22,6 +22,12 @@
 #include "../Common/Application/ErrorManager.h"
 #include "../Common/Application/IniFileSettings.h"
 #include "../Common/Application/TimeoutCalculator.h"
+#include "../Common/Application/Configuration.h"
+#include "../Common/BO/Account.h"
+#include "../Common/Cache/CacheContainer.h"
+#include "../Common/Util/MessageUtilities.h"
+#include "../IMAP/IMAPConfiguration.h"
+#include "../IMAP/MessagesContainer.h"
 #include "../common/Threading/AsynchronousTask.h"
 #include "../common/Threading/WorkQueue.h"
 
@@ -44,6 +50,9 @@ namespace HM
       current_state_(StateGreeting),
       tag_counter_(0),
       uidvalidity_(0),
+      mirror_(pAccount && pAccount->GetMirrorFolders()),
+      next_mailbox_(0),
+      current_flags_(0),
       next_pending_(0),
       current_uid_(0),
       current_literal_seen_(false),
@@ -138,6 +147,7 @@ namespace HM
       case StateGreeting:      HandleGreeting_(line); break;
       case StateStartTlsSent:  HandleStartTls_(line); break;
       case StateLoginSent:     HandleLogin_(line); break;
+      case StateListSent:      HandleList_(line); break;
       case StateSelectSent:    HandleSelect_(line); break;
       case StateSearchSent:    HandleSearch_(line); break;
       case StateFetchSent:     HandleFetchLine_(line); break;
@@ -276,8 +286,126 @@ namespace HM
          return;
       }
 
-      SendSelect_();
+      if (mirror_)
+         SendList_();
+      else
+         SendSelect_();
       EnqueueRead();
+   }
+
+   //---------------------------------------------------------------------------()
+   // Mirror mode: every mailbox LIST returns, one after the other, each collected
+   // the way the INBOX is - SELECT, UID SEARCH, the messages not yet on record,
+   // the cleanup DaysToKeepMessages asks for - except that a message is filed
+   // straight into the local folder of the same name, verbatim, with its flags
+   // and internal date, rather than handed to delivery.
+   //---------------------------------------------------------------------------()
+
+   void
+   IMAPClientConnection::SendList_()
+   {
+      mailboxes_.clear();
+      Send_(_T("LIST \"\" \"*\""));
+      current_state_ = StateListSent;
+   }
+
+   void
+   IMAPClientConnection::HandleList_(const String &line)
+   {
+      if (line.StartsWith(_T("* LIST ")))
+      {
+         String name;
+         String delimiter;
+         bool selectable = true;
+
+         if (!ParseListLine_(line, name, delimiter, selectable))
+         {
+            LOG_APPLICATION(Formatter::Format("External account {0}: a LIST reply could not be read and its mailbox is not collected: {1}", account_->GetName(), line));
+         }
+         else if (!selectable)
+         {
+            LOG_DEBUG(Formatter::Format("IMAP mirror: {0} cannot be selected; skipped.", name));
+         }
+         else if (name.GetLength() > 200)
+         {
+            LOG_APPLICATION(Formatter::Format("External account {0}: mailbox {1} is not collected; its name is longer than a collection record can hold.", account_->GetName(), name));
+         }
+         else
+         {
+            RemoteMailbox mailbox;
+            mailbox.name = name;
+            mailbox.delimiter = delimiter;
+            mailboxes_.push_back(mailbox);
+         }
+
+         EnqueueRead();
+         return;
+      }
+
+      if (!IsTaggedReply_(line))
+      {
+         EnqueueRead();
+         return;
+      }
+
+      if (!TaggedOk_(line))
+      {
+         LOG_DEBUG("IMAP mirror: LIST was refused; giving up.");
+         QuitNow_();
+         EnqueueRead();
+         return;
+      }
+
+      LOG_DEBUG(Formatter::Format("IMAP mirror: {0} mailbox(es) to collect.", (int) mailboxes_.size()));
+      next_mailbox_ = 0;
+      SelectNextMailbox_();
+      EnqueueRead();
+   }
+
+   void
+   IMAPClientConnection::SelectNextMailbox_()
+   {
+      if (next_mailbox_ >= mailboxes_.size())
+      {
+         SendLogout_();
+         return;
+      }
+
+      const RemoteMailbox &mailbox = mailboxes_[next_mailbox_];
+      current_mailbox_ = mailbox.name;
+
+      // The remote hierarchy in the local delimiter: "Archive/2025" on a server
+      // that separates with "/" is "Archive.2025" here. Modified UTF-7 passes
+      // through untouched: both sides speak it on the wire, and the folder store
+      // keeps it.
+      String localDelimiter = Configuration::Instance()->GetIMAPConfiguration()->GetHierarchyDelimiter();
+      current_local_folder_ = mailbox.name;
+      if (!mailbox.delimiter.IsEmpty() && mailbox.delimiter != localDelimiter)
+         current_local_folder_.Replace(mailbox.delimiter, localDelimiter);
+
+      uidvalidity_ = 0;
+      server_uids_.clear();
+      pending_uids_.clear();
+      delete_uids_.clear();
+      keys_to_forget_.clear();
+      next_pending_ = 0;
+      next_delete_ = 0;
+
+      Send_(_T("SELECT ") + QuoteImapString_(mailbox.name));
+      current_state_ = StateSelectSent;
+   }
+
+   void
+   IMAPClientConnection::FinishMailbox_()
+   {
+      if (!mirror_)
+      {
+         SendLogout_();
+         return;
+      }
+
+      next_mailbox_++;
+      SelectNextMailbox_();
    }
 
    void
@@ -307,6 +435,14 @@ namespace HM
 
       if (!TaggedOk_(line))
       {
+         if (mirror_)
+         {
+            LOG_APPLICATION(Formatter::Format("External account {0}: mailbox {1} could not be selected and is not collected: {2}", account_->GetName(), current_mailbox_, line));
+            FinishMailbox_();
+            EnqueueRead();
+            return;
+         }
+
          LOG_DEBUG("IMAP fetch: SELECT INBOX was refused; giving up.");
          QuitNow_();
          EnqueueRead();
@@ -353,6 +489,14 @@ namespace HM
 
       if (!TaggedOk_(line))
       {
+         if (mirror_)
+         {
+            LOG_APPLICATION(Formatter::Format("External account {0}: mailbox {1} refused UID SEARCH and is not collected: {2}", account_->GetName(), current_mailbox_, line));
+            FinishMailbox_();
+            EnqueueRead();
+            return;
+         }
+
          LOG_DEBUG("IMAP fetch: UID SEARCH was refused; giving up.");
          QuitNow_();
          EnqueueRead();
@@ -388,7 +532,12 @@ namespace HM
       current_uid_ = pending_uids_[next_pending_];
       current_literal_seen_ = false;
       current_message_ = std::shared_ptr<Message>(new Message);
-      Send_(Formatter::Format("UID FETCH {0} (BODY.PEEK[])", (int) current_uid_));
+      current_flags_ = 0;
+      current_internal_date_ = _T("");
+      if (mirror_)
+         Send_(Formatter::Format("UID FETCH {0} (FLAGS INTERNALDATE BODY.PEEK[])", (int) current_uid_));
+      else
+         Send_(Formatter::Format("UID FETCH {0} (BODY.PEEK[])", (int) current_uid_));
       current_state_ = StateFetchSent;
    }
 
@@ -448,7 +597,10 @@ namespace HM
                return;
             }
             download_finalized_ = false;
-            PrependHeaders_();
+            if (mirror_)
+               ParseFetchAttributes_(line);   // FLAGS and INTERNALDATE, when they precede the literal
+            else
+               PrependHeaders_();
 
             current_literal_seen_ = true;
             current_state_ = StateFetchLiteral;
@@ -520,7 +672,10 @@ namespace HM
    {
       if (!IsTaggedReply_(line))
       {
-         // ")" and any other untagged reply.
+         // ")" and any other untagged reply - or, from a server that puts them
+         // after the literal, the message's FLAGS and INTERNALDATE.
+         if (mirror_)
+            ParseFetchAttributes_(line);
          EnqueueRead();
          return;
       }
@@ -591,6 +746,33 @@ namespace HM
          }
          download_finalized_ = true;
          QuitNow_();
+         EnqueueRead();
+         return;
+      }
+
+      if (mirror_)
+      {
+         ULONGLONG mirrorTick = GetTickCount64();
+         if (!FileMirroredMessage_())
+         {
+            // FileMirroredMessage_ removed the file and said why. No record is
+            // written, so the message is collected again on the next poll.
+            download_finalized_ = true;
+            QuitNow_();
+            EnqueueRead();
+            return;
+         }
+         LogFinalizationStage_("mirror", mirrorTick);
+
+         MarkCurrentMessageAsRead_(uidKey);
+         download_finalized_ = true;
+         transmission_buffer_.reset();
+
+         if (GetDaysToKeep_(uidKey) == 0)
+            delete_uids_.push_back(current_uid_);
+
+         next_pending_++;
+         RequestNextMessage_();
          EnqueueRead();
          return;
       }
@@ -686,7 +868,7 @@ namespace HM
 
       // Records of messages that have left the server by other means are forgotten
       // now; the records of what is deleted below go once the EXPUNGE is acknowledged.
-      uids->DeleteUIDsNotInSet(onServer);
+      uids->DeleteUIDsNotInSetWithPrefix(MailboxKeyPrefix_(), onServer);
 
       next_delete_ = 0;
       SendNextDelete_();
@@ -710,7 +892,7 @@ namespace HM
          return;
       }
 
-      SendLogout_();
+      FinishMailbox_();
    }
 
    void
@@ -755,7 +937,7 @@ namespace HM
       }
       keys_to_forget_.clear();
 
-      SendLogout_();
+      FinishMailbox_();
       EnqueueRead();
    }
 
@@ -822,7 +1004,214 @@ namespace HM
    String
    IMAPClientConnection::RemoteUidKey_(unsigned int uid) const
    {
-      return Formatter::Format("{0}:{1}", (__int64) uidvalidity_, (__int64) uid);
+      return MailboxKeyPrefix_() + Formatter::Format("{0}:{1}", (__int64) uidvalidity_, (__int64) uid);
+   }
+
+   String
+   IMAPClientConnection::MailboxKeyPrefix_() const
+   {
+      // In mirror mode a record names its mailbox, so the same UID in two mailboxes
+      // is two records and one mailbox's pruning never touches another's. The
+      // INBOX collected without the mirror keeps the bare key it has always had.
+      if (!mirror_)
+         return _T("");
+
+      return current_mailbox_ + _T("|");
+   }
+
+   //---------------------------------------------------------------------------()
+   // Mirror mode: filing, and the two replies that need reading.
+   //---------------------------------------------------------------------------()
+
+   bool
+   IMAPClientConnection::FileMirroredMessage_()
+   {
+      // The download spooled into the queue directory, where a message with no
+      // account goes; the copy belongs in the account's own directory, under the
+      // same partial name, exactly where an APPEND would have written it.
+      String spoolFileName = PersistentMessage::GetFileName(current_message_);
+      transmission_buffer_.reset();
+
+      std::shared_ptr<const Account> owner = CacheContainer::Instance()->GetAccount(account_->GetAccountID());
+      if (!owner)
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 6370, "IMAPClientConnection::FileMirroredMessage_",
+            Formatter::Format("External account {0}: the local account it belongs to does not exist, so the message could not be filed; it is still on the remote server.", account_->GetName()));
+         FileUtilities::DeleteFile(spoolFileName);
+         return false;
+      }
+
+      current_message_->SetAccountID(owner->GetID());
+      current_message_->SetState(Message::Delivered);
+      current_message_->SetFlags(current_flags_);
+
+      // The remote INTERNALDATE is the message's date here too - what a client shows
+      // as the date received - so a mailbox migrated today does not read as having
+      // arrived today. A reply without one gets the moment of filing.
+      String createTime;
+      if (!current_internal_date_.IsEmpty())
+         createTime = Time::GetInternalDateFromIMAPInternalDate(current_internal_date_);
+      if (createTime.IsEmpty())
+         createTime = Time::GetCurrentDateTime();
+      current_message_->SetCreateTime(createTime);
+
+      String fileName = PersistentMessage::GetFileName(owner, current_message_);
+      String directory = FileUtilities::GetFilePath(fileName);
+      if (!FileUtilities::Exists(directory))
+         FileUtilities::CreateDirectory(directory);
+
+      if (!FileUtilities::Move(spoolFileName, fileName))
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 6371, "IMAPClientConnection::FileMirroredMessage_",
+            Formatter::Format("External account {0}: the collected message could not be moved into the account's directory ({1}), so it has not been filed; it is still on the remote server.", account_->GetName(), fileName));
+         FileUtilities::DeleteFile(spoolFileName);
+         return false;
+      }
+
+      __int64 resultAccount = 0;
+      __int64 resultFolder = 0;
+      if (!MessageUtilities::MoveToIMAPFolder(current_message_, owner->GetID(), current_local_folder_, true, false, resultAccount, resultFolder) || resultFolder == 0)
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 6372, "IMAPClientConnection::FileMirroredMessage_",
+            Formatter::Format("External account {0}: the folder {1} could not be found or created, so the message could not be filed; it is still on the remote server.", account_->GetName(), current_local_folder_));
+         FileUtilities::DeleteFile(fileName);
+         return false;
+      }
+
+      if (!PersistentMessage::SaveObject(current_message_))
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 6373, "IMAPClientConnection::FileMirroredMessage_",
+            Formatter::Format("External account {0}: a message collected into {1} could not be saved, so it has not been filed; it is still on the remote server.", account_->GetName(), current_local_folder_));
+         FileUtilities::DeleteFile(fileName);
+         return false;
+      }
+
+      // A session with the folder open holds its message list in the cache; told
+      // to refresh, it sees the copy on its next command, as it sees a delivery.
+      MessagesContainer::Instance()->SetFolderNeedsRefresh(current_message_->GetFolderID());
+
+      return true;
+   }
+
+   void
+   IMAPClientConnection::ParseFetchAttributes_(const String &line)
+   {
+      // "* 12 FETCH (UID 34 FLAGS (\Seen \Flagged) INTERNALDATE "17-Jul-1996 02:44:25 -0700" BODY[] {56789}"
+      // - the items in any order the server likes, before the literal or after it.
+      int flagsAt = line.Find(_T("FLAGS ("));
+      if (flagsAt >= 0)
+      {
+         int close = line.Find(_T(")"), flagsAt);
+         if (close > flagsAt)
+         {
+            String flags = line.Mid(flagsAt + 7, close - flagsAt - 7);
+            std::vector<String> parts = StringParser::SplitString(flags, " ");
+            for (String flag : parts)
+            {
+               flag.Trim();
+               if (flag.CompareNoCase(_T("\\Seen")) == 0)
+                  current_flags_ |= Message::FlagSeen;
+               else if (flag.CompareNoCase(_T("\\Flagged")) == 0)
+                  current_flags_ |= Message::FlagFlagged;
+               else if (flag.CompareNoCase(_T("\\Answered")) == 0)
+                  current_flags_ |= Message::FlagAnswered;
+               else if (flag.CompareNoCase(_T("\\Draft")) == 0)
+                  current_flags_ |= Message::FlagDraft;
+               else if (flag.CompareNoCase(_T("\\Deleted")) == 0)
+                  current_flags_ |= Message::FlagDeleted;
+            }
+         }
+      }
+
+      int dateAt = line.Find(_T("INTERNALDATE \""));
+      if (dateAt >= 0)
+      {
+         int start = dateAt + 14;
+         int end = line.Find(_T("\""), start);
+         if (end > start)
+            current_internal_date_ = line.Mid(start, end - start);
+      }
+   }
+
+   bool
+   IMAPClientConnection::ParseListLine_(const String &line, String &name, String &delimiter, bool &selectable)
+   {
+      // * LIST (\HasNoChildren) "/" "Archive/2025"
+      // * LIST (\Noselect \HasChildren) "." Archive
+      // * LIST () NIL INBOX
+      int attributesOpen = line.Find(_T("("));
+      int attributesClose = attributesOpen >= 0 ? line.Find(_T(")"), attributesOpen) : -1;
+      if (attributesOpen < 0 || attributesClose < 0)
+         return false;
+
+      String attributes = line.Mid(attributesOpen + 1, attributesClose - attributesOpen - 1);
+      selectable = attributes.FindNoCase(_T("\\Noselect")) < 0 && attributes.FindNoCase(_T("\\NonExistent")) < 0;
+
+      String rest = line.Mid(attributesClose + 1);
+      rest.TrimLeft();
+
+      if (rest.StartsWith(_T("\"")))
+      {
+         int close = rest.Find(_T("\""), 1);
+         if (close < 0)
+            return false;
+         delimiter = UnquoteImapString_(rest.Mid(0, close + 1));
+         rest = rest.Mid(close + 1);
+      }
+      else if (rest.StartsWith(_T("NIL")))
+      {
+         delimiter = _T("");
+         rest = rest.Mid(3);
+      }
+      else
+      {
+         return false;
+      }
+
+      rest.TrimLeft();
+      rest.TrimRight();
+      if (rest.IsEmpty())
+         return false;
+
+      // A name sent as a literal would need the following line, which this reader
+      // does not take: the mailbox is reported and skipped.
+      if (rest.StartsWith(_T("{")))
+         return false;
+
+      if (rest.StartsWith(_T("\"")))
+      {
+         if (rest.GetLength() < 2 || !rest.EndsWith(_T("\"")))
+            return false;
+         name = UnquoteImapString_(rest);
+      }
+      else
+      {
+         name = rest;
+      }
+
+      return !name.IsEmpty();
+   }
+
+   String
+   IMAPClientConnection::UnquoteImapString_(const String &value)
+   {
+      String inner = value;
+      if (inner.GetLength() >= 2 && inner.StartsWith(_T("\"")) && inner.EndsWith(_T("\"")))
+         inner = inner.Mid(1, inner.GetLength() - 2);
+
+      String result;
+      for (int i = 0; i < inner.GetLength(); i++)
+      {
+         TCHAR c = inner.GetAt(i);
+         if (c == '\\' && i + 1 < inner.GetLength())
+         {
+            i++;
+            c = inner.GetAt(i);
+         }
+         result += c;
+      }
+
+      return result;
    }
 
    void

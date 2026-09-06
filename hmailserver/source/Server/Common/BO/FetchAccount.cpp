@@ -31,6 +31,7 @@ namespace HM
       use_anti_spam_(false),
       use_anti_virus_(false),
       enable_route_recipients_(false),
+      mirror_folders_(false),
       connection_security_(CSNone)      
    {
  
@@ -73,6 +74,7 @@ namespace HM
       pNode->AppendAttr(_T("UseAntiSpam"), use_anti_spam_ ? _T("1") : _T("0"));
       pNode->AppendAttr(_T("UseAntiVirus"), use_anti_virus_ ? _T("1") : _T("0"));
       pNode->AppendAttr(_T("EnableRouteRecipients"), enable_route_recipients_ ? _T("1") : _T("0"));
+      pNode->AppendAttr(_T("MirrorFolders"), mirror_folders_ ? _T("1") : _T("0"));
       pNode->AppendAttr(_T("ConnectionSecurity"), StringParser::IntToString(connection_security_));
 
       if (!GetUIDs()->XMLStore(pNode, iOptions))
@@ -99,6 +101,7 @@ namespace HM
       use_anti_spam_ = (pNode->GetAttrValue(_T("UseAntiSpam")) == _T("1"));
       use_anti_virus_ = (pNode->GetAttrValue(_T("UseAntiVirus")) == _T("1"));
       enable_route_recipients_ = (pNode->GetAttrValue(_T("EnableRouteRecipients")) == _T("1"));
+      mirror_folders_ = (pNode->GetAttrValue(_T("MirrorFolders")) == _T("1"));
 
       // Backwards compatibiltiy
       if (pNode->GetAttrValue(_T("UseSSL")) == _T("1"))

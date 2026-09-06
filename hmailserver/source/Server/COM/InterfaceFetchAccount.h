@@ -91,6 +91,8 @@ public:
    STDMETHOD(put_EnableRouteRecipients)(/*[in]*/ VARIANT_BOOL newVal);
    STDMETHOD(get_ConnectionSecurity)(/*[out, retval]*/ eConnectionSecurity *pVal);
    STDMETHOD(put_ConnectionSecurity)(/*[in]*/ eConnectionSecurity newVal);
+   STDMETHOD(get_MirrorFolders)(/*[out, retval]*/ VARIANT_BOOL *pVal);
+   STDMETHOD(put_MirrorFolders)(/*[in]*/ VARIANT_BOOL newVal);
 private:
 
 };

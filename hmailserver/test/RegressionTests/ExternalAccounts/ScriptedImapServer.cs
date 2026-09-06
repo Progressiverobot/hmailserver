@@ -12,10 +12,15 @@ namespace RegressionTests.ExternalAccounts
 {
    /// <summary>
    ///    An IMAP server for the external-account fetcher to collect from, scripted the way
-   ///    ScriptedPop3Server is: which messages exist lives in the caller's mailbox, so a
-   ///    second session sees what the first one did to it, and every way a remote server
+   ///    ScriptedPop3Server is: which messages exist lives in the caller's mailboxes, so a
+   ///    second session sees what the first one did to them, and every way a remote server
    ///    can disappoint the fetcher is a knob - a refused logon, a message that is gone
-   ///    between the SEARCH and its FETCH, a download cut short, a STORE refused.
+   ///    between the SEARCH and its FETCH, a download cut short, a STORE refused, a folder
+   ///    that cannot be selected.
+   ///    <para />
+   ///    One mailbox - the INBOX - is what the fetcher without the mirror sees; the mirror
+   ///    asks for LIST and walks every mailbox given here, so a test hands the server the
+   ///    hierarchy it wants mirrored, with each message's flags and internal date.
    ///    <para />
    ///    The fetcher cannot be pointed at this very server's own IMAP port: TCPConnection
    ///    refuses to connect to a port it listens on, the loop guard the POP3 fetcher has
@@ -23,26 +28,60 @@ namespace RegressionTests.ExternalAccounts
    /// </summary>
    public class ScriptedImapServer : TcpServer
    {
-      /// <summary>One message in the simulated remote INBOX, with the UID the server gives it.</summary>
+      /// <summary>One message in a simulated remote mailbox, with the UID the server gives it, its flags and its internal date.</summary>
       public sealed class RemoteMessage
       {
          public RemoteMessage(int uid, string text)
+            : this(uid, text, "", null)
+         {
+         }
+
+         public RemoteMessage(int uid, string text, string flags, string internalDate)
          {
             Uid = uid;
             Text = text;
+            Flags = flags ?? "";
+            InternalDate = internalDate ?? "01-Jan-2020 00:00:00 +0000";
          }
 
          public int Uid { get; private set; }
          public string Text { get; private set; }
+
+         /// <summary>As FETCH FLAGS reports them, e.g. "\Seen \Flagged".</summary>
+         public string Flags { get; private set; }
+
+         /// <summary>As FETCH INTERNALDATE reports it, e.g. "17-Jul-1996 02:44:25 -0700".</summary>
+         public string InternalDate { get; private set; }
       }
 
       /// <summary>
-      ///    The simulated remote INBOX. Owned by the test and handed to each session's
+      ///    A simulated remote mailbox. Owned by the test and handed to each session's
       ///    server in turn, so what one session expunges the next one no longer lists.
       /// </summary>
       public sealed class RemoteMailbox
       {
          private readonly List<RemoteMessage> _messages = new List<RemoteMessage>();
+
+         public RemoteMailbox()
+            : this("INBOX")
+         {
+         }
+
+         public RemoteMailbox(string name)
+         {
+            Name = name;
+            Delimiter = "/";
+            Selectable = true;
+         }
+
+         /// <summary>The name as LIST gives it, with the remote delimiter: "Archive/2025".</summary>
+         public string Name { get; private set; }
+
+         /// <summary>The hierarchy delimiter LIST announces for this mailbox.</summary>
+         public string Delimiter { get; set; }
+
+         /// <summary>False lists it with \Noselect - a hierarchy node with no messages of its own.</summary>
+         public bool Selectable { get; set; }
 
          public int Count
          {
@@ -81,20 +120,33 @@ namespace RegressionTests.ExternalAccounts
          }
       }
 
-      private readonly RemoteMailbox _mailbox;
+      private readonly List<RemoteMailbox> _mailboxes;
+      private RemoteMailbox _mailbox;
 
-      // \Deleted flags the client has set. Applied to the mailbox on EXPUNGE, as a real
-      // server does, so a session that never reaches EXPUNGE leaves the mailbox intact.
+      // \Deleted flags the client has set in the selected mailbox. Applied to it on
+      // EXPUNGE, as a real server does, so a session that never reaches EXPUNGE leaves
+      // the mailbox intact.
       private readonly List<int> _flaggedForDeletion = new List<int>();
 
+      /// <summary>One mailbox, the INBOX: what the fetcher without the mirror collects.</summary>
       public ScriptedImapServer(int port, RemoteMailbox mailbox)
+         : this(port, new[] { mailbox })
+      {
+      }
+
+      /// <summary>The whole hierarchy, for the mirror. The first mailbox is selected until the client selects another.</summary>
+      public ScriptedImapServer(int port, IEnumerable<RemoteMailbox> mailboxes)
          : base(1, port, eConnectionSecurity.eCSNone)
       {
-         _mailbox = mailbox;
+         _mailboxes = mailboxes.ToList();
+         _mailbox = _mailboxes.FirstOrDefault();
          UidValidity = 7;
          FetchedUids = new List<int>();
+         FetchedMessages = new List<string>();
          StoredDeletedUids = new List<int>();
          VanishedUids = new List<int>();
+         SelectedMailboxes = new List<string>();
+         RefuseSelectOf = new List<string>();
          SecondsToWaitBeforeTerminate = 60;
       }
 
@@ -107,6 +159,15 @@ namespace RegressionTests.ExternalAccounts
       /// <summary>Answer every UID STORE with a tagged NO and flag nothing.</summary>
       public bool RefuseStore { get; set; }
 
+      /// <summary>Mailboxes whose SELECT is answered with a tagged NO, by name.</summary>
+      public List<string> RefuseSelectOf { get; private set; }
+
+      /// <summary>
+      ///    Send FLAGS and INTERNALDATE after the body literal rather than before it, as
+      ///    some servers do; the client has to read them off the tail of the reply.
+      /// </summary>
+      public bool AttributesAfterBody { get; set; }
+
       /// <summary>UIDs the SEARCH lists but a FETCH finds nothing for - gone in between, as far as the client can tell.</summary>
       public List<int> VanishedUids { get; private set; }
 
@@ -116,8 +177,17 @@ namespace RegressionTests.ExternalAccounts
       /// <summary>The UIDs whose bodies were asked for, in order.</summary>
       public List<int> FetchedUids { get; private set; }
 
+      /// <summary>The same, qualified by mailbox: "Archive/2025:101", in order.</summary>
+      public List<string> FetchedMessages { get; private set; }
+
       /// <summary>The UIDs the client flagged \Deleted (or tried to), in order.</summary>
       public List<int> StoredDeletedUids { get; private set; }
+
+      /// <summary>The mailboxes the client selected, in order, whether or not the SELECT succeeded.</summary>
+      public List<string> SelectedMailboxes { get; private set; }
+
+      /// <summary>How many LIST commands arrived.</summary>
+      public int ListCount { get; private set; }
 
       /// <summary>How many EXPUNGE commands arrived.</summary>
       public int ExpungeCount { get; private set; }
@@ -178,16 +248,25 @@ namespace RegressionTests.ExternalAccounts
             return true;
          }
 
-         if (upper.StartsWith("SELECT "))
+         if (upper.StartsWith("LIST "))
          {
-            Send("* " + _mailbox.Count + " EXISTS\r\n" +
-                 "* 0 RECENT\r\n" +
-                 "* OK [UIDVALIDITY " + UidValidity + "] UIDs valid\r\n" +
-                 "* OK [UIDNEXT " + _mailbox.NextUid + "] Predicted next UID\r\n" +
-                 "* FLAGS (\\Seen \\Deleted)\r\n" +
-                 tag + " OK [READ-WRITE] SELECT completed\r\n");
+            ListCount++;
+            var reply = new StringBuilder();
+            foreach (var mailbox in _mailboxes)
+            {
+               reply.Append("* LIST (")
+                  .Append(mailbox.Selectable ? "\\HasNoChildren" : "\\Noselect \\HasChildren")
+                  .Append(") \"").Append(mailbox.Delimiter).Append("\" ")
+                  .Append(QuoteName(mailbox.Name))
+                  .Append("\r\n");
+            }
+            reply.Append(tag).Append(" OK LIST completed\r\n");
+            Send(reply.ToString());
             return true;
          }
+
+         if (upper.StartsWith("SELECT "))
+            return HandleSelect(tag, rest);
 
          if (upper.StartsWith("UID SEARCH"))
          {
@@ -230,10 +309,38 @@ namespace RegressionTests.ExternalAccounts
          return true;
       }
 
+      private bool HandleSelect(string tag, string rest)
+      {
+         // SELECT INBOX, or SELECT "Archive/2025".
+         var name = UnquoteName(rest.Substring(7).Trim());
+         SelectedMailboxes.Add(name);
+
+         var mailbox = _mailboxes.FirstOrDefault(candidate =>
+            string.Equals(candidate.Name, name, System.StringComparison.OrdinalIgnoreCase));
+
+         if (mailbox == null || RefuseSelectOf.Contains(name) || !mailbox.Selectable)
+         {
+            Send(tag + " NO [NONEXISTENT] Mailbox does not exist, or cannot be selected\r\n");
+            return true;
+         }
+
+         _mailbox = mailbox;
+         _flaggedForDeletion.Clear();
+
+         Send("* " + _mailbox.Count + " EXISTS\r\n" +
+              "* 0 RECENT\r\n" +
+              "* OK [UIDVALIDITY " + UidValidity + "] UIDs valid\r\n" +
+              "* OK [UIDNEXT " + _mailbox.NextUid + "] Predicted next UID\r\n" +
+              "* FLAGS (\\Seen \\Deleted \\Flagged \\Answered \\Draft)\r\n" +
+              tag + " OK [READ-WRITE] SELECT completed\r\n");
+         return true;
+      }
+
       private bool HandleFetch(string tag, string rest)
       {
          var uid = ParseUid(rest);
          FetchedUids.Add(uid);
+         FetchedMessages.Add(_mailbox.Name + ":" + uid);
 
          var message = _mailbox.Find(uid);
 
@@ -248,16 +355,29 @@ namespace RegressionTests.ExternalAccounts
          var length = Encoding.UTF8.GetByteCount(message.Text);
          var sequence = _mailbox.SequenceOf(message);
 
+         // What the client asked for besides the body, in the order a real server
+         // would answer: FLAGS and INTERNALDATE before the literal - or after it, when
+         // the test says so.
+         var upper = rest.ToUpperInvariant();
+         var attributes = "";
+         if (upper.Contains("FLAGS"))
+            attributes += " FLAGS (" + message.Flags + ")";
+         if (upper.Contains("INTERNALDATE"))
+            attributes += " INTERNALDATE \"" + message.InternalDate + "\"";
+
+         var before = AttributesAfterBody ? "" : attributes;
+         var after = AttributesAfterBody ? attributes : "";
+
          if (TruncateFetchAfterBytes > 0 && TruncateFetchAfterBytes < length)
          {
-            Send("* " + sequence + " FETCH (UID " + uid + " BODY[] {" + length + "}\r\n");
+            Send("* " + sequence + " FETCH (UID " + uid + before + " BODY[] {" + length + "}\r\n");
             Send(message.Text.Substring(0, TruncateFetchAfterBytes));
             return false;
          }
 
-         Send("* " + sequence + " FETCH (UID " + uid + " BODY[] {" + length + "}\r\n" +
+         Send("* " + sequence + " FETCH (UID " + uid + before + " BODY[] {" + length + "}\r\n" +
               message.Text +
-              ")\r\n" +
+              after + ")\r\n" +
               tag + " OK FETCH completed\r\n");
          return true;
       }
@@ -285,6 +405,18 @@ namespace RegressionTests.ExternalAccounts
          var parts = rest.Split(' ');
          int uid;
          return parts.Length >= 3 && int.TryParse(parts[2], out uid) ? uid : 0;
+      }
+
+      private static string QuoteName(string name)
+      {
+         return "\"" + name.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
+      }
+
+      private static string UnquoteName(string name)
+      {
+         if (name.Length >= 2 && name.StartsWith("\"") && name.EndsWith("\""))
+            name = name.Substring(1, name.Length - 2);
+         return name.Replace("\\\"", "\"").Replace("\\\\", "\\");
       }
    }
 }

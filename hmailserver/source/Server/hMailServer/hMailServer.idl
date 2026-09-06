@@ -1874,6 +1874,8 @@ interface IInterfaceFetchAccount : IDispatch{
    [propput, id(23), helpstring("Connection security for this fetch account.")] HRESULT ConnectionSecurity([in] eConnectionSecurity newVal);
    [propget, id(24), helpstring("Read message recipients from these MIME headers.")] HRESULT MIMERecipientHeaders([out, retval] BSTR* pVal);
    [propput, id(24), helpstring("Read message recipients from these MIME headers.")] HRESULT MIMERecipientHeaders([in] BSTR newVal);
+   [propget, id(25), helpstring("IMAP accounts only: collect every folder the remote server lists into a local folder of the same name - each message verbatim, with its flags and its internal date, filed straight into the folder rather than delivered. A migration. Off, the INBOX alone is collected and delivered. Default false.")] HRESULT MirrorFolders([out, retval] VARIANT_BOOL *pVal);
+   [propput, id(25), helpstring("IMAP accounts only: collect every folder the remote server lists into a local folder of the same name - each message verbatim, with its flags and its internal date, filed straight into the folder rather than delivered. A migration. Off, the INBOX alone is collected and delivered. Default false.")] HRESULT MirrorFolders([in] VARIANT_BOOL newVal);
 };
 [
    object,

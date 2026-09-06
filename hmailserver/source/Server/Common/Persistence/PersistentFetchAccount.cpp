@@ -110,6 +110,7 @@ namespace HM
       oFA->SetUseAntiSpam(pRS->GetLongValue("fauseantispam") == 1);
       oFA->SetUseAntiVirus(pRS->GetLongValue("fauseantivirus") == 1);
       oFA->SetEnableRouteRecipients(pRS->GetLongValue("faenablerouterecipients") == 1);
+      oFA->SetMirrorFolders(pRS->GetLongValue("famirrorfolders") == 1);
 
       
       return true;
@@ -175,6 +176,7 @@ namespace HM
       oStatement.AddColumn("fauseantispam", pFA->GetUseAntiSpam());
       oStatement.AddColumn("fauseantivirus", pFA->GetUseAntiVirus());
       oStatement.AddColumn("faenablerouterecipients", pFA->GetEnableRouteRecipients());
+      oStatement.AddColumn("famirrorfolders", pFA->GetMirrorFolders() ? 1 : 0);
 
       if (bNewObject)
       {

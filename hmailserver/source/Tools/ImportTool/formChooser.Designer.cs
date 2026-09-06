@@ -62,7 +62,7 @@ namespace ImportTool
          this.buttonMboxImport.Name = "buttonMboxImport";
          this.buttonMboxImport.Size = new System.Drawing.Size(200, 28);
          this.buttonMboxImport.TabIndex = 3;
-         this.buttonMboxImport.Text = "Messages from mbox files...";
+         this.buttonMboxImport.Text = "Messages from mbox files or a Maildir...";
          this.buttonMboxImport.UseVisualStyleBackColor = true;
          this.buttonMboxImport.Click += new System.EventHandler(this.buttonMboxImport_Click);
          //
@@ -72,8 +72,8 @@ namespace ImportTool
          this.labelMboxImportHelp.Name = "labelMboxImportHelp";
          this.labelMboxImportHelp.Size = new System.Drawing.Size(400, 32);
          this.labelMboxImportHelp.TabIndex = 4;
-         this.labelMboxImportHelp.Text = "Imports the messages in a folder of mbox files into an account, one IMAP folder p" +
-             "er mbox file.";
+         this.labelMboxImportHelp.Text = "Imports messages into an account: a folder of mbox files, one IMAP folder per fi" +
+             "le, or a Maildir, its folders and flags kept.";
          //
          // buttonClose
          //

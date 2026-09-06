@@ -357,7 +357,12 @@ namespace DBUpdater
          new SchemaProbe(6030, "hm_messagerecipients.fk_hm_messagerecipients_message",
                          "update hm_dbversion set value = value / (value - value) where not exists (select 1 from information_schema.table_constraints where constraint_name = 'fk_hm_messagerecipients_message' and constraint_type = 'FOREIGN KEY')"),
          new SchemaProbe(6030, "hm_messageindexterms.fk_hm_messageindexterms_message",
-                         "update hm_dbversion set value = value / (value - value) where not exists (select 1 from information_schema.table_constraints where constraint_name = 'fk_hm_messageindexterms_message' and constraint_type = 'FOREIGN KEY')")
+                         "update hm_dbversion set value = value / (value - value) where not exists (select 1 from information_schema.table_constraints where constraint_name = 'fk_hm_messageindexterms_message' and constraint_type = 'FOREIGN KEY')"),
+
+         // Upgrade6030to6031* - the fetch account's mirror switch: every folder of a
+         // remote IMAP account collected into a local folder of the same name.
+         new SchemaProbe(6031, "hm_fetchaccounts.famirrorfolders",
+                         "update hm_fetchaccounts set famirrorfolders = famirrorfolders where 1 = 0")
       };
 
       /// <summary>

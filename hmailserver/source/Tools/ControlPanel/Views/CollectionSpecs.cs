@@ -254,7 +254,10 @@ namespace hMailServer.ControlPanel.Views
                Default = 0
             },
             new FieldSpec { Prop = "UseAntiSpam", Label = "Run anti-spam on downloaded mail", Kind = FieldKind.Bool, ShowInGrid = false, Default = true },
-            new FieldSpec { Prop = "UseAntiVirus", Label = "Run anti-virus on downloaded mail", Kind = FieldKind.Bool, ShowInGrid = false, Default = true }
+            new FieldSpec { Prop = "UseAntiVirus", Label = "Run anti-virus on downloaded mail", Kind = FieldKind.Bool, ShowInGrid = false, Default = true },
+            // IMAP accounts only; the server ignores it for POP3. A migration rather than a
+            // collection: every folder, verbatim, flags and dates kept, nothing delivered.
+            new FieldSpec { Prop = "MirrorFolders", Label = "Mirror every folder (IMAP only: a migration, verbatim, with flags and dates)", Kind = FieldKind.Bool, ShowInGrid = false, Default = false }
          }
       }, embedded: true);
 

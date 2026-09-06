@@ -116,6 +116,12 @@ jobs:
       - name: Build tools solution (Release)
         run: dotnet build "hmailserver/source/Tools/hMailServer Tools.sln" -c Release --no-restore -warnaserror
 
+      # The Import Tool's reader of Maildir trees - folders, messages, the flags in a
+      # file name, the line endings the server expects. The wizard around it has no
+      # silent mode and is not tested; this is.
+      - name: Test the Import Tool
+        run: dotnet test hmailserver/source/Tools/ImportTool.Tests/ImportTool.Tests.csproj -c Release --no-build
+
       - name: Publish smoke check
         shell: pwsh
         run: ./build/build-tools.ps1

@@ -456,13 +456,17 @@ namespace RegressionTests.API
          File.WriteAllText(fileName, messageText);
          Assert.IsTrue(_application.Utilities.ImportMessageFromFile(fileName, account.ID));
 
-         // Since the cache isn't refreshed, the message has not yet appeared.
-         Pop3ClientSimulator.AssertMessageCount(account.Address, "test", 1);
+         // The import tells the folder's cache to refresh, as a delivery does, so the
+         // message is there at once - the Import Tool runs while clients are connected,
+         // and a copy that appeared only after a restart was a defect, not a property
+         // this test should hold on to. (It used to assert the count still at 1 here,
+         // which is what proved that Reinitialize cleared the cache.)
+         Pop3ClientSimulator.AssertMessageCount(account.Address, "test", 2);
 
-         // Reinitialize the server. Should, among other things, clear the cache.
+         // Reinitialize the server: the servers stop and start, the caches are cleared,
+         // and both messages are still there afterwards.
          _application.Reinitialize();
 
-         // Now the message should have appeared.
          Pop3ClientSimulator.AssertMessageCount(account.Address, "test", 2);
 
          var sim = new Pop3ClientSimulator();

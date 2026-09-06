@@ -21,6 +21,7 @@ namespace ImportTool.MboxImport
       private void InitializeComponent()
       {
          this.buttonSelectDirectory = new System.Windows.Forms.Button();
+         this.buttonSelectMaildir = new System.Windows.Forms.Button();
          this.listFiles = new System.Windows.Forms.ListView();
          this.columnFile = new System.Windows.Forms.ColumnHeader();
          this.columnFolder = new System.Windows.Forms.ColumnHeader();
@@ -32,9 +33,19 @@ namespace ImportTool.MboxImport
          this.buttonSelectDirectory.Name = "buttonSelectDirectory";
          this.buttonSelectDirectory.Size = new System.Drawing.Size(121, 23);
          this.buttonSelectDirectory.TabIndex = 0;
-         this.buttonSelectDirectory.Text = "&Select directory";
+         this.buttonSelectDirectory.Text = "Select m&box files";
          this.buttonSelectDirectory.UseVisualStyleBackColor = true;
          this.buttonSelectDirectory.Click += new System.EventHandler(this.buttonSelectDirectory_Click);
+         //
+         // buttonSelectMaildir
+         //
+         this.buttonSelectMaildir.Location = new System.Drawing.Point(136, 8);
+         this.buttonSelectMaildir.Name = "buttonSelectMaildir";
+         this.buttonSelectMaildir.Size = new System.Drawing.Size(121, 23);
+         this.buttonSelectMaildir.TabIndex = 2;
+         this.buttonSelectMaildir.Text = "Select &Maildir";
+         this.buttonSelectMaildir.UseVisualStyleBackColor = true;
+         this.buttonSelectMaildir.Click += new System.EventHandler(this.buttonSelectMaildir_Click);
          //
          // listFiles
          //
@@ -51,7 +62,7 @@ namespace ImportTool.MboxImport
          //
          // columnFile
          //
-         this.columnFile.Text = "File";
+         this.columnFile.Text = "Source";
          this.columnFile.Width = 290;
          //
          // columnFolder
@@ -65,6 +76,7 @@ namespace ImportTool.MboxImport
          this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
          this.Controls.Add(this.listFiles);
          this.Controls.Add(this.buttonSelectDirectory);
+         this.Controls.Add(this.buttonSelectMaildir);
          this.Name = "ucMboxSelect";
          this.Size = new System.Drawing.Size(472, 195);
          this.ResumeLayout(false);
@@ -74,6 +86,7 @@ namespace ImportTool.MboxImport
       #endregion
 
       private System.Windows.Forms.Button buttonSelectDirectory;
+      private System.Windows.Forms.Button buttonSelectMaildir;
       private System.Windows.Forms.ListView listFiles;
       private System.Windows.Forms.ColumnHeader columnFile;
       private System.Windows.Forms.ColumnHeader columnFolder;

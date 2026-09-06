@@ -59,6 +59,7 @@ namespace HM
          StateGreeting,
          StateStartTlsSent,
          StateLoginSent,
+         StateListSent,
          StateSelectSent,
          StateSearchSent,
          StateFetchSent,
@@ -84,6 +85,7 @@ namespace HM
       void HandleGreeting_(const String &line);
       void HandleStartTls_(const String &line);
       void HandleLogin_(const String &line);
+      void HandleList_(const String &line);
       void HandleSelect_(const String &line);
       void HandleSearch_(const String &line);
       void HandleFetchLine_(const String &line);
@@ -93,6 +95,16 @@ namespace HM
       void HandleLogout_(const String &line);
 
       void SendLogin_();
+
+      // Mirror mode (FetchAccount::GetMirrorFolders).
+      void SendList_();
+      void SelectNextMailbox_();
+      void FinishMailbox_();
+      bool FileMirroredMessage_();
+      void ParseFetchAttributes_(const String &line);
+      String MailboxKeyPrefix_() const;
+      static bool ParseListLine_(const String &line, String &name, String &delimiter, bool &selectable);
+      static String UnquoteImapString_(const String &value);
       void SendSelect_();
       void SendSearch_();
       void RequestNextMessage_();
@@ -119,6 +131,23 @@ namespace HM
       String pending_command_;
 
       unsigned int uidvalidity_;
+
+      // Mirror mode: the mailboxes LIST returned, walked in order; the one being
+      // collected, as LIST named it (modified UTF-7, the remote's own delimiter)
+      // and as it is called here; and what the FETCH said about the message
+      // being downloaded.
+      struct RemoteMailbox
+      {
+         String name;
+         String delimiter;
+      };
+      bool mirror_;
+      std::vector<RemoteMailbox> mailboxes_;
+      size_t next_mailbox_;
+      String current_mailbox_;
+      String current_local_folder_;
+      short current_flags_;
+      String current_internal_date_;
       std::vector<unsigned int> server_uids_;
       std::vector<unsigned int> pending_uids_;
       size_t next_pending_;
