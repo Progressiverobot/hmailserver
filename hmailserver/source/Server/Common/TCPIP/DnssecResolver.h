@@ -12,6 +12,12 @@
 // Supported algorithms: RSA/SHA-256 (8), RSA/SHA-512 (10),
 // ECDSA P-256/SHA-256 (13), ECDSA P-384/SHA-384 (14), Ed25519 (15).
 // Supported DS digests: SHA-256 (2), SHA-384 (4).
+//
+// A delegation without a DS RRset is Insecure only when the parent proves
+// the absence - an NSEC or NSEC3 (SHA-1, Opt-Out understood) in the
+// authority section, signed by the parent; without the proof, or with one
+// that does not verify, it is Bogus (RFC 4035 section 5.2, RFC 5155
+// section 8). A stripped DS is therefore a failure, not a downgrade.
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once

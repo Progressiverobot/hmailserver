@@ -407,6 +407,8 @@
     <Compile Include="Shared\IniFile.cs" />
     <Compile Include="Shared\Paths.cs" />
     <Compile Include="Shared\FakeDnsServer.cs" />
+    <Compile Include="Shared\DnssecSigner.cs" />
+    <Compile Include="Security\DnssecDenialOfExistence.cs" />
     <Compile Include="Shared\SuiteDns.cs" />
     <Compile Include="SMTP\OutboundPipelining.cs" />
     <Compile Include="Shared\FakeFilterEngine.cs" />

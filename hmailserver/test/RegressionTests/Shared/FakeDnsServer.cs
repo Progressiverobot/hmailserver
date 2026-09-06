@@ -68,6 +68,33 @@ namespace RegressionTests.Shared
       private readonly HashSet<string> nonExistent_ =
          new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+      // Records given in wire form, which is how DNSSEC's own types arrive: DNSKEY, DS,
+      // TLSA and the TXT or MX records of a signed zone. Keyed like the text answers by
+      // the type and name a query asks for; a record's owner may differ from that name
+      // (an NSEC3's is a hash).
+      private sealed class RawRecord
+      {
+         public string Owner;
+         public int Type;
+         public byte[] Rdata;
+      }
+
+      private readonly Dictionary<string, List<RawRecord>> raw_ =
+         new Dictionary<string, List<RawRecord>>(StringComparer.OrdinalIgnoreCase);
+
+      // RRSIGs by the type and name they cover, sent in the answer when the query set
+      // the DO bit - a resolver that does not ask for DNSSEC is not handed it, as RFC
+      // 4035 3.2.1 says.
+      private readonly Dictionary<string, List<RawRecord>> rrsigs_ =
+         new Dictionary<string, List<RawRecord>>(StringComparer.OrdinalIgnoreCase);
+
+      // What goes into the AUTHORITY section of a negative answer for a type and name:
+      // the NSEC or NSEC3 records and their RRSIGs that prove the absence - the proof a
+      // validating resolver needs before it may treat "no DS" as an unsigned delegation
+      // rather than a record somebody took away.
+      private readonly Dictionary<string, List<RawRecord>> denials_ =
+         new Dictionary<string, List<RawRecord>>(StringComparer.OrdinalIgnoreCase);
+
       private readonly UdpClient udp_;
       private readonly TcpListener tcp_;
       private volatile bool stopping_;
@@ -157,6 +184,27 @@ namespace RegressionTests.Shared
       }
 
       /// <summary>Forgets every record and every recorded query. The server stays bound.</summary>
+      /// <summary>A record in wire form under a name, answered for that type with the owner as given.</summary>
+      public FakeDnsServer WithRaw(string name, int type, byte[] rdata)
+      {
+         return AddRaw_(raw_, Key_(type, name), name, type, rdata);
+      }
+
+      /// <summary>An RRSIG covering the RRset of that type under that name, sent with it when the query has DO set.</summary>
+      public FakeDnsServer WithRrsig(string name, int coveredType, byte[] rrsigRdata)
+      {
+         return AddRaw_(rrsigs_, Key_(coveredType, name), name, DnsWire.TypeRrsig, rrsigRdata);
+      }
+
+      /// <summary>
+      ///    A record for the AUTHORITY section of the negative answer to a query for that type
+      ///    and name: an NSEC or NSEC3 and its RRSIG, under whatever owner the proof has.
+      /// </summary>
+      public FakeDnsServer WithDenial(string queriedName, int queriedType, string owner, int type, byte[] rdata)
+      {
+         return AddRaw_(denials_, Key_(queriedType, queriedName), owner, type, rdata);
+      }
+
       public void Reset()
       {
          lock (answers_)
@@ -164,9 +212,25 @@ namespace RegressionTests.Shared
             answers_.Clear();
             nonExistent_.Clear();
             cnames_.Clear();
+            raw_.Clear();
+            rrsigs_.Clear();
+            denials_.Clear();
          }
-
          ClearQueries();
+      }
+
+      private FakeDnsServer AddRaw_(Dictionary<string, List<RawRecord>> store, string key, string owner, int type, byte[] rdata)
+      {
+         lock (answers_)
+         {
+            if (!store.TryGetValue(key, out List<RawRecord> records))
+            {
+               records = new List<RawRecord>();
+               store[key] = records;
+            }
+            records.Add(new RawRecord { Owner = owner.TrimEnd('.').ToLowerInvariant(), Type = type, Rdata = rdata });
+         }
+         return this;
       }
 
       private FakeDnsServer Add_(int type, string name, string value)
@@ -447,20 +511,30 @@ namespace RegressionTests.Shared
 
          string cnameTarget;
          List<string> values;
+         List<RawRecord> rawAnswers;
+         List<RawRecord> signatures;
+         List<RawRecord> denial;
          bool nonExistent;
+         bool dnssec = HasDoBit_(query);
 
          lock (answers_)
          {
             cnames_.TryGetValue(name, out cnameTarget);
             answers_.TryGetValue(Key_(type, cnameTarget ?? name), out List<string> found);
             values = found == null ? new List<string>() : new List<string>(found);
+            raw_.TryGetValue(Key_(type, cnameTarget ?? name), out List<RawRecord> foundRaw);
+            rawAnswers = foundRaw == null ? new List<RawRecord>() : new List<RawRecord>(foundRaw);
+            rrsigs_.TryGetValue(Key_(type, cnameTarget ?? name), out List<RawRecord> foundSignatures);
+            signatures = !dnssec || foundSignatures == null ? new List<RawRecord>() : new List<RawRecord>(foundSignatures);
+            denials_.TryGetValue(Key_(type, name), out List<RawRecord> foundDenial);
+            denial = !dnssec || foundDenial == null ? new List<RawRecord>() : new List<RawRecord>(foundDenial);
             nonExistent = nonExistent_.Contains(name.TrimEnd('.').ToLowerInvariant());
          }
 
-         if (cnameTarget != null || values.Count > 0)
+         if (cnameTarget != null || values.Count > 0 || rawAnswers.Count > 0)
          {
             var m = new List<byte>();
-            WriteHeaderAndQuestion_(m, query, values.Count + (cnameTarget != null ? 1 : 0));
+            WriteHeaderAndQuestion_(m, query, values.Count + rawAnswers.Count + signatures.Count + (cnameTarget != null ? 1 : 0));
 
             if (cnameTarget != null)
             {
@@ -482,6 +556,11 @@ namespace RegressionTests.Shared
                   WriteAAnswer_(m, value, cnameTarget);
             }
 
+            foreach (RawRecord record in rawAnswers)
+               WriteRawAnswer_(m, record, cnameTarget ?? name);
+            foreach (RawRecord record in signatures)
+               WriteRawAnswer_(m, record, cnameTarget ?? name);
+
             return m.ToArray();
          }
 
@@ -492,19 +571,50 @@ namespace RegressionTests.Shared
          if (nonExistent)
          {
             var nxdomain = new List<byte>();
-            WriteHeaderAndQuestion_(nxdomain, query, 0, 1, 3);
+            WriteHeaderAndQuestion_(nxdomain, query, 0, 1 + denial.Count, 3);
             WriteAnswerHeader_(nxdomain, 6);
             WriteSoaRdata_(nxdomain);
+            foreach (RawRecord record in denial)
+               WriteRawAnswer_(nxdomain, record, name);
             return nxdomain.ToArray();
          }
 
          // Everything else: NODATA - NOERROR, no answers, an SOA in the AUTHORITY
          // section per RFC 2308. See the class comment for why the SOA is required.
          var nodata = new List<byte>();
-         WriteHeaderAndQuestion_(nodata, query, 0, 1);
+         WriteHeaderAndQuestion_(nodata, query, 0, 1 + denial.Count);
          WriteAnswerHeader_(nodata, 6);
          WriteSoaRdata_(nodata);
+         foreach (RawRecord record in denial)
+            WriteRawAnswer_(nodata, record, name);
          return nodata.ToArray();
+      }
+
+      private static void WriteRawAnswer_(List<byte> m, RawRecord record, string queryName)
+      {
+         // The owner is a pointer to the question when it is the queried name, and
+         // spelled out otherwise - an NSEC3's hashed owner, an NSEC under a name that
+         // sorts before the one asked about.
+         bool sameAsQuery = string.Equals(record.Owner, queryName.TrimEnd('.'), StringComparison.OrdinalIgnoreCase);
+         WriteAnswerHeader_(m, record.Type, sameAsQuery ? null : record.Owner);
+         WriteRdata_(m, record.Rdata);
+      }
+
+      /// <summary>RFC 3225: the DO bit lives in the flags of the OPT record in the query's ADDITIONAL section.</summary>
+      private static bool HasDoBit_(byte[] query)
+      {
+         int additionalCount = (query[10] << 8) | query[11];
+         if (additionalCount == 0)
+            return false;
+
+         // Past the question, then past any answer or authority records the query
+         // carries (none, in practice); the OPT record has the root name, TYPE 41, the
+         // UDP size where CLASS goes, and the DO bit at the top of the TTL's third byte.
+         int offset = QuestionEnd_(query);
+         if (offset + 11 > query.Length || query[offset] != 0)
+            return false;
+         int recordType = (query[offset + 1] << 8) | query[offset + 2];
+         return recordType == 41 && (query[offset + 7] & 0x80) != 0;
       }
    }
 }
