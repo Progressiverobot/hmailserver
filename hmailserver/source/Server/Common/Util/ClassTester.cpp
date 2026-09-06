@@ -13,6 +13,8 @@
 #include "../Util/Utilities.h"
 #include "../Util/MessageUtilities.h"
 #include "../Util/AcmeClient.h"
+#include "../Util/FileUtilities.h"
+#include "../Application/IniFileSettings.h"
 #include "../Util/Charset.h"
 #include "../Util/RegularExpression.h"
 #include "../TCPIP/LocalIPAddresses.h"
@@ -351,6 +353,61 @@ namespace HM
       OutputDebugString(_T("hMailServer: Testing Base64\n"));
       Base64Tester base64Tester;
       base64Tester.Test();
+
+      OutputDebugString(_T("hMailServer: Testing the ACME TLSA record\n"));
+      {
+         // Issue #93. GetCertificateTlsa read the certificate through a FILE* of
+         // this executable's C runtime, and on Windows the OpenSSL DLL reads such
+         // a FILE* through its "uplink" table, which needs an OPENSSL_Applink
+         // export this executable does not have. The DLL's answer to the missing
+         // export is TerminateProcess, so the service died the moment a
+         // certificate had been issued. This runs the same function on a
+         // certificate written to the temp directory: with the FILE* code it
+         // kills the process, which no test framework can miss. The expected
+         // digest is the SHA-256 of the certificate's DER SubjectPublicKeyInfo,
+         // computed independently with the openssl command line:
+         //   openssl x509 -pubkey -noout | openssl pkey -pubin -outform DER | openssl dgst -sha256
+         const char *fixture =
+            "-----BEGIN CERTIFICATE-----\n"
+            "MIIBnTCCAUOgAwIBAgIUTt9dEsQtTAfFIIM+5viNWZ1No2wwCgYIKoZIzj0EAwIw\n"
+            "JDEiMCAGA1UEAwwZdGxzYS1maXh0dXJlLmV4YW1wbGUudGVzdDAeFw0yNjA5MDYw\n"
+            "MTE5NDlaFw00NjA5MDEwMTE5NDlaMCQxIjAgBgNVBAMMGXRsc2EtZml4dHVyZS5l\n"
+            "eGFtcGxlLnRlc3QwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAARcQAyXS3jMUHe7\n"
+            "R1o4DUn+iwKaVorSVrb/ajttx1R+PcKDb2ftkaDapR7MHbBRLTNrY02KJjzoreKa\n"
+            "mGx4JxOJo1MwUTAdBgNVHQ4EFgQU+KRDFDaeMDV/BbibOpNAb0tBARswHwYDVR0j\n"
+            "BBgwFoAU+KRDFDaeMDV/BbibOpNAb0tBARswDwYDVR0TAQH/BAUwAwEB/zAKBggq\n"
+            "hkjOPQQDAgNIADBFAiEAoRJcE3fgMRiHhf3LglFlRkznZENHdc9SwMOGjNpsUokC\n"
+            "IHt+CXzwoEOtys7tKUt6k5y/Qftj4xirfGPZCy00rzX/\n"
+            "-----END CERTIFICATE-----\n";
+
+         String path = IniFileSettings::Instance()->GetTempDirectory() + _T("\\tlsa-fixture.pem");
+         if (!FileUtilities::WriteToFile(path, AnsiString(fixture)))
+            throw 0;
+
+         AnsiString hex;
+         bool computed = AcmeClient::GetCertificateTlsa(path, hex);
+         FileUtilities::DeleteFile(path);
+
+         if (!computed)
+            throw 0;
+         if (hex != "fece5d0297fa1a2bd1a4e510275367f904fc631c70a3e2a5515e554e1ab67a38")
+            throw 0;
+
+         // A file that is not a certificate is a false, not a crash, and leaves
+         // the answer empty.
+         if (!FileUtilities::WriteToFile(path, AnsiString("not a certificate\n")))
+            throw 0;
+
+         bool rejected = !AcmeClient::GetCertificateTlsa(path, hex);
+         FileUtilities::DeleteFile(path);
+
+         if (!rejected || !hex.IsEmpty())
+            throw 0;
+
+         // And so is a file that does not exist.
+         if (AcmeClient::GetCertificateTlsa(path, hex))
+            throw 0;
+      }
 
       OutputDebugString(_T("hMailServer: Testing the ACME challenge locator\n"));
       {

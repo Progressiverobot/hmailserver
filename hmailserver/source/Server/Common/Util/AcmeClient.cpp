@@ -536,6 +536,10 @@ namespace HM
             resolver.resolve(std::string(host.c_str()), std::string(port.c_str()));
 
          boost::asio::ssl::context sslContext(boost::asio::ssl::context::tls_client);
+         // An HTTPS client of a web service: TLS 1.2 is the floor whatever the mail
+         // protocol toggles allow, since there is no 2008-era CA, token issuer or
+         // policy host to accommodate.
+         sslContext.set_options(boost::asio::ssl::context::default_workarounds | boost::asio::ssl::context::no_sslv2 | boost::asio::ssl::context::no_sslv3 | boost::asio::ssl::context::no_tlsv1 | boost::asio::ssl::context::no_tlsv1_1);
          sslContext.set_default_verify_paths();
 
          // Through the shared client initialiser, for the same reason the optional
@@ -1130,11 +1134,16 @@ namespace HM
       {
          AnsiString keyPath = AnsiString(GetCertificateDirectory() + _T("\\privkey.pem"));
 
-         FILE *keyFile = nullptr;
-         if (fopen_s(&keyFile, keyPath.c_str(), "rb") == 0 && keyFile != nullptr)
+         // A BIO, not a FILE*: see GetCertificateTlsa for why a FILE* of this
+         // executable's C runtime handed to the OpenSSL DLL ends the process
+         // (issue #93). This is the renewal half of that: with an existing key on
+         // disk - every renewal, under the default AcmeReuseKey - the process
+         // died here, before the order was even finalised.
+         BIO *keyBio = BIO_new_file(keyPath.c_str(), "r");
+         if (keyBio != nullptr)
          {
-            domainKey = PEM_read_PrivateKey(keyFile, nullptr, nullptr, nullptr);
-            fclose(keyFile);
+            domainKey = PEM_read_bio_PrivateKey(keyBio, nullptr, nullptr, nullptr);
+            BIO_free(keyBio);
 
             if (domainKey != nullptr)
                LOG_APPLICATION("ACME: Reusing the existing certificate key (keeps published TLSA records valid).");
@@ -1463,13 +1472,23 @@ namespace HM
 
       LOG_APPLICATION("ACME: Certificate issued successfully: " + GetCertificateDirectory() + _T("\\fullchain.pem"));
 
+      // Deployment first: the certificate record, the port assignments and the
+      // restart are what the renewal exists for. The TLSA line below is a
+      // convenience for the administrators who publish DANE, and issue #93 was
+      // that convenience taking the service down before the deployment had run.
+      // Make the new certificate take effect without manual steps.
+      ApplyCertificate_();
+
       // Publish-ready DANE record for administrators running inbound DANE.
       AnsiString spkiHex;
       if (GetCertificateTlsa(GetCertificateDirectory() + _T("\\fullchain.pem"), spkiHex))
+      {
          LOG_APPLICATION("ACME: DANE TLSA record for this certificate: _25._tcp.<mx-host>. IN TLSA 3 1 1 " + String(spkiHex));
-
-      // Make the new certificate take effect without manual steps.
-      ApplyCertificate_();
+      }
+      else
+      {
+         LOG_APPLICATION("ACME: The DANE TLSA record for the new certificate could not be computed from fullchain.pem. The certificate itself is installed; only this log line is missing.");
+      }
 
       AcmeChallengeStore::Clear();
 
@@ -1481,14 +1500,28 @@ namespace HM
    {
       spki_sha256_hex = "";
 
+      // Through a BIO that OpenSSL opens itself, never a FILE* of ours. On
+      // Windows a FILE* handed to the OpenSSL DLL is read through its "uplink"
+      // table, which routes every stdio call back into the executable's own C
+      // runtime by way of an OPENSSL_Applink export the executable has to provide
+      // (openssl/applink.c). This executable provides none, and the DLL's answer
+      // to that is not an error return: the first fread lands in a stub that
+      // writes "OPENSSL_Uplink(...): no OPENSSL_Applink" to the Windows
+      // Application log under the source "OpenSSL" and calls TerminateProcess.
+      // That was issue #93 - the service gone the instant a certificate had been
+      // issued, an OpenSSL event that looked empty beside a 7031 from the service
+      // control manager in the same second, and no "ACME (automatic)" record
+      // because this ran before the deployment. Every other file this client
+      // reads or writes already goes through BIO_new_file; this function and
+      // the key reuse in FinalizeOrder_ were the two that did not.
       AnsiString narrowPath = certificate_file;
 
-      FILE *file = nullptr;
-      if (fopen_s(&file, narrowPath.c_str(), "rb") != 0 || file == nullptr)
+      BIO *bio = BIO_new_file(narrowPath.c_str(), "r");
+      if (bio == nullptr)
          return false;
 
-      X509 *certificate = PEM_read_X509(file, nullptr, nullptr, nullptr);
-      fclose(file);
+      X509 *certificate = PEM_read_bio_X509(bio, nullptr, nullptr, nullptr);
+      BIO_free(bio);
 
       if (certificate == nullptr)
          return false;
