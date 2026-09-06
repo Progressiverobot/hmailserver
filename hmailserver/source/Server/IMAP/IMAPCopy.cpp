@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "stdafx.h"
+#include "../Common/AntiSpam/SpamAssassin/SpamAssassinLearner.h"
 #include "IMAPCopy.h"
 #include "IMAPConnection.h"
 #include "../Common/BO/Message.h"
@@ -87,6 +88,10 @@ namespace HM
 
       if (!PersistentMessage::SaveObject(pNewMessage))
          return IMAPResult(IMAPResult::ResultBad, "Failed to save copy of message.");
+
+      // A move into or out of the user's own Junk folder is a lesson for spamd
+      // (SpamAssassinLearnOnMove): decided here, delivered off this thread.
+      SpamAssassinLearner::LearnFromMove(pConnection->GetCurrentFolder(), pFolder, pNewMessage, pDestinationOwner);
 
       // RFC 4315 (UIDPLUS): remember the source/destination UIDs for the COPYUID response.
       RecordCopyUid(pOldMessage->GetUID(), pNewMessage->GetUID(), (unsigned int) pFolder->GetCreationTime().ToInt());

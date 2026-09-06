@@ -25,6 +25,11 @@ namespace HM
       // applies to this scan. Empty sends no header. Set before Connect.
       void SetUser(const AnsiString &user) { user_ = user; }
 
+      // TELL instead of PROCESS: the message is a lesson - spam or ham - for spamd's
+      // local Bayes store, and the reply is an acknowledgement rather than the
+      // message back. Set before Connect. See SpamAssassinLearner.
+      void SetLearning(bool spam) { learning_ = true; learn_spam_ = spam; }
+
       virtual void ParseData(const AnsiString &Request);
       virtual void ParseData(std::shared_ptr<ByteBuffer> pBuf);
 
@@ -54,6 +59,9 @@ namespace HM
 
       String message_file_;
       AnsiString user_;
+      bool learning_ = false;
+      bool learn_spam_ = false;
+      AnsiString learn_reply_;
       __int64 spam_dsize_;      // Content-length spamd reported; < 0 until a valid header is parsed
       __int64 message_size_;
       std::shared_ptr<File> result_;

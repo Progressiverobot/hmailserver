@@ -461,6 +461,11 @@ Administration and monitoring:
                                  ; names each recipient; the debug log says so when it stands in the way). Off by
                                  ; default like ArchiveHardLinks: a link is a promise nothing outside the server
                                  ; edits a message file in place
+   SpamAssassinLearnOnMove=0     ; a message the user moves (or copies) into their \Junk folder is told to spamd
+                                 ; as spam and one moved out of it as ham: spamc's TELL with Set: local, into the
+                                 ; Bayes store the verdicts come from, named for the mailbox owner when
+                                 ; SpamAssassinUserFromRecipient is on. Off by default: spamd refuses TELL unless
+                                 ; started with --allow-tell
    OutboundPipelining=1          ; RFC 2920 on the delivery client: when the remote advertises PIPELINING, send
                                  ; MAIL FROM, every RCPT TO and the data command in one flight and read the
                                  ; replies back in order. 0 = one command per reply, as before
