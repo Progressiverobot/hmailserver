@@ -1463,13 +1463,28 @@ namespace HM
 
       LOG_APPLICATION("ACME: Certificate issued successfully: " + GetCertificateDirectory() + _T("\\fullchain.pem"));
 
-      // Publish-ready DANE record for administrators running inbound DANE.
-      AnsiString spkiHex;
-      if (GetCertificateTlsa(GetCertificateDirectory() + _T("\\fullchain.pem"), spkiHex))
-         LOG_APPLICATION("ACME: DANE TLSA record for this certificate: _25._tcp.<mx-host>. IN TLSA 3 1 1 " + String(spkiHex));
-
-      // Make the new certificate take effect without manual steps.
+      // Make the new certificate take effect without manual steps. This runs
+      // before the TLSA line below, which it used to follow: the certificate had
+      // been issued and written, and the only thing standing between that and the
+      // listeners using it was an optional convenience for the minority publishing
+      // DANE records. Anything that went wrong in there - and it parses the freshly
+      // written PEM with OpenSSL - took the deployment with it, leaving an
+      // installation with a valid certificate on disk, no "ACME (automatic)"
+      // record, and ports still without a certificate.
       ApplyCertificate_();
+
+      // Publish-ready DANE record for administrators running inbound DANE.
+      // Non-fatal by construction: nothing after it depends on it.
+      try
+      {
+         AnsiString spkiHex;
+         if (GetCertificateTlsa(GetCertificateDirectory() + _T("\\fullchain.pem"), spkiHex))
+            LOG_APPLICATION("ACME: DANE TLSA record for this certificate: _25._tcp.<mx-host>. IN TLSA 3 1 1 " + String(spkiHex));
+      }
+      catch (...)
+      {
+         LOG_APPLICATION("ACME: The DANE TLSA record for the new certificate could not be computed. The certificate itself has been issued and applied.");
+      }
 
       AcmeChallengeStore::Clear();
 
@@ -1495,27 +1510,46 @@ namespace HM
 
       bool success = false;
 
-      int derLength = i2d_X509_PUBKEY(X509_get_X509_PUBKEY(certificate), nullptr);
+      // X509_get_X509_PUBKEY returns the certificate's SubjectPublicKeyInfo, or a
+      // null pointer when the certificate carries none that OpenSSL was able to
+      // keep. The result was passed straight into i2d_X509_PUBKEY, which
+      // dereferences it - a null dereference inside OpenSSL, so a crash of the
+      // whole service rather than an exception, and this runs immediately after a
+      // successful ACME issuance.
+      X509_PUBKEY *publicKeyInfo = X509_get_X509_PUBKEY(certificate);
+
+      int derLength = publicKeyInfo == nullptr ? 0 : i2d_X509_PUBKEY(publicKeyInfo, nullptr);
+
       if (derLength > 0)
       {
          std::vector<unsigned char> der(derLength);
          unsigned char *writePointer = der.data();
-         i2d_X509_PUBKEY(X509_get_X509_PUBKEY(certificate), &writePointer);
 
-         unsigned char digest[SHA256_DIGEST_LENGTH];
-         SHA256(der.data(), derLength, digest);
-
-         for (int i = 0; i < SHA256_DIGEST_LENGTH; i++)
+         // Checked as well: a second encoding that fails leaves the buffer holding
+         // whatever it was initialized with, and hashing that produces a TLSA record
+         // an administrator would publish and then wonder why DANE validation fails.
+         if (i2d_X509_PUBKEY(publicKeyInfo, &writePointer) == derLength)
          {
-            AnsiString hexByte;
-            hexByte.Format("%02x", digest[i]);
-            spki_sha256_hex += hexByte;
-         }
+            unsigned char digest[SHA256_DIGEST_LENGTH];
 
-         success = true;
+            if (SHA256(der.data(), derLength, digest) != nullptr)
+            {
+               for (int i = 0; i < SHA256_DIGEST_LENGTH; i++)
+               {
+                  AnsiString hexByte;
+                  hexByte.Format("%02x", digest[i]);
+                  spki_sha256_hex += hexByte;
+               }
+
+               success = true;
+            }
+         }
       }
 
       X509_free(certificate);
+
+      if (!success)
+         spki_sha256_hex = "";
 
       return success;
    }
