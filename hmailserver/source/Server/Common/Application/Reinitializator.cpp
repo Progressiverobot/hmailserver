@@ -42,6 +42,14 @@ namespace HM
          return;
       }
 
+      // The previous restart's thread has finished (is_running_ says so) but was
+      // never joined. Move-assigning over a joinable boost::thread detaches it
+      // silently under the default thread version and terminates the process
+      // under BOOST_THREAD_VERSION 3 and later; either way the handle is reaped
+      // here first, and joining a finished thread returns at once.
+      if (worker_thread_.joinable())
+         worker_thread_.join();
+
       std::function<void ()> func = std::bind( &Reinitializator::WorkerFunc, this );
 
       worker_thread_ = boost::thread(func);
