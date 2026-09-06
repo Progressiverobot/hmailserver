@@ -16,7 +16,7 @@
     <RootNamespace>DataDirectorySynchronizer</RootNamespace>
     <AssemblyName>DataDirectorySynchronizer</AssemblyName>
     <ApplicationIcon>georectify.ico</ApplicationIcon>
-    <Version>6.2.24</Version>
+    <Version>6.2.25</Version>
     <Product>hMailServer Data Directory Synchronizer</Product>
     <Company>Progressive Robot Ltd</Company>
     <Copyright>Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd</Copyright>

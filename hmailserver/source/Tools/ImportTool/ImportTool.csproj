@@ -15,7 +15,7 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <RootNamespace>ImportTool</RootNamespace>
     <AssemblyName>ImportTool</AssemblyName>
-    <Version>6.2.24</Version>
+    <Version>6.2.25</Version>
     <Product>hMailServer Import Tool</Product>
     <Company>Progressive Robot Ltd</Company>
     <Copyright>Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd</Copyright>
