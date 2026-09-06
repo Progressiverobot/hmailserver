@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "../common/TCPIP/TCPConnection.h"
+#include "ExternalFetchClientBase.h"
 
 namespace HM
 {
@@ -17,7 +17,7 @@ namespace HM
    class FetchAccountUIDList;
 
    class POP3ClientConnection : 
-      public TCPConnection
+      public ExternalFetchClientBase
    {
    public:
       POP3ClientConnection(std::shared_ptr<FetchAccount> pAccount, 
@@ -53,16 +53,12 @@ namespace HM
 
       void SendCAPA_();
       bool HandleEtrn_(const String &sRequest, const String &account_name);
-      int GetDaysToKeep_(const String &sUID);
-      void FireOnExternalAccountDownload_(std::shared_ptr<Message> message, const String &uid);
 
       void HandlePOP3FinalizationTaskCompleted_();
 
-      void LogFinalizationStage_(const AnsiString &stage, ULONGLONG startTick);
 
       bool InternalParseData(const String &sRequest);
 
-      void CreateRecipentList_(std::shared_ptr<MimeHeader> pHeader);
 
       // Checks whether the POP3 command hMailServer sent
       // to the remote server was successful.
@@ -87,7 +83,6 @@ namespace HM
 
       // Returns a form of the remote unique-id that fits the 255-character column it is
       // stored in. Normally the id unchanged, since RFC 1939 caps it at 70.
-      static String FoldRemoteUID_(const String &uid);
 
       void ParseRETRResponse_(const String &sData);
       bool ParseQuitResponse_(const String &sData);
@@ -95,26 +90,17 @@ namespace HM
       bool RequestNextMessage_();
 
       bool ParseFirstBinary_(std::shared_ptr<ByteBuffer> pBuf);
-      void ProcessMIMERecipients_(std::shared_ptr<MimeHeader> pHeader);
-      void ProcessReceivedHeaders_(std::shared_ptr<MimeHeader> pHeader);
 
-      void RetrieveReceivedDate_(std::shared_ptr<MimeHeader> pHeader);
 
-      void PrependHeaders_();
       // Adds headers to the beginning of the message.
 
       void QuitNow_();
       // Sends a QUIT message and switch over to
       // quit-state
 
-      std::shared_ptr<FetchAccountUIDList> GetUIDList_();
 
-      void MarkCurrentMessageAsRead_();
-      void ParseMessageHeaders_();
       // False only when the message could not be saved. The caller must then abandon
       // the session without a DELE, so the message stays on the remote server.
-      bool SaveMessage_();
-      bool DoSpamProtection_();
       void SendUserName_();
       void StartMailboxCleanup_();
       // Triggers a clean up start.
@@ -129,14 +115,11 @@ namespace HM
       // Deletes the UID's in the local database if
       // the UID does not exist on the POP3 server.
 
-      void DiscardUnfinishedDownload_();
       // Removes the spool file of a download that never completed, so an interrupted
       // fetch does not leave a file in the data directory that nothing refers to.
 
-      std::shared_ptr<FetchAccount> account_;
       // The current fetch account.
 
-      void RemoveInvalidRecipients_();
 
       enum State
       {
@@ -178,7 +161,6 @@ namespace HM
       std::map<int ,String>::iterator cur_download_;
       std::map<int ,String>::iterator cur_cleanup_;
 
-      std::shared_ptr<Message> current_message_;
 
       // Every unique-id seen in this session's UIDL listing. Used to tell a listing that
       // repeats an id - a server that derives the id from the message content does that
@@ -197,20 +179,15 @@ namespace HM
       // False from the moment a RETR is sent until the message it produced has been
       // dealt with. If the session ends while it is false there is a partly written
       // message file in the data directory that nothing will ever refer to.
-      bool download_finalized_;
 
       // Tick at which the per-message finalization was handed to the async work
       // queue. The queue is shared with the SMTP acknowledgement path, so the
       // wait before the task starts is as interesting as the work itself.
       ULONGLONG finalization_enqueued_tick_;
 
-      String receiving_account_address_;
 
-      std::shared_ptr<TransparentTransmissionBuffer> transmission_buffer_;
 
-      std::map<String, std::shared_ptr<Result> > event_results_;
 
-      std::shared_ptr<FetchAccountUIDList> fetch_account_uidlist_;
 
       std::shared_ptr<ByteBuffer> _firstRetrResponseBuffer;
   };
