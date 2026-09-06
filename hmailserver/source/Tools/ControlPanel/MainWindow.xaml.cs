@@ -78,6 +78,11 @@ namespace hMailServer.ControlPanel
          ApplicationThemeManager.Changed += OnThemeChanged;
          Closing += (s, e) => ApplicationThemeManager.Changed -= OnThemeChanged;
 
+         // High Contrast can be switched on and off while the window is open
+         // (Left Alt + Left Shift + Print Screen); the theme follows it both ways.
+         SystemParameters.StaticPropertyChanged += OnSystemParametersChanged;
+         Closing += (s, e) => SystemParameters.StaticPropertyChanged -= OnSystemParametersChanged;
+
          // Ctrl+K command palette.
          PreviewKeyDown += (s, e) =>
          {
@@ -862,8 +867,37 @@ namespace hMailServer.ControlPanel
          return double.TryParse(value.ToString(), out double d) ? d : fallback;
       }
 
+      private void OnSystemParametersChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+      {
+         if (e.PropertyName == nameof(SystemParameters.HighContrast))
+            Dispatcher.BeginInvoke(new Action(ApplySavedTheme));
+      }
+
       private void ApplySavedTheme()
       {
+         // High Contrast is the operating system's choice and wins over the saved
+         // light/dark preference: Wpf.Ui's High Contrast dictionary paints every
+         // control - its buttons, text boxes, the DataGrid scrollbars, the title
+         // bar - from SystemColors, the same source our own tokens already read.
+         // Without it, the chart card repainted in the system window colour sat
+         // under two dark-theme grey buttons.
+         if (Services.ThemeTokens.IsHighContrast)
+         {
+            try
+            {
+               SystemThemeWatcher.UnWatch(this);
+            }
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
+            {
+               // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
+            }
+
+            ApplicationThemeManager.Apply(ApplicationTheme.HighContrast);
+            Services.ThemeTokens.Refresh();
+            UpdateThemeToggle_();
+            return;
+         }
+
          string saved = null;
          try
          {
@@ -929,6 +963,11 @@ namespace hMailServer.ControlPanel
 
       private void Theme_Click(object sender, RoutedEventArgs e)
       {
+         // Under High Contrast the operating system owns the palette; a light or
+         // dark dictionary on top of it would undo exactly what the user asked for.
+         if (Services.ThemeTokens.IsHighContrast)
+            return;
+
          // An explicit toggle takes over from the OS, so stop following it.
          try
          {
