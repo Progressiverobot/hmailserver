@@ -5,6 +5,14 @@
 
 #pragma once
 
+// The fuzz harness (fuzz/harness/shim/stdafx.h) supplies a stand-in ErrorManager
+// of the same name, because the real one reaches the logger, the configuration
+// and the INI settings - an entire server - and defines HM_FUZZ_HARNESS before
+// any source includes this header. Mime.cpp includes it directly, so the shim
+// cannot shadow it through the include path; the guard is what keeps the two
+// definitions apart.
+#ifndef HM_FUZZ_HARNESS
+
 namespace HM
 {
 
@@ -62,3 +70,5 @@ namespace HM
 
    };
 }
+
+#endif // HM_FUZZ_HARNESS

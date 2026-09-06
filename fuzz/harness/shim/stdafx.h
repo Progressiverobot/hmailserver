@@ -46,6 +46,11 @@
 
 #pragma once
 
+// Says "this is the fuzz harness" to the one production header that has to know:
+// Common/Application/ErrorManager.h, which Mime.cpp includes directly and which
+// would otherwise redefine the stand-in ErrorManager below.
+#define HM_FUZZ_HARNESS 1
+
 #if !defined(UNICODE) || !defined(_UNICODE)
    #error "The fuzz build must define UNICODE and _UNICODE, matching hMailServer.vcxproj. Without them HM::String changes width and you are not fuzzing the shipped parser. Use build-fuzz.ps1."
 #endif
@@ -274,7 +279,18 @@ namespace HM
       static bool Copy(const String &, const String &, bool = false) { return false; }
       static bool WriteToFile(const String &, const String &, bool) { return false; }
       static bool WriteToFile(const String &, const AnsiString &) { return false; }
+      // MimeBody::SaveAllToFile writes through this since the delivery hard-link
+      // change (temporary file, then a replacing rename). The harness never saves
+      // a message, so it answers the way the other writers here do.
+      static bool WriteToFileAtomically(const String &, const AnsiString &) { return false; }
    };
+
+   // The server's LOG_* macros come from Application/Logger.h through its
+   // precompiled header. The parser logs the file it is about to rewrite, and
+   // nothing else; here the argument is evaluated for its side effects (none)
+   // and dropped.
+   #define LOG_DEBUG(s) ((void)(s))
+   #define LOG_APPLICATION(s) ((void)(s))
 
    // Only StringParser::IsValidIPAddress needs this, and nothing the MIME parser
    // does reaches that function - but StringParser.cpp is compiled whole, so the

@@ -1553,6 +1553,38 @@ namespace HM
       return success;
    }
 
+   bool
+   AcmeClient::ApplyIssuedCertificateIfUnrecorded()
+   {
+      // Issue #93 left installations in exactly this state: 6.2.24 wrote a valid
+      // fullchain.pem and privkey.pem and died before ApplyCertificate_ ran, so
+      // the pair sat on disk with no "ACME (automatic)" record naming it and the
+      // TLS ports pointed at nothing - and because the certificate was not due
+      // for renewal, every later run of the task looked at it and left. A pair
+      // on disk that no record names is deployed here, once, the way a fresh
+      // issuance is; with the record in place this is one look-up and nothing
+      // else. An administrator who deleted the record on purpose gets it back
+      // at the next run, which is the lesser surprise: ACME is enabled, the
+      // certificate is its, and a deleted record was the symptom of #93.
+      String certificateFile = GetCertificateDirectory() + _T("\\fullchain.pem");
+      String privateKeyFile = GetCertificateDirectory() + _T("\\privkey.pem");
+
+      if (!FileUtilities::Exists(certificateFile) || !FileUtilities::Exists(privateKeyFile))
+         return false;
+
+      SSLCertificates certificates;
+      certificates.Refresh();
+
+      if (certificates.GetItemByName(_T("ACME (automatic)")))
+         return false;
+
+      LOG_APPLICATION("ACME: The certificate in " + GetCertificateDirectory() + " has no \"ACME (automatic)\" record - it was issued but never deployed. Deploying it now.");
+
+      ApplyCertificate_();
+
+      return true;
+   }
+
    void
    AcmeClient::ApplyCertificate_()
    {
@@ -1808,7 +1840,12 @@ namespace HM
       AcmeClient client;
 
       if (!client.ShouldRenewNow())
+      {
+         // Not due - but a certificate that was issued and never deployed (issue
+         // #93's aftermath) is deployed on the way out.
+         client.ApplyIssuedCertificateIfUnrecorded();
          return;
+      }
 
       LOG_APPLICATION("ACME: Certificate is missing or due for renewal. Requesting a new certificate.");
 

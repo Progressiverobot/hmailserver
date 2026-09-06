@@ -86,6 +86,10 @@ namespace HM
       // Runs the full issuance flow. Returns true on success.
       bool RequestCertificate();
 
+      // A certificate pair on disk that no "ACME (automatic)" record names is
+      // deployed the way a fresh issuance is. Returns true when it did so.
+      bool ApplyIssuedCertificateIfUnrecorded();
+
       // Whether to renew now.
       //
       // Asks the CA through ARI when it offers it, and falls back to the

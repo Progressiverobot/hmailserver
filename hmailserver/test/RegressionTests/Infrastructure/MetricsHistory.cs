@@ -124,24 +124,28 @@ namespace RegressionTests.Infrastructure
          // The history outlives the process and the counter does not: samples
          // taken before the last service restart sit in the same hour with larger
          // totals, so "last minus first" across the whole window went negative
-         // whenever a fixture had restarted the service after a busy stretch. The
-         // comparison is between the two samples this test takes, found by their
-         // position after whatever was already there.
-         int before = Values(_application.Utilities.GetMetricHistory("processed_messages_total", 60, 0)).Length;
-
+         // whenever a fixture had restarted the service after a busy stretch - and
+         // counting positions from the start of the window slid by one whenever
+         // the oldest sample aged out of the hour between two reads. So: the
+         // newest sample right after each of the two samples this test takes, and
+         // the difference between them. A scheduled sample landing in between can
+         // only make the newest one larger, since nothing restarts the service here.
+         // Bucket 0 is every sample, not an average - two samples a second apart
+         // would otherwise be one point.
          _application.Utilities.SampleMetricsNow();
+         double[] first = Values(_application.Utilities.GetMetricHistory("processed_messages_total", 60, 0));
+         ClassicAssert.GreaterOrEqual(first.Length, 1, "The sample just taken is in the history.");
+         double beforeDelivery = first[first.Length - 1];
 
          SmtpClientSimulator.StaticSend("sender@example.test", account.Address, "Counted", "One message.");
          Pop3ClientSimulator.AssertMessageCount(account.Address, "test", 1);
 
          _application.Utilities.SampleMetricsNow();
+         double[] second = Values(_application.Utilities.GetMetricHistory("processed_messages_total", 60, 0));
+         ClassicAssert.GreaterOrEqual(second.Length, 2, "Two samples were taken.");
+         double afterDelivery = second[second.Length - 1];
 
-         // Bucket 0: every sample, not an average - two samples a second apart
-         // would otherwise be one point.
-         double[] values = Values(_application.Utilities.GetMetricHistory("processed_messages_total", 60, 0));
-
-         ClassicAssert.GreaterOrEqual(values.Length, before + 2, "Two samples were taken.");
-         ClassicAssert.GreaterOrEqual(values[values.Length - 1] - values[before], 1.0,
+         ClassicAssert.GreaterOrEqual(afterDelivery - beforeDelivery, 1.0,
             "The total must have advanced by at least the one message delivered in between.");
       }
 

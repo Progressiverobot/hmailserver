@@ -123,7 +123,18 @@ namespace HM
       // If task should only be run once, run it now.
       if (pTask->GetReoccurance() == ScheduledTask::RunOnce)
       {
-         Application::Instance()->GetMaintenanceWorkQueue()->AddTask(pTask);
+         // GetMaintenanceWorkQueue reports HM5118 and answers an empty pointer
+         // while the servers are being torn down; this used to dereference it.
+         // A start-up task queued into a shutdown has nothing to run on, and
+         // the next start queues it again.
+         std::shared_ptr<WorkQueue> maintenanceQueue = Application::Instance()->GetMaintenanceWorkQueue();
+         if (!maintenanceQueue)
+         {
+            LOG_DEBUG("Scheduler::ScheduleTask - The maintenance queue is not available, so a run-once task is dropped: " + pTask->GetName());
+            return;
+         }
+
+         maintenanceQueue->AddTask(pTask);
          return;
       }
 

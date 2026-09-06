@@ -112,6 +112,14 @@ namespace HM
       std::shared_ptr<ExternalFetchManager> external_fetch_manager_;
       std::shared_ptr<BackupManager> backup_manager_;
       std::shared_ptr<Scheduler> scheduler_;
+
+      // Reinitialize() is reachable from a COM client and from the
+      // Reinitializator thread an ACME deployment or a backup restore starts,
+      // and two of them at once tear down and rebuild the same queues under
+      // each other - a RunOnce task queued by one StartServers onto a
+      // maintenance queue the other ExitInstance had just removed was an access
+      // violation. They run one after the other now.
+      boost::mutex reinitialize_mutex_;
       std::shared_ptr<NotificationServer> notification_server_;
       std::shared_ptr<IOService> io_service_;
       std::shared_ptr<FolderManager> folder_manager_;
