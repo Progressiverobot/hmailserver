@@ -13,8 +13,11 @@ create table hm_archiveindex
 	archivesize bigint not null,
 	archivehold int not null
 )
+
 ALTER TABLE hm_archiveindex ADD CONSTRAINT hm_archiveindex_pk PRIMARY KEY (archiveid)
+
 CREATE INDEX idx_hm_archiveindex_domain_time ON hm_archiveindex (archivedomain, archivetime)
+
 CREATE INDEX idx_hm_archiveindex_path ON hm_archiveindex (archivepath)
 
 update hm_dbversion set value = 6029

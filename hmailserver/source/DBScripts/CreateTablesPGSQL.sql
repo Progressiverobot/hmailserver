@@ -988,7 +988,9 @@ create table hm_archiveindex
 	archivesize bigint not null,
 	archivehold int not null
 );
+
 CREATE INDEX idx_hm_archiveindex_domain_time ON hm_archiveindex (archivedomain, archivetime);
+
 CREATE INDEX idx_hm_archiveindex_path ON hm_archiveindex (archivepath);
 
 ALTER TABLE hm_accounts ADD CONSTRAINT fk_hm_accounts_domain FOREIGN KEY (accountdomainid) REFERENCES hm_domains (domainid) ON DELETE CASCADE;

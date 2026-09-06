@@ -13,7 +13,9 @@ create table hm_archiveindex
 	archivesize bigint not null,
 	archivehold int not null
 ) DEFAULT CHARSET=utf8;
+
 CREATE INDEX idx_hm_archiveindex_domain_time ON hm_archiveindex (archivedomain, archivetime);
+
 CREATE INDEX idx_hm_archiveindex_path ON hm_archiveindex (archivepath(255));
 
 update hm_dbversion set value = 6029;
