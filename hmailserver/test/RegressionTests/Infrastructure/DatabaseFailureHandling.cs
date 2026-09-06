@@ -42,6 +42,17 @@ namespace RegressionTests.Infrastructure
          {
             IniFileSetting.Write("SimulateDatabaseFailureFor", "");
             _application.Reinitialize();
+
+            // A delivery the simulation refused bounces, and the bounce is a message
+            // of its own in the delivery queue. Left there, it is delivered during the
+            // next fixture's setup - which has just deleted the domain it is addressed
+            // to - and the HM5207/HM5205/HM6081 trio it provokes lands in a fresh error
+            // log for that setup to find. Seen in the 6.2.25 release gate, on the
+            // fixture's fourth test, after the wait for HM6081 in the first test had
+            // closed the earlier version of the same window. With the simulation off
+            // the bounce delivers cleanly; waiting for the queue to empty is what makes
+            // the log cleared below the last word.
+            CustomAsserts.AssertRecipientsInDeliveryQueue(0);
          }
          finally
          {
