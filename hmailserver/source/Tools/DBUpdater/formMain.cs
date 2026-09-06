@@ -592,12 +592,17 @@ namespace DBUpdater
                }
                catch (Exception e) when (!ExceptionPolicy.IsFatal(e))
                {
-                  // The step's script reported success, so the only way to be
-                  // here is an error that [IGNORE-ERRORS] discarded. Say that
-                  // outright: the operator's next question is always "but it said
-                  // it worked".
+                  // The step's script reported success, so either an error that
+                  // [IGNORE-ERRORS] discarded hid a failed statement, or the probe
+                  // itself is something this backend cannot run - which is what
+                  // happened on SQL Server Compact in 6.2.25 (issue #114), when the
+                  // message below asserted the first cause and was wrong. Say what is
+                  // known - the check failed, with the backend's own words - and name
+                  // both possibilities: the operator's next question is always "but it
+                  // said it worked", and the answer must not send them chasing a
+                  // constraint that is there.
                   error = string.Format(
-                     "{0} did not create {1}. The script reported success because its ALTER statement is marked [IGNORE-ERRORS], which discards every error, not only \"already exists\" - so the real failure was thrown away. The upgrade has been rolled back where the backend allows it. Probe: {2}{3}Error: {4}",
+                     "{0} ran without reporting an error, but the check that {1} exists afterwards failed. Either the script's statement failed and the failure was discarded - its ALTER statements are marked [IGNORE-ERRORS], which discards every error, not only \"already exists\" - or the check itself does not run on this backend; the error text below tells them apart (a division by zero means the object is missing, anything else means the check is at fault and the database is probably fine). The upgrade has been rolled back where the backend allows it. Probe: {2}{3}Error: {4}",
                      Path.GetFileName(GetScriptFileName(script)),
                      probe.Describes,
                      probe.Statement,

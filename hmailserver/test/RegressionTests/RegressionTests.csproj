@@ -540,6 +540,10 @@
     <Compile Include="Infrastructure\MetricsHistory.cs" />
     <Compile Include="Infrastructure\ArchiveIndexTests.cs" />
     <Compile Include="Infrastructure\ReferentialIntegrity.cs" />
+    <Compile Include="Infrastructure\SchemaProbes.cs" />
+    <Compile Include="..\..\source\Tools\DBUpdater\SchemaVerification.cs">
+      <Link>Infrastructure\SchemaVerification.cs</Link>
+    </Compile>
     <Compile Include="Infrastructure\DeliveryHardLinks.cs" />
     <Compile Include="Security\AdministratorTwoFactor.cs" />
     <Compile Include="Security\OAuth2Introspection.cs" />

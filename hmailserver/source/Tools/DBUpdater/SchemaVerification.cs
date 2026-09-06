@@ -327,17 +327,48 @@ namespace DBUpdater
          // Upgrade6029to6030* - the foreign keys. A constraint cannot be proved by a
          // statement that writes nothing, since only a violation makes a database
          // complain, so these ask the catalogue through the one view all four
-         // dialects share and divide by zero when the constraint is absent. The
-         // update writes hm_dbversion's value back to itself when it is present.
+         // dialects share, and fail by dividing by zero when the constraint is
+         // absent: the update touches hm_dbversion's one row only WHERE NOT EXISTS
+         // the constraint, and "value / (value - value)" on that row is a division
+         // by zero on every backend (SQL Server 8134, PostgreSQL 22012, MySQL 1365
+         // in its default strict mode, SQL Server Compact "expression evaluation
+         // caused an overflow"). When the constraint is present no row matches,
+         // nothing is evaluated and nothing is written.
+         //
+         // The shape matters, and this is the second one. The first was
+         // "set value = value / (case when exists (select 1 from ...) then 1 else 0 end)",
+         // which is fine on three backends and takes the SQL Server Compact OLE DB
+         // provider down with an access violation on the fourth - on a correct
+         // database, with every constraint present. The server catches that in
+         // SQLCEConnection::Execute's catch-all and reports it as HM10045 "Unknown
+         // error", DBUpdater reads the failed probe as a missing constraint, and
+         // every Compact Edition upgrade through 6030 failed after having, in fact,
+         // succeeded (issue #114, 6.2.25). Compact Edition also rejects a scalar
+         // subquery in a SET expression outright, so the count of matching rows
+         // cannot be the divisor either; a subquery in the WHERE clause is the one
+         // place it accepts one. Every probe is run against the bench database by
+         // Infrastructure/SchemaProbes.cs and against a fresh database by
+         // build\check-db-scripts.ps1, so a shape the provider cannot execute is
+         // caught before a release rather than by the first upgrade in the field.
          new SchemaProbe(6030, "hm_accounts.fk_hm_accounts_domain",
-                         "update hm_dbversion set value = value / (case when exists (select 1 from information_schema.table_constraints where constraint_name = 'fk_hm_accounts_domain' and constraint_type = 'FOREIGN KEY') then 1 else 0 end)"),
+                         "update hm_dbversion set value = value / (value - value) where not exists (select 1 from information_schema.table_constraints where constraint_name = 'fk_hm_accounts_domain' and constraint_type = 'FOREIGN KEY')"),
          new SchemaProbe(6030, "hm_distributionlistsrecipients.fk_hm_dlrecipients_list",
-                         "update hm_dbversion set value = value / (case when exists (select 1 from information_schema.table_constraints where constraint_name = 'fk_hm_dlrecipients_list' and constraint_type = 'FOREIGN KEY') then 1 else 0 end)"),
+                         "update hm_dbversion set value = value / (value - value) where not exists (select 1 from information_schema.table_constraints where constraint_name = 'fk_hm_dlrecipients_list' and constraint_type = 'FOREIGN KEY')"),
          new SchemaProbe(6030, "hm_messagerecipients.fk_hm_messagerecipients_message",
-                         "update hm_dbversion set value = value / (case when exists (select 1 from information_schema.table_constraints where constraint_name = 'fk_hm_messagerecipients_message' and constraint_type = 'FOREIGN KEY') then 1 else 0 end)"),
+                         "update hm_dbversion set value = value / (value - value) where not exists (select 1 from information_schema.table_constraints where constraint_name = 'fk_hm_messagerecipients_message' and constraint_type = 'FOREIGN KEY')"),
          new SchemaProbe(6030, "hm_messageindexterms.fk_hm_messageindexterms_message",
-                         "update hm_dbversion set value = value / (case when exists (select 1 from information_schema.table_constraints where constraint_name = 'fk_hm_messageindexterms_message' and constraint_type = 'FOREIGN KEY') then 1 else 0 end)")
+                         "update hm_dbversion set value = value / (value - value) where not exists (select 1 from information_schema.table_constraints where constraint_name = 'fk_hm_messageindexterms_message' and constraint_type = 'FOREIGN KEY')")
       };
+
+      /// <summary>
+      /// Every probe, for the checks that run them all against a database known to
+      /// be correct: a probe that fails there is a probe the backend cannot
+      /// execute, not a missing object.
+      /// </summary>
+      public static IList<SchemaProbe> All
+      {
+         get { return Probes.ToList(); }
+      }
 
       /// <summary>
       /// The probes that must succeed once the database has reached
